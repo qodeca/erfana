@@ -26,10 +26,13 @@ import { ConfinementError, OUTSIDE_PROJECT_CHANGE_MESSAGE } from './ConfinementE
 import { resolveConfinedPath, type PathPolicy, type ResolvedPath } from './resolveConfinedPath'
 
 /**
- * A policy plus the position of the argument it governs. `access: 'change'`
- * marks an argument the action writes to, so a refusal reads accordingly.
+ * A policy plus the position of the argument it governs. `key` names the
+ * property of an object argument that holds the path (every `file:*` channel
+ * takes one request object); without it the argument itself is the path.
+ * `access: 'change'` marks an argument the action writes to, so a refusal reads
+ * accordingly.
  */
-export type PathBinding = PathPolicy & { arg: number; access?: 'read' | 'change' }
+export type PathBinding = PathPolicy & { arg: number; key?: string; access?: 'read' | 'change' }
 
 export interface ConfinedHandlerContext {
   /** The project open when the call began; null when none is */
@@ -44,7 +47,7 @@ export interface ConfinedHandleDefinition<
   TResult,
   TOptional extends string = never
 > {
-  /** `z.tuple([...])`: the wire stays positional */
+  /** `z.tuple([...])`: one element per `invoke` argument, normally a single strict request object */
   schema: z.ZodType<TArgs>
   /** Every path argument, by name */
   paths: Record<TPaths, PathBinding>
@@ -55,6 +58,13 @@ export interface ConfinedHandleDefinition<
   optionalPaths?: Record<TOptional, PathBinding>
   /** `'after'`: refuse with `PROJECT_CHANGED` if the project changed while the handler ran */
   staleCheck?: 'none' | 'after'
+  /**
+   * The project session generation the caller acted under, read from the parsed
+   * arguments. When it names one and the open project is a different one, the
+   * call is refused with `PROJECT_CHANGED` before any path is checked or any
+   * file is touched.
+   */
+  expectedGeneration?: (args: TArgs) => number | undefined
   /**
    * A stricter sender test than the registry's, run before anything is checked
    * so a refused sender learns nothing; `denied` is what it gets back
@@ -89,11 +99,12 @@ async function resolveAll<TPaths extends string>(
 ): Promise<Record<TPaths, ResolvedPath>> {
   const resolved = {} as Record<TPaths, ResolvedPath>
   for (const name of Object.keys(paths) as TPaths[]) {
-    const { arg, access, ...policy } = paths[name]
-    if (optionalNames.has(name) && args[arg] === undefined) continue
+    const { arg, key, access, ...policy } = paths[name]
+    const value = key === undefined ? args[arg] : (args[arg] as Record<string, unknown> | undefined)?.[key]
+    if (optionalNames.has(name) && value === undefined) continue
     try {
       resolved[name] = await resolveConfinedPath(
-        args[arg],
+        value,
         { session: snapshot, senderId },
         policy as PathPolicy
       )
@@ -142,6 +153,10 @@ export function registerConfinedHandle<
       }
 
       const snapshot = session.current()
+      const expected = definition.expectedGeneration?.(parsed.data)
+      if (expected !== undefined && (snapshot?.generation ?? null) !== expected) {
+        throw new ConfinementError('PROJECT_CHANGED')
+      }
       const resolved = await resolveAll(
         allBindings,
         optionalNames,

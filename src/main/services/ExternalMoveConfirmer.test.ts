@@ -130,15 +130,35 @@ describe('ExternalMoveConfirmer', () => {
     for (const name of names) expect(shown).toContain(name)
   })
 
-  it('cancels only the box that was cancelled', async () => {
+  it('a Cancel in any box cancels the whole batch, and later boxes are not shown', async () => {
     const { confirmer, showBox } = make()
     showBox.mockResolvedValueOnce({ response: 0 }).mockResolvedValueOnce({ response: 1 })
+    const names = Array.from({ length: 2 * MAX_FILES_PER_BOX + 1 }, (_, i) => `f${i}.md`)
+
+    const answers = await Promise.all(names.map((name) => confirmer.confirm(SENDER, file(name))))
+
+    expect(answers).toEqual(Array(names.length).fill('cancel'))
+    expect(showBox).toHaveBeenCalledTimes(2)
+  })
+
+  it('a Cancel in the first box shows no second box', async () => {
+    const { confirmer, showBox } = make()
+    showBox.mockResolvedValueOnce({ response: 1 })
     const names = Array.from({ length: MAX_FILES_PER_BOX + 1 }, (_, i) => `f${i}.md`)
 
     const answers = await Promise.all(names.map((name) => confirmer.confirm(SENDER, file(name))))
 
-    expect(answers.slice(0, MAX_FILES_PER_BOX)).toEqual(Array(MAX_FILES_PER_BOX).fill('move'))
-    expect(answers[MAX_FILES_PER_BOX]).toBe('cancel')
+    expect(answers).toEqual(Array(names.length).fill('cancel'))
+    expect(showBox).toHaveBeenCalledTimes(1)
+  })
+
+  it('a box that fails to show answers cancel for the whole batch', async () => {
+    const { confirmer, showBox } = make()
+    showBox.mockRejectedValueOnce(new Error('x')).mockResolvedValueOnce({ response: 0 })
+    const names = Array.from({ length: MAX_FILES_PER_BOX + 1 }, (_, i) => `f${i}.md`)
+    const answers = await Promise.all(names.map((name) => confirmer.confirm(SENDER, file(name))))
+    expect(answers).toEqual(Array(names.length).fill('cancel'))
+    expect(showBox).toHaveBeenCalledTimes(1)
   })
 
   it('names the whole dialog pick, and approves its other files for their own moves', async () => {

@@ -288,7 +288,7 @@ describe('useFileWatcher', () => {
         await (result.current.reloadFromDisk as (arg?: unknown) => Promise<void>)(clickEvent)
       })
 
-      expect(mockReadFile).toHaveBeenCalledWith(TEST_PATH)
+      expect(mockReadFile).toHaveBeenCalledWith({ filePath: TEST_PATH })
       expect(onContentUpdate).toHaveBeenCalledWith('# From disk')
       expect(onContentUpdate).not.toHaveBeenCalledWith(clickEvent)
     })
@@ -334,7 +334,7 @@ describe('useFileWatcher', () => {
 
       // Wait for async handleExternalChange to complete
       await waitFor(() => {
-        expect(mockReadFile).toHaveBeenCalledWith(TEST_PATH)
+        expect(mockReadFile).toHaveBeenCalledWith({ filePath: TEST_PATH })
       })
 
       // Should NOT reload – it's our own save echo

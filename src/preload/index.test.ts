@@ -109,86 +109,88 @@ describe('preload api exposure', () => {
     it('forwards the caller version so main can skip the encode', async () => {
       const { ipcRenderer } = await import('electron')
 
-      await window.api.file.readImage('/project/shot.png', '12:34:56')
+      await window.api.file.readImage({ filePath: '/project/shot.png', knownVersion: '12:34:56' })
 
-      expect(ipcRenderer.invoke as any).toHaveBeenCalledWith(
-        'file:readImage',
-        '/project/shot.png',
-        '12:34:56'
-      )
+      expect(ipcRenderer.invoke as any).toHaveBeenCalledWith('file:readImage', {
+        filePath: '/project/shot.png',
+        knownVersion: '12:34:56'
+      })
     })
 
     it('sends no version when the caller holds no bytes', async () => {
       const { ipcRenderer } = await import('electron')
 
-      await window.api.file.readImage('/project/shot.png')
+      await window.api.file.readImage({ filePath: '/project/shot.png' })
 
-      expect(ipcRenderer.invoke as any).toHaveBeenCalledWith(
-        'file:readImage',
-        '/project/shot.png',
-        undefined
-      )
+      expect(ipcRenderer.invoke as any).toHaveBeenCalledWith('file:readImage', {
+        filePath: '/project/shot.png'
+      })
     })
   })
 
   describe('file.moveItem parameter passing', () => {
-    it('should pass all 4 parameters to IPC when replaceExisting=true', async () => {
+    it('sends the request object whole when replaceExisting=true', async () => {
       const { ipcRenderer } = await import('electron')
 
-      await window.api.file.moveItem('/source/file.md', '/target', 'newname.md', true)
+      await window.api.file.moveItem({
+        sourcePath: '/source/file.md',
+        targetParentPath: '/target',
+        newName: 'newname.md',
+        replaceExisting: true
+      })
 
-      expect((ipcRenderer.invoke as any)).toHaveBeenCalledWith(
-        'file:moveItem',
-        '/source/file.md',
-        '/target',
-        'newname.md',
-        true
-      )
+      expect((ipcRenderer.invoke as any)).toHaveBeenCalledWith('file:moveItem', {
+        sourcePath: '/source/file.md',
+        targetParentPath: '/target',
+        newName: 'newname.md',
+        replaceExisting: true
+      })
     })
 
-    it('should pass all 4 parameters to IPC when replaceExisting=false', async () => {
+    it('sends replaceExisting=false as it was given', async () => {
       const { ipcRenderer } = await import('electron')
 
-      await window.api.file.moveItem('/source/file.md', '/target', undefined, false)
+      await window.api.file.moveItem({
+        sourcePath: '/source/file.md',
+        targetParentPath: '/target',
+        replaceExisting: false
+      })
 
-      expect((ipcRenderer.invoke as any)).toHaveBeenCalledWith(
-        'file:moveItem',
-        '/source/file.md',
-        '/target',
-        undefined,
-        false
-      )
+      expect((ipcRenderer.invoke as any)).toHaveBeenCalledWith('file:moveItem', {
+        sourcePath: '/source/file.md',
+        targetParentPath: '/target',
+        replaceExisting: false
+      })
     })
 
-    it('should pass replaceExisting=undefined when not provided', async () => {
+    it('sends no optional key the caller left out', async () => {
       const { ipcRenderer } = await import('electron')
 
-      await window.api.file.moveItem('/source/file.md', '/target')
-
-      // Should be called with 4 arguments, last being undefined
-      const calls = (ipcRenderer.invoke as any).mock.calls
-      const lastCall = calls[calls.length - 1]
-      expect(lastCall).toHaveLength(5) // channel + 4 parameters
-      expect(lastCall[0]).toBe('file:moveItem')
-      expect(lastCall[1]).toBe('/source/file.md')
-      expect(lastCall[2]).toBe('/target')
-      expect(lastCall[3]).toBeUndefined()
-      expect(lastCall[4]).toBeUndefined()
-    })
-
-    it('should pass newName without replaceExisting', async () => {
-      const { ipcRenderer } = await import('electron')
-
-      await window.api.file.moveItem('/source/file.md', '/target', 'renamed.md')
+      await window.api.file.moveItem({ sourcePath: '/source/file.md', targetParentPath: '/target' })
 
       const calls = (ipcRenderer.invoke as any).mock.calls
       const lastCall = calls[calls.length - 1]
       expect(lastCall).toEqual([
         'file:moveItem',
-        '/source/file.md',
-        '/target',
-        'renamed.md',
-        undefined
+        { sourcePath: '/source/file.md', targetParentPath: '/target' }
+      ])
+      expect(Object.keys(lastCall[1])).toEqual(['sourcePath', 'targetParentPath'])
+    })
+
+    it('sends newName without replaceExisting', async () => {
+      const { ipcRenderer } = await import('electron')
+
+      await window.api.file.moveItem({
+        sourcePath: '/source/file.md',
+        targetParentPath: '/target',
+        newName: 'renamed.md'
+      })
+
+      const calls = (ipcRenderer.invoke as any).mock.calls
+      const lastCall = calls[calls.length - 1]
+      expect(lastCall).toEqual([
+        'file:moveItem',
+        { sourcePath: '/source/file.md', targetParentPath: '/target', newName: 'renamed.md' }
       ])
     })
   })

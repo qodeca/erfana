@@ -46,6 +46,7 @@ exports[`preload surface > window.api.file and window.api.terminal expose the ex
   "getProjectPath",
   "getSession",
   "getStats",
+  "moveBatchFromExternal",
   "moveFromExternal",
   "moveItem",
   "onProjectChanged",

@@ -180,7 +180,7 @@ async function checkFileExists(filePath: string): Promise<boolean> {
   // Uses the dedicated file:exists IPC channel (fs.access, never throws), so a
   // missing target is a plain `false` with no error-log noise and no fragile
   // error-message parsing.
-  const exists = await fileGateway.exists(filePath)
+  const exists = await fileGateway.exists({ filePath })
   if (!exists) {
     // Digest, not the path: it names a file in the user's project
     logger.debug('[MarkdownLinkResolver] link target missing', {

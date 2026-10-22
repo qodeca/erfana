@@ -100,7 +100,7 @@ describe('useProjectManagement.handleOpenProjectByPath', () => {
       })
 
       expect(opened).toBe(true)
-      expect(mockOpenProjectByPath).toHaveBeenCalledWith('/test/project')
+      expect(mockOpenProjectByPath).toHaveBeenCalledWith({ projectPath: '/test/project' })
     })
 
     it('should check dirty editors and terminal activity in parallel', async () => {
@@ -381,7 +381,7 @@ describe('useProjectManagement.handleOpenProjectByPath', () => {
         await result.current.handleOpenProjectByPath('/custom/path')
       })
 
-      expect(customApi.file.openProjectByPath).toHaveBeenCalledWith('/custom/path')
+      expect(customApi.file.openProjectByPath).toHaveBeenCalledWith({ projectPath: '/custom/path' })
     })
   })
 })

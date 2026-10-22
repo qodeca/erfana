@@ -373,7 +373,7 @@ export async function openProject(page: Page, projectPath: string): Promise<void
 
   await page.evaluate(async (p: string) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (window as any).api.file.openProjectByPath(p)
+    await (window as any).api.file.openProjectByPath({ projectPath: p })
   }, projectPath)
 
   const fileNodes = page.locator(`[data-testid^="${TEST_IDS.PROJECT_TREE_NODE_FILE}-"]`)

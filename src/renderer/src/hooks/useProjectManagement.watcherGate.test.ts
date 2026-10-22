@@ -123,7 +123,7 @@ beforeEach(() => {
       openProject: vi.fn(async () => null),
       openProjectByPath: vi.fn(async () => null),
       closeProject: vi.fn(async () => true),
-      readDirectory: vi.fn((path: string) => {
+      readDirectory: vi.fn(({ dirPath: path }: { dirPath: string }) => {
         const gate = deferred<FileNode[]>()
         reads.push({ path, gate })
         return gate.promise

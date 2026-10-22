@@ -91,7 +91,47 @@ import { logger } from '../services/LoggingService'
 import { openTestProject } from './__test-helpers__/openTestProject'
 
 const event = { sender: { id: 1 } }
-const invoke = (channel: string, ...args: unknown[]) => handlers[channel](event, ...args)
+
+/**
+ * The request fields of each channel, in the order the cases below list them as
+ * arguments: every `file:*` channel takes ONE strict request object, and the
+ * cases read better as a list of values.
+ */
+const REQUEST_FIELDS: Readonly<Record<string, readonly string[]>> = {
+  'file:openProjectByPath': ['projectPath'],
+  'file:readDirectory': ['dirPath'],
+  'file:readFile': ['filePath'],
+  'file:readImage': ['filePath', 'knownVersion'],
+  'file:writeFile': ['filePath', 'content', '...options'],
+  'file:getStats': ['filePath'],
+  'file:exists': ['filePath'],
+  'file:createFile': ['dirPath', 'name'],
+  'file:createFolder': ['dirPath', 'name'],
+  'file:deleteFile': ['filePath'],
+  'file:deleteFolder': ['filePath'],
+  'file:rename': ['oldPath', 'newName'],
+  'file:moveItem': ['sourcePath', 'targetParentPath', 'newName', 'replaceExisting'],
+  'file:copyItem': ['sourcePath', 'targetParentPath', 'newName'],
+  'file:checkConflict': ['targetParentPath', 'itemName'],
+  'file:revealInFileManager': ['filePath'],
+  'file:validatePath': ['filePath']
+}
+
+const toRequest = (channel: string, args: unknown[]): Record<string, unknown> => {
+  const request: Record<string, unknown> = {}
+  REQUEST_FIELDS[channel].forEach((field, index) => {
+    if (args[index] === undefined) return
+    if (field === '...options') Object.assign(request, args[index])
+    else request[field] = args[index]
+  })
+  return request
+}
+
+/** Call a channel with positional values, sent as the request object the wire takes. */
+const invoke = (channel: string, ...args: unknown[]) =>
+  handlers[channel](event, toRequest(channel, args))
+/** Call a channel with exactly the arguments given. */
+const invokeRaw = (channel: string, ...args: unknown[]) => handlers[channel](event, ...args)
 
 /** Channels that take no path argument, or whose path comes from a native dialog. */
 const UNCONFINED_ALLOW_LIST: Readonly<Record<string, string>> = {
@@ -522,6 +562,115 @@ describe('file:* path checks', () => {
       const read = vi.spyOn(fileService, 'readFile')
       await invoke('file:readFile', path.join(outside, 'secret.txt')).catch(() => undefined)
       expect(read).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('object payloads: one strict request object per channel', () => {
+    /** A valid request for every channel that takes a path, to add a stray key to. */
+    const validRequests = (): Array<[string, Record<string, unknown>]> => [
+      ['file:readDirectory', { dirPath: root }],
+      ['file:readFile', { filePath: path.join(root, 'a.md') }],
+      ['file:readImage', { filePath: path.join(root, 'pic.png') }],
+      ['file:writeFile', { filePath: path.join(root, 'a.md'), content: 'x' }],
+      ['file:getStats', { filePath: path.join(root, 'a.md') }],
+      ['file:createFile', { dirPath: root, name: 'n.md' }],
+      ['file:createFolder', { dirPath: root, name: 'n' }],
+      ['file:deleteFile', { filePath: path.join(root, 'a.md') }],
+      ['file:deleteFolder', { filePath: path.join(root, 'sub') }],
+      ['file:rename', { oldPath: path.join(root, 'a.md'), newName: 'n.md' }],
+      ['file:moveItem', { sourcePath: path.join(root, 'a.md'), targetParentPath: path.join(root, 'sub') }],
+      ['file:copyItem', { sourcePath: path.join(root, 'a.md'), targetParentPath: path.join(root, 'sub') }],
+      ['file:checkConflict', { targetParentPath: root, itemName: 'a.md' }],
+      ['file:openProjectByPath', { projectPath: root }]
+    ]
+
+    it('refuses a key that is not part of the request, and touches nothing', async () => {
+      for (const [channel, request] of validRequests()) {
+        await expect(invokeRaw(channel, { ...request, extra: 1 }), channel).rejects.toThrow('Unrecognized key')
+      }
+      expect(readdirSync(root).sort()).toEqual(
+        process.platform === 'win32' ? ['a.md', 'pic.png', 'sub'] : ['a.md', 'dirlink', 'link.md', 'pic.png', 'sub']
+      )
+      expect(readFileSync(path.join(root, 'a.md'), 'utf8')).toBe('inside')
+    })
+
+    it('refuses positional arguments in place of the request object', async () => {
+      for (const [channel, request] of validRequests()) {
+        await expect(invokeRaw(channel, ...Object.values(request)), channel).rejects.toThrow()
+      }
+      expect(readFileSync(path.join(root, 'a.md'), 'utf8')).toBe('inside')
+    })
+
+    it('refuses a request that is missing', async () => {
+      for (const [channel] of validRequests()) {
+        await expect(invokeRaw(channel), channel).rejects.toThrow()
+      }
+    })
+
+    it('the channels that answer with a value still refuse a stray key', async () => {
+      const file = path.join(root, 'a.md')
+      await expect(invokeRaw('file:exists', { filePath: file, extra: 1 })).resolves.toBe(false)
+      await expect(invokeRaw('file:revealInFileManager', { filePath: file, extra: 1 })).resolves.toBe('Invalid path')
+      await expect(invokeRaw('file:validatePath', { filePath: file, extra: 1 })).resolves.toMatchObject({
+        exists: false
+      })
+      expect(showItemInFolder).not.toHaveBeenCalled()
+    })
+
+    it('refuses a write option other than a literal true', async () => {
+      const file = path.join(root, 'a.md')
+      await expect(invokeRaw('file:writeFile', { filePath: file, content: 'x', createParentDirs: false })).rejects.toThrow()
+      await expect(invokeRaw('file:writeFile', { filePath: file, content: 'x', createParentDirs: 'yes' })).rejects.toThrow()
+      expect(readFileSync(file, 'utf8')).toBe('inside')
+    })
+  })
+
+  describe('file:writeFile generation', () => {
+    const file = (): string => path.join(root, 'a.md')
+
+    it('writes when the generation is the open project’s', async () => {
+      await openTestProject(root, { generation: 7 })
+      await expect(invoke('file:writeFile', file(), 'fresh', { generation: 7 })).resolves.toBe(true)
+      expect(readFileSync(file(), 'utf8')).toBe('fresh')
+    })
+
+    it('writes when no generation is named', async () => {
+      await openTestProject(root, { generation: 7 })
+      await expect(invoke('file:writeFile', file(), 'fresh')).resolves.toBe(true)
+      expect(readFileSync(file(), 'utf8')).toBe('fresh')
+    })
+
+    it('refuses with PROJECT_CHANGED when the project moved on, and writes nothing', async () => {
+      await openTestProject(root, { generation: 8 })
+      const write = vi.spyOn(fileService, 'writeFile')
+      await expect(invoke('file:writeFile', file(), 'stale', { generation: 7 })).rejects.toThrow(
+        'The project changed while the request was running'
+      )
+      expect(write).not.toHaveBeenCalled()
+      expect(readFileSync(file(), 'utf8')).toBe('inside')
+    })
+
+    it('refuses when no project is open any more', async () => {
+      await openTestProject(null)
+      await expect(invoke('file:writeFile', file(), 'stale', { generation: 7 })).rejects.toThrow(
+        'The project changed while the request was running'
+      )
+      expect(readFileSync(file(), 'utf8')).toBe('inside')
+    })
+
+    it('refuses before it restores a missing folder', async () => {
+      await openTestProject(root, { generation: 9 })
+      const deep = path.join(root, 'gone', 'deep', 'a.md')
+      await expect(
+        invoke('file:writeFile', deep, 'x', { createParentDirs: true, generation: 7 })
+      ).rejects.toThrow('The project changed while the request was running')
+      expect(existsSync(path.join(root, 'gone'))).toBe(false)
+    })
+
+    it('rejects a generation that is not an integer', async () => {
+      await expect(invoke('file:writeFile', file(), 'x', { generation: 1.5 })).rejects.toThrow()
+      await expect(invoke('file:writeFile', file(), 'x', { generation: '1' })).rejects.toThrow()
+      expect(readFileSync(file(), 'utf8')).toBe('inside')
     })
   })
 })

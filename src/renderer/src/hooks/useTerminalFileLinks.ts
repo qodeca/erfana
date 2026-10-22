@@ -204,7 +204,7 @@ export function useTerminalFileLinks(
       }
 
       try {
-        const result = await fileGateway.validatePath(path, projectRoot || undefined)
+        const result = await fileGateway.validatePath({ filePath: path })
 
         // With a project open, only files inside it are links (the main process
         // answers for every readable path and says where it lies)

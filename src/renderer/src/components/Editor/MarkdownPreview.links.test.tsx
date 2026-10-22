@@ -267,7 +267,7 @@ describe('MarkdownPreview Link Features', () => {
         <MarkdownPreview content={markdown} filePath="/test/project/file.md" />
       )
       const checked = (window.api.file.exists as ReturnType<typeof vi.fn>).mock.calls.map(
-        ([p]) => p
+        ([request]) => (request as { filePath: string }).filePath
       )
       expect(checked).toContain('/test/project/raw.md')
       expect(checked).toContain('/test/project/ref.md')
@@ -288,7 +288,7 @@ describe('MarkdownPreview Link Features', () => {
         )
       })
       const checked = (window.api.file.exists as ReturnType<typeof vi.fn>).mock.calls.map(
-        ([p]) => p
+        ([request]) => (request as { filePath: string }).filePath
       )
       expect(checked).toEqual(['/test/project/docs/x.md'])
     })

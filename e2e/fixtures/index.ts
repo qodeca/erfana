@@ -378,7 +378,7 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
       // window.api is the preload-bridge contextBridge surface; cast for
       // ergonomics — same shape as fixtures.ts:414-418 uses.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (window as any).api.file.openProjectByPath(projectPath)
+      await (window as any).api.file.openProjectByPath({ projectPath })
     }, testProject.path)
     await byTestId(window, TEST_IDS.PROJECT_TREE).waitFor({
       state: 'visible',
@@ -603,7 +603,7 @@ export const visualTest = base.extend<VisualTestFixtures, WorkerFixtures>({
     // a specific project. Same pattern as windowWithTestProject above (Phase E.1).
     await window.evaluate(async (projectPath: string) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (window as any).api.file.openProjectByPath(projectPath)
+      await (window as any).api.file.openProjectByPath({ projectPath })
     }, visualTestProject)
 
     const fileNodes = window.locator(`[data-testid^="project-tree-node-file-"]`)

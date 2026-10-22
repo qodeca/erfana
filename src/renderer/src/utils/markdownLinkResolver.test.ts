@@ -141,7 +141,7 @@ describe('markdownLinkResolver', () => {
     describe('Filename only', () => {
       it('should find file in current directory', async () => {
         // Only the current-directory candidate exists
-        mockExists.mockImplementation((p: string) =>
+        mockExists.mockImplementation(({ filePath: p }: { filePath: string }) =>
           Promise.resolve(p === '/Users/test/project/docs/api.md')
         )
 
@@ -152,12 +152,12 @@ describe('markdownLinkResolver', () => {
           anchor: undefined,
           exists: true
         })
-        expect(mockExists).toHaveBeenCalledWith('/Users/test/project/docs/api.md')
+        expect(mockExists).toHaveBeenCalledWith({ filePath: '/Users/test/project/docs/api.md' })
       })
 
       it('should fall back to project root if not in current directory', async () => {
         // Only the project-root candidate exists (current dir does not)
-        mockExists.mockImplementation((p: string) =>
+        mockExists.mockImplementation(({ filePath: p }: { filePath: string }) =>
           Promise.resolve(p === '/Users/test/project/README.md')
         )
 
@@ -168,8 +168,8 @@ describe('markdownLinkResolver', () => {
           anchor: undefined,
           exists: true
         })
-        expect(mockExists).toHaveBeenCalledWith('/Users/test/project/docs/README.md')
-        expect(mockExists).toHaveBeenCalledWith('/Users/test/project/README.md')
+        expect(mockExists).toHaveBeenCalledWith({ filePath: '/Users/test/project/docs/README.md' })
+        expect(mockExists).toHaveBeenCalledWith({ filePath: '/Users/test/project/README.md' })
       })
 
       it('should return current directory path if file not found anywhere', async () => {
@@ -431,7 +431,7 @@ describe('markdownLinkResolver', () => {
       mockExists.mockResolvedValue(false)
       const result = await resolveMarkdownLink('./missing-1.md', file, root, win)
       expect(result).toEqual({ filePath: 'C:\\erf\\proj\\missing-1.md', anchor: undefined, exists: false })
-      expect(mockExists).toHaveBeenCalledWith('C:\\erf\\proj\\missing-1.md')
+      expect(mockExists).toHaveBeenCalledWith({ filePath: 'C:\\erf\\proj\\missing-1.md' })
     })
 
     it('resolves an existing sibling and passes the native path to IPC', async () => {
@@ -455,7 +455,7 @@ describe('markdownLinkResolver', () => {
     })
 
     it('finds a filename-only link in the current dir, then the project root', async () => {
-      mockExists.mockImplementation(async (p: string) => p === 'C:\\erf\\proj\\top.md')
+      mockExists.mockImplementation(async ({ filePath: p }: { filePath: string }) => p === 'C:\\erf\\proj\\top.md')
       const nested = 'C:\\erf\\proj\\docs\\a.md'
       const result = await resolveMarkdownLink('top.md', nested, root, win)
       expect(result?.filePath).toBe('C:\\erf\\proj\\top.md')
@@ -563,7 +563,7 @@ describe('markdownLinkResolver', () => {
         mockExists.mockResolvedValue(true)
         const result = await resolveMarkdownLink(href, file, root, win)
         expect(result?.filePath).toBe('C:\\erf\\proj\\evil\\share\\x.md')
-        for (const [checked] of mockExists.mock.calls) {
+        for (const [{ filePath: checked }] of mockExists.mock.calls) {
           expect(checked.startsWith('C:\\erf\\proj\\')).toBe(true)
         }
       }
@@ -578,7 +578,7 @@ describe('markdownLinkResolver', () => {
     it('checks only in-project candidates for a filename-only link', async () => {
       mockExists.mockResolvedValue(false)
       await resolveMarkdownLink('n.md', file, root, win)
-      for (const [checked] of mockExists.mock.calls) {
+      for (const [{ filePath: checked }] of mockExists.mock.calls) {
         expect(checked.startsWith('C:\\erf\\proj\\')).toBe(true)
       }
       mockExists.mockClear()

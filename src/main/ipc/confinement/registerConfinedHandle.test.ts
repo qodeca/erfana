@@ -357,4 +357,91 @@ describe('registerConfinedHandle', () => {
       expect(handler).toHaveBeenCalledTimes(1)
     })
   })
+
+  describe('object payloads', () => {
+    const request = z.strictObject({
+      filePath: z.string(),
+      generation: z.number().int().optional()
+    })
+    const register = (handler: ReturnType<typeof vi.fn>, channel = 'test:object') =>
+      registerConfinedHandle(
+        channel,
+        {
+          schema: z.tuple([request]),
+          paths: { filePath: { arg: 0, key: 'filePath', mode: 'project' } },
+          expectedGeneration: ([payload]) => payload.generation,
+          handler
+        },
+        session
+      )
+
+    it('checks the path held in a key of the request object', async () => {
+      const handler = vi.fn(async (_ctx, _args, resolved) => resolved.filePath.real)
+      register(handler)
+      await expect(call('test:object', { filePath: path.join(root, 'a.md') })).resolves.toBe(
+        path.join(root, 'a.md')
+      )
+      await expect(call('test:object', { filePath: path.join(outside, 'secret.md') })).rejects.toThrow(
+        'outside the project'
+      )
+      expect(handler).toHaveBeenCalledTimes(1)
+    })
+
+    it('refuses a key that is not in the schema before any path is checked', async () => {
+      const handler = vi.fn(async () => true)
+      register(handler)
+      await expect(
+        call('test:object', { filePath: path.join(root, 'a.md'), extra: true })
+      ).rejects.toThrow('Unrecognized key')
+      await expect(call('test:object', path.join(root, 'a.md'))).rejects.toThrow()
+      expect(handler).not.toHaveBeenCalled()
+    })
+
+    it('runs when the generation is the open project’s, or none is named', async () => {
+      const handler = vi.fn(async () => true)
+      register(handler)
+      await expect(call('test:object', { filePath: path.join(root, 'a.md'), generation: 1 })).resolves.toBe(true)
+      await expect(call('test:object', { filePath: path.join(root, 'a.md') })).resolves.toBe(true)
+      expect(handler).toHaveBeenCalledTimes(2)
+    })
+
+    it('refuses with PROJECT_CHANGED when the generation differs, and never reaches the handler', async () => {
+      const handler = vi.fn(async () => true)
+      register(handler)
+      snapshot = { ...snapshot!, generation: 2 }
+      await expect(call('test:object', { filePath: path.join(root, 'a.md'), generation: 1 })).rejects.toThrow(
+        'The project changed while the request was running'
+      )
+      expect(handler).not.toHaveBeenCalled()
+      expect(JSON.stringify(vi.mocked(logger.warn).mock.calls)).toContain('PROJECT_CHANGED')
+    })
+
+    it('refuses with PROJECT_CHANGED when no project is open', async () => {
+      const handler = vi.fn(async () => true)
+      register(handler)
+      snapshot = null
+      await expect(call('test:object', { filePath: path.join(root, 'a.md'), generation: 1 })).rejects.toThrow(
+        'The project changed while the request was running'
+      )
+      expect(handler).not.toHaveBeenCalled()
+    })
+
+    it('hands a refusal to onRefusal like any other', async () => {
+      registerConfinedHandle(
+        'test:object-result',
+        {
+          schema: z.tuple([request]),
+          paths: { filePath: { arg: 0, key: 'filePath', mode: 'project' } },
+          expectedGeneration: ([payload]) => payload.generation,
+          onRefusal: (error) => error.code,
+          handler: async () => 'ran'
+        },
+        session
+      )
+      snapshot = { ...snapshot!, generation: 5 }
+      await expect(call('test:object-result', { filePath: path.join(root, 'a.md'), generation: 1 })).resolves.toBe(
+        'PROJECT_CHANGED'
+      )
+    })
+  })
 })

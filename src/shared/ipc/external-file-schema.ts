@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { z } from 'zod'
 import { isAbsolute } from 'path'
+import { EXTERNAL_MOVE_BATCH_MAX } from './external-file-limits'
 
 /**
  * External File Drop IPC Schema
@@ -29,33 +30,12 @@ export type ConflictResolution = z.infer<typeof ConflictResolution>
  *
  * Validates an external file before copy/move operation
  */
-export const ExternalFileValidateRequestSchema = z.object({
+export const ExternalFileValidateRequestSchema = z.strictObject({
   /** Absolute path to the external source file */
-  sourcePath: absolutePathString,
-  /** Accepted for older callers and ignored: the main process uses the open project */
-  projectRoot: z.string().optional()
+  sourcePath: absolutePathString
 })
 
 export type ExternalFileValidateRequest = z.infer<typeof ExternalFileValidateRequestSchema>
-
-/**
- * Positional arguments of `file:validateExternal`: source, ignored project root
- */
-export const ExternalFileValidateArgsSchema = z.tuple([
-  absolutePathString,
-  z.string().optional()
-])
-
-/**
- * Positional arguments of `file:copyFromExternal` and `file:moveFromExternal`:
- * source, target folder, ignored project root, conflict strategy
- */
-export const ExternalFileTransferArgsSchema = z.tuple([
-  absolutePathString,
-  absolutePathString,
-  z.string().optional(),
-  ConflictResolution.optional()
-])
 
 /**
  * External File Validate Response
@@ -86,13 +66,11 @@ export type ExternalFileValidateResponse = z.infer<typeof ExternalFileValidateRe
  *
  * Copies a file from external location into project
  */
-export const ExternalFileCopyRequestSchema = z.object({
+export const ExternalFileCopyRequestSchema = z.strictObject({
   /** Absolute path to the external source file */
   sourcePath: absolutePathString,
-  /** Absolute path to the target folder within project */
+  /** Absolute path to the target folder; the main process checks it against the open project */
   targetFolder: absolutePathString,
-  /** Accepted for older callers and ignored: the main process uses the open project */
-  projectRoot: z.string().optional(),
   /** How to handle name conflicts */
   conflictResolution: ConflictResolution.optional()
 })
@@ -122,13 +100,11 @@ export type ExternalFileCopyResponse = z.infer<typeof ExternalFileCopyResponseSc
  *
  * Moves a file from external location into project (deletes source after copy)
  */
-export const ExternalFileMoveRequestSchema = z.object({
+export const ExternalFileMoveRequestSchema = z.strictObject({
   /** Absolute path to the external source file */
   sourcePath: absolutePathString,
-  /** Absolute path to the target folder within project */
+  /** Absolute path to the target folder; the main process checks it against the open project */
   targetFolder: absolutePathString,
-  /** Accepted for older callers and ignored: the main process uses the open project */
-  projectRoot: z.string().optional(),
   /** How to handle name conflicts */
   conflictResolution: ConflictResolution.optional()
 })
@@ -152,3 +128,53 @@ export const ExternalFileMoveResponseSchema = z.object({
 })
 
 export type ExternalFileMoveResponse = z.infer<typeof ExternalFileMoveResponseSchema>
+
+
+export { EXTERNAL_MOVE_BATCH_MAX }
+
+/**
+ * External File Move Batch Request
+ *
+ * Moves several external files into one project folder with ONE request, so the
+ * user is asked once ("Move N files into the project?") instead of once per file.
+ * Each item carries its own conflict strategy, because the user answers
+ * name conflicts file by file before the request is sent.
+ */
+export const ExternalFileMoveBatchRequestSchema = z.strictObject({
+  /** The files to move, in order; each path once */
+  items: z
+    .array(
+      z.strictObject({
+        /** Absolute path to the external source file */
+        sourcePath: absolutePathString,
+        /** How to handle a name conflict for this file */
+        conflictResolution: ConflictResolution.optional()
+      })
+    )
+    .min(1, 'At least one file is required')
+    .max(EXTERNAL_MOVE_BATCH_MAX, `At most ${EXTERNAL_MOVE_BATCH_MAX} files per request`)
+    .refine((items) => new Set(items.map((item) => item.sourcePath)).size === items.length, {
+      message: 'Each file may be listed once'
+    }),
+  /** Absolute path to the target folder; the main process checks it against the open project */
+  targetFolder: absolutePathString
+})
+
+export type ExternalFileMoveBatchRequest = z.infer<typeof ExternalFileMoveBatchRequestSchema>
+
+/**
+ * External File Move Batch Response
+ *
+ * One result per requested item, in request order. A request that is refused as
+ * a whole (no project open, target outside it) has no results and carries the
+ * reason in `error` / `errorCode`; every item then failed for that reason.
+ */
+export const ExternalFileMoveBatchResponseSchema = z.object({
+  results: z.array(ExternalFileMoveResponseSchema),
+  /** Why the whole request was refused (when `results` is empty) */
+  error: z.string().optional(),
+  /** Error code for structured handling */
+  errorCode: z.string().optional()
+})
+
+export type ExternalFileMoveBatchResponse = z.infer<typeof ExternalFileMoveBatchResponseSchema>

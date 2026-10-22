@@ -190,7 +190,7 @@ async function decodeOffDom(
  */
 async function safeGetFileSize(filePath: string): Promise<number | null> {
   try {
-    const stats = await fileGateway.getStats(filePath)
+    const stats = await fileGateway.getStats({ filePath })
     return stats.size
   } catch (error) {
     logger.warn('Failed to get file stats', { filePath, error: String(error) })
@@ -318,7 +318,7 @@ export function useImageSource(options: UseImageSourceOptions): UseImageSourceRe
         // or a repoint to another file must always do a full read, never
         // compare against the version of the file it has stopped showing.
         const knownVersion = currentSourceRef.current?.version
-        const response = await fileGateway.readImage(filePath, knownVersion)
+        const response = await fileGateway.readImage({ filePath, knownVersion })
 
         // `unchanged` is a SUCCESS meaning "you are already current", so this
         // returns without decoding, without committing and without moving

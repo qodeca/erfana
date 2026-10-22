@@ -410,10 +410,15 @@ describe('MarkdownEditorPanel Integration', () => {
 
     it('only the tab’s own Cmd+S of a deleted tab may recreate the missing folder', () => {
       expect(handleSave).toContain('if (shouldRecreateParentDirs(trigger, isFileDeleted)) {')
-      expect(handleSave).toContain(
-        'await fileGateway.writeFile(currentFile.path, contentToSave, { createParentDirs: true })'
-      )
+      expect(handleSave).toContain('createParentDirs: true,')
       expect(handleSave.match(/createParentDirs: true/g)).toHaveLength(1)
+    })
+
+    it('names the project the file was opened under on every write', () => {
+      expect(handleSave).toContain('const generation = openedGenerationRef.current')
+      const writes = handleSave.match(/await fileGateway\.writeFile\(\{[^}]*\}\)/g) ?? []
+      expect(writes).toHaveLength(2)
+      for (const write of writes) expect(write).toContain('generation')
     })
 
     it('settles a finished save in one update, from the buffer as it is after the write', () => {
