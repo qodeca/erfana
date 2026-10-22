@@ -21,6 +21,7 @@ import {
   type FileChangeEvent,
   type InternalChange,
   KnownEntries,
+  type KnownEntriesRead,
   type KnownEntryKind
 } from './watcher'
 import {
@@ -37,7 +38,6 @@ import { AppError, ErrorCode } from '../../shared/errors'
 import { RateLimitedLogger } from '../utils/RateLimitedLogger'
 import { collectMemorySnapshot } from '../utils/processMemorySnapshot'
 import { isAtomicTempName } from '../utils/atomicWrite'
-import type { FileNode } from '../../shared/ipc/file-schema'
 import type { DirectoryChangedPayload } from '../../shared/ipc/directory-watch-schema'
 
 interface WatchedDirectory {
@@ -57,10 +57,12 @@ interface WatchedDirectory {
    */
   pauseEpisode?: PauseEpisode
   /**
-   * The throttled worker dropped buffered events since the last broadcast, so
-   * the next one cannot say they were content-only and goes out structural.
+   * The next broadcast goes out structural whatever it holds: the throttled
+   * worker dropped buffered events (they may have been structural), or an
+   * entry was swapped between a file and a symlink in a way the coalescer
+   * would show as a `change`.
    */
-  droppedSinceBroadcast?: boolean
+  forceStructural?: boolean
 }
 
 // Git index watching migrated to GitWatcherService (Issue #74)
@@ -83,10 +85,12 @@ export function isStructuralBatch(events: readonly { type: string }[]): boolean 
 
 /**
  * Whether a batch is structural, judged on its RAW events as well as the
- * coalesced ones: the coalescer turns `unlinkDir` + `addDir` on one path into
- * `change` and drops later events under a deleted folder, so
- * `rm -rf out && mkdir out && write out/new.md` in one window would otherwise
- * coalesce to one `change`.
+ * coalesced ones: a folder created or removed anywhere in the raw batch counts
+ * even when coalescing hid it – cascade prevention drops every later event
+ * under a removed folder, and `addDir` + `unlinkDir` of one path coalesces to
+ * nothing. (Raw `add` / `unlink` need no such check: the coalescer keeps them
+ * unless they cancel out or form a file-to-file `unlink` + `add`, which a
+ * kind swap marks separately.)
  */
 export function isStructuralRawBatch(
   raw: readonly { type: string }[],
@@ -134,10 +138,10 @@ export class DirectoryWatcherService {
   private watchedDirectories: Map<string, WatchedDirectory> = new Map()
   private projectPath: string | null = null
   /**
-   * The non-folder entries the last root tree read showed (finding [29]): lets
-   * a rename-style save of an existing file count as a content change.
+   * The non-folder entries the tree on screen shows (finding [29]): lets a
+   * rename-style save of an existing file count as a content change.
    */
-  private knownEntries: KnownEntries | null = null
+  private readonly knownEntries = new KnownEntries((rel) => this.foldKey(rel))
   private isDisposing: boolean = false // Flag to prevent operations during cleanup
   // Session token to guard against late/stale events during project switches
   private switchVersion = 0
@@ -266,7 +270,7 @@ export class DirectoryWatcherService {
 
   setProjectPath(path: string): void {
     this.projectPath = path
-    this.knownEntries = null
+    this.knownEntries.reset()
     // Bump session on project changes to drop stale events
     this.switchVersion++
   }
@@ -398,7 +402,7 @@ export class DirectoryWatcherService {
           this.metrics.recordBufferOverflow(count)
           // The dropped events may have been structural
           const entry = this.watchedDirectories.get(dirPath)
-          if (entry) entry.droppedSinceBroadcast = true
+          if (entry) entry.forceStructural = true
           this.safeLog(`⚠️  Buffer overflow: dropped ${count} oldest events for ${dirPath}`)
         }
       }
@@ -923,6 +927,12 @@ export class DirectoryWatcherService {
       return
     }
 
+    // Judged against the tree on screen before the pause check: a change made
+    // during a pause must still keep the record (and a read in flight) honest
+    const judged = this.judgeAgainstTree(event)
+    event = judged.event
+    if (judged.kindSwap) watched.forceStructural = true
+
     // Ignore if paused (during our own operations). No path in the log line; the
     // episode remembers structural drops so resume can catch up on them (#210).
     if (watched.pauseController.isPaused()) {
@@ -934,16 +944,21 @@ export class DirectoryWatcherService {
     // Track metrics
     this.metrics.recordEventReceived()
 
-    event = this.reclassifyAgainstTree(event)
-
     // Handle delete events with atomic save detection (VS Code 100ms pattern).
     // Not for the native backend (#211, D2): its `lstat` already confirmed the
     // removal, a rename-style save is coalesced (`unlink` + `add` → `change`),
     // and a large delete must not start one unthrottled `stat` per file.
     if (event.type === 'unlink' && watched.backend !== 'native-recursive') {
-      watched.atomicSaveDetector.registerDelete(event.path, (path, wasAtomicSave) => {
+      const removedKind = judged.removedKind
+      watched.atomicSaveDetector.registerDelete(event.path, (path, wasAtomicSave, kind) => {
         if (wasAtomicSave) {
-          // File reappeared → atomic save, emit as change
+          // File reappeared → atomic save, emit as change – structural unless
+          // it is back as the kind the tree shows (a file↔symlink swap is not a save)
+          const rel = this.projectPath ? toRootRelative(this.projectPath, path) : null
+          if (rel === null || this.knownEntries.reappeared(rel, removedKind, kind)) {
+            const current = this.watchedDirectories.get(dirPath)
+            if (current) current.forceStructural = true
+          }
           watched.throttledWorker.work({ type: 'change', path })
         } else {
           // Actual delete
@@ -958,51 +973,45 @@ export class DirectoryWatcherService {
   }
 
   /**
-   * A successful tree read finished (finding [29]). A read of the project root
-   * replaces the record of known entries, which then follows the watcher's
-   * events until the next one; a read of a subfolder is ignored.
+   * A tree read of `dirPath` is starting (finding [29]). For a read of the
+   * project root the returned handle records its tree as what the screen shows,
+   * minus every path an event touched while it ran; commit it only once the read
+   * succeeded, cancel it otherwise. Any other read gets a no-op handle.
    */
-  noteTreeRead(dirPath: string, tree: readonly FileNode[]): void {
+  beginKnownEntriesRead(dirPath: string): KnownEntriesRead {
     const root = this.projectPath
-    if (!root || typeof dirPath !== 'string' || resolve(dirPath) !== resolve(root)) return
-    this.knownEntries = KnownEntries.fromTree(tree, (abs) => toRootRelative(root, abs), this.foldKey)
+    if (!root || typeof dirPath !== 'string' || resolve(dirPath) !== resolve(root)) {
+      return { commit: () => {}, cancel: () => {} }
+    }
+    return this.knownEntries.beginRootRead()
   }
 
-  private readonly foldKey = (rel: string): string =>
-    this.platformConfig.caseSensitive ? rel : rel.toLowerCase()
+  /** Key folding for the record: NFC on macOS, as `toRootRelative` spells it, and the case rule. */
+  private foldKey(rel: string): string {
+    const spelled = process.platform === 'darwin' ? rel.normalize('NFC') : rel
+    return this.platformConfig.caseSensitive ? spelled : spelled.toLowerCase()
+  }
 
   /**
-   * Against the tree on screen: an `add` of an entry it already shows, of the
-   * same kind, is a content change (a temp file renamed over it); a `change`
-   * that turned a file into a symlink or back is structural. Then the record
-   * follows the event.
+   * Against the tree on screen (see `KnownEntries`): an `add` of an entry it
+   * already shows, of the same kind and spelling, is a content change (a temp
+   * file renamed over it); a `change` that turned a file into a symlink or back
+   * is structural. Then the record follows the event.
    */
-  private reclassifyAgainstTree(event: DirectoryChangeEvent): DirectoryChangeEvent {
-    const known = this.knownEntries
+  private judgeAgainstTree(event: DirectoryChangeEvent): {
+    event: DirectoryChangeEvent
+    kindSwap: boolean
+    removedKind?: KnownEntryKind
+  } {
     const root = this.projectPath
-    if (!known || !root) return event
-    const rel = toRootRelative(root, event.path)
-    if (rel === null) return event
-    const before = known.kindOf(rel)
-    let result = event
-    if (event.type === 'add' && event.kind !== undefined && before === event.kind) {
-      result = { ...event, type: 'change' }
-    } else if (event.type === 'change' && event.kind !== undefined && before !== undefined && before !== event.kind) {
-      result = { ...event, type: 'add' }
+    const rel = root ? toRootRelative(root, event.path) : null
+    if (rel === null || rel === '') return { event, kindSwap: false }
+    const judged = this.knownEntries.judge(rel, event.type, event.kind)
+    return {
+      event: judged.type === event.type ? event : { ...event, type: judged.type },
+      kindSwap: judged.kindSwap,
+      removedKind: judged.removedKind
     }
-    switch (result.type) {
-      case 'add':
-      case 'change':
-        known.noteAdded(rel, result.kind ?? (result.type === 'change' ? before : undefined))
-        break
-      case 'unlink':
-        known.noteRemoved(rel)
-        break
-      case 'unlinkDir':
-        known.noteFolderRemoved(rel)
-        break
-    }
-    return result
   }
 
   /**
@@ -1028,9 +1037,10 @@ export class DirectoryWatcherService {
     this.metrics.recordEventsCoalesced(coalescedCount)
     this.metrics.recordEventsEmitted(coalescedEvents.length)
 
-    // A buffer overflow since the last broadcast makes this one structural
-    const dropped = watched.droppedSinceBroadcast === true
-    watched.droppedSinceBroadcast = false
+    // A buffer overflow or a kind swap since the last broadcast makes this one structural
+    const dropped = watched.forceStructural === true
+    watched.forceStructural = false
+    this.knownEntries.endBatch()
 
     if (coalescedEvents.length === 0) {
       this.safeLog(`📁 All ${events.length} events coalesced away for: ${dirPath}`)

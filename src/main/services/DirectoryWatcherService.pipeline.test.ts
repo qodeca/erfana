@@ -31,7 +31,7 @@ vi.mock('fs', () => ({
 }))
 
 vi.mock('fs/promises', () => ({
-  stat: vi.fn(() =>
+  lstat: vi.fn(() =>
     mockStatResult === 'exists'
       ? Promise.resolve({ isFile: () => true })
       : Promise.reject(new Error('ENOENT'))

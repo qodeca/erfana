@@ -22,7 +22,13 @@ export {
   type FileChangeType,
   type CoalesceResult
 } from './EventCoalescer'
-export { KnownEntries, MAX_KNOWN_ENTRIES, type KnownEntryKind } from './KnownEntries'
+export {
+  KnownEntries,
+  MAX_KNOWN_ENTRIES,
+  type JudgedEvent,
+  type KnownEntriesRead,
+  type KnownEntryKind
+} from './KnownEntries'
 export {
   AtomicSaveDetector,
   createAtomicSaveDetector,

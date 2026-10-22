@@ -15,9 +15,13 @@
  * Solution: Wait 100ms after DELETE. If file reappears, emit CHANGE instead.
  */
 
-import { stat } from 'fs/promises'
+import { lstat } from 'fs/promises'
 
-export type AtomicSaveCallback = (path: string, wasAtomicSave: boolean) => void
+/**
+ * `kind`, on a reappearance only: what `lstat` found back at the path, so the
+ * caller can tell a save from a file↔symlink swap. Absent when unknown.
+ */
+export type AtomicSaveCallback = (path: string, wasAtomicSave: boolean, kind?: 'file' | 'symlink') => void
 
 interface PendingDelete {
   path: string
@@ -36,7 +40,7 @@ export class AtomicSaveDetector {
    * Register a delete event for atomic save detection
    *
    * @param filePath - Path of the deleted file
-   * @param callback - Called with (path, wasAtomicSave)
+   * @param callback - Called with (path, wasAtomicSave, kind)
    *                   wasAtomicSave=true means file reappeared (emit CHANGE)
    *                   wasAtomicSave=false means actual delete (emit DELETE)
    */
@@ -54,11 +58,12 @@ export class AtomicSaveDetector {
 
       try {
         // Check if file reappeared (atomic save pattern)
-        const fileExists = await this.fileExists(filePath)
+        const found = await this.entryAt(filePath)
 
-        if (fileExists) {
+        if (found.exists) {
           // File reappeared → atomic save, emit as CHANGE
-          callback(filePath, true)
+          if (found.kind === undefined) callback(filePath, true)
+          else callback(filePath, true, found.kind)
         } else {
           // File still gone → actual delete
           callback(filePath, false)
@@ -120,15 +125,17 @@ export class AtomicSaveDetector {
   }
 
   /**
-   * Check if file exists. A failed `stat` means it does not: a sync
-   * `existsSync` retry would block the main thread and fail the same way.
+   * What is at the path now, without following a link. A failed `lstat` means
+   * nothing: a sync `existsSync` retry would block the main thread and fail
+   * the same way.
    */
-  private async fileExists(filePath: string): Promise<boolean> {
+  private async entryAt(filePath: string): Promise<{ exists: boolean; kind?: 'file' | 'symlink' }> {
     try {
-      await stat(filePath)
-      return true
+      const stats = await lstat(filePath)
+      if (typeof stats?.isSymbolicLink !== 'function') return { exists: true }
+      return { exists: true, kind: stats.isSymbolicLink() ? 'symlink' : 'file' }
     } catch {
-      return false
+      return { exists: false }
     }
   }
 }

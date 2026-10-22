@@ -140,6 +140,19 @@ function sent(channel: string): Array<Record<string, unknown>> {
   return harness.sends.filter(s => s.channel === channel).map(s => s.payload)
 }
 
+/**
+ * Shrink the throttled worker's buffer (200 events, chunks of 50) for the
+ * overflow tests: the real 30,000 made each test push 30,000 events through
+ * the pipeline, which outran the 5 s test timeout on CI runners under
+ * coverage. Call before `watchDirectory`, which builds the worker. Returns the
+ * buffer limit.
+ */
+function useSmallBuffer(svc: DirectoryWatcherService): number {
+  const target = svc as unknown as { platformConfig: ReturnType<typeof getPlatformConfig> }
+  target.platformConfig = { ...getPlatformConfig(), recommendedBufferLimit: 200, recommendedChunkSize: 50 }
+  return 200
+}
+
 /** Run the three back-off timers, letting each restart settle in between. */
 async function runRestartAttempts(): Promise<void> {
   for (const delay of RESTART_DELAYS_MS) {
@@ -350,9 +363,9 @@ describe('DirectoryWatcherService native backend (#211, W13)', () => {
     )
 
     it('marks the batch after a buffer overflow structural, even if it holds only content edits', async () => {
+      const limit = useSmallBuffer(svc)
       await svc.watchDirectory(ROOT, webContents)
       const native = latestNative()
-      const limit = getPlatformConfig().recommendedBufferLimit
 
       // One past the buffer: the oldest event is dropped, and it may have been an add
       for (let i = 0; i <= limit; i++) {
@@ -368,12 +381,12 @@ describe('DirectoryWatcherService native backend (#211, W13)', () => {
     })
 
     it('sends one compensating refresh when the batch after an overflow coalesces away entirely', async () => {
+      const limit = useSmallBuffer(svc)
       await svc.watchDirectory(ROOT, webContents)
       const native = latestNative()
-      const limit = getPlatformConfig().recommendedBufferLimit
 
       // add + unlink pairs on distinct paths; two past the buffer drops the first
-      // pair, so every chunk (an even 500 events) coalesces to nothing
+      // pair, so every chunk (an even number of events) coalesces to nothing
       for (let i = 0; i < limit / 2 + 1; i++) {
         native.emit('add', inRoot(`t${i}.md`), { symbolicLink: false })
         native.emit('unlink', inRoot(`t${i}.md`))
@@ -427,7 +440,7 @@ describe('DirectoryWatcherService native backend (#211, W13)', () => {
 
     it('treats an add of a file the tree already shows as a content change', async () => {
       await svc.watchDirectory(ROOT, webContents)
-      svc.noteTreeRead(ROOT, tree)
+      svc.beginKnownEntriesRead(ROOT).commit(tree)
 
       latestNative().emit('add', inRoot('a.md'), { symbolicLink: false })
       latestNative().emit('add', inRoot('sub', 'b.md'), { symbolicLink: false })
@@ -440,7 +453,7 @@ describe('DirectoryWatcherService native backend (#211, W13)', () => {
 
     it('keeps a new file structural', async () => {
       await svc.watchDirectory(ROOT, webContents)
-      svc.noteTreeRead(ROOT, tree)
+      svc.beginKnownEntriesRead(ROOT).commit(tree)
 
       latestNative().emit('add', inRoot('new.md'), { symbolicLink: false })
       vi.advanceTimersByTime(FLUSH_MS)
@@ -456,7 +469,7 @@ describe('DirectoryWatcherService native backend (#211, W13)', () => {
       ['a file became a symlink (change)', 'change', 'a.md', true]
     ] as const)('keeps %s structural', async (_label, type, name, symbolicLink) => {
       await svc.watchDirectory(ROOT, webContents)
-      svc.noteTreeRead(ROOT, tree)
+      svc.beginKnownEntriesRead(ROOT).commit(tree)
 
       latestNative().emit(type, inRoot(name), { symbolicLink })
       vi.advanceTimersByTime(FLUSH_MS)
@@ -467,11 +480,11 @@ describe('DirectoryWatcherService native backend (#211, W13)', () => {
     it('keeps an add structural when the kind is unknown, or no root read was seen', async () => {
       await svc.watchDirectory(ROOT, webContents)
       // A subfolder read does not seed the record
-      svc.noteTreeRead(inRoot('sub'), tree)
+      svc.beginKnownEntriesRead(inRoot('sub')).commit(tree)
       latestNative().emit('add', inRoot('a.md'), { symbolicLink: false })
       vi.advanceTimersByTime(FLUSH_MS)
 
-      svc.noteTreeRead(ROOT, tree)
+      svc.beginKnownEntriesRead(ROOT).commit(tree)
       latestNative().emit('add', inRoot('a.md'))
       vi.advanceTimersByTime(FLUSH_MS)
 
@@ -480,7 +493,7 @@ describe('DirectoryWatcherService native backend (#211, W13)', () => {
 
     it('forgets a removed file, so its re-creation is structural', async () => {
       await svc.watchDirectory(ROOT, webContents)
-      svc.noteTreeRead(ROOT, tree)
+      svc.beginKnownEntriesRead(ROOT).commit(tree)
 
       latestNative().emit('unlink', inRoot('a.md'))
       vi.advanceTimersByTime(FLUSH_MS)
@@ -491,6 +504,114 @@ describe('DirectoryWatcherService native backend (#211, W13)', () => {
       vi.advanceTimersByTime(FLUSH_MS)
 
       expect(sent('directory-watch:changed').map(b => b.structural)).toEqual([true, true, true])
+    })
+
+    it('does not let a read that was running during a delete re-learn the deleted file', async () => {
+      await svc.watchDirectory(ROOT, webContents)
+      svc.beginKnownEntriesRead(ROOT).commit(tree)
+
+      // A root read starts and its walk sees a.md; a.md is deleted; the read lands
+      const read = svc.beginKnownEntriesRead(ROOT)
+      latestNative().emit('unlink', inRoot('a.md'))
+      vi.advanceTimersByTime(FLUSH_MS)
+      read.commit(tree)
+
+      // a.md re-created by a rename: new to the tree, so the tree must re-read
+      latestNative().emit('add', inRoot('a.md'), { symbolicLink: false })
+      vi.advanceTimersByTime(FLUSH_MS)
+
+      expect(sent('directory-watch:changed').map(b => b.structural)).toEqual([true, true])
+    })
+
+    it('does not let a read from before a project reopen refill the record', async () => {
+      await svc.watchDirectory(ROOT, webContents)
+      const stale = svc.beginKnownEntriesRead(ROOT)
+      // Close and reopen the same project, as a switch does
+      await svc.stopAll()
+      svc.setProjectPath(ROOT)
+      await svc.watchDirectory(ROOT, webContents)
+      stale.commit(tree)
+
+      latestNative().emit('add', inRoot('a.md'), { symbolicLink: false })
+      vi.advanceTimersByTime(FLUSH_MS)
+
+      expect(sent('directory-watch:changed').at(-1)).toEqual(expect.objectContaining({ structural: true }))
+    })
+
+    it('keeps a case-only rename structural (case-insensitive platforms)', async () => {
+      if (getPlatformConfig().caseSensitive) return
+      await svc.watchDirectory(ROOT, webContents)
+      svc.beginKnownEntriesRead(ROOT).commit(tree)
+
+      latestNative().emit('add', inRoot('A.md'), { symbolicLink: false })
+      vi.advanceTimersByTime(FLUSH_MS)
+
+      expect(sent('directory-watch:changed')).toEqual([
+        expect.objectContaining({ summary: { add: 1 }, structural: true })
+      ])
+    })
+
+    it('keeps a file swapped for a symlink by unlink + add in one batch structural', async () => {
+      await svc.watchDirectory(ROOT, webContents)
+      svc.beginKnownEntriesRead(ROOT).commit(tree)
+
+      latestNative().emit('unlink', inRoot('a.md'))
+      latestNative().emit('add', inRoot('a.md'), { symbolicLink: true })
+      vi.advanceTimersByTime(FLUSH_MS)
+
+      // The coalescer shows it as a change; the batch is structural all the same
+      expect(sent('directory-watch:changed')).toEqual([
+        expect.objectContaining({ summary: { change: 1 }, structural: true })
+      ])
+    })
+
+    it('keeps a delete + re-create of the same file in one batch content-only', async () => {
+      await svc.watchDirectory(ROOT, webContents)
+      svc.beginKnownEntriesRead(ROOT).commit(tree)
+
+      latestNative().emit('unlink', inRoot('a.md'))
+      latestNative().emit('add', inRoot('a.md'), { symbolicLink: false })
+      vi.advanceTimersByTime(FLUSH_MS)
+
+      expect(sent('directory-watch:changed')).toEqual([
+        expect.objectContaining({ summary: { change: 1 }, structural: false })
+      ])
+    })
+
+    it.each([
+      ['back as a symlink', 'symlink', true],
+      ['back as the same file', 'file', false]
+    ] as const)('chokidar: an unlink the atomic-save detector sees %s', async (_label, kind, structural) => {
+      const handlers = new Map<string, (p: string, info?: unknown) => void>()
+      harness.chokidarWatch.mockImplementation(() => {
+        const watcher = {
+          on: vi.fn((event: string, listener: (p: string, info?: unknown) => void) => {
+            handlers.set(event, listener)
+            return watcher
+          }),
+          close: vi.fn(async () => {})
+        }
+        return watcher
+      })
+      // The file reappears at once, as `kind`
+      vi.spyOn(AtomicSaveDetector.prototype, 'registerDelete').mockImplementation((path, callback) => {
+        setTimeout(() => callback(path, true, kind), 100)
+      })
+      const chokidarSvc = new DirectoryWatcherService({ backend: 'chokidar' })
+      try {
+        chokidarSvc.setProjectPath(ROOT)
+        await chokidarSvc.watchDirectory(ROOT, webContents)
+        chokidarSvc.beginKnownEntriesRead(ROOT).commit(tree)
+
+        handlers.get('unlink')?.(inRoot('a.md'))
+        vi.advanceTimersByTime(FLUSH_MS)
+
+        expect(sent('directory-watch:changed')).toEqual([
+          expect.objectContaining({ summary: { change: 1 }, structural })
+        ])
+      } finally {
+        await chokidarSvc.dispose()
+      }
     })
 
     it('passes a native unlink straight through, without the atomic-save stat', async () => {

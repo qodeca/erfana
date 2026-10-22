@@ -1,92 +1,222 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * KnownEntries – which non-folder entries the project tree already shows, and
- * whether each is a file or a symlink (finding [29], PR #316 review).
+ * KnownEntries – which non-folder entries the project tree shows, as what
+ * kind and under which spelling (finding [29], PR #316 review).
  *
  * `fs.watch` reports a save that writes a temp file and renames it over the
  * target – Erfana's own `atomicWrite`, and many editors and agents – as a
  * `rename` of the target, which the native watcher's `lstat` can only call an
  * `add`. Taken at its word that is a structural change and re-reads the whole
  * tree on every such save. With this record the watcher service can tell "an
- * entry that was already there, still of the same kind" (a content change)
- * from a new entry or a file↔symlink swap (structural).
+ * entry the tree already shows, same kind, same spelling" (a content change)
+ * from anything else (structural).
  *
- * Seeded from the last successful root tree read – the tree the renderer is
- * showing – and kept current between reads by the watcher's own events.
- * Paths are project-relative, `/`-separated and folded per the platform's
- * case rule. Past {@link MAX_KNOWN_ENTRIES} the record is left empty (inferred
- * memory cost: a few tens of MB of path strings at 200k entries), and every
- * rename-style save is structural again, as before.
+ * Every doubt resolves to structural – a full tree read is the safe default:
+ *
+ * - The record is seeded only by a successful read of the project root, and
+ *   every path an event touched while that read ran is left out of it (the
+ *   walk may have seen the entry before or after the event). A read that
+ *   began before a project switch, or saw a folder removed while it ran, is
+ *   not used at all.
+ * - A folder removal drops the whole record until the next root read (the
+ *   structural refresh it causes rebuilds it), instead of scanning for keys.
+ * - Above {@link MAX_KNOWN_ENTRIES} entries there is no record (`null`), and
+ *   nothing is learnt from events either: every rename-style save is
+ *   structural again, as before the record existed.
+ * - A `change` only updates an entry the record already has; it never adds one.
+ * - An `unlink` + `add` of one path within one batch, which the coalescer
+ *   turns into a `change`, is reported as a kind swap unless both sides are
+ *   known to be the same kind.
+ *
+ * Keys are project-relative, `/`-separated, NFC on macOS and case-folded
+ * where the platform is case-insensitive; the spelling kept per entry is the
+ * exact last segment, so a case-only or NFC↔NFD-only rename never passes as
+ * a content change.
  */
+import path from 'node:path'
 import type { FileNode } from '../../../shared/ipc/file-schema'
 
 /** What a non-folder entry is, as `lstat` sees it. */
 export type KnownEntryKind = 'file' | 'symlink'
 
-/** Above this many non-folder entries nothing is recorded. */
+/** Above this many non-folder entries there is no record. */
 export const MAX_KNOWN_ENTRIES = 100_000
 
+interface KnownEntry {
+  kind: KnownEntryKind
+  /** The last path segment exactly as shown */
+  name: string
+}
+
+/** A root tree read in flight. */
+interface PendingRead {
+  readonly epoch: number
+  /** Folded keys an event touched while the read ran */
+  readonly touched: Set<string>
+  /** A folder was removed while the read ran: its result is not used */
+  invalid: boolean
+}
+
+/** The handle a root read gets: commit its tree, or cancel on failure. */
+export interface KnownEntriesRead {
+  commit(tree: readonly FileNode[]): void
+  cancel(): void
+}
+
+/** What an event means against the record. */
+export interface JudgedEvent {
+  /** The event's type after the record's view: `add` may become `change` and back */
+  readonly type: 'add' | 'addDir' | 'unlink' | 'unlinkDir' | 'change'
+  /** An `unlink` + `add` of one path whose kinds differ, or cannot be shown equal */
+  readonly kindSwap: boolean
+  /** For an `unlink`: the kind the record had for the entry, if any */
+  readonly removedKind?: KnownEntryKind
+}
+
+/** Count non-folder nodes, stopping as soon as `limit` is passed. */
+function countEntries(nodes: readonly FileNode[], limit: number): number {
+  let count = 0
+  const stack: FileNode[] = [...nodes]
+  while (stack.length > 0) {
+    const node = stack.pop() as FileNode
+    if (node.type === 'directory') {
+      if (node.children) stack.push(...node.children)
+    } else if (++count > limit) {
+      return count
+    }
+  }
+  return count
+}
+
 export class KnownEntries {
-  private readonly kinds = new Map<string, KnownEntryKind>()
+  private record: Map<string, KnownEntry> | null = null
+  private epoch = 0
+  private readonly reads = new Set<PendingRead>()
+  /** Kinds removed by `unlink` in the current batch, by folded key; `null`: not in the record */
+  private readonly removedInBatch = new Map<string, KnownEntryKind | null>()
 
   /**
-   * @param fold - case folding for keys (identity on a case-sensitive platform)
+   * @param fold - key folding: NFC on macOS, lower case where case-insensitive
    */
   constructor(private readonly fold: (rel: string) => string) {}
 
+  /** The number of recorded entries, or `null` when there is no record. */
+  get size(): number | null {
+    return this.record?.size ?? null
+  }
+
+  /** A new project: forget the record and ignore reads that began before. */
+  reset(): void {
+    this.record = null
+    this.epoch++
+    this.reads.clear()
+    this.removedInBatch.clear()
+  }
+
+  /** A read of the project root begins. */
+  beginRootRead(): KnownEntriesRead {
+    const read: PendingRead = { epoch: this.epoch, touched: new Set(), invalid: false }
+    this.reads.add(read)
+    return {
+      commit: (tree) => {
+        if (!this.reads.delete(read)) return
+        if (read.epoch !== this.epoch || read.invalid) return
+        this.record = this.build(tree, read.touched)
+      },
+      cancel: () => {
+        this.reads.delete(read)
+      }
+    }
+  }
+
   /**
-   * Record from a tree read. `toRel` maps a node's absolute path to its
-   * project-relative form (`null`: outside, skipped). Returns `false`, with
-   * nothing recorded, when the tree holds more than {@link MAX_KNOWN_ENTRIES}.
+   * Judge one watcher event against the record, then let the record follow it.
+   *
+   * @param rel - project-relative path of the event
+   * @param kind - the entry's kind per `lstat`, when the backend said
    */
-  static fromTree(
-    nodes: readonly FileNode[],
-    toRel: (absPath: string) => string | null,
-    fold: (rel: string) => string
-  ): KnownEntries {
-    const known = new KnownEntries(fold)
-    const stack: FileNode[] = [...nodes]
+  judge(rel: string, type: JudgedEvent['type'], kind: KnownEntryKind | undefined): JudgedEvent {
+    const key = this.fold(rel)
+    for (const read of this.reads) {
+      read.touched.add(key)
+      if (type === 'unlinkDir') read.invalid = true
+    }
+    if (type === 'unlinkDir') {
+      this.record = null
+      return { type, kindSwap: false }
+    }
+    const record = this.record
+    const before = record?.get(key)
+    const name = path.basename(rel)
+
+    if (type === 'unlink') {
+      record?.delete(key)
+      this.removedInBatch.set(key, before?.kind ?? null)
+      return { type, kindSwap: false, removedKind: before?.kind }
+    }
+    if (type === 'add') {
+      let kindSwap = false
+      if (this.removedInBatch.has(key)) {
+        const removed = this.removedInBatch.get(key)
+        this.removedInBatch.delete(key)
+        kindSwap = removed === null || removed === undefined || kind === undefined || removed !== kind
+      }
+      const sameEntry = before !== undefined && kind !== undefined && before.kind === kind && before.name === name
+      this.learn(key, kind, name)
+      return { type: sameEntry ? 'change' : 'add', kindSwap }
+    }
+    if (type === 'change' && before !== undefined && kind !== undefined && before.kind !== kind) {
+      // A file turned into a symlink in place, or back: structural
+      before.kind = kind
+      return { type: 'add', kindSwap: false }
+    }
+    return { type, kindSwap: false }
+  }
+
+  /**
+   * chokidar's `unlink` turned out to be an atomic save (the entry reappeared,
+   * `AtomicSaveDetector`). Structural unless the entry was known and is back
+   * as the same kind.
+   */
+  reappeared(rel: string, removedKind: KnownEntryKind | undefined, kind: KnownEntryKind | undefined): boolean {
+    const same = removedKind !== undefined && kind !== undefined && removedKind === kind
+    if (same) this.learn(this.fold(rel), kind, path.basename(rel))
+    return !same
+  }
+
+  /** A batch went out: `unlink` + `add` pairs are judged within one batch only. */
+  endBatch(): void {
+    this.removedInBatch.clear()
+  }
+
+  private learn(key: string, kind: KnownEntryKind | undefined, name: string): void {
+    const record = this.record
+    if (!record) return
+    if (kind === undefined) {
+      // An entry of unknown kind is forgotten, so its next `add` stays structural
+      record.delete(key)
+      return
+    }
+    record.set(key, { kind, name })
+    // Past the cap there is no record at all, never a partial one
+    if (record.size > MAX_KNOWN_ENTRIES) this.record = null
+  }
+
+  private build(tree: readonly FileNode[], touched: ReadonlySet<string>): Map<string, KnownEntry> | null {
+    if (countEntries(tree, MAX_KNOWN_ENTRIES) > MAX_KNOWN_ENTRIES) return null
+    const record = new Map<string, KnownEntry>()
+    // Keys built while walking (parent + '/' + name): no path maths per node
+    const stack: Array<{ node: FileNode; rel: string }> = tree.map((node) => ({ node, rel: node.name }))
     while (stack.length > 0) {
-      const node = stack.pop() as FileNode
+      const { node, rel } = stack.pop() as { node: FileNode; rel: string }
       if (node.type === 'directory') {
-        if (node.children) stack.push(...node.children)
+        for (const child of node.children ?? []) stack.push({ node: child, rel: `${rel}/${child.name}` })
         continue
       }
-      const rel = toRel(node.path)
-      if (rel === null) continue
-      if (known.kinds.size >= MAX_KNOWN_ENTRIES) {
-        known.kinds.clear()
-        return known
-      }
-      known.kinds.set(fold(rel), node.isSymlink === true ? 'symlink' : 'file')
+      record.set(this.fold(rel), { kind: node.isSymlink === true ? 'symlink' : 'file', name: node.name })
     }
-    return known
-  }
-
-  get size(): number {
-    return this.kinds.size
-  }
-
-  kindOf(rel: string): KnownEntryKind | undefined {
-    return this.kinds.get(this.fold(rel))
-  }
-
-  noteAdded(rel: string, kind: KnownEntryKind | undefined): void {
-    // An entry of unknown kind is forgotten, so its next `add` stays structural
-    if (kind === undefined) this.kinds.delete(this.fold(rel))
-    else if (this.kinds.size < MAX_KNOWN_ENTRIES) this.kinds.set(this.fold(rel), kind)
-  }
-
-  noteRemoved(rel: string): void {
-    this.kinds.delete(this.fold(rel))
-  }
-
-  /** A folder is gone: forget everything under it. Rare, and a tree re-read follows. */
-  noteFolderRemoved(rel: string): void {
-    const prefix = `${this.fold(rel)}/`
-    for (const key of this.kinds.keys()) {
-      if (key.startsWith(prefix)) this.kinds.delete(key)
-    }
+    for (const key of touched) record.delete(key)
+    return record
   }
 }

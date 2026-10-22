@@ -11,7 +11,7 @@ vi.mock('fs', () => ({
 }))
 
 vi.mock('fs/promises', () => ({
-  stat: vi.fn()
+  lstat: vi.fn()
 }))
 
 describe('AtomicSaveDetector', () => {
@@ -33,7 +33,7 @@ describe('AtomicSaveDetector', () => {
       const callback = vi.fn()
 
       // File will exist after 100ms (atomic save pattern)
-      vi.mocked(fsPromises.stat).mockResolvedValue({} as any)
+      vi.mocked(fsPromises.lstat).mockResolvedValue({} as any)
 
       detector.registerDelete('/test/file.txt', callback)
 
@@ -49,7 +49,7 @@ describe('AtomicSaveDetector', () => {
       const callback = vi.fn()
 
       // File will not exist (actual delete)
-      vi.mocked(fsPromises.stat).mockRejectedValue(new Error('ENOENT'))
+      vi.mocked(fsPromises.lstat).mockRejectedValue(new Error('ENOENT'))
       vi.mocked(fs.existsSync).mockReturnValue(false)
 
       detector.registerDelete('/test/file.txt', callback)
@@ -84,7 +84,7 @@ describe('AtomicSaveDetector', () => {
 
     it('should cancel pending delete', async () => {
       const callback = vi.fn()
-      vi.mocked(fsPromises.stat).mockResolvedValue({} as any)
+      vi.mocked(fsPromises.lstat).mockResolvedValue({} as any)
 
       detector.registerDelete('/test/file.txt', callback)
       detector.cancelPending('/test/file.txt')
@@ -97,7 +97,7 @@ describe('AtomicSaveDetector', () => {
 
     it('should cancel all pending deletes', async () => {
       const callback = vi.fn()
-      vi.mocked(fsPromises.stat).mockResolvedValue({} as any)
+      vi.mocked(fsPromises.lstat).mockResolvedValue({} as any)
 
       detector.registerDelete('/test/file1.txt', callback)
       detector.registerDelete('/test/file2.txt', callback)
@@ -114,7 +114,7 @@ describe('AtomicSaveDetector', () => {
     it('should replace existing pending delete for same path', async () => {
       const callback1 = vi.fn()
       const callback2 = vi.fn()
-      vi.mocked(fsPromises.stat).mockResolvedValue({} as any)
+      vi.mocked(fsPromises.lstat).mockResolvedValue({} as any)
 
       detector.registerDelete('/test/file.txt', callback1)
       detector.registerDelete('/test/file.txt', callback2)
@@ -130,7 +130,7 @@ describe('AtomicSaveDetector', () => {
   describe('dispose', () => {
     it('should not call callbacks after dispose', async () => {
       const callback = vi.fn()
-      vi.mocked(fsPromises.stat).mockResolvedValue({} as any)
+      vi.mocked(fsPromises.lstat).mockResolvedValue({} as any)
 
       detector.registerDelete('/test/file.txt', callback)
       detector.dispose()
@@ -142,7 +142,7 @@ describe('AtomicSaveDetector', () => {
 
     it('should not accept new deletes after dispose', async () => {
       const callback = vi.fn()
-      vi.mocked(fsPromises.stat).mockResolvedValue({} as any)
+      vi.mocked(fsPromises.lstat).mockResolvedValue({} as any)
 
       detector.dispose()
       detector.registerDelete('/test/file.txt', callback)
@@ -159,7 +159,7 @@ describe('AtomicSaveDetector', () => {
       const callback = vi.fn()
 
       // async stat fails; the old code then asked existsSync, which answered true
-      vi.mocked(fsPromises.stat).mockRejectedValue(new Error('Failed'))
+      vi.mocked(fsPromises.lstat).mockRejectedValue(new Error('Failed'))
       vi.mocked(fs.existsSync).mockReturnValue(true)
 
       detector.registerDelete('/test/file.txt', callback)

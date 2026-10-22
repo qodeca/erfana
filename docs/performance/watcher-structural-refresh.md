@@ -32,6 +32,7 @@ The first fix (the `structural` flag alone) took in-place saves to 0 reads but l
 How to read it:
 
 - **The main-process time is the walk only** – about 30 ms per read on this fast machine. It does not include cloning 3.78 MB into the renderer, rebuilding the tree there and re-rendering it, which the benchmark does not time. The data size stands in for that work. On a slower disk, or on a Windows project of 200k entries, one read takes seconds (see #208); that was not measured here.
+- **The record's own cost**: building it from a 100,000-entry tree (the cap) takes **19 ms** median (15–21 ms, 10 warm runs, Node 24.20 outside Electron, same Mac), once per successful root read, on the main thread. Below the cap it scales with the entry count; above it nothing is built – the entries are only counted.
 - **The broadcasts stay**: git badges and anything else listening still hear about every save, and each broadcast grows by one `structural` field. Only the tree's re-read is skipped.
 
 ## Setup
@@ -54,9 +55,9 @@ ERFANA_E2E_BENCH=1 ERFANA_BENCH_LABEL=after ERFANA_BENCH_SAVE_MODE=rename ERFANA
 |---|---|---|
 | `directory-watch:changed` payload | No way to tell a content edit from a new or removed entry | `structural: false` only when every event, raw and coalesced, is a `change`; `true` for any add, addDir, unlink or unlinkDir, for every catch-up, resync or compensating refresh, and for the first batch after a buffer overflow. Shared type: `DirectoryChangedPayload` |
 | Coalescing | `unlink`/`unlinkDir` + `add`/`addDir` on one path became `change` | Only a file-to-file `unlink` + `add` becomes `change`; a swap involving a folder stays a create |
-| Rename-style saves | The native watcher's `add` for a file renamed over an existing one counted as new | The service keeps a record of the files and symlinks the last root tree read showed (`KnownEntries`, at most 100,000; above that, rename-style saves are structural again) and follows it with the watcher's events. An `add` of an entry already shown, of the same kind, is a content change; a file↔symlink swap is structural |
+| Rename-style saves | The native watcher's `add` for a file renamed over an existing one counted as new | The service keeps a record of the files and symlinks the tree on screen shows (`KnownEntries`) and follows it with the watcher's events. An `add` of an entry already shown, of the same kind and exact spelling, is a content change; a new entry, a file↔symlink swap and a case-only or NFC↔NFD-only rename are structural. Seeded by a successful root read, minus every path an event touched while it ran; dropped on a folder removal until the next root read; none at all above 100,000 entries |
 | `useDirectoryWatcher` | Re-read the whole tree for every broadcast | Skips a `structural: false` batch; a payload without the flag still counts as structural |
-| Tree refresh debounce | 250 ms trailing, no limit – a steady stream of changes could hold it back indefinitely | 250 ms trailing, at most max(1 s, 2 × the last refresh) after the first event of a burst |
+| Tree refresh debounce | 250 ms trailing, no limit – a steady stream of changes could hold it back indefinitely | 250 ms trailing, at most max(1 s, 2 × a tree read) after the first event of a burst – the read alone, smoothed, capped at 10 s |
 | `useGitStatus` | Refreshed for every broadcast | Unchanged |
 
 Out of scope: incremental tree updates (only the changed branch) stay with #150.
