@@ -47,8 +47,10 @@ export const TERMINAL_CWD_TOO_LONG_MESSAGE =
 /**
  * Diagnostics only (#305): set to `1` to skip the Windows tree kill on quit and window
  * close, so a process a terminal started is left for the quit helper
- * (`conptyHostReaper.ts`) to find. Lets a Windows tester force a leftover on purpose;
- * the normal path never sets it. Logged as a warning when used.
+ * (`conptyHostReaper.ts`) to find. Lets a Windows tester force a leftover on purpose.
+ * Honoured only after {@link TerminalService.allowDiagnostics} (dev builds and e2e,
+ * `!app.isPackaged`); a packaged build ignores it silently, so a stray environment
+ * variable cannot change quit cleanup. Logged as a warning when used.
  */
 export const SKIP_TREE_KILL_ENV = 'ERFANA_DIAG_SKIP_TREE_KILL'
 
@@ -202,6 +204,8 @@ export class TerminalService extends EventEmitter {
   private liveShells = new Map<string, LiveShell>()
   /** Set when `dispose()` starts: no terminal may be created after it (#305). */
   private shuttingDown = false
+  /** Whether {@link SKIP_TREE_KILL_ENV} is honoured; off unless the app says so (#305). */
+  private diagnosticsAllowed = false
 
   /**
    * @param fsExists - injected for `resolveWindowsShell()` testability;
@@ -831,6 +835,14 @@ export class TerminalService extends EventEmitter {
   }
 
   /**
+   * Lets {@link SKIP_TREE_KILL_ENV} take effect. `src/main/index.ts` passes
+   * `!app.isPackaged`, so only dev builds and e2e honour it (#305).
+   */
+  allowDiagnostics(allowed: boolean): void {
+    this.diagnosticsAllowed = allowed
+  }
+
+  /**
    * Refuses every later `createTerminal` (#305). Called at the quit moment, before the
    * quit helper reads {@link getLiveShells}, so the helper's list is complete and
    * no console host appears after the moment it records. `dispose()` calls it too.
@@ -906,7 +918,7 @@ export class TerminalService extends EventEmitter {
    */
   private async endShells(shells: TerminalInstance[]): Promise<void> {
     const win32 = osPlatform() === 'win32'
-    if (win32 && process.env[SKIP_TREE_KILL_ENV] === '1') {
+    if (win32 && this.diagnosticsAllowed && process.env[SKIP_TREE_KILL_ENV] === '1') {
       logger.warn(`Tree kill skipped: ${SKIP_TREE_KILL_ENV}=1 (diagnostics only)`)
     } else if (win32) {
       await killProcessTrees(shells.filter((t) => !t.hasExited).map((t) => t.pid))

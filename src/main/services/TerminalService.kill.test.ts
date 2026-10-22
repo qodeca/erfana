@@ -302,8 +302,9 @@ describe('TerminalService kill paths (#296)', () => {
       expect(spawned.every((p) => p.kill.mock.calls.length === 1)).toBe(true)
     })
 
-    it('skips the tree kill only when the diagnostics switch is set (#305)', async () => {
+    it('skips the tree kill for the diagnostics switch only when diagnostics are allowed (dev builds)', async () => {
       const { terminalService, SKIP_TREE_KILL_ENV } = await load('win32')
+      terminalService.allowDiagnostics(true)
       await create(terminalService, 'win32')
       spawned[0].kill.mockImplementation(() => spawned[0].emit('exit', { exitCode: 0 }))
       process.env[SKIP_TREE_KILL_ENV] = '1'
@@ -315,6 +316,22 @@ describe('TerminalService kill paths (#296)', () => {
       expect(treeKill.killProcessTrees).not.toHaveBeenCalled()
       // the pty itself is still ended
       expect(spawned[0].kill).toHaveBeenCalledTimes(1)
+    })
+
+    it('ignores the diagnostics switch silently by default (packaged builds)', async () => {
+      const { terminalService, SKIP_TREE_KILL_ENV } = await load('win32')
+      const { logger } = await import('./LoggingService')
+      vi.mocked(logger.warn).mockClear()
+      await create(terminalService, 'win32')
+      spawned[0].kill.mockImplementation(() => spawned[0].emit('exit', { exitCode: 0 }))
+      process.env[SKIP_TREE_KILL_ENV] = '1'
+      try {
+        await terminalService.dispose()
+      } finally {
+        delete process.env[SKIP_TREE_KILL_ENV]
+      }
+      expect(treeKill.killProcessTrees).toHaveBeenCalledTimes(1)
+      expect(vi.mocked(logger.warn).mock.calls.some(([m]) => String(m).includes('Tree kill skipped'))).toBe(false)
     })
 
     it('does no tree kill off Windows', async () => {

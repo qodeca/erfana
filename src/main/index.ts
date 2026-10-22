@@ -415,6 +415,10 @@ app.whenReady().then(async () => {
   // Windows: record which conpty.node node-pty loaded (patched build vs prebuild, #305)
   logNodePtyBinding()
 
+  // ERFANA_DIAG_SKIP_TREE_KILL is honoured in dev builds and e2e only; a packaged build
+  // ignores it, so an environment variable cannot change quit cleanup there (#305)
+  terminalService.allowDiagnostics(!app.isPackaged)
+
   // Deny every page permission except the camera preview (Electron grants all by default)
   installDefaultSessionPermissions(session.defaultSession)
 

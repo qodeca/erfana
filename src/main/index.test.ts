@@ -216,7 +216,10 @@ describe('Main Process - Window Creation', () => {
     vi.doMock('./services/TerminalService', () => ({
       terminalService: {
         dispose: vi.fn(),
-        cleanupForWebContentsId: vi.fn() // issue #59
+        cleanupForWebContentsId: vi.fn(), // issue #59
+        allowDiagnostics: vi.fn(), // #305
+        beginShutdown: vi.fn(),
+        getLiveShells: vi.fn(() => [])
       }
     }))
     vi.doMock('./services/SettingsService', () => ({
@@ -1116,6 +1119,25 @@ describe('Main Process - Window Creation', () => {
       expect(windowConfig.webPreferences.additionalArguments ?? []).not.toContain(
         '--erfana-test-hooks'
       )
+    })
+  })
+
+  describe('Tree-kill diagnostics switch (#305)', () => {
+    it('allows the switch in a dev build', async () => {
+      mockApp.isPackaged = false
+      await import('./index')
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      const { terminalService } = await import('./services/TerminalService')
+      expect(terminalService.allowDiagnostics).toHaveBeenCalledWith(true)
+    })
+
+    it('never allows it in a packaged build', async () => {
+      mockApp.isPackaged = true
+      await import('./index')
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      const { terminalService } = await import('./services/TerminalService')
+      expect(terminalService.allowDiagnostics).toHaveBeenCalledWith(false)
+      expect(terminalService.allowDiagnostics).not.toHaveBeenCalledWith(true)
     })
   })
 
