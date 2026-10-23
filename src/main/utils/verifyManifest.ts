@@ -10,24 +10,26 @@
  * The dual-key trust model: a manifest signed by EITHER our primary
  * (`4AEBCE8499845646`) OR rotation (`E8E4B205269790F1`) minisign key is
  * accepted. This lets us rotate the primary without bricking installs
- * that predate the rotation. Only the untrusted-comment / primary
- * signature is verified; the trusted-comment layer is ignored for
- * performance (we've never used it and our threat model doesn't
- * require it).
+ * that predate the rotation. Both layers are checked: the signature over
+ * the manifest bytes, and the global signature that covers the trusted
+ * comment. Only the prehashed (`ED`) signature form is accepted.
  *
  * @see src/main/services/whisper-pubkeys.ts
  * @see docs/build/whisper-binaries.md
  */
 
 import { verifyAsync } from '@noble/ed25519'
-import { createHash } from 'crypto'
+import { blake2b } from '@noble/hashes/blake2'
 import { readFile } from 'fs/promises'
 
 import { WHISPER_PUBKEYS, type WhisperPubKey } from '../services/whisper-pubkeys'
 
 /** Minisign algorithm identifiers (bytes 0–1 of every payload). */
-const MINISIGN_ALG_ED_LEGACY: readonly [number, number] = [0x45, 0x64] // "Ed" — raw content signed
+const MINISIGN_ALG_ED_LEGACY: readonly [number, number] = [0x45, 0x64] // "Ed" — public keys always use this; signatures must not
 const MINISIGN_ALG_ED_PREHASHED: readonly [number, number] = [0x45, 0x44] // "ED" — BLAKE2b-512(content) signed, minisign >= 0.7 default
+
+const TRUSTED_COMMENT_PREFIX = 'trusted comment: '
+const ED25519_SIG_LEN = 64
 
 const PUBKEY_LEN = 42 // 2 alg + 8 keyId + 32 ed25519 pubkey
 const SIG_LEN = 74 // 2 alg + 8 keyId + 64 ed25519 sig
@@ -64,6 +66,8 @@ export interface VerifyManifestResult {
   signingKeyRole: WhisperPubKey['role'] | null
   /** Hex-encoded 8-byte key ID from the signature. */
   signingKeyId: string
+  /** The exact manifest bytes that were verified. Parse these, not the file again. */
+  content: Buffer
 }
 
 /**
@@ -90,13 +94,12 @@ export async function verifyManifest(
   // what users see in the .pub file and in release descriptions.
   const sigKeyIdHex = Buffer.from(sig.keyId).reverse().toString('hex').toUpperCase()
 
-  // For prehashed (`ED`) signatures — the modern minisign default — the
-  // signature is over BLAKE2b-512(content), not raw content. Compute once
-  // so we don't re-hash per pubkey.
-  const signedMessage =
-    sig.alg === 'ed-prehashed'
-      ? new Uint8Array(createHash('blake2b512').update(content).digest())
-      : new Uint8Array(content)
+  // Prehashed (`ED`) signatures — the only accepted form — sign
+  // BLAKE2b-512(content). Compute once so we don't re-hash per pubkey.
+  // Pure-JS BLAKE2b on purpose: Electron's Node uses BoringSSL, which has no
+  // `blake2b512`, so `crypto.createHash` throws "Digest method not supported"
+  // in packaged builds.
+  const signedMessage = blake2b(new Uint8Array(content), { dkLen: 64 })
 
   for (const trusted of pubkeys) {
     let parsedPub: ParsedPubkey
@@ -108,17 +111,35 @@ export async function verifyManifest(
     }
     if (!timingSafeEqual(sig.keyId, parsedPub.keyId)) continue
 
-    const ok = await verifyAsync(sig.signature, signedMessage, parsedPub.pubkey)
+    const ok = await verifyAsync(sig.signature, signedMessage, parsedPub.pubkey, {
+      zip215: false
+    })
     if (!ok) {
       throw new VerifyManifestError(
         'ed25519-rejected',
-        `Ed25519 verify failed for key ${sigKeyIdHex} (${trusted.role}, alg=${sig.alg})`
+        `Ed25519 verify failed for key ${sigKeyIdHex} (${trusted.role})`
       )
     }
+
+    // Global signature: same key over signature || trusted comment.
+    const globalMessage = new Uint8Array(ED25519_SIG_LEN + sig.trustedComment.length)
+    globalMessage.set(sig.signature, 0)
+    globalMessage.set(sig.trustedComment, ED25519_SIG_LEN)
+    const globalOk = await verifyAsync(sig.globalSignature, globalMessage, parsedPub.pubkey, {
+      zip215: false
+    })
+    if (!globalOk) {
+      throw new VerifyManifestError(
+        'ed25519-rejected',
+        `Global signature verify failed for key ${sigKeyIdHex} (${trusted.role})`
+      )
+    }
+
     return {
       valid: true,
       signingKeyRole: trusted.role,
-      signingKeyId: sigKeyIdHex
+      signingKeyId: sigKeyIdHex,
+      content
     }
   }
 
@@ -133,39 +154,51 @@ interface ParsedPubkey {
   pubkey: Uint8Array
 }
 
-type MinisignAlg = 'ed-legacy' | 'ed-prehashed'
-
 interface ParsedSignature {
-  alg: MinisignAlg
   keyId: Uint8Array
   signature: Uint8Array
+  /** UTF-8 bytes of the trusted comment, without the `trusted comment: ` prefix. */
+  trustedComment: Uint8Array
+  globalSignature: Uint8Array
 }
 
-function detectAlg(raw: Buffer, label: string): MinisignAlg {
-  if (raw[0] === MINISIGN_ALG_ED_LEGACY[0] && raw[1] === MINISIGN_ALG_ED_LEGACY[1]) {
-    return 'ed-legacy'
+/** Strict base64 decode: rejects anything that does not round-trip exactly. */
+function decodeStrictBase64(text: string, label: string): Buffer {
+  const raw = Buffer.from(text, 'base64')
+  if (raw.toString('base64') !== text) {
+    throw new VerifyManifestError('malformed-signature', `${label} is not canonical base64`)
   }
-  if (
-    raw[0] === MINISIGN_ALG_ED_PREHASHED[0] &&
-    raw[1] === MINISIGN_ALG_ED_PREHASHED[1]
-  ) {
-    return 'ed-prehashed'
-  }
-  throw new VerifyManifestError(
-    'unsupported-algorithm',
-    `${label} algorithm bytes 0x${raw[0]?.toString(16) ?? '?'} 0x${raw[1]?.toString(16) ?? '?'} — not Ed25519`
-  )
+  return raw
+}
+
+function algBytesMatch(raw: Buffer, alg: readonly [number, number]): boolean {
+  return raw[0] === alg[0] && raw[1] === alg[1]
+}
+
+function algDescription(raw: Buffer): string {
+  return `0x${raw[0]?.toString(16) ?? '?'} 0x${raw[1]?.toString(16) ?? '?'}`
 }
 
 function parsePubkey(base64Payload: string): ParsedPubkey {
-  const raw = Buffer.from(base64Payload.trim(), 'base64')
+  let raw: Buffer
+  try {
+    raw = decodeStrictBase64(base64Payload.trim(), 'Pubkey')
+  } catch {
+    throw new VerifyManifestError('malformed-signature', 'Pubkey is not canonical base64')
+  }
   if (raw.length !== PUBKEY_LEN) {
     throw new VerifyManifestError(
       'malformed-signature',
       `Pubkey length ${raw.length} != ${PUBKEY_LEN}`
     )
   }
-  detectAlg(raw, 'Pubkey') // throws if not Ed25519 (either variant)
+  // Minisign public keys always carry the "Ed" identifier.
+  if (!algBytesMatch(raw, MINISIGN_ALG_ED_LEGACY)) {
+    throw new VerifyManifestError(
+      'unsupported-algorithm',
+      `Pubkey algorithm bytes ${algDescription(raw)} — not Ed25519`
+    )
+  }
   return {
     keyId: new Uint8Array(raw.subarray(2, 10)),
     pubkey: new Uint8Array(raw.subarray(10, 42))
@@ -178,26 +211,42 @@ function parseSignature(sigFile: string): ParsedSignature {
   //   <base64: 2 alg + 8 keyId + 64 ed25519 sig>
   //   trusted comment: <free-form>
   //   <base64: 64 ed25519 sig over (primary_sig || trusted_comment)>
-  // We only verify the primary (line 2).
   const lines = sigFile.trim().split(/\r?\n/)
-  if (lines.length < 2) {
+  if (lines.length < 4) {
     throw new VerifyManifestError(
       'malformed-signature',
-      `Signature file must have >= 2 lines, got ${lines.length}`
+      `Signature file must have >= 4 lines, got ${lines.length}`
     )
   }
-  const raw = Buffer.from(lines[1].trim(), 'base64')
+  const raw = decodeStrictBase64(lines[1].trim(), 'Signature payload')
   if (raw.length !== SIG_LEN) {
     throw new VerifyManifestError(
       'malformed-signature',
       `Signature payload length ${raw.length} != ${SIG_LEN}`
     )
   }
-  const alg = detectAlg(raw, 'Signature')
+  if (!algBytesMatch(raw, MINISIGN_ALG_ED_PREHASHED)) {
+    throw new VerifyManifestError(
+      'unsupported-algorithm',
+      `Signature algorithm bytes ${algDescription(raw)} — only prehashed Ed25519 ("ED") is accepted`
+    )
+  }
+  if (!lines[2].startsWith(TRUSTED_COMMENT_PREFIX)) {
+    throw new VerifyManifestError('malformed-signature', 'Missing trusted comment line')
+  }
+  const trustedComment = Buffer.from(lines[2].slice(TRUSTED_COMMENT_PREFIX.length), 'utf8')
+  const globalSignature = decodeStrictBase64(lines[3].trim(), 'Global signature')
+  if (globalSignature.length !== ED25519_SIG_LEN) {
+    throw new VerifyManifestError(
+      'malformed-signature',
+      `Global signature length ${globalSignature.length} != ${ED25519_SIG_LEN}`
+    )
+  }
   return {
-    alg,
     keyId: new Uint8Array(raw.subarray(2, 10)),
-    signature: new Uint8Array(raw.subarray(10, 74))
+    signature: new Uint8Array(raw.subarray(10, 74)),
+    trustedComment: new Uint8Array(trustedComment),
+    globalSignature: new Uint8Array(globalSignature)
   }
 }
 

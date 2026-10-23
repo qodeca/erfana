@@ -17,6 +17,10 @@
  */
 
 import { describe, it, expect } from 'vitest'
+import { spawnSync } from 'node:child_process'
+import { mkdtempSync, mkdirSync, realpathSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import {
   CmdExeBootstrapBuilder,
   DEFAULT_WINDOWS_BOOTSTRAP_BUILDERS,
@@ -125,6 +129,30 @@ describe('PowerShellBootstrapBuilder', () => {
       expect(joinArgs(args)).toContain("Set-Location -LiteralPath 'C:\\path\\with''quote'")
     })
 
+    it.each([
+      ['U+2018', '\u2018'],
+      ['U+2019', '\u2019'],
+      ['U+201A', '\u201A'],
+      ['U+201B', '\u201B']
+    ])('doubles the typographic single quote %s in cwd', (_name, ch) => {
+      const args = builder.build({
+        shell: 'pwsh.exe',
+        cwd: `C:\\Users\\Bob${ch}s Files\\proj`,
+        marker: MARKER
+      })
+      expect(joinArgs(args)).toContain(
+        `Set-Location -LiteralPath 'C:\\Users\\Bob${ch}${ch}s Files\\proj'`
+      )
+    })
+
+    it('doubles typographic and plain quotes together in cwd', () => {
+      const args = builder.build({
+        shell: 'pwsh.exe',
+        cwd: "C:\\Bob\u2018s\\it's\\proj",
+        marker: MARKER
+      })
+      expect(joinArgs(args)).toContain("Set-Location -LiteralPath 'C:\\Bob\u2018\u2018s\\it''s\\proj'")
+    })
   })
 })
 
@@ -386,3 +414,26 @@ describe('normalizeWindowsCwd', () => {
     expect(normalizeWindowsCwd('foo')).toBe('foo')
   })
 })
+
+describe.skipIf(spawnSync('pwsh', ['-NoProfile', '-Command', '1'], { timeout: 15000 }).status !== 0)(
+  'PowerShellBootstrapBuilder script run with pwsh',
+  () => {
+    it('opens a folder named with a curly apostrophe', () => {
+      const base = mkdtempSync(join(realpathSync.native(tmpdir()), 'erfana-bootstrap-'))
+      const dir = join(base, 'Bob\u2019s Files')
+      mkdirSync(dir)
+      try {
+        const args = new PowerShellBootstrapBuilder().build({
+          shell: 'pwsh',
+          cwd: dir,
+          marker: MARKER
+        })
+        const run = spawnSync('pwsh', args, { input: '', encoding: 'utf8', timeout: 15000 })
+        expect(run.stdout).toContain(dir)
+        expect(run.stdout).toContain(MARKER)
+      } finally {
+        rmSync(base, { recursive: true, force: true })
+      }
+    })
+  }
+)

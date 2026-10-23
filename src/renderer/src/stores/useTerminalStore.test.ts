@@ -114,3 +114,56 @@ describe('useTerminalStore scrollLocked', () => {
     expect(useTerminalStore.getState().scrollLocked).toBe(true)
   })
 })
+
+describe('useTerminalStore formatPathsForActiveTerminal', () => {
+  const path = 'C:\\Users\\Bob\u2019s Files\\proj'
+
+  it('quotes for a powershell terminal', () => {
+    useTerminalStore.getState().setActiveTerminal({ id: 't-powershell', shellKind: 'powershell' })
+    expect(useTerminalStore.getState().formatPathsForActiveTerminal([path])).toBe(
+      "'C:\\Users\\Bob\u2019\u2019s Files\\proj'"
+    )
+  })
+
+  it('quotes for a cmd terminal', () => {
+    useTerminalStore.getState().setActiveTerminal({ id: 't-cmd', shellKind: 'cmd' })
+    expect(useTerminalStore.getState().formatPathsForActiveTerminal([path])).toBe(`"${path}"`)
+  })
+
+  it('quotes for a posix terminal, one path per line', () => {
+    useTerminalStore.getState().setActiveTerminal({ id: 't-posix', shellKind: 'posix' })
+    expect(useTerminalStore.getState().formatPathsForActiveTerminal(['/a/b', '/c d'])).toBe(
+      "'/a/b'\n'/c d'"
+    )
+  })
+
+  it('falls back to the platform default until the shell kind is known', () => {
+    const getPlatform = vi.fn(() => 'win32')
+    vi.stubGlobal('window', { api: { utils: { getPlatform } } })
+    try {
+      useTerminalStore.getState().setActiveTerminal({ id: 't-none', shellKind: null })
+      expect(useTerminalStore.getState().formatPathsForActiveTerminal(["C:\\it's"])).toBe(
+        "'C:\\it''s'"
+      )
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+})
+
+describe('useTerminalStore active terminal and shell kind', () => {
+  it('sets and clears the id and the shell kind together', () => {
+    useTerminalStore.getState().setActiveTerminal({ id: 't9', shellKind: 'cmd' })
+    expect(useTerminalStore.getState().activeTerminalId).toBe('t9')
+    expect(useTerminalStore.getState().activeShellKind).toBe('cmd')
+    useTerminalStore.getState().setActiveTerminal(null)
+    expect(useTerminalStore.getState().activeTerminalId).toBeNull()
+    expect(useTerminalStore.getState().activeShellKind).toBeNull()
+  })
+
+  it('drops the shell kind when only the id changes', () => {
+    useTerminalStore.getState().setActiveTerminal({ id: 't9', shellKind: 'cmd' })
+    useTerminalStore.getState().setActiveTerminalId('t10')
+    expect(useTerminalStore.getState().activeShellKind).toBeNull()
+  })
+})

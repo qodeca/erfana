@@ -147,6 +147,52 @@ interface WhisperManifest {
   signingKey: 'primary' | 'rotation'
 }
 
+const SHA256_HEX = /^[0-9a-f]{64}$/i
+
+function invalidManifest(detail: string): AppError {
+  return new AppError(
+    `Whisper manifest has an invalid shape: ${detail}`,
+    ErrorCode.WHISPER_MANIFEST_INVALID
+  )
+}
+
+/** Parse + shape-check the signature-verified manifest bytes. */
+function parseVerifiedManifest(content: Buffer): WhisperManifest {
+  const parsed: unknown = JSON.parse(content.toString('utf8'))
+  if (typeof parsed !== 'object' || parsed === null) throw invalidManifest('not an object')
+  const m = parsed as Record<string, unknown>
+  if (!Number.isSafeInteger(m.revisionIndex) || (m.revisionIndex as number) < 0) {
+    throw invalidManifest('revisionIndex must be a non-negative safe integer')
+  }
+  const artifacts = m.artifacts as Record<string, unknown> | null | undefined
+  if (typeof artifacts !== 'object' || artifacts === null) {
+    throw invalidManifest('artifacts missing')
+  }
+  for (const key of ['macosUniversal', 'win64']) {
+    const a = artifacts[key] as Record<string, unknown> | null | undefined
+    if (
+      typeof a !== 'object' ||
+      a === null ||
+      typeof a.filename !== 'string' ||
+      typeof a.sha256 !== 'string' ||
+      !SHA256_HEX.test(a.sha256) ||
+      !Number.isSafeInteger(a.size)
+    ) {
+      throw invalidManifest(`artifacts.${key} needs filename, 64-hex sha256 and integer size`)
+    }
+  }
+  const upstream = m.upstream as Record<string, unknown> | null | undefined
+  if (
+    typeof upstream !== 'object' ||
+    upstream === null ||
+    typeof upstream.sha !== 'string' ||
+    typeof upstream.label !== 'string'
+  ) {
+    throw invalidManifest('upstream needs sha and label')
+  }
+  return parsed as WhisperManifest
+}
+
 class WhisperModelManager implements IWhisperModelManager {
   private readonly whisperDir: string
   private readonly binDir: string
@@ -311,7 +357,8 @@ class WhisperModelManager implements IWhisperModelManager {
         signingKeyId: verifyResult.signingKeyId
       })
 
-      const manifest = JSON.parse(await readFile(tempManifest, 'utf8')) as WhisperManifest
+      // Parse the exact bytes that were verified — never re-read the file.
+      const manifest = parseVerifiedManifest(verifyResult.content)
 
       // Downgrade protection — two-layer:
       //   1. Source floor `MIN_REVISION_INDEX` hard-codes the lowest revision

@@ -202,10 +202,6 @@ function arrangeDefaults(opts: {
   mockDownloadToFile.mockResolvedValue(undefined)
 
   // verifyManifest passes with primary key.
-  mockVerifyManifest.mockResolvedValue({
-    signingKeyRole: 'primary',
-    signingKeyId: 'test-key-id'
-  })
 
   const manifestBody = {
     schemaVersion: 1,
@@ -234,6 +230,12 @@ function arrangeDefaults(opts: {
   //   - manifest.json path → return manifest JSON bytes
   //   - .last-seen-revision → return sentinel or reject ENOENT
   //   - schema-version sentinel → reject ENOENT (triggers slow path)
+  mockVerifyManifest.mockResolvedValue({
+    signingKeyRole: 'primary',
+    signingKeyId: 'test-key-id',
+    content: Buffer.from(JSON.stringify(manifestBody))
+  })
+
   mockReadFile.mockImplementation(async (p: string) => {
     if (typeof p === 'string' && p.includes('manifest.json') && !p.includes('.minisig')) {
       return JSON.stringify(manifestBody)
