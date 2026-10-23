@@ -305,6 +305,9 @@ export function makeHarness(
 
   return {
     service,
+    /** The deps the service was built with (its export controller, session factory). */
+    deps,
+    sessionCreate,
     window,
     hostContents,
     realRoot,

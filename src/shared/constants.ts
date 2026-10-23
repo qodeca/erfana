@@ -601,6 +601,17 @@ export const PREVIEW = {
    */
   TEARDOWN_STEP_TIMEOUT_MS: 2000,
   /**
+   * How long the previewed page gets to prove it repainted below newly revealed
+   * chrome (ms). ONE number for both sides: the renderer's absolute deadline
+   * for the permission band, and main's life for one confirmation script, which
+   * a page that never runs its frames (hidden, frozen) would otherwise hold
+   * for ever.
+   *
+   * Measured on Electron 39: ~17 ms for an idle page, ~130 ms for a heavy one,
+   * and NEVER for a page that refuses to yield.
+   */
+  BOUNDS_ACK_TIMEOUT_MS: 300,
+  /**
    * Bound on the purge that runs when a partition is handed back for reuse
    * and again before it is handed out (ms). Fail-closed: a purge that fails or
    * overruns on either side drops the name and a fresh partition is minted.

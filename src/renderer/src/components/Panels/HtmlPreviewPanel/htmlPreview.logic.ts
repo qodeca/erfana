@@ -20,6 +20,7 @@
  * @see Issue #74 - HTML preview with CSS and JavaScript execution
  */
 
+import { PREVIEW } from '../../../../../shared/constants'
 import type { PreviewFailure } from '../../../../../shared/ipc/preview-schema'
 import type { PreviewBounds, PreviewFailureType } from '../../../../../shared/ipc/preview-types'
 import type { PreviewLoadState } from '../../../stores/usePreviewStore'
@@ -306,7 +307,7 @@ export function previewPlaceholderLabel(pageName: string, enterable: boolean): s
  * yield. 300 clears the heavy case with room to spare while staying short enough
  * that a stuck page does not leave the reader looking at nothing for long.
  */
-export const PREVIEW_BOUNDS_ACK_TIMEOUT_MS = 300
+export const PREVIEW_BOUNDS_ACK_TIMEOUT_MS = PREVIEW.BOUNDS_ACK_TIMEOUT_MS
 
 /**
  * Below this panel height, the page and an open host list cannot share the space.
