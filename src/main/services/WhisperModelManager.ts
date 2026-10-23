@@ -115,7 +115,7 @@ export interface IWhisperModelManager {
   /**
    * Re-stat the model path and require the state returned by
    * `verifyInstalledModelFile`. Call before each spawn of a job. A mismatch
-   * throws `WHISPER_MODEL_INTEGRITY_FAILED` and deletes nothing.
+   * throws `WHISPER_MODEL_CHANGED_DURING_CHECK` and deletes nothing.
    */
   assertVerifiedModelUnchanged(model: WhisperModel, verified: VerifiedModelFile): Promise<void>
   /** Abort in-flight model downloads and remove their temp files (app quit). */
@@ -222,6 +222,8 @@ const STALE_TEMP_MIN_AGE_MS = 10 * 60 * 1000
 
 /** Identity + version of a model file at the moment it was hashed. */
 export interface VerifiedModelFile {
+  /** The path that was hashed; the spawn must use exactly this one. */
+  path: string
   dev: number | bigint
   ino: number | bigint
   size: number | bigint
@@ -229,8 +231,8 @@ export interface VerifiedModelFile {
   ctimeMs: number | bigint
 }
 
-function fileState(s: VerifiedModelFile): VerifiedModelFile {
-  return { dev: s.dev, ino: s.ino, size: s.size, mtimeMs: s.mtimeMs, ctimeMs: s.ctimeMs }
+function fileState(path: string, s: Omit<VerifiedModelFile, 'path'>): VerifiedModelFile {
+  return { path, dev: s.dev, ino: s.ino, size: s.size, mtimeMs: s.mtimeMs, ctimeMs: s.ctimeMs }
 }
 
 /** Same file, same content window: dev, ino, size, mtime and ctime all equal. */
@@ -625,7 +627,7 @@ class WhisperModelManager implements IWhisperModelManager {
       } else if (!onPath || !sameFileState(before, after) || !sameFileState(before, onPath)) {
         changed = true
       } else {
-        state = fileState(before)
+        state = fileState(modelPath, before)
       }
     } finally {
       await handle.close().catch(() => undefined)
@@ -648,7 +650,7 @@ class WhisperModelManager implements IWhisperModelManager {
       logger.warn('Whisper model changed while it was being verified', { model })
       throw new AppError(
         `The ${model} model changed while it was being checked. Try again.`,
-        ErrorCode.WHISPER_MODEL_INTEGRITY_FAILED
+        ErrorCode.WHISPER_MODEL_CHANGED_DURING_CHECK
       )
     }
     return state
@@ -664,7 +666,7 @@ class WhisperModelManager implements IWhisperModelManager {
       logger.warn('Whisper model changed after it was verified', { model })
       throw new AppError(
         `The ${model} model changed after it was checked. Try again.`,
-        ErrorCode.WHISPER_MODEL_INTEGRITY_FAILED
+        ErrorCode.WHISPER_MODEL_CHANGED_DURING_CHECK
       )
     }
   }

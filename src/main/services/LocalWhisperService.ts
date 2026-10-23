@@ -332,7 +332,7 @@ export class LocalWhisperService {
       }
 
       progress({ percent: 4, phase: 'Checking whisper model' })
-      const modelPath = await this.modelManager.ensureModel(model, { signal })
+      await this.modelManager.ensureModel(model, { signal })
 
       if (signal?.aborted) {
         return {
@@ -361,11 +361,11 @@ export class LocalWhisperService {
 
       if (needsChunking) {
         transcript = await this.transcribeChunked(
-          wavPath, duration, binaryPath, modelPath, model, verifiedModel, language, tempFiles, progress, signal
+          wavPath, duration, binaryPath, model, verifiedModel, language, tempFiles, progress, signal
         )
       } else {
         transcript = await this.transcribeSingle(
-          wavPath, binaryPath, modelPath, model, verifiedModel, language, progress, signal
+          wavPath, binaryPath, model, verifiedModel, language, progress, signal
         )
       }
 
@@ -551,7 +551,6 @@ export class LocalWhisperService {
   private async transcribeSingle(
     wavPath: string,
     binaryPath: string,
-    modelPath: string,
     model: WhisperModel,
     verifiedModel: VerifiedModelFile,
     language: string,
@@ -561,7 +560,7 @@ export class LocalWhisperService {
     onProgress({ percent: 10, phase: 'Transcribing' })
 
     const text = await this.runWhisper(
-      wavPath, binaryPath, modelPath, model, verifiedModel, language,
+      wavPath, binaryPath, model, verifiedModel, language,
       (whisperPercent) => {
         // Map whisper 0-100 to overall 10-90
         const overall = 10 + (whisperPercent / 100) * 80
@@ -588,7 +587,6 @@ export class LocalWhisperService {
     wavPath: string,
     duration: number,
     binaryPath: string,
-    modelPath: string,
     model: WhisperModel,
     verifiedModel: VerifiedModelFile,
     language: string,
@@ -640,7 +638,7 @@ export class LocalWhisperService {
 
       // Transcribe the chunk
       const chunkText = await this.runWhisper(
-        chunkPath, binaryPath, modelPath, model, verifiedModel, language,
+        chunkPath, binaryPath, model, verifiedModel, language,
         (whisperPercent) => {
           const overall = chunkStartPercent + (whisperPercent / 100) * (chunkEndPercent - chunkStartPercent)
           onProgress({
@@ -732,7 +730,6 @@ export class LocalWhisperService {
   private async runWhisper(
     audioPath: string,
     binaryPath: string,
-    modelPath: string,
     model: WhisperModel,
     verifiedModel: VerifiedModelFile,
     language: string,
@@ -773,7 +770,7 @@ export class LocalWhisperService {
 
     return new Promise<string>((resolve, reject) => {
       const args = [
-        '-m', modelPath,
+        '-m', verifiedModel.path,
         '-l', language,
         '-otxt',
         '--no-timestamps',

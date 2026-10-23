@@ -215,7 +215,7 @@ describe('WhisperModelManager model integrity (real fs)', () => {
       await writeFile(tinyPath(), GOOD)
       statControl.skewIno = true // path stat now disagrees with the handle
       await expect(manager.verifyInstalledModelFile('tiny')).rejects.toMatchObject({
-        code: 'WHISPER_MODEL_INTEGRITY_FAILED'
+        code: 'WHISPER_MODEL_CHANGED_DURING_CHECK'
       })
       expect(await readFile(tinyPath())).toEqual(GOOD)
 
@@ -228,7 +228,7 @@ describe('WhisperModelManager model integrity (real fs)', () => {
       await writeFile(tinyPath(), EVIL)
       statControl.skewIno = true
       await expect(manager.verifyInstalledModelFile('tiny')).rejects.toMatchObject({
-        code: 'WHISPER_MODEL_INTEGRITY_FAILED'
+        code: 'WHISPER_MODEL_CHANGED_DURING_CHECK'
       })
       expect(await readFile(tinyPath())).toEqual(EVIL) // left alone; next job decides
     })
@@ -245,7 +245,7 @@ describe('WhisperModelManager model integrity (real fs)', () => {
       await writeFile(tinyPath(), EVIL)
       await utimes(tinyPath(), later, later)
       await expect(manager.assertVerifiedModelUnchanged('tiny', verified)).rejects.toMatchObject({
-        code: 'WHISPER_MODEL_INTEGRITY_FAILED'
+        code: 'WHISPER_MODEL_CHANGED_DURING_CHECK'
       })
       expect(await readFile(tinyPath())).toEqual(EVIL)
     })

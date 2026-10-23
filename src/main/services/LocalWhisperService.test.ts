@@ -324,7 +324,7 @@ describe('LocalWhisperService', () => {
     vi.clearAllMocks()
 
     mockEnsureBinary.mockResolvedValue('/userData/whisper/bin/whisper-cli')
-    mockVerifyInstalledModelFile.mockResolvedValue({ dev: 1, ino: 2, size: 3, mtimeMs: 4, ctimeMs: 5 })
+    mockVerifyInstalledModelFile.mockResolvedValue({ path: '/userData/whisper/models/ggml-tiny.bin', dev: 1, ino: 2, size: 3, mtimeMs: 4, ctimeMs: 5 })
     mockAssertModelUnchanged.mockResolvedValue(undefined)
     mockEnsureModel.mockResolvedValue('/userData/whisper/models/ggml-tiny.bin')
     // `verifyInstalledBinary` returns the `VerifiedBinary` shape consumed
@@ -436,7 +436,7 @@ describe('LocalWhisperService', () => {
 
       expect(mockAssertModelUnchanged).toHaveBeenCalledWith(
         'tiny',
-        { dev: 1, ino: 2, size: 3, mtimeMs: 4, ctimeMs: 5 }
+        { path: '/userData/whisper/models/ggml-tiny.bin', dev: 1, ino: 2, size: 3, mtimeMs: 4, ctimeMs: 5 }
       )
       expect(result.success).toBe(false)
       expect(mockSpawn).not.toHaveBeenCalled()
@@ -1145,6 +1145,9 @@ describe('LocalWhisperService', () => {
 
       // 600 / 480 = ceil(1.25) = 2 chunks
       expect(spawnCallCount).toBe(2)
+      // The model is hashed once for the job but re-checked before every chunk's spawn.
+      expect(mockVerifyInstalledModelFile).toHaveBeenCalledTimes(1)
+      expect(mockAssertModelUnchanged).toHaveBeenCalledTimes(2)
     })
 
     it('joins chunk transcripts with spaces', async () => {
