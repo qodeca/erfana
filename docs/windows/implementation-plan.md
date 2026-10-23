@@ -181,7 +181,7 @@ Three of the four rows that used to sit here have shipped and moved to the ✅ t
 ### Manual UAT (verified during Phase-2 UAT session, 2026-04-21)
 
 - [x] Open a project at `C:\Users\<me>\Dev\$weird-name` → PowerShell terminal opens cleanly, prompt shows the correct cwd, no `$weird-name` expansion.
-- [x] Open the same project with cmd.exe forced as the shell → terminal opens cleanly, `cd` shows the correct cwd, marker handshake completes (no "stuck clearing" state).
+- [x] Open the same project with cmd.exe forced as the shell → terminal opens cleanly, `cd` shows the correct cwd, marker handshake completes (no "stuck clearing" state). *(Recorded at the time; a later finding showed cmd.exe terminals showing no output because of node-pty's argument quoting. Fixed in `fix/cmd-terminal-bootstrap`; re-verify on Windows.)*
 - [x] `ping -t 8.8.8.8` then `Ctrl+C` in both PowerShell and cmd.exe → command interrupts cleanly.
 - [x] Try opening a project at a path containing a literal `&` (e.g. `C:\tmp\a&b`) → app surfaces a clear error rather than spawning a broken terminal. Confirms the cwd validation contract.
 - [x] macOS terminal still opens unchanged (regression check — run during Phase 0 AC #4 macOS session).
