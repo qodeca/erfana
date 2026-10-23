@@ -23,7 +23,7 @@ import { isWindowsLongPath } from './watcher/PlatformConfig'
 import { isForegroundBusy, shellProcessNames } from './terminalForeground'
 import { killProcessTrees } from './terminalTreeKill'
 import type { LiveShell } from './conptyHostReaper'
-import { installExitTimeRecorder, installNoForkConsoleList, nativeExitAtMs } from './nodePtyWindowsShim'
+import { installExitTimeRecorder, installNoForkConsoleList, nativeExitAtMs, releaseConoutWorker } from './nodePtyWindowsShim'
 
 /**
  * Outcome of {@link TerminalService.createTerminal}. A failure carries its
@@ -586,6 +586,9 @@ export class TerminalService extends EventEmitter {
         markExited()
         terminal.hasExited = true
         this.liveShells.delete(terminalId)
+        // node-pty ends its conout worker thread only on kill; a shell that exited on its
+        // own would keep it until the app's teardown, which then hangs the quit (#305)
+        if (osPlatform() === 'win32') releaseConoutWorker(ptyProcess)
         // A shell that fails during the handshake still said why: show it before the exit
         if (terminal.clearFallbackTimeout) {
           clearTimeout(terminal.clearFallbackTimeout)

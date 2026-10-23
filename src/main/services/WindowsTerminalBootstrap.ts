@@ -149,11 +149,15 @@ export interface WindowsBootstrapBuilder {
  *   still runs. `$_ | Out-Host` only prints: `Write-Error` would itself become a
  *   stopping error once a profile has set `$ErrorActionPreference = 'Stop'`;
  * - `do { } while ($false)` around each profile catches a top-level `break` or
- *   `continue` in it, which would otherwise end the loader's `foreach`.
+ *   `continue` in it, which would otherwise end the loader's `foreach`;
+ * - a profile the execution policy blocks (Restricted, AllSigned) prints only the
+ *   policy message, which names the profile file: the full error record would point
+ *   at this loader line instead.
  */
 export const PROFILE_LOADER =
   "foreach ($erfanaProfile in @($PROFILE.AllUsersAllHosts, $PROFILE.AllUsersCurrentHost, $PROFILE.CurrentUserAllHosts, $PROFILE.CurrentUserCurrentHost)) " +
-  "{ if ($erfanaProfile -and (Test-Path -LiteralPath $erfanaProfile)) { try { do { . $erfanaProfile } while ($false) } catch { $_ | Out-Host } } }; " +
+  "{ if ($erfanaProfile -and (Test-Path -LiteralPath $erfanaProfile)) { try { do { . $erfanaProfile } while ($false) } " +
+  "catch { if ($_.Exception -is [System.Management.Automation.PSSecurityException]) { $Host.UI.WriteErrorLine($_.Exception.Message) } else { $_ | Out-Host } } } }; " +
   'Remove-Variable erfanaProfile -ErrorAction SilentlyContinue'
 
 export class PowerShellBootstrapBuilder implements WindowsBootstrapBuilder {

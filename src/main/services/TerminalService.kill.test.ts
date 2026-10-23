@@ -42,7 +42,8 @@ vi.mock('./terminalTreeKill', () => treeKill)
 const shim = vi.hoisted(() => ({
   installNoForkConsoleList: vi.fn(() => true),
   installExitTimeRecorder: vi.fn(() => true),
-  nativeExitAtMs: vi.fn((_pty: unknown): number | undefined => undefined)
+  nativeExitAtMs: vi.fn((_pty: unknown): number | undefined => undefined),
+  releaseConoutWorker: vi.fn((_pty: unknown) => true)
 }))
 vi.mock('./nodePtyWindowsShim', () => shim)
 
@@ -97,6 +98,7 @@ describe('TerminalService kill paths (#296)', () => {
     treeKill.killProcessTrees.mockClear()
     shim.installNoForkConsoleList.mockClear()
     shim.installExitTimeRecorder.mockClear()
+    shim.releaseConoutWorker.mockClear()
     shim.nativeExitAtMs.mockReset()
     shim.nativeExitAtMs.mockImplementation(() => undefined)
     treeKill.killProcessTrees.mockImplementation(() => Promise.resolve(true))
@@ -323,6 +325,24 @@ describe('TerminalService kill paths (#296)', () => {
       expect(treeKill.killProcessTrees).not.toHaveBeenCalled()
       // the pty itself is still ended
       expect(spawned[0].kill).toHaveBeenCalledTimes(1)
+    })
+
+    it('ends the conout worker of a Windows shell that exited on its own (#305 quit hang)', async () => {
+      const { terminalService } = await load('win32')
+      await create(terminalService, 'win32')
+      expect(shim.releaseConoutWorker).not.toHaveBeenCalled()
+      // the user typed `exit 7`: node-pty reports the exit, nobody calls kill()
+      spawned[0].emit('exit', { exitCode: 7 })
+      expect(shim.releaseConoutWorker).toHaveBeenCalledTimes(1)
+      expect(shim.releaseConoutWorker).toHaveBeenCalledWith(spawned[0])
+      expect(spawned[0].kill).not.toHaveBeenCalled()
+    })
+
+    it('leaves the conout worker alone off Windows', async () => {
+      const { terminalService } = await load('darwin')
+      await create(terminalService, 'darwin')
+      spawned[0].emit('exit', { exitCode: 0 })
+      expect(shim.releaseConoutWorker).not.toHaveBeenCalled()
     })
 
     it('tells whether the tree kill is skipped, so the quit helper can say a quit is unverified', async () => {

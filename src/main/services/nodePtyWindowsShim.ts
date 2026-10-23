@@ -162,6 +162,45 @@ export function nativeExitAtMs(ptyProcess: unknown): number | undefined {
   return typeof at === 'number' && Number.isFinite(at) ? at : undefined
 }
 
+/**
+ * Ends node-pty's conout worker thread for a Windows terminal whose shell has exited
+ * (#305 round 8, Windows: 2 of 6 quits hung for about 17 s, both after a terminal had
+ * ended with `exit` before the quit).
+ *
+ * node-pty 1.1.0 starts one `worker_threads` Worker per terminal
+ * (`ConoutConnection`, `lib/windowsConoutConnection.js`) that relays the console
+ * output, and ends it only from `WindowsPtyAgent.kill()`. A shell that exits on its
+ * own is never killed – TerminalService drops it from its map on `onExit` – so its
+ * worker keeps running for the rest of the session, and the app's exit then has to
+ * stop it during teardown, on the main thread. The patch notes in
+ * `docs/windows/contributing.md` already record a quit hang from the main thread
+ * joining a conout worker; this ends the worker while the app is running instead.
+ *
+ * Call it after node-pty has reported the exit (its output socket is closed then, so
+ * no output is lost). Does nothing when the shapes are not node-pty 1.1.0's.
+ *
+ * @returns true when a worker was asked to stop
+ */
+export function releaseConoutWorker(ptyProcess: unknown): boolean {
+  try {
+    const agent = (ptyProcess as { _agent?: Record<string, unknown> } | undefined)?._agent
+    const connection = agent?._conoutSocketWorker as
+      | { _worker?: { terminate?: unknown }; _isDisposed?: boolean; _drainTimeout?: ReturnType<typeof setTimeout> }
+      | undefined
+    const worker = connection?._worker
+    if (!connection || !worker || typeof worker.terminate !== 'function') return false
+    connection._isDisposed = true
+    if (connection._drainTimeout) clearTimeout(connection._drainTimeout)
+    const stopping: unknown = (worker.terminate as () => unknown).call(worker)
+    if (stopping && typeof (stopping as Promise<unknown>).catch === 'function') {
+      void (stopping as Promise<unknown>).catch(() => {})
+    }
+    return true
+  } catch {
+    return false
+  }
+}
+
 /** Test hook: lets a test see the once-only warning again. */
 export function resetShimWarningForTests(): void {
   reported = false

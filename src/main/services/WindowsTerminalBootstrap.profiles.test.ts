@@ -68,6 +68,16 @@ describe.skipIf(!hasPwsh)('PowerShell profile loader against real profiles', { t
     expect(out).toContain('alive fn=True')
   })
 
+  it('prints only the policy message for a profile the execution policy blocks, not the loader line', () => {
+    const { out } = load(
+      "throw [System.Management.Automation.PSSecurityException]::new('File /p/profile.ps1 cannot be loaded because running scripts is disabled on this system.')\n",
+      "function Get-ErfanaProbe { 1 }\n"
+    )
+    expect(out).toContain('File /p/profile.ps1 cannot be loaded because running scripts is disabled on this system.')
+    expect(out).not.toContain('erfanaProfile')
+    expect(out).toContain('alive fn=True')
+  })
+
   it("prints a failing profile's error with its file and line", () => {
     const { out } = load("Write-Host 'one'\nthrow 'boom on line two'\n", "function Get-ErfanaProbe { 1 }\n")
     expect(out).toContain('boom on line two')

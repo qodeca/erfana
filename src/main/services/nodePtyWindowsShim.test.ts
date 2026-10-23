@@ -14,8 +14,10 @@ import {
   installNoForkConsoleList,
   nativeExitAtMs,
   readNodePtyVersion,
+  releaseConoutWorker,
   resetShimWarningForTests
 } from './nodePtyWindowsShim'
+import { Worker } from 'worker_threads'
 
 /** Shaped like node-pty 1.1.0: the original builds its list by forking, which throws when the fuse is off */
 function fakeModule() {
@@ -186,5 +188,44 @@ describe('installExitTimeRecorder (#305)', () => {
     })).toBe(false)
     expect(nativeExitAtMs({})).toBeUndefined()
     expect(nativeExitAtMs(undefined)).toBeUndefined()
+  })
+})
+
+describe('releaseConoutWorker (#305 quit hang)', () => {
+  const ptyLib = join(process.cwd(), 'node_modules', 'node-pty', 'lib')
+
+  it('relies on what node-pty 1.1.0 has: one conout Worker per agent, ended only by kill()', () => {
+    const agent = readFileSync(join(ptyLib, 'windowsPtyAgent.js'), 'utf8')
+    const connection = readFileSync(join(ptyLib, 'windowsConoutConnection.js'), 'utf8')
+    expect(agent).toContain('this._conoutSocketWorker = new windowsConoutConnection_1.ConoutConnection(')
+    expect(connection).toContain('this._worker = new worker_threads_1.Worker(')
+    expect(connection).toContain('this._isDisposed')
+    expect(connection).toContain('this._drainTimeout')
+    // the only dispose() calls are in kill(); the exit path never ends the worker
+    const onExit = agent.slice(agent.indexOf('prototype._$onProcessExit'), agent.indexOf('prototype._flushDataAndCleanUp'))
+    expect(onExit).not.toContain('dispose')
+    const kill = agent.slice(agent.indexOf('prototype.kill'), agent.indexOf('prototype._getConsoleProcessList'))
+    expect(kill).toContain('this._conoutSocketWorker.dispose()')
+  })
+
+  it('stops a running worker thread at once and marks the connection disposed', async () => {
+    // a worker that never ends by itself, like the conout relay whose server keeps listening
+    const worker = new Worker('setInterval(() => {}, 1000)', { eval: true })
+    await new Promise<void>((resolve) => worker.once('online', () => resolve()))
+    const exited = new Promise<number>((resolve) => worker.once('exit', resolve))
+    const drain = setTimeout(() => {}, 60_000)
+    const connection: Record<string, unknown> = { _worker: worker, _isDisposed: false, _drainTimeout: drain }
+    expect(releaseConoutWorker({ _agent: { _conoutSocketWorker: connection } })).toBe(true)
+    expect(connection._isDisposed).toBe(true)
+    await expect(exited).resolves.toBe(1)
+  })
+
+  it('does nothing for shapes that are not node-pty 1.1.0', () => {
+    expect(releaseConoutWorker(undefined)).toBe(false)
+    expect(releaseConoutWorker({})).toBe(false)
+    expect(releaseConoutWorker({ _agent: {} })).toBe(false)
+    expect(releaseConoutWorker({ _agent: { _conoutSocketWorker: { _worker: {} } } })).toBe(false)
+    const throwing = { _agent: { _conoutSocketWorker: { _worker: { terminate: () => { throw new Error('gone') } } } } }
+    expect(releaseConoutWorker(throwing)).toBe(false)
   })
 })
