@@ -297,7 +297,11 @@ describe('routeLinkActivation', () => {
       expect(deps.requestOpenFile).toHaveBeenCalledTimes(1)
       deps.requestOpenFile.mockClear()
 
-      await routeLinkActivation({ href: `${CURRENT}${fragment}`, provenance: 'gesture' }, CONTEXT, deps)
+      await routeLinkActivation(
+        { href: `${CURRENT}${fragment}`, provenance: 'gesture' },
+        CONTEXT,
+        deps
+      )
 
       expect(deps.requestOpenFile).not.toHaveBeenCalled()
       expect(deps.openExternal).not.toHaveBeenCalled()

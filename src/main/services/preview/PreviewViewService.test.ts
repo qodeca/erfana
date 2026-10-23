@@ -1999,7 +1999,6 @@ describe('PreviewViewService — every blocked host reaches the renderer', () =>
     // production sources use, so the example cannot drift from the rules again.
     const origin = 'http://[::1]:9000'
     expect(parsePreviewOrigin(origin)).toBeNull()
-    expect(parsePreviewOrigin('http://localhost:9000')).not.toBeNull()
 
     onBlocked('blocked-host', origin, `${origin}/x`, parsePreviewOrigin(origin) !== null, 'connect')
 

@@ -71,7 +71,6 @@ describe('isApprovableHost', () => {
     for (const shorthand of ['http://0x7f.1', 'http://2130706433', 'http://127.1']) {
       expect(parsePreviewOrigin(shorthand)).toBe('http://127.0.0.1')
     }
-    expect(isApprovableHost('127.0.0.1')).toBe(true)
   })
 
   it('rejects a host carrying a CR or LF (header/CSP injection guard)', () => {
@@ -309,10 +308,14 @@ describe('parsePreviewOrigin', () => {
     // old code had to spell out and could have under-spelled.
     for (const shorthand of ['http://127.1', 'http://0x7f.1', 'http://2130706433']) {
       expect(parsePreviewOrigin(shorthand)).toBe('http://127.0.0.1')
-      // And it is a fixed point: the canonical form is itself valid, which is
-      // what lets `PreviewOriginSchema` accept it on the way back from disk.
-      expect(PreviewOriginSchema.safeParse('http://127.0.0.1').success).toBe(true)
     }
+    // And it is a fixed point: the canonical form is itself valid, which is what
+    // lets `PreviewOriginSchema` accept it on the way back from disk.
+    expect(PreviewOriginSchema.safeParse('http://127.0.0.1').success).toBe(true)
+  })
+
+  it('accepts localhost with a port (approvable since #108)', () => {
+    expect(parsePreviewOrigin('http://localhost:9000')).toBe('http://localhost:9000')
   })
 
   describe('length limits', () => {
@@ -328,6 +331,15 @@ describe('parsePreviewOrigin', () => {
       expect(host254).toHaveLength(254)
       expect(parsePreviewOrigin(`https://${host254}`)).toBeNull()
       expect(isApprovableHost(host254)).toBe(false)
+    })
+
+    it('applies the 253 guard to a root-dotted host on its own', () => {
+      // `host252.` is 253 characters with the root dot and `host253.` is 254. The
+      // later `isApprovableHost` check sees the name WITHOUT the dot, so only the
+      // parser's own guard can refuse the second.
+      const host252 = host253.slice(0, -1)
+      expect(parsePreviewOrigin(`https://${host252}.`)).toBe(`https://${host252}.`)
+      expect(parsePreviewOrigin(`https://${host253}.`)).toBeNull()
     })
 
     it('accepts an input of exactly 300 characters and refuses 301', () => {

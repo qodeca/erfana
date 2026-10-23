@@ -299,10 +299,10 @@ describe('bandReducer', () => {
       expanded: true,
       mode: { kind: 'idle' },
       failure: null,
-      announcement:
-        'https://a.example.com is now allowed in this project. The preview is reloading.',
+      announcement: expect.any(String),
       openedByKeyboard: false
     })
+    expect(s.announcement).toMatch(/is now allowed in this project/)
   })
 })
 

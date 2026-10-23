@@ -198,7 +198,17 @@ describe('hardenPreviewSession', () => {
     expect(wc.setWebRTCIPHandlingPolicy).toHaveBeenCalledWith('disable_non_proxied_udp')
   })
 
-  it('does NOT touch response headers (CSP has a single owner)', () => {
+  it('records a webRequest hook read by name, so the next test can fail', () => {
+    // POSITIVE CONTROL for the recorder: a read of the response-headers hook must
+    // show up in the list, or an empty list below would prove nothing.
+    const mock = makeSessionMock()
+
+    void mock.session.webRequest.onHeadersReceived
+
+    expect(mock.webRequestHooksTouched).toEqual(['onHeadersReceived'])
+  })
+
+  it('reads no webRequest hook at all (CSP has a single owner of response headers)', () => {
     const mock = makeSessionMock()
     const { webContents } = makeWebContentsMock()
 

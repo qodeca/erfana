@@ -17,7 +17,6 @@ import { HtmlPreviewPanel } from './HtmlPreviewPanel'
 import { usePreviewStore } from '../../../stores/usePreviewStore'
 import { ErrorCode } from '../../../../../shared/errors'
 import { installHtmlPreviewPanelHarness } from './__test__/panelHarness'
-import { selectBandRows } from './permissionBand.logic'
 
 // The bounds hook logs its drop lines through the renderer logger, which has no
 // bridge here; mocked, as in the other renderer suites, so a run stays quiet.
@@ -53,7 +52,7 @@ describe('HtmlPreviewPanel – event feed', () => {
         {
           id: '1',
           type: 'blocked-host',
-          resourceUrlOrHost: 'cdn.example',
+          resourceUrlOrHost: 'https://cdn.example',
           reasonCode: ErrorCode.PREVIEW_HOST_NOT_APPROVABLE,
           timestamp: 1
         }
@@ -74,17 +73,19 @@ describe('HtmlPreviewPanel – event feed', () => {
     render(<HtmlPreviewPanel {...makeProps('/proj/page.html')} />)
     await waitFor(() => expect(listeners.hostBlocked).not.toBeNull())
 
-    listeners.hostBlocked?.({
-      panelId: 'preview-1',
-      host: 'fourth.example',
-      approvable: true,
-      kinds: ['image'],
-      notify: false
+    act(() => {
+      listeners.hostBlocked?.({
+        panelId: 'preview-1',
+        host: 'https://fourth.example',
+        approvable: true,
+        kinds: ['image'],
+        notify: false
+      })
     })
 
     await waitFor(() =>
       expect(usePreviewStore.getState().panels.get('preview-1')?.blockedHosts).toEqual([
-        { host: 'fourth.example', kinds: ['image'], approvable: true }
+        { host: 'https://fourth.example', kinds: ['image'], approvable: true }
       ])
     )
   })
@@ -96,12 +97,14 @@ describe('HtmlPreviewPanel – event feed', () => {
     render(<HtmlPreviewPanel {...makeProps('/proj/page.html')} />)
     await waitFor(() => expect(listeners.hostBlocked).not.toBeNull())
 
-    listeners.hostBlocked?.({
-      panelId: 'preview-1',
-      host: 'cdn.example',
-      approvable: true,
-      kinds: ['script'],
-      notify: true
+    act(() => {
+      listeners.hostBlocked?.({
+        panelId: 'preview-1',
+        host: 'https://cdn.example',
+        approvable: true,
+        kinds: ['script'],
+        notify: true
+      })
     })
     await waitFor(() =>
       expect(usePreviewStore.getState().panels.get('preview-1')?.blockedHosts).toHaveLength(1)
@@ -118,19 +121,23 @@ describe('HtmlPreviewPanel – event feed', () => {
     render(<HtmlPreviewPanel {...makeProps('/proj/page.html')} />)
     await waitFor(() => expect(listeners.hostBlocked).not.toBeNull())
 
-    listeners.hostBlocked?.({
-      panelId: 'preview-1',
-      host: 'cdn.example',
-      approvable: true,
-      kinds: ['style'],
-      notify: true
+    act(() => {
+      listeners.hostBlocked?.({
+        panelId: 'preview-1',
+        host: 'https://cdn.example',
+        approvable: true,
+        kinds: ['style'],
+        notify: true
+      })
     })
-    listeners.hostBlocked?.({
-      panelId: 'preview-1',
-      host: 'cdn.example',
-      approvable: true,
-      kinds: ['style', 'script'],
-      notify: false
+    act(() => {
+      listeners.hostBlocked?.({
+        panelId: 'preview-1',
+        host: 'https://cdn.example',
+        approvable: true,
+        kinds: ['style', 'script'],
+        notify: false
+      })
     })
 
     await waitFor(() => {
@@ -150,12 +157,14 @@ describe('HtmlPreviewPanel – event feed', () => {
     try {
       render(<HtmlPreviewPanel {...makeProps('/proj/page.html')} />)
       await waitFor(() => expect(listeners.hostBlocked).not.toBeNull())
-      listeners.hostBlocked?.({
-        panelId: 'preview-other',
-        host: 'cdn.example',
-        approvable: true,
-        kinds: ['script'],
-        notify: true
+      act(() => {
+        listeners.hostBlocked?.({
+          panelId: 'preview-other',
+          host: 'https://cdn.example',
+          approvable: true,
+          kinds: ['script'],
+          notify: true
+        })
       })
       // A microtask settle is enough; no toast must be dispatched.
       await Promise.resolve()
@@ -168,37 +177,31 @@ describe('HtmlPreviewPanel – event feed', () => {
   describe('allowlist-changed event', () => {
     const HOST = 'https://cdn.example'
 
-    it('stores the approved hosts, and the blocked row for one of them is gone', async () => {
-      // THE VISIBLE OUTCOME OF THE WHOLE FEATURE. If this event is dropped, the
-      // approved host is never subtracted from the blocked list and the Allow
-      // button stays for good.
+    it('moves the host from blocked to allowed in the rendered band', async () => {
+      // THE VISIBLE OUTCOME OF THE WHOLE FEATURE. If this event is dropped, or the
+      // panel stops passing the stored hosts to the band, the approved host is
+      // never subtracted from the blocked list and the Allow button stays for good.
       render(<HtmlPreviewPanel {...makeProps('/proj/page.html')} />)
       await waitFor(() => expect(listeners.hostBlocked).not.toBeNull())
       await waitFor(() => expect(listeners.allowlist).not.toBeNull())
 
-      listeners.hostBlocked?.({
-        panelId: 'preview-1',
-        host: HOST,
-        approvable: true,
-        kinds: ['script'],
-        notify: true
+      act(() => {
+        listeners.hostBlocked?.({
+          panelId: 'preview-1',
+          host: HOST,
+          approvable: true,
+          kinds: ['script'],
+          notify: true
+        })
       })
-      // Control: before the event the host is a blocked row with an Allow button.
-      await waitFor(() => {
-        const panel = usePreviewStore.getState().panels.get('preview-1')
-        const rows = selectBandRows(panel?.blockedHosts ?? [], panel?.allowedHosts ?? [])
-        expect(rows.blocked.map((r) => r.host)).toEqual([HOST])
-      })
+      const chip = await screen.findByTestId('preview-band-chip')
+      await waitFor(() => expect(chip).toHaveTextContent('1 blocked · 0 allowed'))
 
       act(() => {
         listeners.allowlist?.({ panelId: 'preview-1', hosts: [HOST] })
       })
 
-      const panel = usePreviewStore.getState().panels.get('preview-1')
-      expect(panel?.allowedHosts).toEqual([HOST])
-      const rows = selectBandRows(panel?.blockedHosts ?? [], panel?.allowedHosts ?? [])
-      expect(rows.blocked).toEqual([])
-      expect(rows.allowed.map((r) => r.host)).toEqual([HOST])
+      await waitFor(() => expect(chip).toHaveTextContent('0 blocked · 1 allowed'))
     })
 
     it('ignores an allowlist event addressed to another panel', async () => {

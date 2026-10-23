@@ -115,7 +115,15 @@ describe('buildPreviewCsp frame-src tripwires (issue #124 WI-13)', () => {
     // A source without a port matches only the scheme's default, so the port
     // is what the grant IS: dropping it would leave the approved service blocked.
     const csp = buildPreviewCsp(['https://a.io:8443', 'http://localhost:9000'], OPTIONS)
-    for (const name of ['script-src', 'style-src', 'img-src', 'font-src', 'media-src', 'connect-src']) {
+    const subresourceDirectives = [
+      'script-src',
+      'style-src',
+      'img-src',
+      'font-src',
+      'media-src',
+      'connect-src'
+    ]
+    for (const name of subresourceDirectives) {
       const [directive = ''] = directivesNamed(csp, name)
       expect(directive.split(' ')).toEqual(
         expect.arrayContaining(['https://a.io:8443', 'http://localhost:9000'])
