@@ -96,7 +96,14 @@ function confineModuleSearchPaths(Module, path, filename, entryModule, url) {
           `Cannot find module '${specifier}': it resolves outside app.asar (${targetPath}), which a packaged ` +
             'Erfana never loads code from.'
         )
-        err.code = 'ERR_MODULE_NOT_FOUND'
+        // A `require` (conditions include 'require') gets the CommonJS code, so
+        // an optional-dependency probe (`try { require(x) } catch (e) { if
+        // (e.code === 'MODULE_NOT_FOUND') … }`) treats the refusal as "absent".
+        const conditions = context.conditions
+        err.code =
+          conditions && typeof conditions.includes === 'function' && conditions.includes('require')
+            ? 'MODULE_NOT_FOUND'
+            : 'ERR_MODULE_NOT_FOUND'
         throw err
       }
     })

@@ -273,9 +273,9 @@ The afterPack prunes, chmods and `ffmpeg` staging operate on `app.asar.unpacked/
 Electron limits a packaged app's `require` lookups to `process.resourcesPath` (and already keeps `NODE_PATH` and the home-folder global paths out), which still includes `Resources/node_modules/` and `Resources/app.asar.unpacked/node_modules/` – outside the archive. ESM `import()` goes through Node's ESM resolver, which Electron does not filter. `src/main/bootstrap/confineModulePaths.cjs`, inlined first into every main-process bundle (main process, git-status worker, DOCX utility process):
 
 - narrows every CommonJS search path list to `app.asar/`, including the entry bundle's own `module.paths` (computed before any code in it ran);
-- registers a synchronous resolve hook (`module.registerHooks`, Node 24) that refuses any `require` or `import` resolution landing outside `app.asar/` for a caller inside the app – the layer that covers ESM and absolute paths.
+- registers a synchronous resolve hook (`module.registerHooks`, Node 24) that refuses any `require` or `import` resolution landing outside `app.asar/` for a caller inside the app – the layer that covers ESM and absolute paths (`MODULE_NOT_FOUND` for a `require`, `ERR_MODULE_NOT_FOUND` for an `import`).
 
-A `require()` or `import()` the archive cannot satisfy therefore fails instead of loading a planted file. A build check fails if the confinement text does not come before a bundle's first dependency `require`.
+A `require()` or `import()` the archive cannot satisfy therefore fails instead of loading a planted file. Scope: this covers code in the three bundles that carry the intro; third-party worker threads (node-pty's ConPTY output worker), resolvers rooted outside the archive and `process.dlopen` are not covered – none takes an outside path today. A build check fails if the confinement text does not come before a bundle's first dependency `require`.
 
 ### Limits
 
@@ -283,7 +283,7 @@ A `require()` or `import()` the archive cannot satisfy therefore fails instead o
 - **macOS:** the hash is in `Info.plist`, sealed by the app's code signature; rewriting both breaks the signature.
 - **Windows (per-user install):** the hash and the fuses are inside `Erfana.exe`, and that file, its DLLs and `resources\` are writable by the same user. The integrity check raises the bar and makes tampering visible – the archive stops matching what was signed, and the Authenticode signature breaks – but it does not stop a same-user process, which can change `Erfana.exe` and its DLLs together with the archive. A per-machine install is a planned later change.
 - **Unpacked binaries** (`pty.node`, the LiteParse addon, `ffmpeg`, `ffprobe`) are not covered by the check. On macOS the code signature covers them; on Windows (per-user install) a same-user process can replace them.
-- **`Resources/node_modules` fallback:** narrowed by the module-path confinement above for every caller inside the app – CommonJS search paths and, through the resolve hook, ESM and absolute-path resolutions. Not covered: code whose own file is outside the archive (none in the app today), and native addons, which are loaded by path from `app.asar.unpacked/` (see the line above).
+- **`Resources/node_modules` fallback:** narrowed by the module-path confinement above for code in the three bundles that carry the intro – CommonJS search paths and, through the resolve hook, ESM and absolute-path resolutions. Third-party worker threads (node-pty's ConPTY output worker), resolvers rooted outside the archive and `process.dlopen` are not covered – none takes an outside path today.
 
 ### History
 

@@ -18,8 +18,8 @@ const { confineModuleSearchPaths } = require('./confineModulePaths.cjs') as {
 
 type ResolveHook = (
   specifier: string,
-  context: { parentURL?: string },
-  next: (s: string, c: { parentURL?: string }) => { url: string }
+  context: { parentURL?: string; conditions?: string[] },
+  next: (s: string, c: { parentURL?: string; conditions?: string[] }) => { url: string }
 ) => { url: string }
 
 interface FakeModule {
@@ -167,15 +167,25 @@ describe('confineModuleSearchPaths', () => {
       expect(resolve('x', {}, () => ({ url: outside })).url).toBe(outside)
     })
 
-    it('sets ERR_MODULE_NOT_FOUND on the refusal', () => {
+    const refusalCode = (conditions?: string[]): string | undefined => {
       const resolve = install()
       try {
-        resolve('evil', { parentURL }, () => ({ url: url.pathToFileURL(path.join(RES, 'node_modules', 'evil.js')).href }))
+        resolve('evil', { parentURL, conditions }, () => ({
+          url: url.pathToFileURL(path.join(RES, 'node_modules', 'evil.js')).href
+        }))
       } catch (e) {
-        expect((e as NodeJS.ErrnoException).code).toBe('ERR_MODULE_NOT_FOUND')
-        return
+        return (e as NodeJS.ErrnoException).code
       }
       throw new Error('expected a throw')
+    }
+
+    it('sets ERR_MODULE_NOT_FOUND on an import refusal', () => {
+      expect(refusalCode(['node', 'import'])).toBe('ERR_MODULE_NOT_FOUND')
+      expect(refusalCode()).toBe('ERR_MODULE_NOT_FOUND')
+    })
+
+    it('sets MODULE_NOT_FOUND on a require refusal, so optional CommonJS probes see "absent"', () => {
+      expect(refusalCode(['node', 'require'])).toBe('MODULE_NOT_FOUND')
     })
   })
 })
