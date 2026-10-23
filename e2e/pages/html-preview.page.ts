@@ -26,6 +26,7 @@
 import { expect } from '@playwright/test'
 import type { ElectronApplication, Locator, Page } from '@playwright/test'
 import { ProjectTreePage } from './project-tree.page'
+import { withLastReadError } from '../utils/bounded-exec'
 import {
   clickInPreview,
   clickTrusted,
@@ -80,12 +81,24 @@ export class HtmlPreviewPage {
     // Actual page readiness (title sentinel, script effects) is asserted by each
     // test through `snapshot()` / `eval()`; this only waits for the view to exist.
     const urlPath = segments.map(encodeURIComponent).join('/')
-    await expect
-      .poll(async () => (await this.livePreviews()).some((p) => p.url.endsWith(`/${urlPath}`)), {
-        timeout: PREVIEW_BUDGET_MS,
-        message: `no live preview appeared for ${relPath}`
-      })
-      .toBe(true)
+    await this.withReadError(
+      expect
+        .poll(async () => (await this.livePreviews()).some((p) => p.url.endsWith(`/${urlPath}`)), {
+          timeout: PREVIEW_BUDGET_MS,
+          message: `no live preview appeared for ${relPath}`
+        })
+        .toBe(true)
+    )
+  }
+
+  /**
+   * Run an assertion (usually an `expect.poll` over `snapshot()` / `eval()`)
+   * and, when it fails, name in its message the last read failure the
+   * preview reads tolerated – a capped or destroyed read – so a poll that saw
+   * only `null` says why.
+   */
+  withReadError<T>(assertion: Promise<T>): Promise<T> {
+    return withLastReadError(this.app, assertion)
   }
 
   /**
@@ -259,12 +272,14 @@ export class HtmlPreviewPage {
    * title with the sentinel embedded (`Self-contained corpus page -OK-1`).
    */
   async waitForTitled(sentinel: string): Promise<void> {
-    await expect
-      .poll(async () => (await this.livePreviews()).some((p) => p.docTitle.includes(sentinel)), {
-        timeout: PREVIEW_BUDGET_MS,
-        message: `no live preview gained the ${sentinel} sentinel`
-      })
-      .toBe(true)
+    await this.withReadError(
+      expect
+        .poll(async () => (await this.livePreviews()).some((p) => p.docTitle.includes(sentinel)), {
+          timeout: PREVIEW_BUDGET_MS,
+          message: `no live preview gained the ${sentinel} sentinel`
+        })
+        .toBe(true)
+    )
   }
 
   /**
