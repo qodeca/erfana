@@ -59,13 +59,18 @@ afterEach(() => {
 describe('readManifestVersions', () => {
   it('reads the app version, the Electron major, range and locked version', () => {
     manifests()
-    expect(readManifestVersions(dir)).toEqual({ app: '0.21.0', electron: '44', range: '44.9.0', locked: '44.9.0' })
+    expect(readManifestVersions(dir)).toEqual({ app: '0.21.0', electron: '44', range: '^44.9.0', locked: '44.9.0' })
   })
 
   it('accepts a ~ range and an electron entry under dependencies', () => {
     put('package.json', JSON.stringify({ version: '1.2.3', dependencies: { electron: '~45.1.0' } }))
     put('package-lock.json', JSON.stringify({ packages: { 'node_modules/electron': { version: '45.1.2' } } }))
-    expect(readManifestVersions(dir)).toEqual({ app: '1.2.3', electron: '45', range: '45.1.0', locked: '45.1.2' })
+    expect(readManifestVersions(dir)).toEqual({ app: '1.2.3', electron: '45', range: '~45.1.0', locked: '45.1.2' })
+  })
+
+  it('accepts an exact pin and keeps it as written', () => {
+    manifests({ electron: '44.9.0' })
+    expect(readManifestVersions(dir)).toMatchObject({ electron: '44', range: '44.9.0' })
   })
 
   it('refuses a version that is not X.Y.Z', () => {
@@ -125,8 +130,19 @@ describe('check-version-drift main', () => {
     const out = lines.join('\n')
     expect(out).toContain(`Version drift in ${CLAIMS.length - 1} of ${CLAIMS.length}`)
     expect(out).toContain('SDLC.md:2 says 44; expected 45 (electron)')
-    expect(out).toContain('docs/security.md:5 says 44.9.0; expected 45.0.0 (range)')
+    expect(out).toContain('docs/security.md:5 says ^44.9.0; expected ^45.0.0 (range)')
     expect(out).toContain('docs/getting-started.md:1 says 44.9.0; expected 45.0.1 (locked)')
+  })
+
+  it('catches the range moving from ^ to ~ or to an exact pin, with the version unchanged', () => {
+    for (const declared of ['~44.9.0', '44.9.0']) {
+      manifests({ electron: declared })
+      const { lines, log } = capture()
+      expect(main(dir, CLAIMS, log)).toBe(1)
+      const out = lines.join('\n')
+      expect(out).toContain(`Version drift in 1 of ${CLAIMS.length}`)
+      expect(out).toContain(`docs/security.md:5 says ^44.9.0; expected ${declared} (range)`)
+    }
   })
 
   it('fails when a claimed phrase was reworded away', () => {
@@ -134,7 +150,24 @@ describe('check-version-drift main', () => {
     put('SDLC.md', '| Stack | TypeScript strict, React |\n')
     const { lines, log } = capture()
     expect(main(dir, CLAIMS, log)).toBe(1)
-    expect(lines.join('\n')).toMatch(/SDLC\.md: phrase not found/)
+    expect(lines.join('\n')).toMatch(/SDLC\.md: phrase matched 0 times/)
+  })
+
+  it('fails when a claimed phrase matches more than once, even if the first copy is right', () => {
+    manifests()
+    put(
+      'CLAUDE.md',
+      [
+        '- **Current version**: v0.21.0 (see docs/CHANGELOG.md)',
+        '- **Node Version**: 24+ (development), Electron 44 bundles Node.js 24.22.0',
+        '- **Current version**: v0.20.1 (a stale second copy)',
+      ].join('\n'),
+    )
+    const { lines, log } = capture()
+    expect(main(dir, CLAIMS, log)).toBe(1)
+    const out = lines.join('\n')
+    expect(out).toContain('Version drift in 1 of')
+    expect(out).toMatch(/CLAUDE\.md:1: phrase matched 2 times/)
   })
 
   it('fails when a claimed file is missing', () => {

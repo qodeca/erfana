@@ -145,6 +145,8 @@ git status --porcelain
 
 ### 0.3 Version + CHANGELOG gate
 
+**Pre-skill checklist**, in the version-bump commit before the skill is invoked: fold the `changelog.d/` fragments below `## [Unreleased]`, bump the CLAUDE.md banner, run `npm run check:version-drift`.
+
 Ask the operator (AskUserQuestion) for the **bump type** (patch / minor / major). The skill computes the proposed version from `package.json`. Then:
 
 ```bash
@@ -365,10 +367,10 @@ npm install --package-lock-only --ignore-scripts
 
 # One commit bundles: package.json bump (already done pre-skill or done here),
 # the lockfile's copy of it, CHANGELOG append (pre-skill), release notes file,
-# and the root CLAUDE.md "Current version" banner, which carries a third copy of
-# the version and is easy to leave behind (§0.4.7 fails on it, but only at
-# release time). `git add` tolerates an unchanged path, so listing it is safe
-# even when the bump shipped earlier.
+# and the root CLAUDE.md "Current version" banner, a third copy of the version.
+# The banner is already bumped by now: the pre-skill checklist (§0.3) bumps it
+# and §0.4.7 fails if it was not, so CLAUDE.md is normally unchanged here.
+# `git add` tolerates an unchanged path, so listing it is safe.
 git add package.json package-lock.json docs/CHANGELOG.md \
   "docs/release-notes/v${VERSION}.md" CLAUDE.md
 

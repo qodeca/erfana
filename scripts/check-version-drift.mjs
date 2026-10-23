@@ -10,11 +10,14 @@
 //
 //   app       – `version` in package.json
 //   electron  – the Electron major, from the `electron` range in package.json
-//   range     – that range without its `^` / `~` prefix (`^44.9.0` -> 44.9.0)
+//   range     – that range exactly as declared (`^44.9.0`), so a move to `~`
+//               or to an exact pin is caught too
 //   locked    – the Electron version resolved in package-lock.json
 //
-// A claim whose phrase is no longer in its file fails too, because a reworded
-// line would otherwise pass unchecked: update CLAIMS in the same change.
+// Each phrase must match exactly once in its file. One that is no longer there
+// fails, because a reworded line would otherwise pass unchecked; one that
+// matches twice fails too, because only one of the two would be checked.
+// Either way, update the doc or CLAIMS in the same change.
 // Historical lines ("measured on Electron 39") are deliberately not listed.
 // The Windows status-snapshot anchor has its own gate (`windows_snapshot` in
 // .claude/agents/release-quality-runner.md) and is not repeated here.
@@ -41,14 +44,15 @@ export const CLAIMS = [
   { file: 'docs/security.md', source: 'electron', pattern: /^\*\*Last Updated\*\*: [^\n(]*\(Electron (\d+)\)/m },
   { file: 'docs/security.md', source: 'electron', pattern: /the app now runs Electron (\d+)\b/ },
   { file: 'docs/security.md', source: 'electron', pattern: /Full support for Electron (\d+)\.x/ },
-  { file: 'docs/security.md', source: 'range', pattern: /\(`\^(\d+\.\d+\.\d+)` in `package\.json`/ },
+  { file: 'docs/security.md', source: 'range', pattern: /\(`([\^~]?\d+\.\d+\.\d+)` in `package\.json`/ },
   { file: 'docs/security.md', source: 'locked', pattern: /, (\d+\.\d+\.\d+) in the lockfile\)/ },
   { file: 'docs/ui-style-guide.md', source: 'electron', pattern: /via Electron (\d+)\.x\b/ },
   { file: 'docs/terminal/flickering-prevention.md', source: 'electron', pattern: /The app now runs Electron (\d+)\b/ },
 ]
 
 const SEMVER = /^(\d+)\.(\d+)\.(\d+)$/
-const RANGE_PREFIX = /^[\^~]/
+/** `^X.Y.Z`, `~X.Y.Z` or an exact `X.Y.Z` pin; the group is the major. */
+const DECLARED_RANGE = /^[\^~]?(\d+)\.\d+\.\d+$/
 
 function readJson(root, rel) {
   return JSON.parse(readFileSync(path.join(root, rel), 'utf8'))
@@ -66,16 +70,21 @@ export function readManifestVersions(root) {
     throw new Error(`package.json "version" is not X.Y.Z: ${JSON.stringify(pkg.version)}`)
   }
   const declared = pkg.devDependencies?.electron ?? pkg.dependencies?.electron
-  const range = typeof declared === 'string' ? declared.replace(RANGE_PREFIX, '') : ''
-  const rangeParts = SEMVER.exec(range)
+  const rangeParts = typeof declared === 'string' ? DECLARED_RANGE.exec(declared) : null
   if (!rangeParts) {
-    throw new Error(`package.json "electron" is not ^X.Y.Z or ~X.Y.Z: ${JSON.stringify(declared)}`)
+    throw new Error(`package.json "electron" is not ^X.Y.Z, ~X.Y.Z or X.Y.Z: ${JSON.stringify(declared)}`)
   }
   const locked = lock.packages?.['node_modules/electron']?.version
   if (typeof locked !== 'string' || !SEMVER.test(locked)) {
     throw new Error(`package-lock.json has no resolved electron version: ${JSON.stringify(locked)}`)
   }
-  return { app: pkg.version, electron: rangeParts[1], range, locked }
+  return { app: pkg.version, electron: rangeParts[1], range: declared, locked }
+}
+
+/** Every match of a claim's phrase; the pattern gains the global flag here. */
+function allMatches(pattern, text) {
+  const flags = pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`
+  return [...text.matchAll(new RegExp(pattern.source, flags))]
 }
 
 function lineOf(text, index) {
@@ -94,10 +103,13 @@ export function checkClaims(claims, versions, readText) {
     if (text === null) {
       return { claim, line: 0, found: null, expected, ok: false, reason: 'file not found' }
     }
-    const match = claim.pattern.exec(text)
-    if (!match) {
-      return { claim, line: 0, found: null, expected, ok: false, reason: 'phrase not found' }
+    const matches = allMatches(claim.pattern, text)
+    if (matches.length !== 1) {
+      const line = matches.length > 0 ? lineOf(text, matches[0].index) : 0
+      const reason = `phrase matched ${matches.length} times`
+      return { claim, line, found: null, expected, ok: false, reason }
     }
+    const [match] = matches
     const found = match[1]
     const ok = found === expected
     return { claim, line: lineOf(text, match.index), found, expected, ok, reason: ok ? '' : 'drift' }

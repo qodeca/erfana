@@ -94,7 +94,7 @@ those lines with the package manifests:
 |---|---|
 | `CLAUDE.md` "Current version" banner | `package.json` `"version"` |
 | The Electron major in `CLAUDE.md`, `SDLC.md` (stack row), `CONTRIBUTING.md`, `docs/security.md`, `docs/ui-style-guide.md`, `docs/terminal/flickering-prevention.md` | the major of the `electron` range in `package.json` |
-| The range quoted in `docs/security.md` | that range, without `^` |
+| The range quoted in `docs/security.md` | that range exactly as declared (`^44.9.0`), so a move to `~` or to an exact pin fails too |
 | The full Electron version in `docs/getting-started.md` and `docs/security.md` | the `electron` version resolved in `package-lock.json` |
 
 The exact lines are the `CLAIMS` list at the top of the script.
@@ -104,10 +104,11 @@ The exact lines are the `CLAIMS` list at the top of the script.
 - **Strict equality, after the version bump** — the same timing as §0.4.6: at Phase 0
   `package.json` already carries the version about to be tagged, so the banner must
   already say it.
-- **A reworded line fails too.** A claim whose phrase is no longer in its file is
-  reported as `phrase not found`, not skipped: a line that stops matching would
-  otherwise pass unchecked for good. Rewording such a line means updating `CLAIMS` in
-  the same change.
+- **Each phrase must match exactly once.** Any other count is reported as
+  `phrase matched N times`, not skipped: a line that stops matching would otherwise
+  pass unchecked for good, and with two matches only the first would be checked.
+  Rewording or copying such a line means updating the doc or `CLAIMS` in the same
+  change.
 - **Historical lines are not claims.** "Measured on Electron 39" in a design note or
   spike is a record, not a statement of what ships, and is deliberately not listed.
 - **Not covered here:** the Windows status-snapshot anchor (§0.4.6 owns it), and the
