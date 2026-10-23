@@ -14,7 +14,14 @@
  *   teardown every exit path (unmount, project switch, restart) goes through
  *
  * Every timer id and every unsubscribe function lives in a ref, so the
- * teardown can reach all of them (lens review [51], [52], [53]). Before this
+ * teardown can reach all of them (lens review [51], [52], [53]).
+ *
+ * Start-up is guarded (lens review [18]). Each teardown bumps a generation
+ * counter; a start checks it after every await and gives up when it changed,
+ * killing a PTY that main created for it in the meantime. Only one start runs
+ * per generation – a second call joins the one in flight – so a remount, a
+ * restart or a fast project switch can never open two xterms, start two PTYs
+ * or attach a late PTY's output to the terminal that replaced it. Before this
  * hook the panel had three hand-maintained teardown copies that had drifted
  * apart: the one-time clear listener and the test-hook registration survived a
  * restart, and the fit and WebGL-recovery timers could fire on a disposed
@@ -157,11 +164,13 @@ export interface UseXtermSessionReturn {
   /**
    * Create the xterm instance and its PTY. Waits for the container to become
    * visible first when it is hidden. Errors are reported through `error`,
-   * never thrown.
+   * never thrown. A call while a start of the same generation is running
+   * returns that start's promise; a call while a session is live does nothing.
    */
   start: () => Promise<void>
   /**
-   * The single teardown. Synchronously, in this order: clears every timer,
+   * The single teardown. Synchronously, in this order: invalidates a start in
+   * flight (see the module doc), clears every timer,
    * stops a deferred start, removes every listener, releases the session in
    * the app stores, disposes xterm and nulls its refs; then kills the PTY.
    *
@@ -221,6 +230,10 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
   const contextMenuHandlerRef = useRef<((e: MouseEvent) => void) | null>(null)
   const parserDisposablesRef = useRef<Disposable[]>([])
   const inputDisposableRef = useRef<Disposable | null>(null)
+
+  // Start-up guard ([18]): bumped by every teardown, checked after every await
+  const generationRef = useRef(0)
+  const inFlightStartRef = useRef<{ generation: number; promise: Promise<void> } | null>(null)
 
   // Deferred start while the container is hidden
   const pendingStartRef = useRef(false)
@@ -290,6 +303,10 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
     ({ resetState }: TeardownOptions): Promise<void> => {
       const id = terminalIdRef.current
 
+      // 0. Invalidate a start still in flight: it gives up at its next await
+      generationRef.current += 1
+      inFlightStartRef.current = null
+
       // 1. Timers, so none fires on what is torn down below
       for (const timerRef of [fitTimerRef, webglRecoveryTimerRef, claudeNudgeTimerRef]) {
         if (timerRef.current) clearTimeout(timerRef.current)
@@ -313,6 +330,7 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
       inputDisposableRef.current = null
 
       // 4. The session in the app stores: no active terminal, no Claude tracking (#216)
+      terminalIdRef.current = null
       shellKindRef.current = null
       useTerminalStore.getState().setActiveTerminal(null)
       if (id) {
@@ -348,8 +366,19 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
   )
 
   // Stable identity; the implementation below is republished each render
-  const startImplRef = useRef<() => Promise<void>>(() => Promise.resolve())
-  const start = useCallback(() => startImplRef.current(), [])
+  const startImplRef = useRef<(generation: number) => Promise<void>>(() => Promise.resolve())
+  const start = useCallback((): Promise<void> => {
+    const generation = generationRef.current
+    // One start per generation: a second call (a remount, an effect re-run,
+    // a restart racing a project switch) joins the one already running
+    const inFlight = inFlightStartRef.current
+    if (inFlight && inFlight.generation === generation) return inFlight.promise
+    const promise: Promise<void> = startImplRef.current(generation).finally(() => {
+      if (inFlightStartRef.current?.promise === promise) inFlightStartRef.current = null
+    })
+    inFlightStartRef.current = { generation, promise }
+    return promise
+  }, [])
 
   /** Defer the start until the container has a size (xterm cannot open hidden) */
   const waitForVisibility = (container: HTMLElement): void => {
@@ -372,9 +401,11 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
   }
 
   /** Load the GPU renderer after open(); on context loss try once, then stay on canvas */
-  const loadWebgl = async (xterm: Terminal): Promise<void> => {
+  const loadWebgl = async (xterm: Terminal, isCurrent: () => boolean): Promise<void> => {
     try {
       const { WebglAddon } = await import('@xterm/addon-webgl')
+      // Torn down during the import: the instance is already disposed
+      if (!isCurrent()) return
       const webglAddon = new WebglAddon()
       webglAddon.onContextLoss(() => {
         logger.warn('WebGL context lost, attempting recovery')
@@ -424,9 +455,13 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
     handlers.attachFileDrop(xterm, terminalIdRef)
   }
 
-  const startImpl = async (): Promise<void> => {
+  const startImpl = async (generation: number): Promise<void> => {
+    // False once a teardown ran after this start began
+    const isCurrent = (): boolean => generation === generationRef.current
     const container = containerRef.current
     if (!container) return
+    // A session already lives in this generation; a second one would orphan it
+    if (xtermRef.current) return
     if (!isElementVisible(container)) {
       waitForVisibility(container)
       return
@@ -449,11 +484,16 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
       // xterm measures glyphs at open(); a web font that has not loaded yet
       // would be cached as fallback metrics and misalign the grid later
       await ensureTerminalFontLoaded()
-      if (!containerRef.current) {
+      // Not in the refs yet, so nothing else would dispose it
+      if (!isCurrent() || !containerRef.current) {
         xterm.dispose()
         return
       }
       xterm.open(containerRef.current)
+      // In the refs from here on, so a teardown during the awaits below
+      // disposes this instance and releases what is attached to it
+      xtermRef.current = xterm
+      fitAddonRef.current = fitAddon
 
       // --- attach ---
       attachHandlers(xterm)
@@ -461,10 +501,9 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
       xterm.clear()
       xterm.write(CLEAR_SEQUENCE)
       // After open(): loading it earlier breaks canvas rendering in Electron
-      await loadWebgl(xterm)
+      await loadWebgl(xterm, isCurrent)
+      if (!isCurrent()) return
 
-      xtermRef.current = xterm
-      fitAddonRef.current = fitAddon
       fitTimerRef.current = setTimeout(() => {
         fitTimerRef.current = null
         if (xtermRef.current === xterm) fitAddon.fit()
@@ -481,28 +520,39 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
         xterm.write(CLEAR_SEQUENCE, () => {
           logger.info('[INIT] Clear sequence complete, confirming once the data listener is attached')
           confirmWhenDataListening(id, () => terminalGateway.markClearComplete(id))
-          // One clear per session: drop the listener now that it has run
-          clearUnsubscribeRef.current?.()
-          clearUnsubscribeRef.current = null
+          // One clear per session: drop this listener – only this one, the ref
+          // may already hold the next session's
+          unsubscribeClear()
+          if (clearUnsubscribeRef.current === unsubscribeClear) clearUnsubscribeRef.current = null
         })
       }
-      clearUnsubscribeRef.current = terminalGateway.onClear((data) => {
+      const unsubscribeClear = terminalGateway.onClear((data) => {
         if (createdId === null) {
           earlyClearIds.add(data.terminalId)
           return
         }
         if (data.terminalId === createdId) runClear(createdId)
       })
+      clearUnsubscribeRef.current = unsubscribeClear
 
       // No cwd: main opens the terminal in the session's project root, so a
       // stale path during a project switch cannot fail the start
       const result = await terminalGateway.create({ cols: xterm.cols, rows: xterm.rows })
+      if (!isCurrent()) {
+        // Torn down while main was creating it: nothing owns this PTY, so end
+        // it here rather than leave a shell running with no terminal
+        if (result.success) killOrphan(result.terminalId)
+        return
+      }
       if (!result.success) {
         throw new Error(result.error || 'Failed to create terminal')
       }
 
       const id = result.terminalId
       createdId = id
+      // Synchronously, not only through the state effect: a teardown before
+      // the next commit must still see the id, or it could not kill the PTY
+      terminalIdRef.current = id
       setTerminalId(id)
       if (earlyClearIds.has(id)) runClear(id)
       testTerminalUnregisterRef.current = registerTestTerminal(id, xterm)
@@ -521,6 +571,11 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
         terminalGateway.write(id, data)
       })
     } catch (err) {
+      if (!isCurrent()) {
+        // The listeners in the refs now belong to the next session, or to none
+        logger.warn('Superseded terminal start failed', errorFields(err))
+        return
+      }
       releaseStartListeners()
       logger.error('Failed to initialize terminal', err instanceof Error ? err : undefined)
       setError(err instanceof Error ? err.message : String(err))
@@ -545,6 +600,18 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
     onDataListenerAttached,
     onDataListenerDetached
   }
+}
+
+/** End a PTY that main created for a start that was torn down meanwhile */
+function killOrphan(terminalId: string): void {
+  logger.info('Killing a terminal created after its start was superseded')
+  void (async () => {
+    try {
+      await terminalGateway.kill(terminalId)
+    } catch (err) {
+      logger.error('Failed to kill superseded terminal', err instanceof Error ? err : undefined)
+    }
+  })()
 }
 
 /** Log fields for an unknown thrown value */

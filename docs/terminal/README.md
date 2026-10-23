@@ -512,6 +512,8 @@ See [Terminal Architecture Review](../architecture-reviews/reviews/terminal-pane
 
 **Teardown order** (`teardownTerminal`, fixed): clear the fit, WebGL-recovery and Claude-nudge timers; stop a start that is waiting for visibility; remove the start-up clear listener, the test-hook registration, the file-drop, context-menu and input listeners and the parser hooks; clear the active terminal and Claude tracking; dispose xterm and null its refs; then kill the PTY. Restart and project switch await the kill before starting the next session.
 
+**Start-up guard** (lens review [18]): every teardown bumps a generation counter, and a start checks it after each await (font load, WebGL import, `terminal:create`). A start that finds it changed gives up – disposing its xterm if it was never stored, and killing a PTY main created for it in the meantime – so its id is never set and its output never reaches the terminal that replaced it. Only one start runs per generation: a second `start()` joins the one in flight, and a `start()` while a session is live does nothing.
+
 ### State Management
 
 **File**: `src/renderer/src/stores/useTerminalStore.ts`
