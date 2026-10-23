@@ -14,7 +14,8 @@ import {
   resolveFromIndex,
   resolvePathSmartSync,
   resolvePathSmart,
-  createSmartResolver
+  createSmartResolver,
+  mergeNameSearch
 } from './smartPathResolver.logic'
 import { createFilenameIndex, type FilenameIndex } from './filenameIndex'
 import type { FileNode } from '../../../preload/index'
@@ -393,13 +394,13 @@ describe('smartPathResolver', () => {
     })
   })
 
-  describe('on a truncated tree (finding 32, PR #320 review item 2)', () => {
+  describe('on a truncated tree (finding 32, PR #320 review)', () => {
     const tree: FileNode[] = [
       { name: 'Button.tsx', path: '/project/src/Button.tsx', type: 'file', extension: '.tsx' },
       { name: 'big', path: '/project/big', type: 'directory', children: [], lazy: 'capped' }
     ]
 
-    it('offers a single index match for choosing instead of opening it', async () => {
+    it('offers a single index match for choosing, marked incomplete, without searching', async () => {
       const result = await resolvePathSmart({
         path: 'Button.tsx', cwd: null, projectRoot: '/project', index: createFilenameIndex(), files: tree,
         treeTruncated: true
@@ -410,70 +411,40 @@ describe('smartPathResolver', () => {
       expect(result.incomplete).toBe(true)
     })
 
-    it('also searches when the index has the name, and offers both, once each (review of #320, item 4)', async () => {
-      const searchByName = vi.fn(async () => ({
-        paths: ['/project/src/Button.tsx', '/project/big/Button.tsx'],
-        truncated: true
-      }))
-
-      const result = await resolvePathSmart({
-        path: 'Button.tsx', cwd: null, projectRoot: '/project', index: createFilenameIndex(), files: tree,
-        treeTruncated: true, searchByName
-      })
-
-      expect(searchByName).toHaveBeenCalledWith('Button.tsx')
-      expect(result.status).toBe('multiple-matches')
-      expect(result.candidates?.map((c) => c.path).sort()).toEqual(['/project/big/Button.tsx', '/project/src/Button.tsx'])
-      expect(result.incomplete).toBe(true)
-    })
-
-    it('dedupes a search result that names an index match with the other separator', async () => {
-      const searchByName = vi.fn(async () => ({ paths: ['\\project\\src\\Button.tsx'], truncated: false }))
-      const winTree: FileNode[] = [
-        { name: 'Button.tsx', path: '/project/src/Button.tsx', type: 'file', extension: '.tsx' }
-      ]
-
-      const result = await resolvePathSmart({
-        path: 'Button.tsx', cwd: null, projectRoot: '/project', index: createFilenameIndex(), files: winTree,
-        treeTruncated: true, searchByName
-      })
-
-      expect(result.candidates).toHaveLength(1)
-    })
-
     it('keeps a single match certain when the tree is complete', async () => {
       const result = await resolvePathSmart({
         path: 'Button.tsx', cwd: null, projectRoot: '/project', index: createFilenameIndex(), files: tree
       })
       expect(result.status).toBe('single-match')
+      expect(result.incomplete).toBeUndefined()
     })
 
-    it('searches on disk for a name the index lacks, and offers every result', async () => {
-      const searchByName = vi.fn(async () => ({ paths: ['/project/big/Card.tsx'], truncated: false }))
-
+    it('leaves a name the index lacks unresolved: the search waits for a click', async () => {
       const result = await resolvePathSmart({
         path: 'Card.tsx:12', cwd: null, projectRoot: '/project', index: createFilenameIndex(), files: tree,
-        treeTruncated: true, searchByName
+        treeTruncated: true
       })
+      expect(result.status).toBe('no-match')
+    })
+  })
 
-      expect(searchByName).toHaveBeenCalledWith('Card.tsx')
-      expect(result.status).toBe('multiple-matches')
-      expect(result.candidates?.map((c) => c.path)).toEqual(['/project/big/Card.tsx'])
+  describe('mergeNameSearch (round 3, item 3)', () => {
+    it('offers the index matches and the search results once each, ranked', () => {
+      const candidates = mergeNameSearch(
+        ['/project/src/Button.tsx'],
+        { paths: ['/project/src/Button.tsx', '/project/big/Button.tsx'], truncated: true },
+        'Button.tsx'
+      )
+      expect(candidates.map((c) => c.path).sort()).toEqual(['/project/big/Button.tsx', '/project/src/Button.tsx'])
     })
 
-    it('does not search when the tree is complete, or when the search finds nothing', async () => {
-      const searchByName = vi.fn(async () => ({ paths: [] as string[], truncated: false }))
-      const complete = await resolvePathSmart({
-        path: 'Card.tsx', cwd: null, projectRoot: '/project', index: createFilenameIndex(), files: tree, searchByName
-      })
-      expect(complete.status).toBe('no-match')
-      expect(searchByName).not.toHaveBeenCalled()
-
-      const empty = await resolvePathSmart({
-        path: 'Card.tsx', cwd: null, projectRoot: '/project', index: createFilenameIndex(), files: tree,
-        treeTruncated: true, searchByName
-      })
-      expect(empty.status).toBe('no-match')
+    it('dedupes a search result that names an index match with the other separator', () => {
+      const candidates = mergeNameSearch(
+        ['/project/src/Button.tsx'],
+        { paths: ['\\project\\src\\Button.tsx'], truncated: false },
+        'Button.tsx'
+      )
+      expect(candidates).toHaveLength(1)
     })
   })
 })

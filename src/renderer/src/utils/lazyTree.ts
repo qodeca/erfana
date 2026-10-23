@@ -62,7 +62,9 @@ export function isUnreadLazy(
  * Whether a merged tree is missing files a walk bound left out: some `capped`
  * folder in it is unread ({@link isUnreadLazy}). `ignored` folders do not
  * count – their files are left out by design – and neither do `linked` ones,
- * whose files the tree shows under the folder the link leads to.
+ * whose files the tree shows under the folder the link leads to: nor does
+ * anything below one, such as the `capped` sub-folders an expand read of it
+ * lists, since those too are shown under the real folder.
  */
 export function hasUnloadedCapped(
   nodes: FileNode[],
@@ -71,6 +73,7 @@ export function hasUnloadedCapped(
 ): boolean {
   for (const node of nodes) {
     if (node.type !== 'directory') continue
+    if (node.lazy === 'linked') continue
     if (node.lazy === 'capped' && isUnreadLazy(node.path, loaded, status)) return true
     if (node.children && hasUnloadedCapped(node.children, loaded, status)) return true
   }

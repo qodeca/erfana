@@ -480,6 +480,13 @@ describe('file:* path checks', () => {
       await expect(invoke('file:checkConflict', path.join(root, 'missing-dir'), 'x')).resolves.toBe(false)
     })
 
+    it('passes the generation it checked the request under to the search (round 3, item 4)', async () => {
+      const search = vi.spyOn(fileService, 'findByName')
+      await invoke('file:findByName', root, 'a.md')
+      expect(search).toHaveBeenCalledWith(root, 'a.md', expect.any(String), expect.any(Number))
+      search.mockRestore()
+    })
+
     it('searches by name from the project root only (review of #320, item 9)', async () => {
       await expect(invoke('file:findByName', path.join(root, 'sub'), 'a.md')).rejects.toThrow(
         'Path is not the kind of item this action needs'

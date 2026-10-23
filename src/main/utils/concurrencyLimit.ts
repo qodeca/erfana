@@ -14,13 +14,13 @@ export interface ConcurrencyLimit {
   run<T>(task: () => Promise<T>): Promise<T>
 }
 
+/** Taken entries the queue keeps before it compacts */
+const COMPACT_AFTER = 1024
+
 /**
  * @param max - The most tasks in flight at once; at least 1
  * @returns A limiter whose slots are shared by every `run` call on it
  */
-/** Taken entries the queue keeps before it compacts */
-const COMPACT_AFTER = 1024
-
 export function createConcurrencyLimit(max: number): ConcurrencyLimit {
   if (!Number.isInteger(max) || max < 1) throw new Error('Invalid concurrency limit')
   let active = 0

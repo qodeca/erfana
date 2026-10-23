@@ -16,7 +16,9 @@ import {
   FIND_BY_NAME_TIME_LIMIT_MS,
   createFindByNameGate,
   findByName,
-  type FindByNameResult
+  startFindByName,
+  type FindByNameResult,
+  type FindByNameRun
 } from './findByName'
 
 let base: string
@@ -218,49 +220,142 @@ describe('findByName – bounds (review of #320)', () => {
 })
 
 describe('createFindByNameGate', () => {
-  const deferred = () => {
-    let resolve!: (r: FindByNameResult) => void
-    const promise = new Promise<FindByNameResult>((r) => (resolve = r))
-    return { promise, resolve }
-  }
   const done: FindByNameResult = { paths: [], truncated: false }
+  /** A search whose answer and whose last read the test settles */
+  const controlled = () => {
+    let answer!: (r: FindByNameResult) => void
+    let settle!: () => void
+    const run: FindByNameRun = {
+      result: new Promise<FindByNameResult>((r) => (answer = r)),
+      idle: new Promise<void>((r) => (settle = r))
+    }
+    return { run, answer, settle }
+  }
+  const instant = (): FindByNameRun => ({ result: Promise.resolve(done), idle: Promise.resolve() })
+  const flush = async (): Promise<void> => {
+    for (let i = 0; i < 5; i++) await Promise.resolve()
+  }
 
   it('runs at most two searches at once and the rest in turn', async () => {
     const gate = createFindByNameGate(2, 8)
-    const searches = [deferred(), deferred(), deferred()]
+    const searches = [controlled(), controlled(), controlled()]
     let started = 0
-    const results = searches.map((d, i) => gate.run(`k${i}`, () => (started++, d.promise)))
-    await Promise.resolve()
+    const results = searches.map((c, i) => gate.run(`k${i}`, () => (started++, c.run)))
     expect(started).toBe(2)
-    searches[0].resolve(done)
+    searches[0].answer(done)
+    searches[0].settle()
     await results[0]
-    await Promise.resolve()
+    await flush()
     expect(started).toBe(3)
-    searches[1].resolve(done)
-    searches[2].resolve(done)
+    for (const c of searches.slice(1)) {
+      c.answer(done)
+      c.settle()
+    }
     await Promise.all(results)
   })
 
-  it('shares a search by key, and runs it again once it has ended', async () => {
+  it('keeps a slot taken after the answer while a read of the search is in flight (review of #320, round 3)', async () => {
+    const gate = createFindByNameGate(1, 8, 10_000)
+    const hung = controlled()
+    const first = gate.run('a', () => hung.run)
+    hung.answer(done)
+    await first
+    await flush()
+    expect(gate.running).toBe(1)
+    let started = false
+    const second = gate.run('b', () => ((started = true), instant()))
+    await flush()
+    expect(started).toBe(false)
+
+    hung.settle()
+    await expect(second).resolves.toEqual(done)
+    expect(started).toBe(true)
+  })
+
+  it('answers a waiting call truncated at its own deadline, and never starts its search', async () => {
+    const gate = createFindByNameGate(1, 8, 20)
+    const hung = controlled()
+    void gate.run('a', () => hung.run)
+    let started = false
+    const start = performance.now()
+
+    const waited = await gate.run('b', () => ((started = true), instant()))
+
+    expect(waited).toEqual({ paths: [], truncated: true })
+    expect(performance.now() - start).toBeLessThan(1_000)
+    hung.settle()
+    await flush()
+    expect(started).toBe(false)
+    expect(gate.running).toBe(0)
+  })
+
+  it('bounds hung reads on a stale mount: two searches hold their slots, later calls answer truncated', async () => {
+    let hungReads = 0
+    const readdir = (dir: string): Promise<Dirent[]> => {
+      if (dir === '/r') return later(Array.from({ length: 40 }, (_, i) => fakeDirent(`d${i}`, 'dir')))
+      hungReads++
+      return new Promise<Dirent[]>(() => {})
+    }
+    // Each search's deadline is 10 ms after its timer is set; its reads start before that
+    const clock = (): (() => number) => {
+      const ticks = [0, FIND_BY_NAME_TIME_LIMIT_MS - 10]
+      return () => (ticks.length > 1 ? ticks.shift()! : ticks[0])
+    }
+    const gate = createFindByNameGate(2, 8, 20)
+    const search = () => startFindByName('/r', 'x.md', { ...noSkip, readdir, now: clock() })
+
+    const answers = []
+    for (let i = 0; i < 6; i++) answers.push(await gate.run(`k${i}`, search))
+
+    expect(gate.running).toBe(2)
+    expect(hungReads).toBeLessThanOrEqual(2 * FIND_BY_NAME_CONCURRENCY)
+    expect(answers.slice(2)).toEqual(Array(4).fill({ paths: [], truncated: true }))
+  })
+
+  it('shares a search by key, and runs it again once it has answered', async () => {
     const gate = createFindByNameGate(2, 8)
     let runs = 0
-    const search = async (): Promise<FindByNameResult> => (runs++, done)
+    const search = (): FindByNameRun => (runs++, instant())
     await Promise.all([gate.run('k', search), gate.run('k', search)])
     expect(runs).toBe(1)
     await gate.run('k', search)
     expect(runs).toBe(2)
   })
 
-  it('answers truncated at once when too many searches wait', async () => {
-    const gate = createFindByNameGate(1, 1)
-    const busy = deferred()
-    const first = gate.run('a', () => busy.promise)
-    const second = gate.run('b', async () => done)
+  it('answers truncated at once when too many calls wait', async () => {
+    const gate = createFindByNameGate(1, 1, 10_000)
+    const busy = controlled()
+    const first = gate.run('a', () => busy.run)
+    const second = gate.run('b', instant)
     let ran = false
-    const third = await gate.run('c', async () => ((ran = true), done))
+    const third = await gate.run('c', () => ((ran = true), instant()))
     expect(third).toEqual({ paths: [], truncated: true })
     expect(ran).toBe(false)
-    busy.resolve(done)
+    busy.answer(done)
+    busy.settle()
     await Promise.all([first, second])
+  })
+})
+
+describe('startFindByName', () => {
+  it('is idle only once no read is in flight, and answers before that at the deadline', async () => {
+    const clock = [0, FIND_BY_NAME_TIME_LIMIT_MS - 10]
+    const now = (): number => (clock.length > 1 ? clock.shift()! : clock[0])
+    let release!: () => void
+    const readdir = (dir: string): Promise<Dirent[]> =>
+      dir === '/r'
+        ? later([fakeDirent('slow', 'dir')])
+        : new Promise<Dirent[]>((resolve) => (release = () => resolve([])))
+    const run = startFindByName('/r', 'x.md', { ...noSkip, now, readdir })
+    let idle = false
+    void run.idle.then(() => (idle = true))
+
+    await expect(run.result).resolves.toEqual({ paths: [], truncated: true })
+    await later(null)
+    expect(idle).toBe(false)
+
+    release()
+    await run.idle
+    expect(idle).toBe(true)
   })
 })

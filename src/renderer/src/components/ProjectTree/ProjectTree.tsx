@@ -186,7 +186,16 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
 
   // The tree as rendered and operated on: the base tree with the children of
   // the lazy folders (ignored, or past the walk's cap) read on expand
-  const { tree: files, status: lazyStatus, loaded: lazyLoaded } = useLazyFolderChildren(baseFiles, expandedFolders)
+  // Only lazy folders in view are read: below the root row, through the filter shown
+  const lazyView = useMemo(
+    () => ({ rootPath: projectPath, filter: filterMode === 'markdown' ? filterMarkdownTree : undefined }),
+    [projectPath, filterMode]
+  )
+  const {
+    tree: files,
+    status: lazyStatus,
+    loaded: lazyLoaded
+  } = useLazyFolderChildren(baseFiles, expandedFolders, lazyView)
 
   // Register for project change notifications to reset UI state.
   // Still required for IN-PLACE changes (a project change that does not remount

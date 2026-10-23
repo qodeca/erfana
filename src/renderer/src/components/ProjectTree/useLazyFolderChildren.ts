@@ -44,7 +44,7 @@ function foldersWithChildren(nodes: FileNode[], into: Map<string, FileNode[]> = 
 
 /**
  * The lazy folders in view and expanded: reached from the top through
- * expanded folders only.
+ * expanded folders only (of the tree as shown – filtered, below the root row).
  */
 export function visibleExpandedLazy(nodes: FileNode[], expanded: ReadonlySet<string>, into: string[] = []): string[] {
   for (const node of nodes) {
@@ -88,16 +88,30 @@ export function reconcileLazyState(
   return next ?? loaded
 }
 
+/** What the panel shows of the tree: which rows are in view decides what is read. */
+export interface LazyFolderView {
+  /** The project root row's path: nothing is in view while it is collapsed */
+  readonly rootPath?: string | null
+  /** The filter the panel shows the tree through (the Markdown filter), if any */
+  readonly filter?: (
+    tree: FileNode[],
+    loaded: ReadonlyMap<string, LoadedChildren>,
+    status: ReadonlyMap<string, LazyFolderStatus>
+  ) => FileNode[]
+}
+
 /**
  * @param files - The base tree from the project context
  * @param expandedFolders - The panel's expanded folder paths
+ * @param view - What the panel shows of the tree ({@link LazyFolderView})
  * @returns `tree`: the tree to render, with the loaded lazy folders filled in;
  *   `status`: which lazy folders are being read or failed to read (for
  *   `buildVisibleRows`' placeholder lines); `loaded`: the folders read so far
  */
 export function useLazyFolderChildren(
   files: FileNode[],
-  expandedFolders: ReadonlySet<string>
+  expandedFolders: ReadonlySet<string>,
+  view: LazyFolderView = {}
 ): {
   tree: FileNode[]
   status: ReadonlyMap<string, LazyFolderStatus>
@@ -113,6 +127,7 @@ export function useLazyFolderChildren(
   const previousTree = useRef<FileNode[]>([])
 
   const tree = useMemo(() => mergeLazyChildren(files, loaded), [files, loaded])
+  const { rootPath, filter } = view
 
   // A new base tree: carry children over to folders that turned lazy and drop
   // entries that left the tree – before paint, so a row never flashes empty
@@ -133,7 +148,9 @@ export function useLazyFolderChildren(
       if (settled.current.base !== files) settled.current = { base: files, paths: new Set() }
       settled.current.paths.add(path)
     }
-    for (const path of visibleExpandedLazy(tree, expandedFolders)) {
+    if (rootPath && !expandedFolders.has(rootPath)) return
+    const shown = filter ? filter(tree, loaded, status) : tree
+    for (const path of visibleExpandedLazy(shown, expandedFolders)) {
       if (inFlight.current.has(path)) continue
       const entry = loaded.get(path)
       if (entry?.baseTree === files) continue
@@ -165,7 +182,7 @@ export function useLazyFolderChildren(
           store.setStatus(path, 'failed')
         })
     }
-  }, [expandedFolders, tree, loaded, files])
+  }, [expandedFolders, tree, loaded, status, files, rootPath, filter])
 
   return { tree, status, loaded }
 }

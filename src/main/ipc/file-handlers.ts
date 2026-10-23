@@ -240,7 +240,7 @@ export function registerFileHandlers(): void {
           throw new ConfinementError('WRONG_KIND')
         }
         const start = performance.now()
-        const result = await fileService.findByName(dirPath.requested, name, dirPath.real)
+        const result = await fileService.findByName(dirPath.requested, name, dirPath.real, ctx.session.generation)
         // Counts only: the name and the paths are the user's
         logger.info('file:findByName completed', {
           durationMs: Math.round(performance.now() - start),

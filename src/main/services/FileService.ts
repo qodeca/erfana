@@ -27,7 +27,7 @@ import { atomicWriteText, isAtomicTempName } from '../utils/atomicWrite'
 import { IMAGE_EXTENSIONS, readImage } from './file/imageRead'
 import { childPath } from '../utils/childPath'
 import { createConcurrencyLimit, type ConcurrencyLimit } from '../utils/concurrencyLimit'
-import { createFindByNameGate, findByName, type FindByNameResult } from './file/findByName'
+import { createFindByNameGate, startFindByName, type FindByNameResult } from './file/findByName'
 import { isInsideRoot, isSamePath, normaliseResolved } from '../utils/pathCompare'
 import { getPlatformConfig } from './watcher/PlatformConfig'
 import type { ImageReadResponse } from '../../shared/ipc/file-image-schema'
@@ -725,17 +725,24 @@ export class FileService implements IFileService {
    * @param dirPath - A folder the caller has confined to the project; results are built from it
    * @param name - A plain file name
    * @param readPath - Where `dirPath` is read (its real path), when that differs
+   * @param generation - The project session generation the request was checked
+   *   under (the handler's snapshot); the session's current one when left out
    */
-  async findByName(dirPath: string, name: string, readPath?: string): Promise<FindByNameResult> {
+  async findByName(
+    dirPath: string,
+    name: string,
+    readPath?: string,
+    generation: number | null = this.session?.current()?.generation ?? null
+  ): Promise<FindByNameResult> {
     const hiddenPatterns = [...this.hiddenPatterns]
     const { scope } = this.planWalk(dirPath, hiddenPatterns)
     const filter = scope.filter
     const baseRel = filter === null ? null : toRootRelative(filter.root, dirPath)
-    const generation = this.session?.current()?.generation ?? null
     const isCurrent = (): boolean => (this.session?.current()?.generation ?? null) === generation
-    const key = [generation, readDirectoryKey(readPath ?? dirPath), name.toLowerCase()].join('\0')
+    // The requested spelling too: the answer's paths are built from it
+    const key = [generation, readDirectoryKey(readPath ?? dirPath), dirPath, name.toLowerCase()].join('\0')
     return findByNameGate.run(key, () =>
-      findByName(dirPath, name, {
+      startFindByName(dirPath, name, {
         baseRel,
         readBase: readPath,
         isCurrent,

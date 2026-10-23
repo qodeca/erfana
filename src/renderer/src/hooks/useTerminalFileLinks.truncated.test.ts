@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * A file link on a truncated project tree (#320 review, item 4): a bare name
- * that the tree knows is searched for on disk as well, and the picker is told
- * the list may be incomplete.
+ * File links on a truncated project tree (#320 review): links come from the
+ * tree on hover, with no disk search; a click searches the project, offers
+ * the tree's and the search's matches together and tells the picker the list
+ * may be incomplete. A bare name the tree lacks is a link whose click
+ * searches for it.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
@@ -20,16 +22,16 @@ vi.mock('../utils/logger', () => ({ logger: { debug: vi.fn(), info: vi.fn(), war
 
 import { clearNameSearchCache, useTerminalFileLinks } from './useTerminalFileLinks'
 
-const LINE = 'see Button.tsx:3'
-const fakeTerminal = {
-  cols: 80,
-  buffer: {
-    active: {
-      getLine: (i: number) => (i === 0 ? { isWrapped: false, translateToString: () => LINE } : undefined)
-    }
-  },
-  registerLinkProvider: vi.fn(() => ({ dispose: () => {} }))
-} as unknown as Terminal
+const terminalShowing = (line: string): Terminal =>
+  ({
+    cols: 80,
+    buffer: {
+      active: {
+        getLine: (i: number) => (i === 0 ? { isWrapped: false, translateToString: () => line } : undefined)
+      }
+    },
+    registerLinkProvider: vi.fn(() => ({ dispose: () => {} }))
+  }) as unknown as Terminal
 
 const tree: FileNode[] = [
   { name: 'Button.tsx', path: '/project/src/Button.tsx', type: 'file', extension: '.tsx' },
@@ -42,16 +44,21 @@ beforeEach(() => {
   findByName.mockReset().mockResolvedValue({ paths: ['/project/big/Button.tsx'], truncated: false })
 })
 
-async function linksFor(treeTruncated: boolean, onShowPicker: ReturnType<typeof vi.fn>): Promise<ILink[]> {
+interface Callbacks {
+  onShowPicker: ReturnType<typeof vi.fn>
+  onFileOpen: ReturnType<typeof vi.fn>
+  onNameNotFound: ReturnType<typeof vi.fn>
+}
+
+async function linksFor(line: string, treeTruncated: boolean, callbacks: Callbacks): Promise<ILink[]> {
   const { result } = renderHook(() =>
     useTerminalFileLinks({
-      terminalRef: { current: fakeTerminal },
+      terminalRef: { current: terminalShowing(line) },
       terminalId: 't1',
       projectRoot: '/project',
       files: tree,
       treeTruncated,
-      onFileOpen: vi.fn(),
-      onShowPicker
+      ...callbacks
     })
   )
   await waitFor(() => expect(result.current.linkProvider).not.toBeNull())
@@ -60,27 +67,61 @@ async function linksFor(treeTruncated: boolean, onShowPicker: ReturnType<typeof 
   return links ?? []
 }
 
+const callbacks = (): Callbacks => ({
+  onShowPicker: vi.fn(async () => null),
+  onFileOpen: vi.fn(),
+  onNameNotFound: vi.fn()
+})
+
 describe('useTerminalFileLinks on a truncated tree', () => {
-  it('offers the tree match and the one found on disk, and says the list may be incomplete', async () => {
-    const onShowPicker = vi.fn(async () => null)
-    const links = await linksFor(true, onShowPicker)
+  it('shows the link from the tree without searching, and searches on the click (round 3, item 3)', async () => {
+    const cb = callbacks()
+    const links = await linksFor('see Button.tsx:3', true, cb)
 
     expect(links).toHaveLength(1)
+    expect(findByName).not.toHaveBeenCalled()
+
     await links[0].activate(new MouseEvent('click'), links[0].text)
 
     expect(findByName).toHaveBeenCalledWith({ dirPath: '/project', name: 'Button.tsx' })
-    const [candidates, , options] = onShowPicker.mock.calls[0] as unknown as [Array<{ path: string }>, string, unknown]
+    const [candidates, , options] = cb.onShowPicker.mock.calls[0] as unknown as [Array<{ path: string }>, string, unknown]
     expect(candidates.map((c) => c.path).sort()).toEqual(['/project/big/Button.tsx', '/project/src/Button.tsx'])
     expect(options).toEqual({ incomplete: true })
   })
 
-  it('opens a single match on a complete tree without searching', async () => {
-    const onShowPicker = vi.fn(async () => null)
-    const links = await linksFor(false, onShowPicker)
+  it('makes a bare name the tree lacks a link whose click searches for it', async () => {
+    findByName.mockResolvedValue({ paths: ['/project/big/Card.tsx'], truncated: false })
+    const cb = callbacks()
+    const links = await linksFor('see Card.tsx:7', true, cb)
+
+    expect(links).toHaveLength(1)
+    expect(findByName).not.toHaveBeenCalled()
+    await links[0].activate(new MouseEvent('click'), links[0].text)
+
+    const [candidates] = cb.onShowPicker.mock.calls[0] as unknown as [Array<{ path: string }>]
+    expect(candidates.map((c) => c.path)).toEqual(['/project/big/Card.tsx'])
+  })
+
+  it('says so when the clicked name is not found', async () => {
+    findByName.mockResolvedValue({ paths: [], truncated: false })
+    const cb = callbacks()
+    const links = await linksFor('see Card.tsx:7', true, cb)
 
     await links[0].activate(new MouseEvent('click'), links[0].text)
 
+    expect(cb.onNameNotFound).toHaveBeenCalledWith('Card.tsx')
+    expect(cb.onShowPicker).not.toHaveBeenCalled()
+    expect(cb.onFileOpen).not.toHaveBeenCalled()
+  })
+
+  it('on a complete tree opens a single match without searching, and makes no link of an unknown name', async () => {
+    const cb = callbacks()
+    const links = await linksFor('see Button.tsx:3', false, cb)
+    await links[0].activate(new MouseEvent('click'), links[0].text)
     expect(findByName).not.toHaveBeenCalled()
-    expect(onShowPicker).not.toHaveBeenCalled()
+    expect(cb.onShowPicker).not.toHaveBeenCalled()
+    expect(cb.onFileOpen).toHaveBeenCalledWith('/project/src/Button.tsx', 3, undefined)
+
+    expect(await linksFor('see Card.tsx:7', false, callbacks())).toEqual([])
   })
 })

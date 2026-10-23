@@ -482,3 +482,28 @@ describe('FileService.findByName – the tree rules and the session (review of #
     expect(readdirMock).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('FileService.findByName – the caller\'s session and spelling (review of #320, round 3, item 4)', () => {
+  it('uses the generation the handler checked: a search asked under an older one reads nothing', async () => {
+    listing[ROOT] = [dirent('a.md', 'file')]
+
+    const result = await makeService().findByName(ROOT, 'a.md', undefined, 0)
+
+    expect(result).toEqual({ paths: [], truncated: true })
+    expect(readdirMock).not.toHaveBeenCalled()
+  })
+
+  it('does not share a search between two spellings of one root: each answers in its own', async () => {
+    const alias = abs('alias')
+    listing[ROOT] = [dirent('a.md', 'file')]
+    const service = makeService()
+
+    const [viaRoot, viaAlias] = await Promise.all([
+      service.findByName(ROOT, 'a.md', ROOT),
+      service.findByName(alias, 'a.md', ROOT)
+    ])
+
+    expect(viaRoot.paths).toEqual([at('a.md')])
+    expect(viaAlias.paths).toEqual([path.join(alias, 'a.md')])
+  })
+})

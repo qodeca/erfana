@@ -28,8 +28,14 @@ export interface IFileService {
   /**
    * Files of one name below a folder, bounded (terminal links on an incomplete tree).
    * `readPath` is where `dirPath` is read (its real path); results are built from `dirPath`.
+   * `generation`: the project session generation the request was checked under.
    */
-  findByName(dirPath: string, name: string, readPath?: string): Promise<{ paths: string[]; truncated: boolean }>
+  findByName(
+    dirPath: string,
+    name: string,
+    readPath?: string,
+    generation?: number | null
+  ): Promise<{ paths: string[]; truncated: boolean }>
 
   /**
    * Read file contents

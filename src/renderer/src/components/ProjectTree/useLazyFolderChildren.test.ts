@@ -219,6 +219,28 @@ describe('useLazyFolderChildren', () => {
     await waitFor(() => expect(readDirectory).toHaveBeenCalledTimes(2))
   })
 
+  it('reads nothing while the root row is collapsed, and reads once it is expanded (round 3, item 5)', async () => {
+    readDirectory.mockResolvedValue([])
+    const tree = baseTree()
+    const { rerender } = renderHook(({ expanded }) => useLazyFolderChildren(tree, expanded, { rootPath: '/p' }), {
+      initialProps: { expanded: new Set(['/p/dist']) as ReadonlySet<string> }
+    })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(readDirectory).not.toHaveBeenCalled()
+
+    rerender({ expanded: new Set(['/p', '/p/dist']) })
+    await waitFor(() => expect(readDirectory).toHaveBeenCalledTimes(1))
+  })
+
+  it('reads nothing the view filter hides (round 3, item 5)', async () => {
+    readDirectory.mockResolvedValue([])
+    const tree = baseTree()
+    const hideDist = (nodes: FileNode[]): FileNode[] => nodes.filter((node) => node.path !== '/p/dist')
+    renderHook(() => useLazyFolderChildren(tree, new Set(['/p', '/p/dist']), { rootPath: '/p', filter: hideDist }))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(readDirectory).not.toHaveBeenCalled()
+  })
+
   it('drops a read the project switch refused: no marker, no log, nothing merged', async () => {
     readDirectory.mockRejectedValue(new Error('PROJECT_CHANGED'))
     isProjectChanged.mockReturnValue(true)

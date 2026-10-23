@@ -33,6 +33,9 @@ import {
 } from '../utils/filePathLinks.logic'
 import { useFilenameIndex } from './useFilenameIndex'
 import {
+  extractFilenameFromPath,
+  isFilenameOnly,
+  mergeNameSearch,
   resolvePathSmart,
   type NameSearchResult,
   type SmartResolutionResult
@@ -114,11 +117,16 @@ export interface UseTerminalFileLinksOptions {
   files?: FileNode[]
   /**
    * `files` is incomplete: a walk bound left some folder unread (review
-   * finding 32, `useMergedProjectFiles`). A single match is then offered in
-   * the picker rather than opened, and a name `files` lacks is searched for
-   * in main (bounded, confined to the project).
+   * finding 32, `useMergedProjectFiles`). Links still come from `files` on
+   * hover, so they show at once; a click then searches the project in main
+   * (bounded, confined to the project) and offers every match in the picker,
+   * a single one too. A bare file name `files` lacks is a link too, whose
+   * click runs that search ({@link UseTerminalFileLinksOptions.onNameNotFound}
+   * when it finds nothing).
    */
   treeTruncated?: boolean
+  /** A clicked bare name was searched for and not found (an incomplete tree) */
+  onNameNotFound?: (filename: string) => void
   /**
    * Callback when a file link is clicked.
    * Should open the file in the Monaco editor at the specified position.
@@ -197,7 +205,17 @@ export function isLinkableFile(
 export function useTerminalFileLinks(
   options: UseTerminalFileLinksOptions
 ): UseTerminalFileLinksReturn {
-  const { terminalRef, terminalId, projectRoot, files = [], treeTruncated = false, onFileOpen, onShowPicker, onError } =
+  const {
+    terminalRef,
+    terminalId,
+    projectRoot,
+    files = [],
+    treeTruncated = false,
+    onFileOpen,
+    onShowPicker,
+    onNameNotFound,
+    onError
+  } =
     options
 
   // Track terminal readiness with state to trigger re-renders when terminal is created
@@ -424,8 +442,7 @@ export function useTerminalFileLinks(
                   const v = await validatePath(p)
                   return v.exists
                 },
-                treeTruncated,
-                searchByName: projectRoot ? (name) => searchProjectByName(projectRoot, name) : undefined
+                treeTruncated
               })
 
               if (smartResult.status === 'exact') {
@@ -488,10 +505,16 @@ export function useTerminalFileLinks(
               }
             }
 
-            // Skip if no valid path found
-            if (!finalPath) continue
+            // On an incomplete tree a bare name the index lacks may still be on
+            // disk: it is a link whose click searches for it
+            const searchOnly =
+              !finalPath && treeTruncated && projectRoot !== null && isFilenameOnly(strippedPath)
 
-            const absolutePath = finalPath
+            // Skip if no valid path found
+            if (!finalPath && !searchOnly) continue
+
+            const absolutePath = finalPath ?? ''
+            const searchesOnClick = searchOnly || incomplete
 
             // Map logical positions to buffer coordinates (handles wrapped lines)
             const rangeStart = logicalToBuffer(match.startIndex)
@@ -507,11 +530,28 @@ export function useTerminalFileLinks(
                 end: rangeEnd
               },
               text: match.fullMatch, // includes @ prefix intentionally – shows CLI tool reference context
-              decorations: wasSmartResolved ? SMART_LINK_DECORATIONS : undefined,
+              decorations: wasSmartResolved || searchOnly ? SMART_LINK_DECORATIONS : undefined,
               activate: async () => {
+                if (searchesOnClick) {
+                  // The search runs on the click, never on hover (review of #320)
+                  const name = extractFilenameFromPath(strippedPath)
+                  const found = projectRoot ? await searchProjectByName(projectRoot, name) : NOTHING_FOUND
+                  const candidates = mergeNameSearch(pendingCandidates?.map((c) => c.path) ?? [], found, match.path)
+                  if (candidates.length === 0) {
+                    onNameNotFound?.(name)
+                    return
+                  }
+                  if (!onShowPicker) {
+                    onFileOpen(candidates[0].path, match.line, match.column)
+                    return
+                  }
+                  const selected = await onShowPicker(candidates, match.path, { incomplete: true })
+                  if (selected) onFileOpen(selected, match.line, match.column)
+                  return
+                }
                 // If multiple candidates and picker available, show picker
                 if (pendingCandidates && onShowPicker) {
-                  const selected = await onShowPicker(pendingCandidates, match.path, { incomplete })
+                  const selected = await onShowPicker(pendingCandidates, match.path)
                   if (selected) {
                     onFileOpen(selected, match.line, match.column)
                   }
@@ -539,7 +579,20 @@ export function useTerminalFileLinks(
         }
       }
     }
-  }, [terminal, terminalReady, fetchCwd, validatePath, projectRoot, files, treeTruncated, getIndex, onFileOpen, onShowPicker, onError])
+  }, [
+    terminal,
+    terminalReady,
+    fetchCwd,
+    validatePath,
+    projectRoot,
+    files,
+    treeTruncated,
+    getIndex,
+    onFileOpen,
+    onShowPicker,
+    onNameNotFound,
+    onError
+  ])
 
   // Register the link provider with xterm
   useEffect(() => {

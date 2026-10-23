@@ -38,7 +38,6 @@
 import { readdir as fsReaddir } from 'fs/promises'
 import type { Dirent } from 'fs'
 import { join } from 'path'
-import { createConcurrencyLimit } from '../../utils/concurrencyLimit'
 
 export const FIND_BY_NAME_MAX_RESULTS = 20
 export const FIND_BY_NAME_MAX_FOLDERS = 20_000
@@ -89,11 +88,28 @@ interface Folder {
 
 const defaultReaddir: ReadFolder = (path) => fsReaddir(path, { withFileTypes: true })
 
+/** A search started: its answer, and when its last read has settled. */
+export interface FindByNameRun {
+  /** Answers by the deadline at the latest */
+  readonly result: Promise<FindByNameResult>
+  /**
+   * Settles once the search has stopped and no read of it is in flight. A
+   * read that never settles (a stale mount) keeps it pending: the gate keeps
+   * that search's slot taken, so hung reads cannot pile up.
+   */
+  readonly idle: Promise<void>
+}
+
 /**
  * @param base - The folder to search below, already confined by the caller
  * @param name - A plain file name (no separators)
  */
-export async function findByName(base: string, name: string, options: FindByNameOptions): Promise<FindByNameResult> {
+export function findByName(base: string, name: string, options: FindByNameOptions): Promise<FindByNameResult> {
+  return startFindByName(base, name, options).result
+}
+
+/** {@link findByName}, with the moment its reads are done ({@link FindByNameRun}). */
+export function startFindByName(base: string, name: string, options: FindByNameOptions): FindByNameRun {
   const now = options.now ?? (() => performance.now())
   const read = options.readdir ?? defaultReaddir
   const deadline = now() + FIND_BY_NAME_TIME_LIMIT_MS
@@ -107,12 +123,21 @@ export async function findByName(base: string, name: string, options: FindByName
   let stopped = false
   let finish!: () => void
   const finished = new Promise<void>((resolve) => (finish = resolve))
+  let markIdle!: () => void
+  const idle = new Promise<void>((resolve) => (markIdle = resolve))
+  const checkIdle = (): void => {
+    if (stopped && active === 0) markIdle()
+  }
 
   const end = (cut: boolean): void => {
     if (stopped) return
     stopped = true
     if (cut) truncated = true
+    // Folders not read yet are never read: let their memory go now
+    folders.length = 0
+    head = 0
     finish()
+    checkIdle()
   }
 
   const overBound = (): boolean =>
@@ -144,7 +169,7 @@ export async function findByName(base: string, name: string, options: FindByName
       read(folder.read).then(
         (entries) => {
           active--
-          if (stopped) return
+          if (stopped) return checkIdle()
           if (options.isCurrent?.() === false) return end(true)
           take(folder, entries)
           pump()
@@ -152,6 +177,7 @@ export async function findByName(base: string, name: string, options: FindByName
         () => {
           // An unreadable folder is skipped
           active--
+          if (stopped) return checkIdle()
           pump()
         }
       )
@@ -164,49 +190,88 @@ export async function findByName(base: string, name: string, options: FindByName
     timer = setTimeout(resolve, Math.max(0, deadline - now()))
   })
   pump()
-  await Promise.race([finished, expired])
-  clearTimeout(timer)
-  // The deadline came first: answer with what was found, drop late reads
-  end(true)
-  if (paths.length >= FIND_BY_NAME_MAX_RESULTS) truncated = true
-  return { paths: [...paths].sort(), truncated }
+  const result = Promise.race([finished, expired]).then((): FindByNameResult => {
+    clearTimeout(timer)
+    // The deadline came first: answer with what was found, drop late reads
+    end(true)
+    if (paths.length >= FIND_BY_NAME_MAX_RESULTS) truncated = true
+    return { paths: [...paths].sort(), truncated }
+  })
+  return { result, idle }
 }
 
 export interface FindByNameGate {
   /**
-   * Run `search` for `key` once a slot is free. A call whose key is already
-   * searched for (waiting or running) shares that search; a call that finds
-   * {@link FIND_BY_NAME_MAX_WAITING} searches waiting answers `truncated`
-   * with nothing, at once.
+   * Start `search` for `key` once a slot is free. A call whose key is already
+   * searched for (waiting or running) shares that search's answer. A call
+   * that finds {@link FIND_BY_NAME_MAX_WAITING} calls waiting answers
+   * `truncated` with nothing at once, and one that waits longer than the
+   * wait limit answers so then, and its search never starts.
    */
-  run(key: string, search: () => Promise<FindByNameResult>): Promise<FindByNameResult>
+  run(key: string, search: () => FindByNameRun): Promise<FindByNameResult>
+  /** Slots taken: a search holds one until its reads are idle, not until it answers */
+  readonly running: number
 }
 
+const NOTHING: FindByNameResult = { paths: [], truncated: true }
+
 /**
- * One per process: at most {@link FIND_BY_NAME_MAX_SEARCHES} searches in
- * flight, whatever the number of windows, terminals or hovered lines.
+ * One per process: at most {@link FIND_BY_NAME_MAX_SEARCHES} searches with
+ * reads in flight, whatever the number of windows, terminals or hovered
+ * lines. A slot is freed when the search's last read settles, so reads that
+ * hang (a stale mount) hold their slot – at most `maxSearches` ×
+ * {@link FIND_BY_NAME_CONCURRENCY} reads ever hang – and later calls answer
+ * `truncated` after waiting at most `waitLimitMs`.
  */
 export function createFindByNameGate(
   maxSearches = FIND_BY_NAME_MAX_SEARCHES,
-  maxWaiting = FIND_BY_NAME_MAX_WAITING
+  maxWaiting = FIND_BY_NAME_MAX_WAITING,
+  waitLimitMs = FIND_BY_NAME_TIME_LIMIT_MS
 ): FindByNameGate {
-  const slots = createConcurrencyLimit(maxSearches)
   const pending = new Map<string, Promise<FindByNameResult>>()
-  let waiting = 0
+  // Few entries (at most `maxWaiting`), so a plain array
+  const queue: Array<() => void> = []
+  let running = 0
+
+  const launch = (search: () => FindByNameRun): Promise<FindByNameResult> => {
+    running++
+    const run = search()
+    void run.idle.then(() => {
+      running--
+      while (running < maxSearches && queue.length > 0) queue.shift()!()
+    })
+    return run.result
+  }
+
   return {
+    get running() {
+      return running
+    },
     run(key, search) {
       const shared = pending.get(key)
       if (shared) return shared
-      if (waiting >= maxWaiting) return Promise.resolve({ paths: [], truncated: true })
-      waiting++
-      const result = slots
-        .run(() => {
-          waiting--
-          return search()
+      let answer: Promise<FindByNameResult>
+      if (running < maxSearches) {
+        answer = launch(search)
+      } else if (queue.length >= maxWaiting) {
+        return Promise.resolve(NOTHING)
+      } else {
+        answer = new Promise<FindByNameResult>((resolve) => {
+          const begin = (): void => {
+            clearTimeout(timer)
+            launch(search).then(resolve)
+          }
+          const timer = setTimeout(() => {
+            const at = queue.indexOf(begin)
+            if (at !== -1) queue.splice(at, 1)
+            resolve(NOTHING)
+          }, waitLimitMs)
+          queue.push(begin)
         })
-        .finally(() => pending.delete(key))
-      pending.set(key, result)
-      return result
+      }
+      const shared_ = answer.finally(() => pending.delete(key))
+      pending.set(key, shared_)
+      return shared_
     }
   }
 }

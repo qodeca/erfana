@@ -25,6 +25,14 @@ import type { FilterMode } from '../../types/filters'
 import { installTreeViewport, treeRowCount } from '../../test-utils/treeViewport'
 import { useLazyFolderStore } from '../../stores/useLazyFolderStore'
 import { TEST_IDS, getDynamicTestId } from '../../constants/testids'
+import { useLazyFolderChildren } from './useLazyFolderChildren'
+import { filterMarkdownTree } from './markdownFilter'
+
+// A pass-through spy: the tests below read what the panel hands the hook
+vi.mock('./useLazyFolderChildren', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./useLazyFolderChildren')>()
+  return { ...actual, useLazyFolderChildren: vi.fn(actual.useLazyFolderChildren) }
+})
 
 declare global {
   interface Window {
@@ -226,6 +234,18 @@ describe('ProjectTree lazy folders', () => {
     fireEvent.keyDown(folder, { key: 'ArrowDown' })
 
     await waitFor(() => expect(document.activeElement).toBe(rowOf(`${PROJECT}/docs`)))
+  })
+})
+
+describe('ProjectTree – what is in view decides what is read (round 3, item 5)', () => {
+  const lastView = () => vi.mocked(useLazyFolderChildren).mock.calls.at(-1)?.[2]
+
+  it('hands the hook the root row and, in Markdown mode, the Markdown filter', async () => {
+    const setFilterMode = await openTree('all')
+    expect(lastView()).toEqual({ rootPath: PROJECT, filter: undefined })
+
+    act(() => setFilterMode('markdown'))
+    expect(lastView()).toEqual({ rootPath: PROJECT, filter: filterMarkdownTree })
   })
 })
 

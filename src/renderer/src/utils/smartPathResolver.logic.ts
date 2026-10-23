@@ -85,13 +85,12 @@ export interface SmartResolveOptions {
   /**
    * The tree is incomplete: a walk bound left some folder unread (review
    * finding 32). A single index match is then not certain – another file of
-   * that name may sit in an unread folder – so it is offered for choosing, and
-   * a name the index lacks is looked up with `searchByName`.
+   * that name may sit in an unread folder – so it is offered for choosing,
+   * marked `incomplete`. Resolution stays on the index: the disk search runs
+   * only when a link is clicked (`mergeNameSearch`), so a hover never waits
+   * for it.
    */
   treeTruncated?: boolean
-
-  /** Files of this name on disk, for a truncated tree (a bounded search in main) */
-  searchByName?: (filename: string) => Promise<NameSearchResult>
 }
 
 /**
@@ -273,37 +272,45 @@ export async function resolvePathSmart(
   // Fall back to smart resolution
   const result = resolvePathSmartSync(path, index, files)
   if (options.treeTruncated !== true) return result
-  return resolveOnTruncatedTree(result, path, options.searchByName)
+  return resolveOnTruncatedTree(result, path)
 }
 
 /**
- * On an incomplete tree no lookup is certain: the name is also searched for
- * on disk – whether the index had it or not, since another file of that name
- * may sit in an unread folder – and every match from either, once each, is
- * offered for choosing (a single one too), marked `incomplete`.
+ * On an incomplete tree no index lookup is certain: every match (a single one
+ * too) is offered for choosing, marked `incomplete`. A name the index lacks
+ * stays `no-match`; the caller may offer to search for it on click.
  */
-export async function resolveOnTruncatedTree(
-  result: SmartResolutionResult,
-  query: string,
-  searchByName?: (filename: string) => Promise<NameSearchResult>
-): Promise<SmartResolutionResult> {
-  const fromIndex =
-    result.status === 'single-match' && result.resolvedPath
-      ? [result.resolvedPath]
-      : result.status === 'multiple-matches'
-        ? (result.candidates ?? []).map((candidate) => candidate.path)
-        : []
-  const found = searchByName ? (await searchByName(extractFilenameFromPath(query))).paths : []
-  // Once each: the index and the search name the same file with the same root
+export function resolveOnTruncatedTree(result: SmartResolutionResult, query: string): SmartResolutionResult {
+  if (result.status === 'single-match' && result.resolvedPath) {
+    return {
+      status: 'multiple-matches',
+      candidates: rankCandidates([result.resolvedPath], query),
+      wasSmartResolved: true,
+      incomplete: true
+    }
+  }
+  if (result.status === 'multiple-matches') return { ...result, incomplete: true }
+  return result
+}
+
+/**
+ * The candidates to offer once the disk search has answered (a click on a
+ * link on an incomplete tree): the index's and the search's, once each –
+ * both name a file from the same root, so a path is compared with its
+ * separators normalised – ranked for `query`.
+ *
+ * @param fromIndex - Paths the index offered (may be empty)
+ * @param found - What the bounded search in main found
+ */
+export function mergeNameSearch(fromIndex: readonly string[], found: NameSearchResult, query: string): PathScore[] {
   const seen = new Set<string>()
-  const paths = [...fromIndex, ...found].filter((path) => {
+  const paths = [...fromIndex, ...found.paths].filter((path) => {
     const key = normalizePath(path)
     if (seen.has(key)) return false
     seen.add(key)
     return true
   })
-  if (paths.length === 0) return result
-  return { status: 'multiple-matches', candidates: rankCandidates(paths, query), wasSmartResolved: true, incomplete: true }
+  return rankCandidates(paths, query)
 }
 
 /**

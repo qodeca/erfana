@@ -322,6 +322,11 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     })
   }, [dockviewApi])
 
+  // A bare name clicked on an incomplete tree that the project search did not find
+  const handleNameNotFound = useCallback((filename: string) => {
+    showInfoToast('File not found', `No file named "${filename}" was found in the project.`)
+  }, [])
+
   // Terminal file links hook - enables clickable file paths with smart resolution
   useTerminalFileLinks({
     terminalRef: xtermRef,
@@ -331,6 +336,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     treeTruncated,
     onFileOpen: handleFileOpen,
     onShowPicker: showPicker,
+    onNameNotFound: handleNameNotFound,
     onError: (error) => {
       logger.warn('Terminal file link error', error instanceof Error ? { error: error.message, stack: error.stack } : { error: String(error) })
     }
