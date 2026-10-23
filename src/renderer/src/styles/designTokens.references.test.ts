@@ -16,8 +16,10 @@
  * What is scanned:
  * - every `.css` file under `src/renderer/` (all of the app's stylesheets live
  *   there), and
- * - every non-test `.ts` / `.tsx` file under `src/renderer/`, for `var(--…)`
- *   in inline styles and style strings.
+ * - every non-test `.ts` / `.tsx` file under `src/renderer/`, read through
+ *   TypeScript's parser, for `var(--…)` inside string and template literals
+ *   (inline styles, style strings) and for the z-index token names passed as
+ *   `zIndex: '--z-…'` to the overlay stack.
  *
  * What counts as defined:
  * - a property declared in `styles/design-tokens.css`, or
@@ -32,11 +34,13 @@
  * here; none exist today, and the floor assertions below are what would notice
  * the scan going quiet.
  *
- * Limits, the same as `cssAudit.ts`: regex reading, no cascade. A property
- * defined on one element and read on an unrelated one passes.
+ * Limits: stylesheets are read with a regex, as in `cssAudit.ts`, and there is
+ * no cascade – a property defined on one element and read on an unrelated one
+ * passes.
  */
 import { readdirSync, readFileSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
+import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
 import { REPO_ROOT, RENDERER_SRC, rendererStylesheets, stripComments } from '../test-utils/cssAudit'
 
@@ -90,16 +94,89 @@ const LOCAL_PROPERTIES: readonly LocalProperty[] = [
   }
 ]
 
-/**
- * Remove comments from TypeScript so a JSDoc that quotes `var(--x)` is not a
- * reference. A `//` preceded by `:` or a quote is left alone (URLs, strings).
- *
- * @param source - Raw `.ts` / `.tsx` text
- * @returns The text with block and line comments removed
- */
-function stripScriptComments(source: string): string {
-  return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/.*$/gm, '$1')
+/** What one script reads and sets, taken from its syntax tree. */
+interface ScriptTokens {
+  /** Properties read: `var(--x)` inside any string, and `zIndex: '--z-…'` */
+  reads: string[]
+  /** Properties set: a `'--x'` style-object key, or `setProperty('--x', …)` */
+  sets: Set<string>
 }
+
+/**
+ * Read a script through TypeScript's parser rather than a regex.
+ *
+ * Only the CONTENTS of string literals and template-literal text are searched,
+ * so a comment that quotes `var(--x)` is never a reference, and a string that
+ * contains `/*` cannot hide the code after it – the defect a regex comment
+ * stripper had.
+ *
+ * Also collects the z-index token names handed to the overlay stack as plain
+ * strings (`zIndex: '--z-context-menu'`): `readZIndexToken` resolves them at
+ * runtime and returns 0 for an undefined name, which silently drops the
+ * overlay to the bottom of the Escape order.
+ *
+ * @param source - The script
+ * @returns What it reads and sets
+ */
+function scanScript(source: Source): ScriptTokens {
+  const kind = source.file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS
+  const tree = ts.createSourceFile(source.file, source.text, ts.ScriptTarget.Latest, false, kind)
+  const reads: string[] = []
+  const sets = new Set<string>()
+  const visit = (node: ts.Node): void => {
+    if (
+      ts.isStringLiteral(node) ||
+      ts.isNoSubstitutionTemplateLiteral(node) ||
+      ts.isTemplateHead(node) ||
+      ts.isTemplateMiddle(node) ||
+      ts.isTemplateTail(node)
+    ) {
+      reads.push(...readsIn(node.text))
+    }
+    if (ts.isPropertyAssignment(node)) {
+      const name = node.name
+      if ((ts.isStringLiteral(name) || ts.isNoSubstitutionTemplateLiteral(name)) && name.text.startsWith('--')) {
+        sets.add(name.text)
+      }
+      if (
+        ts.isIdentifier(name) &&
+        name.text === 'zIndex' &&
+        ts.isStringLiteralLike(node.initializer) &&
+        /^--z-[\w-]+$/.test(node.initializer.text)
+      ) {
+        reads.push(node.initializer.text)
+      }
+    }
+    if (
+      ts.isCallExpression(node) &&
+      ts.isPropertyAccessExpression(node.expression) &&
+      node.expression.name.text === 'setProperty' &&
+      node.arguments.length > 0 &&
+      ts.isStringLiteralLike(node.arguments[0]) &&
+      node.arguments[0].text.startsWith('--')
+    ) {
+      sets.add(node.arguments[0].text)
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(tree)
+  return { reads, sets }
+}
+
+/**
+ * The scripts that read a design token today. Pinned by name, on top of the
+ * count floor, so a scan that silently stops seeing one of them fails here.
+ */
+const KNOWN_TOKEN_READERS = [
+  'src/renderer/src/components/Dialog/CameraDialog.tsx',
+  'src/renderer/src/components/Dialog/PromptDialog.tsx',
+  'src/renderer/src/components/Editor/MarkdownEditorPanel/components/EditorErrorBoundary.tsx',
+  'src/renderer/src/providers/search/MonacoSearchProvider.ts',
+  'src/renderer/src/utils/gitStatus.logic.ts',
+  // These two hand the overlay stack a z-index token name as a string.
+  'src/renderer/src/components/ContextMenu/ContextMenu.tsx',
+  'src/renderer/src/components/Settings/SettingsOverlay.tsx'
+] as const
 
 /**
  * Every custom property a text reads through `var()`, fallbacks included:
@@ -120,19 +197,6 @@ function readsIn(text: string): string[] {
  */
 function declaredInCss(css: string): Set<string> {
   return new Set([...css.matchAll(/(?:^|[{;\s])(--[\w-]+)\s*:/g)].map((match) => match[1]))
-}
-
-/**
- * Every custom property a script sets: a quoted key in a style object
- * (`{ '--tree-level': level }`) or a `setProperty('--x', …)` call.
- *
- * @param source - Comment-free script text
- * @returns The set names
- */
-function setInScript(source: string): Set<string> {
-  const keys = [...source.matchAll(/['"](--[\w-]+)['"]\s*:/g)].map((match) => match[1])
-  const calls = [...source.matchAll(/setProperty\(\s*['"`](--[\w-]+)/g)].map((match) => match[1])
-  return new Set([...keys, ...calls])
 }
 
 /**
@@ -182,9 +246,9 @@ function auditTokenReferences(input: {
     for (const token of readsIn(css)) references.push({ token, file: sheet.file })
   }
   for (const script of input.scripts) {
-    const source = stripScriptComments(script.text)
-    for (const name of setInScript(source)) localDefinitions.add(name)
-    for (const token of readsIn(source)) references.push({ token, file: script.file })
+    const { reads, sets } = scanScript(script)
+    for (const name of sets) localDefinitions.add(name)
+    for (const token of reads) references.push({ token, file: script.file })
   }
 
   const unique = new Map<string, Reference>()
@@ -255,14 +319,17 @@ describe('design token references (#82)', () => {
   it('scans a real tree, so an empty result means something', () => {
     // Guard the guard: "no undefined tokens" is also what a scan that read
     // nothing reports. Floors sit a little under today's counts: 50 sheets,
-    // 340 scripts of which 5 read a token, 1129 distinct token-and-file
-    // references, 199 tokens.
+    // 340 scripts, 1129+ distinct token-and-file references, 199 tokens.
     expect(stylesheets.length).toBeGreaterThanOrEqual(45)
     expect(scripts.length).toBeGreaterThan(300)
     expect(result.referenceCount).toBeGreaterThan(1000)
-    expect(scripts.filter((script) => readsIn(stripScriptComments(script.text)).length > 0).length)
-      .toBeGreaterThanOrEqual(4)
     expect(declaredInCss(stripComments(TOKEN_SHEET)).size).toBeGreaterThan(180)
+  })
+
+  it.each(KNOWN_TOKEN_READERS)('still sees the token reads in %s', (file) => {
+    const script = scripts.find((candidate) => candidate.file === file)
+    expect(script, `${file} moved or was renamed: update KNOWN_TOKEN_READERS`).toBeDefined()
+    expect(scanScript(script as Source).reads.length).toBeGreaterThan(0)
   })
 
   it('reads no custom property that is defined nowhere', () => {
@@ -356,5 +423,49 @@ describe('auditTokenReferences catches what it claims to', () => {
       local: [{ name: '--retired-*', why: 'fixture' }]
     })
     expect(result.stale).toEqual(['--retired-*'])
+  })
+
+  it('is not blinded by a string that contains a comment opener', () => {
+    // A regex stripper read `'/*'` as the start of a comment and swallowed
+    // everything up to the next `*/`, including this reference.
+    const result = auditTokenReferences({
+      tokenSheet,
+      stylesheets: [],
+      scripts: [
+        {
+          file: 'F.ts',
+          text: "const glob = 'src/**/*.md'\nconst colour = 'var(--color-hidden)'\n/* a real comment */"
+        }
+      ],
+      local: []
+    })
+    expect(describeRefs(result.undefinedRefs)).toEqual(['--color-hidden in F.ts'])
+  })
+
+  it('reads template literals too', () => {
+    const result = auditTokenReferences({
+      tokenSheet,
+      stylesheets: [],
+      scripts: [{ file: 'G.ts', text: 'const n = 2\nconst s = `calc(var(--space-gone) * ${n})`' }],
+      local: []
+    })
+    expect(describeRefs(result.undefinedRefs)).toEqual(['--space-gone in G.ts'])
+  })
+
+  it('flags a z-index token name handed to the overlay stack that does not exist', () => {
+    const result = auditTokenReferences({
+      tokenSheet: ':root { --z-modal: 1000; }',
+      stylesheets: [],
+      scripts: [
+        {
+          file: 'H.tsx',
+          text:
+            "useOverlayStackEntry(ref, { active: true, zIndex: '--z-modal', onEscape })\n" +
+            "useOverlayStackEntry(ref, { active: true, zIndex: '--z-menu-typo', onEscape })"
+        }
+      ],
+      local: []
+    })
+    expect(describeRefs(result.undefinedRefs)).toEqual(['--z-menu-typo in H.tsx'])
   })
 })
