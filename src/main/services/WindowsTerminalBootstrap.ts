@@ -130,8 +130,8 @@ export interface WindowsBootstrapBuilder {
  *   rationale.
  * - The user's profiles are then dot-sourced in PowerShell's own order (all users
  *   all hosts, all users this host, current user all hosts, current user this host),
- *   each in its own `try` so one failing profile does not stop the next, as PowerShell
- *   does. They run AFTER the cwd is set and after the clear, as they did before.
+ *   each on its own so one failing profile does not stop the next, as PowerShell
+ *   does (see {@link PROFILE_LOADER}). They run AFTER the cwd is set and after the clear, as they did before.
  * - `-NoExit` keeps this same process as the interactive session (#305 round 8).
  *
  * One process, not a bootstrap that starts the shell: until round 8 the script ended
@@ -144,11 +144,16 @@ export interface WindowsBootstrapBuilder {
 /**
  * Dot-sources the profiles `-NoProfile` skipped, in PowerShell's order, at the top
  * scope of the `-Command` script (the global scope, as a profile normally runs).
- * A failing profile prints its error and the next one still runs.
+ * As forgiving as PowerShell's own profile loading:
+ * - a failing profile prints its error, with its file and line, and the next one
+ *   still runs. `$_ | Out-Host` only prints: `Write-Error` would itself become a
+ *   stopping error once a profile has set `$ErrorActionPreference = 'Stop'`;
+ * - `do { } while ($false)` around each profile catches a top-level `break` or
+ *   `continue` in it, which would otherwise end the loader's `foreach`.
  */
-const PROFILE_LOADER =
+export const PROFILE_LOADER =
   "foreach ($erfanaProfile in @($PROFILE.AllUsersAllHosts, $PROFILE.AllUsersCurrentHost, $PROFILE.CurrentUserAllHosts, $PROFILE.CurrentUserCurrentHost)) " +
-  "{ if ($erfanaProfile -and (Test-Path -LiteralPath $erfanaProfile)) { try { . $erfanaProfile } catch { Write-Error $_ } } }; " +
+  "{ if ($erfanaProfile -and (Test-Path -LiteralPath $erfanaProfile)) { try { do { . $erfanaProfile } while ($false) } catch { $_ | Out-Host } } }; " +
   'Remove-Variable erfanaProfile -ErrorAction SilentlyContinue'
 
 export class PowerShellBootstrapBuilder implements WindowsBootstrapBuilder {

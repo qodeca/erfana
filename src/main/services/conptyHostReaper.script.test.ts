@@ -516,15 +516,26 @@ describe.skipIf(!hasPowerShell)('quit helper script against a mocked process lis
     const { stopped, trace } = run({ appMissing: true, procs: wrapperTree() }, [shell(6001, START + 2_000)], undefined, skipped)
     // the leftover cannot be linked to us, so it is not ended – and the result says so
     expect(stopped).toEqual([])
-    expect(trace).toContain('tree kill was skipped and no member was found alive')
-    expect(trace.at(-2)).toBe('helper done result=unverified members-left=unknown')
+    expect(trace).toContain('tree kill was skipped: only a process check after the quit can confirm nothing was left')
+    expect(trace.at(-2)).toBe('helper done result=unverified members-left=0 ended=0')
   })
 
-  it('ends the leftover once the handed-over pid is the interactive shell itself (round 8)', () => {
+  it('says unverified with the count it ended when a linked host was ended but an unlinked leftover stays', () => {
+    const { stopped, trace } = run(
+      { appMissing: true, procs: [host(5001), ...wrapperTree()] },
+      [shell(6001, START + 2_000)],
+      undefined,
+      skipped
+    )
+    expect(stopped).toEqual(['5001'])
+    expect(trace.every((l) => !l.includes('result=clean'))).toBe(true)
+    expect(trace.at(-2)).toBe('helper done result=unverified members-left=0 ended=1')
+  })
+
+  it('ends the leftover once the handed-over pid is the interactive shell itself, and still never says clean (round 8)', () => {
     const { stopped, trace } = run({ appMissing: true, procs: wrapperTree() }, [shell(6010, START + 2_000)], undefined, skipped)
     expect(stopped.sort()).toEqual(['6020', '6021'])
-    expect(trace).not.toContain('tree kill was skipped and no member was found alive')
-    expect(trace.at(-2)).toBe('helper done result=clean members-left=0')
+    expect(trace.at(-2)).toBe('helper done result=unverified members-left=0 ended=2')
   })
 
   it('keeps clean for a quiet quit when the tree kill ran (the tree kill ended the members)', () => {

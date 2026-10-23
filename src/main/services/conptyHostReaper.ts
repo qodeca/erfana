@@ -38,10 +38,11 @@
  * `other`); never a command line, path or window title. The last lines say
  * `result=clean members-left=0` when nothing of ours was left running. When the tree
  * kill was skipped on purpose ({@link ReapOptions.treeKillSkipped}, diagnostics only)
- * and no sweep found a member alive, it says `result=unverified members-left=unknown`
- * instead: the processes the tree kill would have ended were never seen, so "nothing
- * was left" cannot be told from "something was left that the helper could not link to
- * us" (#305 round 8: a child whose parent shell had ended and was never handed over).
+ * it never says `clean`: a quiet end is `result=unverified`, followed by `ended=<n>`
+ * (how many processes the helper ended). The tree kill is what ends the processes the
+ * helper cannot link to us – a child whose parent shell ended and was never handed
+ * over (#305 round 8) – so without it, "nothing was left" can only be confirmed by a
+ * process check from outside after the quit, not by this trace.
  *
  * Safety:
  * - Only three kinds of process are members: a console host whose parent is our pid,
@@ -401,7 +402,7 @@ export function buildReapScript(
     "try { $hd = @($known.Values | Where-Object { $_.H }).Count; Trace ('learned ' + $known.Count + ' (handed ' + $hd + ', seen ' + ($known.Count - $hd) + '): ' + (Fmt @($known.Keys | Sort-Object | ForEach-Object { @{ ProcessId = $_; Name = $known[$_].N; ParentProcessId = $known[$_].P } }))) } catch { }",
     // 2. Sweep until two sweeps in a row find no member alive. members-left = members
     //    alive in the last list that could be read ("unknown" when it could not be).
-    "$quiet = 0; $result = 'gave-up'; $left = 'unknown'; $everAlive = $false",
+    "$quiet = 0; $result = 'gave-up'; $left = 'unknown'; $ended = 0",
     `for ($i = 1; $i -le ${MAX_SWEEPS}; $i++) {`,
     '  try {',
     '    $list = @(Snap)',
@@ -414,7 +415,7 @@ export function buildReapScript(
     "        Trace ('sweep ' + $i + ' alive=none')",
     "        if ($quiet -ge 2) { $result = 'clean'; break }",
     '      } else {',
-    '        $quiet = 0; $everAlive = $true',
+    '        $quiet = 0',
     '        $done = @(); $skip = @()',
     '        foreach ($x in $alive) {',
     '          $id = [int]$x.ProcessId',
@@ -431,17 +432,21 @@ export function buildReapScript(
     '            }',
     "          } catch { $skip += $id; Trace ('sweep ' + $i + ' stop failed pid=' + $id + ' error=' + (ErrId $_)) }",
     '        }',
+    '        $ended += $done.Count',
     "        Trace ('sweep ' + $i + ' alive=' + (Fmt $alive) + ' stopped=' + ($(if ($done.Count) { $done -join ',' } else { 'none' })) + ' skipped=' + ($(if ($skip.Count) { $skip -join ',' } else { 'none' })))",
     '      }',
     '    }',
     "  } catch { $quiet = 0; $left = 'unknown'; Trace ('sweep ' + $i + ' failed error=' + (ErrId $_)) }",
     `  Start-Sleep -Milliseconds ${SWEEP_PAUSE_MS}`,
     '}',
-    // The tree kill was skipped and nothing was ever found: no proof that nothing was left
+    // Tree kill skipped: what only the tree kill would have ended was never checked, so a
+    // quiet end proves nothing; only a process check from outside after the quit does
     ...(treeKillSkipped
-      ? ["if ($result -eq 'clean' -and -not $everAlive) { $result = 'unverified'; $left = 'unknown'; Trace 'tree kill was skipped and no member was found alive' }"]
-      : []),
-    "Trace ('helper done result=' + $result + ' members-left=' + $left)",
+      ? [
+          "if ($result -eq 'clean') { $result = 'unverified'; Trace 'tree kill was skipped: only a process check after the quit can confirm nothing was left' }",
+          "Trace ('helper done result=' + $result + ' members-left=' + $left + ' ended=' + $ended)"
+        ]
+      : ["Trace ('helper done result=' + $result + ' members-left=' + $left)"]),
     // Error ids only (FullyQualifiedErrorId), not the full error records. The cmdlets used
     // here report fixed ids; a plain `throw` uses its message as the id, so an id can
     // carry a message. The expected ones (a pid already gone, a wait that timed out) are
@@ -502,7 +507,8 @@ export interface ReapOptions {
   tracePath?: string
   /**
    * The tree kill is skipped this quit (`TerminalService.treeKillSkipped()`, diagnostics
-   * only): a quiet result with no member ever seen alive is reported as `unverified`.
+   * only): the result is then never `clean` – a quiet end is `unverified`, and the
+   * done line also says how many processes were ended (`ended=<n>`).
    */
   treeKillSkipped?: boolean
   writeFileFn?: typeof writeFileSync
