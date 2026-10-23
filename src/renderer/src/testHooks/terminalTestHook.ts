@@ -3,7 +3,8 @@
 /**
  * E2E test hook: `window.__erfanaTest.terminalText(terminalId)`.
  *
- * The switch comes from the preload (`window.api.testHooks.enabled`), never from a
+ * The switch comes from the preload (`window.api.testHooks.enabled`, read through
+ * `services/testHooksGateway`), never from a
  * global the page could set. Present only when the main process launched this window with the test-hook
  * flag, which it does only for an unpackaged app with `ERFANA_E2E_TEST_HOOKS=1`
  * (`buildAdditionalArguments` in src/main/index.ts). In every other run the
@@ -11,12 +12,14 @@
  * terminals are not recorded.
  */
 import type { Terminal } from '@xterm/xterm'
+import { hasBridge } from '../services/bridgePresence'
+import { testHooksGateway } from '../services/testHooksGateway'
 
 const terminals = new Map<string, Terminal>()
 
-/** Whether the launcher switched the test hooks on for this window. */
+/** Whether the launcher switched the test hooks on for this window (a unit test may install no bridge). */
 function hooksEnabled(): boolean {
-  return window.api?.testHooks?.enabled === true
+  return hasBridge('testHooks') && testHooksGateway.enabled === true
 }
 
 function terminalText(terminalId: string): string | null {

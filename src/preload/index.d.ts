@@ -12,6 +12,13 @@ type GatewayBridges =
   | 'git'
   | 'gitWatcher'
   | 'gitPolling'
+  | 'settings'
+  | 'globalSettings'
+  | 'logging'
+  | 'quit'
+  | 'system'
+  | 'clipboard'
+  | 'testHooks'
 
 declare global {
   interface Window {
@@ -23,8 +30,8 @@ declare global {
     /**
      * Derived from the preload object itself, so it cannot drift from it. The
      * bridges that have a gateway are left out on purpose: the renderer reaches
-     * them through `services/fileGateway`, `terminalGateway`,
-     * `fileWatchGateway`, `directoryWatchGateway` and `gitGateway`.
+     * them through their gateway in `services/` (see docs/ipc-patterns.md §
+     * Renderer gateways).
      */
     api: Omit<Api, GatewayBridges>
     /**

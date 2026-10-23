@@ -50,7 +50,21 @@ describe('preload surface', () => {
     expect(Object.keys(api.terminal).sort()).toMatchSnapshot('terminal')
   })
 
-  it.each(['fileWatch', 'directoryWatch', 'git', 'gitWatcher', 'gitPolling'])(
+  it.each([
+    'fileWatch',
+    'directoryWatch',
+    'git',
+    'gitWatcher',
+    'gitPolling',
+    'settings',
+    'globalSettings',
+    'logging',
+    'quit',
+    'system',
+    'clipboard',
+    'projectLock',
+    'testHooks'
+  ])(
     'window.api.%s exposes the expected members',
     (domain) => {
       const api = exposed.get('api') as Record<string, object>

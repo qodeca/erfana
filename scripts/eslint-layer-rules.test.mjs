@@ -130,7 +130,7 @@ describe('renderer gateway rule', () => {
 
   const READ_FILE = 'export const f = () => window.api.file.readFile("a")'
   const READ_TERMINAL = 'export const t = () => window.api.terminal.kill("a")'
-  const READ_OTHER = 'export const g = () => window.api.settings.getRecentProjects()'
+  const READ_OTHER = 'export const g = () => window.api.import.selectFile()'
 
   it('flags a renderer read of window.api.file and window.api.terminal', async () => {
     expect(await gatewayMessages(RENDERER, READ_FILE)).toHaveLength(1)
@@ -146,6 +146,19 @@ describe('renderer gateway rule', () => {
     'export const f = () => window.api.gitWatcher.stop()',
     'export const f = () => window.api.gitPolling.setEnabled(true)'
   ])('flags the watcher and git bridges: %s', async (code) => {
+    expect(await gatewayMessages(RENDERER, code)).toHaveLength(1)
+  })
+
+  it.each([
+    'export const f = () => window.api.settings.getRecentProjects()',
+    'export const f = () => window.api.globalSettings.reset()',
+    'export const f = () => window.api.logging.getLevel()',
+    'export const f = () => window.api?.logging?.log',
+    'export const f = () => window.api.quit.sendQuitResponse(true)',
+    'export const f = () => window.api.system.relaunchApp()',
+    'export const f = () => window.api.clipboard.readText()',
+    'export const f = () => window.api?.testHooks?.enabled'
+  ])('flags the app bridges: %s', async (code) => {
     expect(await gatewayMessages(RENDERER, code)).toHaveLength(1)
   })
 
@@ -183,6 +196,12 @@ describe('renderer gateway rule', () => {
     'src/renderer/src/services/fileWatchGateway.ts',
     'src/renderer/src/services/directoryWatchGateway.ts',
     'src/renderer/src/services/gitGateway.ts',
+    'src/renderer/src/services/settingsGateway.ts',
+    'src/renderer/src/services/loggingGateway.ts',
+    'src/renderer/src/services/quitGateway.ts',
+    'src/renderer/src/services/systemGateway.ts',
+    'src/renderer/src/services/clipboardGateway.ts',
+    'src/renderer/src/services/testHooksGateway.ts',
     'src/renderer/src/services/bridgePresence.ts'
   ])('exempts %s from the gateway rule only', async (file) => {
     expect(await gatewayMessages(file, READ_FILE)).toHaveLength(0)

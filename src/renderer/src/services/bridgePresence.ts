@@ -5,8 +5,10 @@
  *
  * A gateway assumes its bridge is there. A few callers cannot, and used to
  * read `window.api?.x?.y` for it: code that also runs under unit tests that
- * install no bridge, and degrades to doing nothing there. They ask here first
- * and then call the gateway.
+ * install no bridge, and degrades to doing nothing there; the crash screen,
+ * which offers only the actions whose bridge still works; and the logger,
+ * which also runs in the screenshot-overlay window, where there is no
+ * `window.api`. They ask here first and then call the gateway.
  *
  * Only a yes or no comes back, never the bridge, so this is no way round the
  * gateways.

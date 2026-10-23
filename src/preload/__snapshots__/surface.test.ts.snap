@@ -33,6 +33,13 @@ exports[`preload surface > window.api has the expected top-level groups 1`] = `
 ]
 `;
 
+exports[`preload surface > window.api.clipboard exposes the expected members 1`] = `
+[
+  "readText",
+  "writeText",
+]
+`;
+
 exports[`preload surface > window.api.directoryWatch exposes the expected members 1`] = `
 [
   "getStats",
@@ -135,5 +142,66 @@ exports[`preload surface > window.api.gitWatcher exposes the expected members 1`
   "onStateChanged",
   "start",
   "stop",
+]
+`;
+
+exports[`preload surface > window.api.globalSettings exposes the expected members 1`] = `
+[
+  "get",
+  "onSettingsChanged",
+  "reset",
+  "set",
+]
+`;
+
+exports[`preload surface > window.api.logging exposes the expected members 1`] = `
+[
+  "getLevel",
+  "getLogsDir",
+  "log",
+  "openLogsFolder",
+]
+`;
+
+exports[`preload surface > window.api.projectLock exposes the expected members 1`] = `
+[
+  "acquire",
+  "check",
+  "cleanup",
+  "onFocused",
+  "release",
+  "requestFocus",
+]
+`;
+
+exports[`preload surface > window.api.quit exposes the expected members 1`] = `
+[
+  "onQuitRequested",
+  "sendQuitResponse",
+]
+`;
+
+exports[`preload surface > window.api.settings exposes the expected members 1`] = `
+[
+  "addRecentProject",
+  "getDirectoryWatchDepth",
+  "getProjectFilterMode",
+  "getRecentProjects",
+  "removeRecentProject",
+  "setDirectoryWatchDepth",
+  "setProjectFilterMode",
+]
+`;
+
+exports[`preload surface > window.api.system exposes the expected members 1`] = `
+[
+  "openScreenRecordingSettings",
+  "relaunchApp",
+]
+`;
+
+exports[`preload surface > window.api.testHooks exposes the expected members 1`] = `
+[
+  "enabled",
 ]
 `;

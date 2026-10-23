@@ -9,11 +9,18 @@
  * that drifts from its contract, or an `Api` that stops being `typeof api`,
  * fails the typecheck here.
  */
+import type { ClipboardBridge } from '../shared/ipc/clipboard-schema'
 import type { DirectoryWatchBridge } from '../shared/ipc/directory-watch-schema'
 import type { FileBridge } from '../shared/ipc/file-schema'
 import type { FileWatchBridge } from '../shared/ipc/file-watch-schema'
 import type { GitBridge } from '../shared/ipc/git-schema'
 import type { GitPollingBridge, GitWatcherBridge } from '../shared/ipc/git-watcher-schema'
+import type { GlobalSettingsBridge } from '../shared/ipc/global-settings-schema'
+import type { LoggingBridge } from '../shared/ipc/logging-schema'
+import type { ProjectLockBridge } from '../shared/ipc/project-lock-schema'
+import type { QuitBridge } from '../shared/ipc/quit-schema'
+import type { SettingsBridge } from '../shared/ipc/settings-schema'
+import type { SystemBridge } from '../shared/ipc/system-schema'
 import type { TerminalBridge } from '../shared/ipc/terminal-schema'
 import type { Api } from './index'
 
@@ -54,6 +61,14 @@ export type ApiContractChecks = [
   Assert<Equal<Api['git'], GitBridge>>,
   Assert<Equal<Api['gitWatcher'], GitWatcherBridge>>,
   Assert<Equal<Api['gitPolling'], GitPollingBridge>>,
+  Assert<Equal<Api['settings'], SettingsBridge>>,
+  Assert<Equal<Api['globalSettings'], GlobalSettingsBridge>>,
+  Assert<Equal<Api['logging'], LoggingBridge>>,
+  Assert<Equal<Api['quit'], QuitBridge>>,
+  Assert<Equal<Api['system'], SystemBridge>>,
+  Assert<Equal<Api['clipboard'], ClipboardBridge>>,
+  Assert<Equal<Api['projectLock'], ProjectLockBridge>>,
+  Assert<Equal<Api['testHooks'], { readonly enabled: boolean }>>,
   // A bridge method that returns the unchecked `ipcRenderer.invoke` result would put `any` in the renderer
   Assert<Equal<AnyIn<Api>, never>>
 ]
