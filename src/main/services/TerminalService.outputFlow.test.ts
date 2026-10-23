@@ -46,7 +46,13 @@ const mockNodePty = {
 }
 
 vi.mock('./terminalTreeKill', () => ({ killProcessTrees: vi.fn(() => Promise.resolve(true)) }))
-vi.mock('./nodePtyWindowsShim', () => ({ installNoForkConsoleList: vi.fn(() => true) }))
+vi.mock('./nodePtyWindowsShim', () => ({
+  installNoForkConsoleList: vi.fn(() => true),
+  installExitTimeRecorder: vi.fn(() => true),
+  installConoutWorkerRelease: vi.fn(() => true),
+  nativeExitAtMs: vi.fn(() => undefined),
+  conoutWorkerStats: vi.fn(() => ({ released: 0, exited: 0 }))
+}))
 vi.mock('./LoggingService', () => ({
   logger: { trace: vi.fn(), debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), fatal: vi.fn() }
 }))

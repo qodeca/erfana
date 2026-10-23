@@ -5,6 +5,7 @@ import { resolve } from 'path'
 import { defineConfig } from 'electron-vite'
 import type { Plugin, Rollup } from 'vite'
 import react from '@vitejs/plugin-react'
+import { monacoOwnDompurify, monacoOwnDompurifyEsbuild } from './electron.vite.monaco-dompurify'
 
 // App version is read from package.json at build time and inlined into the
 // renderer as `__APP_VERSION__` (no runtime IPC). Used by the window title.
@@ -55,6 +56,55 @@ function assertSelfContainedPreloads(): Plugin {
           `Preload entr(ies) contain a relative require() that fails under sandbox: ${withRelativeRequire.join(', ')}. ` +
             'Every preload entry must be a single self-contained file.'
         )
+      }
+    }
+  }
+}
+
+/**
+ * Minimum DOMPurify version the renderer may ship. It fixes GHSA-p98j-92pf-mc4p,
+ * GHSA-6688-9rhm-gjv2, GHSA-cg2g-xh64-v4q7, GHSA-mrv2-3pqr-j5jr and GHSA-c6gr-qvv4-5v3f.
+ */
+const MIN_DOMPURIFY = [3, 4, 17]
+
+/**
+ * Fail the renderer build if it ships more than one DOMPurify code copy, or one
+ * older than MIN_DOMPURIFY. Mermaid and Monaco both bundle it and, as
+ * devDependencies, are invisible to `npm audit --omit=dev`, so the output is
+ * checked. Runs in generateBundle so bad output is never written. Two markers
+ * are counted (the licence banner and the `data-tt-policy-suffix` constant) and
+ * must agree, in case a minifier strips the banner. Monaco's instance is built
+ * from the same code (see electron.vite.monaco-dompurify.ts), so one copy remains.
+ */
+function assertSingleDompurify(): Plugin {
+  return {
+    name: 'erfana:single-dompurify',
+    apply: 'build',
+    generateBundle(_options, bundle): void {
+      const versions: string[] = []
+      let markers = 0
+      for (const output of Object.values(bundle)) {
+        const code =
+          output.type === 'chunk'
+            ? output.code
+            : output.fileName.endsWith('.js') && typeof output.source === 'string'
+              ? output.source
+              : ''
+        for (const m of code.matchAll(/@license DOMPurify (\d+\.\d+\.\d+)/g)) versions.push(m[1])
+        markers += code.split('data-tt-policy-suffix').length - 1
+      }
+      if (versions.length !== 1 || markers !== versions.length) {
+        throw new Error(
+          `Expected exactly one DOMPurify copy in the renderer bundle, found ${versions.length} banner(s) (${versions.join(', ') || 'none'}) and ${markers} code marker(s).`
+        )
+      }
+      const parts = versions[0].split('.').map(Number)
+      const tooOld = parts.some((n, i) => {
+        const earlier = parts.slice(0, i).every((p, j) => p === MIN_DOMPURIFY[j])
+        return earlier && n < MIN_DOMPURIFY[i]
+      })
+      if (tooOld) {
+        throw new Error(`Bundled DOMPurify ${versions[0]} is older than ${MIN_DOMPURIFY.join('.')}.`)
       }
     }
   }
@@ -130,6 +180,9 @@ export default defineConfig({
     define: {
       __APP_VERSION__: JSON.stringify(appVersion)
     },
-    plugins: [react()]
+    optimizeDeps: {
+      esbuildOptions: { plugins: [monacoOwnDompurifyEsbuild()] }
+    },
+    plugins: [monacoOwnDompurify(), react(), assertSingleDompurify()]
   }
 })

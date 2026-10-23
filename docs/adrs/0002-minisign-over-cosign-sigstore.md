@@ -36,7 +36,7 @@ Supports both minisign variants:
 **What we accept**
 
 - **No transparency log.** An attacker who compromises the primary key can sign a back-dated manifest and we have no out-of-band way to detect the forgery. Mitigated by [ADR 0003](0003-dual-pubkey-trust-primary-rotation.md) dual-pubkey rotation + monotonic `revisionIndex` anti-replay.
-- **Key-ID endianness quirk.** Minisign displays key IDs with bytes reversed vs the on-wire encoding. The verifier documents this at `verifyManifest.ts:84-88` but a future maintainer comparing hex dumps may re-discover it painfully.
+- **Key-ID endianness quirk.** Minisign displays key IDs with bytes reversed vs the on-wire encoding. The verifier documents this at `verifyManifest.ts:87-92` but a future maintainer comparing hex dumps may re-discover it painfully.
 - **No OIDC / keyless.** Every rebuild requires the primary key secret attached to the CI job. If we ever want GitHub OIDC-backed signing, that's a migration.
 
 ## Alternatives considered

@@ -25,6 +25,8 @@
  */
 
 import type { PreviewFailureInput } from '../../../shared/ipc/preview-types'
+import { stablePathDigest } from '../../../shared/stablePathDigest'
+import { logger } from '../LoggingService'
 import type { IPreviewWatchCoordinator } from './PreviewWatchCoordinator'
 import type { IPreviewReloadPolicy } from './PreviewReloadPolicy'
 import type { IPreviewFindController } from './PreviewFindController'
@@ -50,7 +52,7 @@ import { createPreviewLiveVisibility, type PreviewLiveVisibility } from './previ
 import { createPreviewLivePipeline, type PreviewLivePipeline } from './previewLivePipeline'
 import { createPreviewLiveBackdrop } from './previewLiveBackdrop'
 import { forwardWithHostFocus } from './previewHostFocus'
-import { unwindConstruction } from './previewLiveTeardown'
+import { errorFieldsOf, unwindConstruction } from './previewLiveTeardown'
 import {
   attachStillFrameFreshness,
   type PreviewStillFrameFreshness
@@ -178,7 +180,9 @@ export function wirePreviewLiveView(owner: PreviewLiveWiringOwner): PreviewLiveP
     },
     isWanted: () => visibility.isWanted(),
     captureWhileVisible: () => visibility.captureWhileVisible(),
-    isTornDown: owner.isTornDown
+    // The latch AND the contents' own state (#120): a contents that died outside
+    // a teardown must not be reloaded or scripted, whatever the latch says.
+    isTornDown: () => owner.isTornDown() || wc.isDestroyed()
   })
   // The input watch that keeps the history's gesture clock is attached only
   // once nothing below can throw, so until then no gesture has reached the view.
@@ -223,6 +227,7 @@ export function wirePreviewLiveView(owner: PreviewLiveWiringOwner): PreviewLiveP
   let linkBridge!: PreviewLinkBridge
   let lifecycle!: { dispose(): Promise<void> }
   let frameEvents!: PreviewFrameEvents
+  let viewAttached = false
   try {
     watchCoordinator = deps.createWatchCoordinator(realRoot, (paths) =>
       pipeline.onWatchChanged(paths)
@@ -324,10 +329,24 @@ export function wirePreviewLiveView(owner: PreviewLiveWiringOwner): PreviewLiveP
     frameEvents = attachPreviewFrameEvents({ panelId, contents: wc, pageScopes, ownToken: token })
 
     params.window.contentView.addChildView(view)
+    viewAttached = true
     bounds.place(params.initialBounds)
     backdrop.apply()
   } catch (error) {
     owner.markDestroyed()
+    // The session's contents is destroyed by the caller; a view still attached
+    // to the window would be left pointing at it (#83, #120). A destroyed window
+    // has dropped its children already, and removing from it would throw.
+    if (viewAttached && !params.window.isDestroyed()) {
+      try {
+        params.window.contentView.removeChildView(view)
+      } catch (removeError) {
+        logger.warn('Preview construction unwind: removeChildView failed', {
+          panelId: stablePathDigest(panelId),
+          ...errorFieldsOf(removeError)
+        })
+      }
+    }
     // In unwind order. Declared with `!`, but the throw may precede any of them.
     void unwindConstruction(panelId, {
       lifecycle,

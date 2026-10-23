@@ -211,6 +211,30 @@ describe('escapePathForShell', () => {
       expect(result).toBe("'C:\\a''b''c\\file.txt'")
     })
 
+    it.each([
+      ['U+2018', '\u2018'],
+      ['U+2019', '\u2019'],
+      ['U+201A', '\u201A'],
+      ['U+201B', '\u201B']
+    ])('doubles the typographic single quote %s', (_name, ch) => {
+      const result = escapePathForShell(`C:\\Users\\Bob${ch}s Files\\proj`, 'powershell')
+      expect(result).toBe(`'C:\\Users\\Bob${ch}${ch}s Files\\proj'`)
+    })
+
+    it('doubles typographic and plain quotes in a mixed path', () => {
+      const result = escapePathForShell("C:\\Bob\u2019s\\it's\\\u2018x\u201B", 'powershell')
+      expect(result).toBe("'C:\\Bob\u2019\u2019s\\it''s\\\u2018\u2018x\u201B\u201B'")
+    })
+
+    it('keeps a path with curly apostrophes as one single-quoted literal', () => {
+      const result = escapePathForShell('C:\\Users\\Bob\u2019s Files\\proj', 'powershell')
+      const inner = result.slice(1, -1)
+      expect(result.startsWith("'") && result.endsWith("'")).toBe(true)
+      expect(inner.replace(/(['\u2018\u2019\u201A\u201B])\1/g, '')).not.toMatch(
+        /['\u2018\u2019\u201A\u201B]/
+      )
+    })
+
     it('keeps backtick and $ literal (no interpolation inside single quotes)', () => {
       const result = escapePathForShell('C:\\$HOME\\`cmd`\\file.txt', 'powershell')
       expect(result).toBe("'C:\\$HOME\\`cmd`\\file.txt'")

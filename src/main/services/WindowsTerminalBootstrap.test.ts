@@ -19,6 +19,9 @@
 import { spawnSync } from 'node:child_process'
 import { describe, it, expect } from 'vitest'
 import { argsToCommandLine } from 'node-pty/lib/windowsPtyAgent'
+import { mkdtempSync, mkdirSync, realpathSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import {
   CmdExeBootstrapBuilder,
   isCmdExe,
@@ -77,24 +80,42 @@ describe('PowerShellBootstrapBuilder', () => {
   })
 
   describe('build', () => {
-    it('emits cd, pwd, marker, ConPTY clear, and shell handoff in order', () => {
+    it('emits cd, pwd, marker, ConPTY clear, then the profiles, in order', () => {
       const args = builder.build({ shell: 'pwsh.exe', cwd: CWD, marker: MARKER })
-      expect(args).toHaveLength(3)
-      expect(args[0]).toBe('-NoProfile')
-      expect(args[1]).toBe('-Command')
+      expect(args.slice(0, 4)).toEqual(['-NoLogo', '-NoProfile', '-NoExit', '-Command'])
+      expect(args).toHaveLength(5)
 
-      const script = args[2]
+      const script = args[4]
       const cdIdx = script.indexOf('Set-Location -LiteralPath')
       const pwdIdx = script.indexOf('(Get-Location).Path')
       const markerIdx = script.indexOf(MARKER)
       const clearIdx = script.indexOf("[char]27 + '[2J'")
-      const shellIdx = script.indexOf("& 'pwsh.exe' -NoLogo")
+      const profilesIdx = script.indexOf('$PROFILE.AllUsersAllHosts')
 
       expect(cdIdx).toBeGreaterThanOrEqual(0)
       expect(pwdIdx).toBeGreaterThan(cdIdx)
       expect(markerIdx).toBeGreaterThan(pwdIdx)
       expect(clearIdx).toBeGreaterThan(markerIdx)
-      expect(shellIdx).toBeGreaterThan(clearIdx)
+      expect(profilesIdx).toBeGreaterThan(clearIdx)
+    })
+
+    it('is the interactive shell itself, not a bootstrap that starts it (#305 round 8)', () => {
+      // the pid node-pty reports must be the shell that runs the user's commands, so
+      // the quit cleanup can link what they start to it
+      const args = builder.build({ shell: 'C:\\Program Files\\PowerShell\\7\\pwsh.exe', cwd: CWD, marker: MARKER })
+      expect(args).toContain('-NoExit')
+      expect(joinArgs(args)).not.toMatch(/&\s*'/)
+      expect(joinArgs(args)).not.toContain('pwsh.exe')
+    })
+
+    it('loads the profiles in PowerShell order, each on its own so one failing does not stop the next', () => {
+      const script = builder.build({ shell: 'pwsh.exe', cwd: CWD, marker: MARKER })[4]
+      const order = ['AllUsersAllHosts', 'AllUsersCurrentHost', 'CurrentUserAllHosts', 'CurrentUserCurrentHost'].map((p) =>
+        script.indexOf(`$PROFILE.${p}`)
+      )
+      expect(order.every((i, k) => i > 0 && (k === 0 || i > order[k - 1]))).toBe(true)
+      expect(script).toContain('try { do { . $erfanaProfile } while ($false) } catch {')
+      expect(script).toContain('if ($_.InvocationInfo.ScriptName) { $_ | Out-Host } else { $Host.UI.WriteErrorLine($_.Exception.Message) }')
     })
 
     it('includes all three ConPTY clear escapes (2J, 3J, H)', () => {
@@ -110,9 +131,29 @@ describe('PowerShellBootstrapBuilder', () => {
       expect(joinArgs(args)).toContain("Set-Location -LiteralPath 'C:\\path\\with''quote'")
     })
 
-    it("escapes single quotes in shell path via PowerShell ''", () => {
-      const args = builder.build({ shell: "C:\\bin\\my's.exe", cwd: CWD, marker: MARKER })
-      expect(joinArgs(args)).toContain("& 'C:\\bin\\my''s.exe' -NoLogo")
+    it.each([
+      ['U+2018', '\u2018'],
+      ['U+2019', '\u2019'],
+      ['U+201A', '\u201A'],
+      ['U+201B', '\u201B']
+    ])('doubles the typographic single quote %s in cwd', (_name, ch) => {
+      const args = builder.build({
+        shell: 'pwsh.exe',
+        cwd: `C:\\Users\\Bob${ch}s Files\\proj`,
+        marker: MARKER
+      })
+      expect(joinArgs(args)).toContain(
+        `Set-Location -LiteralPath 'C:\\Users\\Bob${ch}${ch}s Files\\proj'`
+      )
+    })
+
+    it('doubles typographic and plain quotes together in cwd', () => {
+      const args = builder.build({
+        shell: 'pwsh.exe',
+        cwd: "C:\\Bob\u2018s\\it's\\proj",
+        marker: MARKER
+      })
+      expect(joinArgs(args)).toContain("Set-Location -LiteralPath 'C:\\Bob\u2018\u2018s\\it''s\\proj'")
     })
   })
 })
@@ -443,3 +484,26 @@ describe('normalizeWindowsCwd', () => {
     expect(normalizeWindowsCwd('foo')).toBe('foo')
   })
 })
+
+describe.skipIf(spawnSync('pwsh', ['-NoProfile', '-Command', '1'], { timeout: 15000 }).status !== 0)(
+  'PowerShellBootstrapBuilder script run with pwsh',
+  () => {
+    it('opens a folder named with a curly apostrophe', () => {
+      const base = mkdtempSync(join(realpathSync.native(tmpdir()), 'erfana-bootstrap-'))
+      const dir = join(base, 'Bob\u2019s Files')
+      mkdirSync(dir)
+      try {
+        const args = new PowerShellBootstrapBuilder().build({
+          shell: 'pwsh',
+          cwd: dir,
+          marker: MARKER
+        })
+        const run = spawnSync('pwsh', args, { input: '', encoding: 'utf8', timeout: 15000 })
+        expect(run.stdout).toContain(dir)
+        expect(run.stdout).toContain(MARKER)
+      } finally {
+        rmSync(base, { recursive: true, force: true })
+      }
+    })
+  }
+)

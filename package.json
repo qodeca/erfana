@@ -47,6 +47,7 @@
     "@electron-toolkit/utils": "^3.0.0",
     "@llamaindex/liteparse": "2.14.7",
     "@noble/ed25519": "3.2.0",
+    "@noble/hashes": "1.8.0",
     "@turbodocx/html-to-docx": "^1.23.1",
     "async-mutex": "^0.5.0",
     "chokidar": "5.0.0",
@@ -132,6 +133,6 @@
     "chokidar": "5.0.0",
     "lodash": "4.18.1",
     "lodash-es": "4.18.1",
-    "dompurify": "^3.4.1"
+    "dompurify": "^3.4.17"
   }
 }

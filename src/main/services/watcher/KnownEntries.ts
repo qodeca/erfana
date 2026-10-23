@@ -19,6 +19,11 @@
  *   walk may have seen the entry before or after the event). A read that
  *   began before a project switch, or saw a folder removed while it ran, is
  *   not used at all.
+ * - A folder the root read left lazy (finding [32]: ignored, or past the
+ *   walk's cap) is filled in by the read the tree makes when it is expanded,
+ *   under the same rules, and only into a record a root read seeded. A later
+ *   root read keeps what the record knows below the folders it leaves lazy
+ *   again, because the tree on screen still shows those children.
  * - A folder removal drops the whole record until the next root read (the
  *   structural refresh it causes rebuilds it), instead of scanning for keys.
  * - Above {@link MAX_KNOWN_ENTRIES} entries there is no record (`null`), and
@@ -49,7 +54,7 @@ interface KnownEntry {
   name: string
 }
 
-/** A root tree read in flight. */
+/** A tree read in flight: of the root, or of one folder. */
 interface PendingRead {
   readonly epoch: number
   /** Folded keys an event touched while the read ran */
@@ -89,8 +94,74 @@ function countEntries(nodes: readonly FileNode[], limit: number): number {
   return count
 }
 
+/** Whether `key` lies below one of the folder keys in `folders`. */
+function isBelowAny(key: string, folders: ReadonlySet<string>): boolean {
+  for (let slash = key.indexOf('/'); slash !== -1; slash = key.indexOf('/', slash + 1)) {
+    if (folders.has(key.slice(0, slash))) return true
+  }
+  return false
+}
+
+/** The folder key of an entry key (`''` for a top-level entry). */
+const parentKey = (key: string): string => {
+  const slash = key.lastIndexOf('/')
+  return slash === -1 ? '' : key.slice(0, slash)
+}
+
+/**
+ * The record: entries by folded key, indexed by folder, so the entries below
+ * one folder are found without scanning the whole record (an expand read
+ * touches only its folder – review of #320). `files` lists each folder's own
+ * entries; `folders` each folder's sub-folders that hold, or held, entries.
+ * A sub-folder left in `folders` after its last entry went costs one empty
+ * visit, so it is not cleaned up eagerly.
+ */
+class EntryRecord extends Map<string, KnownEntry> {
+  private readonly files = new Map<string, Set<string>>()
+  private readonly folders = new Map<string, Set<string>>()
+
+  override set(key: string, entry: KnownEntry): this {
+    if (!this.has(key)) {
+      let folder = parentKey(key)
+      let own = this.files.get(folder)
+      if (!own) this.files.set(folder, (own = new Set()))
+      own.add(key)
+      // Register the folder chain up to the first one already known
+      while (folder !== '') {
+        const parent = parentKey(folder)
+        let below = this.folders.get(parent)
+        if (!below) this.folders.set(parent, (below = new Set()))
+        if (below.has(folder)) break
+        below.add(folder)
+        folder = parent
+      }
+    }
+    return super.set(key, entry)
+  }
+
+  override delete(key: string): boolean {
+    if (!super.delete(key)) return false
+    const own = this.files.get(parentKey(key))
+    own?.delete(key)
+    if (own?.size === 0) this.files.delete(parentKey(key))
+    return true
+  }
+
+  /** Every entry key below `folder`, except below the folders in `skip`. */
+  keysBelow(folder: string, skip: ReadonlySet<string>): string[] {
+    const keys: string[] = []
+    const stack = [folder]
+    while (stack.length > 0) {
+      const at = stack.pop() as string
+      for (const key of this.files.get(at) ?? []) keys.push(key)
+      for (const sub of this.folders.get(at) ?? []) if (!skip.has(sub)) stack.push(sub)
+    }
+    return keys
+  }
+}
+
 export class KnownEntries {
-  private record: Map<string, KnownEntry> | null = null
+  private record: EntryRecord | null = null
   private epoch = 0
   private readonly reads = new Set<PendingRead>()
   /** Kinds removed by `unlink` in the current batch, by folded key; `null`: not in the record */
@@ -122,7 +193,30 @@ export class KnownEntries {
       commit: (tree) => {
         if (!this.reads.delete(read)) return
         if (read.epoch !== this.epoch || read.invalid) return
-        this.record = this.build(tree, read.touched)
+        this.record = this.build(tree, read.touched, this.record)
+      },
+      cancel: () => {
+        this.reads.delete(read)
+      }
+    }
+  }
+
+  /**
+   * A read of one folder below the root begins – the tree expanding a lazy
+   * folder. Its tree replaces what the record knows below that folder, except
+   * below the sub-folders it leaves lazy. With no record (no root read yet, a
+   * folder removed, past the cap) it adds nothing.
+   *
+   * @param rel - the folder's project-relative path, `/`-separated
+   */
+  beginFolderRead(rel: string): KnownEntriesRead {
+    const read: PendingRead = { epoch: this.epoch, touched: new Set(), invalid: false }
+    this.reads.add(read)
+    return {
+      commit: (tree) => {
+        if (!this.reads.delete(read)) return
+        if (read.epoch !== this.epoch || read.invalid || this.record === null) return
+        this.mergeFolder(rel, tree, read.touched)
       },
       cancel: () => {
         this.reads.delete(read)
@@ -203,20 +297,54 @@ export class KnownEntries {
     if (record.size > MAX_KNOWN_ENTRIES) this.record = null
   }
 
-  private build(tree: readonly FileNode[], touched: ReadonlySet<string>): Map<string, KnownEntry> | null {
+  private build(
+    tree: readonly FileNode[],
+    touched: ReadonlySet<string>,
+    previous: ReadonlyMap<string, KnownEntry> | null
+  ): EntryRecord | null {
     if (countEntries(tree, MAX_KNOWN_ENTRIES) > MAX_KNOWN_ENTRIES) return null
-    const record = new Map<string, KnownEntry>()
+    const { entries: record, lazy } = this.collect(tree, '')
+    // What an expand read taught the record below a folder that is lazy again
+    if (previous !== null && lazy.size > 0) {
+      for (const [key, entry] of previous) {
+        if (!record.has(key) && isBelowAny(key, lazy)) record.set(key, entry)
+      }
+    }
+    for (const key of touched) record.delete(key)
+    return record.size > MAX_KNOWN_ENTRIES ? null : record
+  }
+
+  /** Replace what the record knows below `rel` with an expand read's tree. */
+  private mergeFolder(rel: string, tree: readonly FileNode[], touched: ReadonlySet<string>): void {
+    const record = this.record
+    if (record === null) return
+    const { entries, lazy } = this.collect(tree, rel)
+    // Only the entries below this folder are visited, not the whole record
+    for (const key of record.keysBelow(this.fold(rel), lazy)) {
+      // Gone from the folder since: forgotten, so its re-creation stays structural
+      if (!entries.has(key)) record.delete(key)
+    }
+    for (const [key, entry] of entries) if (!touched.has(key)) record.set(key, entry)
+    for (const key of touched) record.delete(key)
+    if (record.size > MAX_KNOWN_ENTRIES) this.record = null
+  }
+
+  /** The non-folder entries of a tree below `base` (`''`: the root), and its lazy folders, by folded key. */
+  private collect(tree: readonly FileNode[], base: string): { entries: EntryRecord; lazy: Set<string> } {
+    const entries = new EntryRecord()
+    const lazy = new Set<string>()
+    const join = (parent: string, name: string): string => (parent === '' ? name : `${parent}/${name}`)
     // Keys built while walking (parent + '/' + name): no path maths per node
-    const stack: Array<{ node: FileNode; rel: string }> = tree.map((node) => ({ node, rel: node.name }))
+    const stack: Array<{ node: FileNode; rel: string }> = tree.map((node) => ({ node, rel: join(base, node.name) }))
     while (stack.length > 0) {
       const { node, rel } = stack.pop() as { node: FileNode; rel: string }
       if (node.type === 'directory') {
+        if (node.lazy !== undefined) lazy.add(this.fold(rel))
         for (const child of node.children ?? []) stack.push({ node: child, rel: `${rel}/${child.name}` })
         continue
       }
-      record.set(this.fold(rel), { kind: node.isSymlink === true ? 'symlink' : 'file', name: node.name })
+      entries.set(this.fold(rel), { kind: node.isSymlink === true ? 'symlink' : 'file', name: node.name })
     }
-    for (const key of touched) record.delete(key)
-    return record
+    return { entries, lazy }
   }
 }

@@ -20,6 +20,7 @@ import { useTerminalStore } from '../../stores/useTerminalStore'
 import { useProjectStore } from '../../stores/useProjectStore'
 import { useActivityBarStore } from '../../stores/useActivityBarStore'
 import { showWarningToast, showSuccessToast, showInfoToast } from '../../utils/toastHelpers'
+import { showNameNotFoundToast } from './TerminalPanel/nameNotFoundToast'
 import { useScrollAnomalyRecovery } from '../../hooks/useScrollAnomalyRecovery'
 import { useTerminalParserHooks } from '../../hooks/useTerminalParserHooks'
 import { useTerminalClipboard } from '../../hooks/useTerminalClipboard'
@@ -28,6 +29,8 @@ import { useScrollLock, ScrollLockStateAccessor } from '../../hooks/useScrollLoc
 import { useTerminalFileLinks } from '../../hooks/useTerminalFileLinks'
 import { useFilePicker } from '../../hooks/useFilePicker'
 import { useProjectManagementContextSafe } from '../../context/ProjectManagementContext'
+import { useMergedProjectFiles } from '../../hooks/useMergedProjectFiles'
+import type { FileNode } from '../../../../shared/ipc/file-schema'
 import { useTerminalPortalOptional } from '../../context/TerminalPortalContext'
 import { TerminalContextMenu } from '../ContextMenu/TerminalContextMenu'
 import { FilePickerDialog } from '../Dialog/FilePickerDialog'
@@ -43,7 +46,7 @@ import { openFileInPanel } from '../../utils/openFileInPanel'
 import { resolvePanelKind } from '../../utils/resolvePanelKind'
 import { formatShortcut } from '../../utils/shortcutLabel'
 import { registerTestTerminal } from '../../testHooks/terminalTestHook'
-import { formatPathsForTerminal, escapePathForShell, type ShellKind } from '../../utils/shellPathEscape'
+import { escapePathForShell, platformDefaultShellKind, type ShellKind } from '../../utils/shellPathEscape'
 import { logger } from '../../utils/logger'
 import { TEST_IDS } from '../../constants/testids'
 import '@xterm/xterm/css/xterm.css'
@@ -60,6 +63,9 @@ import { ensureTerminalFontLoaded, createTerminalLinkHandler } from './TerminalP
 import type { TerminalState } from './TerminalPanel/types'
 import { fileGateway } from '../../services/fileGateway'
 import { terminalGateway } from '../../services/terminalGateway'
+
+/** One empty tree, so a missing project context does not defeat the merge's memo */
+const EMPTY_FILES: FileNode[] = []
 
 export function TerminalPanel(_props: ISplitviewPanelProps) {
   const [isAvailable, setIsAvailable] = useState<boolean | null>(null)
@@ -193,7 +199,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   }, [])
 
   // Terminal store for cross-component communication
-  const setActiveTerminalId = useTerminalStore((state) => state.setActiveTerminalId)
+  const setActiveTerminal = useTerminalStore((state) => state.setActiveTerminal)
 
   // Project store for file opening functionality (issue #26)
   const dockviewApi = useProjectStore((state) => state.dockviewApi)
@@ -262,7 +268,8 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   // Get project files for smart path resolution (issue #26 enhancement)
   // Use safe version to gracefully degrade in tests without provider
   const projectContext = useProjectManagementContextSafe()
-  const files = projectContext?.files ?? []
+  // With the lazy folders read so far (finding 32), and whether the tree is incomplete
+  const { files, truncated: treeTruncated } = useMergedProjectFiles(projectContext?.files ?? EMPTY_FILES)
 
   // File picker for disambiguation when multiple files match (issue #26 enhancement)
   const { showPicker, pickerProps } = useFilePicker({ projectRoot: projectPath })
@@ -316,14 +323,21 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     })
   }, [dockviewApi])
 
+  // A name clicked on an incomplete tree that the project search did not find
+  const handleNameNotFound = useCallback((filename: string, { cutShort }: { cutShort: boolean }) => {
+    showNameNotFoundToast(filename, cutShort)
+  }, [])
+
   // Terminal file links hook - enables clickable file paths with smart resolution
   useTerminalFileLinks({
     terminalRef: xtermRef,
     terminalId: terminalId,
     projectRoot: projectPath,
     files: files,
+    treeTruncated,
     onFileOpen: handleFileOpen,
     onShowPicker: showPicker,
+    onNameNotFound: handleNameNotFound,
     onError: (error) => {
       logger.warn('Terminal file link error', error instanceof Error ? { error: error.message, stack: error.stack } : { error: String(error) })
     }
@@ -571,7 +585,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
 
           logger.info('External file drop on terminal', { pathCount: paths.length, paths })
 
-          const formattedPaths = formatPathsForTerminal(paths)
+          const formattedPaths = useTerminalStore.getState().formatPathsForActiveTerminal(paths)
           const success = await useTerminalStore.getState().sendToTerminal(formattedPaths, false)
 
           if (!success) {
@@ -713,7 +727,8 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       // correctly without an extra IPC (#164 round-2 F#1). Main always
       // returns a value when terminalId is present, but guard defensively.
       shellKindRef.current = result.shellKind ?? null
-      setActiveTerminalId(result.terminalId) // Register in store
+      // Register in store, together with its shell kind
+      setActiveTerminal({ id: result.terminalId, shellKind: result.shellKind ?? null })
       // Begin tracking Claude Code context status for this panel (#216).
       // Guarded so environments without the bridge (tests) do not crash.
       void window.api?.claudeStatus?.register(result.terminalId)
@@ -780,7 +795,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       void cleanupTerminalInstance(terminalIdRef.current)
       runAllCleanups()
       shellKindRef.current = null
-      setActiveTerminalId(null)
+      setActiveTerminal(null)
       // Cleanup parser hooks before disposing xterm
       parserDisposablesRef.current.forEach((d) => d.dispose())
       parserDisposablesRef.current = []
@@ -801,7 +816,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
         visibilityObserverRef.current = null
       }
     }
-  }, [isAvailable, setActiveTerminalId, cleanupTerminalInstance, cleanupDragHandlers, runAllCleanups])
+  }, [isAvailable, setActiveTerminal, cleanupTerminalInstance, cleanupDragHandlers, runAllCleanups])
 
   // Restart terminal on project change
   useEffect(() => {
@@ -809,7 +824,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       // Kill current terminal session (Phase 1.1 bug fix - use centralized cleanup)
       await cleanupTerminalInstance(terminalIdRef.current)
       shellKindRef.current = null
-      setActiveTerminalId(null)
+      setActiveTerminal(null)
       // Cleanup parser hooks before disposing xterm
       parserDisposablesRef.current.forEach((d) => d.dispose())
       parserDisposablesRef.current = []
@@ -834,7 +849,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       }
     })
     return () => unsubscribe()
-  }, [setActiveTerminalId, cleanupTerminalInstance, cleanupDragHandlers])
+  }, [setActiveTerminal, cleanupTerminalInstance, cleanupDragHandlers])
 
   // Handle terminal data
   useEffect(() => {
@@ -1115,7 +1130,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       }
 
       // Insert path to terminal with shell-safe escaping
-      const quotedPath = escapePathForShell(filePath)
+      const quotedPath = escapePathForShell(filePath, shellKindRef.current ?? platformDefaultShellKind())
       terminalGateway.write(currentTerminalId, quotedPath)
 
       // Show success toast with filename only
@@ -1136,7 +1151,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     // Kill current terminal session (Phase 1.1 bug fix - use centralized cleanup)
     await cleanupTerminalInstance(terminalIdRef.current)
     shellKindRef.current = null
-    setActiveTerminalId(null)
+    setActiveTerminal(null)
 
     // Cleanup parser hooks before disposing xterm
     parserDisposablesRef.current.forEach((d) => d.dispose())
@@ -1165,7 +1180,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     if (terminalRef.current && isAvailable) {
       await initializeTerminalRef.current()
     }
-  }, [setActiveTerminalId, isAvailable, cleanupDragHandlers, cleanupTerminalInstance])
+  }, [setActiveTerminal, isAvailable, cleanupDragHandlers, cleanupTerminalInstance])
 
   /**
    * User-facing restart: asks first when the terminal looks busy, because a

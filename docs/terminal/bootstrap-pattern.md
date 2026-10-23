@@ -28,7 +28,7 @@ shell -c 'cd '\''/target/path'\''; pwd; echo __ERFANA_PWD_MARKER_...; exec -l "$
 bash.exe -c 'cd '\''C:\Users\me\Dev\proj'\''; pwd; echo __ERFANA_PWD_MARKER_...; printf '\''\033[2J\033[3J\033[H'\''; exec -l '\''C:\Program Files\Git\usr\bin\bash.exe'\'' -i'
 
 # Windows PowerShell (cwd single-quote-doubled '→''; `[Console]::Write` wipes ConPTY buffer)
-pwsh.exe -NoProfile -Command "Set-Location -LiteralPath 'C:\Users\me\Dev\proj' ; (Get-Location).Path ; Write-Output '__ERFANA_PWD_MARKER_...' ; [Console]::Write([char]27 + '[2J' + [char]27 + '[3J' + [char]27 + '[H') ; & 'pwsh.exe' -NoLogo"
+pwsh.exe -NoLogo -NoProfile -NoExit -Command "Set-Location -LiteralPath 'C:\Users\me\Dev\proj' ; (Get-Location).Path ; Write-Output '__ERFANA_PWD_MARKER_...' ; [Console]::Write([char]27 + '[2J' + [char]27 + '[3J' + [char]27 + '[H') ; <dot-source the user's profiles>"
 
 # Windows cmd.exe (cwd validated against metachar deny-list and passed as the spawn cwd; `pause` then `cls` wipes the ConPTY buffer, main writes `\r` after the marker)
 cmd.exe /D /S /K "@echo off && cd && echo __ERFANA_PWD_MARKER_... && pause >nul && cls & echo on"   # started with cwd = C:\Users\me\Dev\proj
@@ -49,8 +49,9 @@ When the main process sees `process.env.ERFANA_E2E_FAST_SHELL === '1'`, the POSI
 
 ### PowerShell
 
-- `-NoProfile`: Skip profile loading (faster bootstrap; isolates from user RC)
-- `-Command`: Execute the bootstrap script. `-NoExit` is **not** emitted (`PowerShellBootstrapBuilder.build` returns `['-NoProfile', '-Command', script]`): PowerShell has no POSIX `exec` equivalent, so the script's last step `& '<shell>' -NoLogo` launches the interactive session itself, and the bootstrap process stays alive as its parent
+- `-NoProfile`: PowerShell does not load the profiles before the script; the script's last step dot-sources them itself (all users all hosts, all users this host, current user all hosts, current user this host – PowerShell's own order), each in its own `try`, so they still run after the cwd is set and after the screen clear, as before
+- `-NoExit`: the same process stays as the interactive session once the script ends (`PowerShellBootstrapBuilder.build` returns `['-NoLogo', '-NoProfile', '-NoExit', '-Command', script]`). Until #305 round 8 the script ended with `& '<shell>' -NoLogo`, so the pid node-pty reported was a bootstrap PowerShell and the interactive shell was its child; on quit both ended with the console, and a program the user had started in its own console was left with a parent the quit cleanup had never been told about. Now the reported pid is the shell that runs the user's commands
+- `-Command`: Execute the bootstrap script
 - `Set-Location -LiteralPath`: `-LiteralPath` disables wildcard expansion and variable interpolation. Single-quoting the path further disables `$`-expansion. cwd apostrophes are doubled (`'` → `''`).
 - `Write-Output '<marker>'` with the marker also single-quoted: defensive — protects against marker format changes that might include shell-sensitive characters.
 
@@ -166,7 +167,7 @@ The xterm.js-side handshake (§ 5) is unaffected — xterm still clears its own 
 
 **Shell behavior**:
 - POSIX login shell sources RC files (`.zshrc`, `.bash_profile`) — Homebrew paths, aliases, functions available
-- PowerShell runs without profile (`-NoProfile`) for fast and isolated startup
+- PowerShell loads the user's profiles after the cwd is set (the script dot-sources them; `-NoProfile` only stops PowerShell loading them before the script)
 - cmd.exe runs without AutoRun (`/D`) for the same reason
 
 ## Windows shell selection and fallback chain
@@ -255,14 +256,15 @@ bash.exe -c 'cd '\''C:\path'\''; pwd; echo MARKER; printf '\''\033[2J\033[3J\033
 ### Windows PowerShell (5.1 and 7+)
 
 ```
-pwsh.exe -NoProfile -Command "Set-Location -LiteralPath 'C:\path' ; (Get-Location).Path ; Write-Output 'MARKER' ; [Console]::Write([char]27 + '[2J' + [char]27 + '[3J' + [char]27 + '[H') ; & 'pwsh.exe' -NoLogo"
+pwsh.exe -NoLogo -NoProfile -NoExit -Command "Set-Location -LiteralPath 'C:\path' ; (Get-Location).Path ; Write-Output 'MARKER' ; [Console]::Write([char]27 + '[2J' + [char]27 + '[3J' + [char]27 + '[H') ; foreach ($erfanaProfile in @($PROFILE.AllUsersAllHosts, …, $PROFILE.CurrentUserCurrentHost)) { … try { . $erfanaProfile } catch { Write-Error $_ } }"
 ```
 
-- `-NoProfile`: skip profile loading (faster, isolated)
+- `-NoProfile`: PowerShell skips its own profile loading; the script dot-sources the profiles at its end instead, so they run after the cwd is set
+- `-NoExit`: this process stays as the interactive session (one process, so the pid node-pty reports is the user's shell – #305)
 - `-Command`: run the script string
 - `Set-Location -LiteralPath`: disable glob/variable expansion; cwd apostrophes doubled (`'` → `''`)
 - `[Console]::Write([char]27 + '[2J' + ...)`: wipes ConPTY's screen buffer + scrollback before the interactive session takes over (see § 4)
-- `& '<shell>' -NoLogo`: launch interactive PowerShell (no `-NoExit` needed; the new shell *is* the interactive session)
+- the profile loader: dot-sources each existing profile in PowerShell's order; a failing one prints its error and the next still runs
 - cwd rejected if it contains `\r` / `\n`
 
 ### Windows cmd.exe

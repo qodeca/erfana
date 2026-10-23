@@ -22,6 +22,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor, act, fireEvent } from '@testing-library/react'
 import React from 'react'
 import { ProjectTree } from './ProjectTree'
+import { placeholderKey } from './visibleRows'
 import { DialogProvider } from '../Dialog'
 import { ProjectManagementProvider } from '../../context/ProjectManagementContext'
 import { useClipboardStore } from '../../stores/useClipboardStore'
@@ -305,6 +306,19 @@ describe('ProjectTree root-inclusive lookups', () => {
     await renderWithProject()
 
     await dragEnd(`${PROJECT_PATH}/top.md`, `${PROJECT_PATH}/folder1`)
+
+    expect(fileApi.moveItem).toHaveBeenCalledWith({
+      sourcePath: `${PROJECT_PATH}/top.md`,
+      targetParentPath: `${PROJECT_PATH}/folder1`
+    })
+  })
+
+  it("resolves a lazy folder's placeholder line to that folder (#320)", async () => {
+    await renderWithProject()
+
+    // The line under a lazy folder that is being read, or failed to read, is
+    // a droppable of its own; its id stands for the folder
+    await dragEnd(`${PROJECT_PATH}/top.md`, placeholderKey(`${PROJECT_PATH}/folder1`))
 
     expect(fileApi.moveItem).toHaveBeenCalledWith({
       sourcePath: `${PROJECT_PATH}/top.md`,

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import type { VisibleTreeRow } from './visibleRows'
+import { isNodeRow, type TreeRow } from './visibleRows'
 
 /**
  * What a key press on the focused tree row should do.
@@ -42,11 +42,15 @@ export interface TreeKey {
  * @param event - The key press
  * @returns The action, or null when the key is not part of the contract
  */
-export function resolveTreeKey(rows: readonly VisibleTreeRow[], index: number, event: TreeKey): TreeKeyAction | null {
+export function resolveTreeKey(rows: readonly TreeRow[], index: number, event: TreeKey): TreeKeyAction | null {
   if (event.ctrlKey || event.altKey || event.metaKey) return null
   const row = rows[index]
-  if (!row) return null
-  const last = rows.length - 1
+  if (!isNodeRow(row)) return null
+  // Placeholder lines (lazy folders, #320) are stepped over, never focused
+  const step = (from: number, by: 1 | -1): number | null => {
+    for (let i = from + by; i >= 0 && i < rows.length; i += by) if (isNodeRow(rows[i])) return i
+    return null
+  }
   const isFolder = row.node.type === 'directory'
 
   if ((event.key === 'F10' && event.shiftKey) || event.key === 'ContextMenu') {
@@ -56,25 +60,25 @@ export function resolveTreeKey(rows: readonly VisibleTreeRow[], index: number, e
 
   switch (event.key) {
     case 'ArrowDown':
-      return { type: 'focus', index: Math.min(index + 1, last) }
+      return { type: 'focus', index: step(index, 1) ?? index }
     case 'ArrowUp':
-      return { type: 'focus', index: Math.max(index - 1, 0) }
+      return { type: 'focus', index: step(index, -1) ?? index }
     case 'Home':
-      return { type: 'focus', index: 0 }
+      return { type: 'focus', index: step(-1, 1) ?? index }
     case 'End':
-      return { type: 'focus', index: last }
-    case 'ArrowRight':
+      return { type: 'focus', index: step(rows.length, -1) ?? index }
+    case 'ArrowRight': {
       if (!isFolder) return null
       if (!row.isExpanded) return { type: 'expand', path: row.node.path }
       // Open folder: step to its first child, if it has one.
-      return index < last && rows[index + 1].parentPath === row.node.path
-        ? { type: 'focus', index: index + 1 }
-        : null
+      const next = step(index, 1)
+      return next !== null && rows[next].parentPath === row.node.path ? { type: 'focus', index: next } : null
+    }
     case 'ArrowLeft': {
       if (isFolder && row.isExpanded) return { type: 'collapse', path: row.node.path }
       if (row.parentPath === null) return null
       // The parent is the nearest row above with a smaller level.
-      for (let i = index - 1; i >= 0; i--) {
+      for (let i = step(index, -1); i !== null; i = step(i, -1)) {
         if (rows[i].level < row.level) return { type: 'focus', index: i }
       }
       return null
@@ -99,13 +103,14 @@ export function resolveTreeKey(rows: readonly VisibleTreeRow[], index: number, e
  * @param query - The characters typed so far (case-insensitive)
  * @returns The matching row's index, or null when nothing matches
  */
-export function findTypeAheadMatch(rows: readonly VisibleTreeRow[], index: number, query: string): number | null {
+export function findTypeAheadMatch(rows: readonly TreeRow[], index: number, query: string): number | null {
   if (query === '' || rows.length === 0) return null
   const needle = query.toLowerCase()
   const start = needle.length === 1 ? index + 1 : index
   for (let step = 0; step < rows.length; step++) {
     const i = (start + step) % rows.length
-    if (rows[i].node.name.toLowerCase().startsWith(needle)) return i
+    const row = rows[i]
+    if (isNodeRow(row) && row.node.name.toLowerCase().startsWith(needle)) return i
   }
   return null
 }

@@ -8,6 +8,16 @@
  * Centralizes configuration values that are used across multiple files.
  */
 
+/**
+ * Application ID. Single source of truth for the Windows AppUserModelID.
+ *
+ * Must equal `appId` in `electron-builder.yml`: the NSIS installer stamps that value on the
+ * Start menu and desktop shortcuts, and the running app must report the same one so the taskbar
+ * groups it with the pinned shortcut and toast notifications resolve the app name and icon.
+ * `appId.test.ts` enforces the match.
+ */
+export const APP_ID = 'com.erfana.app'
+
 /** Maximum number of recent projects to track */
 export const MAX_RECENT_PROJECTS = 5
 
@@ -600,6 +610,17 @@ export const PREVIEW = {
    * A step that overruns is logged and skipped; the destroy still happens.
    */
   TEARDOWN_STEP_TIMEOUT_MS: 2000,
+  /**
+   * How long the previewed page gets to prove it repainted below newly revealed
+   * chrome (ms). ONE number for both sides: the renderer's absolute deadline
+   * for the permission band, and main's life for one confirmation script, which
+   * a page that never runs its frames (hidden, frozen) would otherwise hold
+   * for ever.
+   *
+   * Measured on Electron 39: ~17 ms for an idle page, ~130 ms for a heavy one,
+   * and NEVER for a page that refuses to yield.
+   */
+  BOUNDS_ACK_TIMEOUT_MS: 300,
   /**
    * Bound on the purge that runs when a partition is handed back for reuse
    * and again before it is handed out (ms). Fail-closed: a purge that fails or

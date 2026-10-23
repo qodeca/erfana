@@ -68,7 +68,13 @@ describe('selectBandRows', () => {
     // reads them, in a sentence that denies the limit in its next clause.
     const rows = selectBandRows([blocked('https://a.example.com', ['font', 'script'])], [])
     expect(rows.blocked[0].kinds).toEqual(['font', 'script'])
-    expect(rows.blocked[0]).not.toHaveProperty('kind')
+    // The WHOLE row, strictly: a `kind` field added to a row would fail here, which
+    // a `not.toHaveProperty('kind')` on a typed object never could.
+    expect(rows.blocked[0]).toStrictEqual({
+      host: 'https://a.example.com',
+      state: 'allow',
+      kinds: ['font', 'script']
+    })
   })
 
   it('gives an allowed row no kinds at all', () => {
@@ -287,7 +293,15 @@ describe('bandReducer', () => {
     s = bandReducer(s, { type: 'allowClicked', host: 'https://a.example.com' })
     s = bandReducer(s, { type: 'approveStarted', host: 'https://a.example.com' })
     s = bandReducer(s, { type: 'approveSucceeded', host: 'https://a.example.com' })
-    expect(s).not.toHaveProperty('allowed')
+    // The WHOLE state, strictly: success only settles the question. A reducer that
+    // started carrying an optimistic allowed list would add a key and fail here.
+    expect(s).toStrictEqual({
+      expanded: true,
+      mode: { kind: 'idle' },
+      failure: null,
+      announcement: expect.any(String),
+      openedByKeyboard: false
+    })
     expect(s.announcement).toMatch(/is now allowed in this project/)
   })
 })

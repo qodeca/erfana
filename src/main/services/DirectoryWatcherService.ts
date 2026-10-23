@@ -987,14 +987,17 @@ export class DirectoryWatcherService {
    * A tree read of `dirPath` is starting (finding [29]). For a read of the
    * project root the returned handle records its tree as what the screen shows,
    * minus every path an event touched while it ran; commit it only once the read
-   * succeeded, cancel it otherwise. Any other read gets a no-op handle.
+   * succeeded, cancel it otherwise. A read of a folder inside the project – the
+   * tree expanding a lazy folder (finding [32]) – adds that folder's entries to
+   * the record under the same rules. Any other read gets a no-op handle.
    */
   beginKnownEntriesRead(dirPath: string): KnownEntriesRead {
     const root = this.projectPath
-    if (!root || typeof dirPath !== 'string' || resolve(dirPath) !== resolve(root)) {
-      return { commit: () => {}, cancel: () => {} }
-    }
-    return this.knownEntries.beginRootRead()
+    const noop: KnownEntriesRead = { commit: () => {}, cancel: () => {} }
+    if (!root || typeof dirPath !== 'string') return noop
+    if (resolve(dirPath) === resolve(root)) return this.knownEntries.beginRootRead()
+    const rel = toRootRelative(root, dirPath)
+    return rel === null || rel === '' ? noop : this.knownEntries.beginFolderRead(rel)
   }
 
   /** Key folding for the record: NFC on macOS, as `toRootRelative` spells it, and the case rule. */
