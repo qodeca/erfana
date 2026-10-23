@@ -13,8 +13,8 @@ import { IMPORT_CHANNELS, type ImportChannel } from './import-channels'
 
 describe('IMPORT_CHANNELS', () => {
   describe('channel count', () => {
-    it('has exactly 5 channel keys', () => {
-      expect(Object.keys(IMPORT_CHANNELS)).toHaveLength(5)
+    it('has exactly 6 channel keys', () => {
+      expect(Object.keys(IMPORT_CHANNELS)).toHaveLength(6)
     })
   })
 
@@ -37,6 +37,10 @@ describe('IMPORT_CHANNELS', () => {
 
     it('DEPENDENCIES_READY resolves to "import:dependenciesReady"', () => {
       expect(IMPORT_CHANNELS.DEPENDENCIES_READY).toBe('import:dependenciesReady')
+    })
+
+    it('TOOL_STATUS resolves to "import:toolStatus" (#250)', () => {
+      expect(IMPORT_CHANNELS.TOOL_STATUS).toBe('import:toolStatus')
     })
   })
 
@@ -64,6 +68,6 @@ describe('ImportChannel type', () => {
 
   it('is assignable from all IMPORT_CHANNELS values', () => {
     const channels: ImportChannel[] = Object.values(IMPORT_CHANNELS)
-    expect(channels).toHaveLength(5)
+    expect(channels).toHaveLength(6)
   })
 })

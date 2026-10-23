@@ -948,3 +948,66 @@ describe('updateConverterExtensions', () => {
     loggerSpy.mockRestore()
   })
 })
+
+// ============================================================================
+// removeConverterExtensions() Tests (#250 – "Check again" after a tool is gone)
+// ============================================================================
+
+describe('removeConverterExtensions', () => {
+  let registry: ConverterRegistry
+  let docConverter: IConverter
+  let textConverter: IConverter
+
+  beforeEach(() => {
+    registry = new ConverterRegistry()
+    textConverter = createMockConverter({ extensions: ['rtf', 'txt'], requiresConversion: false, category: 'text' })
+    docConverter = createMockConverter({ extensions: ['pdf'], requiresConversion: true, category: 'document' })
+    registry.register(textConverter)
+    registry.register(docConverter)
+  })
+
+  it('unmaps an extension that only the dynamic add gave the converter', () => {
+    registry.updateConverterExtensions('document', ['docx', 'png'])
+
+    registry.removeConverterExtensions('document', ['docx'])
+
+    expect(registry.getConverter('docx')).toBeUndefined()
+    expect(registry.getConverter('png')).toBe(docConverter)
+  })
+
+  it('hands a reassigned extension back to the converter it was taken from', () => {
+    registry.updateConverterExtensions('document', ['rtf'])
+    expect(registry.getConverter('rtf')).toBe(docConverter)
+
+    registry.removeConverterExtensions('document', ['rtf'])
+
+    expect(registry.getConverter('rtf')).toBe(textConverter)
+  })
+
+  it('never removes an extension the converter supports natively', () => {
+    registry.removeConverterExtensions('document', ['pdf'])
+
+    expect(registry.getConverter('pdf')).toBe(docConverter)
+  })
+
+  it('leaves a mapping that another converter owns alone', () => {
+    registry.removeConverterExtensions('document', ['txt'])
+
+    expect(registry.getConverter('txt')).toBe(textConverter)
+  })
+
+  it('is a no-op for an unknown category', () => {
+    expect(() => registry.removeConverterExtensions('audio', ['mp3'])).not.toThrow()
+  })
+
+  it('round-trips: add, remove, add again', () => {
+    registry.updateConverterExtensions('document', ['rtf', 'docx'])
+    registry.removeConverterExtensions('document', ['rtf', 'docx'])
+    registry.updateConverterExtensions('document', ['rtf', 'docx'])
+
+    expect(registry.getConverter('rtf')).toBe(docConverter)
+    expect(registry.getConverter('docx')).toBe(docConverter)
+    registry.removeConverterExtensions('document', ['rtf'])
+    expect(registry.getConverter('rtf')).toBe(textConverter)
+  })
+})

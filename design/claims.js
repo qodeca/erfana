@@ -203,6 +203,21 @@ window.ERFANA_CLAIMS = {
     "value": 2.2,
     "label": "--color-white on --color-btn-primary-bg, the historical label",
     "card": "system/components/button/index.html"
+  },
+  "contrast-wait-text": {
+    "value": 8.52,
+    "label": "--color-text-tertiary on --color-brand-black, the waiting message's body text on the pre-paint backdrop",
+    "card": "product/html-waiting/index.html"
+  },
+  "contrast-wait-aside": {
+    "value": 5.01,
+    "label": "--color-text-secondary on --color-brand-black, the waiting message's aside on the pre-paint backdrop",
+    "card": "product/html-waiting/index.html"
+  },
+  "contrast-wait-aside-muted": {
+    "value": 3.63,
+    "label": "--color-text-muted on --color-brand-black, the aside colour the card used to render",
+    "card": "product/html-waiting/index.html"
   }
 };
 

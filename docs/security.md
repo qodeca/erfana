@@ -574,7 +574,7 @@ The `afterSign` hook is critical: without it, macOS Sequoia+ rejects `@rpath` li
 - **File validation** – LiteParseConverter validates file type, checks for encryption, enforces 1000-page limit and 60s timeout
 - **Hard size cap** – files above `IMPORT.SIZE_HARD_LIMIT` (250 MB) are rejected with `IMPORT_EXCEEDS_SIZE_LIMIT` before any converter runs, bounding memory-bomb input to the image/PDF parsers; `LiteParseConverter.convert()` re-checks this because the document-import IPC path bypasses `ImportService` validation. This bounds input bytes, not decoded pixels — see [technical-debt.md](./technical-debt.md) for the pixel-bomb follow-up
 - **Temp dir cleanup** – Screenshot temp directories cleaned in `finally` blocks (including abort paths)
-- **Dependency isolation** – LibreOffice/ImageMagick invoked via child process with no user-controlled arguments
+- **Dependency isolation** – LibreOffice invoked via child process with no user-controlled arguments; a copy in the open project, a temporary folder, a network share or a relative PATH entry is never run (#250)
 - **Zod validation** – All import IPC inputs validated via Zod schemas (`import-schema.ts`)
 
 ## Document export security

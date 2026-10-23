@@ -27,6 +27,7 @@ import {
   FileText,
   AlertCircle,
   AlertTriangle,
+  CheckCircle,
   ArrowRight,
   ArrowDown,
   ArrowUp,
@@ -66,6 +67,7 @@ export type IconName =
   | 'file-text'
   | 'alert-circle'
   | 'alert-triangle'
+  | 'check-circle'
   | 'arrow-right'
   | 'arrow-down'
   | 'arrow-up'
@@ -87,6 +89,7 @@ const ICON_REGISTRY: Record<IconName, ComponentType<LucideProps>> = {
   'file-text': FileText,
   'alert-circle': AlertCircle,
   'alert-triangle': AlertTriangle,
+  'check-circle': CheckCircle,
   'arrow-right': ArrowRight,
   'arrow-down': ArrowDown,
   'arrow-up': ArrowUp,

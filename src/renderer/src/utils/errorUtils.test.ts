@@ -1,7 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { describe, expect, it } from 'vitest'
-import { classifyFsError, formatFileOperationError, formatSaveError, loggableError } from './errorUtils'
+import {
+  classifyFsError,
+  formatFileOperationError,
+  formatLoadError,
+  formatSaveError,
+  loggableError
+} from './errorUtils'
+import {
+  PERMISSION_DENIED_MESSAGE,
+  UNVERIFIABLE_PATH_MESSAGE,
+  confinementCodeFromMessage
+} from '../../../shared/ipc/confinement'
 
 const ipc = (inner: string): Error =>
   new Error(`Error invoking remote method 'file:writeFile': Error: ${inner}`)
@@ -55,6 +66,47 @@ describe('formatSaveError', () => {
     )
     expect(formatSaveError('not an error', 'a.md')).toBe(
       '"a.md" could not be saved: An unknown error occurred. Your changes are still in the editor.'
+    )
+  })
+})
+
+describe('formatLoadError', () => {
+  // What a rejected file:readFile carries when the confinement check refuses
+  const refused = (message: string): Error =>
+    new Error(`Error invoking remote method 'file:readFile': ConfinementError: ${message}`)
+
+  it('says "permission denied" for an unreadable project file (Windows Deny Read), by its code', () => {
+    expect(classifyFsError(PERMISSION_DENIED_MESSAGE)).toBe('permission')
+    expect(confinementCodeFromMessage(refused(PERMISSION_DENIED_MESSAGE).message)).toBe('PERMISSION_DENIED')
+    expect(formatLoadError(refused(PERMISSION_DENIED_MESSAGE), 'locked.md')).toBe(
+      '"locked.md" could not be opened: permission denied.'
+    )
+  })
+
+  it('keeps the "cannot verify" reason for a path whose place is in doubt (a link)', () => {
+    expect(formatLoadError(refused(UNVERIFIABLE_PATH_MESSAGE), 'link.md')).toBe(
+      '"link.md" could not be opened: Cannot verify this path is inside the project directory.'
+    )
+  })
+
+  it('names the file and says it is gone when the read finds nothing', () => {
+    expect(formatLoadError(ipc("ENOENT: no such file or directory, open '/p/docs/a.md'"), 'a.md')).toBe(
+      '"a.md" could not be opened: it no longer exists on disk.'
+    )
+  })
+
+  it('names a permission problem', () => {
+    expect(formatLoadError(ipc("EACCES: permission denied, open '/p/a.md'"), 'a.md')).toBe(
+      '"a.md" could not be opened: permission denied.'
+    )
+  })
+
+  it('passes any other reason through without the IPC prefix', () => {
+    expect(formatLoadError(ipc('File is too large to open.'), 'a.md')).toBe(
+      '"a.md" could not be opened: File is too large to open.'
+    )
+    expect(formatLoadError('not an error', 'a.md')).toBe(
+      '"a.md" could not be opened: An unknown error occurred.'
     )
   })
 })

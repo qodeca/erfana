@@ -5,7 +5,7 @@ SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 
 # Use the project tree
 
-The left project panel shows files and folders in the open project. It offers creation, import, filtering and Git status; tree navigation currently needs a mouse.
+The left project panel shows files and folders in the open project. It offers creation, import, filtering and Git status, and works with the mouse or the keyboard.
 
 **On this page**
 
@@ -13,7 +13,7 @@ The left project panel shows files and folders in the open project. It offers cr
 - [Git badges and status](#git-badges-and-status)
 - [Special files and visibility](#special-files-and-visibility)
 - [File actions](#file-actions)
-- [Navigation limit](#navigation-limit)
+- [Keyboard navigation](#keyboard-navigation)
 
 ## Toolbar and filter
 
@@ -33,6 +33,6 @@ The left project panel shows files and folders in the open project. It offers cr
 
 **What they do:** Drag an item to another folder to move it; use Cut, Copy and Paste for file operations. Drop from Finder or File Explorer and choose **Move**, **Copy** or **Import**. A name clash offers **Skip**, **Keep both** or **Replace**; deletion requires confirmation. **How to reach them:** Drag onto the tree or use the [file and folder menus](menus.md#project-tree-context-menus). **Reveal in Finder** is labeled **Reveal in Explorer** on Windows.
 
-## Navigation limit
+## Keyboard navigation
 
-**What it does:** Tree nodes do not implement arrow, Enter or Space navigation yet. **How to reach it:** Select items with the mouse; see [issue #88](https://github.com/qodeca/erfana/issues/88).
+**What it does:** The tree is one stop in the <kbd>Tab</kbd> order. Inside it, the arrow keys move between rows and open or close folders, <kbd>Enter</kbd> opens a file or opens and selects a folder, and typing the first letters of a name jumps to it. <kbd>Shift</kbd>+<kbd>F10</kbd> opens the focused row's menu. **How to reach it:** Press <kbd>Tab</kbd> until the tree has focus; the full list is in [keyboard shortcuts](keyboard-shortcuts.md#project-tree). Moving with the arrows does not change the selected folder; <kbd>Enter</kbd> does. The selected folder is the row with the lime edge, and it is where paste, **New markdown file** and import go; screen readers announce that row as selected. Opening a file does not select it. Inside the menu the arrow keys do not work yet ([issue #90](https://github.com/qodeca/erfana/issues/90)).

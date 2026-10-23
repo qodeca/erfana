@@ -131,7 +131,7 @@ When multiple files are dropped simultaneously, document files (PDF, Office, ima
 - A warning toast notifies the user that document files require individual import
 - Non-document files proceed with the normal move/copy/import flow
 - To import document files, drop them individually – this opens the DocumentImportDialog with OCR, language, screenshot, and DPI options
-- If required dependencies (LibreOffice, ImageMagick) are missing, a dependency-missing modal appears with install guidance
+- If LibreOffice is missing (or found in an unsafe location), a dependency-missing modal appears that opens Settings → Import tools
 
 See [ui-components.md](../ui-components.md) for DocumentImportDialog details.
 

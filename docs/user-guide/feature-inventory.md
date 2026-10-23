@@ -67,7 +67,7 @@ Source paths are relative to `src/renderer/src/` (**R/**), `src/main/` (**M/**) 
 | TREE-11 | File right-click menu; HTML files add Open as source, Open in default browser | all | same | [reference/menus](./reference/menus.md#project-tree-context-menus) |
 | TREE-12 | Reveal in Finder / Reveal in Explorer | all (label per OS) | commands.tsx | [reference/project-tree](./reference/project-tree.md#file-actions) |
 | TREE-13 | Delete confirmation ("cannot be undone") | all | commands.tsx | [how-to/organise-project-files](./how-to/organise-project-files.md#manage-files) |
-| TREE-14 | Mouse only: no keyboard navigation of the tree yet (#88) | all | docs/keyboard-shortcuts.md | [reference/project-tree](./reference/project-tree.md#navigation-limit) |
+| TREE-14 | Keyboard navigation: one Tab stop, arrows, Home/End, Enter, type-ahead, Shift+F10 (#88) | all | ProjectTree/treeKeyboard.ts | [reference/project-tree](./reference/project-tree.md#keyboard-navigation) |
 | TREE-15 | Hidden patterns and watcher ignore list (per-project settings) | all | S/ipc/project-settings-schema.ts | [reference/settings](./reference/settings.md#per-project-settings) |
 | TREE-16 | Excluded folders: `files.exclude` in the global and the project settings file (project adds to global); excluded paths are not shown, read or watched; `.erfana` is never excluded; git status unaffected | all | S/ipc/files-exclude-schema.ts, M/utils/excludeMatcher.ts | [reference/settings](./reference/settings.md#excluded-folders) |
 
@@ -93,6 +93,7 @@ Source paths are relative to `src/renderer/src/` (**R/**), `src/main/` (**M/**) 
 | PV-03 | Preserve line breaks option | all | Settings | [reference/settings](./reference/settings.md#editor) |
 | PV-04 | Links: anchors, project files inside the app, external links to the OS, unsafe links blocked | all | MarkdownPreview.tsx | [reference/markdown-preview](./reference/markdown-preview.md#links) |
 | PV-05 | Preview right-click menu: prompt templates, Copy | all | ContextMenu/PreviewContextMenu.tsx | [reference/menus](./reference/menus.md#editor-and-preview-context-menus) |
+| PV-06 | Project images (relative path) shown and refreshed on change; outside, absolute and `file:` images show alt text (#71) | all | Editor/MarkdownImage.tsx | [reference/markdown-preview](./reference/markdown-preview.md#images) |
 | MM-01 | Mermaid diagrams with a toolbar: direction buttons, View fullscreen | all | MermaidToolbar.tsx | [how-to/work-with-mermaid-diagrams](./how-to/work-with-mermaid-diagrams.md#view-a-diagram) |
 | MM-02 | Mermaid error box with "Report this error to Claude Code" | all | MermaidDiagram.tsx | [how-to/work-with-mermaid-diagrams](./how-to/work-with-mermaid-diagrams.md#view-a-diagram) |
 | MM-03 | Full-screen diagram viewer: zoom, fit, reset, directions | all | Editor/DiagramViewer/DiagramViewer.tsx | [how-to/work-with-mermaid-diagrams](./how-to/work-with-mermaid-diagrams.md#view-a-diagram) |
@@ -173,7 +174,7 @@ Source paths are relative to `src/renderer/src/` (**R/**), `src/main/` (**M/**) 
 |---|---|---|---|---|
 | IMP-01 | Import dialog: OCR on/off, 31 languages, page screenshots, DPI 72/150/300; parse at most 1,000 pages, screenshot first 100; options kept for the session | all | R/components/DocumentImport/DocumentImportDialog.tsx | [how-to/import-a-document](./how-to/import-a-document.md#import-a-file) |
 | IMP-02 | Supported formats (LiteParse; the "50+" list to confirm while writing) | all | M/services import | [reference/import-and-transcription](./reference/import-and-transcription.md#import-documents) |
-| IMP-03 | LibreOffice / ImageMagick required dialogs | all | R/hooks/useImport.ts | [how-to/import-a-document](./how-to/import-a-document.md#import-a-file) |
+| IMP-03 | LibreOffice required dialog | all | R/hooks/useImport.ts | [how-to/import-a-document](./how-to/import-a-document.md#import-a-file) |
 | IMP-04 | Large-file warning: Import anyway / Skip | all | useImport.ts | [reference/import-and-transcription](./reference/import-and-transcription.md#import-documents) |
 | IMP-05 | After import: file opens and the organize-import prompt runs | all | DocumentImportDialog.tsx | [how-to/import-a-document](./how-to/import-a-document.md#import-a-file) |
 | TR-01 | Transcription dialog: 31 languages incl. auto-detect, progress, retry | all | R/components/Transcription/TranscriptionDialog.tsx | [how-to/transcribe-audio-or-video](./how-to/transcribe-audio-or-video.md#transcribe-media) |

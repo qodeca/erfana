@@ -114,14 +114,33 @@
   font-size: var(--text-sm);
 }
 
+/* The virtualised list: the sizer is as tall as every visible row together,
+   and each row is placed inside it by an inline `top` from ProjectTree. */
+.project-tree-rows {
+  position: relative;
+  width: 100%;
+}
+
 .project-tree-node {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
   user-select: none;
 }
 
+/* Fixed height: the virtualiser positions rows by TREE_ROW_HEIGHT
+   (ProjectTreeNode.tsx), which must equal this token. 28px is the Rows
+   card's minimum row height. */
 .project-tree-item {
   display: flex;
   align-items: center;
+  box-sizing: border-box;
+  height: var(--space-14);
   padding: var(--space-2) var(--space-4);
+  /* Indent: the Rows card's 16px step per level. ProjectTreeNode sets
+     --tree-level inline; the arithmetic stays here, in tokens. */
+  padding-left: calc(var(--space-4) + var(--tree-level, 0) * var(--space-8));
   cursor: pointer;
   white-space: nowrap;
   overflow: hidden;
@@ -143,6 +162,33 @@
 .project-tree-item.selected {
   background-color: var(--color-bg-selected);
   border-left: var(--border-width-thick) solid var(--color-brand-lime);
+}
+
+/* The loading / could-not-read line under an expanded lazy folder (#320):
+   a row's height and indent (Rows card), but plain text – not a target.
+   Words rather than a spinner: a folder read is short, and text needs no
+   reduced-motion rule (Motion card). */
+.project-tree-item.project-tree-placeholder {
+  cursor: default;
+  font-size: var(--text-sm);
+  font-style: italic;
+  color: var(--color-text-tertiary);
+}
+
+.project-tree-item.project-tree-placeholder:hover {
+  background-color: transparent;
+}
+
+.project-tree-item.project-tree-placeholder[data-status="failed"] {
+  color: var(--color-error);
+}
+
+/* The keyboard focus ring (design/system/foundations/focus.html): the rows
+   sit in a scroll container, so the ring is drawn inward, where it is not
+   clipped. */
+.project-tree-item:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: calc(var(--space-1) * -1);
 }
 
 .file-icon {
@@ -192,6 +238,12 @@
   align-items: center;
 }
 
+/* Symlink marker before the name */
+.symlink-icon {
+  margin-right: var(--space-2);
+  opacity: 0.8;
+}
+
 /* Hidden files - dimmed appearance */
 .file-name.hidden-file {
   opacity: 0.7;
@@ -206,10 +258,6 @@
 /* Hidden files hover - restore full opacity */
 .project-tree-item:hover .file-name.hidden-file {
   opacity: 1;
-}
-
-.project-tree-children {
-  /* Children are indented via paddingLeft in ProjectTreeNode */
 }
 
 /* Scrollbar styling */
@@ -338,15 +386,14 @@
   border-radius: var(--border-radius);
 }
 
-/* Highlight the children area for expanded folders */
-.project-tree-node[data-drop-highlight="true"] > .project-tree-children {
-  position: relative;
+/* Highlight the rows inside the target folder. The list is flat, so each row
+   inside the folder carries data-in-drop-zone instead of one children box. */
+.project-tree-node[data-in-drop-zone="internal"] {
   background-color: var(--color-accent-drag-bg-subtle);
-  border-radius: var(--border-radius);
 }
 
 /* Visual left border using pseudo-element (no layout shift) */
-.project-tree-node[data-drop-highlight="true"] > .project-tree-children::before {
+.project-tree-node[data-in-drop-zone="internal"]::before {
   content: '';
   position: absolute;
   left: 0;
@@ -461,13 +508,12 @@
 
 /* Children area highlight during external drop (for expanded folders) */
 /* Shows where files will be placed */
-.project-tree-node[data-external-drop-highlight="true"] > .project-tree-children {
+.project-tree-node[data-in-drop-zone="external"] {
   background-color: var(--color-accent-drag-bg-subtle);
-  position: relative;
 }
 
 /* Left border indicator for children area */
-.project-tree-node[data-external-drop-highlight="true"] > .project-tree-children::before {
+.project-tree-node[data-in-drop-zone="external"]::before {
   content: '';
   position: absolute;
   left: 0;

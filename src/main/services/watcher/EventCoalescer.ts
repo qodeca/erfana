@@ -186,14 +186,16 @@ export class EventCoalescer {
       return
     }
 
-    // Rule 2: DELETE/UNLINK + CREATE/ADD → UPDATED/CHANGE
+    // Rule 2: UNLINK + ADD (file to file) → CHANGE. A swap that involves a
+    // folder (unlink + addDir, unlinkDir + add, unlinkDir + addDir) keeps the
+    // new create: the entry's kind, or everything under it, changed.
     if (this.isDeleteEvent(lastEvent) && this.isCreateEvent(newEvent)) {
-      // Convert to change event
       stack.events.pop()
-      stack.events.push({
-        type: 'change',
-        path: newEvent.path
-      })
+      stack.events.push(
+        lastEvent.type === 'unlink' && newEvent.type === 'add'
+          ? { type: 'change', path: newEvent.path }
+          : newEvent
+      )
       return
     }
 

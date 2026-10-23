@@ -88,6 +88,19 @@ describe('EventCoalescer', () => {
 
       expect(result.events).toHaveLength(0)
     })
+
+    // PR #316 review: a swap that involves a folder is not a content change
+    it.each([
+      ['unlink', 'addDir', 'addDir'],
+      ['unlinkDir', 'add', 'add'],
+      ['unlinkDir', 'addDir', 'addDir']
+    ] as const)('keeps %s + %s on one path as %s, not change (Rule 2 is file to file only)', (gone, created, expected) => {
+      coalescer.processEvent({ type: gone, path: '/test/out' })
+      coalescer.processEvent({ type: created, path: '/test/out' })
+      const result = coalescer.coalesce()
+
+      expect(result.events).toEqual([{ type: expected, path: '/test/out' }])
+    })
   })
 
   describe('cascade prevention', () => {

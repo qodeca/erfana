@@ -20,6 +20,7 @@ import { useTerminalStore } from '../../stores/useTerminalStore'
 import { useProjectStore } from '../../stores/useProjectStore'
 import { useActivityBarStore } from '../../stores/useActivityBarStore'
 import { showWarningToast, showSuccessToast, showInfoToast } from '../../utils/toastHelpers'
+import { showNameNotFoundToast } from './TerminalPanel/nameNotFoundToast'
 import { useScrollAnomalyRecovery } from '../../hooks/useScrollAnomalyRecovery'
 import { useTerminalParserHooks } from '../../hooks/useTerminalParserHooks'
 import { useTerminalClipboard } from '../../hooks/useTerminalClipboard'
@@ -28,6 +29,8 @@ import { useScrollLock, ScrollLockStateAccessor } from '../../hooks/useScrollLoc
 import { useTerminalFileLinks } from '../../hooks/useTerminalFileLinks'
 import { useFilePicker } from '../../hooks/useFilePicker'
 import { useProjectManagementContextSafe } from '../../context/ProjectManagementContext'
+import { useMergedProjectFiles } from '../../hooks/useMergedProjectFiles'
+import type { FileNode } from '../../../../shared/ipc/file-schema'
 import { useTerminalPortalOptional } from '../../context/TerminalPortalContext'
 import { TerminalContextMenu } from '../ContextMenu/TerminalContextMenu'
 import { FilePickerDialog } from '../Dialog/FilePickerDialog'
@@ -60,6 +63,9 @@ import { ensureTerminalFontLoaded, createTerminalLinkHandler } from './TerminalP
 import type { TerminalState } from './TerminalPanel/types'
 import { fileGateway } from '../../services/fileGateway'
 import { terminalGateway } from '../../services/terminalGateway'
+
+/** One empty tree, so a missing project context does not defeat the merge's memo */
+const EMPTY_FILES: FileNode[] = []
 
 export function TerminalPanel(_props: ISplitviewPanelProps) {
   const [isAvailable, setIsAvailable] = useState<boolean | null>(null)
@@ -262,7 +268,8 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   // Get project files for smart path resolution (issue #26 enhancement)
   // Use safe version to gracefully degrade in tests without provider
   const projectContext = useProjectManagementContextSafe()
-  const files = projectContext?.files ?? []
+  // With the lazy folders read so far (finding 32), and whether the tree is incomplete
+  const { files, truncated: treeTruncated } = useMergedProjectFiles(projectContext?.files ?? EMPTY_FILES)
 
   // File picker for disambiguation when multiple files match (issue #26 enhancement)
   const { showPicker, pickerProps } = useFilePicker({ projectRoot: projectPath })
@@ -316,14 +323,21 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     })
   }, [dockviewApi])
 
+  // A name clicked on an incomplete tree that the project search did not find
+  const handleNameNotFound = useCallback((filename: string, { cutShort }: { cutShort: boolean }) => {
+    showNameNotFoundToast(filename, cutShort)
+  }, [])
+
   // Terminal file links hook - enables clickable file paths with smart resolution
   useTerminalFileLinks({
     terminalRef: xtermRef,
     terminalId: terminalId,
     projectRoot: projectPath,
     files: files,
+    treeTruncated,
     onFileOpen: handleFileOpen,
     onShowPicker: showPicker,
+    onNameNotFound: handleNameNotFound,
     onError: (error) => {
       logger.warn('Terminal file link error', error instanceof Error ? { error: error.message, stack: error.stack } : { error: String(error) })
     }

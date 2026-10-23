@@ -84,7 +84,35 @@ const COMMON_EXTENSIONS =
 /**
  * Set of common file extensions for O(1) lookup in domain detection.
  */
-const COMMON_EXTENSIONS_SET = new Set(COMMON_EXTENSIONS.split('|'));
+export const COMMON_EXTENSIONS_SET: ReadonlySet<string> = new Set(COMMON_EXTENSIONS.split('|'));
+
+/**
+ * A version or a plain number – `v1.2`, `1.2.3`, `24.20.0`, `1.74s`, `3.14`,
+ * `0.5x` – and so an IPv4 address too (`127.0.0.1`, also as `127.0.0.1:3000`,
+ * whose port reads as a line).
+ */
+const VERSION_OR_NUMBER = /^v?\d+(\.\d+)+[a-z]*$/i;
+
+/**
+ * Whether a detected bare name (no folder in it) is worth a link that
+ * searches the project for it on click – used on an incomplete tree, where
+ * the index cannot vouch for it (#320). Only a name that looks like a file:
+ * a common extension (`COMMON_EXTENSIONS_SET`) on a base with a letter in it,
+ * or any name with a line or column (`notes.md:12`, `Makefile.am:3`); never
+ * a version, a number or an IPv4 address. Names such as `Node.js` still pass:
+ * they are spelt like files.
+ */
+export function isSearchableBareName(match: Pick<FilePathMatch, 'path' | 'line' | 'column'>): boolean {
+  const name = match.path;
+  if (name.includes('/') || name.includes('\\')) return false;
+  if (VERSION_OR_NUMBER.test(name)) return false;
+  const dot = name.lastIndexOf('.');
+  if (dot > 0) {
+    const extension = name.slice(dot + 1).toLowerCase();
+    if (COMMON_EXTENSIONS_SET.has(extension) && /[a-z]/i.test(name.slice(0, dot))) return true;
+  }
+  return match.line !== undefined || match.column !== undefined;
+}
 
 /**
  * Interface for fallback matchers that detect paths with spaces.

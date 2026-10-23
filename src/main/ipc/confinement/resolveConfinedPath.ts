@@ -37,6 +37,7 @@ import {
   type PathFlavour
 } from '../../utils/pathCompare'
 import { ConfinementError, PROJECT_FOLDER_GONE_MESSAGE } from './ConfinementError'
+import { isPermissionDeniedFile } from './permissionDeniedFile'
 
 /** Longest path accepted, matching the Windows extended-length limit. */
 export { isInsideRoot, isSamePath, normaliseResolved }
@@ -193,7 +194,10 @@ async function walkToExistingAncestor(
       break
     } catch (error) {
       const code = errnoCode(error)
-      if (code === 'ENOENT') {
+      // ENOTDIR (a file in the middle of the path) climbs like ENOENT: that the
+      // path is not found is only said after the root check, so a refusal for
+      // an outside path never depends on what exists there
+      if (code === 'ENOENT' || code === 'ENOTDIR') {
         const up = path.dirname(probe)
         // Nothing on the way up exists: not a place inside any project
         if (up === probe) throw new ConfinementError('OUTSIDE_PROJECT')
@@ -201,14 +205,9 @@ async function walkToExistingAncestor(
         probe = up
         continue
       }
-      // A file in the middle of the path
-      if (code === 'ENOTDIR') throw new ConfinementError('NOT_FOUND')
       throw new ConfinementError('UNVERIFIABLE')
     }
   }
-
-  // Win32 can report a missing child of a file as ENOENT rather than ENOTDIR
-  if (tail.length > 0 && probeStats?.isFile()) throw new ConfinementError('NOT_FOUND')
 
   let realProbe: string
   try {
@@ -218,17 +217,30 @@ async function walkToExistingAncestor(
     // leads cannot be shown, so it is not acted on
     throw new ConfinementError('UNVERIFIABLE')
   }
+  return { realProbe, tail, probeStats }
+}
 
-  if (tail.length > 0 && probeStats?.isSymbolicLink()) {
+/**
+ * Step 7, after the root check: a missing tail below something that is not a
+ * folder (a file, or a link to one) names nothing that can exist.
+ */
+async function refuseTailBelowNonFolder(walk: Walk, deps: ConfinementDeps): Promise<void> {
+  const { realProbe, tail, probeStats } = walk
+  if (tail.length === 0) return
+  // Nothing can exist below a file or a special file (FIFO, socket, device);
+  // Win32 can also report a missing child of a file as ENOENT, not ENOTDIR
+  if (probeStats && !probeStats.isDirectory() && !probeStats.isSymbolicLink()) {
+    throw new ConfinementError('NOT_FOUND')
+  }
+  if (probeStats?.isSymbolicLink()) {
     let target: ConfinementStats
     try {
-      target = await fs.stat(realProbe)
+      target = await deps.fs.stat(realProbe)
     } catch {
       throw new ConfinementError('UNVERIFIABLE')
     }
     if (!target.isDirectory()) throw new ConfinementError('NOT_FOUND')
   }
-  return { realProbe, tail, probeStats }
 }
 
 interface Located {
@@ -252,7 +264,8 @@ async function locateInProject(
   if (entry && start === lexical) throw new ConfinementError('OUTSIDE_PROJECT')
   const last = entry ? path.basename(lexical) : null
 
-  const { realProbe, tail, probeStats } = await walkToExistingAncestor(start, deps, expectExists)
+  const walk = await walkToExistingAncestor(start, deps, expectExists)
+  const { realProbe, tail, probeStats } = walk
   const below = [...tail, ...(last === null ? [] : [last])]
   const real = below.length > 0 ? path.join(realProbe, ...below) : realProbe
 
@@ -263,6 +276,7 @@ async function locateInProject(
     }
     throw new ConfinementError('OUTSIDE_PROJECT')
   }
+  await refuseTailBelowNonFolder(walk, deps)
 
   // Whether the whole path exists. For an entry the parent exists when `tail` is empty
   let existed = false
@@ -347,7 +361,23 @@ export async function resolveConfinedPath(
   // expected to be there; a path about to be created is not
   const expectExists =
     entry || (policy.mode === 'project' && (policy.mustExist === true || policy.kind !== undefined))
-  const located = await locateInProject(lexical, session, entry, expectExists, deps)
+  let located: Located
+  try {
+    located = await locateInProject(lexical, session, entry, expectExists, deps)
+  } catch (error) {
+    // Still refused; only the reason changes. A regular in-project file that
+    // the file system will not resolve (Windows "Deny Read") says
+    // "permission denied" rather than "cannot verify" (see permissionDeniedFile)
+    if (
+      error instanceof ConfinementError &&
+      error.code === 'UNVERIFIABLE' &&
+      !entry &&
+      (await isPermissionDeniedFile(lexical, session, deps))
+    ) {
+      throw new ConfinementError('PERMISSION_DENIED')
+    }
+    throw error
+  }
 
   if (policy.mustExist && !located.existed) throw new ConfinementError('NOT_FOUND')
   if (
