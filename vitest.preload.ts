@@ -20,13 +20,16 @@ export default defineConfig({
       reporter: ['text-summary', 'lcov', 'html'],
       reportsDirectory: 'coverage/preload',
       include: ['src/preload/**/*.{ts,tsx}'],
-      all: false,
+      // Count an included file that no test loads, at 0 %, so an untested
+      // module lowers the totals instead of vanishing from them.
+      all: true,
       cleanOnRerun: true,
-      // Floor = measured minus ~2 points (measured 2026-09-15: lines/statements
-      // 64.33, functions 30, branches 97.5). `previewBridge.ts` is at 100 on
-      // every axis; the remaining headroom is `index.ts` (54 % lines, 12.5 %
-      // functions), so raise these again as that file gets covered.
-      thresholds: { lines: 62, functions: 28, branches: 95, statements: 62 },
+      // Floor = the measured value rounded down, minus one point (measured
+      // 2026-10-23 with `all: true`: lines/statements 72.19, functions 53.07,
+      // branches 98.4). Every other file is at 100 % lines; the remaining
+      // headroom is `index.ts` (200 of 356 lines), so raise these again as that
+      // file gets covered. Never lower one to make a change pass.
+      thresholds: { lines: 71, functions: 52, branches: 97, statements: 71 },
       exclude: [
         'node_modules/**',
         'out/**',
@@ -39,8 +42,16 @@ export default defineConfig({
         '**/__tests__/**',
         '**/__test__/**',
         '**/__test-helpers__/**',
+        '**/__fixtures__/**',
         'vitest.*.ts',
-        'electron.vite.config.ts'
+        'electron.vite.config.ts',
+        // Type-only: declarations and the compile-time contract proofs.
+        '**/*.d.ts',
+        '**/*.types.ts',
+        // Entry point of the sealed preview page: it adds its listeners as soon
+        // as it loads. previewPage.contract.test.ts pins its source rather than
+        // loading it, and the HTML-preview e2e specs run it.
+        'src/preload/previewPage.ts'
       ],
     },
   },
