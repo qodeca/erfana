@@ -18,6 +18,7 @@ const FILE_METHODS: Record<keyof FileBridge, true> = {
   openProjectByPath: true,
   getSession: true,
   readDirectory: true,
+  findByName: true,
   readFile: true,
   writeFile: true,
   getStats: true,

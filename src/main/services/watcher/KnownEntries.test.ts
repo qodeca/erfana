@@ -144,4 +144,116 @@ describe('KnownEntries', () => {
     expect(known.size).toBeNull()
     expect(known.judge('n.md', 'add', 'file').type).toBe('add')
   })
+
+  describe('lazy folders read on expand (finding [32], PR #320 review item 1)', () => {
+    /** A root tree whose `Capped` folder the walk left unread */
+    const cappedTree: FileNode[] = [
+      { name: 'a.md', path: '/p/a.md', type: 'file' },
+      { name: 'Capped', path: '/p/Capped', type: 'directory', children: [], lazy: 'capped' }
+    ]
+    /** What a shallow read of `Capped` lists */
+    const cappedLevel: FileNode[] = [
+      { name: 'c.md', path: '/p/Capped/c.md', type: 'file' },
+      { name: 'deeper', path: '/p/Capped/deeper', type: 'directory', children: [], lazy: 'capped' }
+    ]
+
+    function withCapped(): KnownEntries {
+      const known = new KnownEntries(same)
+      known.beginRootRead().commit(cappedTree)
+      return known
+    }
+
+    it('adds a folder read to the record, so a rename-style save there is a change', () => {
+      // Without the expand read the save is structural (the judge also learns, so a fresh record)
+      expect(withCapped().judge('Capped/c.md', 'add', 'file').type).toBe('add')
+      const known = withCapped()
+
+      known.beginFolderRead('Capped').commit(cappedLevel)
+
+      expect(known.judge('Capped/c.md', 'add', 'file').type).toBe('change')
+    })
+
+    it('adds nothing without a record, and nothing a running event touched', () => {
+      const none = new KnownEntries(same)
+      none.beginFolderRead('Capped').commit(cappedLevel)
+      expect(none.size).toBeNull()
+
+      const known = withCapped()
+      const read = known.beginFolderRead('Capped')
+      known.judge('Capped/c.md', 'change', 'file')
+      read.commit(cappedLevel)
+      expect(known.judge('Capped/c.md', 'add', 'file').type).toBe('add')
+    })
+
+    it('ignores a folder read across a reset or a folder removal', () => {
+      const known = withCapped()
+      const stale = known.beginFolderRead('Capped')
+      known.reset()
+      known.beginRootRead().commit(cappedTree)
+      stale.commit(cappedLevel)
+      expect(known.judge('Capped/c.md', 'add', 'file').type).toBe('add')
+
+      const removed = withCapped()
+      const read = removed.beginFolderRead('Capped')
+      removed.judge('Capped/deeper', 'unlinkDir', undefined)
+      removed.beginRootRead().commit(cappedTree)
+      read.commit(cappedLevel)
+      expect(removed.judge('Capped/c.md', 'add', 'file').type).toBe('add')
+    })
+
+    it('keeps what an expand read taught across a root read that leaves the folder lazy again', () => {
+      const known = withCapped()
+      known.beginFolderRead('Capped').commit(cappedLevel)
+
+      known.beginRootRead().commit(cappedTree)
+
+      expect(known.judge('Capped/c.md', 'add', 'file').type).toBe('change')
+    })
+
+    it('forgets an entry a newer read of the folder no longer lists', () => {
+      const known = withCapped()
+      known.beginFolderRead('Capped').commit(cappedLevel)
+      known.judge('Capped/deeper/x.md', 'add', 'file')
+
+      known.beginFolderRead('Capped').commit([cappedLevel[1]])
+
+      expect(known.judge('Capped/c.md', 'add', 'file').type).toBe('add')
+      // Below a sub-folder the read left lazy, the record keeps what it knew
+      expect(known.judge('Capped/deeper/x.md', 'add', 'file').type).toBe('change')
+    })
+
+    it('forgets the entries of a sub-folder a full folder read no longer lists', () => {
+      const known = withCapped()
+      known.beginFolderRead('Capped').commit([
+        { name: 'sub', path: '/p/Capped/sub', type: 'directory', children: [{ name: 'y.md', path: '/p/Capped/sub/y.md', type: 'file' }] }
+      ])
+      expect(known.judge('Capped/sub/y.md', 'add', 'file').type).toBe('change')
+
+      known.beginFolderRead('Capped').commit([])
+
+      expect(known.judge('Capped/sub/y.md', 'add', 'file').type).toBe('add')
+    })
+
+    it('touches only the folder it read, not the whole record (review of #320, item 7)', () => {
+      // 90,000 entries elsewhere, then 5,000 one-folder reads: a scan of the
+      // whole record per read is 450 million key visits (seconds); the index
+      // visits the folder's own entries only
+      const wide: FileNode[] = Array.from({ length: 300 }, (_, d) => ({
+        name: `d${d}`,
+        path: `/p/d${d}`,
+        type: 'directory' as const,
+        children: Array.from({ length: 300 }, (_, f) => ({ name: `f${f}.md`, path: `/p/d${d}/f${f}.md`, type: 'file' as const }))
+      }))
+      const known = new KnownEntries(same)
+      known.beginRootRead().commit([...wide, ...cappedTree])
+      expect(known.size).toBe(90_001)
+
+      const start = performance.now()
+      for (let i = 0; i < 5_000; i++) known.beginFolderRead('Capped').commit(cappedLevel)
+      expect(performance.now() - start).toBeLessThan(1_000)
+
+      expect(known.judge('Capped/c.md', 'add', 'file').type).toBe('change')
+      expect(known.judge('d7/f9.md', 'add', 'file').type).toBe('change')
+    })
+  })
 })

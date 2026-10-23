@@ -860,6 +860,19 @@ describe('useExternalFileDrop', () => {
       expect(path).toBe('/project/docs')
     })
 
+    it('drops onto a lazy folder\'s placeholder line into that folder (#320)', () => {
+      const { result } = renderHook(() => useExternalFileDrop(defaultOptions))
+
+      const line = document.createElement('div')
+      line.dataset.dropFolder = '/project/big'
+      const text = document.createElement('div')
+      line.appendChild(text)
+
+      const path = result.current.getTargetFromEvent(createMockDragEvent({ types: ['Files'], target: text }))
+
+      expect(path).toBe('/project/big')
+    })
+
     it('walks up DOM tree to find tree node', () => {
       const { result } = renderHook(() => useExternalFileDrop(defaultOptions))
 

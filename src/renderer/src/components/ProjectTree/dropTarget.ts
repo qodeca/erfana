@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { getDirname, pathsEqual } from '../../utils/fileUtils'
-import type { VisibleTreeRow } from './visibleRows'
+import { isNodeRow, type TreeRow } from './visibleRows'
 
 /**
  * Whether moving `sourcePath` into `targetParent` would leave it where it is.
@@ -33,7 +33,7 @@ export function isSameFolderMove(sourcePath: string, targetParent: string): bool
  * @returns The target folder's path, or null for no feedback
  */
 export function resolveInternalDropFolder(
-  rows: readonly VisibleTreeRow[],
+  rows: readonly TreeRow[],
   indexByPath: ReadonlyMap<string, number>,
   activeId: string | null,
   overId: string | null
@@ -42,6 +42,7 @@ export function resolveInternalDropFolder(
   const index = indexByPath.get(overId)
   if (index === undefined) return null
   const row = rows[index]
+  if (!isNodeRow(row)) return null
   const folder = row.node.type === 'directory' ? row.node.path : row.parentPath
   if (folder === null || isSameFolderMove(activeId, folder)) return null
   return folder
