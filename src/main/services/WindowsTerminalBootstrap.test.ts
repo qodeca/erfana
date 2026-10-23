@@ -7,7 +7,7 @@
  * - `canHandle` matching for PowerShell / Git Bash / cmd.exe builders.
  * - Dispatch-chain precedence in `buildWindowsBootstrap`.
  * - The shape of each builder's emitted script: cd, pwd-equivalent, marker,
- *   ConPTY buffer clear (CSI 2J / 3J / H or `cls` fallback), shell handoff.
+ *   ConPTY buffer clear (CSI 2J / 3J / H, or `pause` + `cls` for cmd.exe), shell handoff.
  * - Cwd deny-list behaviour, including the `C:\Program Files (x86)\…` accept
  *   case that previously regressed on Windows.
  * - `normalizeWindowsCwd` trailing-separator handling.
@@ -16,9 +16,15 @@
  * default vitest `main` project on every OS.
  */
 
+import { spawnSync } from 'node:child_process'
 import { describe, it, expect } from 'vitest'
+import { argsToCommandLine } from 'node-pty/lib/windowsPtyAgent'
+import { mkdtempSync, mkdirSync, realpathSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import {
   CmdExeBootstrapBuilder,
+  isCmdExe,
   DEFAULT_WINDOWS_BOOTSTRAP_BUILDERS,
   GitBashBootstrapBuilder,
   PowerShellBootstrapBuilder,
@@ -74,24 +80,42 @@ describe('PowerShellBootstrapBuilder', () => {
   })
 
   describe('build', () => {
-    it('emits cd, pwd, marker, ConPTY clear, and shell handoff in order', () => {
+    it('emits cd, pwd, marker, ConPTY clear, then the profiles, in order', () => {
       const args = builder.build({ shell: 'pwsh.exe', cwd: CWD, marker: MARKER })
-      expect(args).toHaveLength(3)
-      expect(args[0]).toBe('-NoProfile')
-      expect(args[1]).toBe('-Command')
+      expect(args.slice(0, 4)).toEqual(['-NoLogo', '-NoProfile', '-NoExit', '-Command'])
+      expect(args).toHaveLength(5)
 
-      const script = args[2]
+      const script = args[4]
       const cdIdx = script.indexOf('Set-Location -LiteralPath')
       const pwdIdx = script.indexOf('(Get-Location).Path')
       const markerIdx = script.indexOf(MARKER)
       const clearIdx = script.indexOf("[char]27 + '[2J'")
-      const shellIdx = script.indexOf("& 'pwsh.exe' -NoLogo")
+      const profilesIdx = script.indexOf('$PROFILE.AllUsersAllHosts')
 
       expect(cdIdx).toBeGreaterThanOrEqual(0)
       expect(pwdIdx).toBeGreaterThan(cdIdx)
       expect(markerIdx).toBeGreaterThan(pwdIdx)
       expect(clearIdx).toBeGreaterThan(markerIdx)
-      expect(shellIdx).toBeGreaterThan(clearIdx)
+      expect(profilesIdx).toBeGreaterThan(clearIdx)
+    })
+
+    it('is the interactive shell itself, not a bootstrap that starts it (#305 round 8)', () => {
+      // the pid node-pty reports must be the shell that runs the user's commands, so
+      // the quit cleanup can link what they start to it
+      const args = builder.build({ shell: 'C:\\Program Files\\PowerShell\\7\\pwsh.exe', cwd: CWD, marker: MARKER })
+      expect(args).toContain('-NoExit')
+      expect(joinArgs(args)).not.toMatch(/&\s*'/)
+      expect(joinArgs(args)).not.toContain('pwsh.exe')
+    })
+
+    it('loads the profiles in PowerShell order, each on its own so one failing does not stop the next', () => {
+      const script = builder.build({ shell: 'pwsh.exe', cwd: CWD, marker: MARKER })[4]
+      const order = ['AllUsersAllHosts', 'AllUsersCurrentHost', 'CurrentUserAllHosts', 'CurrentUserCurrentHost'].map((p) =>
+        script.indexOf(`$PROFILE.${p}`)
+      )
+      expect(order.every((i, k) => i > 0 && (k === 0 || i > order[k - 1]))).toBe(true)
+      expect(script).toContain('try { do { . $erfanaProfile } while ($false) } catch {')
+      expect(script).toContain('if ($_.InvocationInfo.ScriptName) { $_ | Out-Host } else { $Host.UI.WriteErrorLine($_.Exception.Message) }')
     })
 
     it('includes all three ConPTY clear escapes (2J, 3J, H)', () => {
@@ -107,9 +131,29 @@ describe('PowerShellBootstrapBuilder', () => {
       expect(joinArgs(args)).toContain("Set-Location -LiteralPath 'C:\\path\\with''quote'")
     })
 
-    it("escapes single quotes in shell path via PowerShell ''", () => {
-      const args = builder.build({ shell: "C:\\bin\\my's.exe", cwd: CWD, marker: MARKER })
-      expect(joinArgs(args)).toContain("& 'C:\\bin\\my''s.exe' -NoLogo")
+    it.each([
+      ['U+2018', '\u2018'],
+      ['U+2019', '\u2019'],
+      ['U+201A', '\u201A'],
+      ['U+201B', '\u201B']
+    ])('doubles the typographic single quote %s in cwd', (_name, ch) => {
+      const args = builder.build({
+        shell: 'pwsh.exe',
+        cwd: `C:\\Users\\Bob${ch}s Files\\proj`,
+        marker: MARKER
+      })
+      expect(joinArgs(args)).toContain(
+        `Set-Location -LiteralPath 'C:\\Users\\Bob${ch}${ch}s Files\\proj'`
+      )
+    })
+
+    it('doubles typographic and plain quotes together in cwd', () => {
+      const args = builder.build({
+        shell: 'pwsh.exe',
+        cwd: "C:\\Bob\u2018s\\it's\\proj",
+        marker: MARKER
+      })
+      expect(joinArgs(args)).toContain("Set-Location -LiteralPath 'C:\\Bob\u2018\u2018s\\it''s\\proj'")
     })
   })
 })
@@ -215,27 +259,95 @@ describe('CmdExeBootstrapBuilder', () => {
     expect(builder.canHandle('gibberish')).toBe(true)
   })
 
-  describe('build', () => {
-    it('emits /D /K with @echo off, cd /d, cd, echo marker, cls in order', () => {
-      const args = builder.build({ shell: 'cmd.exe', cwd: CWD, marker: MARKER })
-      expect(args).toHaveLength(3)
-      expect(args[0]).toBe('/D')
-      expect(args[1]).toBe('/K')
-
-      const script = args[2]
-      expect(script.startsWith('@echo off &&')).toBe(true)
-      expect(script).toContain(`cd /d "${CWD}"`)
-
-      const cdPwdIdx = script.indexOf(`cd /d "${CWD}"`)
-      const barePwdIdx = script.indexOf(' && cd &&')
-      const markerIdx = script.indexOf(`echo ${MARKER}`)
-      const clsIdx = script.indexOf('&& cls')
-
-      expect(cdPwdIdx).toBeGreaterThanOrEqual(0)
-      expect(barePwdIdx).toBeGreaterThan(cdPwdIdx)
-      expect(markerIdx).toBeGreaterThan(barePwdIdx)
-      expect(clsIdx).toBeGreaterThan(markerIdx)
+  describe('isCmdExe', () => {
+    it.each([
+      ['cmd', true],
+      ['cmd.exe', true],
+      ['CMD.EXE', true],
+      ['C:\\Windows\\System32\\cmd.exe', true],
+      ['C:/Windows/System32/cmd.exe', true],
+      ['C:\\Windows\\System32\\cmd.exe ', true],
+      ['  cmd.exe', true],
+      ['"C:\\Windows\\System32\\cmd.exe"', true],
+      ['C:\\tools\\mycmd.exe', false],
+      ['tcc.exe', false],
+      ['C:\\Windows\\System32\\cmd.exe.bak', false],
+      ['', false]
+    ])('%j -> %s', (shell, expected) => {
+      expect(isCmdExe(shell)).toBe(expected)
     })
+  })
+
+  describe('build', () => {
+    it('a shell that is not cmd.exe gets the bootstrap without pause and cls', () => {
+      const script = builder.build({ shell: 'C:\\tools\\tcc.exe', cwd: CWD, marker: MARKER })
+      expect(script).toBe(`/D /S /K "@echo off && cd && echo ${MARKER} & echo on"`)
+    })
+
+    it('cmd.exe with a quoted path or trailing space still gets pause and cls', () => {
+      for (const shell of ['"C:\\Windows\\System32\\cmd.exe"', 'C:\\Windows\\System32\\cmd.exe ']) {
+        expect(builder.build({ shell, cwd: CWD, marker: MARKER })).toContain('pause >nul && cls')
+      }
+    })
+
+    it('emits one ready-made command line string (not argv) in the documented order', () => {
+      const script = builder.build({ shell: 'cmd.exe', cwd: CWD, marker: MARKER })
+      expect(typeof script).toBe('string')
+      expect(script).toBe(
+        `/D /S /K "@echo off && cd && echo ${MARKER} && pause >nul && cls & echo on"`
+      )
+    })
+
+    it('keeps the cwd out of the command line (the shell starts there)', () => {
+      const script = builder.build({ shell: 'cmd.exe', cwd: 'C:\\100%done\\!x!', marker: MARKER })
+      expect(script).not.toContain('100%done')
+      expect(script).not.toContain('cd /d')
+    })
+
+    it('survives node-pty command-line building: cmd sees plain quotes only', () => {
+      const args = builder.build({ shell: 'cmd.exe', cwd: CWD, marker: MARKER })
+      // The real node-pty algorithm, as the Windows PTY agent runs it
+      const commandLine = argsToCommandLine('C:\\Windows\\System32\\cmd.exe', args)
+      expect(commandLine).not.toContain('\\"')
+      // cmd's `/S /K` rule: strip the first and last quote of the /K argument
+      const afterK = commandLine.slice(commandLine.indexOf('/K ') + 3)
+      expect(afterK.startsWith('"') && afterK.endsWith('"')).toBe(true)
+      const executed = afterK.slice(1, -1)
+      expect(executed).toBe(`@echo off && cd && echo ${MARKER} && pause >nul && cls & echo on`)
+    })
+
+    it('regression: an argv array is mangled by node-pty into \\" (the old broken form)', () => {
+      const commandLine = argsToCommandLine('cmd.exe', ['/D', '/K', `@echo off && cd /d "${CWD}"`])
+      expect(commandLine).toContain('\\"')
+    })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Real cmd.exe (Windows only)
+// ---------------------------------------------------------------------------
+
+describe.skipIf(process.platform !== 'win32')('CmdExeBootstrapBuilder against a real cmd.exe', () => {
+  it('prints the cwd, the marker and a prompt', () => {
+    const line = new CmdExeBootstrapBuilder().build({ shell: 'cmd.exe', cwd: CWD, marker: MARKER }) as string
+    const cwd = process.env.SystemRoot ?? 'C:\\Windows'
+    const result = spawnSync('cmd.exe', [line], {
+      windowsVerbatimArguments: true,
+      // The first line releases `pause`
+      input: '\r\nexit\r\n',
+      timeout: 15000,
+      cwd,
+      encoding: 'utf8',
+      // A user PROMPT (or the app's) would replace the default prompt
+      env: { ...process.env, PROMPT: undefined }
+    })
+    const out = result.stdout
+    const markerAt = out.indexOf(MARKER)
+    expect(markerAt).toBeGreaterThan(0)
+    // The `cd` line before the marker is the spawn cwd
+    expect(out.slice(0, markerAt).toLowerCase()).toContain(cwd.toLowerCase())
+    // `echo on` (after `cls`) brings the prompt back
+    expect(out.slice(markerAt)).toMatch(/[A-Za-z]:\\[^\r\n]*>/)
   })
 })
 
@@ -372,3 +484,26 @@ describe('normalizeWindowsCwd', () => {
     expect(normalizeWindowsCwd('foo')).toBe('foo')
   })
 })
+
+describe.skipIf(spawnSync('pwsh', ['-NoProfile', '-Command', '1'], { timeout: 15000 }).status !== 0)(
+  'PowerShellBootstrapBuilder script run with pwsh',
+  () => {
+    it('opens a folder named with a curly apostrophe', () => {
+      const base = mkdtempSync(join(realpathSync.native(tmpdir()), 'erfana-bootstrap-'))
+      const dir = join(base, 'Bob\u2019s Files')
+      mkdirSync(dir)
+      try {
+        const args = new PowerShellBootstrapBuilder().build({
+          shell: 'pwsh',
+          cwd: dir,
+          marker: MARKER
+        })
+        const run = spawnSync('pwsh', args, { input: '', encoding: 'utf8', timeout: 15000 })
+        expect(run.stdout).toContain(dir)
+        expect(run.stdout).toContain(MARKER)
+      } finally {
+        rmSync(base, { recursive: true, force: true })
+      }
+    })
+  }
+)

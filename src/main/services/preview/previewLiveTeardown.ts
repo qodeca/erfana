@@ -51,7 +51,7 @@ export interface PreviewLiveTeardownParts {
  * An error as a log line carries it: its name, plus `code` when it has one.
  * Never the message, which can quote a path or a preview URL (QG-7 S3).
  */
-function errorFieldsOf(error: unknown): { error: string; code?: string } {
+export function errorFieldsOf(error: unknown): { error: string; code?: string } {
   if (!(error instanceof Error)) {
     return { error: typeof error }
   }

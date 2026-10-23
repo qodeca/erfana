@@ -49,10 +49,13 @@ import type {
   DocumentImportRequest,
   DocumentImportResult,
   DocumentImportProgress,
-  DependencyReadyEvent
+  DependencyReadyEvent,
+  ImportToolStatusRequest,
+  ImportToolStatusResponse
 } from '../shared/ipc/import-schema'
 import { fileBridge } from './fileBridge'
 import { terminalBridge } from './terminalBridge'
+import { markdownImageBridge } from './markdownImageBridge'
 import type { FileNode, FileStats } from '../shared/ipc/file-schema'
 
 export type { FileNode, FileStats }
@@ -327,6 +330,14 @@ const api = {
       ipcRenderer.invoke(IMPORT_CHANNELS.GET_DOCUMENT_EXTENSIONS),
 
     /**
+     * Optional import tool status – LibreOffice found / missing / unsafe (#250).
+     * `{ recheck: true }` re-runs detection ("Check again"); main rate-limits
+     * it. Never rejects: failures arrive as `success: false`.
+     */
+    toolStatus: (request: ImportToolStatusRequest): Promise<ImportToolStatusResponse> =>
+      ipcRenderer.invoke(IMPORT_CHANNELS.TOOL_STATUS, request),
+
+    /**
      * Subscribe to document import progress events
      * Returns cleanup function to unsubscribe
      */
@@ -589,7 +600,7 @@ const api = {
      *
      * @returns Success status with binary path or error
      */
-    ensureBinary: (): Promise<{ success: boolean; path?: string; error?: string }> =>
+    ensureBinary: (): Promise<{ success: boolean; path?: string; error?: string; cancelled?: boolean }> =>
       ipcRenderer.invoke(TRANSCRIPTION_CHANNELS.WHISPER_ENSURE_BINARY),
 
     /**
@@ -600,7 +611,7 @@ const api = {
      * @param model - Model size to ensure (tiny, base, small, medium, large)
      * @returns Success status with model path or error
      */
-    ensureModel: (model: WhisperModel): Promise<{ success: boolean; path?: string; error?: string }> =>
+    ensureModel: (model: WhisperModel): Promise<{ success: boolean; path?: string; error?: string; cancelled?: boolean }> =>
       ipcRenderer.invoke(TRANSCRIPTION_CHANNELS.WHISPER_ENSURE_MODEL, model),
 
     /**
@@ -621,6 +632,15 @@ const api = {
      */
     deleteModel: (model: WhisperModel): Promise<{ success: boolean; error?: string }> =>
       ipcRenderer.invoke(TRANSCRIPTION_CHANNELS.WHISPER_DELETE_MODEL, model),
+
+    /**
+     * Cancel the running binary or model download. Its pending ensure call
+     * resolves with `cancelled: true` and the partial file is deleted.
+     *
+     * @returns Success status (false when nothing was downloading)
+     */
+    cancelDownload: (): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke(TRANSCRIPTION_CHANNELS.WHISPER_CANCEL_DOWNLOAD),
 
     /**
      * Subscribe to whisper model download progress events
@@ -735,6 +755,12 @@ const api = {
     openFile: (filePath: string): Promise<BrowserOpenFileResponse> =>
       ipcRenderer.invoke(BROWSER_CHANNELS.OPEN_FILE, { filePath })
   },
+
+  /**
+   * Images referenced from Markdown (#71). Sends a path; gets back a `data:`
+   * URL, `unchanged`, or a refusal reason. Never rejects for a refusal.
+   */
+  markdownImage: markdownImageBridge,
 
   /**
    * Per-terminal Claude Code context status bridge (#216).

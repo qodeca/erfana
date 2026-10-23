@@ -108,6 +108,59 @@ describe('registerConfinedHandle', () => {
     expect(logged).not.toContain(outside)
   })
 
+  it('logs a refusal at debug when the channel says refusals are routine (#71)', async () => {
+    registerConfinedHandle(
+      'test:quiet',
+      {
+        schema: z.tuple([z.string()]),
+        paths: { filePath: { arg: 0, mode: 'project' } },
+        refusalLogLevel: 'debug',
+        onRefusal: () => 'refused',
+        handler: async () => 'read'
+      },
+      session
+    )
+    await expect(call('test:quiet', path.join(outside, 'secret.md'))).resolves.toBe('refused')
+    expect(logger.warn).not.toHaveBeenCalled()
+    const logged = JSON.stringify(vi.mocked(logger.debug).mock.calls)
+    expect(logged).toContain('OUTSIDE_PROJECT')
+    expect(logged).not.toContain(outside)
+  })
+
+  it('with lexicalPrecheck, refuses a path outside the root before the file system is asked (#71)', async () => {
+    const asked: string[] = []
+    const record = <T,>(fn: (target: string) => Promise<T>) => async (target: string): Promise<T> => {
+      asked.push(target)
+      return fn(target)
+    }
+    const { lstat, stat, realpath } = await import('node:fs/promises')
+    const handler = vi.fn(async () => 'read')
+    registerConfinedHandle(
+      'test:lexical',
+      {
+        schema: z.tuple([z.string()]),
+        paths: { filePath: { arg: 0, mode: 'project', mustExist: true } },
+        lexicalPrecheck: true,
+        confinementDeps: {
+          path,
+          platform: process.platform,
+          fs: { lstat: record(lstat), stat: record(stat), realpath: record(realpath) }
+        },
+        onRefusal: (error) => error.code,
+        handler
+      },
+      session
+    )
+    for (const target of [path.join(outside, 'secret.md'), path.join(root, '..', 'outside', 'secret.md')]) {
+      await expect(call('test:lexical', target)).resolves.toBe('OUTSIDE_PROJECT')
+    }
+    expect(asked).toEqual([])
+    expect(handler).not.toHaveBeenCalled()
+    // Inside the root the full check still runs
+    await expect(call('test:lexical', path.join(root, 'a.md'))).resolves.toBe('read')
+    expect(asked.length).toBeGreaterThan(0)
+  })
+
   it('checks every listed path argument', async () => {
     const handler = vi.fn(async () => true)
     registerConfinedHandle(

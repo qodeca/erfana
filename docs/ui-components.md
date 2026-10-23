@@ -542,7 +542,7 @@ Modal dialog for configuring and executing LiteParse document imports (PDF, Offi
 - Indeterminate progress bar with phase text during import
 - OCR warning when OCR is disabled
 - Auto-open imported file on success
-- Dependency-missing modal for LibreOffice/ImageMagick with install guidance
+- Dependency-missing modal for LibreOffice (missing or unsafe location) with an "Open import tools" button
 - Batch drag-drop filtering – document files in multi-file drops show warning toast
 
 **IPC flow**: `import:document` (invoke with options) + `import:documentProgress` (streamed phase events) + `import:documentCancel` (abort)

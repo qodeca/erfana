@@ -403,7 +403,7 @@ The policy as practised: *a file a change adds behaviour to must come in under 5
 | `src/main/services/LocalWhisperService.ts` | 933 | Pre-existing |
 | `src/main/services/ProjectLockService.ts` | 906 | Pre-existing |
 | `src/renderer/src/constants/testids.ts` | 842 | Pre-existing; a flat constant table |
-| `src/main/services/preview/PreviewViewService.ts` | ~~832~~ 493 | **Back under the cap (#124)**, but only just – see entry #47. Navigation, eviction, panel state and the resize-hold registry moved into their own modules |
+| `src/main/services/preview/PreviewViewService.ts` | ~~832~~ 470 | **Back under the cap (#124)**; 493 after #124, 470 after #233 moved the discard of a half-built session into `previewOpenDiscard.ts`. Navigation, eviction, panel state and the resize-hold registry moved into their own modules |
 | `src/main/services/PdfService.ts` | 821 | Pre-existing |
 | `src/main/services/GitWatcherService.ts` | 795 | Pre-existing |
 | `src/main/services/WhisperModelManager.ts` | 753 | Pre-existing |
@@ -740,7 +740,7 @@ One extra obstacle found since: `PreviewViewService.applyApprovedHosts` returns 
 | `src/preload/previewBridge.test.ts` | 496 | `<name>.<topic>.test.ts` |
 | `src/main/services/preview/previewPageScope.test.ts` | 495 | `<name>.<topic>.test.ts` |
 | `src/main/services/preview/PreviewSessionFactory.ts` | 494 | – |
-| `src/main/services/preview/PreviewViewService.ts` | 493 | – |
+| `src/main/services/preview/PreviewViewService.ts` | 470 | – |
 | `src/renderer/src/stores/usePreviewStore.ts` | 492 | `usePreviewStillStore.ts` |
 
 **Split done:** `src/renderer/src/services/preview/previewTabMove.ts` (491 at Phase 10) gave its message helpers to `previewTabMoveMessages.ts` (87 lines) at QG-11a and is now 450 lines.

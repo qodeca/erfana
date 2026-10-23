@@ -116,8 +116,187 @@ export function installNoForkConsoleList(
   }
 }
 
+/** Marks the wrapped exit method so a second install does nothing. */
+const EXIT_MARK = '__erfanaExitTimeRecorder'
+
+/** Property set on a WindowsPtyAgent when its native exit callback fires. */
+const EXIT_AT = '__erfanaExitAtMs'
+
+/**
+ * Records WHEN node-pty's native exit callback fires for each Windows agent (#305).
+ *
+ * node-pty reports the exit to JavaScript only after the output is drained (up to about
+ * a second later), so `onExit` is late. The quit helper must not treat a pid as the
+ * shell's after the shell has ended (Windows may hand the pid to another process), so it
+ * needs the earliest moment the shell was known to be gone. `_$onProcessExit` is the
+ * method the native exit thread calls; the wrapper only notes `Date.now()` on the agent
+ * and then calls the original. Nothing happens if the method is not what 1.1.0 has.
+ *
+ * @returns true when the wrapper is in place
+ */
+export function installExitTimeRecorder(load: () => unknown = loadWindowsPtyAgent): boolean {
+  try {
+    const mod = load() as { WindowsPtyAgent?: { prototype?: Record<string, unknown> } } | undefined
+    const proto = mod?.WindowsPtyAgent?.prototype
+    const original = proto?._$onProcessExit
+    if (!proto || typeof original !== 'function') return false
+    if ((original as unknown as Record<string, unknown>)[EXIT_MARK]) return true
+    const wrapped = function (this: Record<string, unknown>, ...args: unknown[]): unknown {
+      this[EXIT_AT] = Date.now()
+      return (original as (...a: unknown[]) => unknown).apply(this, args)
+    }
+    ;(wrapped as unknown as Record<string, unknown>)[EXIT_MARK] = true
+    proto._$onProcessExit = wrapped
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * When the native exit callback fired for a node-pty Windows terminal (`IPty`), or
+ * `undefined` if it has not (or the terminal is not a Windows one).
+ */
+export function nativeExitAtMs(ptyProcess: unknown): number | undefined {
+  const agent = (ptyProcess as { _agent?: Record<string, unknown> } | undefined)?._agent
+  const at = agent?.[EXIT_AT]
+  return typeof at === 'number' && Number.isFinite(at) ? at : undefined
+}
+
+/** Marks the wrapped clean-up method so a second install does nothing. */
+const CLEANUP_MARK = '__erfanaConoutRelease'
+
+/** Shape problems already logged, one line each (#305). */
+const shapeReported = new Set<string>()
+
+function reportShapeOnce(key: string, message: string): void {
+  if (shapeReported.has(key)) return
+  shapeReported.add(key)
+  logger.warn(message)
+}
+
+/** Workers released and worker exits seen, for the quit log (counts only). */
+const conoutStats = { released: 0, exited: 0 }
+
+/** How many conout workers were released, and how many have reported their exit. */
+export function conoutWorkerStats(): { released: number; exited: number } {
+  return { ...conoutStats }
+}
+
+/**
+ * Ends node-pty's conout worker thread on every Windows shell exit (#305; Windows:
+ * 2 of 6 quits hung for about 17 s, both after a terminal had ended with `exit`).
+ *
+ * node-pty 1.1.0 starts one `worker_threads` Worker per terminal
+ * (`ConoutConnection`, `lib/windowsConoutConnection.js`) that relays the console
+ * output, and ends it only from `WindowsPtyAgent.kill()`. When a shell ends without
+ * `kill()` – the user typed `exit` – nothing ends it, so it runs for the rest of the
+ * session and the app's exit has to stop it during teardown, on the main thread. The
+ * patch notes in `docs/windows/contributing.md` already record a quit hang from the
+ * main thread joining a conout worker; this ends the worker while the app runs.
+ *
+ * The hook is `WindowsPtyAgent.prototype._cleanUpProcess`, which node-pty runs on
+ * every native exit, about a second after the last output, when it destroys the
+ * output socket: so no output is lost, and it runs whether or not the terminal's own
+ * `exit` event is ever wired (that happens only after the data pipe is ready). It also
+ * destroys the input socket, which node-pty leaves open (microsoft/node-pty#947).
+ * Nothing happens if the method is not what 1.1.0 has; that is logged once.
+ *
+ * @returns true when the wrapper is in place
+ */
+export function installConoutWorkerRelease(
+  load: () => unknown = loadWindowsPtyAgent,
+  readVersion: () => string | undefined = readNodePtyVersion
+): boolean {
+  try {
+    const mod = load() as { WindowsPtyAgent?: { prototype?: Record<string, unknown> } } | undefined
+    const proto = mod?.WindowsPtyAgent?.prototype
+    const original = proto?._cleanUpProcess
+    if (!proto || typeof original !== 'function') {
+      reportShapeOnce('cleanup', 'node-pty has no WindowsPtyAgent._cleanUpProcess; a conout worker is left running after its shell exits')
+      noteVersionOnce(readVersion())
+      return false
+    }
+    if ((original as unknown as Record<string, unknown>)[CLEANUP_MARK]) return true
+    const wrapped = function (this: Record<string, unknown>, ...args: unknown[]): unknown {
+      try {
+        return (original as (...a: unknown[]) => unknown).apply(this, args)
+      } finally {
+        // node-pty's own clean-up does nothing in conpty.dll mode, and neither does this
+        if (!this._useConptyDll) releaseAgentConoutWorker(this)
+      }
+    }
+    ;(wrapped as unknown as Record<string, unknown>)[CLEANUP_MARK] = true
+    proto._cleanUpProcess = wrapped
+    noteVersionOnce(readVersion())
+    return true
+  } catch {
+    reportShapeOnce('cleanup', 'Could not hook node-pty\'s Windows clean-up; a conout worker is left running after its shell exits')
+    return false
+  }
+}
+
+type ConoutConnectionLike = {
+  _worker?: { terminate?: unknown; once?: unknown }
+  _isDisposed?: boolean
+  _drainTimeout?: ReturnType<typeof setTimeout>
+}
+
+/**
+ * Terminates one agent's conout worker at once and marks the connection disposed, so
+ * a later `kill()` does not start it again; also destroys the agent's input socket.
+ * Logs counts and times only. Does nothing for other shapes (logged once).
+ *
+ * @returns true when a worker was asked to stop
+ */
+export function releaseAgentConoutWorker(agent: unknown): boolean {
+  try {
+    const a = agent as Record<string, unknown> | undefined
+    const connection = a?._conoutSocketWorker as ConoutConnectionLike | undefined
+    const worker = connection?._worker
+    if (!connection || !worker || typeof worker.terminate !== 'function') {
+      reportShapeOnce('release', 'node-pty conout worker not found on an exited Windows terminal; it is left running')
+      noteVersionOnce(readNodePtyVersion())
+      return false
+    }
+    const inSocket = a?._inSocket as { destroy?: unknown; destroyed?: boolean } | undefined
+    if (inSocket && typeof inSocket.destroy === 'function' && !inSocket.destroyed) {
+      try {
+        ;(inSocket.destroy as () => void).call(inSocket)
+      } catch {
+        // already closed
+      }
+    }
+    connection._isDisposed = true
+    if (connection._drainTimeout) clearTimeout(connection._drainTimeout)
+    const exitAt = a?.[EXIT_AT]
+    const releasedAt = Date.now()
+    if (typeof worker.once === 'function') {
+      ;(worker.once as (e: string, cb: (code: number) => void) => void).call(worker, 'exit', (code: number) => {
+        conoutStats.exited++
+        logger.info('Conout worker exited', { exited: conoutStats.exited, code, releaseToExitMs: Date.now() - releasedAt })
+      })
+    }
+    const stopping: unknown = (worker.terminate as () => unknown).call(worker)
+    if (stopping && typeof (stopping as Promise<unknown>).catch === 'function') {
+      void (stopping as Promise<unknown>).catch(() => {})
+    }
+    conoutStats.released++
+    logger.info('Conout worker released', {
+      released: conoutStats.released,
+      exitToReleaseMs: typeof exitAt === 'number' ? releasedAt - exitAt : null
+    })
+    return true
+  } catch {
+    return false
+  }
+}
+
 /** Test hook: lets a test see the once-only warning again. */
 export function resetShimWarningForTests(): void {
   reported = false
   versionNoted = false
+  shapeReported.clear()
+  conoutStats.released = 0
+  conoutStats.exited = 0
 }

@@ -15,6 +15,7 @@ export type ConfinementErrorCode =
   | 'NO_PROJECT'
   | 'OUTSIDE_PROJECT'
   | 'UNVERIFIABLE'
+  | 'PERMISSION_DENIED'
   | 'ROOT_FORBIDDEN'
   | 'NOT_FOUND'
   | 'WRONG_KIND'
@@ -34,6 +35,14 @@ export const OUTSIDE_PROJECT_CHANGE_MESSAGE =
 /** Refusal message for a path whose position could not be established. */
 export const UNVERIFIABLE_PATH_MESSAGE = 'Cannot verify this path is inside the project directory'
 
+/**
+ * Refusal for a regular file in a verified project folder that the file system
+ * will not let the app resolve (Windows "Deny Read" makes `realpath` fail with
+ * EPERM while `lstat` works). Still a refusal; it names the real reason, and
+ * says "permission denied" so the renderer's errno classifier reads it as one.
+ */
+export const PERMISSION_DENIED_MESSAGE = 'Cannot open this file: permission denied'
+
 /** Refusal when the project folder itself was renamed, moved or deleted. */
 export const PROJECT_FOLDER_GONE_MESSAGE = 'The project folder no longer exists'
 
@@ -43,6 +52,7 @@ export const CONFINEMENT_MESSAGES: Readonly<Record<ConfinementErrorCode, string>
   NO_PROJECT: 'No project is open',
   OUTSIDE_PROJECT: OUTSIDE_PROJECT_MESSAGE,
   UNVERIFIABLE: UNVERIFIABLE_PATH_MESSAGE,
+  PERMISSION_DENIED: PERMISSION_DENIED_MESSAGE,
   ROOT_FORBIDDEN: 'Cannot change the project root directory',
   NOT_FOUND: 'Item not found',
   WRONG_KIND: 'Path is not the kind of item this action needs',

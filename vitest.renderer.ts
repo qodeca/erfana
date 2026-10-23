@@ -3,10 +3,11 @@
 import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import path from 'node:path'
+import { monacoOwnDompurify } from './electron.vite.monaco-dompurify'
 import { maxWorkers } from './vitest.workers'
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [monacoOwnDompurify(), react()],
   // Mirror the renderer build's `define` (electron.vite.config.ts) so components
   // that read the inlined app version resolve to a stable value under test.
   define: {
@@ -17,6 +18,10 @@ export default defineConfig({
     // Worker cap (issue #171); only read when this file is the root `--config`.
     maxWorkers,
     environment: 'jsdom',
+    // Monaco's own files must go through the Vite plugin that redirects its
+    // vendored DOMPurify (electron.vite.monaco-dompurify.ts); vitest skips
+    // node_modules otherwise.
+    server: { deps: { inline: [/monaco-editor/] } },
     include: ['src/renderer/src/**/*.test.{ts,tsx}'],
     exclude: ['node_modules', 'dist', 'out', 'e2e', 'tests/fixtures'],
     globals: true,

@@ -4,6 +4,12 @@ Per-version release notes for Erfana, v0.9.0 onwards. Earlier: v0.8.0–v0.8.3 i
 
 > **Note:** In v0.7.2, BRS (Business Requirements Specifications) were renamed to "specs" and relocated from `specs/business-reqs/` to `specs/spec-t{tier}-{id}-{slug}/`. All references in code and docs now use `Spec #XXX`. Historical entries below have been updated accordingly.
 
+Each version uses the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) groups, plus one intentional extension: `### Internal`, for changes only contributors see (build, tests, tooling).
+
+## [Unreleased]
+
+Changes merged since the last release are not listed here. Each pull request adds a fragment to [`changelog.d/`](../changelog.d/README.md) instead, so no two pull requests edit the same lines of this file. At release time the fragments are folded into a new `## X.Y.Z` section directly below this one and deleted in the same commit; this section stays as it is. To see what is pending, read the fragments, or run `npx git-cliff --unreleased`, which lists the Conventional Commits since the last `v*` tag – the same command drafts the technical half of the release notes.
+
 ## 0.21.0
 
 *Released 2026-10-18. Tag `v0.21.0`.*

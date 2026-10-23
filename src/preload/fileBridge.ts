@@ -18,6 +18,7 @@ export const fileBridge: FileBridge = {
   openProjectByPath: (request) => ipcRenderer.invoke(FILE_CHANNELS.openProjectByPath, request),
   getSession: () => ipcRenderer.invoke(FILE_CHANNELS.getSession),
   readDirectory: (request) => ipcRenderer.invoke(FILE_CHANNELS.readDirectory, request),
+  findByName: (request) => ipcRenderer.invoke(FILE_CHANNELS.findByName, request),
   readFile: (request) => ipcRenderer.invoke(FILE_CHANNELS.readFile, request),
   writeFile: (request) => ipcRenderer.invoke(FILE_CHANNELS.writeFile, request),
   getStats: (request) => ipcRenderer.invoke(FILE_CHANNELS.getStats, request),

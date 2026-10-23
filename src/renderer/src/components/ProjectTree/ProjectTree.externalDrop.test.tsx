@@ -15,6 +15,10 @@ import { subscribeGlobalToasts, type GlobalToastPayload } from '../Toast/toastSe
 import { EXTERNAL_DROP_MAX } from './externalDropLimit'
 import type { ExternalDropFile } from '../../hooks/useExternalFileDrop'
 import type { FileNode } from '../../../../preload/index'
+import { installTreeViewport } from '../../test-utils/treeViewport'
+
+// The tree is virtualised; give it a viewport so every fixture row is mounted.
+installTreeViewport()
 
 const PROJECT_PATH = '/projA'
 

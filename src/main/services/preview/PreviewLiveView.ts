@@ -333,6 +333,10 @@ export class PreviewLiveView {
    * here carries only the panel id, so no name comes from the renderer (#124).
    */
   exportPdf(fallbackName: string): Promise<PdfExportResult> {
+    // Like `find` and `stopFind`: a view that is going or gone has nothing to print.
+    if (this.isDefunct) {
+      return Promise.resolve({ ok: false, errorCode: ErrorCode.PDF_EXPORT_FAILED })
+    }
     const name = exportNameForPage(this.currentPage(), fallbackName)
     return this.deps.exportController.exportToPdf(this.wc, name, this.window.id)
   }
@@ -413,6 +417,7 @@ export class PreviewLiveView {
         { label: 'frameEvents.dispose', run: () => this.parts.frameEvents.dispose() },
         { label: 'freshness.dispose', run: () => this.parts.freshness.dispose() },
         { label: 'page.dispose', run: () => this.parts.page.dispose() },
+        { label: 'bounds.dispose', run: () => this.parts.bounds.dispose() },
         {
           label: 'watchCoordinator.dispose',
           runAsync: () => this.parts.watchCoordinator.dispose()

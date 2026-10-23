@@ -233,7 +233,7 @@ External file drops of document formats (PDF, Office, images) route through the 
 External file drop
   → useImport checks extension against cached document extension list
   → Document file? → Open DocumentImportDialog (OCR, language, screenshots, DPI)
-  → DependencyDetector ran at startup? → Show dependency-missing modal if LibreOffice/ImageMagick absent
+  → DependencyDetector ran at startup? → Show dependency-missing modal if LibreOffice absent or unsafe
   → User confirms → import:document IPC → LiteParseConverter processes file
   → Progress streamed via import:documentProgress
   → Cancellation via import:documentCancel

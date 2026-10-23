@@ -2,8 +2,10 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { app, BrowserWindow, Menu, dialog, session } from 'electron'
 import { join } from 'path'
+import { APP_ID } from '../shared/constants'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { spawnNewInstance } from './utils/spawnNewInstance'
+import { moveToSafeWorkingDirectory } from './utils/safeWorkingDirectory'
 import { registerFileHandlers, projectService } from './ipc/file-handlers'
 import { registerFileWatcherHandlers } from './ipc/file-watcher-handlers'
 import { registerDirectoryWatcherHandlers } from './ipc/directory-watcher-handlers'
@@ -24,16 +26,16 @@ import { registerQuitHandlers } from './ipc/quit-handlers'
 import { registerProjectLockHandlers } from './ipc/project-lock-handlers'
 import { registerExternalFileHandlers } from './ipc/external-file-handlers'
 import { registerTranscriptionHandlers } from './ipc/transcription-handlers'
+import { whisperModelManager } from './services/WhisperModelManager'
 import { registerClipboardHandlers } from './ipc/clipboard-handlers'
 import { registerImageExportHandlers } from './ipc/image-export-handlers'
 import { registerBrowserHandlers } from './ipc/browser-handlers'
+import { registerMarkdownImageHandlers } from './ipc/markdown-image-handlers'
 import { registerClaudeStatusHandlers } from './ipc/claude-status-handlers'
 import { registerPreviewHandlers } from './ipc/preview-handlers'
 import { registerPreviewScheme } from './services/preview/previewScheme'
-import { DependencyDetector, converterRegistry, getExtensionsForDependencies } from './services/import'
+import { importToolStatusService, killActiveLibreOfficeProbes } from './services/import'
 import { FORCE_CRASH_ARG, LOGS_DIR_RELATIVE, TEST_HOOKS_ARG } from '../shared/constants'
-import { IMPORT_CHANNELS } from '../shared/ipc/import-channels'
-import type { DependencyReadyEvent } from '../shared/ipc/import-schema'
 import { createApplicationMenu, setPreviewZoomHandler } from './menu'
 import { fileService } from './services/FileService'
 import { redactedLogError } from './utils/redactUserInput'
@@ -43,6 +45,10 @@ import { terminalService } from './services/TerminalService'
 import { settingsService } from './services/SettingsService'
 import { globalSettingsService } from './services/GlobalSettingsService'
 import { loggingService, logger } from './services/LoggingService'
+import { logNodePtyBinding } from './utils/logNodePtyBinding'
+import { createQuitGuard } from './utils/quitGuard'
+import { armLastResortExit, LAUNCHER_WAIT_MS, runQuitSequence, waitBounded } from './utils/quitSequence'
+import { QUIT_TRACE_FILE, startConptyHostReaper } from './services/conptyHostReaper'
 import { gitWatcherService } from './services/GitWatcherService'
 import { gitPollingService } from './services/GitPollingService'
 import { projectLockService } from './services/ProjectLockService'
@@ -69,6 +75,17 @@ registerProcessCrashLogging()
 // `app.whenReady()`, so it lives here at module scope beside the other pre-ready
 // setup (`registerSchemesAsPrivileged` is a no-op once the app is ready).
 registerPreviewScheme()
+
+// Packaged: leave the launching folder (possibly a cloned repo) as cwd, so no
+// bare-name spawn can resolve into it (#250). Dev keeps the repo as cwd.
+moveToSafeWorkingDirectory({
+  isPackaged: app.isPackaged,
+  platform: process.platform,
+  execPath: process.execPath,
+  userDataPath: () => app.getPath('userData'),
+  chdir: (dir) => process.chdir(dir),
+  warn: (message, context) => logger.warn(message, context)
+})
 
 // Strip --new-window flag to prevent infinite spawn loops
 // Must happen before any window creation
@@ -408,6 +425,13 @@ app.whenReady().then(async () => {
   // Set application name (shows in macOS menu bar)
   app.setName('ERFANA')
 
+  // Windows: record which conpty.node node-pty loaded (patched build vs prebuild, #305)
+  logNodePtyBinding()
+
+  // ERFANA_DIAG_SKIP_TREE_KILL is honoured in dev builds and e2e only; a packaged build
+  // ignores it, so an environment variable cannot change quit cleanup there (#305)
+  terminalService.allowDiagnostics(!app.isPackaged)
+
   // Deny every page permission except the camera preview (Electron grants all by default)
   installDefaultSessionPermissions(session.defaultSession)
 
@@ -415,8 +439,9 @@ app.whenReady().then(async () => {
   // Required for Cmd+C/V to work in textarea and input elements
   Menu.setApplicationMenu(createApplicationMenu())
 
-  // Set app user model id for windows
-  electronApp.setAppUserModelId('com.erfana')
+  // Set app user model id for windows. Must equal the installer's appId so the running window
+  // groups with its pinned shortcut (and any future toast notifications resolve the app name/icon).
+  electronApp.setAppUserModelId(APP_ID)
 
   // Default open or close DevTools by F12 in development
   // and ignore CommandOrControl + R in production.
@@ -499,6 +524,8 @@ app.whenReady().then(async () => {
   registerImageExportHandlers()
   // Open in default browser (#124): sender-gated, confined to the open project.
   registerBrowserHandlers()
+  // Images referenced from Markdown (#71): sender-gated, confined to the open project.
+  registerMarkdownImageHandlers(projectService.session)
   // Per-terminal Claude Code context status bar (#216). Uses the same
   // terminalService singleton so it can look up the main-owned PTY pid + cwd.
   claudeStatusHandlers = registerClaudeStatusHandlers(terminalService)
@@ -548,23 +575,11 @@ app.whenReady().then(async () => {
   }
 
   // Fire-and-forget: detect system dependencies for LiteParse document import
-  // Runs async after window creation so it doesn't block startup
-  const dependencyDetector = new DependencyDetector()
-  dependencyDetector.detect().then((deps) => {
-    const extensions = getExtensionsForDependencies(deps)
-    if (extensions.length > 0) {
-      converterRegistry.updateConverterExtensions('document', extensions)
-    }
-    // Notify renderer that dependencies have been detected
-    if (mainWindowRef && !mainWindowRef.isDestroyed()) {
-      const payload: DependencyReadyEvent = {
-        libreOffice: deps.libreOffice,
-        imageMagick: deps.imageMagick,
-        extensions: converterRegistry.getExtensionsByConversionType().requiresConversion
-      }
-      mainWindowRef.webContents.send(IMPORT_CHANNELS.DEPENDENCIES_READY, payload)
-    }
-  }).catch((error) => {
+  // Runs async after window creation so it doesn't block startup. The service
+  // maps the found tools' extensions into the converter registry, caches the
+  // result for `import:toolStatus`, and broadcasts `import:dependenciesReady`
+  // to every window (#250).
+  importToolStatusService.getStatus().catch((error) => {
     logger.error('Failed to detect document import dependencies', error instanceof Error ? error : undefined)
   })
 
@@ -621,6 +636,8 @@ app.whenReady().then(async () => {
   app.on('activate', function () {
     // On macOS it's common to re-create a window in the app when the
     // dock icon is clicked and there are no other windows open.
+    // Not during the shutdown: a window would reopen the project and retake its lock (#305)
+    if (quitGuard.isShuttingDown()) return
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 })
@@ -629,12 +646,18 @@ app.whenReady().then(async () => {
 // Note: On macOS, apps typically stay active but we want consistent quit behavior
 // since confirmation already happened via close handler
 app.on('window-all-closed', () => {
-  app.quit()
+  // Destroying the window inside the quit sequence lands here; a second app.quit()
+  // would make Electron emit another before-quit while the shutdown is running (#305)
+  quitGuard.handleWindowAllClosed(() => app.quit())
 })
+
+// A LibreOffice detection probe still running at quit must not outlive the app.
+app.on('will-quit', killActiveLibreOfficeProbes)
 
 // Cleanup file watchers, directory watchers, terminals, git watchers, and project locks before app quits.
 // Pattern B (F11): preventDefault + sequenced shutdown guarantees lock release before exit.
-// isShuttingDown guards against the second before-quit Electron emits after preventDefault.
+// quitGuard (utils/quitGuard.ts) prevents the second before-quit Electron emits and keeps
+// window-all-closed from calling app.quit() while the shutdown runs.
 const SHUTDOWN_TIMEOUT_MS = 2_000
 
 /**
@@ -647,7 +670,7 @@ const SHUTDOWN_TIMEOUT_MS = 2_000
  * is a local file unlink on the happy path.
  */
 const LOCK_DISPOSE_TIMEOUT_MS = 1_000
-let isShuttingDown = false
+const quitGuard = createQuitGuard()
 
 /**
  * Runs one disposer and returns when it settles or when `timeoutMs` elapses,
@@ -715,51 +738,98 @@ function handleShutdownException(err: unknown): void {
   )
 }
 
-app.on('before-quit', async (event) => {
-  if (isShuttingDown) return
-  isShuttingDown = true
-  event.preventDefault()
+app.on('before-quit', (event): Promise<void> | undefined => {
+  // Always prevented: Electron emits a second before-quit when the quit-confirm handler
+  // destroys the window (window-all-closed -> app.quit()). Letting that one through
+  // quits 1 ms after the shutdown started, before any disposer finishes (#305). The
+  // only way out is app.exit(0), which runQuitSequence always reaches.
+  if (!quitGuard.handleBeforeQuit(event)) return
+  // app.exit(0) below skips `will-quit`, so a running LibreOffice probe is killed here.
+  killActiveLibreOfficeProbes()
 
   // Install the guard synchronously, before the first await, so an already-queued
   // chokidar read callback can't crash the process before the handler is registered.
   process.on('uncaughtException', handleShutdownException)
 
-  logger.info('App quitting, cleaning up services')
+  // Last resort: a step that never settles must not leave the app un-quittable (the
+  // guard blocks every later quit). Not unref'd.
+  armLastResortExit(() => app.exit(0))
+  let launcherDone: Promise<void> = Promise.resolve()
 
-  // Priority: lock release runs first and alone, so the next launch can open
-  // the project without waiting for heartbeat staleness — but bounded, so a
-  // disposer that never settles cannot strand the process short of app.exit(0).
-  await disposeWithin(
-    'projectLockService.dispose()',
-    () => projectLockService.dispose(),
-    LOCK_DISPOSE_TIMEOUT_MS
+  return runQuitSequence(
+    [
+      () => {
+        // Windows (#305): a hidden helper (started by a short launcher, so it outlives us)
+        // that force-ends us if teardown hangs and then
+        // ends every console host, terminal shell and process they started that is still
+        // running. Started FIRST so a main thread that blocks in a disposer is still
+        // force-ended, and outside the dispose race so it always runs. The quit moment it
+        // records is the start of the shutdown; no terminal is created after it. What it
+        // saw and ended is written to QUIT_TRACE_FILE in the log folder.
+        terminalService.beginShutdown()
+        const quitHelper = startConptyHostReaper({
+          shells: terminalService.getLiveShells(),
+          tracePath: join(loggingService.getLogsDir(), QUIT_TRACE_FILE),
+          treeKillSkipped: terminalService.treeKillSkipped()
+        })
+        launcherDone = quitHelper.launcherDone
+        logger.info('App quitting, cleaning up services', {
+          quitHelperStarted: quitHelper.started,
+          quitTrace: QUIT_TRACE_FILE
+        })
+      },
+      // Priority: lock release runs first and alone, so the next launch can open
+      // the project without waiting for heartbeat staleness — but bounded, so a
+      // disposer that never settles cannot strand the process short of app.exit(0).
+      () =>
+        disposeWithin(
+          'projectLockService.dispose()',
+          () => projectLockService.dispose(),
+          LOCK_DISPOSE_TIMEOUT_MS
+        ),
+      // Best-effort: the remaining disposers run together, bounded by the same
+      // helper the lock release uses — so the timer is cleared on both branches and
+      // a timeout leaves a log line instead of passing silently.
+      // `Promise.allSettled` swallows individual failures so one bad disposer
+      // can't cancel the others.
+      () =>
+        disposeWithin(
+          'best-effort disposers',
+          async () => {
+            await Promise.allSettled([
+              fileWatcherService.dispose(),
+              directoryWatcherService.dispose(),
+              terminalService.dispose(),
+              claudeStatusHandlers ? claudeStatusHandlers.dispose() : Promise.resolve(),
+              previewHandlers ? previewHandlers.dispose() : Promise.resolve(),
+              gitWatcherService.dispose(),
+              gitStatusService.dispose(),
+              // Abort an in-flight model download so its temp file is removed now.
+              whisperModelManager.dispose()
+            ])
+          },
+          SHUTDOWN_TIMEOUT_MS
+        ),
+      // Sync disposer — always runs after the race
+      () => {
+        gitPollingService.dispose()
+        // electron-log writes synchronously, so this line is on disk before the process exits
+        logger.info('App quit: disposers done, exiting')
+      },
+      // Last: the quit helper's launcher is inside libuv's kill-on-close job until it has
+      // started the helper, so wait for it (bounded; it is usually long done by now). Only
+      // the launcher is waited for, never the helper (#305)
+      async () => {
+        const { settled, waitedMs } = await waitBounded(launcherDone, LAUNCHER_WAIT_MS)
+        logger.info('App quit: quit helper launcher wait', { settled, waitedMs })
+      }
+    ],
+    () => app.exit(0),
+    (error) =>
+      logger.error('App quit: a shutdown step threw', error instanceof Error ? error : undefined, {
+        error: error instanceof Error ? error.message : String(error)
+      })
   )
-
-  // Best-effort: the remaining disposers run together, bounded by the same
-  // helper the lock release uses — so the timer is cleared on both branches and
-  // a timeout leaves a log line instead of passing silently.
-  // `Promise.allSettled` swallows individual failures so one bad disposer
-  // can't cancel the others.
-  await disposeWithin(
-    'best-effort disposers',
-    async () => {
-      await Promise.allSettled([
-        fileWatcherService.dispose(),
-        directoryWatcherService.dispose(),
-        terminalService.dispose(),
-        claudeStatusHandlers ? claudeStatusHandlers.dispose() : Promise.resolve(),
-        previewHandlers ? previewHandlers.dispose() : Promise.resolve(),
-        gitWatcherService.dispose(),
-        gitStatusService.dispose()
-      ])
-    },
-    SHUTDOWN_TIMEOUT_MS
-  )
-
-  // Sync disposer — always runs after the race
-  gitPollingService.dispose()
-
-  app.exit(0)
 })
 
 // In this file you can include the rest of your app's specific main process

@@ -405,7 +405,8 @@ export function useScrollSync(options: UseScrollSyncOptions): UseScrollSyncRetur
       const { isAnySplitMode: split, isEditorReady: ready } = syncGateRef.current
       if (!split || !ready) return
 
-      if (info.reason === 'diagram') {
+      // A diagram drawn or an image arrived: content moved after the commit
+      if (info.reason === 'diagram' || info.reason === 'image') {
         scheduleLateRebuild()
         return
       }

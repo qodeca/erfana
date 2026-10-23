@@ -93,4 +93,20 @@ describe('useSettingsStore', () => {
       expect(useSettingsStore.getState().isOpen).toBe(true)
     })
   })
+
+  describe('opening a section (#250)', () => {
+    it('remembers the requested section, and a plain open clears it', () => {
+      useSettingsStore.getState().openSettings({ section: 'import-tools' })
+      expect(useSettingsStore.getState()).toMatchObject({ isOpen: true, focusSection: 'import-tools' })
+
+      useSettingsStore.getState().openSettings()
+      expect(useSettingsStore.getState().focusSection).toBeNull()
+    })
+
+    it('closing clears the requested section', () => {
+      useSettingsStore.getState().openSettings({ section: 'import-tools' })
+      useSettingsStore.getState().closeSettings()
+      expect(useSettingsStore.getState()).toMatchObject({ isOpen: false, focusSection: null })
+    })
+  })
 })

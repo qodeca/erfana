@@ -49,7 +49,8 @@ vi.mock('fs/promises', () => ({
   readdir: (...args: unknown[]) => mockReaddir(...args),
   chmod: (...args: unknown[]) => mockChmod(...args),
   unlink: (...args: unknown[]) => mockUnlink(...args),
-  rename: vi.fn()
+  rename: vi.fn(),
+  stat: vi.fn()
 }))
 
 // `fs` (sync) for `createReadStream` used by streaming SHA in verifyAllFiles
@@ -108,7 +109,14 @@ vi.mock('./whisper-assets', () => ({
   MANIFEST_SIG_URL: 'https://example.invalid/manifest.json.minisig',
   MANIFEST_URL: 'https://example.invalid/manifest.json',
   MIN_REVISION_INDEX: 1,
-  MODEL_MAX_BYTES: 2 * 1024 * 1024 * 1024,
+  MODEL_SIZE_MARGIN_BYTES: 1024,
+  MODEL_PINS: {
+    tiny: { remoteFilename: 'ggml-tiny.bin', sizeBytes: 1000, sha256: 'a'.repeat(64) },
+    base: { remoteFilename: 'ggml-base.bin', sizeBytes: 2000, sha256: 'b'.repeat(64) },
+    small: { remoteFilename: 'ggml-small.bin', sizeBytes: 3000, sha256: 'c'.repeat(64) },
+    medium: { remoteFilename: 'ggml-medium.bin', sizeBytes: 4000, sha256: 'd'.repeat(64) },
+    large: { remoteFilename: 'ggml-large-v3.bin', sizeBytes: 5000, sha256: 'e'.repeat(64) }
+  },
   SCHEMA_SENTINEL_FILENAME: '.schema-version',
   SCHEMA_VERSION: 1,
   artifactUrl: (filename: string) => `https://example.invalid/${filename}`,
@@ -195,10 +203,6 @@ function arrangeDefaults(opts: {
   mockDownloadToFile.mockResolvedValue(undefined)
 
   // verifyManifest passes with primary key.
-  mockVerifyManifest.mockResolvedValue({
-    signingKeyRole: 'primary',
-    signingKeyId: 'test-key-id'
-  })
 
   const manifestBody = {
     schemaVersion: 1,
@@ -227,6 +231,12 @@ function arrangeDefaults(opts: {
   //   - manifest.json path → return manifest JSON bytes
   //   - .last-seen-revision → return sentinel or reject ENOENT
   //   - schema-version sentinel → reject ENOENT (triggers slow path)
+  mockVerifyManifest.mockResolvedValue({
+    signingKeyRole: 'primary',
+    signingKeyId: 'test-key-id',
+    content: Buffer.from(JSON.stringify(manifestBody))
+  })
+
   mockReadFile.mockImplementation(async (p: string) => {
     if (typeof p === 'string' && p.includes('manifest.json') && !p.includes('.minisig')) {
       return JSON.stringify(manifestBody)

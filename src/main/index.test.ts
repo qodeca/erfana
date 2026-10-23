@@ -3,6 +3,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { APP_ID } from '../shared/constants'
 
 /**
  * Main Process Window Creation Tests
@@ -20,6 +21,17 @@ import { join } from 'node:path'
  * applies when the import is genuinely slow; a hung test still fails.
  */
 vi.setConfig({ testTimeout: 20_000 })
+
+/**
+ * The quit helper is mocked for the whole file: the real one would start PowerShell on
+ * Windows, take the test runner for the app, end its console hosts and force-end it
+ * after the grace period (#305). One test replaces it with its own mock.
+ */
+const reaperMock = (): Record<string, unknown> => ({
+  QUIT_TRACE_FILE: 'quit-cleanup.log',
+  startConptyHostReaper: vi.fn(() => ({ started: false, launcherDone: Promise.resolve() }))
+})
+vi.mock('./services/conptyHostReaper', () => reaperMock())
 
 /** Renderer token file — the source of truth for the window's paint colour. */
 const DESIGN_TOKENS_PATH = join(__dirname, '../renderer/src/styles/design-tokens.css')
@@ -216,7 +228,11 @@ describe('Main Process - Window Creation', () => {
     vi.doMock('./services/TerminalService', () => ({
       terminalService: {
         dispose: vi.fn(),
-        cleanupForWebContentsId: vi.fn() // issue #59
+        cleanupForWebContentsId: vi.fn(), // issue #59
+        allowDiagnostics: vi.fn(), // #305
+        beginShutdown: vi.fn(),
+        getLiveShells: vi.fn(() => []),
+        treeKillSkipped: vi.fn(() => false)
       }
     }))
     vi.doMock('./services/SettingsService', () => ({
@@ -251,14 +267,14 @@ describe('Main Process - Window Creation', () => {
       registerDocumentImportHandlers: vi.fn()
     }))
     vi.doMock('./services/import', () => ({
-      DependencyDetector: vi.fn().mockImplementation(() => ({
-        detect: vi.fn().mockResolvedValue({ libreOffice: false, imageMagick: false })
-      })),
-      converterRegistry: {
-        updateConverterExtensions: vi.fn(),
-        getExtensionsByConversionType: vi.fn().mockReturnValue({ requiresConversion: ['pdf'], passthrough: [] })
-      },
-      getExtensionsForDependencies: vi.fn().mockReturnValue([])
+      killActiveLibreOfficeProbes: vi.fn(),
+      importToolStatusService: {
+        getStatus: vi.fn().mockResolvedValue({
+          libreOffice: 'missing',
+          extensions: ['pdf'],
+          throttled: false
+        })
+      }
     }))
     vi.doMock('../shared/ipc/import-channels', () => ({
       IMPORT_CHANNELS: {
@@ -301,6 +317,8 @@ describe('Main Process - Window Creation', () => {
       loggingService: {
         initialize: vi.fn(() => Promise.resolve()),
         cleanupOldLogs: vi.fn(() => Promise.resolve()),
+        // the quit step reads it for the quit-helper trace path (#305)
+        getLogsDir: vi.fn(() => '/tmp/erfana-test-logs'),
         info: vi.fn(),
         debug: vi.fn(),
         warn: vi.fn(),
@@ -985,6 +1003,18 @@ describe('Main Process - Window Creation', () => {
       }
     })
 
+    it('should kill any in-flight LibreOffice probe, since app.exit skips will-quit', async () => {
+      const { killActiveLibreOfficeProbes } = (await import('./services/import')) as any
+      const { run, cleanup } = await loadAndGetBeforeQuit()
+
+      try {
+        await run({ preventDefault: vi.fn() })
+        expect(killActiveLibreOfficeProbes).toHaveBeenCalledTimes(1)
+      } finally {
+        cleanup()
+      }
+    })
+
     it('should release the project lock before the best-effort disposers', async () => {
       const { projectLockService } = (await import('./services/ProjectLockService')) as any
       const { terminalService } = (await import('./services/TerminalService')) as any
@@ -1023,6 +1053,36 @@ describe('Main Process - Window Creation', () => {
         expect(mockApp.exit).toHaveBeenCalledWith(0)
       } finally {
         cleanup()
+      }
+    })
+
+    it('waits at most 3 s for the quit-helper launcher, last, and logs the wait (#305)', async () => {
+      vi.doMock('./services/conptyHostReaper', () => ({
+        QUIT_TRACE_FILE: 'quit-cleanup.log',
+        startConptyHostReaper: vi.fn(() => ({ started: true, launcherDone: new Promise<void>(() => {}) }))
+      }))
+      const { logger } = (await import('./services/LoggingService')) as any
+      const { run, cleanup } = await loadAndGetBeforeQuit()
+
+      try {
+        vi.useFakeTimers()
+        const shutdown = run({ preventDefault: vi.fn() })
+        await vi.advanceTimersByTimeAsync(2_999)
+        expect(mockApp.exit).not.toHaveBeenCalled()
+        await vi.advanceTimersByTimeAsync(1)
+        await shutdown
+
+        expect(mockApp.exit).toHaveBeenCalledWith(0)
+        const waitLog = logger.info.mock.calls.find(([m]: [string]) => m === 'App quit: quit helper launcher wait')
+        expect(waitLog?.[1]).toEqual({ settled: false, waitedMs: 3_000 })
+        // the wait comes after the disposers
+        const order = logger.info.mock.calls.map(([m]: [string]) => m)
+        expect(order.indexOf('App quit: disposers done, exiting')).toBeLessThan(
+          order.indexOf('App quit: quit helper launcher wait')
+        )
+      } finally {
+        cleanup()
+        vi.doMock('./services/conptyHostReaper', () => reaperMock())
       }
     })
 
@@ -1119,6 +1179,25 @@ describe('Main Process - Window Creation', () => {
     })
   })
 
+  describe('Tree-kill diagnostics switch (#305)', () => {
+    it('allows the switch in a dev build', async () => {
+      mockApp.isPackaged = false
+      await import('./index')
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      const { terminalService } = await import('./services/TerminalService')
+      expect(terminalService.allowDiagnostics).toHaveBeenCalledWith(true)
+    })
+
+    it('never allows it in a packaged build', async () => {
+      mockApp.isPackaged = true
+      await import('./index')
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      const { terminalService } = await import('./services/TerminalService')
+      expect(terminalService.allowDiagnostics).toHaveBeenCalledWith(false)
+      expect(terminalService.allowDiagnostics).not.toHaveBeenCalledWith(true)
+    })
+  })
+
   describe('Application Menu Configuration', () => {
     it('should set application menu on startup', async () => {
       mockIs.dev = false
@@ -1135,6 +1214,17 @@ describe('Main Process - Window Creation', () => {
       // Verify Menu.setApplicationMenu was called with the menu
       expect(Menu.setApplicationMenu).toHaveBeenCalledTimes(1)
       expect(Menu.setApplicationMenu).toHaveBeenCalledWith({})
+    })
+  })
+
+  describe('Windows AppUserModelID', () => {
+    it('sets the AppUserModelID to the installer appId', async () => {
+      mockIs.dev = false
+
+      await import('./index')
+
+      const { electronApp } = await import('@electron-toolkit/utils')
+      expect(electronApp.setAppUserModelId).toHaveBeenCalledWith(APP_ID)
     })
   })
 

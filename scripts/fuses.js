@@ -422,6 +422,51 @@ function pruneForeignNodePtyPrebuilds(resourcesDir, platform, archEnum, { requir
 }
 
 /**
+ * Windows only (#305): the shipped app must load the source-built, patched
+ * `build/Release/conpty.node`, never the unpatched prebuild that node-pty falls
+ * back to when build/Release is absent or fails to load.
+ *
+ * Throws when build/Release/conpty.node (or conpty_console_list.node) is missing,
+ * then deletes conpty.node and conpty_console_list.node from every kept
+ * `prebuilds/win32-*` dir so the unpatched fallback cannot happen. The prebuild's
+ * pty.node (winpty) is left alone.
+ *
+ * @param {string} resourcesDir - dir containing `app.asar` + `app.asar.unpacked/` (or `app/`); see packedPayloadDir
+ * @param {string} platform - context.electronPlatformName
+ * @param {object} [options]
+ * @param {boolean} [options.requireMatch=false] - throw (instead of warn) when the build is absent
+ */
+function ensurePatchedConptyBuild(resourcesDir, platform, { requireMatch = false } = {}) {
+  if (platform !== 'win32') return;
+  const ptyDir = path.join(packedPayloadDir(resourcesDir), 'node_modules', 'node-pty');
+  const releaseDir = path.join(ptyDir, 'build', 'Release');
+  const addons = ['conpty.node', 'conpty_console_list.node'];
+  const missing = addons.filter((n) => !fs.existsSync(path.join(releaseDir, n)));
+  if (missing.length > 0) {
+    const message =
+      `node-pty build/Release is missing ${missing.join(', ')} under ${releaseDir}. ` +
+      `The patched conpty.node (#305) must be source-built and packed; refusing to ship the unpatched prebuild.`;
+    if (requireMatch) throw new Error(message);
+    console.warn(`⚠️  ${message}`);
+    return;
+  }
+  const prebuildsDir = path.join(ptyDir, 'prebuilds');
+  if (!fs.existsSync(prebuildsDir)) return;
+  let removed = 0;
+  for (const entry of fs.readdirSync(prebuildsDir, { withFileTypes: true })) {
+    if (!entry.isDirectory() || entry.isSymbolicLink() || !entry.name.startsWith('win32-')) continue;
+    for (const n of addons) {
+      const target = path.join(prebuildsDir, entry.name, n);
+      if (fs.existsSync(target)) {
+        fs.rmSync(target, { force: true });
+        removed++;
+      }
+    }
+  }
+  console.log(`✅ node-pty: build/Release conpty.node present; removed ${removed} prebuild conpty addon(s)`);
+}
+
+/**
  * Suffix every test build's product name must carry. `build:mac:test` sets it
  * through `-c.productName`, so electron-builder names the bundle (and the DMG)
  * itself. The bundle used to be renamed here in afterPack, but electron-builder
@@ -2185,6 +2230,7 @@ async function afterPack(context) {
     const requireMatch = context.electronPlatformName === process.platform;
     pruneForeignFfprobeBinaries(packedResourcesDir, context.electronPlatformName, context.arch, { requireMatch });
     pruneForeignNodePtyPrebuilds(packedResourcesDir, context.electronPlatformName, context.arch, { requireMatch });
+    ensurePatchedConptyBuild(packedResourcesDir, context.electronPlatformName, { requireMatch });
   }
 
   // Restore execute bit on node-pty's spawn-helper before code-signing so
@@ -2280,6 +2326,7 @@ module.exports.chmodNodePtySpawnHelper = chmodNodePtySpawnHelper;
 module.exports.ensurePackedMediaBinaries = ensurePackedMediaBinaries;
 module.exports.pruneForeignFfprobeBinaries = pruneForeignFfprobeBinaries;
 module.exports.pruneForeignNodePtyPrebuilds = pruneForeignNodePtyPrebuilds;
+module.exports.ensurePatchedConptyBuild = ensurePatchedConptyBuild;
 module.exports.SPAWN_HELPER_MODE = SPAWN_HELPER_MODE;
 module.exports.MEDIA_BINARY_MIN_BYTES = MEDIA_BINARY_MIN_BYTES;
 module.exports.assertPackagedAppContents = assertPackagedAppContents;

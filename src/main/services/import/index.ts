@@ -38,7 +38,12 @@ export { isConfigurableConverter } from './types'
 export { ConverterRegistry, createConverterRegistry, converterRegistry } from './ConverterRegistry'
 
 // Dependency detection
-export { DependencyDetector } from './DependencyDetector'
+export { DependencyDetector, killActiveLibreOfficeProbes } from './DependencyDetector'
+export {
+  ImportToolStatusService,
+  importToolStatusService,
+  missingToolsDialogMessage
+} from './ImportToolStatusService'
 
 // Language mapping
 export { isoToTessLang } from './isoToTessLang'

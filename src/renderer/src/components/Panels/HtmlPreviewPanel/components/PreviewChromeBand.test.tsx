@@ -387,7 +387,7 @@ describe('PreviewChromeBand', () => {
     const user = userEvent.setup()
     renderBand({
       blockedHosts: [host('a.example.com'), host('b.example.com')],
-      allowedHosts: ['old.example.com']
+      allowedHosts: ['https://old.example.com']
     })
     await user.click(screen.getByTestId('preview-band-chip'))
     await user.click(screen.getByRole('button', { name: 'Allow https://a.example.com' }))

@@ -81,6 +81,7 @@ const mockReaddir = vi.fn()
 const mockUnlink = vi.fn()
 const mockRename = vi.fn()
 const mockRm = vi.fn()
+const mockStat = vi.fn()
 const mockReadFile = vi.fn()
 const mockWriteFile = vi.fn()
 
@@ -92,6 +93,7 @@ vi.mock('fs/promises', () => ({
   unlink: (...args: unknown[]) => mockUnlink(...args),
   rename: (...args: unknown[]) => mockRename(...args),
   rm: (...args: unknown[]) => mockRm(...args),
+  stat: (...args: unknown[]) => mockStat(...args),
   readFile: (...args: unknown[]) => mockReadFile(...args),
   writeFile: (...args: unknown[]) => mockWriteFile(...args),
   copyFile: vi.fn()
@@ -108,6 +110,21 @@ import { Readable } from 'stream'
 
 function makeBytesStream(buf: Buffer): NodeJS.ReadableStream {
   return Readable.from([buf])
+}
+
+/** Pinned sizes of the mocked MODEL_PINS (see the whisper-assets mock). */
+const MOCK_MODEL_SIZES: Record<string, number> = {
+  'ggml-tiny.bin': 1000,
+  'ggml-base.bin': 2000,
+  'ggml-small.bin': 3000,
+  'ggml-medium.bin': 4000,
+  'ggml-large.bin': 5000
+}
+
+/** `stat` for model files returns the pinned size, so they count as installed. */
+async function defaultStat(p: string): Promise<{ size: number; mtimeMs: number; ino: number }> {
+  const name = p.split(/[\\/]/).pop() ?? ''
+  return { size: MOCK_MODEL_SIZES[name] ?? 1, mtimeMs: 1, ino: 1 }
 }
 
 const mockCreateReadStream = vi.fn((p: string) => {
@@ -226,7 +243,14 @@ vi.mock('./whisper-assets', () => ({
   MANIFEST_SIG_URL: 'https://example.invalid/manifest.json.minisig',
   MANIFEST_URL: 'https://example.invalid/manifest.json',
   MIN_REVISION_INDEX: 1,
-  MODEL_MAX_BYTES: 2 * 1024 * 1024 * 1024,
+  MODEL_SIZE_MARGIN_BYTES: 1024,
+  MODEL_PINS: {
+    tiny: { remoteFilename: 'ggml-tiny.bin', sizeBytes: 1000, sha256: 'a'.repeat(64) },
+    base: { remoteFilename: 'ggml-base.bin', sizeBytes: 2000, sha256: 'b'.repeat(64) },
+    small: { remoteFilename: 'ggml-small.bin', sizeBytes: 3000, sha256: 'c'.repeat(64) },
+    medium: { remoteFilename: 'ggml-medium.bin', sizeBytes: 4000, sha256: 'd'.repeat(64) },
+    large: { remoteFilename: 'ggml-large-v3.bin', sizeBytes: 5000, sha256: 'e'.repeat(64) }
+  },
   RELEASE_URL_BASE: 'https://example.invalid',
   SCHEMA_SENTINEL_FILENAME: '.schema-version',
   SCHEMA_VERSION: 1,
@@ -285,10 +309,6 @@ function arrangeFreshInstall(opts: {
   mockAccess.mockRejectedValue(enoent)
 
   mockDownloadToFile.mockResolvedValue(undefined)
-  mockVerifyManifest.mockResolvedValue({
-    signingKeyRole: 'primary',
-    signingKeyId: 'test-key-id'
-  })
 
   const manifestBody = {
     schemaVersion: 1,
@@ -313,6 +333,12 @@ function arrangeFreshInstall(opts: {
     signingKey: 'primary' as const
   }
 
+  mockVerifyManifest.mockResolvedValue({
+    signingKeyRole: 'primary',
+    signingKeyId: 'test-key-id',
+    content: Buffer.from(JSON.stringify(manifestBody))
+  })
+
   mockReadFile.mockImplementation(async (p: string) => {
     if (typeof p === 'string' && p.includes('manifest.json') && !p.includes('.minisig')) {
       return JSON.stringify(manifestBody)
@@ -334,6 +360,7 @@ function arrangeFreshInstall(opts: {
   mockChmod.mockResolvedValue(undefined)
   mockUnlink.mockResolvedValue(undefined)
   mockRename.mockResolvedValue(undefined)
+  mockStat.mockImplementation(defaultStat)
 
   // execFile (used for macOS xattr strip) — no-op success.
   mockExecFile.mockImplementation((...args: unknown[]) => {
@@ -360,6 +387,7 @@ describe('WhisperModelManager', () => {
     mockChmod.mockResolvedValue(undefined)
     mockUnlink.mockResolvedValue(undefined)
     mockRename.mockResolvedValue(undefined)
+    mockStat.mockImplementation(defaultStat)
     mockRm.mockResolvedValue(undefined)
     mockWriteFile.mockResolvedValue(undefined)
     mockExecFile.mockImplementation((...args: unknown[]) => {
@@ -659,6 +687,54 @@ describe('WhisperModelManager', () => {
       expect(result).toBe(WHISPER_BIN_DARWIN)
     })
 
+    it('parses the verified bytes, not the file on disk', async () => {
+      arrangeFreshInstall({ manifestRevisionIndex: 1, lastSeenRevisionOnDisk: null, platform: 'darwin-universal' })
+      // The file on disk now claims a far higher revision than what was verified.
+      const onDisk = mockReadFile.getMockImplementation()!
+      mockReadFile.mockImplementation(async (p: string, ...rest: unknown[]) => {
+        if (typeof p === 'string' && p.includes('manifest.json') && !p.includes('.minisig')) {
+          const body = JSON.parse(await onDisk(p, ...rest)) as { revisionIndex: number }
+          return JSON.stringify({ ...body, revisionIndex: 999 })
+        }
+        return onDisk(p, ...rest)
+      })
+      const { createWhisperModelManager } = await import('./WhisperModelManager')
+      await createWhisperModelManager().ensureBinary()
+      expect(mockWriteFile).toHaveBeenCalledWith(
+        expect.stringContaining('.last-seen-revision'),
+        '1',
+        'utf8'
+      )
+    })
+
+    it.each([
+      ['a non-integer revisionIndex', (m: Record<string, unknown>) => ({ ...m, revisionIndex: 1.5 })],
+      ['a string revisionIndex', (m: Record<string, unknown>) => ({ ...m, revisionIndex: '2' })],
+      ['a missing artifacts block', (m: Record<string, unknown>) => ({ ...m, artifacts: undefined })],
+      [
+        'a malformed artifact sha256',
+        (m: Record<string, unknown>) => ({
+          ...m,
+          artifacts: {
+            ...(m.artifacts as object),
+            macosUniversal: { filename: 'x', sha256: 'nothex', size: 1 }
+          }
+        })
+      ]
+    ])('rejects %s in the verified manifest', async (_label, mutate) => {
+      arrangeFreshInstall({ manifestRevisionIndex: 1, lastSeenRevisionOnDisk: null, platform: 'darwin-universal' })
+      const result = (await mockVerifyManifest()) as { content: Buffer }
+      const body = JSON.parse(result.content.toString('utf8')) as Record<string, unknown>
+      mockVerifyManifest.mockResolvedValue({
+        ...result,
+        content: Buffer.from(JSON.stringify(mutate(body)))
+      })
+      const { createWhisperModelManager } = await import('./WhisperModelManager')
+      await expect(createWhisperModelManager().ensureBinary()).rejects.toMatchObject({
+        code: 'WHISPER_MANIFEST_INVALID'
+      })
+    })
+
     it('runs the 9-step install flow with zip extraction on win32-x64', async () => {
       arrangeFreshInstall({ manifestRevisionIndex: 1, lastSeenRevisionOnDisk: null, platform: 'win32-x64' })
       const { createWhisperModelManager } = await import('./WhisperModelManager')
@@ -778,6 +854,52 @@ describe('WhisperModelManager', () => {
       expect(result).toBe(MODEL_TINY)
     })
 
+    it('passes the pinned SHA-256 and a size cap that fits the model', async () => {
+      const err = Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+      mockAccess.mockRejectedValue(err)
+      mockDownloadToFile.mockResolvedValue(undefined)
+      const { createWhisperModelManager } = await import('./WhisperModelManager')
+      const manager = createWhisperModelManager()
+      await manager.ensureModel('tiny')
+      expect(mockDownloadToFile).toHaveBeenCalledWith(
+        expect.objectContaining({ expectedSha256: 'a'.repeat(64), maxBytes: 1000 + 1024 })
+      )
+    })
+
+    it('downloads the large model from ggml-large-v3.bin into ggml-large.bin', async () => {
+      const err = Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+      mockAccess.mockRejectedValue(err)
+      mockDownloadToFile.mockResolvedValue(undefined)
+      const { createWhisperModelManager } = await import('./WhisperModelManager')
+      const manager = createWhisperModelManager()
+      await manager.ensureModel('large')
+      expect(mockDownloadToFile).toHaveBeenCalledWith(
+        expect.objectContaining({
+          url: 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3.bin',
+          expectedSha256: 'e'.repeat(64)
+        })
+      )
+      expect(mockRename).toHaveBeenCalledWith(
+        expect.stringContaining('ggml-large.bin.download-'),
+        expect.stringMatching(/ggml-large\.bin$/)
+      )
+    })
+
+    it('refuses a hash mismatch, removes the temp file and never installs it', async () => {
+      const err = Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+      mockAccess.mockRejectedValue(err)
+      const { SecureDownloaderError } = await import('../utils/secureDownloader')
+      mockDownloadToFile.mockRejectedValue(new SecureDownloaderError('SHA-256 mismatch'))
+      const { createWhisperModelManager } = await import('./WhisperModelManager')
+      const manager = createWhisperModelManager()
+      await expect(manager.ensureModel('tiny')).rejects.toMatchObject({
+        code: 'WHISPER_MODEL_DOWNLOAD_FAILED'
+      })
+      expect(mockUnlink).toHaveBeenCalledWith(expect.stringContaining('.download-'))
+      expect(mockRename).not.toHaveBeenCalled()
+      expect(manager.getModelInfo('tiny').installed).toBe(false)
+    })
+
     it('reports download progress via callback in the wrapping shape', async () => {
       const err = Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
       mockAccess.mockRejectedValue(err)
@@ -822,7 +944,7 @@ describe('WhisperModelManager', () => {
         code: 'WHISPER_MODEL_DOWNLOAD_FAILED'
       })
       expect(mockUnlink).toHaveBeenCalledWith(
-        expect.stringContaining('.download-test-uuid-1234')
+        expect.stringContaining('-test-uuid-1234')
       )
     })
 

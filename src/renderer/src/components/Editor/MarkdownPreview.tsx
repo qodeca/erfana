@@ -48,6 +48,8 @@ import { useIdleDebouncedValue } from '../../hooks/useIdleDebouncedValue'
 import { rehypeCollectLinks, rehypeHeadingIds, rehypeShiftLines } from './previewRehypePlugins'
 import { PreviewWorkContext, PreviewWorkTracker } from './previewWork'
 import { LinkTargetCache } from './linkTargetCache'
+import { MarkdownImage, MarkdownImageStoreContext, MARKDOWN_IMAGE_SETTLED_EVENT } from './MarkdownImage'
+import { MarkdownImageStore } from './markdownImageStore'
 import './MarkdownPreview.css'
 import { fileGateway } from '../../services/fileGateway'
 
@@ -83,8 +85,10 @@ export interface PreviewRenderedInfo {
    * `content`: a new version of the document was committed – images in it
    * may still be loading and diagrams still drawing. `diagram`: a Mermaid
    * diagram finished drawing (or failed to) and may have changed height.
+   * `image`: a project image (#71) arrived, was refreshed, or was replaced by
+   * its placeholder, and may have changed height.
    */
-  reason: 'content' | 'diagram'
+  reason: 'content' | 'diagram' | 'image'
 }
 
 interface MarkdownPreviewProps {
@@ -102,7 +106,7 @@ interface MarkdownPreviewProps {
   onRendered?: (info: PreviewRenderedInfo) => void
   /**
    * Whether the panel is on screen (default true). A hidden preview holds its
-   * link re-checks until it is shown again.
+   * link re-checks and image reads until it is shown again.
    */
   isVisible?: boolean
 }
@@ -510,23 +514,31 @@ function createMarkdownComponents(
       </a>
     )
   },
-  // Custom img component with explicit attribute handling
-  // Ensures src, alt, title, width, height are preserved with line tracking
+  // Images (#71): a project-relative `src` is never handed to the DOM – the
+  // page's base is the app bundle – but read main-side and shown as a `data:`
+  // URL; see MarkdownImage. The store arrives through context, so this map
+  // stays stable.
   img({ node, src, alt, title, width, height, ...props }: { node?: unknown; src?: string; alt?: string; title?: string; width?: number | string; height?: number | string } & Record<string, unknown>) {
     const range = extractRange(node)
     return (
-      <img
+      <MarkdownImage
         src={src}
         alt={alt}
         title={title}
         width={width}
         height={height}
-        data-line-start={range?.start}
-        data-line-end={range?.end}
-        data-line={range?.start}
-        {...props}
+        lineStart={range?.start}
+        lineEnd={range?.end}
+        rest={props}
       />
     )
+  },
+  // `<picture><source srcset>` is never rendered (#71): a srcset is resolved
+  // by the page like an img src, and the sanitizer does not check its scheme.
+  // Without it the picture falls back to its <img>, which goes through
+  // MarkdownImage.
+  source(_props: { node?: unknown } & Record<string, unknown>): JSX.Element | null {
+    return null
   },
   // Horizontal rule with line tracking
   hr: withRange('hr'),
@@ -846,6 +858,23 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
       linkTargets.setVisible(isVisible)
     }, [linkTargets, isVisible])
 
+    // Project images (#71): read main-side, re-checked on the same watcher
+    // signals as the links, held while hidden. One store per panel.
+    // Seeded here, not only in the effects below: the images subscribe (and
+    // start reading) before this component's effects run.
+    const [imageStore] = useState(() => {
+      const store = new MarkdownImageStore()
+      store.setDocument(filePath)
+      store.setVisible(isVisible)
+      return store
+    })
+    useEffect(() => {
+      imageStore.setDocument(filePath)
+    }, [imageStore, filePath])
+    useEffect(() => {
+      imageStore.setVisible(isVisible)
+    }, [imageStore, isVisible])
+
     /**
      * Resolve the document's internal links (tooltips, broken-link styling)
      * when the set of links or the file changes, or when the file structure
@@ -1142,8 +1171,14 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
       const root = previewRef.current
       if (!root) return
       const handler = (): void => onRenderedRef.current?.({ root, reason: 'diagram' })
+      // Images arrive (and refresh) after the commit too (#71)
+      const imageHandler = (): void => onRenderedRef.current?.({ root, reason: 'image' })
       root.addEventListener('mermaid:rendered', handler)
-      return () => root.removeEventListener('mermaid:rendered', handler)
+      root.addEventListener(MARKDOWN_IMAGE_SETTLED_EVENT, imageHandler)
+      return () => {
+        root.removeEventListener('mermaid:rendered', handler)
+        root.removeEventListener(MARKDOWN_IMAGE_SETTLED_EVENT, imageHandler)
+      }
     }, [])
 
     const handleMouseUp = (e: React.MouseEvent) => {
@@ -1259,16 +1294,18 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
             raw), heading ids, frontmatter line shift. See buildRehypePlugins.
           */}
           <PreviewWorkContext.Provider value={previewWork}>
-            <ResolvedLinksContext.Provider value={resolvedLinks}>
-              <MarkdownBody
-                source={body}
-                lineOffset={frontmatterLineCount}
-                remarkPlugins={remarkPlugins}
-                components={markdownComponents}
-                linkSink={linkSink}
-                onCommit={handleBodyCommit}
-              />
-            </ResolvedLinksContext.Provider>
+            <MarkdownImageStoreContext.Provider value={imageStore}>
+              <ResolvedLinksContext.Provider value={resolvedLinks}>
+                <MarkdownBody
+                  source={body}
+                  lineOffset={frontmatterLineCount}
+                  remarkPlugins={remarkPlugins}
+                  components={markdownComponents}
+                  linkSink={linkSink}
+                  onCommit={handleBodyCommit}
+                />
+              </ResolvedLinksContext.Provider>
+            </MarkdownImageStoreContext.Provider>
           </PreviewWorkContext.Provider>
         </div>
 

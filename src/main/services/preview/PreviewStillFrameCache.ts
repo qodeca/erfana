@@ -254,14 +254,6 @@ export class PreviewStillFrameCache implements IPreviewStillFrameCache {
       return
     }
 
-    const downscaled = this.downscale(image)
-    const dataUrl = downscaled.toDataURL()
-
-    // Over the data-URL budget ⇒ NO frame (never a partial/blank one).
-    if (dataUrl.length > this.maxDataUrlChars) {
-      return
-    }
-
     /*
      * LAST CHANCE TO THROW THE RESULT AWAY, and it is the only defence against
      * poisoning a good frame with a bad one.
@@ -287,6 +279,14 @@ export class PreviewStillFrameCache implements IPreviewStillFrameCache {
       logger.debug('Preview still frame: kept the existing frame, view went away mid-capture', {
         panelId: stablePathDigest(panelId)
       })
+      return
+    }
+
+    const downscaled = this.downscale(image)
+    const dataUrl = downscaled.toDataURL()
+
+    // Over the data-URL budget ⇒ NO frame (never a partial/blank one).
+    if (dataUrl.length > this.maxDataUrlChars) {
       return
     }
 

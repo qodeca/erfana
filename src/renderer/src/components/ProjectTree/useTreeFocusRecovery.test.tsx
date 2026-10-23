@@ -5,14 +5,26 @@
  * focused row is removed by a rename or delete. The end-to-end path (context
  * menu → dialog → tree refresh) is in e2e/dialog-focus-and-recents-keyboard.e2e.ts.
  */
-import { useRef } from 'react'
+import { useLayoutEffect, useRef } from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, act, fireEvent } from '@testing-library/react'
 import { findTreeFocusFallback, useTreeFocusRecovery } from './useTreeFocusRecovery'
 
+/**
+ * A tree whose fallback focuses the row the DATA picks – the way ProjectTree
+ * wires it (there, through `moveFocusTo`, which also scrolls the row in).
+ */
 function Tree({ paths }: { paths: string[] }): JSX.Element {
   const ref = useRef<HTMLDivElement>(null)
-  useTreeFocusRecovery(ref)
+  const onFocusLost = useRef<(lostPath: string) => void>(() => {})
+  useLayoutEffect(() => {
+    const indexByPath = new Map(paths.map((p, i) => [p, i]))
+    onFocusLost.current = (lostPath: string) => {
+      const index = findTreeFocusFallback(lostPath, indexByPath)
+      if (index !== null) document.querySelector<HTMLElement>(`[data-testid="${paths[index]}"]`)?.focus()
+    }
+  })
+  useTreeFocusRecovery(ref, onFocusLost)
   return (
     <div role="tree" ref={ref}>
       {paths.map((p) => (
@@ -88,34 +100,28 @@ describe('useTreeFocusRecovery', () => {
 })
 
 describe('findTreeFocusFallback', () => {
-  function container(paths: string[]): HTMLElement {
-    const root = document.createElement('div')
-    for (const p of paths) {
-      const row = document.createElement('div')
-      row.className = 'project-tree-item'
-      row.dataset.path = p
-      root.appendChild(row)
-    }
-    return root
-  }
+  const index = (paths: string[]) => new Map(paths.map((p, i) => [p, i]))
 
-  it('prefers a row that now shows the same path', () => {
-    const root = container(['/p', '/p/a.md'])
-    expect(findTreeFocusFallback(root, '/p/a.md')?.dataset.path).toBe('/p/a.md')
+  it('prefers a row that now has the same path', () => {
+    expect(findTreeFocusFallback('/p/a.md', index(['/p', '/p/a.md']))).toBe(1)
   })
 
   it('walks up to the nearest surviving ancestor folder', () => {
-    const root = container(['/p', '/p/docs'])
-    expect(findTreeFocusFallback(root, '/p/docs/deep/a.md')?.dataset.path).toBe('/p/docs')
+    expect(findTreeFocusFallback('/p/docs/deep/a.md', index(['/p', '/p/docs']))).toBe(1)
   })
 
   it('handles Windows separators', () => {
-    const root = container(['C:\\p', 'C:\\p\\docs'])
-    expect(findTreeFocusFallback(root, 'C:\\p\\docs\\a.md')?.dataset.path).toBe('C:\\p\\docs')
+    expect(findTreeFocusFallback('C:\\p\\docs\\a.md', index(['C:\\p', 'C:\\p\\docs']))).toBe(1)
+  })
+
+  it('finds a row from the data even when it is not mounted (virtualised list)', () => {
+    // 5,000 rows, only a screenful in the DOM: the ancestor is row 4,000.
+    const paths = Array.from({ length: 5000 }, (_, i) => `/p/f${i}`)
+    expect(findTreeFocusFallback('/p/f4000/gone.md', index(paths))).toBe(4000)
   })
 
   it('falls back to the first row, and to null for an empty tree', () => {
-    expect(findTreeFocusFallback(container(['/x']), '/elsewhere/a.md')?.dataset.path).toBe('/x')
-    expect(findTreeFocusFallback(container([]), '/p/a.md')).toBeNull()
+    expect(findTreeFocusFallback('/elsewhere/a.md', index(['/x']))).toBe(0)
+    expect(findTreeFocusFallback('/p/a.md', index([]))).toBeNull()
   })
 })

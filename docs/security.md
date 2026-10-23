@@ -517,7 +517,7 @@ The overlay windows have their own, tighter channel path: `screenshot:areaSelect
 
 ## Known vulnerabilities
 
-Run `npm audit` to check. **Policy**: zero high/critical production advisories at release. Pre-release: `npm audit --omit=dev --json` and diff against the **Accepted exceptions for v0.20.1** table below.
+Run `npm audit` to check. **Policy**: zero high/critical production advisories at release. Pre-release: `npm audit --omit=dev --json` and diff against the previous release's table of accepted exceptions (the `### Accepted exceptions for v<version>` heading below). A release with no such table shipped with no accepted exceptions, so every advisory the audit reports is new.
 
 **Current state** (audited 2026-10-18, after v0.20.1): `npm audit --omit=dev` reports **0** production advisories. The four v0.20.1 highs are cleared (see below), `chokidar` 5.0.0 took `braces` (GHSA-vfj7-8cjw-p6xm) out of the production tree, and `fast-uri` moved to 3.1.8 (GHSA-hrr3-gc8f-f4qj, a lock-only update inside `ajv`'s range). The full tree (`npm audit`) reports 28 (2 critical, 11 high, 12 moderate, 3 low); all of them run only while dependencies install or the app builds, or under the test runner, and never ship.
 
@@ -578,7 +578,7 @@ The `afterSign` hook is critical: without it, macOS Sequoia+ rejects `@rpath` li
 - **File validation** – LiteParseConverter validates file type, checks for encryption, enforces 1000-page limit and 60s timeout
 - **Hard size cap** – files above `IMPORT.SIZE_HARD_LIMIT` (250 MB) are rejected with `IMPORT_EXCEEDS_SIZE_LIMIT` before any converter runs, bounding memory-bomb input to the image/PDF parsers; `LiteParseConverter.convert()` re-checks this because the document-import IPC path bypasses `ImportService` validation. This bounds input bytes, not decoded pixels — see [technical-debt.md](./technical-debt.md) for the pixel-bomb follow-up
 - **Temp dir cleanup** – Screenshot temp directories cleaned in `finally` blocks (including abort paths)
-- **Dependency isolation** – LibreOffice/ImageMagick invoked via child process with no user-controlled arguments
+- **Dependency isolation** – LibreOffice invoked via child process with no user-controlled arguments; a copy in the open project, a temporary folder, a network share or a relative PATH entry is never run (#250). It always runs headless with no window: the app's own probe is unit-tested for `--headless`, and `e2e/document-import-libreoffice-headless.e2e.ts` checks the conversion LiteParse starts itself
 - **Zod validation** – All import IPC inputs validated via Zod schemas (`import-schema.ts`)
 
 ## Document export security

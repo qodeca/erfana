@@ -35,14 +35,11 @@ import type {
 } from '../../../shared/ipc/preview-types'
 import type { PreviewFindOptions } from './PreviewFindController'
 import type { PreviewSession } from './PreviewSessionFactory'
-import {
-  PreviewLiveView,
-  type PreviewLiveViewDeps,
-  type PreviewWindowLike
-} from './PreviewLiveView'
+import type { PreviewLiveViewDeps, PreviewWindowLike } from './PreviewLiveView'
 import { PreviewViewRegistry } from './PreviewViewRegistry'
 import { createNoViewDropLog } from './previewBoundsDropLog'
 import { createPageScopeHolder, createPreviewPageScope } from './previewPageScope'
+import { createPreviewOpenDiscard, type PreviewOpenDiscard } from './previewOpenDiscard'
 import { createPreviewPanelState } from './previewPanelState'
 import { createPreviewViewEviction } from './previewViewEviction'
 import { createPreviewViewFocus } from './previewViewFocus'
@@ -66,7 +63,7 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
   /** The live-view budget: suspends the least recently active previews. */
   private readonly eviction = createPreviewViewEviction({
     registry: this.registry,
-    onSuspended: (panelId) => this.deps.emit.loadStateChanged(panelId, 'suspended', 0)
+    onSuspended: panelId => this.deps.emit.loadStateChanged(panelId, 'suspended', 0)
   })
   /** Same-tab moves, history steps and resume (issue #124, `previewViewNavigation.ts`). */
   private readonly navigation = createPreviewViewNavigation({
@@ -83,6 +80,8 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
   /** Each window's resize hold (issue #124, `previewResizeHold.ts`), dropped with the window. */
   private readonly resizeHolds: PreviewResizeHoldRegistry
   private readonly liveViewDeps: PreviewLiveViewDeps
+  /** Discards a session `open` built but never installed (`previewOpenDiscard.ts`). */
+  private readonly openDiscard: PreviewOpenDiscard
 
   constructor(private readonly deps: PreviewViewDeps) {
     // The subset a live view needs; the manager keeps `sessionFactory`,
@@ -105,11 +104,12 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
       openExternal: deps.openExternal,
       checkEligibility: deps.checkEligibility
     }
+    this.openDiscard = createPreviewOpenDiscard({ registry: deps.registry })
     this.resizeHolds = createResizeHoldRegistry({
-      views: (windowId) =>
+      views: windowId =>
         this.registry
           .all()
-          .filter((entry) => entry.windowId === windowId)
+          .filter(entry => entry.windowId === windowId)
           .map(({ view }) => ({ panelId: view.panelId, target: view.resizeHoldTarget() })),
       emit: deps.emit,
       now: () => deps.now()
@@ -188,8 +188,7 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
       // installed entry for an open still parked here and moves no generation,
       // so without this check the open resumed and built a view against a
       // destroyed window (#83). Discard rather than install a stale view.
-      pageScopes.dispose()
-      await this.discardSession(session)
+      await this.openDiscard.discardBuilt(pageScopes, session)
       return { ok: false, errorCode: ErrorCode.PREVIEW_OPEN_SUPERSEDED }
     }
 
@@ -197,34 +196,25 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
       // A resume whose own page, and the tab's own, both failed the navigation
       // gate (QG-7 item 11): there is no page this panel may show, so no view
       // is installed and the tab shows its failed state.
-      pageScopes.dispose()
-      await this.discardSession(session)
+      await this.openDiscard.discardBuilt(pageScopes, session)
       return { ok: false, errorCode: start.errorCode }
     }
 
-    // The constructor does REAL work that can throw — it builds the watch
-    // coordinator, the find controller and a chokidar entry watcher, and calls
-    // `window.contentView.addChildView`. If the host window closed during the
-    // `create()` await above, that last call throws against a destroyed
-    // BrowserWindow. Unguarded, the session built one line earlier would never
-    // be discarded: its token stays resolvable and keeps serving file reads for
-    // the life of the process (lens review F9).
-    let live: PreviewLiveView
-    try {
-      live = new PreviewLiveView({
-        panelId,
-        projectPath,
-        entryFilePath: start.filePath,
-        window,
-        initialBounds: req.bounds,
-        session,
-        pageScopes,
-        navigation: start.navigation,
-        deps: this.liveViewDeps
-      })
-    } catch {
-      pageScopes.dispose()
-      await this.discardSession(session)
+    // Synchronous on purpose: nothing may interleave between the constructor
+    // and `registry.install` below, so this must not become an await.
+    const live = this.openDiscard.tryBuildLive({
+      panelId,
+      projectPath,
+      entryFilePath: start.filePath,
+      window,
+      initialBounds: req.bounds,
+      session,
+      pageScopes,
+      navigation: start.navigation,
+      deps: this.liveViewDeps
+    })
+    if (live === null) {
+      await this.openDiscard.discardBuilt(pageScopes, session)
       return { ok: false, errorCode: ErrorCode.PREVIEW_CSP_INVALID }
     }
 
@@ -269,19 +259,6 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
     // Never rejects: housekeeping for OTHER panels must not change this answer.
     await this.eviction.enforceBudget(panelId)
     return { ok: true }
-  }
-
-  /** Tear down a session that was built but never installed as a live view. */
-  private async discardSession(session: PreviewSession): Promise<void> {
-    session.teardown()
-    if (!session.view.webContents.isDestroyed()) {
-      session.view.webContents.destroy()
-    }
-    // A live view revokes its token on teardown; a never-installed session must
-    // do it here or the registry entry leaks.
-    this.deps.registry.revoke(session.token)
-    // Purges (bounded) and hands the partition back for reuse; never rejects.
-    await session.release()
   }
 
   async close(panelId: string): Promise<void> {
@@ -356,7 +333,7 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
    * the host window's own zoom when it did not.
    */
   async zoomFocused(step: number): Promise<boolean> {
-    const focused = this.registry.all().find((entry) => entry.view.isFocused())
+    const focused = this.registry.all().find(entry => entry.view.isFocused())
     if (focused === undefined) {
       return false
     }
@@ -394,7 +371,7 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
     // so every host it refuses again is news to the reader.
     // `allSettled` over a snapshot: one view failing (or being torn down
     // mid-flight) must not stop the others from getting the rebuilt CSP.
-    await Promise.allSettled(targets.map((target) => target.view.applyApprovedHosts(hosts)))
+    await Promise.allSettled(targets.map(target => target.view.applyApprovedHosts(hosts)))
 
     // Tell EVERY view of this project, including one whose rebuild rejected: the
     // allowlist genuinely did change for the project, and a view that failed to
@@ -444,7 +421,7 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
       this.registry.invalidateOpen(entry.view.panelId)
       this.noViewDrops.forget(entry.view.panelId)
     }
-    await Promise.allSettled(entries.map((entry) => entry.view.teardown('immediate')))
+    await Promise.allSettled(entries.map(entry => entry.view.teardown('immediate')))
   }
 
   async onProjectChanged(_oldPath: string | null, _newPath: string | null): Promise<void> {
@@ -483,7 +460,7 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
     // down.
     this.registry.bumpGeneration()
     const entries = this.registry.drain()
-    await Promise.allSettled(entries.map((entry) => entry.view.teardown('immediate')))
+    await Promise.allSettled(entries.map(entry => entry.view.teardown('immediate')))
   }
 }
 

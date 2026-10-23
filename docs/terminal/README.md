@@ -408,7 +408,7 @@ See [Scroll Fixes](./scroll-fixes.md) for related scroll preservation features.
 
 **Shell Arguments** (Platform-Specific):
 - **macOS/Linux**: `-l` (login shell) - Sources RC files (.zprofile, .bash_profile) to load environment, Homebrew paths, and user configuration
-- **Windows (PowerShell)**: `-NoProfile` - Skips the user profile for a fast, isolated bootstrap; the bootstrap then launches the interactive `pwsh`/`powershell` with `-NoLogo` (see [Bootstrap Pattern](./bootstrap-pattern.md))
+- **Windows (PowerShell)**: `-NoLogo -NoProfile -NoExit` - One process: the bootstrap script sets the cwd, then dot-sources the user's profiles itself, and `-NoExit` keeps the same shell interactive (see [Bootstrap Pattern](./bootstrap-pattern.md))
 - **Windows (cmd.exe)**: No arguments - Uses default environment
 
 ### Terminal Initialization

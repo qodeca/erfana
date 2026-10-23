@@ -22,11 +22,16 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor, act, fireEvent } from '@testing-library/react'
 import React from 'react'
 import { ProjectTree } from './ProjectTree'
+import { placeholderKey } from './visibleRows'
 import { DialogProvider } from '../Dialog'
 import { ProjectManagementProvider } from '../../context/ProjectManagementContext'
 import { useClipboardStore } from '../../stores/useClipboardStore'
 import { subscribeGlobalToasts, type GlobalToastPayload } from '../Toast/toastService'
 import type { FileNode } from '../../../../preload/index'
+import { installTreeViewport } from '../../test-utils/treeViewport'
+
+// The tree is virtualised; give it a viewport so every fixture row is mounted.
+installTreeViewport()
 
 declare global {
   interface Window {
@@ -287,10 +292,12 @@ describe('ProjectTree root-inclusive lookups', () => {
   it('resolves the project root as a drop target', async () => {
     await renderWithProject()
 
-    await dragEnd(`${PROJECT_PATH}/top.md`, PROJECT_PATH)
+    // A nested file, so the drop really moves it (top.md is already in the
+    // root, and a drop into an item's own folder is a no-op – see below).
+    await dragEnd(`${PROJECT_PATH}/folder1/child.md`, PROJECT_PATH)
 
     expect(fileApi.moveItem).toHaveBeenCalledWith({
-      sourcePath: `${PROJECT_PATH}/top.md`,
+      sourcePath: `${PROJECT_PATH}/folder1/child.md`,
       targetParentPath: PROJECT_PATH
     })
   })
@@ -299,6 +306,19 @@ describe('ProjectTree root-inclusive lookups', () => {
     await renderWithProject()
 
     await dragEnd(`${PROJECT_PATH}/top.md`, `${PROJECT_PATH}/folder1`)
+
+    expect(fileApi.moveItem).toHaveBeenCalledWith({
+      sourcePath: `${PROJECT_PATH}/top.md`,
+      targetParentPath: `${PROJECT_PATH}/folder1`
+    })
+  })
+
+  it("resolves a lazy folder's placeholder line to that folder (#320)", async () => {
+    await renderWithProject()
+
+    // The line under a lazy folder that is being read, or failed to read, is
+    // a droppable of its own; its id stands for the folder
+    await dragEnd(`${PROJECT_PATH}/top.md`, placeholderKey(`${PROJECT_PATH}/folder1`))
 
     expect(fileApi.moveItem).toHaveBeenCalledWith({
       sourcePath: `${PROJECT_PATH}/top.md`,
@@ -324,12 +344,24 @@ describe('ProjectTree root-inclusive lookups', () => {
 
     // Top-level entries carry parentId === null in the index; the projectPath
     // fallback must reproduce what the prepended-root copy used to supply.
-    await dragEnd(`${PROJECT_PATH}/folder1`, `${PROJECT_PATH}/top.md`)
+    await dragEnd(`${PROJECT_PATH}/folder1/child.md`, `${PROJECT_PATH}/top.md`)
 
     expect(fileApi.moveItem).toHaveBeenCalledWith({
-      sourcePath: `${PROJECT_PATH}/folder1`,
+      sourcePath: `${PROJECT_PATH}/folder1/child.md`,
       targetParentPath: PROJECT_PATH
     })
+  })
+
+  it('ends quietly when the drop lands in the item\'s own folder (a sibling was hovered)', async () => {
+    await renderWithProject()
+
+    // top.md and folder1 are both in the root: dropping one onto the other
+    // resolves to the root, where top.md already is.
+    await dragEnd(`${PROJECT_PATH}/top.md`, PROJECT_PATH)
+    await dragEnd(`${PROJECT_PATH}/folder1`, `${PROJECT_PATH}/top.md`)
+
+    expect(fileApi.moveItem).not.toHaveBeenCalled()
+    expect(toasts.filter(t => t.type === 'error' || t.title === 'Success')).toEqual([])
   })
 
   it('reports a miss for an unknown path instead of moving anything', async () => {

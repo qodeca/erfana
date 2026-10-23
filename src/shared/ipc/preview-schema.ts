@@ -106,9 +106,10 @@ export const PreviewSetBoundsSchema = z
      * new size.
      *
      * OPTIONAL, and set only on the pushes that need it — a transition that
-     * reveals Erfana's chrome. The bounds loop sends one of these per frame
-     * while a panel is resizing, and confirming every one would cost a round
-     * trip into the page for each. Absent means today's fire-and-forget.
+     * reveals Erfana's chrome. While a growth is unproved (a window-edge resize
+     * hold, repeated growth pushes) every push asks, so main keeps at most two
+     * confirmation scripts alive and starts the newest at once. Absent means
+     * today's fire-and-forget.
      */
     ack: z.boolean().optional(),
     /**

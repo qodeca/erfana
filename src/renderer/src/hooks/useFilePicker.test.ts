@@ -62,6 +62,20 @@ describe('useFilePicker', () => {
       expect(result.current.pickerProps.query).toBe('Button.tsx')
     })
 
+    it('passes the incomplete flag to the dialog, off unless asked (review of #320, item 4)', () => {
+      const { result } = renderHook(() => useFilePicker({ projectRoot: '/project' }))
+
+      act(() => {
+        result.current.showPicker(mockCandidates, 'Button.tsx', { incomplete: true })
+      })
+      expect(result.current.pickerProps.incomplete).toBe(true)
+
+      act(() => {
+        result.current.showPicker(mockCandidates, 'Button.tsx')
+      })
+      expect(result.current.pickerProps.incomplete).toBe(false)
+    })
+
     it('should return a Promise', () => {
       const { result } = renderHook(() => useFilePicker({ projectRoot: '/project' }))
 

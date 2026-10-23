@@ -304,8 +304,11 @@ describe('FileService.readDirectory – walk hints (#211, D1)', () => {
       'packages/a/node_modules',
       'src/dist'
     ])
-    // An ignored folder is still shown and read; only the watcher drops it.
-    expect(treePaths(tree)).toEqual(expect.arrayContaining(['src/dist', 'src/dist/out.js']))
+    // An ignored folder is still shown – and still a hint – but left lazy: not
+    // read until it is expanded (review finding 32).
+    expect(treePaths(tree)).toContain('src/dist')
+    expect(treePaths(tree)).not.toContain('src/dist/out.js')
+    expect(foldersRead()).not.toContain('src/dist')
     expect(foldersRead()).not.toContain('a/b/test-tmp')
     expect(completedLines()[0]).toMatchObject({ walkHintCount: 3, excludedEntryCount: 1 })
   })

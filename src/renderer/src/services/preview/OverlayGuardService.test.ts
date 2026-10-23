@@ -108,12 +108,20 @@ describe('OverlayGuardService — reconciling with what main actually did', () =
       }
     })
 
+    // Positive controls, in this test: the guard DID emit (so the spy is wired to
+    // the real send), and the listener IS live (a disagreement below makes it
+    // speak). Without them the silence would equally hold for a guard that never
+    // sent anything or a listener that was never attached.
     guard.sync('preview-1')
+    expect(setVisibility).toHaveBeenCalledTimes(1)
+    expect(setVisibility).toHaveBeenLastCalledWith('preview-1', true, expect.any(String))
     setVisibility.mockClear()
 
     applied('preview-1', true)
-
     expect(setVisibility).not.toHaveBeenCalled()
+
+    applied('preview-1', false)
+    expect(setVisibility).toHaveBeenCalledWith('preview-1', true, expect.any(String))
   })
 })
 
@@ -203,10 +211,12 @@ describe('OverlayGuardService (item 69)', () => {
     const unsubOccluded = vi.fn()
     const unsubPreview = vi.fn()
     const unsubGate = vi.fn()
+    const unsubApplied = vi.fn()
     const { guard } = makeGuard({
       subscribeOccluded: () => unsubOccluded,
       subscribePreview: () => unsubPreview,
-      subscribeGate: () => unsubGate
+      subscribeGate: () => unsubGate,
+      subscribeVisibilityApplied: () => unsubApplied
     })
 
     guard.dispose()
@@ -214,6 +224,7 @@ describe('OverlayGuardService (item 69)', () => {
     expect(unsubOccluded).toHaveBeenCalledTimes(1)
     expect(unsubPreview).toHaveBeenCalledTimes(1)
     expect(unsubGate).toHaveBeenCalledTimes(1)
+    expect(unsubApplied).toHaveBeenCalledTimes(1)
   })
 
   it('hides ONLY the gated panel, not its sibling in a split view', () => {

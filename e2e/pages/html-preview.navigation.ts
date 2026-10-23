@@ -29,6 +29,11 @@ import { expect } from '@playwright/test'
 import type { ElectronApplication, Locator, Page } from '@playwright/test'
 
 import { previewNavKeyFor, type PreviewNavAction } from '../../src/shared/previewNavKeys'
+import {
+  EXEC_ACTION_CAP_MS,
+  installBoundedExec,
+  type BoundedExecGlobal
+} from '../utils/bounded-exec'
 import { bringAppToFront } from './html-preview.focus'
 import { PREVIEW_BUDGET_MS, type HtmlPreviewPage, type PreviewTarget } from './html-preview.page'
 
@@ -123,12 +128,14 @@ export async function waitForLivePages(app: ElectronApplication, relPaths: strin
  * `sentinel` – the page landed, not just the URL.
  */
 export async function waitForPage(preview: HtmlPreviewPage, relPath: string, sentinel: string): Promise<void> {
-  await expect
-    .poll(() => preview.eval('document.title', { urlIncludes: `/${relPath}` }), {
-      timeout: PREVIEW_BUDGET_MS,
-      message: `${relPath} never showed ${sentinel}`
-    })
-    .toContain(sentinel)
+  await preview.withReadError(
+    expect
+      .poll(() => preview.eval('document.title', { urlIncludes: `/${relPath}` }), {
+        timeout: PREVIEW_BUDGET_MS,
+        message: `${relPath} never showed ${sentinel}`
+      })
+      .toContain(sentinel)
+  )
 }
 
 /** The page's scroll offset and fragment, read inside it. */
@@ -144,6 +151,7 @@ export async function scrollState(
  * A TRUSTED click on the element `elementId` in the preview matched by
  * `target`: a real mouse event at its centre, with the button and accelerator
  * asked for. `true` only when the page and the element were found.
+ * @throws when locating the element does not answer within the action cap.
  */
 export async function clickLink(
   app: ElectronApplication,
@@ -152,8 +160,10 @@ export async function clickLink(
   how: LinkClick = {}
 ): Promise<boolean> {
   const modifiers = how.accel ? [process.platform === 'darwin' ? 'meta' : 'control'] : []
+  await installBoundedExec(app)
   return app.evaluate(
-    async ({ webContents }, { id, urlIncludes, button, mods }) => {
+    async ({ webContents }, { id, urlIncludes, button, mods, actionCapMs }) => {
+      const exec = (globalThis as unknown as BoundedExecGlobal).__erfanaE2eExec
       const wc = webContents.getAllWebContents().find((c) => {
         try {
           const url = c.getURL()
@@ -163,14 +173,17 @@ export async function clickLink(
         }
       })
       if (!wc) return false
-      const point: { x: number; y: number } | null = await wc.executeJavaScript(
+      const point = await exec<{ x: number; y: number } | null>(
+        wc,
         `(() => {
            const el = document.getElementById(${JSON.stringify(id)})
            if (!el) return null
            el.scrollIntoView({ block: 'center', inline: 'center' })
            const r = el.getBoundingClientRect()
            return { x: r.left + r.width / 2, y: r.top + r.height / 2 }
-         })()`
+         })()`,
+        actionCapMs,
+        `clickLink: locate #${id}`
       )
       if (point === null) return false
       // Input is in view pixels, the rectangle in CSS pixels: they differ by the zoom.
@@ -183,7 +196,7 @@ export async function clickLink(
       wc.sendInputEvent({ type: 'mouseUp', x, y, button, clickCount: 1, modifiers })
       return true
     },
-    { id: elementId, urlIncludes: target.urlIncludes, button: how.button ?? 'left', mods: modifiers }
+    { id: elementId, urlIncludes: target.urlIncludes, button: how.button ?? 'left', mods: modifiers, actionCapMs: EXEC_ACTION_CAP_MS }
   )
 }
 

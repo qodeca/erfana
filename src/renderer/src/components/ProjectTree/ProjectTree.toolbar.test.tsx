@@ -22,6 +22,10 @@ import { ProjectManagementProvider } from '../../context/ProjectManagementContex
 import { TEST_IDS } from '../../constants/testids'
 import type { FileNode } from '../../../../preload/index'
 import { isMacOS } from '../../utils/platform'
+import { installTreeViewport } from '../../test-utils/treeViewport'
+
+// The tree is virtualised; give it a viewport so every fixture row is mounted.
+installTreeViewport()
 
 // Defaults to false: with no preload bridge the tree already resolved to a
 // non-macOS platform here, so every other test keeps its old behaviour.
