@@ -50,6 +50,11 @@ declare global {
       terminalText: (terminalId: string) => string | null
       /** The cursor position in a terminal's buffer, or null for an unknown id */
       terminalCursor: (terminalId: string) => { x: number; y: number } | null
+      /**
+       * The model value of the Monaco editor rendered inside `container`, or
+       * null when no live editor is there
+       */
+      editorValue: (container: Element) => string | null
     }
   }
 }

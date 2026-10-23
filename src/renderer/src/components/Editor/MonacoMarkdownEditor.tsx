@@ -6,6 +6,7 @@ import * as monaco from 'monaco-editor'
 import { useSearchStore } from '../../stores/useSearchStore'
 import { logger } from '../../utils/logger'
 import { TEST_IDS } from '../../constants/testids'
+import { registerTestEditor } from '../../testHooks/editorTestHook'
 import { registerClipboardActions } from '../../utils/monacoClipboardCommands'
 import { getMonacoLanguage } from '../../utils/monacoLanguage'
 import { disableWorkerLanguageServices } from '../../utils/monacoLanguageServices'
@@ -166,6 +167,9 @@ export const MonacoMarkdownEditor = forwardRef<MonacoEditorHandle, MonacoMarkdow
       logger.debug('Monaco mounted', { valueLength: latestRef.current.value.length })
       editorRef.current = editor
       monacoRef.current = monaco
+      // E2E only: a no-op unless the launcher switched the test hooks on.
+      // Forgets the editor itself when the editor is disposed.
+      registerTestEditor(editor)
 
       // The model was created from `defaultValue` when Monaco finished
       // loading, which can be a few renders before this callback: start from

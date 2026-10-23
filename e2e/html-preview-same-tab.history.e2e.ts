@@ -380,8 +380,11 @@ test.describe('HTML preview same tab – Back and Forward (P3-AC4)', () => {
     await h.page.keyboard.press(navChord('back'))
 
     if (process.platform === 'darwin') {
-      // Cmd+[ reached Monaco, which outdents the line.
-      await expect.poll(() => monaco.getContent(), { timeout: PREVIEW_BUDGET_MS }).not.toMatch(/^ {4}- item/)
+      // Cmd+[ reached Monaco, which outdents the line: it is still the one
+      // line, now with less than its four spaces of indent. Positive on
+      // purpose – a "not four spaces" check also passed on an empty or
+      // unreadable buffer (lens review finding 37).
+      await expect.poll(() => monaco.getContent(), { timeout: PREVIEW_BUDGET_MS }).toMatch(/^ {0,3}- item$/)
     }
     // Barrier: preview 1's Back lands one step back, on pricing.html – two
     // steps back (index.html) had the key moved it too.
