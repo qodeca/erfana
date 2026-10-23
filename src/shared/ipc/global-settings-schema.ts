@@ -62,6 +62,28 @@ export const HtmlPreviewSettingsSchema = z.object({
 export type HtmlPreviewSettings = z.infer<typeof HtmlPreviewSettingsSchema>
 
 /**
+ * Terminal screen-reader mode (lens review [23]).
+ *
+ * - `auto` – on while the OS reports a screen reader (macOS, Windows), else off
+ * - `on` – always on, for a screen reader Electron cannot detect (Linux)
+ * - `off` – always off, for a tool Chromium mistakes for a screen reader
+ */
+export const TerminalScreenReaderModeSchema = z.enum(['auto', 'on', 'off'])
+export type TerminalScreenReaderMode = z.infer<typeof TerminalScreenReaderModeSchema>
+
+/**
+ * Terminal configuration. Lenient like `files`: a missing or malformed value
+ * resolves to the default instead of tripping the corruption reset that would
+ * replace every other setting.
+ */
+export const TerminalSettingsSchema = z
+  .object({
+    screenReaderMode: TerminalScreenReaderModeSchema.catch('auto')
+  })
+  .catch(() => ({ screenReaderMode: 'auto' as const }))
+export type TerminalSettings = z.infer<typeof TerminalSettingsSchema>
+
+/**
  * Root schema for ~/.erfana/settings.json
  */
 export const GlobalSettingsSchema = z.object({
@@ -86,7 +108,9 @@ export const GlobalSettingsSchema = z.object({
    * section resolves to `{ exclude: [] }`, so it never triggers the corruption
    * reset that would replace every other setting.
    */
-  files: FilesSettingsSchema
+  files: FilesSettingsSchema,
+  /** Terminal configuration (lens review [23]) */
+  terminal: TerminalSettingsSchema
 })
 export type GlobalSettings = z.infer<typeof GlobalSettingsSchema>
 

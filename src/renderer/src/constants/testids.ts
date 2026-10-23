@@ -636,6 +636,12 @@ export const TEST_IDS = {
   SETTINGS_SECTION_HTML_PREVIEW: 'settings-section-html-preview',
   /** HTML preview enabled toggle (Issue #74, AC21) */
   SETTINGS_TOGGLE_HTML_PREVIEW: 'settings-toggle-html-preview',
+  /** Terminal settings section (lens review [23]) */
+  SETTINGS_SECTION_TERMINAL: 'settings-section-terminal',
+  /** Terminal screen-reader mode select: Auto / On / Off */
+  SETTINGS_SELECT_SCREEN_READER_MODE: 'settings-select-screen-reader-mode',
+  /** What Auto currently detects (screen reader reported or not) */
+  SETTINGS_SCREEN_READER_STATUS: 'settings-screen-reader-status',
   /** Import tools section (Issue #250) */
   SETTINGS_SECTION_IMPORT_TOOLS: 'settings-section-import-tools',
   /** One format row's status; the row carries `data-format` and `data-ready` */

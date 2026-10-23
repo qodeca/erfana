@@ -14,6 +14,7 @@ import { useOccluder } from '../../hooks/useOccluder'
 import { useOverlayStackEntry } from '../../hooks/useOverlayStackEntry'
 import { TEST_IDS } from '../../constants/testids'
 import { HtmlPreviewSection } from './sections/HtmlPreviewSection'
+import { TerminalSection } from './sections/TerminalSection'
 import { ImportToolsSection } from './sections/ImportToolsSection'
 import './SettingsOverlay.css'
 
@@ -612,6 +613,8 @@ export function SettingsOverlay() {
             <ImportToolsSection />
 
             <HtmlPreviewSection />
+
+            <TerminalSection />
           </div>
         </div>
       </div>

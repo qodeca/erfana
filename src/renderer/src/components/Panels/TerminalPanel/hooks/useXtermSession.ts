@@ -129,6 +129,12 @@ export interface UseXtermSessionOptions {
   attachFileDrop: (xterm: Terminal, terminalIdRef: RefObject<string | null>) => void
   /** Detaches the external file-drop listeners */
   detachFileDrop: () => void
+  /**
+   * xterm's `screenReaderMode` (lens review [23]): an offscreen accessibility
+   * tree plus a live region, so a screen reader can read the canvas-drawn
+   * output. Applied at creation and updated live on the running instance.
+   */
+  screenReaderMode: boolean
 }
 
 /**
@@ -246,6 +252,13 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
   useEffect(() => {
     terminalIdRef.current = terminalId
   }, [terminalId])
+
+  // Live toggle. Also re-run on a new session id: the mode may have changed
+  // between the constructor reading it and the session coming up
+  const { screenReaderMode } = options
+  useEffect(() => {
+    applyScreenReaderMode(xtermRef.current, screenReaderMode)
+  }, [screenReaderMode, terminalId, xtermRef])
 
   const nudgeClaudeStatus = useCallback((id: string) => {
     if (claudeNudgeTimerRef.current) clearTimeout(claudeNudgeTimerRef.current)
@@ -469,7 +482,7 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
 
     try {
       // --- create ---
-      const xterm = new Terminal(XTERM_OPTIONS)
+      const xterm = new Terminal({ ...XTERM_OPTIONS, screenReaderMode: optionsRef.current.screenReaderMode })
       const fitAddon = new FitAddon()
       // Links go through the checked IPC path, never the addon's default window.open
       const webLinksAddon = new WebLinksAddon(
@@ -599,6 +612,18 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
     nudgeClaudeStatus,
     onDataListenerAttached,
     onDataListenerDetached
+  }
+}
+
+/**
+ * Set xterm's screen-reader mode on a live instance. xterm builds or removes
+ * its accessibility tree on the option change; writing an unchanged value is
+ * skipped so a re-render does no work.
+ */
+function applyScreenReaderMode(xterm: Terminal | null, enabled: boolean): void {
+  const xtermOptions = xterm?.options
+  if (xtermOptions && xtermOptions.screenReaderMode !== enabled) {
+    xtermOptions.screenReaderMode = enabled
   }
 }
 

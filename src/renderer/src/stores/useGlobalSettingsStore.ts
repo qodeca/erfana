@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { create } from 'zustand'
-import type { GlobalSettings, LoggingLevel } from '../../../shared/ipc/global-settings-schema'
+import type { GlobalSettings, LoggingLevel, TerminalScreenReaderMode } from '../../../shared/ipc/global-settings-schema'
 import type { TranscriptionBackend, WhisperModel } from '../../../shared/ipc/transcription-schema'
 
 /**
@@ -29,6 +29,7 @@ interface GlobalSettingsState {
   updateTranscriptionBackend: (backend: TranscriptionBackend) => Promise<void>
   updateWhisperModel: (model: WhisperModel) => Promise<void>
   updateHtmlPreviewEnabled: (enabled: boolean) => Promise<void>
+  updateTerminalScreenReaderMode: (mode: TerminalScreenReaderMode) => Promise<void>
   resetSettings: () => Promise<void>
   clearCorruptionFlag: () => void
 
@@ -95,6 +96,11 @@ export const useGlobalSettingsStore = create<GlobalSettingsState>((set, get) => 
   // live preview view via its `globalSettingsService.onSettingsChanged` subscription.
   updateHtmlPreviewEnabled: async (enabled: boolean) => {
     await get()._updateSection('htmlPreview', (current) => ({ ...current, enabled }))
+  },
+
+  // Read live by every terminal panel (useTerminalScreenReaderMode), no restart needed
+  updateTerminalScreenReaderMode: async (mode: TerminalScreenReaderMode) => {
+    await get()._updateSection('terminal', (current) => ({ ...current, screenReaderMode: mode }))
   },
 
   resetSettings: async () => {

@@ -112,6 +112,9 @@ describe('GlobalSettingsSchema', () => {
         },
         files: {
           exclude: ['tmp']
+        },
+        terminal: {
+          screenReaderMode: 'on' as const
         }
       }
 
@@ -141,6 +144,9 @@ describe('GlobalSettingsSchema', () => {
         },
         files: {
           exclude: ['tmp']
+        },
+        terminal: {
+          screenReaderMode: 'on' as const
         }
       }
 
@@ -229,6 +235,31 @@ describe('GlobalSettingsSchema', () => {
     })
   })
 
+  describe('terminal.screenReaderMode (lens review [23])', () => {
+    it('defaults to auto when the section is missing', () => {
+      expect(GlobalSettingsSchema.parse({}).terminal).toEqual({ screenReaderMode: 'auto' })
+    })
+
+    it.each(['auto', 'on', 'off'] as const)('keeps %s', (mode) => {
+      expect(GlobalSettingsSchema.parse({ terminal: { screenReaderMode: mode } }).terminal.screenReaderMode).toBe(mode)
+    })
+
+    it('never fails on a bad value, so it cannot trip the corruption reset', () => {
+      const badMode = GlobalSettingsSchema.safeParse({ terminal: { screenReaderMode: 'loud' } })
+      expect(badMode.success).toBe(true)
+      expect(badMode.data?.terminal).toEqual({ screenReaderMode: 'auto' })
+
+      const badSection = GlobalSettingsSchema.safeParse({ terminal: 'on' })
+      expect(badSection.success).toBe(true)
+      expect(badSection.data?.terminal).toEqual({ screenReaderMode: 'auto' })
+    })
+
+    it('strips unknown keys', () => {
+      const parsed = GlobalSettingsSchema.parse({ terminal: { screenReaderMode: 'on', extra: 1 } })
+      expect(parsed.terminal).toEqual({ screenReaderMode: 'on' })
+    })
+  })
+
   describe('type inference', () => {
     it('infers correct type for logging.level', () => {
       const settings: GlobalSettings = {
@@ -252,6 +283,9 @@ describe('GlobalSettingsSchema', () => {
         },
         files: {
           exclude: []
+        },
+        terminal: {
+          screenReaderMode: 'auto'
         }
       }
 
@@ -268,7 +302,8 @@ describe('GlobalSettingsSchema', () => {
         gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
         transcription: { backend: 'openai', openaiApiKeyStored: false, whisperModel: 'base' },
         htmlPreview: { enabled: true },
-        files: { exclude: [] }
+        files: { exclude: [] },
+        terminal: { screenReaderMode: 'auto' }
       }
       expect(validSettings.logging.level).toBe('info')
     })
