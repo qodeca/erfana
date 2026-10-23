@@ -507,6 +507,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
         // the cursor, so its box is where the menu opens.
         const caret = xterm.textarea ?? xterm.element ?? null
         const open = (x: number, y: number): void => portalContext?.openTerminalContextMenu(x, y)
+        /* deviates: design/system/components/menu/index.html — no aria-haspopup/expanded: xterm owns its textarea. */
         if (routeTerminalMenuKey(event, caret, open)) return false
         return wrappedKeyHandler(event)
       })

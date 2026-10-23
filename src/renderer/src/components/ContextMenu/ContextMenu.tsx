@@ -13,6 +13,7 @@ import { createPortal } from 'react-dom'
 import { TEST_IDS } from '../../constants/testids'
 import { useOccluder } from '../../hooks/useOccluder'
 import { useOverlayStackEntry } from '../../hooks/useOverlayStackEntry'
+import { toAriaKeyShortcuts } from './ariaKeyShortcuts'
 import './ContextMenu.css'
 
 /**
@@ -34,7 +35,7 @@ export interface ContextMenuItem {
   separator?: boolean
   /** Greyed out and inert, but still reachable by the arrow keys */
   disabled?: boolean
-  /** Shortcut hint, e.g. `⌘C`; exposed as `aria-keyshortcuts` */
+  /** Shortcut hint, e.g. `⌘C`; exposed as `aria-keyshortcuts` (`Meta+C`) */
   shortcut?: string
   /** Optional test ID for automated UI testing */
   testId?: string
@@ -384,8 +385,9 @@ export function ContextMenu({ x, y, items, onClose, containerTestId }: ContextMe
             tabIndex={index === current ? 0 : -1}
             aria-disabled={item.disabled || undefined}
             // The hint is hidden below, so the shortcut reaches assistive tech
-            // as a property of the item rather than as part of its name.
-            aria-keyshortcuts={item.shortcut}
+            // as a property of the item rather than as part of its name – in
+            // ARIA key names (`Meta+C`), not the display glyphs (`⌘C`).
+            aria-keyshortcuts={toAriaKeyShortcuts(item.shortcut)}
             onClick={() => handleItemClick(item)}
             // One active item whichever device is in use: the pointer moves the
             // roving stop instead of painting a second highlight.

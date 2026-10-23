@@ -28,6 +28,7 @@ import { IDockviewPanelHeaderProps } from 'dockview'
 import { ContextMenu } from '../ContextMenu/ContextMenu'
 import { useTabContextMenu } from './useTabContextMenu'
 import { useTabMenuKey } from './useTabMenuKey'
+import { isKeyboardMenuEcho } from '../ContextMenu/contextMenuKey'
 import { useTabTitle } from './useTabTitle'
 import { useProjectManagementContext } from '../../context/ProjectManagementContext'
 import { TEST_IDS, getDynamicTestId } from '../../constants/testids'
@@ -129,6 +130,8 @@ export function ImageTab(props: IDockviewPanelHeaderProps<ImageTabParams>) {
   const handleContextMenu = useCallback((e: MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
+    // The Windows Menu-key echo of a menu the keyboard already opened (#90).
+    if (isKeyboardMenuEcho()) return
     setContextMenu({ x: e.clientX, y: e.clientY })
   }, [])
 

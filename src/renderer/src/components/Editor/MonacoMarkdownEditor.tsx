@@ -294,20 +294,32 @@ export const MonacoMarkdownEditor = forwardRef<MonacoEditorHandle, MonacoMarkdow
 
       // Shift+F10 and the Menu key open the same menu under the caret (#90).
       // With `contextmenu: false` Monaco's own Shift+F10 action shows nothing,
-      // so these commands replace it rather than compete with it.
-      const openMenuFromKeyboard = (): void => {
-        const position = editor.getPosition()
-        const caret = position ? editor.getScrolledVisiblePosition(position) : null
-        const host = editor.getDomNode()?.getBoundingClientRect()
-        if (!host) return
-        markKeyboardMenuOpen()
-        openMenuAt(
-          host.left + (caret?.left ?? 0),
-          host.top + (caret ? caret.top + caret.height : 0)
-        )
-      }
-      editor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.F10, openMenuFromKeyboard)
-      editor.addCommand(monaco.KeyCode.ContextMenu, openMenuFromKeyboard)
+      // so this action replaces it rather than competes with it.
+      //
+      // `addAction`, NOT `addCommand`: in standalone Monaco `addCommand`
+      // registers a keybinding for EVERY editor (no editor-id condition), so
+      // with two editors open the last-mounted one would answer the key, act
+      // on a hidden file, and go dead when that editor closes. An action is
+      // scoped to its editor and disposed with it.
+      /* deviates: design/system/components/menu/index.html — no aria-haspopup /
+         aria-expanded on the opener: Monaco owns its input textarea and its
+         ARIA. See the card's Exceptions. */
+      editor.addAction({
+        id: 'erfana.openContextMenu',
+        label: 'Open context menu',
+        keybindings: [monaco.KeyMod.Shift | monaco.KeyCode.F10, monaco.KeyCode.ContextMenu],
+        run: () => {
+          const position = editor.getPosition()
+          const caret = position ? editor.getScrolledVisiblePosition(position) : null
+          const host = editor.getDomNode()?.getBoundingClientRect()
+          if (!host) return
+          markKeyboardMenuOpen()
+          openMenuAt(
+            host.left + (caret?.left ?? 0),
+            host.top + (caret ? caret.top + caret.height : 0)
+          )
+        }
+      })
 
       // Notify parent component that editor is mounted and ready
       latestRef.current.onEditorMount?.(editor)

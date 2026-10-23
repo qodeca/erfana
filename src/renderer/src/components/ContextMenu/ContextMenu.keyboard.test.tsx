@@ -274,7 +274,8 @@ describe('ContextMenu keyboard contract (#90)', () => {
       />
     )
     const item = screen.getByRole('menuitem', { name: 'Copy' })
-    expect(item).toHaveAttribute('aria-keyshortcuts', '⌘C')
+    // ARIA key names, not the display glyphs.
+    expect(item).toHaveAttribute('aria-keyshortcuts', 'Meta+C')
     expect(screen.getByTestId('icon').parentElement).toHaveAttribute('aria-hidden', 'true')
     expect(screen.getByText('⌘C')).toHaveAttribute('aria-hidden', 'true')
   })
