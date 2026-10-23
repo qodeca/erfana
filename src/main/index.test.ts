@@ -219,7 +219,8 @@ describe('Main Process - Window Creation', () => {
         cleanupForWebContentsId: vi.fn(), // issue #59
         allowDiagnostics: vi.fn(), // #305
         beginShutdown: vi.fn(),
-        getLiveShells: vi.fn(() => [])
+        getLiveShells: vi.fn(() => []),
+        treeKillSkipped: vi.fn(() => false)
       }
     }))
     vi.doMock('./services/SettingsService', () => ({

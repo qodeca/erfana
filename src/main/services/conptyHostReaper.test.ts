@@ -313,6 +313,25 @@ describe('startConptyHostReaper', () => {
     expect(args[args.length - 1]).not.toContain('9001')
   })
 
+  it('tells the helper when the tree kill is skipped, so a quiet quit is reported as unverified (round 8)', () => {
+    const helperFor = (treeKillSkipped?: boolean): string => {
+      const spawnFn = vi.fn(() => fakeChild())
+      startConptyHostReaper({
+        platform: 'win32',
+        pid: 777,
+        now: () => 100_000_000,
+        uptimeSeconds: () => 60,
+        treeKillSkipped,
+        spawnFn: spawnFn as unknown as typeof spawn
+      })
+      const [, , opts] = spawnFn.mock.calls[0] as unknown as [string, string[], { env: Record<string, string> }]
+      return opts.env[QUIT_HELPER_ENV]
+    }
+    expect(helperFor(true)).toContain("$result = 'unverified'")
+    expect(helperFor(false)).not.toContain('unverified')
+    expect(helperFor()).not.toContain('unverified')
+  })
+
   it('records a launcher that failed, and nothing for one that exited normally', async () => {
     const { logger } = await import('./LoggingService')
     vi.mocked(logger.warn).mockClear()

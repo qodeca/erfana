@@ -325,6 +325,20 @@ describe('TerminalService kill paths (#296)', () => {
       expect(spawned[0].kill).toHaveBeenCalledTimes(1)
     })
 
+    it('tells whether the tree kill is skipped, so the quit helper can say a quit is unverified', async () => {
+      const { terminalService, SKIP_TREE_KILL_ENV } = await load('win32')
+      process.env[SKIP_TREE_KILL_ENV] = '1'
+      try {
+        expect(terminalService.treeKillSkipped()).toBe(false)
+        terminalService.allowDiagnostics(true)
+        expect(terminalService.treeKillSkipped()).toBe(true)
+        process.env[SKIP_TREE_KILL_ENV] = '0'
+        expect(terminalService.treeKillSkipped()).toBe(false)
+      } finally {
+        delete process.env[SKIP_TREE_KILL_ENV]
+      }
+    })
+
     it('ignores the diagnostics switch silently by default (packaged builds)', async () => {
       const { terminalService, SKIP_TREE_KILL_ENV } = await load('win32')
       const { logger } = await import('./LoggingService')

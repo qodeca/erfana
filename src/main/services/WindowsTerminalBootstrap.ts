@@ -128,8 +128,29 @@ export interface WindowsBootstrapBuilder {
  * - `[Console]::Write(...)` wipes ConPTY's screen buffer – see the matching
  *   comment on `GitBashBootstrapBuilder.build` below for the reflow-leak
  *   rationale.
- * - `& '<shell>' -NoLogo` starts the interactive PowerShell session.
+ * - The user's profiles are then dot-sourced in PowerShell's own order (all users
+ *   all hosts, all users this host, current user all hosts, current user this host),
+ *   each in its own `try` so one failing profile does not stop the next, as PowerShell
+ *   does. They run AFTER the cwd is set and after the clear, as they did before.
+ * - `-NoExit` keeps this same process as the interactive session (#305 round 8).
+ *
+ * One process, not a bootstrap that starts the shell: until round 8 the script ended
+ * with `& '<shell>' -NoLogo`, so the pid node-pty reported was a bootstrap PowerShell
+ * and the shell that ran the user's commands was its child. On quit, when the console
+ * closed, both ended, and a process the user had started in its own console was left
+ * with a parent the quit helper had never been told about, so it was not found (#305,
+ * Windows round 7b). Now the reported pid is the interactive shell itself.
  */
+/**
+ * Dot-sources the profiles `-NoProfile` skipped, in PowerShell's order, at the top
+ * scope of the `-Command` script (the global scope, as a profile normally runs).
+ * A failing profile prints its error and the next one still runs.
+ */
+const PROFILE_LOADER =
+  "foreach ($erfanaProfile in @($PROFILE.AllUsersAllHosts, $PROFILE.AllUsersCurrentHost, $PROFILE.CurrentUserAllHosts, $PROFILE.CurrentUserCurrentHost)) " +
+  "{ if ($erfanaProfile -and (Test-Path -LiteralPath $erfanaProfile)) { try { . $erfanaProfile } catch { Write-Error $_ } } }; " +
+  'Remove-Variable erfanaProfile -ErrorAction SilentlyContinue'
+
 export class PowerShellBootstrapBuilder implements WindowsBootstrapBuilder {
   readonly kind = 'powershell' as const
   readonly shellKind: ShellKind = 'powershell'
@@ -144,17 +165,16 @@ export class PowerShellBootstrapBuilder implements WindowsBootstrapBuilder {
     return PowerShellBootstrapBuilder.PATTERN.test(shell)
   }
 
-  build({ shell, cwd, marker }: { shell: string; cwd: string; marker: string }): string[] {
+  build({ cwd, marker }: { shell: string; cwd: string; marker: string }): string[] {
     const psEscapedCwd = cwd.replace(/'/g, "''")
-    const psEscapedShell = shell.replace(/'/g, "''")
     const script = [
       `Set-Location -LiteralPath '${psEscapedCwd}'`,
       '(Get-Location).Path',
       `Write-Output '${marker}'`,
       `[Console]::Write([char]27 + '[2J' + [char]27 + '[3J' + [char]27 + '[H')`,
-      `& '${psEscapedShell}' -NoLogo`
+      PROFILE_LOADER
     ].join('; ')
-    return ['-NoProfile', '-Command', script]
+    return ['-NoLogo', '-NoProfile', '-NoExit', '-Command', script]
   }
 }
 

@@ -857,6 +857,14 @@ export class TerminalService extends EventEmitter {
   }
 
   /**
+   * Whether {@link SKIP_TREE_KILL_ENV} is in effect: allowed, and set to `1`. The quit
+   * helper is told, so it does not report a quit it could not check as clean (#305).
+   */
+  treeKillSkipped(): boolean {
+    return this.diagnosticsAllowed && process.env[SKIP_TREE_KILL_ENV] === '1'
+  }
+
+  /**
    * Refuses every later `createTerminal` (#305). Called at the quit moment, before the
    * quit helper reads {@link getLiveShells}, so the helper's list is complete and
    * no console host appears after the moment it records. `dispose()` calls it too.
@@ -932,7 +940,7 @@ export class TerminalService extends EventEmitter {
    */
   private async endShells(shells: TerminalInstance[]): Promise<void> {
     const win32 = osPlatform() === 'win32'
-    if (win32 && this.diagnosticsAllowed && process.env[SKIP_TREE_KILL_ENV] === '1') {
+    if (win32 && this.treeKillSkipped()) {
       logger.warn(`Tree kill skipped: ${SKIP_TREE_KILL_ENV}=1 (diagnostics only)`)
     } else if (win32) {
       const now = Date.now()

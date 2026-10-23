@@ -159,9 +159,10 @@ afterEach(() => {
 function run(
   scenario: Scenario,
   shells: LiveShell[] = [],
-  graceSec?: number
+  graceSec?: number,
+  opts: { treeKillSkipped?: boolean } = {}
 ): { stopped: string[]; trace: string[] } {
-  const script = buildReapScript(APP, START, QUIT, graceSec)
+  const script = buildReapScript(APP, START, QUIT, graceSec, opts)
   // run the helper the way the launcher starts it: its text from the environment
   const result = spawnSync(POWERSHELL, ['-NoProfile', '-NonInteractive', '-NoLogo', '-Command', `${PRELUDE}\n${HELPER_COMMAND}`], {
     encoding: 'utf8',
@@ -498,6 +499,37 @@ describe.skipIf(!hasPowerShell)('quit helper script against a mocked process lis
       'helper done result=clean members-left=0',
       'helper exit errors=none'
     ])
+  })
+
+  // Windows round 7b, forced leftover (tree kill skipped): the pid node-pty reported was
+  // a bootstrap PowerShell that started the interactive shell as its child. Both had
+  // ended when the helper started, so a program started from the shell in its own
+  // console had a parent pid the helper had never been told about.
+  const wrapperTree = (): Proc[] => [
+    // 6001 = bootstrap (handed over) and 6010 = interactive shell: both ended, not listed
+    { pid: 6020, ppid: 6010, name: 'powershell.exe', createdMs: START + 4_000 },
+    { pid: 6021, ppid: 6020, name: 'conhost.exe', createdMs: START + 4_001 }
+  ]
+  const skipped = { treeKillSkipped: true }
+
+  it('says unverified, not clean, when the tree kill was skipped and no member was ever found (round 8)', () => {
+    const { stopped, trace } = run({ appMissing: true, procs: wrapperTree() }, [shell(6001, START + 2_000)], undefined, skipped)
+    // the leftover cannot be linked to us, so it is not ended – and the result says so
+    expect(stopped).toEqual([])
+    expect(trace).toContain('tree kill was skipped and no member was found alive')
+    expect(trace.at(-2)).toBe('helper done result=unverified members-left=unknown')
+  })
+
+  it('ends the leftover once the handed-over pid is the interactive shell itself (round 8)', () => {
+    const { stopped, trace } = run({ appMissing: true, procs: wrapperTree() }, [shell(6010, START + 2_000)], undefined, skipped)
+    expect(stopped.sort()).toEqual(['6020', '6021'])
+    expect(trace).not.toContain('tree kill was skipped and no member was found alive')
+    expect(trace.at(-2)).toBe('helper done result=clean members-left=0')
+  })
+
+  it('keeps clean for a quiet quit when the tree kill ran (the tree kill ended the members)', () => {
+    const { trace } = run({ appMissing: true, procs: wrapperTree() }, [shell(6001, START + 2_000)])
+    expect(trace.at(-2)).toBe('helper done result=clean members-left=0')
   })
 
   it('says it gave up, with members-left unknown, when no listing ever works', () => {

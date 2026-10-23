@@ -760,7 +760,8 @@ app.on('before-quit', (event): Promise<void> | undefined => {
         terminalService.beginShutdown()
         const quitHelper = startConptyHostReaper({
           shells: terminalService.getLiveShells(),
-          tracePath: join(loggingService.getLogsDir(), QUIT_TRACE_FILE)
+          tracePath: join(loggingService.getLogsDir(), QUIT_TRACE_FILE),
+          treeKillSkipped: terminalService.treeKillSkipped()
         })
         launcherDone = quitHelper.launcherDone
         logger.info('App quitting, cleaning up services', {
