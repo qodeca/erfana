@@ -17,7 +17,6 @@ import { useState, useRef, useCallback } from 'react'
 import type { Terminal } from '@xterm/xterm'
 import { useTerminalStore } from '../../../../stores/useTerminalStore'
 import { showWarningToast } from '../../../../utils/toastHelpers'
-import { formatPathsForTerminal } from '../../../../utils/shellPathEscape'
 import { isPointInElement } from '../../../../utils/domGeometry'
 import { logger } from '../../../../utils/logger'
 import type { DragHandlerRefs } from '../types'
@@ -193,7 +192,7 @@ export function useTerminalDragDrop(
 
       logger.info('External file drop on terminal', { pathCount: paths.length, paths })
 
-      const formattedPaths = formatPathsForTerminal(paths)
+      const formattedPaths = useTerminalStore.getState().formatPathsForActiveTerminal(paths)
 
       try {
         const success = await useTerminalStore.getState().sendToTerminal(formattedPaths, false)

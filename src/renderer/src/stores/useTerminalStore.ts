@@ -4,6 +4,8 @@ import { create, type StoreApi, type UseBoundStore } from 'zustand'
 import type { ITerminalOperations } from '../interfaces/ITerminalOperations'
 import { logger } from '../utils/logger'
 import { terminalGateway } from '../services/terminalGateway'
+import type { ShellKind } from '../../../shared/shellKind'
+import { formatPathsForTerminal, platformDefaultShellKind } from '../utils/shellPathEscape'
 
 /** Shortest gap between two recorded activity timestamps for one terminal. */
 export const ACTIVITY_THROTTLE_MS = 250
@@ -11,12 +13,17 @@ export const ACTIVITY_THROTTLE_MS = 250
 interface TerminalStore {
   // Active terminal ID (null if no terminal is active)
   activeTerminalId: string | null
+  // Quoting flavour of the active terminal's shell (null until it is known)
+  activeShellKind: ShellKind | null
   activityById: Map<string, number>
   userInputById: Map<string, number>
 
   // Actions
   setActiveTerminalId: (id: string | null) => void
   getActiveTerminalId: () => string | null
+  setActiveShellKind: (kind: ShellKind | null) => void
+  /** Quote paths for the active terminal's own shell (platform default until known). */
+  formatPathsForActiveTerminal: (paths: string[]) => string
   markActivity: (id: string) => void
   clearActivity: (id: string) => void
   isRecentlyActive: (windowMs?: number) => boolean
@@ -39,6 +46,7 @@ export function createTerminalStore(
 ): UseBoundStore<StoreApi<TerminalStore>> {
   return create<TerminalStore>((set, get) => ({
   activeTerminalId: null,
+  activeShellKind: null,
   activityById: new Map<string, number>(),
   userInputById: new Map<string, number>(),
 
@@ -49,6 +57,14 @@ export function createTerminalStore(
 
   getActiveTerminalId: () => {
     return get().activeTerminalId
+  },
+
+  setActiveShellKind: (kind) => {
+    set({ activeShellKind: kind })
+  },
+
+  formatPathsForActiveTerminal: (paths) => {
+    return formatPathsForTerminal(paths, get().activeShellKind ?? platformDefaultShellKind())
   },
 
   // Called for every batch of output, so a flood would clone the Map and notify

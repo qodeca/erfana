@@ -17,6 +17,10 @@
  */
 
 import { describe, it, expect } from 'vitest'
+import { spawnSync } from 'node:child_process'
+import { mkdtempSync, mkdirSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import {
   CmdExeBootstrapBuilder,
   DEFAULT_WINDOWS_BOOTSTRAP_BUILDERS,
@@ -399,3 +403,26 @@ describe('normalizeWindowsCwd', () => {
     expect(normalizeWindowsCwd('foo')).toBe('foo')
   })
 })
+
+describe.skipIf(spawnSync('pwsh', ['-NoProfile', '-Command', '1']).status !== 0)(
+  'PowerShellBootstrapBuilder script run with pwsh',
+  () => {
+    it('opens a folder named with a curly apostrophe', () => {
+      const base = mkdtempSync(join(tmpdir(), 'erfana-bootstrap-'))
+      const dir = join(base, 'Bob\u2019s Files')
+      mkdirSync(dir)
+      try {
+        const args = new PowerShellBootstrapBuilder().build({
+          shell: 'pwsh',
+          cwd: dir,
+          marker: MARKER
+        })
+        const run = spawnSync('pwsh', args, { input: '', encoding: 'utf8' })
+        expect(run.stdout).toContain(dir)
+        expect(run.stdout).toContain(MARKER)
+      } finally {
+        rmSync(base, { recursive: true, force: true })
+      }
+    })
+  }
+)

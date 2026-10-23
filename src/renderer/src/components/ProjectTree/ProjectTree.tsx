@@ -45,7 +45,6 @@ import { withWatcherPause } from './withWatcherPause'
 import { logger } from '../../utils/logger'
 import { getLastSeenProjectGeneration } from '../../services/projectGeneration'
 import { useTerminalStore } from '../../stores/useTerminalStore'
-import { formatPathsForTerminal } from '../../utils/shellPathEscape'
 import { formatShortcut } from '../../utils/shortcutLabel'
 import { TEST_IDS as TERMINAL_TEST_IDS } from '../../constants/testids'
 import { useDirectoryWatcher } from '../../hooks/useDirectoryWatcher'
@@ -698,7 +697,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
         const sourcePath = active.id as string
         logger.info('Drag to terminal SUCCESS', { sourcePath, x: lastPos.x, y: lastPos.y })
 
-        const formattedPath = formatPathsForTerminal([sourcePath])
+        const formattedPath = useTerminalStore.getState().formatPathsForActiveTerminal([sourcePath])
         const success = await useTerminalStore.getState().sendToTerminal(formattedPath, false)
 
         if (!success) {
