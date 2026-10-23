@@ -23,7 +23,14 @@ import type {
 } from '../../services/session/ProjectSession'
 import { registerHandle } from '../registry'
 import { ConfinementError, OUTSIDE_PROJECT_CHANGE_MESSAGE } from './ConfinementError'
-import { resolveConfinedPath, type PathPolicy, type ResolvedPath } from './resolveConfinedPath'
+import {
+  defaultConfinementDeps,
+  isInsideRoot,
+  resolveConfinedPath,
+  type ConfinementDeps,
+  type PathPolicy,
+  type ResolvedPath
+} from './resolveConfinedPath'
 
 /**
  * A policy plus the position of the argument it governs. `key` names the
@@ -72,6 +79,20 @@ export interface ConfinedHandleDefinition<
   senderGate?: { allow: (event: IpcMainInvokeEvent) => boolean; denied: () => TResult }
   /** For channels that answer with a result value instead of rejecting */
   onRefusal?: (error: ConfinementError, ctx: { sender: WebContents }) => TResult
+  /**
+   * Level of the "IPC path refused" log line; `warn` by default. `debug` is for
+   * a channel where a refusal is routine (a document naming a missing image
+   * is re-asked on every project change, #71).
+   */
+  refusalLogLevel?: 'warn' | 'debug'
+  /**
+   * Refuse a `project`-mode path that is not lexically inside the project root
+   * (as opened, or canonical) before anything is asked of the file system, so
+   * every such path gets one answer without a single `lstat` (#71).
+   */
+  lexicalPrecheck?: boolean
+  /** File system and path flavour for the checks; the real ones by default (tests inject fakes) */
+  confinementDeps?: ConfinementDeps
   handler: (
     ctx: ConfinedHandlerContext,
     args: TArgs,
@@ -80,6 +101,7 @@ export interface ConfinedHandleDefinition<
 }
 
 const confinedChannels = new Map<string, readonly string[]>()
+const channelDeps = new Map<string, ConfinementDeps>()
 
 /**
  * Channels registered through {@link registerConfinedHandle} in this process,
@@ -89,13 +111,41 @@ export function getConfinedChannels(): ReadonlyMap<string, readonly string[]> {
   return confinedChannels
 }
 
+/**
+ * The file system and path flavour each channel checks against. Production
+ * registrations must all use {@link defaultConfinementDeps}; a unit test walks
+ * every registered channel to hold that.
+ */
+export function getConfinedChannelDeps(): ReadonlyMap<string, ConfinementDeps> {
+  return channelDeps
+}
+
 /** The paths of one call, checked in the order they were listed. */
+/**
+ * The lexical half of the project check: `value` names a place under the
+ * root as opened or as canonicalised. Anything that is not an absolute
+ * string is left to {@link resolveConfinedPath}, which refuses it as invalid.
+ */
+function refuseLexicallyOutside(
+  value: unknown,
+  snapshot: ProjectSessionSnapshot | null,
+  deps: ConfinementDeps
+): void {
+  if (!snapshot || typeof value !== 'string' || value.includes('\0') || !deps.path.isAbsolute(value)) return
+  const lexical = deps.path.resolve(value)
+  const inside =
+    isInsideRoot(lexical, snapshot.root, snapshot.caseSensitive, deps) ||
+    isInsideRoot(lexical, snapshot.realRoot, snapshot.caseSensitive, deps)
+  if (!inside) throw new ConfinementError('OUTSIDE_PROJECT')
+}
+
 async function resolveAll<TPaths extends string>(
   paths: Record<TPaths, PathBinding>,
   optionalNames: ReadonlySet<string>,
   args: readonly unknown[],
   snapshot: ProjectSessionSnapshot | null,
-  senderId: number | null
+  senderId: number | null,
+  options: { lexicalPrecheck: boolean; deps: ConfinementDeps }
 ): Promise<Record<TPaths, ResolvedPath>> {
   const resolved = {} as Record<TPaths, ResolvedPath>
   for (const name of Object.keys(paths) as TPaths[]) {
@@ -103,10 +153,14 @@ async function resolveAll<TPaths extends string>(
     const value = key === undefined ? args[arg] : (args[arg] as Record<string, unknown> | undefined)?.[key]
     if (optionalNames.has(name) && value === undefined) continue
     try {
+      if (options.lexicalPrecheck && policy.mode === 'project') {
+        refuseLexicallyOutside(value, snapshot, options.deps)
+      }
       resolved[name] = await resolveConfinedPath(
         value,
         { session: snapshot, senderId },
-        policy as PathPolicy
+        policy as PathPolicy,
+        options.deps
       )
     } catch (error) {
       if (access === 'change' && error instanceof ConfinementError && error.code === 'OUTSIDE_PROJECT') {
@@ -137,6 +191,8 @@ export function registerConfinedHandle<
   }
   const allBindings = { ...definition.paths, ...optionalBindings } as Record<string, PathBinding>
   confinedChannels.set(channel, Object.keys(allBindings))
+  const deps = definition.confinementDeps ?? defaultConfinementDeps
+  channelDeps.set(channel, deps)
 
   registerHandle(channel, async (event, ...rawArgs: unknown[]) => {
     if (definition.senderGate && !definition.senderGate.allow(event)) {
@@ -162,7 +218,11 @@ export function registerConfinedHandle<
         optionalNames,
         parsed.data,
         snapshot,
-        event.sender?.id ?? null
+        event.sender?.id ?? null,
+        {
+          lexicalPrecheck: definition.lexicalPrecheck === true,
+          deps
+        }
       )
       const result = await definition.handler(
         { session: snapshot, sender: event.sender, event },
@@ -180,7 +240,11 @@ export function registerConfinedHandle<
     } catch (error) {
       if (error instanceof ConfinementError) {
         // The code is enough for the log; the path stays out of it
-        logger.warn('IPC path refused', { channel, code: error.code })
+        if (definition.refusalLogLevel === 'debug') {
+          logger.debug('IPC path refused', { channel, code: error.code })
+        } else {
+          logger.warn('IPC path refused', { channel, code: error.code })
+        }
         if (definition.onRefusal) return definition.onRefusal(error, { sender: event.sender })
       }
       throw error

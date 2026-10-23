@@ -53,6 +53,7 @@ import type {
 } from '../shared/ipc/import-schema'
 import { fileBridge } from './fileBridge'
 import { terminalBridge } from './terminalBridge'
+import { markdownImageBridge } from './markdownImageBridge'
 import type { FileNode, FileStats } from '../shared/ipc/file-schema'
 
 export type { FileNode, FileStats }
@@ -735,6 +736,12 @@ const api = {
     openFile: (filePath: string): Promise<BrowserOpenFileResponse> =>
       ipcRenderer.invoke(BROWSER_CHANNELS.OPEN_FILE, { filePath })
   },
+
+  /**
+   * Images referenced from Markdown (#71). Sends a path; gets back a `data:`
+   * URL, `unchanged`, or a refusal reason. Never rejects for a refusal.
+   */
+  markdownImage: markdownImageBridge,
 
   /**
    * Per-terminal Claude Code context status bridge (#216).

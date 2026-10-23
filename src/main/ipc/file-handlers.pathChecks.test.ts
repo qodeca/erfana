@@ -85,7 +85,8 @@ vi.mock('fs/promises', async (importOriginal) => {
 })
 
 import { registerFileHandlers } from './file-handlers'
-import { getConfinedChannels } from './confinement/registerConfinedHandle'
+import { getConfinedChannelDeps, getConfinedChannels } from './confinement/registerConfinedHandle'
+import { defaultConfinementDeps } from './confinement/resolveConfinedPath'
 import { fileService } from '../services/FileService'
 import { logger } from '../services/LoggingService'
 import { openTestProject } from './__test-helpers__/openTestProject'
@@ -216,6 +217,19 @@ describe('file:* path checks', () => {
       for (const channel of Object.keys(UNCONFINED_ALLOW_LIST)) {
         expect(handlers[channel], channel).toBeDefined()
         expect(confined.has(channel), channel).toBe(false)
+      }
+    })
+
+    it('every confined channel registered by production code checks the real file system', async () => {
+      // The Markdown image channel takes an injectable seam for its tests; the
+      // production registration must not use it
+      const { projectService } = await import('./file-handlers')
+      const { registerMarkdownImageHandlers } = await import('./markdown-image-handlers')
+      registerMarkdownImageHandlers(projectService.session)
+      const deps = getConfinedChannelDeps()
+      expect(deps.has('markdown-image:read')).toBe(true)
+      for (const [channel, used] of deps) {
+        expect(used, channel).toBe(defaultConfinementDeps)
       }
     })
 

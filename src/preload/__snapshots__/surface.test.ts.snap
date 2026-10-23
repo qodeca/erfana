@@ -17,6 +17,7 @@ exports[`preload surface > window.api has the expected top-level groups 1`] = `
   "imageExport",
   "import",
   "logging",
+  "markdownImage",
   "pdf",
   "preview",
   "projectLock",

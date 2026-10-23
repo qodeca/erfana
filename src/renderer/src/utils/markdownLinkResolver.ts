@@ -169,6 +169,36 @@ export function isPathWithinProject(
   return isUnder(file, root, platform)
 }
 
+/**
+ * Resolve a '/'-separated path relative to a document's folder, without
+ * touching the disk (Markdown images, #71).
+ *
+ * The same segment math as links: the result is built from the project root's
+ * own strings, and a `..` that would climb out of the root returns null, as
+ * does a Windows segment with ':'. Not a confinement check – the main process
+ * still confines whatever this returns.
+ *
+ * @param relativePath - Decoded, '/'-separated, not absolute
+ * @param currentFilePath - Absolute path of the document
+ * @param projectRoot - Absolute path of the project root
+ * @param platform - Whose path rules apply; defaults to the renderer's own
+ * @returns The native absolute path, or null when it is not inside the project
+ */
+export function resolveDocumentRelativePath(
+  relativePath: string,
+  currentFilePath: string,
+  projectRoot: string,
+  platform: NodeJS.Platform = getRendererPlatform()
+): string | null {
+  const rootPath = parseAbsolute(projectRoot, platform)
+  const parsedFile = parseAbsolute(currentFilePath, platform)
+  if (!rootPath || !parsedFile || !isUnder(parsedFile, rootPath, platform)) return null
+  const currentDir = parsedFile.segments.slice(rootPath.segments.length, -1)
+  const target = applyLink(currentDir, relativePath, platform)
+  if (!target || target.length === 0) return null
+  return formatPath(rootPath.root, [...rootPath.segments, ...target], platform)
+}
+
 /** Answers whether an absolute path exists; see {@link ResolveLinkOptions.exists}. */
 export type FileExistsCheck = (filePath: string) => Promise<boolean>
 
