@@ -241,6 +241,22 @@ describe('FileWatcherService – files the project watcher cannot see (#252)', (
     expect(vi.getTimerCount()).toBe(1)
   })
 
+  it('stops the probe on a project switch before any watcher close is awaited', () => {
+    vi.useFakeTimers()
+    seedWatch(join(root, 'docs', 'open.md'))
+    // A close that never settles, as on a drive that stopped answering
+    ;(internals().watchedFiles.get(join(root, 'docs', 'open.md')) as { watcher: { close: () => Promise<void> } })
+      .watcher.close = () => new Promise<void>(() => {})
+    svc.watchUnseenFiles(fakeCoverage(() => false))
+    expect(vi.getTimerCount()).toBe(1)
+
+    void svc.stopAll()
+
+    expect(vi.getTimerCount()).toBe(0)
+    // Let dispose in afterEach skip the close that never settles
+    internals().watchedFiles.clear()
+  })
+
   it('stops for good on dispose and lets go of the coverage', async () => {
     vi.useFakeTimers()
     seedWatch(join(root, 'docs', 'open.md'))

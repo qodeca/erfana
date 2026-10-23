@@ -4,8 +4,9 @@ import path from 'path'
 import { describe, it, expect } from 'vitest'
 import { PauseEpisode, MAX_INTERNAL_CHANGES, MAX_REMEMBERED_REMOVALS } from './PauseEpisode'
 
-// Paths built with path.join so separators match the host (Windows included).
-const ROOT = path.join(path.sep, 'proj')
+// Paths built with path.resolve so separators and the drive match the host:
+// the episode resolves every path, which adds the drive on Windows.
+const ROOT = path.resolve(path.sep, 'proj')
 const at = (...segments: string[]): string => path.join(ROOT, ...segments)
 
 const OWNER = 1

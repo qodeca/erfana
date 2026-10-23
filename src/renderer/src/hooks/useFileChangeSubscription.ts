@@ -222,14 +222,15 @@ export function useFileChangeSubscription(
       return false
     }
 
-    // After a delete event the slot already forgot its hold (the main process
-    // dropped the whole entry), so this release sends nothing and only the
-    // acquire below talks to the main process: a `stop` here could take the
-    // count of another consumer of the same file and deafen it (#252). With a
-    // live watch – a recover after a watcher error – the release is what keeps
-    // this consumer at one count: `start` increments a per-window count, so a
-    // bare re-`start` would hold two against one teardown `stop`, and the
-    // watcher would outlive the panel (see {@link FileWatchSlot}).
+    // After a delete, or an error that ended the watch, the slot already forgot
+    // its hold (the main process dropped the whole entry), so this release
+    // sends nothing and only the acquire below talks to the main process: a
+    // `stop` here could take the count of another consumer of the same file
+    // and deafen it (#252). With a live watch – a recover after a plain
+    // chokidar error – the release is what keeps this consumer at one count:
+    // `start` increments a per-window count, so a bare re-`start` would hold
+    // two against one teardown `stop`, and the watcher would outlive the panel
+    // (see {@link FileWatchSlot}).
     await releaseFileWatch(slot, filePath)
     const { started, error, cause } = await acquireFileWatch(slot, filePath)
 
@@ -308,9 +309,13 @@ export function useFileChangeSubscription(
 
     const unsubscribeError = window.api.fileWatch.onFileError((data) => {
       if (!isActive || data.filePath !== filePath) return
+      // The main process ended the watch: forget the hold, as on a delete,
+      // so Reload restarts it without a `stop` (#252, invariant 5)
+      if (data.ended) forgetFileWatch(slot)
       logger.error('Read-only file watch error', undefined, {
         filePath,
-        error: data.error
+        error: data.error,
+        ended: data.ended === true
       })
       setUnavailableReason('watcher-error')
     })

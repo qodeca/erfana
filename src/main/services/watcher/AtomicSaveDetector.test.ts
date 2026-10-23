@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { AtomicSaveDetector } from './AtomicSaveDetector'
+import { UNREADABLE_RECHECK_MS } from './pathPresence'
 import * as fs from 'fs'
 import * as fsPromises from 'fs/promises'
 
@@ -174,17 +175,31 @@ describe('AtomicSaveDetector', () => {
     })
   })
 
-  // Only ENOENT and ENOTDIR mean gone (#252): a locked or unreadable file is
-  // still there, and a "deleted" banner over it would be false
+  // A stat that fails without saying the file is gone is asked once more (#252):
+  // a file locked for a moment comes back, one still unreadable - on Windows,
+  // deleted while another process held it open - is a delete
   describe('a stat that fails without saying the file is gone', () => {
-    it.each(['EPERM', 'EBUSY', 'EACCES'])('counts %s as the file still being there', async (code) => {
+    it.each(['EPERM', 'EBUSY', 'EACCES'])('counts %s that clears on the second look as an atomic save', async (code) => {
+      const callback = vi.fn()
+      vi.mocked(fsPromises.stat).mockRejectedValueOnce(errno(code)).mockResolvedValue({} as never)
+
+      detector.registerDelete('/test/file.txt', callback)
+      await vi.advanceTimersByTimeAsync(110)
+      expect(callback).not.toHaveBeenCalled()
+      await vi.advanceTimersByTimeAsync(UNREADABLE_RECHECK_MS)
+
+      expect(callback).toHaveBeenCalledWith('/test/file.txt', true)
+    })
+
+    it.each(['EPERM', 'EBUSY'])('counts %s that is still there on the second look as a delete', async (code) => {
       const callback = vi.fn()
       vi.mocked(fsPromises.stat).mockRejectedValue(errno(code))
 
       detector.registerDelete('/test/file.txt', callback)
-      await vi.advanceTimersByTimeAsync(110)
+      await vi.advanceTimersByTimeAsync(110 + UNREADABLE_RECHECK_MS)
 
-      expect(callback).toHaveBeenCalledWith('/test/file.txt', true)
+      expect(callback).toHaveBeenCalledWith('/test/file.txt', false)
+      expect(fsPromises.stat).toHaveBeenCalledTimes(2)
     })
 
     it('counts ENOTDIR (a folder on the way is now a file) as gone', async () => {

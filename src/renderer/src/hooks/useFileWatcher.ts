@@ -405,7 +405,11 @@ export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcherRe
 
     const unsubscribeError = window.api.fileWatch.onFileError((data) => {
       if (data.filePath === filePath) {
-        logger.error('File watch error', undefined, { error: data.error })
+        // The main process ended the watch: forget the hold, as on a delete
+        // (#252). The editor has no degraded state for this yet, so outside
+        // edits stop reaching the tab until it is reopened - logged only.
+        if (data.ended) forgetFileWatch(slot)
+        logger.error('File watch error', undefined, { error: data.error, ended: data.ended === true })
       }
     })
 

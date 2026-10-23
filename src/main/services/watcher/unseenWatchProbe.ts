@@ -126,7 +126,11 @@ export class UnseenWatchProbe {
     })
   }
 
-  /** A project switch: cancel the armed round, end a running check early, forget every verdict. */
+  /**
+   * A project switch: cancel the armed round, end a running check early (its
+   * answers, even "gone", are dropped) and forget every verdict and the old
+   * project's back-off.
+   */
   reset(): void {
     this.generation++
     if (this.timer !== null) {
@@ -135,6 +139,7 @@ export class UnseenWatchProbe {
     }
     this.coveredVerdicts.clear()
     this.missedRounds.clear()
+    this.lastRoundMs = 0
   }
 
   /** Stop for good (app shutdown). */
@@ -159,7 +164,8 @@ export class UnseenWatchProbe {
       } catch (error) {
         logger.error('Unseen file watch probe failed', redactedLogError(error))
       } finally {
-        this.lastRoundMs = Date.now() - startedAt
+        // A round cut short by a reset says nothing about the next project's disk
+        if (!this.isCancelled(generation)) this.lastRoundMs = Date.now() - startedAt
         this.roundPending = false
       }
       this.schedule()

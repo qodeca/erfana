@@ -20,7 +20,7 @@ import {
   type RemovalCoverage
 } from './unseenWatchProbe'
 
-const ROOT = path.join(path.sep, 'proj')
+const ROOT = path.resolve(path.sep, 'proj')
 const at = (...segments: string[]): string => path.join(ROOT, ...segments)
 const HIDDEN = at('.github', 'workflows', 'ci.yml')
 const DIST = at('dist', 'notes.md')
@@ -340,6 +340,52 @@ describe('UnseenWatchProbe – checkNow, reset and dispose', () => {
     expect(missing).toEqual([DIST, DIST])
     expect(missing).not.toContain(HIDDEN)
     expect(checked(exists).filter(p => p === HIDDEN)).toHaveLength(1)
+    probe.dispose()
+  })
+
+  it('reset() drops a round’s late answer: "gone" after the switch is not counted', async () => {
+    let answer: (present: boolean) => void = () => {}
+    const exists = vi.fn(async (): Promise<boolean> => new Promise<boolean>(resolve => (answer = resolve)))
+    const { probe, missing } = makeProbe({ watched: [HIDDEN], covered: () => false, exists })
+
+    await vi.advanceTimersByTimeAsync(ROUND)
+    expect(exists).toHaveBeenCalledTimes(1)
+    probe.reset()
+    answer(false)
+
+    // The same path is still watched after the switch, and is gone: its first
+    // miss in the new session must not be its second
+    exists.mockImplementation(async () => false)
+    await vi.advanceTimersByTimeAsync(ROUND)
+    expect(exists).toHaveBeenCalledTimes(2)
+    expect(missing).toEqual([])
+    probe.dispose()
+  })
+
+  it('reset() drops a checkNow’s late answer', async () => {
+    let answer: (present: boolean) => void = () => {}
+    const exists = vi.fn(async (): Promise<boolean> => new Promise<boolean>(resolve => (answer = resolve)))
+    const { probe, missing } = makeProbe({ watched: [HIDDEN], covered: () => true, exists })
+
+    const lostCheck = probe.checkNow([HIDDEN], () => false)
+    await vi.waitFor(() => expect(exists).toHaveBeenCalledTimes(1))
+    probe.reset()
+    answer(false)
+    await lostCheck
+
+    expect(missing).toEqual([])
+    probe.dispose()
+  })
+
+  it('counts a stat slower than the time box as present, even when it says "gone" later', async () => {
+    const slowGone = (): Promise<boolean> =>
+      new Promise<boolean>(resolve => setTimeout(() => resolve(false), UNSEEN_STAT_TIMEOUT_MS + 500))
+    const { probe, missing, exists } = makeProbe({ watched: [HIDDEN], covered: () => false, exists: slowGone })
+
+    await vi.advanceTimersByTimeAsync((ROUND + UNSEEN_STAT_TIMEOUT_MS) * 4)
+
+    expect(exists.mock.calls.length).toBeGreaterThanOrEqual(MISSING_ROUNDS_TO_REPORT + 1)
+    expect(missing).toEqual([])
     probe.dispose()
   })
 

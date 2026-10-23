@@ -328,7 +328,8 @@ describe('FileWatcherService re-arm bail-outs', () => {
       {
         id: 1,
         channel: 'file-watch:error',
-        payload: { filePath: FILE, error: WATCH_DEAD_SESSION_ENDED }
+        // `ended`: the renderer slot forgets its hold, as on a delete (#252)
+        payload: { filePath: FILE, error: WATCH_DEAD_SESSION_ENDED, ended: true }
       }
     ])
     expect(internals.watchedFiles.has(FILE)).toBe(false)
@@ -379,7 +380,7 @@ describe('FileWatcherService re-arm confinement', () => {
       {
         id: 1,
         channel: 'file-watch:error',
-        payload: { filePath: FILE, error: WATCH_DEAD_OUTSIDE_PROJECT }
+        payload: { filePath: FILE, error: WATCH_DEAD_OUTSIDE_PROJECT, ended: true }
       }
     ])
     expect(internals.watchedFiles.has(FILE)).toBe(false)

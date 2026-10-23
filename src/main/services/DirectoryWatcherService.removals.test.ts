@@ -93,7 +93,8 @@ import { ProjectPathFilter } from '../utils/projectPathFilter'
 import { PAUSE_CONTROLLER } from '../../shared/constants'
 import { MAX_REMEMBERED_REMOVALS } from './watcher/PauseEpisode'
 
-const ROOT = path.join(path.sep, 'work', 'proj')
+// path.resolve, not path.join: the code resolves paths, which adds the drive on Windows
+const ROOT = path.resolve(path.sep, 'work', 'proj')
 const FLUSH_MS = 1000
 const OWNER = 1
 const webContents = { id: OWNER } as unknown as WebContents
@@ -400,7 +401,7 @@ describe('DirectoryWatcherService.reportsRemovalsAbove (#252)', () => {
     expect(idle.reportsRemovalsAbove(inRoot('docs', 'open.md'))).toBe(false)
 
     const svc = await start('native-recursive')
-    expect(svc.reportsRemovalsAbove(path.join(path.sep, 'elsewhere', 'open.md'))).toBe(false)
+    expect(svc.reportsRemovalsAbove(path.resolve(path.sep, 'elsewhere', 'open.md'))).toBe(false)
     expect(svc.reportsRemovalsAbove(`${ROOT}-sibling${path.sep}open.md`)).toBe(false)
   })
 

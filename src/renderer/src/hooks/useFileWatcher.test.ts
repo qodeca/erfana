@@ -20,7 +20,7 @@ import { createFileSaveGuard, isEchoEvent, useFileWatcher } from './useFileWatch
 
 type FileChangedCallback = (data: { filePath: string }) => void
 type FileDeletedCallback = (data: { filePath: string }) => void
-type FileErrorCallback = (data: { filePath: string; error: string }) => void
+type FileErrorCallback = (data: { filePath: string; error: string; ended?: boolean }) => void
 
 let fileChangedListeners: FileChangedCallback[] = []
 let fileDeletedListeners: FileDeletedCallback[] = []
@@ -745,6 +745,39 @@ describe('useFileWatcher', () => {
       expect(result.current.isFileDeleted).toBe(false)
       await waitFor(() => expect(mockFileWatch.start).toHaveBeenCalledTimes(2))
       expect(mockFileWatch.stop).not.toHaveBeenCalled()
+    })
+
+    it('sends no stop on unmount for a watch main ended with an error (#252)', async () => {
+      let emitError: FileErrorCallback = () => {}
+      mockFileWatch.onFileError.mockImplementation((cb: FileErrorCallback) => {
+        emitError = cb
+        return vi.fn()
+      })
+      const { unmount } = await renderWatching()
+
+      act(() => {
+        emitError({ filePath: TEST_PATH, error: 'File watch ended: could not re-arm', ended: true })
+      })
+      unmount()
+      await act(async () => {})
+
+      expect(mockFileWatch.stop).not.toHaveBeenCalled()
+    })
+
+    it('still sends its stop after a plain watcher error the watch survived', async () => {
+      let emitError: FileErrorCallback = () => {}
+      mockFileWatch.onFileError.mockImplementation((cb: FileErrorCallback) => {
+        emitError = cb
+        return vi.fn()
+      })
+      const { unmount } = await renderWatching()
+
+      act(() => {
+        emitError({ filePath: TEST_PATH, error: 'EMFILE' })
+      })
+      unmount()
+
+      await waitFor(() => expect(mockFileWatch.stop).toHaveBeenCalledTimes(1))
     })
 
     it('sends no stop on unmount for a watch the delete already ended', async () => {

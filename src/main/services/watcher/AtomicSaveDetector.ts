@@ -15,7 +15,7 @@
  * Solution: Wait 100ms after DELETE. If file reappears, emit CHANGE instead.
  */
 
-import { pathIsPresent } from './pathPresence'
+import { isPresentAfterSettle } from './pathPresence'
 
 export type AtomicSaveCallback = (path: string, wasAtomicSave: boolean) => void
 
@@ -120,11 +120,13 @@ export class AtomicSaveDetector {
   }
 
   /**
-   * Check if file exists. Only a `stat` that says the path is gone counts as
-   * a delete (`pathIsPresent`): a locked or unreadable file is still there.
+   * Check if file exists. An unreadable file is asked about once more after a
+   * short wait (`isPresentAfterSettle`): a file locked for a moment comes back
+   * as an atomic save, one still unreadable – on Windows, deleted while
+   * another process held it open – counts as deleted.
    */
   private async fileExists(filePath: string): Promise<boolean> {
-    return pathIsPresent(filePath)
+    return isPresentAfterSettle(filePath)
   }
 }
 

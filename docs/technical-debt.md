@@ -364,9 +364,11 @@ After the heartbeat hardening (Phase A4 resume-refresh, B1 symlink defense, D3 H
 
 **Recommended Solution**: route `watchFile` through `assertInsideProject` from `src/main/utils/projectConfinement.ts`, keeping the existing "file does not exist" throw (the guard lets a `missing` verdict through on purpose).
 
-**Files**: `src/main/services/FileWatcherService.ts` (`watchFile`), `src/main/utils/projectConfinement.ts`.
+**The confined-path wrapper (#252 review, 2026-10).** The fuller fix is to register `file-watch:start` through `registerConfinedHandle`, as every `file:*` channel is. It is not a small change: the channel takes a positional string rather than a request object ([IPC patterns](./ipc-patterns.md)), so it needs a strict request schema, a preload and renderer API change, a project session passed into `registerFileWatcherHandlers`, and a refusal mapped to `{ success: false, error }`, whose wording the renderer's `classifyWatchStartFailure` reads. The handler must also watch the `requested` spelling, since every event is matched against it. `stop`, `pause` and `resume` only look up the map, so they touch no file. Meanwhile, #252's unseen-file probe `stat`s only this session's paths lexically inside the project (`FileWatcherService.probeablePaths`), so it never reaches outside it.
 
-**Status**: Open — recorded by the #70 design (§9.1) and its review rounds. **A follow-up issue should be filed.**
+**Files**: `src/main/services/FileWatcherService.ts` (`watchFile`), `src/main/utils/projectConfinement.ts`; for the wrapper also `src/main/ipc/file-watcher-handlers.ts` and `src/preload/index.ts`.
+
+**Status**: Open — recorded by the #70 design (§9.1) and its review rounds; the wrapper note added by the #252 review. **A follow-up issue should be filed.**
 
 ---
 
@@ -1015,16 +1017,6 @@ The `files.exclude` list, the project path filter and the Windows native directo
 - **D1 – (Windows) a root whose real path cannot be resolved is watched as given.** `realpathSync.native` can fail on some RAM, network or virtual drives; for any code other than `ENOENT` (or `EPERM`, reported as `ENOENT`), `resolveRealRoot` logs `Native watcher: resolving the root failed, watching it as given` and every handle opens under the caller's spelling, which may be an 8.3 short name. Harmless on Electron 39's libuv 1.51.0, which does not abort on a short-name watch ([W0 spike](./spikes/211-windows-fs-watch.md)). Fix: none now; when an Electron upgrade brings libuv 1.52.x, re-check R13 (the short-name abort, [design](./designs/211-large-project-windows-watcher.md) §8) and the D15 self-event match on such a drive. Where: `NativeRecursiveWatcher.ts` (`resolveRealRoot`).
 
 **Status**: Accepted — recorded from the #211 QG-6, QG-7, QG-8 and QG-11a verdicts. User-visible limits of the same change are in [Known issues § Excluded folders](./known-issues.md#excluded-folders-filesexclude-known-limits).
-
----
-
-### 66. `file-watch:*` channels are not on the confined-path wrapper (#252, 2026-10)
-
-**Severity**: Low
-
-`file-watch:start` still checks its path with the lexical prefix test in `FileWatcherService.watchFile` (an `eslint-disable` marks it), not through `registerConfinedHandle`; the atomic re-arm re-checks the real path later (`isPathConfined`). The #252 review asked for the move if it was small. It is not: the channel takes a positional string rather than a request object ([IPC patterns](./ipc-patterns.md)), so it needs a strict request schema, a preload and renderer API change, a project session passed into `registerFileWatcherHandlers`, and a refusal mapped to `{ success: false, error }` – whose wording the renderer's `classifyWatchStartFailure` reads. The handler must also watch the `requested` spelling, since every event is matched against it. `stop`, `pause` and `resume` only look up the map, so they touch no file. What #252 did instead: the unseen-file probe `stat`s only this session's paths lexically inside the project (`FileWatcherService.probeablePaths`), so it never reaches outside it. Where: `src/main/ipc/file-watcher-handlers.ts`, `src/preload/index.ts`, `FileWatcherService.watchFile`.
-
-**Status**: Open — a follow-up from the #252 review.
 
 ---
 

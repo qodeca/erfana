@@ -102,8 +102,12 @@ const api = {
         ipcRenderer.removeListener('file-watch:deleted', listener)
       }
     },
-    onFileError: (callback: (data: { filePath: string; error: string }) => void): (() => void) => {
-      const listener = (_event: unknown, data: { filePath: string; error: string }) => callback(data)
+    // `ended`: the main process dropped the watch (every count with it) - #252
+    onFileError: (
+      callback: (data: { filePath: string; error: string; ended?: boolean }) => void
+    ): (() => void) => {
+      const listener = (_event: unknown, data: { filePath: string; error: string; ended?: boolean }) =>
+        callback(data)
       ipcRenderer.on('file-watch:error', listener)
       return () => {
         ipcRenderer.removeListener('file-watch:error', listener)

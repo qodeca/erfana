@@ -80,6 +80,9 @@ export class FileWatcherService {
    */
   async stopAll(): Promise<void> {
     this.safeLog('👁️  Stopping all file watchers...')
+    // First, before the closes below can be overtaken: a check still waiting on
+    // the old project's disk stops at its next file and reports nothing (#252)
+    this.unseenProbe.reset()
     for (const [filePath, watched] of this.watchedFiles.entries()) {
       this.atomicSaveDetector.cancelPending(filePath)
       if (watched.debounceTimer) {
@@ -94,8 +97,6 @@ export class FileWatcherService {
     this.watchedFiles.clear()
     // Increment session to ignore late events from the previous watchers
     this.switchVersion++
-    // A check still waiting on the old project's disk stops at its next file
-    this.unseenProbe.reset()
   }
 
   /**
@@ -120,7 +121,7 @@ export class FileWatcherService {
   async watchFile(filePath: string, webContents: WebContents): Promise<void> {
     // Security: Prevent watching files outside project
     // The watch channels move onto the confined-path wrapper in a follow-up
-    // (docs/technical-debt.md #66); until then this prefix test stays as it was.
+    // (docs/technical-debt.md #24); until then this prefix test stays as it was.
     // eslint-disable-next-line no-restricted-syntax
     if (this.projectPath && !filePath.startsWith(this.projectPath)) {
       throw new Error('Cannot watch files outside the project directory')
@@ -518,7 +519,9 @@ export class FileWatcherService {
     const watched = this.watchedFiles.get(filePath)
     if (!watched) return
 
-    this.send(watched, 'file-watch:error', { filePath, error: reason })
+    // `ended`: the entry and every count go with it, so a renderer slot must
+    // forget its hold rather than send a `stop` for it later (#252)
+    this.send(watched, 'file-watch:error', { filePath, error: reason, ended: true })
   }
 
   /** Hand one event to the subscribing windows (see `watcher/watchNotifier`) */

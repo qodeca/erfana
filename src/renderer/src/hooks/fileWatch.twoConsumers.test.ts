@@ -4,7 +4,8 @@
  * Two consumers of one file across a delete and a restore (#252).
  *
  * The main process counts `start`s per file and drops the whole entry - every
- * count - when it reports the file deleted. If a consumer then sent a `stop`
+ * count - when it reports the file deleted, or ends the watch with an error
+ * flagged `ended`. If a consumer then sent a `stop`
  * for the hold it had before the delete, it would take the count another
  * consumer had just rebuilt, and that tab would go deaf. Here the editor
  * (`useFileWatcher`) and a read-only viewer (`useFileChangeSubscription`)
@@ -99,4 +100,41 @@ describe('two consumers of one file, across a delete and a restore', () => {
       await waitFor(() => expect(mainCount).toBe(0))
     }
   )
+
+  it('neither sends a stop for a watch the main process ended with an error', async () => {
+    const { editor, viewer } = renderBoth()
+    await waitFor(() => expect(mainCount).toBe(2))
+
+    // notifyWatchDead: main drops the entry, every count with it, and says so
+    mainCount = 0
+    h.emitError(SHARED_PATH, 'File watch ended: could not re-arm after the file was replaced', true)
+    expect(viewer.result.current.unavailableReason).toBe('watcher-error')
+
+    // The viewer's Reload starts a fresh watch; the editor's close must not take it
+    await act(async () => {
+      await viewer.result.current.recover()
+    })
+    await waitFor(() => expect(mainCount).toBe(1))
+    editor.unmount()
+    await act(async () => {})
+
+    expect(mainCount).toBe(1)
+    expect(h.fileWatch.stop).not.toHaveBeenCalled()
+    viewer.unmount()
+    await waitFor(() => expect(mainCount).toBe(0))
+  })
+
+  it('still releases a live watch after a plain watcher error', async () => {
+    const { viewer } = renderBoth()
+    await waitFor(() => expect(mainCount).toBe(2))
+
+    // A chokidar error the watch survives: main keeps the entry and its counts
+    h.emitError(SHARED_PATH, 'EMFILE')
+    await act(async () => {
+      await viewer.result.current.recover()
+    })
+
+    expect(h.fileWatch.stop).toHaveBeenCalledTimes(1)
+    expect(mainCount).toBe(2)
+  })
 })
