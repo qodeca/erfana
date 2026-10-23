@@ -30,6 +30,7 @@ import {
   installNoForkConsoleList,
   nativeExitAtMs
 } from './nodePtyWindowsShim'
+import { TerminalOutputFlow } from './terminalOutputFlow'
 
 /**
  * Outcome of {@link TerminalService.createTerminal}. A failure carries its
@@ -101,6 +102,8 @@ interface TerminalInstance {
   hasReceivedMarker: boolean // Track if marker was detected (prevents late data forwarding)
   /** Output that arrived after the marker line while the clear handshake was open; flushed in order once it ends. */
   pendingOutput: string
+  /** Batches output to the renderer and pauses the PTY when the renderer falls behind. */
+  output: TerminalOutputFlow
   webContentsId: number // Track owning webContents for cleanup on window close
   shellKind: ShellKind // Quoting flavour resolved at create time (#164)
   shellNames: ReadonlySet<string> // Names the idle shell shows as; see terminalForeground.ts
@@ -183,6 +186,16 @@ export function cutHeldOutput(text: string): string {
     tail = tail.slice(1)
   }
   return '\x1b[0m' + tail
+}
+
+/** Whether `pid` is still running. EPERM means it exists but is not ours to signal. */
+function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (error) {
+    return (error as { code?: unknown }).code === 'EPERM'
+  }
 }
 
 /**
@@ -446,6 +459,27 @@ export class TerminalService extends EventEmitter {
         env: spawnEnv
       })
 
+      // Output to the renderer is batched; on POSIX the PTY is also paused while
+      // the renderer is far behind. Not on Windows: node-pty 1.1.0 implements
+      // pause() there by pausing the socket fed from the ConPTY output pipe, and
+      // its clean-up is driven by that socket's data events. After the shell
+      // exits it destroys the socket a fixed time after the last data event
+      // (`_$onProcessExit`, `_flushDataAndCleanUp`), which would drop output a
+      // pause still holds, and the conpty.dll kill path disposes the pipe reader
+      // only on the next data event. A pause there could lose output or hold up
+      // the exit the quit sequence waits for (#214, #296), so Windows terminals
+      // are only batched.
+      const flowControl = osPlatform() !== 'win32'
+      const ptyPid = ptyProcess.pid
+      const output = new TerminalOutputFlow({
+        emit: (data) => this.emit('data', { terminalId, data, webContentsId: webContentsId ?? -1 }),
+        ...(flowControl && {
+          pause: () => ptyProcess.pause(),
+          resume: () => ptyProcess.resume(),
+          isAlive: () => typeof ptyPid !== 'number' || isProcessAlive(ptyPid)
+        })
+      })
+
       let markExited: () => void = () => {}
       const exited = new Promise<void>((resolve) => {
         markExited = resolve
@@ -464,6 +498,7 @@ export class TerminalService extends EventEmitter {
         isClearing: false, // Will be set to true during terminal clear phase
         hasReceivedMarker: false, // Will be set to true when marker is detected
         pendingOutput: '',
+        output,
         // Track owning webContents for cleanup on window close (issue #59)
         // Sentinel value -1 means "no owner" - terminals with -1 won't be cleaned up
         // during window destruction (used in tests and manual terminal creation)
@@ -556,6 +591,17 @@ export class TerminalService extends EventEmitter {
       // regressions.
       ptyProcess.onData((data: string) => {
         const term = this.terminals.get(terminalId)
+        // Steady state, checked first so a flood builds no log strings per chunk
+        if (
+          term?.initializationComplete &&
+          !term.isClearing &&
+          term.hasReceivedMarker &&
+          !markerChunkHandled &&
+          !markerLineEndPending
+        ) {
+          term.output.push(data)
+          return
+        }
         // Length only – PTY output is user content and must never reach the log file.
         // `logger.debug` drops the call below the configured level.
         logger.debug(`[PRIMARY onData] term=${!!term}, init=${term?.initializationComplete}, clearing=${term?.isClearing}, marker=${term?.hasReceivedMarker}, length=${data.length}`)
@@ -581,7 +627,7 @@ export class TerminalService extends EventEmitter {
 
         if (term.initializationComplete && !term.isClearing) {
           logger.debug(`[PRIMARY onData] FORWARDING data`)
-          this.emit('data', { terminalId, data: output, webContentsId: webContentsId ?? -1 })
+          term.output.push(output)
         } else {
           // Clear handshake still open: keep it, in order, for the flush.
           logger.debug(`[PRIMARY onData] QUEUEING data`)
@@ -603,6 +649,8 @@ export class TerminalService extends EventEmitter {
         terminal.isClearing = false
         terminal.initializationComplete = true
         this.flushPendingOutput(terminal)
+        // Everything the shell printed reaches the renderer before its exit does
+        terminal.output.dispose()
         this.emit('exit', { terminalId, exitCode: event.exitCode, signal: event.signal, webContentsId: webContentsId ?? -1 })
         this.terminals.delete(terminalId)
       })
@@ -635,7 +683,17 @@ export class TerminalService extends EventEmitter {
     const data = terminal.pendingOutput
     if (!data) return
     terminal.pendingOutput = ''
-    this.emit('data', { terminalId: terminal.id, data, webContentsId: terminal.webContentsId })
+    // The prompt held back during start-up is shown at once, not a tick later
+    terminal.output.push(data)
+    terminal.output.flush()
+  }
+
+  /**
+   * The renderer has parsed `chars` more characters of a terminal's output
+   * (`terminal:ackOutput`). An unknown id is ignored.
+   */
+  ackOutput(terminalId: string, chars: number): void {
+    this.terminals.get(terminalId)?.output.ack(chars)
   }
 
   /**
@@ -688,6 +746,7 @@ export class TerminalService extends EventEmitter {
         logger.info(`ℹ️ Terminal ${terminalId} PTY closed (terminal likely exited)`)
         // Clean up the closed terminal
         this.terminals.delete(terminalId)
+        terminal.output.dispose()
         this.emit('exit', { terminalId, exitCode: 0, webContentsId: terminal.webContentsId })
         return false
       }
@@ -726,6 +785,7 @@ export class TerminalService extends EventEmitter {
       if (message.includes('already exited')) {
         logger.debug(`Terminal ${terminalId} resize ignored (pty already exited)`)
         this.terminals.delete(terminalId)
+        terminal.output.dispose()
         return false
       }
 
@@ -758,7 +818,11 @@ export class TerminalService extends EventEmitter {
     }
 
     try {
+      // Send what is queued and lift a pause first: a paused shell would not see
+      // its hang-up, and node-pty would not report its exit
+      terminal.output.release()
       this.ptyKill(terminal)
+      terminal.output.dispose()
       this.terminals.delete(terminalId)
       this.trackExit(terminal)
       logger.info(`🛑 Terminal ${terminalId} killed`)
@@ -768,6 +832,7 @@ export class TerminalService extends EventEmitter {
       const code = (error as { code?: unknown }).code
       if (code === 'EPIPE' || code === 'ESRCH') {
         logger.info(`ℹ️ Terminal ${terminalId} process already terminated`)
+        terminal.output.dispose()
         this.terminals.delete(terminalId)
         this.trackExit(terminal)
         return true
@@ -929,6 +994,8 @@ export class TerminalService extends EventEmitter {
         clearTimeout(terminal.clearFallbackTimeout)
         terminal.clearFallbackTimeout = undefined
       }
+      // The owner is gone or the app is quitting: never leave a shell paused
+      terminal.output.dispose()
       this.terminals.delete(terminalId)
       this.trackExit(terminal)
       detached.push(terminal)

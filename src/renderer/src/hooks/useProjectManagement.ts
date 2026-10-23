@@ -27,6 +27,7 @@ import type { IUseProjectManagementOptions, IUseProjectManagementReturn } from '
 import { useDialog } from '../components/Dialog'
 import { showGlobalToast } from '../components/Toast/toastService'
 import { logger } from '../utils/logger'
+import { recordTreeReadMs } from '../utils/treeReadTiming'
 import { noteProjectGeneration } from '../services/projectGeneration'
 import {
   createCoalescingRunner,
@@ -215,7 +216,7 @@ export function useProjectManagement(
         try {
           setLoading(true)
           const treeLoadStart = performance.now()
-          const fileTree = await api.file.readDirectory(newPath)
+          const fileTree = await api.file.readDirectory({ dirPath: newPath })
           const treeLoadDuration = Math.round(performance.now() - treeLoadStart)
           if (generation !== refreshGenerationRef.current) {
             // A newer switch or close superseded this load: no tree, no toast.
@@ -315,7 +316,7 @@ export function useProjectManagement(
       logger.error(createOpenProjectErrorLog(), err instanceof Error ? err : undefined)
       showGlobalToast({
         type: 'error',
-        title: 'Open Project Failed',
+        title: 'Failed to Open Project',
         message: createOpenErrorMessage(err)
       })
     } finally {
@@ -362,7 +363,7 @@ export function useProjectManagement(
       logger.error(createCloseProjectErrorLog(), err instanceof Error ? err : undefined)
       showGlobalToast({
         type: 'error',
-        title: 'Close Project Failed',
+        title: 'Failed to Close Project',
         message: createCloseErrorMessage(err)
       })
     } finally {
@@ -403,7 +404,7 @@ export function useProjectManagement(
         // Open project directly by path (files will be loaded by IPC event)
         // Success toast will be shown by IPC listener after files load
         const previousPath = projectPathRef.current
-        const openedPath = await api.file.openProjectByPath(projectPath)
+        const openedPath = await api.file.openProjectByPath({ projectPath })
         // Main answers the path for a no-op too, so an unchanged path is the no-op
         projectChanged = openedPath !== previousPath
         return true
@@ -437,8 +438,9 @@ export function useProjectManagement(
     try {
       const ticket = takeReadTicket(generation)
       const refreshStart = performance.now()
-      const fileTree = await api.file.readDirectory(path)
+      const fileTree = await api.file.readDirectory({ dirPath: path })
       const refreshDuration = Math.round(performance.now() - refreshStart)
+      recordTreeReadMs(refreshDuration)
       const applied = applyTreeIfCurrent(ticket, fileTree)
       logger.info('[useProjectManagement] File tree refreshed', {
         durationMs: refreshDuration,

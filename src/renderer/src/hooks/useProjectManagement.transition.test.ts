@@ -11,6 +11,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useProjectManagement } from './useProjectManagement'
+import { showGlobalToast } from '../components/Toast/toastService'
 
 const mocks = vi.hoisted(() => ({
   settle: vi.fn(),
@@ -85,6 +86,10 @@ describe('useProjectManagement transitions', () => {
         await result.current.handleOpenProject()
       })
       expect(mocks.settle).toHaveBeenCalledExactlyOnceWith(false)
+      // Same wording as the Welcome panel's open failure
+      expect(showGlobalToast).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'error', title: 'Failed to Open Project' })
+      )
     })
 
     it('opens nothing and never settles when the prompt was cancelled (prepare already ended it)', async () => {
@@ -124,6 +129,9 @@ describe('useProjectManagement transitions', () => {
         await result.current.handleCloseProject()
       })
       expect(mocks.settle).toHaveBeenCalledExactlyOnceWith(false)
+      expect(showGlobalToast).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'error', title: 'Failed to Close Project' })
+      )
     })
   })
 

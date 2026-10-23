@@ -4,6 +4,7 @@ import { app, BrowserWindow, Menu, dialog, session } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { spawnNewInstance } from './utils/spawnNewInstance'
+import { moveToSafeWorkingDirectory } from './utils/safeWorkingDirectory'
 import { registerFileHandlers, projectService } from './ipc/file-handlers'
 import { registerFileWatcherHandlers } from './ipc/file-watcher-handlers'
 import { registerDirectoryWatcherHandlers } from './ipc/directory-watcher-handlers'
@@ -27,13 +28,12 @@ import { registerTranscriptionHandlers } from './ipc/transcription-handlers'
 import { registerClipboardHandlers } from './ipc/clipboard-handlers'
 import { registerImageExportHandlers } from './ipc/image-export-handlers'
 import { registerBrowserHandlers } from './ipc/browser-handlers'
+import { registerMarkdownImageHandlers } from './ipc/markdown-image-handlers'
 import { registerClaudeStatusHandlers } from './ipc/claude-status-handlers'
 import { registerPreviewHandlers } from './ipc/preview-handlers'
 import { registerPreviewScheme } from './services/preview/previewScheme'
-import { DependencyDetector, converterRegistry, getExtensionsForDependencies } from './services/import'
+import { importToolStatusService, killActiveLibreOfficeProbes } from './services/import'
 import { FORCE_CRASH_ARG, LOGS_DIR_RELATIVE, TEST_HOOKS_ARG } from '../shared/constants'
-import { IMPORT_CHANNELS } from '../shared/ipc/import-channels'
-import type { DependencyReadyEvent } from '../shared/ipc/import-schema'
 import { createApplicationMenu, setPreviewZoomHandler } from './menu'
 import { fileService } from './services/FileService'
 import { redactedLogError } from './utils/redactUserInput'
@@ -73,6 +73,17 @@ registerProcessCrashLogging()
 // `app.whenReady()`, so it lives here at module scope beside the other pre-ready
 // setup (`registerSchemesAsPrivileged` is a no-op once the app is ready).
 registerPreviewScheme()
+
+// Packaged: leave the launching folder (possibly a cloned repo) as cwd, so no
+// bare-name spawn can resolve into it (#250). Dev keeps the repo as cwd.
+moveToSafeWorkingDirectory({
+  isPackaged: app.isPackaged,
+  platform: process.platform,
+  execPath: process.execPath,
+  userDataPath: () => app.getPath('userData'),
+  chdir: (dir) => process.chdir(dir),
+  warn: (message, context) => logger.warn(message, context)
+})
 
 // Strip --new-window flag to prevent infinite spawn loops
 // Must happen before any window creation
@@ -510,6 +521,8 @@ app.whenReady().then(async () => {
   registerImageExportHandlers()
   // Open in default browser (#124): sender-gated, confined to the open project.
   registerBrowserHandlers()
+  // Images referenced from Markdown (#71): sender-gated, confined to the open project.
+  registerMarkdownImageHandlers(projectService.session)
   // Per-terminal Claude Code context status bar (#216). Uses the same
   // terminalService singleton so it can look up the main-owned PTY pid + cwd.
   claudeStatusHandlers = registerClaudeStatusHandlers(terminalService)
@@ -559,23 +572,11 @@ app.whenReady().then(async () => {
   }
 
   // Fire-and-forget: detect system dependencies for LiteParse document import
-  // Runs async after window creation so it doesn't block startup
-  const dependencyDetector = new DependencyDetector()
-  dependencyDetector.detect().then((deps) => {
-    const extensions = getExtensionsForDependencies(deps)
-    if (extensions.length > 0) {
-      converterRegistry.updateConverterExtensions('document', extensions)
-    }
-    // Notify renderer that dependencies have been detected
-    if (mainWindowRef && !mainWindowRef.isDestroyed()) {
-      const payload: DependencyReadyEvent = {
-        libreOffice: deps.libreOffice,
-        imageMagick: deps.imageMagick,
-        extensions: converterRegistry.getExtensionsByConversionType().requiresConversion
-      }
-      mainWindowRef.webContents.send(IMPORT_CHANNELS.DEPENDENCIES_READY, payload)
-    }
-  }).catch((error) => {
+  // Runs async after window creation so it doesn't block startup. The service
+  // maps the found tools' extensions into the converter registry, caches the
+  // result for `import:toolStatus`, and broadcasts `import:dependenciesReady`
+  // to every window (#250).
+  importToolStatusService.getStatus().catch((error) => {
     logger.error('Failed to detect document import dependencies', error instanceof Error ? error : undefined)
   })
 
@@ -646,6 +647,9 @@ app.on('window-all-closed', () => {
   // would make Electron emit another before-quit while the shutdown is running (#305)
   quitGuard.handleWindowAllClosed(() => app.quit())
 })
+
+// A LibreOffice detection probe still running at quit must not outlive the app.
+app.on('will-quit', killActiveLibreOfficeProbes)
 
 // Cleanup file watchers, directory watchers, terminals, git watchers, and project locks before app quits.
 // Pattern B (F11): preventDefault + sequenced shutdown guarantees lock release before exit.
@@ -737,6 +741,8 @@ app.on('before-quit', (event): Promise<void> | undefined => {
   // quits 1 ms after the shutdown started, before any disposer finishes (#305). The
   // only way out is app.exit(0), which runQuitSequence always reaches.
   if (!quitGuard.handleBeforeQuit(event)) return
+  // app.exit(0) below skips `will-quit`, so a running LibreOffice probe is killed here.
+  killActiveLibreOfficeProbes()
 
   // Install the guard synchronously, before the first await, so an already-queued
   // chokidar read callback can't crash the process before the handler is registered.

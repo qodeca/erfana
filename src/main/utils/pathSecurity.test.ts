@@ -691,3 +691,33 @@ describe('isSystemDirectory – Windows rules on any host', () => {
     expect(isSystemDirectory(win32.join('C:\\', 'usr'), win)).toBe(false)
   })
 })
+
+describe('isSystemDirectory – this machine\'s own administrative shares', () => {
+  const win: SystemPathContext = {
+    platform: 'win32',
+    flavour: win32,
+    home: 'C:\\Users\\me',
+    env: { SystemRoot: 'C:\\Windows' },
+    hostname: 'BUILD-01'
+  }
+
+  it.each([
+    '\\\\localhost\\C$\\Windows',
+    '\\\\LOCALHOST\\c$\\windows\\System32',
+    '\\\\127.0.0.1\\C$\\Windows',
+    '\\\\build-01\\C$\\Windows\\x',
+    '\\\\?\\UNC\\localhost\\C$\\Windows',
+    '//localhost/C$/Windows'
+  ])('refuses %s as the system folder it is', (value) => {
+    expect(isSystemDirectory(value, win)).toBe(true)
+  })
+
+  it.each([
+    '\\\\localhost\\C$\\Users\\me\\uncproj',
+    '\\\\localhost\\C$',
+    '\\\\otherhost\\C$\\Windows',
+    '\\\\localhost\\share\\Windows'
+  ])('allows %s', (value) => {
+    expect(isSystemDirectory(value, win)).toBe(false)
+  })
+})

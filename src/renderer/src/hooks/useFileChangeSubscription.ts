@@ -212,7 +212,7 @@ export function useFileChangeSubscription(
     if (!filePath) return false
 
     try {
-      await fileGateway.getStats(filePath)
+      await fileGateway.getStats({ filePath })
     } catch {
       // Still gone – keep the deleted banner up rather than claiming recovery.
       if (isMountedRef.current) setIsFileDeleted(true)
@@ -283,7 +283,7 @@ export function useFileChangeSubscription(
 
       // Invariant 3: never believe a delete without re-checking the disk.
       fileGateway
-        .getStats(filePath)
+        .getStats({ filePath })
         .then(async () => {
           if (!isActive) return
           logger.info('Delete event for a file that still exists; recovering the watch', {

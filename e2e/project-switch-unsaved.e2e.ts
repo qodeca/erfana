@@ -80,8 +80,8 @@ async function createProject(fileName: string): Promise<string> {
 async function openAll(page: Page, paths: string[], current: { path: string; file: string }): Promise<void> {
   const tree = new ProjectTreePage(page)
   await page.evaluate(async (list) => {
-    const api = (window as unknown as { api: { file: { openProjectByPath(p: string): Promise<string> } } }).api
-    for (const p of list) await api.file.openProjectByPath(p)
+    const api = (window as unknown as { api: { file: { openProjectByPath(request: { projectPath: string }): Promise<string> } } }).api
+    for (const p of list) await api.file.openProjectByPath({ projectPath: p })
   }, [...paths, current.path])
   await tree.waitForFile(current.file)
 }
@@ -264,9 +264,9 @@ test.describe('Project switch with unsaved tabs', () => {
     // overlap the open path itself has to survive.
     const answers = await page.evaluate(
       async ([b, c]) => {
-        const api = (window as unknown as { api: { file: { openProjectByPath(p: string): Promise<string> } } }).api
-        const first = api.file.openProjectByPath(b)
-        const second = api.file.openProjectByPath(c)
+        const api = (window as unknown as { api: { file: { openProjectByPath(request: { projectPath: string }): Promise<string> } } }).api
+        const first = api.file.openProjectByPath({ projectPath: b })
+        const second = api.file.openProjectByPath({ projectPath: c })
         return Promise.all([first, second])
       },
       [bPath, cPath]

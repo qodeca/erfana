@@ -39,6 +39,8 @@ export interface EditorContentLayoutProps {
   dividerPositionHorizontal: number
   /** Currently active pane for search bar visibility */
   activePaneId: 'editor' | 'preview'
+  /** Whether dockview is drawing the panel; forwarded to the preview */
+  isVisible?: boolean
 
   // Refs
   /** Ref to Monaco editor handle for formatting and scroll operations */
@@ -136,7 +138,8 @@ export function EditorContentLayout({
   onDividerResizeEnd,
   onOpenFile,
   onPreviewRendered,
-  onSelectionChange
+  onSelectionChange,
+  isVisible = true
 }: EditorContentLayoutProps): JSX.Element {
   return (
     <div className={`editor-content view-mode-${viewMode}`} role="region" aria-label="Editor" data-testid={TEST_IDS.EDITOR_CONTENT}>
@@ -157,6 +160,7 @@ export function EditorContentLayout({
               filePath={currentFile.path}
               onOpenFile={onOpenFile}
               onRendered={onPreviewRendered}
+              isVisible={isVisible}
             />
             {activePaneId === 'preview' && (
               <SearchBar provider={previewProvider} />
@@ -239,6 +243,7 @@ export function EditorContentLayout({
                 filePath={currentFile.path}
                 onOpenFile={onOpenFile}
                 onRendered={onPreviewRendered}
+                isVisible={isVisible}
               />
               {(viewMode === 'preview' || activePaneId === 'preview') && (
                 <SearchBar provider={previewProvider} />

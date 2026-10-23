@@ -96,7 +96,8 @@ function installApi(platform: NodeJS.Platform): void {
       onExit: vi.fn().mockReturnValue(vi.fn()),
       onError: vi.fn().mockReturnValue(vi.fn()),
       onClear: vi.fn().mockReturnValue(vi.fn()),
-      markClearComplete: vi.fn()
+      markClearComplete: vi.fn(),
+      ackOutput: vi.fn()
     },
     file: {
       getProjectPath: vi.fn().mockResolvedValue('/test/project'),

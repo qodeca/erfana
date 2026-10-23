@@ -62,7 +62,8 @@ vi.mock('./LoggingService', () => ({
 // Mock fs/promises
 vi.mock('fs/promises', () => ({
   stat: vi.fn(),
-  realpath: vi.fn()
+  realpath: vi.fn(),
+  lstat: vi.fn(() => Promise.reject(new Error('ENOENT')))
 }))
 
 // Real platform config by default; a test overrides case sensitivity once

@@ -266,14 +266,14 @@ describe('Main Process - Window Creation', () => {
       registerDocumentImportHandlers: vi.fn()
     }))
     vi.doMock('./services/import', () => ({
-      DependencyDetector: vi.fn().mockImplementation(() => ({
-        detect: vi.fn().mockResolvedValue({ libreOffice: false, imageMagick: false })
-      })),
-      converterRegistry: {
-        updateConverterExtensions: vi.fn(),
-        getExtensionsByConversionType: vi.fn().mockReturnValue({ requiresConversion: ['pdf'], passthrough: [] })
-      },
-      getExtensionsForDependencies: vi.fn().mockReturnValue([])
+      killActiveLibreOfficeProbes: vi.fn(),
+      importToolStatusService: {
+        getStatus: vi.fn().mockResolvedValue({
+          libreOffice: 'missing',
+          extensions: ['pdf'],
+          throttled: false
+        })
+      }
     }))
     vi.doMock('../shared/ipc/import-channels', () => ({
       IMPORT_CHANNELS: {
@@ -997,6 +997,18 @@ describe('Main Process - Window Creation', () => {
       try {
         await run({ preventDefault: vi.fn() })
         expect(mockApp.exit).toHaveBeenCalledWith(0)
+      } finally {
+        cleanup()
+      }
+    })
+
+    it('should kill any in-flight LibreOffice probe, since app.exit skips will-quit', async () => {
+      const { killActiveLibreOfficeProbes } = (await import('./services/import')) as any
+      const { run, cleanup } = await loadAndGetBeforeQuit()
+
+      try {
+        await run({ preventDefault: vi.fn() })
+        expect(killActiveLibreOfficeProbes).toHaveBeenCalledTimes(1)
       } finally {
         cleanup()
       }

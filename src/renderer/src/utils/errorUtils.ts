@@ -5,6 +5,7 @@
  */
 
 import { INVALID_FILENAME_MARKER } from '../../../shared/errors'
+import { confinementCodeFromMessage } from '../../../shared/ipc/confinement'
 import { redactQuotedPaths } from '../../../shared/redactQuotedPaths'
 
 /**
@@ -31,14 +32,20 @@ export type FsErrorKind = 'not-found' | 'permission' | 'no-space'
 
 /**
  * The one errno -> kind mapper behind every file-error message in the
- * renderer ({@link formatFileOperationError}, {@link formatSaveError}).
+ * renderer ({@link formatFileOperationError}, {@link formatSaveError},
+ * {@link formatLoadError}).
  *
  * @param message - An error message with the IPC prefix already stripped
  * @returns The kind, or `null` for anything else
  */
 export function classifyFsError(message: string): FsErrorKind | null {
   if (/\bENOENT\b/.test(message) || message.includes('not found')) return 'not-found'
-  if (/\b(EACCES|EPERM)\b/.test(message) || message.includes('permission denied')) {
+  if (
+    /\b(EACCES|EPERM)\b/.test(message) ||
+    message.includes('permission denied') ||
+    // The main process's confinement check refusing an unreadable project file
+    confinementCodeFromMessage(message) === 'PERMISSION_DENIED'
+  ) {
     return 'permission'
   }
   if (/\bENOSPC\b/.test(message)) return 'no-space'
@@ -99,7 +106,7 @@ export function formatFileOperationError(
  * the user why the write did not land. A missing file on save means its folder
  * is gone (the file itself is simply recreated by a write).
  *
- * @param error - What `window.api.file.writeFile` rejected with
+ * @param error - What `fileGateway.writeFile` rejected with
  * @param fileName - The tab's file name, shown in full (toasts keep user values)
  * @returns A one-line reason plus the reassurance that nothing was lost
  *
@@ -118,8 +125,41 @@ export function formatSaveError(error: unknown, fileName: string): string {
     'no-space': 'the disk is full'
   }
   const kind = classifyFsError(reason)
-  const why = kind ? what[kind] : reason.replace(/\.$/, '')
+  // A save that names the project the file was opened under, after that project was closed
+  const projectChanged = confinementCodeFromMessage(reason) === 'PROJECT_CHANGED'
+  const why = projectChanged
+    ? 'the project was changed since this file was opened'
+    : kind
+      ? what[kind]
+      : reason.replace(/\.$/, '')
   return `"${fileName}" could not be saved: ${why}. ${kept}`
+}
+
+/**
+ * The toast and panel text for an editor tab whose file could not be read.
+ * A failed open must never look like an empty tab ("No file open"): this
+ * says which file and why.
+ *
+ * @param error - What `fileGateway.readFile` rejected with
+ * @param fileName - The tab's file name, shown in full (toasts keep user values)
+ * @returns A one-line reason
+ *
+ * @example
+ * ```ts
+ * formatLoadError(new Error("ENOENT: no such file or directory, open '/p/a.md'"), 'a.md')
+ * // '"a.md" could not be opened: it no longer exists on disk.'
+ * ```
+ */
+export function formatLoadError(error: unknown, fileName: string): string {
+  const reason = sanitizeIpcError(error)
+  const what: Record<FsErrorKind, string> = {
+    'not-found': 'it no longer exists on disk',
+    permission: 'permission denied',
+    'no-space': 'the disk is full'
+  }
+  const kind = classifyFsError(reason)
+  const why = kind ? what[kind] : reason.replace(/\.$/, '')
+  return `"${fileName}" could not be opened: ${why}.`
 }
 
 /**

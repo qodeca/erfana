@@ -26,5 +26,6 @@ export const terminalGateway: TerminalBridge = {
   onExit: (...args) => bridge().onExit(...args),
   onError: (...args) => bridge().onError(...args),
   onClear: (...args) => bridge().onClear(...args),
-  markClearComplete: (...args) => bridge().markClearComplete(...args)
+  markClearComplete: (...args) => bridge().markClearComplete(...args),
+  ackOutput: (...args) => bridge().ackOutput(...args)
 }

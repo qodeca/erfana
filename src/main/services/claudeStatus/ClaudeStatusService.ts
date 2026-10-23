@@ -41,8 +41,13 @@ import {
   type WindowDetection,
   type WindowRule
 } from './ClaudeWindowDetector'
-import { friendlyModelName, sanitizeModelId } from './friendlyModelName'
-import { stickyModelKey } from './modelId'
+import {
+  friendlyModelName,
+  maskAwsAccountId,
+  sanitizeModelId,
+  sanitizeProviderModelId
+} from './friendlyModelName'
+import { isRecognisedModelId, stickyModelKey, stripModelVariants } from './modelId'
 import { clampPercent, levelFor } from './thresholds'
 import { createProcessDetector } from './process/createProcessDetector'
 import type { IClaudeProcessDetector } from './process/types'
@@ -174,9 +179,54 @@ function hasControlChars(value: string): boolean {
   return false
 }
 
+/**
+ * Distinct unrecognised model ids logged per service before it goes quiet
+ * (#49). The ids are untrusted transcript text, so the set that dedupes them
+ * must not grow without bound.
+ */
+const MAX_LOGGED_UNRECOGNISED_IDS = 32
+
+/**
+ * A model id fit for a log file: sanitized like the wire field, with an AWS
+ * account id masked. A Bedrock ARN carries one, and log files leave the machine
+ * in bug reports.
+ */
+function modelIdForLog(modelId: string): string {
+  return maskAwsAccountId(sanitizeModelId(modelId))
+}
+
+/**
+ * The id the parser actually judged, for a log file: the normalised base, or —
+ * when normalisation is refused (over-long, malformed) — the sanitized id at
+ * the parser's input bound. Account-masked either way. Two different ARNs that
+ * share their first 64 characters stay distinct here.
+ */
+function normalisedModelIdForLog(modelId: string): string {
+  const wide = sanitizeProviderModelId(modelId)
+  return maskAwsAccountId(stripModelVariants(wide)?.base ?? wide)
+}
+
+/** What KIND of id the parser could not read, without any of its text. */
+type UnrecognisedIdShape = 'arn:application-inference-profile' | 'arn:other' | 'custom'
+
+/**
+ * Classify an unrecognised id for a default-level log line. A deployment or
+ * profile name is chosen by the user and can say who they are or what they
+ * work on, so the `warn` line carries only this shape and a length.
+ */
+function unrecognisedIdShape(modelId: string): UnrecognisedIdShape {
+  const value = sanitizeProviderModelId(modelId).trim().toLowerCase()
+  if (!value.startsWith('arn:')) return 'custom'
+  return value.includes(':application-inference-profile/')
+    ? 'arn:application-inference-profile'
+    : 'arn:other'
+}
+
 export class ClaudeStatusService {
   private readonly entries = new Map<string, PanelEntry>()
   private readonly deps: ClaudeStatusDeps
+  /** Unrecognised model ids already logged, so each is logged once (#49). */
+  private readonly loggedUnrecognisedIds = new Set<string>()
 
   constructor(deps?: Partial<ClaudeStatusDeps>) {
     const watcher = deps?.watcher ?? new ClaudeTranscriptWatcher()
@@ -428,7 +478,8 @@ export class ClaudeStatusService {
         pid: entry.pid,
         candidates: candidates.length,
         chosenFile: chosenFile ? path.basename(chosenFile) : undefined,
-        modelId: sanitizeModelId(parsed.modelId),
+        modelId: modelIdForLog(parsed.modelId),
+        normalisedModelId: normalisedModelIdForLog(parsed.modelId),
         windowSize,
         rule,
         inferred,
@@ -512,12 +563,46 @@ export class ClaudeStatusService {
     const sticky = entry.observedExtended === true
     const windowSize: 200000 | 1000000 = sticky ? 1000000 : detectedWindow
 
-    // Say so in the UI (#41 §5.4): a registry-only 1M badge is an inference.
+    // An id the parser could not read gets the safe 200k default, which is a
+    // guess about an unknown model rather than a fact about a known one (#49).
+    const recognised = isRecognisedModelId(parsed.modelId)
+    if (!recognised) this.logUnrecognisedOnce(parsed.modelId)
+
+    // Say so in the UI (#41 §5.4): a registry-only 1M badge is an inference, and
+    // so is the 200k default for an unrecognised id.
     return {
       windowSize,
-      inferred: windowSize === 1000000 && !corroborated && !sticky,
+      inferred:
+        (windowSize === 1000000 && !corroborated && !sticky) ||
+        (windowSize === 200000 && !recognised),
       rule: detail?.rule
     }
+  }
+
+  /**
+   * Log an unrecognised model id the first time this service sees it, so a
+   * meter showing `200k (inferred)` can be traced to the id that caused it
+   * without a line on every ~1.25s refresh. Deduped on the NORMALISED id, so
+   * two profiles whose ARNs share a 64-character prefix are both logged.
+   * Bounded by {@link MAX_LOGGED_UNRECOGNISED_IDS}.
+   *
+   * Two levels on purpose: the default-level `warn` carries only the id's shape
+   * and length, never the user-chosen name; the masked id itself goes to
+   * `debug`, which a user turns on to diagnose.
+   */
+  private logUnrecognisedOnce(modelId: string): void {
+    const key = normalisedModelIdForLog(modelId)
+    if (this.loggedUnrecognisedIds.has(key)) return
+    if (this.loggedUnrecognisedIds.size >= MAX_LOGGED_UNRECOGNISED_IDS) return
+    this.loggedUnrecognisedIds.add(key)
+    logger.warn('claudeStatus.unrecognisedModelId', {
+      shape: unrecognisedIdShape(modelId),
+      length: modelId.length
+    })
+    logger.debug('claudeStatus.unrecognisedModelId', {
+      modelId: modelIdForLog(modelId),
+      normalisedModelId: key
+    })
   }
 
   /**
@@ -573,11 +658,11 @@ export class ClaudeStatusService {
     if (!entry) return
 
     const dir = transcriptDirFor(cwd)
-    if (entry.watchedDir === dir) return
-
-    if (entry.watchedDir) {
+    if (entry.watchedDir !== undefined && entry.watchedDir !== dir) {
       this.deps.watcher.unwatchDir(entry.watchedDir, terminalId)
     }
+    // Every refresh: a no-op for a live watch, and a re-arm for a folder that
+    // was missing (Claude creates it on the first message) or whose watch died
     this.deps.watcher.watchDir(dir, terminalId)
     entry.watchedDir = dir
   }

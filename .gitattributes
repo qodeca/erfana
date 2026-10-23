@@ -24,6 +24,11 @@ patches/*.patch text eol=lf
 design/claims.js text eol=lf
 design/index.html text eol=lf
 
+# The preload surface snapshot must stay LF — it is LF in the repo, and this
+# keeps a local Windows checkout (autocrlf) or a snapshot update run there from
+# rewriting it to CRLF and showing the whole file as changed.
+src/preload/__snapshots__/surface.test.ts.snap text eol=lf
+
 # Binary assets — never normalize
 *.png binary
 *.jpg binary

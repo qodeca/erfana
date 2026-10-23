@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { EventEmitter } from 'events'
+import { TERMINAL_OUTPUT_FLUSH_MS } from './terminalOutputFlow'
 
 // =============================================================================
 // Mock node-pty with controllable PTY instances
@@ -405,6 +406,7 @@ async function createId(
     })
 
     it('markInitializationComplete sets flags correctly', async () => {
+      vi.useFakeTimers()
       vi.doMock('os', async () => {
         const actual = await vi.importActual<any>('os')
         return { ...actual, platform: () => 'darwin' }
@@ -429,7 +431,9 @@ async function createId(
       terminalService.on('data', dataSpy)
 
       pty.emit('data', 'user output\n')
+      vi.advanceTimersByTime(TERMINAL_OUTPUT_FLUSH_MS)
       expect(dataSpy).toHaveBeenCalledWith(expect.objectContaining({ terminalId: tid, data: 'user output\n' }))
+      vi.useRealTimers()
     })
 
     it('fallback timeout enables terminal after 3 seconds if no confirmation', async () => {
@@ -462,8 +466,9 @@ async function createId(
       // Fast-forward 3 seconds
       vi.advanceTimersByTime(3000)
 
-      // Now output should be forwarded (fallback enabled)
+      // Now output should be forwarded (fallback enabled), in the next batch
       pty.emit('data', 'fallback output\n')
+      vi.advanceTimersByTime(TERMINAL_OUTPUT_FLUSH_MS)
       expect(dataSpy).toHaveBeenCalledWith(expect.objectContaining({ terminalId: tid, data: 'fallback output\n' }))
 
       vi.useRealTimers()
@@ -545,6 +550,7 @@ async function createId(
     })
 
     it('forwards output when all three flags are true', async () => {
+      vi.useFakeTimers()
       vi.doMock('os', async () => {
         const actual = await vi.importActual<any>('os')
         return { ...actual, platform: () => 'darwin' }
@@ -568,7 +574,11 @@ async function createId(
 
       // All three flags true: hasReceivedMarker=true, initializationComplete=true, isClearing=false
       pty.emit('data', 'forwarded output\n')
+      // Batched: nothing goes out until the flush timer fires
+      expect(dataSpy).not.toHaveBeenCalled()
+      vi.advanceTimersByTime(TERMINAL_OUTPUT_FLUSH_MS)
       expect(dataSpy).toHaveBeenCalledWith(expect.objectContaining({ terminalId: tid, data: 'forwarded output\n' }))
+      vi.useRealTimers()
     })
   })
 

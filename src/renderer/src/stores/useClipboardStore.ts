@@ -82,7 +82,11 @@ export function createClipboardStore(
 
       if (state.operation === 'cut') {
         // Move item using injected file operations
-        result = await fileOps.moveItem(state.itemPath, targetPath, undefined, replaceExisting)
+        result = await fileOps.moveItem({
+          sourcePath: state.itemPath,
+          targetParentPath: targetPath,
+          replaceExisting
+        })
         logger.info('Clipboard: Move completed', { path: result.path })
 
         // Clear clipboard after successful cut
@@ -94,7 +98,7 @@ export function createClipboardStore(
         })
       } else {
         // Copy item using injected file operations
-        result = await fileOps.copyItem(state.itemPath, targetPath)
+        result = await fileOps.copyItem({ sourcePath: state.itemPath, targetParentPath: targetPath })
         logger.info('Clipboard: Copy completed', { path: result.path })
 
         // Keep clipboard for multiple paste operations (standard behavior)

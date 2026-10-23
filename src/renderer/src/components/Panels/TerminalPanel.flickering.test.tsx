@@ -114,7 +114,8 @@ describe('TerminalPanel flickering prevention', () => {
           mockOnClearCallback = callback
           return vi.fn() // unsubscribe
         }),
-        markClearComplete: vi.fn()
+        markClearComplete: vi.fn(),
+        ackOutput: vi.fn()
         // #164 round-2 F#1: `terminal:getShellKind` deleted; shellKind
         // travels with the `terminal:create` response.
       },

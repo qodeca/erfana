@@ -105,7 +105,7 @@ describe('file:getStats logging', () => {
     )
 
     registerFileHandlers()
-    await expect(handlers['file:getStats']({}, nodePath.resolve('/x/missing.md'))).rejects.toThrow('ENOENT')
+    await expect(handlers['file:getStats']({}, { filePath: nodePath.resolve('/x/missing.md') })).rejects.toThrow('ENOENT')
 
     expect(debugSpy).toHaveBeenCalled()
     expect(errorSpy).not.toHaveBeenCalled()
@@ -129,20 +129,20 @@ describe('file:createFile / createFolder / rename log redaction', () => {
       title: 'file:createFile',
       channel: 'file:createFile',
       method: 'createFile' as const,
-      invoke: (h: (...args: any[]) => any, root: string) => h({}, root, 'secret-budget-q4.md'),
+      invoke: (h: (...args: any[]) => any, root: string) => h({}, { dirPath: root, name: 'secret-budget-q4.md' }),
     },
     {
       title: 'file:createFolder',
       channel: 'file:createFolder',
       method: 'createFolder' as const,
-      invoke: (h: (...args: any[]) => any, root: string) => h({}, root, 'secret-budget-q4'),
+      invoke: (h: (...args: any[]) => any, root: string) => h({}, { dirPath: root, name: 'secret-budget-q4' }),
     },
     {
       title: 'file:rename',
       channel: 'file:rename',
       method: 'rename' as const,
       invoke: (h: (...args: any[]) => any, root: string) =>
-        h({}, `${root}/old.md`, 'secret-budget-q4.md'),
+        h({}, { oldPath: `${root}/old.md`, newName: 'secret-budget-q4.md' }),
     },
   ]
 
@@ -202,14 +202,14 @@ describe('file:writeFile (save after a folder rename)', () => {
     registerFileHandlers()
 
     const inDocs = join(project.root, 'docs', 'a.md')
-    await handlers['file:writeFile']({}, inDocs, 'x')
+    await handlers['file:writeFile']({}, { filePath: inDocs, content: 'x' })
     await expect(
-      handlers['file:writeFile']({}, inDocs, 'x', { createParentDirs: 'yes' })
+      handlers['file:writeFile']({}, { filePath: inDocs, content: 'x', createParentDirs: 'yes' })
     ).rejects.toThrow()
     const gone = join(project.root, 'gone', 'deep', 'a.md')
-    await handlers['file:writeFile']({}, gone, 'x')
+    await handlers['file:writeFile']({}, { filePath: gone, content: 'x' })
     expect(existsSync(join(project.root, 'gone'))).toBe(false)
-    await handlers['file:writeFile']({}, gone, 'x', { createParentDirs: true })
+    await handlers['file:writeFile']({}, { filePath: gone, content: 'x', createParentDirs: true })
     expect(existsSync(join(project.root, 'gone', 'deep'))).toBe(true)
 
     const realRoot = await realpath(project.root)
@@ -236,7 +236,7 @@ describe('file:writeFile (save after a folder rename)', () => {
 
     registerFileHandlers()
     await expect(
-      handlers['file:writeFile']({}, join(project.root, 'docs', 'secret.md'), 'x')
+      handlers['file:writeFile']({}, { filePath: join(project.root, 'docs', 'secret.md'), content: 'x' })
     ).rejects.toBe(original)
 
     const logged = errorSpy.mock.calls[0][1] as Error
@@ -266,8 +266,8 @@ describe('file:exists', () => {
     const { registerFileHandlers } = await import('./file-handlers')
     registerFileHandlers()
 
-    await expect(handlers['file:exists']({}, present)).resolves.toBe(true)
-    await expect(handlers['file:exists']({}, join(dir, 'nope.md'))).resolves.toBe(false)
+    await expect(handlers['file:exists']({}, { filePath: present })).resolves.toBe(true)
+    await expect(handlers['file:exists']({}, { filePath: join(dir, 'nope.md') })).resolves.toBe(false)
 
     rmSync(dir, { recursive: true, force: true })
   })
@@ -308,13 +308,13 @@ describe('file:revealInFileManager', () => {
     const file = join(tmp, 'note.md')
     writeFileSync(file, '# hi')
 
-    expect(await reveal({}, file)).toBe('')
+    expect(await reveal({}, { filePath: file })).toBe('')
     expect(showItemInFolder).toHaveBeenCalledWith(await realpath(file))
   })
 
   it('reveals the project root directory itself', async () => {
     const { realpath } = await import('node:fs/promises')
-    expect(await reveal({}, tmp)).toBe('')
+    expect(await reveal({}, { filePath: tmp })).toBe('')
     expect(showItemInFolder).toHaveBeenCalledWith(await realpath(tmp))
   })
 
@@ -323,14 +323,14 @@ describe('file:revealInFileManager', () => {
     const { tmpdir } = await import('node:os')
     const outside = join(tmpdir(), 'definitely-outside-erfana-project')
 
-    expect(await reveal({}, outside)).toBe('Cannot reveal items outside the project')
+    expect(await reveal({}, { filePath: outside })).toBe('Cannot reveal items outside the project')
     expect(showItemInFolder).not.toHaveBeenCalled()
   })
 
   it('rejects a sibling whose name extends the project root (prefix boundary)', async () => {
     // Shares the root string prefix but is not inside it; lexical guard must reject.
     const sibling = tmp + '-evil'
-    expect(await reveal({}, sibling)).toBe('Cannot reveal items outside the project')
+    expect(await reveal({}, { filePath: sibling })).toBe('Cannot reveal items outside the project')
     expect(showItemInFolder).not.toHaveBeenCalled()
   })
 
@@ -344,7 +344,7 @@ describe('file:revealInFileManager', () => {
       const link = join(tmp, 'link')
       symlinkSync(outsideTarget, link, 'dir')
 
-      expect(await reveal({}, link)).toBe('Cannot reveal items outside the project')
+      expect(await reveal({}, { filePath: link })).toBe('Cannot reveal items outside the project')
       expect(showItemInFolder).not.toHaveBeenCalled()
 
       rmSync(outsideTarget, { recursive: true, force: true })
@@ -355,7 +355,7 @@ describe('file:revealInFileManager', () => {
     const { join } = await import('node:path')
     await openTestProject(null)
 
-    expect(await reveal({}, join(tmp, 'note.md'))).toBe('No project is open')
+    expect(await reveal({}, { filePath: join(tmp, 'note.md') })).toBe('No project is open')
     expect(showItemInFolder).not.toHaveBeenCalled()
   })
 
@@ -363,7 +363,7 @@ describe('file:revealInFileManager', () => {
     const { join } = await import('node:path')
     const missing = join(tmp, 'gone.md')
 
-    expect(await reveal({}, missing)).toBe('Item no longer exists on disk')
+    expect(await reveal({}, { filePath: missing })).toBe('Item no longer exists on disk')
     expect(showItemInFolder).not.toHaveBeenCalled()
   })
 
@@ -377,13 +377,13 @@ describe('file:revealInFileManager', () => {
       writeFileSync(file, '# hi')
       const throughFile = join(file, 'child')
 
-      expect(await reveal({}, throughFile)).toBe('Item no longer exists on disk')
+      expect(await reveal({}, { filePath: throughFile })).toBe('Item no longer exists on disk')
       expect(showItemInFolder).not.toHaveBeenCalled()
     }
   )
 
   it('returns an error for invalid input', async () => {
-    expect(await reveal({}, '')).toBe('Invalid path')
+    expect(await reveal({}, { filePath: '' })).toBe('Invalid path')
     expect(showItemInFolder).not.toHaveBeenCalled()
   })
 
@@ -394,7 +394,7 @@ describe('file:revealInFileManager', () => {
     const file = join(tmp, 'note.md')
     writeFileSync(file, '# hi')
 
-    expect(await reveal({}, file)).toBe('')
+    expect(await reveal({}, { filePath: file })).toBe('')
     expect(showItemInFolder).not.toHaveBeenCalled()
   })
 })
@@ -451,7 +451,7 @@ describe('project confinement for read handlers (issue #70)', () => {
       const { fileService } = await import('../services/FileService')
       const read = vi.spyOn(fileService, 'readFile').mockResolvedValue('# hi')
 
-      await expect(handlers['file:readFile']({}, file)).resolves.toBe('# hi')
+      await expect(handlers['file:readFile']({}, { filePath: file })).resolves.toBe('# hi')
       // Read at the canonical path the check resolved
       const { realpath } = await import('node:fs/promises')
       expect(read).toHaveBeenCalledWith(await realpath(file))
@@ -466,7 +466,7 @@ describe('project confinement for read handlers (issue #70)', () => {
       const { fileService } = await import('../services/FileService')
       const read = vi.spyOn(fileService, 'readFile').mockResolvedValue('secret')
 
-      await expect(handlers['file:readFile']({}, target)).rejects.toThrow(
+      await expect(handlers['file:readFile']({}, { filePath: target })).rejects.toThrow(
         'Cannot read files outside the project directory'
       )
       expect(read).not.toHaveBeenCalled()
@@ -480,7 +480,7 @@ describe('project confinement for read handlers (issue #70)', () => {
         const { fileService } = await import('../services/FileService')
         const read = vi.spyOn(fileService, 'readFile').mockResolvedValue('secret')
 
-        await expect(handlers['file:readFile']({}, link)).rejects.toThrow(
+        await expect(handlers['file:readFile']({}, { filePath: link })).rejects.toThrow(
           'Cannot read files outside the project directory'
         )
         expect(read).not.toHaveBeenCalled()
@@ -494,7 +494,7 @@ describe('project confinement for read handlers (issue #70)', () => {
         Object.assign(new Error('ENOENT: no such file'), { code: 'ENOENT' })
       )
 
-      await expect(handlers['file:readFile']({}, join(tmp, 'gone.md'))).rejects.toThrow('ENOENT')
+      await expect(handlers['file:readFile']({}, { filePath: join(tmp, 'gone.md') })).rejects.toThrow('ENOENT')
     })
   })
 
@@ -513,7 +513,7 @@ describe('project confinement for read handlers (issue #70)', () => {
       const picked = join(outside, 'picked.pdf')
       writeFileSync(picked, 'x')
 
-      await expect(handlers['file:getStats']({}, picked)).resolves.toMatchObject({ size: 1 })
+      await expect(handlers['file:getStats']({}, { filePath: picked })).resolves.toMatchObject({ size: 1 })
     })
 
     it.skipIf(process.platform === 'win32')(
@@ -521,7 +521,7 @@ describe('project confinement for read handlers (issue #70)', () => {
       async () => {
         const link = await plantEscapingSymlink('innocent.svg')
 
-        await expect(handlers['file:getStats']({}, link)).rejects.toThrow(
+        await expect(handlers['file:getStats']({}, { filePath: link })).rejects.toThrow(
           'Cannot read files outside the project directory'
         )
       }
@@ -561,7 +561,7 @@ describe('#210 watcher catch-up hooks', () => {
       const read = vi.spyOn(fileService, 'readDirectory').mockResolvedValue([])
 
       registerFileHandlers()
-      await expect(handlers['file:readDirectory'](event, root)).resolves.toEqual([])
+      await expect(handlers['file:readDirectory'](event, { dirPath: root })).resolves.toEqual([])
 
       expect(begin).toHaveBeenCalledWith(root, 7)
       expect(begin.mock.invocationCallOrder[0]).toBeLessThan(read.mock.invocationCallOrder[0])
@@ -580,7 +580,7 @@ describe('#210 watcher catch-up hooks', () => {
       vi.spyOn(fileService, 'readDirectory').mockRejectedValue(failure)
 
       registerFileHandlers()
-      await expect(handlers['file:readDirectory'](event, root)).rejects.toBe(failure)
+      await expect(handlers['file:readDirectory'](event, { dirPath: root })).rejects.toBe(failure)
 
       expect(commitRead).not.toHaveBeenCalled()
     })
@@ -597,7 +597,7 @@ describe('#210 watcher catch-up hooks', () => {
       vi.spyOn(fileService, 'readDirectory').mockResolvedValue([])
 
       registerFileHandlers()
-      await handlers['file:readDirectory'](event, root)
+      await handlers['file:readDirectory'](event, { dirPath: root })
 
       const logged = JSON.stringify(infoSpy.mock.calls)
       expect(logged).not.toContain(JSON.stringify(dirname(root)).slice(1, -1))
@@ -619,7 +619,7 @@ describe('#210 watcher catch-up hooks', () => {
       vi.spyOn(fileService, 'readDirectory').mockRejectedValue(failure)
 
       registerFileHandlers()
-      await expect(handlers['file:readDirectory'](event, root)).rejects.toBe(failure)
+      await expect(handlers['file:readDirectory'](event, { dirPath: root })).rejects.toBe(failure)
 
       const loggedError = errorSpy.mock.calls[0][1] as Error
       expect(loggedError.message).not.toContain('/Users/alice')
@@ -633,35 +633,35 @@ describe('#210 watcher catch-up hooks', () => {
     {
       channel: 'file:createFile',
       method: 'createFile' as const,
-      args: (r: string) => [r, 'a.md'],
+      args: (r: string) => [{ dirPath: r, name: 'a.md' }],
       resolved: (r: string) => J(r, 'a.md'),
       recorded: (r: string) => [[{ path: J(r, 'a.md'), kind: 'added', subtree: false }]]
     },
     {
       channel: 'file:createFolder',
       method: 'createFolder' as const,
-      args: (r: string) => [r, 'dir2'],
+      args: (r: string) => [{ dirPath: r, name: 'dir2' }],
       resolved: (r: string) => J(r, 'dir2'),
       recorded: (r: string) => [[{ path: J(r, 'dir2'), kind: 'added', subtree: false }]]
     },
     {
       channel: 'file:deleteFile',
       method: 'deleteFile' as const,
-      args: (r: string) => [J(r, 'a.md')],
+      args: (r: string) => [{ filePath: J(r, 'a.md') }],
       resolved: () => undefined,
       recorded: (r: string) => [[{ path: J(r, 'a.md'), kind: 'removed', subtree: true }]]
     },
     {
       channel: 'file:deleteFolder',
       method: 'deleteFolder' as const,
-      args: (r: string) => [J(r, 'dir')],
+      args: (r: string) => [{ filePath: J(r, 'dir') }],
       resolved: () => undefined,
       recorded: (r: string) => [[{ path: J(r, 'dir'), kind: 'removed', subtree: true }]]
     },
     {
       channel: 'file:rename',
       method: 'rename' as const,
-      args: (r: string) => [J(r, 'old'), 'new'],
+      args: (r: string) => [{ oldPath: J(r, 'old'), newName: 'new' }],
       resolved: (r: string) => J(r, 'new'),
       recorded: (r: string) => [
         [
@@ -673,7 +673,7 @@ describe('#210 watcher catch-up hooks', () => {
     {
       channel: 'file:moveItem',
       method: 'moveItem' as const,
-      args: (r: string) => [J(r, 'a'), J(r, 'sub')],
+      args: (r: string) => [{ sourcePath: J(r, 'a'), targetParentPath: J(r, 'sub') }],
       resolved: (r: string) => ({ path: J(r, 'sub/a') }),
       recorded: (r: string) => [
         [
@@ -686,7 +686,7 @@ describe('#210 watcher catch-up hooks', () => {
       channel: 'file:moveItem',
       label: ' (replaceExisting)',
       method: 'moveItem' as const,
-      args: (r: string) => [J(r, 'a'), J(r, 'sub'), undefined, true],
+      args: (r: string) => [{ sourcePath: J(r, 'a'), targetParentPath: J(r, 'sub'), replaceExisting: true }],
       resolved: (r: string) => ({ path: J(r, 'sub/a') }),
       recorded: (r: string) => [
         [
@@ -699,7 +699,7 @@ describe('#210 watcher catch-up hooks', () => {
     {
       channel: 'file:copyItem',
       method: 'copyItem' as const,
-      args: (r: string) => [J(r, 'a'), J(r, 'sub')],
+      args: (r: string) => [{ sourcePath: J(r, 'a'), targetParentPath: J(r, 'sub') }],
       resolved: (r: string) => ({ path: J(r, 'sub/a') }),
       recorded: (r: string) => [[{ path: J(r, 'sub/a'), kind: 'added', subtree: true }]]
     }

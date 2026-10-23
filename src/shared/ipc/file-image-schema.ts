@@ -40,7 +40,7 @@ import { z } from 'zod'
 export const MAX_IMAGE_VERSION_LENGTH = 128
 
 /** Request payload for `file:readImage`. */
-export const ImageReadRequestSchema = z.object({
+export const ImageReadRequestSchema = z.strictObject({
   /** Absolute path to the image file. Confined to the open project by the handler. */
   filePath: z.string().min(1, 'Path is required'),
   /**
