@@ -23,7 +23,7 @@ let nextMockPid = 4000
 // Track all spawned PTYs and their configurations
 const spawnedPTYs: Array<{
   shell: string
-  args: string[]
+  args: string[] | string
   opts: any
   pty: MockPTY
 }> = []
@@ -43,7 +43,7 @@ function createMockPTY(): MockPTY {
 }
 
 const mockNodePty = {
-  spawn: vi.fn((shell: string, args: string[], opts: any) => {
+  spawn: vi.fn((shell: string, args: string[] | string, opts: any) => {
     const pty = createMockPTY()
     spawnedPTYs.push({ shell, args, opts, pty })
     return pty
@@ -272,18 +272,20 @@ async function createId(
       expect(tid).toBeTruthy()
       expect(spawnedPTYs).toHaveLength(1)
 
+      // A ready-made command line, NOT an argv array: node-pty would turn the
+      // inner quotes into `\"`, which cmd.exe does not understand.
       const { args } = spawnedPTYs[0]
-      // /D disables AutoRun, /K keeps cmd.exe interactive after the bootstrap
-      expect(args[0]).toBe('/D')
-      expect(args[1]).toBe('/K')
-
-      const script = args[2]
+      expect(typeof args).toBe('string')
+      const script = args as string
+      // /D disables AutoRun, /S strips exactly the outer quote pair, /K keeps cmd.exe interactive
+      expect(script).toMatch(/^\/D \/S \/K "/)
+      expect(script).not.toContain('\\"')
+      expect(script).toMatch(/ && cls && echo on"$/)
       // Issue #154 BLOCKER #1: bootstrap MUST start with `@echo off &&` so
       // cmd.exe does not echo the bootstrap commands back into the PTY,
       // which would otherwise cause markerDetector to mis-parse the echoed
       // `echo MARKER` line as the cwd.
-      expect(script).toMatch(/^@echo off &&/)
-      expect(script).toContain('cd /d "C:\\Projects\\test"')
+      expect(script).toContain('/K "@echo off && cd /d "C:\\Projects\\test"')
       // bare `cd` (no args) prints cwd – consumed by the marker handshake
       expect(script).toMatch(/&& cd && echo __ERFANA_PWD_MARKER_\d+__/)
     })
@@ -302,7 +304,7 @@ async function createId(
       const tid = await createId(terminalService,{ shell, cwd: 'C:\\Projects\\test' })
 
       const { pty, args } = spawnedPTYs[0]
-      const marker = args[2].match(/__ERFANA_PWD_MARKER_\d+__/)![0]
+      const marker = String(args).match(/__ERFANA_PWD_MARKER_\d+__/)![0]
 
       // Simulate cmd.exe printing the cwd then the echoed marker
       pty.emit('data', 'C:\\Projects\\test\r\n')
@@ -310,6 +312,65 @@ async function createId(
 
       expect(clearSpy).toHaveBeenCalledWith(expect.objectContaining({ terminalId: tid }))
       expect(terminalService.getTerminalInfo(tid!)?.cwd).toBe('C:\\Projects\\test')
+    })
+  })
+
+  describe('cmd.exe missing-marker safety net', () => {
+    async function spawnCmd() {
+      vi.useFakeTimers()
+      vi.doMock('os', async () => {
+        const actual = await vi.importActual<any>('os')
+        return { ...actual, platform: () => 'win32' }
+      })
+      const { terminalService } = await import('./TerminalService')
+      const dataSpy = vi.fn()
+      const clearSpy = vi.fn()
+      terminalService.on('data', dataSpy)
+      terminalService.on('clearTerminal', clearSpy)
+      const tid = await createId(terminalService, {
+        shell: 'C:\\Windows\\System32\\cmd.exe',
+        cwd: 'C:\\Projects\\test'
+      })
+      return { terminalService, tid: tid!, dataSpy, clearSpy, pty: spawnedPTYs[0].pty }
+    }
+
+    it('spawns with a command-line string containing the plain-quoted cd', async () => {
+      await spawnCmd()
+      expect(typeof spawnedPTYs[0].args).toBe('string')
+      expect(spawnedPTYs[0].args).toContain('cd /d "C:\\Projects\\test"')
+      vi.useRealTimers()
+    })
+
+    it('shows the shell output after 10 s when the marker never arrives', async () => {
+      const { tid, dataSpy, pty } = await spawnCmd()
+      pty.emit('data', 'The filename, directory name, or volume label syntax is incorrect.\r\n')
+      vi.advanceTimersByTime(TERMINAL_OUTPUT_FLUSH_MS)
+      expect(dataSpy).not.toHaveBeenCalled()
+
+      vi.advanceTimersByTime(10_000)
+      pty.emit('data', 'C:\\Projects\\test>')
+      vi.advanceTimersByTime(TERMINAL_OUTPUT_FLUSH_MS)
+      const text = dataSpy.mock.calls.map((c) => c[0].data).join('')
+      expect(text).toContain('syntax is incorrect')
+      expect(text).toContain('C:\\Projects\\test>')
+      expect(dataSpy).toHaveBeenCalledWith(expect.objectContaining({ terminalId: tid }))
+      vi.useRealTimers()
+    })
+
+    it('clears the timer when the marker arrives: no forced flush later', async () => {
+      const { terminalService, tid, dataSpy, clearSpy, pty } = await spawnCmd()
+      const marker = String(spawnedPTYs[0].args).match(/__ERFANA_PWD_MARKER_\d+__/)![0]
+      pty.emit('data', `noise\r\nC:\\Projects\\test\r\n${marker}\r\n`)
+      expect(clearSpy).toHaveBeenCalledTimes(1)
+      terminalService.markInitializationComplete(tid)
+
+      vi.advanceTimersByTime(20_000)
+      vi.advanceTimersByTime(TERMINAL_OUTPUT_FLUSH_MS)
+      // The pre-marker noise was dropped and is not replayed by a late timer
+      const text = dataSpy.mock.calls.map((c) => c[0].data).join('')
+      expect(text).not.toContain('noise')
+      expect(clearSpy).toHaveBeenCalledTimes(1)
+      vi.useRealTimers()
     })
   })
 
@@ -1179,7 +1240,7 @@ async function createId(
       expect(tid).toBeTruthy()
 
       const { pty, args } = spawnedPTYs[0]
-      const marker = args[2].match(/__ERFANA_PWD_MARKER_\d+__/)![0]
+      const marker = String(args).match(/__ERFANA_PWD_MARKER_\d+__/)![0]
 
       // Independent invariant pinned inline: production bootstrap MUST start
       // with `@echo off &&`. Without it, cmd.exe would echo the bootstrap
@@ -1187,7 +1248,7 @@ async function createId(
       // would appear BEFORE the actual `cd` output, mis-anchoring
       // markerDetector. The realism test below exercises the clean stream;
       // this assertion is what guarantees production stays clean.
-      expect(args[2]).toMatch(/^@echo off &&/)
+      expect(String(args)).toContain('/K "@echo off &&')
 
       // Realistic PTY stream: banner first, cwd line, marker last
       pty.emit(
@@ -1325,7 +1386,7 @@ async function createId(
       const shell = 'C:\\Windows\\System32\\cmd.exe'
       const tid = await svc.createTerminal({ shell, cwd: 'C:\\Users\\me\\Dev\\' })
       expect(tid).toBeTruthy()
-      const script = spawnedPTYs[0].args[2]
+      const script = String(spawnedPTYs[0].args)
       // Trailing backslash stripped – `\"` cannot occur in the bootstrap
       expect(script).toContain('cd /d "C:\\Users\\me\\Dev"')
       expect(script).not.toContain('cd /d "C:\\Users\\me\\Dev\\"')
@@ -1336,7 +1397,7 @@ async function createId(
       const shell = 'C:\\Windows\\System32\\cmd.exe'
       const tid = await svc.createTerminal({ shell, cwd: 'C:\\Users\\me\\Dev/' })
       expect(tid).toBeTruthy()
-      const script = spawnedPTYs[0].args[2]
+      const script = String(spawnedPTYs[0].args)
       expect(script).toContain('cd /d "C:\\Users\\me\\Dev"')
     })
 
@@ -1345,7 +1406,7 @@ async function createId(
       const shell = 'C:\\Windows\\System32\\cmd.exe'
       const tid = await svc.createTerminal({ shell, cwd: 'C:\\' })
       expect(tid).toBeTruthy()
-      const script = spawnedPTYs[0].args[2]
+      const script = String(spawnedPTYs[0].args)
       // Drive root MUST keep its trailing slash – `cd /d "C:"` would change
       // to the *current* directory of drive C, not the root.
       expect(script).toContain('cd /d "C:\\"')
@@ -1384,7 +1445,7 @@ async function createId(
       const shell = 'C:\\Windows\\System32\\cmd.exe'
       const tid = await svc.createTerminal({ shell, cwd: 'C:\\tmp\\100%done' })
       expect(tid).toBeTruthy()
-      const script = spawnedPTYs[0].args[2]
+      const script = String(spawnedPTYs[0].args)
       expect(script).toContain('cd /d "C:\\tmp\\100%done"')
     })
 
@@ -1528,9 +1589,7 @@ async function createId(
 
     it('routes absolute cmd.exe path to cmd.exe branch', async () => {
       const args = await getArgs('C:\\Windows\\System32\\cmd.exe')
-      expect(args[0]).toBe('/D')
-      expect(args[1]).toBe('/K')
-      expect(args[2]).toMatch(/^@echo off &&/)
+      expect(args).toMatch(/^\/D \/S \/K "@echo off &&/)
     })
   })
 

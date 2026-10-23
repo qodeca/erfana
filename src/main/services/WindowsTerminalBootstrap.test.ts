@@ -17,6 +17,7 @@
  */
 
 import { describe, it, expect } from 'vitest'
+import { argsToCommandLine } from 'node-pty/lib/windowsPtyAgent'
 import {
   CmdExeBootstrapBuilder,
   DEFAULT_WINDOWS_BOOTSTRAP_BUILDERS,
@@ -216,25 +217,30 @@ describe('CmdExeBootstrapBuilder', () => {
   })
 
   describe('build', () => {
-    it('emits /D /K with @echo off, cd /d, cd, echo marker, cls in order', () => {
+    it('emits one ready-made command line string (not argv) in the documented order', () => {
+      const script = builder.build({ shell: 'cmd.exe', cwd: CWD, marker: MARKER })
+      expect(typeof script).toBe('string')
+      expect(script).toBe(
+        `/D /S /K "@echo off && cd /d "${CWD}" && cd && echo ${MARKER} && cls && echo on"`
+      )
+    })
+
+    it('survives node-pty command-line building: cmd sees the cd with plain quotes', () => {
       const args = builder.build({ shell: 'cmd.exe', cwd: CWD, marker: MARKER })
-      expect(args).toHaveLength(3)
-      expect(args[0]).toBe('/D')
-      expect(args[1]).toBe('/K')
+      // The real node-pty algorithm, as the Windows PTY agent runs it
+      const commandLine = argsToCommandLine('C:\\Windows\\System32\\cmd.exe', args)
+      expect(commandLine).not.toContain('\\"')
+      // cmd's `/S /K` rule: strip the first and last quote of the /K argument
+      const afterK = commandLine.slice(commandLine.indexOf('/K ') + 3)
+      expect(afterK.startsWith('"') && afterK.endsWith('"')).toBe(true)
+      const executed = afterK.slice(1, -1)
+      expect(executed).toContain(`cd /d "${CWD}"`)
+      expect(executed).toContain(`echo ${MARKER}`)
+    })
 
-      const script = args[2]
-      expect(script.startsWith('@echo off &&')).toBe(true)
-      expect(script).toContain(`cd /d "${CWD}"`)
-
-      const cdPwdIdx = script.indexOf(`cd /d "${CWD}"`)
-      const barePwdIdx = script.indexOf(' && cd &&')
-      const markerIdx = script.indexOf(`echo ${MARKER}`)
-      const clsIdx = script.indexOf('&& cls')
-
-      expect(cdPwdIdx).toBeGreaterThanOrEqual(0)
-      expect(barePwdIdx).toBeGreaterThan(cdPwdIdx)
-      expect(markerIdx).toBeGreaterThan(barePwdIdx)
-      expect(clsIdx).toBeGreaterThan(markerIdx)
+    it('regression: an argv array is mangled by node-pty into \\" (the old broken form)', () => {
+      const commandLine = argsToCommandLine('cmd.exe', ['/D', '/K', `@echo off && cd /d "${CWD}"`])
+      expect(commandLine).toContain('\\"')
     })
   })
 })

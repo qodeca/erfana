@@ -31,7 +31,7 @@ bash.exe -c 'cd '\''C:\Users\me\Dev\proj'\''; pwd; echo __ERFANA_PWD_MARKER_...;
 pwsh.exe -NoProfile -Command "Set-Location -LiteralPath 'C:\Users\me\Dev\proj' ; (Get-Location).Path ; Write-Output '__ERFANA_PWD_MARKER_...' ; [Console]::Write([char]27 + '[2J' + [char]27 + '[3J' + [char]27 + '[H') ; & 'pwsh.exe' -NoLogo"
 
 # Windows cmd.exe (cwd validated against metachar deny-list; `cls` wipes ConPTY viewport)
-cmd.exe /D /K "@echo off && cd /d "C:\Users\me\Dev\proj" && cd && echo __ERFANA_PWD_MARKER_... && cls"
+cmd.exe /D /S /K "@echo off && cd /d "C:\Users\me\Dev\proj" && cd && echo __ERFANA_PWD_MARKER_... && cls && echo on"
 ```
 
 The trailing screen-clear step (`printf`, `[Console]::Write`, or `cls`) is Windows-specific and exists purely to wipe the ConPTY internal screen buffer before the interactive shell takes over – see [ConPTY resize-reflow mitigation](#4-conpty-resize-reflow-mitigation-windows) below.
@@ -57,10 +57,17 @@ When the main process sees `process.env.ERFANA_E2E_FAST_SHELL === '1'`, the POSI
 ### cmd.exe
 
 - `/D`: Disable AutoRun from registry (prevents `HKLM\...\AutoRun` commands from polluting the bootstrap)
+- `/S`: With `/S`, cmd strips exactly the first and last quote of the `/K` argument and runs the rest verbatim, so the inner quotes around the cwd survive.
 - `/K`: Keep cmd.exe interactive after the command runs
+- **Passed as one command-line string, not an argv array.** node-pty's `argsToCommandLine` wraps an array argument in quotes and rewrites each inner `"` as `\"` (the MSVCRT rule). cmd.exe does not understand that: `cd /d \"C:\...\"` fails, `&&` skips the marker, and the terminal stays blank because output is suppressed until the marker arrives. node-pty passes a `string` through as the ready-made command line. The cwd deny-list (`"&|^<>`) is what keeps the string safe.
+- `echo on` (last): `@echo off` would otherwise stay on and hide the prompt.
 - `@echo off`: **Critical**. Without it, cmd.exe echoes the bootstrap commands back into the PTY, and `markerDetector` mis-parses the echoed `echo <marker>` line as the cwd, resulting in junk stored as `terminal.cwd`.
 - `&&` chain (not `&`): Short-circuit — stop if `cd /d` fails (e.g., invalid drive), rather than plowing through and printing the wrong cwd.
 - `cd` with no args: cmd.exe's analog of `pwd`. Prints the working directory without needing a separate binary.
+
+### Missing-marker safety net
+
+`TerminalService` arms a 10 s timer at spawn. If the marker has not been seen by then (broken bootstrap, bad cwd, shell quirk), it logs a warning with lengths and counts only, marks the marker as received and the initialization as complete, and flushes the buffered output to the renderer, so the user sees the shell's error instead of a blank screen. The detector clears the timer when the marker does arrive, and every cleanup path (kill, exit, window close) clears it too.
 
 ## Initialization Phases
 

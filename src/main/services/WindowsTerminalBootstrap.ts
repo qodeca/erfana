@@ -113,7 +113,7 @@ export interface WindowsBootstrapBuilder {
    * handshake at `TerminalService.ts:215-254` parses
    * `lines[markerIdx - 1]` as the cwd.
    */
-  build(args: { shell: string; cwd: string; marker: string }): string[]
+  build(args: { shell: string; cwd: string; marker: string }): string[] | string
 }
 
 /**
@@ -242,9 +242,17 @@ export class CmdExeBootstrapBuilder implements WindowsBootstrapBuilder {
     return true
   }
 
-  build({ cwd, marker }: { shell: string; cwd: string; marker: string }): string[] {
-    const script = `@echo off && cd /d "${cwd}" && cd && echo ${marker} && cls`
-    return ['/D', '/K', script]
+  /**
+   * Returns a ready-made command-line STRING, not an argv array. node-pty
+   * (`argsToCommandLine`) would wrap an array argument in quotes and turn each
+   * inner `"` into `\"` (the MSVCRT rule), which cmd.exe does not understand:
+   * `cd /d \"C:\..\"` fails and the `&&` chain never reaches the marker.
+   * With `/S`, cmd strips exactly the outer quote pair and runs the rest
+   * verbatim. `echo on` at the end restores the prompt that `@echo off` hid.
+   * The cwd cannot contain `"` (see `UNSAFE_WINDOWS_CWD_CHARS`).
+   */
+  build({ cwd, marker }: { shell: string; cwd: string; marker: string }): string[] | string {
+    return `/D /S /K "@echo off && cd /d "${cwd}" && cd && echo ${marker} && cls && echo on"`
   }
 }
 
@@ -270,7 +278,7 @@ export const DEFAULT_WINDOWS_BOOTSTRAP_BUILDERS: ReadonlyArray<WindowsBootstrapB
 export function buildWindowsBootstrap(
   args: { shell: string; cwd: string; marker: string },
   builders: ReadonlyArray<WindowsBootstrapBuilder> = DEFAULT_WINDOWS_BOOTSTRAP_BUILDERS
-): { kind: WindowsBootstrapKind; shellKind: ShellKind; shellArgs: string[] } {
+): { kind: WindowsBootstrapKind; shellKind: ShellKind; shellArgs: string[] | string } {
   for (const builder of builders) {
     if (builder.canHandle(args.shell)) {
       return {

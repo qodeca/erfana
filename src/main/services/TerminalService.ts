@@ -79,6 +79,7 @@ interface TerminalInstance {
   initializationComplete: boolean // Track whether terminal has finished init
   isClearing: boolean // Track clearing phase to prevent forwarding clear sequence
   clearFallbackTimeout?: NodeJS.Timeout // Safety timeout for clear confirmation
+  markerTimeout?: NodeJS.Timeout // Safety timeout for a marker that never arrives
   hasReceivedMarker: boolean // Track if marker was detected (prevents late data forwarding)
   /** Output that arrived after the marker line while the clear handshake was open; flushed in order once it ends. */
   pendingOutput: string
@@ -125,6 +126,9 @@ export const TERMINAL_KILL_BUDGET_MS = 500
 
 /** Most output kept while waiting for the bootstrap marker (64 KiB). */
 export const MARKER_BUFFER_MAX_CHARS = 64 * 1024
+
+/** How long to wait for the bootstrap marker before showing output anyway. */
+const MARKER_TIMEOUT_MS = 10_000
 
 /** Most post-marker output held while the clear handshake is open (64 KiB, newest kept). */
 export const PENDING_OUTPUT_MAX_CHARS = 64 * 1024
@@ -315,7 +319,7 @@ export class TerminalService extends EventEmitter {
 
       // Build bootstrap script that verifies CWD non-interactively, then execs into interactive shell
       // This prevents TTY echo of verification commands (no interactive input = no echo)
-      const shellArgs: string[] = []
+      let shellArgs: string[] | string = []
       // `shellKind` is recorded on the TerminalInstance AND returned to the
       // renderer via the create response so renderer-side path-quoting can
       // pick the right flavour per terminal (#164 round-2 F#1).
@@ -347,7 +351,7 @@ export class TerminalService extends EventEmitter {
           marker
         })
         logger.info(`🔵 Windows shell kind: ${kind} (quoting=${winShellKind})`)
-        shellArgs.push(...winShellArgs)
+        shellArgs = winShellArgs
         shellKind = winShellKind
       } else {
         // POSIX bootstrap. We use a single-quoted argument so `$`, backtick,
@@ -487,6 +491,11 @@ export class TerminalService extends EventEmitter {
         if (markerAt !== -1) {
           markerDetected = true
           markerChunkHandled = true
+          const pendingMarkerTimer = this.terminals.get(terminalId)
+          if (pendingMarkerTimer?.markerTimeout) {
+            clearTimeout(pendingMarkerTimer.markerTimeout)
+            pendingMarkerTimer.markerTimeout = undefined
+          }
 
           // Parse PWD from output (line before marker)
           const lines = markerBuffer.split(/\r?\n/).filter(Boolean)
@@ -532,6 +541,26 @@ export class TerminalService extends EventEmitter {
         }
       }
       ptyProcess.onData(markerDetector)
+
+      // Safety net: a bootstrap that fails (bad cwd, shell quirk) never prints
+      // the marker, and output stays suppressed for the whole life of the shell.
+      // After a grace period, give up on the handshake and show what arrived.
+      terminal.markerTimeout = setTimeout(() => {
+        const t = this.terminals.get(terminalId)
+        if (!t) return
+        t.markerTimeout = undefined
+        if (markerDetected || t.hasReceivedMarker) return
+        // Lengths and counts only – PTY output is user content.
+        logger.warn(
+          `⚠️ Terminal ${terminalId} marker not seen after ${MARKER_TIMEOUT_MS}ms, forcing output on (buffered ${markerBuffer.length} chars, ${markerBuffer.split(/\r?\n/).length} lines)`
+        )
+        markerDetected = true
+        t.hasReceivedMarker = true
+        t.isClearing = false
+        t.initializationComplete = true
+        if (markerBuffer) t.output.push(markerBuffer)
+        markerBuffer = ''
+      }, MARKER_TIMEOUT_MS)
 
       // Forward PTY output to renderer (only after initialization).
       // These log lines fire on every PTY data chunk and are pure debug
@@ -593,6 +622,10 @@ export class TerminalService extends EventEmitter {
         if (terminal.clearFallbackTimeout) {
           clearTimeout(terminal.clearFallbackTimeout)
           terminal.clearFallbackTimeout = undefined
+        }
+        if (terminal.markerTimeout) {
+          clearTimeout(terminal.markerTimeout)
+          terminal.markerTimeout = undefined
         }
         terminal.isClearing = false
         terminal.initializationComplete = true
@@ -657,6 +690,10 @@ export class TerminalService extends EventEmitter {
       if (terminal.clearFallbackTimeout) {
         clearTimeout(terminal.clearFallbackTimeout)
         terminal.clearFallbackTimeout = undefined
+      }
+      if (terminal.markerTimeout) {
+        clearTimeout(terminal.markerTimeout)
+        terminal.markerTimeout = undefined
       }
 
       terminal.isClearing = false
@@ -759,6 +796,10 @@ export class TerminalService extends EventEmitter {
       if (terminal.clearFallbackTimeout) {
         clearTimeout(terminal.clearFallbackTimeout)
         terminal.clearFallbackTimeout = undefined
+      }
+      if (terminal.markerTimeout) {
+        clearTimeout(terminal.markerTimeout)
+        terminal.markerTimeout = undefined
       }
     } catch (error) {
       logger.warn(`⚠️  Failed to clear fallback timeout for terminal ${terminalId}`, error instanceof Error ? { error: error.message } : undefined)
@@ -897,6 +938,10 @@ export class TerminalService extends EventEmitter {
       if (terminal.clearFallbackTimeout) {
         clearTimeout(terminal.clearFallbackTimeout)
         terminal.clearFallbackTimeout = undefined
+      }
+      if (terminal.markerTimeout) {
+        clearTimeout(terminal.markerTimeout)
+        terminal.markerTimeout = undefined
       }
       // The owner is gone or the app is quitting: never leave a shell paused
       terminal.output.dispose()
