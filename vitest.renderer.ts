@@ -39,8 +39,8 @@ export default defineConfig({
       cleanOnRerun: true,
       thresholds: {
         // Project-wide floors: the measured value rounded down, minus one point.
-        // Measured 2026-10-23 with `all: true`: lines/statements 86.74,
-        // functions 91.11, branches 90.84. Raise them as coverage grows; never
+        // Measured 2026-10-23 with `all: true`: lines/statements 86.78,
+        // functions 91.09, branches 90.89. Raise them as coverage grows; never
         // lower one to make a change pass.
         lines: 85,
         functions: 90,

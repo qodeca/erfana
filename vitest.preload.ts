@@ -25,11 +25,14 @@ export default defineConfig({
       all: true,
       cleanOnRerun: true,
       // Floor = the measured value rounded down, minus one point (measured
-      // 2026-10-23 with `all: true`: lines/statements 72.19, functions 53.07,
-      // branches 98.4). Every other file is at 100 % lines; the remaining
-      // headroom is `index.ts` (200 of 356 lines), so raise these again as that
-      // file gets covered. Never lower one to make a change pass.
-      thresholds: { lines: 71, functions: 52, branches: 97, statements: 71 },
+      // 2026-10-23 with `all: true`: lines/statements 75.03, functions 54.05,
+      // branches 98.77). Every other file is at 100 % lines; the remaining
+      // headroom is `index.ts` (201 of 358 lines, 14 of 99 functions), so raise
+      // these again as that file gets covered. The margin is small: one
+      // untested bridge function costs about half a point of `functions`, so a
+      // new bridge method needs a preload test. Never lower one to make a
+      // change pass.
+      thresholds: { lines: 74, functions: 53, branches: 97, statements: 74 },
       exclude: [
         'node_modules/**',
         'out/**',
@@ -47,11 +50,7 @@ export default defineConfig({
         'electron.vite.config.ts',
         // Type-only: declarations and the compile-time contract proofs.
         '**/*.d.ts',
-        '**/*.types.ts',
-        // Entry point of the sealed preview page: it adds its listeners as soon
-        // as it loads. previewPage.contract.test.ts pins its source rather than
-        // loading it, and the HTML-preview e2e specs run it.
-        'src/preload/previewPage.ts'
+        '**/*.types.ts'
       ],
     },
   },

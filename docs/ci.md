@@ -52,18 +52,18 @@ Nine jobs run in parallel (all `ubuntu-latest` except `windows-checks`). The **R
 | Project | Counts | Leaves out |
 |---|---|---|
 | main | `src/main/**`, `src/shared/**` (the shared tests run here), `scripts/**/*.{js,mjs}` | the script entry points that run their command on load (`add-spdx-headers`, `check-spdx-headers`, `design-sync`, `prebuild`, `run-mcp`, `test-cov`) |
-| preload | `src/preload/**` | `previewPage.ts` – it runs inside the sealed preview page, its test pins the source, and the HTML-preview e2e specs run it |
+| preload | `src/preload/**`, including the sealed preview page's `previewPage.ts` (`previewPage.test.ts` sends it real DOM events) | only the shared list below |
 | renderer | `src/renderer/src/**` | `main.tsx` (mounts the app on load; its tests read the source), the `imageExport/harness.ts` rasterize harness, the test helpers (`test-utils/`, `__test-utils__/`, `utils/testHelpers.ts`) |
 
 All three also leave out tests, the `__tests__`, `__test__`, `__test-helpers__` and `__fixtures__` folders, `*.d.ts` and `*.types.ts`; main and renderer also leave out their type-only `interfaces/` folders. A type-only module under another name reports 0 of 0 lines, so it moves no total. Each project-wide floor is the value measured when it was set, rounded down, minus one point:
 
 | Project | Measured 2026-10-23 (lines / functions / branches / statements) | Floor |
 |---|---|---|
-| main | 91.16 / 93.3 / 91.32 / 91.16 | 90 / 92 / 90 / 90 |
-| preload | 72.19 / 53.07 / 98.4 / 72.19 | 71 / 52 / 97 / 71 |
-| renderer | 86.74 / 91.11 / 90.84 / 86.74 | 85 / 90 / 89 / 85 |
+| main | 91.42 / 93.18 / 91.37 / 91.42 | 90 / 92 / 90 / 90 |
+| preload | 75.03 / 54.05 / 98.77 / 75.03 | 74 / 53 / 97 / 74 |
+| renderer | 86.78 / 91.09 / 90.89 / 86.78 | 85 / 90 / 89 / 85 |
 
-The values were measured on macOS. Before the switch, a macOS run and the Linux `Coverage` job – the authoritative run – agreed to within 0.05 points on every axis. No Windows host has measured them yet, and there the win32-skipped cases cover fewer lines. The per-file floors above them are unchanged. Raise a project-wide floor the same way when coverage grows, and never lower one to make a change pass: a change that drops below a floor needs tests.
+The preload margin is small – one untested bridge function costs about half a point of `functions` – so a new bridge method needs a preload test. The values were measured on macOS. Before the switch, a macOS run and the Linux `Coverage` job – the authoritative run – agreed to within 0.05 points on every axis. No Windows host has measured them yet, and there the win32-skipped cases cover fewer lines. The per-file floors above them are unchanged. Raise a project-wide floor the same way when coverage grows, and never lower one to make a change pass: a change that drops below a floor needs tests.
 
 **The local `npm run test:cov` carries the same `--project` flags** (issue #133). `scripts/test-cov.mjs` runs the three configs scoped as `--project main|preload|renderer`, matching the three CI steps, so each project's suite runs once instead of the whole workspace three times. It runs **all three passes before it exits**, so one project's missed floor cannot hide the other two's: a failing pass prints `FAILED: <project> coverage …`, and the run ends with `Coverage FAILED for project(s): <names>` naming every project that missed a floor, then exits non-zero (the vitest threshold lines above it name the file and axis). The per-area scripts `test:main`, `test:preload` and `test:renderer` carry the same `--project` flag for the same reason. The script starts vitest through `node` (`process.execPath` plus vitest's entry file), not `npx`: on Windows `npx` is `npx.cmd`, which Node refuses to spawn without a shell (`EINVAL`), so an `npx`-based pass failed there before any test ran and left no vitest output in a redirected log. It passes on a Windows host, and it leaves the `out/` build in place (history in [`docs/windows/known-flakes.md`](windows/known-flakes.md#npm-run-testcov-cannot-pass-on-a-windows-host)).
 
