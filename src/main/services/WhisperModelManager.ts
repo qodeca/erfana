@@ -108,7 +108,16 @@ export interface IWhisperModelManager {
    * mismatch the file is deleted and `WHISPER_MODEL_INTEGRITY_FAILED` is
    * thrown, so the user re-downloads it deliberately.
    */
-  verifyInstalledModelFile(model: WhisperModel, options?: { signal?: AbortSignal }): Promise<void>
+  verifyInstalledModelFile(
+    model: WhisperModel,
+    options?: { signal?: AbortSignal }
+  ): Promise<VerifiedModelFile>
+  /**
+   * Re-stat the model path and require the state returned by
+   * `verifyInstalledModelFile`. Call before each spawn of a job. A mismatch
+   * throws `WHISPER_MODEL_INTEGRITY_FAILED` and deletes nothing.
+   */
+  assertVerifiedModelUnchanged(model: WhisperModel, verified: VerifiedModelFile): Promise<void>
   /** Abort in-flight model downloads and remove their temp files (app quit). */
   dispose(): Promise<void>
   listInstalledModels(): Promise<WhisperModel[]>
@@ -202,11 +211,27 @@ function parseVerifiedManifest(content: Buffer): WhisperManifest {
   return parsed as WhisperManifest
 }
 
+/** A pid-marked temp file untouched for this long is stale even if its pid is alive. */
+const STALE_TEMP_MAX_AGE_MS = 60 * 60 * 1000
+
 /** Read size when hashing a model through its handle. */
 const HASH_CHUNK_BYTES = 1024 * 1024
 
 /** An unmarked temp file changed more recently than this may belong to a live download. */
 const STALE_TEMP_MIN_AGE_MS = 10 * 60 * 1000
+
+/** Identity + version of a model file at the moment it was hashed. */
+export interface VerifiedModelFile {
+  dev: number | bigint
+  ino: number | bigint
+  size: number | bigint
+  mtimeMs: number | bigint
+  ctimeMs: number | bigint
+}
+
+function fileState(s: VerifiedModelFile): VerifiedModelFile {
+  return { dev: s.dev, ino: s.ino, size: s.size, mtimeMs: s.mtimeMs, ctimeMs: s.ctimeMs }
+}
 
 /** Same file, same content window: dev, ino, size, mtime and ctime all equal. */
 function sameFileState(
@@ -550,7 +575,7 @@ class WhisperModelManager implements IWhisperModelManager {
   async verifyInstalledModelFile(
     model: WhisperModel,
     options?: { signal?: AbortSignal }
-  ): Promise<void> {
+  ): Promise<VerifiedModelFile> {
     if (!LOCAL_WHISPER.SUPPORTED_MODELS.includes(model)) {
       throw new AppError(
         `Not a known whisper model: ${String(model)}`,
@@ -571,37 +596,74 @@ class WhisperModelManager implements IWhisperModelManager {
       )
     }
 
-    let reason: string | null = null
+    // `badContent` = the bytes we read are wrong (size or hash); `changed` = the
+    // file moved or was rewritten while we looked, which proves nothing about
+    // the content. Only the first deletes, and only if the path still names the
+    // exact file we read (same dev and ino).
+    let badContent: string | null = null
+    let changed = false
+    let state: VerifiedModelFile | null = null
     try {
-      // Hash through the handle we statted, then require that the handle and
-      // the path still describe the same file (no swap or rewrite meanwhile).
       const before = await handle.stat()
+      let sha: string | null = null
       if (before.size !== pin.sizeBytes) {
-        reason = `size ${before.size} does not match the expected ${pin.sizeBytes}`
+        badContent = `size ${before.size} does not match the expected ${pin.sizeBytes}`
       } else {
-        const sha = await this.hashHandle(handle, options?.signal)
-        const after = await handle.stat()
-        const onPath = await stat(modelPath).catch(() => null)
-        if (sha !== pin.sha256) {
-          reason = 'SHA-256 does not match the pinned hash'
-        } else if (
-          !onPath ||
-          !sameFileState(before, after) ||
-          !sameFileState(before, onPath)
-        ) {
-          reason = 'the file changed while it was being verified'
+        sha = await this.hashHandle(handle, options?.signal)
+        if (sha !== pin.sha256) badContent = 'SHA-256 does not match the pinned hash'
+      }
+      const after = await handle.stat()
+      const onPath = await stat(modelPath).catch(() => null)
+      const samePathFile = onPath !== null && onPath.dev === before.dev && onPath.ino === before.ino
+
+      if (badContent !== null) {
+        if (!samePathFile) {
+          // The path no longer names the file we read: leave whatever is there.
+          badContent = null
+          changed = true
         }
+      } else if (!onPath || !sameFileState(before, after) || !sameFileState(before, onPath)) {
+        changed = true
+      } else {
+        state = fileState(before)
       }
     } finally {
       await handle.close().catch(() => undefined)
     }
 
-    if (reason !== null) {
+    if (badContent !== null) {
       this.installedCache.set(model, false)
       await this.safeUnlink(modelPath)
-      logger.warn('Whisper model failed its integrity check and was removed', { model, reason })
+      logger.warn('Whisper model failed its integrity check and was removed', {
+        model,
+        reason: badContent
+      })
       throw new AppError(
         `The ${model} model failed its integrity check and was removed. Download it again from Settings.`,
+        ErrorCode.WHISPER_MODEL_INTEGRITY_FAILED
+      )
+    }
+    if (changed || state === null) {
+      // Nothing is deleted: the next job checks again.
+      logger.warn('Whisper model changed while it was being verified', { model })
+      throw new AppError(
+        `The ${model} model changed while it was being checked. Try again.`,
+        ErrorCode.WHISPER_MODEL_INTEGRITY_FAILED
+      )
+    }
+    return state
+  }
+
+  async assertVerifiedModelUnchanged(
+    model: WhisperModel,
+    verified: VerifiedModelFile
+  ): Promise<void> {
+    const onPath = await stat(this.getModelPath(model)).catch(() => null)
+    if (!onPath || !sameFileState(verified, onPath)) {
+      // Not deleted: this only says the file is no longer the one we hashed.
+      logger.warn('Whisper model changed after it was verified', { model })
+      throw new AppError(
+        `The ${model} model changed after it was checked. Try again.`,
         ErrorCode.WHISPER_MODEL_INTEGRITY_FAILED
       )
     }
@@ -766,10 +828,7 @@ class WhisperModelManager implements IWhisperModelManager {
     let position = 0
     for (;;) {
       if (signal?.aborted) {
-        throw new AppError(
-          'Model verification was cancelled',
-          ErrorCode.WHISPER_MODEL_INTEGRITY_FAILED
-        )
+        throw new AppError('Model verification was cancelled', ErrorCode.TRANSCRIPTION_CANCELLED)
       }
       const { bytesRead } = await handle.read(buffer, 0, buffer.length, position)
       if (bytesRead === 0) break
@@ -795,12 +854,16 @@ class WhisperModelManager implements IWhisperModelManager {
         if (!match) continue
         const full = join(this.modelsDir, entry)
         if (this.activeDownloads.has(full)) continue
+        const info = await stat(full).catch(() => null)
+        if (!info) continue
+        const ageMs = Date.now() - info.mtimeMs
         if (match[1] !== undefined) {
           const pid = Number(match[1])
-          if (pid !== process.pid && isProcessAlive(pid)) continue
-        } else {
-          const info = await stat(full).catch(() => null)
-          if (!info || Date.now() - info.mtimeMs < STALE_TEMP_MIN_AGE_MS) continue
+          // A live pid protects its file, but a download that has not written
+          // for an hour is dead whatever its pid says (pid reuse, hung process).
+          if (pid !== process.pid && isProcessAlive(pid) && ageMs < STALE_TEMP_MAX_AGE_MS) continue
+        } else if (ageMs < STALE_TEMP_MIN_AGE_MS) {
+          continue
         }
         await this.safeUnlink(full)
       }

@@ -22,6 +22,20 @@ const GOOD_SHA = createHash('sha256').update(GOOD).digest('hex')
 
 const env = vi.hoisted(() => ({ userData: '' }))
 
+/** Lets a test make the PATH stat disagree with the open handle (Windows dev/ino quirks). */
+const statControl = vi.hoisted(() => ({ skewIno: false }))
+
+vi.mock('fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('fs/promises')>()
+  return {
+    ...actual,
+    stat: async (...args: Parameters<typeof actual.stat>) => {
+      const result = await actual.stat(...args)
+      return statControl.skewIno ? { ...result, ino: Number(result.ino) + 1 } : result
+    }
+  }
+})
+
 vi.mock('electron', () => ({
   app: { getPath: (): string => env.userData }
 }))
@@ -85,6 +99,7 @@ describe('WhisperModelManager model integrity (real fs)', () => {
   })
 
   afterEach(async () => {
+    statControl.skewIno = false
     vi.unstubAllGlobals()
     await rm(env.userData, { recursive: true, force: true })
   })
@@ -130,7 +145,9 @@ describe('WhisperModelManager model integrity (real fs)', () => {
     it('accepts a file whose hash matches the pin', async () => {
       const manager = await makeManager()
       await writeFile(tinyPath(), GOOD)
-      await expect(manager.verifyInstalledModelFile('tiny')).resolves.toBeUndefined()
+      await expect(manager.verifyInstalledModelFile('tiny')).resolves.toMatchObject({
+        size: GOOD.length
+      })
       expect(await readFile(tinyPath())).toEqual(GOOD)
     })
 
@@ -181,14 +198,56 @@ describe('WhisperModelManager model integrity (real fs)', () => {
       await expect(stat(tinyPath())).rejects.toMatchObject({ code: 'ENOENT' })
     })
 
-    it('stops hashing when the signal is aborted', async () => {
+    it('a cancel during hashing reports a cancellation and keeps the good file', async () => {
       const manager = await makeManager()
       await writeFile(tinyPath(), GOOD)
       const controller = new AbortController()
       controller.abort()
       await expect(
         manager.verifyInstalledModelFile('tiny', { signal: controller.signal })
-      ).rejects.toMatchObject({ code: 'WHISPER_MODEL_INTEGRITY_FAILED' })
+      ).rejects.toMatchObject({ code: 'TRANSCRIPTION_CANCELLED' })
+      expect(await readFile(tinyPath())).toEqual(GOOD)
+      await expect(manager.verifyInstalledModelFile('tiny')).resolves.toBeDefined()
+    })
+
+    it('a "changed while verifying" result fails the job but never deletes a good model', async () => {
+      const manager = await makeManager()
+      await writeFile(tinyPath(), GOOD)
+      statControl.skewIno = true // path stat now disagrees with the handle
+      await expect(manager.verifyInstalledModelFile('tiny')).rejects.toMatchObject({
+        code: 'WHISPER_MODEL_INTEGRITY_FAILED'
+      })
+      expect(await readFile(tinyPath())).toEqual(GOOD)
+
+      statControl.skewIno = false // the next job checks again and passes
+      await expect(manager.verifyInstalledModelFile('tiny')).resolves.toBeDefined()
+    })
+
+    it('does not delete bad content when the path no longer names the file it read', async () => {
+      const manager = await makeManager()
+      await writeFile(tinyPath(), EVIL)
+      statControl.skewIno = true
+      await expect(manager.verifyInstalledModelFile('tiny')).rejects.toMatchObject({
+        code: 'WHISPER_MODEL_INTEGRITY_FAILED'
+      })
+      expect(await readFile(tinyPath())).toEqual(EVIL) // left alone; next job decides
+    })
+
+    it('returns the verified state, and assertVerifiedModelUnchanged accepts it until the file changes', async () => {
+      const manager = await makeManager()
+      await writeFile(tinyPath(), GOOD)
+      const verified = await manager.verifyInstalledModelFile('tiny')
+      expect(verified.size).toBe(GOOD.length)
+      await expect(manager.assertVerifiedModelUnchanged('tiny', verified)).resolves.toBeUndefined()
+
+      // Rewritten after the check: the job must stop, and nothing is deleted.
+      const later = new Date(Number(verified.mtimeMs) + 60_000)
+      await writeFile(tinyPath(), EVIL)
+      await utimes(tinyPath(), later, later)
+      await expect(manager.assertVerifiedModelUnchanged('tiny', verified)).rejects.toMatchObject({
+        code: 'WHISPER_MODEL_INTEGRITY_FAILED'
+      })
+      expect(await readFile(tinyPath())).toEqual(EVIL)
     })
   })
 
@@ -228,6 +287,19 @@ describe('WhisperModelManager model integrity (real fs)', () => {
       const manager = await makeManager()
       await manager.listInstalledModels()
       expect(await readdir(modelsDir)).toEqual([other])
+    })
+
+    it('removes a pid-marked file untouched for over an hour even when its pid is alive', async () => {
+      const pid = await livePid()
+      const stalled = `ggml-base.bin.download-p${pid}-${UUID}`
+      const active = `ggml-small.bin.download-p${pid}-${UUID}`
+      await writeFile(join(modelsDir, stalled), Buffer.alloc(10))
+      await writeFile(join(modelsDir, active), Buffer.alloc(10))
+      const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000)
+      await utimes(join(modelsDir, stalled), twoHoursAgo, twoHoursAgo)
+      const manager = await makeManager()
+      await manager.listInstalledModels()
+      expect(await readdir(modelsDir)).toEqual([active])
     })
 
     it('removes an unmarked file only once it is older than 10 minutes', async () => {
