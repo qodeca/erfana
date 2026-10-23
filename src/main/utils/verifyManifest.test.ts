@@ -27,11 +27,22 @@ import { verifyManifest } from './verifyManifest'
 // md4,md5,ripemd160,sha1,sha224,sha256,sha384,sha512,sha512-256
 vi.mock('crypto', async (importOriginal) => {
   const actual = await importOriginal<typeof import('crypto')>()
-  const createHash = ((algorithm: string, ...rest: unknown[]) => {
-    if (/^blake2/i.test(algorithm)) throw new Error('Digest method not supported')
-    return (actual.createHash as (...a: unknown[]) => unknown)(algorithm, ...rest)
-  }) as typeof actual.createHash
-  return { ...actual, default: { ...actual, createHash }, createHash }
+  const guard =
+    <T extends (...a: never[]) => unknown>(fn: T): T =>
+    ((algorithm: string, ...rest: unknown[]) => {
+      if (/^blake2/i.test(algorithm)) throw new Error('Digest method not supported')
+      return (fn as unknown as (...a: unknown[]) => unknown)(algorithm, ...rest)
+    }) as unknown as T
+  const createHash = guard(actual.createHash)
+  const createHmac = guard(actual.createHmac)
+  const hash = guard(actual.hash)
+  return {
+    ...actual,
+    default: { ...actual, createHash, createHmac, hash },
+    createHash,
+    createHmac,
+    hash
+  }
 })
 
 /**
@@ -105,7 +116,7 @@ describe('verifyManifest', () => {
     })
   })
 
-  it('rejects a malformed signature file (< 2 lines)', async () => {
+  it('rejects a malformed signature file (< 4 lines)', async () => {
     await copyFile(FIXTURE_MANIFEST_PATH, manifestPath)
     await writeFile(sigPath, 'only one line')
     await expect(
@@ -119,7 +130,7 @@ describe('verifyManifest', () => {
     await copyFile(FIXTURE_MANIFEST_PATH, manifestPath)
     await writeFile(
       sigPath,
-      'untrusted comment: custom\nZm9v\n' // base64 "foo" — 3 bytes, way short
+      'untrusted comment: custom\nZm9v\ntrusted comment: x\nZm9v\n' // base64 "foo" — 3 bytes, way short
     )
     await expect(
       verifyManifest({ contentPath: manifestPath, signaturePath: sigPath })
@@ -134,7 +145,10 @@ describe('verifyManifest', () => {
     bogus[1] = 0x00 // not d/D
     const base64 = bogus.toString('base64')
     await copyFile(FIXTURE_MANIFEST_PATH, manifestPath)
-    await writeFile(sigPath, `untrusted comment: custom\n${base64}\n`)
+    await writeFile(
+      sigPath,
+      `untrusted comment: custom\n${base64}\ntrusted comment: x\n${Buffer.alloc(64).toString('base64')}\n`
+    )
     await expect(
       verifyManifest({ contentPath: manifestPath, signaturePath: sigPath })
     ).rejects.toMatchObject({
@@ -142,11 +156,9 @@ describe('verifyManifest', () => {
     })
   })
 
-  it('takes the legacy (raw-content) signed-message branch for an "Ed" signature', async () => {
-    // The fixture is prehashed ("ED"); flip the signature alg byte to legacy
-    // ("Ed") so verifyManifest hashes nothing and signs raw content — exercising
-    // the non-prehashed branch. The keyId still matches primary, so verifyAsync
-    // runs and fails (the sig was over BLAKE2b(content)), proving the branch ran.
+  it('refuses the legacy "Ed" algorithm for signatures', async () => {
+    // Flip the signature alg byte from prehashed ("ED") to legacy ("Ed").
+    // Minisign keys always use "Ed", but a signature must be prehashed.
     const sigFile = await readFile(FIXTURE_SIGNATURE_PATH, 'utf8')
     const lines = sigFile.split(/\r?\n/)
     const raw = Buffer.from(lines[1], 'base64')
@@ -156,7 +168,102 @@ describe('verifyManifest', () => {
     await writeFile(sigPath, lines.join('\n'))
     await expect(
       verifyManifest({ contentPath: manifestPath, signaturePath: sigPath })
+    ).rejects.toMatchObject({ code: 'unsupported-algorithm' })
+  })
+
+  it('verifies the global signature and returns the verified bytes', async () => {
+    await copyFile(FIXTURE_MANIFEST_PATH, manifestPath)
+    await copyFile(FIXTURE_SIGNATURE_PATH, sigPath)
+    const result = await verifyManifest({ contentPath: manifestPath, signaturePath: sigPath })
+    expect(result.content.equals(await readFile(FIXTURE_MANIFEST_PATH))).toBe(true)
+  })
+
+  it('rejects a changed trusted comment', async () => {
+    const sigFile = await readFile(FIXTURE_SIGNATURE_PATH, 'utf8')
+    const lines = sigFile.split(/\r?\n/)
+    lines[2] = lines[2].replace('timestamp:1776875913', 'timestamp:1776875914')
+    expect(lines[2]).not.toBe(sigFile.split(/\r?\n/)[2])
+    await copyFile(FIXTURE_MANIFEST_PATH, manifestPath)
+    await writeFile(sigPath, lines.join('\n'))
+    await expect(
+      verifyManifest({ contentPath: manifestPath, signaturePath: sigPath })
     ).rejects.toMatchObject({ code: 'ed25519-rejected' })
+  })
+
+  it('rejects a garbage global signature', async () => {
+    const sigFile = await readFile(FIXTURE_SIGNATURE_PATH, 'utf8')
+    const lines = sigFile.split(/\r?\n/)
+    lines[3] = Buffer.alloc(64, 7).toString('base64')
+    await copyFile(FIXTURE_MANIFEST_PATH, manifestPath)
+    await writeFile(sigPath, lines.join('\n'))
+    await expect(
+      verifyManifest({ contentPath: manifestPath, signaturePath: sigPath })
+    ).rejects.toMatchObject({ code: 'ed25519-rejected' })
+  })
+
+  it('rejects a signature file without the global signature lines', async () => {
+    const sigFile = await readFile(FIXTURE_SIGNATURE_PATH, 'utf8')
+    const lines = sigFile.split(/\r?\n/).slice(0, 2)
+    await copyFile(FIXTURE_MANIFEST_PATH, manifestPath)
+    await writeFile(sigPath, lines.join('\n'))
+    await expect(
+      verifyManifest({ contentPath: manifestPath, signaturePath: sigPath })
+    ).rejects.toMatchObject({ code: 'malformed-signature' })
+  })
+
+  it('rejects non-canonical base64 in the signature payload', async () => {
+    const sigFile = await readFile(FIXTURE_SIGNATURE_PATH, 'utf8')
+    const lines = sigFile.split(/\r?\n/)
+    lines[1] = `${lines[1]}!!`
+    await copyFile(FIXTURE_MANIFEST_PATH, manifestPath)
+    await writeFile(sigPath, lines.join('\n'))
+    await expect(
+      verifyManifest({ contentPath: manifestPath, signaturePath: sigPath })
+    ).rejects.toMatchObject({ code: 'malformed-signature' })
+  })
+
+  it('rejects a signature file with no trusted comment line', async () => {
+    const sigFile = await readFile(FIXTURE_SIGNATURE_PATH, 'utf8')
+    const lines = sigFile.split(/\r?\n/)
+    lines[2] = 'comment: timestamp:1776875913'
+    await copyFile(FIXTURE_MANIFEST_PATH, manifestPath)
+    await writeFile(sigPath, lines.join('\n'))
+    await expect(
+      verifyManifest({ contentPath: manifestPath, signaturePath: sigPath })
+    ).rejects.toMatchObject({ code: 'malformed-signature' })
+  })
+
+  it('rejects a global signature of the wrong length', async () => {
+    const sigFile = await readFile(FIXTURE_SIGNATURE_PATH, 'utf8')
+    const lines = sigFile.split(/\r?\n/)
+    lines[3] = Buffer.alloc(63, 1).toString('base64')
+    await copyFile(FIXTURE_MANIFEST_PATH, manifestPath)
+    await writeFile(sigPath, lines.join('\n'))
+    await expect(
+      verifyManifest({ contentPath: manifestPath, signaturePath: sigPath })
+    ).rejects.toMatchObject({ code: 'malformed-signature' })
+  })
+
+  it('skips embedded pubkeys that are non-canonical base64 or not "Ed" keys', async () => {
+    const prehashedAlg = Buffer.from(WHISPER_PUBKEYS[0].publicKey, 'base64')
+    prehashedAlg[1] = 0x44 // "ED" is a signature identifier, never a key's
+    await copyFile(FIXTURE_MANIFEST_PATH, manifestPath)
+    await copyFile(FIXTURE_SIGNATURE_PATH, sigPath)
+    await expect(
+      verifyManifest({
+        contentPath: manifestPath,
+        signaturePath: sigPath,
+        trustedPubkeys: [
+          { ...WHISPER_PUBKEYS[0], publicKey: `${WHISPER_PUBKEYS[0].publicKey}!!` },
+          { ...WHISPER_PUBKEYS[0], publicKey: prehashedAlg.toString('base64') }
+        ]
+      })
+    ).rejects.toMatchObject({ code: 'no-trusted-pubkey' })
+  })
+
+  it('does not import node crypto (BoringSSL has no BLAKE2b)', async () => {
+    const source = await readFile(join(__dirname, 'verifyManifest.ts'), 'utf8')
+    expect(source).not.toMatch(/from\s+['"](node:)?crypto['"]/)
   })
 
   it('verifies a prehashed signature when the runtime has no native BLAKE2b (BoringSSL)', async () => {
@@ -174,16 +281,6 @@ describe('verifyManifest', () => {
     await expect(
       verifyManifest({ contentPath: manifestPath, signaturePath: sigPath })
     ).rejects.toMatchObject({ code: 'ed25519-rejected' })
-  })
-
-  it('accepts prehashed ("ED") signatures — the minisign >= 0.7 default', async () => {
-    // Our CI-produced fixture IS prehashed. This test re-asserts the
-    // branch was exercised (future-proofing if we ever switch to legacy).
-    const sigContent = await readFile(FIXTURE_SIGNATURE_PATH, 'utf8')
-    const payloadB64 = sigContent.split(/\r?\n/)[1]
-    const raw = Buffer.from(payloadB64, 'base64')
-    expect(raw[0]).toBe(0x45) // E
-    expect(raw[1]).toBe(0x44) // D — prehashed
   })
 
   it('skips a malformed embedded pubkey and verifies against the next valid one', async () => {
