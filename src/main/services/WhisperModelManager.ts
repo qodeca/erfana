@@ -411,6 +411,19 @@ class WhisperModelManager implements IWhisperModelManager {
 
     await this.ensureDir(tempRoot)
 
+    // Own controller, as for a model download: `dispose()` and
+    // `cancelDownloads()` abort it; the caller's signal feeds into it.
+    const controller = new AbortController()
+    const callerSignal = options?.signal
+    const onCallerAbort = (): void => controller.abort()
+    if (callerSignal?.aborted) controller.abort()
+    else callerSignal?.addEventListener('abort', onCallerAbort, { once: true })
+    let finish: () => void = () => {}
+    const done = new Promise<void>((resolve) => {
+      finish = resolve
+    })
+    this.activeDownloads.set(tempRoot, { controller, done })
+
     try {
       logger.info('Fetching whisper manifest', { url: MANIFEST_URL })
 
@@ -418,13 +431,13 @@ class WhisperModelManager implements IWhisperModelManager {
         url: MANIFEST_URL,
         destPath: tempManifest,
         maxBytes: MANIFEST_MAX_BYTES,
-        signal: options?.signal
+        signal: controller.signal
       })
       await downloadToFile({
         url: MANIFEST_SIG_URL,
         destPath: tempManifestSig,
         maxBytes: MANIFEST_SIG_MAX_BYTES,
-        signal: options?.signal
+        signal: controller.signal
       })
 
       // Signature first — we do NOT read the manifest content until we know
@@ -483,7 +496,7 @@ class WhisperModelManager implements IWhisperModelManager {
         destPath: tempArchive,
         maxBytes: BINARY_ARCHIVE_MAX_BYTES,
         expectedSha256: spec.sha256,
-        signal: options?.signal,
+        signal: controller.signal,
         onProgress: options?.onProgress
           ? (bytes, total): void => {
               options.onProgress!({
@@ -540,7 +553,7 @@ class WhisperModelManager implements IWhisperModelManager {
       // On failure, wipe bin/ so isBinaryInstalled() doesn't return true on a
       // partial state.
       await this.clearBinDir()
-      if (options?.signal?.aborted) {
+      if (controller.signal.aborted) {
         throw new AppError(
           'Binary download was cancelled',
           ErrorCode.WHISPER_BINARY_DOWNLOAD_FAILED
@@ -570,7 +583,10 @@ class WhisperModelManager implements IWhisperModelManager {
       }
       throw AppError.from(error, ErrorCode.WHISPER_BINARY_DOWNLOAD_FAILED)
     } finally {
+      callerSignal?.removeEventListener('abort', onCallerAbort)
       await this.safeRm(tempRoot)
+      this.activeDownloads.delete(tempRoot)
+      finish()
     }
   }
 
@@ -675,6 +691,18 @@ class WhisperModelManager implements IWhisperModelManager {
     const pending = [...this.activeDownloads.values()]
     for (const d of pending) d.controller.abort()
     await Promise.allSettled(pending.map((d) => d.done))
+  }
+
+  /**
+   * Abort every binary or model download in flight (Settings → Cancel). Each
+   * one deletes its partial files and rejects as cancelled.
+   *
+   * @returns How many downloads were running
+   */
+  cancelDownloads(): number {
+    const running = [...this.activeDownloads.values()]
+    for (const d of running) d.controller.abort()
+    return running.length
   }
 
   async ensureModel(

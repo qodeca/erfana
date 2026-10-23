@@ -396,6 +396,20 @@ describe('WhisperModelManager model integrity (real fs)', () => {
       expect(await readdir(modelsDir)).toEqual([])
       expect(await manager.isModelInstalled('tiny')).toBe(false)
     })
+
+    it('cancelDownloads() (Settings → Cancel) aborts the download through the same path', async () => {
+      stubHangingFetch()
+      const manager = await makeManager()
+      const settled = manager.ensureModel('tiny').catch((e: unknown) => e)
+      await vi.waitFor(async () => expect(await tempFiles()).toHaveLength(1))
+
+      expect(manager.cancelDownloads()).toBe(1)
+
+      expect(await settled).toMatchObject({ code: 'WHISPER_MODEL_DOWNLOAD_FAILED' })
+      expect(await readdir(modelsDir)).toEqual([])
+      // Nothing left to cancel once it has settled
+      expect(manager.cancelDownloads()).toBe(0)
+    })
   })
 
   it('uses a pin hash derived from the good payload (guards the test fixture)', () => {

@@ -90,7 +90,7 @@ window.ERFANA_CLAIMS = {
     "card": "system/components/feedback/index.html"
   },
   "alert-role-files": {
-    "value": 11,
+    "value": 12,
     "label": "files announcing with role=\"alert\"",
     "card": "system/components/feedback/index.html"
   },
