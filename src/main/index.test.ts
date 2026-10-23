@@ -251,6 +251,7 @@ describe('Main Process - Window Creation', () => {
       registerDocumentImportHandlers: vi.fn()
     }))
     vi.doMock('./services/import', () => ({
+      killActiveLibreOfficeProbes: vi.fn(),
       importToolStatusService: {
         getStatus: vi.fn().mockResolvedValue({
           libreOffice: 'missing',
@@ -979,6 +980,18 @@ describe('Main Process - Window Creation', () => {
       try {
         await run({ preventDefault: vi.fn() })
         expect(mockApp.exit).toHaveBeenCalledWith(0)
+      } finally {
+        cleanup()
+      }
+    })
+
+    it('should kill any in-flight LibreOffice probe, since app.exit skips will-quit', async () => {
+      const { killActiveLibreOfficeProbes } = (await import('./services/import')) as any
+      const { run, cleanup } = await loadAndGetBeforeQuit()
+
+      try {
+        await run({ preventDefault: vi.fn() })
+        expect(killActiveLibreOfficeProbes).toHaveBeenCalledTimes(1)
       } finally {
         cleanup()
       }

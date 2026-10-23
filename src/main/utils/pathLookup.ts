@@ -67,7 +67,7 @@ export function isUncPath(candidate: string): boolean {
 export function defaultIsExecutableFile(candidate: string): boolean {
   try {
     if (!statSync(candidate).isFile()) return false
-    // X_OK is existence-only on Windows; the --version probe is the liveness check there.
+    // X_OK is existence-only on Windows, where this file check is all the liveness there is (soffice is never run there).
     accessSync(candidate, constants.X_OK)
     return true
   } catch {
