@@ -749,8 +749,17 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
         }
       })
 
-      // Phase 1.2: Success - clear cleanup registry (handlers now owned by component lifecycle)
-      cleanupRegistryRef.current = []
+      // Phase 1.2: Success - clear cleanup registry (handlers now owned by component lifecycle).
+      // The one-time clear listener stays registered until a clear arrives (a shell whose
+      // marker never comes sends none), so unmount removes it.
+      cleanupRegistryRef.current = [
+        () => {
+          if (clearUnsubscribe) {
+            clearUnsubscribe()
+            clearUnsubscribe = null
+          }
+        }
+      ]
     } catch (err) {
       // Phase 1.2 bug fix: Run all registered cleanups on error
       runAllCleanups()
@@ -784,6 +793,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       // Use centralized cleanup (Phase 1.1 bug fix - race condition)
       // Fire-and-forget in cleanup, but properly awaited internally
       void cleanupTerminalInstance(terminalIdRef.current)
+      runAllCleanups()
       shellKindRef.current = null
       setActiveTerminal(null)
       // Cleanup parser hooks before disposing xterm
@@ -806,7 +816,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
         visibilityObserverRef.current = null
       }
     }
-  }, [isAvailable, setActiveTerminal, cleanupTerminalInstance, cleanupDragHandlers])
+  }, [isAvailable, setActiveTerminal, cleanupTerminalInstance, cleanupDragHandlers, runAllCleanups])
 
   // Restart terminal on project change
   useEffect(() => {
