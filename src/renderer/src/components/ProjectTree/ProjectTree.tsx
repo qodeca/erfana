@@ -366,9 +366,10 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     if (filterMode === 'all') {
       return files
     } else {
-      return filterMarkdownTree(files, lazyLoaded, lazyStatus)
+      // A lazy folder read against an older base tree counts as unread (#320)
+      return filterMarkdownTree(files, lazyLoaded, lazyStatus, baseFiles)
     }
-  }, [files, filterMode, lazyLoaded, lazyStatus])
+  }, [files, filterMode, lazyLoaded, lazyStatus, baseFiles])
 
   /**
    * Create synthetic root folder node (VS Code style)

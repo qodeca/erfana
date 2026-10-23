@@ -29,12 +29,12 @@ import {
   detectFilePaths,
   createPathCache,
   resolvePath,
-  normalizePath
+  normalizePath,
+  isSearchableBareName
 } from '../utils/filePathLinks.logic'
 import { useFilenameIndex } from './useFilenameIndex'
 import {
   extractFilenameFromPath,
-  isFilenameOnly,
   mergeNameSearch,
   resolvePathSmart,
   type NameSearchResult,
@@ -62,14 +62,16 @@ const nameSearchCache = new Map<string, { result: NameSearchResult; at: number }
 /** Searches in flight by the same key: every line and terminal asking shares one */
 const nameSearchInFlight = new Map<string, Promise<NameSearchResult>>()
 const NOTHING_FOUND: NameSearchResult = { paths: [], truncated: false }
+/** A search that failed: nothing found, and the search did not finish */
+const SEARCH_FAILED: NameSearchResult = { paths: [], truncated: true }
 
 /**
  * Files named `filename` in the project, from main's bounded search. One
  * search per key is in flight at a time, and an answer is cached for
  * {@link NAME_SEARCH_TTL_MS} so hovering a line does not repeat it – except a
  * failure, or a cut-short search that found nothing (main may have been busy),
- * which the next hover asks again. Answers nothing on any failure: an
- * unresolved name just stays plain text.
+ * which the next hover asks again. A failure answers nothing, `truncated`:
+ * the search did not finish.
  */
 export function searchProjectByName(projectRoot: string, filename: string): Promise<NameSearchResult> {
   const key = `${getLastSeenProjectGeneration() ?? ''}\0${projectRoot}\0${filename.toLowerCase()}`
@@ -88,7 +90,7 @@ export function searchProjectByName(projectRoot: string, filename: string): Prom
       return result
     } catch (e) {
       logger.warn('[FileLinks] Name search failed', { error: e instanceof Error ? e.name : typeof e })
-      return NOTHING_FOUND
+      return SEARCH_FAILED
     } finally {
       nameSearchInFlight.delete(key)
     }
@@ -125,8 +127,12 @@ export interface UseTerminalFileLinksOptions {
    * when it finds nothing).
    */
   treeTruncated?: boolean
-  /** A clicked bare name was searched for and not found (an incomplete tree) */
-  onNameNotFound?: (filename: string) => void
+  /**
+   * A clicked name was searched for and nothing was found (an incomplete
+   * tree). `cutShort`: the search did not finish – a bound stopped it, main
+   * was busy, or it failed – so the file may still exist.
+   */
+  onNameNotFound?: (filename: string, details: { cutShort: boolean }) => void
   /**
    * Callback when a file link is clicked.
    * Should open the file in the Monaco editor at the specified position.
@@ -508,7 +514,10 @@ export function useTerminalFileLinks(
             // On an incomplete tree a bare name the index lacks may still be on
             // disk: it is a link whose click searches for it
             const searchOnly =
-              !finalPath && treeTruncated && projectRoot !== null && isFilenameOnly(strippedPath)
+              !finalPath &&
+              treeTruncated &&
+              projectRoot !== null &&
+              isSearchableBareName({ path: strippedPath, line: match.line, column: match.column })
 
             // Skip if no valid path found
             if (!finalPath && !searchOnly) continue
@@ -538,7 +547,7 @@ export function useTerminalFileLinks(
                   const found = projectRoot ? await searchProjectByName(projectRoot, name) : NOTHING_FOUND
                   const candidates = mergeNameSearch(pendingCandidates?.map((c) => c.path) ?? [], found, match.path)
                   if (candidates.length === 0) {
-                    onNameNotFound?.(name)
+                    onNameNotFound?.(name, { cutShort: found.truncated })
                     return
                   }
                   if (!onShowPicker) {

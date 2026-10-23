@@ -96,7 +96,8 @@ export interface LazyFolderView {
   readonly filter?: (
     tree: FileNode[],
     loaded: ReadonlyMap<string, LoadedChildren>,
-    status: ReadonlyMap<string, LazyFolderStatus>
+    status: ReadonlyMap<string, LazyFolderStatus>,
+    base: FileNode[]
   ) => FileNode[]
 }
 
@@ -149,7 +150,7 @@ export function useLazyFolderChildren(
       settled.current.paths.add(path)
     }
     if (rootPath && !expandedFolders.has(rootPath)) return
-    const shown = filter ? filter(tree, loaded, status) : tree
+    const shown = filter ? filter(tree, loaded, status, files) : tree
     for (const path of visibleExpandedLazy(shown, expandedFolders)) {
       if (inFlight.current.has(path)) continue
       const entry = loaded.get(path)

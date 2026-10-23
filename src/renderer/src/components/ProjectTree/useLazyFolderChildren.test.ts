@@ -19,6 +19,7 @@ vi.mock('../../utils/logger', () => ({
 import { reconcileLazyState, useLazyFolderChildren } from './useLazyFolderChildren'
 import { useLazyFolderStore } from '../../stores/useLazyFolderStore'
 import { useMergedProjectFiles } from '../../hooks/useMergedProjectFiles'
+import { filterMarkdownTree } from './markdownFilter'
 import { getBasename } from '../../utils/fileUtils'
 
 const file = (path: string): FileNode => ({ name: getBasename(path), path, type: 'file', extension: '.md' })
@@ -217,6 +218,48 @@ describe('useLazyFolderChildren', () => {
 
     rerender({ files: tree(), expanded: open })
     await waitFor(() => expect(readDirectory).toHaveBeenCalledTimes(2))
+  })
+
+  it('shows a Markdown file an agent wrote into a capped folder the filter had hidden (round 4, item 3)', async () => {
+    const capped = (): FileNode[] => [folder('/p/big', [], 'capped')]
+    const expanded = new Set(['/p', '/p/big'])
+    const view = { rootPath: '/p', filter: filterMarkdownTree }
+    readDirectory.mockResolvedValueOnce([file('/p/big/x.txt')])
+    const { result, rerender } = renderHook(
+      ({ files }) => {
+        const lazy = useLazyFolderChildren(files, expanded, view)
+        return filterMarkdownTree(lazy.tree, lazy.loaded, lazy.status, files)
+      },
+      { initialProps: { files: capped() } }
+    )
+    // Read with no Markdown in it: the filter hides the folder
+    await waitFor(() => expect(result.current).toEqual([]))
+
+    // The agent writes notes.md; the watcher brings a new base tree
+    readDirectory.mockResolvedValueOnce([file('/p/big/x.txt'), file('/p/big/notes.md')])
+    rerender({ files: capped() })
+
+    await waitFor(() => expect(childrenOf(result.current, '/p/big')).toEqual(['/p/big/notes.md']))
+  })
+
+  it('reports the tree truncated again when a read folder out of view is stale (round 4, item 3)', async () => {
+    readDirectory.mockResolvedValue([file('/p/a/big/x.md')])
+    const tree = (): FileNode[] => [folder('/p/a', [folder('/p/a/big', [], 'capped')])]
+    const { result, rerender } = renderHook(
+      ({ files, expanded }) => {
+        useLazyFolderChildren(files, expanded)
+        return useMergedProjectFiles(files).truncated
+      },
+      { initialProps: { files: tree(), expanded: new Set(['/p/a', '/p/a/big']) as ReadonlySet<string> } }
+    )
+    await waitFor(() => expect(result.current).toBe(false))
+
+    // Out of view, then a new base tree: what big holds now is unknown
+    rerender({ files: tree(), expanded: new Set(['/p/a/big']) })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(readDirectory).toHaveBeenCalledTimes(1)
+    expect(result.current).toBe(true)
   })
 
   it('reads nothing while the root row is collapsed, and reads once it is expanded (round 3, item 5)', async () => {

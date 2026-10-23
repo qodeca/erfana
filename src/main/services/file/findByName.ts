@@ -215,6 +215,22 @@ export interface FindByNameGate {
 
 const NOTHING: FindByNameResult = { paths: [], truncated: true }
 
+/** A slot held this long has a read that does not settle (a stale mount, most likely) */
+export const FIND_BY_NAME_LONG_HOLD_MS = 30_000
+
+export interface FindByNameGateOptions {
+  /** Searches with reads in flight at once ({@link FIND_BY_NAME_MAX_SEARCHES}) */
+  readonly maxSearches?: number
+  /** Calls waiting for a slot ({@link FIND_BY_NAME_MAX_WAITING}) */
+  readonly maxWaiting?: number
+  /** How long a call waits for a slot before it answers `truncated` */
+  readonly waitLimitMs?: number
+  /** How long a slot is held before {@link FindByNameGateOptions.onLongHold} is told */
+  readonly longHoldMs?: number
+  /** Told once per slot held past `longHoldMs` – counts only, never a path or a name */
+  readonly onLongHold?: (info: { readonly heldMs: number; readonly running: number }) => void
+}
+
 /**
  * One per process: at most {@link FIND_BY_NAME_MAX_SEARCHES} searches with
  * reads in flight, whatever the number of windows, terminals or hovered
@@ -223,22 +239,42 @@ const NOTHING: FindByNameResult = { paths: [], truncated: true }
  * {@link FIND_BY_NAME_CONCURRENCY} reads ever hang – and later calls answer
  * `truncated` after waiting at most `waitLimitMs`.
  */
-export function createFindByNameGate(
+export function createFindByNameGate({
   maxSearches = FIND_BY_NAME_MAX_SEARCHES,
   maxWaiting = FIND_BY_NAME_MAX_WAITING,
-  waitLimitMs = FIND_BY_NAME_TIME_LIMIT_MS
-): FindByNameGate {
+  waitLimitMs = FIND_BY_NAME_TIME_LIMIT_MS,
+  longHoldMs = FIND_BY_NAME_LONG_HOLD_MS,
+  onLongHold
+}: FindByNameGateOptions = {}): FindByNameGate {
   const pending = new Map<string, Promise<FindByNameResult>>()
   // Few entries (at most `maxWaiting`), so a plain array
   const queue: Array<() => void> = []
   let running = 0
 
+  const release = (): void => {
+    running--
+    while (running < maxSearches && queue.length > 0) queue.shift()!()
+  }
+
   const launch = (search: () => FindByNameRun): Promise<FindByNameResult> => {
     running++
-    const run = search()
+    let run: FindByNameRun
+    try {
+      run = search()
+    } catch (error) {
+      // A search that throws before it starts holds no slot
+      release()
+      return Promise.reject(error)
+    }
+    const startedAt = performance.now()
+    const longHold = onLongHold
+      ? setTimeout(() => onLongHold({ heldMs: Math.round(performance.now() - startedAt), running }), longHoldMs)
+      : undefined
+    // Never keeps the process alive on its own
+    longHold?.unref?.()
     void run.idle.then(() => {
-      running--
-      while (running < maxSearches && queue.length > 0) queue.shift()!()
+      clearTimeout(longHold)
+      release()
     })
     return run.result
   }
@@ -256,10 +292,10 @@ export function createFindByNameGate(
       } else if (queue.length >= maxWaiting) {
         return Promise.resolve(NOTHING)
       } else {
-        answer = new Promise<FindByNameResult>((resolve) => {
+        answer = new Promise<FindByNameResult>((resolve, reject) => {
           const begin = (): void => {
             clearTimeout(timer)
-            launch(search).then(resolve)
+            launch(search).then(resolve, reject)
           }
           const timer = setTimeout(() => {
             const at = queue.indexOf(begin)

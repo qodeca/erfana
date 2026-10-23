@@ -46,16 +46,25 @@ export function collectLazyPaths(nodes: FileNode[], into: Set<string> = new Set(
   return into
 }
 
+/** What is known of the lazy folders: their reads, their status, and the base tree now shown. */
+type LoadedMap = ReadonlyMap<string, { readonly baseTree?: FileNode[] | null } | unknown>
+
 /**
- * Whether a lazy folder's contents are unknown: never read, or its last read
- * failed (what it may still show is from an older read).
+ * Whether a lazy folder's contents are unknown: never read, its last read
+ * failed, or – given the current base tree `base` – what it shows was read
+ * against an older one (or carried over, `baseTree: null`): files added
+ * since, by an agent for instance, are not in it. Such a folder is read
+ * again when it is next in view; until then it counts as unread.
  */
 export function isUnreadLazy(
   path: string,
-  loaded: ReadonlyMap<string, unknown>,
-  status?: ReadonlyMap<string, LazyFolderStatus>
+  loaded: LoadedMap,
+  status?: ReadonlyMap<string, LazyFolderStatus>,
+  base?: FileNode[]
 ): boolean {
-  return !loaded.has(path) || status?.get(path) === 'failed'
+  if (!loaded.has(path) || status?.get(path) === 'failed') return true
+  if (base === undefined) return false
+  return (loaded.get(path) as { readonly baseTree?: FileNode[] | null }).baseTree !== base
 }
 
 /**
@@ -68,14 +77,15 @@ export function isUnreadLazy(
  */
 export function hasUnloadedCapped(
   nodes: FileNode[],
-  loaded: ReadonlyMap<string, unknown>,
-  status?: ReadonlyMap<string, LazyFolderStatus>
+  loaded: LoadedMap,
+  status?: ReadonlyMap<string, LazyFolderStatus>,
+  base?: FileNode[]
 ): boolean {
   for (const node of nodes) {
     if (node.type !== 'directory') continue
     if (node.lazy === 'linked') continue
-    if (node.lazy === 'capped' && isUnreadLazy(node.path, loaded, status)) return true
-    if (node.children && hasUnloadedCapped(node.children, loaded, status)) return true
+    if (node.lazy === 'capped' && isUnreadLazy(node.path, loaded, status, base)) return true
+    if (node.children && hasUnloadedCapped(node.children, loaded, status, base)) return true
   }
   return false
 }

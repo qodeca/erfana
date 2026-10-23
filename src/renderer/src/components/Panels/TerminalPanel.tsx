@@ -20,6 +20,7 @@ import { useTerminalStore } from '../../stores/useTerminalStore'
 import { useProjectStore } from '../../stores/useProjectStore'
 import { useActivityBarStore } from '../../stores/useActivityBarStore'
 import { showWarningToast, showSuccessToast, showInfoToast } from '../../utils/toastHelpers'
+import { showNameNotFoundToast } from './TerminalPanel/nameNotFoundToast'
 import { useScrollAnomalyRecovery } from '../../hooks/useScrollAnomalyRecovery'
 import { useTerminalParserHooks } from '../../hooks/useTerminalParserHooks'
 import { useTerminalClipboard } from '../../hooks/useTerminalClipboard'
@@ -322,9 +323,9 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     })
   }, [dockviewApi])
 
-  // A bare name clicked on an incomplete tree that the project search did not find
-  const handleNameNotFound = useCallback((filename: string) => {
-    showInfoToast('File not found', `No file named "${filename}" was found in the project.`)
+  // A name clicked on an incomplete tree that the project search did not find
+  const handleNameNotFound = useCallback((filename: string, { cutShort }: { cutShort: boolean }) => {
+    showNameNotFoundToast(filename, cutShort)
   }, [])
 
   // Terminal file links hook - enables clickable file paths with smart resolution

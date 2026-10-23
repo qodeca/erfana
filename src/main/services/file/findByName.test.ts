@@ -4,7 +4,7 @@
  * findByName on a real temp folder: matches, skips, never follows a link, and
  * stops at each of its bounds.
  */
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Dirent } from 'node:fs'
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -237,7 +237,7 @@ describe('createFindByNameGate', () => {
   }
 
   it('runs at most two searches at once and the rest in turn', async () => {
-    const gate = createFindByNameGate(2, 8)
+    const gate = createFindByNameGate({ maxSearches: 2, maxWaiting: 8 })
     const searches = [controlled(), controlled(), controlled()]
     let started = 0
     const results = searches.map((c, i) => gate.run(`k${i}`, () => (started++, c.run)))
@@ -255,7 +255,7 @@ describe('createFindByNameGate', () => {
   })
 
   it('keeps a slot taken after the answer while a read of the search is in flight (review of #320, round 3)', async () => {
-    const gate = createFindByNameGate(1, 8, 10_000)
+    const gate = createFindByNameGate({ maxSearches: 1, maxWaiting: 8, waitLimitMs: 10_000 })
     const hung = controlled()
     const first = gate.run('a', () => hung.run)
     hung.answer(done)
@@ -273,7 +273,7 @@ describe('createFindByNameGate', () => {
   })
 
   it('answers a waiting call truncated at its own deadline, and never starts its search', async () => {
-    const gate = createFindByNameGate(1, 8, 20)
+    const gate = createFindByNameGate({ maxSearches: 1, maxWaiting: 8, waitLimitMs: 20 })
     const hung = controlled()
     void gate.run('a', () => hung.run)
     let started = false
@@ -301,7 +301,7 @@ describe('createFindByNameGate', () => {
       const ticks = [0, FIND_BY_NAME_TIME_LIMIT_MS - 10]
       return () => (ticks.length > 1 ? ticks.shift()! : ticks[0])
     }
-    const gate = createFindByNameGate(2, 8, 20)
+    const gate = createFindByNameGate({ maxSearches: 2, maxWaiting: 8, waitLimitMs: 20 })
     const search = () => startFindByName('/r', 'x.md', { ...noSkip, readdir, now: clock() })
 
     const answers = []
@@ -312,8 +312,36 @@ describe('createFindByNameGate', () => {
     expect(answers.slice(2)).toEqual(Array(4).fill({ paths: [], truncated: true }))
   })
 
+  it('frees the slot of a search that throws before it starts (round 4, item 5)', async () => {
+    const gate = createFindByNameGate({ maxSearches: 1 })
+    await expect(
+      gate.run('a', () => {
+        throw new Error('boom')
+      })
+    ).rejects.toThrow('boom')
+    expect(gate.running).toBe(0)
+    await expect(gate.run('b', instant)).resolves.toEqual(done)
+  })
+
+  it('tells, once and with counts only, about a slot held past the long-hold time (round 4, item 4)', async () => {
+    const onLongHold = vi.fn()
+    const gate = createFindByNameGate({ maxSearches: 2, longHoldMs: 10, onLongHold })
+    const hung = controlled()
+    void gate.run('a', () => hung.run)
+    const quick = controlled()
+    void gate.run('b', () => quick.run)
+    quick.answer(done)
+    quick.settle()
+
+    await new Promise((resolve) => setTimeout(resolve, 40))
+
+    expect(onLongHold).toHaveBeenCalledTimes(1)
+    expect(onLongHold).toHaveBeenCalledWith({ heldMs: expect.any(Number), running: 1 })
+    hung.settle()
+  })
+
   it('shares a search by key, and runs it again once it has answered', async () => {
-    const gate = createFindByNameGate(2, 8)
+    const gate = createFindByNameGate({ maxSearches: 2, maxWaiting: 8 })
     let runs = 0
     const search = (): FindByNameRun => (runs++, instant())
     await Promise.all([gate.run('k', search), gate.run('k', search)])
@@ -323,7 +351,7 @@ describe('createFindByNameGate', () => {
   })
 
   it('answers truncated at once when too many calls wait', async () => {
-    const gate = createFindByNameGate(1, 1, 10_000)
+    const gate = createFindByNameGate({ maxSearches: 1, maxWaiting: 1, waitLimitMs: 10_000 })
     const busy = controlled()
     const first = gate.run('a', () => busy.run)
     const second = gate.run('b', instant)

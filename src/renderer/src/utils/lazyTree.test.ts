@@ -79,6 +79,14 @@ describe('hasUnloadedCapped', () => {
     expect(hasUnloadedCapped(tree, new Map([['/p/a/big', {}]]))).toBe(false)
   })
 
+  it('counts a capped folder read against an older base tree, or carried over, as unread (round 4, item 3)', () => {
+    const base = [folder('/p/big', [], 'capped')]
+    const older: FileNode[] = []
+    expect(hasUnloadedCapped(base, new Map([['/p/big', { baseTree: base }]]), undefined, base)).toBe(false)
+    expect(hasUnloadedCapped(base, new Map([['/p/big', { baseTree: older }]]), undefined, base)).toBe(true)
+    expect(hasUnloadedCapped(base, new Map([['/p/big', { baseTree: null }]]), undefined, base)).toBe(true)
+  })
+
   it('does not count the capped sub-folders an expand read of a linked folder lists (round 3, item 2)', () => {
     const expanded = [folder('/p/alias', [folder('/p/alias/sub', [], 'capped')], 'linked')]
     expect(hasUnloadedCapped(expanded, new Map([['/p/alias', {}]]))).toBe(false)

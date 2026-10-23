@@ -343,7 +343,8 @@ A very large project that kept changing made Erfana exit on Windows with nothing
 | `FileService: readDirectory failed` | warn | A walk rejected (only the root `readdir` can fail one; sub-folder errors are recovered) | `readId`, `pathDigest`, `durationMs` |
 | `FileService: readDirectory still running` | warn | Once per walk, `READ_DIRECTORY_SLOW_WARN_MS` (60 s) after it started | `readId`, `pathDigest`, `elapsedMs` |
 | `FileService: readDirectory joined follow-up read` | info | A call arrived while a walk of that path ran and was queued behind it | `pathDigest`, `behindReadId` |
-| `file:findByName completed` | info | The terminal searched the project for a file name its incomplete tree lacks (finding [32]) | `durationMs`, `resultCount`, `truncated` – never the name or the paths |
+| `file:findByName completed` | info | The terminal searched the project for a clicked file name on an incomplete tree (finding [32]) | `durationMs`, `resultCount`, `truncated` – never the name or the paths |
+| `FileService: name search slot held by a read that has not settled` | warn | A name search's slot has been held for 30 s by a folder read that never returned (a stale network mount, most likely); once per slot | `heldMs`, `running` – counts only |
 | `DirectoryWatcher health` | info (warn when stressed) | Every 120 s while a directory watcher is active, i.e. while a project is open | Watcher metrics, plus `mainMemoryMb` and `processMemoryMb`, and `memoryError` when a source could not be read |
 
 **Renderer** (`renderer.log`, prefixed `[RENDERER]`):

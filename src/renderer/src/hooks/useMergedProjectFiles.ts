@@ -17,6 +17,6 @@ export function useMergedProjectFiles(files: FileNode[]): { files: FileNode[]; t
   const status = useLazyFolderStore((state) => state.status)
   return useMemo(() => {
     const merged = mergeLazyChildren(files, loaded)
-    return { files: merged, truncated: hasUnloadedCapped(merged, loaded, status) }
+    return { files: merged, truncated: hasUnloadedCapped(merged, loaded, status, files) }
   }, [files, loaded, status])
 }

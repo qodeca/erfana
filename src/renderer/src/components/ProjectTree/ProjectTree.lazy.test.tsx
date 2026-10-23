@@ -71,6 +71,7 @@ const fileApi = {
   getStats: vi.fn(async () => ({ size: 0 }))
 }
 
+let onDirectoryChangedCallback: ((data: unknown) => void) | null = null
 let onProjectChangedCallback: ((data: { newPath: string | null; oldPath: string | null }) => void) | null = null
 
 function setupMockApi(): void {
@@ -85,7 +86,10 @@ function setupMockApi(): void {
       stop: vi.fn(async () => ({ success: true })),
       pause: vi.fn(async () => ({ success: true })),
       resume: vi.fn(async () => ({ success: true })),
-      onDirectoryChanged: () => () => {},
+      onDirectoryChanged: (cb: (data: unknown) => void) => {
+        onDirectoryChangedCallback = cb
+        return () => {}
+      },
       onProjectDeleted: () => () => {},
       onDirectoryError: () => () => {}
     },
@@ -296,6 +300,24 @@ describe('ProjectTree lazy folders in the Markdown filter (review items 4, 9)', 
 
     expect(screen.getByText('dist')).toBeInTheDocument()
     expect(placeholderOf(`${PROJECT}/dist`)).toHaveTextContent('Could not read this folder')
+  })
+
+  it('shows a hidden capped folder again after a refresh: its files may have changed (round 4, item 3)', async () => {
+    let finish!: (nodes: FileNode[]) => void
+    await openTree('markdown')
+    fileApi.readDirectory.mockImplementationOnce(() => new Promise<FileNode[]>((resolve) => (finish = resolve)))
+    fireEvent.click(screen.getByText('big'))
+    await waitFor(() => expect(placeholderOf(`${PROJECT}/big`)).not.toBeNull())
+    // Collapsed again while it loads, then it loads with no Markdown: hidden
+    fireEvent.click(screen.getByText('big'))
+    await act(async () => finish(listing[`${PROJECT}/big`]))
+    await waitFor(() => expect(screen.queryByText('big')).toBeNull())
+
+    // An agent writes notes.md into it; the watcher reports a change
+    listing[`${PROJECT}/big`] = [{ name: 'notes.md', path: `${PROJECT}/big/notes.md`, type: 'file', extension: '.md' }]
+    act(() => onDirectoryChangedCallback!({ eventCount: 1, structural: true }))
+
+    await waitFor(() => expect(screen.getByText('big')).toBeInTheDocument(), { timeout: 3_000 })
   })
 
   it('keeps a capped folder whose loaded level holds Markdown', async () => {

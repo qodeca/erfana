@@ -263,7 +263,11 @@ const matcherOverruns = (scope: WalkScope): number =>
  * terminal: at most two at once, one search per project, folder and name
  * (review of #320).
  */
-const findByNameGate = createFindByNameGate()
+const findByNameGate = createFindByNameGate({
+  // A read that never settles keeps its slot; say so once, counts only
+  onLongHold: ({ heldMs, running }) =>
+    logger.warn('FileService: name search slot held by a read that has not settled', { heldMs, running })
+})
 
 export class FileService implements IFileService {
   private projectPath: string | null = null

@@ -34,11 +34,12 @@ describe('searchProjectByName', () => {
     expect(findByName).toHaveBeenCalledWith({ dirPath: '/p', name: 'Card.tsx' })
   })
 
-  it('answers nothing when the search fails, and asks again next time (review of #320, item 10)', async () => {
+  it('answers nothing, as a search that did not finish, when it fails, and asks again next time (item 10)', async () => {
     findByName.mockRejectedValueOnce(new Error('Cannot read files outside the project directory'))
     findByName.mockResolvedValueOnce({ paths: ['/p/Card.tsx'], truncated: false })
 
-    await expect(searchProjectByName('/p', 'Card.tsx')).resolves.toEqual({ paths: [], truncated: false })
+    // `truncated`: the click says the search could not finish, not that the file is missing
+    await expect(searchProjectByName('/p', 'Card.tsx')).resolves.toEqual({ paths: [], truncated: true })
     await expect(searchProjectByName('/p', 'Card.tsx')).resolves.toEqual({ paths: ['/p/Card.tsx'], truncated: false })
     expect(findByName).toHaveBeenCalledTimes(2)
   })

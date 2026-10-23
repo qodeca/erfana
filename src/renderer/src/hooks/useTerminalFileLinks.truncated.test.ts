@@ -102,6 +102,28 @@ describe('useTerminalFileLinks on a truncated tree', () => {
     expect(candidates.map((c) => c.path)).toEqual(['/project/big/Card.tsx'])
   })
 
+  it('makes no search link of version, number or address tokens (round 4, item 1)', async () => {
+    for (const line of [
+      'Released v1.2 and 1.2.3 on 24.20.0',
+      ' Tests  544 passed  Duration  1.74s (transform 12.3ms)',
+      'pi is 3.14 and the ratio is 0.5x',
+      'Listening on 127.0.0.1:3000'
+    ]) {
+      expect(await linksFor(line, true, callbacks())).toEqual([])
+    }
+    expect(findByName).not.toHaveBeenCalled()
+  })
+
+  it('passes cutShort when the search did not finish', async () => {
+    findByName.mockResolvedValue({ paths: [], truncated: true })
+    const cb = callbacks()
+    const links = await linksFor('see Card.tsx:7', true, cb)
+
+    await links[0].activate(new MouseEvent('click'), links[0].text)
+
+    expect(cb.onNameNotFound).toHaveBeenCalledWith('Card.tsx', { cutShort: true })
+  })
+
   it('says so when the clicked name is not found', async () => {
     findByName.mockResolvedValue({ paths: [], truncated: false })
     const cb = callbacks()
@@ -109,7 +131,7 @@ describe('useTerminalFileLinks on a truncated tree', () => {
 
     await links[0].activate(new MouseEvent('click'), links[0].text)
 
-    expect(cb.onNameNotFound).toHaveBeenCalledWith('Card.tsx')
+    expect(cb.onNameNotFound).toHaveBeenCalledWith('Card.tsx', { cutShort: false })
     expect(cb.onShowPicker).not.toHaveBeenCalled()
     expect(cb.onFileOpen).not.toHaveBeenCalled()
   })
