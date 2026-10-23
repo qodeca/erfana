@@ -666,6 +666,7 @@ describe('assertConfigMatchesAllowlist', () => {
     // Pinned by value too, so widening the constant is a reviewed diff here.
     expect([...ASAR_UNPACK]).toEqual([
       'node_modules/node-pty/build/Release/*.node',
+      'node_modules/node-pty/build/Release/*.{dll,exe}',
       'node_modules/node-pty/build/Release/spawn-helper',
       'node_modules/node-pty/prebuilds/*/*.{node,dll,exe}',
       'node_modules/node-pty/prebuilds/*/spawn-helper',
@@ -682,6 +683,7 @@ describe('assertConfigMatchesAllowlist', () => {
     // The Windows debug symbols and the unused conpty/ folder never get packed.
     expect(config.files).toContain('!**/node-pty/prebuilds/*/*.pdb');
     expect(config.files).toContain('!**/node-pty/prebuilds/*/conpty/**');
+    expect(config.files).toContain('!**/node-pty/build/Release/conpty/**');
     expect(config.mac?.asar).toBeUndefined();
     expect(config.win?.asar).toBeUndefined();
     expect(config.mac?.asarUnpack).toBeUndefined();

@@ -77,6 +77,12 @@ files:
   # packed nor re-signed with Erfana's certificate.
   - '!**/node-pty/prebuilds/*/*.pdb'
   - '!**/node-pty/prebuilds/*/conpty/**'
+  # The same for a locally rebuilt node-pty (build/Release, used ahead of the
+  # prebuilds when present): link-time and debug files and the build's own
+  # object folders are never loaded.
+  - '!**/node-pty/build/Release/{*.pdb,*.lib,*.exp}'
+  - '!**/node-pty/build/Release/{obj,obj.target}/**'
+  - '!**/node-pty/build/Release/conpty/**'
 # ASAR on (v0.22.0 spike, docs/spikes/2026-10-22-asar-integrity.md). The app's
 # JS ships inside app.asar, so the EnableEmbeddedAsarIntegrityValidation and
 # OnlyLoadAppFromAsar fuses in scripts/fuses.js can apply.
@@ -95,6 +101,7 @@ asar:
   smartUnpack: false
 asarUnpack:
   - node_modules/node-pty/build/Release/*.node
+  - node_modules/node-pty/build/Release/*.{dll,exe}
   - node_modules/node-pty/build/Release/spawn-helper
   - node_modules/node-pty/prebuilds/*/*.{node,dll,exe}
   - node_modules/node-pty/prebuilds/*/spawn-helper

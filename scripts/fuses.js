@@ -1535,6 +1535,10 @@ const ASAR_OPTIONS = Object.freeze({ smartUnpack: false });
  */
 const ASAR_UNPACK = Object.freeze([
   'node_modules/node-pty/build/Release/*.node',
+  // winpty.dll + winpty-agent.exe must sit beside pty.node: without them there,
+  // the DLL search order falls through to PATH (Windows builds below 18309,
+  // where node-pty uses winpty).
+  'node_modules/node-pty/build/Release/*.{dll,exe}',
   'node_modules/node-pty/build/Release/spawn-helper',
   'node_modules/node-pty/prebuilds/*/*.{node,dll,exe}',
   'node_modules/node-pty/prebuilds/*/spawn-helper',
@@ -1729,38 +1733,62 @@ async function applyAndVerifyFuses(
 
   // Read the wire back: a fuse the flip did not land is a bundle that is not
   // what this hook claims, whatever the log says.
-  const wire = await readWire(electronBinaryPath);
-  const mismatched = [];
-  for (const [name, index] of Object.entries(FuseV1Options)) {
-    if (typeof index !== 'number') continue;
-    const want = config[index] ? fusesLib.FuseState.ENABLE : fusesLib.FuseState.DISABLE;
-    if (wire[index] !== want) mismatched.push(`${name}=${wire[index]} (want ${want})`);
-  }
-  if (mismatched.length > 0) {
-    throw new Error(`Fuse wire read back does not match the config: ${mismatched.join(', ')}. Refusing to ship.`);
-  }
+  assertFuseWireMatches(await readWire(electronBinaryPath), config);
 
   // The integrity hash the fuse will check must be the hash of the archive
   // that ships. electron-builder computes it before afterPack; this catches a
   // step that rewrote app.asar afterwards, or a hash that never got embedded.
   let integrity = null;
   if (platform === 'darwin' || platform === 'win32') {
-    integrity = readEmbeddedAsarIntegrity(platform, electronBinaryPath, deps);
-    const actual = asarHeaderHash(archive, deps.asar || loadAsarModule());
-    if (!integrity) {
-      throw new Error(
-        `No embedded asar integrity hash found in ${electronBinaryPath}. With ` +
-        `EnableEmbeddedAsarIntegrityValidation on, the app would have nothing to check against. Refusing to ship.`
-      );
-    }
-    if (String(integrity.algorithm).toUpperCase() !== 'SHA256' || integrity.hash !== actual) {
-      throw new Error(
-        `Embedded asar integrity (${integrity.algorithm} ${integrity.hash}) does not match app.asar on disk ` +
-        `(SHA256 ${actual}). Something changed app.asar after electron-builder packed it. Refusing to ship.`
-      );
-    }
+    integrity = assertEmbeddedIntegrityMatches(platform, electronBinaryPath, archive, deps);
   }
   return { fuses: config, integrity };
+}
+
+/**
+ * Throw unless every fuse in the wire read back from the binary has the value
+ * `config` asks for. Shared by afterPack (after the flip) and afterSign
+ * (scripts/resign.js, against the signed Windows executable).
+ *
+ * @param {object} wire result of @electron/fuses getCurrentFuseWire
+ * @param {object} config buildFuseConfig output
+ */
+function assertFuseWireMatches(wire, config) {
+  const { FuseState } = require('@electron/fuses');
+  const mismatched = [];
+  for (const [name, index] of Object.entries(FuseV1Options)) {
+    if (typeof index !== 'number') continue;
+    const want = config[index] ? FuseState.ENABLE : FuseState.DISABLE;
+    if (wire[index] !== want) mismatched.push(`${name}=${wire[index]} (want ${want})`);
+  }
+  if (mismatched.length > 0) {
+    throw new Error(`Fuse wire read back does not match the config: ${mismatched.join(', ')}. Refusing to ship.`);
+  }
+}
+
+/**
+ * Throw unless the integrity hash embedded in the binary equals the SHA-256 of
+ * the archive header on disk. Shared by afterPack and afterSign.
+ *
+ * @returns {{algorithm: string, hash: string}} the embedded entry
+ */
+function assertEmbeddedIntegrityMatches(platform, electronBinaryPath, archive, deps = {}) {
+  const integrity = readEmbeddedAsarIntegrity(platform, electronBinaryPath, deps);
+  const actual = asarHeaderHash(archive, deps.asar || loadAsarModule());
+  if (!integrity) {
+    throw new Error(
+      `No embedded asar integrity hash found in ${electronBinaryPath}. With ` +
+      `EnableEmbeddedAsarIntegrityValidation on, the app would have nothing to check against. Refusing to ship.`
+    );
+  }
+  if (String(integrity.algorithm).toUpperCase() !== 'SHA256' || integrity.hash !== actual) {
+    throw new Error(
+      `Embedded asar integrity (${integrity.algorithm} ${integrity.hash}) does not match app.asar on disk ` +
+      `(SHA256 ${actual}). Something changed app.asar or the executable after electron-builder packed it. ` +
+      `Refusing to ship.`
+    );
+  }
+  return integrity;
 }
 
 /**
@@ -2259,6 +2287,8 @@ module.exports.assertPackagedAsarContents = assertPackagedAsarContents;
 module.exports.packedPayloadDir = packedPayloadDir;
 module.exports.buildFuseConfig = buildFuseConfig;
 module.exports.applyAndVerifyFuses = applyAndVerifyFuses;
+module.exports.assertFuseWireMatches = assertFuseWireMatches;
+module.exports.assertEmbeddedIntegrityMatches = assertEmbeddedIntegrityMatches;
 module.exports.readEmbeddedAsarIntegrity = readEmbeddedAsarIntegrity;
 module.exports.asarHeaderHash = asarHeaderHash;
 module.exports.assertEffectiveAsarConfig = assertEffectiveAsarConfig;

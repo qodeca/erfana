@@ -14,6 +14,7 @@ asar:
   smartUnpack: false
 asarUnpack:
   - node_modules/node-pty/build/Release/*.node
+  - node_modules/node-pty/build/Release/*.{dll,exe}
   - node_modules/node-pty/build/Release/spawn-helper
   - node_modules/node-pty/prebuilds/*/*.{node,dll,exe}
   - node_modules/node-pty/prebuilds/*/spawn-helper
@@ -57,7 +58,16 @@ A new dependency that spawns a bundled binary needs an `asarUnpack` entry, the m
 
 ### Module search paths
 
-Electron keeps a packaged app's `require` lookups inside `process.resourcesPath`, but that still includes `Resources/node_modules/` and `Resources/app.asar.unpacked/node_modules/` – both outside the archive. A `require()` the archive cannot satisfy (an optional dependency a package probes for) would fall through to them. `src/main/bootstrap/confineModulePaths.cjs` narrows every lookup from inside the app to `app.asar/` and clears the global paths (`NODE_PATH`, `~/.node_modules`). `electron.vite.config.ts` inlines it as the Rollup `intro` of every main-process bundle – the main process, the git-status worker thread and the DOCX utility process each have their own module system – and the `erfana:main-module-paths-confined` build check fails if it does not come before a bundle's first dependency `require`.
+Electron keeps a packaged app's `require` lookups inside `process.resourcesPath` (and already keeps `NODE_PATH` and `~/.node_modules` out), but that still includes `Resources/node_modules/` and `Resources/app.asar.unpacked/node_modules/` – both outside the archive. A `require()` the archive cannot satisfy (an optional dependency a package probes for) would fall through to them, and an ESM `import()` goes through Node's ESM resolver, which Electron does not filter at all.
+
+`src/main/bootstrap/confineModulePaths.cjs` closes both for callers inside the app:
+
+- it narrows every CommonJS search path list to `app.asar/`, including the entry bundle's own `module.paths` – Node computed that list before any code in the file ran, so the intro is handed the real `module` (`(function(m){…})(module)`) and filters it too;
+- it registers a synchronous resolve hook (`module.registerHooks`, available in Electron 44's Node 24.22) that refuses any `require` or `import` resolution landing outside `app.asar/` – the layer that covers ESM and absolute paths.
+
+It also empties `Module.globalPaths`, which Electron already does for a packaged app – belt and braces, not the fix.
+
+`electron.vite.config.ts` inlines it as the Rollup `intro` of every main-process bundle – the main process, the git-status worker thread and the DOCX utility process each have their own module system – and the `erfana:main-module-paths-confined` build check (in `generateBundle`) fails if the intro text does not come before a bundle's first dependency `require`. That check is about text order only; the runtime effect is checked by the packaged probe in the spike report.
 
 ---
 
@@ -83,10 +93,10 @@ The v0.6.0 attempt used `asarUnpack` on `isomorphic-git` and a growing list of i
 ## Limits
 
 - **macOS:** the integrity hash lives in `Info.plist`, which the app's code signature seals, so changing the archive *and* the hash breaks the signature. Gatekeeper enforces that signature at first launch of a quarantined download; a same-user process that rewrites an already-installed app and strips the quarantine flag is limited by macOS app management protection, not by this check.
-- **Windows:** the hash and the fuses live inside `Erfana.exe`. With the current per-user install that file, its DLLs and `resources\` are writable by the same user, so a same-user process can rewrite the hash along with the archive. The integrity check alone raises the bar and makes tampering visible (the archive no longer matches what was signed, and the Authenticode signature of `Erfana.exe` breaks), but it does not stop such a process. What stops it is the per-machine install in `Program Files` – a separate change in the same release (the "per-machine Windows install" PR) – where a standard user cannot write those files.
-- **Unpacked binaries are not integrity-checked.** A process that can write the install folder can replace `pty.node`, the LiteParse addon, `ffmpeg` or `ffprobe`. On macOS the code signature covers them; on Windows the per-machine install is again what protects them.
-- **`Resources/node_modules` fallback:** closed for code that runs through the bundled entries by `confineModulePaths.cjs` (see [Module search paths](#module-search-paths)). Code that builds its own resolver from an absolute path outside the archive is not covered; nothing in the app does that today.
-- **Windows signing step:** electron-builder 26.16.1 writes the integrity resource with `resedit` in `beforeCopyExtraFiles`, before `afterPack` and independent of `signAndEditExecutable`. The later resource edit (also `resedit`, `editWindowsResources`) and Authenticode signing run after `afterPack`, so whether they keep the resource is a Windows check listed in the spike report.
+- **Windows (per-user install):** the hash and the fuses live inside `Erfana.exe`, and that file, its DLLs and `resources\` are writable by the same user. The integrity check raises the bar and makes tampering visible (the archive no longer matches what was signed, and the Authenticode signature of `Erfana.exe` breaks), but it does not stop a same-user process, which can change `Erfana.exe` and its DLLs along with the archive. A per-machine install is a planned later change.
+- **Unpacked binaries are not integrity-checked.** A process that can write the install folder can replace `pty.node`, the LiteParse addon, `ffmpeg` or `ffprobe`. On macOS the code signature covers them; on Windows (per-user install) a same-user process can replace them.
+- **`Resources/node_modules` fallback:** narrowed by `confineModulePaths.cjs` for every caller inside the app – CommonJS search paths and, through the resolve hook, ESM and absolute-path resolutions (see [Module search paths](#module-search-paths)). Not covered: code whose own file is outside the archive (none in the app today), and native addons, which load by path from `app.asar.unpacked/`.
+- **Windows signing step:** electron-builder 26.16.1 writes the integrity resource with `resedit` in `beforeCopyExtraFiles`, before `afterPack` and independent of `signAndEditExecutable`. The later resource edit (also `resedit`, `editWindowsResources`) and Authenticode signing run after `afterPack`; `afterSign` (`scripts/resign.js`, `verifySignedWindowsBundle`) then reads the fuse wire and the integrity resource back from the **signed** `Erfana.exe` and compares them with the pinned fuses and `app.asar`, and fails the build on a mismatch. It runs only when electron-builder actually signed (not on an unsigned `--dir` build).
 
 ---
 
