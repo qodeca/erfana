@@ -280,12 +280,15 @@ async function createId(
       // /D disables AutoRun, /S strips exactly the outer quote pair, /K keeps cmd.exe interactive
       expect(script).toMatch(/^\/D \/S \/K "/)
       expect(script).not.toContain('\\"')
-      expect(script).toMatch(/ && cls && echo on"$/)
+      expect(script).toMatch(/ && cls & echo on"$/)
       // Issue #154 BLOCKER #1: bootstrap MUST start with `@echo off &&` so
       // cmd.exe does not echo the bootstrap commands back into the PTY,
       // which would otherwise cause markerDetector to mis-parse the echoed
       // `echo MARKER` line as the cwd.
-      expect(script).toContain('/K "@echo off && cd /d "C:\\Projects\\test"')
+      expect(script).toContain('/K "@echo off && cd && echo ')
+      // The cwd is not in the command line: the shell starts there
+      expect(script).not.toContain('cd /d')
+      expect(spawnedPTYs[0].opts.cwd).toBe('C:\\Projects\\test')
       // bare `cd` (no args) prints cwd – consumed by the marker handshake
       expect(script).toMatch(/&& cd && echo __ERFANA_PWD_MARKER_\d+__/)
     })
@@ -334,11 +337,15 @@ async function createId(
       return { terminalService, tid: tid!, dataSpy, clearSpy, pty: spawnedPTYs[0].pty }
     }
 
-    it('spawns with a command-line string containing the plain-quoted cd', async () => {
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it('spawns with a command-line string and the cwd as the spawn cwd', async () => {
       await spawnCmd()
       expect(typeof spawnedPTYs[0].args).toBe('string')
-      expect(spawnedPTYs[0].args).toContain('cd /d "C:\\Projects\\test"')
-      vi.useRealTimers()
+      expect(spawnedPTYs[0].args).not.toContain('C:\\Projects')
+      expect(spawnedPTYs[0].opts.cwd).toBe('C:\\Projects\\test')
     })
 
     it('shows the shell output after 10 s when the marker never arrives', async () => {
@@ -354,7 +361,18 @@ async function createId(
       expect(text).toContain('syntax is incorrect')
       expect(text).toContain('C:\\Projects\\test>')
       expect(dataSpy).toHaveBeenCalledWith(expect.objectContaining({ terminalId: tid }))
-      vi.useRealTimers()
+    })
+
+    it('a late marker after the timeout runs the clear handshake and updates the cwd', async () => {
+      const { terminalService, tid, clearSpy, pty } = await spawnCmd()
+      const marker = String(spawnedPTYs[0].args).match(/__ERFANA_PWD_MARKER_\d+__/)![0]
+      vi.advanceTimersByTime(10_000)
+      expect(clearSpy).not.toHaveBeenCalled()
+
+      pty.emit('data', 'C:\\Late\\dir\r\n')
+      pty.emit('data', `${marker}\r\n`)
+      expect(clearSpy).toHaveBeenCalledTimes(1)
+      expect(terminalService.getTerminalInfo(tid)?.cwd).toBe('C:\\Late\\dir')
     })
 
     it('clears the timer when the marker arrives: no forced flush later', async () => {
@@ -370,7 +388,6 @@ async function createId(
       const text = dataSpy.mock.calls.map((c) => c[0].data).join('')
       expect(text).not.toContain('noise')
       expect(clearSpy).toHaveBeenCalledTimes(1)
-      vi.useRealTimers()
     })
   })
 
@@ -1386,10 +1403,9 @@ async function createId(
       const shell = 'C:\\Windows\\System32\\cmd.exe'
       const tid = await svc.createTerminal({ shell, cwd: 'C:\\Users\\me\\Dev\\' })
       expect(tid).toBeTruthy()
-      const script = String(spawnedPTYs[0].args)
-      // Trailing backslash stripped – `\"` cannot occur in the bootstrap
-      expect(script).toContain('cd /d "C:\\Users\\me\\Dev"')
-      expect(script).not.toContain('cd /d "C:\\Users\\me\\Dev\\"')
+      // Trailing backslash stripped from the spawn cwd; none of it is in the command line
+      expect(spawnedPTYs[0].opts.cwd).toBe('C:\\Users\\me\\Dev')
+      expect(String(spawnedPTYs[0].args)).not.toContain('Users')
     })
 
     it('strips trailing forward slash from cmd.exe cwd', async () => {
@@ -1397,8 +1413,7 @@ async function createId(
       const shell = 'C:\\Windows\\System32\\cmd.exe'
       const tid = await svc.createTerminal({ shell, cwd: 'C:\\Users\\me\\Dev/' })
       expect(tid).toBeTruthy()
-      const script = String(spawnedPTYs[0].args)
-      expect(script).toContain('cd /d "C:\\Users\\me\\Dev"')
+      expect(spawnedPTYs[0].opts.cwd).toBe('C:\\Users\\me\\Dev')
     })
 
     it('preserves drive root `C:\\` for cmd.exe cwd', async () => {
@@ -1406,10 +1421,9 @@ async function createId(
       const shell = 'C:\\Windows\\System32\\cmd.exe'
       const tid = await svc.createTerminal({ shell, cwd: 'C:\\' })
       expect(tid).toBeTruthy()
-      const script = String(spawnedPTYs[0].args)
-      // Drive root MUST keep its trailing slash – `cd /d "C:"` would change
-      // to the *current* directory of drive C, not the root.
-      expect(script).toContain('cd /d "C:\\"')
+      // Drive root MUST keep its trailing slash – `C:` means the *current*
+      // directory of drive C, not the root.
+      expect(spawnedPTYs[0].opts.cwd).toBe('C:\\')
     })
 
     it('strips trailing backslash from PowerShell cwd', async () => {
@@ -1445,8 +1459,9 @@ async function createId(
       const shell = 'C:\\Windows\\System32\\cmd.exe'
       const tid = await svc.createTerminal({ shell, cwd: 'C:\\tmp\\100%done' })
       expect(tid).toBeTruthy()
-      const script = String(spawnedPTYs[0].args)
-      expect(script).toContain('cd /d "C:\\tmp\\100%done"')
+      // The cwd is not in the command line, so `%` is never expanded by cmd.exe
+      expect(spawnedPTYs[0].opts.cwd).toBe('C:\\tmp\\100%done')
+      expect(String(spawnedPTYs[0].args)).not.toContain('100%done')
     })
 
     it('passes through % in cwd verbatim (PowerShell, harmless)', async () => {

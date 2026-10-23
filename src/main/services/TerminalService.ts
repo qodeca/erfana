@@ -130,6 +130,9 @@ export const MARKER_BUFFER_MAX_CHARS = 64 * 1024
 /** How long to wait for the bootstrap marker before showing output anyway. */
 const MARKER_TIMEOUT_MS = 10_000
 
+/** Tail kept while still watching for a marker that arrives after the timeout. */
+const LATE_MARKER_BUFFER_MAX_CHARS = 4096
+
 /** Most post-marker output held while the clear handshake is open (64 KiB, newest kept). */
 export const PENDING_OUTPUT_MAX_CHARS = 64 * 1024
 
@@ -324,6 +327,8 @@ export class TerminalService extends EventEmitter {
       // renderer via the create response so renderer-side path-quoting can
       // pick the right flavour per terminal (#164 round-2 F#1).
       let shellKind: ShellKind = 'posix'
+      // The cmd.exe bootstrap carries no cwd: the shell starts in the validated, normalized path
+      let spawnCwd = cwd
 
       if (osPlatform() === 'win32') {
         // Win32 CreateProcess hard-fails on a cwd over MAX_PATH and node-pty
@@ -352,6 +357,7 @@ export class TerminalService extends EventEmitter {
         })
         logger.info(`🔵 Windows shell kind: ${kind} (quoting=${winShellKind})`)
         shellArgs = winShellArgs
+        if (kind === 'cmd.exe') spawnCwd = winCwd
         shellKind = winShellKind
       } else {
         // POSIX bootstrap. We use a single-quoted argument so `$`, backtick,
@@ -412,7 +418,7 @@ export class TerminalService extends EventEmitter {
         name: 'xterm-256color',
         cols,
         rows,
-        cwd,
+        cwd: spawnCwd,
         env: spawnEnv
       })
 
@@ -474,6 +480,9 @@ export class TerminalService extends EventEmitter {
       // Marker detection: buffer data until we see the marker from bootstrap script
       let markerBuffer = ''
       let markerDetected = false
+      // Set when the missing-marker timeout fired: output is already flowing, but a
+      // late marker still runs the normal clear handshake
+      let markerTimedOut = false
       // True while the line break that ends the marker line has not been seen yet
       let markerLineEndPending = false
       // Set by the detector for the chunk that held the marker, so the forwarder
@@ -484,8 +493,9 @@ export class TerminalService extends EventEmitter {
         markerBuffer += data
         // Output before the marker is bounded: keep the tail (the marker and the
         // line before it are at the end)
-        if (markerBuffer.length > MARKER_BUFFER_MAX_CHARS) {
-          markerBuffer = markerBuffer.slice(-MARKER_BUFFER_MAX_CHARS)
+        const bufferCap = markerTimedOut ? LATE_MARKER_BUFFER_MAX_CHARS : MARKER_BUFFER_MAX_CHARS
+        if (markerBuffer.length > bufferCap) {
+          markerBuffer = markerBuffer.slice(-bufferCap)
         }
         const markerAt = markerBuffer.indexOf(marker)
         if (markerAt !== -1) {
@@ -554,12 +564,14 @@ export class TerminalService extends EventEmitter {
         logger.warn(
           `⚠️ Terminal ${terminalId} marker not seen after ${MARKER_TIMEOUT_MS}ms, forcing output on (buffered ${markerBuffer.length} chars, ${markerBuffer.split(/\r?\n/).length} lines)`
         )
-        markerDetected = true
+        // Keep watching: a slow shell may still print the marker. Then the normal
+        // clear handshake runs and the cwd is updated from the reported line.
+        markerTimedOut = true
         t.hasReceivedMarker = true
         t.isClearing = false
         t.initializationComplete = true
         if (markerBuffer) t.output.push(markerBuffer)
-        markerBuffer = ''
+        markerBuffer = markerBuffer.slice(-LATE_MARKER_BUFFER_MAX_CHARS)
       }, MARKER_TIMEOUT_MS)
 
       // Forward PTY output to renderer (only after initialization).
@@ -730,6 +742,7 @@ export class TerminalService extends EventEmitter {
       if (code === 'EPIPE') {
         logger.info(`ℹ️ Terminal ${terminalId} PTY closed (terminal likely exited)`)
         // Clean up the closed terminal
+        this.clearHandshakeTimers(terminal)
         this.terminals.delete(terminalId)
         terminal.output.dispose()
         this.emit('exit', { terminalId, exitCode: 0, webContentsId: terminal.webContentsId })
@@ -740,6 +753,18 @@ export class TerminalService extends EventEmitter {
       const message = error instanceof Error ? error.message : String(error)
       this.emit('error', { terminalId, error: message, webContentsId: terminal.webContentsId })
       return false
+    }
+  }
+
+  /** Clear the clear-confirmation and missing-marker timers of a terminal. */
+  private clearHandshakeTimers(terminal: TerminalInstance): void {
+    if (terminal.clearFallbackTimeout) {
+      clearTimeout(terminal.clearFallbackTimeout)
+      terminal.clearFallbackTimeout = undefined
+    }
+    if (terminal.markerTimeout) {
+      clearTimeout(terminal.markerTimeout)
+      terminal.markerTimeout = undefined
     }
   }
 
@@ -769,6 +794,7 @@ export class TerminalService extends EventEmitter {
       // emitting an 'error' event the renderer would surface.
       if (message.includes('already exited')) {
         logger.debug(`Terminal ${terminalId} resize ignored (pty already exited)`)
+        this.clearHandshakeTimers(terminal)
         this.terminals.delete(terminalId)
         terminal.output.dispose()
         return false

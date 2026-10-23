@@ -16,6 +16,7 @@
  * default vitest `main` project on every OS.
  */
 
+import { spawnSync } from 'node:child_process'
 import { describe, it, expect } from 'vitest'
 import { argsToCommandLine } from 'node-pty/lib/windowsPtyAgent'
 import {
@@ -220,12 +221,16 @@ describe('CmdExeBootstrapBuilder', () => {
     it('emits one ready-made command line string (not argv) in the documented order', () => {
       const script = builder.build({ shell: 'cmd.exe', cwd: CWD, marker: MARKER })
       expect(typeof script).toBe('string')
-      expect(script).toBe(
-        `/D /S /K "@echo off && cd /d "${CWD}" && cd && echo ${MARKER} && cls && echo on"`
-      )
+      expect(script).toBe(`/D /S /K "@echo off && cd && echo ${MARKER} && cls & echo on"`)
     })
 
-    it('survives node-pty command-line building: cmd sees the cd with plain quotes', () => {
+    it('keeps the cwd out of the command line (the shell starts there)', () => {
+      const script = builder.build({ shell: 'cmd.exe', cwd: 'C:\\100%done\\!x!', marker: MARKER })
+      expect(script).not.toContain('100%done')
+      expect(script).not.toContain('cd /d')
+    })
+
+    it('survives node-pty command-line building: cmd sees plain quotes only', () => {
       const args = builder.build({ shell: 'cmd.exe', cwd: CWD, marker: MARKER })
       // The real node-pty algorithm, as the Windows PTY agent runs it
       const commandLine = argsToCommandLine('C:\\Windows\\System32\\cmd.exe', args)
@@ -234,14 +239,38 @@ describe('CmdExeBootstrapBuilder', () => {
       const afterK = commandLine.slice(commandLine.indexOf('/K ') + 3)
       expect(afterK.startsWith('"') && afterK.endsWith('"')).toBe(true)
       const executed = afterK.slice(1, -1)
-      expect(executed).toContain(`cd /d "${CWD}"`)
-      expect(executed).toContain(`echo ${MARKER}`)
+      expect(executed).toBe(`@echo off && cd && echo ${MARKER} && cls & echo on`)
     })
 
     it('regression: an argv array is mangled by node-pty into \\" (the old broken form)', () => {
       const commandLine = argsToCommandLine('cmd.exe', ['/D', '/K', `@echo off && cd /d "${CWD}"`])
       expect(commandLine).toContain('\\"')
     })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Real cmd.exe (Windows only)
+// ---------------------------------------------------------------------------
+
+describe.skipIf(process.platform !== 'win32')('CmdExeBootstrapBuilder against a real cmd.exe', () => {
+  it('prints the cwd, the marker and a prompt', () => {
+    const line = new CmdExeBootstrapBuilder().build({ shell: 'cmd.exe', cwd: CWD, marker: MARKER }) as string
+    const cwd = process.env.SystemRoot ?? 'C:\\Windows'
+    const result = spawnSync('cmd.exe', [line], {
+      windowsVerbatimArguments: true,
+      input: 'exit\r\n',
+      timeout: 15000,
+      cwd,
+      encoding: 'utf8'
+    })
+    const out = result.stdout
+    const markerAt = out.indexOf(MARKER)
+    expect(markerAt).toBeGreaterThan(0)
+    // The `cd` line before the marker is the spawn cwd
+    expect(out.slice(0, markerAt).toLowerCase()).toContain(cwd.toLowerCase())
+    // `echo on` restored the prompt after the clear
+    expect(out.slice(markerAt)).toMatch(/[A-Za-z]:\\[^\r\n]*>/)
   })
 })
 

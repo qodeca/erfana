@@ -67,8 +67,8 @@ export function validateWindowsCwd(cwd: string): CwdValidationResult {
  * Normalize trailing path separators in a Windows cwd. Drive roots like
  * `C:\` MUST keep their trailing slash because `C:` means "current
  * directory of drive C", not the drive root. Longer paths have any
- * trailing `\` or `/` stripped because cmd.exe `/K` may parse a closing
- * `\"` as an escaped quote, breaking the bootstrap argument.
+ * trailing `\` or `/` stripped so the spawn cwd and the path the shell
+ * reports back agree. The cwd is no longer embedded in the cmd command line.
  */
 export function normalizeWindowsCwd(cwd: string): string {
   return cwd.length > 3 ? cwd.replace(/[\\/]+$/, '') : cwd
@@ -216,7 +216,7 @@ export class GitBashBootstrapBuilder implements WindowsBootstrapBuilder {
  * - `@echo off` runs FIRST so cmd.exe does not echo the bootstrap commands
  *   back into the PTY. Without it, `markerDetector` would mis-parse the
  *   echoed `echo <marker>` line as the cwd.
- * - `cd /d "<cwd>"` changes directory.
+ * - The cwd is set by `pty.spawn`, not by the command line (see `build`).
  * - Bare `cd` (no args) prints the current directory – cmd.exe's analog of
  *   POSIX `pwd`.
  * - `echo <marker>` prints the marker.
@@ -228,11 +228,9 @@ export class GitBashBootstrapBuilder implements WindowsBootstrapBuilder {
  *   hitting scrollback-reflow can switch $SHELL to pwsh or Git Bash, both
  *   of which emit the full three-sequence clear.
  *
- * Documented limitation: cwds containing `%` may have `%VAR%`-style
- * substrings expanded by cmd.exe. The deny-list does not cover `%` because
- * Windows users routinely have legitimate paths containing it (`100%done`).
- * The expansion is deterministic and silent; documented in
- * `docs/windows/implementation-plan.md`.
+ * The cwd never enters the command line, so `%` / `!` in a cwd are inert
+ * (they used to be expanded by cmd.exe). UNC cwds fall back to cmd's own
+ * Windows-directory default (see `build`).
  */
 export class CmdExeBootstrapBuilder implements WindowsBootstrapBuilder {
   readonly kind = 'cmd.exe' as const
@@ -245,14 +243,22 @@ export class CmdExeBootstrapBuilder implements WindowsBootstrapBuilder {
   /**
    * Returns a ready-made command-line STRING, not an argv array. node-pty
    * (`argsToCommandLine`) would wrap an array argument in quotes and turn each
-   * inner `"` into `\"` (the MSVCRT rule), which cmd.exe does not understand:
-   * `cd /d \"C:\..\"` fails and the `&&` chain never reaches the marker.
+   * inner `"` into `\"` (the MSVCRT rule), which cmd.exe does not understand.
    * With `/S`, cmd strips exactly the outer quote pair and runs the rest
-   * verbatim. `echo on` at the end restores the prompt that `@echo off` hid.
-   * The cwd cannot contain `"` (see `UNSAFE_WINDOWS_CWD_CHARS`).
+   * verbatim.
+   *
+   * The cwd is NOT part of the command line: `pty.spawn` already starts the
+   * shell in the validated, normalized cwd, and the bare `cd` prints it for the
+   * marker handshake. That removes every path-quoting risk and `%VAR%` / `!VAR!`
+   * expansion of the cwd. `& echo on` is unconditional so that a failed step
+   * never leaves echo off with no prompt.
+   *
+   * UNC cwds: cmd.exe refuses a UNC current folder, prints its own warning
+   * (dropped, it comes before the marker) and starts in the Windows directory;
+   * `cd` then reports that directory and the handshake still completes.
    */
-  build({ cwd, marker }: { shell: string; cwd: string; marker: string }): string[] | string {
-    return `/D /S /K "@echo off && cd /d "${cwd}" && cd && echo ${marker} && cls && echo on"`
+  build({ marker }: { shell: string; cwd: string; marker: string }): string[] | string {
+    return `/D /S /K "@echo off && cd && echo ${marker} && cls & echo on"`
   }
 }
 

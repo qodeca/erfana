@@ -30,8 +30,8 @@ bash.exe -c 'cd '\''C:\Users\me\Dev\proj'\''; pwd; echo __ERFANA_PWD_MARKER_...;
 # Windows PowerShell (cwd single-quote-doubled '→''; `[Console]::Write` wipes ConPTY buffer)
 pwsh.exe -NoProfile -Command "Set-Location -LiteralPath 'C:\Users\me\Dev\proj' ; (Get-Location).Path ; Write-Output '__ERFANA_PWD_MARKER_...' ; [Console]::Write([char]27 + '[2J' + [char]27 + '[3J' + [char]27 + '[H') ; & 'pwsh.exe' -NoLogo"
 
-# Windows cmd.exe (cwd validated against metachar deny-list; `cls` wipes ConPTY viewport)
-cmd.exe /D /S /K "@echo off && cd /d "C:\Users\me\Dev\proj" && cd && echo __ERFANA_PWD_MARKER_... && cls && echo on"
+# Windows cmd.exe (cwd validated against metachar deny-list and passed as the spawn cwd; `cls` wipes ConPTY viewport)
+cmd.exe /D /S /K "@echo off && cd && echo __ERFANA_PWD_MARKER_... && cls & echo on"   # started with cwd = C:\Users\me\Dev\proj
 ```
 
 The trailing screen-clear step (`printf`, `[Console]::Write`, or `cls`) is Windows-specific and exists purely to wipe the ConPTY internal screen buffer before the interactive shell takes over – see [ConPTY resize-reflow mitigation](#4-conpty-resize-reflow-mitigation-windows) below.
@@ -57,17 +57,19 @@ When the main process sees `process.env.ERFANA_E2E_FAST_SHELL === '1'`, the POSI
 ### cmd.exe
 
 - `/D`: Disable AutoRun from registry (prevents `HKLM\...\AutoRun` commands from polluting the bootstrap)
-- `/S`: With `/S`, cmd strips exactly the first and last quote of the `/K` argument and runs the rest verbatim, so the inner quotes around the cwd survive.
+- `/S`: With `/S`, cmd strips exactly the first and last quote of the `/K` argument and runs the rest verbatim, so the inner quotes survive.
 - `/K`: Keep cmd.exe interactive after the command runs
-- **Passed as one command-line string, not an argv array.** node-pty's `argsToCommandLine` wraps an array argument in quotes and rewrites each inner `"` as `\"` (the MSVCRT rule). cmd.exe does not understand that: `cd /d \"C:\...\"` fails, `&&` skips the marker, and the terminal stays blank because output is suppressed until the marker arrives. node-pty passes a `string` through as the ready-made command line. The cwd deny-list (`"&|^<>`) is what keeps the string safe.
+- **Passed as one command-line string, not an argv array.** node-pty's `argsToCommandLine` wraps an array argument in quotes and rewrites each inner `"` as `\"` (the MSVCRT rule). cmd.exe does not understand that: a quoted `cd /d` fails, `&&` skips the marker, and the terminal stays blank because output is suppressed until the marker arrives. node-pty passes a `string` through as the ready-made command line. The cwd is **not** part of the string: `pty.spawn` starts the shell in the validated, normalized cwd, so there is no path quoting and no `%VAR%` / `!VAR!` expansion of the cwd. The deny-list (`"&|^<>`) stays as defense in depth.
+- **UNC cwds**: cmd.exe refuses a UNC current folder, prints its own warning (before the marker, so it is dropped) and starts in the Windows directory. `cd` then reports that directory and the handshake completes, so the terminal opens, but not in the UNC path.
+- `& echo on` (unconditional, not `&&`): restores the prompt even if an earlier step failed, so a failure never leaves echo off with no prompt.
 - `echo on` (last): `@echo off` would otherwise stay on and hide the prompt.
 - `@echo off`: **Critical**. Without it, cmd.exe echoes the bootstrap commands back into the PTY, and `markerDetector` mis-parses the echoed `echo <marker>` line as the cwd, resulting in junk stored as `terminal.cwd`.
-- `&&` chain (not `&`): Short-circuit — stop if `cd /d` fails (e.g., invalid drive), rather than plowing through and printing the wrong cwd.
+- `&&` chain: the steps up to `cls` short-circuit; only `echo on` runs unconditionally.
 - `cd` with no args: cmd.exe's analog of `pwd`. Prints the working directory without needing a separate binary.
 
 ### Missing-marker safety net
 
-`TerminalService` arms a 10 s timer at spawn. If the marker has not been seen by then (broken bootstrap, bad cwd, shell quirk), it logs a warning with lengths and counts only, marks the marker as received and the initialization as complete, and flushes the buffered output to the renderer, so the user sees the shell's error instead of a blank screen. The detector clears the timer when the marker does arrive, and every cleanup path (kill, exit, window close) clears it too.
+`TerminalService` arms a 10 s timer at spawn. If the marker has not been seen by then (broken bootstrap, bad cwd, shell quirk), it logs a warning with lengths and counts only, marks the marker as received and the initialization as complete, and flushes the buffered output to the renderer, so the user sees the shell's error instead of a blank screen. The detector clears the timer when the marker does arrive. After a timeout it keeps watching a short tail of the output: a marker that arrives late runs the normal clear handshake and updates the cwd from the reported line. and every cleanup path (kill, exit, window close) clears it too.
 
 ## Initialization Phases
 
@@ -100,7 +102,7 @@ Before any Windows bootstrap is constructed, the cwd is validated and normalized
 
 **Normalization** — `normalizeWindowsCwd(cwd)`:
 - Strips trailing `\` or `/` separators (preserving drive roots like `C:\` → `C:\`)
-- Prevents `cd /d "C:\path\"` from being parsed as an escaped quote (`\"`)
+- Keeps the spawn cwd and the path the shell reports back in agreement (the cmd bootstrap no longer embeds the cwd)
 
 **POSIX parity**: the POSIX bootstrap rejects cwds containing `\r` or `\n` and uses canonical single-quote escaping (`'` → `'\''`) on the rest.
 
@@ -260,10 +262,11 @@ pwsh.exe -NoProfile -Command "Set-Location -LiteralPath 'C:\path' ; (Get-Locatio
 ### Windows cmd.exe
 
 ```cmd
-cmd.exe /D /K "@echo off && cd /d "C:\path" && cd && echo MARKER && cls"
+cmd.exe /D /S /K "@echo off && cd && echo MARKER && cls & echo on"
 ```
 
 - `/D`: disable AutoRun
+- `/S`: strip exactly the outer quote pair of the `/K` argument
 - `/K`: keep cmd.exe interactive after the bootstrap completes
 - `@echo off`: critical — without it, cmd.exe echoes bootstrap commands back into PTY, and `markerDetector` mis-parses the echoed `echo MARKER` line as the cwd
 - `cls`: wipes ConPTY's viewport before the interactive prompt appears (only CSI 2J + CSI H; scrollback clear is not available from cmd without a subprocess — see the [cmd.exe caveat](../known-issues.md#cmdexe-terminals-can-leak-pre-bootstrap-text-into-scrollback-after-aggressive-resizing))
