@@ -76,12 +76,14 @@ test.describe('HTML preview — approving an origin', () => {
     await preview.open('remote/index.html')
 
     // The document loads; the remote script does not run.
-    await expect
-      .poll(() => preview.eval('document.body.dataset.remote'), {
-        timeout: PREVIEW_BUDGET_MS,
-        message: 'approval probe page never loaded'
-      })
-      .toBe('pending')
+    await preview.withReadError(
+      expect
+        .poll(() => preview.eval('document.body.dataset.remote'), {
+          timeout: PREVIEW_BUDGET_MS,
+          message: 'approval probe page never loaded'
+        })
+        .toBe('pending')
+    )
 
     // (1) Blocked — and the server never received a request. The second clause
     // is what makes it real: the CSP refuses in the renderer, so the socket must
@@ -121,12 +123,14 @@ test.describe('HTML preview — approving an origin', () => {
     // (4) The page reloaded under the new CSP and the script ran. This is the
     // assertion that did not exist before: the reload is asynchronous and the
     // poll is the barrier.
-    await expect
-      .poll(() => preview.eval('document.body.dataset.remote'), {
-        timeout: PREVIEW_BUDGET_MS,
-        message: 'the approved script never ran inside the preview'
-      })
-      .toBe('loaded')
+    await preview.withReadError(
+      expect
+        .poll(() => preview.eval('document.body.dataset.remote'), {
+          timeout: PREVIEW_BUDGET_MS,
+          message: 'the approved script never ran inside the preview'
+        })
+        .toBe('loaded')
+    )
 
     // (5) A real fetch reached the server, after the approval — not a cached or
     // optimistic render.

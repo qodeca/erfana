@@ -76,7 +76,7 @@ async function started(platform: Platform = 'darwin') {
   const result = await terminalService.createTerminal(config, OWNER)
   if ('error' in result) throw new Error(result.error)
   const { args, pty } = spawned[spawned.length - 1]
-  const marker = args.join(' ').match(/__ERFANA_PWD_MARKER_\d+__/)![0]
+  const marker = [args].flat().join(' ').match(/__ERFANA_PWD_MARKER_\d+__/)![0]
 
   const events: Array<{ type: string; data?: string; webContentsId?: number }> = []
   terminalService.on('data', (e: { data: string; webContentsId: number }) =>
