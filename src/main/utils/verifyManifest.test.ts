@@ -12,13 +12,27 @@
  * makes tampering deterministic.
  */
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { createHash } from 'crypto'
 import { copyFile, mkdtemp, readFile, rm, writeFile } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join, resolve } from 'path'
 
 import { WHISPER_PUBKEYS } from '../services/whisper-pubkeys'
 import { verifyManifest } from './verifyManifest'
+
+// Electron's Node uses BoringSSL, which has no BLAKE2b: `createHash('blake2b512')`
+// throws "Digest method not supported". Mirror that here so a regression to the
+// native hash fails in plain Node too. Electron 44.9.0 getHashes():
+// md4,md5,ripemd160,sha1,sha224,sha256,sha384,sha512,sha512-256
+vi.mock('crypto', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('crypto')>()
+  const createHash = ((algorithm: string, ...rest: unknown[]) => {
+    if (/^blake2/i.test(algorithm)) throw new Error('Digest method not supported')
+    return (actual.createHash as (...a: unknown[]) => unknown)(algorithm, ...rest)
+  }) as typeof actual.createHash
+  return { ...actual, default: { ...actual, createHash }, createHash }
+})
 
 /**
  * Real fixture from whisper-build-v1.8.4-erfana1 (published 2026-04-22).
@@ -140,6 +154,23 @@ describe('verifyManifest', () => {
     lines[1] = raw.toString('base64')
     await copyFile(FIXTURE_MANIFEST_PATH, manifestPath)
     await writeFile(sigPath, lines.join('\n'))
+    await expect(
+      verifyManifest({ contentPath: manifestPath, signaturePath: sigPath })
+    ).rejects.toMatchObject({ code: 'ed25519-rejected' })
+  })
+
+  it('verifies a prehashed signature when the runtime has no native BLAKE2b (BoringSSL)', async () => {
+    expect(() => createHash('blake2b512')).toThrow('Digest method not supported')
+    await copyFile(FIXTURE_MANIFEST_PATH, manifestPath)
+    await copyFile(FIXTURE_SIGNATURE_PATH, sigPath)
+    const result = await verifyManifest({ contentPath: manifestPath, signaturePath: sigPath })
+    expect(result.valid).toBe(true)
+    expect(result.signingKeyRole).toBe('primary')
+  })
+
+  it('still rejects a tampered manifest without native BLAKE2b', async () => {
+    await writeFile(manifestPath, 'tampered')
+    await copyFile(FIXTURE_SIGNATURE_PATH, sigPath)
     await expect(
       verifyManifest({ contentPath: manifestPath, signaturePath: sigPath })
     ).rejects.toMatchObject({ code: 'ed25519-rejected' })

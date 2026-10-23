@@ -20,7 +20,7 @@
  */
 
 import { verifyAsync } from '@noble/ed25519'
-import { createHash } from 'crypto'
+import { blake2b } from '@noble/hashes/blake2b'
 import { readFile } from 'fs/promises'
 
 import { WHISPER_PUBKEYS, type WhisperPubKey } from '../services/whisper-pubkeys'
@@ -92,10 +92,12 @@ export async function verifyManifest(
 
   // For prehashed (`ED`) signatures — the modern minisign default — the
   // signature is over BLAKE2b-512(content), not raw content. Compute once
-  // so we don't re-hash per pubkey.
+  // so we don't re-hash per pubkey. Pure-JS BLAKE2b on purpose: Electron's
+  // Node uses BoringSSL, which has no `blake2b512`, so `crypto.createHash`
+  // throws "Digest method not supported" in packaged builds.
   const signedMessage =
     sig.alg === 'ed-prehashed'
-      ? new Uint8Array(createHash('blake2b512').update(content).digest())
+      ? blake2b(new Uint8Array(content), { dkLen: 64 })
       : new Uint8Array(content)
 
   for (const trusted of pubkeys) {
