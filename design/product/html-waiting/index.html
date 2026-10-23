@@ -11,6 +11,7 @@
 <link rel="stylesheet" href="../../ds.css">
 <link rel="stylesheet" href="../../system/components/row/row.css">
 <link rel="stylesheet" href="../../system/components/permission-band/band.css">
+<script src="../../claims.js"></script>
 <style>
   /* ---------- documentation chrome ---------- */
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
@@ -26,7 +27,7 @@
   .widths { display: flex; flex-direction: column; gap: var(--space-12);
             margin-bottom: var(--space-24); }
   .width__label { margin: 0 0 var(--space-4); font-size: var(--text-xs);
-                  font-family: var(--font-mono); color: var(--color-text-muted); }
+                  font-family: var(--font-mono); color: var(--color-text-secondary); }
 
   .controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-8);
               margin-bottom: var(--space-8); }
@@ -38,7 +39,7 @@
     font-family: inherit; font-size: var(--text-sm);
   }
   .controls button:focus-visible, .controls select:focus-visible {
-    outline: var(--border-width-thick) solid var(--color-border-focus); outline-offset: 2px;
+    outline: var(--border-width-thick) solid var(--color-border-focus); outline-offset: var(--space-1);
   }
   .clock { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-text-secondary); }
   .clock b { color: var(--color-text-emphasis); font-weight: var(--font-semibold); }
@@ -99,7 +100,11 @@
                      color: var(--color-text-emphasis); max-width: 56ch; }
   .erf-wait__text { margin: 0; font-size: var(--text-sm); color: var(--color-text-tertiary);
                     max-width: 56ch; line-height: var(--leading-normal); }
-  .erf-wait__aside { margin: 0; font-size: var(--text-xs); color: var(--color-text-muted);
+  /* Quieter than the text above it, but still text: secondary, not muted. Muted
+     measured under 4.5:1 on the backdrop at this size, so the card was rendering
+     the very contrast failure it asks the app not to ship. The ratio is in the
+     Surface A note below, generated from the tokens. */
+  .erf-wait__aside { margin: 0; font-size: var(--text-xs); color: var(--color-text-secondary);
                      max-width: 56ch; }
   .erf-wait__stop {
     height: var(--btn-height-md); padding: 0 var(--space-12);
@@ -110,18 +115,27 @@
   }
   .erf-wait__stop:hover { background: var(--color-brand-violet-muted); }
   .erf-wait__stop:focus-visible {
-    outline: var(--border-width-thick) solid var(--color-border-focus); outline-offset: 2px;
+    outline: var(--border-width-thick) solid var(--color-border-focus); outline-offset: var(--space-1);
   }
 
   /* ---------- Surface B: the residual wait, inside the band's own bar ---------- */
   /*
-   * HORIZONTAL ONLY. The band's bar is `height: var(--btn-height-md)` and it must
-   * stay that height: growing it pushes the native view down, which costs a
-   * bounds push and can cost the 300 ms proof cycle the Permission band card
-   * decides. A slow load does not justify spending that. So this slot clips with
-   * an ellipsis, and never wraps.
+   * HORIZONTAL ONLY. The band's bar is content-sized and its height must not
+   * change: growing it pushes the native view down, which costs a bounds push
+   * and can cost the 300 ms proof cycle the Permission band card decides. A slow
+   * load does not justify spending that. So this slot clips with an ellipsis,
+   * and never wraps.
+   *
+   * WHICH IS WHY IT NEVER CARRIES A HOST. The Rows card decides a host is never
+   * cut, and a line that may not wrap can only fit a long host by cutting it.
+   * The host is named on Surface A, where it can wrap; this line says only that
+   * something is still outstanding.
+   *
+   * `:where()` on every `.erf-band__*` rule in this card: they are proposals for
+   * band.css, which this card loads. Zero specificity means the day band.css
+   * ships its own versions, those win instead of being shadowed by this sketch.
    */
-  .erf-band__wait {
+  :where(.erf-band__wait) {
     flex: 0 1 auto; min-width: 0;
     font-size: var(--text-xs); color: var(--color-text-tertiary);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -138,13 +152,13 @@
    * What is left is Find (fixed), this line (elastic), and the chip (fixed). The
    * line takes the slack and gives it back; nothing else has to shrink at all.
    * The measurement that forced the old rule still stands as the reason for the
-   * drop-out below: the chip alone is 150 px.
+   * drop-out below: the chip and the tools take most of a narrow bar.
    */
-  .erf-band__wait--stopped { color: var(--color-warning); }
+  :where(.erf-band__wait--stopped) { color: var(--color-warning); }
   /*
    * BELOW 420 px THE LINE DROPS OUT, and this is the honest end of the rule
-   * rather than a fallback. Measured in this card: the chip is 150 px and the
-   * Find button is 32 px, so a 300 px bar has about 90 px left — enough to
+   * rather than a fallback. Each width case below prints, measured live, how
+   * much room the line actually gets; near the threshold that is enough to
    * render an ellipsis and nothing a person could read. A line that is present
    * but unreadable is worse than an absent one, because it occupies the space
    * that would have told you it was missing.
@@ -153,17 +167,17 @@
    * carries the count, and the chip still opens the band.
    */
   @container (max-width: 420px) {
-    .erf-band__wait { display: none; }
+    :where(.erf-band__wait) { display: none; }
   }
-  .erf-band__reload {
+  :where(.erf-band__reload) {
     height: var(--btn-height-sm); padding: 0 var(--space-8);
     border: var(--border-width) solid var(--color-border-warning);
     border-radius: var(--border-radius);
     background: var(--color-warning-bg); color: var(--color-text-primary);
     font-family: inherit; font-size: var(--text-xs); cursor: pointer; flex: 0 0 auto;
   }
-  .erf-band__reload:focus-visible {
-    outline: var(--border-width-thick) solid var(--color-border-focus); outline-offset: 2px;
+  :where(.erf-band__reload):focus-visible {
+    outline: var(--border-width-thick) solid var(--color-border-focus); outline-offset: var(--space-1);
   }
 
   .verdict { font-size: var(--text-sm); }
@@ -308,8 +322,10 @@
   </tr>
   <tr>
     <td>Residual</td>
-    <td class="ds-mono">Still loading — cdn.example.com</td>
-    <td>The page painted; something is still outstanding. Both halves observed.</td>
+    <td class="ds-mono">Still loading – part of the page has not arrived</td>
+    <td>The page painted; something is still outstanding. Both halves observed. The host is
+        <strong>not</strong> named here: this line may not wrap, and a host that cannot wrap can only
+        fit by being cut, which the Rows card forbids. Surface A names it, where it can wrap.</td>
   </tr>
   <tr>
     <td>Stopped</td>
@@ -342,14 +358,20 @@
   </tr>
   <tr>
     <td><strong>B</strong> — the residual line</td>
-    <td>A third slot in the band's existing 32 px bar</td>
+    <td>A third slot in the band's existing bar</td>
     <td>The band is a flow sibling <em>above</em> the page's rectangle. The page has nowhere to
         paint that could reach it. Horizontal only — see the note in this card's CSS.</td>
   </tr>
 </table>
 <div class="ds-note">
   <strong>Contrast is only knowable on Surface A because of when it exists.</strong> Pre-paint the
-  backdrop is provably the brand black, so the text tokens clear 4.5:1 with room. If this surface
+  backdrop is provably the brand black, so the text is measured against it: the body text
+  (<code>--color-text-tertiary</code>) is <strong><span data-claim="contrast-wait-text"></span>:1</strong>
+  and the quieter aside (<code>--color-text-secondary</code>) is
+  <strong><span data-claim="contrast-wait-aside"></span>:1</strong>, both clear of the 4.5:1 small text
+  needs. The aside used to be <code>--color-text-muted</code>, at
+  <strong><span data-claim="contrast-wait-aside-muted"></span>:1</strong> – this card rendered a
+  contrast failure in every case that showed it. If this surface
   were ever allowed to render over the page's own paper — which the page chooses — the contrast
   would be uncontrollable. That timing is a precondition of the design, not a detail of it.
 </div>
@@ -528,7 +550,9 @@ function band({ counts = '0 blocked · 0 allowed', slot = '', paused = false, op
         </button>
       <span class="erf-band__separator" aria-hidden="true"></span>
       <button class="erf-band__tool" type="button" aria-label="Export to PDF" title="Export to PDF">
-          <!-- lucide `file-down`, 16px — the same button the markdown toolbar has. -->
+          <!-- lucide "file-down", 16px — the same button the markdown toolbar has.
+               No backticks in here: this markup is inside a template literal, and a
+               backtick ends it – which once left every case on this card unrendered. -->
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path>
@@ -578,7 +602,7 @@ const CASES = [
   {
     title: 'Explained — a remote host',
     text: 'From <strong>10 s</strong>. Names who is being waited on. The host is deliberately a ' +
-          'long one, so you can see it elide rather than take the reader’s word for it.',
+          'long one, so you can see it wrap at its dots rather than be cut – take no one’s word for it.',
     html: panel({
       bandOpts: { counts: '0 blocked · 6 allowed' },
       bodyClass: 'panel__body--backdrop',
@@ -653,7 +677,7 @@ const WIDTH_CASES = [
     title: 'Residual — the page painted, something is still hanging',
     text: 'The bar’s height must never change, so the line clips rather than wraps. If it ' +
           'wrapped, the page below it would be pushed down — a bounds push, for a slow load.',
-    slot: '<span class="erf-band__wait">Still loading — cdn.example.com</span>',
+    slot: '<span class="erf-band__wait">Still loading – part of the page has not arrived</span>',
     body: PAGE
   },
   {
@@ -699,7 +723,7 @@ WIDTH_CASES.forEach((c) => {
     <div class="widths">
       ${WIDTHS.map((w) => `
         <div class="width">
-          <p class="width__label">${w.px} px — ${w.note}</p>
+          <p class="width__label">${w.px} px — ${w.note} <span data-wait-room></span></p>
           <div style="width: ${w.px}px; max-width: 100%">
             ${panel({ bandOpts: { counts: '0 blocked · 6 allowed', slot: c.slot }, body: c.body })}
           </div>
@@ -707,6 +731,23 @@ WIDTH_CASES.forEach((c) => {
     </div>`;
   hostB.appendChild(el);
 });
+
+/* Measured, not asserted: how much room the line really gets at each width.
+   This replaced chip and button widths typed into a comment, which nothing kept
+   true when the band changed. */
+function measureWaitRoom() {
+  for (const label of hostB.querySelectorAll('.width')) {
+    const line = label.querySelector('.erf-band__wait');
+    const out = label.querySelector('[data-wait-room]');
+    const room = line ? Math.round(line.getBoundingClientRect().width) : 0;
+    out.textContent = room === 0 ? '(measured: the line is not drawn)' : `(measured: the line gets ${room} px)`;
+  }
+}
+measureWaitRoom();
+// Widths depend on the font, so measure again once it has loaded, and again
+// when the window narrows a demo below its nominal width (max-width: 100%).
+document.fonts.ready.then(measureWaitRoom);
+window.addEventListener('resize', measureWaitRoom);
 
 /* ---------- the runnable timeline ---------- */
 

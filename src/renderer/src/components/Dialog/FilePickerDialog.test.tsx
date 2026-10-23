@@ -84,6 +84,14 @@ describe('FilePickerDialog', () => {
       expect(title).toHaveTextContent(/Button\.tsx/)
     })
 
+    it('says the list may be incomplete only when it is (review of #320, item 4)', () => {
+      const { rerender } = render(<FilePickerDialog {...defaultProps} />)
+      expect(screen.queryByText(/other files of this name may be missing/)).not.toBeInTheDocument()
+      rerender(<FilePickerDialog {...defaultProps} incomplete candidates={[mockCandidates[0]]} />)
+      expect(screen.getByText(/other files of this name may be missing/)).toBeInTheDocument()
+      expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent(/A file matches/)
+    })
+
     it('should display all candidates', () => {
       render(<FilePickerDialog {...defaultProps} />)
       expect(screen.getByText('src/components/Button.tsx')).toBeInTheDocument()

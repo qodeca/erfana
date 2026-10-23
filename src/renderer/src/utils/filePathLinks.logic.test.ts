@@ -17,6 +17,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import {
   detectFilePaths,
+  isSearchableBareName,
   parseLineColumn,
   resolvePath,
   createPathCache,
@@ -2363,5 +2364,41 @@ describe('filePathLinks.logic', () => {
         expect(retrieved?.timestamp).toBe(entry.timestamp)
       })
     })
+  })
+})
+
+describe('isSearchableBareName (#320 review, round 4, item 1)', () => {
+  /** What the terminal's detector reads from a line, bare names only */
+  const bareNames = (line: string) =>
+    detectFilePaths(line).filter((m) => !m.path.includes('/') && !m.path.includes('\\'))
+
+  it.each(['v1.2', '1.2.3', '24.20.0', '1.74s', '12.3ms', '3.14', '0.5x', '127.0.0.1:3000', '1.2.3:4'])(
+    'is false for %s',
+    (token) => {
+      for (const match of bareNames(`see ${token} here`)) expect(isSearchableBareName(match)).toBe(false)
+    }
+  )
+
+  it('is false for the version, number and address tokens wherever the detector finds them', () => {
+    const lines = [
+      'Released v1.2 and 1.2.3 on 24.20.0',
+      ' Tests  544 passed (544) Duration  1.74s (transform 1.25s)',
+      'Listening on 127.0.0.1:3000',
+      'took 12.3ms; pi is 3.14 and the ratio is 0.5x'
+    ]
+    for (const line of lines) expect(bareNames(line).filter(isSearchableBareName)).toEqual([])
+  })
+
+  it('is true for a file name with a common extension, or one with a line', () => {
+    expect(isSearchableBareName({ path: 'Button.tsx' })).toBe(true)
+    expect(isSearchableBareName({ path: 'notes.md', line: 12 })).toBe(true)
+    expect(isSearchableBareName({ path: 'Makefile.am', line: 3 })).toBe(true)
+    expect(isSearchableBareName({ path: 'utils.py' })).toBe(true)
+  })
+
+  it('is false for an unknown extension without a line, a base with no letter, or a path', () => {
+    expect(isSearchableBareName({ path: 'example.com' })).toBe(false)
+    expect(isSearchableBareName({ path: '2024.md' })).toBe(false)
+    expect(isSearchableBareName({ path: 'src/Button.tsx' })).toBe(false)
   })
 })

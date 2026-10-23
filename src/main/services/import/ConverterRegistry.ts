@@ -32,6 +32,8 @@ import { audioExtractionService } from '../AudioExtractionService'
 export class ConverterRegistry {
   private converters: Map<string, IConverter> = new Map()
   private extensionToConverter: Map<string, IConverter> = new Map()
+  /** Mappings a dynamic extension took over, so removing it can hand them back. */
+  private displacedConverters: Map<string, IConverter> = new Map()
 
   /**
    * Register a converter for its supported extensions
@@ -161,8 +163,41 @@ export class ConverterRegistry {
       const existing = this.extensionToConverter.get(normalized)
       if (existing && existing !== converter) {
         logger.info(`Extension .${normalized} reassigned from ${existing.category} to ${converter.category}`)
+        this.displacedConverters.set(normalized, existing)
       }
       this.extensionToConverter.set(normalized, converter)
+    }
+  }
+
+  /**
+   * Undo {@link updateConverterExtensions} for extensions whose tool is no
+   * longer available (#250, "Check again" after uninstalling a tool).
+   *
+   * Only mappings currently owned by the category's converter are touched. An
+   * extension that was reassigned from another converter (`.rtf` from text) is
+   * handed back to it; any other is unmapped. Extensions the converter
+   * supports natively (`.pdf`) are never removed.
+   *
+   * @param category - Category of the converter to shrink
+   * @param extensions - Extensions to remove
+   */
+  removeConverterExtensions(category: FileTypeCategory, extensions: readonly string[]): void {
+    const converter = this.converters.get(category)
+    if (!converter) return
+    const native = new Set(converter.supportedExtensions.map((ext) => ext.toLowerCase()))
+
+    for (const ext of extensions) {
+      const normalized = ext.toLowerCase()
+      if (native.has(normalized)) continue
+      if (this.extensionToConverter.get(normalized) !== converter) continue
+
+      const previous = this.displacedConverters.get(normalized)
+      this.displacedConverters.delete(normalized)
+      if (previous) {
+        this.extensionToConverter.set(normalized, previous)
+      } else {
+        this.extensionToConverter.delete(normalized)
+      }
     }
   }
 }

@@ -499,26 +499,30 @@ Document import converter for 50+ formats via `@llamaindex/liteparse` with local
 
 **File:** `src/main/services/import/DependencyDetector.ts`
 
-Runtime detection of optional system tools for document import.
+Runtime detection of LibreOffice, the one optional system tool document import uses. PDF and images need nothing extra: LiteParse 2.14.7 reads images with the Rust `image` crate and OCRs them itself (its native module contains no ImageMagick strings, and png/jpg/webp/bmp/tiff/gif imported with ImageMagick off PATH – #250), so their extensions are registered at startup.
 
 ### Key features
-- Checks LibreOffice (`soffice --version`) and ImageMagick (`magick --version`, v6 `convert` fallback)
-- 5-second timeout per command via `execFile` (no shell – safe from injection)
+- One resolver for detection and conversion (#250, `resolveLibreOffice` in `conversionToolGuard.ts`): it replays the lookup LiteParse's native module does – read from its 2.14.7 strings, since it takes no binary-path option. That is `which libreoffice-fresh` / `libreoffice` / `soffice` (only when `which` itself resolves), then the fixed `/Applications/LibreOffice.app/Contents/MacOS/soffice` and `.../libreoffice`, then the literal `C:\Program Files\Libreoffice\program\soffice.exe`. There is no `(x86)` fallback, because LiteParse never looks there. The result is `found` (with a path), `missing`, or `unsafe` (with the name and path that would run, and a reason: `project`, `temp`, `network`, `relative`, `unresolvable` or `ambiguous`)
+- Bare-name helpers (`which`, `powershell`) are checked as Rust's `Command` starts them: on Windows `<name>.exe` only, searched in the app folder, System32 and the Windows folder before PATH. On Windows a LibreOffice name is resolved both the `which` way (PATHEXT order) and the `.exe`-only way. LibreOffice's own program folder ships `soffice.com` next to `soffice.exe`, so the two differ on a normal install: when both land in the same trusted folder the result is `found` (the `.exe`). An untrusted copy on either side, a copy on one side only, or two different folders is `unsafe` (fail closed)
+- Safe lookup (`findOnPathEntries` in `src/main/utils/pathLookup.ts`): PATH is walked in-process – no lookup tool is spawned. UNC entries are never `stat`-ed, but a real spawn would search them: a UNC entry before the first local hit of a helper or LibreOffice name, or anywhere when that name has no local hit, makes the result `unsafe` (network share). Because LiteParse asks for `libreoffice-fresh` first, which is rarely installed, in practice any UNC entry on PATH while `which` is available gives `unsafe`. A hit is `unsafe` when it comes from a relative or empty PATH entry, or when its path or real path is inside the open project, the user temp folder or a shared temp folder (`/tmp`, `/private/tmp`, `/var/tmp`, `%SystemRoot%\Temp`), or when its real path cannot be resolved. At most four hits per name are examined
+- `unsafe` is never run. `found` is probed with `--version` (5-second timeout, `execFile`, no shell) from `os.tmpdir()` with a minimal environment; a candidate that fails the probe is `missing`
+- Pre-conversion guard: before each Office conversion `LiteParseConverter` runs the same resolver and refuses with `IMPORT_UNTRUSTED_TOOL` when it is `unsafe`. The message names the tool and the reason; the log line redacts the path. `untrustedToolMessage` (`src/shared/errors.ts`) is the single wording source: `import:toolStatus` and `import:dependenciesReady` carry `unsafe: { tool, reason }` (strict enums, never a path), and the Settings hint and the import refusal render the same sentence as main's refusal Not covered: a later LiteParse that changes its lookup order
+- Safe working directory (`src/main/utils/safeWorkingDirectory.ts`): a packaged app moves its cwd to the install folder (Windows) or the user-data folder (created first if missing; a failure logs a warning with the path redacted), so no bare-name spawn can resolve into the folder that launched it. Development keeps the repository as cwd
 - Session-level caching (single detection, concurrent calls share one promise)
-- macOS bundle path fallback for LibreOffice (`/Applications/LibreOffice.app/...`)
-- Windows install-path fallback for LibreOffice (#162): probes `C:\Program Files\LibreOffice\program\soffice.exe` and the `(x86)` 32-bit equivalent when `soffice` is not on `PATH`
 - Non-blocking – never blocks app startup
 
 ### Public methods
 - `detect(): Promise<DependencyStatus>` – Run detection (cached after first call)
-- `clearCache(): void` – Reset cache (testing only)
+- `clearCache(): void` – Reset cache, so the next `detect()` probes again ("Check again" via `ImportToolStatusService`, and tests)
 
 ### DependencyStatus
-`{ libreOffice: boolean, imageMagick: boolean }`
+`{ libreOffice: 'found' | 'missing' | 'unsafe' }`
 
 ### Integration
-- Fire-and-forget at app startup (`src/main/index.ts`) → pushes result via `import:dependenciesReady`
-- `ConverterRegistry.updateConverterExtensions()` consumes result to register format extensions
+- Owned by `ImportToolStatusService` (`src/main/services/import/ImportToolStatusService.ts`, #250), which keeps the converter registry in step with the result: LibreOffice `found` adds the Office extensions (`updateConverterExtensions`); `missing` or `unsafe` removes them (`removeConverterExtensions`, which hands `.rtf` back to the text converter)
+- Fire-and-forget at app startup (`src/main/index.ts`, `importToolStatusService.getStatus()`) → pushes result via `import:dependenciesReady`
+- `import:toolStatus` serves the cached result to Settings → Import tools; `{ recheck: true }` ("Check again") clears the cache and probes again. Rate-limited: a recheck while a probe runs joins it, and one within `DOCUMENT_IMPORT.TOOL_RECHECK_MIN_INTERVAL_MS` (3 s) of the END of the last probe returns `throttled: true` and spawns nothing
+- Every applied result is broadcast to all windows as `import:dependenciesReady`; `import:selectFile` passes a macOS-only `message` saying why Office formats are left out of "All importable files" (LibreOffice missing, or in an unsafe location)
 
 ---
 
@@ -534,7 +538,8 @@ Central Strategy-pattern registry mapping file extensions to `IConverter` implem
 - `isSupported(extension: string): boolean`
 - `getSupportedExtensions(): string[]` / `getExtensionsByConversionType()` / `getCategories(): FileTypeCategory[]`
 - `mightBeTextFile(extension: string): boolean`
-- `updateConverterExtensions(category: FileTypeCategory, extensions: string[]): void` – Two-phase registration hook consumed by `DependencyDetector`
+- `updateConverterExtensions(category: FileTypeCategory, extensions: string[]): void` – Two-phase registration hook consumed by `DependencyDetector`; remembers the converter an extension was taken from
+- `removeConverterExtensions(category: FileTypeCategory, extensions: readonly string[]): void` – The reverse, for a tool that is no longer found (#250); never removes a converter's native extensions
 
 Exports both the class and a shared `converterRegistry` singleton.
 

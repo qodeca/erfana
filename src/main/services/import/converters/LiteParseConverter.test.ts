@@ -63,10 +63,9 @@ import type { DependencyStatus } from '../types'
 // Helpers
 // --------------------------------------------------------------------------
 
-const noDeps: DependencyStatus = { libreOffice: false, imageMagick: false }
-const withLibreOffice: DependencyStatus = { libreOffice: true, imageMagick: false }
-const withImageMagick: DependencyStatus = { libreOffice: false, imageMagick: true }
-const withBoth: DependencyStatus = { libreOffice: true, imageMagick: true }
+const noDeps: DependencyStatus = { libreOffice: 'missing' }
+const withLibreOffice: DependencyStatus = { libreOffice: 'found' }
+const unsafeLibreOffice: DependencyStatus = { libreOffice: 'unsafe' }
 
 describe('LiteParseConverter', () => {
   beforeEach(() => {
@@ -78,9 +77,11 @@ describe('LiteParseConverter', () => {
   // ==========================================================================
 
   describe('supportedExtensions', () => {
-    it('should return only pdf when no dependencies available', () => {
-      const converter = new LiteParseConverter(noDeps)
-      expect(converter.supportedExtensions).toEqual(['pdf'])
+    it('should return pdf and images when LibreOffice is missing (LiteParse reads images natively)', () => {
+      const exts = new LiteParseConverter(noDeps).supportedExtensions
+      expect(exts).toContain('pdf')
+      for (const ext of ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'tiff', 'webp']) expect(exts).toContain(ext)
+      expect(exts).not.toContain('docx')
     })
 
     it('should include doc, docx, ppt, pptx, rtf with LibreOffice', () => {
@@ -91,48 +92,28 @@ describe('LiteParseConverter', () => {
       expect(exts).toContain('ppt')
       expect(exts).toContain('pptx')
       expect(exts).toContain('rtf')
+      expect(exts).toContain('jpg')
     })
 
-    it('should include jpg, jpeg, png, gif, bmp, tiff, webp with ImageMagick', () => {
-      const converter = new LiteParseConverter(withImageMagick)
-      const exts = converter.supportedExtensions
-      expect(exts).toContain('jpg')
-      expect(exts).toContain('jpeg')
+    it('should not unlock Office formats for an unsafe LibreOffice', () => {
+      const exts = new LiteParseConverter(unsafeLibreOffice).supportedExtensions
+      expect(exts).not.toContain('docx')
       expect(exts).toContain('png')
-      expect(exts).toContain('gif')
-      expect(exts).toContain('bmp')
-      expect(exts).toContain('tiff')
-      expect(exts).toContain('webp')
-    })
-
-    it('should include all extensions with both dependencies', () => {
-      const converter = new LiteParseConverter(withBoth)
-      const exts = converter.supportedExtensions
-      expect(exts).toContain('pdf')
-      expect(exts).toContain('docx')
-      expect(exts).toContain('jpg')
     })
 
     it('should always include pdf regardless of dependency state', () => {
       expect(new LiteParseConverter(noDeps).supportedExtensions).toContain('pdf')
       expect(new LiteParseConverter(withLibreOffice).supportedExtensions).toContain('pdf')
-      expect(new LiteParseConverter(withImageMagick).supportedExtensions).toContain('pdf')
-      expect(new LiteParseConverter(withBoth).supportedExtensions).toContain('pdf')
+      expect(new LiteParseConverter(unsafeLibreOffice).supportedExtensions).toContain('pdf')
     })
 
-    it('should NEVER include csv regardless of dependencies', () => {
-      expect(new LiteParseConverter(noDeps).supportedExtensions).not.toContain('csv')
-      expect(new LiteParseConverter(withLibreOffice).supportedExtensions).not.toContain('csv')
-      expect(new LiteParseConverter(withImageMagick).supportedExtensions).not.toContain('csv')
-      expect(new LiteParseConverter(withBoth).supportedExtensions).not.toContain('csv')
-    })
-
-    it('should NEVER include tsv regardless of dependencies', () => {
-      expect(new LiteParseConverter(withBoth).supportedExtensions).not.toContain('tsv')
-    })
-
-    it('should NEVER include svg regardless of dependencies', () => {
-      expect(new LiteParseConverter(withBoth).supportedExtensions).not.toContain('svg')
+    it('should NEVER include csv, tsv or svg regardless of dependencies', () => {
+      for (const deps of [noDeps, withLibreOffice, unsafeLibreOffice]) {
+        const exts = new LiteParseConverter(deps).supportedExtensions
+        expect(exts).not.toContain('csv')
+        expect(exts).not.toContain('tsv')
+        expect(exts).not.toContain('svg')
+      }
     })
   })
 
@@ -613,7 +594,7 @@ describe('LiteParseConverter', () => {
     })
 
     it('should preserve the same dependency status', () => {
-      const base = new LiteParseConverter(withBoth)
+      const base = new LiteParseConverter(withLibreOffice)
       const configured = base.createConfigured({})
 
       // Both should have same supportedExtensions since same deps
@@ -732,7 +713,7 @@ describe('LiteParseConverter', () => {
     })
 
     it('should use the file extension as the format field', async () => {
-      const converter = new LiteParseConverter({ libreOffice: true, imageMagick: false })
+      const converter = new LiteParseConverter(withLibreOffice)
       const result = await converter.convert('/path/to/document.docx')
       expect(result.success).toBe(true)
       expect(result.content).toContain('format: docx')
@@ -752,7 +733,7 @@ describe('LiteParseConverter', () => {
         fileName: 'huge.pdf'
       })
 
-      const converter = new LiteParseConverter(withBoth)
+      const converter = new LiteParseConverter(withLibreOffice)
       const result = await converter.convert('/path/to/huge.pdf')
 
       expect(result.success).toBe(false)
@@ -769,7 +750,7 @@ describe('LiteParseConverter', () => {
         fileName: 'weird.pdf'
       } as never)
 
-      const converter = new LiteParseConverter(withBoth)
+      const converter = new LiteParseConverter(withLibreOffice)
       const result = await converter.convert('/path/to/weird.pdf')
 
       expect(result.success).toBe(false)
@@ -784,51 +765,18 @@ describe('LiteParseConverter', () => {
 // ==========================================================================
 
 describe('getExtensionsForDependencies()', () => {
-  it('should return office extensions but no image extensions when only libreOffice is true', () => {
-    const exts = getExtensionsForDependencies({ libreOffice: true, imageMagick: false })
-
-    expect(exts).toContain('docx')
-    expect(exts).toContain('doc')
-    expect(exts).toContain('pptx')
-    expect(exts).toContain('rtf')
-    // No image extensions
-    expect(exts).not.toContain('jpg')
-    expect(exts).not.toContain('jpeg')
+  // Only the extensions an external tool unlocks: images are always built in.
+  it('should return the office extensions when LibreOffice is found', () => {
+    const exts = getExtensionsForDependencies({ libreOffice: 'found' })
+    for (const ext of ['docx', 'doc', 'pptx', 'rtf']) expect(exts).toContain(ext)
     expect(exts).not.toContain('png')
-  })
-
-  it('should return image extensions but no office extensions when only imageMagick is true', () => {
-    const exts = getExtensionsForDependencies({ libreOffice: false, imageMagick: true })
-
-    expect(exts).toContain('jpg')
-    expect(exts).toContain('jpeg')
-    expect(exts).toContain('png')
-    expect(exts).toContain('tiff')
-    // No office extensions
-    expect(exts).not.toContain('docx')
-    expect(exts).not.toContain('pptx')
-    expect(exts).not.toContain('rtf')
-  })
-
-  it('should return both office and image extensions when both deps are true, never including csv, tsv, or svg', () => {
-    const exts = getExtensionsForDependencies({ libreOffice: true, imageMagick: true })
-
-    // Office extensions present
-    expect(exts).toContain('docx')
-    expect(exts).toContain('pptx')
-    // Image extensions present
-    expect(exts).toContain('jpg')
-    expect(exts).toContain('png')
-    // Excluded extensions never present
     expect(exts).not.toContain('csv')
     expect(exts).not.toContain('tsv')
     expect(exts).not.toContain('svg')
   })
 
-  it('should return an empty array when both deps are false', () => {
-    const exts = getExtensionsForDependencies({ libreOffice: false, imageMagick: false })
-
-    expect(exts).toEqual([])
+  it.each(['missing', 'unsafe'] as const)('should return nothing when LibreOffice is %s', (state) => {
+    expect(getExtensionsForDependencies({ libreOffice: state })).toEqual([])
   })
 })
 
@@ -837,20 +785,21 @@ describe('getExtensionsForDependencies()', () => {
 // ==========================================================================
 
 describe('createLiteParseConverter()', () => {
-  it('should create a LiteParseConverter instance with no args, supporting only pdf', () => {
+  it('should create a LiteParseConverter instance with no args, supporting pdf and images but no Office formats', () => {
     const converter = createLiteParseConverter()
 
     expect(converter).toBeInstanceOf(LiteParseConverter)
-    expect(converter.supportedExtensions).toEqual(['pdf'])
+    expect(converter.supportedExtensions).toContain('pdf')
+    expect(converter.supportedExtensions).toContain('png')
+    expect(converter.supportedExtensions).not.toContain('docx')
   })
 
   it('should create an instance with correct extensions when deps are provided', () => {
-    const converter = createLiteParseConverter({ libreOffice: true, imageMagick: false })
+    const converter = createLiteParseConverter({ libreOffice: 'found' })
 
     expect(converter).toBeInstanceOf(LiteParseConverter)
     expect(converter.supportedExtensions).toContain('pdf')
     expect(converter.supportedExtensions).toContain('docx')
-    expect(converter.supportedExtensions).not.toContain('jpg')
   })
 
   it('should pass options through to the converter instance', async () => {
@@ -860,7 +809,7 @@ describe('createLiteParseConverter()', () => {
     })
 
     const converter = createLiteParseConverter(
-      { libreOffice: false, imageMagick: false },
+      { libreOffice: 'missing' },
       { ocr: false }
     )
 

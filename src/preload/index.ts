@@ -3,6 +3,7 @@
 import { contextBridge, ipcRenderer, IpcRendererEvent, webUtils } from 'electron'
 import { FORCE_CRASH_ARG, TEST_HOOKS_ARG } from '../shared/constants'
 import type { GitStatusResponse } from '../shared/ipc/git-schema'
+import type { DirectoryChangedPayload } from '../shared/ipc/directory-watch-schema'
 import type { PdfExportRequest, PdfExportResponse } from '../shared/ipc/pdf-schema'
 import type { DocxExportRequest, DocxExportResponse } from '../shared/ipc/docx-schema'
 import type { GlobalSettings, GlobalSettingsChanged } from '../shared/ipc/global-settings-schema'
@@ -48,10 +49,13 @@ import type {
   DocumentImportRequest,
   DocumentImportResult,
   DocumentImportProgress,
-  DependencyReadyEvent
+  DependencyReadyEvent,
+  ImportToolStatusRequest,
+  ImportToolStatusResponse
 } from '../shared/ipc/import-schema'
 import { fileBridge } from './fileBridge'
 import { terminalBridge } from './terminalBridge'
+import { markdownImageBridge } from './markdownImageBridge'
 import type { FileNode, FileStats } from '../shared/ipc/file-schema'
 
 export type { FileNode, FileStats }
@@ -123,18 +127,8 @@ const api = {
       ipcRenderer.invoke('directory-watch:get-stats'),
 
     // Event listeners
-    onDirectoryChanged: (
-      callback: (data: {
-        dirPath: string
-        eventCount: number
-        summary: Record<string, number>
-        catchUp?: boolean
-      }) => void
-    ): (() => void) => {
-      const listener = (
-        _event: unknown,
-        data: { dirPath: string; eventCount: number; summary: Record<string, number>; catchUp?: boolean }
-      ) => callback(data)
+    onDirectoryChanged: (callback: (data: DirectoryChangedPayload) => void): (() => void) => {
+      const listener = (_event: unknown, data: DirectoryChangedPayload) => callback(data)
       ipcRenderer.on('directory-watch:changed', listener)
       return () => {
         ipcRenderer.removeListener('directory-watch:changed', listener)
@@ -334,6 +328,14 @@ const api = {
      */
     getDocumentExtensions: (): Promise<string[]> =>
       ipcRenderer.invoke(IMPORT_CHANNELS.GET_DOCUMENT_EXTENSIONS),
+
+    /**
+     * Optional import tool status – LibreOffice found / missing / unsafe (#250).
+     * `{ recheck: true }` re-runs detection ("Check again"); main rate-limits
+     * it. Never rejects: failures arrive as `success: false`.
+     */
+    toolStatus: (request: ImportToolStatusRequest): Promise<ImportToolStatusResponse> =>
+      ipcRenderer.invoke(IMPORT_CHANNELS.TOOL_STATUS, request),
 
     /**
      * Subscribe to document import progress events
@@ -744,6 +746,12 @@ const api = {
     openFile: (filePath: string): Promise<BrowserOpenFileResponse> =>
       ipcRenderer.invoke(BROWSER_CHANNELS.OPEN_FILE, { filePath })
   },
+
+  /**
+   * Images referenced from Markdown (#71). Sends a path; gets back a `data:`
+   * URL, `unchanged`, or a refusal reason. Never rejects for a refusal.
+   */
+  markdownImage: markdownImageBridge,
 
   /**
    * Per-terminal Claude Code context status bridge (#216).

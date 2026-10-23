@@ -159,7 +159,7 @@ The `~/.erfana/logs` literal above is correct, but the single source of truth is
   - `main.log` -> `main.1.log` (most recent)
   - `main.1.log` -> `main.2.log`
   - ...
-  - `main.5.log` is deleted (oldest)
+  - `main.4.log` -> `main.5.log`, replacing the oldest (a rename onto it, no separate delete – rotation is synchronous on the main thread, so it costs one call per file)
 
 **File limit:** 5 rotated files per type. With three logs at 10MB each this keeps the folder to about 180MB (it used to be 100 files per type, up to about 3GB). Leftover `.N.log` files above the cap from older versions are removed by the next cleanup.
 
@@ -339,10 +339,12 @@ A very large project that kept changing made Erfana exit on Windows with nothing
 | Line | Level | When | Context |
 |------|-------|------|---------|
 | `FileService: readDirectory started` | info | A walk starts | `readId`, `pathDigest`, `followUp`, `callers` |
-| `FileService: readDirectory completed` | info | A walk succeeded | `durationMs`, `fileCount`, `dirCount`, `hiddenPatternCount`, `maxDepth`, the #211 exclude counts (`excludePatternCount`, `excludedEntryCount`, `walkHintCount`, `matcherBudgetExceeded` – see [Large projects on Windows](#large-projects-on-windows-211)), plus `readId`, `pathDigest`, `followUp`, `callers` |
+| `FileService: readDirectory completed` | info | A walk succeeded | `durationMs`, `fileCount`, `dirCount`, `hiddenPatternCount`, `maxDepth`, the #211 exclude counts (`excludePatternCount`, `excludedEntryCount`, `walkHintCount`, `matcherBudgetExceeded` – see [Large projects on Windows](#large-projects-on-windows-211)), the lazy-walk counts (`folderReadCount` – folders actually listed, `lazyFolderCount` – folder rows left unread, `entryCapReached` – the walk hit `MAX_WALK_ENTRIES`, and `shallow: true` on the one-level read that expands a lazy folder; see [the lazy tree walk note](./performance/2026-10-22-lazy-tree-walk.md)), plus `readId`, `pathDigest`, `followUp`, `callers` |
 | `FileService: readDirectory failed` | warn | A walk rejected (only the root `readdir` can fail one; sub-folder errors are recovered) | `readId`, `pathDigest`, `durationMs` |
 | `FileService: readDirectory still running` | warn | Once per walk, `READ_DIRECTORY_SLOW_WARN_MS` (60 s) after it started | `readId`, `pathDigest`, `elapsedMs` |
 | `FileService: readDirectory joined follow-up read` | info | A call arrived while a walk of that path ran and was queued behind it | `pathDigest`, `behindReadId` |
+| `file:findByName completed` | info | The terminal searched the project for a clicked file name on an incomplete tree (finding [32]) | `durationMs`, `resultCount`, `truncated` – never the name or the paths |
+| `FileService: name search slot held by a read that has not settled` | warn | A name search's slot has been held for 30 s by a folder read that never returned (a stale network mount, most likely); once per slot | `heldMs`, `running` – counts only |
 | `DirectoryWatcher health` | info (warn when stressed) | Every 120 s while a directory watcher is active, i.e. while a project is open | Watcher metrics, plus `mainMemoryMb` and `processMemoryMb`, and `memoryError` when a source could not be read |
 
 **Renderer** (`renderer.log`, prefixed `[RENDERER]`):

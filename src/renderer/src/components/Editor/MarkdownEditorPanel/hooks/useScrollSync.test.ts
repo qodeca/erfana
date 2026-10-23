@@ -768,6 +768,33 @@ describe('useScrollSync', () => {
     })
   })
 
+  describe('project image notifications (#71)', () => {
+    it('should rebuild (debounced, once per burst) when project images arrive', async () => {
+      const { result } = renderHook(() => useScrollSync(defaultOptions))
+      act(() => {
+        result.current.setIsEditorReady(true)
+      })
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000)
+      })
+      vi.mocked(buildScrollMapEntries).mockClear()
+
+      // Images arrive one by one after the commit; each moves content below it
+      await act(async () => {
+        result.current.handlePreviewRendered({ root: previewRef.current!, reason: 'image' })
+        result.current.handlePreviewRendered({ root: previewRef.current!, reason: 'image' })
+        result.current.handlePreviewRendered({ root: previewRef.current!, reason: 'image' })
+        await vi.advanceTimersByTimeAsync(0)
+      })
+      expect(buildScrollMapEntries).not.toHaveBeenCalled()
+
+      act(() => {
+        vi.advanceTimersByTime(150)
+      })
+      expect(buildScrollMapEntries).toHaveBeenCalledTimes(1)
+    })
+  })
+
   describe('preview render notifications (the only content trigger)', () => {
     it('rebuilds the map when the preview commits new content', async () => {
       const { result } = renderHook(() => useScrollSync(defaultOptions))

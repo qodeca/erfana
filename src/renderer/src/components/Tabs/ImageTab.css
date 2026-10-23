@@ -95,9 +95,11 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: var(--icon-size-md);
-  height: var(--icon-size-md);
-  min-width: var(--icon-size-md);
+  /* A 24 x 24 target (WCAG 2.2 SC 2.5.8, design/system/components/icon): the
+     14px glyph stays its size, centred; only the hit area grows (#96). */
+  width: var(--btn-height-sm);
+  height: var(--btn-height-sm);
+  min-width: var(--btn-height-sm);
   padding: 0;
   border: none;
   border-radius: 0;

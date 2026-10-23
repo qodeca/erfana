@@ -24,7 +24,12 @@ export const IMPORT_CHANNELS = {
   /** Query available document extensions (ipcMain.handle) */
   GET_DOCUMENT_EXTENSIONS: 'import:getDocumentExtensions',
   /** Dependency detection complete event (webContents.send) */
-  DEPENDENCIES_READY: 'import:dependenciesReady'
+  DEPENDENCIES_READY: 'import:dependenciesReady',
+  /**
+   * Read the optional import tools' status, or re-run detection with
+   * `{ recheck: true }` (ipcMain.handle, sender-gated, rate-limited) (#250)
+   */
+  TOOL_STATUS: 'import:toolStatus'
 } as const
 
 /**

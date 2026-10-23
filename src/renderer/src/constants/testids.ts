@@ -83,6 +83,8 @@ export const TEST_IDS = {
   PROJECT_TREE_NODE_FILE: 'project-tree-node-file',
   /** Folder node - use with getDynamicTestId for specific folder targeting */
   PROJECT_TREE_NODE_FOLDER: 'project-tree-node-folder',
+  /** The loading / could-not-read line under an expanded lazy folder (#320) */
+  PROJECT_TREE_PLACEHOLDER: 'project-tree-placeholder',
   /** Drag overlay ghost element during drag operations */
   PROJECT_TREE_DRAG_OVERLAY: 'project-tree-drag-overlay',
   /** Error state container */
@@ -345,6 +347,8 @@ export const TEST_IDS = {
   FILE_PICKER_BTN_SELECT: 'file-picker-btn-select',
   /** Cancel button */
   FILE_PICKER_BTN_CANCEL: 'file-picker-btn-cancel',
+  /** The "list may be incomplete" note (a truncated project tree, #320) */
+  FILE_PICKER_INCOMPLETE: 'file-picker-incomplete',
 
   // =========================================================================
   // Context Menu - Base (2)
@@ -584,7 +588,7 @@ export const TEST_IDS = {
   TOAST_LIVE_ALERT: 'toast-live-alert',
 
   // =========================================================================
-  // Settings Overlay (20)
+  // Settings Overlay (27)
   // =========================================================================
 
   /** Settings overlay container */
@@ -632,6 +636,14 @@ export const TEST_IDS = {
   SETTINGS_SECTION_HTML_PREVIEW: 'settings-section-html-preview',
   /** HTML preview enabled toggle (Issue #74, AC21) */
   SETTINGS_TOGGLE_HTML_PREVIEW: 'settings-toggle-html-preview',
+  /** Import tools section (Issue #250) */
+  SETTINGS_SECTION_IMPORT_TOOLS: 'settings-section-import-tools',
+  /** One format row's status; the row carries `data-format` and `data-ready` */
+  SETTINGS_IMPORT_TOOL_STATUS: 'settings-import-tool-status',
+  /** "Check again" button (Issue #250) */
+  SETTINGS_BTN_IMPORT_TOOLS_RECHECK: 'settings-btn-import-tools-recheck',
+  /** Polite live region announcing the outcome of "Check again" */
+  SETTINGS_IMPORT_TOOLS_LIVE: 'settings-import-tools-live',
 
   // =========================================================================
   // Transcription Dialog (10)

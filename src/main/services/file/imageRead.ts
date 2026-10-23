@@ -57,13 +57,25 @@ export { IMAGE_EXTENSIONS }
 export const MAX_IMAGE_SIZE = 50 * 1024 * 1024 // 50 MB
 
 /**
+ * Thrown when a file is over {@link MAX_IMAGE_SIZE}. A subclass, so a caller
+ * that answers with a reason instead of an error (the Markdown preview, #71)
+ * can tell it apart; the message is unchanged for the image viewer.
+ */
+export class ImageTooLargeError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'ImageTooLargeError'
+  }
+}
+
+/**
  * Mint the opaque version token for a stat result.
  *
  * `size:mtimeNs:ino` - content length, last-write time at the finest resolution
  * the platform records, and the inode so a swapped-in file with identical size
  * and preserved mtime is still a different version. Callers treat it as opaque.
  */
-function formatVersion(stats: BigIntStats): string {
+export function formatVersion(stats: BigIntStats): string {
   return `${stats.size}:${stats.mtimeNs}:${stats.ino}`
 }
 
@@ -107,7 +119,7 @@ export async function readImage(
   // reports the same error whether or not a version was supplied.
   if (size > MAX_IMAGE_SIZE) {
     const sizeMB = (size / (1024 * 1024)).toFixed(1)
-    throw new Error(`Image file too large (${sizeMB} MB). Maximum size is 50 MB.`)
+    throw new ImageTooLargeError(`Image file too large (${sizeMB} MB). Maximum size is 50 MB.`)
   }
 
   const version = formatVersion(stats)

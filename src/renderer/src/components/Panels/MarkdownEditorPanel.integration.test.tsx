@@ -399,10 +399,10 @@ describe('MarkdownEditorPanel Integration', () => {
 
     it('wires each caller to its trigger: Cmd+S is user, autosave is autosave, the registry is registry', () => {
       expect(source).toContain("onSave: () => handleSave('user'),")
-      expect(source).toContain("await handleSave('autosave')")
+      expect(source).toContain("return handleSave('autosave')")
       // an autosave never overwrites a file that changed on disk
       expect(source.indexOf('if (externalChangeDetected) return')).toBeLessThan(
-        source.indexOf("await handleSave('autosave')")
+        source.indexOf("return handleSave('autosave')")
       )
       expect(source).toContain("() => handleSave('registry'), externalChangeDetected")
       expect(source.match(/handleSave\(/g)).toHaveLength(3)
@@ -454,6 +454,62 @@ describe('MarkdownEditorPanel Integration', () => {
       expect(source).toMatch(
         /useEffect\(\(\) => \{\n\s*lastSaveErrorRef\.current = null\n\s*\}, \[currentFile\?\.path\]\)/
       )
+    })
+  })
+  describe('File load wiring (review finding 49) and the autosave indicator timer (finding 52)', () => {
+    // Only the wiring is pinned here, on the source, for the same reason as
+    // the blocks above. The behaviour (latest read wins, failures reported,
+    // nothing sensitive logged, StrictMode) is tested with renderHook in
+    // useLatestFileLoad.test.ts, the error state in EditorLoadError.test.tsx.
+    const source = readFileSync(
+      join(process.cwd(), 'src/renderer/src/components/Panels/MarkdownEditorPanel.tsx'),
+      'utf8'
+    ).replace(/\r\n/g, '\n')
+    /** The text between two markers; throws if either is missing, so a rename cannot empty a slice silently. */
+    const between = (from: string, to: string): string => {
+      const start = source.indexOf(from)
+      const end = source.indexOf(to, start)
+      expect(start, from).toBeGreaterThan(-1)
+      expect(end, to).toBeGreaterThan(-1)
+      return source.slice(start, end)
+    }
+
+    it('loads through useLatestFileLoad, once, with a toast on failure', () => {
+      const load = between('= useLatestFileLoad(props.params?.filePath, {', '\n  })\n')
+      expect(source.match(/useLatestFileLoad\(/g)).toHaveLength(1)
+      expect(load).toContain('openedGenerationRef.current = generation')
+      expect(load).toContain("showToast({ title: 'Could not open file', message, type: 'error'")
+      // no second, unguarded read anywhere in the panel
+      expect(source.match(/fileGateway\.readFile\(/g)).toHaveLength(1)
+      expect(load).toContain('fileGateway.readFile({ filePath })')
+    })
+
+    it('renders the error state with its retry before the empty state', () => {
+      const errorState = source.indexOf('<EditorLoadError message={loadError} onRetry={retryLoad} />')
+      const emptyState = source.indexOf('<p>No file open</p>')
+      expect(errorState).toBeGreaterThan(-1)
+      expect(emptyState).toBeGreaterThan(-1)
+      expect(errorState).toBeLessThan(emptyState)
+      expect(source).toContain(') : loadError ? (')
+    })
+
+    it('hands autosave the save result, so a failed write backs off', () => {
+      expect(source).toContain("return handleSave('autosave')")
+    })
+
+    it('keeps one pending indicator reset, cleared when an autosave starts and on unmount', () => {
+      const handleSave = between('const handleSave = useCallback', '}, [currentFile, isFileDeleted, dismissConflict')
+      const unmountCleanup = between('// Cleanup: ensure panel is not marked dirty on unmount', '// Debug logging')
+      // no fire-and-forget timer is left in the save path
+      expect(handleSave).not.toMatch(/\n\s*setTimeout\(/)
+      const start = handleSave.indexOf('if (isAutoSave) {')
+      const clear = handleSave.indexOf('clearTimeout(autoSaveIndicatorTimerRef.current)')
+      const indicatorOn = handleSave.indexOf('setIsAutoSaving(true)')
+      expect(start).toBeGreaterThan(-1)
+      expect(clear).toBeGreaterThan(start)
+      expect(clear).toBeLessThan(indicatorOn)
+      expect(handleSave).toContain('autoSaveIndicatorTimerRef.current = setTimeout(() => {')
+      expect(unmountCleanup).toContain('clearTimeout(autoSaveIndicatorTimerRef.current)')
     })
   })
 })

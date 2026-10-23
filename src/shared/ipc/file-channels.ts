@@ -16,6 +16,7 @@ export const FILE_CHANNELS = {
   getSession: 'file:getSession',
   getProjectPath: 'file:getProjectPath',
   readDirectory: 'file:readDirectory',
+  findByName: 'file:findByName',
   readFile: 'file:readFile',
   writeFile: 'file:writeFile',
   getStats: 'file:getStats',

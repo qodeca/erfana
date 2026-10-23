@@ -28,12 +28,16 @@ import { useEffect, useRef } from 'react'
 import {
   shouldStartWatcher,
   shouldHandleDirectoryChange,
+  isStructuralDirectoryChange,
+  getRefreshDelay,
+  getMaxWait,
   createDirectoryChangeMessage,
   createWatcherErrorMessage,
   createDirectoryErrorMessage
 } from './useDirectoryWatcher.logic'
 import { DIRECTORY_WATCHER } from '../components/ProjectTree/constants'
 import { logger } from '../utils/logger'
+import { getTreeReadMs, resetTreeReadTiming } from '../utils/treeReadTiming'
 
 interface UseDirectoryWatcherOptions {
   projectPath: string | null
@@ -65,14 +69,20 @@ export function useDirectoryWatcher({
 
   // Debounce timer for refresh callbacks – consumer-side throttle for
   // bursts of 'directory-watch:changed' broadcasts (multi-file edits, save
-  // storms, formatters). Mirrors the useGitStatus.debouncedRefresh pattern.
+  // storms, formatters). Mirrors the useGitStatus.debouncedRefresh pattern,
+  // plus a max wait so a steady stream still refreshes: about once a second,
+  // or every two read-lengths (at most 10 s) on a project whose read is slow.
   const refreshTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const burstStartedAtRef = useRef(0)
 
   useEffect(() => {
     // Guard: Should we start the watcher?
     if (!shouldStartWatcher(projectPath, initialLoadComplete)) {
       return
     }
+
+    // A new project: its reads have not been timed yet
+    resetTreeReadTiming()
 
     // Start watching the project directory
     window.api.directoryWatch.start(projectPath as string).catch((err) => {
@@ -83,7 +93,9 @@ export function useDirectoryWatcher({
     // broadcasts (one editor save + one external tool write + one git op,
     // or N files rewritten by a formatter) collapses to a single tree
     // re-list. Without this, every broadcast triggered a recursive IPC
-    // walk of the project directory.
+    // walk of the project directory. A content-only batch (`structural:
+    // false`) leaves names and folders as they were: useGitStatus refreshes
+    // the badges for it, the tree is not re-read.
     const unsubscribeChanged = window.api.directoryWatch.onDirectoryChanged((data) => {
       // Only refresh if not during our own internal operations – a catch-up
       // refresh (changes dropped during a pause, #210) always goes through
@@ -91,14 +103,27 @@ export function useDirectoryWatcher({
         logger.debug('[RENDERER] Directory change skipped (internal operation)')
         return
       }
+      if (!isStructuralDirectoryChange(data)) {
+        logger.debug('[RENDERER] Content-only directory change – tree not re-read')
+        return
+      }
       logger.info(createDirectoryChangeMessage(data.eventCount))
+      const now = Date.now()
       if (refreshTimerRef.current) {
         clearTimeout(refreshTimerRef.current)
+      } else {
+        burstStartedAtRef.current = now
       }
+      const delay = getRefreshDelay(
+        burstStartedAtRef.current,
+        now,
+        DIRECTORY_WATCHER.DEBOUNCE_DELAY,
+        getMaxWait(DIRECTORY_WATCHER.MAX_WAIT, getTreeReadMs(), DIRECTORY_WATCHER.MAX_WAIT_CEILING)
+      )
       refreshTimerRef.current = setTimeout(() => {
         refreshTimerRef.current = null
         onRefreshRef.current()
-      }, DIRECTORY_WATCHER.DEBOUNCE_DELAY)
+      }, delay)
     })
 
     // Listen for project deletion
