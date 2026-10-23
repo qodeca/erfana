@@ -427,7 +427,8 @@ app.whenReady().then(async () => {
   // Required for Cmd+C/V to work in textarea and input elements
   Menu.setApplicationMenu(createApplicationMenu())
 
-  // Set app user model id for windows
+  // Set app user model id for windows. Must equal the installer's appId so the running window
+  // groups with its pinned shortcut (and any future toast notifications resolve the app name/icon).
   electronApp.setAppUserModelId(APP_ID)
 
   // Default open or close DevTools by F12 in development
