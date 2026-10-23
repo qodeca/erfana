@@ -16,6 +16,7 @@
  */
 
 import { logger } from '../LoggingService'
+import { PREVIEW } from '../../../shared/constants'
 import type { BoundsDrop } from '../../../shared/dropReporter'
 import type { PreviewBounds, PreviewEmitters } from '../../../shared/ipc/preview-types'
 import { stablePathDigest } from '../../../shared/stablePathDigest'
@@ -166,7 +167,7 @@ export function createPreviewLiveBounds(deps: PreviewLiveBoundsDeps): PreviewLiv
    * "assume it is still covering you": a page that never yields never repaints
    * either, so its stale texture really is still at the old geometry.
    */
-  async function confirmRepaint(seq: number): Promise<void> {
+  async function confirmRepaint(seq: number, settled: () => void): Promise<void> {
     try {
       const height = await deps.contents.executeJavaScriptInIsolatedWorld(BOUNDS_ACK_WORLD_ID, [
         { code: REPAINTED_SCRIPT }
@@ -189,6 +190,55 @@ export function createPreviewLiveBounds(deps: PreviewLiveBoundsDeps): PreviewLiv
     } catch {
       // A page that tore down mid-frame, or a world that could not run. Silence
       // is the safe answer, and the caller already has to handle it.
+    } finally {
+      // In the same tick as the answer, so the next wanted script starts at once.
+      settled()
+    }
+  }
+
+  /*
+   * AT MOST ONE confirmation script is in the page at a time. A splitter drag
+   * pushes a rect per frame and, while the growth is unproved, every one of them
+   * asks to be confirmed; starting a script for each ran one into the untrusted
+   * page per frame (#120). Now a push that asks while a script is out only
+   * records that it is the newest wanted, and one more script runs for it when
+   * the current one settles. Only the newest is ever confirmed anyway:
+   * `confirmRepaint` drops an answer a newer push overtook.
+   *
+   * A page that never runs its frames (hidden, frozen) never settles its script,
+   * so the slot expires after `BOUNDS_ACK_SCRIPT_TIMEOUT_MS`; a late answer from
+   * an expired run is told apart by its `run` number and does not free the slot
+   * of the run that replaced it.
+   */
+  let ackRunning = false
+  let ackWanted: number | null = null
+  let ackRun = 0
+
+  function startConfirmation(seq: number): void {
+    ackRunning = true
+    ackRun += 1
+    const mine = ackRun
+    const release = (): void => {
+      if (ackRun !== mine || !ackRunning) {
+        return
+      }
+      ackRunning = false
+      clearTimeout(expiry)
+      if (ackWanted !== null) {
+        const next = ackWanted
+        ackWanted = null
+        startConfirmation(next)
+      }
+    }
+    const expiry = setTimeout(release, PREVIEW.BOUNDS_ACK_SCRIPT_TIMEOUT_MS)
+    void confirmRepaint(seq, release)
+  }
+
+  function requestConfirmation(seq: number): void {
+    if (ackRunning) {
+      ackWanted = seq
+    } else {
+      startConfirmation(seq)
     }
   }
 
@@ -238,7 +288,7 @@ export function createPreviewLiveBounds(deps: PreviewLiveBoundsDeps): PreviewLiv
     // dropped push is exactly a case where it must: the view is not where the
     // renderer believes it is.
     if (ack) {
-      void confirmRepaint(seq)
+      requestConfirmation(seq)
     }
     return true
   }

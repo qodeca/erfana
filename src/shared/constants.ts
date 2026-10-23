@@ -601,6 +601,12 @@ export const PREVIEW = {
    */
   TEARDOWN_STEP_TIMEOUT_MS: 2000,
   /**
+   * Bound on one bounds-repaint confirmation script (ms). A page that never
+   * runs its frames (hidden, frozen) leaves the script pending; past this the
+   * next confirmation may start instead of waiting behind it.
+   */
+  BOUNDS_ACK_SCRIPT_TIMEOUT_MS: 1000,
+  /**
    * Bound on the purge that runs when a partition is handed back for reuse
    * and again before it is handed out (ms). Fail-closed: a purge that fails or
    * overruns on either side drops the name and a fresh partition is minted.

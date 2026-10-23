@@ -28,6 +28,7 @@ vi.mock('../LoggingService', () => ({
 
 import { logger } from '../LoggingService'
 import { BOUNDS_DROP_MESSAGE } from '../../../shared/dropReporter'
+import { PREVIEW } from '../../../shared/constants'
 import { PREVIEW_LIMITS } from '../../../shared/preview-limits'
 import type { PreviewBounds } from '../../../shared/ipc/preview-types'
 import { stablePathDigest } from '../../../shared/stablePathDigest'
@@ -100,6 +101,7 @@ function setup(options: SetupOptions = {}) {
   let defunct = false
   const zoom = options.zoom ?? 1
   const repaints: Array<(height: unknown) => void> = []
+  let started = 0
   const setBounds = vi.fn<(rect: PreviewBounds) => void>()
   const boundsApplied = vi.fn<(panelId: string, seq: number) => void>()
   const host = {
@@ -113,6 +115,7 @@ function setup(options: SetupOptions = {}) {
     contents: {
       executeJavaScriptInIsolatedWorld: () =>
         new Promise((resolve) => {
+          started += 1
           repaints.push(resolve)
         })
     },
@@ -126,6 +129,8 @@ function setup(options: SetupOptions = {}) {
     host,
     setBounds,
     boundsApplied,
+    /** How many confirmation scripts have been started in the page. */
+    scripts: (): number => started,
     advance: (ms: number): void => {
       clock += ms
     },
@@ -294,6 +299,42 @@ describe('createPreviewLiveBounds – drop points', () => {
     expect(lines()).toEqual([
       dropLine('info', { reason: LIVE_BOUNDS_DROP_REASON.ackSuperseded, seq: 1, lastSeq: 2 })
     ])
+  })
+
+  it('keeps one confirmation script in the page, however many pushes ask (#120)', async () => {
+    const h = setup()
+
+    // A splitter drag: every frame's push asks while the growth is unproved.
+    for (let seq = 1; seq <= 5; seq += 1) {
+      h.bounds.apply({ ...RECT, y: 20 + seq }, seq, true)
+    }
+    expect(h.scripts()).toBe(1)
+
+    // The page answers the first; only the newest push is confirmed after it.
+    await h.repaint()
+    expect(h.scripts()).toBe(2)
+    expect(h.boundsApplied).not.toHaveBeenCalled()
+    await h.repaint()
+
+    expect(h.scripts()).toBe(2)
+    expect(h.boundsApplied).toHaveBeenCalledTimes(1)
+    expect(h.boundsApplied).toHaveBeenCalledWith(PANEL, 5)
+  })
+
+  it('frees the slot when the page never answers a confirmation (#120)', async () => {
+    vi.useFakeTimers()
+    try {
+      const h = setup()
+      h.bounds.apply(RECT, 1, true)
+      h.bounds.apply({ ...RECT, y: 40 }, 2, true)
+      expect(h.scripts()).toBe(1)
+
+      await vi.advanceTimersByTimeAsync(PREVIEW.BOUNDS_ACK_SCRIPT_TIMEOUT_MS)
+
+      expect(h.scripts()).toBe(2)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('M5: logs a confirmation that finds the view defunct, and confirms nothing', async () => {

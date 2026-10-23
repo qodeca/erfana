@@ -90,15 +90,22 @@ const PREVIEW_ENTRY_WATCH_OVERRIDES: Partial<ChokidarOptions> = {
   }
 }
 
-/** All live top-level renderer webContents (the default emission targets). */
-function defaultResolveEmitTargets(): readonly PreviewEmitTarget[] {
+/**
+ * All live top-level renderer webContents (the default emission targets), each
+ * wrapped with its window id. The id is routing metadata for an acting event
+ * (`openFileRequested`), which goes to exactly the window whose preview asked
+ * for it; it rides on the wrapper, never on the live Electron object (#120).
+ */
+export function defaultResolveEmitTargets(): readonly PreviewEmitTarget[] {
   return BrowserWindow.getAllWindows()
     .filter((win) => !win.isDestroyed())
-    .map((win) => {
-      // Carry the window id so an acting event (`openFileRequested`) can be sent
-      // to exactly the window whose preview asked for it.
-      const target = win.webContents as unknown as PreviewEmitTarget & { windowId?: number }
-      return Object.assign(target, { windowId: win.id })
+    .map((win): PreviewEmitTarget => {
+      const contents = win.webContents
+      return {
+        isDestroyed: () => contents.isDestroyed(),
+        send: (channel, payload) => contents.send(channel, payload),
+        windowId: win.id
+      }
     })
 }
 
