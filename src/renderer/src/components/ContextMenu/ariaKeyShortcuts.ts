@@ -54,11 +54,13 @@ export function toAriaKeyShortcuts(label: string | undefined): string | undefine
 
   let modifiers: string[] = []
   let key: string
-  if (text.includes('+') && text.length > 1) {
+  // A macOS label starts with a glyph ("⌘+" is Cmd and the plus key); a
+  // Windows / Linux label spells its modifiers out, joined with "+".
+  if (MAC_MODIFIERS[text[0]] === undefined && text.includes('+') && text.length > 1) {
     // "Ctrl++" is Ctrl and the plus key, not an empty key.
     const plusKey = text.endsWith('++')
     const parts = (plusKey ? text.slice(0, -2) : text).split('+').map((part) => part.trim())
-    key = plusKey ? '+' : (parts.pop() ?? '')
+    key = plusKey ? 'Plus' : (parts.pop() ?? '')
     for (const part of parts) {
       const name = WORD_MODIFIERS[part.toLowerCase()]
       if (name === undefined) return undefined
@@ -74,10 +76,14 @@ export function toAriaKeyShortcuts(label: string | undefined): string | undefine
   }
 
   key = KEY_GLYPHS[key] ?? key
+  // ARIA 1.2 names the plus key "Plus" (and the space bar "Space"): "+" is the
+  // separator in `aria-keyshortcuts`, so a literal one would be ambiguous.
+  if (key === '+') key = 'Plus'
   // One printable character (shown upper-case), or a named key such as
   // `Enter` / `F2`. Anything else (a word like "drag") is not a key.
-  const valid = /^[!-~]$/.test(key) || /^(F\d{1,2}|Enter|Backspace|Delete|Escape|Tab|Home|End|PageUp|PageDown|Insert|Space)$/.test(key)
-  // (ARIA spells the space bar "Space", so it stays as written.)
+  const valid =
+    /^[!-~]$/.test(key) ||
+    /^(F\d{1,2}|Enter|Backspace|Delete|Escape|Tab|Home|End|PageUp|PageDown|Insert|Space|Plus)$/.test(key)
   if (!valid) return undefined
   // The spec orders modifiers before the key; keep a stable order among them.
   const order = ['Control', 'Alt', 'Shift', 'Meta']

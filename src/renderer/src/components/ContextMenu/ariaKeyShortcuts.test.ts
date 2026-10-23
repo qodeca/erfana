@@ -19,7 +19,9 @@ describe('toAriaKeyShortcuts', () => {
     ['Enter', 'Enter'],
     ['↩', 'Enter'],
     ['⌘⌫', 'Meta+Backspace'],
-    ['Ctrl++', 'Control++'],
+    ['Ctrl++', 'Control+Plus'],
+    ['⌘+', 'Meta+Plus'],
+    ['+', 'Plus'],
     ['Space', 'Space']
   ])('%s -> %s', (label, expected) => {
     expect(toAriaKeyShortcuts(label)).toBe(expected)

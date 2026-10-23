@@ -569,6 +569,9 @@ export function ChatBubble({
                 onKeyDown={handleKeyDown}
                 onKeyDownCapture={handleTextareaMenuKey}
                 onContextMenu={handleTextareaContextMenu}
+                /* deviates: design/system/components/menu/index.html — aria-haspopup
+                   only: ARIA does not allow aria-expanded on a textbox. See the
+                   card's Exceptions. */
                 aria-haspopup="menu"
                 placeholder="Describe changes to this diagram..."
                 rows={3}

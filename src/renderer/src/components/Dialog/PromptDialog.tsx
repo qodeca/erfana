@@ -320,6 +320,9 @@ export function PromptDialog({ config, zIndex, onSubmit, onCancel }: PromptDialo
               onKeyDown={handleKeyDown}
               onKeyDownCapture={handleMenuKey}
               onContextMenu={handleContextMenu}
+              /* deviates: design/system/components/menu/index.html — aria-haspopup
+                 only: ARIA does not allow aria-expanded on a textbox. See the
+                 card's Exceptions. */
               aria-haspopup="menu"
               onSelect={handleSelect}
               placeholder={inputPlaceholder}
