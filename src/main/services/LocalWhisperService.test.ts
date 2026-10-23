@@ -377,7 +377,7 @@ describe('LocalWhisperService', () => {
       expect(mockEnsureModel).toHaveBeenCalledWith('tiny', expect.objectContaining({ signal: undefined }))
     })
 
-    it('verifies the model file before spawning and does not spawn when it fails', async () => {
+    it('verifies the model once per job before spawning and does not spawn when it fails', async () => {
       setupDualExecFileMock('0:01:00.00')
       mockSpawn.mockImplementation(() => makeWhisperSpawnChild(0))
       mockVerifyInstalledModelFile.mockRejectedValueOnce(
@@ -400,7 +400,8 @@ describe('LocalWhisperService', () => {
       })
 
       expect(mockVerifyInstalledModelFile).toHaveBeenCalledWith(
-        '/userData/whisper/models/ggml-tiny.bin'
+        'tiny',
+        expect.objectContaining({ signal: undefined })
       )
       expect(result.success).toBe(false)
       expect(mockSpawn).not.toHaveBeenCalled()

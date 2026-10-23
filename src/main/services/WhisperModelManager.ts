@@ -35,10 +35,10 @@
  */
 import { app } from 'electron'
 import { createHash } from 'crypto'
-import { access, chmod, readFile, readdir, rename, rm, stat, unlink, writeFile } from 'fs/promises'
-import { constants as fsConstants, createReadStream } from 'fs'
+import { access, chmod, open, readFile, readdir, rename, rm, stat, unlink, writeFile } from 'fs/promises'
+import { constants as fsConstants } from 'fs'
 import { tmpdir } from 'os'
-import { basename, join } from 'path'
+import { join } from 'path'
 import { randomUUID } from 'crypto'
 
 import { LOCAL_WHISPER } from '../../shared/constants'
@@ -104,11 +104,11 @@ export interface IWhisperModelManager {
   isModelInstalled(model: WhisperModel): Promise<boolean>
   /**
    * Hash-check an installed model file against its pin before it is handed to
-   * whisper-cli (cached per session by path, size, mtime and inode). On a
-   * mismatch the file is deleted and `WHISPER_MODEL_NOT_FOUND` is thrown, so
-   * the user re-downloads it deliberately.
+   * whisper-cli. Nothing is cached: call it once per transcription job. On a
+   * mismatch the file is deleted and `WHISPER_MODEL_INTEGRITY_FAILED` is
+   * thrown, so the user re-downloads it deliberately.
    */
-  verifyInstalledModelFile(modelPath: string): Promise<void>
+  verifyInstalledModelFile(model: WhisperModel, options?: { signal?: AbortSignal }): Promise<void>
   /** Abort in-flight model downloads and remove their temp files (app quit). */
   dispose(): Promise<void>
   listInstalledModels(): Promise<WhisperModel[]>
@@ -202,6 +202,36 @@ function parseVerifiedManifest(content: Buffer): WhisperManifest {
   return parsed as WhisperManifest
 }
 
+/** Read size when hashing a model through its handle. */
+const HASH_CHUNK_BYTES = 1024 * 1024
+
+/** An unmarked temp file changed more recently than this may belong to a live download. */
+const STALE_TEMP_MIN_AGE_MS = 10 * 60 * 1000
+
+/** Same file, same content window: dev, ino, size, mtime and ctime all equal. */
+function sameFileState(
+  a: { dev: number | bigint; ino: number | bigint; size: number | bigint; mtimeMs: number | bigint; ctimeMs: number | bigint },
+  b: { dev: number | bigint; ino: number | bigint; size: number | bigint; mtimeMs: number | bigint; ctimeMs: number | bigint }
+): boolean {
+  return (
+    a.dev === b.dev &&
+    a.ino === b.ino &&
+    a.size === b.size &&
+    a.mtimeMs === b.mtimeMs &&
+    a.ctimeMs === b.ctimeMs
+  )
+}
+
+/** True when a process with this pid exists (EPERM means it exists but is not ours). */
+function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (e) {
+    return (e as NodeJS.ErrnoException).code === 'EPERM'
+  }
+}
+
 class WhisperModelManager implements IWhisperModelManager {
   private readonly whisperDir: string
   private readonly binDir: string
@@ -209,9 +239,6 @@ class WhisperModelManager implements IWhisperModelManager {
 
   /** Cache of installed model states (populated lazily). */
   private installedCache = new Map<WhisperModel, boolean>()
-
-  /** Models whose bytes were hashed this session, keyed by path + size + mtime + inode. */
-  private verifiedModelFiles = new Map<string, string>()
 
   /** In-flight model downloads: temp path -> abort handle + settled promise. */
   private activeDownloads = new Map<string, { controller: AbortController; done: Promise<void> }>()
@@ -520,47 +547,64 @@ class WhisperModelManager implements IWhisperModelManager {
     }
   }
 
-  async verifyInstalledModelFile(modelPath: string): Promise<void> {
-    const match = /^ggml-(\w+)\.bin$/.exec(basename(modelPath))
-    const model = match?.[1] as WhisperModel | undefined
-    if (!model || !LOCAL_WHISPER.SUPPORTED_MODELS.includes(model)) {
+  async verifyInstalledModelFile(
+    model: WhisperModel,
+    options?: { signal?: AbortSignal }
+  ): Promise<void> {
+    if (!LOCAL_WHISPER.SUPPORTED_MODELS.includes(model)) {
       throw new AppError(
-        `Not a known whisper model file: ${basename(modelPath)}`,
+        `Not a known whisper model: ${String(model)}`,
         ErrorCode.WHISPER_MODEL_NOT_FOUND
       )
     }
+    const modelPath = this.getModelPath(model)
     const pin = MODEL_PINS[model]
 
-    let info
+    let handle
     try {
-      info = await stat(modelPath)
+      handle = await open(modelPath, 'r')
     } catch {
+      this.installedCache.set(model, false)
       throw new AppError(
         `Model not found: ${model}. Download it from Settings.`,
         ErrorCode.WHISPER_MODEL_NOT_FOUND
       )
     }
-    const key = `${modelPath}|${info.size}|${info.mtimeMs}|${info.ino}`
-    if (this.verifiedModelFiles.get(modelPath) === key) return
 
     let reason: string | null = null
-    if (info.size !== pin.sizeBytes) {
-      reason = `size ${info.size} does not match the expected ${pin.sizeBytes}`
-    } else {
-      const sha = await this.hashFile(modelPath)
-      if (sha !== pin.sha256) reason = 'SHA-256 does not match the pinned hash'
+    try {
+      // Hash through the handle we statted, then require that the handle and
+      // the path still describe the same file (no swap or rewrite meanwhile).
+      const before = await handle.stat()
+      if (before.size !== pin.sizeBytes) {
+        reason = `size ${before.size} does not match the expected ${pin.sizeBytes}`
+      } else {
+        const sha = await this.hashHandle(handle, options?.signal)
+        const after = await handle.stat()
+        const onPath = await stat(modelPath).catch(() => null)
+        if (sha !== pin.sha256) {
+          reason = 'SHA-256 does not match the pinned hash'
+        } else if (
+          !onPath ||
+          !sameFileState(before, after) ||
+          !sameFileState(before, onPath)
+        ) {
+          reason = 'the file changed while it was being verified'
+        }
+      }
+    } finally {
+      await handle.close().catch(() => undefined)
     }
+
     if (reason !== null) {
-      this.verifiedModelFiles.delete(modelPath)
       this.installedCache.set(model, false)
       await this.safeUnlink(modelPath)
       logger.warn('Whisper model failed its integrity check and was removed', { model, reason })
       throw new AppError(
         `The ${model} model failed its integrity check and was removed. Download it again from Settings.`,
-        ErrorCode.WHISPER_MODEL_NOT_FOUND
+        ErrorCode.WHISPER_MODEL_INTEGRITY_FAILED
       )
     }
-    this.verifiedModelFiles.set(modelPath, key)
   }
 
   async dispose(): Promise<void> {
@@ -584,7 +628,7 @@ class WhisperModelManager implements IWhisperModelManager {
     const pin = MODEL_PINS[model]
     const filename = `ggml-${model}.bin`
     const url = `${LOCAL_WHISPER.HUGGINGFACE_MODEL_BASE_URL}/${pin.remoteFilename}`
-    const tempPath = join(this.modelsDir, `${filename}.download-${randomUUID()}`)
+    const tempPath = join(this.modelsDir, `${filename}.download-p${process.pid}-${randomUUID()}`)
 
     logger.info('Downloading whisper model', { model, url })
 
@@ -709,27 +753,55 @@ class WhisperModelManager implements IWhisperModelManager {
     }
   }
 
-  /** Streaming SHA-256 of a file; never buffers the whole model in memory. */
-  private async hashFile(path: string): Promise<string> {
+  /**
+   * Streaming SHA-256 through an open handle; never buffers the whole model.
+   * Aborts between chunks when `signal` fires.
+   */
+  private async hashHandle(
+    handle: Awaited<ReturnType<typeof open>>,
+    signal?: AbortSignal
+  ): Promise<string> {
     const hash = createHash('sha256')
-    for await (const chunk of createReadStream(path)) {
-      hash.update(chunk as Buffer)
+    const buffer = Buffer.allocUnsafe(HASH_CHUNK_BYTES)
+    let position = 0
+    for (;;) {
+      if (signal?.aborted) {
+        throw new AppError(
+          'Model verification was cancelled',
+          ErrorCode.WHISPER_MODEL_INTEGRITY_FAILED
+        )
+      }
+      const { bytesRead } = await handle.read(buffer, 0, buffer.length, position)
+      if (bytesRead === 0) break
+      hash.update(buffer.subarray(0, bytesRead))
+      position += bytesRead
     }
     return hash.digest('hex')
   }
 
   /**
    * Remove `ggml-*.bin.download-*` files an earlier run left behind (quit or
-   * crash mid-download). Downloads that are running now are skipped.
+   * crash mid-download). Never touches a download that is running now: this
+   * process's own (tracked), another live Erfana instance sharing userData
+   * (`-p<pid>-` in the name and that pid is alive), or an unmarked file
+   * changed within the last `STALE_TEMP_MIN_AGE_MS`.
    */
   private async removeStaleModelTemps(): Promise<void> {
     try {
       const entries = await readdir(this.modelsDir)
       if (!Array.isArray(entries)) return
       for (const entry of entries) {
-        if (!/^ggml-\w+\.bin\.download-[\w-]+$/.test(entry)) continue
+        const match = /^ggml-\w+\.bin\.download-(?:p(\d+)-)?[\w-]+$/.exec(entry)
+        if (!match) continue
         const full = join(this.modelsDir, entry)
         if (this.activeDownloads.has(full)) continue
+        if (match[1] !== undefined) {
+          const pid = Number(match[1])
+          if (pid !== process.pid && isProcessAlive(pid)) continue
+        } else {
+          const info = await stat(full).catch(() => null)
+          if (!info || Date.now() - info.mtimeMs < STALE_TEMP_MIN_AGE_MS) continue
+        }
         await this.safeUnlink(full)
       }
     } catch {

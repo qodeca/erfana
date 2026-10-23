@@ -10,6 +10,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { spawn, type ChildProcess } from 'child_process'
 import { createHash } from 'crypto'
 import { mkdir, mkdtemp, readFile, readdir, rm, stat, utimes, writeFile } from 'fs/promises'
 import { tmpdir } from 'os'
@@ -124,89 +125,136 @@ describe('WhisperModelManager model integrity (real fs)', () => {
   })
 
   describe('verifyInstalledModelFile()', () => {
+    const tinyPath = (): string => join(modelsDir, 'ggml-tiny.bin')
+
     it('accepts a file whose hash matches the pin', async () => {
       const manager = await makeManager()
-      const path = join(modelsDir, 'ggml-tiny.bin')
-      await writeFile(path, GOOD)
-      await expect(manager.verifyInstalledModelFile(path)).resolves.toBeUndefined()
+      await writeFile(tinyPath(), GOOD)
+      await expect(manager.verifyInstalledModelFile('tiny')).resolves.toBeUndefined()
+      expect(await readFile(tinyPath())).toEqual(GOOD)
     })
 
-    it('deletes a same-size file with wrong bytes and reports a re-download', async () => {
+    it('deletes a same-size file with wrong bytes and reports an integrity failure', async () => {
       const manager = await makeManager()
-      const path = join(modelsDir, 'ggml-tiny.bin')
-      await writeFile(path, EVIL)
+      await writeFile(tinyPath(), EVIL)
       expect(await manager.isModelInstalled('tiny')).toBe(true) // size alone passes
-      await expect(manager.verifyInstalledModelFile(path)).rejects.toMatchObject({
-        code: 'WHISPER_MODEL_NOT_FOUND'
+      await expect(manager.verifyInstalledModelFile('tiny')).rejects.toMatchObject({
+        code: 'WHISPER_MODEL_INTEGRITY_FAILED'
       })
-      await expect(stat(path)).rejects.toMatchObject({ code: 'ENOENT' })
+      await expect(stat(tinyPath())).rejects.toMatchObject({ code: 'ENOENT' })
       expect(await manager.isModelInstalled('tiny')).toBe(false)
     })
 
     it('deletes a file with the wrong size', async () => {
       const manager = await makeManager()
-      const path = join(modelsDir, 'ggml-tiny.bin')
-      await writeFile(path, Buffer.from('truncated'))
-      await expect(manager.verifyInstalledModelFile(path)).rejects.toMatchObject({
+      await writeFile(tinyPath(), Buffer.from('truncated'))
+      await expect(manager.verifyInstalledModelFile('tiny')).rejects.toMatchObject({
+        code: 'WHISPER_MODEL_INTEGRITY_FAILED'
+      })
+      await expect(stat(tinyPath())).rejects.toMatchObject({ code: 'ENOENT' })
+    })
+
+    it('reports a missing file and refuses ids that are not models', async () => {
+      const manager = await makeManager()
+      await expect(manager.verifyInstalledModelFile('tiny')).rejects.toMatchObject({
         code: 'WHISPER_MODEL_NOT_FOUND'
       })
-      await expect(stat(path)).rejects.toMatchObject({ code: 'ENOENT' })
-    })
-
-    it('reports a missing file and refuses paths that are not model files', async () => {
-      const manager = await makeManager()
       await expect(
-        manager.verifyInstalledModelFile(join(modelsDir, 'ggml-tiny.bin'))
-      ).rejects.toMatchObject({ code: 'WHISPER_MODEL_NOT_FOUND' })
-      await expect(
-        manager.verifyInstalledModelFile(join(modelsDir, 'evil.bin'))
+        manager.verifyInstalledModelFile('../../evil' as never)
       ).rejects.toMatchObject({ code: 'WHISPER_MODEL_NOT_FOUND' })
     })
 
-    it('re-hashes when size, mtime or inode changed since the last good check', async () => {
+    it('does not trust an earlier pass: a tamper with restored metadata is caught in the next job', async () => {
       const manager = await makeManager()
-      const path = join(modelsDir, 'ggml-tiny.bin')
-      await writeFile(path, GOOD)
-      const before = await stat(path)
-      await manager.verifyInstalledModelFile(path)
-
-      // Same size and path, new bytes, new mtime: the cache key changes.
-      await writeFile(path, EVIL)
-      const later = new Date(before.mtimeMs + 60_000)
-      await utimes(path, later, later)
-      await expect(manager.verifyInstalledModelFile(path)).rejects.toMatchObject({
-        code: 'WHISPER_MODEL_NOT_FOUND'
-      })
-    })
-
-    it('hashes once per session while path, size, mtime and inode stay the same', async () => {
-      const manager = await makeManager()
-      const path = join(modelsDir, 'ggml-tiny.bin')
       const fixed = new Date('2026-01-01T00:00:00Z')
-      await writeFile(path, GOOD)
-      await utimes(path, fixed, fixed)
-      await manager.verifyInstalledModelFile(path)
+      await writeFile(tinyPath(), GOOD)
+      await utimes(tinyPath(), fixed, fixed)
+      await manager.verifyInstalledModelFile('tiny') // job 1 passes
 
-      // Identical metadata: the cached verdict is reused (documented trade-off).
-      await writeFile(path, EVIL)
-      await utimes(path, fixed, fixed)
-      await expect(manager.verifyInstalledModelFile(path)).resolves.toBeUndefined()
+      // Rewrite in place (same inode, same size) and restore the old mtime.
+      await writeFile(tinyPath(), EVIL)
+      await utimes(tinyPath(), fixed, fixed)
+
+      await expect(manager.verifyInstalledModelFile('tiny')).rejects.toMatchObject({
+        code: 'WHISPER_MODEL_INTEGRITY_FAILED'
+      }) // job 2 hashes again
+      await expect(stat(tinyPath())).rejects.toMatchObject({ code: 'ENOENT' })
+    })
+
+    it('stops hashing when the signal is aborted', async () => {
+      const manager = await makeManager()
+      await writeFile(tinyPath(), GOOD)
+      const controller = new AbortController()
+      controller.abort()
+      await expect(
+        manager.verifyInstalledModelFile('tiny', { signal: controller.signal })
+      ).rejects.toMatchObject({ code: 'WHISPER_MODEL_INTEGRITY_FAILED' })
     })
   })
 
   describe('stale download temp files', () => {
-    const STALE = 'ggml-base.bin.download-3f2a9c1e-0000-4000-8000-000000000000'
+    const UUID = '3f2a9c1e-0000-4000-8000-000000000000'
+    let live: ChildProcess | null = null
 
-    it('listInstalledModels() removes leftovers and keeps everything else', async () => {
-      await writeFile(join(modelsDir, STALE), Buffer.alloc(10))
+    afterEach(() => {
+      live?.kill()
+      live = null
+    })
+
+    async function deadPid(): Promise<number> {
+      const child = spawn(process.execPath, ['-e', ''])
+      await new Promise((resolve) => child.once('exit', resolve))
+      return child.pid as number
+    }
+
+    async function livePid(): Promise<number> {
+      live = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 60000)'])
+      await new Promise((resolve) => live!.once('spawn', resolve))
+      return live.pid as number
+    }
+
+    it('listInstalledModels() removes leftovers of a dead instance and keeps everything else', async () => {
+      const dead = `ggml-base.bin.download-p${await deadPid()}-${UUID}`
+      await writeFile(join(modelsDir, dead), Buffer.alloc(10))
       await writeFile(join(modelsDir, 'notes.txt'), 'keep')
       const manager = await makeManager()
       await manager.listInstalledModels()
       expect((await readdir(modelsDir)).sort()).toEqual(['notes.txt'])
     })
 
+    it("leaves a live instance's download alone (pid is alive)", async () => {
+      const other = `ggml-base.bin.download-p${await livePid()}-${UUID}`
+      await writeFile(join(modelsDir, other), Buffer.alloc(10))
+      const manager = await makeManager()
+      await manager.listInstalledModels()
+      expect(await readdir(modelsDir)).toEqual([other])
+    })
+
+    it('removes an unmarked file only once it is older than 10 minutes', async () => {
+      const fresh = `ggml-base.bin.download-${UUID}`
+      const old = `ggml-small.bin.download-${UUID}`
+      await writeFile(join(modelsDir, fresh), Buffer.alloc(10))
+      await writeFile(join(modelsDir, old), Buffer.alloc(10))
+      const hourAgo = new Date(Date.now() - 60 * 60 * 1000)
+      await utimes(join(modelsDir, old), hourAgo, hourAgo)
+      const manager = await makeManager()
+      await manager.listInstalledModels()
+      expect(await readdir(modelsDir)).toEqual([fresh])
+    })
+
+    it("removes this process's own untracked leftovers", async () => {
+      const own = `ggml-base.bin.download-p${process.pid}-${UUID}`
+      await writeFile(join(modelsDir, own), Buffer.alloc(10))
+      const manager = await makeManager()
+      await manager.listInstalledModels()
+      expect(await readdir(modelsDir)).toEqual([])
+    })
+
     it('ensureModel() removes leftovers before it downloads', async () => {
-      await writeFile(join(modelsDir, STALE), Buffer.alloc(10))
+      await writeFile(
+        join(modelsDir, `ggml-base.bin.download-p${await deadPid()}-${UUID}`),
+        Buffer.alloc(10)
+      )
       stubFetchServing(GOOD)
       const manager = await makeManager()
       await manager.ensureModel('tiny')

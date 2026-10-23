@@ -944,7 +944,7 @@ describe('WhisperModelManager', () => {
         code: 'WHISPER_MODEL_DOWNLOAD_FAILED'
       })
       expect(mockUnlink).toHaveBeenCalledWith(
-        expect.stringContaining('.download-test-uuid-1234')
+        expect.stringContaining('-test-uuid-1234')
       )
     })
 

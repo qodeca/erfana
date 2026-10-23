@@ -353,6 +353,12 @@ export class LocalWhisperService {
 
       let transcript: string
 
+      // Model integrity: one streaming SHA-256 per transcription job (all chunks
+      // of the job share it; a new job hashes again, nothing is cached across
+      // jobs). A mismatch deletes the file and throws WHISPER_MODEL_INTEGRITY_FAILED
+      // ("download it again"); nothing is re-downloaded here.
+      await this.modelManager.verifyInstalledModelFile(model, { signal })
+
       if (needsChunking) {
         transcript = await this.transcribeChunked(
           wavPath, duration, binaryPath, modelPath, language, tempFiles, progress, signal
@@ -727,18 +733,12 @@ export class LocalWhisperService {
     onWhisperProgress: (percent: number) => void,
     signal?: AbortSignal
   ): Promise<string> {
-    // TOCTOU close: re-verify pinned binary + sidecars immediately before
+    // Narrow the TOCTOU window: re-verify pinned binary + sidecars immediately before
     // every spawn. `{userData}/whisper/bin/` is user-writable, so an attacker
     // with local write access could swap the binary between install-time
     // verification and spawn-time execution. Hashing 2.3 MB (binary + 4 DLLs
     // on Windows) is <50 ms on modern hardware — acceptable per-chunk.
     const verified = await this.modelManager.verifyInstalledBinary()
-
-    // Same TOCTOU close for the model: a size check plus a streaming SHA-256
-    // against the pin, cached per session (path, size, mtime, inode) so only
-    // the first spawn pays for hashing. A mismatch deletes the file and throws
-    // WHISPER_MODEL_NOT_FOUND ("download it again"); nothing is re-downloaded here.
-    await this.modelManager.verifyInstalledModelFile(modelPath)
 
     // Forensic-logging shape, spawn-path half of the 7-tuple the plan commits
     // to (install-time keys `url` + `expectedSha` are logged separately in
