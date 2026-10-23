@@ -340,9 +340,16 @@
   border-color: var(--color-border-subtle);
 }
 
-.settings-btn-secondary:disabled {
+.settings-btn-secondary:disabled,
+.settings-btn-secondary[aria-disabled='true'] {
   opacity: var(--opacity-disabled);
   cursor: not-allowed;
+}
+
+/* aria-disabled keeps the button focusable, so it must not look pressable */
+.settings-btn-secondary[aria-disabled='true']:hover {
+  background-color: var(--color-bg-tertiary);
+  border-color: var(--color-border-default);
 }
 
 .settings-btn-secondary:focus-visible {
@@ -370,4 +377,20 @@
   color: var(--color-error);
   margin: 0;
   line-height: var(--leading-normal);
+}
+
+/*
+ * Visually hidden status region (standard clip-rect sr-only), scoped to this
+ * overlay like `.camera-sr-only` and `.toast-sr-only`.
+ */
+.settings-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
