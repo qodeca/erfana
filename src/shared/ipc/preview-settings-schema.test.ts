@@ -65,8 +65,11 @@ describe('isApprovableHost', () => {
     // The old table listed `0x7f.1` and `2130706433` by hand. Both — and every
     // other shorthand — collapse to 127.0.0.1 in the URL parser, before any
     // predicate is asked anything.
+    // Asserted on ERFANA's own result: the origin it would store, and the host
+    // its predicate would then accept. `new URL(x).hostname` alone is Node's
+    // parser and would stay green whatever this module did.
     for (const shorthand of ['http://0x7f.1', 'http://2130706433', 'http://127.1']) {
-      expect(new URL(shorthand).hostname).toBe('127.0.0.1')
+      expect(parsePreviewOrigin(shorthand)).toBe('http://127.0.0.1')
     }
   })
 
@@ -304,8 +307,53 @@ describe('parsePreviewOrigin', () => {
     // 127.0.0.1 before any policy sees it, so one rule now covers a family the
     // old code had to spell out and could have under-spelled.
     for (const shorthand of ['http://127.1', 'http://0x7f.1', 'http://2130706433']) {
-      expect(new URL(shorthand).hostname).toBe('127.0.0.1')
+      expect(parsePreviewOrigin(shorthand)).toBe('http://127.0.0.1')
     }
+    // And it is a fixed point: the canonical form is itself valid, which is what
+    // lets `PreviewOriginSchema` accept it on the way back from disk.
+    expect(PreviewOriginSchema.safeParse('http://127.0.0.1').success).toBe(true)
+  })
+
+  it('accepts localhost with a port (approvable since #108)', () => {
+    expect(parsePreviewOrigin('http://localhost:9000')).toBe('http://localhost:9000')
+  })
+
+  describe('length limits', () => {
+    // 63 + 1 + 63 + 1 + 63 + 1 + 61 = 253: the longest legal host name.
+    const host253 = [63, 63, 63, 61].map((n) => 'a'.repeat(n)).join('.')
+
+    it('accepts a 253-character host and refuses a 254-character one', () => {
+      expect(host253).toHaveLength(253)
+      expect(parsePreviewOrigin(`https://${host253}`)).toBe(`https://${host253}`)
+      expect(isApprovableHost(host253)).toBe(true)
+
+      const host254 = `${host253}a`
+      expect(host254).toHaveLength(254)
+      expect(parsePreviewOrigin(`https://${host254}`)).toBeNull()
+      expect(isApprovableHost(host254)).toBe(false)
+    })
+
+    it('applies the 253 guard to a root-dotted host on its own', () => {
+      // `host252.` is 253 characters with the root dot and `host253.` is 254. The
+      // later `isApprovableHost` check sees the name WITHOUT the dot, so only the
+      // parser's own guard can refuse the second.
+      const host252 = host253.slice(0, -1)
+      expect(parsePreviewOrigin(`https://${host252}.`)).toBe(`https://${host252}.`)
+      expect(parsePreviewOrigin(`https://${host253}.`)).toBeNull()
+    })
+
+    it('accepts an input of exactly 300 characters and refuses 301', () => {
+      // A valid origin is at most 267 characters, so only an input the URL parser
+      // normalises DOWN can reach the ceiling: leading zeros in a port.
+      const prefix = `https://${host253}:`
+      const at300 = `${prefix}${'0'.repeat(300 - prefix.length - 1)}1`
+      expect(at300).toHaveLength(300)
+      expect(parsePreviewOrigin(at300)).toBe(`https://${host253}:1`)
+
+      const at301 = `${prefix}${'0'.repeat(301 - prefix.length - 1)}1`
+      expect(at301).toHaveLength(301)
+      expect(parsePreviewOrigin(at301)).toBeNull()
+    })
   })
 })
 

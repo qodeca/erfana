@@ -94,9 +94,10 @@ test.describe('HTML preview corpus', () => {
     // Isolation floor: while the preview process floods its own event loop, the
     // HOST renderer still answers a synchronous IPC round-trip promptly.
     const start = Date.now()
-    const platform = await windowWithTestProject.evaluate(() => window.api.utils.getPlatform())
+    // The timing is the assertion; the returned platform string is non-empty on
+    // every supported OS and would assert nothing, so it is not checked.
+    await windowWithTestProject.evaluate(() => window.api.utils.getPlatform())
     expect(Date.now() - start).toBeLessThan(2000)
-    expect(platform).toBeTruthy()
 
     // And the tab still closes promptly (bounded destroy): closing the preview
     // tab tears the view down, so no `erfana-preview://` web contents remains.

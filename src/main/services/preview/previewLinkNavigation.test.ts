@@ -281,15 +281,33 @@ describe('routeLinkActivation', () => {
     expect(recorded.resourceUrlOrHost).not.toMatch(/[\u0000-\u001f\u007f]/)
   })
 
-  it('does nothing for a fragment on the current document', async () => {
-    const deps = makeDeps()
+  it.each(['#section', '#'])(
+    'does nothing for the fragment %s on the current document',
+    async (fragment) => {
+      const deps = makeDeps()
 
-    await routeLinkActivation({ href: `${CURRENT}#section`, provenance: 'gesture' }, CONTEXT, deps)
+      // POSITIVE CONTROL, on the same deps: a link to ANOTHER document is routed
+      // to the renderer. Without it, the silence below would equally hold for a
+      // router that never opens anything.
+      await routeLinkActivation(
+        { href: `erfana-preview://${TOKEN}/other.html${fragment}`, provenance: 'gesture' },
+        CONTEXT,
+        deps
+      )
+      expect(deps.requestOpenFile).toHaveBeenCalledTimes(1)
+      deps.requestOpenFile.mockClear()
 
-    expect(deps.requestOpenFile).not.toHaveBeenCalled()
-    expect(deps.openExternal).not.toHaveBeenCalled()
-    expect(deps.recordFailure).not.toHaveBeenCalled()
-  })
+      await routeLinkActivation(
+        { href: `${CURRENT}${fragment}`, provenance: 'gesture' },
+        CONTEXT,
+        deps
+      )
+
+      expect(deps.requestOpenFile).not.toHaveBeenCalled()
+      expect(deps.openExternal).not.toHaveBeenCalled()
+      expect(deps.recordFailure).not.toHaveBeenCalled()
+    }
+  )
 
   it('blocks a download attempt', async () => {
     const deps = makeDeps()
