@@ -513,7 +513,7 @@ The overlay windows have their own, tighter channel path: `screenshot:areaSelect
 
 ## Known vulnerabilities
 
-Run `npm audit` to check. **Policy**: zero high/critical production advisories at release. Pre-release: `npm audit --omit=dev --json` and diff against the **Accepted exceptions for v0.20.1** table below.
+Run `npm audit` to check. **Policy**: zero high/critical production advisories at release. Pre-release: `npm audit --omit=dev --json` and diff against the previous release's table of accepted exceptions (the `### Accepted exceptions for v<version>` heading below). A release with no such table shipped with no accepted exceptions, so every advisory the audit reports is new.
 
 **Current state** (audited 2026-10-18, after v0.20.1): `npm audit --omit=dev` reports **0** production advisories. The four v0.20.1 highs are cleared (see below), `chokidar` 5.0.0 took `braces` (GHSA-vfj7-8cjw-p6xm) out of the production tree, and `fast-uri` moved to 3.1.8 (GHSA-hrr3-gc8f-f4qj, a lock-only update inside `ajv`'s range). The full tree (`npm audit`) reports 28 (2 critical, 11 high, 12 moderate, 3 low); all of them run only while dependencies install or the app builds, or under the test runner, and never ship.
 

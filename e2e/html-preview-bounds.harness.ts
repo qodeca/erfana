@@ -26,6 +26,7 @@ import { LogTail } from './fixtures/logTail'
 import { dismissAllToasts } from './pages/html-preview.browser'
 import { HtmlPreviewPage, PREVIEW_BUDGET_MS, type ViewBounds } from './pages/html-preview.page'
 import { TerminalPage } from './pages/terminal.page'
+import { EXEC_ACTION_CAP_MS, installBoundedExec, type BoundedExecGlobal } from './utils/bounded-exec'
 import { byTestId } from './utils/locators'
 import { TEST_IDS } from '../src/renderer/src/constants/testids'
 import { BOUNDS_DROP_MESSAGE } from '../src/shared/dropReporter'
@@ -295,16 +296,23 @@ export class BoundsHarness {
 
   /** Resize the host window once per host frame, `frames` times, then settle on `last`. */
   async resizeBurst(frames: number, last: { width: number; height: number }): Promise<void> {
+    await installBoundedExec(this.app)
     await (await this.hostWindow()).evaluate(
-      async (w, { n, end }) => {
+      async (w, { n, end, capMs }) => {
+        const exec = (globalThis as unknown as BoundedExecGlobal).__erfanaE2eExec
         for (let i = 0; i < n; i += 1) {
           w.setSize(1000 + ((i * 37) % 400), 700 + ((i * 53) % 200))
           // Paced by the host's own frames, not a timer: one size per painted frame.
-          await w.webContents.executeJavaScript('new Promise((r) => requestAnimationFrame(() => r(0)))')
+          await exec(
+            w.webContents,
+            'new Promise((r) => requestAnimationFrame(() => r(0)))',
+            capMs,
+            `resizeBurst: host frame ${i + 1} of ${n}`
+          )
         }
         w.setSize(end.width, end.height)
       },
-      { n: frames, end: last }
+      { n: frames, end: last, capMs: EXEC_ACTION_CAP_MS }
     )
   }
 }

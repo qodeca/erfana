@@ -71,15 +71,30 @@ export class MonacoPage {
     await this.page.keyboard.insertText(content)
   }
 
+  /**
+   * The whole document, read straight from the Monaco model of this editor.
+   *
+   * Through the app's e2e test hook (`window.__erfanaTest.editorValue`,
+   * installed only for an unpackaged app launched with
+   * `ERFANA_E2E_TEST_HOOKS=1`, which every fixture launch sets), scoped to the
+   * element {@link getEditor} resolves. Unlike the select-all + copy +
+   * clipboard read it replaces (lens review finding 37), it does not touch the
+   * focus, the selection or the machine-wide clipboard, so it can neither
+   * return a stale copy nor disturb what the test is doing. Not virtualised
+   * either: every line is in the model, unlike {@link visibleText}.
+   *
+   * @throws when no live editor is in the container (the hook is off, or the
+   * editor has not mounted yet) – a thrown read makes an `expect.poll` try
+   * again rather than pass on an empty string.
+   */
   async getContent(): Promise<string> {
-    await this.focus()
-    await this.keyboard.selectAll()
-    await this.keyboard.copy()
-    // Through the app's clipboard bridge, never `navigator.clipboard`: the default
-    // session refuses the page's clipboard-read permission.
-    return this.page.evaluate(
-      () => (window as unknown as { api: { clipboard: { readText(): Promise<string> } } }).api.clipboard.readText()
-    )
+    const value = await this.getEditor().evaluate((el) => window.__erfanaTest?.editorValue(el) ?? null)
+    if (value === null) {
+      throw new Error(
+        'MonacoPage.getContent: no live Monaco model in the editor (not mounted yet, or the e2e test hooks are off – ERFANA_E2E_TEST_HOOKS=1)'
+      )
+    }
+    return value
   }
 
   async selectAll(): Promise<void> {
@@ -136,18 +151,13 @@ export class MonacoPage {
   /**
    * The rendered editor text, read straight from Monaco's own line elements.
    *
-   * Prefer this over {@link getContent} whenever the assertion is about
-   * content that the APP changed (a reload from disk, a tab switch, a
-   * programmatic edit). `getContent` routes through select-all + copy, and
-   * this app deliberately remaps copy to the MAIN-process clipboard
-   * (`monacoClipboardCommands`, so the sandbox stays on) — which means the
-   * renderer's `navigator.clipboard.readText()` can hand back the PREVIOUS
-   * copy. A stale read makes an assertion pass against the old buffer, which
-   * is worse than failing.
+   * What the user SEES, as opposed to {@link getContent}, which reads the
+   * model. Use it when the assertion is about the rendered lines.
    *
    * The trade-off is that Monaco virtualizes: only lines near the viewport are
    * in the DOM. That is fine for asserting a phrase in a short fixture, and
-   * wrong for asserting a whole long document.
+   * wrong for asserting a whole long document – read the model with
+   * {@link getContent} for that.
    *
    * @returns Visible line text, newline-joined
    */
