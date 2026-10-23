@@ -493,11 +493,21 @@ test.describe('Document import – LibreOffice runs headless', () => {
     const isControl = (r: { withoutHeadless: string[] }): boolean =>
       controlMarker !== undefined && r.withoutHeadless.some(c => c.includes(controlMarker as string))
     if (NEGATIVE_CONTROL) {
-      // The check must catch the control: its own non-headless command line is flagged
+      // The check must catch the control: its own non-headless command line is flagged.
+      // Counted by profile, not by process: on Windows the control is two processes
+      // (the soffice.exe launcher and its soffice.bin child), both with the same profile.
+      const flaggedProfiles = new Set(
+        withoutHeadless
+          .filter(isControl)
+          .flatMap(r => r.withoutHeadless)
+          .map(c => c.match(/-env:UserInstallation=([^\s"]+)/)?.[1])
+          .filter((p): p is string => p !== undefined)
+      )
       expect(
-        withoutHeadless.filter(isControl),
-        'the negative-control LibreOffice should be flagged as running without --headless'
-      ).toHaveLength(1)
+        [...flaggedProfiles],
+        'the negative-control LibreOffice (one profile, one or more processes) should be ' +
+          'flagged as running without --headless'
+      ).toEqual([controlMarker])
     }
     // Nothing else may be flagged – in a normal run, nothing at all
     expect(
