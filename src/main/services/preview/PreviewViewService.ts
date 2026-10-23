@@ -42,7 +42,11 @@ import {
 } from './PreviewLiveView'
 import { PreviewViewRegistry } from './PreviewViewRegistry'
 import { createNoViewDropLog } from './previewBoundsDropLog'
-import { createPageScopeHolder, createPreviewPageScope } from './previewPageScope'
+import {
+  createPageScopeHolder,
+  createPreviewPageScope,
+  type PreviewPageScopeHolder
+} from './previewPageScope'
 import { createPreviewPanelState } from './previewPanelState'
 import { createPreviewViewEviction } from './previewViewEviction'
 import { createPreviewViewFocus } from './previewViewFocus'
@@ -188,8 +192,7 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
       // installed entry for an open still parked here and moves no generation,
       // so without this check the open resumed and built a view against a
       // destroyed window (#83). Discard rather than install a stale view.
-      pageScopes.dispose()
-      await this.discardSession(session)
+      await this.discardBuilt(pageScopes, session)
       return { ok: false, errorCode: ErrorCode.PREVIEW_OPEN_SUPERSEDED }
     }
 
@@ -197,34 +200,25 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
       // A resume whose own page, and the tab's own, both failed the navigation
       // gate (QG-7 item 11): there is no page this panel may show, so no view
       // is installed and the tab shows its failed state.
-      pageScopes.dispose()
-      await this.discardSession(session)
+      await this.discardBuilt(pageScopes, session)
       return { ok: false, errorCode: start.errorCode }
     }
 
-    // The constructor does REAL work that can throw — it builds the watch
-    // coordinator, the find controller and a chokidar entry watcher, and calls
-    // `window.contentView.addChildView`. If the host window closed during the
-    // `create()` await above, that last call throws against a destroyed
-    // BrowserWindow. Unguarded, the session built one line earlier would never
-    // be discarded: its token stays resolvable and keeps serving file reads for
-    // the life of the process (lens review F9).
-    let live: PreviewLiveView
-    try {
-      live = new PreviewLiveView({
-        panelId,
-        projectPath,
-        entryFilePath: start.filePath,
-        window,
-        initialBounds: req.bounds,
-        session,
-        pageScopes,
-        navigation: start.navigation,
-        deps: this.liveViewDeps
-      })
-    } catch {
-      pageScopes.dispose()
-      await this.discardSession(session)
+    // Synchronous on purpose: nothing may interleave between the constructor
+    // and `registry.install` below, so this must not become an await.
+    const live = this.tryBuildLive({
+      panelId,
+      projectPath,
+      entryFilePath: start.filePath,
+      window,
+      initialBounds: req.bounds,
+      session,
+      pageScopes,
+      navigation: start.navigation,
+      deps: this.liveViewDeps
+    })
+    if (live === null) {
+      await this.discardBuilt(pageScopes, session)
       return { ok: false, errorCode: ErrorCode.PREVIEW_CSP_INVALID }
     }
 
@@ -269,6 +263,32 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
     // Never rejects: housekeeping for OTHER panels must not change this answer.
     await this.eviction.enforceBudget(panelId)
     return { ok: true }
+  }
+
+  /**
+   * Construct the live view for a session that is already built, or answer
+   * `null` so the caller discards that session.
+   *
+   * The constructor does REAL work that can throw — it builds the watch
+   * coordinator, the find controller and a chokidar entry watcher, and calls
+   * `window.contentView.addChildView`. If the host window closed during the
+   * `create()` await in `open`, that last call throws against a destroyed
+   * BrowserWindow. Unguarded, the session built one line earlier would never
+   * be discarded: its token stays resolvable and keeps serving file reads for
+   * the life of the process (lens review F9).
+   */
+  private tryBuildLive(options: ConstructorParameters<typeof PreviewLiveView>[0]): PreviewLiveView | null {
+    try {
+      return new PreviewLiveView(options)
+    } catch {
+      return null
+    }
+  }
+
+  /** Dispose the page scopes, then discard a session that never became a live view. */
+  private async discardBuilt(pageScopes: PreviewPageScopeHolder, session: PreviewSession): Promise<void> {
+    pageScopes.dispose()
+    await this.discardSession(session)
   }
 
   /** Tear down a session that was built but never installed as a live view. */
