@@ -24,6 +24,17 @@
  * `implForWrapper` and `_dispatch`; the first test checks the helper still
  * produces a trusted event, so a jsdom upgrade that changes them fails here
  * instead of making every "nothing is sent" test pass for the wrong reason.
+ *
+ * JSDOM ORDERING. `_dispatch` runs every listener synchronously and leaves all
+ * microtasks until the whole dispatch is over. Chromium does not, for a click
+ * the user made: it runs microtasks after EACH listener returns. So in jsdom a
+ * report deferred to a microtask would still look as if it waited for the
+ * page's later listeners, and the two tests that rely on that ordering ("a
+ * later page listener cancels", "the page removes the attribute afterwards")
+ * pass with either kind of deferral. The test "waits for a task, not a
+ * microtask" pins the ordering that matters in Chromium, and
+ * e2e/html-preview-links.e2e.ts ("a link the page cancels") checks it in a
+ * real browser.
  */
 import { createRequire } from 'node:module'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
@@ -72,7 +83,10 @@ function cspEvent(blockedURI: string, effectiveDirective?: string): Event {
   return event
 }
 
-/** Let the preload's deferred link report (a microtask) run. */
+/**
+ * Let the preload's deferred link report run. It is a `setTimeout(0)` queued
+ * during the dispatch, so it fires before the one queued here.
+ */
 async function settle(): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, 0))
 }
@@ -156,6 +170,23 @@ describe('previewPage preload – link activation', () => {
       button: 0,
       modifiers: NO_MODIFIERS
     })
+  })
+
+  it('waits for a task, not a microtask, before it reports', async () => {
+    // Chromium runs microtasks after each listener of a user click, so a report
+    // sent at a microtask checkpoint would go out before the page's later
+    // listeners could cancel the click (see JSDOM ORDERING above). Nothing may
+    // be sent until a task has passed.
+    const link = mount('<a href="later.html">Later</a>', 'a')
+
+    userClick(link)
+    // Queued after anything the dispatch queued, so every such microtask has run.
+    await new Promise<void>((resolve) => queueMicrotask(resolve))
+    expect(send).not.toHaveBeenCalled()
+
+    await settle()
+    expect(send).toHaveBeenCalledTimes(1)
+    expect(send).toHaveBeenCalledWith(LINK_CHANNEL, expect.objectContaining({ rawHref: 'later.html' }))
   })
 
   it('reports a middle click (auxclick) with its target, download flag and modifiers', async () => {
@@ -260,7 +291,9 @@ describe('previewPage preload – link activation', () => {
 
   it('keeps the href read at click time when the page removes the attribute afterwards', async () => {
     // The resolved href is captured during the click; the raw attribute is read
-    // in the deferred report, after every page listener has run.
+    // in the deferred report, after every page listener has run. In jsdom this
+    // ordering holds for a microtask too (JSDOM ORDERING above); the
+    // task-not-microtask test is what keeps it true in Chromium.
     const link = mount('<a href="gone.html">Gone</a>', 'a')
     const strip = (): void => link.removeAttribute('href')
     window.addEventListener('click', strip)
@@ -300,7 +333,9 @@ describe('previewPage preload – link activation', () => {
 
   it('reports nothing when a later page listener cancels the click', async () => {
     // A window listener runs after the preload's document listener, so only the
-    // deferred re-check can see this cancellation.
+    // deferred re-check can see this cancellation. In jsdom a microtask would
+    // see it too (JSDOM ORDERING above); in Chromium only a task does, which
+    // the task-not-microtask test and the e2e "a link the page cancels" pin.
     const link = mount('<a href="router.html">Router</a>', 'a')
     const cancel = (event: Event): void => event.preventDefault()
     window.addEventListener('click', cancel)

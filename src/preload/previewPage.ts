@@ -38,8 +38,8 @@
  * clicks an app router was about to handle. And it does not need to: the
  * navigation the browser would attempt is already refused by the sandbox and by
  * main's `will-navigate` deny. So the click is observed, the decision is
- * deferred to a microtask, and if the page cancelled it in the meantime nothing
- * is sent.
+ * deferred to a task (`setTimeout`), and if the page cancelled it in the
+ * meantime nothing is sent.
  *
  * BUILD CONSTRAINT: preload entries must be self-contained. Importing a shared
  * module BY VALUE makes Rollup hoist a chunk that a sandboxed preload cannot
@@ -117,9 +117,13 @@ function isFragmentOfCurrentDocument(href: string): boolean {
 /**
  * Report an activated link to main, unless the page handled it itself.
  *
- * The report is deferred to a microtask so every other listener has run and
+ * The report is deferred to a TASK so every other listener has run and
  * `defaultPrevented` reflects the page's decision, not just this listener's
- * position in the queue.
+ * position in the queue. A microtask is not enough: for a click the user made,
+ * the browser runs microtasks after EACH listener returns, so one queued here
+ * ran before the listeners that come later in the event path (the page's
+ * `window` listeners, say) and missed a cancellation made there. A task runs
+ * after the whole dispatch.
  */
 function onLinkActivation(event: MouseEvent): void {
   // Only a genuine user gesture. `HTMLElement.click()` and `dispatchEvent()`
@@ -140,7 +144,7 @@ function onLinkActivation(event: MouseEvent): void {
   const target = link.getAttribute('target') ?? documentBaseTarget()
   const download = link.hasAttribute('download')
 
-  queueMicrotask(() => {
+  setTimeout(() => {
     // The page's own handler may have cancelled the click after this listener
     // ran. Respect that.
     if (event.defaultPrevented) return
@@ -162,7 +166,7 @@ function onLinkActivation(event: MouseEvent): void {
         alt: event.altKey
       }
     })
-  })
+  }, 0)
 }
 
 /**
@@ -192,7 +196,7 @@ function onCspViolation(event: SecurityPolicyViolationEvent): void {
 }
 
 // Bubble phase on `document`: ancestors of the link get their turn first, and
-// the microtask above covers listeners that run after this one.
+// the deferred report above covers listeners that run after this one.
 document.addEventListener('click', onLinkActivation)
 document.addEventListener('auxclick', onLinkActivation)
 

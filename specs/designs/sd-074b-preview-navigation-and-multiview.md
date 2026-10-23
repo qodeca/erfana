@@ -189,6 +189,8 @@ Behaviour:
 
 Step 6's re-check exists because revision 1 had the ordering backwards: a preload listener registers before any page script, so among document-level listeners Erfana's fires **first**, not last. Deferring restores "the page gets to decide first".
 
+*Revised after the build.* The preload never calls `preventDefault()` (the page's own handlers must win, and the navigation is refused anyway), and the re-check is deferred to a **task** (`setTimeout`), not a microtask. For a click the user made, the browser runs microtasks after each listener returns, so a microtask re-check ran before the page's later listeners – a `window`-level one, for example – and a link the page cancelled there was still followed.
+
 **Documented blind spots**: a page that calls `stopPropagation()` on its own handler, and links inside **closed** shadow roots, both stay inert — the same behaviour as today.
 
 ### 5.2 Wiring the preload

@@ -23,11 +23,12 @@
  *
  * Condition-based waits only — never a sleep.
  *
- * Since #124 (part 3) a tab has a link mode; off by default. The last block
- * clicks with REAL input (`clickLink`) and pins the new-tab mode (P3-AC5):
+ * Since #124 (part 3) a tab has a link mode; off by default. The link-table
+ * block clicks with REAL input (`clickLink`) and pins the new-tab mode (P3-AC5):
  * every row but `_self` opens a new tab, and a click with no gesture proof
  * never moves a tab, whatever the mode. The same-tab mode is
- * `html-preview-same-tab.e2e.ts`.
+ * `html-preview-same-tab.e2e.ts`. The final block, also with real input,
+ * checks that a link the page cancels in its own listener is not followed.
  *
  * @see docs/html-preview/README.md#links
  * @see specs/designs/sd-074b-preview-navigation-and-multiview.md
@@ -46,6 +47,7 @@ import { HtmlPreviewPage, PREVIEW_BUDGET_MS } from './pages/html-preview.page'
 import {
   clickLink,
   linkModeToggle,
+  livePages,
   previewTabs,
   turnSameTabOn,
   waitForLivePages,
@@ -80,6 +82,43 @@ async function clickThenSettle(preview: HtmlPreviewPage, elementId: string): Pro
 }
 
 /**
+ * A page that cancels one of its own links from a `window` click listener.
+ *
+ * The page's listener is registered after the preload's (which listens on
+ * `document`), and `window` is the last stop of a bubbling click, so it runs
+ * after the preload's listener has returned. `data-cancelled` counts the
+ * cancellations, so a test can tell the listener actually ran. `#kept` is left
+ * alone and serves as the barrier: its target opening means the cancelled
+ * click has had its full chance to be routed.
+ */
+const CANCELLING_PAGE = `<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>-CANCEL-PAGE-</title></head>
+<body>
+  <p><a id="cancelled" href="cancelled-target.html">a link the page cancels</a></p>
+  <p><a id="kept" href="target.html">a link the page leaves alone</a></p>
+  <script>
+    window.addEventListener('click', (event) => {
+      const link = event.target instanceof Element ? event.target.closest('a') : null
+      if (link && link.id === 'cancelled') {
+        event.preventDefault()
+        document.body.dataset.cancelled = String(Number(document.body.dataset.cancelled || 0) + 1)
+      }
+    })
+  </script>
+</body>
+</html>
+`
+
+/** The cancelled link's target: a real page, so following the link would open a tab. */
+const CANCELLED_TARGET_PAGE = `<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>-CANCELLED-TARGET-</title></head>
+<body><p>Reached only if a cancelled link was followed.</p></body>
+</html>
+`
+
+/**
  * The page behind the external-link case. Written at runtime with a host that
  * is unique to this run, because the assertion reads `main.log`, which every
  * Erfana process on the machine appends to — a fixed host could match a line
@@ -102,6 +141,8 @@ test.use({
     'links/index.html': corpus('links/index.html'),
     'links/target.html': corpus('links/target.html'),
     'links/base-self.html': corpus('links/base-self.html'),
+    'links/cancelling.html': CANCELLING_PAGE,
+    'links/cancelled-target.html': CANCELLED_TARGET_PAGE,
     'self-contained/index.html': corpus('self-contained/index.html'),
     // Placeholder; the test rewrites it with a run-unique host before opening it.
     'external/index.html': externalLinkPage('placeholder.invalid'),
@@ -377,6 +418,46 @@ test.describe('HTML preview — the link table in new-tab mode (#124, P3-AC5)', 
     expect(await preview.clickInPreview('-LINKS-1', 'plain')).toBe(true)
 
     await waitForLivePages(appWithTestProject, [INDEX, TARGET])
+    await expect(previewTabs(windowWithTestProject)).toHaveCount(2)
+  })
+})
+
+test.describe('HTML preview — a link the page cancels', () => {
+  const PAGE = 'links/cancelling.html'
+  const KEPT_TARGET = 'links/target.html'
+
+  test('is not followed when the page cancels it after the preload has seen the click', async ({
+    windowWithTestProject,
+    appWithTestProject
+  }) => {
+    // A REAL click, so the preload sees a trusted event and would report it.
+    // The page cancels this link from a `window` listener, which runs after the
+    // preload's `document` listener. In Chromium a user click runs microtasks
+    // after every listener, so a report deferred only to a microtask went out
+    // before this cancellation (jsdom's synchronous dispatch cannot show that;
+    // see src/preload/previewPage.test.ts).
+    const preview = new HtmlPreviewPage(windowWithTestProject, appWithTestProject)
+    await preview.open(PAGE)
+    await preview.waitForTitled('-CANCEL-PAGE-')
+
+    expect(await clickLink(appWithTestProject, 'cancelled', HtmlPreviewPage.target(PAGE))).toBe(true)
+
+    // The page's own listener ran and cancelled the click.
+    await expect
+      .poll(() => preview.eval('document.body.dataset.cancelled || ""', HtmlPreviewPage.target(PAGE)), {
+        timeout: PREVIEW_BUDGET_MS,
+        message: 'the page never saw (and cancelled) the click'
+      })
+      .toBe('1')
+
+    // Barrier: a real click on the link the page leaves alone goes through the
+    // same preload → main → policy path, so once its target is live the
+    // cancelled click has had its full chance to open something.
+    expect(await clickLink(appWithTestProject, 'kept', HtmlPreviewPage.target(PAGE))).toBe(true)
+    await waitForLivePages(appWithTestProject, [PAGE, KEPT_TARGET])
+
+    // Settled: the cancelled link's target never opened.
+    expect(await livePages(appWithTestProject)).toEqual([PAGE, KEPT_TARGET].sort())
     await expect(previewTabs(windowWithTestProject)).toHaveCount(2)
   })
 })
