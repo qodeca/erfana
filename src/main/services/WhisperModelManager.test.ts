@@ -285,10 +285,6 @@ function arrangeFreshInstall(opts: {
   mockAccess.mockRejectedValue(enoent)
 
   mockDownloadToFile.mockResolvedValue(undefined)
-  mockVerifyManifest.mockResolvedValue({
-    signingKeyRole: 'primary',
-    signingKeyId: 'test-key-id'
-  })
 
   const manifestBody = {
     schemaVersion: 1,
@@ -312,6 +308,12 @@ function arrangeFreshInstall(opts: {
     },
     signingKey: 'primary' as const
   }
+
+  mockVerifyManifest.mockResolvedValue({
+    signingKeyRole: 'primary',
+    signingKeyId: 'test-key-id',
+    content: Buffer.from(JSON.stringify(manifestBody))
+  })
 
   mockReadFile.mockImplementation(async (p: string) => {
     if (typeof p === 'string' && p.includes('manifest.json') && !p.includes('.minisig')) {
@@ -657,6 +659,54 @@ describe('WhisperModelManager', () => {
       expect(mockChmod).toHaveBeenCalledWith(WHISPER_BIN_DARWIN, 0o755)
       // Returns the path
       expect(result).toBe(WHISPER_BIN_DARWIN)
+    })
+
+    it('parses the verified bytes, not the file on disk', async () => {
+      arrangeFreshInstall({ manifestRevisionIndex: 1, lastSeenRevisionOnDisk: null, platform: 'darwin-universal' })
+      // The file on disk now claims a far higher revision than what was verified.
+      const onDisk = mockReadFile.getMockImplementation()!
+      mockReadFile.mockImplementation(async (p: string, ...rest: unknown[]) => {
+        if (typeof p === 'string' && p.includes('manifest.json') && !p.includes('.minisig')) {
+          const body = JSON.parse(await onDisk(p, ...rest)) as { revisionIndex: number }
+          return JSON.stringify({ ...body, revisionIndex: 999 })
+        }
+        return onDisk(p, ...rest)
+      })
+      const { createWhisperModelManager } = await import('./WhisperModelManager')
+      await createWhisperModelManager().ensureBinary()
+      expect(mockWriteFile).toHaveBeenCalledWith(
+        expect.stringContaining('.last-seen-revision'),
+        '1',
+        'utf8'
+      )
+    })
+
+    it.each([
+      ['a non-integer revisionIndex', (m: Record<string, unknown>) => ({ ...m, revisionIndex: 1.5 })],
+      ['a string revisionIndex', (m: Record<string, unknown>) => ({ ...m, revisionIndex: '2' })],
+      ['a missing artifacts block', (m: Record<string, unknown>) => ({ ...m, artifacts: undefined })],
+      [
+        'a malformed artifact sha256',
+        (m: Record<string, unknown>) => ({
+          ...m,
+          artifacts: {
+            ...(m.artifacts as object),
+            macosUniversal: { filename: 'x', sha256: 'nothex', size: 1 }
+          }
+        })
+      ]
+    ])('rejects %s in the verified manifest', async (_label, mutate) => {
+      arrangeFreshInstall({ manifestRevisionIndex: 1, lastSeenRevisionOnDisk: null, platform: 'darwin-universal' })
+      const result = (await mockVerifyManifest()) as { content: Buffer }
+      const body = JSON.parse(result.content.toString('utf8')) as Record<string, unknown>
+      mockVerifyManifest.mockResolvedValue({
+        ...result,
+        content: Buffer.from(JSON.stringify(mutate(body)))
+      })
+      const { createWhisperModelManager } = await import('./WhisperModelManager')
+      await expect(createWhisperModelManager().ensureBinary()).rejects.toMatchObject({
+        code: 'WHISPER_MANIFEST_INVALID'
+      })
     })
 
     it('runs the 9-step install flow with zip extraction on win32-x64', async () => {
