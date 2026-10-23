@@ -18,6 +18,7 @@ import { ImportToolsSection } from './sections/ImportToolsSection'
 import './SettingsOverlay.css'
 import { loggingGateway } from '../../services/loggingGateway'
 import { transcriptionGateway, whisperGateway } from '../../services/transcriptionGateway'
+import { utilsGateway } from '../../services/utilsGateway'
 
 // Small delay to ensure overlay is fully rendered before focusing
 const FOCUS_DELAY_MS = 10
@@ -92,8 +93,8 @@ export function SettingsOverlay() {
   //   - Linux, others — no binary shipped
   //
   // Mirrors `classifyPlatform()` in src/main/services/whisper-assets.ts.
-  const whisperPlatform = window.api.utils.getPlatform()
-  const whisperArch = window.api.utils.getArch()
+  const whisperPlatform = utilsGateway.getPlatform()
+  const whisperArch = utilsGateway.getArch()
   const isLocalWhisperSupported =
     whisperPlatform === 'darwin' ||
     (whisperPlatform === 'win32' && whisperArch === 'x64')

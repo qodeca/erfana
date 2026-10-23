@@ -45,6 +45,15 @@ exports[`preload surface > window.api.camera exposes the expected members 1`] = 
 ]
 `;
 
+exports[`preload surface > window.api.claudeStatus exposes the expected members 1`] = `
+[
+  "nudge",
+  "onChanged",
+  "register",
+  "unregister",
+]
+`;
+
 exports[`preload surface > window.api.clipboard exposes the expected members 1`] = `
 [
   "readText",
@@ -263,6 +272,16 @@ exports[`preload surface > window.api.quit exposes the expected members 1`] = `
 ]
 `;
 
+exports[`preload surface > window.api.screenshot exposes the expected members 1`] = `
+[
+  "capture",
+  "enumerateWindows",
+  "getCapabilities",
+  "getDisplays",
+  "getScreenPermission",
+]
+`;
+
 exports[`preload surface > window.api.settings exposes the expected members 1`] = `
 [
   "addRecentProject",
@@ -297,6 +316,14 @@ exports[`preload surface > window.api.transcription exposes the expected members
   "onProgress",
   "setApiKey",
   "validate",
+]
+`;
+
+exports[`preload surface > window.api.utils exposes the expected members 1`] = `
+[
+  "getArch",
+  "getPathForFile",
+  "getPlatform",
 ]
 `;
 

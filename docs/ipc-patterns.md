@@ -33,7 +33,7 @@ const content = await fileGateway.readFile({ filePath: '/path/to/file.md' })
 
 ## Renderer gateways
 
-Renderer code does not read a bridge off `window.api` once the bridge has a gateway. Such a bridge has three parts, and the renderer sees only the last:
+Renderer code never reads `window.api`: every bridge has a gateway, and only the gateways read it. A bridge has three parts, and the renderer sees only the last:
 
 1. a **contract** in `src/shared/ipc/*-schema.ts` – an interface such as `FileBridge`, one method per member, written once;
 2. a **preload module** `src/preload/<name>Bridge.ts` typed as that contract, which `src/preload/index.ts` only references; event subscriptions go through `src/preload/ipcSubscribe.ts`, whose unsubscribe returns nothing (`removeListener` returns `ipcRenderer` itself, which must not reach the page);
@@ -65,16 +65,21 @@ Renderer code does not read a bridge off `window.api` once the bridge has a gate
 | `browser` | `BrowserBridge` (`browser-schema.ts`) | `browserBridge.ts` | `browserGateway` |
 | `markdownImage` | `MarkdownImageBridge` (`markdown-image-schema.ts`) | `markdownImageBridge.ts` | `markdownImageGateway` |
 | `preview` | `PreviewBridge` (`preview-bridge-types.ts`) | `previewBridge.ts` | `previewGateway` – `setVisibility` only from `services/preview/OverlayGuardService` (lint-enforced) |
+| `claudeStatus` | `ClaudeStatusBridge` (`claude-status-schema.ts`) | `claudeStatusBridge.ts` | `claudeStatusGateway` |
+| `screenshot` | `ScreenshotBridge` (`screenshot-schema.ts`) | `screenshotBridge.ts` (the overlay-only verbs are in `screenshotOverlay.ts`) | `screenshotGateway` |
+| `utils` | `Api['utils']` – answered by the preload itself (`webUtils.getPathForFile`, `process.platform`, `process.arch`), no IPC | inline in `index.ts` | `utilsGateway` – for the platform, prefer `isMacOS()` / `isWindows()` from `utils/platform` |
 | `projectLock` | `ProjectLockBridge` (`project-lock-schema.ts`) | `projectLockBridge.ts` | none – no renderer caller |
+
+**Not finished yet: the TerminalPanel files.** `components/Panels/TerminalPanel.tsx` and its `useScreenshotCapture` / `useTerminalDragDrop` hooks still read `window.api.claudeStatus`, `window.api.utils` and `window.api.screenshot` directly, because another change owns those files. Until they move to `claudeStatusGateway`, `utilsGateway` and `screenshotGateway`, `Window['api']` keeps those three bridges and ESLint allows exactly those reads in exactly those three files (`RENDERER_TERMINAL_PANEL_FILES`). Remove both once they have moved.
 
 What holds it in place:
 
-- **Types.** `Window['api']` (`src/preload/index.d.ts`) is `Api` without the bridges that have a gateway, so a direct read does not type-check. `src/preload/apiContract.types.ts` proves each `Api` member is exactly its contract and that no `any` is in `Api`; `src/renderer/src/services/windowApi.types.ts` proves each gateway is exactly its contract. Both are compiled by `npm run typecheck`.
-- **Lint.** `no-restricted-syntax` in `eslint.config.mjs` (`GATEWAY_BRIDGES`) rejects a read of those bridges and the ways round the type: destructuring or aliasing `window.api`, computed access, a cast, `globalThis` / `self`. The gateways (`RENDERER_GATEWAY_FILES`) are exempt, and tests and their helper folders may install mocks on `window.api`. The rule's own cases are in `scripts/eslint-layer-rules.test.mjs`.
+- **Types.** `Window['api']` (`src/preload/index.d.ts`) lists no bridge but the three above, so a direct read does not type-check. `src/preload/apiContract.types.ts` proves each `Api` member is exactly its contract and that no `any` is in `Api`; `src/renderer/src/services/windowApi.types.ts` proves each gateway is exactly its contract. Both are compiled by `npm run typecheck`.
+- **Lint.** `no-restricted-syntax` in `eslint.config.mjs` rejects every `window.api` expression (`window?.api`, `globalThis.api` and `self.api` too), so reading, aliasing and destructuring it all fail, plus the ways round the type: computed access on `window` / `globalThis` / `self` and a cast. An alias of `window` itself (`const w = window; w.api`) is not caught – review for it. The gateways and `bridgePresence.ts` (`RENDERER_GATEWAY_FILES`) are exempt, and tests and their helper folders may install mocks on `window.api`. The rule's own cases are in `scripts/eslint-layer-rules.test.mjs`.
 - **Tests.** The wire of each bridge (channel, arguments, events and their unsubscribe) is pinned in `src/preload/__tests__/api-contract.test.ts` and `*-bridges.test.ts`, written out as strings because the channel names must not change; `src/renderer/src/services/gateways.test.ts` checks that every gateway forwards every method.
 - **A bridge that may be missing.** A caller that must also work where the bridge is not there asks `hasBridge(domain)` or `hasBridgeMethod(domain, method)` from `services/bridgePresence.ts` first and then calls the gateway: code that unit tests run without installing one, the crash screen (`RootErrorFallback` offers only the actions whose bridge method is there), and the logger, which also runs in the screenshot-overlay window where there is no `window.api`. That module answers yes or no only; it never hands out the bridge.
 
-Adding a bridge or a method: change the contract first, then the preload module and the gateway (the type checks fail until all three agree), add the wire to the bridge tests, and for a new bridge add its name to the `GatewayBridges` lists in `index.d.ts` and `windowApi.types.ts` and to `GATEWAY_BRIDGES` / `RENDERER_GATEWAY_FILES` in `eslint.config.mjs`.
+Adding a bridge or a method: change the contract first, then the preload module and the gateway (the type checks fail until all three agree), and add the wire to the bridge tests. For a new bridge, also assert its contract in `apiContract.types.ts` and `windowApi.types.ts`, add the gateway to `gateways.test.ts`, and list the gateway file in `RENDERER_GATEWAY_FILES` in `eslint.config.mjs`.
 
 ## Invoke round-trip for terminal writes (v0.3.3)
 

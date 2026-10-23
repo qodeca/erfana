@@ -73,7 +73,10 @@ describe('preload surface', () => {
     'imageExport',
     'browser',
     'markdownImage',
-    'preview'
+    'preview',
+    'claudeStatus',
+    'screenshot',
+    'utils'
   ])(
     'window.api.%s exposes the expected members',
     (domain) => {

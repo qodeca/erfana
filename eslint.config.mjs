@@ -41,72 +41,46 @@ const MAIN_LAYER_PATTERNS = [
 ]
 const GATEWAY_MESSAGE =
   'Reach the preload bridges through their gateway in services/ (fileGateway, gitGateway, …), not window.api.'
-// The bridges that have a gateway. The type system already hides them from
-// `window.api` (see preload/index.d.ts); these selectors are the backstop for
-// the ways round it.
-const GATEWAY_BRIDGES = [
-  'file',
-  'terminal',
-  'fileWatch',
-  'directoryWatch',
-  'git',
-  'gitWatcher',
-  'gitPolling',
-  'settings',
-  'globalSettings',
-  'logging',
-  'quit',
-  'system',
-  'clipboard',
-  'testHooks',
-  'import',
-  'transcription',
-  'whisper',
-  'camera',
-  'pdf',
-  'docx',
-  'imageExport',
-  'browser',
-  'markdownImage',
-  'preview'
-]
-const RENDERER_GATEWAY_SELECTORS = [
-  {
-    selector: `MemberExpression[object.object.name='window'][object.property.name='api'][property.name=/^(${GATEWAY_BRIDGES.join('|')})$/]`,
-    message: GATEWAY_MESSAGE
-  },
-  {
-    // window.api['file'], window.api[key]
-    selector: "MemberExpression[computed=true][object.object.name='window'][object.property.name='api']",
-    message: GATEWAY_MESSAGE
-  },
+// Every way to reach `window.api` outside a gateway. The renderer's `window.api`
+// type already lists only the bridges the TerminalPanel files still read (see
+// preload/index.d.ts); these selectors are the backstop for the ways round it.
+const WINDOW_API =
+  "MemberExpression[computed=false][object.name=/^(window|globalThis|self)$/][property.name='api']"
+const RENDERER_API_BYPASS_SELECTORS = [
   {
     // window['api'], globalThis[k], self[k]
     selector: "MemberExpression[computed=true][object.name=/^(window|globalThis|self)$/]",
     message: GATEWAY_MESSAGE
   },
   {
-    // globalThis.api, self.api
-    selector: "MemberExpression[object.name=/^(globalThis|self)$/][property.name='api']",
-    message: GATEWAY_MESSAGE
-  },
-  {
     // (window as X).api
     selector: "MemberExpression[property.name='api'][object.type=/^TS(As|NonNull|Satisfies)Expression$/]",
     message: GATEWAY_MESSAGE
-  },
-  {
-    // const a = window.api ; a = window.api
-    selector:
-      "VariableDeclarator[id.type!='ObjectPattern'][init.type='MemberExpression'][init.object.name='window'][init.property.name='api'], VariableDeclarator[id.type!='ObjectPattern'][init.type='ChainExpression'][init.expression.object.name='window'][init.expression.property.name='api'], AssignmentExpression[right.type='MemberExpression'][right.object.name='window'][right.property.name='api'], AssignmentExpression[right.type='ChainExpression'][right.expression.object.name='window'][right.expression.property.name='api']",
-    message: GATEWAY_MESSAGE
-  },
-  {
-    // const { file } = window.api
-    selector:
-      "VariableDeclarator[id.type='ObjectPattern'][init.object.name='window'][init.property.name='api'], VariableDeclarator[id.type='ObjectPattern'][init.type='ChainExpression'][init.expression.object.name='window'][init.expression.property.name='api']",
-    message: GATEWAY_MESSAGE
   }
+]
+const RENDERER_GATEWAY_SELECTORS = [
+  // window.api, window?.api, globalThis.api, self.api: read, aliased or destructured
+  { selector: WINDOW_API, message: GATEWAY_MESSAGE },
+  ...RENDERER_API_BYPASS_SELECTORS
+]
+
+// TEMPORARY. These files still read three bridges off `window.api` and are being
+// changed by another PR, so they keep exactly those reads until they move to
+// claudeStatusGateway, utilsGateway and screenshotGateway. Any other read, an
+// alias of `window.api` or a computed key is still an error here. Delete this
+// list, its selectors and its block below once they have moved.
+const RENDERER_TERMINAL_PANEL_FILES = [
+  'src/renderer/src/components/Panels/TerminalPanel.tsx',
+  'src/renderer/src/components/Panels/TerminalPanel/hooks/useScreenshotCapture.ts',
+  'src/renderer/src/components/Panels/TerminalPanel/hooks/useTerminalDragDrop.ts'
+]
+const TERMINAL_PANEL_BRIDGES = ['claudeStatus', 'utils', 'screenshot']
+const RENDERER_TERMINAL_PANEL_SELECTORS = [
+  {
+    selector: `${WINDOW_API}:not(MemberExpression[property.name=/^(${TERMINAL_PANEL_BRIDGES.join('|')})$/] > .object)`,
+    message: GATEWAY_MESSAGE
+  },
+  ...RENDERER_API_BYPASS_SELECTORS
 ]
 
 // Where the renderer may stand in for the bridges: tests install mocks on `window.api`
@@ -147,6 +121,9 @@ const RENDERER_GATEWAY_FILES = [
   'src/renderer/src/services/browserGateway.ts',
   'src/renderer/src/services/markdownImageGateway.ts',
   'src/renderer/src/services/previewGateway.ts',
+  'src/renderer/src/services/claudeStatusGateway.ts',
+  'src/renderer/src/services/screenshotGateway.ts',
+  'src/renderer/src/services/utilsGateway.ts',
   'src/renderer/src/services/bridgePresence.ts'
 ]
 
@@ -721,16 +698,31 @@ export default [
   // matches: the shared families above, plus the gateway selectors where they
   // apply. A block that listed only one set would silently disable the other.
   //
-  // 5. Reading a bridge that has a gateway off `window.api`. The renderer's
-  //    `window.api` type already omits them; the gateway selectors catch the
-  //    ways round the type. Tests may install mocks; the gateways read them.
+  // 5. Reading `window.api` at all. Every bridge has a gateway in `services/`,
+  //    and only the gateways (and the yes/no presence check) read `window.api`.
+  //    The renderer's `window.api` type already leaves the bridges out; the
+  //    gateway selectors catch the ways round the type. Tests may install
+  //    mocks; the gateways read them.
   //
   //  - ordinary renderer code: shared families + gateway selectors
   {
     files: ['src/renderer/**/*.{ts,tsx}'],
-    ignores: [...RENDERER_PATTERN_OWNERS, ...RENDERER_TEST_FILES, ...RENDERER_GATEWAY_FILES],
+    ignores: [
+      ...RENDERER_PATTERN_OWNERS,
+      ...RENDERER_TEST_FILES,
+      ...RENDERER_GATEWAY_FILES,
+      ...RENDERER_TERMINAL_PANEL_FILES
+    ],
     rules: {
       'no-restricted-syntax': ['error', ...RENDERER_GATEWAY_SELECTORS, ...RENDERER_RESTRICTED_SYNTAX]
+    }
+  },
+  //  - TEMPORARY, the TerminalPanel files: shared families + gateway selectors
+  //    that still let them read their three bridges (see RENDERER_TERMINAL_PANEL_FILES)
+  {
+    files: RENDERER_TERMINAL_PANEL_FILES,
+    rules: {
+      'no-restricted-syntax': ['error', ...RENDERER_TERMINAL_PANEL_SELECTORS, ...RENDERER_RESTRICTED_SYNTAX]
     }
   },
   //  - tests and their helpers: shared families only

@@ -2,20 +2,6 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import { FORCE_CRASH_ARG, TEST_HOOKS_ARG } from '../shared/constants'
-import type {
-  ScreenshotCaptureRequest,
-  ScreenshotCaptureResponse,
-  GetDisplaysResponse,
-  EnumerateWindowsRequest,
-  EnumerateWindowsResponse,
-  ScreenshotCapabilities,
-  ScreenRecordingPermission
-} from '../shared/ipc/screenshot-schema'
-import {
-  ClaudeStatusChannels,
-  ClaudeStatusEvents
-} from '../shared/ipc/claude-status-channels'
-import type { ClaudeStatusChangePayload } from '../shared/ipc/claude-status-schema'
 import { previewBridge } from './previewBridge'
 import { fileBridge } from './fileBridge'
 import { terminalBridge } from './terminalBridge'
@@ -35,6 +21,8 @@ import { cameraBridge } from './cameraBridge'
 import { docxBridge, pdfBridge } from './documentExportBridge'
 import { imageExportBridge } from './imageExportBridge'
 import { browserBridge } from './browserBridge'
+import { screenshotBridge } from './screenshotBridge'
+import { claudeStatusBridge } from './claudeStatusBridge'
 import type { FileNode, FileStats } from '../shared/ipc/file-schema'
 
 export type { FileNode, FileStats }
@@ -91,68 +79,12 @@ const api = {
   docx: docxBridge,
 
   /**
-   * Screenshot capture operations.
-   *
-   * Cross-platform as of #164: macOS uses the native screencapture binary,
-   * Windows + Linux fallback use Electron's desktopCapturer + an in-app
-   * area-select overlay window.
-   *
-   * Captures screen, window, or selected area and saves to temp directory.
+   * Screenshot capture, cross-platform as of #164 (see screenshotBridge.ts;
+   * the overlay-only verbs live in screenshotOverlay.ts)
    * @see Issue #86 - original macOS screenshot capture
    * @see Issue #164 - Windows Phase 3 parity
    */
-  screenshot: {
-    /**
-     * Get available displays for multi-monitor support.
-     *
-     * @returns Array of display information (id, label, isPrimary, bounds).
-     */
-    getDisplays: (): Promise<GetDisplaysResponse> =>
-      ipcRenderer.invoke('screenshot:getDisplays'),
-
-    /**
-     * Enumerate capturable windows for the in-app picker dialog.
-     *
-     * On macOS this returns an empty list (`screencapture -iw` handles the
-     * picker natively). On Windows / Linux it returns one entry per visible
-     * window with a thumbnail data URL.
-     */
-    enumerateWindows: (request?: EnumerateWindowsRequest): Promise<EnumerateWindowsResponse> =>
-      ipcRenderer.invoke('screenshot:enumerateWindows', request),
-
-    /**
-     * Capture a screenshot.
-     *
-     * @param request - `{ mode, displayId?, windowId? }`
-     * @returns Capture result with file path or error.
-     */
-    capture: (request: ScreenshotCaptureRequest): Promise<ScreenshotCaptureResponse> =>
-      ipcRenderer.invoke('screenshot:capture', request),
-
-    /**
-     * Describe what the running platform can do (#164 lens-review F[31]).
-     * The renderer hook calls this on mount instead of branching on
-     * `getPlatform()` so platform routing stays single-sourced in main.
-     */
-    getCapabilities: (): Promise<ScreenshotCapabilities> =>
-      ipcRenderer.invoke('screenshot:getCapabilities'),
-
-    /**
-     * Advisory macOS Screen Recording status (`'granted' | 'denied' |
-     * 'not-determined' | 'restricted' | 'unknown'`). Non-macOS returns
-     * `'unknown'`. Used ONLY to enrich the denial dialog — never to gate a
-     * capture. See `system.openScreenRecordingSettings` / `relaunchApp`.
-     */
-    getScreenPermission: (): Promise<ScreenRecordingPermission> =>
-      ipcRenderer.invoke('screenshot:getScreenPermission')
-
-    // Note (#164 lens-review F[6]): the overlay-only verbs
-    // (`areaSelected` / `areaCancelled`) are intentionally NOT exposed here.
-    // They live in `src/preload/screenshotOverlay.ts`, which is loaded only
-    // by the per-display area-select overlay BrowserWindows. Exposing them
-    // to every renderer would let any compromised window forge a selection
-    // or DoS an active capture.
-  },
+  screenshot: screenshotBridge,
 
   /**
    * System / OS-integration actions for the screen-recording permission flow
@@ -199,33 +131,10 @@ const api = {
   markdownImage: markdownImageBridge,
 
   /**
-   * Per-terminal Claude Code context status bridge (#216).
-   *
-   * `register`/`unregister`/`nudge` carry a `terminalId` only — the PTY pid is
-   * resolved main-side and never sent (security §10). `onChanged` mirrors
-   * `terminal.onData`: the returned unsubscribe removes the SAME wrapper
-   * listener reference so its identity never drifts.
+   * Per-terminal Claude Code context status (#216, see claudeStatusBridge.ts).
+   * Carries a `terminalId` only; the PTY pid is resolved main-side.
    */
-  claudeStatus: {
-    /** Begin tracking Claude status for a terminal panel. */
-    register: (terminalId: string): Promise<void> =>
-      ipcRenderer.invoke(ClaudeStatusChannels.REGISTER, { terminalId }),
-    /** Stop tracking a terminal panel (idempotent). */
-    unregister: (terminalId: string): Promise<void> =>
-      ipcRenderer.invoke(ClaudeStatusChannels.UNREGISTER, { terminalId }),
-    /** Activity-triggered light re-check for a terminal panel. */
-    nudge: (terminalId: string): Promise<void> =>
-      ipcRenderer.invoke(ClaudeStatusChannels.NUDGE, { terminalId }),
-    /** Subscribe to per-terminal snapshot changes; returns an unsubscribe. */
-    onChanged: (callback: (payload: ClaudeStatusChangePayload) => void): (() => void) => {
-      const listener = (_event: unknown, payload: ClaudeStatusChangePayload): void =>
-        callback(payload)
-      ipcRenderer.on(ClaudeStatusEvents.CHANGED, listener)
-      return () => {
-        ipcRenderer.removeListener(ClaudeStatusEvents.CHANGED, listener)
-      }
-    }
-  },
+  claudeStatus: claudeStatusBridge,
 
   // Running HTML preview bridge (#74): WebContentsView-backed preview control
   preview: previewBridge,

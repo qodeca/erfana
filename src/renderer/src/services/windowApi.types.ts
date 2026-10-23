@@ -48,40 +48,19 @@ import type { globalSettingsGateway, settingsGateway } from './settingsGateway'
 import type { systemGateway } from './systemGateway'
 import type { terminalGateway } from './terminalGateway'
 import type { testHooksGateway } from './testHooksGateway'
+import type { ClaudeStatusBridge } from '../../../shared/ipc/claude-status-schema'
+import type { ScreenshotBridge } from '../../../shared/ipc/screenshot-schema'
+import type { claudeStatusGateway } from './claudeStatusGateway'
+import type { screenshotGateway } from './screenshotGateway'
+import type { utilsGateway } from './utilsGateway'
 
 type Equal<A, B> =
   (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false
 type Assert<T extends true> = T
 
-/** The bridges that have a gateway, and so are not on `window.api`'s type. */
-type GatewayBridges =
-  | 'file'
-  | 'terminal'
-  | 'fileWatch'
-  | 'directoryWatch'
-  | 'git'
-  | 'gitWatcher'
-  | 'gitPolling'
-  | 'settings'
-  | 'globalSettings'
-  | 'logging'
-  | 'quit'
-  | 'system'
-  | 'clipboard'
-  | 'testHooks'
-  | 'import'
-  | 'transcription'
-  | 'whisper'
-  | 'camera'
-  | 'pdf'
-  | 'docx'
-  | 'imageExport'
-  | 'browser'
-  | 'markdownImage'
-  | 'preview'
-
 export type WindowApiChecks = [
-  Assert<Equal<Window['api'], Omit<Api, GatewayBridges>>>,
+  // Only the bridges the TerminalPanel files still read directly (see preload/index.d.ts)
+  Assert<Equal<Window['api'], Pick<Api, 'claudeStatus' | 'utils' | 'screenshot'>>>,
   Assert<Equal<typeof fileGateway, FileBridge>>,
   Assert<Equal<typeof terminalGateway, TerminalBridge>>,
   Assert<Equal<typeof fileWatchGateway, FileWatchBridge>>,
@@ -105,5 +84,8 @@ export type WindowApiChecks = [
   Assert<Equal<typeof imageExportGateway, ImageExportBridge>>,
   Assert<Equal<typeof browserGateway, BrowserBridge>>,
   Assert<Equal<typeof markdownImageGateway, MarkdownImageBridge>>,
-  Assert<Equal<typeof previewGateway, PreviewBridge>>
+  Assert<Equal<typeof previewGateway, PreviewBridge>>,
+  Assert<Equal<typeof claudeStatusGateway, ClaudeStatusBridge>>,
+  Assert<Equal<typeof screenshotGateway, ScreenshotBridge>>,
+  Assert<Equal<typeof utilsGateway, Api['utils']>>
 ]

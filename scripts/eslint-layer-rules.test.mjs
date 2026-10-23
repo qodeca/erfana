@@ -130,7 +130,6 @@ describe('renderer gateway rule', () => {
 
   const READ_FILE = 'export const f = () => window.api.file.readFile("a")'
   const READ_TERMINAL = 'export const t = () => window.api.terminal.kill("a")'
-  const READ_OTHER = 'export const g = () => window.api.claudeStatus.nudge("t")'
 
   it('flags a renderer read of window.api.file and window.api.terminal', async () => {
     expect(await gatewayMessages(RENDERER, READ_FILE)).toHaveLength(1)
@@ -186,6 +185,20 @@ describe('renderer gateway rule', () => {
   })
 
   it.each([
+    'export const f = () => window.api.claudeStatus.nudge("t")',
+    'export const f = () => window.api?.claudeStatus?.onChanged(() => {})',
+    'export const f = () => window.api.utils.getPlatform()',
+    'export const f = () => window.api?.utils?.getPlatform?.()',
+    'export const f = () => window.api.screenshot.getDisplays()',
+    'export const f = () => window.api.projectLock.isLocked("p")',
+    'export const f = () => window.api.notABridgeYet.call()',
+    'export const f = () => window.api',
+    'export const f = () => globalThis.api.file'
+  ])('flags every read of window.api: %s', async (code) => {
+    expect(await gatewayMessages(RENDERER, code)).toHaveLength(1)
+  })
+
+  it.each([
     ['destructuring', 'const { file } = window.api\nexport { file }'],
     ['aliasing', 'const a = window.api\nexport { a }'],
     ['assignment aliasing', 'let a\na = window.api\nexport { a }'],
@@ -208,9 +221,60 @@ describe('renderer gateway rule', () => {
     expect(await gatewayMessages(HARNESS, code)).toHaveLength(0)
   })
 
-  it('leaves the other bridges to their own migration', async () => {
-    expect(await gatewayMessages(RENDERER, READ_OTHER)).toHaveLength(0)
-    expect(await gatewayMessages(RENDERER, 'export const f = () => deps.window[method]("a")')).toHaveLength(0)
+  it('leaves look-alike names alone', async () => {
+    for (const code of [
+      'export const f = () => deps.window[method]("a")',
+      'export const f = (api) => api.file.readFile("a")',
+      'export const f = () => window.apiVersion',
+      'export const f = () => deps.window.api.file'
+    ]) {
+      expect(await gatewayMessages(RENDERER, code)).toHaveLength(0)
+    }
+  })
+
+  describe('the TerminalPanel files (temporary allowance)', () => {
+    const TERMINAL_PANEL_FILES = [
+      'src/renderer/src/components/Panels/TerminalPanel.tsx',
+      'src/renderer/src/components/Panels/TerminalPanel/hooks/useScreenshotCapture.ts',
+      'src/renderer/src/components/Panels/TerminalPanel/hooks/useTerminalDragDrop.ts'
+    ]
+
+    it.each(TERMINAL_PANEL_FILES)('%s may still read claudeStatus, utils and screenshot', async (file) => {
+      for (const code of [
+        'export const f = (id) => window.api?.claudeStatus?.nudge(id)',
+        'export const f = (id) => window.api.claudeStatus.register(id)',
+        'export const f = (file) => window.api.utils.getPathForFile(file)',
+        'export const f = () => window.api.screenshot.getCapabilities()'
+      ]) {
+        expect(await gatewayMessages(file, code)).toHaveLength(0)
+      }
+    })
+
+    it.each(TERMINAL_PANEL_FILES)('%s may not read anything else off window.api', async (file) => {
+      for (const code of [
+        READ_FILE,
+        READ_TERMINAL,
+        'export const f = () => window.api.preview.reload("p")',
+        'const a = window.api\nexport { a }',
+        'const { utils } = window.api\nexport { utils }',
+        "export const f = () => window.api['utils']",
+        "export const f = () => window['api']",
+        'export const f = () => (window as unknown as { api: object }).api'
+      ]) {
+        expect(await gatewayMessages(file, code)).toHaveLength(1)
+      }
+    })
+
+    it('still applies the shared selectors there', async () => {
+      const messages = await lint(TERMINAL_PANEL_FILES[0], 'export const b = (p) => p.split("/").pop()')
+      expect(messages.some((m) => /POSIX-only basename/.test(m.message))).toBe(true)
+    })
+
+    it('does not extend to the other TerminalPanel files', async () => {
+      const code = 'export const f = () => window.api.utils.getPlatform()'
+      const other = 'src/renderer/src/components/Panels/TerminalPanel/hooks/useTerminalResize.ts'
+      expect(await gatewayMessages(other, code)).toHaveLength(1)
+    })
   })
 
   it.each([
@@ -233,6 +297,9 @@ describe('renderer gateway rule', () => {
     'src/renderer/src/services/browserGateway.ts',
     'src/renderer/src/services/markdownImageGateway.ts',
     'src/renderer/src/services/previewGateway.ts',
+    'src/renderer/src/services/claudeStatusGateway.ts',
+    'src/renderer/src/services/screenshotGateway.ts',
+    'src/renderer/src/services/utilsGateway.ts',
     'src/renderer/src/services/bridgePresence.ts'
   ])('exempts %s from the gateway rule only', async (file) => {
     expect(await gatewayMessages(file, READ_FILE)).toHaveLength(0)
