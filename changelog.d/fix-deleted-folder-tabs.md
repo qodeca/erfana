@@ -5,4 +5,5 @@
   even if the folder is one Erfana does not watch (excluded, hidden or ignored, such as `dist`),
   or if the change happened while Erfana was busy with a file operation of its own. A file
   restored with "Save to restore it" is watched again, so later outside edits reach the editor
-  without reopening the tab. (#252)
+  without reopening the tab, and a second tab on the same file keeps hearing them too. A file
+  that is only locked or unreadable for a moment is no longer taken for deleted. (#252)

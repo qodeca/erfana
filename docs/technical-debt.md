@@ -1018,6 +1018,16 @@ The `files.exclude` list, the project path filter and the Windows native directo
 
 ---
 
+### 66. `file-watch:*` channels are not on the confined-path wrapper (#252, 2026-10)
+
+**Severity**: Low
+
+`file-watch:start` still checks its path with the lexical prefix test in `FileWatcherService.watchFile` (an `eslint-disable` marks it), not through `registerConfinedHandle`; the atomic re-arm re-checks the real path later (`isPathConfined`). The #252 review asked for the move if it was small. It is not: the channel takes a positional string rather than a request object ([IPC patterns](./ipc-patterns.md)), so it needs a strict request schema, a preload and renderer API change, a project session passed into `registerFileWatcherHandlers`, and a refusal mapped to `{ success: false, error }` – whose wording the renderer's `classifyWatchStartFailure` reads. The handler must also watch the `requested` spelling, since every event is matched against it. `stop`, `pause` and `resume` only look up the map, so they touch no file. What #252 did instead: the unseen-file probe `stat`s only this session's paths lexically inside the project (`FileWatcherService.probeablePaths`), so it never reaches outside it. Where: `src/main/ipc/file-watcher-handlers.ts`, `src/preload/index.ts`, `FileWatcherService.watchFile`.
+
+**Status**: Open — a follow-up from the #252 review.
+
+---
+
 ## Code Quality Improvements
 
 ### Documentation Token Efficiency

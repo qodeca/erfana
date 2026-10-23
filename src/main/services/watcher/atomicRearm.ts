@@ -17,8 +17,8 @@
  * without a chokidar instance.
  */
 import { FSWatcher } from 'chokidar'
-import { stat } from 'fs/promises'
 import { logger } from '../LoggingService'
+import { pathIsPresent } from './pathPresence'
 
 /**
  * Reasons a watch died that the renderer must be told about.
@@ -86,8 +86,9 @@ export async function resolveDeletedWatch(
   // One final existence check even when the detector said "gone": a slow
   // temp-then-rename can land between its check and this callback, and a false
   // "file deleted" banner over a file that exists is worse than a late refresh
-  // (issue #70, H-4a).
-  if (wasAtomicSave || (await pathExists(filePath))) {
+  // (issue #70, H-4a). Only a `stat` that says the path is gone counts: a
+  // locked or unreadable file is still there (`pathIsPresent`, #252).
+  if (wasAtomicSave || (await pathIsPresent(filePath))) {
     await rearmWatch(watched, deps)
     return
   }
@@ -157,7 +158,7 @@ async function rearmWatch(watched: RearmableWatch, deps: AtomicRearmDeps): Promi
   // TOCTOU: the path can vanish between the detector's existence check and
   // chokidar.watch(). Without this the entry would hold a MAX_WATCHED_FILES
   // slot forever, watching nothing (issue #70, L-3).
-  if (!(await pathExists(filePath))) {
+  if (!(await pathIsPresent(filePath))) {
     deps.notifyDeleted(filePath)
     deps.discardWatch(filePath, watched)
     return
@@ -185,14 +186,5 @@ async function closeQuietly(watcher: FSWatcher): Promise<void> {
     await watcher.close()
   } catch {
     // A watcher that refuses to close is already gone for our purposes
-  }
-}
-
-async function pathExists(filePath: string): Promise<boolean> {
-  try {
-    await stat(filePath)
-    return true
-  } catch {
-    return false
   }
 }

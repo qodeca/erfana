@@ -24,6 +24,7 @@ import { INDICATOR_DURATION_MS } from '../constants/fileWatch'
 import {
   acquireFileWatch,
   createFileWatchSlot,
+  forgetFileWatch,
   releaseFileWatch,
   type FileWatchSlot
 } from './fileWatchSlot'
@@ -126,8 +127,10 @@ export interface UseFileChangeSubscriptionResult {
  *    two with explicit precedence rather than relying on that.
  * 5. **Exactly one subscription is held at a time.** `fileWatch.start` is a
  *    counting acquire main-side, so `recover()` releases before it re-starts
- *    and teardown only releases what was actually acquired. See
- *    {@link FileWatchSlot} for what each imbalance costs.
+ *    and teardown only releases what was actually acquired. A `deleted` event
+ *    means the main process already dropped the watch, so the slot forgets
+ *    its hold without a `stop`. See {@link FileWatchSlot} for what each
+ *    imbalance costs.
  *
  * @param filePath - Absolute path to watch. An empty string subscribes to nothing.
  * @param options - Change callback
@@ -219,14 +222,14 @@ export function useFileChangeSubscription(
       return false
     }
 
-    // Release before re-acquiring, rather than starting a second subscription.
-    // `start` increments a per-window subscriber count, so a bare re-`start`
-    // would leave this consumer holding two counts against one teardown `stop`,
-    // and the watcher would outlive the panel (see {@link FileWatchSlot}).
-    // Releasing first is also what makes Reload work after a *genuine* delete,
-    // where the main process dropped the whole entry and the count has to be
-    // rebuilt from zero – skipping the start on a still-held slot would leave
-    // the user with a Reload button that never restores auto-refresh.
+    // After a delete event the slot already forgot its hold (the main process
+    // dropped the whole entry), so this release sends nothing and only the
+    // acquire below talks to the main process: a `stop` here could take the
+    // count of another consumer of the same file and deafen it (#252). With a
+    // live watch – a recover after a watcher error – the release is what keeps
+    // this consumer at one count: `start` increments a per-window count, so a
+    // bare re-`start` would hold two against one teardown `stop`, and the
+    // watcher would outlive the panel (see {@link FileWatchSlot}).
     await releaseFileWatch(slot, filePath)
     const { started, error, cause } = await acquireFileWatch(slot, filePath)
 
@@ -280,6 +283,10 @@ export function useFileChangeSubscription(
 
     const unsubscribeDeleted = window.api.fileWatch.onFileDeleted((data) => {
       if (!isActive || data.filePath !== filePath) return
+
+      // Whatever the disk says, the main process dropped the watch before
+      // sending this: the slot holds nothing now (#252, invariant 5).
+      forgetFileWatch(slot)
 
       // Invariant 3: never believe a delete without re-checking the disk.
       fileGateway

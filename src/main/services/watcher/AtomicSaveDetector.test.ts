@@ -14,6 +14,9 @@ vi.mock('fs/promises', () => ({
   stat: vi.fn()
 }))
 
+/** A `stat` failure the way Node reports it: the errno name in `code`. */
+const errno = (code: string): NodeJS.ErrnoException => Object.assign(new Error(code), { code })
+
 describe('AtomicSaveDetector', () => {
   let detector: AtomicSaveDetector
 
@@ -49,7 +52,7 @@ describe('AtomicSaveDetector', () => {
       const callback = vi.fn()
 
       // File will not exist (actual delete)
-      vi.mocked(fsPromises.stat).mockRejectedValue(new Error('ENOENT'))
+      vi.mocked(fsPromises.stat).mockRejectedValue(errno('ENOENT'))
       vi.mocked(fs.existsSync).mockReturnValue(false)
 
       detector.registerDelete('/test/file.txt', callback)
@@ -155,11 +158,11 @@ describe('AtomicSaveDetector', () => {
   })
 
   describe('no sync fallback', () => {
-    it('treats a failed stat as a delete without a sync existsSync on the main thread', async () => {
+    it('treats a missing file as a delete without a sync existsSync on the main thread', async () => {
       const callback = vi.fn()
 
-      // async stat fails; the old code then asked existsSync, which answered true
-      vi.mocked(fsPromises.stat).mockRejectedValue(new Error('Failed'))
+      // async stat says gone; the old code then asked existsSync, which answered true
+      vi.mocked(fsPromises.stat).mockRejectedValue(errno('ENOENT'))
       vi.mocked(fs.existsSync).mockReturnValue(true)
 
       detector.registerDelete('/test/file.txt', callback)
@@ -168,6 +171,30 @@ describe('AtomicSaveDetector', () => {
 
       expect(callback).toHaveBeenCalledWith('/test/file.txt', false)
       expect(fs.existsSync).not.toHaveBeenCalled()
+    })
+  })
+
+  // Only ENOENT and ENOTDIR mean gone (#252): a locked or unreadable file is
+  // still there, and a "deleted" banner over it would be false
+  describe('a stat that fails without saying the file is gone', () => {
+    it.each(['EPERM', 'EBUSY', 'EACCES'])('counts %s as the file still being there', async (code) => {
+      const callback = vi.fn()
+      vi.mocked(fsPromises.stat).mockRejectedValue(errno(code))
+
+      detector.registerDelete('/test/file.txt', callback)
+      await vi.advanceTimersByTimeAsync(110)
+
+      expect(callback).toHaveBeenCalledWith('/test/file.txt', true)
+    })
+
+    it('counts ENOTDIR (a folder on the way is now a file) as gone', async () => {
+      const callback = vi.fn()
+      vi.mocked(fsPromises.stat).mockRejectedValue(errno('ENOTDIR'))
+
+      detector.registerDelete('/test/file.txt', callback)
+      await vi.advanceTimersByTimeAsync(110)
+
+      expect(callback).toHaveBeenCalledWith('/test/file.txt', false)
     })
   })
 })

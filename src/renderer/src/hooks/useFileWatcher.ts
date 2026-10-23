@@ -14,6 +14,7 @@ import { INDICATOR_DURATION_MS } from '../constants/fileWatch'
 import {
   acquireFileWatch,
   createFileWatchSlot,
+  forgetFileWatch,
   releaseFileWatch,
   type FileWatchSlot
 } from './fileWatchSlot'
@@ -219,6 +220,27 @@ export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcherRe
   }, [])
 
   /**
+   * Clear the file deleted state.
+   *
+   * The main process ended the watch when it reported the delete, and the slot
+   * forgot its hold then, so a file that is back – restored by a save, or
+   * reloaded – is watched again with a plain acquire; without it the tab would
+   * stay deaf to outside edits until it was reopened (#252). No release first:
+   * a `stop` here could take the count of another consumer of the same file.
+   */
+  const clearDeletedState = useCallback(() => {
+    const wasDeleted = isFileDeletedRef.current
+    isFileDeletedRef.current = false
+    setIsFileDeleted(false)
+    if (!wasDeleted || !filePath) return
+    void acquireFileWatch(slot, filePath).then(({ started, error, cause }) => {
+      if (!started) {
+        logger.error('Failed to watch the restored file again', cause, { error })
+      }
+    })
+  }, [filePath, slot])
+
+  /**
    * Reload file content from disk.
    *
    * @param prefetchedContent - If provided, uses this content instead of reading from disk.
@@ -239,8 +261,8 @@ export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcherRe
       onContentUpdate(content)
       pendingSavedContentsRef.current.clear() // Disk content is now authoritative
       setExternalChangeDetected(false)
-      isFileDeletedRef.current = false
-      setIsFileDeleted(false)
+      // The file was read, so it is there: watch it again if it had been deleted
+      clearDeletedState()
       onReload?.()
       logger.info('File reloaded successfully', { filePath })
 
@@ -250,7 +272,7 @@ export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcherRe
       logger.error('Error reloading file', error instanceof Error ? error : undefined)
       setIsReloading(false)
     }
-  }, [filePath, onContentUpdate, onReload])
+  }, [filePath, onContentUpdate, onReload, clearDeletedState])
 
   /**
    * Keep local version and dismiss conflict notification
@@ -267,28 +289,6 @@ export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcherRe
   const dismissConflict = useCallback(() => {
     setExternalChangeDetected(false)
   }, [])
-
-  /**
-   * Clear the file deleted state.
-   *
-   * The main process ends a watch when its file is deleted, so a tab restored
-   * by a save would otherwise stay deaf to outside edits until it was reopened
-   * (#252). Release first, then acquire, as `useFileChangeSubscription.recover`
-   * does: the slot still believes it holds the ended watch, and a bare acquire
-   * would skip the `start`.
-   */
-  const clearDeletedState = useCallback(() => {
-    const wasDeleted = isFileDeletedRef.current
-    isFileDeletedRef.current = false
-    setIsFileDeleted(false)
-    if (!wasDeleted || !filePath) return
-    void releaseFileWatch(slot, filePath)
-    void acquireFileWatch(slot, filePath).then(({ started, error, cause }) => {
-      if (!started) {
-        logger.error('Failed to watch the restored file again', cause, { error })
-      }
-    })
-  }, [filePath, slot])
 
   /**
    * Notify the hook that a save completed with the given content.
@@ -366,10 +366,13 @@ export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcherRe
    */
   const handleFileDeleted = useCallback(() => {
     logger.warn('File deleted externally', { filePath })
+    // The main process dropped the watch, every count with it, before sending
+    // this: the slot holds nothing now, and must not send a `stop` (#252)
+    forgetFileWatch(slot)
     isFileDeletedRef.current = true
     setIsFileDeleted(true)
     setExternalChangeDetected(false) // Clear conflict notification if shown
-  }, [filePath])
+  }, [filePath, slot])
 
   // Set up file watching
   useEffect(() => {

@@ -264,9 +264,10 @@ describe('DirectoryWatcherService removals during a pause (#252)', () => {
     expect(removed).toHaveBeenCalledTimes(1)
   })
 
-  it('never reports the operation’s own removals', async () => {
+  it('leaves out the operation’s own removals, noted after their events', async () => {
     const { svc, removed, lost } = await startListening()
     svc.pauseWatch(ROOT, OWNER)
+    latestNative().emit('unlink', inRoot('renamed', 'child.md'))
     latestNative().emit('unlinkDir', inRoot('renamed'))
     svc.noteInternalChange({ path: inRoot('renamed'), kind: 'removed', subtree: true })
 
@@ -274,6 +275,19 @@ describe('DirectoryWatcherService removals during a pause (#252)', () => {
 
     expect(removed).not.toHaveBeenCalled()
     expect(lost).not.toHaveBeenCalled()
+  })
+
+  it('says, while the pause runs, which paths the operation removed itself', async () => {
+    const { svc } = await startListening()
+    svc.pauseWatch(ROOT, OWNER)
+    svc.noteInternalChange({ path: inRoot('.github'), kind: 'removed', subtree: true })
+
+    expect(svc.isOwnRemoval(inRoot('.github', 'workflows', 'ci.yml'))).toBe(true)
+    expect(svc.isOwnRemoval(inRoot('docs', 'open.md'))).toBe(false)
+
+    // The episode ends with the pause
+    svc.resumeWatch(ROOT)
+    expect(svc.isOwnRemoval(inRoot('.github', 'workflows', 'ci.yml'))).toBe(false)
   })
 
   it('reports the removals when the safety timeout ends a pause nobody resumed', async () => {
@@ -294,19 +308,33 @@ describe('DirectoryWatcherService removals during a pause (#252)', () => {
 
     svc.resumeWatch(ROOT)
 
-    expect(lost).toHaveBeenCalledWith(ROOT)
+    expect(lost).toHaveBeenCalledWith(ROOT, expect.any(Function))
     expect(removed).not.toHaveBeenCalled()
   })
 
-  it('says they were lost when the pause dropped more than it can remember', async () => {
-    const { svc, removed, lost } = await startListening()
+  it('hands the lost-removals listener the operation’s own removals to skip', async () => {
+    const { svc, lost } = await startListening()
     svc.pauseWatch(ROOT, OWNER)
-    for (let i = 0; i <= MAX_REMEMBERED_REMOVALS; i++) latestNative().emit('unlink', inRoot(`f${i}.md`))
+    latestNative().emit('resync', 'overflow')
+    svc.noteInternalChange({ path: inRoot('renamed'), kind: 'removed', subtree: true })
 
     svc.resumeWatch(ROOT)
 
-    expect(lost).toHaveBeenCalledWith(ROOT)
-    expect(removed).not.toHaveBeenCalled()
+    const isOwnRemoval = lost.mock.calls[0][1] as (filePath: string) => boolean
+    expect(isOwnRemoval(inRoot('renamed', 'open.md'))).toBe(true)
+    expect(isOwnRemoval(inRoot('docs', 'open.md'))).toBe(false)
+  })
+
+  it('folds removals past what it can remember into their folder, and has only that folder re-checked', async () => {
+    const { svc, removed, lost } = await startListening()
+    svc.pauseWatch(ROOT, OWNER)
+    latestNative().emit('unlink', inRoot('top.md'))
+    for (let i = 0; i <= MAX_REMEMBERED_REMOVALS; i++) latestNative().emit('unlink', inRoot('docs', `f${i}.md`))
+
+    svc.resumeWatch(ROOT)
+
+    expect(lost.mock.calls).toEqual([[inRoot('docs'), expect.any(Function)]])
+    expect(removed).toHaveBeenCalledWith([inRoot('top.md')])
   })
 
   it('logs a throwing lost-removals listener and still runs the others', async () => {
@@ -318,7 +346,7 @@ describe('DirectoryWatcherService removals during a pause (#252)', () => {
     latestNative().emit('resync', 'overflow')
 
     expect(() => svc.resumeWatch(ROOT)).not.toThrow()
-    expect(lost).toHaveBeenCalledWith(ROOT)
+    expect(lost).toHaveBeenCalledWith(ROOT, expect.any(Function))
     expect(harness.logger.error).toHaveBeenCalledWith('Directory removal listener failed', expect.any(Error))
   })
 
@@ -390,5 +418,49 @@ describe('DirectoryWatcherService.reportsRemovalsAbove (#252)', () => {
     await svc.stopAll()
 
     expect(svc.reportsRemovalsAbove(inRoot('docs', 'open.md'))).toBe(false)
+  })
+})
+
+describe('DirectoryWatcherService.onCoverageChanged (#252)', () => {
+  it('fires whenever reportsRemovalsAbove may answer differently', async () => {
+    const svc = new DirectoryWatcherService({ backend: 'native-recursive' })
+    services.push(svc)
+    const changed = vi.fn()
+    svc.onCoverageChanged(changed)
+
+    svc.setProjectPath(ROOT)
+    expect(changed).toHaveBeenCalledTimes(1)
+
+    await svc.watchDirectory(ROOT, webContents)
+    expect(changed).toHaveBeenCalledTimes(2)
+
+    svc.setPathFilter(
+      new ProjectPathFilter(ROOT, { exclude: ['big'], hiddenPatterns: [], ignorePatterns: [], caseSensitive: true })
+    )
+    expect(changed).toHaveBeenCalledTimes(3)
+
+    await svc.unwatchDirectory(ROOT, webContents)
+    expect(changed).toHaveBeenCalledTimes(4)
+
+    await svc.watchDirectory(ROOT, webContents)
+    await svc.stopAll()
+    expect(changed).toHaveBeenCalledTimes(6)
+  })
+
+  it('logs a throwing listener, still tells the others, and stops once unsubscribed', async () => {
+    const svc = await start('native-recursive')
+    const second = vi.fn()
+    svc.onCoverageChanged(() => {
+      throw new Error('boom')
+    })
+    const unsubscribe = svc.onCoverageChanged(second)
+
+    expect(() => svc.setProjectPath(ROOT)).not.toThrow()
+    expect(second).toHaveBeenCalledTimes(1)
+    expect(harness.logger.error).toHaveBeenCalledWith('Directory removal listener failed', expect.any(Error))
+
+    unsubscribe()
+    svc.setProjectPath(ROOT)
+    expect(second).toHaveBeenCalledTimes(1)
   })
 })

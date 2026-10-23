@@ -726,11 +726,37 @@ describe('useFileWatcher', () => {
 
       expect(result.current.isFileDeleted).toBe(false)
       await waitFor(() => expect(mockFileWatch.start).toHaveBeenCalledTimes(2))
-      // The slot's old hold is let go first, so the counts stay balanced
-      expect(mockFileWatch.stop).toHaveBeenCalledWith(TEST_PATH)
-      expect(mockFileWatch.stop.mock.invocationCallOrder[0]).toBeLessThan(
-        mockFileWatch.start.mock.invocationCallOrder[1]
-      )
+      // Main dropped the old watch with the delete: a `stop` now could take
+      // another consumer's count for the same file
+      expect(mockFileWatch.stop).not.toHaveBeenCalled()
+    })
+
+    it('starts a new watch when a deleted file is reloaded from disk', async () => {
+      const { result } = await renderWatching()
+      act(() => {
+        emitFileDeleted(TEST_PATH)
+      })
+      mockReadFile.mockResolvedValueOnce('# back')
+
+      await act(async () => {
+        await result.current.reloadFromDisk()
+      })
+
+      expect(result.current.isFileDeleted).toBe(false)
+      await waitFor(() => expect(mockFileWatch.start).toHaveBeenCalledTimes(2))
+      expect(mockFileWatch.stop).not.toHaveBeenCalled()
+    })
+
+    it('sends no stop on unmount for a watch the delete already ended', async () => {
+      const { unmount } = await renderWatching()
+      act(() => {
+        emitFileDeleted(TEST_PATH)
+      })
+
+      unmount()
+      await act(async () => {})
+
+      expect(mockFileWatch.stop).not.toHaveBeenCalled()
     })
 
     it('leaves a live watch alone after an ordinary save', async () => {
@@ -775,7 +801,10 @@ describe('useFileWatcher', () => {
 
       unmount()
 
-      await waitFor(() => expect(mockFileWatch.stop).toHaveBeenCalledTimes(2))
+      // One stop for the one live watch: the ended one sends none
+      await waitFor(() => expect(mockFileWatch.stop).toHaveBeenCalledTimes(1))
+      await act(async () => {})
+      expect(mockFileWatch.stop).toHaveBeenCalledTimes(1)
     })
   })
 })

@@ -121,10 +121,12 @@ function entryKindOf(info: unknown): KnownEntryKind | undefined {
 export type PathsRemovedListener = (removedPaths: readonly string[]) => void
 
 /**
- * Told that removals under this watch root were lost without a path: a paused
- * watch dropped more than it could remember, or a resync swallowed them (#252).
+ * Told that a paused watch lost removals under `root` without their paths: a
+ * resync swallowed them (`root` is then the watch root), or more removals than
+ * it could remember were folded into this folder (#252). `isOwnRemoval` says
+ * which paths the pausing operation removed itself.
  */
-export type RemovalsLostListener = (watchRoot: string) => void
+export type RemovalsLostListener = (root: string, isOwnRemoval: (filePath: string) => boolean) => void
 
 /** Construction options for {@link DirectoryWatcherService}. */
 export interface DirectoryWatcherServiceOptions {
@@ -191,6 +193,8 @@ export class DirectoryWatcherService {
   // watches can notice a file whose parent folder was renamed or deleted
   private readonly removalListeners = new Set<PathsRemovedListener>()
   private readonly removalsLostListeners = new Set<RemovalsLostListener>()
+  // Told when reportsRemovalsAbove may answer differently (#252)
+  private readonly coverageListeners = new Set<() => void>()
 
   constructor(options: DirectoryWatcherServiceOptions = {}) {
     this.watchBackend = options.backend ?? selectDirectoryWatchBackend()
@@ -204,6 +208,7 @@ export class DirectoryWatcherService {
    */
   setPathFilter(filter: ProjectPathFilter): void {
     this.pathFilter = filter
+    this.coverageChanged()
   }
 
   /**
@@ -212,8 +217,10 @@ export class DirectoryWatcherService {
    * parent folder being renamed away – nothing touches the file itself – so
    * `FileWatcherService` listens here to mark such an open file deleted.
    * A removal an outside program made while the watch was paused for one of
-   * the app's own operations is reported when the pause ends; the operation's
-   * own removals never are (#252).
+   * the app's own operations is reported when the pause ends. The operation's
+   * own removals are left out when it noted them (`noteInternalChange`); past
+   * the internal-change cap, or after a resync, they cannot be told apart, and
+   * the open files are checked on disk instead (`onRemovalsLost`, #252).
    *
    * @returns a function that removes the listener
    */
@@ -226,7 +233,7 @@ export class DirectoryWatcherService {
 
   /**
    * Hear about removals a paused watch lost without a path (#252), so the
-   * open files under that watch root can be re-checked on disk instead.
+   * open files under that folder can be re-checked on disk instead.
    *
    * @returns a function that removes the listener
    */
@@ -235,6 +242,36 @@ export class DirectoryWatcherService {
     return () => {
       this.removalsLostListeners.delete(listener)
     }
+  }
+
+  /**
+   * Hear when {@link reportsRemovalsAbove} may answer differently: a watch
+   * started or stopped, the path filter or the project changed (#252).
+   *
+   * @returns a function that removes the listener
+   */
+  onCoverageChanged(listener: () => void): () => void {
+    this.coverageListeners.add(listener)
+    return () => {
+      this.coverageListeners.delete(listener)
+    }
+  }
+
+  private coverageChanged(): void {
+    this.callEachListener(this.coverageListeners, (listener) => listener())
+  }
+
+  /**
+   * Whether an internal operation, in a pause still running, noted the
+   * removal of this path or a folder above it (#252). The unseen-file probe
+   * asks before it reports a missing file, so a tab the operation itself is
+   * moving is not marked deleted on the way.
+   */
+  isOwnRemoval(filePath: string): boolean {
+    for (const watched of this.watchedDirectories.values()) {
+      if (watched.pauseEpisode?.isOwnRemoval(filePath)) return true
+    }
+    return false
   }
 
   /**
@@ -275,14 +312,16 @@ export class DirectoryWatcherService {
 
   /**
    * At the end of a pause, hand on what outside programs removed during it
-   * (#252) – by path, or as lost when the episode could not keep the paths.
+   * (#252): by path, and as lost under each folder the episode folded
+   * removals into – or under the whole watch when it could not keep them.
    */
   private reportPausedRemovals(dirPath: string, episode: PauseEpisode | undefined): void {
     if (!episode) return
     const removals = episode.externalRemovals()
-    if (!removals.complete) {
-      this.callEachListener(this.removalsLostListeners, (listener) => listener(dirPath))
-      return
+    const lostUnder = removals.complete ? removals.recheckUnder : [dirPath]
+    const isOwnRemoval = (filePath: string): boolean => episode.isOwnRemoval(filePath)
+    for (const root of lostUnder) {
+      this.callEachListener(this.removalsLostListeners, (listener) => listener(root, isOwnRemoval))
     }
     this.reportRemovedPaths(removals.paths)
   }
@@ -341,6 +380,7 @@ export class DirectoryWatcherService {
     this.knownEntries.reset()
     // Bump session on project changes to drop stale events
     this.switchVersion++
+    this.coverageChanged()
   }
   /**
    * Stop all directory watchers (for project switching)
@@ -374,6 +414,7 @@ export class DirectoryWatcherService {
     }
     this.watchedDirectories.clear()
     this.metrics.setActiveWatchers(0)
+    this.coverageChanged()
   }
 
   /**
@@ -495,6 +536,7 @@ export class DirectoryWatcherService {
 
     this.watchedDirectories.set(dirPath, watched)
     this.metrics.setActiveWatchers(this.watchedDirectories.size)
+    this.coverageChanged()
 
     // Start health logger on first watch
     this.startHealthLogger()
@@ -763,6 +805,7 @@ export class DirectoryWatcherService {
       await watched.watcher.close()
       this.watchedDirectories.delete(dirPath)
       this.metrics.setActiveWatchers(this.watchedDirectories.size)
+      this.coverageChanged()
     }
   }
 
@@ -829,6 +872,7 @@ export class DirectoryWatcherService {
     }
 
     this.metrics.setActiveWatchers(this.watchedDirectories.size)
+    this.coverageChanged()
     this.safeLog(`👁️  Cleaned up directory watches for webContentsId ${webContentsId}`)
   }
 
@@ -1374,6 +1418,7 @@ export class DirectoryWatcherService {
       this.switchVersion++
       this.watchedDirectories.delete(dirPath)
       this.metrics.setActiveWatchers(this.watchedDirectories.size)
+      this.coverageChanged()
 
       logger.info(`EMFILE detected for ${dirPath} – watcher torn down, scheduling restart`)
       this.scheduleRestart(dirPath, webContentsIds)
@@ -1481,6 +1526,7 @@ export class DirectoryWatcherService {
         existing.atomicSaveDetector.dispose()
         await existing.watcher.close()
         this.watchedDirectories.delete(dirPath)
+        this.coverageChanged()
       }
 
       // Try to restart for each webContents that was watching

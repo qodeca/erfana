@@ -11,7 +11,7 @@ import { createSingleFileWatcher } from './watcher/singleFileWatch'
 import { sendToSubscribers } from './watcher/watchNotifier'
 import { AtomicRearmDeps, RearmableWatch, resolveDeletedWatch } from './watcher/atomicRearm'
 import { watchedUnderRemovedFolders } from './watcher/ancestorRemoval'
-import { UnseenWatchProbe, reportMissingPaths } from './watcher/unseenWatchProbe'
+import { UnseenWatchProbe, type RemovalCoverage } from './watcher/unseenWatchProbe'
 
 interface WatchedFile {
   filePath: string
@@ -44,8 +44,11 @@ export class FileWatcherService {
    */
   private readonly atomicSaveDetector = createAtomicSaveDetector()
 
-  /** Re-checks the files the project watcher cannot see (#252); set by {@link watchUnseenFiles}. */
-  private unseenProbe: UnseenWatchProbe | null = null
+  /** Re-checks the files the project watcher cannot see (#252); see {@link watchUnseenFiles}. */
+  private readonly unseenProbe = new UnseenWatchProbe({
+    probeablePaths: () => this.probeablePaths(),
+    onMissing: filePath => this.handleFileDeleted(filePath)
+  })
 
   /**
    * The seam the atomic re-arm branch talks to this service through.
@@ -91,6 +94,8 @@ export class FileWatcherService {
     this.watchedFiles.clear()
     // Increment session to ignore late events from the previous watchers
     this.switchVersion++
+    // A check still waiting on the old project's disk stops at its next file
+    this.unseenProbe.reset()
   }
 
   /**
@@ -114,8 +119,8 @@ export class FileWatcherService {
    */
   async watchFile(filePath: string, webContents: WebContents): Promise<void> {
     // Security: Prevent watching files outside project
-    // The watch channels move onto the confined-path wrapper in a follow-up; until then this
-    // prefix test stays as it was.
+    // The watch channels move onto the confined-path wrapper in a follow-up
+    // (docs/technical-debt.md #66); until then this prefix test stays as it was.
     // eslint-disable-next-line no-restricted-syntax
     if (this.projectPath && !filePath.startsWith(this.projectPath)) {
       throw new Error('Cannot watch files outside the project directory')
@@ -180,7 +185,7 @@ export class FileWatcherService {
     }
 
     this.watchedFiles.set(filePath, watched)
-    this.unseenProbe?.schedule()
+    this.unseenProbe.pathChanged(filePath)
   }
 
   /**
@@ -328,6 +333,7 @@ export class FileWatcherService {
     this.cancelPendingWork(filePath, watched)
     await watched.watcher.close()
     this.watchedFiles.delete(filePath)
+    this.unseenProbe.pathChanged(filePath)
   }
 
   /**
@@ -431,28 +437,42 @@ export class FileWatcherService {
 
   /**
    * Re-check, on a slow timer, the watched files whose folders the project
-   * watcher cannot report on (`isCovered` false): excluded, hidden or ignored
-   * ones, and files outside the project (`watcher/unseenWatchProbe`, #252).
+   * watcher cannot report on: excluded, hidden or ignored ones
+   * (`watcher/unseenWatchProbe`, #252). `coverage` says which those are.
    */
-  watchUnseenFiles(isCovered: (filePath: string) => boolean): void {
-    this.unseenProbe?.stop()
-    this.unseenProbe = new UnseenWatchProbe({
-      watchedPaths: () => this.watchedFiles.keys(),
-      isCovered,
-      onMissing: filePath => this.handleFileDeleted(filePath)
-    })
-    if (this.watchedFiles.size > 0) this.unseenProbe.schedule()
+  watchUnseenFiles(coverage: RemovalCoverage): void {
+    this.unseenProbe.setCoverage(coverage)
   }
 
   /**
    * A paused project watch lost removals under `root` without their paths:
-   * check every watched file there on disk now, and take each missing one down
-   * the unlink branch (#252).
+   * check the watched files there on disk, in the probe's one-`stat`-at-a-time
+   * queue, and take each missing one down the unlink branch – except the ones
+   * the pausing operation removed itself (#252).
    */
-  async checkWatchedFilesUnder(root: string): Promise<void> {
+  async checkWatchedFilesUnder(
+    root: string,
+    isOwnRemoval: (filePath: string) => boolean = () => false
+  ): Promise<void> {
     if (this.isDisposing) return
-    const under = [...this.watchedFiles.keys()].filter(filePath => isLexicallyInside(filePath, root))
-    await reportMissingPaths(under, filePath => this.handleFileDeleted(filePath), undefined, () => this.isDisposing)
+    const under = this.probeablePaths().filter(filePath => isLexicallyInside(filePath, root))
+    await this.unseenProbe.checkNow(under, isOwnRemoval)
+  }
+
+  /**
+   * The watched paths the probe may `stat`: this session's, lexically inside
+   * the project. Nothing without a project, so no probe reaches outside it.
+   */
+  private probeablePaths(): string[] {
+    const root = this.projectPath
+    if (!root) return []
+    const paths: string[] = []
+    for (const watched of this.watchedFiles.values()) {
+      if (watched.version === this.switchVersion && isLexicallyInside(watched.filePath, root)) {
+        paths.push(watched.filePath)
+      }
+    }
+    return paths
   }
 
   /**
@@ -463,6 +483,7 @@ export class FileWatcherService {
     this.cancelPendingWork(filePath, watched)
     void watched.watcher.close().catch(() => {})
     this.watchedFiles.delete(filePath)
+    this.unseenProbe.pathChanged(filePath)
   }
 
   /**
@@ -525,7 +546,7 @@ export class FileWatcherService {
     this.isDisposing = true // Set flag FIRST to stop all event processing
     this.safeLog('👁️  Disposing all file watchers...')
     this.atomicSaveDetector.dispose()
-    this.unseenProbe?.stop()
+    this.unseenProbe.dispose()
 
     for (const [, watched] of this.watchedFiles.entries()) {
       if (watched.debounceTimer) {

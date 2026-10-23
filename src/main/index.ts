@@ -494,13 +494,13 @@ app.whenReady().then(async () => {
     fileWatcherService.handleAncestorRemovals(removedPaths)
   )
   // ...and where it cannot tell (a pause lost the paths, or the file's folder is
-  // filtered out or outside the project), the single-file watches check the disk (#252)
-  directoryWatcherService.onRemovalsLost((watchRoot) => {
+  // filtered out), the single-file watches check the disk (#252)
+  directoryWatcherService.onRemovalsLost((root, isOwnRemoval) => {
     fileWatcherService
-      .checkWatchedFilesUnder(watchRoot)
+      .checkWatchedFilesUnder(root, isOwnRemoval)
       .catch((error: unknown) => logger.error('Re-checking open files failed', redactedLogError(error)))
   })
-  fileWatcherService.watchUnseenFiles((filePath) => directoryWatcherService.reportsRemovalsAbove(filePath))
+  fileWatcherService.watchUnseenFiles(directoryWatcherService)
 
   // Register IPC handlers. Every global channel is gated on the app's own
   // top-level renderer by construction: the handlers register through

@@ -225,8 +225,7 @@ describe('Main Process - Window Creation', () => {
         setProjectPath: vi.fn(), // issue #59: clear project state on destroy
         cleanupForWebContentsId: vi.fn(() => Promise.resolve()), // issue #59
         onPathsRemoved: vi.fn(() => () => {}), // save after a folder rename
-        onRemovalsLost: vi.fn(() => () => {}), // #252
-        reportsRemovalsAbove: vi.fn(() => true) // #252
+        onRemovalsLost: vi.fn(() => () => {}) // #252
       }
     }))
     vi.doMock('./services/TerminalService', () => ({
@@ -472,16 +471,18 @@ describe('Main Process - Window Creation', () => {
       // Removals a paused watch lost without their paths: check the disk under that root
       const onRemovalsLost = directoryWatcherService.onRemovalsLost as unknown as ReturnType<typeof vi.fn>
       expect(onRemovalsLost).toHaveBeenCalledTimes(1)
-      const lost = onRemovalsLost.mock.calls[0][0] as (watchRoot: string) => void
-      lost('/proj')
-      expect(fileWatcherService.checkWatchedFilesUnder).toHaveBeenCalledWith('/proj')
+      const lost = onRemovalsLost.mock.calls[0][0] as (
+        root: string,
+        isOwnRemoval: (filePath: string) => boolean
+      ) => void
+      const isOwnRemoval = (): boolean => false
+      lost('/proj', isOwnRemoval)
+      expect(fileWatcherService.checkWatchedFilesUnder).toHaveBeenCalledWith('/proj', isOwnRemoval)
 
-      // Files the project watcher cannot see: the coverage test is the project watcher's own
+      // Files the project watcher cannot see: the project watcher itself says which those are
       const watchUnseen = fileWatcherService.watchUnseenFiles as unknown as ReturnType<typeof vi.fn>
       expect(watchUnseen).toHaveBeenCalledTimes(1)
-      const isCovered = watchUnseen.mock.calls[0][0] as (filePath: string) => boolean
-      expect(isCovered('/proj/.github/workflows/ci.yml')).toBe(true)
-      expect(directoryWatcherService.reportsRemovalsAbove).toHaveBeenCalledWith('/proj/.github/workflows/ci.yml')
+      expect(watchUnseen).toHaveBeenCalledWith(directoryWatcherService)
     })
   })
 

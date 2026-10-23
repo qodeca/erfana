@@ -15,7 +15,7 @@
  * Solution: Wait 100ms after DELETE. If file reappears, emit CHANGE instead.
  */
 
-import { stat } from 'fs/promises'
+import { pathIsPresent } from './pathPresence'
 
 export type AtomicSaveCallback = (path: string, wasAtomicSave: boolean) => void
 
@@ -120,16 +120,11 @@ export class AtomicSaveDetector {
   }
 
   /**
-   * Check if file exists. A failed `stat` means it does not: a sync
-   * `existsSync` retry would block the main thread and fail the same way.
+   * Check if file exists. Only a `stat` that says the path is gone counts as
+   * a delete (`pathIsPresent`): a locked or unreadable file is still there.
    */
   private async fileExists(filePath: string): Promise<boolean> {
-    try {
-      await stat(filePath)
-      return true
-    } catch {
-      return false
-    }
+    return pathIsPresent(filePath)
   }
 }
 
