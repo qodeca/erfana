@@ -17,8 +17,10 @@
  * Negative control: run with `E2E_SOFFICE_NEGATIVE_CONTROL=1` and the test also
  * starts its own LibreOffice WITHOUT `--headless` (with `--invisible`, so no
  * window opens, and a throw-away profile, so it never joins a LibreOffice the
- * user has open). The test must then FAIL with "every LibreOffice process
- * should run with --headless" – proof that the check can catch an offender.
+ * user has open). In that mode the test checks its own result: it passes only
+ * if the control's command line (found by its profile path) is flagged as
+ * running without `--headless` and nothing else is flagged – proof that the
+ * check catches a real offender.
  *
  * @see e2e/document-import.e2e.ts - the PDF import flow this test reuses
  * @see src/main/services/import/DependencyDetector.ts - the app's own probe (unit-tested for --headless)
@@ -69,6 +71,8 @@ const NAME_ONLY_LIMIT_MS = 5_000
 /** One LibreOffice process in one `ps` (or CIM) snapshot. */
 interface SofficeSighting {
   pid: number
+  /** Process start time (`ps` lstart on POSIX, CIM CreationDate ticks on Windows). */
+  startedAt: string
   commandLine: string
   /**
    * macOS/Linux: `ps` printed only the process name in brackets – `(soffice)` on
@@ -112,6 +116,12 @@ const SOFFICE_COMMAND = /(^|\/)(soffice(\.bin)?|oosplash|libreoffice)(\s|$)/
 /** `ps` showing only the name: `(soffice)` on macOS, `[soffice.bin]` or `[soffice.bin] <defunct>` on Linux. */
 const SOFFICE_NAME_ONLY = /^[([](soffice(\.bin)?|oosplash|libreoffice)[)\]]( <defunct>)?$/
 
+/** A hung listing must not block the test or its cleanup. */
+const LISTING_TIMEOUT_MS = 10_000
+
+/** `ps` `lstart` in the C locale: `Sun Oct 18 08:54:24 2026`. */
+const PS_LINE = /^(\d+)\s+(\S+)\s+(\S+\s+\S+\s+\d+\s+\d\d:\d\d:\d\d\s+\d{4})\s+(.*)$/
+
 /** The LibreOffice processes running right now. */
 async function listSoffice(): Promise<SofficeSighting[]> {
   if (process.platform === 'win32') {
@@ -119,17 +129,19 @@ async function listSoffice(): Promise<SofficeSighting[]> {
     const script =
       "Get-CimInstance Win32_Process -Filter \"Name like 'soffice%'\" | ForEach-Object { " +
       '$p = Get-Process -Id $_.ProcessId -ErrorAction SilentlyContinue; ' +
-      '"$($_.ProcessId)`t$([int64]$p.MainWindowHandle)`t$($_.CommandLine)" }'
+      '"$($_.ProcessId)`t$($_.CreationDate.Ticks)`t$([int64]$p.MainWindowHandle)`t$($_.CommandLine)" }'
     const { stdout } = await execFileAsync('powershell.exe', ['-NoProfile', '-Command', script], {
-      windowsHide: true
+      windowsHide: true,
+      timeout: LISTING_TIMEOUT_MS
     })
     return stdout
       .split(/\r?\n/)
       .filter(Boolean)
       .map((line) => {
-        const [pid, handle, ...rest] = line.split('\t')
+        const [pid, created, handle, ...rest] = line.split('\t')
         return {
           pid: Number(pid),
+          startedAt: created,
           visibleWindow: Number(handle) !== 0,
           commandLine: rest.join('\t'),
           nameOnly: false,
@@ -137,16 +149,21 @@ async function listSoffice(): Promise<SofficeSighting[]> {
         }
       })
   }
-  const { stdout } = await execFileAsync('ps', ['-axo', 'pid=,stat=,command='])
+  const { stdout } = await execFileAsync('ps', ['-axo', 'pid=,stat=,lstart=,command='], {
+    timeout: LISTING_TIMEOUT_MS,
+    // A fixed lstart format, whatever the user's locale
+    env: { ...process.env, LC_ALL: 'C' }
+  })
   const sightings: SofficeSighting[] = []
   for (const line of stdout.split('\n')) {
-    const m = line.trim().match(/^(\d+)\s+(\S+)\s+(.*)$/)
+    const m = line.trim().match(PS_LINE)
     if (!m) continue
-    const [, pid, stat, commandLine] = m
+    const [, pid, stat, startedAt, commandLine] = m
     const nameOnly = SOFFICE_NAME_ONLY.test(commandLine)
     if (!nameOnly && !SOFFICE_COMMAND.test(commandLine)) continue
     sightings.push({
       pid: Number(pid),
+      startedAt: startedAt.replace(/\s+/g, ' '),
       commandLine,
       nameOnly,
       zombie: stat.startsWith('Z'),
@@ -155,6 +172,9 @@ async function listSoffice(): Promise<SofficeSighting[]> {
   }
   return sightings
 }
+
+/** Identifies one process: a pid alone could be reused by a later process. */
+const processKey = (s: SofficeSighting): string => `${s.pid}@${s.startedAt}`
 
 /** Fold one snapshot's sighting into the per-pid record. */
 function recordSighting(seen: Map<number, SofficeRecord>, s: SofficeSighting, at: number): void {
@@ -201,23 +221,32 @@ const nameOnlySpanMs = (r: SofficeRecord): number =>
  *     arguments long before 5 s.
  * A live pid past both limits ran long enough to be checked and was not – it
  * could be a non-headless LibreOffice, so it fails the test rather than being
- * dropped. A pid seen by name only below either limit and then gone (it
- * exited, or exec'd into something that is not LibreOffice) is logged as an
- * annotation and allowed: there was no command line to check.
+ * dropped. A name-only pid that is still alive, and still name-only, in the
+ * final snapshot (taken after the import completed) also fails: it was not
+ * "gone", so the transient allowance does not apply. A pid seen by name only
+ * below both limits and then gone (it exited, or exec'd into something that is
+ * not LibreOffice) is logged as an annotation and allowed: there was no command
+ * line to check.
  */
-function evaluate(seen: Map<number, SofficeRecord>): {
+function evaluate(
+  seen: Map<number, SofficeRecord>,
+  nameOnlyAtEnd: Set<number>
+): {
   checked: SofficeRecord[]
   transient: SofficeRecord[]
   unverified: SofficeRecord[]
+  stillNameOnlyAtEnd: SofficeRecord[]
 } {
-  const isUnverified = (r: SofficeRecord): boolean =>
+  const pastLimits = (r: SofficeRecord): boolean =>
     r.nameOnlySightings >= NAME_ONLY_LIMIT_SIGHTINGS && nameOnlySpanMs(r) >= NAME_ONLY_LIMIT_MS
   const records = [...seen.values()]
   const nameOnly = records.filter(r => r.commandLines.length === 0)
+  const atEnd = (r: SofficeRecord): boolean => nameOnlyAtEnd.has(r.pid)
   return {
     checked: records.filter(r => r.commandLines.length > 0),
-    transient: nameOnly.filter(r => !isUnverified(r)),
-    unverified: nameOnly.filter(isUnverified)
+    transient: nameOnly.filter(r => !pastLimits(r) && !atEnd(r)),
+    unverified: nameOnly.filter(pastLimits),
+    stillNameOnlyAtEnd: nameOnly.filter(r => !pastLimits(r) && atEnd(r))
   }
 }
 
@@ -238,23 +267,52 @@ function startNonHeadlessSoffice(profileDir: string): ChildProcess {
   )
 }
 
-/** Stop the negative-control LibreOffice – only the process (group) this test started. */
-async function stopNonHeadlessSoffice(child: ChildProcess): Promise<void> {
-  if (child.pid === undefined || child.exitCode !== null || child.signalCode !== null) return
-  const exited = new Promise<void>(resolve => child.once('exit', () => resolve()))
+/** How long the negative-control LibreOffice gets to exit on SIGTERM before SIGKILL. */
+const CONTROL_EXIT_GRACE_MS = 5_000
+
+/** Signal the control's whole process group; a group already gone (ESRCH) is fine. */
+function signalGroup(pgid: number, signal: NodeJS.Signals): void {
   try {
-    if (process.platform === 'win32') {
-      // /T: the launcher and the soffice.bin it started – this test's tree only
-      await execFileAsync('taskkill', ['/PID', String(child.pid), '/T', '/F'], {
-        windowsHide: true
-      })
-    } else {
-      process.kill(-child.pid, 'SIGTERM')
-    }
-  } catch {
-    // already gone
+    process.kill(-pgid, signal)
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'ESRCH') throw err
   }
-  await exited
+}
+
+/**
+ * Stop the negative-control LibreOffice – only the process (group) this test
+ * started. The group is signalled even when the leader has already exited, so
+ * a child it left behind is still reached.
+ */
+async function stopNonHeadlessSoffice(child: ChildProcess): Promise<void> {
+  const pid = child.pid
+  if (pid === undefined) return
+  if (process.platform === 'win32') {
+    try {
+      // /T: the launcher and the soffice.bin it started – this test's tree only
+      await execFileAsync('taskkill', ['/PID', String(pid), '/T', '/F'], {
+        windowsHide: true,
+        timeout: LISTING_TIMEOUT_MS
+      })
+    } catch {
+      // already gone
+    }
+    return
+  }
+  const leaderGone = child.exitCode !== null || child.signalCode !== null
+  const exited = leaderGone
+    ? Promise.resolve(true)
+    : new Promise<boolean>(resolve => child.once('exit', () => resolve(true)))
+  signalGroup(pid, 'SIGTERM')
+  let timer: NodeJS.Timeout | undefined
+  // Not a fixed delay: resolves as soon as the leader exits, the timer only bounds it
+  const grace = new Promise<boolean>(resolve => {
+    timer = setTimeout(() => resolve(false), CONTROL_EXIT_GRACE_MS)
+  })
+  await Promise.race([exited, grace])
+  clearTimeout(timer)
+  // Always: reaches a leader that ignored SIGTERM and any child left in the group
+  signalGroup(pid, 'SIGKILL')
 }
 
 /** A minimal Word document (three parts, no styles) that LibreOffice converts. */
@@ -314,26 +372,35 @@ test.describe('Document import – LibreOffice runs headless', () => {
     })
     let window: Awaited<ReturnType<typeof electronApp.firstWindow>> | undefined
 
-    // LibreOffice processes already running (the user's own) are not ours to judge
-    const preExisting = new Set((await listSoffice()).map((p) => p.pid))
     const seen = new Map<number, SofficeRecord>()
     let polling = true
-    const poller = (async () => {
-      while (polling) {
-        const snapshot = await listSoffice().catch(() => [])
-        const at = Date.now()
-        for (const s of snapshot) {
-          if (!preExisting.has(s.pid)) recordSighting(seen, s, at)
-        }
-      }
-    })()
-
+    let poller: Promise<void> | undefined
+    /** Pids still alive and name-only in the last snapshot; undefined if it could not be taken. */
+    let nameOnlyAtEnd: Set<number> | undefined
     let controlProfile: string | undefined
+    let controlMarker: string | undefined
     let control: ChildProcess | undefined
+    let preExisting: Set<string> | undefined
+    /** One snapshot, folded into `seen`; the processes in the baseline are skipped. */
+    const take = async (baseline: Set<string>): Promise<SofficeSighting[]> => {
+      const snapshot = (await listSoffice()).filter(s => !baseline.has(processKey(s)))
+      const at = Date.now()
+      for (const s of snapshot) recordSighting(seen, s, at)
+      return snapshot
+    }
     try {
+      // LibreOffice processes already running (the user's own) are not ours to judge.
+      // Keyed on pid + start time, so a process that reuses one of their pids is still judged.
+      const baseline = new Set((await listSoffice()).map(processKey))
+      preExisting = baseline
+      poller = (async () => {
+        while (polling) await take(baseline).catch(() => [])
+      })()
+
       if (NEGATIVE_CONTROL) {
         controlProfile = fs.mkdtempSync(path.join(os.tmpdir(), 'erfana-headless-control-'))
         const marker = pathToFileURL(controlProfile).href
+        controlMarker = marker
         control = startNonHeadlessSoffice(controlProfile)
         // Wait until the poller has its full command line, so the check below has it to judge
         await expect
@@ -358,17 +425,41 @@ test.describe('Document import – LibreOffice runs headless', () => {
       await byTestId(window, TEST_IDS.DOCUMENT_IMPORT_BTN_START).click()
       await expect(dialog.locator('.doc-import-success-message')).toHaveText('Import complete', { timeout: 60000 })
     } finally {
-      polling = false
-      await poller
-      if (control) await stopNonHeadlessSoffice(control)
-      if (controlProfile) fs.rmSync(controlProfile, { recursive: true, force: true })
-      await closeApp(electronApp, window)
-      await cleanupProject()
-      await cleanupUserData()
-      fs.rmSync(docDir, { recursive: true, force: true })
+      // Each step on its own, so one failing step never skips the rest – closeApp always runs
+      const step = async (name: string, run: () => unknown): Promise<void> => {
+        try {
+          await run()
+        } catch (err) {
+          console.warn(`[headless-guard] cleanup step "${name}" failed:`, err)
+        }
+      }
+      await step('stop poller', async () => {
+        polling = false
+        await poller
+      })
+      // The final snapshot: after "Import complete" (or a failure), before anything is stopped
+      await step('final snapshot', async () => {
+        if (!preExisting) return
+        const last = await take(preExisting)
+        nameOnlyAtEnd = new Set(last.filter(s => s.nameOnly && !s.zombie).map(s => s.pid))
+      })
+      await step('stop negative control', () => control && stopNonHeadlessSoffice(control))
+      await step('remove control profile', () => {
+        if (controlProfile) fs.rmSync(controlProfile, { recursive: true, force: true, maxRetries: 3 })
+      })
+      await step('close app', () => closeApp(electronApp, window))
+      await step('remove project', () => cleanupProject())
+      await step('remove user data', () => cleanupUserData())
+      await step('remove document', () =>
+        fs.rmSync(docDir, { recursive: true, force: true, maxRetries: 3 })
+      )
     }
 
-    const { checked, transient, unverified } = evaluate(seen)
+    expect(nameOnlyAtEnd, 'the final process snapshot should have been taken').toBeDefined()
+    const { checked, transient, unverified, stillNameOnlyAtEnd } = evaluate(
+      seen,
+      nameOnlyAtEnd ?? new Set()
+    )
     test
       .info()
       .annotations.push({ type: 'soffice-processes', description: JSON.stringify(checked) })
@@ -389,12 +480,28 @@ test.describe('Document import – LibreOffice runs headless', () => {
         'without ever showing its command line, so --headless could not be checked'
     ).toEqual([])
     expect(
-      checked
-        .map(r => ({
-          pid: r.pid,
-          withoutHeadless: r.commandLines.filter(c => !HEADLESS_FLAG.test(c))
-        }))
-        .filter(r => r.withoutHeadless.length > 0),
+      stillNameOnlyAtEnd,
+      'a LibreOffice process was still running at the end without ever showing its command line, ' +
+        'so --headless could not be checked'
+    ).toEqual([])
+    const withoutHeadless = checked
+      .map(r => ({
+        pid: r.pid,
+        withoutHeadless: r.commandLines.filter(c => !HEADLESS_FLAG.test(c))
+      }))
+      .filter(r => r.withoutHeadless.length > 0)
+    const isControl = (r: { withoutHeadless: string[] }): boolean =>
+      controlMarker !== undefined && r.withoutHeadless.some(c => c.includes(controlMarker as string))
+    if (NEGATIVE_CONTROL) {
+      // The check must catch the control: its own non-headless command line is flagged
+      expect(
+        withoutHeadless.filter(isControl),
+        'the negative-control LibreOffice should be flagged as running without --headless'
+      ).toHaveLength(1)
+    }
+    // Nothing else may be flagged – in a normal run, nothing at all
+    expect(
+      withoutHeadless.filter(r => !isControl(r)),
       'every LibreOffice process should run with --headless'
     ).toEqual([])
     expect(
