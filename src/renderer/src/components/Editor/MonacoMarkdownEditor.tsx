@@ -10,6 +10,7 @@ import { registerClipboardActions } from '../../utils/monacoClipboardCommands'
 import { getMonacoLanguage } from '../../utils/monacoLanguage'
 import { disableWorkerLanguageServices } from '../../utils/monacoLanguageServices'
 import { createEditorValueSync, type EditorValueSync } from '../../utils/monacoValueSync'
+import { isKeyboardMenuEcho, markKeyboardMenuOpen } from '../ContextMenu/contextMenuKey'
 import './MonacoMarkdownEditor.css'
 
 // Configure Monaco to use local files instead of CDN
@@ -253,12 +254,9 @@ export const MonacoMarkdownEditor = forwardRef<MonacoEditorHandle, MonacoMarkdow
       // no contextMenu group/order is set.
       registerClipboardActions(editor, monaco)
 
-      // Handle right-click context menu (always show our menu for Paste support)
-      editor.onContextMenu((e: monaco.editor.IEditorMouseEvent) => {
-        // Prevent Monaco's default context menu (disabled, but belt-and-suspenders)
-        e.event.preventDefault()
-        e.event.stopPropagation()
-
+      // One path for both ways in: the pointer (at the pointer) and the
+      // keyboard (under the caret).
+      const openMenuAt = (x: number, y: number): void => {
         const model = editor.getModel()
         if (!model) return
 
@@ -274,14 +272,42 @@ export const MonacoMarkdownEditor = forwardRef<MonacoEditorHandle, MonacoMarkdow
         const notify = latestRef.current.onContextMenu
         if (notify) {
           notify({
-            x: e.event.posx,
-            y: e.event.posy,
+            x,
+            y,
             selectedText,
             startLine: hasSelection ? selection!.startLineNumber : cursorLine,
             endLine: hasSelection ? selection!.endLineNumber : cursorLine
           })
         }
+      }
+
+      // Handle right-click context menu (always show our menu for Paste support)
+      editor.onContextMenu((e: monaco.editor.IEditorMouseEvent) => {
+        // Prevent Monaco's default context menu (disabled, but belt-and-suspenders)
+        e.event.preventDefault()
+        e.event.stopPropagation()
+        // Windows also turns the Menu key into a native contextmenu after the
+        // keybinding below already opened the menu under the caret (#90).
+        if (isKeyboardMenuEcho()) return
+        openMenuAt(e.event.posx, e.event.posy)
       })
+
+      // Shift+F10 and the Menu key open the same menu under the caret (#90).
+      // With `contextmenu: false` Monaco's own Shift+F10 action shows nothing,
+      // so these commands replace it rather than compete with it.
+      const openMenuFromKeyboard = (): void => {
+        const position = editor.getPosition()
+        const caret = position ? editor.getScrolledVisiblePosition(position) : null
+        const host = editor.getDomNode()?.getBoundingClientRect()
+        if (!host) return
+        markKeyboardMenuOpen()
+        openMenuAt(
+          host.left + (caret?.left ?? 0),
+          host.top + (caret ? caret.top + caret.height : 0)
+        )
+      }
+      editor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.F10, openMenuFromKeyboard)
+      editor.addCommand(monaco.KeyCode.ContextMenu, openMenuFromKeyboard)
 
       // Notify parent component that editor is mounted and ready
       latestRef.current.onEditorMount?.(editor)
