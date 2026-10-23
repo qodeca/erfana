@@ -17,6 +17,7 @@
  * - transcription:whisperEnsureModel   - Download whisper model
  * - transcription:whisperListModels    - List installed models
  * - transcription:whisperDeleteModel   - Delete a model
+ * - transcription:whisperCancelDownload - Cancel the running binary or model download
  *
  * @see Issue #75 - Media import with transcription
  * @see Issue #111 - Local Whisper transcription backend
@@ -53,6 +54,24 @@ import { registerHandle } from './registry'
 
 /** Active AbortController for current transcription */
 let activeController: AbortController | null = null
+
+/**
+ * Whisper ensure requests still running. Cancel marks each one, so its failure
+ * is reported as cancelled; the abort itself is the manager's own
+ * (`whisperModelManager.cancelDownloads()`), which also deletes the partials.
+ */
+const runningDownloads = new Set<{ cancelled: boolean }>()
+
+/** Result of a whisper download; `cancelled` marks a user cancel, not an error to show */
+type WhisperDownloadResult = { success: boolean; path?: string; error?: string; cancelled?: boolean }
+const DOWNLOAD_CANCELLED: WhisperDownloadResult = { success: false, cancelled: true, error: 'Download cancelled' }
+
+/** Start tracking a whisper ensure request; `release` stops tracking it. */
+function trackDownload(): { request: { cancelled: boolean }; release: () => void } {
+  const request = { cancelled: false }
+  runningDownloads.add(request)
+  return { request, release: () => runningDownloads.delete(request) }
+}
 
 /**
  * Route a transcription call to the appropriate backend
@@ -575,7 +594,7 @@ export function registerTranscriptionHandlers(): void {
    */
   registerHandle(
     TRANSCRIPTION_CHANNELS.WHISPER_ENSURE_BINARY,
-    async (event): Promise<{ success: boolean; path?: string; error?: string }> => {
+    async (event): Promise<WhisperDownloadResult> => {
       const webContents = event.sender
 
       const onProgress: ProgressCallback = (progressData) => {
@@ -588,15 +607,19 @@ export function registerTranscriptionHandlers(): void {
         }
       }
 
+      const download = trackDownload()
       try {
         const path = await whisperModelManager.ensureBinary({ onProgress })
         return { success: true, path }
       } catch (error) {
+        if (download.request.cancelled) return DOWNLOAD_CANCELLED
         logger.error('Failed to ensure whisper binary', error instanceof Error ? error : undefined)
         return {
           success: false,
           error: error instanceof Error ? error.message : 'Failed to download whisper binary'
         }
+      } finally {
+        download.release()
       }
     }
   )
@@ -611,7 +634,7 @@ export function registerTranscriptionHandlers(): void {
     async (
       event,
       model: string
-    ): Promise<{ success: boolean; path?: string; error?: string }> => {
+    ): Promise<WhisperDownloadResult> => {
       const webContents = event.sender
 
       const onProgress: ProgressCallback = (progressData) => {
@@ -624,21 +647,44 @@ export function registerTranscriptionHandlers(): void {
         }
       }
 
-      try {
-        const parsed = WhisperModelSchema.safeParse(model)
-        if (!parsed.success) {
-          return { success: false, error: `Invalid whisper model: ${model}` }
-        }
+      const parsed = WhisperModelSchema.safeParse(model)
+      if (!parsed.success) {
+        return { success: false, error: `Invalid whisper model: ${model}` }
+      }
 
+      const download = trackDownload()
+      try {
         const path = await whisperModelManager.ensureModel(parsed.data, { onProgress })
         return { success: true, path }
       } catch (error) {
+        if (download.request.cancelled) return DOWNLOAD_CANCELLED
         logger.error('Failed to ensure whisper model', error instanceof Error ? error : undefined)
         return {
           success: false,
           error: error instanceof Error ? error.message : 'Failed to download whisper model'
         }
+      } finally {
+        download.release()
       }
+    }
+  )
+
+  /**
+   * Cancel the running whisper binary or model download.
+   *
+   * The pending ensure call then resolves with `cancelled: true`; the manager
+   * has deleted the partial file by then.
+   */
+  registerHandle(
+    TRANSCRIPTION_CHANNELS.WHISPER_CANCEL_DOWNLOAD,
+    async (): Promise<{ success: boolean; error?: string }> => {
+      if (runningDownloads.size === 0) {
+        return { success: false, error: 'No active download' }
+      }
+      for (const request of runningDownloads) request.cancelled = true
+      const aborted = whisperModelManager.cancelDownloads()
+      logger.info('Whisper download cancelled by user', { aborted })
+      return { success: true }
     }
   )
 

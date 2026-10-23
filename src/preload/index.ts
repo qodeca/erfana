@@ -447,7 +447,7 @@ const api = {
      *
      * @returns Success status with binary path or error
      */
-    ensureBinary: (): Promise<{ success: boolean; path?: string; error?: string }> =>
+    ensureBinary: (): Promise<{ success: boolean; path?: string; error?: string; cancelled?: boolean }> =>
       ipcRenderer.invoke(TRANSCRIPTION_CHANNELS.WHISPER_ENSURE_BINARY),
 
     /**
@@ -458,7 +458,7 @@ const api = {
      * @param model - Model size to ensure (tiny, base, small, medium, large)
      * @returns Success status with model path or error
      */
-    ensureModel: (model: WhisperModel): Promise<{ success: boolean; path?: string; error?: string }> =>
+    ensureModel: (model: WhisperModel): Promise<{ success: boolean; path?: string; error?: string; cancelled?: boolean }> =>
       ipcRenderer.invoke(TRANSCRIPTION_CHANNELS.WHISPER_ENSURE_MODEL, model),
 
     /**
@@ -479,6 +479,15 @@ const api = {
      */
     deleteModel: (model: WhisperModel): Promise<{ success: boolean; error?: string }> =>
       ipcRenderer.invoke(TRANSCRIPTION_CHANNELS.WHISPER_DELETE_MODEL, model),
+
+    /**
+     * Cancel the running binary or model download. Its pending ensure call
+     * resolves with `cancelled: true` and the partial file is deleted.
+     *
+     * @returns Success status (false when nothing was downloading)
+     */
+    cancelDownload: (): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke(TRANSCRIPTION_CHANNELS.WHISPER_CANCEL_DOWNLOAD),
 
     /**
      * Subscribe to whisper model download progress events
