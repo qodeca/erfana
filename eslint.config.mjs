@@ -58,7 +58,16 @@ const GATEWAY_BRIDGES = [
   'quit',
   'system',
   'clipboard',
-  'testHooks'
+  'testHooks',
+  'import',
+  'transcription',
+  'whisper',
+  'camera',
+  'pdf',
+  'docx',
+  'imageExport',
+  'browser',
+  'markdownImage'
 ]
 const RENDERER_GATEWAY_SELECTORS = [
   {
@@ -129,6 +138,13 @@ const RENDERER_GATEWAY_FILES = [
   'src/renderer/src/services/systemGateway.ts',
   'src/renderer/src/services/clipboardGateway.ts',
   'src/renderer/src/services/testHooksGateway.ts',
+  'src/renderer/src/services/importGateway.ts',
+  'src/renderer/src/services/transcriptionGateway.ts',
+  'src/renderer/src/services/cameraGateway.ts',
+  'src/renderer/src/services/documentExportGateway.ts',
+  'src/renderer/src/services/imageExportGateway.ts',
+  'src/renderer/src/services/browserGateway.ts',
+  'src/renderer/src/services/markdownImageGateway.ts',
   'src/renderer/src/services/bridgePresence.ts'
 ]
 

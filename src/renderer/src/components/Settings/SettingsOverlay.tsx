@@ -17,6 +17,7 @@ import { HtmlPreviewSection } from './sections/HtmlPreviewSection'
 import { ImportToolsSection } from './sections/ImportToolsSection'
 import './SettingsOverlay.css'
 import { loggingGateway } from '../../services/loggingGateway'
+import { transcriptionGateway, whisperGateway } from '../../services/transcriptionGateway'
 
 // Small delay to ensure overlay is fully rendered before focusing
 const FOCUS_DELAY_MS = 10
@@ -116,7 +117,7 @@ export function SettingsOverlay() {
    */
   useEffect(() => {
     if (!isOpen) return
-    window.api.transcription.hasApiKey()
+    transcriptionGateway.hasApiKey()
       .then((result) => setHasApiKey(result))
       .catch(() => setHasApiKey(false))
   }, [isOpen])
@@ -136,7 +137,7 @@ export function SettingsOverlay() {
    */
   useEffect(() => {
     if (!isOpen) return
-    window.api.whisper.listModels()
+    whisperGateway.listModels()
       .then((result) => {
         if (result.success && result.models) {
           const installed = result.models
@@ -153,7 +154,7 @@ export function SettingsOverlay() {
    */
   useEffect(() => {
     if (!isOpen) return undefined
-    const cleanup = window.api.whisper.onDownloadProgress((progress) => {
+    const cleanup = whisperGateway.onDownloadProgress((progress) => {
       setDownloadProgress(progress)
     })
     return cleanup
@@ -185,7 +186,7 @@ export function SettingsOverlay() {
     setDownloadError(null)
     try {
       // Ensure binary is available before downloading the model
-      const binaryResult = await window.api.whisper.ensureBinary()
+      const binaryResult = await whisperGateway.ensureBinary()
       if (!binaryResult.success) {
         const errorMsg = binaryResult.error || 'Binary setup failed'
         setDownloadError(errorMsg)
@@ -193,7 +194,7 @@ export function SettingsOverlay() {
         return
       }
 
-      const result = await window.api.whisper.ensureModel(model)
+      const result = await whisperGateway.ensureModel(model)
       if (result.success) {
         setInstalledModels((prev) => prev.includes(model) ? prev : [...prev, model])
       } else {
@@ -221,7 +222,7 @@ export function SettingsOverlay() {
       if (!value || value.length < 8) return
 
       try {
-        const result = await window.api.transcription.setApiKey(value)
+        const result = await transcriptionGateway.setApiKey(value)
         if (result.success) {
           setApiKeyError(null)
           setHasApiKey(true)
@@ -243,7 +244,7 @@ export function SettingsOverlay() {
    */
   const handleClearApiKey = useCallback(async () => {
     try {
-      const result = await window.api.transcription.clearApiKey()
+      const result = await transcriptionGateway.clearApiKey()
       if (result.success) {
         setHasApiKey(false)
       } else {

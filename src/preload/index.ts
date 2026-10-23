@@ -2,8 +2,6 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import { FORCE_CRASH_ARG, TEST_HOOKS_ARG } from '../shared/constants'
-import type { PdfExportRequest, PdfExportResponse } from '../shared/ipc/pdf-schema'
-import type { DocxExportRequest, DocxExportResponse } from '../shared/ipc/docx-schema'
 import type {
   ScreenshotCaptureRequest,
   ScreenshotCaptureResponse,
@@ -13,39 +11,12 @@ import type {
   ScreenshotCapabilities,
   ScreenRecordingPermission
 } from '../shared/ipc/screenshot-schema'
-import type {
-  CameraSaveRequest,
-  CameraSaveResponse
-} from '../shared/ipc/camera-schema'
-import type {
-  TranscriptionImportRequest,
-  TranscriptionImportResult,
-  TranscriptionProgress,
-  WhisperModel
-} from '../shared/ipc/transcription-schema'
-import { TRANSCRIPTION_CHANNELS } from '../shared/ipc/transcription-channels'
-import { IMPORT_CHANNELS } from '../shared/ipc/import-channels'
-import { IMAGE_EXPORT_CHANNELS } from '../shared/ipc/image-export-channels'
-import { BROWSER_CHANNELS } from '../shared/ipc/browser-channels'
-import type { BrowserOpenFileResponse } from '../shared/ipc/browser-schema'
-import type {
-  ImageExportRequest,
-  ImageExportResponse
-} from '../shared/ipc/image-export-schema'
 import {
   ClaudeStatusChannels,
   ClaudeStatusEvents
 } from '../shared/ipc/claude-status-channels'
 import type { ClaudeStatusChangePayload } from '../shared/ipc/claude-status-schema'
 import { previewBridge } from './previewBridge'
-import type {
-  DocumentImportRequest,
-  DocumentImportResult,
-  DocumentImportProgress,
-  DependencyReadyEvent,
-  ImportToolStatusRequest,
-  ImportToolStatusResponse
-} from '../shared/ipc/import-schema'
 import { fileBridge } from './fileBridge'
 import { terminalBridge } from './terminalBridge'
 import { markdownImageBridge } from './markdownImageBridge'
@@ -58,6 +29,12 @@ import { quitBridge } from './quitBridge'
 import { systemBridge } from './systemBridge'
 import { clipboardBridge } from './clipboardBridge'
 import { projectLockBridge } from './projectLockBridge'
+import { importBridge } from './importBridge'
+import { transcriptionBridge, whisperBridge } from './transcriptionBridge'
+import { cameraBridge } from './cameraBridge'
+import { docxBridge, pdfBridge } from './documentExportBridge'
+import { imageExportBridge } from './imageExportBridge'
+import { browserBridge } from './browserBridge'
 import type { FileNode, FileStats } from '../shared/ipc/file-schema'
 
 export type { FileNode, FileStats }
@@ -103,133 +80,15 @@ const api = {
   // Terminal operations (see terminalBridge.ts)
   terminal: terminalBridge,
 
-  // Unified import operations (supports PDF, text, and future formats)
-  import: {
-    /**
-     * Open native file dialog for selecting files to import
-     * Returns file info or null if cancelled
-     */
-    selectFile: (): Promise<{
-      path: string
-      name: string
-      sizeInMB: number
-      extension: string
-    } | null> => ipcRenderer.invoke('import:selectFile'),
-
-    /**
-     * Validate a file before import
-     * Returns validation result with any warnings/errors
-     */
-    validate: (filePath: string): Promise<{
-      valid: boolean
-      error?: string
-      sizeInMB: number
-      fileName: string
-    }> => ipcRenderer.invoke('import:validate', filePath),
-
-    /**
-     * Import a file into the current project
-     * Full workflow: validate → convert → write to import/
-     */
-    process: (filePath: string): Promise<{
-      success: boolean
-      outputPath?: string
-      error?: string
-      errorCode?: string
-    }> => ipcRenderer.invoke('import:process', filePath),
-
-    /**
-     * Get list of supported file extensions
-     */
-    getSupportedExtensions: (): Promise<string[]> =>
-      ipcRenderer.invoke('import:getSupportedExtensions'),
-
-    /**
-     * Check if a file type is supported for import
-     */
-    isSupported: (extension: string): Promise<boolean> =>
-      ipcRenderer.invoke('import:isSupported', extension),
-
-    /**
-     * Import a document via LiteParse converter with options
-     */
-    documentImport: (request: DocumentImportRequest): Promise<DocumentImportResult> =>
-      ipcRenderer.invoke(IMPORT_CHANNELS.DOCUMENT, request),
-
-    /**
-     * Cancel an active document import
-     */
-    cancelDocument: (): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke(IMPORT_CHANNELS.DOCUMENT_CANCEL),
-
-    /**
-     * Get list of supported document extensions (depends on system tools)
-     */
-    getDocumentExtensions: (): Promise<string[]> =>
-      ipcRenderer.invoke(IMPORT_CHANNELS.GET_DOCUMENT_EXTENSIONS),
-
-    /**
-     * Optional import tool status – LibreOffice found / missing / unsafe (#250).
-     * `{ recheck: true }` re-runs detection ("Check again"); main rate-limits
-     * it. Never rejects: failures arrive as `success: false`.
-     */
-    toolStatus: (request: ImportToolStatusRequest): Promise<ImportToolStatusResponse> =>
-      ipcRenderer.invoke(IMPORT_CHANNELS.TOOL_STATUS, request),
-
-    /**
-     * Subscribe to document import progress events
-     * Returns cleanup function to unsubscribe
-     */
-    onDocumentProgress: (callback: (progress: DocumentImportProgress) => void): (() => void) => {
-      const listener = (_event: unknown, data: DocumentImportProgress): void => callback(data)
-      ipcRenderer.on(IMPORT_CHANNELS.DOCUMENT_PROGRESS, listener)
-      return () => {
-        ipcRenderer.removeListener(IMPORT_CHANNELS.DOCUMENT_PROGRESS, listener)
-      }
-    },
-
-    /**
-     * Subscribe to dependency detection completion event
-     * Returns cleanup function to unsubscribe
-     */
-    onDependenciesReady: (callback: (event: DependencyReadyEvent) => void): (() => void) => {
-      const listener = (_event: unknown, data: DependencyReadyEvent): void => callback(data)
-      ipcRenderer.on(IMPORT_CHANNELS.DEPENDENCIES_READY, listener)
-      return () => {
-        ipcRenderer.removeListener(IMPORT_CHANNELS.DEPENDENCIES_READY, listener)
-      }
-    }
-  },
+  // Unified import operations: PDF, text and documents (see importBridge.ts)
+  import: importBridge,
 
   // Git status (see gitBridge.ts)
   git: gitBridge,
 
-  // PDF export operations
-  pdf: {
-    /**
-     * Export HTML content to PDF
-     *
-     * Shows native save dialog, renders in hidden window, writes PDF file.
-     * @param request - { html: string, fileName: string }
-     * @returns Export result with file path or error
-     */
-    exportToPdf: (request: PdfExportRequest): Promise<PdfExportResponse> =>
-      ipcRenderer.invoke('pdf:exportToPdf', request)
-  },
-
-  // DOCX export operations
-  docx: {
-    /**
-     * Export HTML content to DOCX (Word)
-     *
-     * Shows native save dialog, parses HTML, generates DOCX file.
-     * @param request - { html: string, fileName: string }
-     * @returns Export result with file path or error
-     * @see Issue #65 - DOCX export with Mermaid diagram support
-     */
-    exportToDocx: (request: DocxExportRequest): Promise<DocxExportResponse> =>
-      ipcRenderer.invoke('docx:exportToDocx', request)
-  },
+  // PDF and DOCX export operations (see documentExportBridge.ts)
+  pdf: pdfBridge,
+  docx: docxBridge,
 
   /**
    * Screenshot capture operations.
@@ -302,173 +161,18 @@ const api = {
   system: systemBridge,
 
   /**
-   * Camera photo capture operations
-   *
-   * Saves webcam photos captured via MediaDevices API to temp directory.
+   * Camera photo capture (see cameraBridge.ts)
    * @see Spec #014 - Camera photo capture specification
    */
-  camera: {
-    /**
-     * Save a captured photo to temp file
-     *
-     * @param request - { dataUrl: string, timestamp?: number }
-     * @returns Save result with file path or error
-     */
-    save: (request: CameraSaveRequest): Promise<CameraSaveResponse> =>
-      ipcRenderer.invoke('camera:save', request)
-  },
+  camera: cameraBridge,
 
   /**
-   * Transcription operations for audio-to-text conversion
-   *
-   * Provides import with progress streaming, validation, cancellation,
-   * and API key management for the transcription backend.
-   *
+   * Audio transcription and the local whisper backend (see transcriptionBridge.ts)
    * @see Issue #75 - Media import with transcription
-   * @see Spec #009 - Media import with transcription specification
-   */
-  transcription: {
-    /**
-     * Import an audio file with transcription
-     *
-     * Starts the full transcription workflow: validate, transcribe (with chunking
-     * for long files), and write markdown output to the import/ directory.
-     * Progress events are streamed via onProgress.
-     *
-     * @param request - Import request with filePath and language
-     * @returns Import result with success status and output path
-     */
-    import: (request: TranscriptionImportRequest): Promise<TranscriptionImportResult> =>
-      ipcRenderer.invoke('transcription:import', request),
-
-    /**
-     * Cancel the active transcription
-     *
-     * Aborts any in-progress transcription and cleans up temp files.
-     *
-     * @returns Success status
-     */
-    cancel: (): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke('transcription:cancel'),
-
-    /**
-     * Validate an audio file before import
-     *
-     * Checks file exists, is a supported audio format, and extracts metadata.
-     *
-     * @param filePath - Absolute path to the audio file
-     * @returns Validation result with duration and size info
-     */
-    validate: (filePath: string): Promise<{
-      valid: boolean; error?: string; durationSeconds?: number; sizeInMB: number
-    }> => ipcRenderer.invoke('transcription:validate', filePath),
-
-    /**
-     * Store an API key in Electron safeStorage
-     *
-     * The key is encrypted and stored securely. Only a boolean flag
-     * is saved in settings JSON.
-     *
-     * @param apiKey - The API key to store (e.g., OpenAI key starting with "sk-")
-     * @returns Success status
-     */
-    setApiKey: (apiKey: string): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke('transcription:setApiKey', apiKey),
-
-    /**
-     * Check whether an API key exists in safeStorage
-     *
-     * @returns true if a key is stored, false otherwise
-     */
-    hasApiKey: (): Promise<boolean> =>
-      ipcRenderer.invoke('transcription:hasApiKey'),
-
-    /**
-     * Remove the stored API key from safeStorage
-     *
-     * @returns Success status
-     */
-    clearApiKey: (): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke('transcription:clearApiKey'),
-
-    /**
-     * Subscribe to transcription progress events
-     *
-     * Progress events are streamed from main process during active transcription.
-     * Returns a cleanup function to unsubscribe.
-     *
-     * @param callback - Called with progress updates (percent, phase, chunks, ETA)
-     * @returns Cleanup function to remove the listener
-     */
-    onProgress: (callback: (progress: TranscriptionProgress) => void): (() => void) => {
-      const listener = (_event: unknown, data: TranscriptionProgress): void => callback(data)
-      ipcRenderer.on('transcription:progress', listener)
-      return () => {
-        ipcRenderer.removeListener('transcription:progress', listener)
-      }
-    }
-  },
-
-  /**
-   * Whisper model management for local transcription backend
-   *
-   * Manages whisper.cpp binary and model downloads for offline transcription.
-   *
    * @see Issue #111 - Local Whisper transcription backend
    */
-  whisper: {
-    /**
-     * Ensure the whisper.cpp binary is downloaded and available
-     *
-     * @returns Success status with binary path or error
-     */
-    ensureBinary: (): Promise<{ success: boolean; path?: string; error?: string }> =>
-      ipcRenderer.invoke(TRANSCRIPTION_CHANNELS.WHISPER_ENSURE_BINARY),
-
-    /**
-     * Ensure a specific whisper model is downloaded
-     *
-     * Triggers download if not present. Progress is streamed via onDownloadProgress.
-     *
-     * @param model - Model size to ensure (tiny, base, small, medium, large)
-     * @returns Success status with model path or error
-     */
-    ensureModel: (model: WhisperModel): Promise<{ success: boolean; path?: string; error?: string }> =>
-      ipcRenderer.invoke(TRANSCRIPTION_CHANNELS.WHISPER_ENSURE_MODEL, model),
-
-    /**
-     * List installed whisper models
-     *
-     * @returns Array of installed model names
-     */
-    listModels: (): Promise<{
-      success: boolean
-      models: Array<{ name: WhisperModel; size: number; installed: boolean }>
-    }> => ipcRenderer.invoke(TRANSCRIPTION_CHANNELS.WHISPER_LIST_MODELS),
-
-    /**
-     * Delete a downloaded whisper model
-     *
-     * @param model - Model to delete
-     * @returns Success status
-     */
-    deleteModel: (model: WhisperModel): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke(TRANSCRIPTION_CHANNELS.WHISPER_DELETE_MODEL, model),
-
-    /**
-     * Subscribe to whisper model download progress events
-     *
-     * @param callback - Called with download progress updates
-     * @returns Cleanup function to remove the listener
-     */
-    onDownloadProgress: (callback: (progress: { percent: number; downloadedBytes: number; totalBytes: number }) => void): (() => void) => {
-      const listener = (_event: unknown, data: { percent: number; downloadedBytes: number; totalBytes: number }): void => callback(data)
-      ipcRenderer.on(TRANSCRIPTION_CHANNELS.WHISPER_DOWNLOAD_PROGRESS, listener)
-      return () => {
-        ipcRenderer.removeListener(TRANSCRIPTION_CHANNELS.WHISPER_DOWNLOAD_PROGRESS, listener)
-      }
-    }
-  },
+  transcription: transcriptionBridge,
+  whisper: whisperBridge,
 
   // Global settings operations (see settingsBridge.ts)
   globalSettings: globalSettingsBridge,
@@ -482,31 +186,11 @@ const api = {
    */
   clipboard: clipboardBridge,
 
-  /**
-   * Image export bridge (#73).
-   *
-   * Sends a path and a target; gets back a small structured result. NO IMAGE
-   * BYTES cross this bridge in either direction — the main process reads the
-   * file fresh from disk and writes or copies the output itself, so a 50 MB
-   * source never becomes a ~67 MB base64 payload on the wire.
-   *
-   * Never rejects: failures arrive as the `success: false` branch, carrying a
-   * code and the message to show for it.
-   */
-  imageExport: {
-    /** Export the image at `filePath` as PNG, as PDF, or to the clipboard. */
-    run: (request: ImageExportRequest): Promise<ImageExportResponse> =>
-      ipcRenderer.invoke(IMAGE_EXPORT_CHANNELS.RUN, request)
-  },
+  // Image export, no image bytes on the wire (#73, see imageExportBridge.ts)
+  imageExport: imageExportBridge,
 
-  /**
-   * Open in default browser (#124). Sends a file path, never an address: main
-   * confines it to the open project and launches the real path. Never rejects.
-   */
-  browser: {
-    openFile: (filePath: string): Promise<BrowserOpenFileResponse> =>
-      ipcRenderer.invoke(BROWSER_CHANNELS.OPEN_FILE, { filePath })
-  },
+  // Open in default browser (#124, see browserBridge.ts)
+  browser: browserBridge,
 
   /**
    * Images referenced from Markdown (#71). Sends a path; gets back a `data:`

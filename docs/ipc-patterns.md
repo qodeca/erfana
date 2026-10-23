@@ -55,6 +55,15 @@ Renderer code does not read a bridge off `window.api` once the bridge has a gate
 | `system` | `SystemBridge` (`system-schema.ts`) | `systemBridge.ts` | `systemGateway` |
 | `clipboard` | `ClipboardBridge` (`clipboard-schema.ts`) | `clipboardBridge.ts` | `clipboardGateway` – copy and paste through `services/textClipboard`, the transport-error chokepoint |
 | `testHooks` | `Api['testHooks']` – a value the preload reads from its launch arguments, no IPC | inline in `index.ts` | `testHooksGateway` |
+| `import` | `ImportBridge` (`import-schema.ts`) | `importBridge.ts` | `importGateway` |
+| `transcription` | `TranscriptionBridge` (`transcription-schema.ts`) | `transcriptionBridge.ts` | `transcriptionGateway` (`transcriptionGateway.ts`) |
+| `whisper` | `WhisperBridge` (`transcription-schema.ts`) | `transcriptionBridge.ts` | `whisperGateway` (`transcriptionGateway.ts`) |
+| `camera` | `CameraBridge` (`camera-schema.ts`) | `cameraBridge.ts` | `cameraGateway` |
+| `pdf` | `PdfBridge` (`pdf-schema.ts`) | `documentExportBridge.ts` | `pdfGateway` (`documentExportGateway.ts`) |
+| `docx` | `DocxBridge` (`docx-schema.ts`) | `documentExportBridge.ts` | `docxGateway` (`documentExportGateway.ts`) |
+| `imageExport` | `ImageExportBridge` (`image-export-schema.ts`) | `imageExportBridge.ts` (`imageExport.ts` is the hidden rasterize window's own preload) | `imageExportGateway` |
+| `browser` | `BrowserBridge` (`browser-schema.ts`) | `browserBridge.ts` | `browserGateway` |
+| `markdownImage` | `MarkdownImageBridge` (`markdown-image-schema.ts`) | `markdownImageBridge.ts` | `markdownImageGateway` |
 | `projectLock` | `ProjectLockBridge` (`project-lock-schema.ts`) | `projectLockBridge.ts` | none – no renderer caller |
 
 What holds it in place:

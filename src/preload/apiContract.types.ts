@@ -9,7 +9,15 @@
  * that drifts from its contract, or an `Api` that stops being `typeof api`,
  * fails the typecheck here.
  */
+import type { BrowserBridge } from '../shared/ipc/browser-schema'
+import type { CameraBridge } from '../shared/ipc/camera-schema'
 import type { ClipboardBridge } from '../shared/ipc/clipboard-schema'
+import type { DocxBridge } from '../shared/ipc/docx-schema'
+import type { ImageExportBridge } from '../shared/ipc/image-export-schema'
+import type { ImportBridge } from '../shared/ipc/import-schema'
+import type { MarkdownImageBridge } from '../shared/ipc/markdown-image-schema'
+import type { PdfBridge } from '../shared/ipc/pdf-schema'
+import type { TranscriptionBridge, WhisperBridge } from '../shared/ipc/transcription-schema'
 import type { DirectoryWatchBridge } from '../shared/ipc/directory-watch-schema'
 import type { FileBridge } from '../shared/ipc/file-schema'
 import type { FileWatchBridge } from '../shared/ipc/file-watch-schema'
@@ -69,6 +77,15 @@ export type ApiContractChecks = [
   Assert<Equal<Api['clipboard'], ClipboardBridge>>,
   Assert<Equal<Api['projectLock'], ProjectLockBridge>>,
   Assert<Equal<Api['testHooks'], { readonly enabled: boolean }>>,
+  Assert<Equal<Api['import'], ImportBridge>>,
+  Assert<Equal<Api['transcription'], TranscriptionBridge>>,
+  Assert<Equal<Api['whisper'], WhisperBridge>>,
+  Assert<Equal<Api['camera'], CameraBridge>>,
+  Assert<Equal<Api['pdf'], PdfBridge>>,
+  Assert<Equal<Api['docx'], DocxBridge>>,
+  Assert<Equal<Api['imageExport'], ImageExportBridge>>,
+  Assert<Equal<Api['browser'], BrowserBridge>>,
+  Assert<Equal<Api['markdownImage'], MarkdownImageBridge>>,
   // A bridge method that returns the unchecked `ipcRenderer.invoke` result would put `any` in the renderer
   Assert<Equal<AnyIn<Api>, never>>
 ]

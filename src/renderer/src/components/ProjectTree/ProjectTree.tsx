@@ -72,6 +72,7 @@ import { useTreeFocusRecovery, findTreeFocusFallback } from './useTreeFocusRecov
 import { fileGateway } from '../../services/fileGateway'
 import { moveExternalBatch, type PendingExternalMove } from './externalMoveBatch'
 import { refuseOversizedDrop } from './externalDropLimit'
+import { importGateway } from '../../services/importGateway'
 
 interface ProjectTreeProps {
   onFileSelect: (filePath: string) => void
@@ -1013,7 +1014,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     // Note: isSupported expects a filename/path, not just the extension
     let hasImportableFiles = false
     for (const file of droppedFiles) {
-      if (await window.api.import.isSupported(file.name)) {
+      if (await importGateway.isSupported(file.name)) {
         hasImportableFiles = true
         break
       }

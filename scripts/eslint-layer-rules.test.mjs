@@ -130,7 +130,7 @@ describe('renderer gateway rule', () => {
 
   const READ_FILE = 'export const f = () => window.api.file.readFile("a")'
   const READ_TERMINAL = 'export const t = () => window.api.terminal.kill("a")'
-  const READ_OTHER = 'export const g = () => window.api.import.selectFile()'
+  const READ_OTHER = 'export const g = () => window.api.preview.reload("p")'
 
   it('flags a renderer read of window.api.file and window.api.terminal', async () => {
     expect(await gatewayMessages(RENDERER, READ_FILE)).toHaveLength(1)
@@ -159,6 +159,21 @@ describe('renderer gateway rule', () => {
     'export const f = () => window.api.clipboard.readText()',
     'export const f = () => window.api?.testHooks?.enabled'
   ])('flags the app bridges: %s', async (code) => {
+    expect(await gatewayMessages(RENDERER, code)).toHaveLength(1)
+  })
+
+  it.each([
+    'export const f = () => window.api.import.selectFile()',
+    'export const f = () => window.api?.import?.toolStatus',
+    'export const f = () => window.api.transcription.cancel()',
+    'export const f = () => window.api.whisper.listModels()',
+    'export const f = () => window.api.camera.save({})',
+    'export const f = () => window.api.pdf.exportToPdf({})',
+    'export const f = () => window.api.docx.exportToDocx({})',
+    'export const f = () => window.api.imageExport.run({})',
+    'export const f = () => window.api.browser.openFile("a")',
+    'export const f = () => window.api?.markdownImage?.read({})'
+  ])('flags the import, media and export bridges: %s', async (code) => {
     expect(await gatewayMessages(RENDERER, code)).toHaveLength(1)
   })
 
@@ -202,6 +217,13 @@ describe('renderer gateway rule', () => {
     'src/renderer/src/services/systemGateway.ts',
     'src/renderer/src/services/clipboardGateway.ts',
     'src/renderer/src/services/testHooksGateway.ts',
+    'src/renderer/src/services/importGateway.ts',
+    'src/renderer/src/services/transcriptionGateway.ts',
+    'src/renderer/src/services/cameraGateway.ts',
+    'src/renderer/src/services/documentExportGateway.ts',
+    'src/renderer/src/services/imageExportGateway.ts',
+    'src/renderer/src/services/browserGateway.ts',
+    'src/renderer/src/services/markdownImageGateway.ts',
     'src/renderer/src/services/bridgePresence.ts'
   ])('exempts %s from the gateway rule only', async (file) => {
     expect(await gatewayMessages(file, READ_FILE)).toHaveLength(0)

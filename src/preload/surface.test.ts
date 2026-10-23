@@ -63,7 +63,16 @@ describe('preload surface', () => {
     'system',
     'clipboard',
     'projectLock',
-    'testHooks'
+    'testHooks',
+    'import',
+    'transcription',
+    'whisper',
+    'camera',
+    'pdf',
+    'docx',
+    'imageExport',
+    'browser',
+    'markdownImage'
   ])(
     'window.api.%s exposes the expected members',
     (domain) => {
