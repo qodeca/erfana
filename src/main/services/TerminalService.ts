@@ -84,9 +84,12 @@ interface TerminalInstance {
    * cmd.exe only: the bootstrap waits in `pause` after the marker so ConPTY
    * flushes the marker frame before `cls` runs. While this array exists the
    * shell is still paused: typed input is held here (a key would be swallowed by
-   * `pause`) and `releaseCmdPause` sends the release key, then the held input.
+   * `pause`). `releaseCmdPause` sends the release key; `finishCmdPause` sends the
+   * held input when the clear handshake ends.
    */
   cmdPauseHold?: string[]
+  /** cmd.exe only: the release key has been written (it is written once). */
+  cmdKeySent?: boolean
   hasReceivedMarker: boolean // Track if marker was detected (prevents late data forwarding)
   /** Output that arrived after the marker line while the clear handshake was open; flushed in order once it ends. */
   pendingOutput: string
@@ -147,10 +150,13 @@ const ESC = String.fromCharCode(0x1b)
 const MARKER_LINE_END = new RegExp(`^(?:[ \\t]|${ESC}\\[[0-9;]*K)*\\r?\\n`)
 const MARKER_LINE_END_PARTIAL = new RegExp(`^(?:[ \\t]|${ESC}\\[[0-9;]*K)*\\r?$`)
 
+/** Cap on a cursor-forward move turned into spaces (a hostile `ESC[999999999C`). */
+const MAX_CURSOR_FORWARD = 1024
 const ST_CHAR = String.fromCharCode(0x9c)
 const BEL_CHAR = String.fromCharCode(0x07)
-// A complete OSC sequence: ESC ] body, ended by BEL, ESC \ or the 0x9C string terminator
-const OSC_SEQUENCE = new RegExp(`${ESC}\\][^${BEL_CHAR}${ESC}${ST_CHAR}]*(?:${BEL_CHAR}|${ESC}\\\\|${ST_CHAR})`, 'g')
+// A complete OSC sequence: ESC ] body, ended by BEL, ESC \, the 0x9C string terminator, or
+// (as xterm does) the start of another escape sequence
+const OSC_SEQUENCE = new RegExp(`${ESC}\\][^${BEL_CHAR}${ESC}${ST_CHAR}]*(?:${BEL_CHAR}|${ESC}\\\\|${ST_CHAR}|(?=${ESC}))`, 'g')
 const CSI_CURSOR_FORWARD = new RegExp(`${ESC}\\[([0-9]*)C`, 'g')
 const CSI_CURSOR_POSITION = new RegExp(`${ESC}\\[[0-9;:]*[Hf]`, 'g')
 const CSI_SEQUENCE = new RegExp(`${ESC}\\[[0-9;:?<=>]*[ -/]*[@-~]`, 'g')
@@ -166,7 +172,7 @@ const SHORT_ESCAPE = new RegExp(`${ESC}[ -/]*[0-~]`, 'g')
 export function plainLinesForCwd(text: string): string[] {
   return text
     .replace(OSC_SEQUENCE, '')
-    .replace(CSI_CURSOR_FORWARD, (_m, n: string) => ' '.repeat(n === '' ? 1 : Number(n)))
+    .replace(CSI_CURSOR_FORWARD, (_m, n: string) => ' '.repeat(Math.min(Number(n) || 1, MAX_CURSOR_FORWARD)))
     .replace(CSI_CURSOR_POSITION, '\n')
     .replace(CSI_SEQUENCE, '')
     .replace(SHORT_ESCAPE, '')
@@ -413,7 +419,8 @@ export class TerminalService extends EventEmitter {
         shellArgs = winShellArgs
         if (kind === 'cmd.exe') {
           spawnCwd = winCwd
-          cmdPauses = true
+          // Only a real cmd.exe sits in `pause`; the catch-all builder also takes unknown shells
+          cmdPauses = /(?:^|[\\/])cmd(?:\.exe)?$/i.test(shell)
         }
         shellKind = winShellKind
       } else {
@@ -616,6 +623,7 @@ export class TerminalService extends EventEmitter {
                 t.initializationComplete = true
                 t.clearFallbackTimeout = undefined
                 this.flushPendingOutput(t)
+                this.finishCmdPause(t)
               }
             }, 3000)
           }
@@ -639,10 +647,10 @@ export class TerminalService extends EventEmitter {
         // clear handshake runs and the cwd is updated from the reported line.
         markerTimedOut = true
         t.hasReceivedMarker = true
-        // cmd would otherwise wait in `pause` forever
-        this.releaseCmdPause(t)
         t.isClearing = false
         t.initializationComplete = true
+        // cmd would otherwise wait in `pause` forever; input typed meanwhile goes out too
+        this.finishCmdPause(t)
         if (markerBuffer) t.output.push(markerBuffer)
         markerBuffer = markerBuffer.slice(-LATE_MARKER_BUFFER_MAX_CHARS)
       }, MARKER_TIMEOUT_MS)
@@ -784,6 +792,9 @@ export class TerminalService extends EventEmitter {
       terminal.isClearing = false
       terminal.initializationComplete = true
       this.flushPendingOutput(terminal)
+      // The marker timer was the backstop that releases the cmd pause; with it
+      // cleared, release here so input is never held forever
+      this.finishCmdPause(terminal)
 
       // Note: We intentionally do NOT send a newline here
       // Sending '\r' would cause the shell to flush its output buffer,
@@ -841,15 +852,34 @@ export class TerminalService extends EventEmitter {
    * released (a late marker after the timeout must not send a second key).
    */
   private releaseCmdPause(terminal: TerminalInstance): void {
+    if (!terminal.cmdPauseHold || terminal.cmdKeySent) return
+    terminal.cmdKeySent = true
+    try {
+      terminal.ptyProcess.write('\r')
+    } catch (error) {
+      logger.warn(
+        `⚠️ Terminal ${terminal.id} could not release the cmd pause`,
+        error instanceof Error ? { error: error.message } : undefined
+      )
+    }
+  }
+
+  /**
+   * cmd.exe only: end the pause hold when the clear handshake ends (renderer
+   * confirmation or a fallback timer). Sends the key if it was not sent yet,
+   * then the input typed meanwhile, in order. Sending it only now keeps a held
+   * Ctrl+C from landing on `cls & echo on` right behind the key.
+   */
+  private finishCmdPause(terminal: TerminalInstance): void {
+    this.releaseCmdPause(terminal)
     const held = terminal.cmdPauseHold
     if (!held) return
     terminal.cmdPauseHold = undefined
     try {
-      terminal.ptyProcess.write('\r')
       for (const data of held) terminal.ptyProcess.write(data)
     } catch (error) {
       logger.warn(
-        `⚠️ Terminal ${terminal.id} could not release the cmd pause`,
+        `⚠️ Terminal ${terminal.id} could not send held input`,
         error instanceof Error ? { error: error.message } : undefined
       )
     }

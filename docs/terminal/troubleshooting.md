@@ -148,7 +148,7 @@ const terminalIdRef = useRef<string | null>(null)
 - macOS/Linux: `cd '<projectRoot>'; pwd; echo <MARKER>; exec -l "$SHELL" -i`
 - Windows (Git Bash): `cd '<projectRoot>'; pwd; echo <MARKER>; printf '\033[2J\033[3J\033[H'; exec -l '<bash.exe>' -i`
 - Windows (PowerShell): `-NoProfile -Command "Set-Location -LiteralPath '<projectRoot>'; (Get-Location).Path; Write-Output '<MARKER>'; [Console]::Write(<clear>); & '<pwsh.exe>' -NoLogo"`
-- Windows (cmd.exe): `/D /K "@echo off && cd /d "<projectRoot>" && cd && echo <MARKER> && cls"`
+- Windows (cmd.exe): `/D /S /K "@echo off && cd && echo <MARKER> && pause >nul && cls & echo on"` (started in `<projectRoot>`; main writes `\r` after the marker)
 
 **References**:
 - Main: `src/main/services/TerminalService.ts`

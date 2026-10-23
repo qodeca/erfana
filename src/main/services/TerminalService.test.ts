@@ -355,9 +355,61 @@ async function createId(
       expect(write).toHaveBeenCalledTimes(1)
       expect(write).toHaveBeenCalledWith('\r')
 
-      // A late duplicate or a later write goes straight through, with no second key
+      // Input is held until the clear handshake ends, then goes straight through, with no second key
       terminalService.write(tid, 'dir\r')
+      expect(write.mock.calls.map((c) => c[0])).toEqual(['\r'])
+      terminalService.markInitializationComplete(tid)
       expect(write.mock.calls.map((c) => c[0])).toEqual(['\r', 'dir\r'])
+      terminalService.write(tid, 'more')
+      expect(write.mock.calls.map((c) => c[0])).toEqual(['\r', 'dir\r', 'more'])
+    })
+
+    it('an early clear confirmation with no marker releases the pause and the held input', async () => {
+      const { terminalService, tid, pty } = await spawnCmd()
+      const write = pty.write as ReturnType<typeof vi.fn>
+      terminalService.write(tid, 'x')
+      terminalService.markInitializationComplete(tid)
+      expect(write.mock.calls.map((c) => c[0])).toEqual(['\r', 'x'])
+      // The marker timer is gone, so nothing else is sent later
+      vi.advanceTimersByTime(20_000)
+      expect(write).toHaveBeenCalledTimes(2)
+    })
+
+    it('the 3 s clear fallback also sends the held input, after the key', async () => {
+      const { terminalService, tid, pty } = await spawnCmd()
+      const write = pty.write as ReturnType<typeof vi.fn>
+      terminalService.write(tid, '\x03')
+      pty.emit('data', `C:\\Projects\\test\r\n${markerOf()}\r\n`)
+      expect(write.mock.calls.map((c) => c[0])).toEqual(['\r'])
+      vi.advanceTimersByTime(3_000)
+      expect(write.mock.calls.map((c) => c[0])).toEqual(['\r', '\x03'])
+    })
+
+    it('does not hold input or send the key for a shell that is not cmd.exe', async () => {
+      vi.useFakeTimers()
+      vi.doMock('os', async () => {
+        const actual = await vi.importActual<any>('os')
+        return { ...actual, platform: () => 'win32' }
+      })
+      const { terminalService } = await import('./TerminalService')
+      const tid = await createId(terminalService, { shell: 'C:\\tools\\mystery.exe', cwd: 'C:\\Projects\\test' })
+      const write = spawnedPTYs[0].pty.write as ReturnType<typeof vi.fn>
+      terminalService.write(tid!, 'a')
+      vi.advanceTimersByTime(20_000)
+      expect(write.mock.calls.map((c) => c[0])).toEqual(['a'])
+    })
+
+    it('matches the cmd.exe file name case-insensitively', async () => {
+      vi.useFakeTimers()
+      vi.doMock('os', async () => {
+        const actual = await vi.importActual<any>('os')
+        return { ...actual, platform: () => 'win32' }
+      })
+      const { terminalService } = await import('./TerminalService')
+      const tid = await createId(terminalService, { shell: 'C:\\WINDOWS\\SYSTEM32\\CMD.EXE', cwd: 'C:\\Projects\\test' })
+      const write = spawnedPTYs[0].pty.write as ReturnType<typeof vi.fn>
+      terminalService.write(tid!, 'a')
+      expect(write).not.toHaveBeenCalled()
     })
 
     it('releases the cmd pause on the missing-marker timeout too', async () => {
@@ -386,6 +438,9 @@ async function createId(
       expect(write).not.toHaveBeenCalled()
 
       pty.emit('data', `C:\\Projects\\test\r\n${markerOf()}\r\n`)
+      // Only the key goes out now: held input waits for the end of the clear handshake
+      expect(write.mock.calls.map((c) => c[0])).toEqual(['\r'])
+      terminalService.markInitializationComplete(tid)
       expect(write.mock.calls.map((c) => c[0])).toEqual(['\r', 'd', 'ir\r'])
     })
 
@@ -463,6 +518,22 @@ async function createId(
       expect(terminalService.getTerminalInfo(tid)?.cwd).toBe('C:\\Projects\\test')
     })
 
+    it('Git Bash: keeps the Windows spawn cwd when bash reads back a /c/... path', async () => {
+      vi.doMock('os', async () => {
+        const actual = await vi.importActual<any>('os')
+        return { ...actual, platform: () => 'win32' }
+      })
+      const { terminalService } = await import('./TerminalService')
+      const tid = await createId(terminalService, {
+        shell: 'C:\\Program Files\\Git\\usr\\bin\\bash.exe',
+        cwd: 'C:\\Projects\\test'
+      })
+      const marker = [spawnedPTYs[0].args].flat().join(' ').match(/__ERFANA_PWD_MARKER_\d+__/)![0]
+      spawnedPTYs[0].pty.emit('data', `/c/Projects/test\r\n${marker}\r\n`)
+      // Deliberate: the Windows path is what file links and the Claude status lookup expect
+      expect(terminalService.getTerminalInfo(tid!)?.cwd).toBe('C:\\Projects\\test')
+    })
+
     it('accepts a UNC read-back path', async () => {
       const { terminalService, tid, pty } = await spawnCmd()
       pty.emit('data', `\\\\server\\share\\dir\r\n${markerOf()}\r\n`)
@@ -538,6 +609,9 @@ async function createId(
         ['cursor positioning starts a line', '\x1b[1;1HC:\\a\x1b[2;1HM', ['C:\\a', 'M']],
         ['cursor forward becomes spaces', 'C:\\a\x1b[3Cb\r\nM', ['C:\\a   b', 'M']],
         ['cursor forward default is one', 'a\x1b[Cb\r\nM', ['a b', 'M']],
+        ['cursor forward zero counts as one', 'a\x1b[0Cb\r\nM', ['a b', 'M']],
+        ['cursor forward is capped', `a\x1b[999999999Cb\r\nM`, [`a${' '.repeat(1024)}b`, 'M']],
+        ['an OSC ended by the next escape', '\x1b]0;title\x1b[1;1HC:\\a\x1b[2;1HM', ['C:\\a', 'M']],
         ['charset and short escapes', '\x1b(B\x1b=\x1b7C:\\a\r\nM', ['C:\\a', 'M']],
         ['bare 0x9C is dropped', 'C:\\a\x9c\r\nM', ['C:\\a', 'M']]
       ])('plainLinesForCwd: %s', async (_name, input, expected) => {
@@ -552,6 +626,10 @@ async function createId(
         expect(view).toHaveLength(complete.length)
         expect(view.indexOf('M')).toBe(complete.length - 1)
         expect(markerSearchView('ok\x1b]0;M')).toBe('ok')
+        // An unterminated OSC is ended by the next escape sequence, as xterm does
+        const endedByEscape = 'ok\x1b]0;M\x1b[HM'
+        expect(markerSearchView(endedByEscape)).toHaveLength(endedByEscape.length)
+        expect(markerSearchView(endedByEscape).indexOf('M')).toBe(endedByEscape.length - 1)
         const stTerminated = 'ok\x1b]0;M\x1b\\ M'
         expect(markerSearchView(stTerminated)).toHaveLength(stTerminated.length)
         expect(markerSearchView(stTerminated).indexOf('M')).toBe(stTerminated.length - 1)
