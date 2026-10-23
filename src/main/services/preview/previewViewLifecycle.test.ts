@@ -78,6 +78,9 @@ function makeHooks(): PreviewLifecycleHooks {
     onRenderProcessGone: vi.fn(),
     onUnresponsive: vi.fn(),
     onDidFinishLoad: vi.fn(),
+    onDidStartLoading: vi.fn(),
+    onDidStopLoading: vi.fn(),
+    onDidFailLoad: vi.fn(),
     onForwardedShortcut: vi.fn(),
     onConsoleMessage: vi.fn(),
     onCspViolation: vi.fn()

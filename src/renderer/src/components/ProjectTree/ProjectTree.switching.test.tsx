@@ -17,21 +17,18 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, act } from '@testing-library/react'
-import React from 'react'
 import { ProjectTree } from './ProjectTree'
 import { DialogProvider } from '../Dialog'
 import { ProjectManagementProvider } from '../../context/ProjectManagementContext'
 import type { FileNode } from '../../../../preload/index'
 import { installTreeViewport } from '../../test-utils/treeViewport'
+import type { FileBridge } from '../../../../shared/ipc/file-schema'
+import { gatewayBridgeMock, type BridgeMock } from '../../test-utils/gatewayBridgeMock'
+
+const fileMock = (): BridgeMock<FileBridge> => gatewayBridgeMock('file')
 
 // The tree is virtualised; give it a viewport so every fixture row is mounted.
 installTreeViewport()
-
-declare global {
-  interface Window {
-    api: any
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Shared test data
@@ -194,14 +191,14 @@ describe('ProjectTree project switching (AC-009)', () => {
       })
 
       // Create a delayed readDirectory to observe the transition state
-      const originalReadDirectory = window.api.file.readDirectory
+      const originalReadDirectory = fileMock().readDirectory
       let resolveReadDirectory: (files: FileNode[]) => void
       const delayedReadDirectory = vi.fn(() => {
         return new Promise<FileNode[]>((resolve) => {
           resolveReadDirectory = resolve
         })
       })
-      window.api.file.readDirectory = delayedReadDirectory
+      fileMock().readDirectory = delayedReadDirectory
 
       // Switch to project B
       await act(async () => {
@@ -223,7 +220,7 @@ describe('ProjectTree project switching (AC-009)', () => {
       })
 
       // Restore original mock
-      window.api.file.readDirectory = originalReadDirectory
+      fileMock().readDirectory = originalReadDirectory
     })
   })
 

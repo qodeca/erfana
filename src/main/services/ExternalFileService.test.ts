@@ -37,7 +37,9 @@ vi.mock('fs/promises', () => {
       R_OK: 4,
       COPYFILE_EXCL: 1
     }
-  } satisfies Partial<typeof FsProm> & { constants: { R_OK: number; COPYFILE_EXCL: number } }
+  } satisfies Partial<Omit<typeof FsProm, 'constants'>> & {
+    constants: Pick<typeof FsProm.constants, 'R_OK' | 'COPYFILE_EXCL'>
+  }
 })
 
 // Mock pathSecurity utilities
@@ -99,7 +101,11 @@ function createMockFileService(): IFileService {
     copyItem: vi.fn(),
     checkNameConflict: vi.fn(),
     setHiddenPatterns: vi.fn(),
-    getHiddenPatterns: vi.fn()
+    getHiddenPatterns: vi.fn(),
+    findByName: vi.fn(),
+    isImageFile: vi.fn(),
+    readImage: vi.fn(),
+    setPathFilter: vi.fn()
   }
 }
 

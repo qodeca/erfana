@@ -304,7 +304,7 @@ describe('createFindByNameGate', () => {
     const gate = createFindByNameGate({ maxSearches: 2, maxWaiting: 8, waitLimitMs: 20 })
     const search = () => startFindByName('/r', 'x.md', { ...noSkip, readdir, now: clock() })
 
-    const answers = []
+    const answers: Awaited<ReturnType<typeof gate.run>>[] = []
     for (let i = 0; i < 6; i++) answers.push(await gate.run(`k${i}`, search))
 
     expect(gate.running).toBe(2)

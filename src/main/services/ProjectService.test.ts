@@ -180,12 +180,12 @@ describe('ProjectService integration with ProjectLockService', () => {
       // Track call order
       const callOrder: string[] = []
 
-      mockProjectLockService.acquireLock.mockImplementation(async () => {
+      vi.mocked(mockProjectLockService.acquireLock).mockImplementation(async () => {
         callOrder.push('acquireLock')
         return { status: 'acquired', lockPath: '/locks/hash.lock' }
       })
 
-      mockProjectSettingsService.loadSettings.mockImplementation(async () => {
+      vi.mocked(mockProjectSettingsService.loadSettings).mockImplementation(async () => {
         callOrder.push('loadSettings')
         return {
           treeHiddenPatterns: [],
@@ -231,13 +231,13 @@ describe('ProjectService integration with ProjectLockService', () => {
       await seedOpenProject(oldProjectPath)
 
       // Mock successful lock acquisition
-      mockProjectLockService.acquireLock.mockResolvedValue({
+      vi.mocked(mockProjectLockService.acquireLock).mockResolvedValue({
         status: 'acquired',
         lockPath: '/locks/new.lock'
       })
 
       // Make settings load fail
-      mockProjectSettingsService.loadSettings.mockRejectedValue(
+      vi.mocked(mockProjectSettingsService.loadSettings).mockRejectedValue(
         new AppError('Invalid settings', ErrorCode.PROJECT_SETTINGS_VALIDATION_FAILED)
       )
 
@@ -254,7 +254,7 @@ describe('ProjectService integration with ProjectLockService', () => {
       const projectPath = projectDir('new-project')
 
       // Mock successful lock acquisition
-      mockProjectLockService.acquireLock.mockResolvedValue({
+      vi.mocked(mockProjectLockService.acquireLock).mockResolvedValue({
         status: 'acquired',
         lockPath: '/locks/hash.lock'
       })
@@ -277,13 +277,13 @@ describe('ProjectService integration with ProjectLockService', () => {
       const projectPath = projectDir('locked-project')
 
       // Mock lock already held by another instance
-      mockProjectLockService.acquireLock.mockResolvedValue({
+      vi.mocked(mockProjectLockService.acquireLock).mockResolvedValue({
         status: 'already_locked',
         holderPid: 12345,
         holderHostname: 'other-machine.local'
       })
 
-      mockProjectLockService.requestFocus.mockResolvedValue(true)
+      vi.mocked(mockProjectLockService.requestFocus).mockResolvedValue(true)
 
       const result = await projectService.switchProject(projectPath)
 
@@ -304,14 +304,14 @@ describe('ProjectService integration with ProjectLockService', () => {
     it('should return early even if focus request fails', async () => {
       const projectPath = projectDir('locked-project')
 
-      mockProjectLockService.acquireLock.mockResolvedValue({
+      vi.mocked(mockProjectLockService.acquireLock).mockResolvedValue({
         status: 'already_locked',
         holderPid: 12345,
         holderHostname: 'other-machine.local'
       })
 
       // Focus request fails
-      mockProjectLockService.requestFocus.mockResolvedValue(false)
+      vi.mocked(mockProjectLockService.requestFocus).mockResolvedValue(false)
 
       const result = await projectService.switchProject(projectPath)
 
@@ -329,7 +329,7 @@ describe('ProjectService integration with ProjectLockService', () => {
       const projectPath = projectDir('test-project')
 
       // Mock lock acquisition error
-      mockProjectLockService.acquireLock.mockResolvedValue({
+      vi.mocked(mockProjectLockService.acquireLock).mockResolvedValue({
         status: 'error',
         message: 'Filesystem error: EACCES'
       })
@@ -354,7 +354,7 @@ describe('ProjectService integration with ProjectLockService', () => {
       await seedOpenProject(oldProjectPath)
 
       // Make lock release fail
-      mockProjectLockService.releaseLock.mockRejectedValue(
+      vi.mocked(mockProjectLockService.releaseLock).mockRejectedValue(
         new Error('Permission denied')
       )
 
@@ -370,18 +370,18 @@ describe('ProjectService integration with ProjectLockService', () => {
     it('should handle lock release errors gracefully during rollback', async () => {
       const projectPath = projectDir('new-project')
 
-      mockProjectLockService.acquireLock.mockResolvedValue({
+      vi.mocked(mockProjectLockService.acquireLock).mockResolvedValue({
         status: 'acquired',
         lockPath: '/locks/hash.lock'
       })
 
       // Make settings load fail
-      mockProjectSettingsService.loadSettings.mockRejectedValue(
+      vi.mocked(mockProjectSettingsService.loadSettings).mockRejectedValue(
         new AppError('Invalid settings', ErrorCode.PROJECT_SETTINGS_VALIDATION_FAILED)
       )
 
       // Make lock release fail during rollback
-      mockProjectLockService.releaseLock.mockRejectedValue(
+      vi.mocked(mockProjectLockService.releaseLock).mockRejectedValue(
         new Error('Permission denied')
       )
 
@@ -453,12 +453,12 @@ describe('ProjectService integration with ProjectLockService', () => {
 
       const callOrder: string[] = []
 
-      mockProjectLockService.acquireLock.mockImplementation(async () => {
+      vi.mocked(mockProjectLockService.acquireLock).mockImplementation(async () => {
         callOrder.push('acquireLock')
         return { status: 'acquired', lockPath: '/locks/hash.lock' }
       })
 
-      mockFileWatcherService.stopAll.mockImplementation(async () => {
+      vi.mocked(mockFileWatcherService.stopAll).mockImplementation(async () => {
         callOrder.push('stopWatchers')
       })
 
@@ -474,12 +474,12 @@ describe('ProjectService integration with ProjectLockService', () => {
 
       const callOrder: string[] = []
 
-      mockProjectLockService.acquireLock.mockImplementation(async () => {
+      vi.mocked(mockProjectLockService.acquireLock).mockImplementation(async () => {
         callOrder.push('acquireLock')
         return { status: 'acquired', lockPath: '/locks/hash.lock' }
       })
 
-      mockFileService.setProjectPath.mockImplementation(() => {
+      vi.mocked(mockFileService.setProjectPath).mockImplementation(() => {
         callOrder.push('setProjectPath')
       })
 
@@ -498,15 +498,15 @@ describe('ProjectService integration with ProjectLockService', () => {
 
       const callOrder: string[] = []
 
-      mockFileService.setProjectPath.mockImplementation(() => {
+      vi.mocked(mockFileService.setProjectPath).mockImplementation(() => {
         callOrder.push('setProjectPath')
       })
 
-      mockSettingsService.setLastProjectPath.mockImplementation(async () => {
+      vi.mocked(mockSettingsService.setLastProjectPath).mockImplementation(async () => {
         callOrder.push('persistSettings')
       })
 
-      mockProjectLockService.releaseLock.mockImplementation(async () => {
+      vi.mocked(mockProjectLockService.releaseLock).mockImplementation(async () => {
         callOrder.push('releaseLock')
       })
 
@@ -526,7 +526,7 @@ describe('ProjectService integration with ProjectLockService', () => {
     it('should rollback services if lock acquired but directory check fails', async () => {
       const projectPath = projectDir('nonexistent')
 
-      mockProjectLockService.acquireLock.mockResolvedValue({
+      vi.mocked(mockProjectLockService.acquireLock).mockResolvedValue({
         status: 'acquired',
         lockPath: '/locks/hash.lock'
       })
@@ -549,13 +549,13 @@ describe('ProjectService integration with ProjectLockService', () => {
     it('should rollback services if lock acquired but settings validation fails', async () => {
       const projectPath = projectDir('invalid-settings')
 
-      mockProjectLockService.acquireLock.mockResolvedValue({
+      vi.mocked(mockProjectLockService.acquireLock).mockResolvedValue({
         status: 'acquired',
         lockPath: '/locks/hash.lock'
       })
 
       // Settings validation fails
-      mockProjectSettingsService.loadSettings.mockRejectedValue(
+      vi.mocked(mockProjectSettingsService.loadSettings).mockRejectedValue(
         new AppError('Invalid schema', ErrorCode.PROJECT_SETTINGS_VALIDATION_FAILED)
       )
 
@@ -574,7 +574,7 @@ describe('ProjectService integration with ProjectLockService', () => {
     it('should continue rollback even if lock release fails', async () => {
       const projectPath = projectDir('test-project')
 
-      mockProjectLockService.acquireLock.mockResolvedValue({
+      vi.mocked(mockProjectLockService.acquireLock).mockResolvedValue({
         status: 'acquired',
         lockPath: '/locks/hash.lock'
       })
@@ -583,7 +583,7 @@ describe('ProjectService integration with ProjectLockService', () => {
       mockedStat.mockRejectedValue(new Error('ENOENT'))
 
       // Make lock release fail
-      mockProjectLockService.releaseLock.mockRejectedValue(
+      vi.mocked(mockProjectLockService.releaseLock).mockRejectedValue(
         new Error('Filesystem error')
       )
 

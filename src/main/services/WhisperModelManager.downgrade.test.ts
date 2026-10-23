@@ -346,7 +346,7 @@ describe('WhisperModelManager downgrade protection', () => {
     // Make signature verify fail.
     const { VerifyManifestError } = await import('../utils/verifyManifest')
     mockVerifyManifest.mockRejectedValue(
-      new VerifyManifestError('signature verification failed for both keys')
+      new VerifyManifestError('ed25519-rejected', 'signature verification failed for both keys')
     )
 
     const { createWhisperModelManager } = await import('./WhisperModelManager')

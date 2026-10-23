@@ -6,17 +6,18 @@
  */
 import { test, expect } from './fixtures/index'
 import { TerminalPage } from './pages/terminal.page'
+import type { Api } from '../src/preload/index'
 
 test.describe('terminal test hook', () => {
-  test('is installed in e2e mode and returns the drawn terminal text', async ({ windowWithTestProject: window }) => {
-    const terminalPage = new TerminalPage(window)
+  test('is installed in e2e mode and returns the drawn terminal text', async ({ windowWithTestProject: page }) => {
+    const terminalPage = new TerminalPage(page)
     await terminalPage.open()
 
-    expect(await window.evaluate(() => window.api.testHooks.enabled)).toBe(true)
+    expect(await page.evaluate(() => window.api.testHooks.enabled)).toBe(true)
 
-    const viaHook = await window.evaluate(async () => {
-      const listed = await window.api.terminal.list()
-      const id = listed.terminals?.[0]?.id
+    const viaHook = await page.evaluate(async () => {
+      const listed = await (window.api as Api).terminal.list()
+      const id = listed.success ? listed.terminals[0]?.id : undefined
       return id ? (window.__erfanaTest?.terminalText(id) ?? null) : null
     })
     const screen = await terminalPage.readScreen()

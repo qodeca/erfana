@@ -99,23 +99,21 @@ function createMockProps(
   const apiClose = vi.fn()
 
   return {
+    // EditorTab reads only these members of the panel api.
     api: {
       id: overrides.apiId || 'panel-123',
       close: apiClose,
       title: overrides.title,
       onDidTitleChange: overrides.onDidTitleChange
-    },
+    } as Partial<IDockviewPanelHeaderProps['api']> as IDockviewPanelHeaderProps['api'],
     params: {
       filePath: overrides.filePath ?? '/path/to/document.md',
       panelId: overrides.panelId
     },
-    containerApi: {} as IDockviewPanelHeaderProps['containerApi'],
     // Required for dockview but not used in our component
-    isFocused: false,
-    isActive: false,
-    title: '',
-    group: {} as IDockviewPanelHeaderProps['group']
-  } as IDockviewPanelHeaderProps<{ filePath?: string; panelId?: string }>
+    containerApi: {} as IDockviewPanelHeaderProps['containerApi'],
+    tabLocation: 'header'
+  }
 }
 
 describe('EditorTab', () => {

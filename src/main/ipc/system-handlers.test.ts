@@ -26,7 +26,7 @@ vi.mock('electron', () => ({
   }
 }))
 
-const mockIsTrusted = vi.fn(() => true)
+const mockIsTrusted = vi.fn((_event: unknown) => true)
 vi.mock('./senderValidation', () => ({ isTrustedSender: (e: unknown) => mockIsTrusted(e),
     isTrustedAppSender: () => true }))
 

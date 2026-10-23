@@ -105,6 +105,7 @@ vi.mock('fs/promises', () => ({
 // ---------------------------------------------------------------------------
 
 import { Readable } from 'stream'
+import type { classifyPlatform } from './whisper-assets'
 
 function makeBytesStream(buf: Buffer): NodeJS.ReadableStream {
   return Readable.from([buf])
@@ -212,7 +213,7 @@ const WIN32_SPEC = {
   }
 }
 
-const mockClassifyPlatform = vi.fn(() => ({ supported: true, platform: 'darwin-universal' as const }))
+const mockClassifyPlatform = vi.fn<typeof classifyPlatform>(() => ({ supported: true, platform: 'darwin-universal' }))
 
 vi.mock('./whisper-assets', () => ({
   ARTIFACTS: {
@@ -772,7 +773,7 @@ describe('WhisperModelManager', () => {
       let call = 0
       mockDownloadToFile.mockImplementation(async () => {
         call += 1
-        if (call >= 3) throw new SecureDownloaderError('connection reset')
+        if (call >= 3) throw new SecureDownloaderError('content-length-mismatch', 'connection reset')
         return undefined
       })
       const { createWhisperModelManager } = await import('./WhisperModelManager')
@@ -853,7 +854,7 @@ describe('WhisperModelManager', () => {
       const err = Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
       mockAccess.mockRejectedValue(err)
       const { SecureDownloaderError } = await import('../utils/secureDownloader')
-      mockDownloadToFile.mockRejectedValue(new SecureDownloaderError('HTTP 404'))
+      mockDownloadToFile.mockRejectedValue(new SecureDownloaderError('http-status', 'HTTP 404'))
       const { createWhisperModelManager } = await import('./WhisperModelManager')
       const manager = createWhisperModelManager()
       await expect(manager.ensureModel('base')).rejects.toMatchObject({
@@ -865,7 +866,7 @@ describe('WhisperModelManager', () => {
       const err = Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
       mockAccess.mockRejectedValue(err)
       const { SecureDownloaderError } = await import('../utils/secureDownloader')
-      mockDownloadToFile.mockRejectedValue(new SecureDownloaderError('HTTP 503'))
+      mockDownloadToFile.mockRejectedValue(new SecureDownloaderError('http-status', 'HTTP 503'))
       const { createWhisperModelManager } = await import('./WhisperModelManager')
       const manager = createWhisperModelManager()
       await expect(manager.ensureModel('tiny')).rejects.toMatchObject({

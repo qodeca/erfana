@@ -83,9 +83,9 @@ interface TestBed {
 function makeBed(): TestBed {
   const clock = makeFakeClock()
   const powerMonitor = new EventEmitter()
-  const readLockFile = vi.fn<[string], Promise<LockInfo | null>>()
-  const onOwnershipLost = vi.fn<[string], void>()
-  const onFocusRequest = vi.fn<[LockInfo, string], Promise<void>>().mockResolvedValue(undefined)
+  const readLockFile = vi.fn<(...args: [string]) => Promise<LockInfo | null>>()
+  const onOwnershipLost = vi.fn<(...args: [string]) => void>()
+  const onFocusRequest = vi.fn<(...args: [LockInfo, string]) => Promise<void>>().mockResolvedValue(undefined)
   const deps: LockHeartbeatDeps = {
     clock,
     powerMonitor,
@@ -250,7 +250,7 @@ describe('LockHeartbeat', () => {
     })
 
     it('refreshAll covers multiple active locks', async () => {
-      const readLockFile = vi.fn<[string], Promise<LockInfo | null>>()
+      const readLockFile = vi.fn<(...args: [string]) => Promise<LockInfo | null>>()
       const deps: LockHeartbeatDeps = {
         clock: makeFakeClock(),
         powerMonitor: new EventEmitter(),
@@ -344,7 +344,7 @@ describe('LockHeartbeat', () => {
     })
 
     it('does not call onFocusRequest when it is not provided', async () => {
-      const readLockFile = vi.fn<[string], Promise<LockInfo | null>>()
+      const readLockFile = vi.fn<(...args: [string]) => Promise<LockInfo | null>>()
       const deps: LockHeartbeatDeps = {
         clock: makeFakeClock(),
         powerMonitor: new EventEmitter(),

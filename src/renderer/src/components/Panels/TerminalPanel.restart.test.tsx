@@ -17,12 +17,10 @@ import { DialogProvider } from '../Dialog/DialogContext'
 import { DialogManager } from '../Dialog/DialogManager'
 import { useTerminalStore } from '../../stores/useTerminalStore'
 import { useClaudeStatusStore } from '../../stores/useClaudeStatusStore'
+import type { TerminalBridge } from '../../../../shared/ipc/terminal-schema'
+import { gatewayBridgeMock, type BridgeMock } from '../../test-utils/gatewayBridgeMock'
 
-declare global {
-  interface Window {
-    api: any
-  }
-}
+const terminalMock = (): BridgeMock<TerminalBridge> => gatewayBridgeMock('terminal')
 
 const TERMINAL_ID = 'test-terminal-1'
 
@@ -115,7 +113,7 @@ async function renderPanel(): Promise<void> {
       <DialogManager />
     </DialogProvider>
   )
-  await waitFor(() => expect(window.api.terminal.create).toHaveBeenCalled())
+  await waitFor(() => expect(terminalMock().create).toHaveBeenCalled())
 }
 
 /** The user typed in the terminal and it is still producing output. */
@@ -146,7 +144,7 @@ describe('TerminalPanel restart confirmation', () => {
 
     await user.click(screen.getByTestId(TEST_IDS.TERMINAL_BTN_RESTART))
 
-    await waitFor(() => expect(window.api.terminal.kill).toHaveBeenCalledWith(TERMINAL_ID))
+    await waitFor(() => expect(terminalMock().kill).toHaveBeenCalledWith(TERMINAL_ID))
     expect(screen.queryByTestId(TEST_IDS.DIALOG_CONFIRM)).not.toBeInTheDocument()
   })
 
@@ -164,7 +162,7 @@ describe('TerminalPanel restart confirmation', () => {
     await waitFor(() =>
       expect(document.activeElement).toBe(screen.getByTestId(TEST_IDS.DIALOG_BTN_CANCEL))
     )
-    expect(window.api.terminal.kill).not.toHaveBeenCalled()
+    expect(terminalMock().kill).not.toHaveBeenCalled()
   })
 
   it('asks while Claude Code runs in the terminal, even with no recent output', async () => {
@@ -190,7 +188,7 @@ describe('TerminalPanel restart confirmation', () => {
     expect(await screen.findByTestId(TEST_IDS.DIALOG_CONFIRM_MESSAGE)).toHaveTextContent(
       /Claude Code is running/
     )
-    expect(window.api.terminal.kill).not.toHaveBeenCalled()
+    expect(terminalMock().kill).not.toHaveBeenCalled()
   })
 
   it('keeps the terminal when the user cancels', async () => {
@@ -204,8 +202,8 @@ describe('TerminalPanel restart confirmation', () => {
     await waitFor(() =>
       expect(screen.queryByTestId(TEST_IDS.DIALOG_CONFIRM)).not.toBeInTheDocument()
     )
-    expect(window.api.terminal.kill).not.toHaveBeenCalled()
-    expect(window.api.terminal.create).toHaveBeenCalledTimes(1)
+    expect(terminalMock().kill).not.toHaveBeenCalled()
+    expect(terminalMock().create).toHaveBeenCalledTimes(1)
   })
 
   it('opens one prompt for a double click on Restart', async () => {
@@ -231,7 +229,7 @@ describe('TerminalPanel restart confirmation', () => {
     await user.click(screen.getByTestId(TEST_IDS.TERMINAL_BTN_RESTART))
     await user.click(await screen.findByTestId(TEST_IDS.DIALOG_BTN_CONFIRM))
 
-    await waitFor(() => expect(window.api.terminal.kill).toHaveBeenCalledWith(TERMINAL_ID))
+    await waitFor(() => expect(terminalMock().kill).toHaveBeenCalledWith(TERMINAL_ID))
   })
 })
 
@@ -257,7 +255,7 @@ describe('TerminalPanel shell kind in the terminal store', () => {
 
   it('follows the shell kind of each created terminal and clears it on unmount', async () => {
     const user = userEvent.setup()
-    window.api.terminal.create
+    terminalMock().create
       .mockResolvedValueOnce({ success: true, terminalId: TERMINAL_ID, shellKind: 'cmd' })
       .mockResolvedValueOnce({ success: true, terminalId: 'test-terminal-2', shellKind: 'powershell' })
     const { TerminalPanel } = await import('./TerminalPanel')

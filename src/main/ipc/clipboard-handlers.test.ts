@@ -16,6 +16,9 @@ import type { IpcMainInvokeEvent } from 'electron'
 import { CLIPBOARD_CHANNELS } from '../../shared/ipc/clipboard-channels'
 import { CLIPBOARD_MAX_TEXT_LENGTH } from '../../shared/ipc/clipboard-schema'
 
+// electron-vite declares ELECTRON_RENDERER_URL read-only; this file sets and clears it.
+const writableEnv: Record<string, string | undefined> = process.env
+
 // =============================================================================
 // Mock electron (clipboard + ipcMain.handle capture)
 // =============================================================================
@@ -98,7 +101,7 @@ describe('clipboard-handlers', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.resetModules()
-    delete process.env['ELECTRON_RENDERER_URL']
+    delete writableEnv.ELECTRON_RENDERER_URL
     mockIs.dev = false
     mockClipboardReadText.mockReturnValue('clipboard text')
     mockClipboardWriteText.mockReturnValue(undefined)
@@ -133,7 +136,7 @@ describe('clipboard-handlers', () => {
 
     it('accepts the dev renderer origin only when is.dev && ELECTRON_RENDERER_URL', async () => {
       mockIs.dev = true
-      process.env['ELECTRON_RENDERER_URL'] = 'http://localhost:5173'
+      writableEnv.ELECTRON_RENDERER_URL = 'http://localhost:5173'
       const handler = await getHandler(CLIPBOARD_CHANNELS.readText)
 
       const result = await handler(
@@ -167,7 +170,7 @@ describe('clipboard-handlers', () => {
       // Mirrors index.ts: a production build never loads the dev URL even if the
       // env var leaks in, so the dev trust branch must be unreachable there.
       mockIs.dev = false
-      process.env['ELECTRON_RENDERER_URL'] = 'http://localhost:5173'
+      writableEnv.ELECTRON_RENDERER_URL = 'http://localhost:5173'
       const handler = await getHandler(CLIPBOARD_CHANNELS.readText)
 
       expect(() => handler(makeEvent(frame))).toThrow(/Untrusted sender/)

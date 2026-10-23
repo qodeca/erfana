@@ -36,7 +36,7 @@ class MockTerminalService extends EventEmitter {
   owners = new Map<string, number>()
 
   isAvailable = vi.fn(() => ({ available: true, initialized: true }))
-  createTerminal = vi.fn(async (): Promise<unknown> => ({
+  createTerminal = vi.fn(async (_config?: unknown, _webContentsId?: number): Promise<unknown> => ({
     terminalId: 'terminal-1',
     shellKind: 'posix' as const
   }))

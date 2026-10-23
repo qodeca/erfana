@@ -51,7 +51,7 @@ describe('MonacoSearchProvider', () => {
   let mockEditor: MockedEditor
   let mockModel: MockedModel
   let mockEditorHandle: MonacoEditorHandle
-  let editorRef: React.RefObject<MonacoEditorHandle | null>
+  let editorRef: React.MutableRefObject<MonacoEditorHandle | null>
 
   beforeEach(() => {
     vi.clearAllMocks()

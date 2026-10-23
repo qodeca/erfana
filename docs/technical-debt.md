@@ -307,10 +307,10 @@ After the heartbeat hardening (Phase A4 resume-refresh, B1 symlink defense, D3 H
 
 ---
 
-### 21. No tsconfig covers `e2e/` (#60, 2026-08)
+### 21. No tsconfig covers `e2e/` (#60, 2026-08) ✅ Resolved (#109)
 
 **Severity**: Low
-**Impact**: TypeScript errors in Playwright specs are **editor-only**. `npm run typecheck` runs `tsconfig.node.json` (`src/main`, `src/preload`, `src/shared`) and `tsconfig.web.json` (`src/renderer`, `src/preload/*.d.ts`); `tsconfig.test.json` covers `src/**` + `tests/**` + `vitest.*.ts` and is not wired into the script at all. `e2e/` appears in no `include` and is explicitly excluded from every vitest project, so nothing in CI ever type-checks it.
+**Impact (when filed)**: TypeScript errors in Playwright specs are **editor-only**. `npm run typecheck` runs `tsconfig.node.json` (`src/main`, `src/preload`, `src/shared`) and `tsconfig.web.json` (`src/renderer`, `src/preload/*.d.ts`); `tsconfig.test.json` covers `src/**` + `tests/**` + `vitest.*.ts` and is not wired into the script at all. `e2e/` appears in no `include` and is explicitly excluded from every vitest project, so nothing in CI ever type-checks it.
 
 **Problem**: A spec, page object or fixture can be committed with a type error and stay green on every required check. Because `e2e.yml` is disabled (item #5), the error surfaces only when a developer runs the suite locally — and a *type* error surfaces even later than a behavioural one, since Playwright transpiles per file.
 
@@ -318,7 +318,7 @@ After the heartbeat hardening (Phase A4 resume-refresh, B1 symlink defense, D3 H
 
 **Files**: `tsconfig.json`, `tsconfig.node.json`, `tsconfig.web.json`, `tsconfig.test.json`, `package.json` (`typecheck` scripts), `e2e/`.
 
-**Status**: Open — recorded by the #60 change-set review.
+**Resolved (#109).** `tsconfig.e2e.json` covers `e2e/**/*.ts` and `playwright.config.ts`, and `npm run typecheck` runs it as `typecheck:test:e2e`, so the required `Typecheck` job now fails on a type error in a spec, page object or fixture. The number is kept so existing references to "item #21" stay valid.
 
 ---
 
@@ -761,17 +761,17 @@ One extra obstacle found since: `PreviewViewService.applyApprovedHosts` returns 
 
 ---
 
-### 48. Test files are not type-checked (#124, 2026-09)
+### 48. Test files are not type-checked (#124, 2026-09) ✅ Resolved (#109)
 
 **Severity**: Medium
 
-**Impact**: `npx tsc -p tsconfig.test.json` stops at TypeScript 6 deprecation errors (TS5107 / TS5101) before it checks anything, so **no test file is type-checked, locally or in CI**. A fake that drifts from the interface it stands in for compiles silently – #124's QG-8 found exactly that: the hand-written preview bridge mock had lost two members.
+**Impact (when filed)**: `npx tsc -p tsconfig.test.json` stops at TypeScript 6 deprecation errors (TS5107 / TS5101) before it checks anything, so **no test file is type-checked, locally or in CI**. A fake that drifts from the interface it stands in for compiles silently – #124's QG-8 found exactly that: the hand-written preview bridge mock had lost two members.
 
 **Problem**: With `--ignoreDeprecations 6.0` the check runs and reports pre-existing errors: 391 at the base commit of #124 (`02387c57`) and 367 at #124's last gate, where each group gate compared the files the branch touched against their base counts by hand. Nothing automated holds the line.
 
 **Recommended Solution**: fix the deprecated options in `tsconfig.test.json`, burn the error list down per folder, then add the check to the required `Typecheck` job.
 
-**Status**: Open — recorded by the #124 group gates.
+**Resolved (#109).** `tsconfig.test.json` is replaced by one test config per process, like the production ones: `tsconfig.node.test.json` (main, preload and shared tests) and `tsconfig.web.test.json` (renderer tests), plus `tsconfig.e2e.json`. `npm run typecheck` runs all three, so the required `Typecheck` job checks every test file. One merged program was not trustworthy: it drops `src/preload/index.d.ts` (its `index.ts` is in the same program) and lets one test's `declare global` reach every other file, which alone produced 25 errors in clean code. The pre-existing errors were fixed in the tests, not silenced. The number is kept so existing references to "item #48" stay valid.
 
 ---
 
