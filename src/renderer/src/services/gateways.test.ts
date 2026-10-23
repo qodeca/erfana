@@ -1,14 +1,21 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * The file and terminal gateways forward every bridge method, with the same
- * arguments and result, and read `window.api` on each call.
+ * The gateways forward every bridge method, with the same arguments and
+ * result, and read `window.api` on each call.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { DirectoryWatchBridge } from '../../../shared/ipc/directory-watch-schema'
 import type { FileBridge } from '../../../shared/ipc/file-schema'
+import type { FileWatchBridge } from '../../../shared/ipc/file-watch-schema'
+import type { GitBridge } from '../../../shared/ipc/git-schema'
+import type { GitPollingBridge, GitWatcherBridge } from '../../../shared/ipc/git-watcher-schema'
 import type { TerminalBridge } from '../../../shared/ipc/terminal-schema'
 import { fileGateway } from './fileGateway'
 import { terminalGateway } from './terminalGateway'
+import { fileWatchGateway } from './fileWatchGateway'
+import { directoryWatchGateway } from './directoryWatchGateway'
+import { gitGateway, gitPollingGateway, gitWatcherGateway } from './gitGateway'
 import { getDefaultProjectTreeApi } from './projectTreeApi'
 import { onFileStructureChanged } from './fileStructureSignal'
 
@@ -61,6 +68,47 @@ const TERMINAL_METHODS: Record<keyof TerminalBridge, true> = {
   ackOutput: true
 }
 
+const FILE_WATCH_METHODS: Record<keyof FileWatchBridge, true> = {
+  start: true,
+  stop: true,
+  stopAll: true,
+  pause: true,
+  resume: true,
+  getStats: true,
+  onFileChanged: true,
+  onFileDeleted: true,
+  onFileError: true
+}
+
+const DIRECTORY_WATCH_METHODS: Record<keyof DirectoryWatchBridge, true> = {
+  start: true,
+  stop: true,
+  stopAll: true,
+  pause: true,
+  resume: true,
+  getStats: true,
+  onDirectoryChanged: true,
+  onProjectDeleted: true,
+  onDirectoryError: true
+}
+
+const GIT_METHODS: Record<keyof GitBridge, true> = { getStatus: true }
+
+const GIT_WATCHER_METHODS: Record<keyof GitWatcherBridge, true> = {
+  start: true,
+  stop: true,
+  getStatus: true,
+  onStateChanged: true
+}
+
+const GIT_POLLING_METHODS: Record<keyof GitPollingBridge, true> = {
+  start: true,
+  stop: true,
+  setInterval: true,
+  setEnabled: true,
+  onPollTriggered: true
+}
+
 type Anything = (...args: unknown[]) => unknown
 
 function fakeBridge(methods: string[]): Record<string, ReturnType<typeof vi.fn>> {
@@ -75,7 +123,12 @@ afterEach(() => {
 
 describe.each([
   ['fileGateway', 'file', fileGateway, FILE_METHODS],
-  ['terminalGateway', 'terminal', terminalGateway, TERMINAL_METHODS]
+  ['terminalGateway', 'terminal', terminalGateway, TERMINAL_METHODS],
+  ['fileWatchGateway', 'fileWatch', fileWatchGateway, FILE_WATCH_METHODS],
+  ['directoryWatchGateway', 'directoryWatch', directoryWatchGateway, DIRECTORY_WATCH_METHODS],
+  ['gitGateway', 'git', gitGateway, GIT_METHODS],
+  ['gitWatcherGateway', 'gitWatcher', gitWatcherGateway, GIT_WATCHER_METHODS],
+  ['gitPollingGateway', 'gitPolling', gitPollingGateway, GIT_POLLING_METHODS]
 ] as const)('%s', (_name, key, gateway, methods) => {
   const names = Object.keys(methods)
 
@@ -160,27 +213,28 @@ describe('fileGateway – file structure signal', () => {
 })
 
 describe('getDefaultProjectTreeApi', () => {
-  it('hands the project tree the gateways and the directory watcher', () => {
-    const directoryWatch = { start: vi.fn() }
-    window.api = { directoryWatch } as unknown as typeof window.api
-
+  it('hands the project tree the file, directory-watch and terminal gateways', () => {
     const api = getDefaultProjectTreeApi()
 
     expect(api.file).toBe(fileGateway)
     expect(api.terminal).toBe(terminalGateway)
-    expect(api.directoryWatch).toBe(directoryWatch)
+    expect(api.directoryWatch).toBe(directoryWatchGateway)
   })
 
   it('keeps its identity, so effect dependencies hold', () => {
     expect(getDefaultProjectTreeApi()).toBe(getDefaultProjectTreeApi())
   })
 
-  it('reads the directory watcher from the current window.api', () => {
+  it('reaches the directory watcher of the current window.api', async () => {
     const first = { start: vi.fn() }
     const second = { start: vi.fn() }
     window.api = { directoryWatch: first } as unknown as typeof window.api
     const api = getDefaultProjectTreeApi()
     window.api = { directoryWatch: second } as unknown as typeof window.api
-    expect(api.directoryWatch).toBe(second)
+
+    await api.directoryWatch.start('/p')
+
+    expect(first.start).not.toHaveBeenCalled()
+    expect(second.start).toHaveBeenCalledWith('/p')
   })
 })

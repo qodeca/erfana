@@ -33,6 +33,20 @@ exports[`preload surface > window.api has the expected top-level groups 1`] = `
 ]
 `;
 
+exports[`preload surface > window.api.directoryWatch exposes the expected members 1`] = `
+[
+  "getStats",
+  "onDirectoryChanged",
+  "onDirectoryError",
+  "onProjectDeleted",
+  "pause",
+  "resume",
+  "start",
+  "stop",
+  "stopAll",
+]
+`;
+
 exports[`preload surface > window.api.file and window.api.terminal expose the expected members > file 1`] = `
 [
   "checkConflict",
@@ -82,5 +96,44 @@ exports[`preload surface > window.api.file and window.api.terminal expose the ex
   "onExit",
   "resize",
   "write",
+]
+`;
+
+exports[`preload surface > window.api.fileWatch exposes the expected members 1`] = `
+[
+  "getStats",
+  "onFileChanged",
+  "onFileDeleted",
+  "onFileError",
+  "pause",
+  "resume",
+  "start",
+  "stop",
+  "stopAll",
+]
+`;
+
+exports[`preload surface > window.api.git exposes the expected members 1`] = `
+[
+  "getStatus",
+]
+`;
+
+exports[`preload surface > window.api.gitPolling exposes the expected members 1`] = `
+[
+  "onPollTriggered",
+  "setEnabled",
+  "setInterval",
+  "start",
+  "stop",
+]
+`;
+
+exports[`preload surface > window.api.gitWatcher exposes the expected members 1`] = `
+[
+  "getStatus",
+  "onStateChanged",
+  "start",
+  "stop",
 ]
 `;

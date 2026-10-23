@@ -60,6 +60,8 @@ import {
 } from '../../../../shared/ipc/markdown-image-schema'
 import { onFileStructureChanged } from '../../services/fileStructureSignal'
 import { fileGateway } from '../../services/fileGateway'
+import { directoryWatchGateway } from '../../services/directoryWatchGateway'
+import { hasBridgeMethod } from '../../services/bridgePresence'
 import { resolveDocumentRelativePath } from '../../utils/markdownLinkResolver'
 import { getRendererPlatform } from '../../utils/platform'
 import { logger } from '../../utils/logger'
@@ -174,8 +176,11 @@ const defaultDeps: MarkdownImageStoreDeps = {
     Promise.resolve({ status: 'refused', reason: 'unreadable' }),
   getProjectPath: () => fileGateway.getProjectPath(),
   decode: decodeImage,
+  // Likewise: without a directory-watch bridge (or an unsubscribe from its mock), nothing is heard.
   onDirectoryChanged: (callback) =>
-    window.api?.directoryWatch?.onDirectoryChanged?.(() => callback()) ?? (() => {}),
+    (hasBridgeMethod('directoryWatch', 'onDirectoryChanged')
+      ? directoryWatchGateway.onDirectoryChanged(() => callback())
+      : undefined) ?? (() => {}),
   onFileStructureChanged,
   platform: getRendererPlatform,
   budget: sharedImageByteBudget

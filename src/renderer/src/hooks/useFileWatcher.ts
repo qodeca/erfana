@@ -19,6 +19,7 @@ import {
 } from './fileWatchSlot'
 import { logger } from '../utils/logger'
 import { fileGateway } from '../services/fileGateway'
+import { fileWatchGateway } from '../services/fileWatchGateway'
 
 /**
  * Normalizes line endings to LF for cross-platform content comparison.
@@ -364,19 +365,19 @@ export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcherRe
     })
 
     // Set up event listeners
-    const unsubscribeChanged = window.api.fileWatch.onFileChanged((data) => {
+    const unsubscribeChanged = fileWatchGateway.onFileChanged((data) => {
       if (data.filePath === filePath) {
         handleExternalChange()
       }
     })
 
-    const unsubscribeDeleted = window.api.fileWatch.onFileDeleted((data) => {
+    const unsubscribeDeleted = fileWatchGateway.onFileDeleted((data) => {
       if (data.filePath === filePath) {
         handleFileDeleted()
       }
     })
 
-    const unsubscribeError = window.api.fileWatch.onFileError((data) => {
+    const unsubscribeError = fileWatchGateway.onFileError((data) => {
       if (data.filePath === filePath) {
         logger.error('File watch error', undefined, { error: data.error })
       }
@@ -442,10 +443,10 @@ export interface FileSaveGuard {
 export function createFileSaveGuard(filePath: string): FileSaveGuard {
   return {
     pauseWatch: async () => {
-      await window.api.fileWatch.pause(filePath)
+      await fileWatchGateway.pause(filePath)
     },
     resumeWatch: async () => {
-      await window.api.fileWatch.resume(filePath)
+      await fileWatchGateway.resume(filePath)
     }
   }
 }
