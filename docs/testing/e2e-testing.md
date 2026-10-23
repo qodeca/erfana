@@ -365,14 +365,24 @@ deadline (#255). So every such call goes through `e2e/utils/bounded-exec.ts`:
 `await installBoundedExec(app)` first (once per app, idempotent), then, inside
 the `app.evaluate` callback,
 `(globalThis as unknown as BoundedExecGlobal).__erfanaE2eExec(target, code, capMs, label)`.
-A call that misses its cap rejects with `<label>: executeJavaScript did not
-settle within <n> ms`. Reads (`EXEC_READ_CAP_MS`) treat that like any failed
-read and let the caller poll again; actions (`EXEC_ACTION_CAP_MS`) let it fail
-the test with the call's name. A click that navigates its own frame is queued
-in the page (`clickInFrame`), so the call answers before the document goes.
+A call that misses its cap rejects with a `BoundedExecTimeout`
+(`<label>: executeJavaScript did not settle within <n> ms`); every other
+rejection is re-raised as an `Error` prefixed with the label. Reads
+(`EXEC_READ_CAP_MS`) tolerate only the timeout and a target that was destroyed
+or disposed under them (`__erfanaE2eTolerable`): they report "nothing yet" and
+the caller polls again. A script error (Electron reports a `webContents` one as
+`Script failed to execute …`, a frame one as the bare error text) is rethrown
+and fails the test. The read helpers remember the last failure they tolerated,
+and `HtmlPreviewPage.withReadError(poll)` adds it to a failing poll's message.
+Actions (`EXEC_ACTION_CAP_MS`) catch nothing. A click that navigates its own
+frame is queued in the page (`clickInFrame`), so the call answers before the
+document goes; `true` then means only "queued", and the test must assert an
+effect of the click.
 
 A direct `executeJavaScript` call anywhere under `e2e/` other than that file is
-a lint error (`no-restricted-syntax` in `eslint.config.mjs`). The one other
+a lint error (`no-restricted-syntax` in `eslint.config.mjs`). The rule bans the
+reference, not just the call, so an alias, `.call` / `.bind` and a destructure
+are caught too. The one other
 copy is the bench driver `e2e/fixtures/terminalHiddenFloodDriver.cjs`, which
 runs outside Playwright and bounds its own calls.
 

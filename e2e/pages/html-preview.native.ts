@@ -30,8 +30,21 @@ import {
   EXEC_ACTION_CAP_MS,
   EXEC_READ_CAP_MS,
   installBoundedExec,
+  noteReadError,
   type BoundedExecGlobal
 } from '../utils/bounded-exec'
+
+/** A main-side read's value, plus the failure it tolerated on the way (if any). */
+interface ReadResult<T> {
+  value: T
+  lastError?: string
+}
+
+/** Unwrap a {@link ReadResult}, remembering its tolerated failure for the poll's message. */
+function unwrap<T>(app: ElectronApplication, result: ReadResult<T>): T {
+  noteReadError(app, result.lastError)
+  return result.value
+}
 
 /** A snapshot of one live preview's own web contents, read from the main process. */
 export interface PreviewSnapshot {
@@ -91,8 +104,9 @@ export async function previewSnapshot(
   target: PreviewTarget = {}
 ): Promise<PreviewSnapshot | null> {
   await installBoundedExec(app)
-  return app.evaluate(async ({ webContents }, { urlIncludes, readCapMs }) => {
-    const exec = (globalThis as unknown as BoundedExecGlobal).__erfanaE2eExec
+  const result = await app.evaluate(async ({ webContents }, { urlIncludes, readCapMs }) => {
+    const { __erfanaE2eExec: exec, __erfanaE2eTolerable: tolerable, __erfanaE2eErrorText: errorText } =
+      globalThis as unknown as BoundedExecGlobal
     const previews = webContents.getAllWebContents().filter((wc) => {
       try {
         const url = wc.getURL()
@@ -104,11 +118,13 @@ export async function previewSnapshot(
         return false
       }
     })
-    if (previews.length === 0) return null
+    if (previews.length === 0) return { value: null }
     const wc = previews[0]
     // Every read can throw "Object has been destroyed" — eviction can take
     // this view at any point, including on the synchronous `getURL()`. A
     // snapshot of a view that vanished is `null`, which the caller polls on.
+    // A script error is not tolerated: it is rethrown and fails the test.
+    let lastError: string | undefined
     try {
       const url = wc.getURL()
       let docTitle = ''
@@ -122,29 +138,37 @@ export async function previewSnapshot(
           readCapMs,
           'previewSnapshot: js-output marker'
         )
-      } catch {
-        // Page may be mid-load / navigating, or the read was capped — leave
-        // the defaults, the caller polls.
+      } catch (err) {
+        // Navigating (capped) or gone: leave the defaults, the caller polls.
+        if (!tolerable(err)) throw err
+        lastError = errorText(err)
       }
       const destroyed = wc.isDestroyed()
       return {
-        title: destroyed ? '' : wc.getTitle(),
-        docTitle,
-        jsRan,
-        url,
-        destroyed
+        value: {
+          title: destroyed ? '' : wc.getTitle(),
+          docTitle,
+          jsRan,
+          url,
+          destroyed
+        },
+        lastError
       }
-    } catch {
-      return null
+    } catch (err) {
+      if (!tolerable(err)) throw err
+      return { value: null, lastError: errorText(err) }
     }
   }, { urlIncludes: target.urlIncludes, readCapMs: EXEC_READ_CAP_MS })
+  return unwrap<PreviewSnapshot | null>(app, result)
 }
 
 /** Every live preview's URL and document title, read from the main process. */
 export async function livePreviews(app: ElectronApplication): Promise<LivePreview[]> {
   await installBoundedExec(app)
-  return app.evaluate(async ({ webContents }, readCapMs) => {
-    const exec = (globalThis as unknown as BoundedExecGlobal).__erfanaE2eExec
+  const result = await app.evaluate(async ({ webContents }, readCapMs) => {
+    const { __erfanaE2eExec: exec, __erfanaE2eTolerable: tolerable, __erfanaE2eErrorText: errorText } =
+      globalThis as unknown as BoundedExecGlobal
+    let lastError: string | undefined
     const previews = webContents.getAllWebContents().filter((wc) => {
       try {
         return wc.getURL().startsWith('erfana-preview://') && !wc.isDestroyed()
@@ -164,22 +188,31 @@ export async function livePreviews(app: ElectronApplication): Promise<LivePrevie
         let docTitle = ''
         try {
           docTitle = await exec<string>(wc, 'document.title', readCapMs, 'livePreviews: document.title')
-        } catch {
-          // Mid-load or capped; the caller polls.
+        } catch (err) {
+          // Navigating (capped) or gone; the caller polls. A script error is rethrown.
+          if (!tolerable(err)) throw err
+          lastError = errorText(err)
         }
         if (wc.isDestroyed()) continue
         out.push({ url, docTitle })
-      } catch {
+      } catch (err) {
+        if (!tolerable(err)) throw err
+        lastError = errorText(err)
         continue
       }
     }
-    return out
+    return { value: out, lastError }
   }, EXEC_READ_CAP_MS)
+  return unwrap<LivePreview[]>(app, result)
 }
 
 /**
  * Evaluate an expression inside a live preview page's DOM (main-process
- * read). `null` when no matching preview is live or the page is mid-load.
+ * read). `null` when no matching preview is live, or the page is navigating
+ * or gone (the read was capped or its target destroyed) – the caller polls.
+ *
+ * @throws when the expression itself throws (a ReferenceError, a SyntaxError,
+ * a TypeError on a missing element): that is a test bug, not "not yet".
  */
 export async function evalInPreview(
   app: ElectronApplication,
@@ -187,9 +220,10 @@ export async function evalInPreview(
   target: PreviewTarget = {}
 ): Promise<string | null> {
   await installBoundedExec(app)
-  return app.evaluate(
+  const result = await app.evaluate(
     async ({ webContents }, { e, urlIncludes, readCapMs }) => {
-      const exec = (globalThis as unknown as BoundedExecGlobal).__erfanaE2eExec
+      const { __erfanaE2eExec: exec, __erfanaE2eTolerable: tolerable, __erfanaE2eErrorText: errorText } =
+        globalThis as unknown as BoundedExecGlobal
       const wc = webContents.getAllWebContents().find((c) => {
         try {
           const url = c.getURL()
@@ -201,16 +235,19 @@ export async function evalInPreview(
           return false
         }
       })
-      if (!wc) return null
+      if (!wc) return { value: null }
       try {
-        return await exec<string>(wc, e, readCapMs, `evalInPreview: ${e.slice(0, 60)}`)
-      } catch {
-        // Mid-load, a throwing expression, or a capped read: the caller polls.
-        return null
+        return { value: await exec<string>(wc, e, readCapMs, `evalInPreview: ${e.slice(0, 60)}`) }
+      } catch (err) {
+        // Navigating (capped) or gone: the caller polls. A throwing
+        // expression is rethrown.
+        if (!tolerable(err)) throw err
+        return { value: null, lastError: errorText(err) }
       }
     },
     { e: expr, urlIncludes: target.urlIncludes, readCapMs: EXEC_READ_CAP_MS }
   )
+  return unwrap<string | null>(app, result)
 }
 
 /**
@@ -235,15 +272,16 @@ export async function clickInPreview(
   await installBoundedExec(app)
   return app.evaluate(
     async ({ webContents }, { title, id, readCapMs, actionCapMs }) => {
-      const exec = (globalThis as unknown as BoundedExecGlobal).__erfanaE2eExec
+      const { __erfanaE2eExec: exec, __erfanaE2eTolerable: tolerable } = globalThis as unknown as BoundedExecGlobal
       for (const wc of webContents.getAllWebContents()) {
         if (!wc.getURL().startsWith('erfana-preview://')) continue
         let found = ''
         try {
           found = await exec<string>(wc, 'document.title', readCapMs, 'clickInPreview: document.title')
-        } catch {
-          // Mid-load, already gone or capped: this is not the page we are
-          // looking for. Only the IDENTIFICATION probe may fail quietly.
+        } catch (err) {
+          // Navigating (capped) or gone: this is not the page we are looking
+          // for. Only the IDENTIFICATION probe may fail quietly, and only so.
+          if (!tolerable(err)) throw err
           continue
         }
         if (!found.includes(title)) continue

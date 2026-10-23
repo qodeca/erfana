@@ -133,15 +133,17 @@ async function framesWhen(
   message: string
 ): Promise<Awaited<ReturnType<typeof frameTree>>> {
   let tree = await frameTree(h.app, target(relPath))
-  await expect
-    .poll(
-      async () => {
-        tree = await frameTree(h.app, target(relPath))
-        return ready(tree.map((f) => f.title))
-      },
-      { timeout: PREVIEW_BUDGET_MS, message }
-    )
-    .toBe(true)
+  await h.preview.withReadError(
+    expect
+      .poll(
+        async () => {
+          tree = await frameTree(h.app, target(relPath))
+          return ready(tree.map((f) => f.title))
+        },
+        { timeout: PREVIEW_BUDGET_MS, message }
+      )
+      .toBe(true)
+  )
   return tree
 }
 
@@ -187,7 +189,9 @@ async function swapPageCss(h: Frames, relPath: string, value: string): Promise<v
   await expect(async () => {
     round += 1
     await edit(h, 'frames/page.css', /--page-mark: [^;]+;/, `--page-mark: ${value}-${round};`)
-    await expect.poll(() => h.preview.eval(PAGE_MARK, target(relPath)), { timeout: 3_000 }).toBe(`${value}-${round}`)
+    await h.preview.withReadError(
+      expect.poll(() => h.preview.eval(PAGE_MARK, target(relPath)), { timeout: 3_000 }).toBe(`${value}-${round}`)
+    )
   }).toPass({ timeout: PREVIEW_BUDGET_MS })
 }
 
@@ -413,7 +417,9 @@ test.describe('HTML preview frames – blocked hosts inside frames (P2-AC2)', ()
   test('should list a host blocked inside a frame in the band, and load it there after Allow and Confirm', async ({ frames: h, localServer }) => {
     await edit(h, 'frames/cdn-child.html', CDN_SCRIPT_URL, localServer.probeUrl)
     await openAndSettle(h, CDN, '-FRAMES-CDN-')
-    await expect.poll(() => h.preview.eval('document.body.dataset.remote', target(CDN)), { timeout: PREVIEW_BUDGET_MS }).toBe('blocked')
+    await h.preview.withReadError(
+      expect.poll(() => h.preview.eval('document.body.dataset.remote', target(CDN)), { timeout: PREVIEW_BUDGET_MS }).toBe('blocked')
+    )
 
     const chip = h.preview.chip()
     // The loopback script origin and the frame's fetch host.
@@ -435,7 +441,9 @@ test.describe('HTML preview frames – blocked hosts inside frames (P2-AC2)', ()
 
   test("should list a fetch inside a frame as a network request, and ignore the frame's own console.log look-alike", async ({ frames: h }) => {
     await openAndSettle(h, CDN, '-FRAMES-CDN-')
-    await expect.poll(() => h.preview.eval('document.body.dataset.remote', target(CDN)), { timeout: PREVIEW_BUDGET_MS }).toBe('blocked')
+    await h.preview.withReadError(
+      expect.poll(() => h.preview.eval('document.body.dataset.remote', target(CDN)), { timeout: PREVIEW_BUDGET_MS }).toBe('blocked')
+    )
 
     // The look-alike is printed first; the two real refusals come after it.
     await expect(h.preview.chip()).toContainText('2 blocked · 0 allowed', { timeout: PREVIEW_BUDGET_MS })

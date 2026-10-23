@@ -183,6 +183,18 @@ const RENDERER_LAYER_PATTERNS = [
   }
 ]
 
+// Every way an e2e file can reach `executeJavaScript` without the bounded
+// helper (lens review finding 34) – see the `e2e/**` block below.
+const E2E_EXECUTE_JAVASCRIPT_MESSAGE =
+  'Unbounded executeJavaScript can hang a test forever. Use the bounded exec from e2e/utils/bounded-exec.ts (installBoundedExec + globalThis.__erfanaE2eExec).'
+const E2E_EXECUTE_JAVASCRIPT_SELECTORS = [
+  'MemberExpression[property.name=/^executeJavaScript/]',
+  'MemberExpression[computed=true][property.value=/^executeJavaScript/]',
+  "MemberExpression[computed=true][property.type='TemplateLiteral'][property.quasis.0.value.raw=/^executeJavaScript/]",
+  'ObjectPattern > Property[key.name=/^executeJavaScript/]',
+  'ObjectPattern > Property[key.value=/^executeJavaScript/]'
+].map((selector) => ({ selector, message: E2E_EXECUTE_JAVASCRIPT_MESSAGE }))
+
 export default [
   // Ignore build outputs and vendored folders. `playwright-report/`,
   // `test-results/`, and `coverage/` are test-run artifacts containing
@@ -317,23 +329,17 @@ export default [
   // which call hung (#255). Every call goes through the bounded helper in
   // e2e/utils/bounded-exec.ts, the one file exempt here. No other block sets
   // `no-restricted-syntax` for `e2e/**`, so this list is complete for it.
+  //
+  // The selectors ban the REFERENCE, not just the call, so an alias
+  // (`const run = wc.executeJavaScript`), `.call` / `.bind` and a destructure
+  // (`const { executeJavaScript } = wc`) are caught too: member access in dot,
+  // string and template form, and a destructured key in either form. Matches
+  // `executeJavaScriptInIsolatedWorld` as well.
   {
     files: ['e2e/**/*.{ts,js,cjs,mjs}'],
     ignores: ['e2e/utils/bounded-exec.ts'],
     rules: {
-      'no-restricted-syntax': [
-        'error',
-        {
-          selector: 'CallExpression[callee.property.name=/^executeJavaScript/]',
-          message:
-            'Unbounded executeJavaScript can hang a test forever. Use the bounded exec from e2e/utils/bounded-exec.ts (installBoundedExec + globalThis.__erfanaE2eExec).'
-        },
-        {
-          selector: 'CallExpression[callee.property.value=/^executeJavaScript/]',
-          message:
-            'Unbounded executeJavaScript can hang a test forever. Use the bounded exec from e2e/utils/bounded-exec.ts (installBoundedExec + globalThis.__erfanaE2eExec).'
-        }
-      ]
+      'no-restricted-syntax': ['error', ...E2E_EXECUTE_JAVASCRIPT_SELECTORS]
     }
   },
   // Build scripts: CommonJS Node.js environment

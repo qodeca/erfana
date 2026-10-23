@@ -128,12 +128,14 @@ export async function waitForLivePages(app: ElectronApplication, relPaths: strin
  * `sentinel` – the page landed, not just the URL.
  */
 export async function waitForPage(preview: HtmlPreviewPage, relPath: string, sentinel: string): Promise<void> {
-  await expect
-    .poll(() => preview.eval('document.title', { urlIncludes: `/${relPath}` }), {
-      timeout: PREVIEW_BUDGET_MS,
-      message: `${relPath} never showed ${sentinel}`
-    })
-    .toContain(sentinel)
+  await preview.withReadError(
+    expect
+      .poll(() => preview.eval('document.title', { urlIncludes: `/${relPath}` }), {
+        timeout: PREVIEW_BUDGET_MS,
+        message: `${relPath} never showed ${sentinel}`
+      })
+      .toContain(sentinel)
+  )
 }
 
 /** The page's scroll offset and fragment, read inside it. */

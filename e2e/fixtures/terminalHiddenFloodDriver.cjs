@@ -42,11 +42,13 @@ const COMMAND = `yes | head -c ${BYTES}; echo DONE_$((1+1))`
  * never answers must fail the run with its name, not stall it.
  */
 const JS_CAP_MS = 60000
+/** The error a capped `js()` call rejects with – never to be read as an answer. */
+class JsCapError extends Error {}
 const js = (win, code) => {
   let timer
   const cap = new Promise((_resolve, reject) => {
     timer = setTimeout(
-      () => reject(new Error(`executeJavaScript did not settle within ${JS_CAP_MS} ms: ${code.slice(0, 80)}`)),
+      () => reject(new JsCapError(`executeJavaScript did not settle within ${JS_CAP_MS} ms: ${code.slice(0, 80)}`)),
       JS_CAP_MS
     )
   })
@@ -57,12 +59,15 @@ const js = (win, code) => {
 const t0 = Date.now()
 const log = (step) => process.stdout.write(`BENCH_STEP ${step} +${Date.now() - t0} ms\n`)
 
+/** `until` ran out of time: the condition never held. */
+class UntilTimeout extends Error {}
+
 async function until(check, timeoutMs, label, intervalMs = 100) {
   const deadline = Date.now() + timeoutMs
   for (;;) {
     const value = await check()
     if (value) return value
-    if (Date.now() > deadline) throw new Error(`timed out waiting for ${label}`)
+    if (Date.now() > deadline) throw new UntilTimeout(`timed out waiting for ${label}`)
     await new Promise((resolve) => setTimeout(resolve, intervalMs))
   }
 }
@@ -136,7 +141,13 @@ async function run(win) {
           () => js(win, `document.visibilityState === 'hidden' ? 'hidden' : null`),
           2000,
           'the page to be hidden'
-        ).catch(() => 'visible')
+        ).catch((err) => {
+          // Only `until`'s own 2 s deadline means "the hide never reached
+          // the page". Anything else – a capped call (JsCapError, a hang) or a
+          // script error – fails the run.
+          if (!(err instanceof UntilTimeout)) throw err
+          return 'visible'
+        })
 
   log(`hidden: page ${hiddenState}, window ${win.isMinimized() ? 'minimized' : 'normal'}`)
   // Sample the page's visibility while it is hidden, so a run that was not
