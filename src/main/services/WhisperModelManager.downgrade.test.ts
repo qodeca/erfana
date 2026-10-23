@@ -49,7 +49,8 @@ vi.mock('fs/promises', () => ({
   readdir: (...args: unknown[]) => mockReaddir(...args),
   chmod: (...args: unknown[]) => mockChmod(...args),
   unlink: (...args: unknown[]) => mockUnlink(...args),
-  rename: vi.fn()
+  rename: vi.fn(),
+  stat: vi.fn()
 }))
 
 // `fs` (sync) for `createReadStream` used by streaming SHA in verifyAllFiles

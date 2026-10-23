@@ -16,6 +16,20 @@ import { join } from 'path'
 
 import { SecureDownloaderError, downloadToFile } from './secureDownloader'
 
+/** Lets a test make `rm` fail (e.g. a file locked on Windows). Passes through otherwise. */
+const rmControl = vi.hoisted(() => ({ fail: false }))
+
+vi.mock('fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('fs/promises')>()
+  return {
+    ...actual,
+    rm: async (...args: Parameters<typeof actual.rm>) => {
+      if (rmControl.fail) throw new Error('EBUSY: resource busy or locked')
+      return actual.rm(...args)
+    }
+  }
+})
+
 /** Build a Response-like object whose body is a ReadableStream of one chunk. */
 function mockResponse(opts: {
   status?: number
@@ -47,6 +61,7 @@ describe('secureDownloader.downloadToFile', () => {
   })
 
   afterEach(async () => {
+    rmControl.fail = false
     vi.unstubAllGlobals()
     await rm(workDir, { recursive: true, force: true })
   })
@@ -304,6 +319,157 @@ describe('secureDownloader.downloadToFile', () => {
     })
     expect(result.finalUrl).toContain('us.aws.cdn.hf.co')
     expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it.each([
+    ['plain http', 'http://huggingface.co/m.bin'],
+    ['a non-default port', 'https://huggingface.co:8443/m.bin'],
+    ['a trailing-dot host', 'https://huggingface.co./m.bin'],
+    ['userinfo with an allowlisted host', 'https://user:pw@huggingface.co/m.bin'],
+    ['userinfo hiding another host', 'https://huggingface.co@evil.example.com/m.bin'],
+    ['a non-http scheme', 'ftp://huggingface.co/m.bin']
+  ])('rejects %s before contacting the network', async (_label, url) => {
+    await expect(downloadToFile({ url, destPath, maxBytes: 100 })).rejects.toMatchObject({
+      code: 'hostname-not-allowed'
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('accepts the explicit default https port', async () => {
+    const payload = new TextEncoder().encode('ok')
+    fetchMock.mockResolvedValueOnce(
+      mockResponse({ headers: { 'content-length': String(payload.length) }, body: payload })
+    )
+    const result = await downloadToFile({
+      url: 'https://huggingface.co:443/m.bin',
+      destPath,
+      maxBytes: 100
+    })
+    expect(result.bytes).toBe(payload.length)
+  })
+
+  it('rejects a redirect that downgrades to http or adds a port', async () => {
+    fetchMock.mockResolvedValueOnce(
+      mockResponse({ status: 302, headers: { location: 'http://us.aws.cdn.hf.co/x' } })
+    )
+    await expect(
+      downloadToFile({ url: 'https://huggingface.co/m.bin', destPath, maxBytes: 100 })
+    ).rejects.toMatchObject({ code: 'hostname-not-allowed' })
+
+    fetchMock.mockResolvedValueOnce(
+      mockResponse({ status: 302, headers: { location: 'https://us.aws.cdn.hf.co:8443/x' } })
+    )
+    await expect(
+      downloadToFile({ url: 'https://huggingface.co/m.bin', destPath, maxBytes: 100 })
+    ).rejects.toMatchObject({ code: 'hostname-not-allowed' })
+  })
+
+  describe('error messages never carry the query string', () => {
+    const SIGNED = 'https://us.aws.cdn.hf.co/xet-bridge-us/abc?X-Amz-Signature=SECRET&Policy=P'
+
+    it('http-status', async () => {
+      fetchMock.mockResolvedValueOnce(mockResponse({ status: 403 }))
+      const err = await downloadToFile({ url: SIGNED, destPath, maxBytes: 100 }).catch((e) => e)
+      expect(err).toMatchObject({ code: 'http-status' })
+      expect(err.message).toContain('https://us.aws.cdn.hf.co/xet-bridge-us/abc')
+      expect(err.message).not.toContain('SECRET')
+      expect(err.message).not.toContain('?')
+    })
+
+    it('redirect without Location', async () => {
+      fetchMock.mockResolvedValueOnce(mockResponse({ status: 302 }))
+      const err = await downloadToFile({ url: SIGNED, destPath, maxBytes: 100 }).catch((e) => e)
+      expect(err).toMatchObject({ code: 'http-status' })
+      expect(err.message).not.toContain('SECRET')
+    })
+
+    it('empty body', async () => {
+      fetchMock.mockResolvedValueOnce(mockResponse({ status: 200 }))
+      const err = await downloadToFile({ url: SIGNED, destPath, maxBytes: 100 }).catch((e) => e)
+      expect(err).toMatchObject({ code: 'no-body' })
+      expect(err.message).not.toContain('SECRET')
+    })
+
+    it('too many redirects', async () => {
+      fetchMock.mockImplementation(async () =>
+        mockResponse({ status: 302, headers: { location: SIGNED } })
+      )
+      const err = await downloadToFile({ url: SIGNED, destPath, maxBytes: 100 }).catch((e) => e)
+      expect(err).toMatchObject({ code: 'too-many-redirects' })
+      expect(err.message).not.toContain('SECRET')
+    })
+
+    it('unparseable URL is not echoed', async () => {
+      const err = await downloadToFile({
+        url: 'not a url?token=SECRET',
+        destPath,
+        maxBytes: 100
+      }).catch((e) => e)
+      expect(err).toMatchObject({ code: 'hostname-not-allowed' })
+      expect(err.message).not.toContain('SECRET')
+    })
+  })
+
+  it('still throws sha-mismatch when removing the file fails', async () => {
+    const payload = new TextEncoder().encode('tampered')
+    fetchMock.mockResolvedValueOnce(
+      mockResponse({ headers: { 'content-length': String(payload.length) }, body: payload })
+    )
+    rmControl.fail = true
+    await expect(
+      downloadToFile({
+        url: 'https://github.com/x',
+        destPath,
+        maxBytes: 100,
+        expectedSha256: '0'.repeat(64)
+      })
+    ).rejects.toMatchObject({ name: 'SecureDownloaderError', code: 'sha-mismatch' })
+  })
+
+  it('refuses a 0-byte response when a hash is pinned', async () => {
+    const pinned = createHash('sha256').update('real model').digest('hex')
+    fetchMock.mockResolvedValueOnce(
+      mockResponse({ headers: { 'content-length': '0' }, body: new Uint8Array(0) })
+    )
+    await expect(
+      downloadToFile({
+        url: 'https://huggingface.co/m.bin',
+        destPath,
+        maxBytes: 100,
+        expectedSha256: pinned
+      })
+    ).rejects.toMatchObject({ code: 'sha-mismatch' })
+    await expect(stat(destPath)).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
+  it('rejects when the signal aborts in the middle of the stream', async () => {
+    const controller = new AbortController()
+    const body = new ReadableStream<Uint8Array>({
+      start(c) {
+        c.enqueue(new Uint8Array(5))
+      },
+      pull() {
+        return new Promise<void>((_resolve, reject) => {
+          controller.signal.addEventListener(
+            'abort',
+            () => reject(new DOMException('aborted', 'AbortError')),
+            { once: true }
+          )
+          setTimeout(() => controller.abort(), 0)
+        })
+      }
+    })
+    fetchMock.mockResolvedValueOnce(
+      new Response(body, { status: 200, headers: { 'content-length': '50' } })
+    )
+    await expect(
+      downloadToFile({
+        url: 'https://huggingface.co/m.bin',
+        destPath,
+        maxBytes: 100,
+        signal: controller.signal
+      })
+    ).rejects.toMatchObject({ name: 'AbortError' })
   })
 
   it('rejects Content-Length mismatch (server sent fewer bytes than promised)', async () => {

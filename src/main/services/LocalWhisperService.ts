@@ -734,6 +734,12 @@ export class LocalWhisperService {
     // on Windows) is <50 ms on modern hardware — acceptable per-chunk.
     const verified = await this.modelManager.verifyInstalledBinary()
 
+    // Same TOCTOU close for the model: a size check plus a streaming SHA-256
+    // against the pin, cached per session (path, size, mtime, inode) so only
+    // the first spawn pays for hashing. A mismatch deletes the file and throws
+    // WHISPER_MODEL_NOT_FOUND ("download it again"); nothing is re-downloaded here.
+    await this.modelManager.verifyInstalledModelFile(modelPath)
+
     // Forensic-logging shape, spawn-path half of the 7-tuple the plan commits
     // to (install-time keys `url` + `expectedSha` are logged separately in
     // `WhisperModelManager.ensureBinary`; keeping install-time keys off the

@@ -81,6 +81,7 @@ const mockReaddir = vi.fn()
 const mockUnlink = vi.fn()
 const mockRename = vi.fn()
 const mockRm = vi.fn()
+const mockStat = vi.fn()
 const mockReadFile = vi.fn()
 const mockWriteFile = vi.fn()
 
@@ -92,6 +93,7 @@ vi.mock('fs/promises', () => ({
   unlink: (...args: unknown[]) => mockUnlink(...args),
   rename: (...args: unknown[]) => mockRename(...args),
   rm: (...args: unknown[]) => mockRm(...args),
+  stat: (...args: unknown[]) => mockStat(...args),
   readFile: (...args: unknown[]) => mockReadFile(...args),
   writeFile: (...args: unknown[]) => mockWriteFile(...args),
   copyFile: vi.fn()
@@ -108,6 +110,21 @@ import { Readable } from 'stream'
 
 function makeBytesStream(buf: Buffer): NodeJS.ReadableStream {
   return Readable.from([buf])
+}
+
+/** Pinned sizes of the mocked MODEL_PINS (see the whisper-assets mock). */
+const MOCK_MODEL_SIZES: Record<string, number> = {
+  'ggml-tiny.bin': 1000,
+  'ggml-base.bin': 2000,
+  'ggml-small.bin': 3000,
+  'ggml-medium.bin': 4000,
+  'ggml-large.bin': 5000
+}
+
+/** `stat` for model files returns the pinned size, so they count as installed. */
+async function defaultStat(p: string): Promise<{ size: number; mtimeMs: number; ino: number }> {
+  const name = p.split('/').pop() ?? ''
+  return { size: MOCK_MODEL_SIZES[name] ?? 1, mtimeMs: 1, ino: 1 }
 }
 
 const mockCreateReadStream = vi.fn((p: string) => {
@@ -343,6 +360,7 @@ function arrangeFreshInstall(opts: {
   mockChmod.mockResolvedValue(undefined)
   mockUnlink.mockResolvedValue(undefined)
   mockRename.mockResolvedValue(undefined)
+  mockStat.mockImplementation(defaultStat)
 
   // execFile (used for macOS xattr strip) — no-op success.
   mockExecFile.mockImplementation((...args: unknown[]) => {
@@ -369,6 +387,7 @@ describe('WhisperModelManager', () => {
     mockChmod.mockResolvedValue(undefined)
     mockUnlink.mockResolvedValue(undefined)
     mockRename.mockResolvedValue(undefined)
+    mockStat.mockImplementation(defaultStat)
     mockRm.mockResolvedValue(undefined)
     mockWriteFile.mockResolvedValue(undefined)
     mockExecFile.mockImplementation((...args: unknown[]) => {

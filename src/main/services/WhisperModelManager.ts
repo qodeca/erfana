@@ -35,10 +35,10 @@
  */
 import { app } from 'electron'
 import { createHash } from 'crypto'
-import { access, chmod, readFile, readdir, rename, rm, unlink, writeFile } from 'fs/promises'
-import { constants as fsConstants } from 'fs'
+import { access, chmod, readFile, readdir, rename, rm, stat, unlink, writeFile } from 'fs/promises'
+import { constants as fsConstants, createReadStream } from 'fs'
 import { tmpdir } from 'os'
-import { join } from 'path'
+import { basename, join } from 'path'
 import { randomUUID } from 'crypto'
 
 import { LOCAL_WHISPER } from '../../shared/constants'
@@ -102,6 +102,15 @@ export interface IWhisperModelManager {
   getModelPath(model: WhisperModel): string
   isBinaryInstalled(): Promise<boolean>
   isModelInstalled(model: WhisperModel): Promise<boolean>
+  /**
+   * Hash-check an installed model file against its pin before it is handed to
+   * whisper-cli (cached per session by path, size, mtime and inode). On a
+   * mismatch the file is deleted and `WHISPER_MODEL_NOT_FOUND` is thrown, so
+   * the user re-downloads it deliberately.
+   */
+  verifyInstalledModelFile(modelPath: string): Promise<void>
+  /** Abort in-flight model downloads and remove their temp files (app quit). */
+  dispose(): Promise<void>
   listInstalledModels(): Promise<WhisperModel[]>
   ensureBinary(options?: {
     onProgress?: ProgressCallback
@@ -201,6 +210,12 @@ class WhisperModelManager implements IWhisperModelManager {
   /** Cache of installed model states (populated lazily). */
   private installedCache = new Map<WhisperModel, boolean>()
 
+  /** Models whose bytes were hashed this session, keyed by path + size + mtime + inode. */
+  private verifiedModelFiles = new Map<string, string>()
+
+  /** In-flight model downloads: temp path -> abort handle + settled promise. */
+  private activeDownloads = new Map<string, { controller: AbortController; done: Promise<void> }>()
+
   constructor() {
     this.whisperDir = join(app.getPath('userData'), LOCAL_WHISPER.WHISPER_DIR)
     this.binDir = join(this.whisperDir, LOCAL_WHISPER.BIN_DIR)
@@ -267,11 +282,20 @@ class WhisperModelManager implements IWhisperModelManager {
     }
   }
 
+  /**
+   * A model counts as installed only when the file is readable AND has exactly
+   * the pinned size. The content hash is checked separately, right before a
+   * spawn (`verifyInstalledModelFile`), because hashing up to 3 GB is too slow
+   * for a status query.
+   */
   async isModelInstalled(model: WhisperModel): Promise<boolean> {
     try {
-      await access(this.getModelPath(model), fsConstants.R_OK)
-      this.installedCache.set(model, true)
-      return true
+      const modelPath = this.getModelPath(model)
+      await access(modelPath, fsConstants.R_OK)
+      const info = await stat(modelPath)
+      const ok = info.size === MODEL_PINS[model].sizeBytes
+      this.installedCache.set(model, ok)
+      return ok
     } catch {
       this.installedCache.set(model, false)
       return false
@@ -279,6 +303,7 @@ class WhisperModelManager implements IWhisperModelManager {
   }
 
   async listInstalledModels(): Promise<WhisperModel[]> {
+    await this.removeStaleModelTemps()
     try {
       const entries = await readdir(this.modelsDir)
       const models: WhisperModel[] = []
@@ -287,8 +312,10 @@ class WhisperModelManager implements IWhisperModelManager {
         if (match) {
           const name = match[1] as WhisperModel
           if (LOCAL_WHISPER.SUPPORTED_MODELS.includes(name)) {
-            models.push(name)
-            this.installedCache.set(name, true)
+            if (await this.hasPinnedSize(name)) {
+              models.push(name)
+              this.installedCache.set(name, true)
+            }
           }
         }
       }
@@ -493,6 +520,55 @@ class WhisperModelManager implements IWhisperModelManager {
     }
   }
 
+  async verifyInstalledModelFile(modelPath: string): Promise<void> {
+    const match = /^ggml-(\w+)\.bin$/.exec(basename(modelPath))
+    const model = match?.[1] as WhisperModel | undefined
+    if (!model || !LOCAL_WHISPER.SUPPORTED_MODELS.includes(model)) {
+      throw new AppError(
+        `Not a known whisper model file: ${basename(modelPath)}`,
+        ErrorCode.WHISPER_MODEL_NOT_FOUND
+      )
+    }
+    const pin = MODEL_PINS[model]
+
+    let info
+    try {
+      info = await stat(modelPath)
+    } catch {
+      throw new AppError(
+        `Model not found: ${model}. Download it from Settings.`,
+        ErrorCode.WHISPER_MODEL_NOT_FOUND
+      )
+    }
+    const key = `${modelPath}|${info.size}|${info.mtimeMs}|${info.ino}`
+    if (this.verifiedModelFiles.get(modelPath) === key) return
+
+    let reason: string | null = null
+    if (info.size !== pin.sizeBytes) {
+      reason = `size ${info.size} does not match the expected ${pin.sizeBytes}`
+    } else {
+      const sha = await this.hashFile(modelPath)
+      if (sha !== pin.sha256) reason = 'SHA-256 does not match the pinned hash'
+    }
+    if (reason !== null) {
+      this.verifiedModelFiles.delete(modelPath)
+      this.installedCache.set(model, false)
+      await this.safeUnlink(modelPath)
+      logger.warn('Whisper model failed its integrity check and was removed', { model, reason })
+      throw new AppError(
+        `The ${model} model failed its integrity check and was removed. Download it again from Settings.`,
+        ErrorCode.WHISPER_MODEL_NOT_FOUND
+      )
+    }
+    this.verifiedModelFiles.set(modelPath, key)
+  }
+
+  async dispose(): Promise<void> {
+    const pending = [...this.activeDownloads.values()]
+    for (const d of pending) d.controller.abort()
+    await Promise.allSettled(pending.map((d) => d.done))
+  }
+
   async ensureModel(
     model: WhisperModel,
     options?: { onProgress?: ProgressCallback; signal?: AbortSignal }
@@ -504,12 +580,27 @@ class WhisperModelManager implements IWhisperModelManager {
     }
 
     await this.ensureDirs()
+    await this.removeStaleModelTemps()
     const pin = MODEL_PINS[model]
     const filename = `ggml-${model}.bin`
     const url = `${LOCAL_WHISPER.HUGGINGFACE_MODEL_BASE_URL}/${pin.remoteFilename}`
     const tempPath = join(this.modelsDir, `${filename}.download-${randomUUID()}`)
 
     logger.info('Downloading whisper model', { model, url })
+
+    // Own controller so `dispose()` can abort the download at quit; the
+    // caller's signal feeds into it.
+    const controller = new AbortController()
+    const callerSignal = options?.signal
+    const onCallerAbort = (): void => controller.abort()
+    if (callerSignal?.aborted) controller.abort()
+    else callerSignal?.addEventListener('abort', onCallerAbort, { once: true })
+
+    let finish: () => void = () => {}
+    const done = new Promise<void>((resolve) => {
+      finish = resolve
+    })
+    this.activeDownloads.set(tempPath, { controller, done })
 
     try {
       await downloadToFile({
@@ -519,7 +610,7 @@ class WhisperModelManager implements IWhisperModelManager {
         maxBytes: pin.sizeBytes + MODEL_SIZE_MARGIN_BYTES,
         // A mismatch deletes the temp file (catch below) and fails the download.
         expectedSha256: pin.sha256,
-        signal: options?.signal,
+        signal: controller.signal,
         onProgress: options?.onProgress
           ? (bytes, total): void => {
               options.onProgress!({
@@ -535,7 +626,7 @@ class WhisperModelManager implements IWhisperModelManager {
       return modelPath
     } catch (error) {
       await this.safeUnlink(tempPath)
-      if (options?.signal?.aborted) {
+      if (controller.signal.aborted) {
         throw new AppError(
           `Model download was cancelled: ${model}`,
           ErrorCode.WHISPER_MODEL_DOWNLOAD_FAILED
@@ -545,6 +636,10 @@ class WhisperModelManager implements IWhisperModelManager {
         throw new AppError(error.message, ErrorCode.WHISPER_MODEL_DOWNLOAD_FAILED)
       }
       throw AppError.from(error, ErrorCode.WHISPER_MODEL_DOWNLOAD_FAILED)
+    } finally {
+      callerSignal?.removeEventListener('abort', onCallerAbort)
+      this.activeDownloads.delete(tempPath)
+      finish()
     }
   }
 
@@ -602,6 +697,44 @@ class WhisperModelManager implements IWhisperModelManager {
   private safeSpec(): PlatformArtifactSpec | null {
     const c = classifyPlatform()
     return c.supported ? ARTIFACTS[c.platform] : null
+  }
+
+  /** True when `ggml-<model>.bin` exists with exactly the pinned size. */
+  private async hasPinnedSize(model: WhisperModel): Promise<boolean> {
+    try {
+      const info = await stat(this.getModelPath(model))
+      return info.size === MODEL_PINS[model].sizeBytes
+    } catch {
+      return false
+    }
+  }
+
+  /** Streaming SHA-256 of a file; never buffers the whole model in memory. */
+  private async hashFile(path: string): Promise<string> {
+    const hash = createHash('sha256')
+    for await (const chunk of createReadStream(path)) {
+      hash.update(chunk as Buffer)
+    }
+    return hash.digest('hex')
+  }
+
+  /**
+   * Remove `ggml-*.bin.download-*` files an earlier run left behind (quit or
+   * crash mid-download). Downloads that are running now are skipped.
+   */
+  private async removeStaleModelTemps(): Promise<void> {
+    try {
+      const entries = await readdir(this.modelsDir)
+      if (!Array.isArray(entries)) return
+      for (const entry of entries) {
+        if (!/^ggml-\w+\.bin\.download-[\w-]+$/.test(entry)) continue
+        const full = join(this.modelsDir, entry)
+        if (this.activeDownloads.has(full)) continue
+        await this.safeUnlink(full)
+      }
+    } catch {
+      // Best effort: a failed sweep must not block a download.
+    }
   }
 
   private async ensureDirs(): Promise<void> {

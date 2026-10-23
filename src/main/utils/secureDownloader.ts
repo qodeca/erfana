@@ -66,7 +66,7 @@ export interface DownloadToFileOpts {
   destPath: string
   /**
    * Hard cap on bytes downloaded. Exceeded → rejected with `size-exceeded`.
-   * Callers set this per-artifact (binary ≤ 20 MB, GGML model ≤ 2 GB).
+   * Callers set this per-artifact (binary ≤ 20 MB, GGML model = its pinned size + a small margin).
    */
   maxBytes: number
   /**
@@ -113,7 +113,7 @@ export async function downloadToFile(opts: DownloadToFileOpts): Promise<Download
       if (!loc) {
         throw new SecureDownloaderError(
           'http-status',
-          `Redirect ${status} from ${url} without Location header`
+          `Redirect ${status} from ${redactUrl(url)} without Location header`
         )
       }
       // Resolve potentially-relative Location against the current URL.
@@ -123,11 +123,11 @@ export async function downloadToFile(opts: DownloadToFileOpts): Promise<Download
     }
 
     if (status !== 200) {
-      throw new SecureDownloaderError('http-status', `HTTP ${status} from ${url}`)
+      throw new SecureDownloaderError('http-status', `HTTP ${status} from ${redactUrl(url)}`)
     }
 
     if (!res.body) {
-      throw new SecureDownloaderError('no-body', `Empty body from ${url}`)
+      throw new SecureDownloaderError('no-body', `Empty body from ${redactUrl(url)}`)
     }
 
     let totalBytes: number | null = null
@@ -187,7 +187,12 @@ export async function downloadToFile(opts: DownloadToFileOpts): Promise<Download
       const expected = opts.expectedSha256.toLowerCase()
       if (sha256 !== expected) {
         // Never leave unverified bytes on disk under the caller's path.
-        await rm(opts.destPath, { force: true })
+        try {
+          await rm(opts.destPath, { force: true })
+        } catch {
+          // Best effort: the caller removes its temp file too, and the
+          // mismatch below must stay the error the caller sees.
+        }
         throw new SecureDownloaderError(
           'sha-mismatch',
           `SHA-256 mismatch: expected ${expected}, got ${sha256}`
@@ -200,7 +205,7 @@ export async function downloadToFile(opts: DownloadToFileOpts): Promise<Download
 
   throw new SecureDownloaderError(
     'too-many-redirects',
-    `Exceeded ${MAX_REDIRECTS} redirects from ${opts.url}`
+    `Exceeded ${MAX_REDIRECTS} redirects from ${redactUrl(opts.url)}`
   )
 }
 
@@ -209,7 +214,23 @@ function assertAllowedHost(url: string): void {
   try {
     parsed = new URL(url)
   } catch {
-    throw new SecureDownloaderError('hostname-not-allowed', `Invalid URL: ${url}`)
+    throw new SecureDownloaderError('hostname-not-allowed', 'Invalid URL')
+  }
+  if (parsed.protocol !== 'https:') {
+    throw new SecureDownloaderError(
+      'hostname-not-allowed',
+      `Protocol not allowed: ${parsed.protocol}`
+    )
+  }
+  // `port` is '' for the default port (https:443 is normalised away).
+  if (parsed.port !== '') {
+    throw new SecureDownloaderError(
+      'hostname-not-allowed',
+      `Port not allowed: ${parsed.port} on ${parsed.hostname}`
+    )
+  }
+  if (parsed.username !== '' || parsed.password !== '') {
+    throw new SecureDownloaderError('hostname-not-allowed', 'Credentials in URL not allowed')
   }
   if (!ALLOWED_HOSTS.has(parsed.hostname)) {
     throw new SecureDownloaderError(
@@ -223,4 +244,17 @@ function writeChunk(stream: NodeJS.WritableStream, chunk: Uint8Array): Promise<v
   return new Promise<void>((resolve, reject) => {
     stream.write(chunk, (err) => (err ? reject(err) : resolve()))
   })
+}
+
+/**
+ * Origin + path only. Signed CDN URLs carry credentials in the query string,
+ * and error messages reach the logs and the renderer.
+ */
+function redactUrl(url: string): string {
+  try {
+    const parsed = new URL(url)
+    return `${parsed.origin}${parsed.pathname}`
+  } catch {
+    return '[invalid url]'
+  }
 }
