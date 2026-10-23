@@ -23,6 +23,7 @@
  */
 
 import type { ShellKind } from '../../shared/shellKind'
+import { escapePowerShellSingleQuotes } from '../../shared/powershellQuote'
 
 /**
  * Characters forbidden in Windows cwds. `"` is the only character that can
@@ -145,8 +146,8 @@ export class PowerShellBootstrapBuilder implements WindowsBootstrapBuilder {
   }
 
   build({ shell, cwd, marker }: { shell: string; cwd: string; marker: string }): string[] {
-    const psEscapedCwd = cwd.replace(/'/g, "''")
-    const psEscapedShell = shell.replace(/'/g, "''")
+    const psEscapedCwd = escapePowerShellSingleQuotes(cwd)
+    const psEscapedShell = escapePowerShellSingleQuotes(shell)
     const script = [
       `Set-Location -LiteralPath '${psEscapedCwd}'`,
       '(Get-Location).Path',

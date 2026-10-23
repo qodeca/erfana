@@ -111,6 +111,33 @@ describe('PowerShellBootstrapBuilder', () => {
       const args = builder.build({ shell: "C:\\bin\\my's.exe", cwd: CWD, marker: MARKER })
       expect(joinArgs(args)).toContain("& 'C:\\bin\\my''s.exe' -NoLogo")
     })
+
+    it.each([
+      ['U+2018', '\u2018'],
+      ['U+2019', '\u2019'],
+      ['U+201A', '\u201A'],
+      ['U+201B', '\u201B']
+    ])('doubles the typographic single quote %s in cwd', (_name, ch) => {
+      const args = builder.build({
+        shell: 'pwsh.exe',
+        cwd: `C:\\Users\\Bob${ch}s Files\\proj`,
+        marker: MARKER
+      })
+      expect(joinArgs(args)).toContain(
+        `Set-Location -LiteralPath 'C:\\Users\\Bob${ch}${ch}s Files\\proj'`
+      )
+    })
+
+    it('doubles typographic and plain quotes together in cwd and shell path', () => {
+      const args = builder.build({
+        shell: 'C:\\bin\\Bob\u2019s\\pwsh.exe',
+        cwd: "C:\\Bob\u2018s\\it's\\proj",
+        marker: MARKER
+      })
+      const script = joinArgs(args)
+      expect(script).toContain("Set-Location -LiteralPath 'C:\\Bob\u2018\u2018s\\it''s\\proj'")
+      expect(script).toContain("& 'C:\\bin\\Bob\u2019\u2019s\\pwsh.exe' -NoLogo")
+    })
   })
 })
 
