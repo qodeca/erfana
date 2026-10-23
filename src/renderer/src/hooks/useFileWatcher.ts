@@ -73,7 +73,10 @@ export interface FileWatcherActions {
   keepLocal: () => void
   /** Dismiss external change notification without action */
   dismissConflict: () => void
-  /** Clear the file deleted state (e.g., after saving) */
+  /**
+   * Clear the file deleted state (e.g., after saving). When the tab was marked
+   * deleted, the save restored the file, so it is watched again (#252).
+   */
   clearDeletedState: () => void
   /** Mark that a save operation is starting (prevents race conditions) */
   markSaving: () => void
@@ -172,6 +175,10 @@ export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcherRe
   const [isFileDeleted, setIsFileDeleted] = useState(false)
   const [isReloading, setIsReloading] = useState(false)
 
+  // Mirrors isFileDeleted for clearDeletedState, which must know synchronously
+  // whether the main-process watch is gone (it ends the watch on a delete).
+  const isFileDeletedRef = useRef(false)
+
   // Track save operations to prevent race conditions
   // Exposed via markSaving/unmarkSaving so parent component can coordinate saves
   const isSavingRef = useRef(false)
@@ -232,6 +239,7 @@ export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcherRe
       onContentUpdate(content)
       pendingSavedContentsRef.current.clear() // Disk content is now authoritative
       setExternalChangeDetected(false)
+      isFileDeletedRef.current = false
       setIsFileDeleted(false)
       onReload?.()
       logger.info('File reloaded successfully', { filePath })
@@ -261,11 +269,26 @@ export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcherRe
   }, [])
 
   /**
-   * Clear the file deleted state
+   * Clear the file deleted state.
+   *
+   * The main process ends a watch when its file is deleted, so a tab restored
+   * by a save would otherwise stay deaf to outside edits until it was reopened
+   * (#252). Release first, then acquire, as `useFileChangeSubscription.recover`
+   * does: the slot still believes it holds the ended watch, and a bare acquire
+   * would skip the `start`.
    */
   const clearDeletedState = useCallback(() => {
+    const wasDeleted = isFileDeletedRef.current
+    isFileDeletedRef.current = false
     setIsFileDeleted(false)
-  }, [])
+    if (!wasDeleted || !filePath) return
+    void releaseFileWatch(slot, filePath)
+    void acquireFileWatch(slot, filePath).then(({ started, error, cause }) => {
+      if (!started) {
+        logger.error('Failed to watch the restored file again', cause, { error })
+      }
+    })
+  }, [filePath, slot])
 
   /**
    * Notify the hook that a save completed with the given content.
@@ -343,6 +366,7 @@ export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcherRe
    */
   const handleFileDeleted = useCallback(() => {
     logger.warn('File deleted externally', { filePath })
+    isFileDeletedRef.current = true
     setIsFileDeleted(true)
     setExternalChangeDetected(false) // Clear conflict notification if shown
   }, [filePath])

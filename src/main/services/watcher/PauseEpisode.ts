@@ -25,6 +25,11 @@
  *   for a resync, #211 D13) counts as one structural drop that no own change
  *   can explain; a completed owner read that began after it covers it.
  *
+ * It also answers a second question at resume (#252): which paths did an
+ * outside program remove during the pause? A tree read redraws the tree but
+ * tells no open tab that its folder is gone, so those removals are handed to
+ * the single-file watches whether or not a read covered them.
+ *
  * Pure: no Electron, no filesystem access.
  */
 
@@ -51,6 +56,25 @@ export interface InternalChange {
  * trusted to stay cheap, so the episode simply asks for a catch-up at resume.
  */
 export const MAX_INTERNAL_CHANGES = 256
+
+/**
+ * Cap on removal paths remembered per episode. Past it the removals are
+ * reported as lost, and the open files under the watch are re-checked instead.
+ */
+export const MAX_REMEMBERED_REMOVALS = 256
+
+/**
+ * The removals an outside program made during one pause (#252).
+ *
+ * `complete` is false when some removals have no path: a resync, more than
+ * {@link MAX_REMEMBERED_REMOVALS} of them, or the internal-change cap, past
+ * which an own change can no longer be told from an outside one. `paths` is
+ * then empty.
+ */
+export interface ExternalRemovals {
+  paths: string[]
+  complete: boolean
+}
 
 /** Watcher event types by the change kind that explains them; `null` for content-only. */
 const STRUCTURAL_EVENT_KIND: Readonly<Record<FileChangeType, InternalChangeKind | null>> = {
@@ -79,6 +103,10 @@ export class PauseEpisode {
   private coveredUpTo = 0
   private readonly changes: RecordedChange[] = []
   private forceCatchUp = false
+  /** Removed paths not yet known as own changes, in arrival order (#252). */
+  private readonly removedPaths: string[] = []
+  /** Some removal has no path in {@link removedPaths}. */
+  private removalsLost = false
 
   /**
    * @param ownerSenderId - webContents id of the window that paused; only its
@@ -91,11 +119,14 @@ export class PauseEpisode {
    * operation's own changes are ignored.
    */
   recordDrop(type: FileChangeType, eventPath: string): void {
+    const kind = STRUCTURAL_EVENT_KIND[type]
+    if (kind === 'removed') {
+      this.rememberRemoval(eventPath)
+    }
     // Once the cap forced a catch-up, counting further drops changes nothing
     if (this.forceCatchUp) {
       return
     }
-    const kind = STRUCTURAL_EVENT_KIND[type]
     if (!kind || this.isOwnChange(kind, eventPath)) {
       return
     }
@@ -108,11 +139,29 @@ export class PauseEpisode {
    * change, since nothing says where the lost changes were.
    */
   recordUnknownDrop(): void {
+    // A resync may have swallowed a removal, and nothing says where
+    this.removalsLost = true
     // Once the cap forced a catch-up, counting further drops changes nothing
     if (this.forceCatchUp) {
       return
     }
     this.droppedTotal++
+  }
+
+  /**
+   * The paths an outside program removed during this pause, for the open files
+   * under them (#252). Asked at resume, when the operation has noted every own
+   * change – an event can arrive before its operation notes it, so the filter
+   * runs again here rather than only at drop time.
+   */
+  externalRemovals(): ExternalRemovals {
+    if (this.removalsLost || this.forceCatchUp) {
+      return { paths: [], complete: false }
+    }
+    return {
+      paths: this.removedPaths.filter(removed => !this.isOwnChange('removed', removed)),
+      complete: true
+    }
   }
 
   /**
@@ -162,6 +211,22 @@ export class PauseEpisode {
   /** Drops no completed read covers – for the log line only. */
   uncoveredDrops(): number {
     return this.droppedTotal - this.coveredUpTo
+  }
+
+  /**
+   * Keep a removed path for {@link externalRemovals}. A path already known as
+   * an own change is not kept, so the app's own large delete does not use up
+   * the cap; past the cap the removals are marked lost.
+   */
+  private rememberRemoval(eventPath: string): void {
+    if (this.removalsLost || this.isOwnChange('removed', eventPath)) {
+      return
+    }
+    if (this.removedPaths.length >= MAX_REMEMBERED_REMOVALS) {
+      this.removalsLost = true
+      return
+    }
+    this.removedPaths.push(eventPath)
   }
 
   /**

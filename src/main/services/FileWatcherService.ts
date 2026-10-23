@@ -4,13 +4,14 @@ import { FSWatcher } from 'chokidar'
 import { WebContents } from 'electron'
 import { stat } from 'fs/promises'
 import { logger } from './LoggingService'
-import { classifyConfinement } from '../utils/projectConfinement'
+import { classifyConfinement, isLexicallyInside } from '../utils/projectConfinement'
 import { createAtomicSaveDetector } from './watcher/AtomicSaveDetector'
 import { SubscriberCounter } from './watcher/SubscriberCounter'
 import { createSingleFileWatcher } from './watcher/singleFileWatch'
 import { sendToSubscribers } from './watcher/watchNotifier'
 import { AtomicRearmDeps, RearmableWatch, resolveDeletedWatch } from './watcher/atomicRearm'
 import { watchedUnderRemovedFolders } from './watcher/ancestorRemoval'
+import { UnseenWatchProbe, reportMissingPaths } from './watcher/unseenWatchProbe'
 
 interface WatchedFile {
   filePath: string
@@ -42,6 +43,9 @@ export class FileWatcherService {
    * methods. One instance keeps disposal in one place (issue #70, M2).
    */
   private readonly atomicSaveDetector = createAtomicSaveDetector()
+
+  /** Re-checks the files the project watcher cannot see (#252); set by {@link watchUnseenFiles}. */
+  private unseenProbe: UnseenWatchProbe | null = null
 
   /**
    * The seam the atomic re-arm branch talks to this service through.
@@ -176,6 +180,7 @@ export class FileWatcherService {
     }
 
     this.watchedFiles.set(filePath, watched)
+    this.unseenProbe?.schedule()
   }
 
   /**
@@ -425,6 +430,32 @@ export class FileWatcherService {
   }
 
   /**
+   * Re-check, on a slow timer, the watched files whose folders the project
+   * watcher cannot report on (`isCovered` false): excluded, hidden or ignored
+   * ones, and files outside the project (`watcher/unseenWatchProbe`, #252).
+   */
+  watchUnseenFiles(isCovered: (filePath: string) => boolean): void {
+    this.unseenProbe?.stop()
+    this.unseenProbe = new UnseenWatchProbe({
+      watchedPaths: () => this.watchedFiles.keys(),
+      isCovered,
+      onMissing: filePath => this.handleFileDeleted(filePath)
+    })
+    if (this.watchedFiles.size > 0) this.unseenProbe.schedule()
+  }
+
+  /**
+   * A paused project watch lost removals under `root` without their paths:
+   * check every watched file there on disk now, and take each missing one down
+   * the unlink branch (#252).
+   */
+  async checkWatchedFilesUnder(root: string): Promise<void> {
+    if (this.isDisposing) return
+    const under = [...this.watchedFiles.keys()].filter(filePath => isLexicallyInside(filePath, root))
+    await reportMissingPaths(under, filePath => this.handleFileDeleted(filePath), undefined, () => this.isDisposing)
+  }
+
+  /**
    * Fire-and-forget teardown, used from the async unlink branch where there is
    * nobody left to await the close
    */
@@ -494,6 +525,7 @@ export class FileWatcherService {
     this.isDisposing = true // Set flag FIRST to stop all event processing
     this.safeLog('👁️  Disposing all file watchers...')
     this.atomicSaveDetector.dispose()
+    this.unseenProbe?.stop()
 
     for (const [, watched] of this.watchedFiles.entries()) {
       if (watched.debounceTimer) {

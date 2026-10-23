@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import path from 'path'
 import { describe, it, expect } from 'vitest'
-import { PauseEpisode, MAX_INTERNAL_CHANGES } from './PauseEpisode'
+import { PauseEpisode, MAX_INTERNAL_CHANGES, MAX_REMEMBERED_REMOVALS } from './PauseEpisode'
 
 // Paths built with path.join so separators match the host (Windows included).
 const ROOT = path.join(path.sep, 'proj')
@@ -180,6 +180,74 @@ describe('PauseEpisode (#210)', () => {
 
       expect(episode.uncoveredDrops()).toBe(0)
       expect(episode.needsCatchUp()).toBe(true)
+    })
+  })
+
+  describe('external removals (#252)', () => {
+    it('keeps an outside removal by path, but no addition or content change', () => {
+      const episode = new PauseEpisode(OWNER)
+      episode.recordDrop('unlinkDir', at('docs'))
+      episode.recordDrop('unlink', at('top.md'))
+      episode.recordDrop('addDir', at('docs2'))
+      episode.recordDrop('change', at('notes.md'))
+
+      expect(episode.externalRemovals()).toEqual({ paths: [at('docs'), at('top.md')], complete: true })
+    })
+
+    it('reports a removal even when a completed owner read covered it', () => {
+      const episode = new PauseEpisode(OWNER)
+      episode.recordDrop('unlinkDir', at('docs'))
+      episode.completeTreeRead(episode.beginTreeRead(OWNER) as number)
+
+      expect(episode.needsCatchUp()).toBe(false)
+      expect(episode.externalRemovals().paths).toEqual([at('docs')])
+    })
+
+    it('leaves out the operation’s own removals, also when the event beat the note', () => {
+      const episode = new PauseEpisode(OWNER)
+      // The watcher event arrives before the handler notes its own rename...
+      episode.recordDrop('unlinkDir', at('renamed'))
+      episode.recordDrop('unlink', at('renamed', 'child.md'))
+      episode.noteInternalChange({ path: at('renamed'), kind: 'removed', subtree: true })
+      // ...and one after it; an outside removal elsewhere is kept
+      episode.recordDrop('unlink', at('renamed', 'late.md'))
+      episode.recordDrop('unlinkDir', at('outside'))
+
+      expect(episode.externalRemovals()).toEqual({ paths: [at('outside')], complete: true })
+    })
+
+    it('does not spend the cap on removals already known as the app’s own', () => {
+      const episode = new PauseEpisode(OWNER)
+      episode.noteInternalChange({ path: at('big'), kind: 'removed', subtree: true })
+      for (let i = 0; i <= MAX_REMEMBERED_REMOVALS; i++) episode.recordDrop('unlink', at('big', `f${i}.md`))
+      episode.recordDrop('unlinkDir', at('docs'))
+
+      expect(episode.externalRemovals()).toEqual({ paths: [at('docs')], complete: true })
+    })
+
+    it('reports the removals as lost past the cap', () => {
+      const episode = new PauseEpisode(OWNER)
+      for (let i = 0; i <= MAX_REMEMBERED_REMOVALS; i++) episode.recordDrop('unlink', at(`f${i}.md`))
+
+      expect(episode.externalRemovals()).toEqual({ paths: [], complete: false })
+    })
+
+    it('reports the removals as lost after a resync, which has no paths', () => {
+      const episode = new PauseEpisode(OWNER)
+      episode.recordDrop('unlinkDir', at('docs'))
+      episode.recordUnknownDrop()
+
+      expect(episode.externalRemovals()).toEqual({ paths: [], complete: false })
+    })
+
+    it('reports the removals as lost once the internal-change cap blinds the own-change filter', () => {
+      const episode = new PauseEpisode(OWNER)
+      episode.recordDrop('unlinkDir', at('docs'))
+      for (let i = 0; i <= MAX_INTERNAL_CHANGES; i++) {
+        episode.noteInternalChange({ path: at(`own-${i}`), kind: 'removed', subtree: false })
+      }
+
+      expect(episode.externalRemovals()).toEqual({ paths: [], complete: false })
     })
   })
 })

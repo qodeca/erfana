@@ -9,6 +9,11 @@
  * `unlinkDir` and a chokidar `unlinkDir` each reach `onPathsRemoved` with the
  * absolute path, after coalescing and in the same flush as the broadcast.
  *
+ * #252 adds the cases the project watcher used to miss: a removal dropped
+ * while the watch was paused for the app's own operation is reported when the
+ * pause ends (or lost, when the pause could not keep its path), and
+ * `reportsRemovalsAbove` says which open files it cannot speak for at all.
+ *
  * Both watcher libraries are replaced by fakes driven by hand (module-scope
  * mocks, hence a file of its own per the test-file split policy).
  */
@@ -75,7 +80,7 @@ vi.mock('electron', () => ({
 }))
 
 vi.mock('./SettingsService', () => ({
-  settingsService: { getDirectoryWatchDepth: vi.fn(async () => undefined) }
+  settingsService: { getDirectoryWatchDepth: vi.fn(async (): Promise<number | undefined> => undefined) }
 }))
 
 vi.mock('../utils/pathSecurity', () => ({ isSystemDirectory: vi.fn(() => false) }))
@@ -83,10 +88,15 @@ vi.mock('../utils/pathSecurity', () => ({ isSystemDirectory: vi.fn(() => false) 
 vi.mock('./LoggingService', () => ({ logger: harness.logger }))
 
 import { DirectoryWatcherService } from './DirectoryWatcherService'
+import { settingsService } from './SettingsService'
+import { ProjectPathFilter } from '../utils/projectPathFilter'
+import { PAUSE_CONTROLLER } from '../../shared/constants'
+import { MAX_REMEMBERED_REMOVALS } from './watcher/PauseEpisode'
 
 const ROOT = path.join(path.sep, 'work', 'proj')
 const FLUSH_MS = 1000
-const webContents = { id: 1 } as unknown as WebContents
+const OWNER = 1
+const webContents = { id: OWNER } as unknown as WebContents
 const inRoot = (...segments: string[]): string => path.join(ROOT, ...segments)
 
 function latestNative(): { emit(event: string, ...args: unknown[]): boolean } {
@@ -95,29 +105,30 @@ function latestNative(): { emit(event: string, ...args: unknown[]): boolean } {
   return native
 }
 
+const services: DirectoryWatcherService[] = []
+
+async function start(backend: 'native-recursive' | 'chokidar'): Promise<DirectoryWatcherService> {
+  const svc = new DirectoryWatcherService({ backend })
+  services.push(svc)
+  svc.setProjectPath(ROOT)
+  await svc.watchDirectory(ROOT, webContents)
+  return svc
+}
+
+beforeEach(() => {
+  vi.useFakeTimers()
+  harness.sends.length = 0
+  harness.natives.length = 0
+  harness.chokidarHandlers.clear()
+  harness.logger.error.mockClear()
+})
+
+afterEach(async () => {
+  await Promise.all(services.splice(0).map(svc => svc.dispose()))
+  vi.useRealTimers()
+})
+
 describe('DirectoryWatcherService.onPathsRemoved', () => {
-  const services: DirectoryWatcherService[] = []
-
-  async function start(backend: 'native-recursive' | 'chokidar'): Promise<DirectoryWatcherService> {
-    const svc = new DirectoryWatcherService({ backend })
-    services.push(svc)
-    svc.setProjectPath(ROOT)
-    await svc.watchDirectory(ROOT, webContents)
-    return svc
-  }
-
-  beforeEach(() => {
-    vi.useFakeTimers()
-    harness.sends.length = 0
-    harness.natives.length = 0
-    harness.chokidarHandlers.clear()
-    harness.logger.error.mockClear()
-  })
-
-  afterEach(async () => {
-    await Promise.all(services.splice(0).map(svc => svc.dispose()))
-    vi.useRealTimers()
-  })
 
   it('reports a renamed folder (native unlinkDir) with its absolute path', async () => {
     const svc = await start('native-recursive')
@@ -200,5 +211,184 @@ describe('DirectoryWatcherService.onPathsRemoved', () => {
     expect(second).toHaveBeenCalledWith([inRoot('docs')])
     expect(harness.logger.error).toHaveBeenCalledWith('Directory removal listener failed', expect.any(Error))
     expect(harness.sends.filter(s => s.channel === 'directory-watch:changed')).toHaveLength(1)
+  })
+})
+
+describe('DirectoryWatcherService removals during a pause (#252)', () => {
+  async function startListening(): Promise<{
+    svc: DirectoryWatcherService
+    removed: ReturnType<typeof vi.fn>
+    lost: ReturnType<typeof vi.fn>
+  }> {
+    const svc = await start('native-recursive')
+    const removed = vi.fn()
+    const lost = vi.fn()
+    svc.onPathsRemoved(removed)
+    svc.onRemovalsLost(lost)
+    return { svc, removed, lost }
+  }
+
+  it('reports an outside removal dropped during a pause once the pause ends', async () => {
+    const { svc, removed, lost } = await startListening()
+    svc.pauseWatch(ROOT, OWNER)
+
+    latestNative().emit('unlinkDir', inRoot('docs'))
+    vi.advanceTimersByTime(FLUSH_MS)
+    expect(removed).not.toHaveBeenCalled()
+
+    svc.resumeWatch(ROOT)
+    expect(removed).toHaveBeenCalledWith([inRoot('docs')])
+    expect(lost).not.toHaveBeenCalled()
+  })
+
+  it('reports it even when the pausing window re-read the tree after the drop', async () => {
+    const { svc, removed } = await startListening()
+    svc.pauseWatch(ROOT, OWNER)
+    latestNative().emit('unlinkDir', inRoot('docs'))
+    svc.beginTreeRead(ROOT, OWNER)()
+
+    svc.resumeWatch(ROOT)
+
+    expect(removed).toHaveBeenCalledWith([inRoot('docs')])
+  })
+
+  it('waits for the outermost resume of nested pauses', async () => {
+    const { svc, removed } = await startListening()
+    svc.pauseWatch(ROOT, OWNER)
+    svc.pauseWatch(ROOT, OWNER)
+    latestNative().emit('unlinkDir', inRoot('docs'))
+
+    svc.resumeWatch(ROOT)
+    expect(removed).not.toHaveBeenCalled()
+    svc.resumeWatch(ROOT)
+    expect(removed).toHaveBeenCalledTimes(1)
+  })
+
+  it('never reports the operation’s own removals', async () => {
+    const { svc, removed, lost } = await startListening()
+    svc.pauseWatch(ROOT, OWNER)
+    latestNative().emit('unlinkDir', inRoot('renamed'))
+    svc.noteInternalChange({ path: inRoot('renamed'), kind: 'removed', subtree: true })
+
+    svc.resumeWatch(ROOT)
+
+    expect(removed).not.toHaveBeenCalled()
+    expect(lost).not.toHaveBeenCalled()
+  })
+
+  it('reports the removals when the safety timeout ends a pause nobody resumed', async () => {
+    const { svc, removed } = await startListening()
+    svc.pauseWatch(ROOT, OWNER)
+    latestNative().emit('unlinkDir', inRoot('docs'))
+
+    vi.advanceTimersByTime(PAUSE_CONTROLLER.SAFETY_TIMEOUT_MS)
+
+    expect(removed).toHaveBeenCalledWith([inRoot('docs')])
+  })
+
+  it('says the removals under the root were lost when a resync swallowed them', async () => {
+    const { svc, removed, lost } = await startListening()
+    svc.pauseWatch(ROOT, OWNER)
+    latestNative().emit('unlinkDir', inRoot('docs'))
+    latestNative().emit('resync', 'overflow')
+
+    svc.resumeWatch(ROOT)
+
+    expect(lost).toHaveBeenCalledWith(ROOT)
+    expect(removed).not.toHaveBeenCalled()
+  })
+
+  it('says they were lost when the pause dropped more than it can remember', async () => {
+    const { svc, removed, lost } = await startListening()
+    svc.pauseWatch(ROOT, OWNER)
+    for (let i = 0; i <= MAX_REMEMBERED_REMOVALS; i++) latestNative().emit('unlink', inRoot(`f${i}.md`))
+
+    svc.resumeWatch(ROOT)
+
+    expect(lost).toHaveBeenCalledWith(ROOT)
+    expect(removed).not.toHaveBeenCalled()
+  })
+
+  it('logs a throwing lost-removals listener and still runs the others', async () => {
+    const { svc, lost } = await startListening()
+    svc.onRemovalsLost(() => {
+      throw new Error('boom')
+    })
+    svc.pauseWatch(ROOT, OWNER)
+    latestNative().emit('resync', 'overflow')
+
+    expect(() => svc.resumeWatch(ROOT)).not.toThrow()
+    expect(lost).toHaveBeenCalledWith(ROOT)
+    expect(harness.logger.error).toHaveBeenCalledWith('Directory removal listener failed', expect.any(Error))
+  })
+
+  it('stops telling a lost-removals listener once unsubscribed', async () => {
+    const svc = await start('native-recursive')
+    const lost = vi.fn()
+    svc.onRemovalsLost(lost)()
+    svc.pauseWatch(ROOT, OWNER)
+    latestNative().emit('resync', 'overflow')
+
+    svc.resumeWatch(ROOT)
+
+    expect(lost).not.toHaveBeenCalled()
+  })
+})
+
+describe('DirectoryWatcherService.reportsRemovalsAbove (#252)', () => {
+  it('speaks for a file in a watched folder and for one at the root', async () => {
+    const svc = await start('native-recursive')
+
+    expect(svc.reportsRemovalsAbove(inRoot('docs', 'deep', 'open.md'))).toBe(true)
+    expect(svc.reportsRemovalsAbove(inRoot('top.md'))).toBe(true)
+  })
+
+  it('cannot speak for a file under a hidden or an ignored folder', async () => {
+    const svc = await start('chokidar')
+
+    expect(svc.reportsRemovalsAbove(inRoot('.git', 'notes.md'))).toBe(false)
+    expect(svc.reportsRemovalsAbove(inRoot('dist', 'notes.md'))).toBe(false)
+    expect(svc.reportsRemovalsAbove(inRoot('src', 'node_modules', 'pkg', 'readme.md'))).toBe(false)
+  })
+
+  it('cannot speak for a file under an excluded folder', async () => {
+    const svc = await start('native-recursive')
+    svc.setPathFilter(
+      new ProjectPathFilter(ROOT, {
+        exclude: ['big'],
+        hiddenPatterns: [],
+        ignorePatterns: [],
+        caseSensitive: true
+      })
+    )
+
+    expect(svc.reportsRemovalsAbove(inRoot('big', 'open.md'))).toBe(false)
+    expect(svc.reportsRemovalsAbove(inRoot('small', 'open.md'))).toBe(true)
+  })
+
+  it('cannot speak for a file outside every watch, or with no watch at all', async () => {
+    const idle = new DirectoryWatcherService({ backend: 'native-recursive' })
+    services.push(idle)
+    expect(idle.reportsRemovalsAbove(inRoot('docs', 'open.md'))).toBe(false)
+
+    const svc = await start('native-recursive')
+    expect(svc.reportsRemovalsAbove(path.join(path.sep, 'elsewhere', 'open.md'))).toBe(false)
+    expect(svc.reportsRemovalsAbove(`${ROOT}-sibling${path.sep}open.md`)).toBe(false)
+  })
+
+  it('cannot speak for a file deeper than the watch depth cap', async () => {
+    vi.mocked(settingsService.getDirectoryWatchDepth).mockResolvedValueOnce(1)
+    const svc = await start('native-recursive')
+
+    // Folder `a/b` has 2 segments: watched at depth 1 (chokidar's n - 1 > depth rule)
+    expect(svc.reportsRemovalsAbove(inRoot('a', 'b', 'open.md'))).toBe(true)
+    expect(svc.reportsRemovalsAbove(inRoot('a', 'b', 'c', 'open.md'))).toBe(false)
+  })
+
+  it('stops speaking for the old project once the watches stop', async () => {
+    const svc = await start('native-recursive')
+    await svc.stopAll()
+
+    expect(svc.reportsRemovalsAbove(inRoot('docs', 'open.md'))).toBe(false)
   })
 })

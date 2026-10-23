@@ -66,6 +66,13 @@ function emitFileChanged(filePath: string): void {
   }
 }
 
+// Emit a simulated delete: main has ended the watch by the time this arrives
+function emitFileDeleted(filePath: string): void {
+  for (const listener of fileDeletedListeners) {
+    listener({ filePath })
+  }
+}
+
 // =========================================================================
 // isEchoEvent
 // =========================================================================
@@ -694,6 +701,81 @@ describe('useFileWatcher', () => {
       // Event for a different file is filtered at the listener level (not our file)
       expect(mockReadFile).not.toHaveBeenCalled()
       expect(onContentUpdate).not.toHaveBeenCalled()
+    })
+  })
+
+  // #252: the main process ends a watch when its file is deleted, so a tab a
+  // save restored stayed deaf to outside edits until it was reopened
+  describe('watching a restored file again', () => {
+    async function renderWatching() {
+      const rendered = renderFileWatcher()
+      await waitFor(() => expect(mockFileWatch.start).toHaveBeenCalledTimes(1))
+      return rendered
+    }
+
+    it('starts a new watch once a save restores a file deleted on disk', async () => {
+      const { result } = await renderWatching()
+      act(() => {
+        emitFileDeleted(TEST_PATH)
+      })
+      expect(result.current.isFileDeleted).toBe(true)
+
+      act(() => {
+        result.current.clearDeletedState()
+      })
+
+      expect(result.current.isFileDeleted).toBe(false)
+      await waitFor(() => expect(mockFileWatch.start).toHaveBeenCalledTimes(2))
+      // The slot's old hold is let go first, so the counts stay balanced
+      expect(mockFileWatch.stop).toHaveBeenCalledWith(TEST_PATH)
+      expect(mockFileWatch.stop.mock.invocationCallOrder[0]).toBeLessThan(
+        mockFileWatch.start.mock.invocationCallOrder[1]
+      )
+    })
+
+    it('leaves a live watch alone after an ordinary save', async () => {
+      const { result } = await renderWatching()
+
+      act(() => {
+        result.current.clearDeletedState()
+      })
+      await act(async () => {})
+
+      expect(mockFileWatch.start).toHaveBeenCalledTimes(1)
+      expect(mockFileWatch.stop).not.toHaveBeenCalled()
+    })
+
+    it('restarts the watch once per restore, not on every later save', async () => {
+      const { result } = await renderWatching()
+      act(() => {
+        emitFileDeleted(TEST_PATH)
+      })
+      act(() => {
+        result.current.clearDeletedState()
+      })
+      await waitFor(() => expect(mockFileWatch.start).toHaveBeenCalledTimes(2))
+
+      act(() => {
+        result.current.clearDeletedState()
+      })
+      await act(async () => {})
+
+      expect(mockFileWatch.start).toHaveBeenCalledTimes(2)
+    })
+
+    it('ends the restarted watch on unmount', async () => {
+      const { result, unmount } = await renderWatching()
+      act(() => {
+        emitFileDeleted(TEST_PATH)
+      })
+      act(() => {
+        result.current.clearDeletedState()
+      })
+      await waitFor(() => expect(mockFileWatch.start).toHaveBeenCalledTimes(2))
+
+      unmount()
+
+      await waitFor(() => expect(mockFileWatch.stop).toHaveBeenCalledTimes(2))
     })
   })
 })
