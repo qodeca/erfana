@@ -293,7 +293,7 @@ Three further `image-export:*` names exist in `src/shared/ipc/image-export-chann
 | `transcription:whisperEnsureModel` | Ensure a whisper model is downloaded and verified |
 | `transcription:whisperListModels` | List locally available whisper models |
 | `transcription:whisperDeleteModel` | Delete a downloaded whisper model |
-| `transcription:whisperCancelDownload` | Cancel the running binary or model download; the pending ensure call resolves with `cancelled: true` and the partial file is deleted |
+| `transcription:whisperCancelDownload` | Cancel the running binary or model download; the pending ensure call resolves with `cancelled: true` and the partial file is deleted. Only the abort is reported as cancelled: an error that lands after Cancel (an integrity failure, say) stays an error. Cancel is app-wide by design (one model store per app): it stops the download of every window, not only the sender's |
 | `transcription:progress` | Event: progress update (main → renderer) |
 | `transcription:whisperDownloadProgress` | Event: binary/model download progress (main → renderer) |
 

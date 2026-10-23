@@ -819,6 +819,27 @@ describe('WhisperModelManager', () => {
         code: 'WHISPER_BINARY_DOWNLOAD_FAILED'
       })
     })
+
+    it('keeps an archive hash mismatch that lands after Cancel as a hash mismatch', async () => {
+      arrangeFreshInstall({ manifestRevisionIndex: 1, lastSeenRevisionOnDisk: null })
+      const { SecureDownloaderError } = await import('../utils/secureDownloader')
+      // The manifests arrive; Cancel lands while the archive fails its hash
+      let cancelDownloads: () => number = () => 0
+      let call = 0
+      mockDownloadToFile.mockImplementation(async () => {
+        call += 1
+        if (call < 3) return undefined
+        cancelDownloads()
+        throw new SecureDownloaderError('SHA-256 mismatch')
+      })
+      const { createWhisperModelManager } = await import('./WhisperModelManager')
+      const manager = createWhisperModelManager()
+      cancelDownloads = () => manager.cancelDownloads()
+      await expect(manager.ensureBinary()).rejects.toMatchObject({
+        code: 'WHISPER_BINARY_DOWNLOAD_FAILED',
+        message: 'SHA-256 mismatch'
+      })
+    })
   })
 
   // =========================================================================
@@ -958,6 +979,41 @@ describe('WhisperModelManager', () => {
       const manager = createWhisperModelManager()
       await expect(manager.ensureModel('tiny', { signal: controller.signal })).rejects.toMatchObject({
         code: 'WHISPER_MODEL_DOWNLOAD_FAILED'
+      })
+    })
+
+    it('reports an abort as cancelled, with the AbortError as its cause', async () => {
+      const accessErr = Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+      mockAccess.mockRejectedValue(accessErr)
+      const abort = new DOMException('aborted', 'AbortError')
+      mockDownloadToFile.mockRejectedValue(abort)
+      const controller = new AbortController()
+      controller.abort()
+      const { createWhisperModelManager } = await import('./WhisperModelManager')
+      const manager = createWhisperModelManager()
+      await expect(manager.ensureModel('tiny', { signal: controller.signal })).rejects.toMatchObject({
+        code: 'WHISPER_MODEL_DOWNLOAD_FAILED',
+        message: 'Model download was cancelled: tiny',
+        originalError: abort
+      })
+    })
+
+    it('keeps a hash mismatch that lands after Cancel as a hash mismatch', async () => {
+      const accessErr = Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+      mockAccess.mockRejectedValue(accessErr)
+      const { SecureDownloaderError } = await import('../utils/secureDownloader')
+      // The download fails its hash; Cancel lands while it is failing
+      let cancelDownloads: () => number = () => 0
+      mockDownloadToFile.mockImplementation(async () => {
+        cancelDownloads()
+        throw new SecureDownloaderError('SHA-256 mismatch')
+      })
+      const { createWhisperModelManager } = await import('./WhisperModelManager')
+      const manager = createWhisperModelManager()
+      cancelDownloads = () => manager.cancelDownloads()
+      await expect(manager.ensureModel('tiny')).rejects.toMatchObject({
+        code: 'WHISPER_MODEL_DOWNLOAD_FAILED',
+        message: 'SHA-256 mismatch'
       })
     })
 

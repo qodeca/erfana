@@ -65,6 +65,7 @@ import {
   type PlatformArtifactSpec
 } from './whisper-assets'
 import { downloadToFile, SecureDownloaderError } from '../utils/secureDownloader'
+import { isAbortError } from '../utils/isAbortError'
 import { unzip } from '../utils/zipArchive'
 import { untarGz } from '../utils/tarArchive'
 import { verifyManifest, VerifyManifestError } from '../utils/verifyManifest'
@@ -553,10 +554,14 @@ class WhisperModelManager implements IWhisperModelManager {
       // On failure, wipe bin/ so isBinaryInstalled() doesn't return true on a
       // partial state.
       await this.clearBinDir()
-      if (controller.signal.aborted) {
+      // Only the abort itself is a cancel; any other error stays that error,
+      // even when the abort came while it was failing. The AbortError is kept
+      // as the cause so the IPC layer can tell a cancel from a failure.
+      if (controller.signal.aborted && isAbortError(error)) {
         throw new AppError(
           'Binary download was cancelled',
-          ErrorCode.WHISPER_BINARY_DOWNLOAD_FAILED
+          ErrorCode.WHISPER_BINARY_DOWNLOAD_FAILED,
+          error
         )
       }
       // Route the specific trust-chain failure classes to granular codes so
@@ -762,10 +767,12 @@ class WhisperModelManager implements IWhisperModelManager {
       return modelPath
     } catch (error) {
       await this.safeUnlink(tempPath)
-      if (controller.signal.aborted) {
+      // As for the binary: only the abort itself is a cancel, kept as the cause.
+      if (controller.signal.aborted && isAbortError(error)) {
         throw new AppError(
           `Model download was cancelled: ${model}`,
-          ErrorCode.WHISPER_MODEL_DOWNLOAD_FAILED
+          ErrorCode.WHISPER_MODEL_DOWNLOAD_FAILED,
+          error
         )
       }
       if (error instanceof SecureDownloaderError) {

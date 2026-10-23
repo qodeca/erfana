@@ -199,6 +199,35 @@ describe('SettingsOverlay – whisper model download', () => {
     expect(downloadButton()).toHaveFocus()
   })
 
+  it('sends one cancel for repeated presses and reads "Cancelling…" until the download settles', async () => {
+    await renderAndStart()
+    binary.resolve({ success: true, path: '/bin/whisper' })
+    await flush()
+
+    act(() => cancelButton()!.focus())
+    fireEvent.click(cancelButton()!)
+    fireEvent.click(cancelButton()!)
+
+    expect(api.cancelDownload).toHaveBeenCalledTimes(1)
+    expect(cancelButton()).toHaveTextContent('Cancelling…')
+    // aria-disabled, like Download: the button keeps the focus of the user who pressed it
+    expect(cancelButton()).toHaveAttribute('aria-disabled', 'true')
+    expect(cancelButton()).not.toBeDisabled()
+    expect(cancelButton()).toHaveFocus()
+
+    model.resolve({ success: false, cancelled: true, error: 'Download cancelled' })
+    await flush()
+    expect(cancelButton()).toBeNull()
+
+    // The next download offers a fresh Cancel
+    binary = deferred<DownloadResult>()
+    model = deferred<DownloadResult>()
+    fireEvent.click(downloadButton())
+    await flush()
+    expect(cancelButton()).toHaveTextContent(/^Cancel$/)
+    expect(cancelButton()).not.toHaveAttribute('aria-disabled')
+  })
+
   it('does not start the model when Cancel came during the binary step', async () => {
     await renderAndStart()
     fireEvent.click(cancelButton()!)

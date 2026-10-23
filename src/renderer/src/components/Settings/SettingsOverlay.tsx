@@ -134,6 +134,8 @@ export function SettingsOverlay() {
   const lastAnnounced = useRef<Announced | null>(null)
   // Set by Cancel; also stops a model download the binary step had not started yet
   const cancelRequested = useRef(false)
+  // Cancel was pressed and the download has not settled yet ("Cancelling…")
+  const [cancelPending, setCancelPending] = useState(false)
   // Where focus goes when the download ends and the control that held it is gone
   const focusAfterDownload = useRef<'download' | 'model' | null>(null)
   const downloadControlsRef = useRef<HTMLDivElement>(null)
@@ -236,6 +238,7 @@ export function SettingsOverlay() {
     setDownloadProgress({ percent: 0, downloadedBytes: 0, totalBytes: 0 })
     setDownloadError(null)
     cancelRequested.current = false
+    setCancelPending(false)
     lastAnnounced.current = null
     setDownloadAnnouncement('Download started')
     let outcome: 'ready' | 'cancelled' | 'failed' = 'failed'
@@ -277,16 +280,21 @@ export function SettingsOverlay() {
         focusAfterDownload.current = outcome === 'ready' ? 'model' : 'download'
       }
       setModelDownloading(false)
+      setCancelPending(false)
       setDownloadProgress(null)
     }
   }, [settings?.transcription.whisperModel, modelDownloading])
 
   /**
    * Cancel the running download. The main process deletes the partial file and
-   * the pending ensure call resolves as cancelled.
+   * the pending ensure call resolves as cancelled. Only the first press sends
+   * the request; the button then reads "Cancelling…" until the download settles.
    */
   const handleCancelDownload = useCallback(() => {
+    // The ref, not the state: a second press can land before the re-render
+    if (cancelRequested.current) return
     cancelRequested.current = true
+    setCancelPending(true)
     window.api.whisper.cancelDownload().catch((error: unknown) => {
       logger.warn('Failed to cancel whisper download', { error: String(error) })
     })
@@ -683,9 +691,10 @@ export function SettingsOverlay() {
                             <button
                               className="settings-btn-secondary"
                               onClick={handleCancelDownload}
+                              aria-disabled={cancelPending || undefined}
                               data-testid={TEST_IDS.SETTINGS_BTN_WHISPER_CANCEL}
                             >
-                              Cancel
+                              {cancelPending ? 'Cancelling…' : 'Cancel'}
                             </button>
                           )}
                         </>
