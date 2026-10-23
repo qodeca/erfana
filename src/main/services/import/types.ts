@@ -201,6 +201,8 @@ export type ToolState = 'found' | 'missing' | 'unsafe'
  */
 export interface DependencyStatus {
   libreOffice: ToolState
+  /** Installed version when it could be read without running LibreOffice, else null */
+  version?: string | null
   /** Which program was refused and why, when `libreOffice` is `unsafe` (#250) */
   unsafe?: UnsafeToolInfo | null
 }

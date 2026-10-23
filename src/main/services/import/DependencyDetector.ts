@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { execFile } from 'child_process'
+import { spawn } from 'child_process'
+import { mkdtempSync, readFileSync, realpathSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
-import { posix, win32 } from 'path'
+import { join, posix, win32 } from 'path'
+import { pathToFileURL } from 'url'
 import { resolveLibreOffice, type LibreOfficeResolution } from './conversionToolGuard'
 import type { DependencyStatus, ToolState } from './types'
 import { UNSAFE_TOOL_NAMES, type UnsafeToolName } from '../../../shared/unsafeTool'
@@ -95,12 +97,44 @@ export class DependencyDetector {
         : 'soffice'
       return { libreOffice: 'unsafe', unsafe: { tool, reason: resolution.reason } }
     }
-    const state: ToolState = (await this.tryCommand(resolution.path, ['--version'])) ? 'found' : 'missing'
+    return this.probe(resolution.path)
+  }
+
+  /**
+   * Decide whether the resolved candidate is a live LibreOffice – without
+   * launching it where launching leaves a process behind.
+   *
+   * - Windows: `soffice.exe` starts `soffice.bin` and exits, and `soffice.bin`
+   *   never exits, so it is never run. The resolver already confirmed the file
+   *   exists; the version is read from `program\version.ini` when present.
+   * - macOS inside an app bundle: the version comes from `Contents/Info.plist`.
+   * - Anywhere else (Linux, a bare binary): `--version` exits cleanly.
+   */
+  private async probe(path: string): Promise<DependencyStatus> {
+    const pathApi = process.platform === 'win32' ? win32 : posix
+    if (!pathApi.isAbsolute(path)) return { libreOffice: 'missing', unsafe: null }
+
+    if (process.platform === 'win32') {
+      return { libreOffice: 'found', unsafe: null, version: readWindowsVersion(path) }
+    }
+    if (process.platform === 'darwin') {
+      const plist = bundlePlistPath(path)
+      if (plist) {
+        const version = parsePlistVersion(readTextOrNull(plist))
+        return version
+          ? { libreOffice: 'found', unsafe: null, version }
+          : { libreOffice: 'missing', unsafe: null }
+      }
+    }
+    const state: ToolState = (await this.tryCommand(path, ['--version'])) ? 'found' : 'missing'
     return { libreOffice: state, unsafe: null }
   }
 
   /**
-   * Run `command args` with a timeout. Only ever called with an absolute path.
+   * Run `command args` with a timeout. Only ever called with an absolute path,
+   * and never on Windows (see {@link probe}). stdio is ignored so the child
+   * cannot hold the app's pipes, the profile is a private temp folder, and on
+   * timeout the whole process group is killed (the child leads its own group).
    *
    * @returns true if the command exits with code 0
    */
@@ -108,22 +142,39 @@ export class DependencyDetector {
     const pathApi = process.platform === 'win32' ? win32 : posix
     if (!pathApi.isAbsolute(command)) return Promise.resolve(false)
     return new Promise((resolve) => {
-      try {
-        const child = execFile(
-          command,
-          args,
-          // cwd outside any project; minimal env
-          { timeout: DETECTION_TIMEOUT_MS, cwd: tmpdir(), windowsHide: true, env: probeEnv() },
-          (error) => {
-            resolve(!error)
+      let profile: string | null = null
+      let timer: NodeJS.Timeout | undefined
+      let settled = false
+      const finish = (ok: boolean): void => {
+        if (settled) return
+        settled = true
+        if (timer) clearTimeout(timer)
+        if (profile) {
+          try {
+            rmSync(profile, { recursive: true, force: true })
+          } catch {
+            // best effort
           }
+        }
+        resolve(ok)
+      }
+      try {
+        profile = mkdtempSync(join(tmpdir(), 'erfana-lo-probe-'))
+        const child = spawn(
+          command,
+          [...args, '--headless', '--norestore', `-env:UserInstallation=${pathToFileURL(profile).href}`],
+          // cwd outside any project; minimal env; no inherited stdio
+          { cwd: tmpdir(), windowsHide: true, env: probeEnv(), stdio: 'ignore', detached: true }
         )
-
-        // Safety: handle unexpected errors on the child process
-        child.on('error', () => resolve(false))
+        timer = setTimeout(() => {
+          killGroup(child.pid)
+          finish(false)
+        }, DETECTION_TIMEOUT_MS)
+        child.on('error', () => finish(false))
+        child.on('exit', (code) => finish(code === 0))
       } catch {
-        // execFile itself threw (e.g., invalid command)
-        resolve(false)
+        // spawn itself threw (e.g., invalid command)
+        finish(false)
       }
     })
   }
@@ -145,4 +196,57 @@ function probeEnv(): NodeJS.ProcessEnv {
     if (value !== undefined) env[key] = value
   }
   return env
+}
+
+/** Kill the process group a detached probe leads. Only the PID we started (POSIX). */
+function killGroup(pid: number | undefined): void {
+  if (pid === undefined) return
+  try {
+    process.kill(-pid, 'SIGKILL')
+  } catch {
+    // already gone
+  }
+}
+
+function readTextOrNull(file: string): string | null {
+  try {
+    return readFileSync(file, 'utf8')
+  } catch {
+    return null
+  }
+}
+
+/** `<app>/Contents/Info.plist` for a binary inside an app bundle, else null. */
+function bundlePlistPath(binary: string): string | null {
+  let real = binary
+  try {
+    real = realpathSync.native(binary)
+  } catch {
+    // keep the given path
+  }
+  const marker = '/Contents/MacOS/'
+  const at = real.indexOf(marker)
+  return at === -1 ? null : `${real.slice(0, at)}/Contents/Info.plist`
+}
+
+/** `CFBundleShortVersionString` from an XML Info.plist, or null. */
+export function parsePlistVersion(text: string | null): string | null {
+  if (!text) return null
+  const match = /<key>CFBundleShortVersionString<\/key>\s*<string>([^<]+)<\/string>/.exec(text)
+  return match ? match[1].trim() : null
+}
+
+/** `ProductVersion` (or `Version`) from an ini file's text, or null. */
+export function parseIniVersion(text: string | null): string | null {
+  if (!text) return null
+  for (const key of ['ProductVersion', 'Version']) {
+    const match = new RegExp(`^\\s*${key}\\s*=\\s*(\\S.*?)\\s*$`, 'mi').exec(text)
+    if (match) return match[1]
+  }
+  return null
+}
+
+/** Best-effort version of a Windows install, from `version.ini` beside the exe. */
+function readWindowsVersion(exe: string): string | null {
+  return parseIniVersion(readTextOrNull(win32.join(win32.dirname(exe), 'version.ini')))
 }
