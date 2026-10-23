@@ -211,7 +211,17 @@ describe('renderer gateway rule', () => {
     ['a cast window', 'export const f = () => (window as unknown as { api: object }).api'],
     ['optional-chain aliasing', 'const a = window?.api\nexport { a }'],
     ['optional-chain assignment', 'let a\na = window?.api\nexport { a }'],
-    ['optional-chain destructuring', 'const { file } = window?.api\nexport { file }']
+    ['optional-chain destructuring', 'const { file } = window?.api\nexport { file }'],
+    ['destructuring api off window', 'const { api } = window\nexport { api }'],
+    ['destructuring api off globalThis', 'const { api } = globalThis\nexport { api }'],
+    ['destructuring api off self, renamed', 'const { api: a } = self\nexport { a }'],
+    ['destructuring a string api key', "const { 'api': a } = window\nexport { a }"],
+    ['destructuring api off a cast window', 'const { api } = window as unknown as { api: object }\nexport { api }'],
+    ['destructuring api off a non-null window', 'const { api } = window!\nexport { api }'],
+    ['destructuring api off an angle-bracket cast', 'const { api } = <{ api: object }>window\nexport { api }'],
+    ['assignment destructuring', 'let api\n;({ api } = window)\nexport { api }'],
+    ['assignment destructuring off a cast', 'let api\n;({ api } = globalThis as never)\nexport { api }'],
+    ['an angle-bracket cast', 'export const f = () => (<{ api: object }>window).api']
   ])('flags %s', async (_name, code) => {
     expect(await gatewayMessages(RENDERER, code)).toHaveLength(1)
   })
@@ -226,7 +236,12 @@ describe('renderer gateway rule', () => {
       'export const f = () => deps.window[method]("a")',
       'export const f = (api) => api.file.readFile("a")',
       'export const f = () => window.apiVersion',
-      'export const f = () => deps.window.api.file'
+      'export const f = () => deps.window.api.file',
+      // An `api` key is everyday code (dockview: `const { api } = props`); only the global's counts
+      'export const f = (props) => {\n  const { api } = props\n  return api\n}',
+      'export const f = (deps) => {\n  const { api } = deps.window\n  return api\n}',
+      'export const f = (props) => {\n  let api\n  ;({ api } = props)\n  return api\n}',
+      'const { location } = window\nexport { location }'
     ]) {
       expect(await gatewayMessages(RENDERER, code)).toHaveLength(0)
     }
@@ -257,6 +272,7 @@ describe('renderer gateway rule', () => {
         'export const f = () => window.api.preview.reload("p")',
         'const a = window.api\nexport { a }',
         'const { utils } = window.api\nexport { utils }',
+        'const { api } = window\nexport { api }',
         "export const f = () => window.api['utils']",
         "export const f = () => window['api']",
         'export const f = () => (window as unknown as { api: object }).api'

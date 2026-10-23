@@ -44,19 +44,33 @@ const GATEWAY_MESSAGE =
 // Every way to reach `window.api` outside a gateway. The renderer's `window.api`
 // type already lists only the bridges the TerminalPanel files still read (see
 // preload/index.d.ts); these selectors are the backstop for the ways round it.
-const WINDOW_API =
-  "MemberExpression[computed=false][object.name=/^(window|globalThis|self)$/][property.name='api']"
+const GLOBAL_OBJECTS = '/^(window|globalThis|self)$/'
+const WINDOW_API = `MemberExpression[computed=false][object.name=${GLOBAL_OBJECTS}][property.name='api']`
+// Where the global sits in a destructure's source: bare, or under one or two
+// casts (`as`, `!`, `satisfies`, `<T>`), each of which keeps it in `.expression`
+const GLOBAL_SOURCE_PATHS = ['name', 'expression.name', 'expression.expression.name']
+// The `api` key of a destructure, as an identifier or a string. Tied to the
+// global on the right: a bare `{ api }` is everyday code (`const { api } = props`)
+const API_PROPERTY = "Property:matches([key.name='api'], [key.value='api'])"
+const DESTRUCTURE_API_SELECTORS = GLOBAL_SOURCE_PATHS.flatMap((path) => [
+  // const { api } = window
+  `VariableDeclarator[init.${path}=${GLOBAL_OBJECTS}] > ObjectPattern.id > ${API_PROPERTY}`,
+  // ({ api } = window)
+  `AssignmentExpression[right.${path}=${GLOBAL_OBJECTS}] > ObjectPattern.left > ${API_PROPERTY}`
+]).map((selector) => ({ selector, message: GATEWAY_MESSAGE }))
 const RENDERER_API_BYPASS_SELECTORS = [
   {
     // window['api'], globalThis[k], self[k]
-    selector: "MemberExpression[computed=true][object.name=/^(window|globalThis|self)$/]",
+    selector: `MemberExpression[computed=true][object.name=${GLOBAL_OBJECTS}]`,
     message: GATEWAY_MESSAGE
   },
   {
-    // (window as X).api
-    selector: "MemberExpression[property.name='api'][object.type=/^TS(As|NonNull|Satisfies)Expression$/]",
+    // (window as X).api, (<X>window).api
+    selector:
+      "MemberExpression[property.name='api'][object.type=/^TS(AsExpression|NonNullExpression|SatisfiesExpression|TypeAssertion)$/]",
     message: GATEWAY_MESSAGE
-  }
+  },
+  ...DESTRUCTURE_API_SELECTORS
 ]
 const RENDERER_GATEWAY_SELECTORS = [
   // window.api, window?.api, globalThis.api, self.api: read, aliased or destructured
