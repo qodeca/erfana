@@ -55,7 +55,8 @@ import {
   MANIFEST_SIG_URL,
   MANIFEST_URL,
   MIN_REVISION_INDEX,
-  MODEL_MAX_BYTES,
+  MODEL_PINS,
+  MODEL_SIZE_MARGIN_BYTES,
   SCHEMA_SENTINEL_FILENAME,
   SCHEMA_VERSION,
   artifactUrl,
@@ -456,8 +457,9 @@ class WhisperModelManager implements IWhisperModelManager {
     }
 
     await this.ensureDirs()
+    const pin = MODEL_PINS[model]
     const filename = `ggml-${model}.bin`
-    const url = `${LOCAL_WHISPER.HUGGINGFACE_MODEL_BASE_URL}/${filename}`
+    const url = `${LOCAL_WHISPER.HUGGINGFACE_MODEL_BASE_URL}/${pin.remoteFilename}`
     const tempPath = join(this.modelsDir, `${filename}.download-${randomUUID()}`)
 
     logger.info('Downloading whisper model', { model, url })
@@ -466,8 +468,10 @@ class WhisperModelManager implements IWhisperModelManager {
       await downloadToFile({
         url,
         destPath: tempPath,
-        // Models are large (tiny ~75 MB, large ~1.5 GB). 2 GB cap per plan.
-        maxBytes: MODEL_MAX_BYTES,
+        // Cap at the pinned size plus a small margin (large-v3 is ~3.1 GB).
+        maxBytes: pin.sizeBytes + MODEL_SIZE_MARGIN_BYTES,
+        // A mismatch deletes the temp file (catch below) and fails the download.
+        expectedSha256: pin.sha256,
         signal: options?.signal,
         onProgress: options?.onProgress
           ? (bytes, total): void => {

@@ -278,6 +278,16 @@ Hard-won knowledge from Phase 4 implementation — documented here so future mai
 3. **Pure-JS verifier via `@noble/ed25519`.** We chose this over `sodium-native` to keep the verifier a pure-function with no native bindings. Tradeoff: ~100µs per verify vs ~10µs native — negligible for once-per-install use.
 4. **Test fixture pattern**: `src/main/utils/verifyManifest.test.ts` uses a real published manifest + signature from `whisper-build-v1.8.4-erfana1` as fixture bytes. When the pin advances, either (a) the fixture stays pointing at the old release (still cryptographically valid) or (b) refresh the fixture to the new release. Do NOT generate synthetic manifests with test keypairs — that would miss the `Ed`/`ED` variant-detection path.
 
+## Security baseline
+
+What `src/main/utils/secureDownloader.ts` enforces for every whisper download (binaries, manifest and GGML models):
+
+- **Exact host allowlist, no wildcards.** `github.com`, `objects.githubusercontent.com`, `release-assets.githubusercontent.com`, `huggingface.co`, `us.aws.cdn.hf.co` (Hugging Face Xet storage, where model files now redirect to), and the older `cdn-lfs.huggingface.co`, `cdn-lfs-us-1.huggingface.co`, `cdn-lfs-eu-1.huggingface.co`. Redirects are followed by hand and every hop is checked again. `eu.aws.cdn.hf.co` does not resolve (checked 2026-10-23), so it is not listed; add a host only after confirming it, as an exact name.
+- **Models are hash-pinned.** `MODEL_PINS` in `src/main/services/whisper-assets.ts` holds the SHA-256 and exact size of each model, taken from the Hugging Face API (`https://huggingface.co/api/models/ggerganov/whisper.cpp/tree/main`, each file's `lfs.oid` and `size`). `ensureModel()` passes the hash to `downloadToFile`; on a mismatch the temp file is deleted and the download fails with `WHISPER_MODEL_DOWNLOAD_FAILED`. The host allowlist is therefore not the integrity check for models.
+- **`large` maps to `ggml-large-v3.bin`.** The repository has no plain `ggml-large.bin`; the file is stored locally as `ggml-large.bin`.
+- **Byte cap per model** is the pinned size plus 1 MiB, checked against `Content-Length` and the streamed bytes.
+- To refresh a pin (a model re-published upstream), re-read the API output above and update `MODEL_PINS` and its test mock together.
+
 ## Rejected approaches (don't re-propose without reading this section)
 
 1. **PowerShell `Compress-Archive` for Windows zips**. Produces stream-format zips that Node's `extract-zip` (via `yauzl`) rejects on long or non-ASCII paths. Use `7z a -tzip -mx=9 ...` as currently. A cleanup PR removing 7z as "redundant since Windows has native zip" would break every Erfana Windows install silently — the round-trip extract-zip check in the workflow catches it at CI time, but only if the check isn't removed too. **Leave 7z + extract-zip round-trip test in place.**

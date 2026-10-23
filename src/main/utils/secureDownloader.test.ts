@@ -238,6 +238,74 @@ describe('secureDownloader.downloadToFile', () => {
     })
   })
 
+  it('deletes the destination file on SHA-256 mismatch', async () => {
+    const payload = new TextEncoder().encode('tampered')
+    fetchMock.mockResolvedValueOnce(
+      mockResponse({
+        headers: { 'content-length': String(payload.length) },
+        body: payload
+      })
+    )
+    await expect(
+      downloadToFile({
+        url: 'https://github.com/x',
+        destPath,
+        maxBytes: 100,
+        expectedSha256: '0'.repeat(64)
+      })
+    ).rejects.toMatchObject({ code: 'sha-mismatch' })
+    await expect(stat(destPath)).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
+  it('accepts the Hugging Face Xet CDN host', async () => {
+    const payload = new TextEncoder().encode('xet')
+    fetchMock.mockResolvedValueOnce(
+      mockResponse({ headers: { 'content-length': String(payload.length) }, body: payload })
+    )
+    const result = await downloadToFile({
+      url: 'https://us.aws.cdn.hf.co/xet-bridge-us/abc',
+      destPath,
+      maxBytes: 100
+    })
+    expect(result.bytes).toBe(payload.length)
+  })
+
+  it.each([
+    'https://us.aws.cdn.hf.co.evil.com/m.bin',
+    'https://evilcdn.hf.co/m.bin',
+    'https://cdn.hf.co/m.bin',
+    'https://eu.aws.cdn.hf.co/m.bin',
+    'https://evil.us.aws.cdn.hf.co/m.bin'
+  ])('rejects look-alike host %s', async (url) => {
+    await expect(downloadToFile({ url, destPath, maxBytes: 100 })).rejects.toMatchObject({
+      code: 'hostname-not-allowed'
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('follows huggingface.co -> us.aws.cdn.hf.co and verifies the pinned hash', async () => {
+    const payload = new TextEncoder().encode('model-bytes')
+    const sha = createHash('sha256').update(payload).digest('hex')
+    fetchMock
+      .mockResolvedValueOnce(
+        mockResponse({
+          status: 302,
+          headers: { location: 'https://us.aws.cdn.hf.co/xet-bridge-us/abc?sig=1' }
+        })
+      )
+      .mockResolvedValueOnce(
+        mockResponse({ headers: { 'content-length': String(payload.length) }, body: payload })
+      )
+    const result = await downloadToFile({
+      url: 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin',
+      destPath,
+      maxBytes: 100,
+      expectedSha256: sha
+    })
+    expect(result.finalUrl).toContain('us.aws.cdn.hf.co')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
   it('rejects Content-Length mismatch (server sent fewer bytes than promised)', async () => {
     fetchMock.mockResolvedValueOnce(
       mockResponse({

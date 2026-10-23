@@ -21,6 +21,7 @@
 
 import { createHash } from 'crypto'
 import { createWriteStream } from 'fs'
+import { rm } from 'fs/promises'
 
 /** Hosts Erfana will fetch binary/model assets from. Anything else = hard fail. */
 const ALLOWED_HOSTS: ReadonlySet<string> = new Set([
@@ -28,8 +29,12 @@ const ALLOWED_HOSTS: ReadonlySet<string> = new Set([
   'github.com',
   'objects.githubusercontent.com',
   'release-assets.githubusercontent.com',
-  // GGML model hosting (Hugging Face).
+  // GGML model hosting (Hugging Face). huggingface.co redirects model files to
+  // the Xet storage CDN (us.aws.cdn.hf.co) or the older cdn-lfs hosts. Exact
+  // hostnames only, no wildcards: eu.aws.cdn.hf.co does not resolve, so it is
+  // not listed. Model bytes are SHA-256 pinned (see MODEL_PINS), not host-trusted.
   'huggingface.co',
+  'us.aws.cdn.hf.co',
   'cdn-lfs.huggingface.co',
   'cdn-lfs-us-1.huggingface.co',
   'cdn-lfs-eu-1.huggingface.co'
@@ -86,7 +91,8 @@ export interface DownloadResult {
 /**
  * Fetch a URL, stream to disk, verify integrity.
  *
- * On failure the destination file is not guaranteed to be removed; callers
+ * On failure the destination file is not guaranteed to be removed (except on
+ * a SHA-256 mismatch, where it is deleted); callers
  * should `fs.rm` themselves before retrying to avoid partial-content reuse.
  */
 export async function downloadToFile(opts: DownloadToFileOpts): Promise<DownloadResult> {
@@ -180,6 +186,8 @@ export async function downloadToFile(opts: DownloadToFileOpts): Promise<Download
     if (opts.expectedSha256 !== undefined) {
       const expected = opts.expectedSha256.toLowerCase()
       if (sha256 !== expected) {
+        // Never leave unverified bytes on disk under the caller's path.
+        await rm(opts.destPath, { force: true })
         throw new SecureDownloaderError(
           'sha-mismatch',
           `SHA-256 mismatch: expected ${expected}, got ${sha256}`

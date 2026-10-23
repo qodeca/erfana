@@ -372,7 +372,7 @@ export const LOCAL_WHISPER = {
     base: 142_000_000,
     small: 466_000_000,
     medium: 1_500_000_000,
-    large: 2_900_000_000
+    large: 3_100_000_000
   },
   /** Download timeout in ms (10 minutes – large models) */
   DOWNLOAD_TIMEOUT: 600_000,
