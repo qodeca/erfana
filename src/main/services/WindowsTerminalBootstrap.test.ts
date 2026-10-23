@@ -18,7 +18,7 @@
 
 import { describe, it, expect } from 'vitest'
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, rmSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, realpathSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
@@ -404,11 +404,11 @@ describe('normalizeWindowsCwd', () => {
   })
 })
 
-describe.skipIf(spawnSync('pwsh', ['-NoProfile', '-Command', '1']).status !== 0)(
+describe.skipIf(spawnSync('pwsh', ['-NoProfile', '-Command', '1'], { timeout: 15000 }).status !== 0)(
   'PowerShellBootstrapBuilder script run with pwsh',
   () => {
     it('opens a folder named with a curly apostrophe', () => {
-      const base = mkdtempSync(join(tmpdir(), 'erfana-bootstrap-'))
+      const base = mkdtempSync(join(realpathSync.native(tmpdir()), 'erfana-bootstrap-'))
       const dir = join(base, 'Bob\u2019s Files')
       mkdirSync(dir)
       try {
@@ -417,7 +417,7 @@ describe.skipIf(spawnSync('pwsh', ['-NoProfile', '-Command', '1']).status !== 0)
           cwd: dir,
           marker: MARKER
         })
-        const run = spawnSync('pwsh', args, { input: '', encoding: 'utf8' })
+        const run = spawnSync('pwsh', args, { input: '', encoding: 'utf8', timeout: 15000 })
         expect(run.stdout).toContain(dir)
         expect(run.stdout).toContain(MARKER)
       } finally {

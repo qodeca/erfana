@@ -21,7 +21,8 @@ interface TerminalStore {
   // Actions
   setActiveTerminalId: (id: string | null) => void
   getActiveTerminalId: () => string | null
-  setActiveShellKind: (kind: ShellKind | null) => void
+  /** Set the active terminal and its shell kind together, so they cannot drift apart. */
+  setActiveTerminal: (terminal: { id: string; shellKind: ShellKind | null } | null) => void
   /** Quote paths for the active terminal's own shell (platform default until known). */
   formatPathsForActiveTerminal: (paths: string[]) => string
   markActivity: (id: string) => void
@@ -52,15 +53,17 @@ export function createTerminalStore(
 
   setActiveTerminalId: (id) => {
     logger.info(`Terminal store: Setting active terminal ID to ${id}`)
-    set({ activeTerminalId: id })
+    // A kind recorded for another terminal must not outlive it
+    set(id === get().activeTerminalId ? { activeTerminalId: id } : { activeTerminalId: id, activeShellKind: null })
   },
 
   getActiveTerminalId: () => {
     return get().activeTerminalId
   },
 
-  setActiveShellKind: (kind) => {
-    set({ activeShellKind: kind })
+  setActiveTerminal: (terminal) => {
+    logger.info(`Terminal store: Setting active terminal to ${terminal?.id ?? null}`)
+    set({ activeTerminalId: terminal?.id ?? null, activeShellKind: terminal?.shellKind ?? null })
   },
 
   formatPathsForActiveTerminal: (paths) => {
