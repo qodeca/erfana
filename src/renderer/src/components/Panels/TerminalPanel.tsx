@@ -46,7 +46,7 @@ import { openFileInPanel } from '../../utils/openFileInPanel'
 import { resolvePanelKind } from '../../utils/resolvePanelKind'
 import { formatShortcut } from '../../utils/shortcutLabel'
 import { registerTestTerminal } from '../../testHooks/terminalTestHook'
-import { formatPathsForTerminal, escapePathForShell, type ShellKind } from '../../utils/shellPathEscape'
+import { escapePathForShell, platformDefaultShellKind, type ShellKind } from '../../utils/shellPathEscape'
 import { logger } from '../../utils/logger'
 import { TEST_IDS } from '../../constants/testids'
 import '@xterm/xterm/css/xterm.css'
@@ -199,7 +199,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   }, [])
 
   // Terminal store for cross-component communication
-  const setActiveTerminalId = useTerminalStore((state) => state.setActiveTerminalId)
+  const setActiveTerminal = useTerminalStore((state) => state.setActiveTerminal)
 
   // Project store for file opening functionality (issue #26)
   const dockviewApi = useProjectStore((state) => state.dockviewApi)
@@ -585,7 +585,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
 
           logger.info('External file drop on terminal', { pathCount: paths.length, paths })
 
-          const formattedPaths = formatPathsForTerminal(paths)
+          const formattedPaths = useTerminalStore.getState().formatPathsForActiveTerminal(paths)
           const success = await useTerminalStore.getState().sendToTerminal(formattedPaths, false)
 
           if (!success) {
@@ -727,7 +727,8 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       // correctly without an extra IPC (#164 round-2 F#1). Main always
       // returns a value when terminalId is present, but guard defensively.
       shellKindRef.current = result.shellKind ?? null
-      setActiveTerminalId(result.terminalId) // Register in store
+      // Register in store, together with its shell kind
+      setActiveTerminal({ id: result.terminalId, shellKind: result.shellKind ?? null })
       // Begin tracking Claude Code context status for this panel (#216).
       // Guarded so environments without the bridge (tests) do not crash.
       void window.api?.claudeStatus?.register(result.terminalId)
@@ -784,7 +785,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       // Fire-and-forget in cleanup, but properly awaited internally
       void cleanupTerminalInstance(terminalIdRef.current)
       shellKindRef.current = null
-      setActiveTerminalId(null)
+      setActiveTerminal(null)
       // Cleanup parser hooks before disposing xterm
       parserDisposablesRef.current.forEach((d) => d.dispose())
       parserDisposablesRef.current = []
@@ -805,7 +806,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
         visibilityObserverRef.current = null
       }
     }
-  }, [isAvailable, setActiveTerminalId, cleanupTerminalInstance, cleanupDragHandlers])
+  }, [isAvailable, setActiveTerminal, cleanupTerminalInstance, cleanupDragHandlers])
 
   // Restart terminal on project change
   useEffect(() => {
@@ -813,7 +814,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       // Kill current terminal session (Phase 1.1 bug fix - use centralized cleanup)
       await cleanupTerminalInstance(terminalIdRef.current)
       shellKindRef.current = null
-      setActiveTerminalId(null)
+      setActiveTerminal(null)
       // Cleanup parser hooks before disposing xterm
       parserDisposablesRef.current.forEach((d) => d.dispose())
       parserDisposablesRef.current = []
@@ -838,7 +839,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       }
     })
     return () => unsubscribe()
-  }, [setActiveTerminalId, cleanupTerminalInstance, cleanupDragHandlers])
+  }, [setActiveTerminal, cleanupTerminalInstance, cleanupDragHandlers])
 
   // Handle terminal data
   useEffect(() => {
@@ -1119,7 +1120,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       }
 
       // Insert path to terminal with shell-safe escaping
-      const quotedPath = escapePathForShell(filePath)
+      const quotedPath = escapePathForShell(filePath, shellKindRef.current ?? platformDefaultShellKind())
       terminalGateway.write(currentTerminalId, quotedPath)
 
       // Show success toast with filename only
@@ -1140,7 +1141,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     // Kill current terminal session (Phase 1.1 bug fix - use centralized cleanup)
     await cleanupTerminalInstance(terminalIdRef.current)
     shellKindRef.current = null
-    setActiveTerminalId(null)
+    setActiveTerminal(null)
 
     // Cleanup parser hooks before disposing xterm
     parserDisposablesRef.current.forEach((d) => d.dispose())
@@ -1169,7 +1170,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     if (terminalRef.current && isAvailable) {
       await initializeTerminalRef.current()
     }
-  }, [setActiveTerminalId, isAvailable, cleanupDragHandlers, cleanupTerminalInstance])
+  }, [setActiveTerminal, isAvailable, cleanupDragHandlers, cleanupTerminalInstance])
 
   /**
    * User-facing restart: asks first when the terminal looks busy, because a

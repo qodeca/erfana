@@ -234,3 +234,50 @@ describe('TerminalPanel restart confirmation', () => {
     await waitFor(() => expect(window.api.terminal.kill).toHaveBeenCalledWith(TERMINAL_ID))
   })
 })
+
+describe('TerminalPanel shell kind in the terminal store', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    installApi()
+    useTerminalStore.setState({
+      activityById: new Map(),
+      userInputById: new Map(),
+      activeTerminalId: null,
+      activeShellKind: null
+    })
+    useClaudeStatusStore.getState().reset()
+    const portalRoot = document.createElement('div')
+    portalRoot.id = 'portal-root'
+    document.body.appendChild(portalRoot)
+  })
+
+  afterEach(() => {
+    document.getElementById('portal-root')?.remove()
+  })
+
+  it('follows the shell kind of each created terminal and clears it on unmount', async () => {
+    const user = userEvent.setup()
+    window.api.terminal.create
+      .mockResolvedValueOnce({ success: true, terminalId: TERMINAL_ID, shellKind: 'cmd' })
+      .mockResolvedValueOnce({ success: true, terminalId: 'test-terminal-2', shellKind: 'powershell' })
+    const { TerminalPanel } = await import('./TerminalPanel')
+    const { unmount } = render(
+      <DialogProvider>
+        <TerminalPanel {...({} as any)} />
+        <DialogManager />
+      </DialogProvider>
+    )
+    await waitFor(() => expect(useTerminalStore.getState().activeShellKind).toBe('cmd'))
+    expect(useTerminalStore.getState().activeTerminalId).toBe(TERMINAL_ID)
+
+    await user.click(screen.getByTestId(TEST_IDS.TERMINAL_BTN_RESTART))
+
+    await waitFor(() => expect(useTerminalStore.getState().activeShellKind).toBe('powershell'))
+    expect(useTerminalStore.getState().activeTerminalId).toBe('test-terminal-2')
+
+    unmount()
+    expect(useTerminalStore.getState().activeShellKind).toBeNull()
+    expect(useTerminalStore.getState().activeTerminalId).toBeNull()
+  })
+})
+

@@ -25,6 +25,7 @@
  */
 
 import type { ShellKind } from '../../../shared/shellKind'
+import { quotePowerShellLiteral } from '../../../shared/powershellQuote'
 
 export type { ShellKind }
 
@@ -66,8 +67,10 @@ export function escapePathForShell(path: string, shellKind: ShellKind = 'posix')
       return '"' + sanitized.replace(/"/g, '') + '"'
     case 'powershell':
       // PowerShell escapes a single quote inside a single-quoted string
-      // by doubling it. Single quotes also disable `$`/backtick interpolation.
-      return "'" + sanitized.replace(/'/g, "''") + "'"
+      // by doubling it, and treats the typographic single quotes
+      // (U+2018, U+2019, U+201A, U+201B) the same way. Single quotes also
+      // disable `$`/backtick interpolation.
+      return quotePowerShellLiteral(sanitized)
   }
 }
 
@@ -84,4 +87,15 @@ export function formatPathsForTerminal(
   shellKind: ShellKind = 'posix'
 ): string {
   return paths.map((p) => escapePathForShell(p, shellKind)).join('\n')
+}
+
+/**
+ * Platform default quoting flavour, used when no terminal is active yet or
+ * when the terminal's shell kind has not been recorded. Windows defaults to
+ * `'powershell'` because PowerShell is the modern default shell on Windows
+ * 10+ (#164 round-2 F#30 — pre-round-2 this defaulted to `'cmd'` which
+ * mis-quotes paths for the dominant shell).
+ */
+export function platformDefaultShellKind(): ShellKind {
+  return window.api.utils.getPlatform() === 'win32' ? 'powershell' : 'posix'
 }

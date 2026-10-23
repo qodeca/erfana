@@ -23,6 +23,7 @@
  */
 
 import type { ShellKind } from '../../shared/shellKind'
+import { escapePowerShellSingleQuotes } from '../../shared/powershellQuote'
 
 /**
  * Characters forbidden in Windows cwds. `"` is the only character that can
@@ -121,7 +122,7 @@ export interface WindowsBootstrapBuilder {
  *
  * - `Set-Location -LiteralPath '<cwd>'` disables variable, wildcard, and
  *   backtick expansion. The only escape needed inside `'…'` is doubling
- *   single quotes (`'` → `''`).
+ *   single quotes, plain and typographic (see `escapePowerShellSingleQuotes`).
  * - `(Get-Location).Path` prints the resolved cwd.
  * - `Write-Output '<marker>'` prints the marker (single-quoted defensively
  *   in case the marker format ever changes).
@@ -177,7 +178,7 @@ export class PowerShellBootstrapBuilder implements WindowsBootstrapBuilder {
   }
 
   build({ cwd, marker }: { shell: string; cwd: string; marker: string }): string[] {
-    const psEscapedCwd = cwd.replace(/'/g, "''")
+    const psEscapedCwd = escapePowerShellSingleQuotes(cwd)
     const script = [
       `Set-Location -LiteralPath '${psEscapedCwd}'`,
       '(Get-Location).Path',
