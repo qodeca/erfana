@@ -9,8 +9,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 
 import { ErrorCode } from '../../../shared/errors'
-import type { PreviewViewDeps } from './PreviewViewService'
-import type { PreviewLiveView } from './PreviewLiveView'
 import {
   makeHarness,
   removeProjects,
@@ -27,20 +25,9 @@ afterEach(() => {
   removeProjects()
 })
 
-function depsOf(h: NavHarness): PreviewViewDeps {
-  return (h.service as unknown as { deps: PreviewViewDeps }).deps
-}
-
-function liveViewOf(h: NavHarness, panelId = 'panel-A'): PreviewLiveView {
-  const registry = (
-    h.service as unknown as { registry: { get(id: string): PreviewLiveView | null } }
-  ).registry
-  return registry.get(panelId)!
-}
-
 /** Make every view the session factory builds throw when bounds are first placed. */
 function throwOnPlaceBounds(h: NavHarness): { views: unknown[] } {
-  const create = depsOf(h).sessionFactory.create as Mock
+  const create = h.sessionCreate as Mock
   const original = create.getMockImplementation()!
   const views: unknown[] = []
   create.mockImplementation(async (ctx: unknown) => {
@@ -93,23 +80,21 @@ describe('a live view whose contents is gone does no work (#120)', () => {
   it('exportPdf returns a failure without calling the export controller', async () => {
     const h = makeHarness()
     const page = await h.openCommitted('a.html')
-    const live = liveViewOf(h)
     page.contents.destroy()
 
-    const result = await live.exportPdf('preview')
+    const result = await h.service.exportPdf('panel-A', 'preview')
 
     expect(result).toEqual({ ok: false, errorCode: ErrorCode.PDF_EXPORT_FAILED })
-    expect(depsOf(h).exportController.exportToPdf).not.toHaveBeenCalled()
+    expect(h.deps.exportController.exportToPdf).not.toHaveBeenCalled()
   })
 
   it('reload does not reload a destroyed contents', async () => {
     const h = makeHarness()
     const page = await h.openCommitted('a.html')
-    const live = liveViewOf(h)
     page.contents.destroy()
 
-    live.reload(true)
-    live.reload(false)
+    await h.service.reload('panel-A', { ignoreCache: true })
+    await h.service.reload('panel-A')
     await vi.advanceTimersByTimeAsync(0)
 
     expect(page.contents.reloadIgnoringCache).not.toHaveBeenCalled()
@@ -119,11 +104,10 @@ describe('a live view whose contents is gone does no work (#120)', () => {
   it('swapStylesheet runs no script in a destroyed contents', async () => {
     const h = makeHarness()
     const page = await h.openCommitted('a.html')
-    const live = liveViewOf(h)
     page.contents.destroy()
     page.contents.executeJavaScriptInIsolatedWorld.mockClear()
 
-    await expect(live.swapStylesheet('a.css')).resolves.toBe(false)
+    await expect(h.service.swapStylesheet('panel-A', 'a.css')).resolves.toBe(false)
 
     expect(page.contents.executeJavaScriptInIsolatedWorld).not.toHaveBeenCalled()
     expect(page.contents.reloadIgnoringCache).not.toHaveBeenCalled()

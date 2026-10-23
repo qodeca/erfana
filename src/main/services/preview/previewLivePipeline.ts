@@ -84,9 +84,9 @@ export interface PreviewLivePipelineDeps {
   /** Photograph the page now that it is ready (the visibility module). */
   readonly captureWhileVisible: () => void
   /**
-   * Whether the view is torn down or its webContents is gone. Deliberately not
-   * the wider `isDefunct`: a view that is merely `closing` still finishes the
-   * work it already has (#120).
+   * Whether the view is torn down or its webContents is gone (#120). Not the
+   * wider `isDefunct`, which also reads `closing`: these guards have never read
+   * it, and a closing view's reload is harmless.
    */
   readonly isTornDown: () => boolean
 }

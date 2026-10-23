@@ -67,6 +67,8 @@ export interface PreviewLiveBounds {
    * @returns whether it reached the view – only such bounds end a resize hold.
    */
   apply(cssRect: PreviewBounds, seq: number, ack: boolean): boolean
+  /** Teardown: forget the wanted confirmation and clear every timer. */
+  dispose(): void
   /** The last DIP rect handed to `view.setBounds`, or `null` before the first. */
   lastRect(): PreviewBounds | null
   /**
@@ -197,49 +199,65 @@ export function createPreviewLiveBounds(deps: PreviewLiveBoundsDeps): PreviewLiv
   }
 
   /*
-   * AT MOST ONE confirmation script is in the page at a time. A splitter drag
-   * pushes a rect per frame and, while the growth is unproved, every one of them
-   * asks to be confirmed; starting a script for each ran one into the untrusted
-   * page per frame (#120). Now a push that asks while a script is out only
-   * records that it is the newest wanted, and one more script runs for it when
-   * the current one settles. Only the newest is ever confirmed anyway:
-   * `confirmRepaint` drops an answer a newer push overtook.
+   * AT MOST TWO confirmation scripts are alive in the page at any time (#120).
+   * A burst of growth pushes (a window-edge resize hold, repeated growth) used
+   * to start one script per asking push. Now the newest asking push ALWAYS
+   * starts its script at once: the renderer's deadline for a confirmation is
+   * absolute (`BOUNDS_ACK_TIMEOUT_MS`), so making it wait behind an older
+   * script would double its latency. The older script's answer is then
+   * superseded and dropped, as `confirmRepaint` has always done. A third asking
+   * push, with two alive, is only recorded as `ackWanted` and starts as soon as
+   * either script settles.
    *
-   * A page that never runs its frames (hidden, frozen) never settles its script,
-   * so the slot expires after `BOUNDS_ACK_SCRIPT_TIMEOUT_MS`; a late answer from
-   * an expired run is told apart by its `run` number and does not free the slot
-   * of the run that replaced it.
+   * A page that never runs its frames never settles its script, so each lives
+   * at most `BOUNDS_ACK_TIMEOUT_MS`. A run that expired and answers late finds
+   * its own `released` flag set, so it frees nothing a later run holds.
    */
-  let ackRunning = false
+  const MAX_ACK_SCRIPTS = 2
+  let ackAlive = 0
   let ackWanted: number | null = null
-  let ackRun = 0
+  const ackTimers = new Set<ReturnType<typeof setTimeout>>()
 
   function startConfirmation(seq: number): void {
-    ackRunning = true
-    ackRun += 1
-    const mine = ackRun
+    ackAlive += 1
+    let released = false
+    const expiry = setTimeout(() => release(), PREVIEW.BOUNDS_ACK_TIMEOUT_MS)
+    ackTimers.add(expiry)
     const release = (): void => {
-      if (ackRun !== mine || !ackRunning) {
+      if (released) {
         return
       }
-      ackRunning = false
+      released = true
+      ackAlive -= 1
       clearTimeout(expiry)
-      if (ackWanted !== null) {
+      ackTimers.delete(expiry)
+      if (deps.isDefunct()) {
+        ackWanted = null
+        return
+      }
+      if (ackWanted !== null && ackAlive < MAX_ACK_SCRIPTS) {
         const next = ackWanted
         ackWanted = null
         startConfirmation(next)
       }
     }
-    const expiry = setTimeout(release, PREVIEW.BOUNDS_ACK_SCRIPT_TIMEOUT_MS)
     void confirmRepaint(seq, release)
   }
 
   function requestConfirmation(seq: number): void {
-    if (ackRunning) {
-      ackWanted = seq
-    } else {
+    if (ackAlive < MAX_ACK_SCRIPTS) {
       startConfirmation(seq)
+    } else {
+      ackWanted = seq
     }
+  }
+
+  function dispose(): void {
+    ackWanted = null
+    for (const timer of ackTimers) {
+      clearTimeout(timer)
+    }
+    ackTimers.clear()
   }
 
   function place(cssRect: PreviewBounds): void {
@@ -293,5 +311,5 @@ export function createPreviewLiveBounds(deps: PreviewLiveBoundsDeps): PreviewLiv
     return true
   }
 
-  return { place, apply, lastRect: () => last, lastCssSize: () => lastCss }
+  return { place, apply, dispose, lastRect: () => last, lastCssSize: () => lastCss }
 }

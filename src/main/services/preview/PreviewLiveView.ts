@@ -417,6 +417,7 @@ export class PreviewLiveView {
         { label: 'frameEvents.dispose', run: () => this.parts.frameEvents.dispose() },
         { label: 'freshness.dispose', run: () => this.parts.freshness.dispose() },
         { label: 'page.dispose', run: () => this.parts.page.dispose() },
+        { label: 'bounds.dispose', run: () => this.parts.bounds.dispose() },
         {
           label: 'watchCoordinator.dispose',
           runAsync: () => this.parts.watchCoordinator.dispose()
