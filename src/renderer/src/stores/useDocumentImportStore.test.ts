@@ -27,6 +27,7 @@ const mockDocumentCancel = vi.fn()
 const mockGetDocumentExtensions = vi.fn()
 const mockOnDocumentProgress = vi.fn()
 const mockOnDependenciesReady = vi.fn()
+const mockToolStatus = vi.fn()
 
 ;(window as any).api = {
   ...(window as any).api,
@@ -36,7 +37,8 @@ const mockOnDependenciesReady = vi.fn()
     cancelDocument: mockDocumentCancel,
     getDocumentExtensions: mockGetDocumentExtensions,
     onDocumentProgress: mockOnDocumentProgress,
-    onDependenciesReady: mockOnDependenciesReady
+    onDependenciesReady: mockOnDependenciesReady,
+    toolStatus: mockToolStatus
   }
 }
 
@@ -62,7 +64,11 @@ function resetStore(): void {
     lastDpi: 150,
     documentExtensions: [],
     hasLibreOffice: false,
-    hasImageMagick: false
+    libreOfficeState: null,
+    libreOfficeUnsafe: null,
+    toolStatusKnown: false,
+    isCheckingTools: false,
+    toolCheckOutcome: 'idle'
   })
 }
 
@@ -619,7 +625,7 @@ describe('useDocumentImportStore', () => {
     })
 
     it('updates documentExtensions when dependency event fires', () => {
-      let capturedCallback: ((event: { libreOffice: boolean; imageMagick: boolean; extensions: string[] }) => void) | null = null
+      let capturedCallback: ((event: { libreOffice: 'found' | 'missing' | 'unsafe'; extensions: string[] }) => void) | null = null
       mockOnDependenciesReady.mockImplementation((cb) => {
         capturedCallback = cb
         return vi.fn()
@@ -629,14 +635,13 @@ describe('useDocumentImportStore', () => {
 
       // Simulate the event
       capturedCallback!({
-        libreOffice: true,
-        imageMagick: false,
+        libreOffice: 'found',
         extensions: ['pdf', 'docx']
       })
 
       expect(useDocumentImportStore.getState().documentExtensions).toEqual(['pdf', 'docx'])
       expect(useDocumentImportStore.getState().hasLibreOffice).toBe(true)
-      expect(useDocumentImportStore.getState().hasImageMagick).toBe(false)
+      expect(useDocumentImportStore.getState().libreOfficeState).toBe('found')
     })
 
     it('returns a no-op cleanup when api.import.onDependenciesReady is missing', () => {
@@ -652,6 +657,104 @@ describe('useDocumentImportStore', () => {
 
       // Restore
       ;(window as any).api.import.onDependenciesReady = original
+    })
+  })
+
+  // ===========================================================================
+  // loadToolStatus (#250)
+  // ===========================================================================
+
+  describe('loadToolStatus (#250)', () => {
+    const status = (libreOffice: 'found' | 'missing' | 'unsafe', throttled = false) => ({
+      success: true,
+      libreOffice,
+      extensions: libreOffice === 'found' ? ['pdf', 'docx'] : ['pdf'],
+      throttled
+    })
+
+    it('the silent read fills the flags and extensions but announces nothing', async () => {
+      mockToolStatus.mockResolvedValueOnce(status('found'))
+
+      await useDocumentImportStore.getState().loadToolStatus(false)
+
+      const s = useDocumentImportStore.getState()
+      expect(mockToolStatus).toHaveBeenCalledWith({ recheck: false })
+      expect(s).toMatchObject({
+        hasLibreOffice: true,
+        libreOfficeState: 'found',
+        toolStatusKnown: true,
+        isCheckingTools: false,
+        toolCheckOutcome: 'idle',
+        documentExtensions: ['pdf', 'docx']
+      })
+    })
+
+    it('Check again reports checked, or throttled when main rate-limited it', async () => {
+      mockToolStatus.mockResolvedValueOnce(status('found'))
+      await useDocumentImportStore.getState().loadToolStatus(true)
+      expect(useDocumentImportStore.getState().toolCheckOutcome).toBe('checked')
+
+      mockToolStatus.mockResolvedValueOnce(status('found', true))
+      await useDocumentImportStore.getState().loadToolStatus(true)
+      expect(useDocumentImportStore.getState().toolCheckOutcome).toBe('throttled')
+    })
+
+    it('ignores a call while one is in flight', async () => {
+      let release: (v: unknown) => void = () => {}
+      mockToolStatus.mockReturnValueOnce(new Promise((resolve) => { release = resolve }))
+
+      const first = useDocumentImportStore.getState().loadToolStatus(true)
+      await useDocumentImportStore.getState().loadToolStatus(true)
+      expect(mockToolStatus).toHaveBeenCalledTimes(1)
+      expect(useDocumentImportStore.getState().isCheckingTools).toBe(true)
+
+      release(status('missing'))
+      await first
+      expect(useDocumentImportStore.getState().isCheckingTools).toBe(false)
+    })
+
+    it('a refused or failing call reports failed and keeps the previous flags', async () => {
+      useDocumentImportStore.setState({ hasLibreOffice: true, toolStatusKnown: true })
+      mockToolStatus.mockResolvedValueOnce({ success: false, error: 'Request refused' })
+      await useDocumentImportStore.getState().loadToolStatus(true)
+      expect(useDocumentImportStore.getState()).toMatchObject({ toolCheckOutcome: 'failed', hasLibreOffice: true })
+
+      mockToolStatus.mockRejectedValueOnce(new Error('ipc gone'))
+      await useDocumentImportStore.getState().loadToolStatus(true)
+      expect(useDocumentImportStore.getState()).toMatchObject({ toolCheckOutcome: 'failed', isCheckingTools: false })
+    })
+
+    it('marks the status known when the startup dependenciesReady event arrives', () => {
+      let captured: ((e: unknown) => void) | null = null
+      mockOnDependenciesReady.mockImplementation((cb: (e: unknown) => void) => {
+        captured = cb
+        return vi.fn()
+      })
+      useDocumentImportStore.getState().initDependencyListener()
+      captured!({ libreOffice: 'unsafe', unsafe: { tool: 'which', reason: 'unresolvable' }, extensions: ['pdf', 'png'] })
+
+      expect(useDocumentImportStore.getState()).toMatchObject({
+        toolStatusKnown: true,
+        libreOfficeState: 'unsafe',
+        libreOfficeUnsafe: { tool: 'which', reason: 'unresolvable' },
+        hasLibreOffice: false
+      })
+    })
+
+    it('keeps the unsafe details from a status read, and drops them once LibreOffice is found', async () => {
+      mockToolStatus.mockResolvedValueOnce({
+        success: true,
+        libreOffice: 'unsafe',
+        unsafe: { tool: 'soffice', reason: 'ambiguous' },
+        extensions: ['pdf'],
+        throttled: false
+      })
+      await useDocumentImportStore.getState().loadToolStatus(false)
+      expect(useDocumentImportStore.getState().libreOfficeUnsafe).toEqual({ tool: 'soffice', reason: 'ambiguous' })
+
+      mockToolStatus.mockResolvedValueOnce(status('found'))
+      await useDocumentImportStore.getState().loadToolStatus(true)
+      expect(useDocumentImportStore.getState().libreOfficeUnsafe).toBeNull()
     })
   })
 })

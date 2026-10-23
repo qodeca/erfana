@@ -9,6 +9,10 @@ import { DOCUMENT_IMPORT } from '../../../../shared/constants'
 import { validateFileForImport } from '../../../utils/fileUtils'
 import { isoToTessLang } from '../isoToTessLang'
 import { LITEPARSE_EXCLUDED_EXTENSIONS } from '../extensions'
+import { findUntrustedConversionTool, currentUntrustedRoots } from '../conversionToolGuard'
+import { logger } from '../../LoggingService'
+import { redactPath } from '../../../utils/redactUserInput'
+import { untrustedToolMessage } from '../../../../shared/errors'
 import type {
   IConverter,
   IConfigurableConverter,
@@ -34,8 +38,13 @@ const PDF_EXTENSIONS = ['pdf']
 /** Office extensions -- require LibreOffice (from shared constants) */
 const OFFICE_EXTENSIONS: readonly string[] = DOCUMENT_IMPORT.LIBREOFFICE_EXTENSIONS
 
-/** Image extensions -- require ImageMagick (from shared constants) */
-const IMAGE_EXTENSIONS: readonly string[] = DOCUMENT_IMPORT.IMAGEMAGICK_EXTENSIONS
+/**
+ * Image extensions -- read natively by LiteParse (its Rust `image` decoder),
+ * no external tool needed (#250). Excluded formats (svg) are filtered out.
+ */
+const IMAGE_EXTENSIONS: readonly string[] = DOCUMENT_IMPORT.IMAGE_EXTENSIONS.filter(
+  (ext) => !LITEPARSE_EXCLUDED_EXTENSIONS.has(ext)
+)
 
 /**
  * LiteParse document converter
@@ -44,8 +53,8 @@ const IMAGE_EXTENSIONS: readonly string[] = DOCUMENT_IMPORT.IMAGEMAGICK_EXTENSIO
  * Supports OCR, page screenshots, and YAML frontmatter generation.
  *
  * Extension registration is two-phase:
- * - Sync at startup: PDF only (always available)
- * - Async after DependencyDetector: Office (LibreOffice) and image (ImageMagick) extensions
+ * - Sync at startup: PDF and images (LiteParse reads both natively, #250)
+ * - Async after DependencyDetector: Office extensions, when LibreOffice is `found`
  *
  * Implements IConfigurableConverter for per-import options via createConfigured().
  *
@@ -59,11 +68,11 @@ export class LiteParseConverter implements IConverter, IConfigurableConverter {
   private readonly deps: DependencyStatus
 
   /**
-   * @param deps - System dependency availability (LibreOffice, ImageMagick)
+   * @param deps - System dependency availability (LibreOffice)
    * @param options - Per-import configuration (OCR, language, screenshots, DPI)
    */
   constructor(
-    deps: DependencyStatus = { libreOffice: false, imageMagick: false },
+    deps: DependencyStatus = { libreOffice: 'missing' },
     options: ImportOptions = {}
   ) {
     this.deps = deps
@@ -72,15 +81,13 @@ export class LiteParseConverter implements IConverter, IConfigurableConverter {
 
   /**
    * Supported extensions based on available system dependencies.
-   * PDF is always included. Office/image extensions are added dynamically.
+   * PDF and images are always included; Office extensions are added once
+   * LibreOffice is found.
    */
   get supportedExtensions(): string[] {
-    const exts = [...PDF_EXTENSIONS]
-    if (this.deps.libreOffice) {
+    const exts = [...PDF_EXTENSIONS, ...IMAGE_EXTENSIONS]
+    if (this.deps.libreOffice === 'found') {
       exts.push(...OFFICE_EXTENSIONS)
-    }
-    if (this.deps.imageMagick) {
-      exts.push(...IMAGE_EXTENSIONS)
     }
     return exts
   }
@@ -124,6 +131,22 @@ export class LiteParseConverter implements IConverter, IConfigurableConverter {
         success: false,
         error: ERROR_MESSAGES[code],
         errorCode: code
+      }
+    }
+
+    // LiteParse finds LibreOffice itself, by name on PATH (#250). Refuse when
+    // the binary it would run is unsafe (project, temp, network share, ...).
+    const untrusted = findUntrustedConversionTool(ext, currentUntrustedRoots())
+    if (untrusted) {
+      logger.warn('Refused conversion: untrusted tool on PATH', {
+        tool: untrusted.name,
+        reason: untrusted.reason,
+        path: redactPath(untrusted.path)
+      })
+      return {
+        success: false,
+        error: untrustedToolMessage(untrusted.name, untrusted.reason),
+        errorCode: ErrorCode.IMPORT_UNTRUSTED_TOOL
       }
     }
 
@@ -318,7 +341,9 @@ export class LiteParseConverter implements IConverter, IConfigurableConverter {
 }
 
 /**
- * Get extensions for a given dependency state.
+ * Get the extensions an external tool unlocks for a given dependency state:
+ * Office formats when LibreOffice is `found`. Images are not listed – LiteParse
+ * reads them natively, so they never depend on a tool.
  * Used by ConverterRegistry.updateConverterExtensions().
  *
  * @param deps - Dependency status
@@ -326,11 +351,8 @@ export class LiteParseConverter implements IConverter, IConfigurableConverter {
  */
 export function getExtensionsForDependencies(deps: DependencyStatus): string[] {
   const exts: string[] = []
-  if (deps.libreOffice) {
+  if (deps.libreOffice === 'found') {
     exts.push(...OFFICE_EXTENSIONS)
-  }
-  if (deps.imageMagick) {
-    exts.push(...IMAGE_EXTENSIONS)
   }
   return exts.filter((ext) => !LITEPARSE_EXCLUDED_EXTENSIONS.has(ext))
 }

@@ -266,6 +266,7 @@ flow added later, whose channel names come from `import-channels.ts`.
 | `import:getDocumentExtensions` | Query available document extensions |
 | `import:documentProgress` | Event: import progress update (main → renderer) |
 | `import:dependenciesReady` | Event: dependency detection complete (main → renderer); sent from `src/main/index.ts` |
+| `import:toolStatus` | LibreOffice status – `found` / `missing` / `unsafe`, with `unsafe: { tool, reason }` (no path) – (`{ recheck: false }`), or "Check again" (`{ recheck: true }`, clears the per-session cache, rate-limited); strict schema in `import-schema.ts`, sender-gated, never rejects (#250) |
 
 ### Export (`pdf-handlers.ts`, `docx-handlers.ts`, `image-export-handlers.ts`)
 
