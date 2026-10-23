@@ -39,7 +39,13 @@ const treeKill = vi.hoisted(() => ({
 }))
 vi.mock('./terminalTreeKill', () => treeKill)
 
-const shim = vi.hoisted(() => ({ installNoForkConsoleList: vi.fn(() => true) }))
+const shim = vi.hoisted(() => ({
+  installNoForkConsoleList: vi.fn(() => true),
+  installExitTimeRecorder: vi.fn(() => true),
+  nativeExitAtMs: vi.fn((_pty: unknown): number | undefined => undefined),
+  installConoutWorkerRelease: vi.fn(() => true),
+  conoutWorkerStats: vi.fn(() => ({ released: 0, exited: 0 }))
+}))
 vi.mock('./nodePtyWindowsShim', () => shim)
 
 const PTY_GLOBAL = '__ERFANA_TEST_PTY__'
@@ -92,6 +98,10 @@ describe('TerminalService kill paths (#296)', () => {
     mockNodePty.spawn.mockClear()
     treeKill.killProcessTrees.mockClear()
     shim.installNoForkConsoleList.mockClear()
+    shim.installExitTimeRecorder.mockClear()
+    shim.installConoutWorkerRelease.mockClear()
+    shim.nativeExitAtMs.mockReset()
+    shim.nativeExitAtMs.mockImplementation(() => undefined)
     treeKill.killProcessTrees.mockImplementation(() => Promise.resolve(true))
     process.env.SHELL = '/bin/zsh'
     delete process.env.ERFANA_E2E_FAST_SHELL
@@ -302,6 +312,67 @@ describe('TerminalService kill paths (#296)', () => {
       expect(spawned.every((p) => p.kill.mock.calls.length === 1)).toBe(true)
     })
 
+    it('skips the tree kill for the diagnostics switch only when diagnostics are allowed (dev builds)', async () => {
+      const { terminalService, SKIP_TREE_KILL_ENV } = await load('win32')
+      terminalService.allowDiagnostics(true)
+      await create(terminalService, 'win32')
+      spawned[0].kill.mockImplementation(() => spawned[0].emit('exit', { exitCode: 0 }))
+      process.env[SKIP_TREE_KILL_ENV] = '1'
+      try {
+        await terminalService.dispose()
+      } finally {
+        delete process.env[SKIP_TREE_KILL_ENV]
+      }
+      expect(treeKill.killProcessTrees).not.toHaveBeenCalled()
+      // the pty itself is still ended
+      expect(spawned[0].kill).toHaveBeenCalledTimes(1)
+    })
+
+    it('hooks the conout worker release before a Windows terminal is created (#305 quit hang)', async () => {
+      const { terminalService } = await load('win32')
+      await create(terminalService, 'win32')
+      expect(shim.installConoutWorkerRelease).toHaveBeenCalled()
+      expect(shim.installConoutWorkerRelease.mock.invocationCallOrder[0]).toBeLessThan(
+        mockNodePty.spawn.mock.invocationCallOrder[0]
+      )
+    })
+
+    it('does not hook the conout worker release off Windows', async () => {
+      const { terminalService } = await load('darwin')
+      await create(terminalService, 'darwin')
+      expect(shim.installConoutWorkerRelease).not.toHaveBeenCalled()
+    })
+
+    it('tells whether the tree kill is skipped, so the quit helper can say a quit is unverified', async () => {
+      const { terminalService, SKIP_TREE_KILL_ENV } = await load('win32')
+      process.env[SKIP_TREE_KILL_ENV] = '1'
+      try {
+        expect(terminalService.treeKillSkipped()).toBe(false)
+        terminalService.allowDiagnostics(true)
+        expect(terminalService.treeKillSkipped()).toBe(true)
+        process.env[SKIP_TREE_KILL_ENV] = '0'
+        expect(terminalService.treeKillSkipped()).toBe(false)
+      } finally {
+        delete process.env[SKIP_TREE_KILL_ENV]
+      }
+    })
+
+    it('ignores the diagnostics switch silently by default (packaged builds)', async () => {
+      const { terminalService, SKIP_TREE_KILL_ENV } = await load('win32')
+      const { logger } = await import('./LoggingService')
+      vi.mocked(logger.warn).mockClear()
+      await create(terminalService, 'win32')
+      spawned[0].kill.mockImplementation(() => spawned[0].emit('exit', { exitCode: 0 }))
+      process.env[SKIP_TREE_KILL_ENV] = '1'
+      try {
+        await terminalService.dispose()
+      } finally {
+        delete process.env[SKIP_TREE_KILL_ENV]
+      }
+      expect(treeKill.killProcessTrees).toHaveBeenCalledTimes(1)
+      expect(vi.mocked(logger.warn).mock.calls.some(([m]) => String(m).includes('Tree kill skipped'))).toBe(false)
+    })
+
     it('does no tree kill off Windows', async () => {
       const { terminalService } = await load('darwin')
       await create(terminalService, 'darwin')
@@ -327,6 +398,91 @@ describe('TerminalService kill paths (#296)', () => {
       release()
       await done
       expect(spawned[0].kill).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('quit helper inputs (#305)', () => {
+    it('lists the shells still running with their spawn time, including ones a window close is ending', async () => {
+      const { terminalService } = await load('win32')
+      const before = Date.now()
+      await create(terminalService, 'win32', 7)
+      await create(terminalService, 'win32')
+      await create(terminalService, 'win32')
+      const pids = () => terminalService.getLiveShells().map((s) => s.pid)
+      expect(pids()).toEqual([9000, 9001, 9002])
+      for (const shell of terminalService.getLiveShells()) {
+        expect(shell.spawnedAtMs).toBeGreaterThanOrEqual(before)
+        expect(shell.spawnedAtMs).toBeLessThanOrEqual(Date.now())
+      }
+
+      spawned[1].emit('exit', { exitCode: 0 })
+      // detached from the map, but its shell has not reported an exit yet
+      terminalService.cleanupForWebContentsId(7)
+      expect(pids()).toEqual([9000, 9002])
+      spawned[0].emit('exit', { exitCode: 0 })
+      expect(pids()).toEqual([9002])
+    })
+
+    it('an old exit does not drop a newer shell that got the same pid', async () => {
+      const { terminalService } = await load('win32')
+      await create(terminalService, 'win32')
+      const first = spawned[0]
+      // the mock numbers pids by count, so the next shell gets the same pid (9000)
+      spawned.length = 0
+      await create(terminalService, 'win32')
+      expect(spawned[0].pid).toBe(first.pid)
+      first.emit('exit', { exitCode: 0 })
+      expect(terminalService.getLiveShells().map((s) => s.pid)).toEqual([9000])
+    })
+
+    it('takes the spawn time before node-pty spawns the shell', async () => {
+      const { terminalService } = await load('win32')
+      let spawnCalledAt = 0
+      mockNodePty.spawn.mockImplementationOnce((...args: unknown[]) => {
+        spawnCalledAt = Date.now()
+        return (mockNodePty.spawn.getMockImplementation() as (...a: unknown[]) => MockPTY)(...args)
+      })
+      await create(terminalService, 'win32')
+      const [live] = terminalService.getLiveShells()
+      expect(live.spawnedAtMs).toBeLessThanOrEqual(spawnCalledAt)
+      expect(shim.installExitTimeRecorder).toHaveBeenCalled()
+    })
+
+    it('reports the earliest end: the kill request or the native exit, whichever came first', async () => {
+      vi.useFakeTimers({ now: 1_000_000 })
+      const { terminalService } = await load('win32')
+      await create(terminalService, 'win32', 7)
+      await create(terminalService, 'win32')
+      expect(terminalService.getLiveShells().every((s) => s.endBeforeMs === undefined)).toBe(true)
+
+      // the second shell's native exit fired at 1,000,500 (onExit not yet delivered)
+      shim.nativeExitAtMs.mockImplementation((pty: unknown) => (pty === spawned[1] ? 1_000_500 : undefined))
+      vi.setSystemTime(1_002_000)
+      // the window closes: the first shell is asked to end now
+      terminalService.cleanupForWebContentsId(7)
+      const ends = terminalService.getLiveShells().map((s) => [s.pid, s.endBeforeMs])
+      expect(ends).toEqual([
+        [9000, 1_002_000],
+        [9001, 1_000_500]
+      ])
+    })
+
+    it('creates no terminal once the shutdown has begun', async () => {
+      const { terminalService, TERMINAL_SHUTTING_DOWN_MESSAGE } = await load('win32')
+      terminalService.beginShutdown()
+      const result = await terminalService.createTerminal({ shell: 'C:\\Windows\\System32\\cmd.exe', cwd: 'C:\\Projects\\test' })
+      expect(result).toEqual({ error: TERMINAL_SHUTTING_DOWN_MESSAGE })
+      expect(mockNodePty.spawn).not.toHaveBeenCalled()
+      expect(terminalService.getLiveShells()).toEqual([])
+    })
+
+    it('refuses a terminal requested while dispose runs', async () => {
+      const { terminalService, TERMINAL_SHUTTING_DOWN_MESSAGE } = await load('darwin')
+      const disposed = terminalService.dispose()
+      const result = await terminalService.createTerminal({ cwd: tmpdir() })
+      await disposed
+      expect(result).toEqual({ error: TERMINAL_SHUTTING_DOWN_MESSAGE })
+      expect(mockNodePty.spawn).not.toHaveBeenCalled()
     })
   })
 })
