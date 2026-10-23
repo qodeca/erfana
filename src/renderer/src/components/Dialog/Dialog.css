@@ -373,8 +373,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
+  /* A 24 x 24 target (WCAG 2.2 SC 2.5.8, #96) with the 16px glyph centred in it:
+     the standard pairing on design/system/components/icon. */
+  width: var(--btn-height-sm);
+  height: var(--btn-height-sm);
   color: var(--color-text-secondary);
   cursor: help;
   transition: color var(--transition-slow);

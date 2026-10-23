@@ -61,6 +61,51 @@ const COMMITTED = (() => {
   return JSON.parse(source.slice(start, end + 2))
 })()
 
+/**
+ * What is wrong with a stylesheet's app-wide reduced-motion rule, as a list of
+ * problems (empty when it holds). The contract, from the Motion card: an exact
+ * `@media (prefers-reduced-motion: reduce)` block – not negated, no extra
+ * conditions – whose rule targets `*`, `*::before` and `*::after` and makes
+ * every animation start at once (delay 0), last at most 1 ms and run once, all
+ * `!important` so a component rule cannot win. A `transition-duration`, if the
+ * block sets one, is held to the same 1 ms.
+ *
+ * The delay matters: a 1 ms animation behind a 2 s delay still holds its first
+ * frame for 2 s, and a flash or slide that starts late is still motion.
+ */
+function reduceBlockProblems(rawCss) {
+  const css = rawCss.replace(/\/\*[\s\S]*?\*\//g, '')
+  const media = /@media\s*\(\s*prefers-reduced-motion\s*:\s*reduce\s*\)\s*\{/.exec(css)
+  if (!media) return ['no exact @media (prefers-reduced-motion: reduce) block']
+  const rule = /^\s*([^{}]+)\{([^}]*)\}/.exec(css.slice(media.index + media[0].length))
+  if (!rule) return ['the reduce block holds no rule']
+  const problems = []
+  const selectors = rule[1].split(',').map(sel => sel.trim())
+  for (const needed of ['*', '*::before', '*::after']) {
+    if (!selectors.includes(needed)) problems.push(`selector list lacks ${needed}`)
+  }
+  const decl = name => new RegExp(`(?:^|;|\\s)${name}\\s*:\\s*([^;]+?)\\s*(!important)?\\s*(?:;|$)`).exec(rule[2])
+  const ms = value => {
+    const m = /^(\d*\.?\d+)(ms|s)$/.exec(value)
+    return m ? Number(m[1]) * (m[2] === 's' ? 1000 : 1) : NaN
+  }
+  const duration = decl('animation-duration')
+  if (!duration || !duration[2] || !(ms(duration[1]) <= 1)) {
+    problems.push('animation-duration must be at most 1ms (or 0s) and !important')
+  }
+  const delay = decl('animation-delay')
+  if (!delay || !delay[2] || ms(delay[1]) !== 0) problems.push('animation-delay must be 0 and !important')
+  const count = decl('animation-iteration-count')
+  if (!count || !count[2] || count[1] !== '1') {
+    problems.push('animation-iteration-count must be 1 and !important')
+  }
+  const transition = decl('transition-duration')
+  if (transition && (!transition[2] || !(ms(transition[1]) <= 1))) {
+    problems.push('transition-duration, when set, must be at most 1ms and !important')
+  }
+  return problems
+}
+
 const CARD_FILES = walk(ROOT, 'design', ['.html']).filter(f => f !== 'design/index.html')
 
 const CLAIM_IDS_IN_CARDS = new Set(
@@ -105,6 +150,64 @@ describe('design claims ledger', () => {
         `design/claims.js is stale for "${id}" (card: ${LEDGER[id].card}). ` +
           `Run \`npm run design\` and commit the result.`
       ).toBe(fresh)
+    })
+  })
+
+  describe('the reduced-motion contract (#96, system/foundations/motion.html)', () => {
+    // The drift check above only proves the card matches the code: deleting the
+    // app-wide block and re-running `npm run design` would turn the count to 0
+    // and pass it. Twelve stylesheets once animated with no escape because the
+    // rule lived per file, so these checks are what keep it from going back.
+    const ENTRY_CSS = readFileSync(path.join(ROOT, 'src/renderer/src/index.css'), 'utf8')
+
+    it('keeps the app-wide reduce block whenever a stylesheet animates', () => {
+      const fresh = evaluate(ROOT, {
+        animating: LEDGER['animating-stylesheets'],
+        entry: LEDGER['reduced-motion-entry-rules']
+      })
+      // Nothing animating needs no escape; the rule is only owed while something moves.
+      if (fresh.animating === 0) return
+      expect(
+        fresh.entry,
+        'src/renderer/src/index.css lost its @media (prefers-reduced-motion: reduce) block'
+      ).toBeGreaterThanOrEqual(1)
+    })
+
+    it('ends every animation on every element in the entry stylesheet', () => {
+      expect(reduceBlockProblems(ENTRY_CSS)).toEqual([])
+    })
+
+    // Each mutation of the shipped block must be caught, or the check above
+    // proves nothing.
+    const GOOD = `@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-delay: 0s !important;
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}`
+    it('accepts the shipped shape, in any selector order', () => {
+      expect(reduceBlockProblems(GOOD)).toEqual([])
+      expect(reduceBlockProblems(GOOD.replace('*, *::before, *::after', '*::after,\n*,*::before'))).toEqual([])
+    })
+
+    it.each([
+      ['no block at all', '', /no exact/],
+      ['a negated query', GOOD.replace('(prefers', 'not all and (prefers'), /no exact/],
+      ['an extra condition', GOOD.replace('reduce)', 'reduce) and (min-width: 1px)'), /no exact/],
+      ['no-preference', GOOD.replace('reduce', 'no-preference'), /no exact/],
+      ['a missing ::before', GOOD.replace('*::before, ', ''), /\*::before/],
+      ['a missing ::after', GOOD.replace(', *::after', ''), /\*::after/],
+      ['a missing bare *', GOOD.replace('*, ', ''), /selector list lacks \*$/],
+      ['a long duration', GOOD.replace('1ms', '200ms'), /animation-duration/],
+      ['a duration in seconds over 1ms', GOOD.replace('1ms', '0.5s'), /animation-duration/],
+      ['a duration without !important', GOOD.replace('1ms !important', '1ms'), /animation-duration/],
+      ['a delay left in', GOOD.replace('animation-delay: 0s', 'animation-delay: 2s'), /animation-delay/],
+      ['no delay rule', GOOD.replace(/\s*animation-delay[^;]*;/, ''), /animation-delay/],
+      ['iterations left looping', GOOD.replace('count: 1', 'count: infinite'), /iteration-count/],
+      ['a long transition', GOOD.replace('{\n    animation-delay', '{\n    transition-duration: 300ms !important;\n    animation-delay'), /transition-duration/]
+    ])('rejects %s', (_label, css, problem) => {
+      expect(reduceBlockProblems(css).join('\n')).toMatch(problem)
     })
   })
 
