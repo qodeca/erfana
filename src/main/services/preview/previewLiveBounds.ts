@@ -199,19 +199,22 @@ export function createPreviewLiveBounds(deps: PreviewLiveBoundsDeps): PreviewLiv
   }
 
   /*
-   * AT MOST TWO confirmation scripts are alive in the page at any time (#120).
-   * A burst of growth pushes (a window-edge resize hold, repeated growth) used
-   * to start one script per asking push. Now the newest asking push ALWAYS
-   * starts its script at once: the renderer's deadline for a confirmation is
-   * absolute (`BOUNDS_ACK_TIMEOUT_MS`), so making it wait behind an older
-   * script would double its latency. The older script's answer is then
-   * superseded and dropped, as `confirmRepaint` has always done. A third asking
-   * push, with two alive, is only recorded as `ackWanted` and starts as soon as
-   * either script settles.
+   * AT MOST TWO runs main is waiting on at any time (#120). A burst of growth
+   * pushes (a window-edge resize hold, repeated growth) used to start one script
+   * per asking push. Now an asking push starts its script immediately while
+   * fewer than two runs are being waited on: the renderer's deadline for a
+   * confirmation is absolute (`BOUNDS_ACK_TIMEOUT_MS`), and queueing the second
+   * push behind the first would roughly double its latency. The older run's
+   * answer is then superseded and dropped, as `confirmRepaint` has always done.
    *
-   * A page that never runs its frames never settles its script, so each lives
-   * at most `BOUNDS_ACK_TIMEOUT_MS`. A run that expired and answers late finds
-   * its own `released` flag set, so it frees nothing a later run holds.
+   * THE LIMIT: a third asking push, with two runs waited on, is only recorded
+   * as `ackWanted` and starts when either settles or expires. So a burst of
+   * three or more pushes can take up to about twice the script time to confirm.
+   *
+   * A page that runs no frames (hidden, frozen) never settles its script, so
+   * main stops waiting on a run after `BOUNDS_ACK_TIMEOUT_MS`; that expired
+   * script may stay pending in such a page. A run that expired and answers late
+   * finds its own `released` flag set, so it frees nothing a later run holds.
    */
   const MAX_ACK_SCRIPTS = 2
   let ackAlive = 0

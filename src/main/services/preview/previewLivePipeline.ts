@@ -86,7 +86,8 @@ export interface PreviewLivePipelineDeps {
   /**
    * Whether the view is torn down or its webContents is gone (#120). Not the
    * wider `isDefunct`, which also reads `closing`: these guards have never read
-   * it, and a closing view's reload is harmless.
+   * it, and a closing view's reload is harmless. `closing` is set only after
+   * `destroyed` (inside the teardown), so this latch is already true by then.
    */
   readonly isTornDown: () => boolean
 }

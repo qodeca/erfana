@@ -2,9 +2,11 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * How many repaint-confirmation scripts one live view keeps in the page (#120).
- * The rule: the newest asking push starts its script AT ONCE (the renderer's
- * deadline is absolute), at most two scripts are alive, a third push waits for
- * either to settle, and a view that is gone starts nothing and keeps no timer.
+ * The rule: at most two runs main is waiting on; an asking push starts its
+ * script immediately while fewer than two are (the renderer's deadline is
+ * absolute), a third push waits for either to settle or expire (so a burst of
+ * three or more can take about twice the script time), and a view that is gone
+ * starts nothing and keeps no timer.
  *
  * Split from `previewLiveBounds.test.ts`, which holds the drop-log cases.
  */
