@@ -280,9 +280,7 @@ async function createId(
       // /D disables AutoRun, /S strips exactly the outer quote pair, /K keeps cmd.exe interactive
       expect(script).toMatch(/^\/D \/S \/K "/)
       expect(script).not.toContain('\\"')
-      expect(script).toMatch(/ & echo on"$/)
-      // No `cls`: ConPTY would swallow the marker frame with it
-      expect(script).not.toContain('cls')
+      expect(script).toMatch(/ && pause >nul && cls & echo on"$/)
       // Issue #154 BLOCKER #1: bootstrap MUST start with `@echo off &&` so
       // cmd.exe does not echo the bootstrap commands back into the PTY,
       // which would otherwise cause markerDetector to mis-parse the echoed
@@ -341,6 +339,152 @@ async function createId(
 
     afterEach(() => {
       vi.useRealTimers()
+      vi.unstubAllEnvs()
+    })
+
+    function markerOf(): string {
+      return String(spawnedPTYs[0].args).match(/__ERFANA_PWD_MARKER_\d+__/)![0]
+    }
+
+    it('releases the cmd pause with a carriage return when the marker is detected', async () => {
+      const { terminalService, tid, pty } = await spawnCmd()
+      const write = pty.write as ReturnType<typeof vi.fn>
+      expect(write).not.toHaveBeenCalled()
+
+      pty.emit('data', `C:\\Projects\\test\r\n${markerOf()}\r\n`)
+      expect(write).toHaveBeenCalledTimes(1)
+      expect(write).toHaveBeenCalledWith('\r')
+
+      // A late duplicate or a later write goes straight through, with no second key
+      terminalService.write(tid, 'dir\r')
+      expect(write.mock.calls.map((c) => c[0])).toEqual(['\r', 'dir\r'])
+    })
+
+    it('releases the cmd pause on the missing-marker timeout too', async () => {
+      const { pty } = await spawnCmd()
+      const write = pty.write as ReturnType<typeof vi.fn>
+      vi.advanceTimersByTime(9_999)
+      expect(write).not.toHaveBeenCalled()
+      vi.advanceTimersByTime(1)
+      expect(write).toHaveBeenCalledTimes(1)
+      expect(write).toHaveBeenCalledWith('\r')
+    })
+
+    it('does not send a second key when the marker arrives after the timeout', async () => {
+      const { pty } = await spawnCmd()
+      const write = pty.write as ReturnType<typeof vi.fn>
+      vi.advanceTimersByTime(10_000)
+      pty.emit('data', `C:\\Late\\dir\r\n${markerOf()}\r\n`)
+      expect(write).toHaveBeenCalledTimes(1)
+    })
+
+    it('holds input typed before the release and sends it in order after the key', async () => {
+      const { terminalService, tid, pty } = await spawnCmd()
+      const write = pty.write as ReturnType<typeof vi.fn>
+      expect(terminalService.write(tid, 'd')).toBe(true)
+      expect(terminalService.write(tid, 'ir\r')).toBe(true)
+      expect(write).not.toHaveBeenCalled()
+
+      pty.emit('data', `C:\\Projects\\test\r\n${markerOf()}\r\n`)
+      expect(write.mock.calls.map((c) => c[0])).toEqual(['\r', 'd', 'ir\r'])
+    })
+
+    it('flushes held input after the key on the timeout as well', async () => {
+      const { terminalService, tid, pty } = await spawnCmd()
+      const write = pty.write as ReturnType<typeof vi.fn>
+      terminalService.write(tid, 'x')
+      vi.advanceTimersByTime(10_000)
+      expect(write.mock.calls.map((c) => c[0])).toEqual(['\r', 'x'])
+    })
+
+    it.each([
+      ['PowerShell', 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe'],
+      ['Git Bash', 'C:\\Program Files\\Git\\usr\\bin\\bash.exe']
+    ])('never sends the release key or holds input for %s', async (_name, shell) => {
+      vi.useFakeTimers()
+      vi.doMock('os', async () => {
+        const actual = await vi.importActual<any>('os')
+        return { ...actual, platform: () => 'win32' }
+      })
+      const { terminalService } = await import('./TerminalService')
+      const tid = await createId(terminalService, { shell, cwd: 'C:\\Projects\\test' })
+      const { pty, args } = spawnedPTYs[0]
+      const write = pty.write as ReturnType<typeof vi.fn>
+      terminalService.write(tid!, 'a')
+      expect(write.mock.calls.map((c) => c[0])).toEqual(['a'])
+      const marker = [args].flat().join(' ').match(/__ERFANA_PWD_MARKER_\d+__/)![0]
+      pty.emit('data', `C:\\Projects\\test\r\n${marker}\r\n`)
+      vi.advanceTimersByTime(20_000)
+      expect(write.mock.calls.map((c) => c[0])).toEqual(['a'])
+    })
+
+    it('never sends the release key or holds input on POSIX', async () => {
+      vi.useFakeTimers()
+      vi.doMock('os', async () => {
+        const actual = await vi.importActual<any>('os')
+        return { ...actual, platform: () => 'darwin' }
+      })
+      const { terminalService } = await import('./TerminalService')
+      const tid = await createId(terminalService, { cwd: '/tmp' })
+      const { pty, args } = spawnedPTYs[0]
+      const write = pty.write as ReturnType<typeof vi.fn>
+      terminalService.write(tid!, 'a')
+      const marker = [args].flat().join(' ').match(/__ERFANA_PWD_MARKER_\d+__/)![0]
+      pty.emit('data', `/tmp\n${marker}\n`)
+      vi.advanceTimersByTime(20_000)
+      expect(write.mock.calls.map((c) => c[0])).toEqual(['a'])
+    })
+
+    it('ignores a marker inside an OSC window title and waits for the real one', async () => {
+      const { terminalService, tid, clearSpy, pty } = await spawnCmd()
+      const marker = markerOf()
+      pty.emit('data', `\x1b]0;cmd.exe - echo ${marker}\x07C:\\Projects\\test\r\n`)
+      expect(clearSpy).not.toHaveBeenCalled()
+      pty.emit('data', `${marker}\r\n`)
+      expect(clearSpy).toHaveBeenCalledTimes(1)
+      expect(terminalService.getTerminalInfo(tid)?.cwd).toBe('C:\\Projects\\test')
+    })
+
+    it('waits for more data while an OSC sequence is still open', async () => {
+      const { clearSpy, pty } = await spawnCmd()
+      const marker = markerOf()
+      pty.emit('data', `C:\\Projects\\test\r\n\x1b]0;title ${marker}`)
+      expect(clearSpy).not.toHaveBeenCalled()
+      pty.emit('data', '\x07')
+      expect(clearSpy).not.toHaveBeenCalled()
+      pty.emit('data', `${marker}\r\n`)
+      expect(clearSpy).toHaveBeenCalledTimes(1)
+    })
+
+    it('keeps the spawn cwd when the line before the marker is not a path (wrapped long cwd)', async () => {
+      const { terminalService, tid, clearSpy, pty } = await spawnCmd()
+      pty.emit('data', `\x1b[1;1H${'x'.repeat(10)}\\tail\\of\\a\\long\\path\x1b[2;1H${markerOf()}\r\n`)
+      expect(clearSpy).toHaveBeenCalledTimes(1)
+      expect(terminalService.getTerminalInfo(tid)?.cwd).toBe('C:\\Projects\\test')
+    })
+
+    it('accepts a UNC read-back path', async () => {
+      const { terminalService, tid, pty } = await spawnCmd()
+      pty.emit('data', `\\\\server\\share\\dir\r\n${markerOf()}\r\n`)
+      expect(terminalService.getTerminalInfo(tid)?.cwd).toBe('\\\\server\\share\\dir')
+    })
+
+    it('POSIX: reads the cwd back verbatim and rejects a non-path line', async () => {
+      vi.doMock('os', async () => {
+        const actual = await vi.importActual<any>('os')
+        return { ...actual, platform: () => 'darwin' }
+      })
+      const { terminalService } = await import('./TerminalService')
+      const a = await createId(terminalService, { cwd: '/tmp/a' })
+      const b = await createId(terminalService, { cwd: '/tmp/b' })
+      const markerA = [spawnedPTYs[0].args].flat().join(' ').match(/__ERFANA_PWD_MARKER_\d+__/)![0]
+      const markerB = [spawnedPTYs[1].args].flat().join(' ').match(/__ERFANA_PWD_MARKER_\d+__/)![0]
+      // A folder name holding an escape is NOT interpreted on POSIX
+      spawnedPTYs[0].pty.emit('data', `/tmp/a\x1b[Hb\n${markerA}\n`)
+      expect(terminalService.getTerminalInfo(a!)?.cwd).toBe('/tmp/a\x1b[Hb')
+      // A line that is not a path leaves the spawn cwd alone
+      spawnedPTYs[1].pty.emit('data', `not-a-path\n${markerB}\n`)
+      expect(terminalService.getTerminalInfo(b!)?.cwd).toBe('/tmp/b')
     })
 
     it('spawns with a command-line string and the cwd as the spawn cwd', async () => {
@@ -367,7 +511,51 @@ async function createId(
       const env = spawnedPTYs[0].opts.env as Record<string, string | undefined>
       // The user's own PROMPT passes through untouched
       expect(env.PROMPT).toBe('$P$G')
-      vi.unstubAllEnvs()
+    })
+
+    it.each([
+      ['POSIX', 'darwin', undefined, '/tmp'],
+      ['PowerShell', 'win32', 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe', 'C:\\Projects\\test']
+    ])('still sets PROMPT to the app prompt for %s', async (_name, platform, shell, cwd) => {
+      vi.stubEnv('PROMPT', '$P$G')
+      vi.doMock('os', async () => {
+        const actual = await vi.importActual<any>('os')
+        return { ...actual, platform: () => platform }
+      })
+      const { terminalService } = await import('./TerminalService')
+      await createId(terminalService, shell ? { shell, cwd } : { cwd })
+      const env = spawnedPTYs[0].opts.env as Record<string, string | undefined>
+      expect(env.PROMPT).toBe('%n %~ $ ')
+    })
+
+    describe('plain lines and the marker search view', () => {
+      it.each([
+        ['BEL-terminated OSC', '\x1b]0;title\x07C:\\a\r\nM', ['C:\\a', 'M']],
+        ['ESC \\ terminated OSC', '\x1b]0;title\x1b\\C:\\a\r\nM', ['C:\\a', 'M']],
+        ['0x9C terminated OSC', '\x1b]0;title\x9cC:\\a\r\nM', ['C:\\a', 'M']],
+        ['private mode and intermediate bytes', '\x1b[?25l\x1b[0 qC:\\a\r\nM', ['C:\\a', 'M']],
+        ['colon parameters', '\x1b[38:2::1:2:3mC:\\a\r\nM', ['C:\\a', 'M']],
+        ['cursor positioning starts a line', '\x1b[1;1HC:\\a\x1b[2;1HM', ['C:\\a', 'M']],
+        ['cursor forward becomes spaces', 'C:\\a\x1b[3Cb\r\nM', ['C:\\a   b', 'M']],
+        ['cursor forward default is one', 'a\x1b[Cb\r\nM', ['a b', 'M']],
+        ['charset and short escapes', '\x1b(B\x1b=\x1b7C:\\a\r\nM', ['C:\\a', 'M']],
+        ['bare 0x9C is dropped', 'C:\\a\x9c\r\nM', ['C:\\a', 'M']]
+      ])('plainLinesForCwd: %s', async (_name, input, expected) => {
+        const { plainLinesForCwd } = await import('./TerminalService')
+        expect(plainLinesForCwd(input)).toEqual(expected)
+      })
+
+      it('markerSearchView blanks complete OSC sequences, keeps length, cuts at an open one', async () => {
+        const { markerSearchView } = await import('./TerminalService')
+        const complete = 'a\x1b]0;M\x07bM'
+        const view = markerSearchView(complete)
+        expect(view).toHaveLength(complete.length)
+        expect(view.indexOf('M')).toBe(complete.length - 1)
+        expect(markerSearchView('ok\x1b]0;M')).toBe('ok')
+        const stTerminated = 'ok\x1b]0;M\x1b\\ M'
+        expect(markerSearchView(stTerminated)).toHaveLength(stTerminated.length)
+        expect(markerSearchView(stTerminated).indexOf('M')).toBe(stTerminated.length - 1)
+      })
     })
 
     it('shows the shell output after 10 s when the marker never arrives', async () => {

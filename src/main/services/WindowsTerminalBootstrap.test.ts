@@ -7,7 +7,7 @@
  * - `canHandle` matching for PowerShell / Git Bash / cmd.exe builders.
  * - Dispatch-chain precedence in `buildWindowsBootstrap`.
  * - The shape of each builder's emitted script: cd, pwd-equivalent, marker,
- *   ConPTY buffer clear (CSI 2J / 3J / H or `cls` fallback (not for cmd.exe)), shell handoff.
+ *   ConPTY buffer clear (CSI 2J / 3J / H, or `pause` + `cls` for cmd.exe), shell handoff.
  * - Cwd deny-list behaviour, including the `C:\Program Files (x86)\…` accept
  *   case that previously regressed on Windows.
  * - `normalizeWindowsCwd` trailing-separator handling.
@@ -221,7 +221,9 @@ describe('CmdExeBootstrapBuilder', () => {
     it('emits one ready-made command line string (not argv) in the documented order', () => {
       const script = builder.build({ shell: 'cmd.exe', cwd: CWD, marker: MARKER })
       expect(typeof script).toBe('string')
-      expect(script).toBe(`/D /S /K "@echo off && cd && echo ${MARKER} & echo on"`)
+      expect(script).toBe(
+        `/D /S /K "@echo off && cd && echo ${MARKER} && pause >nul && cls & echo on"`
+      )
     })
 
     it('keeps the cwd out of the command line (the shell starts there)', () => {
@@ -239,7 +241,7 @@ describe('CmdExeBootstrapBuilder', () => {
       const afterK = commandLine.slice(commandLine.indexOf('/K ') + 3)
       expect(afterK.startsWith('"') && afterK.endsWith('"')).toBe(true)
       const executed = afterK.slice(1, -1)
-      expect(executed).toBe(`@echo off && cd && echo ${MARKER} & echo on`)
+      expect(executed).toBe(`@echo off && cd && echo ${MARKER} && pause >nul && cls & echo on`)
     })
 
     it('regression: an argv array is mangled by node-pty into \\" (the old broken form)', () => {
@@ -259,7 +261,8 @@ describe.skipIf(process.platform !== 'win32')('CmdExeBootstrapBuilder against a 
     const cwd = process.env.SystemRoot ?? 'C:\\Windows'
     const result = spawnSync('cmd.exe', [line], {
       windowsVerbatimArguments: true,
-      input: 'exit\r\n',
+      // The first line releases `pause`
+      input: '\r\nexit\r\n',
       timeout: 15000,
       cwd,
       encoding: 'utf8',
@@ -271,7 +274,7 @@ describe.skipIf(process.platform !== 'win32')('CmdExeBootstrapBuilder against a 
     expect(markerAt).toBeGreaterThan(0)
     // The `cd` line before the marker is the spawn cwd
     expect(out.slice(0, markerAt).toLowerCase()).toContain(cwd.toLowerCase())
-    // `echo on` restored the prompt after the clear
+    // `echo on` (after `cls`) brings the prompt back
     expect(out.slice(markerAt)).toMatch(/[A-Za-z]:\\[^\r\n]*>/)
   })
 })

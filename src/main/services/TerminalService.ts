@@ -80,6 +80,13 @@ interface TerminalInstance {
   isClearing: boolean // Track clearing phase to prevent forwarding clear sequence
   clearFallbackTimeout?: NodeJS.Timeout // Safety timeout for clear confirmation
   markerTimeout?: NodeJS.Timeout // Safety timeout for a marker that never arrives
+  /**
+   * cmd.exe only: the bootstrap waits in `pause` after the marker so ConPTY
+   * flushes the marker frame before `cls` runs. While this array exists the
+   * shell is still paused: typed input is held here (a key would be swallowed by
+   * `pause`) and `releaseCmdPause` sends the release key, then the held input.
+   */
+  cmdPauseHold?: string[]
   hasReceivedMarker: boolean // Track if marker was detected (prevents late data forwarding)
   /** Output that arrived after the marker line while the clear handshake was open; flushed in order once it ends. */
   pendingOutput: string
@@ -140,23 +147,49 @@ const ESC = String.fromCharCode(0x1b)
 const MARKER_LINE_END = new RegExp(`^(?:[ \\t]|${ESC}\\[[0-9;]*K)*\\r?\\n`)
 const MARKER_LINE_END_PARTIAL = new RegExp(`^(?:[ \\t]|${ESC}\\[[0-9;]*K)*\\r?$`)
 
-const OSC_SEQUENCE = new RegExp(`${ESC}\\][^\\x07${ESC}]*(?:\\x07|${ESC}\\\\)`, 'g')
-const CSI_CURSOR_POSITION = new RegExp(`${ESC}\\[[0-9;]*[Hf]`, 'g')
-const CSI_SEQUENCE = new RegExp(`${ESC}\\[[0-9;?<=>]*[ -/]*[@-~]`, 'g')
+const ST_CHAR = String.fromCharCode(0x9c)
+const BEL_CHAR = String.fromCharCode(0x07)
+// A complete OSC sequence: ESC ] body, ended by BEL, ESC \ or the 0x9C string terminator
+const OSC_SEQUENCE = new RegExp(`${ESC}\\][^${BEL_CHAR}${ESC}${ST_CHAR}]*(?:${BEL_CHAR}|${ESC}\\\\|${ST_CHAR})`, 'g')
+const CSI_CURSOR_FORWARD = new RegExp(`${ESC}\\[([0-9]*)C`, 'g')
+const CSI_CURSOR_POSITION = new RegExp(`${ESC}\\[[0-9;:]*[Hf]`, 'g')
+const CSI_SEQUENCE = new RegExp(`${ESC}\\[[0-9;:?<=>]*[ -/]*[@-~]`, 'g')
+// Charset selection and other short escapes: ESC ( B, ESC =, ESC 7, ESC M ...
+const SHORT_ESCAPE = new RegExp(`${ESC}[ -/]*[0-~]`, 'g')
 
 /**
  * Turns raw PTY output into plain lines for reading the cwd back. ConPTY
  * redraws the screen with VT sequences (title, modes, cursor moves) instead of
- * plain line breaks: a cursor move starts a new line, every other sequence is
- * dropped.
+ * plain line breaks: a cursor move starts a new line, a cursor-forward move
+ * becomes spaces, every other sequence is dropped.
  */
 export function plainLinesForCwd(text: string): string[] {
   return text
     .replace(OSC_SEQUENCE, '')
+    .replace(CSI_CURSOR_FORWARD, (_m, n: string) => ' '.repeat(n === '' ? 1 : Number(n)))
     .replace(CSI_CURSOR_POSITION, '\n')
     .replace(CSI_SEQUENCE, '')
+    .replace(SHORT_ESCAPE, '')
+    .replaceAll(ST_CHAR, '')
     .split(/\r?\n|\r/)
     .filter((line) => line.trim() !== '')
+}
+
+/**
+ * The buffer as the marker search should see it: same length (so indices still
+ * match the raw buffer), complete OSC sequences blanked out, and everything
+ * from an unterminated OSC on cut off. A marker inside a window title must not
+ * match, and an open OSC means more data is needed first.
+ */
+export function markerSearchView(buffer: string): string {
+  const view = buffer.replace(OSC_SEQUENCE, (m) => '\0'.repeat(m.length))
+  const open = view.lastIndexOf(`${ESC}]`)
+  return open === -1 ? view : view.slice(0, open)
+}
+
+/** True when a read-back cwd line looks like an absolute path for the platform. */
+export function looksLikeCwd(candidate: string, windows: boolean): boolean {
+  return windows ? /^(?:[A-Za-z]:\\|\\\\)/.test(candidate) : candidate.startsWith('/')
 }
 
 /**
@@ -348,6 +381,8 @@ export class TerminalService extends EventEmitter {
       let shellKind: ShellKind = 'posix'
       // The cmd.exe bootstrap carries no cwd: the shell starts in the validated, normalized path
       let spawnCwd = cwd
+      // True for the cmd.exe bootstrap, which ends in `pause` (see CmdExeBootstrapBuilder)
+      let cmdPauses = false
 
       if (osPlatform() === 'win32') {
         // Win32 CreateProcess hard-fails on a cwd over MAX_PATH and node-pty
@@ -376,7 +411,10 @@ export class TerminalService extends EventEmitter {
         })
         logger.info(`🔵 Windows shell kind: ${kind} (quoting=${winShellKind})`)
         shellArgs = winShellArgs
-        if (kind === 'cmd.exe') spawnCwd = winCwd
+        if (kind === 'cmd.exe') {
+          spawnCwd = winCwd
+          cmdPauses = true
+        }
         shellKind = winShellKind
       } else {
         // POSIX bootstrap. We use a single-quoted argument so `$`, backtick,
@@ -481,6 +519,7 @@ export class TerminalService extends EventEmitter {
         initializationComplete: false, // Will be set to true after cwd verification
         isClearing: false, // Will be set to true during terminal clear phase
         hasReceivedMarker: false, // Will be set to true when marker is detected
+        cmdPauseHold: cmdPauses ? [] : undefined,
         pendingOutput: '',
         output,
         // Track owning webContents for cleanup on window close (issue #59)
@@ -518,7 +557,8 @@ export class TerminalService extends EventEmitter {
         if (markerBuffer.length > bufferCap) {
           markerBuffer = markerBuffer.slice(-bufferCap)
         }
-        const markerAt = markerBuffer.indexOf(marker)
+        const isWindows = osPlatform() === 'win32'
+        const markerAt = (isWindows ? markerSearchView(markerBuffer) : markerBuffer).indexOf(marker)
         if (markerAt !== -1) {
           markerDetected = true
           markerChunkHandled = true
@@ -528,12 +568,18 @@ export class TerminalService extends EventEmitter {
             pendingMarkerTimer.markerTimeout = undefined
           }
 
-          // Parse PWD from output (line before marker)
-          const lines = plainLinesForCwd(markerBuffer.slice(0, markerAt + marker.length))
+          // Parse PWD from output (line before marker). ConPTY output carries VT
+          // sequences, so it is flattened first (Windows only). The line is only
+          // trusted when it looks like a path: a wrapped long cwd reads back as
+          // its tail and a stray escape must not leave junk in `terminal.cwd`.
+          const beforeMarker = markerBuffer.slice(0, markerAt + marker.length)
+          const lines = isWindows
+            ? plainLinesForCwd(beforeMarker)
+            : beforeMarker.split(/\r?\n/).filter(Boolean)
           const markerIdx = lines.findIndex((l) => l.includes(marker))
           if (markerIdx > 0) {
             const detectedCwd = lines[markerIdx - 1].trim()
-            if (detectedCwd) {
+            if (detectedCwd && looksLikeCwd(detectedCwd, isWindows)) {
               const term = this.terminals.get(terminalId)
               if (term) term.cwd = detectedCwd
             }
@@ -546,6 +592,10 @@ export class TerminalService extends EventEmitter {
             logger.info(`[MARKER DETECTED] Setting hasReceivedMarker=true, isClearing=true`)
             term.hasReceivedMarker = true
             term.isClearing = true
+            // Output after the marker is held (isClearing) until the renderer
+            // confirms its clear, so releasing the cmd pause here is safe: the
+            // `cls` frame and the prompt reach the screen after the clear.
+            this.releaseCmdPause(term)
 
             // Output that followed the marker in the same chunk (a fast shell can
             // draw its prompt right behind it) is real: hold it until the clear
@@ -589,6 +639,8 @@ export class TerminalService extends EventEmitter {
         // clear handshake runs and the cwd is updated from the reported line.
         markerTimedOut = true
         t.hasReceivedMarker = true
+        // cmd would otherwise wait in `pause` forever
+        this.releaseCmdPause(t)
         t.isClearing = false
         t.initializationComplete = true
         if (markerBuffer) t.output.push(markerBuffer)
@@ -752,6 +804,12 @@ export class TerminalService extends EventEmitter {
       return false
     }
 
+    // cmd.exe is still waiting in `pause`: a typed key would be swallowed by it
+    if (terminal.cmdPauseHold) {
+      terminal.cmdPauseHold.push(data)
+      return true
+    }
+
     try {
       // Simple synchronous write - no callback needed
       // The PTY will buffer and handle the write internally
@@ -774,6 +832,26 @@ export class TerminalService extends EventEmitter {
       const message = error instanceof Error ? error.message : String(error)
       this.emit('error', { terminalId, error: message, webContentsId: terminal.webContentsId })
       return false
+    }
+  }
+
+  /**
+   * cmd.exe only: end the bootstrap's `pause` with a carriage return, then send
+   * the input typed meanwhile, in order. A no-op for every other shell and once
+   * released (a late marker after the timeout must not send a second key).
+   */
+  private releaseCmdPause(terminal: TerminalInstance): void {
+    const held = terminal.cmdPauseHold
+    if (!held) return
+    terminal.cmdPauseHold = undefined
+    try {
+      terminal.ptyProcess.write('\r')
+      for (const data of held) terminal.ptyProcess.write(data)
+    } catch (error) {
+      logger.warn(
+        `⚠️ Terminal ${terminal.id} could not release the cmd pause`,
+        error instanceof Error ? { error: error.message } : undefined
+      )
     }
   }
 
