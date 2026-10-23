@@ -255,7 +255,7 @@ describe('design token references (#82)', () => {
   it('scans a real tree, so an empty result means something', () => {
     // Guard the guard: "no undefined tokens" is also what a scan that read
     // nothing reports. Floors sit a little under today's counts: 50 sheets,
-    // 344 scripts of which 5 read a token, 1129 distinct token-and-file
+    // 340 scripts of which 5 read a token, 1129 distinct token-and-file
     // references, 199 tokens.
     expect(stylesheets.length).toBeGreaterThanOrEqual(45)
     expect(scripts.length).toBeGreaterThan(300)
