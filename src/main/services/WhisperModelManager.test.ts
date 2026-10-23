@@ -123,7 +123,7 @@ const MOCK_MODEL_SIZES: Record<string, number> = {
 
 /** `stat` for model files returns the pinned size, so they count as installed. */
 async function defaultStat(p: string): Promise<{ size: number; mtimeMs: number; ino: number }> {
-  const name = p.split('/').pop() ?? ''
+  const name = p.split(/[\\/]/).pop() ?? ''
   return { size: MOCK_MODEL_SIZES[name] ?? 1, mtimeMs: 1, ino: 1 }
 }
 
