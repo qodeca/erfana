@@ -56,7 +56,9 @@ const DESTRUCTURE_API_SELECTORS = GLOBAL_SOURCE_PATHS.flatMap((path) => [
   // const { api } = window
   `VariableDeclarator[init.${path}=${GLOBAL_OBJECTS}] > ObjectPattern.id > ${API_PROPERTY}`,
   // ({ api } = window)
-  `AssignmentExpression[right.${path}=${GLOBAL_OBJECTS}] > ObjectPattern.left > ${API_PROPERTY}`
+  `AssignmentExpression[right.${path}=${GLOBAL_OBJECTS}] > ObjectPattern.left > ${API_PROPERTY}`,
+  // ({ api } = window) => …, a default value in a parameter or a nested pattern
+  `AssignmentPattern[right.${path}=${GLOBAL_OBJECTS}] > ObjectPattern.left > ${API_PROPERTY}`
 ]).map((selector) => ({ selector, message: GATEWAY_MESSAGE }))
 const RENDERER_API_BYPASS_SELECTORS = [
   {

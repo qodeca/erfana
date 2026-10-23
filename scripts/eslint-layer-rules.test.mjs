@@ -221,6 +221,9 @@ describe('renderer gateway rule', () => {
     ['destructuring api off an angle-bracket cast', 'const { api } = <{ api: object }>window\nexport { api }'],
     ['assignment destructuring', 'let api\n;({ api } = window)\nexport { api }'],
     ['assignment destructuring off a cast', 'let api\n;({ api } = globalThis as never)\nexport { api }'],
+    ['a parameter default', 'export const f = ({ api } = window) => api'],
+    ['a parameter default off a cast', 'export const f = ({ api } = window as never) => api'],
+    ['a nested default', 'export const f = (deps) => {\n  const { a: { api } = self } = deps\n  return api\n}'],
     ['an angle-bracket cast', 'export const f = () => (<{ api: object }>window).api']
   ])('flags %s', async (_name, code) => {
     expect(await gatewayMessages(RENDERER, code)).toHaveLength(1)
@@ -241,6 +244,7 @@ describe('renderer gateway rule', () => {
       'export const f = (props) => {\n  const { api } = props\n  return api\n}',
       'export const f = (deps) => {\n  const { api } = deps.window\n  return api\n}',
       'export const f = (props) => {\n  let api\n  ;({ api } = props)\n  return api\n}',
+      'export const f = ({ api } = props) => api',
       'const { location } = window\nexport { location }'
     ]) {
       expect(await gatewayMessages(RENDERER, code)).toHaveLength(0)
