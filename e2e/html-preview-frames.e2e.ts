@@ -36,8 +36,8 @@ import { removeDirWithRetry } from './fixtures/isolation'
 import { HtmlPreviewPage, PREVIEW_BUDGET_MS } from './pages/html-preview.page'
 import {
   armFrameTrail,
+  clickInFrame,
   dismissToasts,
-  evalInFrame,
   frameTree,
   readBadgeGroups,
   readFrameTrail,
@@ -380,7 +380,7 @@ test.describe('HTML preview frames – frame caps and frame links (P2-AC4)', () 
 
     // A synthetic click in the frame: the guard judges the frame's navigation,
     // whoever started it.
-    expect(await evalInFrame(h.app, 'frame-nav-b.html', "document.getElementById('to-child').click(), true", target(top))).toBe(true)
+    expect(await clickInFrame(h.app, 'frame-nav-b.html', 'to-child', target(top))).toBe(true)
 
     await framesWhen(h, top, (t) => t.length === 1 && t[0] === CHILD_TITLE, 'the frame did not follow its link')
     expect((await h.preview.snapshot(target(top)))?.docTitle).toBe('Frame links -FRAMENAV-')
@@ -394,7 +394,7 @@ test.describe('HTML preview frames – frame caps and frame links (P2-AC4)', () 
     await openAndSettle(h, top, '-FRAMENAV-')
     await framesWhen(h, top, (t) => t.includes(NAV_TARGET_TITLE), 'the link frame never loaded')
 
-    expect(await evalInFrame(h.app, 'frame-nav-b.html', "document.getElementById('to-remote').click(), true", target(top))).toBe(true)
+    expect(await clickInFrame(h.app, 'frame-nav-b.html', 'to-remote', target(top))).toBe(true)
 
     await waitForBadgeCount(h.preview, 1)
     const { groups, writer } = await badgeWithWriters(h)

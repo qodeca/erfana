@@ -310,6 +310,32 @@ export default [
       ]
     }
   },
+  // E2E suite: no direct `executeJavaScript` (lens review finding 34).
+  // `webContents.executeJavaScript` / `WebFrameMain.executeJavaScript` have no
+  // timeout, and a call whose document is replaced under it can stay pending
+  // forever, stalling the caller's poll past its deadline with no word about
+  // which call hung (#255). Every call goes through the bounded helper in
+  // e2e/utils/bounded-exec.ts, the one file exempt here. No other block sets
+  // `no-restricted-syntax` for `e2e/**`, so this list is complete for it.
+  {
+    files: ['e2e/**/*.{ts,js,cjs,mjs}'],
+    ignores: ['e2e/utils/bounded-exec.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'CallExpression[callee.property.name=/^executeJavaScript/]',
+          message:
+            'Unbounded executeJavaScript can hang a test forever. Use the bounded exec from e2e/utils/bounded-exec.ts (installBoundedExec + globalThis.__erfanaE2eExec).'
+        },
+        {
+          selector: 'CallExpression[callee.property.value=/^executeJavaScript/]',
+          message:
+            'Unbounded executeJavaScript can hang a test forever. Use the bounded exec from e2e/utils/bounded-exec.ts (installBoundedExec + globalThis.__erfanaE2eExec).'
+        }
+      ]
+    }
+  },
   // Build scripts: CommonJS Node.js environment
   {
     files: ['scripts/**/*.js', 'scripts/**/*.cjs', 'scripts/**/*.mjs'],

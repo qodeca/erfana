@@ -5,9 +5,11 @@
  *
  * Frames live inside the sealed preview `WebContentsView`, so, like the page
  * itself, they are read main-side (`app.evaluate`): `frameTree()` lists every
- * frame of a preview with its depth, URL and `document.title`, and
- * `evalInFrame()` runs one expression in one frame. Those reads are the
- * TEST's; the product runs no script in a page's frames.
+ * frame of a preview with its depth, URL and `document.title`,
+ * `evalInFrame()` runs one expression in one frame, and `clickInFrame()`
+ * clicks a link in one. Those reads are the TEST's; the product runs no
+ * script in a page's frames. Every script call goes through the bounded
+ * `executeJavaScript` of `e2e/utils/bounded-exec.ts`.
  *
  * **Which layer wrote a badge entry.** Four layers can list a refused frame:
  * the failed-load writer (`did-fail-provisional-load` -30 / -27, for frames
@@ -33,6 +35,12 @@ import type { ElectronApplication, Page } from '@playwright/test'
 import type { WebFrameMain } from 'electron'
 
 import { SRCDOC_TOO_DEEP_ENTRY } from '../../src/shared/previewFrameBadgeText'
+import {
+  EXEC_ACTION_CAP_MS,
+  EXEC_READ_CAP_MS,
+  installBoundedExec,
+  type BoundedExecGlobal
+} from '../utils/bounded-exec'
 import { PREVIEW_BUDGET_MS, type HtmlPreviewPage, type PreviewTarget } from './html-preview.page'
 
 /** One frame of a preview page: depth 1 is a frame in the page itself. */
@@ -58,19 +66,14 @@ export interface BadgeGroup {
   entries: string[]
 }
 
-/**
- * The longest one frame's title read may take before it counts as empty. Not a
- * wait: a healthy read answers in milliseconds, and this only bounds a read
- * whose frame navigated away under it, which never settles on its own.
- */
-const FRAME_READ_CAP_MS = 2_000
-
 /** Every frame of the matching preview, parents before children; `[]` when none is live. */
 export async function frameTree(
   app: ElectronApplication,
   target: PreviewTarget = {}
 ): Promise<FrameRead[]> {
+  await installBoundedExec(app)
   return app.evaluate(async ({ webContents }, { urlIncludes, readCapMs }) => {
+    const exec = (globalThis as unknown as BoundedExecGlobal).__erfanaE2eExec
     const wc = webContents.getAllWebContents().find((c) => {
       try {
         const url = c.getURL()
@@ -95,17 +98,9 @@ export async function frameTree(
           // just followed) can leave `executeJavaScript` pending forever, and
           // one hung read would stall the caller's poll past its timeout.
           // A capped read counts as empty and the caller polls again.
-          let cap: ReturnType<typeof setTimeout> | undefined
-          title = String(
-            await Promise.race([
-              frame.executeJavaScript('document.title'),
-              new Promise<string>((resolve) => {
-                cap = setTimeout(() => resolve(''), readCapMs)
-              })
-            ]).finally(() => clearTimeout(cap))
-          )
+          title = String(await exec(frame, 'document.title', readCapMs, 'frameTree: document.title'))
         } catch {
-          // Mid-load or gone: read as empty, the caller polls.
+          // Mid-load, gone or capped: read as empty, the caller polls.
         }
         out.push({ depth, url: frame.url, title })
       }
@@ -113,12 +108,16 @@ export async function frameTree(
       return []
     }
     return out
-  }, { urlIncludes: target.urlIncludes, readCapMs: FRAME_READ_CAP_MS })
+  }, { urlIncludes: target.urlIncludes, readCapMs: EXEC_READ_CAP_MS })
 }
 
 /**
  * Evaluate `expr` in the first frame (not the page) whose URL contains
- * `frameUrlIncludes`. `null` when no such frame is found or the call throws.
+ * `frameUrlIncludes`. `null` when no such frame is found, the call throws or
+ * it does not answer within the read cap (the caller polls).
+ *
+ * A read. For a click that navigates the frame use {@link clickInFrame}: an
+ * expression whose own frame is replaced under it may never answer.
  */
 export async function evalInFrame(
   app: ElectronApplication,
@@ -126,8 +125,10 @@ export async function evalInFrame(
   expr: string,
   target: PreviewTarget = {}
 ): Promise<unknown> {
+  await installBoundedExec(app)
   return app.evaluate(
-    async ({ webContents }, { e, frameUrl, urlIncludes }) => {
+    async ({ webContents }, { e, frameUrl, urlIncludes, readCapMs }) => {
+      const exec = (globalThis as unknown as BoundedExecGlobal).__erfanaE2eExec
       const wc = webContents.getAllWebContents().find((c) => {
         try {
           const url = c.getURL()
@@ -143,12 +144,66 @@ export async function evalInFrame(
       )
       if (!frame) return null
       try {
-        return await frame.executeJavaScript(e)
+        return await exec(frame, e, readCapMs, `evalInFrame: ${e.slice(0, 60)}`)
       } catch {
         return null
       }
     },
-    { e: expr, frameUrl: frameUrlIncludes, urlIncludes: target.urlIncludes }
+    { e: expr, frameUrl: frameUrlIncludes, urlIncludes: target.urlIncludes, readCapMs: EXEC_READ_CAP_MS }
+  )
+}
+
+/**
+ * Click the element `elementId` (a synthetic `HTMLElement.click()`) in the
+ * first frame (not the page) whose URL contains `frameUrlIncludes`.
+ *
+ * Fire-and-forget: the click is queued as a task in the frame and the call
+ * answers first, so the navigation it starts cannot replace the document
+ * under a call still waiting for its answer – the hang this replaces (lens
+ * review finding 34). The caller observes the effect (`frameTree`, the badge)
+ * with a poll.
+ *
+ * @returns `true` only when the frame and the element were found and the
+ * click was queued; `false` when either is missing.
+ * @throws when the frame does not answer within the action cap.
+ */
+export async function clickInFrame(
+  app: ElectronApplication,
+  frameUrlIncludes: string,
+  elementId: string,
+  target: PreviewTarget = {}
+): Promise<boolean> {
+  await installBoundedExec(app)
+  return app.evaluate(
+    async ({ webContents }, { id, frameUrl, urlIncludes, actionCapMs }) => {
+      const exec = (globalThis as unknown as BoundedExecGlobal).__erfanaE2eExec
+      const wc = webContents.getAllWebContents().find((c) => {
+        try {
+          const url = c.getURL()
+          return url.startsWith('erfana-preview://') && (urlIncludes === undefined || url.includes(urlIncludes))
+        } catch {
+          return false
+        }
+      })
+      if (!wc) return false
+      const topId = wc.mainFrame.frameTreeNodeId
+      const frame = wc.mainFrame.framesInSubtree.find(
+        (f) => f.frameTreeNodeId !== topId && f.url.includes(frameUrl)
+      )
+      if (!frame) return false
+      return exec<boolean>(
+        frame,
+        `(() => {
+           const el = document.getElementById(${JSON.stringify(id)})
+           if (!el) return false
+           setTimeout(() => el.click(), 0)
+           return true
+         })()`,
+        actionCapMs,
+        `clickInFrame: click #${id}`
+      )
+    },
+    { id: elementId, frameUrl: frameUrlIncludes, urlIncludes: target.urlIncludes, actionCapMs: EXEC_ACTION_CAP_MS }
   )
 }
 

@@ -14,7 +14,10 @@
  *
  * Each `app.evaluate` callback is serialised into the main process, so it
  * cannot call a shared helper: the preview lookup is repeated in each one on
- * purpose.
+ * purpose. The one exception is the bounded `executeJavaScript`
+ * (`e2e/utils/bounded-exec.ts`), which `installBoundedExec` puts on the main
+ * process's `globalThis` first: reads treat its timeout as "poll again",
+ * actions let it fail the test with the name of the call.
  *
  * Condition-based waits only – never a sleep. Nothing here waits: callers poll.
  *
@@ -22,6 +25,13 @@
  */
 
 import type { ElectronApplication } from '@playwright/test'
+
+import {
+  EXEC_ACTION_CAP_MS,
+  EXEC_READ_CAP_MS,
+  installBoundedExec,
+  type BoundedExecGlobal
+} from '../utils/bounded-exec'
 
 /** A snapshot of one live preview's own web contents, read from the main process. */
 export interface PreviewSnapshot {
@@ -80,7 +90,9 @@ export async function previewSnapshot(
   app: ElectronApplication,
   target: PreviewTarget = {}
 ): Promise<PreviewSnapshot | null> {
-  return app.evaluate(async ({ webContents }, urlIncludes) => {
+  await installBoundedExec(app)
+  return app.evaluate(async ({ webContents }, { urlIncludes, readCapMs }) => {
+    const exec = (globalThis as unknown as BoundedExecGlobal).__erfanaE2eExec
     const previews = webContents.getAllWebContents().filter((wc) => {
       try {
         const url = wc.getURL()
@@ -102,11 +114,17 @@ export async function previewSnapshot(
       let docTitle = ''
       let jsRan = false
       try {
-        docTitle = await wc.executeJavaScript('document.title')
+        docTitle = await exec<string>(wc, 'document.title', readCapMs, 'previewSnapshot: document.title')
         // The self-contained fixture drops the `pending` class on DOMContentLoaded.
-        jsRan = await wc.executeJavaScript('!document.querySelector("#js-output.pending")')
+        jsRan = await exec<boolean>(
+          wc,
+          '!document.querySelector("#js-output.pending")',
+          readCapMs,
+          'previewSnapshot: js-output marker'
+        )
       } catch {
-        // Page may be mid-load / navigating — leave the defaults, the caller polls.
+        // Page may be mid-load / navigating, or the read was capped — leave
+        // the defaults, the caller polls.
       }
       const destroyed = wc.isDestroyed()
       return {
@@ -119,12 +137,14 @@ export async function previewSnapshot(
     } catch {
       return null
     }
-  }, target.urlIncludes)
+  }, { urlIncludes: target.urlIncludes, readCapMs: EXEC_READ_CAP_MS })
 }
 
 /** Every live preview's URL and document title, read from the main process. */
 export async function livePreviews(app: ElectronApplication): Promise<LivePreview[]> {
-  return app.evaluate(async ({ webContents }) => {
+  await installBoundedExec(app)
+  return app.evaluate(async ({ webContents }, readCapMs) => {
+    const exec = (globalThis as unknown as BoundedExecGlobal).__erfanaE2eExec
     const previews = webContents.getAllWebContents().filter((wc) => {
       try {
         return wc.getURL().startsWith('erfana-preview://') && !wc.isDestroyed()
@@ -143,9 +163,9 @@ export async function livePreviews(app: ElectronApplication): Promise<LivePrevie
         const url = wc.getURL()
         let docTitle = ''
         try {
-          docTitle = await wc.executeJavaScript('document.title')
+          docTitle = await exec<string>(wc, 'document.title', readCapMs, 'livePreviews: document.title')
         } catch {
-          // Mid-load; the caller polls.
+          // Mid-load or capped; the caller polls.
         }
         if (wc.isDestroyed()) continue
         out.push({ url, docTitle })
@@ -154,7 +174,7 @@ export async function livePreviews(app: ElectronApplication): Promise<LivePrevie
       }
     }
     return out
-  })
+  }, EXEC_READ_CAP_MS)
 }
 
 /**
@@ -166,8 +186,10 @@ export async function evalInPreview(
   expr: string,
   target: PreviewTarget = {}
 ): Promise<string | null> {
+  await installBoundedExec(app)
   return app.evaluate(
-    async ({ webContents }, { e, urlIncludes }) => {
+    async ({ webContents }, { e, urlIncludes, readCapMs }) => {
+      const exec = (globalThis as unknown as BoundedExecGlobal).__erfanaE2eExec
       const wc = webContents.getAllWebContents().find((c) => {
         try {
           const url = c.getURL()
@@ -181,12 +203,13 @@ export async function evalInPreview(
       })
       if (!wc) return null
       try {
-        return await wc.executeJavaScript(e)
+        return await exec<string>(wc, e, readCapMs, `evalInPreview: ${e.slice(0, 60)}`)
       } catch {
+        // Mid-load, a throwing expression, or a capped read: the caller polls.
         return null
       }
     },
-    { e: expr, urlIncludes: target.urlIncludes }
+    { e: expr, urlIncludes: target.urlIncludes, readCapMs: EXEC_READ_CAP_MS }
   )
 }
 
@@ -200,37 +223,45 @@ export async function evalInPreview(
  *
  * The return value is the point: a renamed fixture id, or an element that
  * never rendered, must not produce a test that quietly clicks nothing.
+ *
+ * @throws when the click itself does not answer within its cap – an action
+ * that hangs fails the test with the call's name instead of stalling it.
  */
 export async function clickInPreview(
   app: ElectronApplication,
   docTitle: string,
   elementId: string
 ): Promise<boolean> {
+  await installBoundedExec(app)
   return app.evaluate(
-    async ({ webContents }, { title, id }) => {
+    async ({ webContents }, { title, id, readCapMs, actionCapMs }) => {
+      const exec = (globalThis as unknown as BoundedExecGlobal).__erfanaE2eExec
       for (const wc of webContents.getAllWebContents()) {
         if (!wc.getURL().startsWith('erfana-preview://')) continue
         let found = ''
         try {
-          found = await wc.executeJavaScript('document.title')
+          found = await exec<string>(wc, 'document.title', readCapMs, 'clickInPreview: document.title')
         } catch {
-          // Mid-load or already gone: this is not the page we are looking for.
-          // Only the IDENTIFICATION probe is allowed to fail quietly.
+          // Mid-load, already gone or capped: this is not the page we are
+          // looking for. Only the IDENTIFICATION probe may fail quietly.
           continue
         }
         if (!found.includes(title)) continue
-        return await wc.executeJavaScript(
+        return await exec<boolean>(
+          wc,
           `(() => {
              const el = document.getElementById(${JSON.stringify(id)})
              if (!el) return false
              el.click()
              return true
-           })()`
+           })()`,
+          actionCapMs,
+          `clickInPreview: click #${id}`
         )
       }
       return false
     },
-    { title: docTitle, id: elementId }
+    { title: docTitle, id: elementId, readCapMs: EXEC_READ_CAP_MS, actionCapMs: EXEC_ACTION_CAP_MS }
   )
 }
 
@@ -242,14 +273,17 @@ export async function clickInPreview(
  *
  * @returns `true` only when the page and the element were found; the click
  * is dispatched at the element's centre after scrolling it into view.
+ * @throws when locating the element does not answer within its cap.
  */
 export async function clickTrusted(
   app: ElectronApplication,
   elementId: string,
   target: PreviewTarget = {}
 ): Promise<boolean> {
+  await installBoundedExec(app)
   return app.evaluate(
-    async ({ webContents }, { id, urlIncludes }) => {
+    async ({ webContents }, { id, urlIncludes, actionCapMs }) => {
+      const exec = (globalThis as unknown as BoundedExecGlobal).__erfanaE2eExec
       const wc = webContents.getAllWebContents().find((c) => {
         try {
           const url = c.getURL()
@@ -262,14 +296,17 @@ export async function clickTrusted(
         }
       })
       if (!wc) return false
-      const point: { x: number; y: number } | null = await wc.executeJavaScript(
+      const point = await exec<{ x: number; y: number } | null>(
+        wc,
         `(() => {
            const el = document.getElementById(${JSON.stringify(id)})
            if (!el) return null
            el.scrollIntoView({ block: 'center', inline: 'center' })
            const r = el.getBoundingClientRect()
            return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }
-         })()`
+         })()`,
+        actionCapMs,
+        `clickTrusted: locate #${id}`
       )
       if (point === null) return false
       wc.sendInputEvent({ type: 'mouseMove', x: point.x, y: point.y })
@@ -289,7 +326,7 @@ export async function clickTrusted(
       })
       return true
     },
-    { id: elementId, urlIncludes: target.urlIncludes }
+    { id: elementId, urlIncludes: target.urlIncludes, actionCapMs: EXEC_ACTION_CAP_MS }
   )
 }
 

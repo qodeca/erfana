@@ -24,7 +24,7 @@
  * again once the end marker has arrived over IPC, and prints one line
  * `BENCH_RESULT <json>` before it exits.
  */
-/* global require, process, setTimeout -- CommonJS, run inside Electron's main process */
+/* global require, process, setTimeout, clearTimeout -- CommonJS, run inside Electron's main process */
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- `-r` preloads CommonJS only
 const { app, BrowserWindow } = require('electron')
 
@@ -34,7 +34,26 @@ const PROJECT = process.env.ERFANA_BENCH_PROJECT
 const MARKER = 'DONE_2'
 const COMMAND = `yes | head -c ${BYTES}; echo DONE_$((1+1))`
 
-const js = (win, code) => win.webContents.executeJavaScript(code, true)
+/**
+ * `executeJavaScript` with a deadline, named by the code it ran. The e2e helpers
+ * use `e2e/utils/bounded-exec.ts` for this; this script runs outside Playwright
+ * (preloaded with `-r`) and cannot load TypeScript, so it has its own copy. The
+ * cap is generous: a hidden, flooded window may answer slowly, but a call that
+ * never answers must fail the run with its name, not stall it.
+ */
+const JS_CAP_MS = 60000
+const js = (win, code) => {
+  let timer
+  const cap = new Promise((_resolve, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`executeJavaScript did not settle within ${JS_CAP_MS} ms: ${code.slice(0, 80)}`)),
+      JS_CAP_MS
+    )
+  })
+  // eslint-disable-next-line no-restricted-syntax -- the bounded wrapper itself; see the comment above
+  const call = Promise.resolve().then(() => win.webContents.executeJavaScript(code, true))
+  return Promise.race([call, cap]).finally(() => clearTimeout(timer))
+}
 const t0 = Date.now()
 const log = (step) => process.stdout.write(`BENCH_STEP ${step} +${Date.now() - t0} ms\n`)
 
