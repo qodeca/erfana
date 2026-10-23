@@ -34,6 +34,7 @@ import {
 import { useFilenameIndex } from './useFilenameIndex'
 import {
   resolvePathSmart,
+  type NameSearchResult,
   type SmartResolutionResult
 } from '../utils/smartPathResolver.logic'
 import type { PathScore } from '../utils/pathScoring'
@@ -41,39 +42,62 @@ import { findCliWrapGroup, joinedPosToBuffer, type JoinSegment } from '../utils/
 import { logger } from '../utils/logger'
 import { fileGateway } from '../services/fileGateway'
 import { terminalGateway } from '../services/terminalGateway'
+import { getLastSeenProjectGeneration } from '../services/projectGeneration'
 
 // Create a module-level cache shared across hook instances
 // This ensures cache hits across terminal restarts and multiple terminals
 const pathCache = createPathCache(100, 30000)
 
-/** Name searches on a truncated tree, by project + lower-case name; same lifetime as `pathCache` */
+/**
+ * Name searches on a truncated tree, by project session generation + project
+ * + lower-case name, so a reopened project never reuses an older answer; same
+ * lifetime as `pathCache`
+ */
 const NAME_SEARCH_TTL_MS = 30_000
 const NAME_SEARCH_CACHE_MAX = 100
-const nameSearchCache = new Map<string, { paths: string[]; at: number }>()
+const nameSearchCache = new Map<string, { result: NameSearchResult; at: number }>()
+/** Searches in flight by the same key: every line and terminal asking shares one */
+const nameSearchInFlight = new Map<string, Promise<NameSearchResult>>()
+const NOTHING_FOUND: NameSearchResult = { paths: [], truncated: false }
 
 /**
- * Files named `filename` in the project, from main's bounded search, cached
- * for {@link NAME_SEARCH_TTL_MS} so hovering a line does not repeat it.
- * Answers [] on any failure: an unresolved name just stays plain text.
+ * Files named `filename` in the project, from main's bounded search. One
+ * search per key is in flight at a time, and an answer is cached for
+ * {@link NAME_SEARCH_TTL_MS} so hovering a line does not repeat it – except a
+ * failure, or a cut-short search that found nothing (main may have been busy),
+ * which the next hover asks again. Answers nothing on any failure: an
+ * unresolved name just stays plain text.
  */
-export async function searchProjectByName(projectRoot: string, filename: string): Promise<string[]> {
-  const key = `${projectRoot}\0${filename.toLowerCase()}`
+export function searchProjectByName(projectRoot: string, filename: string): Promise<NameSearchResult> {
+  const key = `${getLastSeenProjectGeneration() ?? ''}\0${projectRoot}\0${filename.toLowerCase()}`
   const cached = nameSearchCache.get(key)
-  if (cached && Date.now() - cached.at < NAME_SEARCH_TTL_MS) return cached.paths
-  let paths: string[] = []
-  try {
-    paths = (await fileGateway.findByName({ dirPath: projectRoot, name: filename })).paths
-  } catch (e) {
-    logger.warn('[FileLinks] Name search failed', { error: e instanceof Error ? e.name : typeof e })
-  }
-  if (nameSearchCache.size >= NAME_SEARCH_CACHE_MAX) nameSearchCache.clear()
-  nameSearchCache.set(key, { paths, at: Date.now() })
-  return paths
+  if (cached && Date.now() - cached.at < NAME_SEARCH_TTL_MS) return Promise.resolve(cached.result)
+  const running = nameSearchInFlight.get(key)
+  if (running) return running
+  const search = (async (): Promise<NameSearchResult> => {
+    try {
+      const { paths, truncated } = await fileGateway.findByName({ dirPath: projectRoot, name: filename })
+      const result = { paths, truncated }
+      if (paths.length > 0 || !truncated) {
+        if (nameSearchCache.size >= NAME_SEARCH_CACHE_MAX) nameSearchCache.clear()
+        nameSearchCache.set(key, { result, at: Date.now() })
+      }
+      return result
+    } catch (e) {
+      logger.warn('[FileLinks] Name search failed', { error: e instanceof Error ? e.name : typeof e })
+      return NOTHING_FOUND
+    } finally {
+      nameSearchInFlight.delete(key)
+    }
+  })()
+  nameSearchInFlight.set(key, search)
+  return search
 }
 
 /** Forget cached name searches (tests). */
 export function clearNameSearchCache(): void {
   nameSearchCache.clear()
+  nameSearchInFlight.clear()
 }
 
 export interface UseTerminalFileLinksOptions {
@@ -112,7 +136,7 @@ export interface UseTerminalFileLinksOptions {
    * @param query The original query string
    * @returns Promise resolving to selected path, or null if cancelled
    */
-  onShowPicker?: (candidates: PathScore[], query: string) => Promise<string | null>
+  onShowPicker?: (candidates: PathScore[], query: string, options?: { incomplete?: boolean }) => Promise<string | null>
   /**
    * Optional error handler for link provider errors.
    * Note: Should be memoized (useCallback) to prevent unnecessary re-renders.
@@ -382,10 +406,12 @@ export function useTerminalFileLinks(
             finalPath: string | null
             wasSmartResolved: boolean
             pendingCandidates: PathScore[] | null
+            incomplete: boolean
           }> => {
             let finalPath: string | null = null
             let wasSmartResolved = false
             let pendingCandidates: PathScore[] | null = null
+            let incomplete = false
 
             if (files.length > 0) {
               const smartResult: SmartResolutionResult = await resolvePathSmart({
@@ -411,6 +437,7 @@ export function useTerminalFileLinks(
                 pendingCandidates = smartResult.candidates!
                 finalPath = smartResult.candidates![0].path
                 wasSmartResolved = true
+                incomplete = smartResult.incomplete === true
               }
             } else {
               const validation = await validatePath(candidatePath)
@@ -419,7 +446,7 @@ export function useTerminalFileLinks(
               }
             }
 
-            return { finalPath, wasSmartResolved, pendingCandidates }
+            return { finalPath, wasSmartResolved, pendingCandidates, incomplete }
           }
 
           // Convert matches to ILinks
@@ -442,7 +469,7 @@ export function useTerminalFileLinks(
             resolvedPath = normalizePath(resolvedPath)
 
             // Try smart resolution (includes exact path validation as first step)
-            const { finalPath: resolvedFinalPath, wasSmartResolved, pendingCandidates } =
+            const { finalPath: resolvedFinalPath, wasSmartResolved, pendingCandidates, incomplete } =
               await tryResolveCandidate(resolvedPath)
             let finalPath = resolvedFinalPath
 
@@ -484,7 +511,7 @@ export function useTerminalFileLinks(
               activate: async () => {
                 // If multiple candidates and picker available, show picker
                 if (pendingCandidates && onShowPicker) {
-                  const selected = await onShowPicker(pendingCandidates, match.path)
+                  const selected = await onShowPicker(pendingCandidates, match.path, { incomplete })
                   if (selected) {
                     onFileOpen(selected, match.line, match.column)
                   }

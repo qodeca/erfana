@@ -63,6 +63,22 @@ describe('createConcurrencyLimit', () => {
     await expect(next).resolves.toBe(2)
   })
 
+  it('keeps the order across queue compactions', async () => {
+    const limit = createConcurrencyLimit(1)
+    const order: number[] = []
+    await Promise.all(Array.from({ length: 5000 }, (_, i) => limit.run(async () => order.push(i))))
+    expect(order).toEqual(Array.from({ length: 5000 }, (_, i) => i))
+  })
+
+  it('takes a queued task in O(1): a 200,000-deep queue drains without stalling (review of #320)', async () => {
+    // With `Array.prototype.shift` this drain is quadratic: ~15 s here, and a
+    // walk of 65k queued folders stalled the main process for ~2 s
+    const limit = createConcurrencyLimit(16)
+    const start = performance.now()
+    await Promise.all(Array.from({ length: 200_000 }, () => limit.run(async () => null)))
+    expect(performance.now() - start).toBeLessThan(2_000)
+  }, 60_000)
+
   it.each([0, -1, 1.5, Number.NaN])('refuses a limit of %s', (max) => {
     expect(() => createConcurrencyLimit(max)).toThrow('Invalid concurrency limit')
   })

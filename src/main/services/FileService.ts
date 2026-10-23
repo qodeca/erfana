@@ -27,7 +27,7 @@ import { atomicWriteText, isAtomicTempName } from '../utils/atomicWrite'
 import { IMAGE_EXTENSIONS, readImage } from './file/imageRead'
 import { childPath } from '../utils/childPath'
 import { createConcurrencyLimit, type ConcurrencyLimit } from '../utils/concurrencyLimit'
-import { findByName, type FindByNameResult } from './file/findByName'
+import { createFindByNameGate, findByName, type FindByNameResult } from './file/findByName'
 import { isInsideRoot, isSamePath, normaliseResolved } from '../utils/pathCompare'
 import { getPlatformConfig } from './watcher/PlatformConfig'
 import type { ImageReadResponse } from '../../shared/ipc/file-image-schema'
@@ -257,6 +257,13 @@ function recordWalkHints(scope: WalkScope): number {
  */
 const matcherOverruns = (scope: WalkScope): number =>
   scope.filter?.excludeMatcher.budgetExceeded ?? 0
+
+/**
+ * Name searches in flight in the whole process, shared by every window and
+ * terminal: at most two at once, one search per project, folder and name
+ * (review of #320).
+ */
+const findByNameGate = createFindByNameGate()
 
 export class FileService implements IFileService {
   private projectPath: string | null = null
@@ -508,6 +515,12 @@ export class FileService implements IFileService {
    */
   private async _readDirectoryInternal(dir: WalkDir, scope: WalkScope): Promise<FileNode[] | LazyKind> {
     if (dir.depth > 0 && scope.shallow) return 'capped'
+    // Checked before queueing too, so a folder past the cap never waits for a
+    // slot: the queue holds at most one entry per folder row listed
+    if (dir.depth > 0 && scope.entryCount >= MAX_WALK_ENTRIES) {
+      scope.entryCapReached = true
+      return 'capped'
+    }
     const entries = await scope.reads.run(async () => {
       if (dir.depth > 0 && scope.entryCount >= MAX_WALK_ENTRIES) return null
       scope.folderReadCount++
@@ -614,7 +627,7 @@ export class FileService implements IFileService {
    * entered through another link) or the chain is too deep; then it is a folder
    * row with no children. A link that is, or leads to, an ignored folder is
    * left lazy (`ignored`) instead of entered, and so is one whose target this
-   * walk already entered through another link, or one past
+   * walk already entered through another link (`linked`), or one past
    * {@link MAX_ENTERED_LINKS} (`capped`): the row can still be expanded.
    */
   private async readLinkedDirectory(
@@ -641,10 +654,9 @@ export class FileService implements IFileService {
     // Tested and taken with no await in between: sibling folders are read in
     // parallel, and two links to one folder must not both pass the test.
     const key = snapshot.caseSensitive ? target : target.toLowerCase()
-    if (scope.enteredLinkTargets.has(key) || scope.enteredLinkTargets.size >= MAX_ENTERED_LINKS) {
-      // Not a loop: the folder is shown elsewhere, or the bound was reached
-      return 'capped'
-    }
+    // Not a loop: the folder is shown elsewhere (`linked`), or the bound was reached (`capped`)
+    if (scope.enteredLinkTargets.has(key)) return 'linked'
+    if (scope.enteredLinkTargets.size >= MAX_ENTERED_LINKS) return 'capped'
     const depth = parent.depth + 1
     const dropped = parent.dropped || isDroppedFolder(rel, scope)
     if (dropped && !parent.dropped && rel !== null) scope.hints?.add(rel, depth)
@@ -705,24 +717,34 @@ export class FileService implements IFileService {
   /**
    * Files named `name` (case-insensitive) below `dirPath`, bounded – the
    * terminal's fallback for a name the incomplete tree does not hold. Applies
-   * the tree's hidden names and, inside the project, its exclude list; never
-   * follows a link. See `file/findByName`.
+   * the tree's rules – hidden names and, inside the project, its exclude list
+   * and its ignored folders (left lazy by the walk, so not searched either);
+   * never follows a link. Searches share the process-wide gate, and one asked
+   * under a project that has since changed ends. See `file/findByName`.
    *
-   * @param dirPath - A folder the caller has confined to the project
+   * @param dirPath - A folder the caller has confined to the project; results are built from it
    * @param name - A plain file name
+   * @param readPath - Where `dirPath` is read (its real path), when that differs
    */
-  async findByName(dirPath: string, name: string): Promise<FindByNameResult> {
+  async findByName(dirPath: string, name: string, readPath?: string): Promise<FindByNameResult> {
     const hiddenPatterns = [...this.hiddenPatterns]
     const { scope } = this.planWalk(dirPath, hiddenPatterns)
     const filter = scope.filter
     const baseRel = filter === null ? null : toRootRelative(filter.root, dirPath)
-    return findByName(dirPath, name, {
-      baseRel,
-      skip: (entryName, rel) =>
-        hiddenPatterns.includes(entryName) ||
-        isAtomicTempName(entryName) ||
-        (rel !== null && filter !== null && filter.isEntryExcluded(rel))
-    })
+    const generation = this.session?.current()?.generation ?? null
+    const isCurrent = (): boolean => (this.session?.current()?.generation ?? null) === generation
+    const key = [generation, readDirectoryKey(readPath ?? dirPath), name.toLowerCase()].join('\0')
+    return findByNameGate.run(key, () =>
+      findByName(dirPath, name, {
+        baseRel,
+        readBase: readPath,
+        isCurrent,
+        skip: (entryName, rel, isDirectory) =>
+          hiddenPatterns.includes(entryName) ||
+          isAtomicTempName(entryName) ||
+          (rel !== null && filter !== null && (filter.isEntryExcluded(rel) || (isDirectory && filter.isIgnoredFolder(rel))))
+      })
+    )
   }
 
   async readFile(filePath: string): Promise<string> {

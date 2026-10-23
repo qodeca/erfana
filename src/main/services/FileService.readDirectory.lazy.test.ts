@@ -222,6 +222,23 @@ describe('FileService.readDirectory – parallel reads (finding 32)', () => {
     expect(countRows(tree)).toBe(names.length * 3)
   })
 
+  it('leaves a link past the walk\'s link bound `capped`, not `linked` (review of #320, item 5)', async () => {
+    const targets = 201
+    listing[ROOT] = [dirent('links', 'dir'), ...Array.from({ length: targets }, (_, i) => dirent(`t${i}`, 'dir'))]
+    listing[at('links')] = Array.from({ length: targets }, (_, i) => dirent(`l${i}`, 'link'))
+    for (let i = 0; i < targets; i++) {
+      listing[at(`t${i}`)] = [dirent('x.md', 'file')]
+      statDir[at('links', `l${i}`)] = true
+      real[at('links', `l${i}`)] = at(`t${i}`)
+    }
+
+    const tree = await makeService().readDirectory(ROOT)
+
+    const links = byName(tree).links.children!
+    expect(links.filter((link) => link.lazy === 'capped')).toHaveLength(1)
+    expect(links.filter((link) => link.lazy === undefined && link.children!.length === 1)).toHaveLength(targets - 1)
+  })
+
   it('enters a folder reached by two links at once only once per walk', async () => {
     listing[ROOT] = [dirent('a', 'dir'), dirent('b', 'dir'), dirent('docs', 'dir')]
     listing[at('a')] = [dirent('toDocs', 'link')]
@@ -237,8 +254,8 @@ describe('FileService.readDirectory – parallel reads (finding 32)', () => {
     const links = ['a', 'b'].map((parent) => byName(tree)[parent].children![0])
     // Both links resolve in parallel; exactly one of them enters the folder
     expect(links.map((link) => link.children!.length).sort()).toEqual([0, 1])
-    // The other is not a loop: it stays expandable, as a capped lazy row (review item 3)
-    expect(links.map((link) => link.lazy ?? null).sort()).toEqual(['capped', null])
+    // The other is not a loop: it stays expandable, as a `linked` lazy row – its files are in the tree via docs (review of #320, item 5)
+    expect(links.map((link) => link.lazy ?? null).sort()).toEqual(['linked', null])
   })
 
   it('keeps a link back to its own ancestor an empty row, not a lazy one', async () => {
@@ -407,5 +424,61 @@ describe('FileService.readDirectory – sort order (finding 32)', () => {
     await makeService([]).readDirectory(ROOT)
 
     expect(localeCompare).not.toHaveBeenCalled()
+  })
+})
+
+describe('FileService.findByName – the tree rules and the session (review of #320)', () => {
+  it('does not search an ignored folder, as the walk does not read it (item 3)', async () => {
+    listing[ROOT] = [dirent('dist', 'dir'), dirent('src', 'dir')]
+    listing[at('dist')] = [dirent('a.md', 'file')]
+    listing[at('src')] = [dirent('a.md', 'file')]
+
+    const result = await makeService().findByName(ROOT, 'a.md')
+
+    expect(result).toEqual({ paths: [at('src', 'a.md')], truncated: false })
+    expect(foldersRead()).toEqual(['', 'src'])
+  })
+
+  it('reads the real path and answers with the requested one (item 9)', async () => {
+    const alias = abs('alias')
+    listing[ROOT] = [dirent('a.md', 'file')]
+
+    const result = await makeService().findByName(alias, 'a.md', ROOT)
+
+    expect(result.paths).toEqual([path.join(alias, 'a.md')])
+    expect(foldersRead()).toEqual([''])
+  })
+
+  it('ends a search once the project changes (item 1)', async () => {
+    listing[ROOT] = [dirent('a', 'dir'), dirent('b', 'dir')]
+    listing[at('a')] = [dirent('deep', 'dir')]
+    listing[at('a', 'deep')] = [dirent('x.md', 'file')]
+    const service = makeService()
+    let generation = 1
+    service.bindSession({
+      current: () =>
+        ({ root: ROOT, realRoot: ROOT, caseSensitive: true, generation, ownerWebContentsId: null }) as never
+    })
+    readdirMock.mockImplementation(async (dir: string) => {
+      await tick()
+      // The project is switched while the first level is read
+      generation = 2
+      return listing[path.resolve(dir)] ?? []
+    })
+
+    const result = await service.findByName(ROOT, 'x.md')
+
+    expect(result).toEqual({ paths: [], truncated: true })
+    expect(foldersRead()).toEqual([''])
+  })
+
+  it('shares one search between calls for the same folder and name (item 1)', async () => {
+    listing[ROOT] = [dirent('a.md', 'file')]
+    const service = makeService()
+
+    const [first, second] = await Promise.all([service.findByName(ROOT, 'a.md'), service.findByName(ROOT, 'A.MD')])
+
+    expect(first).toEqual(second)
+    expect(readdirMock).toHaveBeenCalledTimes(1)
   })
 })

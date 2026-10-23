@@ -40,10 +40,13 @@ export const FileNodeSchema = z.object({
    * - `ignored`: on `watcher.ignoreList` (`dist`, `.venv`, ...). Its files are
    *   left out of the tree by design.
    * - `capped`: a walk bound left it unread – the walk's entry cap, a shallow
-   *   read, or a folder link whose target was already entered. The tree is
+   *   read, or the walk's bound on folder links entered. The tree is
    *   incomplete there, so a lookup by name must not take one match as certain.
+   * - `linked`: a folder link whose real folder the walk already entered
+   *   through another path. Its files are in the tree under that path, so the
+   *   tree is not incomplete because of it.
    */
-  lazy: z.enum(['ignored', 'capped']).optional()
+  lazy: z.enum(['ignored', 'capped', 'linked']).optional()
 })
 
 export type FileNode = z.infer<typeof FileNodeSchema>

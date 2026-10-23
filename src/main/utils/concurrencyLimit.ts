@@ -18,15 +18,31 @@ export interface ConcurrencyLimit {
  * @param max - The most tasks in flight at once; at least 1
  * @returns A limiter whose slots are shared by every `run` call on it
  */
+/** Taken entries the queue keeps before it compacts */
+const COMPACT_AFTER = 1024
+
 export function createConcurrencyLimit(max: number): ConcurrencyLimit {
   if (!Number.isInteger(max) || max < 1) throw new Error('Invalid concurrency limit')
   let active = 0
-  const waiting: Array<() => void> = []
+  // A FIFO with O(1) take: `Array.prototype.shift` is O(n), and a walk can
+  // queue tens of thousands of folders (65k queued took ~1.9 s to drain,
+  // review of #320). Taken slots are cleared and the array compacted once
+  // most of it is behind `head`, so its memory follows what still waits.
+  let waiting: Array<(() => void) | undefined> = []
+  let head = 0
 
   const release = (): void => {
-    const next = waiting.shift()
-    if (next) next()
-    else active--
+    if (head === waiting.length) {
+      active--
+      return
+    }
+    const next = waiting[head]!
+    waiting[head++] = undefined
+    if (head >= COMPACT_AFTER && head * 2 >= waiting.length) {
+      waiting = waiting.slice(head)
+      head = 0
+    }
+    next()
   }
 
   return {

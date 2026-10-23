@@ -78,4 +78,10 @@ describe('hasUnloadedCapped', () => {
     expect(hasUnloadedCapped(tree, new Map())).toBe(true)
     expect(hasUnloadedCapped(tree, new Map([['/p/a/big', {}]]))).toBe(false)
   })
+
+  it('does not count a linked folder, and counts a capped one whose read failed (review of #320, items 5, 6)', () => {
+    expect(hasUnloadedCapped([folder('/p/alias', [], 'linked')], new Map())).toBe(false)
+    const tree = [folder('/p/big', [], 'capped')]
+    expect(hasUnloadedCapped(tree, new Map([['/p/big', {}]]), new Map([['/p/big', 'failed' as const]]))).toBe(true)
+  })
 })

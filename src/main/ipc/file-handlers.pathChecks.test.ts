@@ -480,6 +480,12 @@ describe('file:* path checks', () => {
       await expect(invoke('file:checkConflict', path.join(root, 'missing-dir'), 'x')).resolves.toBe(false)
     })
 
+    it('searches by name from the project root only (review of #320, item 9)', async () => {
+      await expect(invoke('file:findByName', path.join(root, 'sub'), 'a.md')).rejects.toThrow(
+        'Path is not the kind of item this action needs'
+      )
+    })
+
     it('writes, and restores a missing folder chain only on request', async () => {
       const nested = path.join(root, 'docs', 'deep', 'note.md')
       await expect(invoke('file:writeFile', nested, 'x')).rejects.toMatchObject({ code: 'ENOENT' })
@@ -507,6 +513,11 @@ describe('file:* path checks', () => {
         await invoke('file:moveItem', path.join(aliasRoot, 'renamed.md'), path.join(aliasRoot, 'folder2'))
       ).toMatchObject({ path: path.join(aliasRoot, 'folder2', 'renamed.md') })
       expect(existsSync(path.join(root, 'folder2', 'renamed.md'))).toBe(true)
+      // A name search walks the real root and answers in the alias spelling
+      expect(await invoke('file:findByName', aliasRoot, 'a.md')).toEqual({
+        paths: [path.join(aliasRoot, 'a.md'), path.join(aliasRoot, 'sub', 'a.md')],
+        truncated: false
+      })
     })
 
     it.skipIf(process.platform === 'win32')('copying a link inside the project keeps the name the link was given', async () => {

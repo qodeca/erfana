@@ -357,9 +357,9 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     if (filterMode === 'all') {
       return files
     } else {
-      return filterMarkdownTree(files, lazyLoaded)
+      return filterMarkdownTree(files, lazyLoaded, lazyStatus)
     }
-  }, [files, filterMode, lazyLoaded])
+  }, [files, filterMode, lazyLoaded, lazyStatus])
 
   /**
    * Create synthetic root folder node (VS Code style)

@@ -407,6 +407,38 @@ describe('smartPathResolver', () => {
 
       expect(result.status).toBe('multiple-matches')
       expect(result.candidates?.map((c) => c.path)).toEqual(['/project/src/Button.tsx'])
+      expect(result.incomplete).toBe(true)
+    })
+
+    it('also searches when the index has the name, and offers both, once each (review of #320, item 4)', async () => {
+      const searchByName = vi.fn(async () => ({
+        paths: ['/project/src/Button.tsx', '/project/big/Button.tsx'],
+        truncated: true
+      }))
+
+      const result = await resolvePathSmart({
+        path: 'Button.tsx', cwd: null, projectRoot: '/project', index: createFilenameIndex(), files: tree,
+        treeTruncated: true, searchByName
+      })
+
+      expect(searchByName).toHaveBeenCalledWith('Button.tsx')
+      expect(result.status).toBe('multiple-matches')
+      expect(result.candidates?.map((c) => c.path).sort()).toEqual(['/project/big/Button.tsx', '/project/src/Button.tsx'])
+      expect(result.incomplete).toBe(true)
+    })
+
+    it('dedupes a search result that names an index match with the other separator', async () => {
+      const searchByName = vi.fn(async () => ({ paths: ['\\project\\src\\Button.tsx'], truncated: false }))
+      const winTree: FileNode[] = [
+        { name: 'Button.tsx', path: '/project/src/Button.tsx', type: 'file', extension: '.tsx' }
+      ]
+
+      const result = await resolvePathSmart({
+        path: 'Button.tsx', cwd: null, projectRoot: '/project', index: createFilenameIndex(), files: winTree,
+        treeTruncated: true, searchByName
+      })
+
+      expect(result.candidates).toHaveLength(1)
     })
 
     it('keeps a single match certain when the tree is complete', async () => {
@@ -417,7 +449,7 @@ describe('smartPathResolver', () => {
     })
 
     it('searches on disk for a name the index lacks, and offers every result', async () => {
-      const searchByName = vi.fn(async () => ['/project/big/Card.tsx'])
+      const searchByName = vi.fn(async () => ({ paths: ['/project/big/Card.tsx'], truncated: false }))
 
       const result = await resolvePathSmart({
         path: 'Card.tsx:12', cwd: null, projectRoot: '/project', index: createFilenameIndex(), files: tree,
@@ -430,7 +462,7 @@ describe('smartPathResolver', () => {
     })
 
     it('does not search when the tree is complete, or when the search finds nothing', async () => {
-      const searchByName = vi.fn(async () => [] as string[])
+      const searchByName = vi.fn(async () => ({ paths: [] as string[], truncated: false }))
       const complete = await resolvePathSmart({
         path: 'Card.tsx', cwd: null, projectRoot: '/project', index: createFilenameIndex(), files: tree, searchByName
       })

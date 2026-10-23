@@ -102,8 +102,66 @@ function isBelowAny(key: string, folders: ReadonlySet<string>): boolean {
   return false
 }
 
+/** The folder key of an entry key (`''` for a top-level entry). */
+const parentKey = (key: string): string => {
+  const slash = key.lastIndexOf('/')
+  return slash === -1 ? '' : key.slice(0, slash)
+}
+
+/**
+ * The record: entries by folded key, indexed by folder, so the entries below
+ * one folder are found without scanning the whole record (an expand read
+ * touches only its folder – review of #320). `files` lists each folder's own
+ * entries; `folders` each folder's sub-folders that hold, or held, entries.
+ * A sub-folder left in `folders` after its last entry went costs one empty
+ * visit, so it is not cleaned up eagerly.
+ */
+class EntryRecord extends Map<string, KnownEntry> {
+  private readonly files = new Map<string, Set<string>>()
+  private readonly folders = new Map<string, Set<string>>()
+
+  override set(key: string, entry: KnownEntry): this {
+    if (!this.has(key)) {
+      let folder = parentKey(key)
+      let own = this.files.get(folder)
+      if (!own) this.files.set(folder, (own = new Set()))
+      own.add(key)
+      // Register the folder chain up to the first one already known
+      while (folder !== '') {
+        const parent = parentKey(folder)
+        let below = this.folders.get(parent)
+        if (!below) this.folders.set(parent, (below = new Set()))
+        if (below.has(folder)) break
+        below.add(folder)
+        folder = parent
+      }
+    }
+    return super.set(key, entry)
+  }
+
+  override delete(key: string): boolean {
+    if (!super.delete(key)) return false
+    const own = this.files.get(parentKey(key))
+    own?.delete(key)
+    if (own?.size === 0) this.files.delete(parentKey(key))
+    return true
+  }
+
+  /** Every entry key below `folder`, except below the folders in `skip`. */
+  keysBelow(folder: string, skip: ReadonlySet<string>): string[] {
+    const keys: string[] = []
+    const stack = [folder]
+    while (stack.length > 0) {
+      const at = stack.pop() as string
+      for (const key of this.files.get(at) ?? []) keys.push(key)
+      for (const sub of this.folders.get(at) ?? []) if (!skip.has(sub)) stack.push(sub)
+    }
+    return keys
+  }
+}
+
 export class KnownEntries {
-  private record: Map<string, KnownEntry> | null = null
+  private record: EntryRecord | null = null
   private epoch = 0
   private readonly reads = new Set<PendingRead>()
   /** Kinds removed by `unlink` in the current batch, by folded key; `null`: not in the record */
@@ -243,7 +301,7 @@ export class KnownEntries {
     tree: readonly FileNode[],
     touched: ReadonlySet<string>,
     previous: ReadonlyMap<string, KnownEntry> | null
-  ): Map<string, KnownEntry> | null {
+  ): EntryRecord | null {
     if (countEntries(tree, MAX_KNOWN_ENTRIES) > MAX_KNOWN_ENTRIES) return null
     const { entries: record, lazy } = this.collect(tree, '')
     // What an expand read taught the record below a folder that is lazy again
@@ -261,10 +319,10 @@ export class KnownEntries {
     const record = this.record
     if (record === null) return
     const { entries, lazy } = this.collect(tree, rel)
-    const prefix = `${this.fold(rel)}/`
-    for (const key of [...record.keys()]) {
+    // Only the entries below this folder are visited, not the whole record
+    for (const key of record.keysBelow(this.fold(rel), lazy)) {
       // Gone from the folder since: forgotten, so its re-creation stays structural
-      if (key.startsWith(prefix) && !entries.has(key) && !isBelowAny(key, lazy)) record.delete(key)
+      if (!entries.has(key)) record.delete(key)
     }
     for (const [key, entry] of entries) if (!touched.has(key)) record.set(key, entry)
     for (const key of touched) record.delete(key)
@@ -272,8 +330,8 @@ export class KnownEntries {
   }
 
   /** The non-folder entries of a tree below `base` (`''`: the root), and its lazy folders, by folded key. */
-  private collect(tree: readonly FileNode[], base: string): { entries: Map<string, KnownEntry>; lazy: Set<string> } {
-    const entries = new Map<string, KnownEntry>()
+  private collect(tree: readonly FileNode[], base: string): { entries: EntryRecord; lazy: Set<string> } {
+    const entries = new EntryRecord()
     const lazy = new Set<string>()
     const join = (parent: string, name: string): string => (parent === '' ? name : `${parent}/${name}`)
     // Keys built while walking (parent + '/' + name): no path maths per node

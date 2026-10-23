@@ -26,9 +26,10 @@ export interface IFileService {
   readDirectory(dirPath: string, options?: { shallow?: boolean }): Promise<FileNode[]>
 
   /**
-   * Files of one name below a folder, bounded (terminal links on an incomplete tree)
+   * Files of one name below a folder, bounded (terminal links on an incomplete tree).
+   * `readPath` is where `dirPath` is read (its real path); results are built from `dirPath`.
    */
-  findByName(dirPath: string, name: string): Promise<{ paths: string[]; truncated: boolean }>
+  findByName(dirPath: string, name: string, readPath?: string): Promise<{ paths: string[]; truncated: boolean }>
 
   /**
    * Read file contents

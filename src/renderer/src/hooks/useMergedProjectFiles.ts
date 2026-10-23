@@ -14,8 +14,9 @@ import { hasUnloadedCapped, mergeLazyChildren } from '../utils/lazyTree'
  */
 export function useMergedProjectFiles(files: FileNode[]): { files: FileNode[]; truncated: boolean } {
   const loaded = useLazyFolderStore((state) => state.loaded)
+  const status = useLazyFolderStore((state) => state.status)
   return useMemo(() => {
     const merged = mergeLazyChildren(files, loaded)
-    return { files: merged, truncated: hasUnloadedCapped(merged, loaded) }
-  }, [files, loaded])
+    return { files: merged, truncated: hasUnloadedCapped(merged, loaded, status) }
+  }, [files, loaded, status])
 }

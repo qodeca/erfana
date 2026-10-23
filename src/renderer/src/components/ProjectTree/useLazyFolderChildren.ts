@@ -5,7 +5,7 @@
  *
  * The tree walk leaves an ignored folder (`watcher.ignoreList`, e.g. `dist`,
  * `.venv`) and every folder past its entry cap unread: the row arrives with
- * `lazy: 'ignored' | 'capped'` and no children. This hook reads such a folder
+ * `lazy` set (`ignored`, `capped` or `linked`) and no children. This hook reads such a folder
  * when it is expanded – one shallow `file:readDirectory` of that folder, which
  * lists one level and leaves its sub-folders lazy in turn – and keeps the
  * result in `useLazyFolderStore`, where every consumer of the project's files
@@ -13,8 +13,11 @@
  *
  * Loaded children outlive a collapse. A new base tree (a refresh, a watcher
  * event) makes every loaded folder stale: each one is read again when it is
- * next expanded – at once, if it is expanded now – and its old children stay
- * on screen until the new ones arrive. A folder that was read in the old tree
+ * next shown expanded – at once, if it is in view now (it and every folder
+ * above it expanded), so a refresh never re-reads folders out of view – and
+ * its old children stay on screen until the new ones arrive. A failed read
+ * stores nothing: the folder keeps what it showed, if anything, its status
+ * says `failed`, and it is tried again after the next base tree. A folder that was read in the old tree
  * and is lazy in the new one (the cap moved) keeps the children it showed,
  * also stale. Entries for paths no longer lazy in the tree are dropped.
  *
@@ -35,6 +38,19 @@ function foldersWithChildren(nodes: FileNode[], into: Map<string, FileNode[]> = 
     if (node.type !== 'directory' || !node.children || node.children.length === 0) continue
     into.set(node.path, node.children)
     foldersWithChildren(node.children, into)
+  }
+  return into
+}
+
+/**
+ * The lazy folders in view and expanded: reached from the top through
+ * expanded folders only.
+ */
+export function visibleExpandedLazy(nodes: FileNode[], expanded: ReadonlySet<string>, into: string[] = []): string[] {
+  for (const node of nodes) {
+    if (node.type !== 'directory' || !expanded.has(node.path)) continue
+    if (node.lazy) into.push(node.path)
+    if (node.children) visibleExpandedLazy(node.children, expanded, into)
   }
   return into
 }
@@ -90,14 +106,13 @@ export function useLazyFolderChildren(
   const loaded = useLazyFolderStore((state) => state.loaded)
   const status = useLazyFolderStore((state) => state.status)
   const inFlight = useRef(new Set<string>())
-  // Folders whose read a project switch refused, for the base tree it was
-  // made against: not asked again until the tree changes (or every re-render
-  // would ask again)
-  const refused = useRef<{ base: FileNode[]; paths: Set<string> }>({ base: files, paths: new Set() })
+  // Folders whose read failed or a project switch refused, for the base tree
+  // it was made against: not asked again until the tree changes (or every
+  // re-render would ask again)
+  const settled = useRef<{ base: FileNode[]; paths: Set<string> }>({ base: files, paths: new Set() })
   const previousTree = useRef<FileNode[]>([])
 
   const tree = useMemo(() => mergeLazyChildren(files, loaded), [files, loaded])
-  const lazyPaths = useMemo(() => collectLazyPaths(tree), [tree])
 
   // A new base tree: carry children over to folders that turned lazy and drop
   // entries that left the tree – before paint, so a row never flashes empty
@@ -114,11 +129,15 @@ export function useLazyFolderChildren(
 
   useEffect(() => {
     const store = useLazyFolderStore.getState()
-    for (const path of expandedFolders) {
-      if (!lazyPaths.has(path) || inFlight.current.has(path)) continue
+    const noRetry = (path: string): void => {
+      if (settled.current.base !== files) settled.current = { base: files, paths: new Set() }
+      settled.current.paths.add(path)
+    }
+    for (const path of visibleExpandedLazy(tree, expandedFolders)) {
+      if (inFlight.current.has(path)) continue
       const entry = loaded.get(path)
       if (entry?.baseTree === files) continue
-      if (refused.current.base === files && refused.current.paths.has(path)) continue
+      if (settled.current.base === files && settled.current.paths.has(path)) continue
       inFlight.current.add(path)
       store.setStatus(path, 'loading')
       fileGateway
@@ -132,9 +151,8 @@ export function useLazyFolderChildren(
         .catch((error: unknown) => {
           inFlight.current.delete(path)
           // A project switch refuses the read; the remounted tree starts afresh
+          noRetry(path)
           if (isProjectChanged(error)) {
-            if (refused.current.base !== files) refused.current = { base: files, paths: new Set() }
-            refused.current.paths.add(path)
             store.setStatus(path, null)
             return
           }
@@ -142,12 +160,12 @@ export function useLazyFolderChildren(
           logger.warn('[ProjectTree] Lazy folder read failed', {
             error: error instanceof Error ? error.name : typeof error
           })
-          // Whatever it showed stays, marked failed until the next base tree – not retried in a loop
-          store.setLoaded(path, { children: entry?.children ?? [], baseTree: files })
+          // Nothing is stored: whatever it showed stays, marked failed until
+          // the next base tree – not retried in a loop
           store.setStatus(path, 'failed')
         })
     }
-  }, [expandedFolders, lazyPaths, loaded, files])
+  }, [expandedFolders, tree, loaded, files])
 
   return { tree, status, loaded }
 }

@@ -150,16 +150,73 @@ describe('useLazyFolderChildren', () => {
   it('marks a failed read, keeps it empty and does not retry it in a loop', async () => {
     readDirectory.mockRejectedValue(new Error('EACCES: /p/dist'))
     const tree = baseTree()
-    const expanded = new Set(['/p', '/p/dist'])
-    const { result, rerender } = renderHook(() => useLazyFolderChildren(tree, expanded).tree)
+    const { result, rerender } = renderHook(({ expanded }) => useLazyFolderChildren(tree, expanded).tree, {
+      initialProps: { expanded: new Set(['/p', '/p/dist']) as ReadonlySet<string> }
+    })
 
     await waitFor(() => expect(status('/p/dist')).toBe('failed'))
-    rerender()
+    // The panel hands a new set on every expand change: still no second read
+    rerender({ expanded: new Set(['/p', '/p/dist']) })
     await new Promise((resolve) => setTimeout(resolve, 0))
     expect(readDirectory).toHaveBeenCalledTimes(1)
     expect(childrenOf(result.current, '/p/dist')).toEqual([])
+    // A failure is not a read: nothing is stored as loaded (review of #320, item 6)
+    expect(useLazyFolderStore.getState().loaded.has('/p/dist')).toBe(false)
     // The path in the message is never logged
     expect(JSON.stringify(warn.mock.calls)).not.toContain('/p/dist')
+  })
+
+  it('keeps the older children of a folder whose re-read fails, and counts it as unread (item 6)', async () => {
+    readDirectory.mockResolvedValueOnce([file('/p/big/a.md')])
+    const expanded = new Set(['/p/big'])
+    const capped = (): FileNode[] => [folder('/p/big', [], 'capped')]
+    const { result, rerender } = renderHook(
+      ({ files }) => ({ lazy: useLazyFolderChildren(files, expanded), merged: useMergedProjectFiles(files) }),
+      { initialProps: { files: capped() } }
+    )
+    await waitFor(() => expect(childrenOf(result.current.lazy.tree, '/p/big')).toEqual(['/p/big/a.md']))
+    expect(result.current.merged.truncated).toBe(false)
+
+    readDirectory.mockRejectedValueOnce(new Error('EIO'))
+    rerender({ files: capped() })
+
+    await waitFor(() => expect(status('/p/big')).toBe('failed'))
+    expect(childrenOf(result.current.lazy.tree, '/p/big')).toEqual(['/p/big/a.md'])
+    expect(result.current.merged.truncated).toBe(true)
+  })
+
+  it('reads only the lazy folders in view: not one below a collapsed folder (item 7)', async () => {
+    readDirectory.mockResolvedValue([file('/p/a/big/x.md')])
+    const tree = [folder('/p/a', [folder('/p/a/big', [], 'capped')])]
+    const { rerender } = renderHook(({ expanded }) => useLazyFolderChildren(tree, expanded), {
+      initialProps: { expanded: new Set(['/p/a/big']) as ReadonlySet<string> }
+    })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(readDirectory).not.toHaveBeenCalled()
+
+    rerender({ expanded: new Set(['/p/a', '/p/a/big']) })
+
+    await waitFor(() => expect(readDirectory).toHaveBeenCalledTimes(1))
+  })
+
+  it('does not re-read a loaded folder out of view after a new base tree, until it is shown (item 7)', async () => {
+    readDirectory.mockResolvedValue([file('/p/a/big/x.md')])
+    const tree = (): FileNode[] => [folder('/p/a', [folder('/p/a/big', [], 'capped')])]
+    const open = new Set(['/p/a', '/p/a/big'])
+    const { rerender } = renderHook(({ files, expanded }) => useLazyFolderChildren(files, expanded), {
+      initialProps: { files: tree(), expanded: open as ReadonlySet<string> }
+    })
+    await waitFor(() => expect(useLazyFolderStore.getState().loaded.has('/p/a/big')).toBe(true))
+
+    // Collapse the parent, then a refresh brings a new base tree
+    const collapsed = new Set(['/p/a/big'])
+    rerender({ files: tree(), expanded: collapsed })
+    rerender({ files: tree(), expanded: collapsed })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(readDirectory).toHaveBeenCalledTimes(1)
+
+    rerender({ files: tree(), expanded: open })
+    await waitFor(() => expect(readDirectory).toHaveBeenCalledTimes(2))
   })
 
   it('drops a read the project switch refused: no marker, no log, nothing merged', async () => {

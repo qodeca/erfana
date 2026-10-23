@@ -42,6 +42,19 @@ export interface SmartResolutionResult {
 
   /** Whether smart resolution was used (vs exact match) */
   wasSmartResolved: boolean
+
+  /**
+   * The candidates come from an incomplete tree (and a bounded search): there
+   * may be other files of that name. The picker says so.
+   */
+  incomplete?: boolean
+}
+
+/** What a bounded name search in main found. */
+export interface NameSearchResult {
+  paths: string[]
+  /** A bound stopped the search early */
+  truncated: boolean
 }
 
 /**
@@ -78,7 +91,7 @@ export interface SmartResolveOptions {
   treeTruncated?: boolean
 
   /** Files of this name on disk, for a truncated tree (a bounded search in main) */
-  searchByName?: (filename: string) => Promise<string[]>
+  searchByName?: (filename: string) => Promise<NameSearchResult>
 }
 
 /**
@@ -264,22 +277,33 @@ export async function resolvePathSmart(
 }
 
 /**
- * On an incomplete tree no lookup is certain: a single match becomes a choice
- * of one, and a name the index lacks is searched for on disk – every result
- * offered for choosing.
+ * On an incomplete tree no lookup is certain: the name is also searched for
+ * on disk – whether the index had it or not, since another file of that name
+ * may sit in an unread folder – and every match from either, once each, is
+ * offered for choosing (a single one too), marked `incomplete`.
  */
 export async function resolveOnTruncatedTree(
   result: SmartResolutionResult,
   query: string,
-  searchByName?: (filename: string) => Promise<string[]>
+  searchByName?: (filename: string) => Promise<NameSearchResult>
 ): Promise<SmartResolutionResult> {
-  if (result.status === 'single-match' && result.resolvedPath) {
-    return { status: 'multiple-matches', candidates: rankCandidates([result.resolvedPath], query), wasSmartResolved: true }
-  }
-  if (result.status !== 'no-match' || !searchByName) return result
-  const found = await searchByName(extractFilenameFromPath(query))
-  if (found.length === 0) return result
-  return { status: 'multiple-matches', candidates: rankCandidates(found, query), wasSmartResolved: true }
+  const fromIndex =
+    result.status === 'single-match' && result.resolvedPath
+      ? [result.resolvedPath]
+      : result.status === 'multiple-matches'
+        ? (result.candidates ?? []).map((candidate) => candidate.path)
+        : []
+  const found = searchByName ? (await searchByName(extractFilenameFromPath(query))).paths : []
+  // Once each: the index and the search name the same file with the same root
+  const seen = new Set<string>()
+  const paths = [...fromIndex, ...found].filter((path) => {
+    const key = normalizePath(path)
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+  if (paths.length === 0) return result
+  return { status: 'multiple-matches', candidates: rankCandidates(paths, query), wasSmartResolved: true, incomplete: true }
 }
 
 /**

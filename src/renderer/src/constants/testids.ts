@@ -347,6 +347,8 @@ export const TEST_IDS = {
   FILE_PICKER_BTN_SELECT: 'file-picker-btn-select',
   /** Cancel button */
   FILE_PICKER_BTN_CANCEL: 'file-picker-btn-cancel',
+  /** The "list may be incomplete" note (a truncated project tree, #320) */
+  FILE_PICKER_INCOMPLETE: 'file-picker-incomplete',
 
   // =========================================================================
   // Context Menu - Base (2)

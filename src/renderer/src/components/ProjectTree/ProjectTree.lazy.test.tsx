@@ -106,23 +106,28 @@ function setupMockApi(): void {
   }
 }
 
-async function openTree(filterMode: FilterMode = 'all', waitFor_ = 'docs'): Promise<void> {
-  render(
-    <DialogProvider>
-      <ProjectManagementProvider>
-        <ProjectTree
-          onFileSelect={vi.fn()}
-          showControlPanel={false}
-          filterMode={filterMode}
-          onFilterModeChange={() => {}}
-        />
-      </ProjectManagementProvider>
-    </DialogProvider>
-  )
+const onFileSelect = vi.fn()
+const treeUi = (filterMode: FilterMode) => (
+  <DialogProvider>
+    <ProjectManagementProvider>
+      <ProjectTree
+        onFileSelect={onFileSelect}
+        showControlPanel={false}
+        filterMode={filterMode}
+        onFilterModeChange={() => {}}
+      />
+    </ProjectManagementProvider>
+  </DialogProvider>
+)
+
+/** Render the tree on the project; the answer switches the filter mode */
+async function openTree(filterMode: FilterMode = 'all', waitFor_ = 'docs'): Promise<(mode: FilterMode) => void> {
+  const { rerender } = render(treeUi(filterMode))
   await act(async () => {
     onProjectChangedCallback!({ newPath: PROJECT, oldPath: null })
   })
   await waitFor(() => expect(screen.getByText(waitFor_)).toBeInTheDocument())
+  return (mode) => rerender(treeUi(mode))
 }
 
 /** The focusable treeitem of a node row */
@@ -249,6 +254,28 @@ describe('ProjectTree lazy folders in the Markdown filter (review items 4, 9)', 
     await waitFor(() => expect(screen.queryByText('big')).toBeNull())
     // Focus recovery lands on the nearest ancestor that still has a row: the project root
     await waitFor(() => expect(document.activeElement).toBe(rowOf(PROJECT)))
+  })
+
+  it('keeps a folder whose read failed, with its "Could not read" line (review of #320, item 6)', async () => {
+    await openTree('markdown')
+    fileApi.readDirectory.mockRejectedValueOnce(new Error('EACCES'))
+
+    fireEvent.click(screen.getByText('big'))
+
+    await waitFor(() => expect(placeholderOf(`${PROJECT}/big`)).toHaveTextContent('Could not read this folder'))
+    expect(screen.getByText('big')).toBeInTheDocument()
+  })
+
+  it('keeps an ignored folder whose read failed when the filter turns to Markdown (item 6)', async () => {
+    const setFilterMode = await openTree('all')
+    fileApi.readDirectory.mockRejectedValueOnce(new Error('EACCES'))
+    fireEvent.click(screen.getByText('dist'))
+    await waitFor(() => expect(placeholderOf(`${PROJECT}/dist`)).not.toBeNull())
+
+    act(() => setFilterMode('markdown'))
+
+    expect(screen.getByText('dist')).toBeInTheDocument()
+    expect(placeholderOf(`${PROJECT}/dist`)).toHaveTextContent('Could not read this folder')
   })
 
   it('keeps a capped folder whose loaded level holds Markdown', async () => {

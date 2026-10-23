@@ -9,11 +9,17 @@
  * - read on expand: like any folder – kept while what was read holds Markdown,
  *   or a still-unread `capped` sub-folder that may; one that loads with
  *   neither disappears (focus recovery moves a focus it held to its parent);
+ * - its read failed: kept, whatever its kind, so its "Could not read this
+ *   folder" line stays in view; it counts as unread;
  * - never read, `capped`: kept, because a walk bound – not its contents – left
  *   it empty, and it may well hold Markdown;
- * - never read, `ignored`: hidden, like the build and cache output it is.
+ * - never read, `ignored`: hidden, like the build and cache output it is;
+ * - never read, `linked`: hidden – its files show under the folder the link
+ *   leads to.
  */
 import type { FileNode } from '../../../../shared/ipc/file-schema'
+import type { LazyFolderStatus } from '../../stores/useLazyFolderStore'
+import { isUnreadLazy } from '../../utils/lazyTree'
 
 /** `.md` and `.markdown`, any case. */
 export function isMarkdownFileName(fileName: string): boolean {
@@ -24,19 +30,28 @@ export function isMarkdownFileName(fileName: string): boolean {
 /**
  * @param nodes - The merged tree
  * @param loaded - Lazy folders read so far, by path
+ * @param status - Lazy folders being read or whose read failed, by path
  * @returns The filtered tree
  */
-export function filterMarkdownTree(nodes: FileNode[], loaded: ReadonlyMap<string, unknown>): FileNode[] {
+export function filterMarkdownTree(
+  nodes: FileNode[],
+  loaded: ReadonlyMap<string, unknown>,
+  status: ReadonlyMap<string, LazyFolderStatus> = new Map()
+): FileNode[] {
   const kept: FileNode[] = []
   for (const node of nodes) {
     if (node.type === 'file') {
       if (isMarkdownFileName(node.name)) kept.push(node)
       continue
     }
-    const children = node.children && node.children.length > 0 ? filterMarkdownTree(node.children, loaded) : []
+    const children =
+      node.children && node.children.length > 0 ? filterMarkdownTree(node.children, loaded, status) : []
     if (children.length > 0) {
       kept.push({ ...node, children })
-    } else if (node.lazy === 'capped' && !loaded.has(node.path)) {
+    } else if (node.lazy !== undefined && status.get(node.path) === 'failed') {
+      // Its line says it could not be read
+      kept.push({ ...node, children: [] })
+    } else if (node.lazy === 'capped' && isUnreadLazy(node.path, loaded, status)) {
       // Its contents are unknown until it is expanded
       kept.push({ ...node, children: [] })
     }

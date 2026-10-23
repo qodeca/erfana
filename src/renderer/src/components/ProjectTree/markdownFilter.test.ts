@@ -41,6 +41,21 @@ describe('filterMarkdownTree', () => {
     expect(names(filterMarkdownTree([withMarkdown], loaded))).toEqual(['big', 'big/a.md'])
   })
 
+  it('keeps a lazy folder whose read failed, so its line stays in view (review of #320, item 6)', () => {
+    const failed = new Map([
+      ['/p/dist', 'failed' as const],
+      ['/p/big', 'failed' as const]
+    ])
+    // big was read once (an older read, no Markdown), then its re-read failed
+    const loaded = new Map([['/p/big', {}]])
+    const tree = [dir('/p/dist', [], 'ignored'), dir('/p/big', [file('/p/big/x.txt')], 'capped')]
+    expect(names(filterMarkdownTree(tree, loaded, failed))).toEqual(['dist', 'big'])
+  })
+
+  it('hides a never-read linked folder: its files show where the link leads (item 5)', () => {
+    expect(filterMarkdownTree([dir('/p/alias', [], 'linked')], new Map())).toEqual([])
+  })
+
   it('names Markdown by extension, any case', () => {
     expect(isMarkdownFileName('A.Md')).toBe(true)
     expect(isMarkdownFileName('notes.markdown')).toBe(true)

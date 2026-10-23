@@ -37,10 +37,11 @@ import { logger } from '../services/LoggingService'
 import { withErrorCodeMarker } from '../../shared/errorCodeMarker'
 import { fileExists } from '../utils/fileUtils'
 import { redactPath, redactedLogError } from '../utils/redactUserInput'
-import { isInsideRoot } from '../utils/pathCompare'
+import { isInsideRoot, isSamePath } from '../utils/pathCompare'
 import { isSystemPath } from '../utils/systemPathBlock'
 import { restoreParentDirectory } from '../services/file/restoreParentDirectory'
 import { registerConfinedHandle } from './confinement/registerConfinedHandle'
+import { ConfinementError } from './confinement/ConfinementError'
 import { isTrustedSender } from './senderValidation'
 import { registerHandle } from './registry'
 import { rememberDialogResult, withLastDirectory } from '../utils/lastDialogDirectory'
@@ -208,18 +209,24 @@ export function registerFileHandlers(): void {
     session
   )
 
-  // Find files by name below a project folder (finding [32], PR #320 review):
+  // Find files by name in the project (finding [32], PR #320 review):
   // the terminal's fallback for a bare file name the incomplete tree does not
   // hold. The controls, for review:
   // - payload: strict `{ dirPath, name }`; `name` is one entry name (no `/`,
   //   `\`, NUL, `.` or `..`), so it is compared, never joined into a path;
   // - `dirPath`: confined to the open project and must exist (`mode:
-  //   'project'`, the same binding as `file:readDirectory`); a project
-  //   switch during the search answers PROJECT_CHANGED (`staleCheck`);
+  //   'project'`, the same binding as `file:readDirectory`), and must be the
+  //   project root itself (WRONG_KIND otherwise). The walk reads its real
+  //   path; result paths are built from the path as requested. A project
+  //   switch ends the walk and answers PROJECT_CHANGED (`staleCheck`);
   // - the walk: never follows a link or junction, so it stays below `dirPath`;
-  //   hidden names and the exclude list are skipped as in the tree;
-  // - cost: at most 20 results, 20,000 folders, 1.5 s and 16 reads in flight
-  //   (`file/findByName`), then it answers with what it found, `truncated`;
+  //   hidden names, the exclude list and ignored folders are skipped as in
+  //   the tree;
+  // - cost: at most 20 results, 20,000 folders (a bounded list), 16 reads in
+  //   flight and a hard 1.5 s deadline that a hanging read cannot hold up;
+  //   then it answers with what it found, `truncated`. Across calls, at most
+  //   2 searches run in the process, one per project + folder + name, and 8
+  //   wait; a call past that answers `truncated` (`file/findByName`);
   // - logs: counts and duration only, never the name or the paths.
   registerConfinedHandle(
     FILE_CHANNELS.findByName,
@@ -227,9 +234,13 @@ export function registerFileHandlers(): void {
       schema: payloadArgs(FindByNameRequestSchema),
       paths: { dirPath: { arg: 0, key: 'dirPath', mode: 'project', mustExist: true } },
       staleCheck: 'after',
-      handler: async (_ctx, [{ name }], { dirPath }): Promise<FindByNameResponse> => {
+      handler: async (ctx, [{ name }], { dirPath }): Promise<FindByNameResponse> => {
+        // The terminal searches the whole project; a sub-folder is not a use
+        if (!ctx.session || !isSamePath(dirPath.real, ctx.session.realRoot, ctx.session.caseSensitive)) {
+          throw new ConfinementError('WRONG_KIND')
+        }
         const start = performance.now()
-        const result = await fileService.findByName(dirPath.requested, name)
+        const result = await fileService.findByName(dirPath.requested, name, dirPath.real)
         // Counts only: the name and the paths are the user's
         logger.info('file:findByName completed', {
           durationMs: Math.round(performance.now() - start),

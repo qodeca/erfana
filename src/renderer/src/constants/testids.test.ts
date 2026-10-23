@@ -276,10 +276,10 @@ describe('TEST_IDS', () => {
       expect(ids).toHaveLength(4)
     })
 
-    it('should have 5 File picker IDs', async () => {
+    it('should have 6 File picker IDs', async () => {
       const { TEST_IDS } = await getTestIds()
       const ids = Object.keys(TEST_IDS).filter((k) => k.startsWith('FILE_PICKER'))
-      expect(ids).toHaveLength(5)
+      expect(ids).toHaveLength(6)
     })
 
     it('should have 5 Diagram Viewer IDs', async () => {

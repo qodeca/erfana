@@ -6,6 +6,7 @@
  * merged tree (`useMergedProjectFiles`).
  */
 import type { FileNode } from '../../../shared/ipc/file-schema'
+import type { LazyFolderStatus } from '../stores/useLazyFolderStore'
 
 /**
  * The tree with each loaded lazy folder's children put in place. Nodes on no
@@ -46,15 +47,32 @@ export function collectLazyPaths(nodes: FileNode[], into: Set<string> = new Set(
 }
 
 /**
- * Whether a merged tree is missing files a walk bound left out: some `capped`
- * folder in it has not been read. `ignored` folders do not count – their
- * files are left out by design.
+ * Whether a lazy folder's contents are unknown: never read, or its last read
+ * failed (what it may still show is from an older read).
  */
-export function hasUnloadedCapped(nodes: FileNode[], loaded: ReadonlyMap<string, unknown>): boolean {
+export function isUnreadLazy(
+  path: string,
+  loaded: ReadonlyMap<string, unknown>,
+  status?: ReadonlyMap<string, LazyFolderStatus>
+): boolean {
+  return !loaded.has(path) || status?.get(path) === 'failed'
+}
+
+/**
+ * Whether a merged tree is missing files a walk bound left out: some `capped`
+ * folder in it is unread ({@link isUnreadLazy}). `ignored` folders do not
+ * count – their files are left out by design – and neither do `linked` ones,
+ * whose files the tree shows under the folder the link leads to.
+ */
+export function hasUnloadedCapped(
+  nodes: FileNode[],
+  loaded: ReadonlyMap<string, unknown>,
+  status?: ReadonlyMap<string, LazyFolderStatus>
+): boolean {
   for (const node of nodes) {
     if (node.type !== 'directory') continue
-    if (node.lazy === 'capped' && !loaded.has(node.path)) return true
-    if (node.children && hasUnloadedCapped(node.children, loaded)) return true
+    if (node.lazy === 'capped' && isUnreadLazy(node.path, loaded, status)) return true
+    if (node.children && hasUnloadedCapped(node.children, loaded, status)) return true
   }
   return false
 }
