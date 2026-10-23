@@ -12,8 +12,9 @@ required by their licenses. Development-only dependencies are not distributed wi
 the application and are not listed here.
 
 The per-dependency section below is generated from the production dependency tree
-(`npx generate-license-file --input package.json`); last generated 2026-10-18.
-Regenerate it whenever production dependencies change.
+(`npx generate-license-file --input package.json`); last generated 2026-10-18, with the
+`@noble/hashes` entry added by hand afterwards (same format). Regenerate it whenever production
+dependencies change.
 
 ## Bundled binaries and assets (notable)
 

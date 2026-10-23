@@ -261,9 +261,27 @@ describe('verifyManifest', () => {
     ).rejects.toMatchObject({ code: 'no-trusted-pubkey' })
   })
 
+  it('parses every embedded pubkey: a rotation-key ID reaches the Ed25519 check', async () => {
+    // Point the fixture's key ID at the rotation key. Its pubkey must parse and
+    // match, so the (wrong-key) signature fails Ed25519 rather than being
+    // reported as "no trusted pubkey".
+    const rotation = WHISPER_PUBKEYS.find((k) => k.role === 'rotation')!
+    const rotationKeyId = Buffer.from(rotation.publicKey, 'base64').subarray(2, 10)
+    const sigFile = await readFile(FIXTURE_SIGNATURE_PATH, 'utf8')
+    const lines = sigFile.split(/\r?\n/)
+    const raw = Buffer.from(lines[1], 'base64')
+    rotationKeyId.copy(raw, 2)
+    lines[1] = raw.toString('base64')
+    await copyFile(FIXTURE_MANIFEST_PATH, manifestPath)
+    await writeFile(sigPath, lines.join('\n'))
+    await expect(
+      verifyManifest({ contentPath: manifestPath, signaturePath: sigPath })
+    ).rejects.toMatchObject({ code: 'ed25519-rejected' })
+  })
+
   it('does not import node crypto (BoringSSL has no BLAKE2b)', async () => {
     const source = await readFile(join(__dirname, 'verifyManifest.ts'), 'utf8')
-    expect(source).not.toMatch(/from\s+['"](node:)?crypto['"]/)
+    expect(source).not.toMatch(/(from\s+|require\(\s*|import\(\s*)['"](node:)?crypto['"]/)
   })
 
   it('verifies a prehashed signature when the runtime has no native BLAKE2b (BoringSSL)', async () => {
