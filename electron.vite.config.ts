@@ -60,6 +60,63 @@ function assertSelfContainedPreloads(): Plugin {
   }
 }
 
+/**
+ * Monaco vendors its own DOMPurify (pinned in its package, currently 3.2.7) that
+ * the `dompurify` override in package.json cannot reach, and no Monaco release
+ * carries a patched copy. Point that vendored import at the npm `dompurify`
+ * (pinned by the override) so the renderer ships a single, patched copy. Both
+ * modules have a default export of the DOMPurify instance, so no shim is needed.
+ */
+function useNpmDompurifyForMonaco(): Plugin {
+  const vendoredImport = /(^|[\\/])dompurify[\\/]dompurify\.js$/
+  return {
+    name: 'erfana:monaco-npm-dompurify',
+    enforce: 'pre',
+    async resolveId(source, importer, options) {
+      if (!importer || !vendoredImport.test(source)) return null
+      if (!/[\\/]monaco-editor[\\/]/.test(importer)) return null
+      return this.resolve('dompurify', importer, { ...options, skipSelf: true })
+    }
+  }
+}
+
+/** Minimum DOMPurify version the renderer may ship (fixes GHSA-cg2g-xh64-v4q7, GHSA-mrv2-3pqr-j5jr). */
+const MIN_DOMPURIFY = [3, 4, 17]
+
+/**
+ * Fail the renderer build if it ships more than one DOMPurify copy, or one
+ * older than MIN_DOMPURIFY. Both devDependencies that bundle it (Mermaid and
+ * Monaco) are invisible to `npm audit --omit=dev`, so the bundle is checked.
+ */
+function assertSingleDompurify(): Plugin {
+  return {
+    name: 'erfana:single-dompurify',
+    apply: 'build',
+    writeBundle(_options, bundle): void {
+      const versions: string[] = []
+      for (const output of Object.values(bundle)) {
+        if (output.type !== 'chunk') continue
+        for (const m of output.code.matchAll(/@license DOMPurify (\d+\.\d+\.\d+)/g)) {
+          versions.push(m[1])
+        }
+      }
+      if (versions.length !== 1) {
+        throw new Error(
+          `Expected exactly one DOMPurify copy in the renderer bundle, found ${versions.length}: ${versions.join(', ') || 'none'}.`
+        )
+      }
+      const parts = versions[0].split('.').map(Number)
+      const tooOld = parts.some((n, i) => {
+        const earlier = parts.slice(0, i).every((p, j) => p === MIN_DOMPURIFY[j])
+        return earlier && n < MIN_DOMPURIFY[i]
+      })
+      if (tooOld) {
+        throw new Error(`Bundled DOMPurify ${versions[0]} is older than ${MIN_DOMPURIFY.join('.')}.`)
+      }
+    }
+  }
+}
+
 export default defineConfig({
   main: {
     build: {
@@ -130,6 +187,6 @@ export default defineConfig({
     define: {
       __APP_VERSION__: JSON.stringify(appVersion)
     },
-    plugins: [react()]
+    plugins: [useNpmDompurifyForMonaco(), react(), assertSingleDompurify()]
   }
 })
