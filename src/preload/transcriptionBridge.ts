@@ -29,6 +29,7 @@ export const whisperBridge: WhisperBridge = {
   ensureModel: (model) => ipcRenderer.invoke(TRANSCRIPTION_CHANNELS.WHISPER_ENSURE_MODEL, model),
   listModels: () => ipcRenderer.invoke(TRANSCRIPTION_CHANNELS.WHISPER_LIST_MODELS),
   deleteModel: (model) => ipcRenderer.invoke(TRANSCRIPTION_CHANNELS.WHISPER_DELETE_MODEL, model),
+  cancelDownload: () => ipcRenderer.invoke(TRANSCRIPTION_CHANNELS.WHISPER_CANCEL_DOWNLOAD),
   onDownloadProgress: (callback) =>
     subscribe(TRANSCRIPTION_CHANNELS.WHISPER_DOWNLOAD_PROGRESS, callback)
 }

@@ -66,7 +66,8 @@ describeBridge('whisper bridge', whisperBridge, {
     { method: 'ensureBinary', args: [], channel: 'transcription:whisperEnsureBinary', wire: [] },
     { method: 'ensureModel', args: ['base'], channel: 'transcription:whisperEnsureModel', wire: ['base'] },
     { method: 'listModels', args: [], channel: 'transcription:whisperListModels', wire: [] },
-    { method: 'deleteModel', args: ['base'], channel: 'transcription:whisperDeleteModel', wire: ['base'] }
+    { method: 'deleteModel', args: ['base'], channel: 'transcription:whisperDeleteModel', wire: ['base'] },
+    { method: 'cancelDownload', args: [], channel: 'transcription:whisperCancelDownload', wire: [] }
   ],
   events: [{ method: 'onDownloadProgress', channel: 'transcription:whisperDownloadProgress' }]
 })

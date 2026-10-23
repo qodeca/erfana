@@ -206,6 +206,7 @@ const WHISPER_METHODS: Record<keyof WhisperBridge, true> = {
   ensureModel: true,
   listModels: true,
   deleteModel: true,
+  cancelDownload: true,
   onDownloadProgress: true
 }
 

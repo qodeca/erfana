@@ -337,6 +337,7 @@ Three further `image-export:*` names exist in `src/shared/ipc/image-export-chann
 | `transcription:whisperEnsureModel` | Ensure a whisper model is downloaded and verified |
 | `transcription:whisperListModels` | List locally available whisper models |
 | `transcription:whisperDeleteModel` | Delete a downloaded whisper model |
+| `transcription:whisperCancelDownload` | Cancel the running binary or model download; the pending ensure call resolves with `cancelled: true` and the partial file is deleted |
 | `transcription:progress` | Event: progress update (main → renderer) |
 | `transcription:whisperDownloadProgress` | Event: binary/model download progress (main → renderer) |
 

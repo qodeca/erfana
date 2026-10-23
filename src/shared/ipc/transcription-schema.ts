@@ -149,14 +149,25 @@ export interface WhisperDownloadProgress {
  * @see Issue #111 - Local Whisper transcription backend
  */
 export interface WhisperBridge {
-  /** Download the whisper.cpp binary if it is not there yet. */
-  ensureBinary(): Promise<{ success: boolean; path?: string; error?: string }>
-  /** Download a model if it is not there yet; progress arrives through `onDownloadProgress`. */
-  ensureModel(model: WhisperModel): Promise<{ success: boolean; path?: string; error?: string }>
+  /** Download the whisper.cpp binary if it is not there yet; `cancelled` after `cancelDownload`. */
+  ensureBinary(): Promise<{ success: boolean; path?: string; error?: string; cancelled?: boolean }>
+  /**
+   * Download a model if it is not there yet; progress arrives through
+   * `onDownloadProgress`, and `cancelled` is set after `cancelDownload`.
+   */
+  ensureModel(
+    model: WhisperModel
+  ): Promise<{ success: boolean; path?: string; error?: string; cancelled?: boolean }>
   listModels(): Promise<{
     success: boolean
     models: Array<{ name: WhisperModel; size: number; installed: boolean }>
   }>
   deleteModel(model: WhisperModel): Promise<IpcAck>
+  /**
+   * Cancel the running binary or model download. Its pending ensure call
+   * resolves with `cancelled: true` and the partial file is deleted; `success`
+   * is false when nothing was downloading.
+   */
+  cancelDownload(): Promise<IpcAck>
   onDownloadProgress(callback: (progress: WhisperDownloadProgress) => void): () => void
 }
