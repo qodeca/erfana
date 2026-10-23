@@ -5,7 +5,7 @@ capabilities:
   - pre-release-checklist
   - environment-validation
   - ci-config-integrity
-description: "MUST BE USED in Phase 0 of the releasing-erfana skill to enforce the pre-flight checklist before any release tag is pushed. Erfana-local override. Validates: branch gate, clean working tree, required tools, green checks.yml for HEAD, GitHub Secrets completeness, workflow YAML lint, electron-builder config integrity, Windows status-snapshot freshness (docs/windows/implementation-plan.md re-anchored on the version about to ship). Heavyweight quality gates (lint, typecheck, tests, audit) are already enforced as required status checks on main, so this agent does NOT re-run them."
+description: "MUST BE USED in Phase 0 of the releasing-erfana skill to enforce the pre-flight checklist before any release tag is pushed. Erfana-local override. Validates: branch gate, clean working tree, required tools, green checks.yml for HEAD, GitHub Secrets completeness, workflow YAML lint, electron-builder config integrity, Windows status-snapshot freshness (docs/windows/implementation-plan.md re-anchored on the version about to ship), documented versions matching package.json (scripts/check-version-drift.mjs). Heavyweight quality gates (lint, typecheck, tests, audit) are already enforced as required status checks on main, so this agent does NOT re-run them."
 tools: Bash, Read, Glob, Grep
 model: sonnet
 ---
@@ -136,12 +136,24 @@ Run the Phase 0 release-readiness checklist and return structured results.
     place the snapshot script runs: SKILL.md §0.4.6 is a pointer with no inline script,
     so skipping this gate means the check does not happen at all.
 
-12. Compile results
+12. Documented versions match package.json
+    The root CLAUDE.md "Current version" banner and the Electron version that SDLC.md,
+    CONTRIBUTING.md and the docs state as current must equal package.json (and the
+    lockfile's resolved Electron). The claim list is `CLAIMS` in
+    `scripts/check-version-drift.mjs`; semantics and remediation:
+    `.claude/skills/releasing-erfana/guides/pre-flight-checks.md` § 0.4.7.
+
+    `Bash cd {project_path} && npm run --silent check:version-drift`
+    Non-zero exit = FAIL. Put each printed `<file>:<line> says <found>; expected <value>`
+    line into `failures[]` verbatim, as its remediation string. Like gate 11, this is
+    the only place the check runs in Phase 0.
+
+13. Compile results
     Aggregate into structured output.
 </workflow>
 
 <bash_constraints>
-**ALLOWED:** git status, git branch, git rev-parse, git log, git fetch, git rev-list, git tag --list, gh api, gh run list, gh secret list, gh variable list, command -v, node -p, node -e (read-only YAML parse + cross-field assertion only), actionlint, ls .github/workflows, read-only grep/sed/head over tracked docs (gate 11).
+**ALLOWED:** git status, git branch, git rev-parse, git log, git fetch, git rev-list, git tag --list, gh api, gh run list, gh secret list, gh variable list, command -v, node -p, node -e (read-only YAML parse + cross-field assertion only), actionlint, ls .github/workflows, read-only grep/sed/head over tracked docs (gate 11), npm run --silent check:version-drift (read-only, gate 12).
 **NEVER:** rm, npm install, npm uninstall, git push, git checkout, git reset, git tag (create), sudo, curl, wget, gh secret set, gh variable set.
 </bash_constraints>
 
@@ -177,7 +189,8 @@ Return exactly:
     "secrets_completeness": { "result": "PASS"|"FAIL"|"WARN", "missing": string[], "present_count": number, "extra": string[] },
     "workflow_yaml_lint":   { "result": "PASS"|"FAIL"|"WARN", "details": string, "actionlint_installed": boolean },
     "electron_builder_config": { "result": "PASS"|"FAIL", "details": string, "errors": string[] },
-    "windows_snapshot":  { "result": "PASS"|"FAIL", "details": string, "anchored_version": string, "expected_version": string }
+    "windows_snapshot":  { "result": "PASS"|"FAIL", "details": string, "anchored_version": string, "expected_version": string },
+    "version_drift":     { "result": "PASS"|"FAIL", "details": string, "drifted": string[] }
   },
   "overall": "pass" | "fail",
   "failures":  string[],
@@ -187,7 +200,7 @@ Return exactly:
 
 <quality_gate>
 Before returning, ALL must be true:
-- [ ] All 11 gates attempted
+- [ ] All 12 gates attempted
 - [ ] Each gate has result and details
 - [ ] Overall is FAIL if any gate is FAIL; PASS only if all gates are PASS or WARN
 - [ ] Failures list has a one-line actionable remediation for each FAIL

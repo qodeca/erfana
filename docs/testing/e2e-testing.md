@@ -17,6 +17,7 @@ Erfana supports automated E2E testing using Playwright with Electron. This guide
 - [POM classes](../../e2e/pages/) – Page Object Model implementations
 - [Fixtures](../../e2e/fixtures/index.ts) – Composed Playwright fixtures (POM, project, settings, open-file)
 - [Wait helpers](../../e2e/utils/wait-helpers.ts) – Race-safe IPC wait utilities
+- [Bounded exec](../../e2e/utils/bounded-exec.ts) – The only way an e2e helper may call `executeJavaScript` (a deadline that names the call)
 
 ---
 
@@ -175,7 +176,7 @@ Located in `e2e/pages/`:
 | `ImageViewerNarrowPage` | Extends the above for the narrow-width toolbar contract (#73) – `toolbar()`, `controls()`, `constrainPanelWidth()`, `toolbarScrollMetrics()`, `panelScrollLeft()`, `focusedTestId()`, `expectWithinPanel()`. A separate file only because the base POM is near the 500-line cap |
 | `HtmlPreviewPage` | HTML preview (#111) – takes `(page, app)` because the previewed page runs in a sealed `WebContentsView` and is read main-side: `open()` (path-exact, waits for the `erfana-preview://` web contents), `snapshot()` / `eval()` / `livePreviews()` / `waitForTitled()` (address one of several with `HtmlPreviewPage.target(relPath)`), `clickInPreview()` (untrusted, `will-navigate` path) vs `clickTrusted()` (real input event – the only way to a gesture-gated path such as an external link), `viewBounds()` (`{ x, y, width, height, visible }`, window content DIP – `x` and `y` because a view can keep the right size at the wrong place). The native-view reads are plain functions taking the `ElectronApplication` in `e2e/pages/html-preview.native.ts` (#124 split); the class methods are one-line delegates. DOM chrome: `placeholder()` / `panel()` / `stillFrame()` / `tab()` scoped by basename (the placeholder name is `HTML preview of <basename>`, followed by ` – press Enter …` while the page can be entered from the keyboard; both match), the failure badge, and the permission band (`chip()`, `openBand()`, `hostRow()`, `allowButton(origin)`, `confirmDialog()` / `confirmButton()` / `cancelButton()`, `allowedSection()`). Not a composed fixture – construct it in the test. Companions: `e2e/fixtures/localServer.ts` (ephemeral loopback server + `localServer` fixture) and `e2e/fixtures/logTail.ts` (condition-based read of what the worker's `~/.erfana/logs/main.log` gains after a mark; `new LogTail(appMainLogPath(homeDir))`) |
 | `html-preview.native.ts` | The native-view reads behind `HtmlPreviewPage` (#124 split) – plain functions taking the `ElectronApplication`, read main-side: `previewSnapshot()`, `livePreviews()`, `evalInPreview()`, `clickInPreview()`, `clickTrusted()` and `viewBounds()`. The class methods of the same names are one-line delegates |
-| `html-preview.frames.ts` | HTML preview frames (#124, part 2) – plain functions (like `html-preview.native.ts`, because `HtmlPreviewPage` keeps its app handle private): `frameTree()` (every frame with depth, URL and `document.title`, read main-side), `evalInFrame()`, `armFrameTrail()` / `readFrameTrail()` / `writerOf()` (which layer wrote a refused-frame entry, from Electron's own frame signals), `waitForBadgeCount()`, `readBadgeGroups()`, `resetHostZoom()`; `dismissToasts` re-exports the shared `dismissAllToasts`. The reads and clicks in frames are the test's own – the product runs no script in a page's frames |
+| `html-preview.frames.ts` | HTML preview frames (#124, part 2) – plain functions (like `html-preview.native.ts`, because `HtmlPreviewPage` keeps its app handle private): `frameTree()` (every frame with depth, URL and `document.title`, read main-side), `evalInFrame()` (a read), `clickInFrame()` (a click queued in the frame, so a navigating link cannot hang the call), `armFrameTrail()` / `readFrameTrail()` / `writerOf()` (which layer wrote a refused-frame entry, from Electron's own frame signals), `waitForBadgeCount()`, `readBadgeGroups()`, `resetHostZoom()`; `dismissToasts` re-exports the shared `dismissAllToasts`. The reads and clicks in frames are the test's own – the product runs no script in a page's frames |
 | `html-preview.browser.ts` | "Open in default browser" (#124, part 4) – the launch seam: `armBrowserSeam(app, mode)` (`answer` / `hold` / `throw`), `setBrowserSeamMode()`, `releaseBrowserSeam()`, `browserSeamCalls()` / `waitForBrowserSeamCalls()`, `stubBrowserLookup()` (a fixed default-browser path, or `'reject'` to force the fallback), `expectedBrowserLaunch()`; plus `openInBrowserButton()`, `toastsOf(page, type)`, `dismissAllToasts()`, `rendererPlatform()` / `revealCommandFor()` |
 | `html-preview.navigation.ts` | Same-tab links and history (#124, part 3) – panel-scoped chrome (`backButton()`, `linkModeToggle()`, `moveAnnouncement()`, `previewTabs()`, `turnSameTabOn()`), main-side reads (`livePages()` / `waitForLivePages()`, `waitForPage()`, `scrollState()`, `previewZoomLevel()`), real input inside the page (`clickLink()` with `button` and `accel`, `pressNavKeyInPage()`, `navChord()`, `zoomInPreview()`) and save-dialog recording (`recordSaveDialogs()` / `savedDialogNames()`). Still holds its own `dismissAllToasts` copy (technical debt) |
 | `html-preview.focus.ts` | Keyboard focus into a previewed page and back (#124, QG-8 U1 and QG-11a H1) – plain functions taking the `ElectronApplication`, like `html-preview.native.ts`: `bandChip()`, `bringAppToFront()` (makes Erfana the OS key window and **fails** when the OS will not, naming the locked screen or inactive session as the cause), `focusState()` (native focus read main-side with `webContents.isFocused()` for the preview and its host window – `document.activeElement` cannot tell), `pressKeyInPage()` (real input through `webContents.sendInputEvent`; Playwright's `page.keyboard` drives the host and never reaches the page), and `recordHostFocusTrail()` / `hostFocusTrail()` (the order of host `focus()` calls and forwarded shortcuts, observable without OS focus) |
@@ -336,18 +337,54 @@ Teardown (#134): the `app` fixtures wait for the Electron process to exit (`clos
 
 ### Reading editor content: `getContent()` vs `visibleText()`
 
-`MonacoPage.getContent()` selects all, copies, and reads
-`navigator.clipboard.readText()`. This app remaps copy to the **main-process**
-clipboard (`monacoClipboardCommands`, so the sandbox stays on), so the
-renderer-side clipboard can return the PREVIOUS copy. When the assertion is
-about content the APP changed — a reload from disk, a tab switch, a
-programmatic edit — a stale read makes the test pass against the old buffer.
+`MonacoPage.getContent()` reads the whole document from the Monaco **model**
+of the editor its locator resolves, through the app's e2e test hook
+(`window.__erfanaTest.editorValue(container)`, registered in
+`MonacoMarkdownEditor` by `registerTestEditor`). Like the terminal hook it is
+installed only for an unpackaged app launched with `ERFANA_E2E_TEST_HOOKS=1`,
+which `buildAppEnv()` sets for every fixture launch. It does not touch focus,
+selection or the clipboard. It used to select all, copy and read the
+clipboard, which is machine-wide and could return the PREVIOUS copy, so an
+assertion could pass against a stale buffer (lens review finding 37). It throws
+while no editor has mounted in the container, so pair it with `expect.poll`
+when the content is still changing.
 
-Use `MonacoPage.visibleText()` for those: it reads Monaco's own `.view-lines`
-DOM. The trade-off is virtualization — only lines near the viewport are in the
+`MonacoPage.visibleText()` reads Monaco's own `.view-lines` DOM – what the user
+sees. The trade-off is virtualization: only lines near the viewport are in the
 DOM, so it fits a phrase in a short fixture, not a whole long document. Pair it
 with `expect.poll`, since `waitForReady()` only proves the editor is attached
 and Monaco paints its lines a frame or two later.
+
+### Script calls into a page: bounded `executeJavaScript`
+
+`webContents.executeJavaScript` and `WebFrameMain.executeJavaScript` have no
+timeout, and neither has `ElectronApplication.evaluate`. A call whose document
+is replaced under it (a link just followed, a frame navigating, a view being
+evicted) can stay pending forever and stall the caller's poll past its own
+deadline (#255). So every such call goes through `e2e/utils/bounded-exec.ts`:
+`await installBoundedExec(app)` first (once per app, idempotent), then, inside
+the `app.evaluate` callback,
+`(globalThis as unknown as BoundedExecGlobal).__erfanaE2eExec(target, code, capMs, label)`.
+A call that misses its cap rejects with a `BoundedExecTimeout`
+(`<label>: executeJavaScript did not settle within <n> ms`); every other
+rejection is re-raised as an `Error` prefixed with the label. Reads
+(`EXEC_READ_CAP_MS`) tolerate only the timeout and a target that was destroyed
+or disposed under them (`__erfanaE2eTolerable`): they report "nothing yet" and
+the caller polls again. A script error (Electron reports a `webContents` one as
+`Script failed to execute …`, a frame one as the bare error text) is rethrown
+and fails the test. The read helpers remember the last failure they tolerated,
+and `HtmlPreviewPage.withReadError(poll)` adds it to a failing poll's message.
+Actions (`EXEC_ACTION_CAP_MS`) catch nothing. A click that navigates its own
+frame is queued in the page (`clickInFrame`), so the call answers before the
+document goes; `true` then means only "queued", and the test must assert an
+effect of the click.
+
+A direct `executeJavaScript` call anywhere under `e2e/` other than that file is
+a lint error (`no-restricted-syntax` in `eslint.config.mjs`). The rule bans the
+reference, not just the call, so an alias, `.call` / `.bind` and a destructure
+are caught too. The one other
+copy is the bench driver `e2e/fixtures/terminalHiddenFloodDriver.cjs`, which
+runs outside Playwright and bounds its own calls.
 
 ## Test structure
 

@@ -3,24 +3,19 @@
 /**
  * E2E test hook: `window.__erfanaTest.terminalText(terminalId)`.
  *
- * The switch comes from the preload (`window.api.testHooks.enabled`, read through
- * `services/testHooksGateway`), never from a
+ * The switch comes from the preload (`window.api.testHooks.enabled`), never from a
  * global the page could set. Present only when the main process launched this window with the test-hook
  * flag, which it does only for an unpackaged app with `ERFANA_E2E_TEST_HOOKS=1`
  * (`buildAdditionalArguments` in src/main/index.ts). In every other run the
  * preload reports `api.testHooks.enabled` as false, nothing is installed, and
- * terminals are not recorded.
+ * terminals are not recorded. The hook object is shared with the other e2e
+ * hooks: see testHookSurface.ts.
  */
 import type { Terminal } from '@xterm/xterm'
-import { hasBridge } from '../services/bridgePresence'
-import { testHooksGateway } from '../services/testHooksGateway'
+
+import { hooksEnabled, provideTestHook } from './testHookSurface'
 
 const terminals = new Map<string, Terminal>()
-
-/** Whether the launcher switched the test hooks on for this window (a unit test may install no bridge). */
-function hooksEnabled(): boolean {
-  return hasBridge('testHooks') && testHooksGateway.enabled === true
-}
 
 function terminalText(terminalId: string): string | null {
   const xterm = terminals.get(terminalId)
@@ -51,7 +46,8 @@ function terminalCursor(terminalId: string): { x: number; y: number } | null {
  */
 export function registerTestTerminal(terminalId: string, xterm: Terminal): () => void {
   if (!hooksEnabled()) return () => {}
-  window.__erfanaTest = { terminalText, terminalCursor }
+  provideTestHook('terminalText', terminalText)
+  provideTestHook('terminalCursor', terminalCursor)
   terminals.set(terminalId, xterm)
   return () => {
     if (terminals.get(terminalId) === xterm) terminals.delete(terminalId)

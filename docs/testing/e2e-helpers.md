@@ -127,7 +127,7 @@ await monaco.focus(page)
 // Set content (clears existing, inserts new as one input event)
 await monaco.setContent(page, '# Hello World')
 
-// Get content via clipboard
+// Get content from the Monaco model (e2e test hook)
 const content = await monaco.getContent(page)
 
 // Get Monaco's internal textarea locator (for advanced use)
@@ -156,7 +156,7 @@ await monaco.executeCommand(page, 'Format Document')
 | `getTextArea(page)` | Returns Monaco's internal textarea locator |
 | `waitForCursor(page)` | Waits for cursor to be visible (focus verification) |
 | `setContent(content)` | Selects all, then inserts the new content with `keyboard.insertText` — never `keyboard.type`, which Monaco drops characters from during re-layout (#129) |
-| `getContent(page)` | Copies all content and reads from clipboard. Can return a STALE value - the app remaps copy to the main-process clipboard, so the renderer clipboard may hold the previous copy. When asserting content the app changed, use `MonacoPage.visibleText()` instead; it is on the POM class only, not on this adapter |
+| `getContent(page)` | Reads the whole document from the Monaco model through the e2e test hook (`window.__erfanaTest.editorValue`) – no focus, selection or clipboard involved. Throws while no editor has mounted, so poll it when the content is still changing. For what is on screen use `MonacoPage.visibleText()`; it is on the POM class only, not on this adapter |
 
 ### Terminal helpers
 
