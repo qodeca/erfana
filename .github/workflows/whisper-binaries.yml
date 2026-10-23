@@ -131,11 +131,16 @@ jobs:
         with:
           xcode-version: "16.2"
 
-      - name: Configure (universal, Metal embedded, no host-CPU auto-detect)
+      - name: Configure (universal, static, Metal embedded, no host-CPU auto-detect)
+        # BUILD_SHARED_LIBS=OFF links libwhisper and every libggml* into
+        # whisper-cli. The tarball ships whisper-cli alone, so a shared build
+        # cannot start on a user's Mac. Do not add GGML_STATIC: on Apple it
+        # passes `-static` to the linker, which macOS does not support.
         run: >
           cmake -B build
           -DCMAKE_BUILD_TYPE=Release
           -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
+          -DBUILD_SHARED_LIBS=OFF
           -DGGML_NATIVE=OFF
           -DGGML_METAL_EMBED_LIBRARY=ON
 
@@ -193,6 +198,34 @@ jobs:
           Erfana repository for rebuild procedure and supply-chain notes.
           EOF
 
+      - name: Verify whisper-cli links system libraries only
+        # whisper-build-v1.8.4-erfana1 shipped a whisper-cli that loaded six
+        # @rpath dylibs left behind in build/, so it could not start on a
+        # user's Mac. Fail before signing if any dependency is not part of
+        # macOS, or if an LC_RPATH still points into this runner's workspace.
+        run: |
+          set -euo pipefail
+          otool -arch all -L staging/whisper-cli | tee otool-deps.txt
+          # Dependency lines are indented; the unindented lines name each slice.
+          deps=$(awk '/^[[:space:]]/ { print $1 }' otool-deps.txt)
+          [ -n "$deps" ] || { echo "::error::otool -L listed no dependencies, nothing was verified"; exit 1; }
+          bad=$(printf '%s\n' "$deps" | grep -Ev '^(/usr/lib/|/System/Library/)' || true)
+          if [ -n "$bad" ]; then
+            echo "::error::whisper-cli loads libraries that are not part of macOS:"
+            printf '%s\n' "$bad" | sort -u
+            exit 1
+          fi
+          rpaths=$(otool -arch all -l staging/whisper-cli \
+            | awk '$1 == "cmd" { in_rpath = ($2 == "LC_RPATH") } in_rpath && $1 == "path" { print $2 }')
+          echo "LC_RPATH entries:"
+          printf '%s\n' "${rpaths:-none}"
+          leaked=$(printf '%s\n' "$rpaths" | grep -F -e "$GITHUB_WORKSPACE" -e "$RUNNER_TEMP" || true)
+          if [ -n "$leaked" ]; then
+            echo "::error::whisper-cli has LC_RPATH entries into the runner workspace:"
+            printf '%s\n' "$leaked" | sort -u
+            exit 1
+          fi
+
       - name: Configure signing keychain
         # apple-actions/import-codesign-certs v3 (resolved 2026-04-25 to
         # commit 63fff01cd422d4b7b855d40ca1e9d34d2de9427d). This action
@@ -235,11 +268,19 @@ jobs:
           codesign --verify --verbose=2 staging/whisper-cli
 
       - name: Smoke test (transcribe JFK sample)
+        # Run a copy of staging/ from outside the checkout, with build/ moved
+        # aside, so a library missing from the tarball fails here instead of
+        # resolving through a leftover build-tree path.
         run: |
           set -euo pipefail
+          SMOKE_DIR="$RUNNER_TEMP/whisper-smoke"
+          rm -rf "$SMOKE_DIR"
+          cp -R staging "$SMOKE_DIR"
+          mv build build-hidden-from-smoke-test
+          cd "$SMOKE_DIR"
           curl -fsSL "$FIXTURE_MODEL_URL" -o ggml-tiny.bin
           curl -fsSL "$FIXTURE_AUDIO_URL" -o jfk.wav
-          staging/whisper-cli -m ggml-tiny.bin -l en -otxt --no-timestamps -f jfk.wav
+          ./whisper-cli -m ggml-tiny.bin -l en -otxt --no-timestamps -f jfk.wav
           grep -q "$FIXTURE_ASSERT_PHRASE" jfk.wav.txt || {
             echo "::error::Smoke test transcript missing expected phrase"
             cat jfk.wav.txt

@@ -113,6 +113,15 @@ Three of the workflow's four jobs — `build-macos`, `build-windows` and `publis
 
 Typical end-to-end time once approved: ~25–30 minutes (macOS build ~15 min + Windows build ~8 min + notary queue ~5–10 min).
 
+## macOS build is static
+
+The macOS tarball ships `whisper-cli` with no libraries beside it, so `build-macos` configures with `-DBUILD_SHARED_LIBS=OFF`: `libwhisper` and every `libggml*` library are linked into the binary. Do not add `-DGGML_STATIC=ON` – on Apple it passes `-static` to the linker, which macOS does not support for executables. Two steps keep the binary self-contained:
+
+- **"Verify whisper-cli links system libraries only"** runs after staging, before signing. It fails if `otool -arch all -L staging/whisper-cli` lists anything outside `/usr/lib/` and `/System/Library/` (an `@rpath/`, `@loader_path/` or `@executable_path/` entry, or any other path), or if `otool -l` shows an `LC_RPATH` into the runner workspace.
+- **"Smoke test (transcribe JFK sample)"** runs a copy of `staging/` from `$RUNNER_TEMP/whisper-smoke`, with `build/` moved aside, so a library missing from the tarball fails the run.
+
+Why: `whisper-build-v1.8.4-erfana1` was a shared build. Its `whisper-cli` loads `@rpath/libwhisper.1.dylib` and five `libggml*` dylibs that are not in the tarball, so on a user's Mac it stops at launch and Erfana reports `WHISPER_PROCESS_FAILED`. The CI smoke test still passed, because it ran on the runner, where the binary's absolute `LC_RPATH` entries pointed into `build/`.
+
 ## Diff-review checklist (every upstream bump)
 
 **Before** triggering a workflow for a new upstream SHA, review the diff:
@@ -236,7 +245,8 @@ After CI publishes a new `whisper-build-<label>-erfana<N>` release, the app-side
    npm run typecheck
    npm run test:main -- src/main/services/WhisperModelManager.test.ts src/main/services/WhisperModelManager.downgrade.test.ts src/main/services/LocalWhisperService.test.ts src/main/utils/
    ```
-8. **Local smoke test** (on at least one of macOS / Windows, or both):
+8. **Local smoke test** – on macOS (required) and, if you can, on Windows:
+   - macOS is required because the CI smoke test runs on the build machine, and passed for a binary that could not start on a user's Mac (see [macOS build is static](#macos-build-is-static)).
    - Delete `{userData}/whisper/` to force a fresh install.
    - Launch Erfana → Settings → Transcription → Backend = Local → Download model → transcribe a test audio file.
    - Expected log: `INFO: Whisper binary installed` with the new `manifestRevision` value.
