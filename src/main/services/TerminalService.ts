@@ -16,6 +16,7 @@ import { logger } from './LoggingService'
 import { redactPath } from '../utils/redactUserInput'
 import {
   buildWindowsBootstrap,
+  isCmdExe,
   normalizeWindowsCwd,
   validateWindowsCwd
 } from './WindowsTerminalBootstrap'
@@ -420,7 +421,7 @@ export class TerminalService extends EventEmitter {
         if (kind === 'cmd.exe') {
           spawnCwd = winCwd
           // Only a real cmd.exe sits in `pause`; the catch-all builder also takes unknown shells
-          cmdPauses = /(?:^|[\\/])cmd(?:\.exe)?$/i.test(shell)
+          cmdPauses = isCmdExe(shell)
         }
         shellKind = winShellKind
       } else {
@@ -847,9 +848,10 @@ export class TerminalService extends EventEmitter {
   }
 
   /**
-   * cmd.exe only: end the bootstrap's `pause` with a carriage return, then send
-   * the input typed meanwhile, in order. A no-op for every other shell and once
-   * released (a late marker after the timeout must not send a second key).
+   * cmd.exe only: end the bootstrap's `pause` with a carriage return. The input
+   * typed meanwhile stays held until `finishCmdPause`. A no-op for every other
+   * shell and once released (a late marker after the timeout must not send a
+   * second key).
    */
   private releaseCmdPause(terminal: TerminalInstance): void {
     if (!terminal.cmdPauseHold || terminal.cmdKeySent) return

@@ -394,6 +394,8 @@ async function createId(
       const { terminalService } = await import('./TerminalService')
       const tid = await createId(terminalService, { shell: 'C:\\tools\\mystery.exe', cwd: 'C:\\Projects\\test' })
       const write = spawnedPTYs[0].pty.write as ReturnType<typeof vi.fn>
+      // The bootstrap has no pause either, so nothing waits for the key
+      expect(String(spawnedPTYs[0].args)).not.toContain('pause')
       terminalService.write(tid!, 'a')
       vi.advanceTimersByTime(20_000)
       expect(write.mock.calls.map((c) => c[0])).toEqual(['a'])

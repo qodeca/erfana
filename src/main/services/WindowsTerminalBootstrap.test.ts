@@ -21,6 +21,7 @@ import { describe, it, expect } from 'vitest'
 import { argsToCommandLine } from 'node-pty/lib/windowsPtyAgent'
 import {
   CmdExeBootstrapBuilder,
+  isCmdExe,
   DEFAULT_WINDOWS_BOOTSTRAP_BUILDERS,
   GitBashBootstrapBuilder,
   PowerShellBootstrapBuilder,
@@ -217,7 +218,37 @@ describe('CmdExeBootstrapBuilder', () => {
     expect(builder.canHandle('gibberish')).toBe(true)
   })
 
+  describe('isCmdExe', () => {
+    it.each([
+      ['cmd', true],
+      ['cmd.exe', true],
+      ['CMD.EXE', true],
+      ['C:\\Windows\\System32\\cmd.exe', true],
+      ['C:/Windows/System32/cmd.exe', true],
+      ['C:\\Windows\\System32\\cmd.exe ', true],
+      ['  cmd.exe', true],
+      ['"C:\\Windows\\System32\\cmd.exe"', true],
+      ['C:\\tools\\mycmd.exe', false],
+      ['tcc.exe', false],
+      ['C:\\Windows\\System32\\cmd.exe.bak', false],
+      ['', false]
+    ])('%j -> %s', (shell, expected) => {
+      expect(isCmdExe(shell)).toBe(expected)
+    })
+  })
+
   describe('build', () => {
+    it('a shell that is not cmd.exe gets the bootstrap without pause and cls', () => {
+      const script = builder.build({ shell: 'C:\\tools\\tcc.exe', cwd: CWD, marker: MARKER })
+      expect(script).toBe(`/D /S /K "@echo off && cd && echo ${MARKER} & echo on"`)
+    })
+
+    it('cmd.exe with a quoted path or trailing space still gets pause and cls', () => {
+      for (const shell of ['"C:\\Windows\\System32\\cmd.exe"', 'C:\\Windows\\System32\\cmd.exe ']) {
+        expect(builder.build({ shell, cwd: CWD, marker: MARKER })).toContain('pause >nul && cls')
+      }
+    })
+
     it('emits one ready-made command line string (not argv) in the documented order', () => {
       const script = builder.build({ shell: 'cmd.exe', cwd: CWD, marker: MARKER })
       expect(typeof script).toBe('string')

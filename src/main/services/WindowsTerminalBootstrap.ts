@@ -209,6 +209,17 @@ export class GitBashBootstrapBuilder implements WindowsBootstrapBuilder {
 }
 
 /**
+ * True when the shell is cmd.exe itself: the file name is `cmd` or `cmd.exe`
+ * (case-insensitive, either separator), after trimming whitespace and
+ * surrounding quotes. The single test shared by the cmd bootstrap (which emits
+ * `pause`) and `TerminalService` (which sends the key that ends it).
+ */
+export function isCmdExe(shell: string): boolean {
+  const path = shell.trim().replace(/^"+|"+$/g, '').trim()
+  return /(?:^|[\\/])cmd(?:\.exe)?$/i.test(path)
+}
+
+/**
  * cmd.exe catch-all bootstrap builder. MUST be last in the dispatch chain.
  *
  * - `/D` disables AutoRun.
@@ -263,8 +274,12 @@ export class CmdExeBootstrapBuilder implements WindowsBootstrapBuilder {
    * (dropped, it comes before the marker) and starts in the Windows directory;
    * `cd` then reports that directory and the handshake still completes.
    */
-  build({ marker }: { shell: string; cwd: string; marker: string }): string[] | string {
-    return `/D /S /K "@echo off && cd && echo ${marker} && pause >nul && cls & echo on"`
+  build({ shell, marker }: { shell: string; cwd: string; marker: string }): string[] | string {
+    // `pause >nul && cls` only for a real cmd.exe: TerminalService sends the release
+    // key under the same `isCmdExe` test, so a shell that falls to this catch-all
+    // (TCC, a COMSPEC the test misses) must not be left waiting in `pause`.
+    const pauseAndClear = isCmdExe(shell) ? ' && pause >nul && cls' : ''
+    return `/D /S /K "@echo off && cd && echo ${marker}${pauseAndClear} & echo on"`
   }
 }
 
