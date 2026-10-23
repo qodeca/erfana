@@ -35,5 +35,6 @@ export const whisperGateway: WhisperBridge = {
   ensureModel: (...args) => bridges().whisper.ensureModel(...args),
   listModels: (...args) => bridges().whisper.listModels(...args),
   deleteModel: (...args) => bridges().whisper.deleteModel(...args),
+  cancelDownload: (...args) => bridges().whisper.cancelDownload(...args),
   onDownloadProgress: (...args) => bridges().whisper.onDownloadProgress(...args)
 }

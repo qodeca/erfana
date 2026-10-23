@@ -272,6 +272,7 @@ exports[`preload surface > window.api.transcription exposes the expected members
 
 exports[`preload surface > window.api.whisper exposes the expected members 1`] = `
 [
+  "cancelDownload",
   "deleteModel",
   "ensureBinary",
   "ensureModel",
