@@ -40,7 +40,7 @@ function appliedTranslate(el: HTMLElement): { x: number; y: number } {
 }
 
 export function ToastNotification() {
-  const { toasts, removeToast } = useToast()
+  const { toasts, removeToast, pauseToast, resumeToast } = useToast()
 
   // A previewed page runs in a native view the OS paints ABOVE all sibling DOM,
   // so a toast that overlaps one is invisible AND unclickable — a click lands on
@@ -185,15 +185,49 @@ export function ToastNotification() {
         }
       >
         {toasts.map((toast) => (
-          <ToastItem key={toast.id} toast={toast} onClose={() => removeToast(toast.id)} />
+          <ToastItem
+            key={toast.id}
+            toast={toast}
+            onClose={() => removeToast(toast.id)}
+            onPause={() => pauseToast(toast.id)}
+            onResume={() => resumeToast(toast.id)}
+          />
         ))}
       </div>
     </>
   )
 }
 
-function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
+function ToastItem({
+  toast,
+  onClose,
+  onPause,
+  onResume
+}: {
+  toast: Toast
+  onClose: () => void
+  onPause: () => void
+  onResume: () => void
+}) {
   const Icon = ICON_MAP[toast.type]
+  const itemRef = useRef<HTMLDivElement>(null)
+
+  // The timer pauses while the pointer is over the toast OR focus is inside it,
+  // and resumes with the time left only when neither holds (WCAG 2.2.1).
+  const hovered = useRef(false)
+  const focused = useRef(false)
+  const sync = (): void => (hovered.current || focused.current ? onPause() : onResume())
+
+  // Where focus came from when it entered the toast, so dismissing the toast
+  // from the keyboard hands focus back instead of dropping it on <body>.
+  const returnFocusTo = useRef<HTMLElement | null>(null)
+
+  const dismiss = (): void => {
+    const hadFocus = itemRef.current?.contains(document.activeElement) ?? false
+    const back = returnFocusTo.current
+    onClose()
+    if (hadFocus && back?.isConnected) back.focus()
+  }
 
   // No live role on the visual item: announcements are owned by the two hidden
   // live regions (see ToastNotification). An ACTIONABLE toast (e.g. approve a
@@ -201,10 +235,41 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
   // and reach its action button, which otherwise sits unnamed at the DOM's end.
   return (
     <div
+      ref={itemRef}
       className={`toast toast-${toast.type}`}
       data-testid={`${TEST_IDS.TOAST}-${toast.type}`}
+      data-toast-id={toast.id}
       role={toast.action ? 'group' : undefined}
       aria-label={toast.action ? toast.title : undefined}
+      onMouseEnter={() => {
+        hovered.current = true
+        sync()
+      }}
+      onMouseLeave={() => {
+        hovered.current = false
+        sync()
+      }}
+      onFocus={(event) => {
+        if (!focused.current) {
+          const from = event.relatedTarget
+          returnFocusTo.current = from instanceof HTMLElement && !itemRef.current?.contains(from) ? from : null
+        }
+        focused.current = true
+        sync()
+      }}
+      onBlur={(event) => {
+        // Moving between the toast's own buttons is not leaving it
+        if (itemRef.current?.contains(event.relatedTarget as Node | null)) return
+        focused.current = false
+        sync()
+      }}
+      onKeyDown={(event) => {
+        // Escape on a focused toast dismisses it. Toasts are not modal, so they
+        // are deliberately NOT on the shared overlay stack (#281).
+        if (event.key !== 'Escape') return
+        event.stopPropagation()
+        dismiss()
+      }}
     >
       <div className="toast-icon">
         <Icon size={20} strokeWidth={2} />
@@ -219,7 +284,7 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
               // Run the action, then dismiss — an actionable toast is
               // manual-dismiss (duration 0), so it does not clear on its own.
               toast.action?.onClick()
-              onClose()
+              dismiss()
             }}
             data-testid={TEST_IDS.TOAST_BTN_ACTION}
           >
@@ -229,7 +294,7 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
       </div>
       <button
         className="toast-close"
-        onClick={onClose}
+        onClick={dismiss}
         aria-label="Close"
         data-testid={TEST_IDS.TOAST_BTN_DISMISS}
       >

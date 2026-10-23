@@ -12,7 +12,10 @@ import { showGlobalToast } from '../components/Toast/toastService'
 import { TOAST_DURATION } from '../../../shared/constants'
 
 /**
- * Show an error toast notification
+ * Show an error toast notification.
+ *
+ * An error toast stays until the user dismisses it (WCAG 2.2.1); the provider
+ * ignores `duration` for errors, so the argument only shapes the payload.
  */
 export function showErrorToast(title: string, message: string, duration: number = TOAST_DURATION.ERROR): void {
   showGlobalToast({ title, message, type: 'error', duration })
