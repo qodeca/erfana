@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { app, BrowserWindow, Menu, dialog, session } from 'electron'
 import { join } from 'path'
+import { APP_ID } from '../shared/constants'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { spawnNewInstance } from './utils/spawnNewInstance'
 import { moveToSafeWorkingDirectory } from './utils/safeWorkingDirectory'
@@ -437,8 +438,9 @@ app.whenReady().then(async () => {
   // Required for Cmd+C/V to work in textarea and input elements
   Menu.setApplicationMenu(createApplicationMenu())
 
-  // Set app user model id for windows
-  electronApp.setAppUserModelId('com.erfana')
+  // Set app user model id for windows. Must equal the installer's appId so the running window
+  // groups with its pinned shortcut (and any future toast notifications resolve the app name/icon).
+  electronApp.setAppUserModelId(APP_ID)
 
   // Default open or close DevTools by F12 in development
   // and ignore CommandOrControl + R in production.
