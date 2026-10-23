@@ -7,6 +7,7 @@ import { TEST_IDS } from '../../constants/testids'
 import { useOccluder } from '../../hooks/useOccluder'
 import { readPreviewRects, usePreviewViewportStore } from '../../stores/usePreviewViewportStore'
 import { placeToastContainer, type ToastPlacement } from './toastPlacement'
+import { useToastDwellTimer } from './toastDwell'
 import './Toast.css'
 
 const ICON_MAP = {
@@ -194,6 +195,11 @@ export function ToastNotification() {
 
 function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
   const Icon = ICON_MAP[toast.type]
+  const rootRef = useRef<HTMLDivElement>(null)
+  // `duration` was already resolved by the provider (errors persist, warnings
+  // are floored). The countdown pauses while the pointer or focus is on the
+  // toast, so a reader is never cut off mid-sentence (WCAG 2.2.1).
+  const { paused, ...dwellHandlers } = useToastDwellTimer(toast.duration ?? 0, onClose, rootRef)
 
   // No live role on the visual item: announcements are owned by the two hidden
   // live regions (see ToastNotification). An ACTIONABLE toast (e.g. approve a
@@ -201,8 +207,11 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
   // and reach its action button, which otherwise sits unnamed at the DOM's end.
   return (
     <div
+      ref={rootRef}
       className={`toast toast-${toast.type}`}
       data-testid={`${TEST_IDS.TOAST}-${toast.type}`}
+      data-paused={paused ? 'true' : undefined}
+      {...dwellHandlers}
       role={toast.action ? 'group' : undefined}
       aria-label={toast.action ? toast.title : undefined}
     >
