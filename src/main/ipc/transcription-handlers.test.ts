@@ -772,6 +772,27 @@ describe('transcription-handlers', () => {
       })
     }
 
+    /**
+     * A manager download still preparing (checking the install, creating its
+     * folders), so not yet registered with the manager, until the test lets it
+     * go on. Like the real manager, it then honours a caller signal that was
+     * aborted meanwhile.
+     */
+    function preparing(): { start: (signal?: AbortSignal) => Promise<string>; goOn: () => void } {
+      let goOn!: () => void
+      const prepared = new Promise<void>((resolve) => {
+        goOn = resolve
+      })
+      const start = async (signal?: AbortSignal): Promise<string> => {
+        await prepared
+        if (signal?.aborted) {
+          throw new AppError('Download was cancelled', ErrorCode.WHISPER_MODEL_DOWNLOAD_FAILED, signal.reason as Error)
+        }
+        return '/models/whisper/base.bin'
+      }
+      return { start, goOn }
+    }
+
     /** A manager download the test fails by hand, after it has sent Cancel. */
     function failsByHand(): { promise: Promise<string>; fail: (error: Error) => void } {
       let fail!: (error: Error) => void
@@ -808,7 +829,7 @@ describe('transcription-handlers', () => {
       const cancel = await getHandler('transcription:whisperCancelDownload')!(mockEvent) as DownloadResult
 
       expect(cancel).toEqual({ success: true })
-      // The abort is the manager's own, not a second controller here
+      // The downloads the manager has registered are aborted too
       expect(whisperModelManager.cancelDownloads).toHaveBeenCalledTimes(1)
       expect(await pending).toEqual({ success: false, cancelled: true, error: 'Download cancelled' })
       expect(mockLogger.error).not.toHaveBeenCalled()
@@ -832,6 +853,39 @@ describe('transcription-handlers', () => {
       const pending = getHandler('transcription:whisperEnsureBinary')!(mockEvent) as Promise<DownloadResult>
       await getHandler('transcription:whisperCancelDownload')!(mockEvent)
 
+      expect(await pending).toEqual({ success: false, cancelled: true, error: 'Download cancelled' })
+    })
+
+    it('aborts a model download that Cancel reached before the manager had registered it', async () => {
+      const { whisperModelManager } = await import('../services/WhisperModelManager')
+      const download = preparing()
+      vi.mocked(whisperModelManager.ensureModel).mockImplementation((_model, options) => download.start(options?.signal))
+
+      const { registerTranscriptionHandlers } = await import('./transcription-handlers')
+      registerTranscriptionHandlers()
+
+      const pending = getHandler('transcription:whisperEnsureModel')!(mockEvent, 'base') as Promise<DownloadResult>
+      const cancel = await getHandler('transcription:whisperCancelDownload')!(mockEvent) as DownloadResult
+      expect(cancel).toEqual({ success: true })
+      // The manager had nothing registered: only the request's own signal can stop it
+      expect(whisperModelManager.cancelDownloads).toHaveReturnedWith(0)
+
+      download.goOn()
+      expect(await pending).toEqual({ success: false, cancelled: true, error: 'Download cancelled' })
+    })
+
+    it('aborts a binary download that Cancel reached before the manager had registered it', async () => {
+      const { whisperModelManager } = await import('../services/WhisperModelManager')
+      const download = preparing()
+      vi.mocked(whisperModelManager.ensureBinary).mockImplementation((options) => download.start(options?.signal))
+
+      const { registerTranscriptionHandlers } = await import('./transcription-handlers')
+      registerTranscriptionHandlers()
+
+      const pending = getHandler('transcription:whisperEnsureBinary')!(mockEvent) as Promise<DownloadResult>
+      await getHandler('transcription:whisperCancelDownload')!(mockEvent)
+
+      download.goOn()
       expect(await pending).toEqual({ success: false, cancelled: true, error: 'Download cancelled' })
     })
 

@@ -810,14 +810,34 @@ describe('WhisperModelManager', () => {
 
     it('throws WHISPER_BINARY_DOWNLOAD_FAILED when AbortSignal is already aborted', async () => {
       arrangeFreshInstall({ manifestRevisionIndex: 1, lastSeenRevisionOnDisk: null })
-      mockDownloadToFile.mockRejectedValue(new DOMException('aborted', 'AbortError'))
+      const abort = new DOMException('aborted', 'AbortError')
+      mockDownloadToFile.mockRejectedValue(abort)
       const controller = new AbortController()
       controller.abort()
       const { createWhisperModelManager } = await import('./WhisperModelManager')
       const manager = createWhisperModelManager()
       await expect(manager.ensureBinary({ signal: controller.signal })).rejects.toMatchObject({
-        code: 'WHISPER_BINARY_DOWNLOAD_FAILED'
+        code: 'WHISPER_BINARY_DOWNLOAD_FAILED',
+        message: 'Binary download was cancelled',
+        originalError: abort
       })
+    })
+
+    it('stops on a caller abort that lands before the download is registered', async () => {
+      arrangeFreshInstall({ manifestRevisionIndex: 1, lastSeenRevisionOnDisk: null })
+      // Like fetch: a signal aborted by the time of the call rejects at once
+      mockDownloadToFile.mockImplementation(async (opts: { signal?: AbortSignal }) => {
+        if (opts.signal?.aborted) throw new DOMException('aborted', 'AbortError')
+        return undefined
+      })
+      const { createWhisperModelManager } = await import('./WhisperModelManager')
+      const manager = createWhisperModelManager()
+      const controller = new AbortController()
+      const settled = manager.ensureBinary({ signal: controller.signal })
+      // Still checking the install: cancelDownloads() has nothing to abort yet
+      expect(manager.cancelDownloads()).toBe(0)
+      controller.abort()
+      await expect(settled).rejects.toMatchObject({ message: 'Binary download was cancelled' })
     })
 
     it('keeps an archive hash mismatch that lands after Cancel as a hash mismatch', async () => {
@@ -996,6 +1016,25 @@ describe('WhisperModelManager', () => {
         message: 'Model download was cancelled: tiny',
         originalError: abort
       })
+    })
+
+    it('stops on a caller abort that lands before the download is registered', async () => {
+      const accessErr = Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+      mockAccess.mockRejectedValue(accessErr)
+      // Like fetch: a signal aborted by the time of the call rejects at once
+      mockDownloadToFile.mockImplementation(async (opts: { signal?: AbortSignal }) => {
+        if (opts.signal?.aborted) throw new DOMException('aborted', 'AbortError')
+        return undefined
+      })
+      const { createWhisperModelManager } = await import('./WhisperModelManager')
+      const manager = createWhisperModelManager()
+      const controller = new AbortController()
+      const settled = manager.ensureModel('tiny', { signal: controller.signal })
+      // Still checking the install: cancelDownloads() has nothing to abort yet
+      expect(manager.cancelDownloads()).toBe(0)
+      controller.abort()
+      await expect(settled).rejects.toMatchObject({ message: 'Model download was cancelled: tiny' })
+      expect(mockRename).not.toHaveBeenCalled()
     })
 
     it('keeps a hash mismatch that lands after Cancel as a hash mismatch', async () => {

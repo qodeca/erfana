@@ -228,6 +228,29 @@ describe('SettingsOverlay – whisper model download', () => {
     expect(cancelButton()).not.toHaveAttribute('aria-disabled')
   })
 
+  it('offers Cancel again when the cancel request itself fails', async () => {
+    await renderAndStart()
+    binary.resolve({ success: true, path: '/bin/whisper' })
+    await flush()
+    api.cancelDownload.mockRejectedValueOnce(new Error('IPC channel closed'))
+
+    act(() => cancelButton()!.focus())
+    fireEvent.click(cancelButton()!)
+    await flush()
+
+    expect(mockLogger.warn).toHaveBeenCalledWith('Failed to cancel whisper download', {
+      error: 'Error: IPC channel closed'
+    })
+    expect(cancelButton()).toHaveTextContent(/^Cancel$/)
+    expect(cancelButton()).not.toHaveAttribute('aria-disabled')
+    expect(cancelButton()).toHaveFocus()
+
+    // A second press is sent this time
+    fireEvent.click(cancelButton()!)
+    expect(api.cancelDownload).toHaveBeenCalledTimes(2)
+    expect(cancelButton()).toHaveTextContent('Cancelling…')
+  })
+
   it('does not start the model when Cancel came during the binary step', async () => {
     await renderAndStart()
     fireEvent.click(cancelButton()!)

@@ -57,23 +57,32 @@ import { registerHandle } from './registry'
 /** Active AbortController for current transcription */
 let activeController: AbortController | null = null
 
+/** A whisper ensure request still running; `controller` feeds the manager's signal. */
+interface DownloadRequest {
+  cancelled: boolean
+  controller: AbortController
+}
+
 /**
  * Whisper ensure requests still running. Cancel marks each one, so its abort
- * is reported as cancelled; the abort itself is the manager's own
- * (`whisperModelManager.cancelDownloads()`), which also deletes the partials.
+ * is reported as cancelled, and aborts its controller. The signal is handed to
+ * the manager, so it also stops a download the manager has not registered yet
+ * (while it checks the install and prepares its folders), which
+ * `whisperModelManager.cancelDownloads()` cannot reach. The manager deletes
+ * the partials either way.
  *
  * No sender is recorded: cancel is app-wide by design, because there is one
  * model store per app, so Cancel in any window stops every running download.
  */
-const runningDownloads = new Set<{ cancelled: boolean }>()
+const runningDownloads = new Set<DownloadRequest>()
 
 /** Result of a whisper download; `cancelled` marks a user cancel, not an error to show */
 type WhisperDownloadResult = { success: boolean; path?: string; error?: string; cancelled?: boolean }
 const DOWNLOAD_CANCELLED: WhisperDownloadResult = { success: false, cancelled: true, error: 'Download cancelled' }
 
 /** Start tracking a whisper ensure request; `release` stops tracking it. */
-function trackDownload(): { request: { cancelled: boolean }; release: () => void } {
-  const request = { cancelled: false }
+function trackDownload(): { request: DownloadRequest; release: () => void } {
+  const request: DownloadRequest = { cancelled: false, controller: new AbortController() }
   runningDownloads.add(request)
   return { request, release: () => runningDownloads.delete(request) }
 }
@@ -90,7 +99,7 @@ function isDownloadAbort(error: unknown): boolean {
  */
 function downloadFailure(
   error: unknown,
-  request: { cancelled: boolean },
+  request: DownloadRequest,
   artifact: 'binary' | 'model'
 ): WhisperDownloadResult {
   if (request.cancelled && isDownloadAbort(error)) {
@@ -640,7 +649,10 @@ export function registerTranscriptionHandlers(): void {
 
       const download = trackDownload()
       try {
-        const path = await whisperModelManager.ensureBinary({ onProgress })
+        const path = await whisperModelManager.ensureBinary({
+          onProgress,
+          signal: download.request.controller.signal
+        })
         return { success: true, path }
       } catch (error) {
         return downloadFailure(error, download.request, 'binary')
@@ -680,7 +692,10 @@ export function registerTranscriptionHandlers(): void {
 
       const download = trackDownload()
       try {
-        const path = await whisperModelManager.ensureModel(parsed.data, { onProgress })
+        const path = await whisperModelManager.ensureModel(parsed.data, {
+          onProgress,
+          signal: download.request.controller.signal
+        })
         return { success: true, path }
       } catch (error) {
         return downloadFailure(error, download.request, 'model')
@@ -704,7 +719,13 @@ export function registerTranscriptionHandlers(): void {
       if (runningDownloads.size === 0) {
         return { success: false, error: 'No active download' }
       }
-      for (const request of runningDownloads) request.cancelled = true
+      for (const request of runningDownloads) {
+        request.cancelled = true
+        // Reaches the download even before the manager has registered it
+        request.controller.abort()
+      }
+      // How many downloads the manager had registered: 0 means Cancel came
+      // while it was still preparing, and only the signals above stop them
       const aborted = whisperModelManager.cancelDownloads()
       logger.info('Whisper download cancelled by user', { aborted })
       return { success: true }
