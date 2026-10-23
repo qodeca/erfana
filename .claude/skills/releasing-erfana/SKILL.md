@@ -68,7 +68,7 @@ These values appear in multiple places. Update here first, then update `EXPECTED
 
 | Agent | Purpose | Source | Used in |
 |-------|---------|--------|---------|
-| `release-quality-runner` | Enforce Phase 0 pre-flight checklist (branch, tree, version, CHANGELOG, tools, green `checks.yml`, secrets, workflow lint, electron-builder schema, Windows status snapshot) | shared (project override) | Phase 0 |
+| `release-quality-runner` | Enforce Phase 0 pre-flight checklist (branch, tree, version, CHANGELOG, tools, green `checks.yml`, secrets, workflow lint, electron-builder schema, Windows status snapshot, documented versions) | shared (project override) | Phase 0 |
 | `release-notes-drafter` | Emit two-tier release-notes markdown via `git cliff` + operator summary | shared (project override) | Phase 1 |
 | `release-failure-analyzer` | On Phase 3 CI failure: identify failed leg, match log against the troubleshooting cookbook, write structured incident memo to `docs/release-incidents/` | project-local | Phase 3 (failure path) |
 
@@ -267,6 +267,10 @@ fi
 
 `docs/windows/implementation-plan.md` must be re-anchored on v{version} before tagging — script, semantics and traps in [`./guides/pre-flight-checks.md`](./guides/pre-flight-checks.md); also enforced as the agent's `windows_snapshot` gate.
 
+### 0.4.7 Documented versions match package.json
+
+The app version in the root `CLAUDE.md` and the Electron version that `SDLC.md`, `CONTRIBUTING.md` and the docs state as current must equal `package.json` — `npm run check:version-drift`; semantics and remediation in [`./guides/pre-flight-checks.md`](./guides/pre-flight-checks.md#047-documented-versions-match-packagejson); enforced as the agent's `version_drift` gate.
+
 ### 0.5 Delegate the rest of the checklist to `release-quality-runner`
 
 ```
@@ -362,8 +366,8 @@ npm install --package-lock-only --ignore-scripts
 # One commit bundles: package.json bump (already done pre-skill or done here),
 # the lockfile's copy of it, CHANGELOG append (pre-skill), release notes file,
 # and the root CLAUDE.md "Current version" banner, which carries a third copy of
-# the version and is easy to leave behind (nothing fails if it drifts, so only a
-# reader notices). `git add` tolerates an unchanged path, so listing it is safe
+# the version and is easy to leave behind (§0.4.7 fails on it, but only at
+# release time). `git add` tolerates an unchanged path, so listing it is safe
 # even when the bump shipped earlier.
 git add package.json package-lock.json docs/CHANGELOG.md \
   "docs/release-notes/v${VERSION}.md" CLAUDE.md
@@ -519,7 +523,7 @@ See [`./guides/anti-patterns.md`](./guides/anti-patterns.md) for the full Don't/
 - [`guides/anti-patterns.md`](guides/anti-patterns.md) — Don't/Do table for release-day patterns
 - [`guides/examples.md`](guides/examples.md) — Worked examples (success, lockfile-drift, hash-mismatch)
 - [`guides/git-signing.md`](guides/git-signing.md) — Pre-flight git signing check (Phase 1.5)
-- [`guides/pre-flight-checks.md`](guides/pre-flight-checks.md) — Phase 0.4.6 Windows status-snapshot gate
+- [`guides/pre-flight-checks.md`](guides/pre-flight-checks.md) — Phase 0.4.6 Windows status-snapshot gate and Phase 0.4.7 version-drift gate
 - [`guides/troubleshooting.md`](guides/troubleshooting.md) — failure recovery and rollback procedures
 - [`templates/release-notes.md`](templates/release-notes.md) — two-tier release-notes template
 - [`docs/build/release.md`](../../../docs/build/release.md) — full operator reference (matrix, secrets, incident response)
