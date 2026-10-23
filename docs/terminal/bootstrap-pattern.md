@@ -30,11 +30,11 @@ bash.exe -c 'cd '\''C:\Users\me\Dev\proj'\''; pwd; echo __ERFANA_PWD_MARKER_...;
 # Windows PowerShell (cwd single-quote-doubled '→''; `[Console]::Write` wipes ConPTY buffer)
 pwsh.exe -NoProfile -Command "Set-Location -LiteralPath 'C:\Users\me\Dev\proj' ; (Get-Location).Path ; Write-Output '__ERFANA_PWD_MARKER_...' ; [Console]::Write([char]27 + '[2J' + [char]27 + '[3J' + [char]27 + '[H') ; & 'pwsh.exe' -NoLogo"
 
-# Windows cmd.exe (cwd validated against metachar deny-list and passed as the spawn cwd; `cls` wipes ConPTY viewport)
-cmd.exe /D /S /K "@echo off && cd && echo __ERFANA_PWD_MARKER_... && cls & echo on"   # started with cwd = C:\Users\me\Dev\proj
+# Windows cmd.exe (cwd validated against metachar deny-list and passed as the spawn cwd; no `cls`: ConPTY would swallow the marker frame; the renderer clear handshake wipes the screen)
+cmd.exe /D /S /K "@echo off && cd && echo __ERFANA_PWD_MARKER_... & echo on"   # started with cwd = C:\Users\me\Dev\proj
 ```
 
-The trailing screen-clear step (`printf`, `[Console]::Write`, or `cls`) is Windows-specific and exists purely to wipe the ConPTY internal screen buffer before the interactive shell takes over – see [ConPTY resize-reflow mitigation](#4-conpty-resize-reflow-mitigation-windows) below.
+The trailing screen-clear step (`printf` or `[Console]::Write`; cmd.exe has none, see below) is Windows-specific and exists purely to wipe the ConPTY internal screen buffer before the interactive shell takes over – see [ConPTY resize-reflow mitigation](#4-conpty-resize-reflow-mitigation-windows) below.
 
 ## Why the specific shell flags
 
@@ -64,7 +64,9 @@ When the main process sees `process.env.ERFANA_E2E_FAST_SHELL === '1'`, the POSI
 - `& echo on` (unconditional, not `&&`): restores the prompt even if an earlier step failed, so a failure never leaves echo off with no prompt.
 - `echo on` (last): `@echo off` would otherwise stay on and hide the prompt.
 - `@echo off`: **Critical**. Without it, cmd.exe echoes the bootstrap commands back into the PTY, and `markerDetector` mis-parses the echoed `echo <marker>` line as the cwd, resulting in junk stored as `terminal.cwd`.
-- `&&` chain: the steps up to `cls` short-circuit; only `echo on` runs unconditionally.
+- `&&` chain: `@echo off`, `cd` and `echo <marker>` short-circuit; only `echo on` runs unconditionally.
+- **No `cls`**: ConPTY sends the final screen, not every line. A `cls` right after the marker lands in the same frame, so the cd line and the marker never reach the PTY stream and the missing-marker timeout fires after 10 s (found on a Windows run of #335). The renderer's clear handshake wipes the screen on marker detection instead. The ConPTY buffer still holds the cd and marker lines, so the prompt can appear a few rows down; the scrollback caveat in Known issues applies.
+- **`PROMPT` is not overridden for cmd**: cmd reads `PROMPT`, so the app's `%n %~ $` would show literally. cmd keeps its default (or the user's own) prompt.
 - `cd` with no args: cmd.exe's analog of `pwd`. Prints the working directory without needing a separate binary.
 
 ### Missing-marker safety net
@@ -133,7 +135,7 @@ Before any Windows bootstrap is constructed, the cwd is validated and normalized
 |---|---|---|
 | Git Bash | `printf '\033[2J\033[3J\033[H'` | Viewport + scrollback + cursor home |
 | PowerShell / pwsh | `[Console]::Write([char]27 + '[2J' + [char]27 + '[3J' + [char]27 + '[H')` | Viewport + scrollback + cursor home |
-| cmd.exe | `cls` | Viewport + cursor home only (no scrollback clear – see [Known issues](../known-issues.md#cmdexe-terminals-can-leak-pre-bootstrap-text-into-scrollback-after-aggressive-resizing)) |
+| cmd.exe | none (renderer clear handshake only) | The ConPTY buffer is not wiped (no scrollback clear – see [Known issues](../known-issues.md#cmdexe-terminals-can-leak-pre-bootstrap-text-into-scrollback-after-aggressive-resizing)) |
 
 The xterm.js-side handshake (§ 5) is unaffected — xterm still clears its own buffer via `\x1b[2J\x1b[3J\x1b[H` when the renderer receives `terminal:clear`.
 
@@ -262,14 +264,14 @@ pwsh.exe -NoProfile -Command "Set-Location -LiteralPath 'C:\path' ; (Get-Locatio
 ### Windows cmd.exe
 
 ```cmd
-cmd.exe /D /S /K "@echo off && cd && echo MARKER && cls & echo on"
+cmd.exe /D /S /K "@echo off && cd && echo MARKER & echo on"
 ```
 
 - `/D`: disable AutoRun
 - `/S`: strip exactly the outer quote pair of the `/K` argument
 - `/K`: keep cmd.exe interactive after the bootstrap completes
 - `@echo off`: critical — without it, cmd.exe echoes bootstrap commands back into PTY, and `markerDetector` mis-parses the echoed `echo MARKER` line as the cwd
-- `cls`: wipes ConPTY's viewport before the interactive prompt appears (only CSI 2J + CSI H; scrollback clear is not available from cmd without a subprocess — see the [cmd.exe caveat](../known-issues.md#cmdexe-terminals-can-leak-pre-bootstrap-text-into-scrollback-after-aggressive-resizing))
+- no `cls`: see the cmd.exe section above; the [cmd.exe caveat](../known-issues.md#cmdexe-terminals-can-leak-pre-bootstrap-text-into-scrollback-after-aggressive-resizing) covers the ConPTY buffer
 - cwd rejected if it contains any of `"&|^<>\r\n` (parens are allowed — unblocks `C:\Program Files (x86)\…`)
 
 ### Shell kind classification regex (code)

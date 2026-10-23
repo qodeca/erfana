@@ -280,7 +280,9 @@ async function createId(
       // /D disables AutoRun, /S strips exactly the outer quote pair, /K keeps cmd.exe interactive
       expect(script).toMatch(/^\/D \/S \/K "/)
       expect(script).not.toContain('\\"')
-      expect(script).toMatch(/ && cls & echo on"$/)
+      expect(script).toMatch(/ & echo on"$/)
+      // No `cls`: ConPTY would swallow the marker frame with it
+      expect(script).not.toContain('cls')
       // Issue #154 BLOCKER #1: bootstrap MUST start with `@echo off &&` so
       // cmd.exe does not echo the bootstrap commands back into the PTY,
       // which would otherwise cause markerDetector to mis-parse the echoed
@@ -346,6 +348,15 @@ async function createId(
       expect(typeof spawnedPTYs[0].args).toBe('string')
       expect(spawnedPTYs[0].args).not.toContain('C:\\Projects')
       expect(spawnedPTYs[0].opts.cwd).toBe('C:\\Projects\\test')
+    })
+
+    it('does not override PROMPT for cmd.exe (it would show %n %~ literally)', async () => {
+      vi.stubEnv('PROMPT', '$P$G')
+      await spawnCmd()
+      const env = spawnedPTYs[0].opts.env as Record<string, string | undefined>
+      // The user's own PROMPT passes through untouched
+      expect(env.PROMPT).toBe('$P$G')
+      vi.unstubAllEnvs()
     })
 
     it('shows the shell output after 10 s when the marker never arrives', async () => {

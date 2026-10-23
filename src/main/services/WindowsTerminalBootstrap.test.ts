@@ -7,7 +7,7 @@
  * - `canHandle` matching for PowerShell / Git Bash / cmd.exe builders.
  * - Dispatch-chain precedence in `buildWindowsBootstrap`.
  * - The shape of each builder's emitted script: cd, pwd-equivalent, marker,
- *   ConPTY buffer clear (CSI 2J / 3J / H or `cls` fallback), shell handoff.
+ *   ConPTY buffer clear (CSI 2J / 3J / H or `cls` fallback (not for cmd.exe)), shell handoff.
  * - Cwd deny-list behaviour, including the `C:\Program Files (x86)\…` accept
  *   case that previously regressed on Windows.
  * - `normalizeWindowsCwd` trailing-separator handling.
@@ -221,7 +221,7 @@ describe('CmdExeBootstrapBuilder', () => {
     it('emits one ready-made command line string (not argv) in the documented order', () => {
       const script = builder.build({ shell: 'cmd.exe', cwd: CWD, marker: MARKER })
       expect(typeof script).toBe('string')
-      expect(script).toBe(`/D /S /K "@echo off && cd && echo ${MARKER} && cls & echo on"`)
+      expect(script).toBe(`/D /S /K "@echo off && cd && echo ${MARKER} & echo on"`)
     })
 
     it('keeps the cwd out of the command line (the shell starts there)', () => {
@@ -239,7 +239,7 @@ describe('CmdExeBootstrapBuilder', () => {
       const afterK = commandLine.slice(commandLine.indexOf('/K ') + 3)
       expect(afterK.startsWith('"') && afterK.endsWith('"')).toBe(true)
       const executed = afterK.slice(1, -1)
-      expect(executed).toBe(`@echo off && cd && echo ${MARKER} && cls & echo on`)
+      expect(executed).toBe(`@echo off && cd && echo ${MARKER} & echo on`)
     })
 
     it('regression: an argv array is mangled by node-pty into \\" (the old broken form)', () => {
@@ -262,7 +262,9 @@ describe.skipIf(process.platform !== 'win32')('CmdExeBootstrapBuilder against a 
       input: 'exit\r\n',
       timeout: 15000,
       cwd,
-      encoding: 'utf8'
+      encoding: 'utf8',
+      // A user PROMPT (or the app's) would replace the default prompt
+      env: { ...process.env, PROMPT: undefined }
     })
     const out = result.stdout
     const markerAt = out.indexOf(MARKER)

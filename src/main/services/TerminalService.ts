@@ -407,7 +407,9 @@ export class TerminalService extends EventEmitter {
         COLORTERM: 'truecolor',
         // Set traditional prompt: username directory $
         // %n = username, %~ = current directory (~ for home)
-        PROMPT: '%n %~ $ ',
+        // cmd.exe also reads PROMPT and would show these codes literally, so it
+        // keeps its own (default $P$G) prompt.
+        ...(shellKind === 'cmd' ? {} : { PROMPT: '%n %~ $ ' }),
         PS1: '%n %~ $ ',
         // Disable macOS session restoration (prevents "Restored session" message)
         SHELL_SESSIONS_DISABLE: '1'

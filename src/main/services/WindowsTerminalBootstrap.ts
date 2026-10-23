@@ -220,7 +220,12 @@ export class GitBashBootstrapBuilder implements WindowsBootstrapBuilder {
  * - Bare `cd` (no args) prints the current directory – cmd.exe's analog of
  *   POSIX `pwd`.
  * - `echo <marker>` prints the marker.
- * - `cls` wipes ConPTY's visible viewport before the interactive prompt
+ * - NO `cls`: ConPTY sends the final screen, not every line, so a `cls` right
+ *   after `echo <marker>` lands in the same frame and the cd line and the
+ *   marker never reach the PTY stream (the marker timeout then fires after
+ *   10 s). The renderer's clear handshake wipes the screen instead. The old
+ *   `cls` rationale follows for reference:
+ *   `cls` wiped ConPTY's visible viewport before the interactive prompt
  *   takes over. See `GitBashBootstrapBuilder.build` for the reflow-leak
  *   rationale. Note: on Windows 10 ≥ 1809 ConPTY `cls` emits `CSI 2J` +
  *   `CSI H` but *not* `CSI 3J`, so scrollback is not cleared – this is a
@@ -258,7 +263,7 @@ export class CmdExeBootstrapBuilder implements WindowsBootstrapBuilder {
    * `cd` then reports that directory and the handshake still completes.
    */
   build({ marker }: { shell: string; cwd: string; marker: string }): string[] | string {
-    return `/D /S /K "@echo off && cd && echo ${marker} && cls & echo on"`
+    return `/D /S /K "@echo off && cd && echo ${marker} & echo on"`
   }
 }
 
