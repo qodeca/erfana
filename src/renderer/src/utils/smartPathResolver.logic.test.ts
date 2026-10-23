@@ -14,7 +14,8 @@ import {
   resolveFromIndex,
   resolvePathSmartSync,
   resolvePathSmart,
-  createSmartResolver
+  createSmartResolver,
+  mergeNameSearch
 } from './smartPathResolver.logic'
 import { createFilenameIndex, type FilenameIndex } from './filenameIndex'
 import type { FileNode } from '../../../preload/index'
@@ -390,6 +391,60 @@ describe('smartPathResolver', () => {
 
       expect(result.status).toBe('single-match')
       expect(result.resolvedPath).toBe('/project/README.md')
+    })
+  })
+
+  describe('on a truncated tree (finding 32, PR #320 review)', () => {
+    const tree: FileNode[] = [
+      { name: 'Button.tsx', path: '/project/src/Button.tsx', type: 'file', extension: '.tsx' },
+      { name: 'big', path: '/project/big', type: 'directory', children: [], lazy: 'capped' }
+    ]
+
+    it('offers a single index match for choosing, marked incomplete, without searching', async () => {
+      const result = await resolvePathSmart({
+        path: 'Button.tsx', cwd: null, projectRoot: '/project', index: createFilenameIndex(), files: tree,
+        treeTruncated: true
+      })
+
+      expect(result.status).toBe('multiple-matches')
+      expect(result.candidates?.map((c) => c.path)).toEqual(['/project/src/Button.tsx'])
+      expect(result.incomplete).toBe(true)
+    })
+
+    it('keeps a single match certain when the tree is complete', async () => {
+      const result = await resolvePathSmart({
+        path: 'Button.tsx', cwd: null, projectRoot: '/project', index: createFilenameIndex(), files: tree
+      })
+      expect(result.status).toBe('single-match')
+      expect(result.incomplete).toBeUndefined()
+    })
+
+    it('leaves a name the index lacks unresolved: the search waits for a click', async () => {
+      const result = await resolvePathSmart({
+        path: 'Card.tsx:12', cwd: null, projectRoot: '/project', index: createFilenameIndex(), files: tree,
+        treeTruncated: true
+      })
+      expect(result.status).toBe('no-match')
+    })
+  })
+
+  describe('mergeNameSearch (round 3, item 3)', () => {
+    it('offers the index matches and the search results once each, ranked', () => {
+      const candidates = mergeNameSearch(
+        ['/project/src/Button.tsx'],
+        { paths: ['/project/src/Button.tsx', '/project/big/Button.tsx'], truncated: true },
+        'Button.tsx'
+      )
+      expect(candidates.map((c) => c.path).sort()).toEqual(['/project/big/Button.tsx', '/project/src/Button.tsx'])
+    })
+
+    it('dedupes a search result that names an index match with the other separator', () => {
+      const candidates = mergeNameSearch(
+        ['/project/src/Button.tsx'],
+        { paths: ['\\project\\src\\Button.tsx'], truncated: false },
+        'Button.tsx'
+      )
+      expect(candidates).toHaveLength(1)
     })
   })
 })

@@ -5,35 +5,51 @@
  *
  * The detector asks `resolveLibreOffice` (the replay of LiteParse's own
  * lookup, tested in conversionToolGuard.test.ts) which LibreOffice a
- * conversion would run, then probes a `found` candidate with `--version`.
+ * conversion would run. On macOS and Linux a `found` candidate is probed with
+ * a hardened `--version`; on Windows soffice is never run (the resolver's
+ * file check is the answer).
  *
  * @see Issue #132 – LiteParse document import
  * @see Issue #250 – detection agrees with what a conversion would run
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type { ChildProcess } from 'child_process'
 import { tmpdir } from 'os'
 
-vi.mock('child_process', () => ({
-  execFile: vi.fn()
+const fsMocks = vi.hoisted(() => ({
+  mkdtempSync: vi.fn(() => '/tmp/erfana-lo-probe-x'),
+  rmSync: vi.fn()
 }))
 
-import { execFile } from 'child_process'
-import { DependencyDetector } from './DependencyDetector'
+vi.mock('child_process', () => ({
+  spawn: vi.fn()
+}))
+vi.mock('fs', () => ({ ...fsMocks, default: fsMocks }))
+
+import { spawn } from 'child_process'
+import { DependencyDetector, killActiveLibreOfficeProbes } from './DependencyDetector'
 import type { LibreOfficeResolution } from './conversionToolGuard'
 
-const mockedExecFile = vi.mocked(execFile)
+const mockedSpawn = vi.mocked(spawn)
+const realPlatform = process.platform
 
-/** execFile succeeds for the given absolute paths only. */
+function setPlatform(platform: NodeJS.Platform): void {
+  Object.defineProperty(process, 'platform', { value: platform, configurable: true })
+}
+
+/** spawn returns a child that exits with `code` for the given absolute paths only. */
 function probeSucceedsFor(...paths: string[]): void {
-  mockedExecFile.mockImplementation(
-    (command: string, _args: unknown, _options: unknown, callback: unknown) => {
-      const cb = callback as (error: Error | null) => void
-      cb(paths.includes(command) ? null : new Error('exit 1'))
-      return { on: vi.fn() } as unknown as ChildProcess
-    }
-  )
+  mockedSpawn.mockImplementation(((command: string) => {
+    const handlers: Record<string, (arg?: unknown) => void> = {}
+    setImmediate(() => handlers['exit']?.(paths.includes(command) ? 0 : 1))
+    return {
+      pid: 4242,
+      on: (event: string, handler: (arg?: unknown) => void) => {
+        handlers[event] = handler
+      }
+    } as unknown as ChildProcess
+  }) as unknown as typeof spawn)
 }
 
 function detectorWith(resolution: LibreOfficeResolution, roots: string[] = []) {
@@ -42,10 +58,55 @@ function detectorWith(resolution: LibreOfficeResolution, roots: string[] = []) {
 }
 
 const SOFFICE = '/usr/bin/soffice'
+const WIN_SOFFICE = 'C:\\Program Files\\LibreOffice\\program\\soffice.exe'
 
 describe('DependencyDetector', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    setPlatform('linux')
+  })
+  afterEach(() => {
+    setPlatform(realPlatform)
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+  })
+
+  describe('Windows – soffice.exe is never launched', () => {
+    beforeEach(() => setPlatform('win32'))
+
+    it('reports found without spawning anything when the install exists', async () => {
+      const { detector } = detectorWith({ state: 'found', path: WIN_SOFFICE })
+
+      expect(await detector.detect()).toEqual({ libreOffice: 'found', unsafe: null })
+      expect(mockedSpawn).not.toHaveBeenCalled()
+      expect(fsMocks.mkdtempSync).not.toHaveBeenCalled()
+    })
+
+    it('reports missing without spawning when nothing is installed', async () => {
+      const { detector } = detectorWith({ state: 'missing' })
+
+      expect(await detector.detect()).toEqual({ libreOffice: 'missing', unsafe: null })
+      expect(mockedSpawn).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('macOS – the bundle binary still runs a hardened --version', () => {
+    beforeEach(() => setPlatform('darwin'))
+    const BIN = '/Applications/LibreOffice.app/Contents/MacOS/soffice'
+
+    it('spawns with stdio ignored, headless, a private profile, and no kill on a clean exit', async () => {
+      probeSucceedsFor(BIN)
+      const kill = vi.spyOn(process, 'kill').mockImplementation(() => true)
+      const { detector } = detectorWith({ state: 'found', path: BIN })
+
+      expect(await detector.detect()).toEqual({ libreOffice: 'found', unsafe: null })
+      const [command, args, options] = mockedSpawn.mock.calls[0]
+      expect(command).toBe(BIN)
+      expect(args).toEqual(['--version', '--headless', '--norestore', expect.stringMatching(/^-env:UserInstallation=file:\/\/\//)])
+      expect(options).toMatchObject({ stdio: 'ignore', windowsHide: true, detached: true })
+      expect(kill).not.toHaveBeenCalled()
+      expect(fsMocks.rmSync).toHaveBeenCalledWith('/tmp/erfana-lo-probe-x', { recursive: true, force: true })
+    })
   })
 
   it('reports found when the resolved LibreOffice answers --version', async () => {
@@ -53,7 +114,11 @@ describe('DependencyDetector', () => {
     const { detector } = detectorWith({ state: 'found', path: SOFFICE })
 
     expect(await detector.detect()).toEqual({ libreOffice: 'found', unsafe: null })
-    expect(mockedExecFile).toHaveBeenCalledWith(SOFFICE, ['--version'], expect.any(Object), expect.any(Function))
+    const [command, args, options] = mockedSpawn.mock.calls[0]
+    expect(command).toBe(SOFFICE)
+    expect(args).toEqual(['--version', '--headless', '--norestore', expect.stringMatching(/^-env:UserInstallation=file:\/\/\//)])
+    expect(options).toMatchObject({ stdio: 'ignore', windowsHide: true, detached: true })
+    expect(fsMocks.rmSync).toHaveBeenCalledWith('/tmp/erfana-lo-probe-x', { recursive: true, force: true })
   })
 
   it('reports missing when the candidate fails the liveness probe (a planted stub)', async () => {
@@ -67,7 +132,7 @@ describe('DependencyDetector', () => {
     const { detector } = detectorWith({ state: 'missing' })
 
     expect(await detector.detect()).toEqual({ libreOffice: 'missing', unsafe: null })
-    expect(mockedExecFile).not.toHaveBeenCalled()
+    expect(mockedSpawn).not.toHaveBeenCalled()
   })
 
   it('reports unsafe – and never runs the binary – when a conversion would refuse it', async () => {
@@ -75,14 +140,14 @@ describe('DependencyDetector', () => {
     const { detector } = detectorWith({ state: 'unsafe', name: 'soffice', path: '/work/repo/soffice', reason: 'temp' })
 
     expect(await detector.detect()).toEqual({ libreOffice: 'unsafe', unsafe: { tool: 'soffice', reason: 'temp' } })
-    expect(mockedExecFile).not.toHaveBeenCalled()
+    expect(mockedSpawn).not.toHaveBeenCalled()
   })
 
   it.each(['unresolvable', 'ambiguous', 'network'] as const)('reports the %s reason and the helper at fault', async (reason) => {
     const { detector } = detectorWith({ state: 'unsafe', name: 'which', path: 'C:\\Repo\\which.exe', reason })
 
     expect(await detector.detect()).toEqual({ libreOffice: 'unsafe', unsafe: { tool: 'which', reason } })
-    expect(mockedExecFile).not.toHaveBeenCalled()
+    expect(mockedSpawn).not.toHaveBeenCalled()
   })
 
   it('passes the untrusted roots to the lookup on every detection', async () => {
@@ -101,7 +166,7 @@ describe('DependencyDetector', () => {
 
     await detector.detect()
 
-    const options = mockedExecFile.mock.calls[0][2] as { cwd?: string; env?: NodeJS.ProcessEnv; windowsHide?: boolean }
+    const options = mockedSpawn.mock.calls[0][2] as { cwd?: string; env?: NodeJS.ProcessEnv; windowsHide?: boolean }
     expect(options.cwd).toBe(tmpdir())
     expect(options.windowsHide).toBe(true)
     expect(options.env).not.toHaveProperty('SAL_USE_VCLPLUGIN')
@@ -113,7 +178,7 @@ describe('DependencyDetector', () => {
     const { detector } = detectorWith({ state: 'found', path: 'soffice' })
 
     expect(await detector.detect()).toEqual({ libreOffice: 'missing', unsafe: null })
-    expect(mockedExecFile).not.toHaveBeenCalled()
+    expect(mockedSpawn).not.toHaveBeenCalled()
   })
 
   it('treats a throwing lookup as missing', async () => {
@@ -126,20 +191,70 @@ describe('DependencyDetector', () => {
     expect(await detector.detect()).toEqual({ libreOffice: 'missing', unsafe: null })
   })
 
-  it('resolves to missing when execFile throws or the child emits error', async () => {
-    mockedExecFile.mockImplementationOnce(() => {
+  it('resolves to missing when spawn throws, and removes the profile', async () => {
+    mockedSpawn.mockImplementationOnce(() => {
       throw new Error('spawn EACCES')
     })
-    const first = detectorWith({ state: 'found', path: SOFFICE }).detector
-    expect(await first.detect()).toEqual({ libreOffice: 'missing', unsafe: null })
+    const { detector } = detectorWith({ state: 'found', path: SOFFICE })
 
-    mockedExecFile.mockImplementationOnce(((_c: unknown, _a: unknown, _o: unknown, _cb: unknown) => ({
+    expect(await detector.detect()).toEqual({ libreOffice: 'missing', unsafe: null })
+    expect(fsMocks.rmSync).toHaveBeenCalledWith('/tmp/erfana-lo-probe-x', { recursive: true, force: true })
+  })
+
+  it('kills the group, removes the profile and reports missing when the child emits error', async () => {
+    const kill = vi.spyOn(process, 'kill').mockImplementation(() => true)
+    mockedSpawn.mockImplementationOnce((() => ({
+      pid: 77,
       on: (event: string, handler: (e: Error) => void) => {
         if (event === 'error') handler(new Error('spawn ENOENT'))
       }
-    })) as unknown as typeof execFile)
-    const second = detectorWith({ state: 'found', path: SOFFICE }).detector
-    expect(await second.detect()).toEqual({ libreOffice: 'missing', unsafe: null })
+    })) as unknown as typeof spawn)
+    const { detector } = detectorWith({ state: 'found', path: SOFFICE })
+
+    expect(await detector.detect()).toEqual({ libreOffice: 'missing', unsafe: null })
+    expect(kill).toHaveBeenCalledWith(-77, 'SIGKILL')
+    expect(fsMocks.rmSync).toHaveBeenCalledWith('/tmp/erfana-lo-probe-x', { recursive: true, force: true })
+  })
+
+  it('kills the group on a non-zero exit', async () => {
+    const kill = vi.spyOn(process, 'kill').mockImplementation(() => true)
+    probeSucceedsFor()
+    const { detector } = detectorWith({ state: 'found', path: SOFFICE })
+
+    expect(await detector.detect()).toEqual({ libreOffice: 'missing', unsafe: null })
+    expect(kill).toHaveBeenCalledWith(-4242, 'SIGKILL')
+  })
+
+  it('kills the group, removes the profile and reports missing when it hangs past the timeout', async () => {
+    vi.useFakeTimers()
+    const kill = vi.spyOn(process, 'kill').mockImplementation(() => true)
+    mockedSpawn.mockImplementationOnce((() => ({ pid: 4242, on: vi.fn() })) as unknown as typeof spawn)
+    const { detector } = detectorWith({ state: 'found', path: SOFFICE })
+
+    const result = detector.detect()
+    await vi.advanceTimersByTimeAsync(6000)
+
+    expect(await result).toEqual({ libreOffice: 'missing', unsafe: null })
+    expect(kill).toHaveBeenCalledWith(-4242, 'SIGKILL')
+    expect(fsMocks.rmSync).toHaveBeenCalledWith('/tmp/erfana-lo-probe-x', { recursive: true, force: true })
+  })
+
+  it('kills an in-flight probe when the app quits', async () => {
+    vi.useFakeTimers()
+    const kill = vi.spyOn(process, 'kill').mockImplementation(() => true)
+    mockedSpawn.mockImplementationOnce((() => ({ pid: 555, on: vi.fn() })) as unknown as typeof spawn)
+    const { detector } = detectorWith({ state: 'found', path: SOFFICE })
+
+    const result = detector.detect()
+    await vi.advanceTimersByTimeAsync(10)
+    killActiveLibreOfficeProbes()
+
+    expect(kill).toHaveBeenCalledWith(-555, 'SIGKILL')
+    kill.mockClear()
+    killActiveLibreOfficeProbes()
+    expect(kill).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(6000)
+    await result
   })
 
   describe('caching', () => {
@@ -152,7 +267,7 @@ describe('DependencyDetector', () => {
 
       expect(second).toBe(first)
       expect(resolve).toHaveBeenCalledTimes(1)
-      expect(mockedExecFile).toHaveBeenCalledTimes(1)
+      expect(mockedSpawn).toHaveBeenCalledTimes(1)
     })
 
     it('shares one detection between concurrent callers', async () => {

@@ -20,6 +20,7 @@ const {
   MEDIA_BINARY_MIN_BYTES,
   pruneForeignFfprobeBinaries,
   pruneForeignNodePtyPrebuilds,
+  ensurePatchedConptyBuild,
   assertPackagedAppContents,
   assertConfigMatchesAllowlist,
   deriveAllowedAppEntries,
@@ -421,6 +422,61 @@ describe('pruneForeignFfprobeBinaries', () => {
 
     // The symlink was skipped, so the external target's contents are untouched.
     expect(fs.existsSync(path.join(external, 'keep'))).toBe(true);
+  });
+});
+
+describe('ensurePatchedConptyBuild (#305)', () => {
+  let tmpRoot;
+  const releaseDir = (root) => path.join(root, 'app', 'node_modules', 'node-pty', 'build', 'Release');
+  const seedRelease = (root, names = ['conpty.node', 'conpty_console_list.node']) => {
+    fs.mkdirSync(releaseDir(root), { recursive: true });
+    names.forEach((n) => fs.writeFileSync(path.join(releaseDir(root), n), 'built'));
+  };
+  const seedPrebuild = (root, name) => {
+    const dir = makePrebuild(root, name);
+    fs.writeFileSync(path.join(dir, 'conpty.node'), 'unpatched');
+    fs.writeFileSync(path.join(dir, 'conpty_console_list.node'), 'unpatched');
+    return dir;
+  };
+  beforeEach(() => {
+    tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'conpty-guard-'));
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    fs.rmSync(tmpRoot, { recursive: true, force: true });
+  });
+
+  it('throws on win32 when build/Release is missing and deletes nothing', () => {
+    const dir = seedPrebuild(tmpRoot, 'win32-x64');
+    expect(() => ensurePatchedConptyBuild(tmpRoot, 'win32', { requireMatch: true })).toThrow(/build.Release is missing/);
+    expect(fs.existsSync(path.join(dir, 'conpty.node'))).toBe(true);
+  });
+
+  it('throws when conpty_console_list.node is missing from build/Release', () => {
+    seedRelease(tmpRoot, ['conpty.node']);
+    expect(() => ensurePatchedConptyBuild(tmpRoot, 'win32', { requireMatch: true })).toThrow(/conpty_console_list\.node/);
+  });
+
+  it('only warns when the match is not required (cross-platform pack)', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(() => ensurePatchedConptyBuild(tmpRoot, 'win32', { requireMatch: false })).not.toThrow();
+    expect(warn).toHaveBeenCalled();
+  });
+
+  it('removes the prebuild conpty addons but keeps pty.node when build/Release is present', () => {
+    seedRelease(tmpRoot);
+    const dir = seedPrebuild(tmpRoot, 'win32-x64');
+    ensurePatchedConptyBuild(tmpRoot, 'win32', { requireMatch: true });
+    expect(fs.existsSync(path.join(dir, 'conpty.node'))).toBe(false);
+    expect(fs.existsSync(path.join(dir, 'conpty_console_list.node'))).toBe(false);
+    expect(fs.existsSync(path.join(dir, 'pty.node'))).toBe(true);
+    expect(fs.existsSync(path.join(releaseDir(tmpRoot), 'conpty.node'))).toBe(true);
+  });
+
+  it('is a no-op on non-win32 platforms', () => {
+    const dir = seedPrebuild(tmpRoot, 'darwin-arm64');
+    ensurePatchedConptyBuild(tmpRoot, 'darwin', { requireMatch: true });
+    expect(fs.existsSync(path.join(dir, 'conpty.node'))).toBe(true);
   });
 });
 

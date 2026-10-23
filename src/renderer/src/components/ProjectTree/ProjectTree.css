@@ -164,6 +164,25 @@
   border-left: var(--border-width-thick) solid var(--color-brand-lime);
 }
 
+/* The loading / could-not-read line under an expanded lazy folder (#320):
+   a row's height and indent (Rows card), but plain text – not a target.
+   Words rather than a spinner: a folder read is short, and text needs no
+   reduced-motion rule (Motion card). */
+.project-tree-item.project-tree-placeholder {
+  cursor: default;
+  font-size: var(--text-sm);
+  font-style: italic;
+  color: var(--color-text-tertiary);
+}
+
+.project-tree-item.project-tree-placeholder:hover {
+  background-color: transparent;
+}
+
+.project-tree-item.project-tree-placeholder[data-status="failed"] {
+  color: var(--color-error);
+}
+
 /* The keyboard focus ring (design/system/foundations/focus.html): the rows
    sit in a scroll container, so the ring is drawn inward, where it is not
    clipped. */

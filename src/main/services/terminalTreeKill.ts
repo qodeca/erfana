@@ -37,7 +37,7 @@ export const TREE_KILL_AWAIT_MS = 500
 const DEFAULT_SYSTEM_ROOT = 'C:\\Windows'
 
 /** `win32.isAbsolute` also accepts a rooted path with no drive (`\\Windows`), which still depends on the current drive. */
-function isDriveOrUncPath(value: string): boolean {
+export function isDriveOrUncPath(value: string): boolean {
   return win32.isAbsolute(value) && /^(?:[A-Za-z]:[\\/]|\\\\)/.test(value)
 }
 

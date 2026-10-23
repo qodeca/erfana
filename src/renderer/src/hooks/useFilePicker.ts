@@ -33,6 +33,8 @@ export interface FilePickerState {
   isOpen: boolean
   candidates: PathScore[]
   query: string
+  /** The candidates come from an incomplete tree (`FilePickerDialog`) */
+  incomplete: boolean
 }
 
 export interface UseFilePickerReturn {
@@ -40,7 +42,7 @@ export interface UseFilePickerReturn {
    * Show the file picker dialog.
    * Returns a Promise that resolves to the selected path, or null if cancelled.
    */
-  showPicker: (candidates: PathScore[], query: string) => Promise<string | null>
+  showPicker: (candidates: PathScore[], query: string, options?: { incomplete?: boolean }) => Promise<string | null>
 
   /**
    * Props to spread onto the FilePickerDialog component.
@@ -52,6 +54,7 @@ export interface UseFilePickerReturn {
     candidates: PathScore[]
     query: string
     projectRoot: string | null
+    incomplete: boolean
   }
 }
 
@@ -61,20 +64,22 @@ export function useFilePicker(options: UseFilePickerOptions): UseFilePickerRetur
   const [state, setState] = useState<FilePickerState>({
     isOpen: false,
     candidates: [],
-    query: ''
+    query: '',
+    incomplete: false
   })
 
   // Store resolve/reject functions for the current Promise
   const resolveRef = useRef<((value: string | null) => void) | null>(null)
 
   const showPicker = useCallback(
-    (candidates: PathScore[], query: string): Promise<string | null> => {
+    (candidates: PathScore[], query: string, options?: { incomplete?: boolean }): Promise<string | null> => {
       return new Promise((resolve) => {
         resolveRef.current = resolve
         setState({
           isOpen: true,
           candidates,
-          query
+          query,
+          incomplete: options?.incomplete === true
         })
       })
     },
@@ -105,7 +110,8 @@ export function useFilePicker(options: UseFilePickerOptions): UseFilePickerRetur
       onSelect: handleSelect,
       candidates: state.candidates,
       query: state.query,
-      projectRoot
+      projectRoot,
+      incomplete: state.incomplete
     }
   }
 }

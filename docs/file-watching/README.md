@@ -244,7 +244,7 @@ Uses a **selective blacklist** approach (same as VS Code). Since #211 one projec
 
 - **excluded** – matched by the `files.exclude` list (global plus project; merge and syntax: [Settings § Exclude list](../settings.md#exclude-list-filesexclude)). The tree does not show or read it and neither backend watches it;
 - **hidden** – any path segment equals a `tree.hiddenPatterns` name (the tree's own rule; default `node_modules` and `.git`). Neither backend watches it;
-- **ignored** – `/` + the relative path contains `/` + a `watcher.ignoreList` entry (default `DEFAULT_WATCHER_IGNORE_PATTERNS` in `src/shared/constants.ts`). The tree still shows it; neither backend watches it;
+- **ignored** – `/` + the relative path contains `/` + a `watcher.ignoreList` entry (default `DEFAULT_WATCHER_IGNORE_PATTERNS` in `src/shared/constants.ts`). The tree still shows it; neither backend watches it. A folder that matches an entry on whole segments (`dist`, `src/dist`, `.yarn/cache` – not `outline` for `out`) is a **lazy** row: the walk does not read it, and the tree reads one level of it when it is expanded (see [the lazy tree walk note](../performance/2026-10-22-lazy-tree-walk.md));
 - **outside the project** – dropped, fail closed. The project root itself is never dropped.
 
 Because the test runs on the project-relative path, a project that itself lives under a folder named `build`, `out` or `dist` is watched normally; before #211 the substring test ran on the absolute path and such a project was not watched at all. The ignore rule is still a substring test, so `out` also matches `outline` (a known limit).

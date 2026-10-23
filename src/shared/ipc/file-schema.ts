@@ -31,10 +31,28 @@ export const FileNodeSchema = z.object({
     return z.array(FileNodeSchema).optional()
   },
   extension: z.string().optional(),
-  isSymlink: z.boolean().optional()
+  isSymlink: z.boolean().optional(),
+  /**
+   * A folder the walk did not read, and why. Its `children` is empty, not its
+   * contents – the tree asks for them (`file:readDirectory` of this path,
+   * `shallow`) when the folder is expanded. Absent on every folder that was read.
+   *
+   * - `ignored`: on `watcher.ignoreList` (`dist`, `.venv`, ...). Its files are
+   *   left out of the tree by design.
+   * - `capped`: a walk bound left it unread – the walk's entry cap, a shallow
+   *   read, or the walk's bound on folder links entered. The tree is
+   *   incomplete there, so a lookup by name must not take one match as certain.
+   * - `linked`: a folder link whose real folder the walk already entered
+   *   through another path. Its files are in the tree under that path, so the
+   *   tree is not incomplete because of it.
+   */
+  lazy: z.enum(['ignored', 'capped', 'linked']).optional()
 })
 
 export type FileNode = z.infer<typeof FileNodeSchema>
+
+/** Why a folder row was left unread (see `FileNode.lazy`). */
+export type LazyKind = NonNullable<FileNode['lazy']>
 
 export const FileStatsSchema = z.object({
   size: z.number(),
@@ -76,9 +94,27 @@ export const payloadArgs = <T extends z.ZodType>(request: T) => z.tuple([request
 
 /** `file:readDirectory` */
 export const ReadDirectoryRequestSchema = z.strictObject({
-  dirPath: pathField('Invalid directory path')
+  dirPath: pathField('Invalid directory path'),
+  /** One level only: every sub-folder comes back lazy. How the tree expands a lazy folder. */
+  shallow: z.literal(true).optional()
 })
 export type ReadDirectoryRequest = z.infer<typeof ReadDirectoryRequestSchema>
+
+/**
+ * `file:findByName`: files of one name below `dirPath` (the project root), for
+ * a terminal link the incomplete tree cannot resolve. Bounded in main.
+ */
+export const FindByNameRequestSchema = z.strictObject({
+  dirPath: pathField('Invalid directory path'),
+  name: entryNameField('Invalid name')
+})
+export type FindByNameRequest = z.infer<typeof FindByNameRequestSchema>
+
+/** What `file:findByName` answers: `truncated` when a bound stopped the search early. */
+export interface FindByNameResponse {
+  paths: string[]
+  truncated: boolean
+}
 
 /** `file:readFile`, `file:getStats`, `file:exists`, `file:deleteFile`, `file:deleteFolder`, `file:revealInFileManager` */
 export const PathRequestSchema = z.strictObject({ filePath: pathField('Invalid file path') })
@@ -193,6 +229,8 @@ export interface FileBridge {
   openProjectByPath(request: OpenProjectByPathRequest): Promise<string>
   getSession(): Promise<ProjectSessionInfo | null>
   readDirectory(request: ReadDirectoryRequest): Promise<FileNode[]>
+  /** Files of one name below the project root, bounded (terminal links on an incomplete tree). */
+  findByName(request: FindByNameRequest): Promise<FindByNameResponse>
   readFile(request: PathRequest): Promise<string>
   /**
    * `createParentDirs`: the explicit "Save to restore it" of a tab whose folder is gone.

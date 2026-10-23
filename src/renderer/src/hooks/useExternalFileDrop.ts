@@ -314,6 +314,8 @@ export function useExternalFileDrop(
     // Walk up the DOM tree looking for a tree node with path data
     let current: HTMLElement | null = target
     while (current) {
+      // A lazy folder's placeholder line (#320) stands for its folder
+      if (current.dataset?.dropFolder) return current.dataset.dropFolder
       const path = current.dataset?.path
       const type = current.dataset?.type
 

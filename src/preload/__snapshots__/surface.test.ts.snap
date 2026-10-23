@@ -44,6 +44,7 @@ exports[`preload surface > window.api.file and window.api.terminal expose the ex
   "deleteFile",
   "deleteFolder",
   "exists",
+  "findByName",
   "getProjectPath",
   "getSession",
   "getStats",

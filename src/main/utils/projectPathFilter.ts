@@ -109,6 +109,19 @@ export class ProjectPathFilter {
   }
 
   /**
+   * The folder matches an ignore pattern on whole segments – `dist` matches
+   * `dist` and `src/dist/x`, never `distribution` – for the tree walk, which
+   * leaves such a folder lazy (its entries read only when it is expanded).
+   * Stricter than {@link isIgnored}'s substring rule on purpose: a folder named
+   * `outline` must not stop being listed because `out` is on the list.
+   */
+  readonly isIgnoredFolder = (rel: string): boolean => {
+    if (rel === '') return false
+    const probe = `/${rel}/`
+    return this.ignoreNeedles.some(needle => probe.includes(needle.endsWith('/') ? needle : `${needle}/`))
+  }
+
+  /**
    * Whether an event or entry at this project-relative path is dropped.
    * `null` (outside the project) always is; `''` (the root) never is.
    */

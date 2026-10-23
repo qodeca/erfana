@@ -81,7 +81,7 @@ Honest per-feature assessment of what an end user running an NSIS install of v0.
 | Keyboard shortcuts, quit confirmation, multi-instance project lock | Cross-platform Electron |
 | **Git status in project tree** (#160) | Auto-discovers `git.exe` at Program Files / Chocolatey / Scoop with `--version` liveness probe |
 | **Reserved filename rejection** (#161) | `CON.md`, `PRN.md`, etc. produce friendly toast `"…" is not a valid filename — try "_…"` instead of cryptic EINVAL. Bidi-override stripping defends against Trojan-Source RTL attacks |
-| **DOCX import via LibreOffice** (#162) | DependencyDetector probes `C:\Program Files\LibreOffice\program\soffice.exe` (+ x86) with `--version` liveness when not on PATH |
+| **DOCX import via LibreOffice** (#162) | DependencyDetector finds `C:\Program Files\LibreOffice\program\soffice.exe` when not on PATH; since #329 it never runs it on Windows (the #162 `--version` liveness check ran the very file it meant to vet and is removed on purpose) |
 | **Screenshot capture** (screen / window / area) (#164) | Phase 3, shipped v0.12.0. `ScreenshotService` dispatches to `DesktopCapturerScreenshotCapturer` on win32 (Electron `desktopCapturer` + per-display area-select overlay + in-app `WindowPickerDialog`) |
 | **Local Whisper transcription** (offline, model download) (#165) | Phase 4, shipped v0.9.4. `classifyPlatform()` accepts `win32-x64`; self-hosted signed binaries with the 4-layer trust chain. Windows ARM64 and pre-SSE4.2 CPUs are still rejected by design |
 | **Signed NSIS installer** (#174) | Shipped v0.9.5. Azure Artifact Signing via X.509 certificate auth; SmartScreen reputation ramp tracked in [#177](https://github.com/qodeca/erfana/issues/177) |
@@ -204,7 +204,7 @@ Three of the four rows that used to sit here have shipped and moved to the ✅ t
    - Wired into `FileService.createFile`/`createFolder`/`rename` (throws), `PdfService.getSavePath` + `DocxService.sanitizeFilename` (transforms). Renderer formatters use `INVALID_FILENAME_MARKER` shared constant from `shared/errors.ts` since `AppError.code` does not survive Electron IPC.
    - **Landed:** `612192b` (271 new validateFilename tests + 7 renderer formatter tests).
 3. **[#162](https://github.com/qodeca/erfana/issues/162) — LibreOffice Windows detection** (P2, import polish) — `DependencyDetector.ts`
-   - On `win32` after the `soffice` PATH probe, probes `C:\Program Files\LibreOffice\program\soffice.exe` and the (x86) variant via `tryCommand(--version)` liveness (mirrors #160's pattern; security review HIGH-severity finding addressed).
+   - On `win32` after the `soffice` PATH probe, looked up `C:\Program Files\LibreOffice\program\soffice.exe` with a `--version` liveness probe (mirrors #160's pattern). *Superseded by #329:* the `--version` check ran the very file it meant to vet, and always timed out on Windows, so it is removed on purpose; the file check alone is the answer.
    - Optional registry probe (`reg query HKLM\SOFTWARE\LibreOffice\UNO\InstallPath`) deferred unless filesystem probe proves insufficient.
    - **Landed:** `13bd3b8` (5 new DependencyDetector tests).
 4. **[#163](https://github.com/qodeca/erfana/issues/163) — `isWindowsLongPath`** (P2, decision-deferred) — `PlatformConfig.ts:205`

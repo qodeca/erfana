@@ -51,3 +51,12 @@ path = "docs/assets/readme/**"
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2025-2026 Qodeca sp. z o.o."
 SPDX-License-Identifier = "GPL-3.0-only"
+
+# patches/node-pty+1.1.0.patch carries upstream node-pty source lines (MIT): the
+# microsoft/node-pty#922 conpty.cc lock (#305) plus our build fixes to node-pty's
+# own files. The diff text is node-pty code, so it keeps node-pty's licence.
+[[annotations]]
+path = "patches/node-pty+1.1.0.patch"
+precedence = "override"
+SPDX-FileCopyrightText = ["2017 Daniel Imms", "2018 Microsoft Corporation"]
+SPDX-License-Identifier = "MIT"

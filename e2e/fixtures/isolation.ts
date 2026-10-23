@@ -277,7 +277,13 @@ async function killAppProcess(child: ChildProcess): Promise<string> {
  * is killed.
  */
 export async function closeAppAndWait(app: ElectronApplication): Promise<void> {
-  const child = app.process()
+  let child: ReturnType<ElectronApplication['process']>
+  try {
+    child = app.process()
+  } catch {
+    // The test already quit the app and Playwright dropped its handle: nothing left to close
+    return
+  }
   const exited =
     child.exitCode !== null || child.signalCode !== null
       ? Promise.resolve()

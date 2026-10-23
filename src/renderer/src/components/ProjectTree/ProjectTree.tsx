@@ -6,7 +6,9 @@ import { useVirtualizer, defaultRangeExtractor, type Range } from '@tanstack/rea
 import type { FileNode } from '../../../../preload/index'
 import type { FilterMode } from '../../types/filters'
 import { ProjectTreeNode, TREE_ROW_HEIGHT } from './ProjectTreeNode'
-import { buildVisibleRows } from './visibleRows'
+import { buildVisibleRows, dropTargetPath, isNodeRow, placeholderKey } from './visibleRows'
+import { TreePlaceholderRow } from './TreePlaceholderRow'
+import { filterMarkdownTree } from './markdownFilter'
 import { resolveInternalDropFolder, isSameFolderMove } from './dropTarget'
 import { isKeyboardContextMenu, rowMenuAnchor, KEYBOARD_MENU_ECHO_MS, type PointerPress } from './contextMenuOrigin'
 import { resolveTreeKey, findTypeAheadMatch, isTypeAheadKey } from './treeKeyboard'
@@ -42,6 +44,7 @@ import { useClipboardStore } from '../../stores/useClipboardStore'
 import { formatFileOperationError } from '../../utils/errorUtils'
 import { DRAG_DROP, AUTO_EXPAND } from './constants'
 import { withWatcherPause } from './withWatcherPause'
+import { useLazyFolderChildren } from './useLazyFolderChildren'
 import { logger } from '../../utils/logger'
 import { getLastSeenProjectGeneration } from '../../services/projectGeneration'
 import { useTerminalStore } from '../../stores/useTerminalStore'
@@ -158,7 +161,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
   // Project lifecycle management via context (singleton - avoids duplicate IPC listeners)
   const {
     projectPath,
-    files,
+    files: baseFiles,
     loading,
     error,
     isSwitchingProject,
@@ -179,6 +182,19 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(() =>
     seedExpansion(projectPath)
   )
+
+  // The tree as rendered and operated on: the base tree with the children of
+  // the lazy folders (ignored, or past the walk's cap) read on expand
+  // Only lazy folders in view are read: below the root row, through the filter shown
+  const lazyView = useMemo(
+    () => ({ rootPath: projectPath, filter: filterMode === 'markdown' ? filterMarkdownTree : undefined }),
+    [projectPath, filterMode]
+  )
+  const {
+    tree: files,
+    status: lazyStatus,
+    loaded: lazyLoaded
+  } = useLazyFolderChildren(baseFiles, expandedFolders, lazyView)
 
   // Register for project change notifications to reset UI state.
   // Still required for IN-PLACE changes (a project change that does not remount
@@ -342,51 +358,17 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
   })
 
   /**
-   * Check if a file is a markdown file
-   */
-  const isMarkdownFile = (fileName: string): boolean => {
-    const lower = fileName.toLowerCase()
-    return lower.endsWith('.md') || lower.endsWith('.markdown')
-  }
-
-  /**
-   * Recursively filter file tree to show only markdown files and folders containing them
-   */
-  const filterMarkdownFiles = (nodes: FileNode[]): FileNode[] => {
-    return nodes
-      .map(node => {
-        if (node.type === 'file') {
-          // Keep only markdown files
-          return isMarkdownFile(node.name) ? node : null
-        } else {
-          // For directories, recursively filter children
-          if (node.children && node.children.length > 0) {
-            const filteredChildren = filterMarkdownFiles(node.children)
-
-            // Keep directory only if it has markdown children
-            if (filteredChildren.length > 0) {
-              return {
-                ...node,
-                children: filteredChildren
-              }
-            }
-          }
-          return null
-        }
-      })
-      .filter((node): node is FileNode => node !== null)
-  }
-
-  /**
-   * Apply filtering based on current filter mode
+   * Apply filtering based on current filter mode. In Markdown mode a lazy
+   * folder is judged by what is known of it (`markdownFilter.ts`, #320).
    */
   const filteredFiles = useMemo(() => {
     if (filterMode === 'all') {
       return files
     } else {
-      return filterMarkdownFiles(files)
+      // A lazy folder read against an older base tree counts as unread (#320)
+      return filterMarkdownTree(files, lazyLoaded, lazyStatus, baseFiles)
     }
-  }, [files, filterMode])
+  }, [files, filterMode, lazyLoaded, lazyStatus, baseFiles])
 
   /**
    * Create synthetic root folder node (VS Code style)
@@ -464,8 +446,8 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
   // and what the arrow keys walk. Rebuilt only when the tree or the expansion
   // changes – never on a selection, focus or drag-hover change.
   const { rows: visibleRows, indexByPath } = useMemo(
-    () => buildVisibleRows(rootFolderNode, expandedFolders),
-    [rootFolderNode, expandedFolders]
+    () => buildVisibleRows(rootFolderNode, expandedFolders, lazyStatus),
+    [rootFolderNode, expandedFolders, lazyStatus]
   )
 
   // The row that holds the tree's one Tab stop (roving tabindex). Follows DOM
@@ -507,7 +489,10 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     count: visibleRows.length,
     getScrollElement: () => treeContainerRef.current,
     estimateSize: () => TREE_ROW_HEIGHT,
-    getItemKey: (index) => visibleRows[index].node.path,
+    getItemKey: (index) => {
+      const row = visibleRows[index]
+      return isNodeRow(row) ? row.node.path : placeholderKey(row.folderPath)
+    },
     overscan: TREE_OVERSCAN,
     scrollMargin: listOffset,
     rangeExtractor
@@ -540,7 +525,8 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
   const moveFocusTo = useCallback((index: number) => {
     const row = visibleRows[index]
     const container = treeContainerRef.current
-    if (!row || !container) return
+    // A placeholder line is never focused (lazy folders, #320)
+    if (!isNodeRow(row) || !container) return
     virtualizer.scrollToIndex(index, { align: 'auto' })
     setFocusedPath(row.node.path)
     const mounted = findMountedRow(container, row.node.path)
@@ -633,7 +619,9 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
   }
 
   const handleDragOver = (event: DragOverEvent) => {
-    const newOverId = event.over?.id as string | null
+    // Over a lazy folder's placeholder line means over the folder (#320)
+    const overRaw = event.over?.id as string | null | undefined
+    const newOverId = overRaw ? dropTargetPath(overRaw) : null
 
     // Handle auto-expand
     if (newOverId && newOverId !== overId) {
@@ -721,7 +709,8 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     }
 
     const sourcePath = active.id as string
-    const targetPath = over.id as string
+    // A drop on a lazy folder's placeholder line lands in the folder (#320)
+    const targetPath = dropTargetPath(over.id as string)
 
     logger.info('Drag end', { sourcePath, targetPath })
 
@@ -1456,7 +1445,9 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     }
 
     e.preventDefault()
-    const { node } = visibleRows[index]
+    const focused = visibleRows[index]
+    if (!isNodeRow(focused)) return
+    const { node } = focused
     switch (action.type) {
       case 'focus':
         moveFocusTo(action.index)
@@ -1651,6 +1642,17 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
             <div className="project-tree-rows" style={{ height: virtualizer.getTotalSize() }}>
               {virtualItems.map((item) => {
                 const row = visibleRows[item.index]
+                if (!isNodeRow(row)) {
+                  return (
+                    <TreePlaceholderRow
+                      key={item.key}
+                      folderPath={row.folderPath}
+                      level={row.level}
+                      status={row.status}
+                      top={item.start - listOffset}
+                    />
+                  )
+                }
                 const { node } = row
                 const dropZone =
                   internalDropFolder !== null && isStrictDescendant(internalDropFolder, node.path)
@@ -1668,6 +1670,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
                     parentPath={row.parentPath}
                     top={item.start - listOffset}
                     isExpanded={row.isExpanded}
+                    isBusy={row.isExpanded && lazyStatus.get(node.path) === 'loading'}
                     // "Selected" = the paste-target folder; see the prop's doc.
                     isSelected={node.path === selectedFolder}
                     isTabStop={item.index === tabStopIndex}

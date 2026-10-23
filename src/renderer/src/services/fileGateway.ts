@@ -89,6 +89,7 @@ export const fileGateway: FileBridge = {
   openProjectByPath: forward('openProjectByPath'),
   getSession: forward('getSession'),
   readDirectory: forward('readDirectory'),
+  findByName: forward('findByName'),
   readFile: forward('readFile'),
   writeFile: forward('writeFile'),
   getStats: forward('getStats'),
