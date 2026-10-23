@@ -32,7 +32,7 @@ import { registerMarkdownImageHandlers } from './ipc/markdown-image-handlers'
 import { registerClaudeStatusHandlers } from './ipc/claude-status-handlers'
 import { registerPreviewHandlers } from './ipc/preview-handlers'
 import { registerPreviewScheme } from './services/preview/previewScheme'
-import { importToolStatusService } from './services/import'
+import { importToolStatusService, killActiveLibreOfficeProbes } from './services/import'
 import { FORCE_CRASH_ARG, LOGS_DIR_RELATIVE, TEST_HOOKS_ARG } from '../shared/constants'
 import { createApplicationMenu, setPreviewZoomHandler } from './menu'
 import { fileService } from './services/FileService'
@@ -632,6 +632,9 @@ app.whenReady().then(async () => {
 app.on('window-all-closed', () => {
   app.quit()
 })
+
+// A LibreOffice detection probe still running at quit must not outlive the app.
+app.on('will-quit', killActiveLibreOfficeProbes)
 
 // Cleanup file watchers, directory watchers, terminals, git watchers, and project locks before app quits.
 // Pattern B (F11): preventDefault + sequenced shutdown guarantees lock release before exit.

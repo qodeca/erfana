@@ -5,7 +5,9 @@
  *
  * The detector asks `resolveLibreOffice` (the replay of LiteParse's own
  * lookup, tested in conversionToolGuard.test.ts) which LibreOffice a
- * conversion would run, then probes a `found` candidate with `--version`.
+ * conversion would run. On macOS and Linux a `found` candidate is probed with
+ * a hardened `--version`; on Windows soffice is never run (the resolver's
+ * file check is the answer).
  *
  * @see Issue #132 – LiteParse document import
  * @see Issue #250 – detection agrees with what a conversion would run
@@ -17,8 +19,6 @@ import { tmpdir } from 'os'
 
 const fsMocks = vi.hoisted(() => ({
   mkdtempSync: vi.fn(() => '/tmp/erfana-lo-probe-x'),
-  readFileSync: vi.fn(),
-  realpathSync: Object.assign(vi.fn((p: string) => p), { native: vi.fn((p: string) => p) }),
   rmSync: vi.fn()
 }))
 
@@ -28,7 +28,7 @@ vi.mock('child_process', () => ({
 vi.mock('fs', () => ({ ...fsMocks, default: fsMocks }))
 
 import { spawn } from 'child_process'
-import { DependencyDetector, parseIniVersion, parsePlistVersion } from './DependencyDetector'
+import { DependencyDetector, killActiveLibreOfficeProbes } from './DependencyDetector'
 import type { LibreOfficeResolution } from './conversionToolGuard'
 
 const mockedSpawn = vi.mocked(spawn)
@@ -63,31 +63,23 @@ const WIN_SOFFICE = 'C:\\Program Files\\LibreOffice\\program\\soffice.exe'
 describe('DependencyDetector', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    fsMocks.realpathSync.native.mockImplementation((p: string) => p)
     setPlatform('linux')
   })
-  afterEach(() => setPlatform(realPlatform))
+  afterEach(() => {
+    setPlatform(realPlatform)
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+  })
 
   describe('Windows – soffice.exe is never launched', () => {
     beforeEach(() => setPlatform('win32'))
 
-    it('reports found without spawning anything, and reads the version from version.ini', async () => {
-      fsMocks.readFileSync.mockReturnValue('[Version]\r\nProductVersion=26.8.1\r\n')
+    it('reports found without spawning anything when the install exists', async () => {
       const { detector } = detectorWith({ state: 'found', path: WIN_SOFFICE })
 
-      expect(await detector.detect()).toEqual({ libreOffice: 'found', unsafe: null, version: '26.8.1' })
+      expect(await detector.detect()).toEqual({ libreOffice: 'found', unsafe: null })
       expect(mockedSpawn).not.toHaveBeenCalled()
-      expect(fsMocks.readFileSync).toHaveBeenCalledWith('C:\\Program Files\\LibreOffice\\program\\version.ini', 'utf8')
-    })
-
-    it('still reports found, with no version, when version.ini is unreadable', async () => {
-      fsMocks.readFileSync.mockImplementation(() => {
-        throw new Error('ENOENT')
-      })
-      const { detector } = detectorWith({ state: 'found', path: WIN_SOFFICE })
-
-      expect(await detector.detect()).toEqual({ libreOffice: 'found', unsafe: null, version: null })
-      expect(mockedSpawn).not.toHaveBeenCalled()
+      expect(fsMocks.mkdtempSync).not.toHaveBeenCalled()
     })
 
     it('reports missing without spawning when nothing is installed', async () => {
@@ -98,43 +90,22 @@ describe('DependencyDetector', () => {
     })
   })
 
-  describe('macOS', () => {
+  describe('macOS – the bundle binary still runs a hardened --version', () => {
     beforeEach(() => setPlatform('darwin'))
     const BIN = '/Applications/LibreOffice.app/Contents/MacOS/soffice'
 
-    it('reads the version from the bundle Info.plist and spawns nothing', async () => {
-      fsMocks.readFileSync.mockReturnValue(
-        '<dict><key>CFBundleShortVersionString</key>\n<string>25.2.3</string></dict>'
-      )
+    it('spawns with stdio ignored, headless, a private profile, and no kill on a clean exit', async () => {
+      probeSucceedsFor(BIN)
+      const kill = vi.spyOn(process, 'kill').mockImplementation(() => true)
       const { detector } = detectorWith({ state: 'found', path: BIN })
 
-      expect(await detector.detect()).toEqual({ libreOffice: 'found', unsafe: null, version: '25.2.3' })
-      expect(fsMocks.readFileSync).toHaveBeenCalledWith('/Applications/LibreOffice.app/Contents/Info.plist', 'utf8')
-      expect(mockedSpawn).not.toHaveBeenCalled()
-    })
-
-    it('reports missing when the bundle has no readable version', async () => {
-      fsMocks.readFileSync.mockImplementation(() => {
-        throw new Error('ENOENT')
-      })
-      const { detector } = detectorWith({ state: 'found', path: BIN })
-
-      expect(await detector.detect()).toEqual({ libreOffice: 'missing', unsafe: null })
-      expect(mockedSpawn).not.toHaveBeenCalled()
-    })
-  })
-
-  describe('version parsers', () => {
-    it('parses ProductVersion from an ini and ignores text without one', () => {
-      expect(parseIniVersion('[Version]\nProductVersion = 7.6.4.1\n')).toBe('7.6.4.1')
-      expect(parseIniVersion('[Version]\nbuildid=abc\n')).toBeNull()
-      expect(parseIniVersion(null)).toBeNull()
-    })
-
-    it('parses CFBundleShortVersionString from a plist', () => {
-      expect(parsePlistVersion('<key>CFBundleShortVersionString</key><string>24.8.0</string>')).toBe('24.8.0')
-      expect(parsePlistVersion('<key>Other</key><string>1</string>')).toBeNull()
-      expect(parsePlistVersion(null)).toBeNull()
+      expect(await detector.detect()).toEqual({ libreOffice: 'found', unsafe: null })
+      const [command, args, options] = mockedSpawn.mock.calls[0]
+      expect(command).toBe(BIN)
+      expect(args).toEqual(['--version', '--headless', '--norestore', expect.stringMatching(/^-env:UserInstallation=file:\/\/\//)])
+      expect(options).toMatchObject({ stdio: 'ignore', windowsHide: true, detached: true })
+      expect(kill).not.toHaveBeenCalled()
+      expect(fsMocks.rmSync).toHaveBeenCalledWith('/tmp/erfana-lo-probe-x', { recursive: true, force: true })
     })
   })
 
@@ -220,24 +191,41 @@ describe('DependencyDetector', () => {
     expect(await detector.detect()).toEqual({ libreOffice: 'missing', unsafe: null })
   })
 
-  it('resolves to missing when spawn throws or the child emits error', async () => {
+  it('resolves to missing when spawn throws, and removes the profile', async () => {
     mockedSpawn.mockImplementationOnce(() => {
       throw new Error('spawn EACCES')
     })
-    const first = detectorWith({ state: 'found', path: SOFFICE }).detector
-    expect(await first.detect()).toEqual({ libreOffice: 'missing', unsafe: null })
+    const { detector } = detectorWith({ state: 'found', path: SOFFICE })
 
+    expect(await detector.detect()).toEqual({ libreOffice: 'missing', unsafe: null })
+    expect(fsMocks.rmSync).toHaveBeenCalledWith('/tmp/erfana-lo-probe-x', { recursive: true, force: true })
+  })
+
+  it('kills the group, removes the profile and reports missing when the child emits error', async () => {
+    const kill = vi.spyOn(process, 'kill').mockImplementation(() => true)
     mockedSpawn.mockImplementationOnce((() => ({
-      pid: 1,
+      pid: 77,
       on: (event: string, handler: (e: Error) => void) => {
         if (event === 'error') handler(new Error('spawn ENOENT'))
       }
     })) as unknown as typeof spawn)
-    const second = detectorWith({ state: 'found', path: SOFFICE }).detector
-    expect(await second.detect()).toEqual({ libreOffice: 'missing', unsafe: null })
+    const { detector } = detectorWith({ state: 'found', path: SOFFICE })
+
+    expect(await detector.detect()).toEqual({ libreOffice: 'missing', unsafe: null })
+    expect(kill).toHaveBeenCalledWith(-77, 'SIGKILL')
+    expect(fsMocks.rmSync).toHaveBeenCalledWith('/tmp/erfana-lo-probe-x', { recursive: true, force: true })
   })
 
-  it('kills the probe process group and reports missing when it hangs past the timeout', async () => {
+  it('kills the group on a non-zero exit', async () => {
+    const kill = vi.spyOn(process, 'kill').mockImplementation(() => true)
+    probeSucceedsFor()
+    const { detector } = detectorWith({ state: 'found', path: SOFFICE })
+
+    expect(await detector.detect()).toEqual({ libreOffice: 'missing', unsafe: null })
+    expect(kill).toHaveBeenCalledWith(-4242, 'SIGKILL')
+  })
+
+  it('kills the group, removes the profile and reports missing when it hangs past the timeout', async () => {
     vi.useFakeTimers()
     const kill = vi.spyOn(process, 'kill').mockImplementation(() => true)
     mockedSpawn.mockImplementationOnce((() => ({ pid: 4242, on: vi.fn() })) as unknown as typeof spawn)
@@ -248,8 +236,22 @@ describe('DependencyDetector', () => {
 
     expect(await result).toEqual({ libreOffice: 'missing', unsafe: null })
     expect(kill).toHaveBeenCalledWith(-4242, 'SIGKILL')
-    kill.mockRestore()
-    vi.useRealTimers()
+    expect(fsMocks.rmSync).toHaveBeenCalledWith('/tmp/erfana-lo-probe-x', { recursive: true, force: true })
+  })
+
+  it('kills an in-flight probe when the app quits', async () => {
+    vi.useFakeTimers()
+    const kill = vi.spyOn(process, 'kill').mockImplementation(() => true)
+    mockedSpawn.mockImplementationOnce((() => ({ pid: 555, on: vi.fn() })) as unknown as typeof spawn)
+    const { detector } = detectorWith({ state: 'found', path: SOFFICE })
+
+    const result = detector.detect()
+    await vi.advanceTimersByTimeAsync(10)
+    killActiveLibreOfficeProbes()
+
+    expect(kill).toHaveBeenCalledWith(-555, 'SIGKILL')
+    await vi.advanceTimersByTimeAsync(6000)
+    await result
   })
 
   describe('caching', () => {

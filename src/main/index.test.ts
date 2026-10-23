@@ -251,6 +251,7 @@ describe('Main Process - Window Creation', () => {
       registerDocumentImportHandlers: vi.fn()
     }))
     vi.doMock('./services/import', () => ({
+      killActiveLibreOfficeProbes: vi.fn(),
       importToolStatusService: {
         getStatus: vi.fn().mockResolvedValue({
           libreOffice: 'missing',
