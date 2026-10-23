@@ -140,7 +140,7 @@ describe('PreviewSessionFactory', () => {
   it('runs the §5(a) sequence in order and returns a wired session', async () => {
     const order: string[] = []
     const registry = makeRegistry()
-    const store = makeStore(['cdn.example.com'])
+    const store = makeStore(['https://cdn.example.com'])
     const view = makeView()
 
     const detachProtocol = vi.fn<() => void>()
@@ -200,7 +200,7 @@ describe('PreviewSessionFactory', () => {
     })
 
     expect(store.load).toHaveBeenCalledTimes(1)
-    expect(registry.issue).toHaveBeenCalledWith('/proj', ['cdn.example.com'])
+    expect(registry.issue).toHaveBeenCalledWith('/proj', ['https://cdn.example.com'])
     expect(order).toEqual([
       'createSession:erfana-preview-test',
       'buildWebPreferences',
@@ -225,8 +225,17 @@ describe('PreviewSessionFactory', () => {
     })
     expect(recordFailure).toHaveBeenCalledTimes(1)
 
-    // The filter reads the LIVE allowed-host set and forwards blocks.
-    expect([...(filterCtx?.getAllowedHosts() ?? [])]).toEqual(['cdn.example.com'])
+    // The filter reads the LIVE allowed-host set: an approval made after the
+    // session was built must reach the filter without rebuilding it. A snapshot
+    // taken at create() would keep answering with the old set.
+    expect([...(filterCtx?.getAllowedHosts() ?? [])]).toEqual(['https://cdn.example.com'])
+    vi.mocked(store.getOrigins).mockReturnValue(
+      new Set(['https://cdn.example.com', 'https://later.example.com'])
+    )
+    expect([...(filterCtx?.getAllowedHosts() ?? [])]).toEqual([
+      'https://cdn.example.com',
+      'https://later.example.com'
+    ])
     filterCtx?.onBlocked('blocked-host', 'evil.com', 'https://evil.com/x', true)
     expect(onBlocked).toHaveBeenCalledWith('blocked-host', 'evil.com', 'https://evil.com/x', true)
 

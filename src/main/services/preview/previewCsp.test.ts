@@ -40,9 +40,12 @@ describe('buildPreviewCsp', () => {
   })
 
   it('always contains default-src none and sandbox allow-scripts', () => {
-    for (const hosts of [[], ['cdn.jsdelivr.net']]) {
+    for (const hosts of [[], ['https://cdn.jsdelivr.net']]) {
       for (const options of [OPTIONS, { ownToken: 'not-a-token' }]) {
         const csp = buildPreviewCsp(hosts, options)
+        // The fixture must be one the origin schema ACCEPTS: a bare host is
+        // silently rejected, and then this loop would only ever test the empty case.
+        expect(csp.includes('https://cdn.jsdelivr.net')).toBe(hosts.length > 0)
         expect(csp).toContain("default-src 'none'")
         expect(csp).toContain('sandbox allow-scripts')
       }
@@ -106,6 +109,19 @@ describe('buildPreviewCsp frame-src tripwires (issue #124 WI-13)', () => {
     expect(directivesNamed(csp, 'script-src')[0]).toContain(
       'https://cdn.example.com https://a.io:8443'
     )
+  })
+
+  it('carries a port into every subresource directive, as a distinct source', () => {
+    // A source without a port matches only the scheme's default, so the port
+    // is what the grant IS: dropping it would leave the approved service blocked.
+    const csp = buildPreviewCsp(['https://a.io:8443', 'http://localhost:9000'], OPTIONS)
+    for (const name of ['script-src', 'style-src', 'img-src', 'font-src', 'media-src', 'connect-src']) {
+      const [directive = ''] = directivesNamed(csp, name)
+      expect(directive.split(' ')).toEqual(
+        expect.arrayContaining(['https://a.io:8443', 'http://localhost:9000'])
+      )
+      expect(directive.split(' ')).not.toContain('https://a.io')
+    }
   })
 
   it("names each page's own token and never another's", () => {

@@ -17,6 +17,7 @@ import { HtmlPreviewPanel } from './HtmlPreviewPanel'
 import { usePreviewStore } from '../../../stores/usePreviewStore'
 import { ErrorCode } from '../../../../../shared/errors'
 import { installHtmlPreviewPanelHarness } from './__test__/panelHarness'
+import { selectBandRows } from './permissionBand.logic'
 
 // The bounds hook logs its drop lines through the renderer logger, which has no
 // bridge here; mocked, as in the other renderer suites, so a run stays quiet.
@@ -162,5 +163,60 @@ describe('HtmlPreviewPanel – event feed', () => {
     } finally {
       window.removeEventListener('app:toast', capture)
     }
+  })
+
+  describe('allowlist-changed event', () => {
+    const HOST = 'https://cdn.example'
+
+    it('stores the approved hosts, and the blocked row for one of them is gone', async () => {
+      // THE VISIBLE OUTCOME OF THE WHOLE FEATURE. If this event is dropped, the
+      // approved host is never subtracted from the blocked list and the Allow
+      // button stays for good.
+      render(<HtmlPreviewPanel {...makeProps('/proj/page.html')} />)
+      await waitFor(() => expect(listeners.hostBlocked).not.toBeNull())
+      await waitFor(() => expect(listeners.allowlist).not.toBeNull())
+
+      listeners.hostBlocked?.({
+        panelId: 'preview-1',
+        host: HOST,
+        approvable: true,
+        kinds: ['script'],
+        notify: true
+      })
+      // Control: before the event the host is a blocked row with an Allow button.
+      await waitFor(() => {
+        const panel = usePreviewStore.getState().panels.get('preview-1')
+        const rows = selectBandRows(panel?.blockedHosts ?? [], panel?.allowedHosts ?? [])
+        expect(rows.blocked.map((r) => r.host)).toEqual([HOST])
+      })
+
+      act(() => {
+        listeners.allowlist?.({ panelId: 'preview-1', hosts: [HOST] })
+      })
+
+      const panel = usePreviewStore.getState().panels.get('preview-1')
+      expect(panel?.allowedHosts).toEqual([HOST])
+      const rows = selectBandRows(panel?.blockedHosts ?? [], panel?.allowedHosts ?? [])
+      expect(rows.blocked).toEqual([])
+      expect(rows.allowed.map((r) => r.host)).toEqual([HOST])
+    })
+
+    it('ignores an allowlist event addressed to another panel', async () => {
+      render(<HtmlPreviewPanel {...makeProps('/proj/page.html')} />)
+      await waitFor(() => expect(listeners.allowlist).not.toBeNull())
+
+      // Control: the same payload for THIS panel is stored.
+      act(() => {
+        listeners.allowlist?.({ panelId: 'preview-1', hosts: [HOST] })
+      })
+      expect(usePreviewStore.getState().panels.get('preview-1')?.allowedHosts).toEqual([HOST])
+
+      act(() => {
+        listeners.allowlist?.({ panelId: 'preview-other', hosts: ['https://other.example'] })
+      })
+
+      expect(usePreviewStore.getState().panels.get('preview-1')?.allowedHosts).toEqual([HOST])
+      expect(usePreviewStore.getState().panels.get('preview-other')).toBeUndefined()
+    })
   })
 })

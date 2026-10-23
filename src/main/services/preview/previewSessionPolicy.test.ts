@@ -23,8 +23,8 @@ interface SessionMock {
   setPermissionCheckHandler: ReturnType<typeof vi.fn<(h: PermCheckHandler) => void>>
   on: ReturnType<typeof vi.fn<(event: string, listener: WillDownloadListener) => void>>
   removeListener: ReturnType<typeof vi.fn<(event: string, listener: WillDownloadListener) => void>>
-  onHeadersReceived: ReturnType<typeof vi.fn>
-  onBeforeSendHeaders: ReturnType<typeof vi.fn>
+  /** Every `webRequest.<hook>` property production READ, by name -- whatever it is called. */
+  webRequestHooksTouched: string[]
 }
 
 function makeSessionMock(): SessionMock {
@@ -32,15 +32,27 @@ function makeSessionMock(): SessionMock {
   const setPermissionCheckHandler = vi.fn<(h: PermCheckHandler) => void>()
   const on = vi.fn<(event: string, listener: WillDownloadListener) => void>()
   const removeListener = vi.fn<(event: string, listener: WillDownloadListener) => void>()
-  const onHeadersReceived = vi.fn()
-  const onBeforeSendHeaders = vi.fn()
+  // A Proxy rather than two hand-named spies: a spy named `onHeadersReceived`
+  // only notices a call to a hook the mock's author thought of, so production
+  // reaching for any other hook (`onSendHeaders`, `onResponseStarted`) -- or a
+  // mock whose name differs from production's -- left the test green.
+  const webRequestHooksTouched: string[] = []
+  const webRequest = new Proxy(
+    {},
+    {
+      get(_target, property) {
+        webRequestHooksTouched.push(String(property))
+        return vi.fn()
+      }
+    }
+  )
 
   const session = {
     setPermissionRequestHandler,
     setPermissionCheckHandler,
     on,
     removeListener,
-    webRequest: { onHeadersReceived, onBeforeSendHeaders }
+    webRequest
   } as unknown as Session
 
   return {
@@ -49,8 +61,7 @@ function makeSessionMock(): SessionMock {
     setPermissionCheckHandler,
     on,
     removeListener,
-    onHeadersReceived,
-    onBeforeSendHeaders
+    webRequestHooksTouched
   }
 }
 
@@ -193,8 +204,7 @@ describe('hardenPreviewSession', () => {
 
     hardenPreviewSession(mock.session, webContents)
 
-    expect(mock.onHeadersReceived).not.toHaveBeenCalled()
-    expect(mock.onBeforeSendHeaders).not.toHaveBeenCalled()
+    expect(mock.webRequestHooksTouched).toEqual([])
   })
 
   it('the disposer resets the handlers and removes the download listener', () => {

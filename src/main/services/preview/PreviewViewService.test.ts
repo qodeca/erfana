@@ -19,6 +19,7 @@ afterEach(() => {
 
 import { ErrorCode } from '../../../shared/errors'
 import { PREVIEW } from '../../../shared/constants'
+import { parsePreviewOrigin } from '../../../shared/ipc/preview-settings-schema'
 import type { PreviewFailureInput } from '../../../shared/ipc/preview-types'
 import type { IPreviewFailureLog, PreviewFailureEmit } from './PreviewFailureLog'
 import type { IPreviewWatchCoordinator, WatchSetResult } from './PreviewWatchCoordinator'
@@ -1448,6 +1449,22 @@ describe('PreviewViewService — live-view budget', () => {
     expect(applied).toHaveBeenCalledWith('panel-A', false)
   })
 
+  it('reports the show to the renderer too, since the guard reconciles on it', async () => {
+    // `OverlayGuardService` feeds `visibilityApplied` into its reconciliation, and
+    // the SHOW is the half that matters there: a hide the renderer asked for is
+    // already known to it, a show main applied (or deferred) is not.
+    const h = makeHarness()
+    await h.service.open(REQUEST_A, h.window)
+    await h.service.setVisibility('panel-A', false, 'dialog')
+    const applied = h.deps.emit.visibilityApplied as unknown as ReturnType<typeof vi.fn>
+    applied.mockClear()
+
+    await h.service.setVisibility('panel-A', true, 'dialog')
+
+    expect(applied).toHaveBeenCalledTimes(1)
+    expect(applied).toHaveBeenCalledWith('panel-A', true)
+  })
+
   /**
    * The other side of the synchronous hide, and the regression it nearly caused.
    *
@@ -1976,10 +1993,18 @@ describe('PreviewViewService — every blocked host reaches the renderer', () =>
     const onBlocked = await blockedSink(h)
     h.hostBlocked.mockClear()
 
-    onBlocked('blocked-host', 'http://localhost:9000', 'http://localhost:9000/x', false, 'connect')
+    // An IPv6 literal: a CSP host-source cannot express one, so it is refused by
+    // the rules themselves. (`localhost` used to be the example here and has been
+    // approvable since #108.) The flag is COMPUTED from the same parser the
+    // production sources use, so the example cannot drift from the rules again.
+    const origin = 'http://[::1]:9000'
+    expect(parsePreviewOrigin(origin)).toBeNull()
+    expect(parsePreviewOrigin('http://localhost:9000')).not.toBeNull()
+
+    onBlocked('blocked-host', origin, `${origin}/x`, parsePreviewOrigin(origin) !== null, 'connect')
 
     const [, host, approvable] = h.hostBlocked.mock.calls[0]
-    expect(host).toBe('http://localhost:9000')
+    expect(host).toBe(origin)
     expect(approvable).toBe(false)
   })
 
