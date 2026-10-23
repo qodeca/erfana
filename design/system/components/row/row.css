@@ -137,11 +137,13 @@
   cursor: not-allowed;
 }
 
-/* Cut: fading alone would read as "disabled", so add a shape.
-   Both literals below want tokens — 0.6 sits between --opacity-disabled (0.4)
-   and opaque, and 3px is off the 2px spacing scale. Left as literals rather than
-   quietly restyled: adoption tokenises them, and that is a visual decision, not
-   a side effect of a security fix. */
+/* Cut: fading alone would read as "disabled", so add a shape. */
+/* deviates: design/system/components/row/index.html — tokens only
+   (design/README.md). 0.6 sits between --opacity-disabled (0.4) and opaque –
+   the fade ProjectTree.css ships today – and 3px is off the
+   2px spacing scale. Left as literals rather than quietly restyled:
+   adoption tokenises them, and that is a visual decision, not a side effect of a
+   security fix. See the Rows card's Exceptions. */
 .erf-row--cut { opacity: 0.6; }
 .erf-row--cut .erf-row__name {
   text-decoration: underline dashed;

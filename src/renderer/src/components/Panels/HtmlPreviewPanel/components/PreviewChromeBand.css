@@ -73,7 +73,7 @@
  */
 .erf-band__separator {
   flex: 0 0 auto;
-  width: 1px;
+  width: var(--border-width);
   height: var(--icon-size-lg);           /* 24px */
   margin: 0 var(--space-4);
   background: var(--color-border-default);
@@ -86,7 +86,7 @@
   justify-content: center;
   flex: 0 0 auto;
   width: var(--btn-height-md);           /* 32px */
-  height: 28px;
+  height: var(--space-14);               /* 28px, as `.markdown-toolbar .toolbar-btn` */
   padding: 0;
   background: transparent;
   border: none;
@@ -136,6 +136,11 @@
   opacity: var(--opacity-disabled);
 }
 
+/* deviates: design/system/foundations/focus.html — inset, not outward. The
+   permitted case, recorded: the bar is a scroller (`overflow-x: auto` in
+   PreviewNavControls.css), and the card words its inset case for lists.
+   Outward, a tool's ring would be clipped at the scroll edge and would land on
+   its neighbour across the 2px gap. See the card's Exceptions. */
 .erf-band__tool:focus-visible {
   outline: var(--border-width-thick) solid var(--color-border-focus);
   outline-offset: calc(var(--space-1) * -1);
@@ -201,8 +206,13 @@
  * its row. Every Allow click would shift the remaining buttons sideways under
  * the pointer, which is how a mis-click becomes a one-way permission grant.
  */
+/* deviates: design/system/components/permission-band/index.html — the 240px
+   clamp is a literal: the spacing scale stops at 48px and no layout token
+   covers a list height. It used to read `var(--erf-band-max-list, 240px)`, a
+   property defined nowhere, so the fallback always won. See the card's
+   Exceptions. */
 .erf-band__scroll {
-  max-height: var(--erf-band-max-list, 240px);
+  max-height: 240px;
   overflow-y: auto;
   scrollbar-gutter: stable;
   /* Breathing room between the last Allow button and the thumb. Inside the
@@ -232,11 +242,18 @@
 .erf-band__section {
   padding: var(--space-4) 0 var(--space-2);
   font-size: var(--text-xs);
-  letter-spacing: 0.07em;
+  /* deviates: design/system/components/permission-band/index.html — the type
+     scale has no letter-spacing token. 0.5px is what the app's other uppercase
+     labels use (ProjectPanel.css, TerminalPanel.css, ProjectTree.css). See the
+     card's Exceptions. */
+  letter-spacing: 0.5px;
   text-transform: uppercase;
   color: var(--color-text-tertiary);
 }
 
+/* deviates: design/system/components/permission-band/index.html — the 72px
+   middle track is a literal: it is sized to the short failure text it carries
+   ("Not saved"), not to a step of the spacing scale. See the card's Exceptions. */
 .erf-band__row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 72px auto;
@@ -247,9 +264,14 @@
    * what makes the row readable: a 24px button in a 28px row left about 2px
    * between the button's edge and the separator above it, so the rules read as
    * boxes drawn around the buttons rather than as lines between rows.
+   *
+   * Under border-box the padding and the top rule are INSIDE min-height, so all
+   * three have to be in the sum. It used to be a bare 28px: a row with a button
+   * came out 37px and a row without one (the IPv6 row, an allowed row) 28px –
+   * two heights in one list.
    */
   padding-block: var(--space-3);         /* 6px above and below */
-  min-height: var(--space-14);           /* 28px */
+  min-height: calc(var(--btn-height-sm) + var(--space-3) * 2 + var(--border-width));   /* 37px */
   border-top: var(--border-width) solid var(--color-border-default);
 }
 
@@ -324,6 +346,8 @@
 
 .erf-band__confirm-body {
   margin: 0 0 var(--space-6);
+  /* deviates: design/system/components/permission-band/index.html — the type
+     scale has no measure (line-length) token. See the card's Exceptions. */
   max-width: 72ch;
   font-size: var(--text-base);
   line-height: var(--leading-normal);

@@ -184,6 +184,15 @@
         over whatever is on the desktop. Same bypass as the Colours card's exception; see
         <code>ScreenshotOverlay.css</code>.</td>
     </tr>
+    <tr>
+      <td>HTML-preview toolbar tools</td>
+      <td>Offset 2px outward, or inset inside a scroller.</td>
+      <td>Inset – the permitted case, recorded. The bar scrolls sideways when a narrow pane cannot fit it
+        (<code>overflow-x: auto</code>, <code>PreviewNavControls.css</code>), so an outward ring is clipped at
+        the scroll edge, and across the tools' 2px gap it would land on the neighbouring tool. Recorded because
+        this card words its inset case for lists. The band's chip keeps the outward ring: it fits inside the
+        bar's padding. See <code>PreviewChromeBand.css</code>.</td>
+    </tr>
   </tbody>
 </table>
 
