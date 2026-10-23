@@ -40,7 +40,8 @@ describe.skipIf(process.platform !== 'win32')('cmd.exe bootstrap through a real 
         await new Promise((resolve) => setTimeout(resolve, 50))
       }
       expect(cleared).toBe(true)
-      expect(service.getTerminalInfo(result.terminalId)?.cwd).toMatch(/^[A-Za-z]:\\/)
+      const cwd = service.getTerminalInfo(result.terminalId)?.cwd ?? ''
+      expect(cwd, `detected cwd: ${JSON.stringify(cwd)}`).toMatch(/^[A-Za-z]:\\/)
     } finally {
       service.killTerminal(result.terminalId)
     }

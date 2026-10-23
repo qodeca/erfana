@@ -350,6 +350,17 @@ async function createId(
       expect(spawnedPTYs[0].opts.cwd).toBe('C:\\Projects\\test')
     })
 
+    it('reads the cwd from a ConPTY-style stream with VT sequences and cursor moves', async () => {
+      const { terminalService, tid, pty } = await spawnCmd()
+      const marker = String(spawnedPTYs[0].args).match(/__ERFANA_PWD_MARKER_\d+__/)![0]
+      pty.emit(
+        'data',
+        '\x1b[?9001h\x1b[?1004h\x1b[?25l\x1b[2J\x1b[m\x1b[H\x1b]0;cmd.exe - echo  off\x07' +
+          `\x1b[1;1HC:\\Real\\dir\x1b[K\x1b[2;1H${marker}\x1b[K\r\n`
+      )
+      expect(terminalService.getTerminalInfo(tid)?.cwd).toBe('C:\\Real\\dir')
+    })
+
     it('does not override PROMPT for cmd.exe (it would show %n %~ literally)', async () => {
       vi.stubEnv('PROMPT', '$P$G')
       await spawnCmd()

@@ -140,6 +140,25 @@ const ESC = String.fromCharCode(0x1b)
 const MARKER_LINE_END = new RegExp(`^(?:[ \\t]|${ESC}\\[[0-9;]*K)*\\r?\\n`)
 const MARKER_LINE_END_PARTIAL = new RegExp(`^(?:[ \\t]|${ESC}\\[[0-9;]*K)*\\r?$`)
 
+const OSC_SEQUENCE = new RegExp(`${ESC}\\][^\\x07${ESC}]*(?:\\x07|${ESC}\\\\)`, 'g')
+const CSI_CURSOR_POSITION = new RegExp(`${ESC}\\[[0-9;]*[Hf]`, 'g')
+const CSI_SEQUENCE = new RegExp(`${ESC}\\[[0-9;?<=>]*[ -/]*[@-~]`, 'g')
+
+/**
+ * Turns raw PTY output into plain lines for reading the cwd back. ConPTY
+ * redraws the screen with VT sequences (title, modes, cursor moves) instead of
+ * plain line breaks: a cursor move starts a new line, every other sequence is
+ * dropped.
+ */
+export function plainLinesForCwd(text: string): string[] {
+  return text
+    .replace(OSC_SEQUENCE, '')
+    .replace(CSI_CURSOR_POSITION, '\n')
+    .replace(CSI_SEQUENCE, '')
+    .split(/\r?\n|\r/)
+    .filter((line) => line.trim() !== '')
+}
+
 /**
  * Drops the rest of the marker's own line from output that follows the marker.
  *
@@ -510,7 +529,7 @@ export class TerminalService extends EventEmitter {
           }
 
           // Parse PWD from output (line before marker)
-          const lines = markerBuffer.split(/\r?\n/).filter(Boolean)
+          const lines = plainLinesForCwd(markerBuffer.slice(0, markerAt + marker.length))
           const markerIdx = lines.findIndex((l) => l.includes(marker))
           if (markerIdx > 0) {
             const detectedCwd = lines[markerIdx - 1].trim()
