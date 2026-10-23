@@ -109,7 +109,7 @@ describe('PowerShellBootstrapBuilder', () => {
       )
       expect(order.every((i, k) => i > 0 && (k === 0 || i > order[k - 1]))).toBe(true)
       expect(script).toContain('try { do { . $erfanaProfile } while ($false) } catch {')
-      expect(script).toContain('else { $_ | Out-Host }')
+      expect(script).toContain('if ($_.InvocationInfo.ScriptName) { $_ | Out-Host } else { $Host.UI.WriteErrorLine($_.Exception.Message) }')
     })
 
     it('includes all three ConPTY clear escapes (2J, 3J, H)', () => {

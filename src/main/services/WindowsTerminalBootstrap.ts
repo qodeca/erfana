@@ -150,14 +150,16 @@ export interface WindowsBootstrapBuilder {
  *   stopping error once a profile has set `$ErrorActionPreference = 'Stop'`;
  * - `do { } while ($false)` around each profile catches a top-level `break` or
  *   `continue` in it, which would otherwise end the loader's `foreach`;
- * - a profile the execution policy blocks (Restricted, AllSigned) prints only the
- *   policy message, which names the profile file: the full error record would point
- *   at this loader line instead.
+ * - the choice is made by where the error points: an error raised inside a profile
+ *   (`InvocationInfo.ScriptName` set) is printed whole, with its file and line; one
+ *   raised at the dot-source itself – the execution policy (Restricted, AllSigned)
+ *   blocking the file, a profile that cannot be read or parsed – prints only its
+ *   message, which names the file, since its position would be this loader line.
  */
 export const PROFILE_LOADER =
   "foreach ($erfanaProfile in @($PROFILE.AllUsersAllHosts, $PROFILE.AllUsersCurrentHost, $PROFILE.CurrentUserAllHosts, $PROFILE.CurrentUserCurrentHost)) " +
   "{ if ($erfanaProfile -and (Test-Path -LiteralPath $erfanaProfile)) { try { do { . $erfanaProfile } while ($false) } " +
-  "catch { if ($_.Exception -is [System.Management.Automation.PSSecurityException]) { $Host.UI.WriteErrorLine($_.Exception.Message) } else { $_ | Out-Host } } } }; " +
+  "catch { if ($_.InvocationInfo.ScriptName) { $_ | Out-Host } else { $Host.UI.WriteErrorLine($_.Exception.Message) } } } }; " +
   'Remove-Variable erfanaProfile -ErrorAction SilentlyContinue'
 
 export class PowerShellBootstrapBuilder implements WindowsBootstrapBuilder {

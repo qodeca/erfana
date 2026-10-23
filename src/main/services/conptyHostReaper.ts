@@ -544,6 +544,11 @@ export interface ReapOptions {
  *   it, bounded, before `app.exit(0)`: until `Start-Process` has returned, the launcher
  *   is inside libuv's kill-on-close job and the helper would not be started.
  */
+/** True inside Vitest (it sets `VITEST`, and `NODE_ENV=test` unless told otherwise). */
+export function isUnitTestRun(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env.VITEST === 'true' || (env.VITEST !== undefined && env.NODE_ENV === 'test')
+}
+
 export function startConptyHostReaper(options: ReapOptions = {}): QuitHelperStart {
   const {
     platform = process.platform,
@@ -559,6 +564,12 @@ export function startConptyHostReaper(options: ReapOptions = {}): QuitHelperStar
   } = options
   const none: QuitHelperStart = { started: false, launcherDone: Promise.resolve() }
   if (platform !== 'win32') return none
+  // Never from a unit test: the real helper would take the test runner for the app,
+  // end its console hosts and force-end it after the grace period (#305)
+  if (spawnFn === nodeSpawn && isUnitTestRun()) {
+    logger.warn('Quit cleanup helper not started: unit test run (inject spawnFn to test it)')
+    return none
+  }
 
   const trace = tracePath && isDriveOrUncPath(tracePath) ? tracePath : undefined
   const note = (line: string, first = false): void => {

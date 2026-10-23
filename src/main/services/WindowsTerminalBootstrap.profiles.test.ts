@@ -3,8 +3,10 @@
 /**
  * Runs the PowerShell profile loader (#305 round 8) under a real `pwsh` with throwaway
  * profiles, to check it is as forgiving as PowerShell's own profile loading. The
- * profiles are placed through `HOME`, which decides `$PROFILE.CurrentUser*` on macOS
- * and Linux only, so the suite is skipped on Windows and where `pwsh` is missing.
+ * profiles are placed through `HOME` / `XDG_CONFIG_HOME`, which decide
+ * `$PROFILE.CurrentUser*` on macOS and Linux only, so that suite is skipped on Windows
+ * and where `pwsh` is missing. The execution-policy suite is Windows-only: elsewhere
+ * PowerShell has no execution policy. It replaces `$PROFILE` with a stand-in object.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { spawnSync } from 'child_process'
@@ -36,7 +38,8 @@ function load(allHosts: string, currentHost: string): { out: string; status: num
   const r = spawnSync('pwsh', ['-NoLogo', '-NoProfile', '-NoExit', '-Command', PROFILE_LOADER], {
     input: '"alive fn=" + [bool](Get-Command Get-ErfanaProbe -ErrorAction SilentlyContinue); exit 0\n',
     encoding: 'utf8',
-    env: { ...process.env, HOME: home },
+    // pwsh on Linux takes the profile folder from XDG_CONFIG_HOME when it is set (CI sets it)
+    env: { ...process.env, HOME: home, XDG_CONFIG_HOME: join(home, '.config') },
     timeout: 30_000
   })
   // drop colour codes; errors go to the host, so both streams are kept
@@ -68,20 +71,36 @@ describe.skipIf(!hasPwsh)('PowerShell profile loader against real profiles', { t
     expect(out).toContain('alive fn=True')
   })
 
-  it('prints only the policy message for a profile the execution policy blocks, not the loader line', () => {
-    const { out } = load(
-      "throw [System.Management.Automation.PSSecurityException]::new('File /p/profile.ps1 cannot be loaded because running scripts is disabled on this system.')\n",
-      "function Get-ErfanaProbe { 1 }\n"
-    )
-    expect(out).toContain('File /p/profile.ps1 cannot be loaded because running scripts is disabled on this system.')
-    expect(out).not.toContain('erfanaProfile')
-    expect(out).toContain('alive fn=True')
-  })
-
   it("prints a failing profile's error with its file and line", () => {
     const { out } = load("Write-Host 'one'\nthrow 'boom on line two'\n", "function Get-ErfanaProbe { 1 }\n")
     expect(out).toContain('boom on line two')
     expect(out).toMatch(/profile\.ps1:2/)
+    expect(out).toContain('alive fn=True')
+  })
+})
+
+const windowsShells = process.platform === 'win32'
+  ? ['pwsh', 'powershell.exe'].filter((exe) => spawnSync(exe, ['-NoProfile', '-NonInteractive', '-Command', 'exit 0']).status === 0)
+  : []
+
+describe.skipIf(windowsShells.length === 0)('PowerShell profile loader under a blocking execution policy (Windows)', { timeout: 60_000 }, () => {
+  it.each(windowsShells)('%s: prints the policy message, not the loader line, and the shell stays usable', (exe) => {
+    const file = join(home, 'profile.ps1')
+    writeFileSync(file, 'function Get-ErfanaProbe { 1 }\n')
+    const p = file.replace(/'/g, "''")
+    // the stand-in has the four properties the loader reads, all on one temp profile;
+    // the probe is defined here because the blocked profile cannot define it
+    const standIn =
+      `$PROFILE = [pscustomobject]@{ AllUsersAllHosts = '${p}'; AllUsersCurrentHost = '${p}'; CurrentUserAllHosts = '${p}'; CurrentUserCurrentHost = '${p}' }; ` +
+      'function global:Get-ErfanaProbe { 1 }; '
+    const r = spawnSync(exe, ['-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Restricted', '-NoExit', '-Command', standIn + PROFILE_LOADER], {
+      input: '"alive fn=" + [bool](Get-Command Get-ErfanaProbe -ErrorAction SilentlyContinue); exit 0\n',
+      encoding: 'utf8',
+      timeout: 30_000
+    })
+    const out = `${r.stdout}\n${r.stderr}`.replace(ANSI, '')
+    expect(out).toContain('cannot be loaded')
+    expect(out).not.toContain('erfanaProfile')
     expect(out).toContain('alive fn=True')
   })
 })

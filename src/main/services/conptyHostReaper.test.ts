@@ -7,6 +7,7 @@ import type { spawn } from 'child_process'
 vi.mock('./LoggingService', () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }))
 
 import {
+  isUnitTestRun,
   buildLauncherScript,
   buildReapScript,
   HELPER_COMMAND,
@@ -311,6 +312,20 @@ describe('startConptyHostReaper', () => {
     expect(opts.env[QUIT_SHELLS_ENV]).toBe('9001:1000050:1000100,9002:1000050:1000100')
     expect(opts.env[QUIT_TRACE_ENV]).toBe(tracePath)
     expect(args[args.length - 1]).not.toContain('9001')
+  })
+
+  it('never starts the real launcher from a unit test run (#305)', async () => {
+    const { logger } = await import('./LoggingService')
+    vi.mocked(logger.warn).mockClear()
+    // no spawnFn: the real child_process.spawn would be used
+    const start = startConptyHostReaper({ platform: 'win32', pid: 777 })
+    expect(start.started).toBe(false)
+    await start.launcherDone
+    expect(vi.mocked(logger.warn).mock.calls.some(([m]) => String(m).includes('unit test run'))).toBe(true)
+    expect(isUnitTestRun({ VITEST: 'true' })).toBe(true)
+    expect(isUnitTestRun({ VITEST: '1', NODE_ENV: 'test' })).toBe(true)
+    expect(isUnitTestRun({ NODE_ENV: 'test' })).toBe(false)
+    expect(isUnitTestRun({})).toBe(false)
   })
 
   it('tells the helper when the tree kill is skipped, so a quiet quit is reported as unverified (round 8)', () => {

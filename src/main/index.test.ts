@@ -21,6 +21,17 @@ import { join } from 'node:path'
  */
 vi.setConfig({ testTimeout: 20_000 })
 
+/**
+ * The quit helper is mocked for the whole file: the real one would start PowerShell on
+ * Windows, take the test runner for the app, end its console hosts and force-end it
+ * after the grace period (#305). One test replaces it with its own mock.
+ */
+const reaperMock = (): Record<string, unknown> => ({
+  QUIT_TRACE_FILE: 'quit-cleanup.log',
+  startConptyHostReaper: vi.fn(() => ({ started: false, launcherDone: Promise.resolve() }))
+})
+vi.mock('./services/conptyHostReaper', () => reaperMock())
+
 /** Renderer token file — the source of truth for the window's paint colour. */
 const DESIGN_TOKENS_PATH = join(__dirname, '../renderer/src/styles/design-tokens.css')
 
@@ -1058,7 +1069,7 @@ describe('Main Process - Window Creation', () => {
         )
       } finally {
         cleanup()
-        vi.doUnmock('./services/conptyHostReaper')
+        vi.doMock('./services/conptyHostReaper', () => reaperMock())
       }
     })
 

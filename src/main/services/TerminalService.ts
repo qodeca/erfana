@@ -23,7 +23,13 @@ import { isWindowsLongPath } from './watcher/PlatformConfig'
 import { isForegroundBusy, shellProcessNames } from './terminalForeground'
 import { killProcessTrees } from './terminalTreeKill'
 import type { LiveShell } from './conptyHostReaper'
-import { installExitTimeRecorder, installNoForkConsoleList, nativeExitAtMs, releaseConoutWorker } from './nodePtyWindowsShim'
+import {
+  conoutWorkerStats,
+  installConoutWorkerRelease,
+  installExitTimeRecorder,
+  installNoForkConsoleList,
+  nativeExitAtMs
+} from './nodePtyWindowsShim'
 
 /**
  * Outcome of {@link TerminalService.createTerminal}. A failure carries its
@@ -317,6 +323,9 @@ export class TerminalService extends EventEmitter {
       installNoForkConsoleList()
       // When each shell's native exit fires: bounds what the quit helper may take as ours (#305)
       installExitTimeRecorder()
+      // node-pty ends a terminal's conout worker thread only in kill(); a shell that ends
+      // without kill() (the user typed `exit`) kept it until the app's teardown (#305)
+      installConoutWorkerRelease()
     }
 
     const terminalId = `terminal-${++this.terminalCounter}`
@@ -586,9 +595,6 @@ export class TerminalService extends EventEmitter {
         markExited()
         terminal.hasExited = true
         this.liveShells.delete(terminalId)
-        // node-pty ends its conout worker thread only on kill; a shell that exited on its
-        // own would keep it until the app's teardown, which then hangs the quit (#305)
-        if (osPlatform() === 'win32') releaseConoutWorker(ptyProcess)
         // A shell that fails during the handshake still said why: show it before the exit
         if (terminal.clearFallbackTimeout) {
           clearTimeout(terminal.clearFallbackTimeout)
@@ -905,6 +911,8 @@ export class TerminalService extends EventEmitter {
     await this.waitForPendingExits(
       Math.max(TERMINAL_MIN_EXIT_WAIT_MS, Math.min(TERMINAL_EXIT_WAIT_MS, deadline - Date.now()))
     )
+    // Counts only: lets a Windows quit log show the conout workers were ended (#305)
+    if (osPlatform() === 'win32') logger.info('Conout workers released before quit', conoutWorkerStats())
     logger.info('✅ TerminalService disposed')
   }
 

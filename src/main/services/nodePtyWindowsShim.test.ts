@@ -14,7 +14,9 @@ import {
   installNoForkConsoleList,
   nativeExitAtMs,
   readNodePtyVersion,
-  releaseConoutWorker,
+  conoutWorkerStats,
+  installConoutWorkerRelease,
+  releaseAgentConoutWorker,
   resetShimWarningForTests
 } from './nodePtyWindowsShim'
 import { Worker } from 'worker_threads'
@@ -191,12 +193,18 @@ describe('installExitTimeRecorder (#305)', () => {
   })
 })
 
-describe('releaseConoutWorker (#305 quit hang)', () => {
+describe('conout worker release (#305 quit hang)', () => {
   const ptyLib = join(process.cwd(), 'node_modules', 'node-pty', 'lib')
+  beforeEach(() => {
+    resetShimWarningForTests()
+    logger.info.mockClear()
+    logger.warn.mockClear()
+  })
 
-  it('relies on what node-pty 1.1.0 has: one conout Worker per agent, ended only by kill()', () => {
+  it('relies on what node-pty 1.1.0 has: one conout Worker per agent, ended only by kill(), clean-up on every exit', () => {
     const agent = readFileSync(join(ptyLib, 'windowsPtyAgent.js'), 'utf8')
     const connection = readFileSync(join(ptyLib, 'windowsConoutConnection.js'), 'utf8')
+    const terminal = readFileSync(join(ptyLib, 'windowsTerminal.js'), 'utf8')
     expect(agent).toContain('this._conoutSocketWorker = new windowsConoutConnection_1.ConoutConnection(')
     expect(connection).toContain('this._worker = new worker_threads_1.Worker(')
     expect(connection).toContain('this._isDisposed')
@@ -204,28 +212,79 @@ describe('releaseConoutWorker (#305 quit hang)', () => {
     // the only dispose() calls are in kill(); the exit path never ends the worker
     const onExit = agent.slice(agent.indexOf('prototype._$onProcessExit'), agent.indexOf('prototype._flushDataAndCleanUp'))
     expect(onExit).not.toContain('dispose')
+    expect(onExit).toContain('this._flushDataAndCleanUp()')
+    const flush = agent.slice(agent.indexOf('prototype._flushDataAndCleanUp'), agent.indexOf('prototype._cleanUpProcess'))
+    expect(flush).toContain('_this._cleanUpProcess()')
     const kill = agent.slice(agent.indexOf('prototype.kill'), agent.indexOf('prototype._getConsoleProcessList'))
     expect(kill).toContain('this._conoutSocketWorker.dispose()')
+    // the terminal's 'exit' event comes from the output socket's close, wired only after the data pipe is ready
+    expect(terminal).toMatch(/_this\._socket\.on\('close', function \(\) \{\s*_this\.emit\('exit', _this\._agent\.exitCode\);/)
   })
 
-  it('stops a running worker thread at once and marks the connection disposed', async () => {
+  it('wraps _cleanUpProcess once, still runs the original, then releases the worker', () => {
+    const original = vi.fn()
+    const terminate = vi.fn(() => Promise.resolve(1))
+    class WindowsPtyAgent {
+      _useConptyDll = false
+      _conoutSocketWorker = { _worker: { terminate, once: vi.fn() }, _isDisposed: false }
+      _inSocket = { destroy: vi.fn(), destroyed: false }
+      _cleanUpProcess(): void {
+        original()
+      }
+    }
+    const load = () => ({ WindowsPtyAgent })
+    expect(installConoutWorkerRelease(load, () => '1.1.0')).toBe(true)
+    const wrapped = WindowsPtyAgent.prototype._cleanUpProcess
+    expect(installConoutWorkerRelease(load, () => '1.1.0')).toBe(true)
+    expect(WindowsPtyAgent.prototype._cleanUpProcess).toBe(wrapped)
+
+    const agent = new WindowsPtyAgent()
+    agent._cleanUpProcess()
+    expect(original).toHaveBeenCalledTimes(1)
+    expect(terminate).toHaveBeenCalledTimes(1)
+    expect(agent._conoutSocketWorker._isDisposed).toBe(true)
+    expect(agent._inSocket.destroy).toHaveBeenCalledTimes(1)
+    expect(conoutWorkerStats()).toEqual({ released: 1, exited: 0 })
+
+    // conpty.dll mode: node-pty's clean-up does nothing, and neither does the release
+    const dll = new WindowsPtyAgent()
+    dll._useConptyDll = true
+    dll._cleanUpProcess()
+    expect(terminate).toHaveBeenCalledTimes(1)
+  })
+
+  it('logs once and notes the version when node-pty has no _cleanUpProcess', () => {
+    expect(installConoutWorkerRelease(() => ({ WindowsPtyAgent: { prototype: {} } }), () => '1.2.0')).toBe(false)
+    expect(installConoutWorkerRelease(() => ({ WindowsPtyAgent: { prototype: {} } }), () => '1.2.0')).toBe(false)
+    const shape = logger.warn.mock.calls.filter(([m]: [string]) => m.includes('_cleanUpProcess'))
+    expect(shape).toHaveLength(1)
+    expect(logger.warn.mock.calls.some(([m]: [string]) => m.includes('node-pty 1.2.0'))).toBe(true)
+  })
+
+  it('stops a running worker thread at once and logs counts and times only', async () => {
     // a worker that never ends by itself, like the conout relay whose server keeps listening
     const worker = new Worker('setInterval(() => {}, 1000)', { eval: true })
     await new Promise<void>((resolve) => worker.once('online', () => resolve()))
     const exited = new Promise<number>((resolve) => worker.once('exit', resolve))
     const drain = setTimeout(() => {}, 60_000)
     const connection: Record<string, unknown> = { _worker: worker, _isDisposed: false, _drainTimeout: drain }
-    expect(releaseConoutWorker({ _agent: { _conoutSocketWorker: connection } })).toBe(true)
+    expect(releaseAgentConoutWorker({ _conoutSocketWorker: connection, __erfanaExitAtMs: Date.now() - 1_000 })).toBe(true)
     expect(connection._isDisposed).toBe(true)
     await expect(exited).resolves.toBe(1)
+    await vi.waitFor(() => expect(conoutWorkerStats()).toEqual({ released: 1, exited: 1 }))
+    const released = logger.info.mock.calls.find(([m]: [string]) => m === 'Conout worker released')
+    expect(Object.keys(released?.[1] ?? {}).sort()).toEqual(['exitToReleaseMs', 'released'])
+    expect(released?.[1].exitToReleaseMs).toBeGreaterThanOrEqual(1_000)
+    const gone = logger.info.mock.calls.find(([m]: [string]) => m === 'Conout worker exited')
+    expect(Object.keys(gone?.[1] ?? {}).sort()).toEqual(['code', 'exited', 'releaseToExitMs'])
   })
 
-  it('does nothing for shapes that are not node-pty 1.1.0', () => {
-    expect(releaseConoutWorker(undefined)).toBe(false)
-    expect(releaseConoutWorker({})).toBe(false)
-    expect(releaseConoutWorker({ _agent: {} })).toBe(false)
-    expect(releaseConoutWorker({ _agent: { _conoutSocketWorker: { _worker: {} } } })).toBe(false)
-    const throwing = { _agent: { _conoutSocketWorker: { _worker: { terminate: () => { throw new Error('gone') } } } } }
-    expect(releaseConoutWorker(throwing)).toBe(false)
+  it('does nothing for shapes that are not node-pty 1.1.0, and says so once', () => {
+    expect(releaseAgentConoutWorker(undefined)).toBe(false)
+    expect(releaseAgentConoutWorker({})).toBe(false)
+    expect(releaseAgentConoutWorker({ _conoutSocketWorker: { _worker: {} } })).toBe(false)
+    const throwing = { _conoutSocketWorker: { _worker: { terminate: () => { throw new Error('gone') } } } }
+    expect(releaseAgentConoutWorker(throwing)).toBe(false)
+    expect(logger.warn.mock.calls.filter(([m]: [string]) => m.includes('conout worker not found'))).toHaveLength(1)
   })
 })
