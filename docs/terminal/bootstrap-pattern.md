@@ -118,7 +118,7 @@ Before any Windows bootstrap is constructed, the cwd is validated and normalized
 - Emits `terminal:clear` on a bypass channel to the renderer
 - Awaits renderer confirmation (`markClearComplete`, which sends `terminal:clearComplete`) before unblocking output forwarding
 
-**Renderer-Side Clear** (`TerminalPanel.tsx`):
+**Renderer-Side Clear** (`TerminalPanel/hooks/useXtermSession.ts`):
 
 - Listens for `terminal:clear` on the bypass channel (`window.api.terminal.onClear`)
 - Clears xterm buffer and screen (`\x1b[2J\x1b[H`)
@@ -312,7 +312,7 @@ Handles: `C:\tools\pwsh\pwsh.exe`, `/c/Program Files/PowerShell/7/pwsh.exe` (Git
 - `src/main/services/TerminalService.ts` – service, bootstrap dispatch, marker detection, three-flag gating, `resolveWindowsShell` fallback chain
 - `src/main/services/WindowsTerminalBootstrap.ts` — strategy interface + `PowerShellBootstrapBuilder` / `GitBashBootstrapBuilder` / `CmdExeBootstrapBuilder` + `validateWindowsCwd` / `normalizeWindowsCwd` helpers
 - `src/main/services/WindowsTerminalBootstrap.test.ts` — unit tests for the strategy layer (added during Phase-2 UAT hardening)
-- `src/renderer/src/components/Panels/TerminalPanel.tsx` — clear handler + `markClearComplete` confirmation
+- `src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts` — clear handler + `markClearComplete` confirmation (sent once `TerminalPanel.tsx` reports its data listener attached)
 - `src/main/ipc/terminal-handlers.ts` — clear event bypass channel
 - `src/preload/index.ts` — `onClear()` and `markClearComplete()` API
 
