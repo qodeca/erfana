@@ -72,7 +72,8 @@ describe('preload surface', () => {
     'docx',
     'imageExport',
     'browser',
-    'markdownImage'
+    'markdownImage',
+    'preview'
   ])(
     'window.api.%s exposes the expected members',
     (domain) => {

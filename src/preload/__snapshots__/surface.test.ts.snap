@@ -215,6 +215,36 @@ exports[`preload surface > window.api.pdf exposes the expected members 1`] = `
 ]
 `;
 
+exports[`preload surface > window.api.preview exposes the expected members 1`] = `
+[
+  "approveHost",
+  "checkEligibility",
+  "close",
+  "exportPdf",
+  "find",
+  "focusPage",
+  "navigate",
+  "onAllowlistChanged",
+  "onBackdropChanged",
+  "onBoundsApplied",
+  "onFailuresChanged",
+  "onFindResult",
+  "onForwardedShortcut",
+  "onHostBlocked",
+  "onLoadStateChanged",
+  "onOpenFileRequested",
+  "onPageChanged",
+  "onResizeHold",
+  "onStillFrameChanged",
+  "onVisibilityApplied",
+  "open",
+  "reload",
+  "setBounds",
+  "setVisibility",
+  "stopFind",
+]
+`;
+
 exports[`preload surface > window.api.projectLock exposes the expected members 1`] = `
 [
   "acquire",

@@ -20,10 +20,10 @@
  * #124 C2 – the terminal expanded over the editor).
  *
  * **This is the ONLY file in `src/renderer/**` allowed to call
- * `api.preview.setVisibility`.** An ESLint `no-restricted-syntax` rule (item 84,
- * a separate batch) enforces that every other renderer module goes through this
- * guard rather than poking main-side visibility directly, so show/hide has
- * exactly one application site.
+ * `setVisibility` (on `previewGateway`, the preview bridge's gateway).** An
+ * ESLint `no-restricted-syntax` rule (item 84, a separate batch) enforces that
+ * every other renderer module goes through this guard rather than poking
+ * main-side visibility directly, so show/hide has exactly one application site.
  *
  * Why this must be the sole owner (design §5(d)): main applies each call at
  * once – a hide is synchronous and shows the cached still frame, a show re-adds
@@ -59,6 +59,7 @@ import {
 } from '../../stores/usePreviewChromeGateStore'
 import { usePreviewCollapsedStore } from '../../stores/usePreviewCollapsedStore'
 import { logger } from '../../utils/logger'
+import { previewGateway } from '../previewGateway'
 
 /**
  * Reason strings sent alongside `preview:setVisibility` (design §5(d)).
@@ -145,7 +146,7 @@ export interface OverlayGuardDeps {
   subscribePreview: (listener: () => void) => () => void
   /**
    * Fire-and-forget visibility send to main. In production this is
-   * `window.api.preview.setVisibility` — the ONE permitted call site.
+   * `previewGateway.setVisibility` — the ONE permitted call site.
    * @param panelId - The live preview panel.
    * @param visible - Whether the view should be shown.
    * @param reason - Advisory cause, for main-side logging.
@@ -427,10 +428,10 @@ let singleton: IOverlayGuard | null = null
 
 /**
  * The production overlay-guard singleton, wired to the real occluder + preview
- * stores and the `window.api.preview.setVisibility` bridge.
+ * stores and the `previewGateway.setVisibility` bridge.
  *
- * The `setVisibility` closure here is the ONLY `api.preview.setVisibility` call
- * site in `src/renderer/**` (design §1.8; item 84 ESLint guard).
+ * The `setVisibility` closure here is the ONLY `previewGateway.setVisibility`
+ * call site in `src/renderer/**` (design §1.8; item 84 ESLint guard).
  *
  * @returns The lazily-created singleton guard.
  */
@@ -444,9 +445,9 @@ export function getOverlayGuard(): IOverlayGuard {
     getPanelGate: readPanelGate,
     subscribeGate: subscribePanelGate,
     setVisibility: (panelId, visible, reason) =>
-      window.api.preview.setVisibility(panelId, visible, reason),
+      previewGateway.setVisibility(panelId, visible, reason),
     subscribeVisibilityApplied: (listener) =>
-      window.api.preview.onVisibilityApplied((payload) =>
+      previewGateway.onVisibilityApplied((payload) =>
         listener(payload.panelId, payload.visible)
       )
   })

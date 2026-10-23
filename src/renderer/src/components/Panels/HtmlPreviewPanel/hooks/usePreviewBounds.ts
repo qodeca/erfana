@@ -8,7 +8,7 @@
  * measure loop that runs while the tab is visible and live, and an imperative
  * {@link UsePreviewBoundsResult.pushBounds} feed the placeholder's
  * `getBoundingClientRect()` through `deriveBounds` and send it with
- * `window.api.preview.setBounds`.
+ * `previewGateway.setBounds`.
  *
  * The loop, the observer and the resize listener share one compare-and-send
  * (issue #124, part 1 §1.4): a rect goes out only when it differs from the last
@@ -47,6 +47,7 @@ import {
   type DropRect
 } from '../../../../../../shared/dropReporter'
 import type { PreviewBounds } from '../../../../../../shared/ipc/preview-types'
+import { previewGateway } from '../../../../services/previewGateway'
 
 /**
  * CSS pixels reserved at the top of the native view while the find bar is open
@@ -281,9 +282,9 @@ export function usePreviewBounds(options: UsePreviewBoundsOptions): UsePreviewBo
       // only on pushes that reveal chrome, `settled` only on a hold's answer.
       if (needsAck || settled) {
         const options = { ...(needsAck ? { ack: true } : {}), ...(settled ? { settled: true } : {}) }
-        window.api.preview.setBounds(panelId, bounds, seqRef.current, options)
+        previewGateway.setBounds(panelId, bounds, seqRef.current, options)
       } else {
-        window.api.preview.setBounds(panelId, bounds, seqRef.current)
+        previewGateway.setBounds(panelId, bounds, seqRef.current)
       }
       ack?.recordPush(seqRef.current, effectiveInset, needsAck)
       seqRef.current += 1

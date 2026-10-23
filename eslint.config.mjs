@@ -67,7 +67,8 @@ const GATEWAY_BRIDGES = [
   'docx',
   'imageExport',
   'browser',
-  'markdownImage'
+  'markdownImage',
+  'preview'
 ]
 const RENDERER_GATEWAY_SELECTORS = [
   {
@@ -145,6 +146,7 @@ const RENDERER_GATEWAY_FILES = [
   'src/renderer/src/services/imageExportGateway.ts',
   'src/renderer/src/services/browserGateway.ts',
   'src/renderer/src/services/markdownImageGateway.ts',
+  'src/renderer/src/services/previewGateway.ts',
   'src/renderer/src/services/bridgePresence.ts'
 ]
 
@@ -188,13 +190,13 @@ const RENDERER_RESTRICTED_SYNTAX = [
       'Preview panel ids are built in one place. Use openFileInPanel({ kind: "preview" }) from utils/openFileInPanel.'
   },
   // The running preview's visibility has a single owner (§1.8). Forbid the
-  // `api.preview.setVisibility` bridge call and the raw
+  // `setVisibility` call on the preview gateway or bridge and the raw
   // `preview:setVisibility` channel everywhere except OverlayGuardService.
   {
     selector:
-      "CallExpression[callee.property.name='setVisibility'][callee.object.property.name='preview'], Literal[value='preview:setVisibility']",
+      "CallExpression[callee.property.name='setVisibility'][callee.object.property.name='preview'], CallExpression[callee.property.name='setVisibility'][callee.object.name='previewGateway'], Literal[value='preview:setVisibility']",
     message:
-      'Preview visibility is owned by services/preview/OverlayGuardService. Do not call api.preview.setVisibility or reference the preview:setVisibility channel elsewhere (issue #74, design §1.8).'
+      'Preview visibility is owned by services/preview/OverlayGuardService. Do not call previewGateway.setVisibility (or api.preview.setVisibility) or reference the preview:setVisibility channel elsewhere (issue #74, design §1.8).'
   },
   {
     selector:
@@ -701,11 +703,11 @@ export default [
   //    in the wrong panel type; `utils/openFileInPanel.ts` owns that (and is
   //    therefore exempt). The `preview-` prefix is issue #74's running HTML
   //    preview. See issues #70 and #74.
-  // 3. The running preview's visibility. `api.preview.setVisibility` and the
-  //    `preview:setVisibility` channel have exactly ONE permitted caller,
-  //    `services/preview/OverlayGuardService.ts` (exempt), so the "single
-  //    hide/show owner" invariant is enforced by the linter, not by convention.
-  //    See issue #74 design §1.8.
+  // 3. The running preview's visibility. `previewGateway.setVisibility` (and
+  //    `api.preview.setVisibility`) and the `preview:setVisibility` channel
+  //    have exactly ONE permitted caller, `services/preview/OverlayGuardService.ts`
+  //    (exempt), so the "single hide/show owner" invariant is enforced by the
+  //    linter, not by convention. See issue #74 design §1.8.
   // 4. Creating an `object` / `embed` / `iframe` element. Those load an SVG AS
   //    A DOCUMENT, which executes script — the one route the image-export
   //    harness (#73) must never acquire. The selector lives HERE rather than in

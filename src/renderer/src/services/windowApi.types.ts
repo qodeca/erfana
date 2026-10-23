@@ -16,6 +16,8 @@ import type { ImageExportBridge } from '../../../shared/ipc/image-export-schema'
 import type { ImportBridge } from '../../../shared/ipc/import-schema'
 import type { MarkdownImageBridge } from '../../../shared/ipc/markdown-image-schema'
 import type { PdfBridge } from '../../../shared/ipc/pdf-schema'
+import type { PreviewBridge } from '../../../shared/ipc/preview-bridge-types'
+import type { previewGateway } from './previewGateway'
 import type { TranscriptionBridge, WhisperBridge } from '../../../shared/ipc/transcription-schema'
 import type { browserGateway } from './browserGateway'
 import type { cameraGateway } from './cameraGateway'
@@ -76,6 +78,7 @@ type GatewayBridges =
   | 'imageExport'
   | 'browser'
   | 'markdownImage'
+  | 'preview'
 
 export type WindowApiChecks = [
   Assert<Equal<Window['api'], Omit<Api, GatewayBridges>>>,
@@ -101,5 +104,6 @@ export type WindowApiChecks = [
   Assert<Equal<typeof docxGateway, DocxBridge>>,
   Assert<Equal<typeof imageExportGateway, ImageExportBridge>>,
   Assert<Equal<typeof browserGateway, BrowserBridge>>,
-  Assert<Equal<typeof markdownImageGateway, MarkdownImageBridge>>
+  Assert<Equal<typeof markdownImageGateway, MarkdownImageBridge>>,
+  Assert<Equal<typeof previewGateway, PreviewBridge>>
 ]

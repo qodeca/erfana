@@ -130,7 +130,7 @@ describe('renderer gateway rule', () => {
 
   const READ_FILE = 'export const f = () => window.api.file.readFile("a")'
   const READ_TERMINAL = 'export const t = () => window.api.terminal.kill("a")'
-  const READ_OTHER = 'export const g = () => window.api.preview.reload("p")'
+  const READ_OTHER = 'export const g = () => window.api.claudeStatus.nudge("t")'
 
   it('flags a renderer read of window.api.file and window.api.terminal', async () => {
     expect(await gatewayMessages(RENDERER, READ_FILE)).toHaveLength(1)
@@ -174,6 +174,14 @@ describe('renderer gateway rule', () => {
     'export const f = () => window.api.browser.openFile("a")',
     'export const f = () => window.api?.markdownImage?.read({})'
   ])('flags the import, media and export bridges: %s', async (code) => {
+    expect(await gatewayMessages(RENDERER, code)).toHaveLength(1)
+  })
+
+  it.each([
+    'export const f = () => window.api.preview.reload("p")',
+    'export const f = () => window.api?.preview?.onOpenFileRequested(() => {})',
+    'export const f = () => new Provider("p", window.api.preview)'
+  ])('flags the preview bridge: %s', async (code) => {
     expect(await gatewayMessages(RENDERER, code)).toHaveLength(1)
   })
 
@@ -224,6 +232,7 @@ describe('renderer gateway rule', () => {
     'src/renderer/src/services/imageExportGateway.ts',
     'src/renderer/src/services/browserGateway.ts',
     'src/renderer/src/services/markdownImageGateway.ts',
+    'src/renderer/src/services/previewGateway.ts',
     'src/renderer/src/services/bridgePresence.ts'
   ])('exempts %s from the gateway rule only', async (file) => {
     expect(await gatewayMessages(file, READ_FILE)).toHaveLength(0)
@@ -246,5 +255,30 @@ describe('renderer gateway rule', () => {
     expect(await gatewayMessages('src/renderer/src/utils/fileUtils.ts', READ_FILE)).toHaveLength(1)
     const messages = await lint('src/renderer/src/utils/fileUtils.ts', 'export const b = (p) => p.split("/").pop()')
     expect(messages.some((m) => /POSIX-only basename/.test(m.message))).toBe(false)
+  })
+})
+
+describe('preview visibility owner rule', () => {
+  const OWNER = /Preview visibility is owned by services\/preview\/OverlayGuardService/
+  const ownerMessages = async (rel, code) =>
+    (await lint(rel, code)).filter((m) => OWNER.test(m.message))
+  const OVERLAY_GUARD = 'src/renderer/src/services/preview/OverlayGuardService.ts'
+
+  it.each([
+    ['the gateway call', 'export const f = () => previewGateway.setVisibility("p", false, "r")'],
+    ['the bridge call', 'export const f = (api) => api.preview.setVisibility("p", false, "r")'],
+    ['the channel name', "export const c = 'preview:setVisibility'"]
+  ])('flags %s outside OverlayGuardService', async (_name, code) => {
+    expect(await ownerMessages(RENDERER, code)).toHaveLength(1)
+  })
+
+  it('lets OverlayGuardService call previewGateway.setVisibility', async () => {
+    const code = 'export const f = () => previewGateway.setVisibility("p", false, "r")'
+    expect(await ownerMessages(OVERLAY_GUARD, code)).toHaveLength(0)
+  })
+
+  it('leaves the gateway its own forwarder', async () => {
+    const code = 'const bridge = () => ({})\nexport const g = { setVisibility: (...a) => bridge().setVisibility(...a) }'
+    expect(await ownerMessages('src/renderer/src/services/previewGateway.ts', code)).toHaveLength(0)
   })
 })

@@ -43,6 +43,8 @@ import { docxGateway, pdfGateway } from './documentExportGateway'
 import { imageExportGateway } from './imageExportGateway'
 import { browserGateway } from './browserGateway'
 import { markdownImageGateway } from './markdownImageGateway'
+import { previewGateway } from './previewGateway'
+import type { PreviewBridge } from '../../../shared/ipc/preview-bridge-types'
 import { getDefaultProjectTreeApi } from './projectTreeApi'
 import { onFileStructureChanged } from './fileStructureSignal'
 
@@ -214,6 +216,34 @@ const IMAGE_EXPORT_METHODS: Record<keyof ImageExportBridge, true> = { run: true 
 const BROWSER_METHODS: Record<keyof BrowserBridge, true> = { openFile: true }
 const MARKDOWN_IMAGE_METHODS: Record<keyof MarkdownImageBridge, true> = { read: true }
 
+const PREVIEW_METHODS: Record<keyof PreviewBridge, true> = {
+  checkEligibility: true,
+  open: true,
+  close: true,
+  setBounds: true,
+  setVisibility: true,
+  reload: true,
+  approveHost: true,
+  find: true,
+  stopFind: true,
+  exportPdf: true,
+  navigate: true,
+  focusPage: true,
+  onFailuresChanged: true,
+  onHostBlocked: true,
+  onVisibilityApplied: true,
+  onAllowlistChanged: true,
+  onFindResult: true,
+  onStillFrameChanged: true,
+  onLoadStateChanged: true,
+  onBackdropChanged: true,
+  onBoundsApplied: true,
+  onForwardedShortcut: true,
+  onOpenFileRequested: true,
+  onPageChanged: true,
+  onResizeHold: true
+}
+
 type Anything = (...args: unknown[]) => unknown
 
 function fakeBridge(methods: string[]): Record<string, ReturnType<typeof vi.fn>> {
@@ -248,7 +278,8 @@ describe.each([
   ['docxGateway', 'docx', docxGateway, DOCX_METHODS],
   ['imageExportGateway', 'imageExport', imageExportGateway, IMAGE_EXPORT_METHODS],
   ['browserGateway', 'browser', browserGateway, BROWSER_METHODS],
-  ['markdownImageGateway', 'markdownImage', markdownImageGateway, MARKDOWN_IMAGE_METHODS]
+  ['markdownImageGateway', 'markdownImage', markdownImageGateway, MARKDOWN_IMAGE_METHODS],
+  ['previewGateway', 'preview', previewGateway, PREVIEW_METHODS]
 ] as const)('%s', (_name, key, gateway, methods) => {
   const names = Object.keys(methods)
 
