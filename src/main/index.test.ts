@@ -985,6 +985,18 @@ describe('Main Process - Window Creation', () => {
       }
     })
 
+    it('should kill any in-flight LibreOffice probe, since app.exit skips will-quit', async () => {
+      const { killActiveLibreOfficeProbes } = (await import('./services/import')) as any
+      const { run, cleanup } = await loadAndGetBeforeQuit()
+
+      try {
+        await run({ preventDefault: vi.fn() })
+        expect(killActiveLibreOfficeProbes).toHaveBeenCalledTimes(1)
+      } finally {
+        cleanup()
+      }
+    })
+
     it('should release the project lock before the best-effort disposers', async () => {
       const { projectLockService } = (await import('./services/ProjectLockService')) as any
       const { terminalService } = (await import('./services/TerminalService')) as any

@@ -45,10 +45,9 @@ export interface DependencyDetectorOptions {
  *   the status never says "found" while every conversion would be refused.
  * - Liveness: on macOS and Linux a `found` candidate must answer `--version`
  *   (run headless, stdio ignored, private profile, process group killed on
- *   timeout, non-zero exit or app quit), so a stub planted at a fixed path is
- *   rejected. Only absolute paths are run, from `os.tmpdir()` with a minimal
- *   env. A `.bat` / `.cmd` fails safely: Node refuses to spawn one without a
- *   shell (EINVAL, CVE-2024-27980).
+ *   timeout, non-zero exit or app quit), so a broken or non-LibreOffice file
+ *   is reported missing (a liveness check, not a security check – the file
+ *   runs). Only absolute paths are run, from `os.tmpdir()` with a minimal env.
  * - Windows never runs LibreOffice to detect it: the resolver's file check is
  *   the answer. The #162 Windows `--version` check ran the very file it meant
  *   to vet, and is removed on purpose.

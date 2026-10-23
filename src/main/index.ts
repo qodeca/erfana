@@ -723,6 +723,8 @@ app.on('before-quit', async (event) => {
   if (isShuttingDown) return
   isShuttingDown = true
   event.preventDefault()
+  // app.exit(0) below skips `will-quit`, so a running LibreOffice probe is killed here.
+  killActiveLibreOfficeProbes()
 
   // Install the guard synchronously, before the first await, so an already-queued
   // chokidar read callback can't crash the process before the handler is registered.

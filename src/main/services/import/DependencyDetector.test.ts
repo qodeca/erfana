@@ -250,6 +250,9 @@ describe('DependencyDetector', () => {
     killActiveLibreOfficeProbes()
 
     expect(kill).toHaveBeenCalledWith(-555, 'SIGKILL')
+    kill.mockClear()
+    killActiveLibreOfficeProbes()
+    expect(kill).not.toHaveBeenCalled()
     await vi.advanceTimersByTimeAsync(6000)
     await result
   })
