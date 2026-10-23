@@ -471,8 +471,13 @@ window.api.terminal = {
   // Bootstrap clear handshake (see bootstrap-pattern.md)
   onClear: (callback) => unsubscribe
   markClearComplete: (terminalId) => void
+
+  // Flow control: report output xterm has parsed (UTF-16 code units)
+  ackOutput: (terminalId, chars) => void
 }
 ```
+
+Output reaches `onData` in batches (every 8 ms or at 64 KiB per terminal, in order, always before that terminal's exit). The panel acknowledges parsed output with `ackOutput` once per 32 KiB, and on macOS and Linux main pauses the PTY while more than 512 KiB is unacknowledged; a hidden window acknowledges on receipt, so background work is never held back, and Windows terminals are batched only. Design and measurements: [docs/performance/terminal-output-batching.md](../performance/terminal-output-batching.md).
 
 ### UI Component (Modular Architecture, v0.6.5)
 

@@ -93,7 +93,7 @@ describe('file:readImage', () => {
       .spyOn(fileService, 'readImage')
       .mockResolvedValue({ status: 'ok', dataUrl: 'data:image/png;base64,AAAA', version: '1:2:3' })
 
-    await expect(handlers['file:readImage']({}, inProjectImage, '0:0:0')).resolves.toEqual({
+    await expect(handlers['file:readImage']({}, { filePath: inProjectImage, knownVersion: '0:0:0' })).resolves.toEqual({
       status: 'ok',
       dataUrl: 'data:image/png;base64,AAAA',
       version: '1:2:3'
@@ -106,7 +106,7 @@ describe('file:readImage', () => {
     const { fileService } = await import('../services/FileService')
     vi.spyOn(fileService, 'readImage').mockResolvedValue({ status: 'unchanged', version: '1:2:3' })
 
-    await expect(handlers['file:readImage']({}, inProjectImage, '1:2:3')).resolves.toEqual({
+    await expect(handlers['file:readImage']({}, { filePath: inProjectImage, knownVersion: '1:2:3' })).resolves.toEqual({
       status: 'unchanged',
       version: '1:2:3'
     })
@@ -118,7 +118,7 @@ describe('file:readImage', () => {
       .spyOn(fileService, 'readImage')
       .mockResolvedValue({ status: 'ok', dataUrl: 'data:,', version: '1:2:3' })
 
-    await handlers['file:readImage']({}, inProjectImage)
+    await handlers['file:readImage']({}, { filePath: inProjectImage })
 
     expect(read).toHaveBeenCalledWith(await realpath(inProjectImage), undefined)
   })
@@ -132,7 +132,7 @@ describe('file:readImage', () => {
     const { fileService } = await import('../services/FileService')
     const read = vi.spyOn(fileService, 'readImage')
 
-    await expect(handlers['file:readImage']({}, target)).rejects.toThrow(
+    await expect(handlers['file:readImage']({}, { filePath: target })).rejects.toThrow(
       'Cannot read files outside the project directory'
     )
     expect(read).not.toHaveBeenCalled()
@@ -151,7 +151,7 @@ describe('file:readImage', () => {
       const { fileService } = await import('../services/FileService')
       const read = vi.spyOn(fileService, 'readImage')
 
-      await expect(handlers['file:readImage']({}, link)).rejects.toThrow(
+      await expect(handlers['file:readImage']({}, { filePath: link })).rejects.toThrow(
         'Cannot read files outside the project directory'
       )
       expect(read).not.toHaveBeenCalled()
@@ -161,7 +161,7 @@ describe('file:readImage', () => {
   it('rejects when no project is open', async () => {
     await openTestProject(null)
 
-    await expect(handlers['file:readImage']({}, inProjectImage)).rejects.toThrow(
+    await expect(handlers['file:readImage']({}, { filePath: inProjectImage })).rejects.toThrow(
       'No project is open'
     )
   })
@@ -171,7 +171,7 @@ describe('file:readImage', () => {
     const read = vi.spyOn(fileService, 'readImage')
 
     await expect(
-      handlers['file:readImage']({}, inProjectImage, 'x'.repeat(129))
+      handlers['file:readImage']({}, { filePath: inProjectImage, knownVersion: 'x'.repeat(129) })
     ).rejects.toThrow('Too big: expected string to have <=128 characters')
     expect(read).not.toHaveBeenCalled()
   })
@@ -180,7 +180,7 @@ describe('file:readImage', () => {
     const { fileService } = await import('../services/FileService')
     const read = vi.spyOn(fileService, 'readImage')
 
-    await expect(handlers['file:readImage']({}, '')).rejects.toThrow('Invalid file path')
+    await expect(handlers['file:readImage']({}, { filePath: '' })).rejects.toThrow('Path is required')
     expect(read).not.toHaveBeenCalled()
   })
 })

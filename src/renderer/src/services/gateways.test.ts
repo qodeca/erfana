@@ -10,6 +10,7 @@ import type { TerminalBridge } from '../../../shared/ipc/terminal-schema'
 import { fileGateway } from './fileGateway'
 import { terminalGateway } from './terminalGateway'
 import { getDefaultProjectTreeApi } from './projectTreeApi'
+import { onFileStructureChanged } from './fileStructureSignal'
 
 // Exhaustive by construction: a method added to a contract fails to compile here
 const FILE_METHODS: Record<keyof FileBridge, true> = {
@@ -36,6 +37,7 @@ const FILE_METHODS: Record<keyof FileBridge, true> = {
   validateExternal: true,
   copyFromExternal: true,
   moveFromExternal: true,
+  moveBatchFromExternal: true,
   selectExternalFiles: true,
   onProjectChanged: true,
   closeProject: true
@@ -54,7 +56,8 @@ const TERMINAL_METHODS: Record<keyof TerminalBridge, true> = {
   onExit: true,
   onError: true,
   onClear: true,
-  markClearComplete: true
+  markClearComplete: true,
+  ackOutput: true
 }
 
 type Anything = (...args: unknown[]) => unknown
@@ -79,15 +82,16 @@ describe.each([
     expect(Object.keys(gateway).sort()).toEqual([...names].sort())
   })
 
-  it.each(names)('%s forwards its arguments and returns the bridge result', (method) => {
+  it.each(names)('%s forwards its arguments and returns the bridge result', async (method) => {
     const bridge = fakeBridge(names)
     window.api = { [key]: bridge } as unknown as typeof window.api
 
     const result = (gateway as unknown as Record<string, Anything>)[method]('a', 2, { c: 3 })
 
+    // The bridge is called before the first await, so the call is visible at once
     expect(bridge[method]).toHaveBeenCalledTimes(1)
     expect(bridge[method]).toHaveBeenCalledWith('a', 2, { c: 3 })
-    expect(result).toBe(`${method}-result`)
+    expect(await result).toBe(`${method}-result`)
   })
 
   it('forwards a call with no arguments without inventing any', () => {
@@ -110,6 +114,47 @@ describe.each([
 
     expect(first[names[0]]).toHaveBeenCalledTimes(1)
     expect(second[names[0]]).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('fileGateway – file structure signal', () => {
+  // The methods that can add, remove or move an entry; the preview's link cache
+  // relies on hearing about every one of them (the watcher is paused for them)
+  const STRUCTURAL = [
+    'createFile',
+    'createFolder',
+    'deleteFile',
+    'deleteFolder',
+    'rename',
+    'moveItem',
+    'copyItem',
+    'copyFromExternal',
+    'moveFromExternal',
+    'moveBatchFromExternal'
+  ]
+  const names = Object.keys(FILE_METHODS).filter((name) => name !== 'onProjectChanged')
+
+  it.each(names)('%s raises the signal only if it can change the structure', async (method) => {
+    window.api = { file: fakeBridge(names) } as unknown as typeof window.api
+    const heard = vi.fn()
+    const stop = onFileStructureChanged(heard)
+    try {
+      await (fileGateway as unknown as Record<string, Anything>)[method]()
+    } finally {
+      stop()
+    }
+    expect(heard).toHaveBeenCalledTimes(STRUCTURAL.includes(method) ? 1 : 0)
+  })
+
+  it('raises the signal after a failed structural call too, and still rejects', async () => {
+    const bridge = fakeBridge(names)
+    bridge.moveItem.mockRejectedValue(new Error('disk full'))
+    window.api = { file: bridge } as unknown as typeof window.api
+    const heard = vi.fn()
+    const stop = onFileStructureChanged(heard)
+    await expect(fileGateway.moveItem({} as never)).rejects.toThrow('disk full')
+    stop()
+    expect(heard).toHaveBeenCalledTimes(1)
   })
 })
 

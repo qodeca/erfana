@@ -228,7 +228,7 @@ export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcherRe
       // and crashed the panel. A zero-arg signature is assignable to a one-arg
       // DOM handler, so the type system never saw it.
       const prefetched = typeof prefetchedContent === 'string' ? prefetchedContent : undefined
-      const content = prefetched ?? await fileGateway.readFile(filePath)
+      const content = prefetched ?? await fileGateway.readFile({ filePath })
       onContentUpdate(content)
       pendingSavedContentsRef.current.clear() // Disk content is now authoritative
       setExternalChangeDetected(false)
@@ -299,7 +299,7 @@ export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcherRe
 
     // Guard 2: Read file and compare with last saved content
     try {
-      const diskContent = await fileGateway.readFile(filePath)
+      const diskContent = await fileGateway.readFile({ filePath })
 
       // Self-save echo detection: disk matches a recently saved content → drop
       if (isEchoEvent(diskContent, pendingSavedContentsRef.current)) {

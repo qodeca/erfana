@@ -170,8 +170,8 @@ test.describe('Recent projects with the keyboard ([24])', () => {
     extraProjects.push(other)
     await writeFile(join(other, 'other.md'), '# Other\n', 'utf-8')
     await page.evaluate(async (paths) => {
-      const api = (window as unknown as { api: { file: { openProjectByPath(p: string): Promise<string> } } }).api
-      for (const p of paths) await api.file.openProjectByPath(p)
+      const api = (window as unknown as { api: { file: { openProjectByPath(request: { projectPath: string }): Promise<string> } } }).api
+      for (const p of paths) await api.file.openProjectByPath({ projectPath: p })
     }, [other, testProject.path])
     await tree.waitForFile('a.md')
 

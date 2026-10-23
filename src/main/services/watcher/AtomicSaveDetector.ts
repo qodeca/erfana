@@ -15,7 +15,6 @@
  * Solution: Wait 100ms after DELETE. If file reappears, emit CHANGE instead.
  */
 
-import { existsSync } from 'fs'
 import { stat } from 'fs/promises'
 
 export type AtomicSaveCallback = (path: string, wasAtomicSave: boolean) => void
@@ -121,15 +120,15 @@ export class AtomicSaveDetector {
   }
 
   /**
-   * Check if file exists (async with fallback to sync)
+   * Check if file exists. A failed `stat` means it does not: a sync
+   * `existsSync` retry would block the main thread and fail the same way.
    */
   private async fileExists(filePath: string): Promise<boolean> {
     try {
       await stat(filePath)
       return true
     } catch {
-      // Fallback to sync check
-      return existsSync(filePath)
+      return false
     }
   }
 }

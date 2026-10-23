@@ -360,5 +360,26 @@
     "label": "--color-white on --color-btn-primary-bg, the historical label",
     "foreground": "--color-white",
     "background": "--color-btn-primary-bg"
+  },
+  "contrast-wait-text": {
+    "kind": "contrast",
+    "card": "product/html-waiting/index.html",
+    "label": "--color-text-tertiary on --color-brand-black, the waiting message's body text on the pre-paint backdrop",
+    "foreground": "--color-text-tertiary",
+    "background": "--color-brand-black"
+  },
+  "contrast-wait-aside": {
+    "kind": "contrast",
+    "card": "product/html-waiting/index.html",
+    "label": "--color-text-secondary on --color-brand-black, the waiting message's aside on the pre-paint backdrop",
+    "foreground": "--color-text-secondary",
+    "background": "--color-brand-black"
+  },
+  "contrast-wait-aside-muted": {
+    "kind": "contrast",
+    "card": "product/html-waiting/index.html",
+    "label": "--color-text-muted on --color-brand-black, the aside colour the card used to render",
+    "foreground": "--color-text-muted",
+    "background": "--color-brand-black"
   }
 }

@@ -34,6 +34,7 @@ export const FILE_CHANNELS = {
   validateExternal: 'file:validateExternal',
   copyFromExternal: 'file:copyFromExternal',
   moveFromExternal: 'file:moveFromExternal',
+  moveBatchFromExternal: 'file:moveBatchFromExternal',
   selectExternalFiles: 'file:selectExternalFiles'
 } as const
 

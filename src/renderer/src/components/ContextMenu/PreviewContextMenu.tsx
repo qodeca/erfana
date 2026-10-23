@@ -54,7 +54,7 @@ async function readSourceLines(
   endLine: number
 ): Promise<string | null> {
   try {
-    const content = await fileGateway.readFile(filePath)
+    const content = await fileGateway.readFile({ filePath })
     const lines = content.split('\n')
     // Line numbers are 1-indexed in markdown AST, but arrays are 0-indexed
     const selectedLines = lines.slice(startLine - 1, endLine)

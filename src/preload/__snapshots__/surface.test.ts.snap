@@ -17,6 +17,7 @@ exports[`preload surface > window.api has the expected top-level groups 1`] = `
   "imageExport",
   "import",
   "logging",
+  "markdownImage",
   "pdf",
   "preview",
   "projectLock",
@@ -46,6 +47,7 @@ exports[`preload surface > window.api.file and window.api.terminal expose the ex
   "getProjectPath",
   "getSession",
   "getStats",
+  "moveBatchFromExternal",
   "moveFromExternal",
   "moveItem",
   "onProjectChanged",
@@ -65,6 +67,7 @@ exports[`preload surface > window.api.file and window.api.terminal expose the ex
 
 exports[`preload surface > window.api.file and window.api.terminal expose the expected members > terminal 1`] = `
 [
+  "ackOutput",
   "create",
   "getActivity",
   "getInfo",

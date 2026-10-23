@@ -5,8 +5,8 @@
  * typed as {@link FileBridge} (the shared contract in
  * `file-schema.ts`). Channel names come from `file-channels.ts`.
  *
- * The wire is positional and unchanged: this module only moves the code out of
- * `index.ts` and ties it to the contract.
+ * Every channel that takes arguments takes ONE request object, passed through
+ * as it is; the main process validates it against a strict schema.
  */
 import { ipcRenderer } from 'electron'
 import { FILE_CHANNELS, FILE_EVENTS } from '../shared/ipc/file-channels'
@@ -15,35 +15,24 @@ import type { ProjectChanged } from '../shared/ipc/schema'
 
 export const fileBridge: FileBridge = {
   openProject: () => ipcRenderer.invoke(FILE_CHANNELS.openProject),
-  openProjectByPath: (projectPath) =>
-    ipcRenderer.invoke(FILE_CHANNELS.openProjectByPath, projectPath),
+  openProjectByPath: (request) => ipcRenderer.invoke(FILE_CHANNELS.openProjectByPath, request),
   getSession: () => ipcRenderer.invoke(FILE_CHANNELS.getSession),
-  readDirectory: (dirPath) => ipcRenderer.invoke(FILE_CHANNELS.readDirectory, dirPath),
-  readFile: (filePath) => ipcRenderer.invoke(FILE_CHANNELS.readFile, filePath),
-  writeFile: (filePath, content, options) =>
-    options === undefined
-      ? ipcRenderer.invoke(FILE_CHANNELS.writeFile, filePath, content)
-      : ipcRenderer.invoke(FILE_CHANNELS.writeFile, filePath, content, options),
-  getStats: (filePath) => ipcRenderer.invoke(FILE_CHANNELS.getStats, filePath),
-  exists: (filePath) => ipcRenderer.invoke(FILE_CHANNELS.exists, filePath),
+  readDirectory: (request) => ipcRenderer.invoke(FILE_CHANNELS.readDirectory, request),
+  readFile: (request) => ipcRenderer.invoke(FILE_CHANNELS.readFile, request),
+  writeFile: (request) => ipcRenderer.invoke(FILE_CHANNELS.writeFile, request),
+  getStats: (request) => ipcRenderer.invoke(FILE_CHANNELS.getStats, request),
+  exists: (request) => ipcRenderer.invoke(FILE_CHANNELS.exists, request),
   getProjectPath: () => ipcRenderer.invoke(FILE_CHANNELS.getProjectPath),
-  createFile: (dirPath, fileName) =>
-    ipcRenderer.invoke(FILE_CHANNELS.createFile, dirPath, fileName),
-  createFolder: (dirPath, folderName) =>
-    ipcRenderer.invoke(FILE_CHANNELS.createFolder, dirPath, folderName),
-  deleteFile: (filePath) => ipcRenderer.invoke(FILE_CHANNELS.deleteFile, filePath),
-  deleteFolder: (folderPath) => ipcRenderer.invoke(FILE_CHANNELS.deleteFolder, folderPath),
-  rename: (oldPath, newName) => ipcRenderer.invoke(FILE_CHANNELS.rename, oldPath, newName),
-  revealInFileManager: (filePath) =>
-    ipcRenderer.invoke(FILE_CHANNELS.revealInFileManager, filePath),
-  moveItem: (sourcePath, targetParentPath, newName, replaceExisting) =>
-    ipcRenderer.invoke(FILE_CHANNELS.moveItem, sourcePath, targetParentPath, newName, replaceExisting),
-  copyItem: (sourcePath, targetParentPath, newName) =>
-    ipcRenderer.invoke(FILE_CHANNELS.copyItem, sourcePath, targetParentPath, newName),
-  checkConflict: (targetParentPath, itemName) =>
-    ipcRenderer.invoke(FILE_CHANNELS.checkConflict, targetParentPath, itemName),
-  validatePath: (filePath, projectRoot) =>
-    ipcRenderer.invoke(FILE_CHANNELS.validatePath, filePath, projectRoot),
+  createFile: (request) => ipcRenderer.invoke(FILE_CHANNELS.createFile, request),
+  createFolder: (request) => ipcRenderer.invoke(FILE_CHANNELS.createFolder, request),
+  deleteFile: (request) => ipcRenderer.invoke(FILE_CHANNELS.deleteFile, request),
+  deleteFolder: (request) => ipcRenderer.invoke(FILE_CHANNELS.deleteFolder, request),
+  rename: (request) => ipcRenderer.invoke(FILE_CHANNELS.rename, request),
+  revealInFileManager: (request) => ipcRenderer.invoke(FILE_CHANNELS.revealInFileManager, request),
+  moveItem: (request) => ipcRenderer.invoke(FILE_CHANNELS.moveItem, request),
+  copyItem: (request) => ipcRenderer.invoke(FILE_CHANNELS.copyItem, request),
+  checkConflict: (request) => ipcRenderer.invoke(FILE_CHANNELS.checkConflict, request),
+  validatePath: (request) => ipcRenderer.invoke(FILE_CHANNELS.validatePath, request),
 
   /**
    * Read an image, or learn that it has not changed.
@@ -64,29 +53,15 @@ export const fileBridge: FileBridge = {
    *
    * @see Issue #70 - preview tabs show stale content when the file changes
    */
-  readImage: (filePath, knownVersion) =>
-    ipcRenderer.invoke(FILE_CHANNELS.readImage, filePath, knownVersion),
+  readImage: (request) => ipcRenderer.invoke(FILE_CHANNELS.readImage, request),
 
-  // External file drop operations (Spec #012). `projectRoot` is ignored: the
-  // main process uses the open project.
-  validateExternal: (sourcePath, projectRoot) =>
-    ipcRenderer.invoke(FILE_CHANNELS.validateExternal, sourcePath, projectRoot),
-  copyFromExternal: (sourcePath, targetFolder, projectRoot, conflictResolution) =>
-    ipcRenderer.invoke(
-      FILE_CHANNELS.copyFromExternal,
-      sourcePath,
-      targetFolder,
-      projectRoot,
-      conflictResolution
-    ),
-  moveFromExternal: (sourcePath, targetFolder, projectRoot, conflictResolution) =>
-    ipcRenderer.invoke(
-      FILE_CHANNELS.moveFromExternal,
-      sourcePath,
-      targetFolder,
-      projectRoot,
-      conflictResolution
-    ),
+  // External file drop operations (Spec #012). The main process uses the open
+  // project; the requests carry no project root.
+  validateExternal: (request) => ipcRenderer.invoke(FILE_CHANNELS.validateExternal, request),
+  copyFromExternal: (request) => ipcRenderer.invoke(FILE_CHANNELS.copyFromExternal, request),
+  moveFromExternal: (request) => ipcRenderer.invoke(FILE_CHANNELS.moveFromExternal, request),
+  moveBatchFromExternal: (request) =>
+    ipcRenderer.invoke(FILE_CHANNELS.moveBatchFromExternal, request),
   selectExternalFiles: () => ipcRenderer.invoke(FILE_CHANNELS.selectExternalFiles),
 
   // Project change event listener
@@ -97,6 +72,5 @@ export const fileBridge: FileBridge = {
       ipcRenderer.removeListener(FILE_EVENTS.projectChanged, listener)
     }
   },
-  closeProject: (expectedGeneration) =>
-    ipcRenderer.invoke(FILE_CHANNELS.closeProject, expectedGeneration)
+  closeProject: (request) => ipcRenderer.invoke(FILE_CHANNELS.closeProject, request)
 }

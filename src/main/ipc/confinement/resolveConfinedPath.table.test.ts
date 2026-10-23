@@ -68,6 +68,17 @@ const sessionOf = (
 // ---------------------------------------------------------------------------
 // Rows 1-10, 13, 14, 25: a real tree
 // ---------------------------------------------------------------------------
+/** `mkfifo` is on the path (POSIX hosts only). */
+function hasMkfifo(): boolean {
+  if (process.platform === 'win32') return false
+  try {
+    execFileSync('which', ['mkfifo'], { stdio: 'ignore' })
+    return true
+  } catch {
+    return false
+  }
+}
+
 describe.skipIf(process.platform === 'win32')('resolveConfinedPath – POSIX tree', () => {
   let base: string
   let root: string
@@ -242,6 +253,26 @@ describe.skipIf(process.platform === 'win32')('resolveConfinedPath – POSIX tre
     const missing = await outcome(path.join(outside, 'no-such-file'), ctx, project)
     expect(existing).toBe('OUTSIDE_PROJECT')
     expect(missing).toBe(existing)
+  })
+
+  it.runIf(hasMkfifo())('a path below a special file in the project is not found, in project and entry modes', async () => {
+    const fifo = path.join(root, 'pipe')
+    execFileSync('mkfifo', [fifo])
+    try {
+      expect(await outcome(path.join(fifo, 'child'), ctx, project)).toBe('NOT_FOUND')
+      expect(await outcome(path.join(fifo, 'a', 'child'), ctx, project)).toBe('NOT_FOUND')
+      expect(await outcome(path.join(fifo, 'a', 'child'), ctx, { mode: 'project-entry' })).toBe('NOT_FOUND')
+    } finally {
+      rmSync(fifo)
+    }
+  })
+
+  it('a path below an outside file gets the outside answer, not "not found"', async () => {
+    expect(await outcome(path.join(outside, 'hosts', 'child'), ctx, project)).toBe('OUTSIDE_PROJECT')
+    expect(await outcome(path.join(outside, 'hosts', 'a', 'b'), ctx, project)).toBe('OUTSIDE_PROJECT')
+    expect(await outcome(path.join(root, 'link', 'child'), ctx, project)).toBe('OUTSIDE_PROJECT')
+    // Inside the project the same shape is still "not found"
+    expect(await outcome(path.join(root, 'file.md', 'child'), ctx, project)).toBe('NOT_FOUND')
   })
 })
 
@@ -519,6 +550,35 @@ describe('resolveConfinedPath – Windows', () => {
       fs: { ...base.fs, realpath: async () => '\\\\?\\UNC\\srv\\share\\p\\x' }
     }
     expect(await outcome('C:\\p\\x', ctxFor('\\\\srv\\share\\p'), project, prefixedUnc)).toBe('ACCEPTED')
+  })
+
+  it('row 30: realpath succeeds where lstat would be refused (EACCES / EPERM); accepted only inside', async () => {
+    const base = win({
+      'C:\\': 'dir',
+      'C:\\p': 'dir',
+      'C:\\p\\x.md': 'file',
+      'C:\\q': 'dir',
+      'C:\\q\\y.md': 'file'
+    })
+    const refusing = (code: string): ConfinementDeps => ({
+      ...base,
+      fs: {
+        ...base.fs,
+        lstat: async () => {
+          throw Object.assign(new Error(code), { code })
+        }
+      }
+    })
+    const mustExist: PathPolicy = { mode: 'project', mustExist: true }
+    for (const code of ['EACCES', 'EPERM']) {
+      const deps = refusing(code)
+      // A path that must exist is canonicalised first, so the lstat refusal is not reached
+      expect(await outcome('C:\\p\\x.md', ctxFor('C:\\p'), mustExist, deps)).toBe('ACCEPTED')
+      // The same shortcut never accepts a canonical path outside the project
+      expect(await outcome('C:\\q\\y.md', ctxFor('C:\\p'), mustExist, deps)).toBe('OUTSIDE_PROJECT')
+      // A path that is not expected to exist still takes the full climb and refuses
+      expect(await outcome('C:\\p\\x.md', ctxFor('C:\\p'), project, deps)).toBe('UNVERIFIABLE')
+    }
   })
 })
 

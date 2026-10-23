@@ -1,10 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react'
 import { FilePlus, FolderPlus, FolderOpen, Replace, FileText, Files, FileUp, RotateCw, X as CloseIcon } from 'lucide-react'
+import { useVirtualizer, defaultRangeExtractor, type Range } from '@tanstack/react-virtual'
 import type { FileNode } from '../../../../preload/index'
 import type { FilterMode } from '../../types/filters'
-import { ProjectTreeNode } from './ProjectTreeNode'
+import { ProjectTreeNode, TREE_ROW_HEIGHT } from './ProjectTreeNode'
+import { buildVisibleRows } from './visibleRows'
+import { resolveInternalDropFolder, isSameFolderMove } from './dropTarget'
+import { isKeyboardContextMenu, rowMenuAnchor, KEYBOARD_MENU_ECHO_MS, type PointerPress } from './contextMenuOrigin'
+import { resolveTreeKey, findTypeAheadMatch, isTypeAheadKey } from './treeKeyboard'
+import { isStrictDescendant } from '../../utils/fileUtils'
 import { ContextMenu, ContextMenuItem } from '../ContextMenu/ContextMenu'
 import { useDialog } from '../Dialog'
 import type { DropModeDialogResult, ConflictDialogResult } from '../Dialog/types'
@@ -34,7 +40,7 @@ import {
 import { useDragDropTree } from '../../hooks/useDragDropTree'
 import { useClipboardStore } from '../../stores/useClipboardStore'
 import { formatFileOperationError } from '../../utils/errorUtils'
-import { DRAG_DROP, AUTO_SCROLL, AUTO_EXPAND } from './constants'
+import { DRAG_DROP, AUTO_EXPAND } from './constants'
 import { withWatcherPause } from './withWatcherPause'
 import { logger } from '../../utils/logger'
 import { getLastSeenProjectGeneration } from '../../services/projectGeneration'
@@ -60,8 +66,10 @@ import type { ConflictResolution } from '../../../../shared/ipc/external-file-sc
 import { IMPORT } from '../../../../shared/constants'
 import { isTreeClipboardKeystroke, treeClipboardAction } from './treeClipboardScope'
 import { isMacOS } from '../../utils/platform'
-import { useTreeFocusRecovery } from './useTreeFocusRecovery'
+import { useTreeFocusRecovery, findTreeFocusFallback } from './useTreeFocusRecovery'
 import { fileGateway } from '../../services/fileGateway'
+import { moveExternalBatch, type PendingExternalMove } from './externalMoveBatch'
+import { refuseOversizedDrop } from './externalDropLimit'
 
 interface ProjectTreeProps {
   onFileSelect: (filePath: string) => void
@@ -119,6 +127,28 @@ const treeCollisionDetection: CollisionDetection = (args) => {
  */
 function seedExpansion(path: string | null): Set<string> {
   return path ? new Set([path]) : new Set()
+}
+
+/** Rows rendered above and below the viewport, so a fast scroll does not show blanks. */
+const TREE_OVERSCAN = 10
+
+/** Type-ahead forgets what was typed after this long without a key (APG tree view). */
+const TYPE_AHEAD_RESET_MS = 500
+
+/** dnd-kit's screen-reader markup goes to the body, outside role="tree". */
+const TREE_DND_ACCESSIBILITY = { container: typeof document !== 'undefined' ? document.body : undefined }
+
+/** The mounted row element for `path`, if it is in range (paths compared as data, not as a selector). */
+function findMountedRow(container: HTMLElement, path: string): HTMLElement | null {
+  for (const row of container.querySelectorAll<HTMLElement>('.project-tree-item[data-path]')) {
+    if (row.dataset.path === path) return row
+  }
+  return null
+}
+
+/** The focusable tree row a keyboard or focus event came from, if any. */
+function rowFromEventTarget(target: EventTarget | null): HTMLElement | null {
+  return target instanceof HTMLElement && target.matches('.project-tree-item[data-path]') ? target : null
 }
 
 export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilterModeChange }: ProjectTreeProps) {
@@ -205,10 +235,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
   const [activeId, setActiveId] = useState<string | null>(null)
   const [overId, setOverId] = useState<string | null>(null)
   const autoExpandTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const autoScrollIntervalRef = useRef<number | null>(null)
   const treeContainerRef = useRef<HTMLDivElement | null>(null)
-  // A rename or delete removes the focused row; keep focus in the tree.
-  useTreeFocusRecovery(treeContainerRef)
   const lastMousePositionRef = useRef<{ x: number; y: number } | null>(null)
 
   // Drag-drop hooks.
@@ -305,7 +332,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
       })
       // Close project via API (hook will update state via onProjectChanged listener)
       // Send the generation this window last saw: a stale close must not close a newer project
-      fileGateway.closeProject(getLastSeenProjectGeneration()).catch(err => {
+      fileGateway.closeProject({ expectedGeneration: getLastSeenProjectGeneration() }).catch(err => {
         logger.error('Error closing deleted project', err instanceof Error ? err : undefined)
       })
       setExpandedFolders(new Set())
@@ -381,7 +408,8 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     }
   }, [projectPath, filteredFiles])
 
-  const handleToggleFolder = (folderPath: string) => {
+  // Stable identity (setter-only), so the memoised rows are not re-rendered by it.
+  const handleToggleFolder = useCallback((folderPath: string) => {
     setExpandedFolders((prev) => {
       const newSet = new Set(prev)
       if (newSet.has(folderPath)) {
@@ -391,17 +419,162 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
       }
       return newSet
     })
-  }
+  }, [])
 
-
-  // Context menu handlers
-  const handleContextMenu = (e: React.MouseEvent, node: FileNode) => {
-    setContextMenu({
-      x: e.clientX,
-      y: e.clientY,
-      node
+  /** Open or close one folder, leaving the set untouched when it is already in that state. */
+  const setFolderExpanded = useCallback((folderPath: string, expand: boolean) => {
+    setExpandedFolders((prev) => {
+      if (prev.has(folderPath) === expand) return prev
+      const newSet = new Set(prev)
+      if (expand) newSet.add(folderPath)
+      else newSet.delete(folderPath)
+      return newSet
     })
+  }, [])
+
+  // Context menu handlers (stable identity: refs and the setter only).
+  // The last pointer press on the tree, and the last menu the keyboard opened
+  // – together they tell a right-click from a key-made native event
+  // (contextMenuOrigin.ts).
+  const lastPointerPressRef = useRef<PointerPress | null>(null)
+  const keyboardMenuRef = useRef<{ path: string; at: number } | null>(null)
+  const handleTreePointerDownCapture = useCallback((e: React.PointerEvent) => {
+    lastPointerPressRef.current = { x: e.clientX, y: e.clientY, at: performance.now() }
+  }, [])
+  const handleContextMenu = useCallback((e: React.MouseEvent, node: FileNode) => {
+    const now = performance.now()
+    const pointerType = (e.nativeEvent as Partial<PointerEvent>).pointerType
+    if (!isKeyboardContextMenu({ clientX: e.clientX, clientY: e.clientY, pointerType }, lastPointerPressRef.current, now)) {
+      setContextMenu({ x: e.clientX, y: e.clientY, node })
+      return
+    }
+    // Keyboard-made (Windows turns the Menu key into a native event at the
+    // row's centre). If keydown already opened this row's menu, this is its
+    // echo: keep the one menu where it is.
+    const opened = keyboardMenuRef.current
+    keyboardMenuRef.current = null
+    if (opened !== null && opened.path === node.path && now - opened.at <= KEYBOARD_MENU_ECHO_MS) return
+    setContextMenu({ ...rowMenuAnchor(e.currentTarget), node })
+  }, [])
+
+  // ---------------------------------------------------------------------------
+  // Visible rows, virtualisation and keyboard (#87, review finding [33])
+  // ---------------------------------------------------------------------------
+
+  // The expanded part of the tree as a flat list: what the virtualiser renders
+  // and what the arrow keys walk. Rebuilt only when the tree or the expansion
+  // changes – never on a selection, focus or drag-hover change.
+  const { rows: visibleRows, indexByPath } = useMemo(
+    () => buildVisibleRows(rootFolderNode, expandedFolders),
+    [rootFolderNode, expandedFolders]
+  )
+
+  // The row that holds the tree's one Tab stop (roving tabindex). Follows DOM
+  // focus (`handleTreeFocus`); falls back to the selection, then to the first
+  // row, when that row is no longer visible (collapsed away, deleted).
+  const [focusedPath, setFocusedPath] = useState<string | null>(null)
+  const tabStopIndex = useMemo(() => {
+    if (focusedPath !== null && indexByPath.has(focusedPath)) return indexByPath.get(focusedPath)!
+    if (selectedFolder !== null && indexByPath.has(selectedFolder)) return indexByPath.get(selectedFolder)!
+    return visibleRows.length > 0 ? 0 : -1
+  }, [focusedPath, selectedFolder, indexByPath, visibleRows.length])
+  const dragIndex = activeId !== null ? indexByPath.get(activeId) ?? -1 : -1
+
+  // Always render the Tab-stop row and the row being dragged, even when they
+  // are scrolled out of view. If the focused row unmounted on a wheel scroll,
+  // focus would fall to <body> (and focus recovery would yank the scroll
+  // back); if the dragged row unmounted, dnd-kit would lose its active node.
+  const rangeExtractor = useCallback((range: Range) => {
+    const indexes = defaultRangeExtractor(range)
+    for (const pinned of [tabStopIndex, dragIndex]) {
+      if (pinned >= 0 && pinned < range.count && !indexes.includes(pinned)) indexes.push(pinned)
+    }
+    return indexes.sort((a, b) => a - b)
+  }, [tabStopIndex, dragIndex])
+
+  // The scroll container is padded; the list starts that far into it.
+  const [listOffset, setListOffset] = useState(0)
+  useLayoutEffect(() => {
+    const container = treeContainerRef.current
+    if (!container) return
+    const padding = parseFloat(getComputedStyle(container).paddingTop)
+    setListOffset(Number.isFinite(padding) ? padding : 0)
+  }, [rootFolderNode])
+
+  // The rule warns that React Compiler skips this component; the app does not
+  // build with the compiler, and the virtualizer is only read during render.
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const virtualizer = useVirtualizer({
+    count: visibleRows.length,
+    getScrollElement: () => treeContainerRef.current,
+    estimateSize: () => TREE_ROW_HEIGHT,
+    getItemKey: (index) => visibleRows[index].node.path,
+    overscan: TREE_OVERSCAN,
+    scrollMargin: listOffset,
+    rangeExtractor
+  })
+
+  // A keyboard move to a row that is not mounted yet parks its path here; the
+  // layout effect below focuses it once the row renders. Only then: a row that
+  // is already mounted is focused at once, so nothing is left parked to fire
+  // on some later, unrelated render.
+  const pendingFocusRef = useRef<string | null>(null)
+  useLayoutEffect(() => {
+    const path = pendingFocusRef.current
+    const container = treeContainerRef.current
+    if (path === null || !container) return
+    // Never pull focus back from outside: a pending move only completes while
+    // the keyboard is still in the tree (or focus fell to <body>, which is
+    // where a removed row leaves it).
+    const active = document.activeElement
+    if (active !== null && active !== document.body && !container.contains(active)) {
+      pendingFocusRef.current = null
+      return
+    }
+    const row = findMountedRow(container, path)
+    if (row) {
+      pendingFocusRef.current = null
+      row.focus({ preventScroll: true })
+    }
+  })
+
+  const moveFocusTo = useCallback((index: number) => {
+    const row = visibleRows[index]
+    const container = treeContainerRef.current
+    if (!row || !container) return
+    virtualizer.scrollToIndex(index, { align: 'auto' })
+    setFocusedPath(row.node.path)
+    const mounted = findMountedRow(container, row.node.path)
+    if (mounted) {
+      pendingFocusRef.current = null
+      mounted.focus({ preventScroll: true })
+    } else {
+      pendingFocusRef.current = row.node.path
+    }
+  }, [visibleRows, virtualizer])
+
+  // Focus leaving the tree cancels a parked move (see the layout effect).
+  const handleTreeBlur = (e: React.FocusEvent<HTMLDivElement>) => {
+    const next = e.relatedTarget
+    if (next instanceof Node && e.currentTarget.contains(next)) return
+    pendingFocusRef.current = null
   }
+
+  // A rename or delete removes the focused row; focus goes to the nearest row
+  // that still exists in the DATA – the same path, else the nearest ancestor
+  // folder, else the first row – even if that row is scrolled out of range.
+  const focusFallbackRef = useRef<(lostPath: string) => void>(() => {})
+  focusFallbackRef.current = (lostPath: string) => {
+    const index = findTreeFocusFallback(lostPath, indexByPath)
+    if (index !== null) moveFocusTo(index)
+  }
+  useTreeFocusRecovery(treeContainerRef, focusFallbackRef)
+
+  // Type-ahead buffer: characters typed in quick succession form one query.
+  const typeAheadRef = useRef<{ query: string; timer: ReturnType<typeof setTimeout> | null }>({ query: '', timer: null })
+  useEffect(() => () => {
+    if (typeAheadRef.current.timer) clearTimeout(typeAheadRef.current.timer)
+  }, [])
 
   const handleCloseContextMenu = () => {
     setContextMenu(null)
@@ -409,25 +582,10 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
 
   // Remaining handlers now provided by useFileOperations hook
 
-  // Auto-scroll logic
-  const startAutoScroll = (direction: 'up' | 'down') => {
-    if (autoScrollIntervalRef.current) return // Already scrolling
-
-    const container = treeContainerRef.current
-    if (!container) return
-
-    autoScrollIntervalRef.current = window.setInterval(() => {
-      const scrollAmount = direction === 'up' ? -AUTO_SCROLL.SCROLL_AMOUNT : AUTO_SCROLL.SCROLL_AMOUNT
-      container.scrollTop += scrollAmount
-    }, AUTO_SCROLL.SCROLL_INTERVAL) // ~60fps
-  }
-
-  const stopAutoScroll = () => {
-    if (autoScrollIntervalRef.current) {
-      window.clearInterval(autoScrollIntervalRef.current)
-      autoScrollIntervalRef.current = null
-    }
-  }
+  // Auto-scroll while dragging near the tree's top or bottom edge is dnd-kit's
+  // own (`DndContext` autoScroll, on by default), driven by the live pointer.
+  // The tree's former interval read `activatorEvent.clientY` – the pointer
+  // position when the drag STARTED – so it scrolled on a stale position.
 
   // Auto-expand logic
   const startAutoExpandTimer = (folderId: string) => {
@@ -478,28 +636,6 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
   const handleDragOver = (event: DragOverEvent) => {
     const newOverId = event.over?.id as string | null
 
-    // Handle auto-scroll based on pointer position
-    if (treeContainerRef.current && event.activatorEvent) {
-      const container = treeContainerRef.current
-      const rect = container.getBoundingClientRect()
-
-      // Type guard for mouse/pointer events
-      const pointerY = ('clientY' in event.activatorEvent && typeof event.activatorEvent.clientY === 'number')
-        ? event.activatorEvent.clientY
-        : 0
-
-      const distanceFromTop = pointerY - rect.top
-      const distanceFromBottom = rect.bottom - pointerY
-
-      if (distanceFromTop < AUTO_SCROLL.TRIGGER_DISTANCE_TOP && distanceFromTop > 0) {
-        startAutoScroll('up')
-      } else if (distanceFromBottom < AUTO_SCROLL.TRIGGER_DISTANCE_BOTTOM && distanceFromBottom > 0) {
-        startAutoScroll('down')
-      } else {
-        stopAutoScroll()
-      }
-    }
-
     // Handle auto-expand
     if (newOverId && newOverId !== overId) {
       // Moved to a new target
@@ -519,7 +655,6 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     const { active, over } = event
 
     // Cleanup timers and state
-    stopAutoScroll()
     cancelAutoExpandTimer()
 
     setActiveId(null)
@@ -641,10 +776,17 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
       return
     }
 
+    // Dropped next to itself (on a sibling, or on its own folder): nothing to
+    // move, so end quietly instead of asking main to move it onto itself.
+    if (isSameFolderMove(sourcePath, targetParent)) {
+      logger.info('Drag ended in the item\'s own folder - nothing to move')
+      return
+    }
+
     try {
       const result = await withWatcherPause(projectPath, isInternalOperation, setFileOperationLoading, async () => {
         // Execute move
-        const moveResult = await fileGateway.moveItem(sourcePath, targetParent)
+        const moveResult = await fileGateway.moveItem({ sourcePath, targetParentPath: targetParent })
         logger.info('Move completed', { path: moveResult.path })
 
         // Refresh tree
@@ -761,7 +903,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     const sourceItemType = clipboard.itemType
     if (sourceItemName && clipboard.operation === 'cut') {
       try {
-        const hasConflict = await fileGateway.checkConflict(targetPath, sourceItemName)
+        const hasConflict = await fileGateway.checkConflict({ targetParentPath: targetPath, itemName: sourceItemName })
 
         if (hasConflict) {
           // Show replace confirmation dialog
@@ -854,6 +996,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
    * Execute external file drop operation (Spec #012)
    *
    * Handles the complete workflow for dropped external files:
+   * 0. Refuse a drop over the file limit ("Too many files"), before any question
    * 1. Show drop mode dialog (move/copy/import)
    * 2. Validate each file
    * 3. Check for conflicts and prompt resolution
@@ -874,6 +1017,9 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
       fileCount: droppedFiles.length,
       targetFolder
     })
+
+    // A drop too large to add is refused before the user is asked how to add it
+    if (refuseOversizedDrop(droppedFiles.length)) return
 
     // Check if any files are importable (to conditionally show Import option)
     // Note: isSupported expects a filename/path, not just the extension
@@ -918,14 +1064,16 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
       return
     }
 
-    // Step 3: Process move/copy for each file
+    // Step 3: Validate each file and settle its name conflict. Copies run as they go;
+    // moves are collected and sent together (below), so the user is asked once
     let successCount = 0
     let failCount = 0
+    const pendingMoves: PendingExternalMove[] = []
 
     for (const file of droppedFiles) {
       try {
         // Validate file still exists and is valid
-        const validation = await fileGateway.validateExternal(file.path, projectPath)
+        const validation = await fileGateway.validateExternal({ sourcePath: file.path })
 
         if (!validation.valid) {
           logger.warn('External file validation failed', {
@@ -945,7 +1093,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
         // Note (M4): Using forward slash works cross-platform in Electron/Node.
         // Actual file operations use backend APIs that handle path joining correctly.
         const targetPath = `${targetFolder}/${file.name}`
-        const hasConflict = await fileGateway.checkConflict(targetFolder, file.name)
+        const hasConflict = await fileGateway.checkConflict({ targetParentPath: targetFolder, itemName: file.name })
 
         let conflictResolution: ConflictResolution | undefined
 
@@ -967,41 +1115,13 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
 
         // Execute the operation
         if (mode === 'move') {
-          const result = await fileGateway.moveFromExternal(
-            file.path,
-            targetFolder,
-            projectPath,
-            conflictResolution
-          )
-
-          if (result.success) {
-            successCount++
-            if (result.isSymlink) {
-              showGlobalToast({
-                title: 'Symlink moved',
-                message: 'Warning: You moved a symbolic link. The target file remains at its original location.',
-                type: 'warning'
-              })
-            }
-          } else if (result.errorCode === 'EXTERNAL_FILE_MOVE_CANCELLED') {
-            // The user answered Cancel in the confirmation box: not an error
-            logger.info('User cancelled moving file', { fileName: file.name })
-          } else {
-            logger.warn('Move failed', { path: file.path, error: result.error })
-            showGlobalToast({
-              title: 'Move failed',
-              message: result.error || `Failed to move "${file.name}"`,
-              type: 'error'
-            })
-            failCount++
-          }
+          pendingMoves.push({ file, conflictResolution })
         } else if (mode === 'copy') {
-          const result = await fileGateway.copyFromExternal(
-            file.path,
+          const result = await fileGateway.copyFromExternal({
+            sourcePath: file.path,
             targetFolder,
-            projectPath,
             conflictResolution
-          )
+          })
 
           if (result.success) {
             successCount++
@@ -1035,7 +1155,14 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
       }
     }
 
-    // Step 3: Refresh tree and show summary
+    // Step 3b: One request for all the moves: main shows ONE confirmation box
+    if (pendingMoves.length > 0) {
+      const outcome = await moveExternalBatch(fileGateway, pendingMoves, targetFolder)
+      successCount += outcome.successCount
+      failCount += outcome.failCount
+    }
+
+    // Step 3c: Refresh tree and show summary
     await refreshProjectTree()
     refreshGitStatus()
 
@@ -1147,7 +1274,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     const droppedFiles: ExternalDropFile[] = await Promise.all(
       result.paths.map(async (filePath) => {
         try {
-          const stats = await fileGateway.getStats(filePath)
+          const stats = await fileGateway.getStats({ filePath })
           return {
             path: filePath,
             name: getBasename(filePath) || 'unknown',
@@ -1289,6 +1416,84 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     }))
   }
 
+  // `handleFileClick` reads the current tree and selection, so it changes on
+  // every render. The rows get a stable wrapper instead; it always calls the
+  // latest version, and the memoised rows are not re-rendered by it.
+  const handleFileClickRef = useRef(handleFileClick)
+  handleFileClickRef.current = handleFileClick
+  const handleRowClick = useCallback((filePath: string) => handleFileClickRef.current(filePath), [])
+
+  /** Roving tabindex: the row that takes DOM focus becomes the Tab stop. */
+  const handleTreeFocus = (e: React.FocusEvent<HTMLDivElement>) => {
+    const row = rowFromEventTarget(e.target)
+    const path = row?.dataset.path
+    if (path !== undefined && path !== focusedPath) setFocusedPath(path)
+  }
+
+  /**
+   * The tree's keyboard contract (WAI-ARIA APG tree view, decided by
+   * design/system/components/row/index.html); the key → action mapping lives
+   * in `treeKeyboard.ts`. Keys only count when a row has focus, so nothing
+   * here reaches a keystroke meant for a dialog or input elsewhere.
+   */
+  const handleTreeKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const row = rowFromEventTarget(e.target)
+    const index = row?.dataset.path !== undefined ? indexByPath.get(row.dataset.path) : undefined
+    if (row === null || index === undefined) return
+
+    const action = resolveTreeKey(visibleRows, index, e)
+    if (action === null) {
+      if (!isTypeAheadKey(e)) return
+      const buffer = typeAheadRef.current
+      if (buffer.timer) clearTimeout(buffer.timer)
+      buffer.query += e.key
+      buffer.timer = setTimeout(() => { buffer.query = ''; buffer.timer = null }, TYPE_AHEAD_RESET_MS)
+      const match = findTypeAheadMatch(visibleRows, index, buffer.query)
+      if (match !== null) {
+        e.preventDefault()
+        moveFocusTo(match)
+      }
+      return
+    }
+
+    e.preventDefault()
+    const { node } = visibleRows[index]
+    switch (action.type) {
+      case 'focus':
+        moveFocusTo(action.index)
+        break
+      case 'expand':
+        setFolderExpanded(action.path, true)
+        break
+      case 'collapse':
+        setFolderExpanded(action.path, false)
+        break
+      case 'activate':
+        // Exactly what a click does: a folder toggles and becomes the paste
+        // target, a file opens.
+        if (node.type === 'directory') handleToggleFolder(node.path)
+        handleFileClick(node.path)
+        break
+      case 'menu': {
+        // Shift+F10 / the Menu key: open the menu under the row, not at a
+        // pointer position the keyboard user never set. Handled here on every
+        // platform; a native `contextmenu` that Windows sends after it is
+        // recognised as its echo in handleContextMenu, so there is one menu.
+        keyboardMenuRef.current = { path: node.path, at: performance.now() }
+        setContextMenu({ ...rowMenuAnchor(row), node })
+        break
+      }
+    }
+  }
+
+  const virtualItems = virtualizer.getVirtualItems()
+  // Drop feedback for the folder a drag will land in (see dropTarget.ts).
+  const internalDropFolder = useMemo(
+    () => resolveInternalDropFolder(visibleRows, indexByPath, activeId, overId),
+    [activeId, overId, indexByPath, visibleRows]
+  )
+  const isCut = clipboard.operation === 'cut'
+
   return (
     <div
       className="project-tree"
@@ -1420,32 +1625,67 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
       </div>
     )}
 
-      <div className="project-tree-content" role="tree" aria-label="Project files" ref={treeContainerRef}>
+      <div
+        className="project-tree-content"
+        role="tree"
+        aria-label="Project files"
+        ref={treeContainerRef}
+        onKeyDown={handleTreeKeyDown}
+        onFocus={handleTreeFocus}
+        onBlur={handleTreeBlur}
+        onPointerDownCapture={handleTreePointerDownCapture}
+      >
         <DndContext
           sensors={sensors}
           collisionDetection={treeCollisionDetection}
           onDragStart={handleDragStart}
           onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
+          // dnd-kit renders its live region and instructions next to the
+          // rows; inside role="tree" they would be children a tree may not
+          // own (only treeitem and group). Render them at the body instead.
+          accessibility={TREE_DND_ACCESSIBILITY}
         >
           {rootFolderNode ? (
-            <ProjectTreeNode
-              key={rootFolderNode.path}
-              node={rootFolderNode}
-              level={0}
-              onFileClick={handleFileClick}
-              onContextMenu={handleContextMenu}
-              selectedFolder={selectedFolder}
-              expandedFolders={expandedFolders}
-              onToggleFolder={handleToggleFolder}
-              isDragging={activeId === rootFolderNode.path}
-              isDropTarget={overId === rootFolderNode.path}
-              clipboardCut={clipboard.itemPath === rootFolderNode.path && clipboard.operation === 'cut'}
-              getFileStatus={getFileStatus}
-              getFolderStatus={getFolderStatus}
-              isExternalDragActive={isExternalDragActive}
-              externalDropTarget={externalDropTarget}
-            />
+            // Only the rows in (and just around) the viewport are mounted; the
+            // sizer gives the scroll container the height of the whole list.
+            <div className="project-tree-rows" style={{ height: virtualizer.getTotalSize() }}>
+              {virtualItems.map((item) => {
+                const row = visibleRows[item.index]
+                const { node } = row
+                const dropZone =
+                  internalDropFolder !== null && isStrictDescendant(internalDropFolder, node.path)
+                    ? 'internal'
+                    : externalDropTarget !== null && isStrictDescendant(externalDropTarget, node.path)
+                      ? 'external'
+                      : null
+                return (
+                  <ProjectTreeNode
+                    key={item.key}
+                    node={node}
+                    level={row.level}
+                    posInSet={row.posInSet}
+                    setSize={row.setSize}
+                    parentPath={row.parentPath}
+                    top={item.start - listOffset}
+                    isExpanded={row.isExpanded}
+                    // "Selected" = the paste-target folder; see the prop's doc.
+                    isSelected={node.path === selectedFolder}
+                    isTabStop={item.index === tabStopIndex}
+                    onFileClick={handleRowClick}
+                    onContextMenu={handleContextMenu}
+                    onToggleFolder={handleToggleFolder}
+                    isDragging={activeId === node.path}
+                    isDropTarget={internalDropFolder === node.path}
+                    clipboardCut={isCut && clipboard.itemPath === node.path}
+                    inDropZone={dropZone}
+                    gitStatus={node.type === 'file' ? getFileStatus(node.path) : getFolderStatus(node.path)}
+                    isExternalDragActive={isExternalDragActive}
+                    isExternalDropTarget={externalDropTarget === node.path}
+                  />
+                )
+              })}
+            </div>
           ) : (
             <div className="project-tree-empty" data-testid={TEST_IDS.PROJECT_TREE_EMPTY}>
               {projectPath ? (filterMode === 'markdown' ? 'No markdown files found' : 'No files found') : 'Open a project to get started'}

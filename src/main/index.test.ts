@@ -251,14 +251,13 @@ describe('Main Process - Window Creation', () => {
       registerDocumentImportHandlers: vi.fn()
     }))
     vi.doMock('./services/import', () => ({
-      DependencyDetector: vi.fn().mockImplementation(() => ({
-        detect: vi.fn().mockResolvedValue({ libreOffice: false, imageMagick: false })
-      })),
-      converterRegistry: {
-        updateConverterExtensions: vi.fn(),
-        getExtensionsByConversionType: vi.fn().mockReturnValue({ requiresConversion: ['pdf'], passthrough: [] })
-      },
-      getExtensionsForDependencies: vi.fn().mockReturnValue([])
+      importToolStatusService: {
+        getStatus: vi.fn().mockResolvedValue({
+          libreOffice: 'missing',
+          extensions: ['pdf'],
+          throttled: false
+        })
+      }
     }))
     vi.doMock('../shared/ipc/import-channels', () => ({
       IMPORT_CHANNELS: {

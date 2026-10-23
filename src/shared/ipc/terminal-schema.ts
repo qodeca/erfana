@@ -66,6 +66,29 @@ export const TerminalResizeRequestSchema = z.object({
 })
 export type TerminalResizeRequest = z.infer<typeof TerminalResizeRequestSchema>
 
+/**
+ * How much parsed output the renderer collects before it acknowledges it
+ * (32 KiB). Kept below the main process's low watermark, so output that was
+ * parsed but not yet reported can never keep a PTY paused.
+ */
+export const TERMINAL_OUTPUT_ACK_STEP_CHARS = 32 * 1024
+
+/** Largest single acknowledgement accepted (16 Mi characters). */
+export const TERMINAL_OUTPUT_ACK_MAX_CHARS = 16 * 1024 * 1024
+
+/**
+ * `terminal:ackOutput`: the renderer has parsed `chars` more characters of the
+ * terminal's output (UTF-16 code units, as `string.length` counts them, like the main process counts
+ * what it sent). Strict, and ignored unless it comes from the owning window.
+ */
+export const TerminalOutputAckRequestSchema = z
+  .object({
+    terminalId: TerminalIdSchema,
+    chars: z.number().int().min(1).max(TERMINAL_OUTPUT_ACK_MAX_CHARS)
+  })
+  .strict()
+export type TerminalOutputAckRequest = z.infer<typeof TerminalOutputAckRequestSchema>
+
 /** `{ terminalId }`, as `terminal:clearComplete` sends it. */
 export const TerminalIdRequestSchema = z.object({ terminalId: TerminalIdSchema })
 export type TerminalIdRequest = z.infer<typeof TerminalIdRequestSchema>
@@ -158,4 +181,6 @@ export interface TerminalBridge {
   onClear(callback: (data: TerminalIdRequest) => void): () => void
   /** Confirm that a clear was processed. */
   markClearComplete(terminalId: string): void
+  /** Fire-and-forget: report that xterm has parsed `chars` more characters of output. */
+  ackOutput(terminalId: string, chars: number): void
 }

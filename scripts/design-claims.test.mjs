@@ -25,7 +25,14 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-import { contrastRatio, evaluate, walk } from './lib/design-claims.mjs'
+import {
+  collectCustomProperties,
+  contrastRatio,
+  evaluate,
+  resolveVar,
+  stripCssComments,
+  walk
+} from './lib/design-claims.mjs'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -241,6 +248,62 @@ describe('design claims ledger', () => {
       expect(copies).toEqual(['design/tokens.css'])
     })
   })
+})
+
+describe('a card does not render the contrast failure it warns about', () => {
+  /*
+   * THE BUG THIS EXISTS FOR (#114). The html-waiting card drew its aside in
+   * --color-text-muted at --text-xs on the pre-paint backdrop: 3.63:1, under the
+   * 4.5:1 small text needs (WCAG 1.4.3). Every gate was green, because the ratio
+   * was never a claim – and a card is the reference the app copies. So every text
+   * rule of Surface A is read from the card's own <style> and measured against
+   * the backdrop it sits on.
+   */
+  const CARD = readFileSync(path.join(DESIGN, 'product/html-waiting/index.html'), 'utf8')
+  const STYLE = stripCssComments(CARD.slice(CARD.indexOf('<style>'), CARD.indexOf('</style>')))
+  const TOKENS = collectCustomProperties(
+    readFileSync(path.join(ROOT, 'src/renderer/src/styles/design-tokens.css'), 'utf8')
+  )
+  /** The value `property` takes in the card's first rule for exactly `selector`. */
+  const declOf = (selector, property) => {
+    for (const [, sel, body] of STYLE.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      if (sel.trim() !== selector) continue
+      return new RegExp(`(?:^|;)\\s*${property}:\\s*([^;]+)`).exec(body)?.[1].trim()
+    }
+    return undefined
+  }
+
+  it('paints the waiting message on the brand-black backdrop', () => {
+    // The surface the ratios below are measured against. If this moves, so do they.
+    expect(declOf('.panel__body--backdrop', 'background')).toBe('var(--color-brand-black)')
+  })
+
+  it.each(['.erf-wait__title', '.erf-wait__text', '.erf-wait__aside'])(
+    '%s clears 4.5:1 on that backdrop',
+    selector => {
+      const colour = declOf(selector, 'color')
+      expect(colour, `${selector} must declare a colour`).toBeDefined()
+      const ratio = contrastRatio(
+        resolveVar(colour, TOKENS),
+        resolveVar('var(--color-brand-black)', TOKENS)
+      )
+      expect(ratio, `${selector} is ${ratio}:1`).toBeGreaterThanOrEqual(4.5)
+    }
+  )
+
+  it.each(['.erf-wait__title', '.erf-wait__text', '.erf-wait__aside'])(
+    '%s sets its colour exactly once, so no later rule can override the measured one',
+    selector => {
+      // Innermost brace pairs, so rules nested in @media or @container are seen
+      // as themselves. Any rule whose selector mentions the class counts, not
+      // only an exact match: a `.panel .erf-wait__aside` would win just as well.
+      const name = new RegExp(`${selector.replace('.', '\\.')}(?![\\w-])`)
+      const setters = [...STYLE.matchAll(/([^{}]+)\{([^{}]*)\}/g)].filter(
+        ([, sel, body]) => name.test(sel) && /(?:^|;)\s*color:/.test(body)
+      )
+      expect(setters.map(([, sel]) => sel.trim())).toHaveLength(1)
+    }
+  )
 })
 
 describe('design folder hygiene', () => {

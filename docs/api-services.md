@@ -66,13 +66,16 @@ Returns terminal metadata, or `null` if not found.
 #### `listTerminals(): Array<{ id: string; title: string }>`
 Returns metadata for all live terminals.
 
+#### `ackOutput(terminalId: string, chars: number): void`
+Flow control (`terminal:ackOutput`): the owning window has parsed `chars` more UTF-16 code units of output. On macOS and Linux the PTY is paused above 512 KiB unacknowledged and resumed below 128 KiB; a pause with no ack progress for 5 s is lifted. Windows terminals are batched, never paused. See [performance/terminal-output-batching.md](performance/terminal-output-batching.md).
+
 ---
 
 ### Events
 
 | Event | Payload | When |
 |---|---|---|
-| `'data'` | `{ terminalId: string; data: string }` | PTY output (after marker handshake + clear confirm) |
+| `'data'` | `{ terminalId: string; data: string }` | PTY output (after marker handshake + clear confirm), batched per terminal by `TerminalOutputFlow` (8 ms or 64 KiB) and always sent before that terminal's `'exit'` |
 | `'exit'` | `{ terminalId: string; exitCode: number; signal?: string }` | PTY process exit |
 | `'clearTerminal'` | `{ terminalId: string }` | Bootstrap marker detected; renderer should clear and call `markClearComplete()` |
 | `'error'` | `{ terminalId: string; error: string }` | cwd deny-list rejection (Windows), shell resolution failure, or spawn failure |
@@ -236,7 +239,7 @@ Resume watching after pause. Synchronous. Decrements the pause reference count; 
 `DirectoryWatcherService` is a plain class, not an event emitter: it pushes these channels to the owning window with `webContents.send`. The renderer subscribes through the preload bridge (`window.api.directoryWatch.onDirectoryChanged`, `onProjectDeleted`, `onDirectoryError`).
 
 #### `'directory-watch:changed'`
-**Payload:**
+**Payload** – `DirectoryChangedPayload` in `src/shared/ipc/directory-watch-schema.ts`, the one type the sender, the preload bridge and `IProjectTreeApi` share:
 ```ts
 {
   dirPath: string
@@ -244,11 +247,14 @@ Resume watching after pause. Synchronous. Decrements the pause reference count; 
   originalEventCount: number  // raw events from the backend watcher, after the path filter
   coalescedCount: number      // events removed by the coalescer
   summary: Record<'add' | 'addDir' | 'unlink' | 'unlinkDir' | 'change', number>
-  catchUp?: true              // #210: only on a catch-up refresh (bridge types it `boolean`)
+  structural: boolean         // false only for content edits to entries already shown – the tree is unchanged
+  catchUp?: true              // #210: only on a catch-up refresh (typed `boolean`)
 }
 ```
 
-Emitted when files or folders change anywhere in the watched project tree. Main process throttles via a 75 ms collection window + 200 ms throttle (VS Code pattern); the renderer's `useDirectoryWatcher` adds a 250 ms consumer debounce so multi-file write storms collapse to a single tree re-list.
+Emitted when files or folders change anywhere in the watched project tree. Main process throttles via a 75 ms collection window + 200 ms throttle (VS Code pattern); the renderer's `useDirectoryWatcher` adds a 250 ms consumer debounce, capped at max(1 s, 2 × a tree read) – the read alone, smoothed, and never more than 10 s – from the first event of a burst, so multi-file write storms collapse to a single tree re-list and a steady stream still refreshes – about once a second, less often on a project whose read is slow.
+
+**Structural flag:** `structural` is `true` when the coalesced batch holds an `add`, `addDir`, `unlink` or `unlinkDir`, or the raw batch holds an `addDir` or `unlinkDir` (cascade prevention drops events under a removed folder, and a folder created and removed again coalesces to nothing); when a file was swapped for a symlink or back, even if the coalescer shows that as a `change`; and always on a catch-up or compensating refresh and on the first batch after a buffer overflow, because what was lost cannot be known to be content-only. A save that renames a temp file over an existing one (Erfana's `atomicWrite`, many editors) arrives as an `add`; `DirectoryWatcherService` turns it into a `change` only when the tree on screen shows that entry with the same kind (file or symlink) and the exact same spelling – see `KnownEntries` (`src/main/services/watcher/KnownEntries.ts`). The record is seeded by a successful read of the project root (`beginKnownEntriesRead`, called by the `file:readDirectory` handler) minus every path an event touched while the read ran, is dropped on a folder removal until the next root read, and does not exist above 100,000 entries; every doubt counts as structural. A batch of only content edits is `structural: false`: `useDirectoryWatcher` does not re-read the tree for it, while `useGitStatus` refreshes the badges for every batch, as before. Open editor tabs are reloaded by their own file watchers, not by this channel. Measurement: [docs/performance/watcher-structural-refresh.md](./performance/watcher-structural-refresh.md).
 
 **Event types:** `'add'`, `'addDir'`, `'unlink'`, `'unlinkDir'`, `'change'`. The `'change'` listener was added in #241 — in-place editor saves (Monaco autosave, terminal commands, external editors) now also wake the renderer. `'change'` events whose path is inside `.git/` are suppressed at the source listener (`GitWatcherService` is the canonical publisher for git internals).
 
@@ -326,11 +332,11 @@ Rename a file or folder. The second argument is a **basename**, not a full path 
 
 ### IPC: `file:revealInFileManager`
 
-**Handler:** `src/main/ipc/file-handlers.ts` · **Preload:** `window.api.file.revealInFileManager(filePath)`
+**Handler:** `src/main/ipc/file-handlers.ts` · **Preload:** `window.api.file.revealInFileManager({ filePath })`
 
 Reveals a file or folder in the native OS file manager (Finder/Explorer) by calling Electron `shell.showItemInFolder`. Backs the Project Tree "Reveal in Finder/Explorer" context-menu command (file, folder, and project-root nodes).
 
-- **Arg:** absolute path (the right-clicked tree node's `path`).
+- **Request:** `{ filePath }`, the absolute path (the right-clicked tree node's `path`).
 - **Returns `Promise<string>`:** `''` on success, otherwise a human-readable error message the renderer surfaces as an error toast (`'Item no longer exists on disk'`, `'Cannot reveal items outside the project'`, `'No project is open'`, `'Invalid path'`).
 - **Security:** validates the IPC sender via the shared `isTrustedSender` (`src/main/ipc/senderValidation.ts`, also used by the clipboard handlers) and confines the path to the open project root (the root itself is allowed so the project-root node can be revealed); an untrusted sender is a silent no-op returning `''`. The path is `fs.realpath`-canonicalized before the boundary check, so an in-project symlink cannot escape the project.
 

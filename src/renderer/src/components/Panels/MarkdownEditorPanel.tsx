@@ -68,6 +68,7 @@ import { INDICATOR_DURATION_MS } from '../../constants/fileWatch'
 
 import './MarkdownEditorPanel.css'
 import { fileGateway } from '../../services/fileGateway'
+import { getLastSeenProjectGeneration } from '../../services/projectGeneration'
 
 /**
  * Props passed to the MarkdownEditorPanel via Dockview.
@@ -116,6 +117,8 @@ export function MarkdownEditorPanel(
   // Core State
   // =========================================================================
   const [currentFile, setCurrentFile] = useState<EditorFile | null>(null)
+  // The project session generation the file was loaded under (undefined until a project event was seen)
+  const openedGenerationRef = useRef<number | undefined>(undefined)
   const [viewMode, setViewMode] = useState<ViewMode>('preview')
   const [selectedText, setSelectedText] = useState<string>('')
   const [activePaneId, setActivePaneId] = useState<'editor' | 'preview'>('editor')
@@ -127,6 +130,11 @@ export function MarkdownEditorPanel(
    * acting on keystrokes aimed at the foreground tab.
    */
   const [isActivePanel, setIsActivePanel] = useState<boolean>(() => props.api.isActive)
+  /**
+   * Whether dockview is drawing this panel. A hidden preview holds its link
+   * re-checks until it is shown again (see `linkTargetCache`).
+   */
+  const [isPanelVisible, setIsPanelVisible] = useState<boolean>(() => props.api?.isVisible ?? true)
 
   // =========================================================================
   // Refs
@@ -271,10 +279,22 @@ export function MarkdownEditorPanel(
       // the banner's "Save to restore it", so only it may recreate the folder
       // the file lived in. An autosave or a save by id never does: it would
       // silently resurrect a folder someone just renamed.
+      // The write names the project the file was opened under: after a project
+      // switch the main process refuses it, so a stale tab never lands in the next project.
+      const generation = openedGenerationRef.current
       if (shouldRecreateParentDirs(trigger, isFileDeleted)) {
-        await fileGateway.writeFile(currentFile.path, contentToSave, { createParentDirs: true })
+        await fileGateway.writeFile({
+          filePath: currentFile.path,
+          content: contentToSave,
+          createParentDirs: true,
+          generation
+        })
       } else {
-        await fileGateway.writeFile(currentFile.path, contentToSave)
+        await fileGateway.writeFile({
+          filePath: currentFile.path,
+          content: contentToSave,
+          generation
+        })
       }
       lastSaveErrorRef.current = null
 
@@ -443,6 +463,14 @@ export function MarkdownEditorPanel(
     return () => disposable.dispose()
   }, [props.api])
 
+  useEffect(() => {
+    const api = props.api
+    if (!api?.onDidVisibilityChange) return
+    setIsPanelVisible(api.isVisible ?? true)
+    const disposable = api.onDidVisibilityChange((event) => setIsPanelVisible(event.isVisible))
+    return () => disposable.dispose()
+  }, [props.api])
+
   useKeyboardShortcuts({
     onSave: () => handleSave('user'),
     onClose: () => props.api.close(),
@@ -481,7 +509,10 @@ export function MarkdownEditorPanel(
     logger.info('Loading file', { filePath })
     setIsEditorReady(false) // Reset editor ready state when loading new file
     try {
-      const content = await fileGateway.readFile(filePath)
+      // The project this file is opened under; saves name it
+      const generation = getLastSeenProjectGeneration()
+      const content = await fileGateway.readFile({ filePath })
+      openedGenerationRef.current = generation
       logger.info('File loaded successfully', {
         filePath,
         contentLength: content.length,
@@ -672,6 +703,7 @@ export function MarkdownEditorPanel(
             onOpenFile={handleOpenFile}
             onPreviewRendered={handlePreviewRendered}
             onSelectionChange={setSelectedText}
+            isVisible={isPanelVisible}
           />
         </EditorErrorBoundary>
       ) : (

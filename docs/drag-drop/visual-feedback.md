@@ -36,17 +36,19 @@
 }
 ```
 
-**Children area highlight** (expanded folders):
+**Children area highlight** (expanded folders). The tree is a flat, virtualised list (#87, review
+finding [33]), so there is no children container to tint: `ProjectTree` resolves the folder a drag
+will land in – the hovered folder, or the hovered file's folder – marks that folder's row as the drop
+target, and gives every visible row inside it `data-in-drop-zone="internal"` (`"external"` for a drag
+from the OS, drawn with a dashed edge):
 ```css
-/* ProjectTree.css – "Highlight the children area for expanded folders" */
-.project-tree-node[data-drop-highlight="true"] > .project-tree-children {
-  position: relative;
+/* ProjectTree.css – "Highlight the rows inside the target folder" */
+.project-tree-node[data-in-drop-zone="internal"] {
   background-color: var(--color-accent-drag-bg-subtle);
-  border-radius: var(--border-radius);
 }
 
 /* Visual left border using pseudo-element (no layout shift) */
-.project-tree-node[data-drop-highlight="true"] > .project-tree-children::before {
+.project-tree-node[data-in-drop-zone="internal"]::before {
   content: '';
   position: absolute;
   left: 0;

@@ -22,6 +22,10 @@ import { ProjectTree } from './ProjectTree'
 import { DialogProvider } from '../Dialog'
 import { ProjectManagementProvider } from '../../context/ProjectManagementContext'
 import type { FileNode } from '../../../../preload/index'
+import { installTreeViewport } from '../../test-utils/treeViewport'
+
+// The tree is virtualised; give it a viewport so every fixture row is mounted.
+installTreeViewport()
 
 declare global {
   interface Window {
@@ -61,7 +65,7 @@ const projCFiles: FileNode[] = [
 function setupMockApi(
   getStatusOverride?: ReturnType<typeof vi.fn>
 ) {
-  const readDirectory = vi.fn(async (path: string) => {
+  const readDirectory = vi.fn(async ({ dirPath: path }: { dirPath: string }) => {
     if (path === '/projA') return projAFiles
     if (path === '/projB') return projBFiles
     if (path === '/projC') return projCFiles
@@ -169,7 +173,7 @@ describe('ProjectTree project switching (AC-009)', () => {
 
       // Wait for project B to load
       await waitFor(() => {
-        expect(readDirectory).toHaveBeenCalledWith('/projB')
+        expect(readDirectory).toHaveBeenCalledWith({ dirPath: '/projB' })
       })
     })
 
@@ -237,7 +241,7 @@ describe('ProjectTree project switching (AC-009)', () => {
       })
 
       await waitFor(() => {
-        expect(readDirectory).toHaveBeenCalledWith('/projA')
+        expect(readDirectory).toHaveBeenCalledWith({ dirPath: '/projA' })
       })
 
       readDirectory.mockClear()
@@ -249,7 +253,7 @@ describe('ProjectTree project switching (AC-009)', () => {
 
       // Should call readDirectory for new project
       await waitFor(() => {
-        expect(readDirectory).toHaveBeenCalledWith('/projB')
+        expect(readDirectory).toHaveBeenCalledWith({ dirPath: '/projB' })
       })
     })
 
@@ -299,7 +303,7 @@ describe('ProjectTree project switching (AC-009)', () => {
       })
 
       await waitFor(() => {
-        expect(readDirectory).toHaveBeenCalledWith('/projA')
+        expect(readDirectory).toHaveBeenCalledWith({ dirPath: '/projA' })
       })
 
       // The watcher starts once the first read has been applied (#211, D12)
@@ -313,7 +317,7 @@ describe('ProjectTree project switching (AC-009)', () => {
       })
 
       await waitFor(() => {
-        expect(readDirectory).toHaveBeenCalledWith('/projB')
+        expect(readDirectory).toHaveBeenCalledWith({ dirPath: '/projB' })
       })
 
       // Watcher should be stopped for old project A (cleanup in useDirectoryWatcher effect)
@@ -352,7 +356,7 @@ describe('ProjectTree project switching (AC-009)', () => {
       })
 
       await waitFor(() => {
-        expect(readDirectory).toHaveBeenCalledWith('/projA')
+        expect(readDirectory).toHaveBeenCalledWith({ dirPath: '/projA' })
       })
 
       // Directory watcher should be subscribed
@@ -365,7 +369,7 @@ describe('ProjectTree project switching (AC-009)', () => {
       })
 
       await waitFor(() => {
-        expect(readDirectory).toHaveBeenCalledWith('/projB')
+        expect(readDirectory).toHaveBeenCalledWith({ dirPath: '/projB' })
       })
 
       // Unsubscribe should have been called during cleanup (old watcher removed)
@@ -581,8 +585,8 @@ describe('Edge cases', () => {
 
     // Verify readDirectory was called for all three projects
     // (useProjectManagement calls readDirectory for each project change)
-    expect(readDirectory).toHaveBeenCalledWith('/projA')
-    expect(readDirectory).toHaveBeenCalledWith('/projB')
-    expect(readDirectory).toHaveBeenCalledWith('/projC')
+    expect(readDirectory).toHaveBeenCalledWith({ dirPath: '/projA' })
+    expect(readDirectory).toHaveBeenCalledWith({ dirPath: '/projB' })
+    expect(readDirectory).toHaveBeenCalledWith({ dirPath: '/projC' })
   })
 })

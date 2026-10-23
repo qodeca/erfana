@@ -57,7 +57,7 @@ export async function resolvePlatformBinary(opts: {
 The two current callers diverge in non-trivial ways:
 
 - **git resolver**: 60-second cooldown cache, `--version` liveness probe, FD-pressure-aware error handling
-- **LibreOffice detector**: per-app-launch cache, `--version` liveness probe (added in review fix), parallel detect with `imageMagick`
+- **LibreOffice detector**: per-app-launch cache, `--version` liveness probe (added in review fix), shared resolver with the conversion guard (#250)
 
 Premature extraction risks a leaky abstraction where the helper grows ad-hoc options. The Rule of Three says extract on the **third** caller.
 

@@ -990,63 +990,32 @@ describe('LoggingService', () => {
       vi.clearAllMocks()
     })
 
+    const LOGS = path.join(MOCK_TMP, 'erfana-test-logs')
+    const inLogs = (name: string): string => path.join(LOGS, name)
+
     it('shifts files correctly when rotating', async () => {
-      // Setup: simulate having main.1.log, main.2.log, main.3.log already
-      mockExistsSync.mockImplementation((path: string) => {
-        // main.5.log doesn't exist (for deletion check)
-        if (path === path.join(MOCK_TMP, 'erfana-test-logs', 'main.5.log')) return false
-        // main.1.log, main.2.log, main.3.log exist
-        if (path === path.join(MOCK_TMP, 'erfana-test-logs', 'main.1.log')) return true
-        if (path === path.join(MOCK_TMP, 'erfana-test-logs', 'main.2.log')) return true
-        if (path === path.join(MOCK_TMP, 'erfana-test-logs', 'main.3.log')) return true
-        // main.log exists
-        if (path === path.join(MOCK_TMP, 'erfana-test-logs', 'main.log')) return true
-        // All other numbered files don't exist
-        return false
-      })
-
       const archiveLogFn = mockMainLogger.transports.file.archiveLogFn
+      archiveLogFn({ path: inLogs('main.log') })
 
-      // Create a mock LogFile object
-      const mockLogFile = { path: path.join(MOCK_TMP, 'erfana-test-logs', 'main.log') }
-
-      // Call archive function
-      archiveLogFn(mockLogFile)
-
-      // Should shift files down: 3->4, 2->3, 1->2
-      expect(mockRenameSync).toHaveBeenCalledWith(
-        path.join(MOCK_TMP, 'erfana-test-logs', 'main.3.log'),
-        path.join(MOCK_TMP, 'erfana-test-logs', 'main.4.log')
-      )
-      expect(mockRenameSync).toHaveBeenCalledWith(
-        path.join(MOCK_TMP, 'erfana-test-logs', 'main.2.log'),
-        path.join(MOCK_TMP, 'erfana-test-logs', 'main.3.log')
-      )
-      expect(mockRenameSync).toHaveBeenCalledWith(
-        path.join(MOCK_TMP, 'erfana-test-logs', 'main.1.log'),
-        path.join(MOCK_TMP, 'erfana-test-logs', 'main.2.log')
-      )
-
-      // Should move current log to .1
-      expect(mockRenameSync).toHaveBeenCalledWith(
-        path.join(MOCK_TMP, 'erfana-test-logs', 'main.log'),
-        path.join(MOCK_TMP, 'erfana-test-logs', 'main.1.log')
-      )
+      // Highest first, so no file is overwritten before it moved on: 4->5 ... 1->2, then current -> 1
+      expect(mockRenameSync.mock.calls).toEqual([
+        [inLogs('main.4.log'), inLogs('main.5.log')],
+        [inLogs('main.3.log'), inLogs('main.4.log')],
+        [inLogs('main.2.log'), inLogs('main.3.log')],
+        [inLogs('main.1.log'), inLogs('main.2.log')],
+        [inLogs('main.log'), inLogs('main.1.log')]
+      ])
     })
 
-    it('deletes oldest file when at max rotation', async () => {
-      // Setup: simulate having main.5.log (oldest)
-      mockExistsSync.mockImplementation((path: string) => {
-        return path === path.join(MOCK_TMP, 'erfana-test-logs', 'main.5.log') || path === path.join(MOCK_TMP, 'erfana-test-logs', 'main.log')
-      })
-
+    it('replaces the oldest by renaming onto it – no existence check, no separate delete', async () => {
+      // Five sync calls on the main thread per rotation: one rename per file
       const archiveLogFn = mockMainLogger.transports.file.archiveLogFn
-      const mockLogFile = { path: path.join(MOCK_TMP, 'erfana-test-logs', 'main.log') }
+      archiveLogFn({ path: inLogs('main.log') })
 
-      archiveLogFn(mockLogFile)
-
-      // Should delete the oldest file
-      expect(mockUnlinkSync).toHaveBeenCalledWith(path.join(MOCK_TMP, 'erfana-test-logs', 'main.5.log'))
+      expect(mockExistsSync).not.toHaveBeenCalled()
+      expect(mockUnlinkSync).not.toHaveBeenCalled()
+      expect(mockRenameSync).toHaveBeenCalledTimes(5)
+      expect(mockRenameSync).toHaveBeenCalledWith(inLogs('main.4.log'), inLogs('main.5.log'))
     })
 
     it('handles rotation when no previous rotated files exist', async () => {
@@ -1062,34 +1031,16 @@ describe('LoggingService', () => {
         throw error
       })
 
-      mockUnlinkSync.mockImplementation(() => {
-        const error: any = new Error('ENOENT: no such file')
-        error.code = 'ENOENT'
-        throw error
-      })
-
       const archiveLogFn = mockMainLogger.transports.file.archiveLogFn
-      const mockLogFile = { path: path.join(MOCK_TMP, 'erfana-test-logs', 'main.log') }
+      archiveLogFn({ path: inLogs('main.log') })
 
-      archiveLogFn(mockLogFile)
-
-      // Should attempt 5 renames (4 shifts + 1 current log rotation) + 1 delete
-      // But only main.log -> main.1.log succeeds
+      // 5 renames (4 shifts + 1 current log rotation); only main.log -> main.1.log succeeds
       expect(mockRenameSync).toHaveBeenCalledTimes(5)
-      expect(mockUnlinkSync).toHaveBeenCalledTimes(1)
-
-      // Verify the successful call
-      expect(mockRenameSync).toHaveBeenCalledWith(
-        path.join(MOCK_TMP, 'erfana-test-logs', 'main.log'),
-        path.join(MOCK_TMP, 'erfana-test-logs', 'main.1.log')
-      )
+      expect(mockRenameSync).toHaveBeenCalledWith(inLogs('main.log'), inLogs('main.1.log'))
+      expect(consoleErrorSpy).not.toHaveBeenCalled()
     })
 
     it('works with different log file names', async () => {
-      mockExistsSync.mockImplementation((path: string) => {
-        return path === path.join(MOCK_TMP, 'erfana-test-logs', 'renderer.log')
-      })
-
       const archiveLogFn = mockRendererLogger.transports.file.archiveLogFn
       const mockLogFile = { path: path.join(MOCK_TMP, 'erfana-test-logs', 'renderer.log') }
 
@@ -1357,7 +1308,6 @@ describe('LoggingService', () => {
     })
 
     it('ignores ENOENT errors when shifting files', () => {
-      mockExistsSync.mockReturnValue(false)
       mockRenameSync.mockImplementation(() => {
         const error: any = new Error('ENOENT: no such file')
         error.code = 'ENOENT'
@@ -1372,7 +1322,6 @@ describe('LoggingService', () => {
     })
 
     it('logs non-ENOENT errors when shifting files', () => {
-      mockExistsSync.mockReturnValue(true)
       mockRenameSync.mockImplementation(() => {
         const error: any = new Error('EACCES: permission denied')
         error.code = 'EACCES'
@@ -1405,37 +1354,6 @@ describe('LoggingService', () => {
       const mockLogFile = { path: path.join(MOCK_TMP, 'erfana-test-logs', 'main.log') }
 
       expect(() => archiveLogFn(mockLogFile)).not.toThrow()
-    })
-
-    it('ignores ENOENT when deleting oldest file', () => {
-      mockUnlinkSync.mockImplementation(() => {
-        const error: any = new Error('ENOENT: no such file')
-        error.code = 'ENOENT'
-        throw error
-      })
-
-      const archiveLogFn = mockMainLogger.transports.file.archiveLogFn
-      const mockLogFile = { path: path.join(MOCK_TMP, 'erfana-test-logs', 'main.log') }
-
-      expect(() => archiveLogFn(mockLogFile)).not.toThrow()
-    })
-
-    it('logs non-ENOENT errors when deleting oldest file', () => {
-      mockUnlinkSync.mockImplementation(() => {
-        const error: any = new Error('EACCES: permission denied')
-        error.code = 'EACCES'
-        throw error
-      })
-
-      const archiveLogFn = mockMainLogger.transports.file.archiveLogFn
-      const mockLogFile = { path: path.join(MOCK_TMP, 'erfana-test-logs', 'main.log') }
-
-      archiveLogFn(mockLogFile)
-
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to delete oldest log'),
-        expect.anything()
-      )
     })
 
     it('catches and logs catastrophic errors', () => {

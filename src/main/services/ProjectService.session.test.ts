@@ -28,7 +28,8 @@ vi.mock('electron', () => ({
 }))
 
 vi.mock('../utils/pathSecurity', () => ({
-  validatePath: vi.fn(() => Promise.resolve())
+  validatePath: vi.fn(() => Promise.resolve()),
+  assertAcceptableProjectRoot: vi.fn()
 }))
 
 vi.mock('./LoggingService', () => ({
@@ -37,12 +38,14 @@ vi.mock('./LoggingService', () => ({
 
 vi.mock('fs/promises', () => ({
   stat: vi.fn(),
-  realpath: vi.fn()
+  realpath: vi.fn(),
+  lstat: vi.fn(() => Promise.reject(new Error('ENOENT')))
 }))
 
 import { stat, realpath } from 'fs/promises'
 import { BrowserWindow } from 'electron'
-import { validatePath } from '../utils/pathSecurity'
+import { assertAcceptableProjectRoot, validatePath } from '../utils/pathSecurity'
+import { AppError, ErrorCode } from '../../shared/errors'
 
 const mockedStat = vi.mocked(stat)
 const mockedRealpath = vi.mocked(realpath)
@@ -218,6 +221,26 @@ describe('ProjectService – main-owned project session', () => {
       expect(fileService.setProjectPath).not.toHaveBeenCalled()
     })
 
+    it('refuses a folder whose canonical path is unacceptable, before the watchers stop', async () => {
+      await service.switchProject(PROJECT_A)
+      const before = service.session.current()
+      vi.mocked(assertAcceptableProjectRoot).mockImplementationOnce(() => {
+        throw new AppError('Cannot open the top of a drive', ErrorCode.PATH_SYSTEM_DIR)
+      })
+      vi.mocked(directoryWatcherService.stopAll).mockClear()
+
+      const result = await service.switchProject(PROJECT_B)
+
+      expect(result).toMatchObject({
+        success: false,
+        path: PROJECT_A,
+        action: 'noop',
+        errorCode: ErrorCode.PATH_SYSTEM_DIR
+      })
+      expect(service.session.current()).toBe(before)
+      expect(directoryWatcherService.stopAll).not.toHaveBeenCalled()
+    })
+
     it('does not spend a generation number', async () => {
       await service.switchProject(PROJECT_A)
       mockedStat.mockRejectedValueOnce(new Error('ENOENT'))
@@ -287,7 +310,8 @@ describe('ProjectService – main-owned project session', () => {
 
       expect(service.session.require()).toEqual({
         generation: 1,
-        root: PROJECT_A,
+        // On Windows the shown root is the native realpath spelling; elsewhere the typed one
+        root: process.platform === 'win32' ? `${PROJECT_A}-real` : PROJECT_A,
         realRoot: `${PROJECT_A}-real`,
         caseSensitive: expect.any(Boolean),
         ownerWebContentsId: 42

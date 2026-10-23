@@ -52,7 +52,10 @@ export interface ProjectPathFilterOptions {
  */
 export function toRootRelative(root: string, absPath: string): string | null {
   if (!isLexicallyInside(absPath, root)) return null
-  const rel = path.relative(path.resolve(root), path.resolve(absPath))
+  // `isLexicallyInside` treats the two spellings of an accented name as one folder on macOS;
+  // `path.relative` does not, so give it one spelling too
+  const spell = (value: string): string => (process.platform === 'darwin' ? value.normalize('NFC') : value)
+  const rel = path.relative(spell(path.resolve(root)), spell(path.resolve(absPath)))
   return path.sep === '/' ? rel : rel.split(path.sep).join('/')
 }
 

@@ -89,6 +89,7 @@ describe('channel names', () => {
           "getProjectPath": "file:getProjectPath",
           "getSession": "file:getSession",
           "getStats": "file:getStats",
+          "moveBatchFromExternal": "file:moveBatchFromExternal",
           "moveFromExternal": "file:moveFromExternal",
           "moveItem": "file:moveItem",
           "openProject": "file:openProject",
@@ -107,6 +108,7 @@ describe('channel names', () => {
           "projectChanged": "project:changed",
         },
         "TERMINAL_CHANNELS": {
+          "ackOutput": "terminal:ackOutput",
           "clearComplete": "terminal:clearComplete",
           "create": "terminal:create",
           "getActivity": "terminal:getActivity",
@@ -129,76 +131,110 @@ describe('channel names', () => {
 })
 
 describe('file bridge', () => {
-  /** Every request method, called with the arguments the contract allows, and the wire it must produce. */
+  /**
+   * Every request method, called with the request object the contract takes. The
+   * bridge passes the object through as it is: the wire is that one argument.
+   */
   const calls: Array<{
     method: keyof FileBridge
     channel: string
     args: unknown[]
-    wire: unknown[]
   }> = [
-    { method: 'openProject', channel: FILE_CHANNELS.openProject, args: [], wire: [] },
-    { method: 'openProjectByPath', channel: FILE_CHANNELS.openProjectByPath, args: ['p'], wire: ['p'] },
-    { method: 'getSession', channel: FILE_CHANNELS.getSession, args: [], wire: [] },
-    { method: 'readDirectory', channel: FILE_CHANNELS.readDirectory, args: ['d'], wire: ['d'] },
-    { method: 'readFile', channel: FILE_CHANNELS.readFile, args: ['f'], wire: ['f'] },
-    { method: 'getStats', channel: FILE_CHANNELS.getStats, args: ['f'], wire: ['f'] },
-    { method: 'exists', channel: FILE_CHANNELS.exists, args: ['f'], wire: ['f'] },
-    { method: 'getProjectPath', channel: FILE_CHANNELS.getProjectPath, args: [], wire: [] },
-    { method: 'createFile', channel: FILE_CHANNELS.createFile, args: ['d', 'n'], wire: ['d', 'n'] },
-    { method: 'createFolder', channel: FILE_CHANNELS.createFolder, args: ['d', 'n'], wire: ['d', 'n'] },
-    { method: 'deleteFile', channel: FILE_CHANNELS.deleteFile, args: ['f'], wire: ['f'] },
-    { method: 'deleteFolder', channel: FILE_CHANNELS.deleteFolder, args: ['d'], wire: ['d'] },
-    { method: 'rename', channel: FILE_CHANNELS.rename, args: ['o', 'n'], wire: ['o', 'n'] },
-    { method: 'revealInFileManager', channel: FILE_CHANNELS.revealInFileManager, args: ['f'], wire: ['f'] },
+    { method: 'openProject', channel: FILE_CHANNELS.openProject, args: [] },
+    { method: 'openProjectByPath', channel: FILE_CHANNELS.openProjectByPath, args: [{ projectPath: 'p' }] },
+    { method: 'getSession', channel: FILE_CHANNELS.getSession, args: [] },
+    { method: 'readDirectory', channel: FILE_CHANNELS.readDirectory, args: [{ dirPath: 'd' }] },
+    { method: 'readFile', channel: FILE_CHANNELS.readFile, args: [{ filePath: 'f' }] },
+    { method: 'writeFile', channel: FILE_CHANNELS.writeFile, args: [{ filePath: 'f', content: 'c' }] },
+    {
+      method: 'writeFile',
+      channel: FILE_CHANNELS.writeFile,
+      args: [{ filePath: 'f', content: 'c', createParentDirs: true, generation: 4 }]
+    },
+    { method: 'getStats', channel: FILE_CHANNELS.getStats, args: [{ filePath: 'f' }] },
+    { method: 'exists', channel: FILE_CHANNELS.exists, args: [{ filePath: 'f' }] },
+    { method: 'getProjectPath', channel: FILE_CHANNELS.getProjectPath, args: [] },
+    { method: 'createFile', channel: FILE_CHANNELS.createFile, args: [{ dirPath: 'd', name: 'n' }] },
+    { method: 'createFolder', channel: FILE_CHANNELS.createFolder, args: [{ dirPath: 'd', name: 'n' }] },
+    { method: 'deleteFile', channel: FILE_CHANNELS.deleteFile, args: [{ filePath: 'f' }] },
+    { method: 'deleteFolder', channel: FILE_CHANNELS.deleteFolder, args: [{ filePath: 'd' }] },
+    { method: 'rename', channel: FILE_CHANNELS.rename, args: [{ oldPath: 'o', newName: 'n' }] },
+    { method: 'revealInFileManager', channel: FILE_CHANNELS.revealInFileManager, args: [{ filePath: 'f' }] },
     {
       method: 'moveItem',
       channel: FILE_CHANNELS.moveItem,
-      args: ['s', 't', 'n', true],
-      wire: ['s', 't', 'n', true]
+      args: [{ sourcePath: 's', targetParentPath: 't', newName: 'n', replaceExisting: true }]
     },
-    { method: 'copyItem', channel: FILE_CHANNELS.copyItem, args: ['s', 't', 'n'], wire: ['s', 't', 'n'] },
-    { method: 'checkConflict', channel: FILE_CHANNELS.checkConflict, args: ['t', 'n'], wire: ['t', 'n'] },
-    { method: 'validatePath', channel: FILE_CHANNELS.validatePath, args: ['f', 'r'], wire: ['f', 'r'] },
-    { method: 'readImage', channel: FILE_CHANNELS.readImage, args: ['f', 'v'], wire: ['f', 'v'] },
     {
-      method: 'validateExternal',
-      channel: FILE_CHANNELS.validateExternal,
-      args: ['s', 'r'],
-      wire: ['s', 'r']
+      method: 'copyItem',
+      channel: FILE_CHANNELS.copyItem,
+      args: [{ sourcePath: 's', targetParentPath: 't', newName: 'n' }]
     },
+    {
+      method: 'checkConflict',
+      channel: FILE_CHANNELS.checkConflict,
+      args: [{ targetParentPath: 't', itemName: 'n' }]
+    },
+    { method: 'validatePath', channel: FILE_CHANNELS.validatePath, args: [{ filePath: 'f' }] },
+    { method: 'readImage', channel: FILE_CHANNELS.readImage, args: [{ filePath: 'f', knownVersion: 'v' }] },
+    { method: 'validateExternal', channel: FILE_CHANNELS.validateExternal, args: [{ sourcePath: 's' }] },
     {
       method: 'copyFromExternal',
       channel: FILE_CHANNELS.copyFromExternal,
-      args: ['s', 't', 'r', 'replace'],
-      wire: ['s', 't', 'r', 'replace']
+      args: [{ sourcePath: 's', targetFolder: 't', conflictResolution: 'replace' }]
     },
     {
       method: 'moveFromExternal',
       channel: FILE_CHANNELS.moveFromExternal,
-      args: ['s', 't', 'r', 'keepBoth'],
-      wire: ['s', 't', 'r', 'keepBoth']
+      args: [{ sourcePath: 's', targetFolder: 't', conflictResolution: 'keepBoth' }]
     },
-    { method: 'selectExternalFiles', channel: FILE_CHANNELS.selectExternalFiles, args: [], wire: [] },
-    { method: 'closeProject', channel: FILE_CHANNELS.closeProject, args: [3], wire: [3] }
+    {
+      method: 'moveBatchFromExternal',
+      channel: FILE_CHANNELS.moveBatchFromExternal,
+      args: [
+        {
+          items: [{ sourcePath: 's1' }, { sourcePath: 's2', conflictResolution: 'replace' }],
+          targetFolder: 't'
+        }
+      ]
+    },
+    { method: 'selectExternalFiles', channel: FILE_CHANNELS.selectExternalFiles, args: [] },
+    { method: 'closeProject', channel: FILE_CHANNELS.closeProject, args: [{ expectedGeneration: 3 }] },
+    { method: 'closeProject', channel: FILE_CHANNELS.closeProject, args: [] }
   ]
 
-  it.each(calls)('$method sends $channel with its arguments', async ({ method, channel, args, wire }) => {
+  /** Methods that take no request: nothing but the channel goes on the wire. */
+  const NO_REQUEST = new Set<keyof FileBridge>([
+    'openProject',
+    'getSession',
+    'getProjectPath',
+    'selectExternalFiles'
+  ])
+
+  it.each(calls)('$method sends $channel with its request object', async ({ method, channel, args }) => {
     await (fileBridge[method] as (...a: unknown[]) => Promise<unknown>)(...args)
     expect(ipc.invoke).toHaveBeenCalledTimes(1)
-    expect(ipc.invoke).toHaveBeenCalledWith(channel, ...wire)
+    // At most one argument on the wire: the request object itself, not a copy spread into positions
+    const [sentChannel, ...wire] = ipc.invoke.mock.calls[0] as unknown[]
+    expect(sentChannel).toBe(channel)
+    if (NO_REQUEST.has(method)) {
+      expect(wire).toEqual([])
+    } else {
+      expect(wire).toHaveLength(1)
+      expect(wire[0]).toBe(args[0])
+    }
   })
 
-  it('writeFile sends no options argument unless it was given one', async () => {
-    await fileBridge.writeFile('f', 'c')
-    expect(ipc.invoke).toHaveBeenLastCalledWith(FILE_CHANNELS.writeFile, 'f', 'c')
-    await fileBridge.writeFile('f', 'c', { createParentDirs: true })
-    expect(ipc.invoke).toHaveBeenLastCalledWith(FILE_CHANNELS.writeFile, 'f', 'c', {
-      createParentDirs: true
-    })
+  it('passes no project root on any external-file channel', async () => {
+    await fileBridge.validateExternal({ sourcePath: 's' })
+    await fileBridge.copyFromExternal({ sourcePath: 's', targetFolder: 't' })
+    await fileBridge.moveFromExternal({ sourcePath: 's', targetFolder: 't' })
+    for (const call of ipc.invoke.mock.calls) {
+      expect(JSON.stringify(call)).not.toContain('projectRoot')
+    }
   })
 
   it('covers every file channel constant', async () => {
-    await fileBridge.writeFile('f', 'c')
     for (const { method, args } of calls) {
       await (fileBridge[method] as (...a: unknown[]) => Promise<unknown>)(...args)
     }
@@ -207,7 +243,7 @@ describe('file bridge', () => {
   })
 
   it('has one method per contract entry, and nothing else', () => {
-    const expected = [...calls.map((c) => c.method), 'writeFile', 'onProjectChanged'].sort()
+    const expected = [...new Set(calls.map((c) => c.method)), 'onProjectChanged'].sort()
     expect(Object.keys(fileBridge).sort()).toEqual(expected)
   })
 
@@ -257,7 +293,7 @@ describe('terminal bridge', () => {
     expect(ipc.invoke).toHaveBeenCalledWith(channel, ...wire)
   })
 
-  it('resize and markClearComplete are fire-and-forget sends', () => {
+  it('resize, markClearComplete and ackOutput are fire-and-forget sends', () => {
     terminalBridge.resize('t', 80, 24)
     expect(ipc.send).toHaveBeenLastCalledWith(TERMINAL_CHANNELS.resize, {
       terminalId: 't',
@@ -266,6 +302,8 @@ describe('terminal bridge', () => {
     })
     terminalBridge.markClearComplete('t')
     expect(ipc.send).toHaveBeenLastCalledWith(TERMINAL_CHANNELS.clearComplete, { terminalId: 't' })
+    terminalBridge.ackOutput('t', 4096)
+    expect(ipc.send).toHaveBeenLastCalledWith(TERMINAL_CHANNELS.ackOutput, { terminalId: 't', chars: 4096 })
     expect(ipc.invoke).not.toHaveBeenCalled()
   })
 
@@ -275,6 +313,7 @@ describe('terminal bridge', () => {
     }
     terminalBridge.resize('t', 80, 24)
     terminalBridge.markClearComplete('t')
+    terminalBridge.ackOutput('t', 1)
     const sent = [
       ...ipc.invoke.mock.calls.map((call) => (call as unknown[])[0]),
       ...ipc.send.mock.calls.map((call) => (call as unknown[])[0])

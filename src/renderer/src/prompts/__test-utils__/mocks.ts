@@ -24,7 +24,8 @@ export function createMockWindowApi() {
       }),
       list: vi.fn().mockResolvedValue(['mock-terminal-1']),
       isAvailable: vi.fn().mockResolvedValue(true),
-      markClearComplete: vi.fn()
+      markClearComplete: vi.fn(),
+      ackOutput: vi.fn()
     },
     file: {
       readFile: vi.fn().mockResolvedValue('# Test File\n\nFile content here'),

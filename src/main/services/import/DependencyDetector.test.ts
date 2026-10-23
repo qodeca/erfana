@@ -3,558 +3,177 @@
 /**
  * DependencyDetector.test.ts
  *
- * Tests for the DependencyDetector service that checks for optional
- * system tools (LibreOffice, ImageMagick) required for document import.
+ * The detector asks `resolveLibreOffice` (the replay of LiteParse's own
+ * lookup, tested in conversionToolGuard.test.ts) which LibreOffice a
+ * conversion would run, then probes a `found` candidate with `--version`.
  *
  * @see Issue #132 – LiteParse document import
+ * @see Issue #250 – detection agrees with what a conversion would run
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { ChildProcess } from 'child_process'
+import { tmpdir } from 'os'
 
-// Mock child_process before importing DependencyDetector
 vi.mock('child_process', () => ({
   execFile: vi.fn()
 }))
 
-// Mock fs/promises before importing DependencyDetector
-vi.mock('fs/promises', () => ({
-  access: vi.fn(),
-  constants: { X_OK: 1, F_OK: 0 }
-}))
-
 import { execFile } from 'child_process'
-import { access } from 'fs/promises'
 import { DependencyDetector } from './DependencyDetector'
+import type { LibreOfficeResolution } from './conversionToolGuard'
 
 const mockedExecFile = vi.mocked(execFile)
-const mockedAccess = vi.mocked(access)
 
-// Helper to set up execFile mock per command
-function setupExecFileMock(config: Record<string, boolean>): void {
+/** execFile succeeds for the given absolute paths only. */
+function probeSucceedsFor(...paths: string[]): void {
   mockedExecFile.mockImplementation(
     (command: string, _args: unknown, _options: unknown, callback: unknown) => {
       const cb = callback as (error: Error | null) => void
-      const shouldSucceed = config[command] ?? false
-      if (shouldSucceed) {
-        cb(null)
-      } else {
-        const err = new Error('ENOENT')
-        ;(err as NodeJS.ErrnoException).code = 'ENOENT'
-        cb(err)
-      }
-      // Return a minimal fake ChildProcess
+      cb(paths.includes(command) ? null : new Error('exit 1'))
       return { on: vi.fn() } as unknown as ChildProcess
     }
   )
 }
 
-describe('DependencyDetector', () => {
-  let detector: DependencyDetector
-  let originalPlatform: PropertyDescriptor | undefined
+function detectorWith(resolution: LibreOfficeResolution, roots: string[] = []) {
+  const resolve = vi.fn(() => resolution)
+  return { detector: new DependencyDetector({ resolve, untrustedRoots: () => roots }), resolve }
+}
 
+const SOFFICE = '/usr/bin/soffice'
+
+describe('DependencyDetector', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    detector = new DependencyDetector()
-    originalPlatform = Object.getOwnPropertyDescriptor(process, 'platform')
   })
 
-  afterEach(() => {
-    // Restore platform after tests that override it
-    if (originalPlatform) {
-      Object.defineProperty(process, 'platform', originalPlatform)
-    }
+  it('reports found when the resolved LibreOffice answers --version', async () => {
+    probeSucceedsFor(SOFFICE)
+    const { detector } = detectorWith({ state: 'found', path: SOFFICE })
+
+    expect(await detector.detect()).toEqual({ libreOffice: 'found', unsafe: null })
+    expect(mockedExecFile).toHaveBeenCalledWith(SOFFICE, ['--version'], expect.any(Object), expect.any(Function))
   })
 
-  // --------------------------------------------------------------------------
-  // Both found
-  // --------------------------------------------------------------------------
+  it('reports missing when the candidate fails the liveness probe (a planted stub)', async () => {
+    probeSucceedsFor()
+    const { detector } = detectorWith({ state: 'found', path: SOFFICE })
 
-  describe('both soffice and magick found', () => {
-    it('should return { libreOffice: true, imageMagick: true } when both succeed', async () => {
-      setupExecFileMock({ soffice: true, magick: true })
-
-      const result = await detector.detect()
-
-      expect(result).toEqual({ libreOffice: true, imageMagick: true })
-    })
+    expect(await detector.detect()).toEqual({ libreOffice: 'missing', unsafe: null })
   })
 
-  // --------------------------------------------------------------------------
-  // Neither found
-  // --------------------------------------------------------------------------
+  it('reports missing without running anything when nothing resolves', async () => {
+    const { detector } = detectorWith({ state: 'missing' })
 
-  describe('neither soffice nor magick found', () => {
-    it('should return { libreOffice: false, imageMagick: false } when all commands fail', async () => {
-      // Set platform to non-darwin to skip macOS fallback
-      Object.defineProperty(process, 'platform', {
-        value: 'linux',
-        configurable: true
-      })
-
-      setupExecFileMock({})
-
-      const result = await detector.detect()
-
-      expect(result).toEqual({ libreOffice: false, imageMagick: false })
-    })
+    expect(await detector.detect()).toEqual({ libreOffice: 'missing', unsafe: null })
+    expect(mockedExecFile).not.toHaveBeenCalled()
   })
 
-  // --------------------------------------------------------------------------
-  // LibreOffice only
-  // --------------------------------------------------------------------------
+  it('reports unsafe – and never runs the binary – when a conversion would refuse it', async () => {
+    probeSucceedsFor('/work/repo/soffice')
+    const { detector } = detectorWith({ state: 'unsafe', name: 'soffice', path: '/work/repo/soffice', reason: 'temp' })
 
-  describe('LibreOffice only', () => {
-    it('should return { libreOffice: true, imageMagick: false } when only soffice succeeds', async () => {
-      Object.defineProperty(process, 'platform', {
-        value: 'linux',
-        configurable: true
-      })
-
-      setupExecFileMock({ soffice: true })
-
-      const result = await detector.detect()
-
-      expect(result).toEqual({ libreOffice: true, imageMagick: false })
-    })
+    expect(await detector.detect()).toEqual({ libreOffice: 'unsafe', unsafe: { tool: 'soffice', reason: 'temp' } })
+    expect(mockedExecFile).not.toHaveBeenCalled()
   })
 
-  // --------------------------------------------------------------------------
-  // ImageMagick v6 fallback (magick fails, convert succeeds)
-  // --------------------------------------------------------------------------
+  it.each(['unresolvable', 'ambiguous', 'network'] as const)('reports the %s reason and the helper at fault', async (reason) => {
+    const { detector } = detectorWith({ state: 'unsafe', name: 'which', path: 'C:\\Repo\\which.exe', reason })
 
-  describe('ImageMagick v6 fallback', () => {
-    it('should detect imageMagick via convert when magick fails but convert succeeds', async () => {
-      Object.defineProperty(process, 'platform', {
-        value: 'linux',
-        configurable: true
-      })
+    expect(await detector.detect()).toEqual({ libreOffice: 'unsafe', unsafe: { tool: 'which', reason } })
+    expect(mockedExecFile).not.toHaveBeenCalled()
+  })
 
-      setupExecFileMock({ convert: true })
+  it('passes the untrusted roots to the lookup on every detection', async () => {
+    probeSucceedsFor(SOFFICE)
+    const { detector, resolve } = detectorWith({ state: 'found', path: SOFFICE }, ['/work/repo'])
 
-      const result = await detector.detect()
+    await detector.detect()
 
-      expect(result.imageMagick).toBe(true)
+    expect(resolve).toHaveBeenCalledWith(['/work/repo'])
+  })
+
+  it('probes from the temp folder with a minimal env', async () => {
+    process.env['SAL_USE_VCLPLUGIN'] = 'evil'
+    probeSucceedsFor(SOFFICE)
+    const { detector } = detectorWith({ state: 'found', path: SOFFICE })
+
+    await detector.detect()
+
+    const options = mockedExecFile.mock.calls[0][2] as { cwd?: string; env?: NodeJS.ProcessEnv; windowsHide?: boolean }
+    expect(options.cwd).toBe(tmpdir())
+    expect(options.windowsHide).toBe(true)
+    expect(options.env).not.toHaveProperty('SAL_USE_VCLPLUGIN')
+    delete process.env['SAL_USE_VCLPLUGIN']
+  })
+
+  it('never runs a relative path, whatever the lookup returns', async () => {
+    probeSucceedsFor('soffice')
+    const { detector } = detectorWith({ state: 'found', path: 'soffice' })
+
+    expect(await detector.detect()).toEqual({ libreOffice: 'missing', unsafe: null })
+    expect(mockedExecFile).not.toHaveBeenCalled()
+  })
+
+  it('treats a throwing lookup as missing', async () => {
+    const detector = new DependencyDetector({
+      resolve: () => {
+        throw new Error('boom')
+      }
     })
 
-    it('should use v7 magick first and skip convert check when magick succeeds', async () => {
-      Object.defineProperty(process, 'platform', {
-        value: 'linux',
-        configurable: true
-      })
-
-      setupExecFileMock({ soffice: true, magick: true })
-      mockedExecFile.mockImplementation(
-        (command: string, _args: unknown, _options: unknown, callback: unknown) => {
-          const cb = callback as (error: Error | null) => void
-          if (command === 'magick') {
-            cb(null)
-          } else {
-            const err = new Error('ENOENT')
-            cb(err)
-          }
-          return { on: vi.fn() } as unknown as ChildProcess
-        }
-      )
-
-      const result = await detector.detect()
-
-      expect(result.imageMagick).toBe(true)
-    })
+    expect(await detector.detect()).toEqual({ libreOffice: 'missing', unsafe: null })
   })
 
-  // --------------------------------------------------------------------------
-  // Caching
-  // --------------------------------------------------------------------------
+  it('resolves to missing when execFile throws or the child emits error', async () => {
+    mockedExecFile.mockImplementationOnce(() => {
+      throw new Error('spawn EACCES')
+    })
+    const first = detectorWith({ state: 'found', path: SOFFICE }).detector
+    expect(await first.detect()).toEqual({ libreOffice: 'missing', unsafe: null })
+
+    mockedExecFile.mockImplementationOnce(((_c: unknown, _a: unknown, _o: unknown, _cb: unknown) => ({
+      on: (event: string, handler: (e: Error) => void) => {
+        if (event === 'error') handler(new Error('spawn ENOENT'))
+      }
+    })) as unknown as typeof execFile)
+    const second = detectorWith({ state: 'found', path: SOFFICE }).detector
+    expect(await second.detect()).toEqual({ libreOffice: 'missing', unsafe: null })
+  })
 
   describe('caching', () => {
-    it('should return the same result on second detect() call without re-running commands', async () => {
-      Object.defineProperty(process, 'platform', {
-        value: 'linux',
-        configurable: true
-      })
+    it('serves the cached result without probing again', async () => {
+      probeSucceedsFor(SOFFICE)
+      const { detector, resolve } = detectorWith({ state: 'found', path: SOFFICE })
 
-      setupExecFileMock({ soffice: true, magick: true })
+      const first = await detector.detect()
+      const second = await detector.detect()
 
-      const result1 = await detector.detect()
-      const result2 = await detector.detect()
-
-      expect(result1).toBe(result2) // Same object reference (cached)
-
-      // execFile called for first detect only: soffice + magick = 2 calls
-      const callCount = mockedExecFile.mock.calls.length
-      expect(callCount).toBeLessThanOrEqual(3) // at most soffice + magick (+ possibly convert)
+      expect(second).toBe(first)
+      expect(resolve).toHaveBeenCalledTimes(1)
+      expect(mockedExecFile).toHaveBeenCalledTimes(1)
     })
 
-    it('should not call execFile again after caching', async () => {
-      Object.defineProperty(process, 'platform', {
-        value: 'linux',
-        configurable: true
-      })
+    it('shares one detection between concurrent callers', async () => {
+      probeSucceedsFor(SOFFICE)
+      const { detector, resolve } = detectorWith({ state: 'found', path: SOFFICE })
 
-      setupExecFileMock({ soffice: true, magick: true })
+      const [a, b] = await Promise.all([detector.detect(), detector.detect()])
+
+      expect(a).toEqual(b)
+      expect(resolve).toHaveBeenCalledTimes(1)
+    })
+
+    it('probes again after clearCache()', async () => {
+      probeSucceedsFor(SOFFICE)
+      const { detector, resolve } = detectorWith({ state: 'found', path: SOFFICE })
 
       await detector.detect()
-      const callsAfterFirst = mockedExecFile.mock.calls.length
-
-      await detector.detect()
-      const callsAfterSecond = mockedExecFile.mock.calls.length
-
-      expect(callsAfterSecond).toBe(callsAfterFirst) // No new calls
-    })
-  })
-
-  // --------------------------------------------------------------------------
-  // Concurrent calls
-  // --------------------------------------------------------------------------
-
-  describe('concurrent calls', () => {
-    it('should share the same promise for concurrent detect() calls', async () => {
-      Object.defineProperty(process, 'platform', {
-        value: 'linux',
-        configurable: true
-      })
-
-      setupExecFileMock({ soffice: true, magick: true })
-
-      const [result1, result2] = await Promise.all([detector.detect(), detector.detect()])
-
-      expect(result1).toEqual(result2)
-    })
-  })
-
-  // --------------------------------------------------------------------------
-  // Command error (non-zero exit)
-  // --------------------------------------------------------------------------
-
-  describe('command error (non-zero exit)', () => {
-    it('should return false for libreOffice when soffice exits with error', async () => {
-      Object.defineProperty(process, 'platform', {
-        value: 'linux',
-        configurable: true
-      })
-
-      mockedExecFile.mockImplementation(
-        (command: string, _args: unknown, _options: unknown, callback: unknown) => {
-          const cb = callback as (error: Error | null) => void
-          if (command === 'soffice') {
-            const err = new Error('Command failed with exit code 1')
-            cb(err)
-          } else {
-            cb(null) // imageMagick succeeds
-          }
-          return { on: vi.fn() } as unknown as ChildProcess
-        }
-      )
-
-      const result = await detector.detect()
-
-      expect(result.libreOffice).toBe(false)
-    })
-  })
-
-  // --------------------------------------------------------------------------
-  // clearCache()
-  // --------------------------------------------------------------------------
-
-  describe('clearCache()', () => {
-    it('should re-run commands after cache is cleared', async () => {
-      Object.defineProperty(process, 'platform', {
-        value: 'linux',
-        configurable: true
-      })
-
-      setupExecFileMock({ soffice: true, magick: true })
-
-      await detector.detect()
-      const callsAfterFirst = mockedExecFile.mock.calls.length
-
       detector.clearCache()
       await detector.detect()
-      const callsAfterSecond = mockedExecFile.mock.calls.length
 
-      expect(callsAfterSecond).toBeGreaterThan(callsAfterFirst)
-    })
-
-    it('should allow detect() to produce a new result after clearCache()', async () => {
-      Object.defineProperty(process, 'platform', {
-        value: 'linux',
-        configurable: true
-      })
-
-      // First detect: both found
-      setupExecFileMock({ soffice: true, magick: true })
-      const result1 = await detector.detect()
-      expect(result1).toEqual({ libreOffice: true, imageMagick: true })
-
-      // Clear cache and change mock: nothing found
-      detector.clearCache()
-      setupExecFileMock({})
-      const result2 = await detector.detect()
-      expect(result2).toEqual({ libreOffice: false, imageMagick: false })
-    })
-  })
-
-  // --------------------------------------------------------------------------
-  // tryCommand edge cases
-  // --------------------------------------------------------------------------
-
-  describe('tryCommand edge cases', () => {
-    it('should resolve to false when execFile throws synchronously', async () => {
-      Object.defineProperty(process, 'platform', {
-        value: 'linux',
-        configurable: true
-      })
-
-      // Make execFile throw instead of returning a child process
-      mockedExecFile.mockImplementation(() => {
-        throw new Error('spawn EACCES')
-      })
-
-      const detector = new DependencyDetector()
-      const result = await detector.detect()
-
-      expect(result).toEqual({ libreOffice: false, imageMagick: false })
-    })
-
-    it('should resolve to false when child process emits error event', async () => {
-      Object.defineProperty(process, 'platform', {
-        value: 'linux',
-        configurable: true
-      })
-
-      // execFile returns a child process that emits 'error' immediately
-      // but never fires the callback
-      mockedExecFile.mockImplementation((_cmd, _args, _opts, _callback) => {
-        const handlers: Record<string, (...args: unknown[]) => void> = {}
-        const fakeChild = {
-          on: vi.fn((event: string, handler: (...args: unknown[]) => void) => {
-            handlers[event] = handler
-            // Immediately fire the error event
-            if (event === 'error') {
-              handler(new Error('spawn ENOENT'))
-            }
-          })
-        }
-        return fakeChild as any
-      })
-
-      const detector = new DependencyDetector()
-      const result = await detector.detect()
-
-      expect(result).toEqual({ libreOffice: false, imageMagick: false })
-    })
-  })
-
-  // --------------------------------------------------------------------------
-  // ImageMagick only
-  // --------------------------------------------------------------------------
-
-  describe('ImageMagick only', () => {
-    it('should detect ImageMagick only when soffice fails on non-darwin', async () => {
-      Object.defineProperty(process, 'platform', {
-        value: 'linux',
-        configurable: true
-      })
-
-      setupExecFileMock({
-        magick: true
-      })
-
-      const detector = new DependencyDetector()
-      const result = await detector.detect()
-
-      expect(result).toEqual({ libreOffice: false, imageMagick: true })
-    })
-  })
-
-  // --------------------------------------------------------------------------
-  // macOS bundle path fallback
-  // --------------------------------------------------------------------------
-
-  describe('macOS bundle path fallback', () => {
-    it('should detect libreOffice via bundle path on darwin when soffice command fails', async () => {
-      Object.defineProperty(process, 'platform', {
-        value: 'darwin',
-        configurable: true
-      })
-
-      // soffice command fails, but bundle path is accessible
-      setupExecFileMock({ magick: true })
-      mockedAccess.mockResolvedValue(undefined)
-
-      const result = await detector.detect()
-
-      expect(result.libreOffice).toBe(true)
-    })
-
-    it('should return false for libreOffice on darwin when soffice fails and bundle path inaccessible', async () => {
-      Object.defineProperty(process, 'platform', {
-        value: 'darwin',
-        configurable: true
-      })
-
-      setupExecFileMock({})
-      mockedAccess.mockRejectedValue(new Error('ENOENT'))
-
-      const result = await detector.detect()
-
-      expect(result.libreOffice).toBe(false)
-    })
-
-    it('should not check bundle path on non-darwin platforms', async () => {
-      Object.defineProperty(process, 'platform', {
-        value: 'linux',
-        configurable: true
-      })
-
-      setupExecFileMock({})
-
-      await detector.detect()
-
-      // access() should not be called when platform is not darwin
-      expect(mockedAccess).not.toHaveBeenCalled()
-    })
-
-    it('should prefer PATH-based soffice over macOS bundle path', async () => {
-      Object.defineProperty(process, 'platform', {
-        value: 'darwin',
-        configurable: true
-      })
-
-      // soffice on PATH succeeds – no need for bundle path check
-      setupExecFileMock({ soffice: true, magick: true })
-
-      const result = await detector.detect()
-
-      expect(result.libreOffice).toBe(true)
-      // access() should not be called when PATH-based detection succeeds
-      expect(mockedAccess).not.toHaveBeenCalled()
-    })
-  })
-
-  // --------------------------------------------------------------------------
-  // Windows install-path fallback (#162)
-  // --------------------------------------------------------------------------
-
-  describe('Windows install-path fallback (#162) — F_OK + liveness probe (post security review)', () => {
-    /**
-     * Updated post-security-review: the Windows fallback now uses `tryCommand`
-     * (execFile + `--version` liveness probe), not bare `fs.access(F_OK)`.
-     * Mirrors the git-resolver pattern in `git-status.worker.ts`.
-     */
-
-    const PF_GIT = 'C:\\Program Files\\LibreOffice\\program\\soffice.exe'
-    const PFx86_GIT = 'C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe'
-
-    it('detects libreOffice via Program Files path on win32 when soffice command fails (liveness succeeds)', async () => {
-      Object.defineProperty(process, 'platform', { value: 'win32', configurable: true })
-
-      // soffice on PATH fails; Program Files candidate exists AND its
-      // `--version` liveness probe succeeds.
-      mockedExecFile.mockImplementation(
-        (command: string, _args: unknown, _options: unknown, callback: unknown) => {
-          const cb = callback as (error: Error | null) => void
-          if (command === PF_GIT || command === 'magick') {
-            cb(null)
-          } else {
-            const err = new Error('ENOENT')
-            ;(err as NodeJS.ErrnoException).code = 'ENOENT'
-            cb(err)
-          }
-          return { on: vi.fn() } as unknown as ChildProcess
-        },
-      )
-
-      const result = await detector.detect()
-
-      expect(result.libreOffice).toBe(true)
-      expect(mockedExecFile).toHaveBeenCalledWith(
-        PF_GIT,
-        ['--version'],
-        expect.any(Object),
-        expect.any(Function),
-      )
-    })
-
-    it('rejects a candidate that exists but FAILS the --version liveness probe (security)', async () => {
-      Object.defineProperty(process, 'platform', { value: 'win32', configurable: true })
-
-      // PF candidate is "present" but its --version invocation fails
-      // (simulates an attacker-planted stub that does not behave like soffice).
-      mockedExecFile.mockImplementation(
-        (command: string, _args: unknown, _options: unknown, callback: unknown) => {
-          const cb = callback as (error: Error | null) => void
-          if (command === 'magick') {
-            cb(null)
-          } else {
-            // soffice on PATH and BOTH PF candidates fail liveness.
-            const err = new Error('not a valid Win32 application')
-            cb(err)
-          }
-          return { on: vi.fn() } as unknown as ChildProcess
-        },
-      )
-
-      const result = await detector.detect()
-
-      expect(result.libreOffice).toBe(false)
-    })
-
-    it('detects libreOffice via Program Files (x86) path when 64-bit path is missing', async () => {
-      Object.defineProperty(process, 'platform', { value: 'win32', configurable: true })
-
-      mockedExecFile.mockImplementation(
-        (command: string, _args: unknown, _options: unknown, callback: unknown) => {
-          const cb = callback as (error: Error | null) => void
-          if (command === PFx86_GIT || command === 'magick') {
-            cb(null)
-          } else {
-            cb(new Error('ENOENT'))
-          }
-          return { on: vi.fn() } as unknown as ChildProcess
-        },
-      )
-
-      const result = await detector.detect()
-
-      expect(result.libreOffice).toBe(true)
-    })
-
-    it('returns false when both Program Files paths fail liveness and PATH probe fails', async () => {
-      Object.defineProperty(process, 'platform', { value: 'win32', configurable: true })
-
-      setupExecFileMock({}) // every command fails
-
-      const result = await detector.detect()
-
-      expect(result.libreOffice).toBe(false)
-    })
-
-    it('does NOT probe Windows paths on linux (POSIX regression)', async () => {
-      Object.defineProperty(process, 'platform', { value: 'linux', configurable: true })
-
-      setupExecFileMock({})
-
-      await detector.detect()
-
-      // No Windows .exe paths should appear in execFile calls.
-      const calledCommands = mockedExecFile.mock.calls.map((c) => c[0] as string)
-      expect(calledCommands.some((cmd) => cmd.startsWith('C:\\'))).toBe(false)
-    })
-
-    it('prefers PATH-based soffice over Windows install paths', async () => {
-      Object.defineProperty(process, 'platform', { value: 'win32', configurable: true })
-
-      // soffice on PATH succeeds – no need for install-path probe
-      setupExecFileMock({ soffice: true })
-
-      const result = await detector.detect()
-
-      expect(result.libreOffice).toBe(true)
-      // execFile should have been called for `soffice` but not for any `C:\` path.
-      const calledCommands = mockedExecFile.mock.calls.map((c) => c[0] as string)
-      expect(calledCommands.some((cmd) => cmd.startsWith('C:\\'))).toBe(false)
+      expect(resolve).toHaveBeenCalledTimes(2)
     })
   })
 })

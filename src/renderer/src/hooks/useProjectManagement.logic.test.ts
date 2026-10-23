@@ -198,6 +198,19 @@ describe('useProjectManagement.logic', () => {
       expect(formatErrorForState(error)).toBe('State error')
     })
 
+    it('should show a coded refusal in words, without the Electron prefix or the marker', () => {
+      const error = new Error(
+        "Error invoking remote method 'file:openProject': Error: Security validation failed: x [PATH_SYSTEM_DIR]"
+      )
+      expect(formatErrorForState(error)).toBe('System directories cannot be opened as projects')
+      expect(createOpenErrorMessage(error)).toBe(formatErrorForState(error))
+    })
+
+    it('should show a refused link in words too', () => {
+      const error = new Error('Security validation failed: link [SYMLINK_ATTACK]')
+      expect(createOpenErrorMessage(error)).toBe('This directory link points to a protected location')
+    })
+
     it('should return string error as-is', () => {
       expect(formatErrorForState('Direct error')).toBe('Direct error')
     })

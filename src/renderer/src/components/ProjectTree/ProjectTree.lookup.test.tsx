@@ -27,6 +27,10 @@ import { ProjectManagementProvider } from '../../context/ProjectManagementContex
 import { useClipboardStore } from '../../stores/useClipboardStore'
 import { subscribeGlobalToasts, type GlobalToastPayload } from '../Toast/toastService'
 import type { FileNode } from '../../../../preload/index'
+import { installTreeViewport } from '../../test-utils/treeViewport'
+
+// The tree is virtualised; give it a viewport so every fixture row is mounted.
+installTreeViewport()
 
 declare global {
   interface Window {
@@ -287,9 +291,14 @@ describe('ProjectTree root-inclusive lookups', () => {
   it('resolves the project root as a drop target', async () => {
     await renderWithProject()
 
-    await dragEnd(`${PROJECT_PATH}/top.md`, PROJECT_PATH)
+    // A nested file, so the drop really moves it (top.md is already in the
+    // root, and a drop into an item's own folder is a no-op – see below).
+    await dragEnd(`${PROJECT_PATH}/folder1/child.md`, PROJECT_PATH)
 
-    expect(fileApi.moveItem).toHaveBeenCalledWith(`${PROJECT_PATH}/top.md`, PROJECT_PATH)
+    expect(fileApi.moveItem).toHaveBeenCalledWith({
+      sourcePath: `${PROJECT_PATH}/folder1/child.md`,
+      targetParentPath: PROJECT_PATH
+    })
   })
 
   it('resolves a nested folder as a drop target', async () => {
@@ -297,10 +306,10 @@ describe('ProjectTree root-inclusive lookups', () => {
 
     await dragEnd(`${PROJECT_PATH}/top.md`, `${PROJECT_PATH}/folder1`)
 
-    expect(fileApi.moveItem).toHaveBeenCalledWith(
-      `${PROJECT_PATH}/top.md`,
-      `${PROJECT_PATH}/folder1`
-    )
+    expect(fileApi.moveItem).toHaveBeenCalledWith({
+      sourcePath: `${PROJECT_PATH}/top.md`,
+      targetParentPath: `${PROJECT_PATH}/folder1`
+    })
   })
 
   it('resolves a nested file to its parent directory', async () => {
@@ -310,10 +319,10 @@ describe('ProjectTree root-inclusive lookups', () => {
     // tree, not just the rendered rows.
     await dragEnd(`${PROJECT_PATH}/top.md`, `${PROJECT_PATH}/folder1/child.md`)
 
-    expect(fileApi.moveItem).toHaveBeenCalledWith(
-      `${PROJECT_PATH}/top.md`,
-      `${PROJECT_PATH}/folder1`
-    )
+    expect(fileApi.moveItem).toHaveBeenCalledWith({
+      sourcePath: `${PROJECT_PATH}/top.md`,
+      targetParentPath: `${PROJECT_PATH}/folder1`
+    })
   })
 
   it('resolves a top-level file to the project root (drop parity)', async () => {
@@ -321,9 +330,24 @@ describe('ProjectTree root-inclusive lookups', () => {
 
     // Top-level entries carry parentId === null in the index; the projectPath
     // fallback must reproduce what the prepended-root copy used to supply.
+    await dragEnd(`${PROJECT_PATH}/folder1/child.md`, `${PROJECT_PATH}/top.md`)
+
+    expect(fileApi.moveItem).toHaveBeenCalledWith({
+      sourcePath: `${PROJECT_PATH}/folder1/child.md`,
+      targetParentPath: PROJECT_PATH
+    })
+  })
+
+  it('ends quietly when the drop lands in the item\'s own folder (a sibling was hovered)', async () => {
+    await renderWithProject()
+
+    // top.md and folder1 are both in the root: dropping one onto the other
+    // resolves to the root, where top.md already is.
+    await dragEnd(`${PROJECT_PATH}/top.md`, PROJECT_PATH)
     await dragEnd(`${PROJECT_PATH}/folder1`, `${PROJECT_PATH}/top.md`)
 
-    expect(fileApi.moveItem).toHaveBeenCalledWith(`${PROJECT_PATH}/folder1`, PROJECT_PATH)
+    expect(fileApi.moveItem).not.toHaveBeenCalled()
+    expect(toasts.filter(t => t.type === 'error' || t.title === 'Success')).toEqual([])
   })
 
   it('reports a miss for an unknown path instead of moving anything', async () => {
@@ -481,12 +505,11 @@ describe('ProjectTree paste keyboard shortcut', () => {
     })
 
     await waitFor(() => {
-      expect(fileApi.moveItem).toHaveBeenCalledWith(
-        `${PROJECT_PATH}/other.md`,
-        `${PROJECT_PATH}/folder1`,
-        undefined,
-        false
-      )
+      expect(fileApi.moveItem).toHaveBeenCalledWith({
+        sourcePath: `${PROJECT_PATH}/other.md`,
+        targetParentPath: `${PROJECT_PATH}/folder1`,
+        replaceExisting: false
+      })
     })
     expect(dialog.showConfirm).not.toHaveBeenCalled()
   })

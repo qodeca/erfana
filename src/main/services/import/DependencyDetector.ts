@@ -1,58 +1,73 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { execFile } from 'child_process'
-import { access, constants } from 'fs/promises'
-import type { DependencyStatus } from './types'
+import { tmpdir } from 'os'
+import { posix, win32 } from 'path'
+import { resolveLibreOffice, type LibreOfficeResolution } from './conversionToolGuard'
+import type { DependencyStatus, ToolState } from './types'
+import { UNSAFE_TOOL_NAMES, type UnsafeToolName } from '../../../shared/unsafeTool'
 
 /** Timeout for each dependency check command (ms) */
 const DETECTION_TIMEOUT_MS = 5000
 
-/** Known macOS bundle path for LibreOffice */
-const MACOS_LIBREOFFICE_PATH = '/Applications/LibreOffice.app/Contents/MacOS/soffice'
-
 /**
- * Standard Windows install locations for LibreOffice (#162).
- * Probed in priority order when `soffice` is not on PATH. The user-installer
- * defaults to `Program Files\LibreOffice\program\soffice.exe`; the 32-bit
- * installer on a 64-bit Windows lands in `Program Files (x86)`.
+ * The only variables a probe child gets. `--version` needs nothing else, and a
+ * minimal env keeps `SAL_*` / `LD_*` / `DYLD_*` style overrides out of it.
  */
-const WIN32_LIBREOFFICE_PATHS = [
-  'C:\\Program Files\\LibreOffice\\program\\soffice.exe',
-  'C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe',
-]
+const PROBE_ENV_ALLOWLIST = ['PATH', 'Path', 'HOME', 'USERPROFILE', 'SystemRoot', 'TEMP', 'TMP', 'LANG', 'PATHEXT']
+
+/** Construction options – all exist so tests and callers can narrow the lookup. */
+export interface DependencyDetectorOptions {
+  /**
+   * Folders whose binaries must never be run – the open project, which the
+   * user (or a cloned repository) controls. Evaluated on every detection; the
+   * temp folders are always added.
+   */
+  untrustedRoots?: () => ReadonlyArray<string | null | undefined>
+  /** LibreOffice lookup; defaults to {@link resolveLibreOffice} (the replay of LiteParse's). */
+  resolve?: (roots: ReadonlyArray<string | null | undefined>) => LibreOfficeResolution
+}
 
 /**
  * Dependency detector service
  *
- * Checks for optional system tools (LibreOffice, ImageMagick) required
- * for Office document and image OCR import. Results are cached for the
- * session lifetime – detection runs at most once.
+ * Checks for LibreOffice, which Office document import needs. Images and PDF
+ * need no external tool. Results are cached for the session lifetime –
+ * `clearCache()` ("Check again") forces a new probe.
  *
  * Design:
- * - Non-blocking: all checks are async, never blocks app startup
- * - Timeout: 5s per command to prevent hangs
- * - Caching: single detection per session, concurrent calls share one promise
- * - Graceful: missing tools or errors result in false, never thrown errors
+ * - Same answer as a conversion (#250): the candidate comes from
+ *   {@link resolveLibreOffice}, which replays LiteParse's own lookup – `which
+ *   libreoffice-fresh` / `libreoffice` / `soffice`, then its fixed paths. A
+ *   candidate a conversion would refuse is reported `unsafe` and never run, so
+ *   the status never says "found" while every conversion would be refused.
+ * - Liveness: a `found` candidate must answer `--version`, so a stub planted at
+ *   a fixed path is rejected. Only absolute paths are run, from `os.tmpdir()`
+ *   with a minimal env. A `.bat` / `.cmd` fails safely: Node refuses to
+ *   `execFile` one without a shell (EINVAL, CVE-2024-27980).
+ * - Non-blocking, 5 s timeout, concurrent calls share one promise, never throws.
  *
  * @see Issue #132 – LiteParse document import
  */
 export class DependencyDetector {
   private cachedResult: DependencyStatus | null = null
   private pendingDetection: Promise<DependencyStatus> | null = null
+  private readonly untrustedRoots: () => ReadonlyArray<string | null | undefined>
+  private readonly resolve: (roots: ReadonlyArray<string | null | undefined>) => LibreOfficeResolution
+
+  constructor(options: DependencyDetectorOptions = {}) {
+    this.untrustedRoots = options.untrustedRoots ?? (() => [])
+    this.resolve = options.resolve ?? ((roots) => resolveLibreOffice(roots))
+  }
 
   /**
    * Detect available system dependencies.
    *
    * First call runs actual detection; subsequent calls return cached result.
    * Concurrent calls during detection share the same promise.
-   *
-   * @returns Detected dependency status
    */
   async detect(): Promise<DependencyStatus> {
-    // Return cached result if available
     if (this.cachedResult) return this.cachedResult
-
-    // Share pending detection promise for concurrent callers
     if (this.pendingDetection) return this.pendingDetection
 
     this.pendingDetection = this.runDetection()
@@ -65,101 +80,40 @@ export class DependencyDetector {
     }
   }
 
-  /**
-   * Run all dependency checks in parallel.
-   */
   private async runDetection(): Promise<DependencyStatus> {
-    const [libreOffice, imageMagick] = await Promise.all([
-      this.detectLibreOffice(),
-      this.detectImageMagick()
-    ])
-
-    return { libreOffice, imageMagick }
+    let resolution: LibreOfficeResolution
+    try {
+      resolution = this.resolve(this.untrustedRoots())
+    } catch {
+      return { libreOffice: 'missing', unsafe: null }
+    }
+    if (resolution.state === 'missing') return { libreOffice: 'missing', unsafe: null }
+    if (resolution.state === 'unsafe') {
+      // The name always comes from LiteParse's fixed list; anything else is reported as soffice.
+      const tool = (UNSAFE_TOOL_NAMES as readonly string[]).includes(resolution.name)
+        ? (resolution.name as UnsafeToolName)
+        : 'soffice'
+      return { libreOffice: 'unsafe', unsafe: { tool, reason: resolution.reason } }
+    }
+    const state: ToolState = (await this.tryCommand(resolution.path, ['--version'])) ? 'found' : 'missing'
+    return { libreOffice: state, unsafe: null }
   }
 
   /**
-   * Check if LibreOffice is available.
-   *
-   * Strategy:
-   * 1. Try `soffice --version` (works if soffice is on PATH)
-   * 2. On macOS, fall back to the known .app bundle path
-   * 3. On Windows (#162), fall back to standard Program Files locations
-   */
-  private async detectLibreOffice(): Promise<boolean> {
-    // Try PATH-based detection first
-    if (await this.tryCommand('soffice', ['--version'])) {
-      return true
-    }
-
-    // macOS fallback: check the standard .app bundle path.
-    // `X_OK` is meaningful on POSIX — verifies the user has execute
-    // permission on the binary. Combined with the system-protected
-    // `/Applications/` location, this is sufficient (no liveness probe
-    // needed; the Windows branch below adds liveness specifically because
-    // `X_OK` is existence-only on Windows).
-    if (process.platform === 'darwin') {
-      try {
-        await access(MACOS_LIBREOFFICE_PATH, constants.X_OK)
-        return true
-      } catch {
-        return false
-      }
-    }
-
-    // Windows fallback (#162): probe standard install locations.
-    //
-    // Each candidate must pass BOTH `F_OK` (file exists) AND a `--version`
-    // liveness probe (binary actually runs and produces output). This
-    // mirrors the git-resolver pattern at `git-status.worker.ts:isExecutableGit`.
-    //
-    // Why not F_OK only (security review HIGH): an attacker with write
-    // access to `C:\Program Files\LibreOffice\program\soffice.exe` (e.g. a
-    // malicious installer that drops a stub) could otherwise plant a path
-    // that satisfies detection. By the time we try to `execFile(soffice,
-    // [user-supplied args])` it would be too late — attacker code would
-    // have already run. The liveness probe forces the candidate to behave
-    // like a real LibreOffice binary first.
-    if (process.platform === 'win32') {
-      for (const candidate of WIN32_LIBREOFFICE_PATHS) {
-        if (await this.tryCommand(candidate, ['--version'])) {
-          return true
-        }
-      }
-      return false
-    }
-
-    return false
-  }
-
-  /**
-   * Check if ImageMagick is available.
-   *
-   * Strategy:
-   * 1. Try `magick --version` (ImageMagick v7+)
-   * 2. Fall back to `convert --version` (ImageMagick v6)
-   */
-  private async detectImageMagick(): Promise<boolean> {
-    // ImageMagick v7+
-    if (await this.tryCommand('magick', ['--version'])) {
-      return true
-    }
-
-    // ImageMagick v6 fallback
-    return this.tryCommand('convert', ['--version'])
-  }
-
-  /**
-   * Try running a command with timeout.
+   * Run `command args` with a timeout. Only ever called with an absolute path.
    *
    * @returns true if the command exits with code 0
    */
   private tryCommand(command: string, args: string[]): Promise<boolean> {
+    const pathApi = process.platform === 'win32' ? win32 : posix
+    if (!pathApi.isAbsolute(command)) return Promise.resolve(false)
     return new Promise((resolve) => {
       try {
         const child = execFile(
           command,
           args,
-          { timeout: DETECTION_TIMEOUT_MS },
+          // cwd outside any project; minimal env
+          { timeout: DETECTION_TIMEOUT_MS, cwd: tmpdir(), windowsHide: true, env: probeEnv() },
           (error) => {
             resolve(!error)
           }
@@ -175,11 +129,20 @@ export class DependencyDetector {
   }
 
   /**
-   * Clear cached detection result.
-   * Primarily used for testing.
+   * Clear cached detection result, so the next `detect()` probes again.
+   * Used by "Check again" (#250, via `ImportToolStatusService`) and by tests.
    */
   clearCache(): void {
     this.cachedResult = null
     this.pendingDetection = null
   }
+}
+
+function probeEnv(): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {}
+  for (const key of PROBE_ENV_ALLOWLIST) {
+    const value = process.env[key]
+    if (value !== undefined) env[key] = value
+  }
+  return env
 }

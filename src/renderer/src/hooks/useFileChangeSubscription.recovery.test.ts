@@ -34,7 +34,7 @@ describe('useFileChangeSubscription – deletion', () => {
     h.emitDeleted(WATCHED_PATH)
 
     await waitFor(() => expect(result.current.isFileDeleted).toBe(true))
-    expect(h.getStats).toHaveBeenCalledWith(WATCHED_PATH)
+    expect(h.getStats).toHaveBeenCalledWith({ filePath: WATCHED_PATH })
   })
 
   it('recovers and reports a change when the file is actually still there', async () => {

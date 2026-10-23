@@ -28,7 +28,10 @@ vi.mock('electron', () => ({
   BrowserWindow: { getAllWindows: vi.fn(() => []) }
 }))
 
-vi.mock('../utils/pathSecurity', () => ({ validatePath: vi.fn(async () => {}) }))
+vi.mock('../utils/pathSecurity', () => ({
+  validatePath: vi.fn(async () => {}),
+  assertAcceptableProjectRoot: vi.fn()
+}))
 
 vi.mock('../services/FileWatcherService', () => ({
   fileWatcherService: { stopAll: vi.fn(async () => {}), setProjectPath: vi.fn() }
@@ -90,7 +93,7 @@ describe('session channels', () => {
 
   it('file:getSession returns only the root and the generation', async () => {
     const dir = makeProject()
-    await handlers['file:openProjectByPath'](event, dir)
+    await handlers['file:openProjectByPath'](event, { projectPath: dir })
 
     const session = await handlers['file:getSession'](event)
 
@@ -99,7 +102,7 @@ describe('session channels', () => {
   })
 
   it('file:closeProject closes the project through the service', async () => {
-    await handlers['file:openProjectByPath'](event, makeProject())
+    await handlers['file:openProjectByPath'](event, { projectPath: makeProject() })
 
     expect(await handlers['file:closeProject'](event)).toBe(true)
 
@@ -109,23 +112,29 @@ describe('session channels', () => {
   it('file:closeProject with a stale generation leaves a newer project open', async () => {
     const first = makeProject()
     const second = makeProject()
-    await handlers['file:openProjectByPath'](event, first)
+    await handlers['file:openProjectByPath'](event, { projectPath: first })
     const seenByRenderer = projectService.session.require().generation
-    await handlers['file:openProjectByPath'](event, second)
+    await handlers['file:openProjectByPath'](event, { projectPath: second })
 
     // The renderer saw the first project vanish, but main has moved on
-    expect(await handlers['file:closeProject'](event, seenByRenderer)).toBe(true)
+    expect(await handlers['file:closeProject'](event, { expectedGeneration: seenByRenderer })).toBe(true)
     expect(projectService.session.current()?.root).toBe(second)
 
-    await handlers['file:closeProject'](event, projectService.session.require().generation)
+    await handlers['file:closeProject'](event, { expectedGeneration: projectService.session.require().generation })
     expect(projectService.session.current()).toBeNull()
   })
 
-  it('file:closeProject treats a non-numeric argument as a plain close', async () => {
-    await handlers['file:openProjectByPath'](event, makeProject())
+  it('file:closeProject refuses a malformed request and closes nothing', async () => {
+    await handlers['file:openProjectByPath'](event, { projectPath: makeProject() })
 
-    await handlers['file:closeProject'](event, 'not-a-number')
+    await expect(
+      handlers['file:closeProject'](event, { expectedGeneration: 'not-a-number' })
+    ).rejects.toThrow('Invalid close request')
+    await expect(handlers['file:closeProject'](event, { unexpected: true })).rejects.toThrow(
+      'Invalid close request'
+    )
+    await expect(handlers['file:closeProject'](event, 3)).rejects.toThrow('Invalid close request')
 
-    expect(projectService.session.current()).toBeNull()
+    expect(projectService.session.current()).not.toBeNull()
   })
 })

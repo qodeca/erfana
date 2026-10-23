@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+import { ERROR_CODE_MARKER_PATTERN, cleanErrorMessage } from './errorCodeMarker'
 /**
  * Standardized Error Codes and Types
  *
  * todo021: Unified error handling across all application layers
  * Provides type-safe error codes and structured error class
  */
+
+import type { UnsafeToolReason } from './unsafeTool'
 
 /**
  * Sentinel phrase embedded in `AppError` messages thrown by
@@ -85,6 +88,8 @@ export enum ErrorCode {
   IMPORT_PAGE_LIMIT_EXCEEDED = 'IMPORT_PAGE_LIMIT_EXCEEDED',
   IMPORT_TIMEOUT = 'IMPORT_TIMEOUT',
   IMPORT_BUSY = 'IMPORT_BUSY',
+  // The tool a conversion would run resolves into the project or a temp folder (#250)
+  IMPORT_UNTRUSTED_TOOL = 'IMPORT_UNTRUSTED_TOOL',
 
   // Prompt execution errors
   PROMPT_NOT_FOUND = 'PROMPT_NOT_FOUND',
@@ -333,6 +338,45 @@ export class AppError extends Error {
  * User-friendly error messages for display
  * todo023: Error message translator
  */
+export {
+  UNSAFE_TOOL_REASONS,
+  UNSAFE_TOOL_NAMES,
+  type UnsafeToolReason,
+  type UnsafeToolName,
+  type UnsafeToolInfo
+} from './unsafeTool'
+
+const UNSAFE_REASON_TEXT: Record<UnsafeToolReason, { what: string; fix: string }> = {
+  project: { what: 'is in the open project', fix: 'Remove that folder from PATH, then try again.' },
+  temp: { what: 'is in a temporary folder', fix: 'Remove that folder from PATH, then try again.' },
+  network: {
+    what: 'would be looked up on a network share listed in PATH',
+    fix: 'Remove the network share from PATH, or move it after the local folder, then try again.'
+  },
+  relative: { what: 'comes from a relative PATH entry', fix: 'Remove that entry from PATH, then try again.' },
+  unresolvable: {
+    what: 'could not be checked, because its real location cannot be resolved',
+    fix: 'Reinstall it in its default folder, then try again.'
+  },
+  ambiguous: {
+    what: 'has copies in more than one PATH folder, and Erfana cannot tell which one would run',
+    fix: 'Remove the extra copy from PATH, then try again.'
+  }
+}
+
+/**
+ * Why Erfana will not run LibreOffice (#250), naming the tool or the helper
+ * (`which`, `powershell`) at fault, the reason and its fix. Never carries the
+ * path. The single wording source: the conversion refusal in main, the
+ * Settings → Import tools hint and the import refusal dialog all use it, so
+ * they cannot disagree.
+ */
+export function untrustedToolMessage(tool: string, reason: UnsafeToolReason): string {
+  const who = tool === 'which' || tool === 'powershell' ? `the ${tool} program LiteParse uses to find LibreOffice` : tool
+  const { what, fix } = UNSAFE_REASON_TEXT[reason]
+  return `Erfana will not run LibreOffice: ${who} ${what}. ${fix}`
+}
+
 export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   // Path validation errors
   [ErrorCode.PATH_INVALID]: 'The selected path is invalid',
@@ -391,6 +435,8 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.IMPORT_PAGE_LIMIT_EXCEEDED]: 'Document exceeds the maximum page limit',
   [ErrorCode.IMPORT_TIMEOUT]: 'Document conversion timed out',
   [ErrorCode.IMPORT_BUSY]: 'A document import is already in progress',
+  [ErrorCode.IMPORT_UNTRUSTED_TOOL]:
+    'Erfana did not run LibreOffice: the copy it would use is in the open project, a temporary folder or a network share, or comes from a relative PATH entry. Remove that folder from PATH, then try again.',
 
   // Prompt execution errors
   [ErrorCode.PROMPT_NOT_FOUND]: 'Prompt template not found',
@@ -552,9 +598,39 @@ export function getUserFriendlyMessage(error: unknown): string {
     return ERROR_MESSAGES[error.code] || ERROR_MESSAGES[ErrorCode.UNKNOWN_ERROR]
   }
 
+  // An error that crossed IPC is a plain Error; main marks the code on the end of its message
+  const carried = errorCodeInMessage(error)
+  if (carried) {
+    return ERROR_MESSAGES[carried]
+  }
+
   // Security: Don't expose raw error messages - return generic message
   // Internal details are logged separately, not sent to renderer
   return ERROR_MESSAGES[ErrorCode.UNKNOWN_ERROR]
+}
+
+/**
+ * What to show a person for a failed operation, in a toast or inline: the
+ * friendly text of the error's code when it has one (an `AppError`, or an error
+ * that crossed IPC with its code marked), otherwise its message without the
+ * Electron prefix and code marker.
+ */
+export function getDisplayMessage(error: unknown): string {
+  const code = error instanceof AppError ? error.code : errorCodeInMessage(error)
+  if (code && ERROR_MESSAGES[code]) {
+    return ERROR_MESSAGES[code]
+  }
+  if (error instanceof Error) return cleanErrorMessage(error.message)
+  if (typeof error === 'string') return cleanErrorMessage(error)
+  return String(error)
+}
+
+/** The code main marked on the end of an error's message (see errorCodeMarker.ts), if any. */
+export function errorCodeInMessage(error: unknown): ErrorCode | null {
+  if (!(error instanceof Error)) return null
+  const match = ERROR_CODE_MARKER_PATTERN.exec(error.message)
+  if (!match) return null
+  return (Object.values(ErrorCode) as string[]).includes(match[1]) ? (match[1] as ErrorCode) : null
 }
 
 /**

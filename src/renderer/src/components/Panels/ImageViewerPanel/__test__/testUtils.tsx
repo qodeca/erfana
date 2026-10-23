@@ -18,7 +18,7 @@ import { vi, beforeEach, afterEach, type Mock } from 'vitest'
 import { render, screen, cleanup, type RenderResult } from '@testing-library/react'
 import type { IDockviewPanelProps } from 'dockview'
 
-import type { ImageReadResponse } from '../../../../../../shared/ipc/file-image-schema'
+import type { ImageReadRequest, ImageReadResponse } from '../../../../../../shared/ipc/file-image-schema'
 import type {
   ImageExportRequest,
   ImageExportResponse
@@ -71,7 +71,7 @@ export interface ImageViewerHarness {
    * what every watcher event in these suites represents. Override it (see
    * {@link ImageViewerHarness.serveUnchanged}) to exercise the skip path.
    */
-  readImage: Mock<(path: string, knownVersion?: string) => Promise<ImageReadResponse>>
+  readImage: Mock<(request: ImageReadRequest) => Promise<ImageReadResponse>>
   /**
    * Makes the fake disk hold still: from now on a read whose `knownVersion`
    * matches the version last handed out answers `unchanged`, and no bytes are
@@ -85,7 +85,7 @@ export interface ImageViewerHarness {
    */
   serveChanged: () => void
   /** Fake `window.api.file.getStats`. */
-  getStats: Mock<(path: string) => Promise<{ size: number }>>
+  getStats: Mock<(request: { filePath: string }) => Promise<{ size: number }>>
   /**
    * Fake `window.api.imageExport.run` (issue #73).
    *
@@ -149,8 +149,8 @@ export function installImageViewerHarness(): ImageViewerHarness {
   let errorListeners: WatchErrorCallback[] = []
 
   const readBytes = vi.fn<(path: string) => Promise<string>>()
-  const readImage = vi.fn<(path: string, knownVersion?: string) => Promise<ImageReadResponse>>()
-  const getStats = vi.fn<(path: string) => Promise<{ size: number }>>()
+  const readImage = vi.fn<(request: ImageReadRequest) => Promise<ImageReadResponse>>()
+  const getStats = vi.fn<(request: { filePath: string }) => Promise<{ size: number }>>()
   const imageExportRun = vi.fn<(request: ImageExportRequest) => Promise<ImageExportResponse>>()
 
   /** Default export behaviour: it worked, and nothing needed reporting. */
@@ -176,8 +176,8 @@ export function installImageViewerHarness(): ImageViewerHarness {
    * version differs every time and the hook never takes the skip path unless a
    * test asks for it.
    */
-  const alwaysChanged = async (path: string): Promise<ImageReadResponse> => {
-    const dataUrl = await readBytes(path)
+  const alwaysChanged = async ({ filePath }: ImageReadRequest): Promise<ImageReadResponse> => {
+    const dataUrl = await readBytes(filePath)
     versionSeq += 1
     servedVersion = `v${versionSeq}`
     return { status: 'ok', dataUrl, version: servedVersion }
@@ -320,10 +320,10 @@ export function installImageViewerHarness(): ImageViewerHarness {
     getStats,
     imageExportRun,
     serveUnchanged: () => {
-      readImage.mockImplementation(async (path, knownVersion) =>
-        knownVersion === servedVersion
+      readImage.mockImplementation(async (request) =>
+        request.knownVersion === servedVersion
           ? { status: 'unchanged', version: servedVersion }
-          : alwaysChanged(path)
+          : alwaysChanged(request)
       )
     },
     serveChanged: () => {

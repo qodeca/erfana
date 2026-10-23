@@ -658,6 +658,28 @@ describe('useGitStatus behavioral tests', () => {
       expect(mockGetStatus).toHaveBeenCalledTimes(0)
     })
 
+    it('refreshes git status for a content-only directory change', async () => {
+      // The tree skips a `structural: false` batch; the badges must not
+      renderHook(() =>
+        useGitStatus({ projectPath: '/test/project', enabled: true })
+      )
+      await act(async () => {
+        await vi.runAllTimersAsync()
+      })
+      mockGetStatus.mockClear()
+
+      await act(async () => {
+        ;(directoryChangeCallback as (data: unknown) => void)({
+          eventCount: 1,
+          summary: { change: 1 },
+          structural: false
+        })
+        await vi.runAllTimersAsync()
+      })
+
+      expect(mockGetStatus).toHaveBeenCalledTimes(1)
+    })
+
     // Note: this tests that git status refreshes triggered by directory changes
     // are gated. Directory *tree* refreshes (useDirectoryWatcher) are NOT gated
     // by visibility -- they continue even while hidden, as specified in FR-008.

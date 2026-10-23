@@ -877,6 +877,27 @@ describe('useExternalFileDrop', () => {
       expect(path).toBe('/project/docs')
     })
 
+    it('drops onto a file row into the folder that row names (flat, virtualised tree)', () => {
+      const { result } = renderHook(() => useExternalFileDrop(defaultOptions))
+
+      // The tree is a flat list: the file row is NOT inside its folder's
+      // element, so walking up would reach the container and fall back to the
+      // project root. The row names its folder instead.
+      const treeContainer = document.createElement('div')
+      treeContainer.classList.add('project-tree-content')
+      const row = document.createElement('div')
+      row.dataset.path = '/project/docs/readme.md'
+      row.dataset.type = 'file'
+      row.dataset.parentPath = '/project/docs'
+      const name = document.createElement('span')
+      row.appendChild(name)
+      treeContainer.appendChild(row)
+
+      const event = createMockDragEvent({ types: ['Files'], target: name })
+
+      expect(result.current.getTargetFromEvent(event)).toBe('/project/docs')
+    })
+
     it('returns project root when no specific folder found', () => {
       const { result } = renderHook(() => useExternalFileDrop(defaultOptions))
 

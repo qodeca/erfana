@@ -13,7 +13,11 @@
  * - `terminal:create` takes `{ cwd?, cols, rows }` only; the shell and its
  *   environment are chosen here, and `cwd` must be an existing folder inside
  *   the open project
- * - data, exit, error and clear events go to the owning window only
+ * - data, exit, error and clear events go to the owning window only; data
+ *   arrives batched (see terminalOutputFlow.ts), and every batch is sent
+ *   before the terminal's exit event
+ * - `terminal:ackOutput` (flow control) counts only when it comes from the
+ *   owning window
  */
 
 import { webContents } from 'electron'
@@ -29,6 +33,7 @@ import {
   TerminalCreateRequestSchema,
   TerminalIdRequestSchema,
   TerminalIdSchema,
+  TerminalOutputAckRequestSchema,
   TerminalResizeRequestSchema,
   TerminalWriteRequestSchema,
   type TerminalCreateRequest,
@@ -355,6 +360,15 @@ export function registerTerminalHandlers(session: ProjectSession): void {
     if (!parsed.success) return
     if (!ownsTerminal(event.sender?.id, parsed.data.terminalId)) return
     terminalService.markInitializationComplete(parsed.data.terminalId)
+  })
+
+  // Flow control: the renderer reports how much output xterm has parsed. Fires
+  // often under load, so a malformed one is dropped without a log line.
+  registerOn(TERMINAL_CHANNELS.ackOutput, (event, payload: unknown) => {
+    const parsed = TerminalOutputAckRequestSchema.safeParse(payload)
+    if (!parsed.success) return
+    if (!ownsTerminal(event.sender?.id, parsed.data.terminalId)) return
+    terminalService.ackOutput(parsed.data.terminalId, parsed.data.chars)
   })
 
   logger.info('✅ Terminal IPC handlers registered')
