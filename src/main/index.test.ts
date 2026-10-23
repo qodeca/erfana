@@ -3,6 +3,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { APP_ID } from '../shared/constants'
 
 /**
  * Main Process Window Creation Tests
@@ -1134,6 +1135,17 @@ describe('Main Process - Window Creation', () => {
       // Verify Menu.setApplicationMenu was called with the menu
       expect(Menu.setApplicationMenu).toHaveBeenCalledTimes(1)
       expect(Menu.setApplicationMenu).toHaveBeenCalledWith({})
+    })
+  })
+
+  describe('Windows AppUserModelID', () => {
+    it('sets the AppUserModelID to the installer appId', async () => {
+      mockIs.dev = false
+
+      await import('./index')
+
+      const { electronApp } = await import('@electron-toolkit/utils')
+      expect(electronApp.setAppUserModelId).toHaveBeenCalledWith(APP_ID)
     })
   })
 

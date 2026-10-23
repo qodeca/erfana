@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { app, BrowserWindow, Menu, dialog, session } from 'electron'
 import { join } from 'path'
+import { APP_ID } from '../shared/constants'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { spawnNewInstance } from './utils/spawnNewInstance'
 import { moveToSafeWorkingDirectory } from './utils/safeWorkingDirectory'
@@ -427,7 +428,7 @@ app.whenReady().then(async () => {
   Menu.setApplicationMenu(createApplicationMenu())
 
   // Set app user model id for windows
-  electronApp.setAppUserModelId('com.erfana')
+  electronApp.setAppUserModelId(APP_ID)
 
   // Default open or close DevTools by F12 in development
   // and ignore CommandOrControl + R in production.

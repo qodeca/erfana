@@ -8,6 +8,16 @@
  * Centralizes configuration values that are used across multiple files.
  */
 
+/**
+ * Application ID. Single source of truth for the Windows AppUserModelID.
+ *
+ * Must equal `appId` in `electron-builder.yml`: the NSIS installer stamps that value on the
+ * Start menu and desktop shortcuts, and the running app must report the same one so the taskbar
+ * groups it with the pinned shortcut and toast notifications resolve the app name and icon.
+ * `appId.test.ts` enforces the match.
+ */
+export const APP_ID = 'com.erfana.app'
+
 /** Maximum number of recent projects to track */
 export const MAX_RECENT_PROJECTS = 5
 
