@@ -20,7 +20,7 @@ export interface MenuAnchor {
   y: number
 }
 
-/** Gap kept from the panel's edges when the anchor is clamped or falls back */
+/** Gap kept from the panel's right and bottom edges when the anchor is pulled in, and from its top-left in the fallback */
 export const ANCHOR_PADDING_PX = 8
 
 /**
@@ -43,9 +43,9 @@ export interface CursorAnchorSource {
  * `.xterm-screen` box divided by the grid (`cols` × `rows`), and the cursor
  * row is taken relative to the rows on screen (`baseY + cursorY - viewportY`),
  * so a scrolled-back viewport still anchors where the cursor shows. The point
- * kept inside the terminal element (pulled in by the padding only past its
- * right or bottom edge); with no usable screen box it falls
- * back to the element's top-left plus padding.
+ * is kept inside the terminal element (pulled in by the padding only past its
+ * right or bottom edge); with no usable screen box it falls back to the
+ * element's top-left plus padding.
  *
  * @param xterm - The instance, or anything with the same public fields
  * @returns The anchor in viewport coordinates
@@ -79,7 +79,7 @@ export function terminalCursorAnchor(xterm: CursorAnchorSource): MenuAnchor {
 }
 
 function clamp(value: number, min: number, max: number): number {
-  // A panel narrower than twice the padding: keep its near edge
+  // A panel narrower or shorter than the padding: keep its near edge
   if (max < min) return min
   return Math.min(Math.max(value, min), max)
 }
