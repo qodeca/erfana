@@ -132,17 +132,33 @@ Error references app.asar paths
 
 ### Cause
 
-ASAR is enabled but dependencies can't be loaded from inside archive
+A JavaScript package was moved to `app.asar.unpacked/` (an `asarUnpack` glob that matches `.js` files, or `smartUnpack` turned back on). An unpacked package resolves its `require`s from `app.asar.unpacked/node_modules/`, where its still-packed dependencies are not.
 
 ### Solution
 
-Verify ASAR is disabled:
-```yaml
-# electron-builder.yml
-asar: false
-```
+Unpack only native addons and executables, never a package's JavaScript – keep `asar.smartUnpack: false` and the file-level `asarUnpack` list. Do **not** fall back to `asar: false`: `afterPack` refuses to flip the asar fuses onto a bundle without `app.asar`.
 
 **See**: [ASAR Packaging](./asar.md)
+
+---
+
+## ASAR Integrity Violation at start-up
+
+### Error Message
+
+```
+ASAR Integrity Violation: got a hash mismatch (… vs …)
+```
+
+or `FATAL:… Integrity check failed for asar archive entry '<header>'`.
+
+### Cause
+
+`app.asar` changed after electron-builder embedded its hash – something edited the archive after packing (a hook, a manual patch), or the file is damaged.
+
+### Solution
+
+Rebuild. Never modify `app.asar` after packing; anything that must change goes in before `electron-builder` packs, or into `app.asar.unpacked/` (which is not hashed).
 
 ---
 

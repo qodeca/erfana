@@ -23,9 +23,8 @@
 }
 
 /* Hover and keyboard focus look the same, per design/system/components/menu:
-   a menu has one active item whichever device you use. Items do not take
-   focus yet (#90 adds the arrow keys); the rule is here so the state is
-   already right when they do. */
+   a menu has one active item whichever device you use. The pointer moves the
+   roving focus too (ContextMenu.tsx, #90), so the two never disagree. */
 .context-menu-item:hover:not(.disabled),
 .context-menu-item:focus-visible:not(.disabled) {
   background-color: var(--color-bg-hover-solid);

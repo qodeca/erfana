@@ -2,9 +2,9 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * ContextMenu hands focus back to whatever had it at open before running an
- * item's action (PR #286 review). Menu items are not focusable, so the click
- * that picks one leaves focus on <body>; a dialog the action opens would then
- * record <body> as its opener and return focus nowhere when it closes.
+ * item's action (PR #286 review). Focus is inside the menu when an item is
+ * picked; without the hand-back a dialog the action opens would record the
+ * vanishing item (or <body>) as its opener and return focus nowhere.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
@@ -31,9 +31,10 @@ describe('ContextMenu focus hand-back', () => {
     })
 
     render(<ContextMenu x={10} y={10} items={[{ label: 'Rename', action }]} onClose={vi.fn()} />)
-    // What a real click on a non-focusable menu item does to focus.
-    row.blur()
-    expect(document.activeElement).toBe(document.body)
+    // Since #90 the menu takes focus on open, so at click time focus is on the
+    // item – not on the row, and not on <body> as it was when items were not
+    // focusable. Either way the action must see the row focused.
+    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Rename' }))
 
     fireEvent.click(screen.getByText('Rename'))
 

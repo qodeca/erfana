@@ -40,6 +40,7 @@ import {
 } from './chatBubble.logic'
 import { formatZoomLevel } from './diagramViewer.logic'
 import { TextareaContextMenu } from '../../ContextMenu/TextareaContextMenu'
+import { isKeyboardMenuEcho, openMenuFromKey } from '../../ContextMenu/contextMenuKey'
 import { useTextareaClipboard } from '../../../hooks/useTextareaClipboard'
 import { CharacterCount } from '../../shared'
 import { scheduleScrollIfNeeded } from '../../../utils/promptScrollScheduler.logic'
@@ -344,7 +345,14 @@ export function ChatBubble({
   // Context menu handlers for textarea copy/paste (issue #37)
   const handleTextareaContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
+    // The Windows Menu-key echo of a menu the keyboard already opened (#90).
+    if (isKeyboardMenuEcho()) return
     setTextareaContextMenu({ x: e.clientX, y: e.clientY })
+  }, [])
+
+  // Shift+F10 / the Menu key open the same menu under the field (#90).
+  const handleTextareaMenuKey = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    openMenuFromKey(e, setTextareaContextMenu)
   }, [])
 
   const handleCloseTextareaContextMenu = useCallback(() => {
@@ -559,7 +567,12 @@ export function ChatBubble({
                 value={message}
                 onChange={handleChange}
                 onKeyDown={handleKeyDown}
+                onKeyDownCapture={handleTextareaMenuKey}
                 onContextMenu={handleTextareaContextMenu}
+                /* deviates: design/system/components/menu/index.html — aria-haspopup
+                   only: ARIA does not allow aria-expanded on a textbox. See the
+                   card's Exceptions. */
+                aria-haspopup="menu"
                 placeholder="Describe changes to this diagram..."
                 rows={3}
                 maxLength={CHAT_LIMITS.MAX_LENGTH}

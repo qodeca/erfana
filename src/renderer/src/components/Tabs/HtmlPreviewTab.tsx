@@ -17,11 +17,13 @@
  * @see ImageTab for the sibling read-only tab this mirrors
  */
 
-import { useState, useCallback, useMemo, MouseEvent } from 'react'
+import { useState, useCallback, useMemo, useRef, MouseEvent } from 'react'
 import { X, Globe } from 'lucide-react'
 import { IDockviewPanelHeaderProps } from 'dockview'
 import { ContextMenu } from '../ContextMenu/ContextMenu'
 import { useTabContextMenu } from './useTabContextMenu'
+import { useTabMenuKey } from './useTabMenuKey'
+import { isKeyboardMenuEcho } from '../ContextMenu/contextMenuKey'
 import { useTabTitle } from './useTabTitle'
 import { useProjectManagementContext } from '../../context/ProjectManagementContext'
 import { PreviewFailureBadge } from '../Panels/HtmlPreviewPanel/components'
@@ -76,6 +78,9 @@ export function HtmlPreviewTab(props: IDockviewPanelHeaderProps<HtmlPreviewTabPa
   const failureSummary = useMemo(() => summarizeFailures(failures), [failures])
 
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
+  const rootRef = useRef<HTMLDivElement>(null)
+  // Shift+F10 / the Menu key on the focused tab (#90).
+  useTabMenuKey(rootRef, setContextMenu)
   // The same close items every tab gets, and nothing else.
   //
   // "Export as PDF" used to be prepended here, because the panel surface is
@@ -120,6 +125,8 @@ export function HtmlPreviewTab(props: IDockviewPanelHeaderProps<HtmlPreviewTabPa
   const handleContextMenu = useCallback((e: MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
+    // The Windows Menu-key echo of a menu the keyboard already opened (#90).
+    if (isKeyboardMenuEcho()) return
     setContextMenu({ x: e.clientX, y: e.clientY })
   }, [])
 
@@ -132,6 +139,7 @@ export function HtmlPreviewTab(props: IDockviewPanelHeaderProps<HtmlPreviewTabPa
   return (
     <>
       <div
+        ref={rootRef}
         className="html-preview-tab"
         title={tooltipContent}
         onAuxClick={handleAuxClick}
