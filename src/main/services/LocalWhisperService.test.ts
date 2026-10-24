@@ -1452,7 +1452,7 @@ describe('LocalWhisperService', () => {
   describe('duration detection fallback', () => {
     it('falls back to file size estimation when ffmpeg cannot parse duration', async () => {
       // Duration probe emits no parseable duration
-      setupDualExecFileMock('unparseable_duration', true)
+      setupDualExecFileMock('unparseable_duration')
       mockStat.mockResolvedValue({ size: 32_000 }) // 1 second at 32,000 bytes/sec
       mockSpawn.mockImplementation(() => makeWhisperSpawnChild(0))
 
@@ -1478,7 +1478,7 @@ describe('LocalWhisperService', () => {
     })
 
     it('uses Math.max(1, ...) so minimum duration is 1 second', async () => {
-      setupDualExecFileMock('unparseable_duration', true)
+      setupDualExecFileMock('unparseable_duration')
       mockStat.mockResolvedValue({ size: 100 }) // very small file → < 1 sec → clamped to 1
       mockSpawn.mockImplementation(() => makeWhisperSpawnChild(0))
 

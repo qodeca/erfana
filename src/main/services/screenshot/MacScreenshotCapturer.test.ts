@@ -15,7 +15,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import path from 'path'
 import os from 'os'
-import type { ChildProcess } from 'child_process'
+import type { ChildProcess, ExecFileException } from 'child_process'
 import { EventEmitter } from 'events'
 
 const REAL_TMPDIR = os.tmpdir()
@@ -47,7 +47,7 @@ vi.mock('fs/promises', () => ({
   access: mockAccess
 }))
 
-const mockTmpdir = vi.fn(() => REAL_TMPDIR)
+const mockTmpdir = vi.fn((..._args: unknown[]) => REAL_TMPDIR)
 
 vi.mock('os', async (importOriginal) => {
   const actual = await importOriginal<typeof import('os')>()
@@ -59,7 +59,7 @@ vi.mock('os', async (importOriginal) => {
 
 const mockGetAllDisplays = vi.fn()
 const mockGetPrimaryDisplay = vi.fn()
-const mockGetMediaAccessStatus = vi.fn(() => 'granted')
+const mockGetMediaAccessStatus = vi.fn((..._args: unknown[]) => 'granted')
 
 vi.mock('electron', () => ({
   screen: {
@@ -229,7 +229,8 @@ describe('MacScreenshotCapturer', () => {
     })
 
     it('returns SCREENSHOT_CANCELLED on exit code 1 + missing file', async () => {
-      const err = new Error('Cancelled') as NodeJS.ErrnoException
+      // execFile reports the exit code as a number and a kill as `killed`.
+      const err = new Error('Cancelled') as ExecFileException
       err.code = 1
       mockExecFile.mockImplementation((_p, _a, _o, cb) => {
         cb(err, '', '')
@@ -244,7 +245,7 @@ describe('MacScreenshotCapturer', () => {
     })
 
     it('returns SCREENSHOT_TIMEOUT when process is killed', async () => {
-      const err = new Error('Timeout') as NodeJS.ErrnoException
+      const err = new Error('Timeout') as ExecFileException
       err.killed = true
       mockExecFile.mockImplementation((_p, _a, _o, cb) => {
         cb(err, '', '')

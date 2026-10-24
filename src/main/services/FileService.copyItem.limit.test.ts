@@ -43,8 +43,7 @@ vi.mock('fs/promises', () => ({
   rm: vi.fn(),
   unlink: vi.fn(),
   access: vi.fn(),
-  chmod: vi.fn(),
-  readdirent: vi.fn()
+  chmod: vi.fn()
 } satisfies Partial<typeof FsProm>))
 
 import { stat, lstat, readdir } from 'fs/promises'

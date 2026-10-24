@@ -389,6 +389,7 @@ describe('buildWindowsBootstrap dispatch', () => {
     // shell. This proves order-dependence, not just correctness of the
     // default chain.
     const promiscuous: WindowsBootstrapBuilder = {
+      // @ts-expect-error -- a sentinel kind no real builder has, so only this builder can produce it
       kind: 'promiscuous',
       canHandle: () => true,
       build: () => ['--promiscuous']

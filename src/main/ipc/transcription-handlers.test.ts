@@ -328,7 +328,7 @@ describe('transcription-handlers', () => {
       const request = { filePath: TEST_AUDIO, language: 'en' }
       await handler!(mockEvent, request)
 
-      const sender = (mockEvent as { sender: { send: ReturnType<typeof vi.fn> } }).sender
+      const sender = mockEvent.sender
       expect(sender.send).toHaveBeenCalledWith(
         'transcription:progress',
         expect.objectContaining({ percent: 50, phase: 'Processing' })
@@ -563,8 +563,8 @@ describe('transcription-handlers', () => {
 
     it('should stream download progress to renderer', async () => {
       const { whisperModelManager } = await import('../services/WhisperModelManager')
-      vi.mocked(whisperModelManager.ensureBinary).mockImplementation(async ({ onProgress }) => {
-        onProgress?.({ percent: 42, phase: 'Downloading' })
+      vi.mocked(whisperModelManager.ensureBinary).mockImplementation(async (options) => {
+        options?.onProgress?.({ percent: 42, downloadedBytes: 420, totalBytes: 1000 })
         return '/usr/local/bin/whisper'
       })
 
@@ -574,10 +574,10 @@ describe('transcription-handlers', () => {
       const handler = getHandler('transcription:whisperEnsureBinary')
       await handler!(mockEvent)
 
-      const sender = (mockEvent as { sender: { send: ReturnType<typeof vi.fn> } }).sender
+      const sender = mockEvent.sender
       expect(sender.send).toHaveBeenCalledWith(
         'transcription:whisperDownloadProgress',
-        expect.objectContaining({ percent: 42, phase: 'Downloading' })
+        expect.objectContaining({ percent: 42, downloadedBytes: 420, totalBytes: 1000 })
       )
     })
   })
@@ -635,8 +635,8 @@ describe('transcription-handlers', () => {
 
     it('should stream download progress to renderer', async () => {
       const { whisperModelManager } = await import('../services/WhisperModelManager')
-      vi.mocked(whisperModelManager.ensureModel).mockImplementation(async (_model, { onProgress }) => {
-        onProgress?.({ percent: 75, phase: 'Downloading model' })
+      vi.mocked(whisperModelManager.ensureModel).mockImplementation(async (_model, options) => {
+        options?.onProgress?.({ percent: 75, downloadedBytes: 750, totalBytes: 1000 })
         return '/models/whisper/small.bin'
       })
 
@@ -646,10 +646,10 @@ describe('transcription-handlers', () => {
       const handler = getHandler('transcription:whisperEnsureModel')
       await handler!(mockEvent, 'small')
 
-      const sender = (mockEvent as { sender: { send: ReturnType<typeof vi.fn> } }).sender
+      const sender = mockEvent.sender
       expect(sender.send).toHaveBeenCalledWith(
         'transcription:whisperDownloadProgress',
-        expect.objectContaining({ percent: 75, phase: 'Downloading model' })
+        expect.objectContaining({ percent: 75, downloadedBytes: 750, totalBytes: 1000 })
       )
     })
   })

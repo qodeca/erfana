@@ -8,6 +8,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { useGlobalSettingsStore } from './useGlobalSettingsStore'
 import type { GlobalSettings } from '../../../shared/ipc/global-settings-schema'
+import { globalSettings } from '../test-utils/globalSettings'
 
 // Mock window.api.globalSettings
 const mockGlobalSettingsAPI = {
@@ -26,9 +27,9 @@ Object.defineProperty(window, 'api', {
 })
 
 describe('useGlobalSettingsStore', () => {
-  const mockSettings: GlobalSettings = {
+  const mockSettings: GlobalSettings = globalSettings({
     logging: { level: 'info' }
-  }
+  })
 
   beforeEach(() => {
     vi.clearAllMocks()
@@ -261,10 +262,10 @@ describe('useGlobalSettingsStore', () => {
     beforeEach(() => {
       // Initialize with settings
       useGlobalSettingsStore.setState({
-        settings: {
+        settings: globalSettings({
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false }
-        },
+        }),
         isInitialized: true
       })
     })
@@ -343,11 +344,11 @@ describe('useGlobalSettingsStore', () => {
     beforeEach(() => {
       // Initialize with settings including gitStatus
       useGlobalSettingsStore.setState({
-        settings: {
+        settings: globalSettings({
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 30000 }
-        },
+        }),
         isInitialized: true
       })
     })
@@ -427,11 +428,11 @@ describe('useGlobalSettingsStore', () => {
     beforeEach(() => {
       // Initialize with settings including gitStatus
       useGlobalSettingsStore.setState({
-        settings: {
+        settings: globalSettings({
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 30000 }
-        },
+        }),
         isInitialized: true
       })
     })
@@ -573,9 +574,9 @@ describe('useGlobalSettingsStore', () => {
 
   describe('_handleSettingsChanged()', () => {
     it('updates state from broadcast', () => {
-      const newSettings: GlobalSettings = {
+      const newSettings: GlobalSettings = globalSettings({
         logging: { level: 'debug' }
-      }
+      })
 
       const { _handleSettingsChanged } = useGlobalSettingsStore.getState()
       _handleSettingsChanged(newSettings)
@@ -588,9 +589,9 @@ describe('useGlobalSettingsStore', () => {
     it('clears error when settings updated', () => {
       useGlobalSettingsStore.setState({ error: 'Previous error' })
 
-      const newSettings: GlobalSettings = {
+      const newSettings: GlobalSettings = globalSettings({
         logging: { level: 'warn' }
-      }
+      })
 
       const { _handleSettingsChanged } = useGlobalSettingsStore.getState()
       _handleSettingsChanged(newSettings)

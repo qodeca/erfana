@@ -77,7 +77,8 @@ describe('git-handlers', () => {
 
   describe('git:getStatus handler', () => {
      
-    let handler: (event: any, projectPath: string) => Promise<any>
+    // `unknown`: an IPC handler takes whatever the renderer sends, which these tests probe.
+    let handler: (event: any, projectPath: unknown) => Promise<any>
 
     beforeEach(() => {
       registerGitHandlers()

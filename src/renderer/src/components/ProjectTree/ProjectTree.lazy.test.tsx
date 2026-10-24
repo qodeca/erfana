@@ -34,12 +34,6 @@ vi.mock('./useLazyFolderChildren', async (importOriginal) => {
   return { ...actual, useLazyFolderChildren: vi.fn(actual.useLazyFolderChildren) }
 })
 
-declare global {
-  interface Window {
-    api: any
-  }
-}
-
 installTreeViewport()
 
 const PROJECT = '/proj'

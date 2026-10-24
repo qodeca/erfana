@@ -4,6 +4,7 @@ import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
 import { CLIPBOARD_CHANNELS } from '../shared/ipc/clipboard-channels'
 import { IMAGE_EXPORT_CHANNELS } from '../shared/ipc/image-export-channels'
 import { BROWSER_CHANNELS } from '../shared/ipc/browser-channels'
+import type { Api } from './index'
 
 // Mock electron + toolkit before importing preload
 const listeners: Record<string, Array<(e: unknown, d: any) => void>> = {}
@@ -36,9 +37,12 @@ vi.mock('electron', () => {
   }
 })
 
+// The preload under test exposes its whole object, `file` and `terminal`
+// included, so this file types `window.api` as that object (`Api`) rather than
+// the renderer-facing `Omit<Api, 'file' | 'terminal'>` in index.d.ts.
 declare global {
   interface Window {
-    api: typeof import('./index').default extends never ? any : any
+    api: Api
   }
 }
 
@@ -74,12 +78,12 @@ describe('preload api exposure', () => {
 
   it('file.closeProject passes the generation the renderer last saw', async () => {
     const { ipcRenderer } = await import('electron')
-    await window.api.file.closeProject(7)
-    expect((ipcRenderer.invoke as any)).toHaveBeenCalledWith('file:closeProject', 7)
+    await window.api.file.closeProject({ expectedGeneration: 7 })
+    expect((ipcRenderer.invoke as any)).toHaveBeenCalledWith('file:closeProject', { expectedGeneration: 7 })
   })
 
   it('file.getLastProjectPath is gone', () => {
-    expect((window.api.file as Record<string, unknown>).getLastProjectPath).toBeUndefined()
+    expect(Reflect.get(window.api.file, 'getLastProjectPath')).toBeUndefined()
   })
 
   it('onProjectChanged delivers payload with string | null', async () => {

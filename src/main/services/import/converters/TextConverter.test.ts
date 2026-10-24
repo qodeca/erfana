@@ -69,7 +69,8 @@ describe('TextConverter', () => {
 
       it('should be a copy of TEXT_EXTENSIONS (not a reference)', () => {
         const originalLength = TEXT_EXTENSIONS.length
-        converter.supportedExtensions.push('custom')
+        // Any string will do: the test only checks the push does not reach TEXT_EXTENSIONS.
+        ;(converter.supportedExtensions as string[]).push('custom')
         expect(TEXT_EXTENSIONS.length).toBe(originalLength)
       })
     })

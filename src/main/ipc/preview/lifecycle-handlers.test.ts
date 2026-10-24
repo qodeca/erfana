@@ -85,7 +85,6 @@ function setup(overrides?: Partial<PreviewLifecycleHandlerDeps>): {
     eligibility: { check: eligibilityCheck },
     getProjectPath: () => '/project',
     isTrustedSender: () => trusted.value,
-    isTrustedAppSender: () => true,
     resolveWindow: () => FAKE_WINDOW,
     ...overrides
   })

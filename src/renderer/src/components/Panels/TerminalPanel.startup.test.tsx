@@ -11,12 +11,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, waitFor } from '@testing-library/react'
 import { useTerminalStore } from '../../stores/useTerminalStore'
 import { useClaudeStatusStore } from '../../stores/useClaudeStatusStore'
+import type { TerminalBridge } from '../../../../shared/ipc/terminal-schema'
+import { gatewayBridgeMock, type BridgeMock } from '../../test-utils/gatewayBridgeMock'
 
-declare global {
-  interface Window {
-    api: any
-  }
-}
+const terminalMock = (): BridgeMock<TerminalBridge> => gatewayBridgeMock('terminal')
 
 const TERMINAL_ID = 'test-terminal-1'
 
@@ -108,7 +106,7 @@ let clearHandler: ClearHandler | null = null
 async function renderPanel(): Promise<void> {
   const { TerminalPanel } = await import('./TerminalPanel')
   render(<TerminalPanel {...({} as any)} />)
-  await waitFor(() => expect(window.api.terminal.create).toHaveBeenCalled())
+  await waitFor(() => expect(terminalMock().create).toHaveBeenCalled())
   writesBefore = rawClearWrites()
 }
 
@@ -126,7 +124,7 @@ describe('TerminalPanel start-up clear handshake', () => {
     vi.clearAllMocks()
     installApi()
     clearHandler = null
-    window.api.terminal.onClear.mockImplementation((cb: ClearHandler) => {
+    terminalMock().onClear.mockImplementation((cb: ClearHandler) => {
       clearHandler = cb
       return vi.fn()
     })
@@ -142,55 +140,55 @@ describe('TerminalPanel start-up clear handshake', () => {
 
   it('confirms the clear only after the data listener is attached', async () => {
     await renderPanel()
-    await waitFor(() => expect(window.api.terminal.onData).toHaveBeenCalled())
+    await waitFor(() => expect(terminalMock().onData).toHaveBeenCalled())
     clearHandler!({ terminalId: TERMINAL_ID })
-    await waitFor(() => expect(window.api.terminal.markClearComplete).toHaveBeenCalledWith(TERMINAL_ID))
-    const dataOrder = window.api.terminal.onData.mock.invocationCallOrder[0]
-    const confirmOrder = window.api.terminal.markClearComplete.mock.invocationCallOrder[0]
+    await waitFor(() => expect(terminalMock().markClearComplete).toHaveBeenCalledWith(TERMINAL_ID))
+    const dataOrder = terminalMock().onData.mock.invocationCallOrder[0]
+    const confirmOrder = terminalMock().markClearComplete.mock.invocationCallOrder[0]
     expect(dataOrder).toBeLessThan(confirmOrder)
   })
 
   it('ignores a clear event for another terminal', async () => {
     await renderPanel()
-    await waitFor(() => expect(window.api.terminal.onData).toHaveBeenCalled())
+    await waitFor(() => expect(terminalMock().onData).toHaveBeenCalled())
     clearHandler!({ terminalId: 'some-other-terminal' })
     expect(clearWrites()).toBe(0)
-    expect(window.api.terminal.markClearComplete).not.toHaveBeenCalled()
+    expect(terminalMock().markClearComplete).not.toHaveBeenCalled()
   })
 
   it('holds a clear event that arrives before create resolves and runs it for the right id', async () => {
     let resolveCreate: (v: unknown) => void = () => {}
-    window.api.terminal.create.mockImplementation(
+    terminalMock().create.mockImplementation(
       () => new Promise((resolve) => { resolveCreate = resolve })
     )
     await renderPanel()
     clearHandler!({ terminalId: TERMINAL_ID })
     expect(clearWrites()).toBe(0)
     resolveCreate({ success: true, terminalId: TERMINAL_ID, shellKind: 'posix' })
-    await waitFor(() => expect(window.api.terminal.markClearComplete).toHaveBeenCalledWith(TERMINAL_ID))
+    await waitFor(() => expect(terminalMock().markClearComplete).toHaveBeenCalledWith(TERMINAL_ID))
     expect(clearWrites()).toBe(1)
     // the clear ran before the data effect did, yet the confirmation still waited for it
-    expect(window.api.terminal.onData.mock.invocationCallOrder[0]).toBeLessThan(
-      window.api.terminal.markClearComplete.mock.invocationCallOrder[0]
+    expect(terminalMock().onData.mock.invocationCallOrder[0]).toBeLessThan(
+      terminalMock().markClearComplete.mock.invocationCallOrder[0]
     )
   })
 
   it('does not run an early clear event that belongs to another terminal', async () => {
     let resolveCreate: (v: unknown) => void = () => {}
-    window.api.terminal.create.mockImplementation(
+    terminalMock().create.mockImplementation(
       () => new Promise((resolve) => { resolveCreate = resolve })
     )
     await renderPanel()
     clearHandler!({ terminalId: 'some-other-terminal' })
     resolveCreate({ success: true, terminalId: TERMINAL_ID, shellKind: 'posix' })
-    await waitFor(() => expect(window.api.terminal.onData).toHaveBeenCalled())
+    await waitFor(() => expect(terminalMock().onData).toHaveBeenCalled())
     expect(clearWrites()).toBe(0)
-    expect(window.api.terminal.markClearComplete).not.toHaveBeenCalled()
+    expect(terminalMock().markClearComplete).not.toHaveBeenCalled()
   })
 
   it('acknowledges output once xterm has parsed it (flow control)', async () => {
     let dataHandler: ((d: { terminalId: string; data: string }) => void) | null = null
-    window.api.terminal.onData.mockImplementation((cb: typeof dataHandler) => {
+    terminalMock().onData.mockImplementation((cb: typeof dataHandler) => {
       dataHandler = cb
       return vi.fn()
     })
@@ -207,10 +205,10 @@ describe('TerminalPanel start-up clear handshake', () => {
     dataHandler!({ terminalId: TERMINAL_ID, data: batch })
     dataHandler!({ terminalId: TERMINAL_ID, data: batch })
     dataHandler!({ terminalId: 'some-other-terminal', data: batch })
-    expect(window.api.terminal.ackOutput).not.toHaveBeenCalled()
+    expect(terminalMock().ackOutput).not.toHaveBeenCalled()
 
     for (const done of parsed.splice(0)) done()
-    expect(window.api.terminal.ackOutput).toHaveBeenCalledExactlyOnceWith(TERMINAL_ID, 32 * 1024)
+    expect(terminalMock().ackOutput).toHaveBeenCalledExactlyOnceWith(TERMINAL_ID, 32 * 1024)
   })
 
   describe('hidden window (flow control)', () => {
@@ -225,7 +223,7 @@ describe('TerminalPanel start-up clear handshake', () => {
 
     async function panelWithHeldParses() {
       let dataHandler: ((d: { terminalId: string; data: string }) => void) | null = null
-      window.api.terminal.onData.mockImplementation((cb: typeof dataHandler) => {
+      terminalMock().onData.mockImplementation((cb: typeof dataHandler) => {
         dataHandler = cb
         return vi.fn()
       })
@@ -243,7 +241,7 @@ describe('TerminalPanel start-up clear handshake', () => {
       const { send, parsed } = await panelWithHeldParses()
       visibility = 'hidden'
       send('x'.repeat(32 * 1024))
-      expect(window.api.terminal.ackOutput).toHaveBeenCalledExactlyOnceWith(TERMINAL_ID, 32 * 1024)
+      expect(terminalMock().ackOutput).toHaveBeenCalledExactlyOnceWith(TERMINAL_ID, 32 * 1024)
       // Written without a parse callback, so it can never be counted twice
       expect(parsed).toHaveLength(0)
       expect(mockXtermInstance.write).toHaveBeenLastCalledWith('x'.repeat(32 * 1024), undefined)
@@ -253,23 +251,23 @@ describe('TerminalPanel start-up clear handshake', () => {
       const { send, parsed } = await panelWithHeldParses()
       send('x'.repeat(16 * 1024))
       send('x'.repeat(8 * 1024))
-      expect(window.api.terminal.ackOutput).not.toHaveBeenCalled()
+      expect(terminalMock().ackOutput).not.toHaveBeenCalled()
 
       visibility = 'hidden'
       document.dispatchEvent(new Event('visibilitychange'))
-      expect(window.api.terminal.ackOutput).toHaveBeenCalledExactlyOnceWith(TERMINAL_ID, 24 * 1024)
+      expect(terminalMock().ackOutput).toHaveBeenCalledExactlyOnceWith(TERMINAL_ID, 24 * 1024)
 
       // The parses finish later: nothing more is reported for them
       for (const done of parsed.splice(0)) done()
-      expect(window.api.terminal.ackOutput).toHaveBeenCalledTimes(1)
+      expect(terminalMock().ackOutput).toHaveBeenCalledTimes(1)
 
       // Visible again: acks follow the parse callbacks once more
       visibility = 'visible'
       document.dispatchEvent(new Event('visibilitychange'))
       send('x'.repeat(32 * 1024))
-      expect(window.api.terminal.ackOutput).toHaveBeenCalledTimes(1)
+      expect(terminalMock().ackOutput).toHaveBeenCalledTimes(1)
       for (const done of parsed.splice(0)) done()
-      expect(window.api.terminal.ackOutput).toHaveBeenLastCalledWith(TERMINAL_ID, 32 * 1024)
+      expect(terminalMock().ackOutput).toHaveBeenLastCalledWith(TERMINAL_ID, 32 * 1024)
     })
   })
 })

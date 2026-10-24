@@ -56,7 +56,7 @@ const mockApi = {
     getRecentProjects: mockGetRecentProjects,
     removeRecentProject: mockRemoveRecentProject
   },
-  file: { onProjectChanged: vi.fn(() => vi.fn()) }
+  file: { onProjectChanged: vi.fn((_onChange: () => void) => vi.fn()) }
 }
 const originalApi = (window as unknown as { api?: typeof mockApi }).api
 

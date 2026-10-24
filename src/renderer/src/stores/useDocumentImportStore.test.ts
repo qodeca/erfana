@@ -578,7 +578,7 @@ describe('useDocumentImportStore', () => {
       const newProgress: DocumentImportProgress = {
         percent: 80,
         phase: 'OCR',
-        warning: 'Low confidence on page 3'
+        warnings: 'Low confidence on page 3'
       }
 
       useDocumentImportStore.getState()._handleProgress(newProgress)

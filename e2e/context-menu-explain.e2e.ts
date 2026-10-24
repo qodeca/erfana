@@ -14,7 +14,7 @@
  */
 
 import { IS_LINUX_CONTAINER } from './utils/linux-container'
-import { test, expect, _electron as electron } from '@playwright/test'
+import { test, expect, _electron as electron, type Page } from '@playwright/test'
 import * as path from 'path'
 import {
   TEST_IDS,
@@ -59,7 +59,7 @@ const testSeed = {
  * user gesture where there is nothing selected.
  */
 async function selectAndOpenPreviewContextMenu(
-  page: Awaited<ReturnType<typeof electron.firstWindow>>,
+  page: Page,
   previewTestId: string
 ): Promise<void> {
   await page.evaluate((tid) => {

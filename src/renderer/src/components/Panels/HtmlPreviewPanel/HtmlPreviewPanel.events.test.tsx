@@ -79,7 +79,7 @@ describe('HtmlPreviewPanel – event feed', () => {
         host: 'https://fourth.example',
         approvable: true,
         kinds: ['image'],
-        notify: false
+        truncated: false
       })
     })
 
@@ -103,7 +103,7 @@ describe('HtmlPreviewPanel – event feed', () => {
         host: 'https://cdn.example',
         approvable: true,
         kinds: ['script'],
-        notify: true
+        truncated: false
       })
     })
     await waitFor(() =>
@@ -127,7 +127,7 @@ describe('HtmlPreviewPanel – event feed', () => {
         host: 'https://cdn.example',
         approvable: true,
         kinds: ['style'],
-        notify: true
+        truncated: false
       })
     })
     act(() => {
@@ -136,7 +136,7 @@ describe('HtmlPreviewPanel – event feed', () => {
         host: 'https://cdn.example',
         approvable: true,
         kinds: ['style', 'script'],
-        notify: false
+        truncated: false
       })
     })
 
@@ -163,7 +163,7 @@ describe('HtmlPreviewPanel – event feed', () => {
           host: 'https://cdn.example',
           approvable: true,
           kinds: ['script'],
-          notify: true
+          truncated: false
         })
       })
       // A microtask settle is enough; no toast must be dispatched.
@@ -191,7 +191,7 @@ describe('HtmlPreviewPanel – event feed', () => {
           host: HOST,
           approvable: true,
           kinds: ['script'],
-          notify: true
+          truncated: false
         })
       })
       const chip = await screen.findByTestId('preview-band-chip')
