@@ -75,6 +75,9 @@ export function useTerminalClipboard(
     }
     // Depend on xtermRef.current (not just xtermRef) to re-run when terminal instance changes.
     // The ref object is stable, but we need to reattach when the terminal is recreated.
+    // Reading the ref here is deliberate: the instance lives in a ref the caller owns,
+    // and making it state would change the caller's (TerminalPanel's) contract.
+    // eslint-disable-next-line react-hooks/exhaustive-deps, react-hooks/refs -- re-attach when a re-render shows a new terminal instance; see above
   }, [xtermRef.current])
 
   const copy = useCallback(async () => {

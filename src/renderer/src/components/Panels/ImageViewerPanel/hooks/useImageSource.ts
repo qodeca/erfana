@@ -407,6 +407,7 @@ export function useImageSource(options: UseImageSourceOptions): UseImageSourceRe
   // Initial load, and a full reload whenever the panel is repointed at another file.
   useEffect(() => {
     pendingRefreshRef.current = false
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- starting the read is the effect's job; load() flips its loading flag before its first await, which is what the rule sees
     void load('initial')
   }, [load])
 

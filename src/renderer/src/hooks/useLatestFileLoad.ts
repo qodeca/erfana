@@ -127,6 +127,7 @@ export function useLatestFileLoad<T extends FileLoadResult>(
 
   useEffect(() => {
     if (!filePath) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- starting the read is the effect's job; load() sets state only after its await
     void load(filePath)
     return () => {
       // Retire the load in flight (unmount, path change, StrictMode remount)

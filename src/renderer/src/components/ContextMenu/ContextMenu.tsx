@@ -11,6 +11,7 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 import { TEST_IDS } from '../../constants/testids'
+import { useLatestRef } from '../../hooks/useLatestRef'
 import { useOccluder } from '../../hooks/useOccluder'
 import { useOverlayStackEntry } from '../../hooks/useOverlayStackEntry'
 import { toAriaKeyShortcuts } from './ariaKeyShortcuts'
@@ -122,7 +123,8 @@ function lastItem(items: ContextMenuItem[]): number {
  */
 export function ContextMenu({ x, y, items, onClose, containerTestId }: ContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null)
-  const openTimeRef = useRef<number>(Date.now())
+  // Stamped on mount by the click-outside effect below; 0 until then.
+  const openTimeRef = useRef<number>(0)
   // What had focus when the menu opened (the right-clicked tree row, say),
   // captured on the first render – before the menu moves focus into itself –
   // so it is remembered on open, never looked up on close. Focus goes back
@@ -152,8 +154,7 @@ export function ContextMenu({ x, y, items, onClose, containerTestId }: ContextMe
 
   // Store onClose in a ref to avoid re-running effect when it changes
   // This prevents openTimeRef from being reset when context value updates
-  const onCloseRef = useRef(onClose)
-  onCloseRef.current = onClose
+  const onCloseRef = useLatestRef(onClose)
 
   const restoreFocus = useCallback(() => {
     if (opener?.isConnected) {
@@ -207,7 +208,7 @@ export function ContextMenu({ x, y, items, onClose, containerTestId }: ContextMe
       // Must match capture option when removing
       document.removeEventListener('mousedown', handleClickOutside, { capture: true })
     }
-  }, []) // Empty deps - only run on mount/unmount
+  }, [onCloseRef]) // onCloseRef is stable, so this runs on mount/unmount only
 
   // Calculate optimal position with viewport boundary checks
   useEffect(() => {
