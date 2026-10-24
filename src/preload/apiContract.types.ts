@@ -9,7 +9,11 @@
  * that drifts from its contract, or an `Api` that stops being `typeof api`,
  * fails the typecheck here.
  */
+import type { DirectoryWatchBridge } from '../shared/ipc/directory-watch-schema'
 import type { FileBridge } from '../shared/ipc/file-schema'
+import type { FileWatchBridge } from '../shared/ipc/file-watch-schema'
+import type { GitBridge } from '../shared/ipc/git-schema'
+import type { GitPollingBridge, GitWatcherBridge } from '../shared/ipc/git-watcher-schema'
 import type { TerminalBridge } from '../shared/ipc/terminal-schema'
 import type { Api } from './index'
 
@@ -45,6 +49,11 @@ type AnyIn<T, Depth extends unknown[] = []> = Depth['length'] extends 14
 export type ApiContractChecks = [
   Assert<Equal<Api['file'], FileBridge>>,
   Assert<Equal<Api['terminal'], TerminalBridge>>,
+  Assert<Equal<Api['fileWatch'], FileWatchBridge>>,
+  Assert<Equal<Api['directoryWatch'], DirectoryWatchBridge>>,
+  Assert<Equal<Api['git'], GitBridge>>,
+  Assert<Equal<Api['gitWatcher'], GitWatcherBridge>>,
+  Assert<Equal<Api['gitPolling'], GitPollingBridge>>,
   // A bridge method that returns the unchecked `ipcRenderer.invoke` result would put `any` in the renderer
   Assert<Equal<AnyIn<Api>, never>>
 ]

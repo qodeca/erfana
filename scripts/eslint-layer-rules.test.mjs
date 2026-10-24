@@ -124,18 +124,29 @@ describe('layer import rules', () => {
 })
 
 describe('renderer gateway rule', () => {
-  const GATEWAY = /services\/fileGateway and services\/terminalGateway/
+  const GATEWAY = /through their gateway in services\//
   const gatewayMessages = async (rel, code) =>
     (await lint(rel, code)).filter((m) => GATEWAY.test(m.message))
 
   const READ_FILE = 'export const f = () => window.api.file.readFile("a")'
   const READ_TERMINAL = 'export const t = () => window.api.terminal.kill("a")'
-  const READ_OTHER = 'export const g = () => window.api.git.status("a")'
+  const READ_OTHER = 'export const g = () => window.api.settings.getRecentProjects()'
 
   it('flags a renderer read of window.api.file and window.api.terminal', async () => {
     expect(await gatewayMessages(RENDERER, READ_FILE)).toHaveLength(1)
     expect(await gatewayMessages(RENDERER, READ_TERMINAL)).toHaveLength(1)
     expect(await gatewayMessages(RENDERER, 'export const f = () => window.api?.file?.exists("a")')).toHaveLength(1)
+  })
+
+  it.each([
+    'export const f = () => window.api.fileWatch.start("a")',
+    'export const f = () => window.api.directoryWatch.pause("a")',
+    'export const f = () => window.api?.directoryWatch?.onDirectoryChanged?.(() => {})',
+    'export const f = () => window.api.git.getStatus("a")',
+    'export const f = () => window.api.gitWatcher.stop()',
+    'export const f = () => window.api.gitPolling.setEnabled(true)'
+  ])('flags the watcher and git bridges: %s', async (code) => {
+    expect(await gatewayMessages(RENDERER, code)).toHaveLength(1)
   })
 
   it.each([
@@ -168,7 +179,11 @@ describe('renderer gateway rule', () => {
 
   it.each([
     'src/renderer/src/services/fileGateway.ts',
-    'src/renderer/src/services/terminalGateway.ts'
+    'src/renderer/src/services/terminalGateway.ts',
+    'src/renderer/src/services/fileWatchGateway.ts',
+    'src/renderer/src/services/directoryWatchGateway.ts',
+    'src/renderer/src/services/gitGateway.ts',
+    'src/renderer/src/services/bridgePresence.ts'
   ])('exempts %s from the gateway rule only', async (file) => {
     expect(await gatewayMessages(file, READ_FILE)).toHaveLength(0)
     const messages = await lint(file, 'export const b = (p) => p.split("/").pop()')
