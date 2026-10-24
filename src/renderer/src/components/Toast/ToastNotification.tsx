@@ -217,15 +217,24 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
     pauseOnFocus()
   }
 
-  // Close from the Close button, the action, or Escape. Focus goes back only if
-  // it was inside the toast (a mouse click on Close focuses Close first) and
-  // the element it came from still exists.
+  // Focus goes back when the toast LEAVES, however it leaves: the Close button,
+  // the action, Escape, a `removeToast` call elsewhere, or the sticky cap in
+  // `toastStack.ts`. Doing it in the unmount cleanup covers every one of those.
+  // A layout-effect cleanup runs while the toast is still in the DOM, so it can
+  // still see whether focus is inside it. Focus moves only if it was inside the
+  // toast (a mouse click on Close focuses Close first) and the element it came
+  // from still exists.
+  useLayoutEffect(() => {
+    const root = rootRef.current
+    return () => {
+      const back = returnFocusTo.current
+      if (root?.contains(document.activeElement) && back?.isConnected) back.focus()
+    }
+  }, [])
+
   const dismissRef = useRef<() => void>(() => {})
   const dismiss = (): void => {
-    const hadFocus = rootRef.current?.contains(document.activeElement) ?? false
-    const back = returnFocusTo.current
     onClose()
-    if (hadFocus && back?.isConnected) back.focus()
   }
   useLayoutEffect(() => {
     dismissRef.current = dismiss
@@ -260,6 +269,7 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
       ref={rootRef}
       className={`toast toast-${toast.type}`}
       data-testid={`${TEST_IDS.TOAST}-${toast.type}`}
+      data-toast-id={toast.id}
       data-paused={paused ? 'true' : undefined}
       {...dwellHandlers}
       onFocus={handleFocus}
@@ -270,7 +280,16 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
         <Icon size={20} strokeWidth={2} />
       </div>
       <div className="toast-content">
-        <div className="toast-title">{toast.title}</div>
+        <div className="toast-title">
+          {toast.title}
+          {/* Repeats merge into one toast (toastStack.ts). The count is not
+              re-announced: the live region already read this message once. */}
+          {(toast.count ?? 1) > 1 && (
+            <span className="toast-count" data-testid={TEST_IDS.TOAST_COUNT}>
+              ×{toast.count}
+            </span>
+          )}
+        </div>
         <div className="toast-message" data-testid={TEST_IDS.TOAST_MESSAGE}>{toast.message}</div>
         {toast.action && (
           <button

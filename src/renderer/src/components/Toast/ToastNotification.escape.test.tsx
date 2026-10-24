@@ -13,7 +13,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { showGlobalToast } from './toastService'
 import { ToastNotification } from './ToastNotification'
-import { ToastProvider } from './ToastContext'
+import { ToastProvider, useToast } from './ToastContext'
 import { BaseDialog } from '../Dialog/BaseDialog'
 import { TEST_IDS } from '../../constants/testids'
 
@@ -137,5 +137,113 @@ describe('Toast keyboard dismissal', () => {
     act(() => screen.getByTestId('in-dialog').focus())
     fireEvent.keyDown(screen.getByTestId('in-dialog'), { key: 'Escape' })
     expect(dialogClose).toHaveBeenCalledOnce()
+  })
+
+  it('with two toasts, Escape closes only the focused one', () => {
+    mount()
+    act(() => {
+      showGlobalToast({ title: 'First', message: 'one', type: 'error' })
+      showGlobalToast({ title: 'Second', message: 'two', type: 'error' })
+    })
+    const [, secondClose] = screen.getAllByTestId(TEST_IDS.TOAST_BTN_DISMISS)
+    act(() => secondClose.focus())
+
+    fireEvent.keyDown(secondClose, { key: 'Escape' })
+
+    const left = screen.getAllByTestId(`${TEST_IDS.TOAST}-error`)
+    expect(left).toHaveLength(1)
+    expect(left[0].textContent).toContain('First')
+  })
+})
+
+describe('Toast stack: merged repeats, sticky cap, focus on removal', () => {
+  beforeEach(() => {
+    const portalRoot = document.createElement('div')
+    portalRoot.id = 'portal-root'
+    document.body.appendChild(portalRoot)
+  })
+
+  afterEach(() => {
+    document.body.innerHTML = ''
+  })
+
+  let removeToastFromOutside: (id: string) => void = () => {}
+  function Remover(): null {
+    removeToastFromOutside = useToast().removeToast
+    return null
+  }
+
+  function mount(): void {
+    render(
+      <ToastProvider>
+        <button data-testid="opener">opener</button>
+        <Remover />
+        <ToastNotification />
+      </ToastProvider>
+    )
+  }
+
+  it('10 identical errors show as one toast with count 10, announced once', () => {
+    mount()
+    for (let i = 0; i < 10; i += 1) {
+      act(() => showGlobalToast({ title: 'Save failed', message: 'disk full', type: 'error' }))
+    }
+    expect(screen.getAllByTestId(`${TEST_IDS.TOAST}-error`)).toHaveLength(1)
+    expect(screen.getByTestId(TEST_IDS.TOAST_COUNT).textContent).toBe('×10')
+    expect(screen.getByTestId(TEST_IDS.TOAST_LIVE_ALERT).textContent).toBe('Save failed: disk full')
+  })
+
+  it('7 different errors leave at most 5 on screen, the newest ones', () => {
+    mount()
+    for (let i = 0; i < 7; i += 1) {
+      act(() => showGlobalToast({ title: 'Failed', message: `error ${i}`, type: 'error' }))
+    }
+    const shown = screen.getAllByTestId(TEST_IDS.TOAST_MESSAGE).map((el) => el.textContent)
+    expect(shown).toEqual(['error 2', 'error 3', 'error 4', 'error 5', 'error 6'])
+  })
+
+  it('never drops the focused toast when the cap is reached', () => {
+    mount()
+    for (let i = 0; i < 5; i += 1) {
+      act(() => showGlobalToast({ title: 'Failed', message: `error ${i}`, type: 'error' }))
+    }
+    const oldestClose = screen.getAllByTestId(TEST_IDS.TOAST_BTN_DISMISS)[0]
+    act(() => oldestClose.focus())
+
+    act(() => showGlobalToast({ title: 'Failed', message: 'error 5', type: 'error' }))
+
+    const shown = screen.getAllByTestId(TEST_IDS.TOAST_MESSAGE).map((el) => el.textContent)
+    expect(shown).toEqual(['error 0', 'error 2', 'error 3', 'error 4', 'error 5'])
+    expect(document.activeElement).toBe(oldestClose)
+  })
+
+  it('gives focus back when a focused toast is removed from outside the toast', () => {
+    mount()
+    show('error')
+    const opener = screen.getByTestId('opener')
+    act(() => opener.focus())
+    act(() => closeButton().focus())
+    const id = toastOf('error')?.getAttribute('data-toast-id') ?? ''
+
+    act(() => removeToastFromOutside(id))
+
+    expect(toastOf('error')).toBeNull()
+    expect(document.activeElement).toBe(opener)
+  })
+
+  it('does not move focus when an unfocused toast is removed', () => {
+    mount()
+    show('error')
+    const opener = screen.getByTestId('opener')
+    const elsewhere = document.createElement('input')
+    document.body.appendChild(elsewhere)
+    act(() => opener.focus())
+    act(() => closeButton().focus())
+    act(() => elsewhere.focus())
+    const id = toastOf('error')?.getAttribute('data-toast-id') ?? ''
+
+    act(() => removeToastFromOutside(id))
+
+    expect(document.activeElement).toBe(elsewhere)
   })
 })

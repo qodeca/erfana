@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react'
 import { subscribeGlobalToasts } from './toastService'
 import { resolveToastDuration } from './toastDwell'
+import { addToStack, focusedToastId } from './toastStack'
 
 /**
  * An optional actionable button rendered inside a toast (design §5(c), item 64).
@@ -33,6 +34,11 @@ export interface Toast {
   duration?: number
   /** Optional action button; presence forces `duration: 0` (manual dismiss). */
   action?: ToastAction
+  /**
+   * How many times this same toast was raised while it was on screen
+   * (shown as "×3"); absent or 1 for a single occurrence. See `toastStack.ts`.
+   */
+  count?: number
 }
 
 interface ToastContextType {
@@ -72,7 +78,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     // The countdown itself lives in `ToastItem` (`useToastDwellTimer`), not
     // here: only the rendered toast knows whether the pointer or focus is on
     // it, and the timer must pause while it is.
-    setToasts((prev) => [...prev, newToast])
+    //
+    // Errors stay until closed, so repeats merge into one toast with a count
+    // and sticky toasts are capped, never dropping the focused one
+    // (`toastStack.ts`).
+    const focused = focusedToastId()
+    setToasts((prev) => addToStack(prev, newToast, focused))
   }, [])
 
   const removeToast = useCallback((id: string) => {
