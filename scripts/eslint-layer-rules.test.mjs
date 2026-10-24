@@ -253,15 +253,12 @@ describe('renderer gateway rule', () => {
 
   describe('the TerminalPanel files (temporary allowance)', () => {
     const TERMINAL_PANEL_FILES = [
-      'src/renderer/src/components/Panels/TerminalPanel.tsx',
       'src/renderer/src/components/Panels/TerminalPanel/hooks/useScreenshotCapture.ts',
       'src/renderer/src/components/Panels/TerminalPanel/hooks/useTerminalDragDrop.ts'
     ]
 
-    it.each(TERMINAL_PANEL_FILES)('%s may still read claudeStatus, utils and screenshot', async (file) => {
+    it.each(TERMINAL_PANEL_FILES)('%s may still read utils and screenshot', async (file) => {
       for (const code of [
-        'export const f = (id) => window.api?.claudeStatus?.nudge(id)',
-        'export const f = (id) => window.api.claudeStatus.register(id)',
         'export const f = (file) => window.api.utils.getPathForFile(file)',
         'export const f = () => window.api.screenshot.getCapabilities()'
       ]) {
@@ -274,6 +271,8 @@ describe('renderer gateway rule', () => {
         READ_FILE,
         READ_TERMINAL,
         'export const f = () => window.api.preview.reload("p")',
+        'export const f = (id) => window.api?.claudeStatus?.nudge(id)',
+        'export const f = (id) => window.api.claudeStatus.register(id)',
         'const a = window.api\nexport { a }',
         'const { utils } = window.api\nexport { utils }',
         'const { api } = window\nexport { api }',
@@ -290,9 +289,12 @@ describe('renderer gateway rule', () => {
       expect(messages.some((m) => /POSIX-only basename/.test(m.message))).toBe(true)
     })
 
-    it('does not extend to the other TerminalPanel files', async () => {
+    it.each([
+      'src/renderer/src/components/Panels/TerminalPanel.tsx',
+      'src/renderer/src/components/Panels/TerminalPanel/hooks/useTerminalResize.ts',
+      'src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts'
+    ])('does not extend to %s', async (other) => {
       const code = 'export const f = () => window.api.utils.getPlatform()'
-      const other = 'src/renderer/src/components/Panels/TerminalPanel/hooks/useTerminalResize.ts'
       expect(await gatewayMessages(other, code)).toHaveLength(1)
     })
   })

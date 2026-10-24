@@ -5,13 +5,13 @@ import type { LogEntry } from '../shared/ipc/logging-schema'
 
 /**
  * The only bridges still on `window.api`'s type. Every bridge has a gateway in
- * `src/renderer/src/services/`; these three stay typed only because
- * `components/Panels/TerminalPanel.tsx` and its `useScreenshotCapture` /
- * `useTerminalDragDrop` hooks still read them directly, and ESLint allows
+ * `src/renderer/src/services/`; these two stay typed only because the
+ * TerminalPanel hooks `useScreenshotCapture` (screenshot) and
+ * `useTerminalDragDrop` (utils) still read them directly, and ESLint allows
  * exactly those reads in exactly those files. Empty this list when they move
- * to `claudeStatusGateway`, `utilsGateway` and `screenshotGateway`.
+ * to `screenshotGateway` and `utilsGateway`.
  */
-type TerminalPanelBridges = 'claudeStatus' | 'utils' | 'screenshot'
+type TerminalPanelBridges = 'utils' | 'screenshot'
 
 declare global {
   interface Window {
