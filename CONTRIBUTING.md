@@ -89,9 +89,10 @@ pipx run --spec "reuse[charset-normalizer]" reuse lint   # REUSE compliance
 ```
 
 `npm run test:ci` runs without coverage, so the coverage floors cannot fire
-locally. They sit in all three vitest configs: per-file floors in
-`vitest.main.ts`, global floors in `vitest.preload.ts`, and per-file floors for
-the HTML-preview modules (#124) in `vitest.renderer.ts`. `npm run test:cov` runs
+locally. They sit in all three vitest configs: a project-wide floor in each
+(with `all: true`, so a file no test loads counts at 0 %), plus per-file floors
+in `vitest.main.ts` and for the HTML-preview modules (#124) in
+`vitest.renderer.ts`. `npm run test:cov` runs
 all three and is the only way to reproduce the `Coverage` job before pushing.
 It cannot pass on a Windows host (at least two `vitest.main.ts` floors miss
 because their symlink cases skip on win32, and the #124 floors have not been run

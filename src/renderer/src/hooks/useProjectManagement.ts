@@ -29,6 +29,7 @@ import { showGlobalToast } from '../components/Toast/toastService'
 import { logger } from '../utils/logger'
 import { recordTreeReadMs } from '../utils/treeReadTiming'
 import { noteProjectGeneration } from '../services/projectGeneration'
+import { confinementCodeFromMessage } from '../../../shared/ipc/confinement'
 import {
   createCoalescingRunner,
   type CoalescedRunInfo,
@@ -234,6 +235,13 @@ export function useProjectManagement(
         } catch (err) {
           if (generation !== refreshGenerationRef.current) {
             logger.debug('[useProjectManagement] Stale project load failed; ignored')
+            return
+          }
+          // Main refused the read because a newer open had already replaced
+          // this project. Its project-changed event can still be on the way,
+          // so the generation check above has not seen it: the load is stale.
+          if (confinementCodeFromMessage(err instanceof Error ? err.message : String(err)) === 'PROJECT_CHANGED') {
+            logger.debug('[useProjectManagement] Project load refused as superseded; ignored')
             return
           }
           logger.error(createNewProjectTreeErrorLog(), err instanceof Error ? err : undefined)
