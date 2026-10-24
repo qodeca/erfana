@@ -32,9 +32,23 @@
  * @see src/main/ipc/preview/focus-handlers.ts - the channel it calls
  */
 
-import { useCallback, useEffect, useState, type KeyboardEvent } from 'react'
+import { useCallback, type KeyboardEvent } from 'react'
 import type { DockviewPanelApi } from 'dockview'
 import { previewGateway } from '../../../../services/previewGateway'
+import { useDockviewValue, type DockviewValueSource } from '../../../../hooks/useDockviewValue'
+
+type ActiveApi = Pick<DockviewPanelApi, 'isActive' | 'onDidActiveChange'>
+
+/**
+ * Whether the tab is the active one. Unlike `DOCKVIEW_PANEL_ACTIVE`, a panel
+ * with no api (or one that cannot report the change) counts as active, as the
+ * visibility term does.
+ */
+const PAGE_ENTRY_ACTIVE: DockviewValueSource<ActiveApi, { isActive: boolean }, boolean> = {
+  read: (api) => api?.isActive ?? true,
+  subscribe: (api, listener) => api.onDidActiveChange?.(listener),
+  fromEvent: (event) => event.isActive
+}
 
 /** Options for {@link usePreviewPageEntry}. */
 export interface UsePreviewPageEntryOptions {
@@ -76,13 +90,7 @@ export interface PreviewPageEntry {
 export function usePreviewPageEntry(options: UsePreviewPageEntryOptions): PreviewPageEntry {
   const { panelId, api, pageLive } = options
 
-  const [isActive, setIsActive] = useState<boolean>(api?.isActive ?? true)
-  useEffect(() => {
-    if (!api?.onDidActiveChange) return
-    setIsActive(api.isActive ?? true)
-    const disposable = api.onDidActiveChange((event) => setIsActive(event.isActive))
-    return () => disposable.dispose()
-  }, [api])
+  const isActive = useDockviewValue(api, PAGE_ENTRY_ACTIVE)
 
   const enabled = isActive && pageLive
 

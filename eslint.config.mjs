@@ -305,30 +305,18 @@ export default [
   pluginJs.configs.recommended,
   ...tseslint.configs.recommended,
   pluginReact.configs.flat.recommended,
-  // React hooks (renderer only). `rules-of-hooks` is an error and
-  // `exhaustive-deps` a warning. The plugin's v7 preset also switches on the
-  // React-Compiler-derived rules as errors; this codebase does not use the
-  // compiler, so those are downgraded to warnings rather than blocking lint.
+  // React hooks (renderer only). Every rule of the plugin's v7 preset is an
+  // error, including `exhaustive-deps` and the React-Compiler-derived rules the
+  // preset ships as errors or warnings (lens review [19]: the warnings were
+  // fixed in #368 and its follow-up, so a new one now fails lint instead of
+  // piling up). A justified exception is a targeted
+  // `eslint-disable-next-line <rule> -- <reason>` at the site.
   {
     ...reactHooks.configs.flat.recommended,
     files: ['src/renderer/**/*.{ts,tsx}'],
-    rules: {
-      ...reactHooks.configs.flat.recommended.rules,
-      'react-hooks/rules-of-hooks': 'error',
-      'react-hooks/exhaustive-deps': 'warn',
-      'react-hooks/static-components': 'warn',
-      'react-hooks/use-memo': 'warn',
-      'react-hooks/preserve-manual-memoization': 'warn',
-      'react-hooks/immutability': 'warn',
-      'react-hooks/globals': 'warn',
-      'react-hooks/refs': 'warn',
-      'react-hooks/set-state-in-effect': 'warn',
-      'react-hooks/error-boundaries': 'warn',
-      'react-hooks/purity': 'warn',
-      'react-hooks/set-state-in-render': 'warn',
-      'react-hooks/config': 'warn',
-      'react-hooks/gating': 'warn'
-    }
+    rules: Object.fromEntries(
+      Object.keys(reactHooks.configs.flat.recommended.rules).map((rule) => [rule, 'error'])
+    )
   },
   // Disable formatting-related rules that conflict with Prettier
   { rules: eslintConfigPrettier.rules },
