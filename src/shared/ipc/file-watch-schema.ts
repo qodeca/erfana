@@ -15,6 +15,12 @@ export interface FileWatchEvent {
 export interface FileWatchErrorEvent {
   filePath: string
   error: string
+  /**
+   * True when the main process gave the watch up and dropped it, every count
+   * with it: the renderer slot then forgets its hold instead of sending a
+   * `stop` later (#252). Absent after a plain watcher error the watch survives.
+   */
+  ended?: boolean
 }
 
 /** `file-watch:stats` and `directory-watch:get-stats`: watcher counters for diagnostics. */

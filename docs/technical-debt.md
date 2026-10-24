@@ -364,9 +364,11 @@ After the heartbeat hardening (Phase A4 resume-refresh, B1 symlink defense, D3 H
 
 **Recommended Solution**: route `watchFile` through `assertInsideProject` from `src/main/utils/projectConfinement.ts`, keeping the existing "file does not exist" throw (the guard lets a `missing` verdict through on purpose).
 
-**Files**: `src/main/services/FileWatcherService.ts` (`watchFile`), `src/main/utils/projectConfinement.ts`.
+**The confined-path wrapper (#252 review, 2026-10).** The fuller fix is to register `file-watch:start` through `registerConfinedHandle`, as every `file:*` channel is. It is not a small change: the channel takes a positional string rather than a request object ([IPC patterns](./ipc-patterns.md)), so it needs a strict request schema, a preload and renderer API change, a project session passed into `registerFileWatcherHandlers`, and a refusal mapped to `{ success: false, error }`, whose wording the renderer's `classifyWatchStartFailure` reads. The handler must also watch the `requested` spelling, since every event is matched against it. `stop`, `pause` and `resume` only look up the map, so they touch no file. Meanwhile, #252's unseen-file probe `stat`s only this session's paths lexically inside the project (`FileWatcherService.probeablePaths`), so it never reaches outside it.
 
-**Status**: Open — recorded by the #70 design (§9.1) and its review rounds. **A follow-up issue should be filed.**
+**Files**: `src/main/services/FileWatcherService.ts` (`watchFile`), `src/main/utils/projectConfinement.ts`; for the wrapper also `src/main/ipc/file-watcher-handlers.ts` and `src/preload/index.ts`.
+
+**Status**: Open — recorded by the #70 design (§9.1) and its review rounds; the wrapper note added by the #252 review. **A follow-up issue should be filed.**
 
 ---
 

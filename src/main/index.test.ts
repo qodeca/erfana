@@ -214,7 +214,9 @@ describe('Main Process - Window Creation', () => {
         dispose: vi.fn(),
         setProjectPath: vi.fn(), // issue #59: clear project state on destroy
         cleanupForWebContentsId: vi.fn(() => Promise.resolve()), // issue #59
-        handleAncestorRemovals: vi.fn() // save after a folder rename
+        handleAncestorRemovals: vi.fn(), // save after a folder rename
+        checkWatchedFilesUnder: vi.fn(() => Promise.resolve()), // #252
+        watchUnseenFiles: vi.fn() // #252
       }
     }))
     vi.doMock('./services/DirectoryWatcherService', () => ({
@@ -222,7 +224,8 @@ describe('Main Process - Window Creation', () => {
         dispose: vi.fn(),
         setProjectPath: vi.fn(), // issue #59: clear project state on destroy
         cleanupForWebContentsId: vi.fn(() => Promise.resolve()), // issue #59
-        onPathsRemoved: vi.fn(() => () => {}) // save after a folder rename
+        onPathsRemoved: vi.fn(() => () => {}), // save after a folder rename
+        onRemovalsLost: vi.fn(() => () => {}) // #252
       }
     }))
     vi.doMock('./services/TerminalService', () => ({
@@ -457,6 +460,29 @@ describe('Main Process - Window Creation', () => {
       const listener = onPathsRemoved.mock.calls[0][0] as (paths: readonly string[]) => void
       listener(['/proj/docs'])
       expect(fileWatcherService.handleAncestorRemovals).toHaveBeenCalledWith(['/proj/docs'])
+    })
+
+    it('re-checks the open files where the project watcher cannot tell (#252)', async () => {
+      await import('./index')
+      await flushStartup()
+      const { directoryWatcherService } = await import('./services/DirectoryWatcherService')
+      const { fileWatcherService } = await import('./services/FileWatcherService')
+
+      // Removals a paused watch lost without their paths: check the disk under that root
+      const onRemovalsLost = directoryWatcherService.onRemovalsLost as unknown as ReturnType<typeof vi.fn>
+      expect(onRemovalsLost).toHaveBeenCalledTimes(1)
+      const lost = onRemovalsLost.mock.calls[0][0] as (
+        root: string,
+        isOwnRemoval: (filePath: string) => boolean
+      ) => void
+      const isOwnRemoval = (): boolean => false
+      lost('/proj', isOwnRemoval)
+      expect(fileWatcherService.checkWatchedFilesUnder).toHaveBeenCalledWith('/proj', isOwnRemoval)
+
+      // Files the project watcher cannot see: the project watcher itself says which those are
+      const watchUnseen = fileWatcherService.watchUnseenFiles as unknown as ReturnType<typeof vi.fn>
+      expect(watchUnseen).toHaveBeenCalledTimes(1)
+      expect(watchUnseen).toHaveBeenCalledWith(directoryWatcherService)
     })
   })
 

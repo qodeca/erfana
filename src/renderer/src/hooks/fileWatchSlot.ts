@@ -159,3 +159,28 @@ export function releaseFileWatch(slot: FileWatchSlot, filePath: string): Promise
     }
   })
 }
+
+/**
+ * Marks the slot as holding nothing, **without** telling the main process.
+ *
+ * For a watch the main process has already ended on its own: it drops the
+ * whole entry, every count with it, when it reports `file-watch:deleted`. A
+ * `stop` sent after that would decrement whatever count another consumer has
+ * since built for the same file and deafen it – the "one stop too many" case
+ * above. After a forget, the next acquire starts a fresh watch and a release
+ * sends nothing (#252).
+ *
+ * Synchronous, not queued: it records what the main process did when the
+ * event was sent. An acquire still in flight that succeeds afterwards holds a
+ * new count and may keep it.
+ *
+ * @param slot - The consumer's slot
+ *
+ * @example
+ * ```ts
+ * window.api.fileWatch.onFileDeleted(() => forgetFileWatch(slot))
+ * ```
+ */
+export function forgetFileWatch(slot: FileWatchSlot): void {
+  slot.isHeld = false
+}
