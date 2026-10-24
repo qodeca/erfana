@@ -156,6 +156,15 @@ export interface TerminalAvailabilityResponse {
 }
 
 /**
+ * Whether the OS reports a screen reader (Chromium accessibility support),
+ * answered by `terminal:getScreenReaderSupport` and pushed by
+ * `terminal:screenReaderSupportChanged`. `false` where Electron cannot tell
+ * (Linux) and for a sender that fails the trust gate.
+ */
+export const ScreenReaderSupportSchema = z.object({ enabled: z.boolean() }).strict()
+export type ScreenReaderSupport = z.infer<typeof ScreenReaderSupportSchema>
+
+/**
  * Shared contract for the preload `terminal` bridge.
  *
  * Implemented by `window.api.terminal` (preload, `terminalBridge.ts`, typed as
@@ -183,4 +192,8 @@ export interface TerminalBridge {
   markClearComplete(terminalId: string): void
   /** Fire-and-forget: report that xterm has parsed `chars` more characters of output. */
   ackOutput(terminalId: string, chars: number): void
+  /** Whether the OS reports a screen reader right now (payload-free, sender-gated). */
+  getScreenReaderSupport(): Promise<ScreenReaderSupport>
+  /** The OS turned assistive technology on or off. */
+  onScreenReaderSupportChanged(callback: (data: ScreenReaderSupport) => void): () => void
 }

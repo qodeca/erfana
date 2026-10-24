@@ -14,6 +14,7 @@ Open **Settings** with the gear at the bottom of the left activity bar. <kbd>Esc
 - [Logging](#logging)
 - [Transcription](#transcription)
 - [HTML preview](#html-preview)
+- [Terminal](#terminal)
 - [Per-project settings](#per-project-settings)
 - [Excluded folders](#excluded-folders)
 
@@ -69,6 +70,16 @@ Open **Settings** with the gear at the bottom of the left activity bar. <kbd>Esc
 | **Run HTML files** | On | When off, HTML files open as source only; live previews stop and no preview process is started. |
 
 Remote-host approvals belong to each project. An approved host is saved to `.erfana/settings.json`; the app currently has no remove-approval control. See [HTML preview](html-preview.md#remote-host-permission).
+
+## Terminal
+
+**What it does:** **Screen reader mode** lets VoiceOver, NVDA and other screen readers read the terminal's output. **How to reach it:** **Settings > Terminal**.
+
+| Option | Default | Effect |
+| --- | --- | --- |
+| **Screen reader mode** | Auto | **Auto** turns it on while the system reports a screen reader (macOS and Windows) and off otherwise. **On** keeps it on – use it on Linux, where the system does not report screen readers to Erfana. **Off** keeps it off, for a tool the system mistakes for a screen reader. Changes apply to open terminals at once. |
+
+The line under the option says what Auto detects right now.
 
 ## Per-project settings
 

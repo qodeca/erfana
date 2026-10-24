@@ -273,6 +273,8 @@ Note the `file:` prefix – these are **not** `external-file:*`.
 | `terminal:exit` | Event: PTY exited, with exit code and signal |
 | `terminal:error` | Event: PTY error |
 | `terminal:clear` | Event: main asks the renderer to clear the xterm buffer |
+| `terminal:getScreenReaderSupport` | Payload-free and sender-gated (`isTrustedSender`, in `terminal-screen-reader-handlers.ts`): `{ enabled }` from `app.isAccessibilitySupportEnabled()` – whether the OS reports a screen reader. Always `false` on Linux and for an untrusted sender. Drives the terminal's screen-reader mode in Auto (lens review [23]) |
+| `terminal:screenReaderSupportChanged` | Event: `{ enabled }`, broadcast to every window when Electron emits `accessibility-support-changed` (macOS, Windows) |
 
 ### Settings (`settings-handlers.ts`, `global-settings-handlers.ts`)
 

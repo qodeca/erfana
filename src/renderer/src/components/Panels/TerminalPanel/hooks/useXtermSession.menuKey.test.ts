@@ -90,7 +90,8 @@ async function startSession() {
     wheelEventHandler: vi.fn(() => true),
     onContextMenu: vi.fn(),
     attachFileDrop: vi.fn(),
-    detachFileDrop: vi.fn()
+    detachFileDrop: vi.fn(),
+    screenReaderMode: false
   }
   const hook = renderHook(() => useXtermSession(options))
   await act(async () => {

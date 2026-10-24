@@ -45,9 +45,10 @@ vi.mock('../../utils/logger', () => ({ logger: mockLogger }))
 // The settings sections no test in this file varies. Every fixture spreads
 // them so it is a complete GlobalSettings; `enabled: true` is also what the
 // HTML preview section falls back to when the section is absent.
-const UNVARIED_SECTIONS: Pick<GlobalSettings, 'htmlPreview' | 'files'> = {
+const UNVARIED_SECTIONS: Pick<GlobalSettings, 'htmlPreview' | 'files' | 'terminal'> = {
   htmlPreview: { enabled: true },
-  files: { exclude: [] }
+  files: { exclude: [] },
+  terminal: { screenReaderMode: 'auto' }
 }
 
 describe('SettingsOverlay', () => {
@@ -2470,7 +2471,8 @@ describe('SettingsOverlay', () => {
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
           transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
           htmlPreview: { enabled: true },
-          files: UNVARIED_SECTIONS.files
+          files: UNVARIED_SECTIONS.files,
+          terminal: UNVARIED_SECTIONS.terminal
         }
       })
 
