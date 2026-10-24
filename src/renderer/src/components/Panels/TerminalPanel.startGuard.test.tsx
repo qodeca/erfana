@@ -8,7 +8,8 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, render, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
+import { TEST_IDS } from '../../constants/testids'
 import { useTerminalStore } from '../../stores/useTerminalStore'
 import { useClaudeStatusStore } from '../../stores/useClaudeStatusStore'
 
@@ -57,7 +58,7 @@ vi.mock('@xterm/addon-webgl', () => ({
 }))
 vi.mock('../../utils/domUtils', () => ({ isElementVisible: vi.fn().mockReturnValue(true) }))
 
-type CreateResult = { success: true; terminalId: string; shellKind: 'posix' }
+type CreateResult = { success: true; terminalId: string; shellKind: 'posix' } | { success: false; error: string }
 const pendingCreates: Array<(result: CreateResult) => void> = []
 const projectListeners: Array<(data: { newPath: string | null }) => void> = []
 let dataListener: ((d: { terminalId: string; data: string }) => void) | null = null
@@ -187,5 +188,27 @@ describe('TerminalPanel start-up guard', () => {
     await waitFor(() => expect(window.api.terminal.kill).toHaveBeenCalledWith('pty-orphan'))
     expect(useTerminalStore.getState().activeTerminalId).toBeNull()
     expect(instances[0].dispose).toHaveBeenCalledTimes(1)
+  })
+
+  it('a project switch after a failed create starts a new terminal (Windows: cwd with "&")', async () => {
+    await mountPanel()
+    await waitFor(() => expect(window.api.terminal.create).toHaveBeenCalledTimes(1))
+    // terminal:create answers with an error (not a rejection), as main does for a bad cwd
+    await act(async () => {
+      pendingCreates[0]({ success: false, error: 'cwd contains unsupported character "&"' })
+    })
+    await waitFor(() => expect(screen.getByTestId(TEST_IDS.TERMINAL_STATUS_ERROR)).toBeTruthy())
+    expect(screen.queryByTestId(TEST_IDS.TERMINAL_INSTANCE)).toBeNull()
+
+    // Opening a good project must create again, once the terminal container is back
+    await switchProject('/good/project')
+    await waitFor(() => expect(window.api.terminal.create).toHaveBeenCalledTimes(2))
+    await answerCreate(1, 'pty-good')
+
+    await waitFor(() => expect(useTerminalStore.getState().activeTerminalId).toBe('pty-good'))
+    expect(screen.queryByTestId(TEST_IDS.TERMINAL_STATUS_ERROR)).toBeNull()
+    expect(screen.getByTestId(TEST_IDS.TERMINAL_INSTANCE)).toBeTruthy()
+    await waitFor(() => expect(screen.getByTestId(TEST_IDS.TERMINAL_BTN_RESTART)).toBeTruthy())
+    expect(window.api.terminal.create).toHaveBeenCalledTimes(2)
   })
 })

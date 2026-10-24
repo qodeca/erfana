@@ -348,6 +348,19 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     }
   }, [isAvailable, startSession, teardownTerminal])
 
+  // The terminal container is rendered only while the panel is available and
+  // shows no error. A start asked for while the error box replaced it – a
+  // project switch after a failed create (Windows: a cwd with "&") – found no
+  // container and returned, and nothing asked again: the panel stayed black.
+  // So start once the container is back. No cleanup here: the effect above
+  // owns the teardown, and a second start while one runs joins it.
+  const showsTerminalContainer = isAvailable === true && !error
+  useEffect(() => {
+    if (showsTerminalContainer && terminalRef.current && !xtermRef.current) {
+      void startSession()
+    }
+  }, [showsTerminalContainer, startSession])
+
   // Restart terminal on project change
   useEffect(() => {
     const unsubscribe = fileGateway.onProjectChanged(async (data) => {
