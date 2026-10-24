@@ -30,7 +30,7 @@
  * @module TerminalPanel/hooks/useXtermSession
  */
 
-import { useCallback, useLayoutEffect, useRef, useState, type MutableRefObject, type RefObject } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MutableRefObject, type RefObject } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
