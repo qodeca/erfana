@@ -48,6 +48,7 @@ import {
 } from '../../../../../../shared/dropReporter'
 import type { PreviewBounds } from '../../../../../../shared/ipc/preview-types'
 import { previewGateway } from '../../../../services/previewGateway'
+import { useLatestRef } from '../../../../hooks/useLatestRef'
 
 /**
  * CSS pixels reserved at the top of the native view while the find bar is open
@@ -228,18 +229,13 @@ export function usePreviewBounds(options: UsePreviewBoundsOptions): UsePreviewBo
   const seqRef = useRef(0)
 
   // Keep the props readable from the stable callbacks without re-creating them.
-  const enabledRef = useRef(enabled)
-  enabledRef.current = enabled
-  const searchOpenRef = useRef(searchOpen)
-  searchOpenRef.current = searchOpen
-  const isVisibleRef = useRef(isVisible)
-  isVisibleRef.current = isVisible
-  const isLiveRef = useRef(isLive)
-  isLiveRef.current = isLive
-  const ackControllerRef = useRef(ackController)
-  ackControllerRef.current = ackController
-  const panelTopRef = useRef(panelRef?.current ?? null)
-  panelTopRef.current = panelRef?.current ?? null
+  // Every reader is a passive effect, an observer or an event, never render.
+  const enabledRef = useLatestRef(enabled)
+  const searchOpenRef = useLatestRef(searchOpen)
+  const isVisibleRef = useLatestRef(isVisible)
+  const isLiveRef = useLatestRef(isLive)
+  const ackControllerRef = useLatestRef(ackController)
+  const panelRefRef = useLatestRef(panelRef)
 
   // The key of the last measurement acted on; see `sync`.
   const lastKeyRef = useRef<string | null>(null)
@@ -272,7 +268,7 @@ export function usePreviewBounds(options: UsePreviewBoundsOptions): UsePreviewBo
        * applied here now that the chrome band is subtracted by layout. When the
        * band grows, that inset does not change at all; the placeholder moves down.
        */
-      const panelTop = panelTopRef.current?.getBoundingClientRect().top ?? rect.top
+      const panelTop = panelRefRef.current?.current?.getBoundingClientRect().top ?? rect.top
       const effectiveInset = bounds.y - panelTop
 
       const ack = ackControllerRef.current
@@ -303,7 +299,7 @@ export function usePreviewBounds(options: UsePreviewBoundsOptions): UsePreviewBo
         height: bounds.height
       })
     },
-    [panelId]
+    [panelId, panelRefRef, ackControllerRef, isLiveRef]
   )
 
   /**
@@ -319,7 +315,7 @@ export function usePreviewBounds(options: UsePreviewBoundsOptions): UsePreviewBo
     usePreviewViewportStore.getState().clearRect(panelId)
     if (!isVisibleRef.current || !isLiveRef.current || !sentSinceLiveRef.current) return
     usePreviewCollapsedStore.getState().setCollapsed(panelId)
-  }, [panelId])
+  }, [panelId, isVisibleRef, isLiveRef])
 
   /**
    * Measures the placeholder and acts on the result.
@@ -387,7 +383,7 @@ export function usePreviewBounds(options: UsePreviewBoundsOptions): UsePreviewBo
           return true
       }
     },
-    [panelId, placeholderRef, reportDrop, send, collapse]
+    [panelId, placeholderRef, enabledRef, searchOpenRef, reportDrop, send, collapse]
   )
 
   const pushBounds = useCallback(

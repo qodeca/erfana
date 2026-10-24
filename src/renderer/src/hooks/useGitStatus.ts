@@ -16,7 +16,7 @@
  * @see Issue #74 - real-time git status refresh
  */
 
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useLayoutEffect, useRef, useCallback } from 'react'
 import { useGitStore } from '../stores/useGitStore'
 import { useGlobalSettingsStore } from '../stores/useGlobalSettingsStore'
 import { GIT_STATUS } from '../components/ProjectTree/constants'
@@ -203,8 +203,12 @@ export function useGitStatus({
     [projectPath, enabled, setRefreshing, setStatus]
   )
 
-  // Keep ref updated with latest executeRefresh (Issue #74 review fix)
-  executeRefreshRef.current = executeRefresh
+  // Keep ref updated with latest executeRefresh (Issue #74 review fix). In a
+  // layout effect, not during render, so it is current before any passive
+  // effect of the same commit reads it.
+  useLayoutEffect(() => {
+    executeRefreshRef.current = executeRefresh
+  }, [executeRefresh])
 
   /**
    * Debounced refresh for file watcher events

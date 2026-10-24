@@ -514,7 +514,7 @@ This pattern avoids stale updates from previous switches.
 
 Applied in services:
 - File watcher: src/main/services/FileWatcherService.ts (`switchVersion` guards change/delete/notify)
-- Directory watcher: src/main/services/DirectoryWatcherService.ts (`switchVersion` guards queue/process/notify)
+- Directory watcher: src/main/services/DirectoryWatcherService.ts and its layers in src/main/services/watcher/ (`DirectoryWatcherEvents.ts`, `DirectoryWatcherCore.ts`; `switchVersion` guards queue/process/notify)
 
 ### Preview channels not in this index (sd-074b)
 

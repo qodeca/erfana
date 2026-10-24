@@ -200,9 +200,7 @@ export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcherRe
   // This consumer's single hold on the main-process watch. `fileWatch.start` is
   // a counting acquire, so start/stop must be balanced and ordered – the slot
   // owns both properties (issue #70).
-  const slotRef = useRef<FileWatchSlot | null>(null)
-  if (slotRef.current === null) slotRef.current = createFileWatchSlot()
-  const slot = slotRef.current
+  const [slot] = useState<FileWatchSlot>(createFileWatchSlot)
 
   /**
    * Mark that a save operation is starting.
@@ -378,6 +376,8 @@ export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcherRe
   // Set up file watching
   useEffect(() => {
     if (!filePath) return
+    // The ref always holds the same Set; capture it for the cleanup.
+    const pendingSavedContents = pendingSavedContentsRef.current
 
     logger.info('Starting watch for file', { filePath })
 
@@ -421,7 +421,7 @@ export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcherRe
       unsubscribeChanged()
       unsubscribeDeleted()
       unsubscribeError()
-      pendingSavedContentsRef.current.clear() // Clear on file switch
+      pendingSavedContents.clear() // Clear on file switch
     }
   }, [filePath, handleExternalChange, handleFileDeleted, slot])
 
