@@ -92,11 +92,15 @@ const entryNameField = (message: string) =>
 /** The one-element tuple a handler registers for a channel that takes a single object. */
 export const payloadArgs = <T extends z.ZodType>(request: T) => z.tuple([request])
 
-/** `file:readDirectory` */
+/**
+ * `file:readDirectory`. `generation` is the project session generation the load
+ * belongs to: the read is refused with `PROJECT_CHANGED` when the session has moved on.
+ */
 export const ReadDirectoryRequestSchema = z.strictObject({
   dirPath: pathField('Invalid directory path'),
   /** One level only: every sub-folder comes back lazy. How the tree expands a lazy folder. */
-  shallow: z.literal(true).optional()
+  shallow: z.literal(true).optional(),
+  generation: z.number().int().optional()
 })
 export type ReadDirectoryRequest = z.infer<typeof ReadDirectoryRequestSchema>
 
