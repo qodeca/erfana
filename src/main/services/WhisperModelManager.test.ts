@@ -107,6 +107,7 @@ vi.mock('fs/promises', () => ({
 // ---------------------------------------------------------------------------
 
 import { Readable } from 'stream'
+import type { classifyPlatform } from './whisper-assets'
 
 function makeBytesStream(buf: Buffer): NodeJS.ReadableStream {
   return Readable.from([buf])
@@ -229,7 +230,7 @@ const WIN32_SPEC = {
   }
 }
 
-const mockClassifyPlatform = vi.fn(() => ({ supported: true, platform: 'darwin-universal' as const }))
+const mockClassifyPlatform = vi.fn<typeof classifyPlatform>(() => ({ supported: true, platform: 'darwin-universal' }))
 
 vi.mock('./whisper-assets', () => ({
   ARTIFACTS: {
@@ -268,7 +269,7 @@ const mockDownloadToFile = vi.fn()
 vi.mock('../utils/secureDownloader', () => ({
   downloadToFile: (...args: unknown[]) => mockDownloadToFile(...args),
   SecureDownloaderError: class SecureDownloaderError extends Error {
-    constructor(msg: string) { super(msg); this.name = 'SecureDownloaderError' }
+    constructor(public readonly code: string, msg: string) { super(msg); this.name = 'SecureDownloaderError' }
   }
 }))
 
@@ -798,7 +799,7 @@ describe('WhisperModelManager', () => {
       let call = 0
       mockDownloadToFile.mockImplementation(async () => {
         call += 1
-        if (call >= 3) throw new SecureDownloaderError('connection reset')
+        if (call >= 3) throw new SecureDownloaderError('content-length-mismatch', 'connection reset')
         return undefined
       })
       const { createWhisperModelManager } = await import('./WhisperModelManager')
@@ -850,7 +851,7 @@ describe('WhisperModelManager', () => {
         call += 1
         if (call < 3) return undefined
         cancelDownloads()
-        throw new SecureDownloaderError('SHA-256 mismatch')
+        throw new SecureDownloaderError('sha-mismatch', 'SHA-256 mismatch')
       })
       const { createWhisperModelManager } = await import('./WhisperModelManager')
       const manager = createWhisperModelManager()
@@ -930,7 +931,7 @@ describe('WhisperModelManager', () => {
       const err = Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
       mockAccess.mockRejectedValue(err)
       const { SecureDownloaderError } = await import('../utils/secureDownloader')
-      mockDownloadToFile.mockRejectedValue(new SecureDownloaderError('SHA-256 mismatch'))
+      mockDownloadToFile.mockRejectedValue(new SecureDownloaderError('sha-mismatch', 'SHA-256 mismatch'))
       const { createWhisperModelManager } = await import('./WhisperModelManager')
       const manager = createWhisperModelManager()
       await expect(manager.ensureModel('tiny')).rejects.toMatchObject({
@@ -966,7 +967,7 @@ describe('WhisperModelManager', () => {
       const err = Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
       mockAccess.mockRejectedValue(err)
       const { SecureDownloaderError } = await import('../utils/secureDownloader')
-      mockDownloadToFile.mockRejectedValue(new SecureDownloaderError('HTTP 404'))
+      mockDownloadToFile.mockRejectedValue(new SecureDownloaderError('http-status', 'HTTP 404'))
       const { createWhisperModelManager } = await import('./WhisperModelManager')
       const manager = createWhisperModelManager()
       await expect(manager.ensureModel('base')).rejects.toMatchObject({
@@ -978,7 +979,7 @@ describe('WhisperModelManager', () => {
       const err = Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
       mockAccess.mockRejectedValue(err)
       const { SecureDownloaderError } = await import('../utils/secureDownloader')
-      mockDownloadToFile.mockRejectedValue(new SecureDownloaderError('HTTP 503'))
+      mockDownloadToFile.mockRejectedValue(new SecureDownloaderError('http-status', 'HTTP 503'))
       const { createWhisperModelManager } = await import('./WhisperModelManager')
       const manager = createWhisperModelManager()
       await expect(manager.ensureModel('tiny')).rejects.toMatchObject({
@@ -1045,7 +1046,7 @@ describe('WhisperModelManager', () => {
       let cancelDownloads: () => number = () => 0
       mockDownloadToFile.mockImplementation(async () => {
         cancelDownloads()
-        throw new SecureDownloaderError('SHA-256 mismatch')
+        throw new SecureDownloaderError('sha-mismatch', 'SHA-256 mismatch')
       })
       const { createWhisperModelManager } = await import('./WhisperModelManager')
       const manager = createWhisperModelManager()

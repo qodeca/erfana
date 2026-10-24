@@ -18,6 +18,7 @@
 
 import { test, expect, _electron as electron } from '@playwright/test'
 import * as path from 'path'
+import type { Api } from '../src/preload/index'
 import * as fs from 'fs'
 import { stubDialog } from 'electron-playwright-helpers'
 import {
@@ -116,7 +117,8 @@ test.describe('Audio transcription', () => {
       // Safe cast: OPENAI_API_KEY is guaranteed non-null by test.skip guard above
       const apiKey = OPENAI_API_KEY as string
       const setKeyResult = await window.evaluate(
-        (key: string) => window.api.transcription.setApiKey(key),
+        // `globalThis.window`: this runs in the page, where the outer `window` (a Page) does not exist.
+        (key: string) => (globalThis.window.api as Api).transcription.setApiKey(key),
         apiKey
       )
       expect(setKeyResult).toHaveProperty('success', true)

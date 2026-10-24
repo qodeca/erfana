@@ -20,6 +20,8 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { systemPreferences } from 'electron'
+import type { IScreenshotCapturer } from './screenshot/types'
+import type { ScreenshotCapabilities } from '../../shared/ipc/screenshot-schema'
 
 const macCapabilities = {
   supported: true,
@@ -65,11 +67,11 @@ vi.mock('electron', () => ({
   systemPreferences: { getMediaAccessStatus: vi.fn(() => 'granted') }
 }))
 
-function stubCapturer(capabilities = desktopCapabilities) {
+function stubCapturer(capabilities: ScreenshotCapabilities = desktopCapabilities) {
   return {
-    getCapabilities: vi.fn(() => capabilities),
-    enumerateWindowsRaw: vi.fn(async () => []),
-    capture: vi.fn(async () => ({ success: true, filePath: '/tmp/stub.png' }))
+    getCapabilities: vi.fn<IScreenshotCapturer['getCapabilities']>(() => capabilities),
+    enumerateWindowsRaw: vi.fn<IScreenshotCapturer['enumerateWindowsRaw']>(async () => []),
+    capture: vi.fn<IScreenshotCapturer['capture']>(async () => ({ success: true, filePath: '/tmp/stub.png' }))
   }
 }
 

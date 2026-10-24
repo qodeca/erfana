@@ -292,7 +292,7 @@ describe('DocxService', () => {
       ['|', 'file|name', 'file-name.docx'],
       ['?', 'file?name', 'file-name.docx'],
       ['*', 'file*name', 'file-name.docx']
-    ])('should replace %s with hyphen', async (char, input, expected) => {
+    ])('should replace %s with hyphen', async (_char, input, expected) => {
       setupCancelledExport()
 
       await docxService.exportToDocx('<p>Test</p>', input)

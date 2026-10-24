@@ -76,7 +76,7 @@ function createMockDragEvent(options: {
     types,
     files: files as any as FileList,
     dropEffect: 'none' as DataTransfer['dropEffect']
-  } as DataTransfer
+  } as unknown as DataTransfer
 
   const event = {
     dataTransfer,
@@ -184,7 +184,7 @@ describe('extractDroppedFiles', () => {
       name: 'file.md',
       path: '/external/file.md',
       type: 'text/markdown',
-      sizeInBytes: 1024
+      size: 1024
     })
     const directory = createMockFile({
       name: 'folder',

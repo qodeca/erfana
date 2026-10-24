@@ -48,6 +48,7 @@ import {
   createTestProject,
   createTempUserDataDir
 } from './utils/helpers'
+import type { Api } from '../src/preload/index'
 
 const BYTES = Number(process.env.ERFANA_BENCH_BYTES ?? 50_000_000)
 const RUNS = Number(process.env.ERFANA_BENCH_RUNS ?? 3)
@@ -118,8 +119,9 @@ function installRecorder(marker: string): void {
 async function markerParsed(marker: string): Promise<boolean> {
   const hook = window.__erfanaTest
   if (!hook) throw new Error('e2e test hook missing (ERFANA_E2E_TEST_HOOKS=1)')
-  const listed = await window.api.terminal.list()
-  const id = listed.terminals?.at(-1)?.id
+  // The page exposes the whole preload object; the renderer's `Window['api']` type leaves `terminal` out.
+  const listed = await (window.api as Api).terminal.list()
+  const id = listed.success ? listed.terminals.at(-1)?.id : undefined
   if (!id) return false
   const text = hook.terminalText(id) ?? ''
   return text.split('\n').some((line) => line.trim() === marker)

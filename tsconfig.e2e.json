@@ -1,0 +1,13 @@
+{
+  "extends": "@electron-toolkit/tsconfig/tsconfig.node.json",
+  "include": [
+    "e2e/**/*.ts",
+    "playwright.config.ts",
+    "src/preload/index.d.ts"
+  ],
+  "compilerOptions": {
+    "noEmit": true,
+    "moduleResolution": "bundler",
+    "types": ["node"]
+  }
+}

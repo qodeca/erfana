@@ -14,12 +14,14 @@
 
 import { beforeEach, describe, expect, it, vi, afterEach } from 'vitest'
 import { render, waitFor } from '@testing-library/react'
+import type { ISplitviewPanelProps } from 'dockview'
+import type { TerminalBridge } from '../../../../shared/ipc/terminal-schema'
+import { gatewayBridgeMock, type BridgeMock } from '../../test-utils/gatewayBridgeMock'
 
-declare global {
-  interface Window {
-    api: any
-  }
-}
+// TerminalPanel ignores its dockview props, so an empty object stands in for them.
+const PANEL_PROPS = {} as ISplitviewPanelProps
+
+const terminalMock = (): BridgeMock<TerminalBridge> => gatewayBridgeMock('terminal')
 
 // Mock xterm with scroll position tracking
 const mockXtermInstance = {
@@ -149,7 +151,7 @@ describe('TerminalPanel scroll position preservation', () => {
 
   it('initializes terminal with scroll-preserving options', async () => {
     const { TerminalPanel } = await import('./TerminalPanel')
-    render(<TerminalPanel /> as any)
+    render(<TerminalPanel {...PANEL_PROPS} />)
 
     // Wait for terminal to initialize
     await waitFor(() => {
@@ -164,11 +166,11 @@ describe('TerminalPanel scroll position preservation', () => {
 
   it('preserves scroll position when user is scrolled up (not at bottom)', async () => {
     const { TerminalPanel } = await import('./TerminalPanel')
-    render(<TerminalPanel /> as any)
+    render(<TerminalPanel {...PANEL_PROPS} />)
 
     // Wait for terminal creation and clear handler setup
     await waitFor(() => {
-      expect(window.api.terminal.create).toHaveBeenCalled()
+      expect(terminalMock().create).toHaveBeenCalled()
       expect(mockOnClearCallback).not.toBeNull()
     })
 
@@ -208,11 +210,11 @@ describe('TerminalPanel scroll position preservation', () => {
 
   it('allows auto-scroll when user is at bottom', async () => {
     const { TerminalPanel } = await import('./TerminalPanel')
-    render(<TerminalPanel /> as any)
+    render(<TerminalPanel {...PANEL_PROPS} />)
 
     // Wait for terminal creation
     await waitFor(() => {
-      expect(window.api.terminal.create).toHaveBeenCalled()
+      expect(terminalMock().create).toHaveBeenCalled()
       expect(mockOnClearCallback).not.toBeNull()
     })
 
@@ -248,10 +250,10 @@ describe('TerminalPanel scroll position preservation', () => {
 
   it('tracks scroll position during multiple data writes', async () => {
     const { TerminalPanel } = await import('./TerminalPanel')
-    render(<TerminalPanel /> as any)
+    render(<TerminalPanel {...PANEL_PROPS} />)
 
     await waitFor(() => {
-      expect(window.api.terminal.create).toHaveBeenCalled()
+      expect(terminalMock().create).toHaveBeenCalled()
       expect(mockOnClearCallback).not.toBeNull()
     })
 
@@ -308,10 +310,10 @@ describe('TerminalPanel scroll position preservation', () => {
 
   it('handles edge case where viewport and base are both zero', async () => {
     const { TerminalPanel } = await import('./TerminalPanel')
-    render(<TerminalPanel /> as any)
+    render(<TerminalPanel {...PANEL_PROPS} />)
 
     await waitFor(() => {
-      expect(window.api.terminal.create).toHaveBeenCalled()
+      expect(terminalMock().create).toHaveBeenCalled()
       expect(mockOnClearCallback).not.toBeNull()
     })
 
@@ -344,7 +346,7 @@ describe('TerminalPanel scroll position preservation', () => {
 
   it('verifies scroll options prevent unwanted behavior', async () => {
     const { TerminalPanel } = await import('./TerminalPanel')
-    render(<TerminalPanel /> as any)
+    render(<TerminalPanel {...PANEL_PROPS} />)
 
     await waitFor(() => {
       expect(mockXtermInstance.constructor).toHaveBeenCalled()

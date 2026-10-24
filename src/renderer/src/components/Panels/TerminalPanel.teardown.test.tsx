@@ -19,12 +19,6 @@ import { TEST_IDS } from '../../constants/testids'
 import { useTerminalStore } from '../../stores/useTerminalStore'
 import { useClaudeStatusStore } from '../../stores/useClaudeStatusStore'
 
-declare global {
-  interface Window {
-    api: any
-  }
-}
-
 const TERMINAL_ID = 'test-terminal-1'
 /** Poll every 1 ms of fake time, see the header */
 const WAIT = { interval: 1, timeout: 2000 }
@@ -89,6 +83,7 @@ vi.mock('../../utils/domUtils', () => ({
 }))
 
 import { WebglAddon } from '@xterm/addon-webgl'
+import { gatewayBridgeMock } from '../../test-utils/gatewayBridgeMock'
 
 /** One unsubscribe mock per onClear subscription, in subscription order */
 const clearUnsubscribes: Array<ReturnType<typeof vi.fn>> = []
@@ -192,11 +187,11 @@ describe('TerminalPanel teardown', () => {
     expect(parserDisposable.dispose).toHaveBeenCalled()
     expect(inputDisposable.dispose).toHaveBeenCalled()
     expect(mockXtermInstance.dispose).toHaveBeenCalledTimes(1)
-    expect(window.api.terminal.kill).toHaveBeenCalledWith(TERMINAL_ID)
-    expect(window.api.claudeStatus.unregister).toHaveBeenCalledWith(TERMINAL_ID)
+    expect(gatewayBridgeMock('terminal').kill).toHaveBeenCalledWith(TERMINAL_ID)
+    expect(gatewayBridgeMock('claudeStatus').unregister).toHaveBeenCalledWith(TERMINAL_ID)
     // Disposed before the kill is sent, so no output lands on a dying instance
     expect(mockXtermInstance.dispose.mock.invocationCallOrder[0]).toBeLessThan(
-      window.api.terminal.kill.mock.invocationCallOrder[0]
+      gatewayBridgeMock('terminal').kill.mock.invocationCallOrder[0]
     )
   })
 
@@ -217,7 +212,7 @@ describe('TerminalPanel teardown', () => {
     })
 
     expect(fit).not.toHaveBeenCalled()
-    expect(window.api.claudeStatus.nudge).not.toHaveBeenCalled()
+    expect(gatewayBridgeMock('claudeStatus').nudge).not.toHaveBeenCalled()
   })
 
   it('on unmount cancels a pending WebGL recovery', async () => {
@@ -242,11 +237,11 @@ describe('TerminalPanel teardown', () => {
       await vi.advanceTimersByTimeAsync(200)
     })
 
-    await vi.waitFor(() => expect(window.api.terminal.create).toHaveBeenCalledTimes(2), WAIT)
+    await vi.waitFor(() => expect(gatewayBridgeMock('terminal').create).toHaveBeenCalledTimes(2), WAIT)
     expect(clearUnsubscribes).toHaveLength(2)
     expect(clearUnsubscribes[0]).toHaveBeenCalledTimes(1)
     expect(clearUnsubscribes[1]).not.toHaveBeenCalled()
-    expect(window.api.terminal.kill).toHaveBeenCalledWith(TERMINAL_ID)
+    expect(gatewayBridgeMock('terminal').kill).toHaveBeenCalledWith(TERMINAL_ID)
   })
 
   it('on a project switch leaves one set of file-drop listeners, not two', async () => {
@@ -258,7 +253,7 @@ describe('TerminalPanel teardown', () => {
       projectChanged!({ newPath: '/other/project' })
     })
 
-    await vi.waitFor(() => expect(window.api.terminal.create).toHaveBeenCalledTimes(2), WAIT)
+    await vi.waitFor(() => expect(gatewayBridgeMock('terminal').create).toHaveBeenCalledTimes(2), WAIT)
     expect(clearUnsubscribes[0]).toHaveBeenCalledTimes(1)
     expect(captureListenerCount(addSpy, removeSpy, 'drop')).toBe(1)
     expect(mockXtermInstance.dispose).toHaveBeenCalledTimes(1)
@@ -271,8 +266,8 @@ describe('TerminalPanel teardown', () => {
       projectChanged!({ newPath: null })
     })
 
-    await vi.waitFor(() => expect(window.api.terminal.kill).toHaveBeenCalledWith(TERMINAL_ID), WAIT)
-    expect(window.api.terminal.create).toHaveBeenCalledTimes(1)
+    await vi.waitFor(() => expect(gatewayBridgeMock('terminal').kill).toHaveBeenCalledWith(TERMINAL_ID), WAIT)
+    expect(gatewayBridgeMock('terminal').create).toHaveBeenCalledTimes(1)
     expect(useTerminalStore.getState().activeTerminalId).toBeNull()
   })
 })

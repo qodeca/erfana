@@ -81,8 +81,7 @@ test.describe('fixture smoke: withSettings', () => {
 
   test('writes .erfana/settings.json with correct content', async ({
     testProject,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    withSettings
+    withSettings: _withSettings
   }) => {
     const settingsPath = path.join(testProject.path, '.erfana', 'settings.json')
     const raw = await fs.promises.readFile(settingsPath, 'utf-8')

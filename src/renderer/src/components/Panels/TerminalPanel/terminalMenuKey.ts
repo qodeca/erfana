@@ -43,7 +43,8 @@ export interface CursorAnchorSource {
  * `.xterm-screen` box divided by the grid (`cols` × `rows`), and the cursor
  * row is taken relative to the rows on screen (`baseY + cursorY - viewportY`),
  * so a scrolled-back viewport still anchors where the cursor shows. The point
- * is clamped into the terminal element; with no usable screen box it falls
+ * kept inside the terminal element (pulled in by the padding only past its
+ * right or bottom edge); with no usable screen box it falls
  * back to the element's top-left plus padding.
  *
  * @param xterm - The instance, or anything with the same public fields
@@ -70,8 +71,10 @@ export function terminalCursorAnchor(xterm: CursorAnchorSource): MenuAnchor {
   const col = clamp(cursorX, 0, xterm.cols - 1)
   const row = clamp(baseY + cursorY - viewportY, 0, xterm.rows - 1)
   return {
-    x: clamp(screen.left + col * cellWidth, panel.left + ANCHOR_PADDING_PX, panel.right - ANCHOR_PADDING_PX),
-    y: clamp(screen.top + (row + 1) * cellHeight, panel.top + ANCHOR_PADDING_PX, panel.bottom - ANCHOR_PADDING_PX)
+    // A point already inside the panel stays where it is (column 0 is not
+    // pushed right); only one past an edge is pulled in, by the padding
+    x: clamp(screen.left + col * cellWidth, panel.left, panel.right - ANCHOR_PADDING_PX),
+    y: clamp(screen.top + (row + 1) * cellHeight, panel.top, panel.bottom - ANCHOR_PADDING_PX)
   }
 }
 

@@ -72,7 +72,8 @@ function createMockEditorRef(): React.RefObject<MonacoEditorHandle | null> {
     getScrollTop: vi.fn(),
     setScrollTop: vi.fn(),
     getTopForLineNumber: vi.fn(),
-    setPositionAndReveal: vi.fn()
+    setPositionAndReveal: vi.fn(),
+    getMonaco: vi.fn(() => null)
   }
   return { current: mockHandle }
 }
