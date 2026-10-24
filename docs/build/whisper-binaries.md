@@ -251,6 +251,7 @@ After CI publishes a new `whisper-build-<label>-erfana<N>` release, the app-side
    - Delete `{userData}/whisper/` to force a fresh install.
    - Launch Erfana → Settings → Transcription → Backend = Local → Download model → transcribe a test audio file.
    - Expected log: `INFO: Whisper binary installed` with the new `manifestRevision` value.
+   - Without a usable desktop session, run the same path headless: `ERFANA_WHISPER_REAL_RELEASE=1 npx vitest --run --config vitest.main.ts src/main/services/WhisperModelManager.realRelease.integration.test.ts`. It installs the pinned release into a temp `userData` through the shipped `WhisperModelManager` and transcribes the JFK sample with `ggml-tiny` through `LocalWhisperService` (~80 MB download). It does not cover Gatekeeper's first-launch check of a quarantined download.
 9. **Commit** with a conventional message: `feat(whisper): pin whisper-build-<label>-erfana<N> (upstream <whisper.cpp version>)`.
 10. **PR review** — reviewer should confirm: (a) SHAs match manifest, (b) `MIN_REVISION_INDEX` monotonic, (c) `CHANGELOG.md` mentions the security-relevant upstream changes (see the [diff-review checklist](#diff-review-checklist-every-upstream-bump) above).
 

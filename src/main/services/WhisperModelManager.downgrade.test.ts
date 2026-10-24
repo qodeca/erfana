@@ -53,12 +53,14 @@ vi.mock('fs/promises', () => ({
   stat: vi.fn()
 }))
 
-// `fs` (sync) for `createReadStream` used by streaming SHA in verifyAllFiles
-// — we don't hit that path in these tests (all 3 tests fail before extract).
+// `fs` (sync) for `createReadStream` used by streaming SHA in verifyAllFiles.
+// Only the successful-upgrade test reaches it; it arranges the stream itself.
+const mockCreateReadStream = vi.fn((_path: string): unknown => {
+  throw new Error('not expected to reach verifyAllFiles in this downgrade test')
+})
+
 vi.mock('fs', () => ({
-  createReadStream: vi.fn(() => {
-    throw new Error('not expected to reach verifyAllFiles in downgrade tests')
-  }),
+  createReadStream: (path: string) => mockCreateReadStream(path),
   constants: { R_OK: 4, X_OK: 1 }
 }))
 
@@ -221,7 +223,7 @@ function arrangeDefaults(opts: {
       win64: {
         filename: 'whisper-win-x64-v1.8.4-erfana2.zip',
         sha256: 'f4a459133c29911e484146917c1ada49aac8668d734db8c300a820be11be36f2',
-        size: 1_000_000
+        size: 1_014_883
       }
     },
     signingKey: 'primary' as const
@@ -270,12 +272,41 @@ describe('WhisperModelManager downgrade protection', () => {
     vi.restoreAllMocks()
   })
 
-  it('real pin refuses the erfana1 manifest (revisionIndex 1)', async () => {
+  it('real pin floor is above erfana1', async () => {
     // erfana1's macOS whisper-cli could not start on users' Macs (its dylibs
     // were not in the tarball), so the shipped floor must stay above it.
     const real = await vi.importActual<typeof import('./whisper-assets')>('./whisper-assets')
     expect(real.MIN_REVISION_INDEX).toBeGreaterThanOrEqual(2)
     expect(real.RELEASE_TAG).not.toContain('erfana1')
+  })
+
+  it('upgrades an erfana1 install: stored floor 1 + manifest 2 → accepted, floor written as 2', async () => {
+    arrangeDefaults({ manifestRevisionIndex: 2, lastSeenRevisionOnDisk: 1 })
+
+    // verifyAllFiles streams the extracted main binary. Serve bytes whose
+    // SHA-256 is the pin for the duration of this test.
+    const { Readable } = await vi.importActual<typeof import('stream')>('stream')
+    const { createHash } = await vi.importActual<typeof import('crypto')>('crypto')
+    const fakeBinary = Buffer.from('erfana2 whisper-cli stand-in')
+    const originalSha = DARWIN_SPEC.files.main.sha256
+    DARWIN_SPEC.files.main.sha256 = createHash('sha256').update(fakeBinary).digest('hex')
+    mockCreateReadStream.mockImplementation(() => Readable.from([fakeBinary]))
+
+    try {
+      const { createWhisperModelManager } = await import('./WhisperModelManager')
+      const manager = createWhisperModelManager()
+
+      await expect(manager.ensureBinary()).resolves.toMatch(/whisper-cli$/)
+
+      const floorWrites = mockWriteFile.mock.calls.filter(
+        ([p]) => typeof p === 'string' && p.endsWith('.last-seen-revision')
+      )
+      expect(floorWrites).toHaveLength(1)
+      expect(floorWrites[0][1]).toBe('2')
+    } finally {
+      DARWIN_SPEC.files.main.sha256 = originalSha
+      mockCreateReadStream.mockReset()
+    }
   })
 
   it('rejects manifest whose revisionIndex is below MIN_REVISION_INDEX (source floor)', async () => {

@@ -1,6 +1,6 @@
 # Phase 4 binary spec — whisper.cpp
 
-> **Note**: issue and PR numbers, commit SHAs, release tags and CI run links below predate the 2026-06 open-source migration and no longer resolve on `qodeca/erfana`; they are retained as provenance.
+> **Note**: in the `erfana1` sections (the retired pin and its first-run evidence), issue and PR numbers, commit SHAs, release tags and CI run links predate the 2026-06 open-source migration and no longer resolve on `qodeca/erfana`; they are retained as provenance.
 
 Authoritative record of the whisper.cpp binary release currently pinned by Erfana. Update this file every time `src/main/services/whisper-assets.ts` advances to a new `whisper-build-*` tag.
 
@@ -135,7 +135,8 @@ Pin bump checked on 2026-10-24 from a fresh `gh release download` of `whisper-bu
 - `manifest.json` server digest: `sha256:634bb05014a7cfc0882000312483ff09dcc48506ef2cb5994fcfe14c56ecb34f`
 - `manifest.json.minisig` server digest: `sha256:a1eb518dab2d7cad88ad3cc69367da546d2e01b9e5f63a8bcafb0cc4eaf8908d`
 - macOS (Apple silicon, macOS 26): `spctl -a -vv -t install whisper-cli` → `accepted`, `source=Notarized Developer ID`. Run from a folder outside the extracted tree on `ggml-tiny.bin` + upstream `samples/jfk.wav`, it printed "And so my fellow Americans ask not what your country can do for you, ask what you can do for your country." The x86_64 slice was not run (no Rosetta on the test machine).
-- Windows: not smoke-tested at pin time.
+- macOS in-app path, headless: `ERFANA_WHISPER_REAL_RELEASE=1` with `src/main/services/WhisperModelManager.realRelease.integration.test.ts` ran the shipped `ensureBinary()` (signed manifest, download, extraction into a temp `userData`, quarantine strip, chmod, re-hash) and then `LocalWhisperService.transcribe()` on `ggml-tiny`. Logged `Whisper binary installed` with `manifestRevision: 2` and `signingKeyRole: primary`, then `Whisper spawn` with `computedSha: e533e2ae…c0de`, and transcribed the same JFK sentence. Gatekeeper's first-launch check of a quarantined download is not covered, because Node's fetch sets no quarantine attribute.
+- Windows: the build toolchain changed for this release – #372 dropped the VS 2022 pin, so the runner's current Visual Studio (2026) built the zip. Windows results: _pending – to be added after the Windows session tests this build._
 
 ## First-run verification evidence (erfana1)
 
@@ -278,5 +279,5 @@ Full manifest:
 
 | Erfana app versions | Pinned whisper build | Date pinned | Notes |
 |---|---|---|---|
-| `0.9.4`–`0.21.0` | `whisper-build-v1.8.4-erfana1` | 2026-04-22 | First Windows + macOS release under Option A (#165) — upstream `9386f239` (v1.8.4) |
-| next release after 0.21.0 | `whisper-build-v1.8.4-erfana2` | 2026-10-24 | Static macOS `whisper-cli` (PR #363) – fixes local transcription failing to start on macOS; Windows rebuilt, same 4 DLLs. Same upstream `9386f239` (v1.8.4). `MIN_REVISION_INDEX` 1 → 2 |
+| `0.9.4`–`0.21.0` (0.21.0 not tagged yet at pin time; last tag v0.20.1) | `whisper-build-v1.8.4-erfana1` | 2026-04-22 | First Windows + macOS release under Option A (#165) — upstream `9386f239` (v1.8.4) |
+| the release after 0.21.0 | `whisper-build-v1.8.4-erfana2` | 2026-10-24 | Static macOS `whisper-cli` (PR #363) – fixes local transcription failing to start on macOS; Windows rebuilt, same 4 DLLs. Same upstream `9386f239` (v1.8.4). `MIN_REVISION_INDEX` 1 → 2 |
