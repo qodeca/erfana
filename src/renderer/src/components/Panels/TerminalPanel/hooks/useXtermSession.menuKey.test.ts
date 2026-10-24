@@ -131,8 +131,11 @@ describe('useXtermSession menu key (#90)', () => {
   it('the Menu key opens it too, and the native contextmenu echo that follows is ignored', async () => {
     const options = await startSession()
 
-    expect(keyHandler!(key('keydown', { key: 'ContextMenu' }))).toBe(false)
+    const down = key('keydown', { key: 'ContextMenu' })
+    expect(keyHandler!(down)).toBe(false)
+    expect(down.defaultPrevented).toBe(true)
     expect(options.onContextMenu).toHaveBeenCalledTimes(1)
+    expect(options.keyEventHandler).not.toHaveBeenCalled()
     contextMenuListener!(new MouseEvent('contextmenu', { cancelable: true, clientX: 5, clientY: 5 }))
     expect(options.onContextMenu).toHaveBeenCalledTimes(1)
   })
