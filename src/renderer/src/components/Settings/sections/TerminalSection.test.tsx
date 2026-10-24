@@ -10,6 +10,7 @@ import { TerminalSection, screenReaderStatusText } from './TerminalSection'
 import { useGlobalSettingsStore } from '../../../stores/useGlobalSettingsStore'
 import { getDefaultGlobalSettings } from '../../../../../shared/ipc/global-settings-schema'
 import { TEST_IDS } from '../../../constants/testids'
+import { gatewayBridgeMock } from '../../../test-utils/gatewayBridgeMock'
 
 const platform = { mac: true, windows: false }
 vi.mock('../../../utils/platform', () => ({
@@ -61,7 +62,7 @@ describe('TerminalSection', () => {
 
     await user.selectOptions(screen.getByTestId(TEST_IDS.SETTINGS_SELECT_SCREEN_READER_MODE), 'on')
 
-    expect(window.api.globalSettings.set).toHaveBeenCalledWith('terminal', { screenReaderMode: 'on' })
+    expect(gatewayBridgeMock('globalSettings').set).toHaveBeenCalledWith('terminal', { screenReaderMode: 'on' })
     expect(useGlobalSettingsStore.getState().settings?.terminal.screenReaderMode).toBe('on')
     expect(screen.getByTestId(TEST_IDS.SETTINGS_SCREEN_READER_STATUS)).toHaveTextContent('On for every terminal.')
   })
