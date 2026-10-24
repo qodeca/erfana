@@ -113,6 +113,15 @@ Three of the workflow's four jobs — `build-macos`, `build-windows` and `publis
 
 Typical end-to-end time once approved: ~25–30 minutes (macOS build ~15 min + Windows build ~8 min + notary queue ~5–10 min).
 
+## macOS build is static
+
+The macOS tarball ships `whisper-cli` with no libraries beside it, so `build-macos` configures with `-DBUILD_SHARED_LIBS=OFF`: `libwhisper` and every `libggml*` library are linked into the binary. It also sets `-DGGML_OPENMP=OFF`, as upstream's own Apple build (`build-xcframework.sh`) does, so the binary cannot pick up a `libomp` dependency, even if a runner image makes OpenMP findable. Do not add `-DGGML_STATIC=ON` – on Apple it passes `-static` to the linker, which macOS does not support for executables. Two steps keep the binary self-contained:
+
+- **"Verify whisper-cli links system libraries only"** runs after staging, before signing. It fails if `otool -arch all -L staging/whisper-cli` lists anything outside `/usr/lib/` and `/System/Library/` (an `@rpath/`, `@loader_path/` or `@executable_path/` entry, or any other path), or if `otool -l` shows an `LC_RPATH` into the runner workspace.
+- **"Smoke test (transcribe JFK sample)"** runs a copy of `staging/` from `$RUNNER_TEMP/whisper-smoke`, with `build/` moved aside, so a library missing from the tarball fails the run.
+
+Why: `whisper-build-v1.8.4-erfana1` was a shared build. Its `whisper-cli` loads `@rpath/libwhisper.1.dylib` and five `libggml*` dylibs that are not in the tarball, so on a user's Mac it stops at launch and Erfana reports `WHISPER_PROCESS_FAILED`. The CI smoke test still passed, because it ran on the runner, where the binary's absolute `LC_RPATH` entries pointed into `build/`.
+
 ## Diff-review checklist (every upstream bump)
 
 **Before** triggering a workflow for a new upstream SHA, review the diff:
@@ -236,7 +245,8 @@ After CI publishes a new `whisper-build-<label>-erfana<N>` release, the app-side
    npm run typecheck
    npm run test:main -- src/main/services/WhisperModelManager.test.ts src/main/services/WhisperModelManager.downgrade.test.ts src/main/services/LocalWhisperService.test.ts src/main/utils/
    ```
-8. **Local smoke test** (on at least one of macOS / Windows, or both):
+8. **Local smoke test** – on macOS (required) and, if you can, on Windows:
+   - macOS is required because the CI smoke test runs on the build machine, and passed for a binary that could not start on a user's Mac (see [macOS build is static](#macos-build-is-static)).
    - Delete `{userData}/whisper/` to force a fresh install.
    - Launch Erfana → Settings → Transcription → Backend = Local → Download model → transcribe a test audio file.
    - Expected log: `INFO: Whisper binary installed` with the new `manifestRevision` value.
@@ -277,6 +287,20 @@ Hard-won knowledge from Phase 4 implementation — documented here so future mai
 2. **Signature algorithm variants**: public keys always carry `Ed` (magic bytes `0x45 0x64`); signatures must be `ED` (prehashed via BLAKE2b-512, then Ed25519 over the 64-byte digest – magic bytes `0x45 0x44`, the minisign >= 0.7 default). `parseSignature` (`verifyManifest.ts`) refuses a legacy `Ed` signature and anything else with `unsupported-algorithm`. It also requires the trusted-comment and global-signature lines, and checks the global signature (same key, over signature || trusted comment). The BLAKE2b-512 is computed with the pure-JS `@noble/hashes`, because Electron's BoringSSL has no `blake2b512` (`crypto.createHash` throws "Digest method not supported").
 3. **Pure-JS verifier via `@noble/ed25519`.** We chose this over `sodium-native` to keep the verifier a pure-function with no native bindings. Tradeoff: ~100µs per verify vs ~10µs native — negligible for once-per-install use.
 4. **Test fixture pattern**: `src/main/utils/verifyManifest.test.ts` uses a real published manifest + signature from `whisper-build-v1.8.4-erfana1` as fixture bytes. When the pin advances, either (a) the fixture stays pointing at the old release (still cryptographically valid) or (b) refresh the fixture to the new release. Do NOT generate synthetic manifests with test keypairs — that would miss the `Ed`/`ED` variant-detection path.
+
+## Security baseline
+
+What `src/main/utils/secureDownloader.ts` enforces for every whisper download (binaries, manifest and GGML models):
+
+- **Exact host allowlist, no wildcards.** `github.com`, `objects.githubusercontent.com`, `release-assets.githubusercontent.com`, `huggingface.co`, `us.aws.cdn.hf.co` (Hugging Face Xet storage, where model files now redirect to), and the older `cdn-lfs.huggingface.co`, `cdn-lfs-us-1.huggingface.co`, `cdn-lfs-eu-1.huggingface.co`. Redirects are followed by hand and every hop is checked again. `eu.aws.cdn.hf.co` does not resolve (checked 2026-10-23), so it is not listed; add a host only after confirming it, as an exact name.
+- **Only `https:`, default port, no credentials in the URL.** Checked on the first URL and on every redirect hop. Error messages carry origin + path only (signed CDN query strings never reach logs or the renderer).
+- **Models are hash-pinned.** `MODEL_PINS` in `src/shared/whisper-model-pins.ts` (re-exported by `whisper-assets.ts`) holds the SHA-256 and exact size of each model, taken from the Hugging Face API (`https://huggingface.co/api/models/ggerganov/whisper.cpp/tree/main`, each file's `lfs.oid` and `size`). `ensureModel()` passes the hash to `downloadToFile`; on a mismatch the temp file is deleted and the download fails with `WHISPER_MODEL_DOWNLOAD_FAILED`. The host allowlist is therefore not the integrity check for models.
+- **Installed models are checked too.** A model counts as installed only with the exact pinned size (`isModelInstalled`, `listInstalledModels`). `LocalWhisperService` calls `verifyInstalledModelFile(model)` once per transcription job, before the first spawn; every chunk of that job shares the one check. It opens the file once, stats the handle, streams a SHA-256 through the same handle, then re-stats the handle and the path and requires the same dev, ino, size, mtime and ctime. **Nothing is cached across jobs**: a file rewritten in place with its mtime restored is caught by the next job, because each job hashes again (a multi-GB model costs a few seconds). The state it verified (dev, ino, size, mtime, ctime) is returned, and before each chunk's spawn `assertVerifiedModelUnchanged()` re-stats the path and requires the same state; a mismatch stops the job (`WHISPER_MODEL_CHANGED_DURING_CHECK`). The window between the check and the spawn is narrowed, not closed. The file is deleted only when its size or hash is wrong AND the path still names the exact file that was hashed (same dev and ino); `WHISPER_MODEL_INTEGRITY_FAILED` ("download it again from Settings") is raised. If the file merely *changed* while it was being checked, or between chunks, the job fails with `WHISPER_MODEL_CHANGED_DURING_CHECK` and nothing is deleted (the next job checks again). A cancel during hashing raises `TRANSCRIPTION_CANCELLED` and leaves the file. Nothing is re-downloaded without the user asking.
+- **Windows limit.** A same-user process can restore ChangeTime and LastWriteTime, so a swap between two chunks of one job is not caught by the per-chunk recheck; the next job re-hashes the file.
+- **No leftovers.** Temp files are named `ggml-<model>.bin.download-p<pid>-<uuid>`. An in-flight download is aborted and its temp file removed at app quit (`dispose()`). Any `ggml-*.bin.download-*` file from an earlier run is deleted the next time models are listed or downloaded, except a download of another Erfana instance sharing the same userData (its pid is still alive) and an unmarked file changed in the last 10 minutes. A pid-marked file untouched for over an hour is stale even if its pid is alive.
+- **`large` maps to `ggml-large-v3.bin`.** The repository has no plain `ggml-large.bin`; the file is stored locally as `ggml-large.bin`.
+- **Byte cap per model** is the pinned size plus 1 MiB, checked against `Content-Length` and the streamed bytes.
+- To refresh a pin (a model re-published upstream), re-read the API output above and update `MODEL_PINS` and its test mock together.
 
 ## Rejected approaches (don't re-propose without reading this section)
 

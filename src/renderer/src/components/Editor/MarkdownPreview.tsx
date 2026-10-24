@@ -605,6 +605,7 @@ function RenderTimingProbe({
   /** Called after each commit with the render's duration and whether it was an update (not the mount) */
   onCommit: (durationMs: number, isUpdate: boolean) => void
 }): JSX.Element {
+  // eslint-disable-next-line react-hooks/purity -- impure on purpose: this probe exists to time the render, so it must read the clock while rendering
   const startedAt = performance.now()
   notePreviewRenderStart()
   const hasCommittedRef = useRef(false)
@@ -896,6 +897,7 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
 
       // No project context, or nothing to resolve.
       if (!filePath || hrefs.length === 0) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- clears the previous resolution on the same path as the async resolve below, so the two cannot race; returns prev when already empty
         setResolvedLinks((prev) => (prev.size === 0 ? prev : NO_RESOLUTIONS))
         return
       }
@@ -1119,6 +1121,7 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
     )
 
     const markdownComponents = useMemo(
+      // eslint-disable-next-line react-hooks/refs -- handleInternalLink reads its refs only when a link is clicked, never while the renderers are built
       () => createMarkdownComponents(filePath, handleInternalLink, notifyLinkError),
       [filePath, handleInternalLink, notifyLinkError]
     )
@@ -1129,6 +1132,7 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
      * The mount render is ignored for the decision – it includes one-off costs
      * and is never debounced anyway.
      */
+    const bodyCommittedRef = useRef(false)
     const handleBodyCommit = useCallback((durationMs: number, isUpdate: boolean) => {
       if (isUpdate) {
         // Damped: a mode switch needs PREVIEW_MODE_SWITCH_STREAK renders in a row.
@@ -1147,7 +1151,6 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
       bodyCommittedRef.current = true
       publishInternalLinks()
     }, [publishInternalLinks])
-    const bodyCommittedRef = useRef(false)
 
     useLayoutEffect(() => {
       if (!bodyCommittedRef.current) return

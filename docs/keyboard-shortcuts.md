@@ -59,6 +59,10 @@ The image panel handles its own keys in `imageViewer.logic.ts`; the [user-facing
 
 `BaseDialog` owns Escape and focus trapping where enabled. Native focus determines what Enter activates, so a focused Cancel button cancels. `CameraDialog` keeps shutter-on-Enter only when focus is outside a button, select or input; it checks that target before calling `preventDefault()`. `PromptDialog` submits on `Cmd/Ctrl+Enter`, leaving plain Enter for textarea newlines. `FilePickerDialog` handles arrows, Enter, Escape and copying the selected path; `ChatBubble` uses `Cmd/Ctrl+Enter` to send. User bindings are in the [dialog shortcut reference](./user-guide/reference/keyboard-shortcuts.md#dialogs-and-file-picker).
 
+## Context menus
+
+Every context menu is the shared `ContextMenu` (`components/ContextMenu/ContextMenu.tsx`), which implements the decided [Menu card](../design/system/components/menu/index.html): focus moves to the first item on open, roving tabindex, ↑ ↓ with wrap, Home / End, Enter / Space, typeahead, and Escape or Tab close it and return focus to the opener (#90). **Shift+F10** and the **Menu key** open the menu of the focused project-tree row (`ProjectTree/treeKeyboard.ts`), dock tab (`Tabs/useTabMenuKey.ts`, on dockview's `.dv-tab`), editor (Monaco commands, under the caret), terminal (`TerminalPanel/terminalMenuKey.ts`, at the cursor – the shell no longer receives Shift+F10) and the dialog and diagram-chat text fields (`onKeyDownCapture`). Windows also sends a native `contextmenu` after the Menu key; `contextMenuKey.ts` drops that echo so the menu does not open twice.
+
 ## DevTools
 
 | Shortcut | Action |

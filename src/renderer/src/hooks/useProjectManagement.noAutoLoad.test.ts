@@ -3,8 +3,8 @@
 /**
  * useProjectManagement — "no auto-load on mount" invariant (issue #60)
  *
- * The mount effect (`useProjectManagement.ts`, "Load last project on mount -
- * DISABLED") only clears the spinner; it never reopens the last project. Crash recovery leans on that: relaunching after a crash caused BY a
+ * The hook has no "load last project on mount" step (`useProjectManagement.ts`,
+ * `loading` starts false); it never reopens the last project. Crash recovery leans on that: relaunching after a crash caused BY a
  * project must land on the welcome screen, not reopen the offending project and
  * crash again.
  *

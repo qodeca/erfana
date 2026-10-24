@@ -22,6 +22,7 @@ import { useTerminalStore } from '../../../../stores/useTerminalStore'
 import { showWarningToast } from '../../../../utils/toastHelpers'
 import { isPointInElement } from '../../../../utils/domGeometry'
 import { logger } from '../../../../utils/logger'
+import { utilsGateway } from '../../../../services/utilsGateway'
 import type { DragHandlerRefs } from '../types'
 
 /** Listener options shared by add and remove, so the pair always matches */
@@ -132,7 +133,7 @@ export function useTerminalFileDrop({
         const paths = Array.from(e.dataTransfer.files)
           .map((f) => {
             try {
-              return window.api.utils.getPathForFile(f)
+              return utilsGateway.getPathForFile(f)
             } catch (err) {
               logger.warn('Failed to get path for dropped file', {
                 fileName: f.name,

@@ -15,8 +15,9 @@
  * @module useKeyboardShortcuts
  */
 
-import { useEffect, useRef } from 'react'
+import { useEffect } from 'react'
 import { isMacOS } from '../utils/platform'
+import { useLatestRef } from './useLatestRef'
 
 /**
  * Configuration for confirmation dialog.
@@ -109,8 +110,7 @@ export interface UseKeyboardShortcutsOptions {
 export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions): void {
   // Use refs to access latest values without re-registering the listener
   // This prevents stale closure issues when options change
-  const optionsRef = useRef(options)
-  optionsRef.current = options
+  const optionsRef = useLatestRef(options)
 
   useEffect(() => {
     const handleKeyDown = async (e: KeyboardEvent): Promise<void> => {
@@ -159,5 +159,5 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions): void
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, []) // Empty deps - we use refs to avoid stale closures
+  }, [optionsRef]) // optionsRef is stable: registers once, reads the latest options
 }

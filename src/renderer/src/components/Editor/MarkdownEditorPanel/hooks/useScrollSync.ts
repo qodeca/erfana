@@ -281,6 +281,7 @@ export function useScrollSync(options: UseScrollSyncOptions): UseScrollSyncRetur
   // Reset editor state when view mode changes - force rebuild on next effect
   // Uses functional update to avoid unnecessary state changes if already false
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- kept as an effect on purpose: moving the reset into render would change what the scroll-listener and rebuild effects below see on the view-mode commit
     setIsEditorReady((prev) => {
       if (prev) {
         logger.debug('Resetting editor state due to view mode change', { viewMode })

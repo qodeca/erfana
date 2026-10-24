@@ -27,6 +27,7 @@ import { registerQuitHandlers } from './ipc/quit-handlers'
 import { registerProjectLockHandlers } from './ipc/project-lock-handlers'
 import { registerExternalFileHandlers } from './ipc/external-file-handlers'
 import { registerTranscriptionHandlers } from './ipc/transcription-handlers'
+import { whisperModelManager } from './services/WhisperModelManager'
 import { registerClipboardHandlers } from './ipc/clipboard-handlers'
 import { registerImageExportHandlers } from './ipc/image-export-handlers'
 import { registerBrowserHandlers } from './ipc/browser-handlers'
@@ -494,6 +495,14 @@ app.whenReady().then(async () => {
   directoryWatcherService.onPathsRemoved((removedPaths) =>
     fileWatcherService.handleAncestorRemovals(removedPaths)
   )
+  // ...and where it cannot tell (a pause lost the paths, or the file's folder is
+  // filtered out), the single-file watches check the disk (#252)
+  directoryWatcherService.onRemovalsLost((root, isOwnRemoval) => {
+    fileWatcherService
+      .checkWatchedFilesUnder(root, isOwnRemoval)
+      .catch((error: unknown) => logger.error('Re-checking open files failed', redactedLogError(error)))
+  })
+  fileWatcherService.watchUnseenFiles(directoryWatcherService)
 
   // Register IPC handlers. Every global channel is gated on the app's own
   // top-level renderer by construction: the handlers register through
@@ -804,7 +813,9 @@ app.on('before-quit', (event): Promise<void> | undefined => {
               claudeStatusHandlers ? claudeStatusHandlers.dispose() : Promise.resolve(),
               previewHandlers ? previewHandlers.dispose() : Promise.resolve(),
               gitWatcherService.dispose(),
-              gitStatusService.dispose()
+              gitStatusService.dispose(),
+              // Abort an in-flight model download so its temp file is removed now.
+              whisperModelManager.dispose()
             ])
           },
           SHUTDOWN_TIMEOUT_MS

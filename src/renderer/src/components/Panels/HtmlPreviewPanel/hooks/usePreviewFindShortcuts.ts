@@ -29,6 +29,7 @@
  */
 
 import { useEffect, useRef } from 'react'
+import { previewGateway } from '../../../../services/previewGateway'
 
 /** The panel actions the forwarded accelerators drive. */
 export interface PreviewShortcutActions {
@@ -90,7 +91,7 @@ export function usePreviewFindShortcuts(
   actionsRef.current = actions
 
   useEffect(() => {
-    const unsubscribe = window.api.preview.onForwardedShortcut((payload) => {
+    const unsubscribe = previewGateway.onForwardedShortcut((payload) => {
       if (payload.panelId !== panelId) return
 
       const current = actionsRef.current

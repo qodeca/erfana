@@ -9,6 +9,7 @@
 import { z } from 'zod'
 import { TranscriptionSettingsSchema } from './transcription-schema'
 import { FilesSettingsSchema } from './files-exclude-schema'
+import type { IpcAck } from './schema'
 
 /**
  * Logging level enum
@@ -128,4 +129,21 @@ export interface GlobalSettingsChanged {
   settings: GlobalSettings
   changedKey: string
   previousValue?: unknown
+}
+
+/**
+ * Shared contract for the preload `globalSettings` bridge.
+ *
+ * Implemented by `window.api.globalSettings` (preload, `settingsBridge.ts`)
+ * and consumed by the renderer settings gateway.
+ */
+export interface GlobalSettingsBridge {
+  /** All global settings from ~/.erfana/settings.json */
+  get(): Promise<{ success: boolean; settings?: GlobalSettings; error?: string }>
+  /** Set one setting; sent as `{ key, value }`. */
+  set(key: string, value: unknown): Promise<IpcAck>
+  /** Reset every global setting to its default. */
+  reset(): Promise<IpcAck>
+  /** Subscribe to setting changes; returns the unsubscribe function. */
+  onSettingsChanged(callback: (data: GlobalSettingsChanged) => void): () => void
 }

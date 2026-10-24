@@ -10,7 +10,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, act } from '@testing-library/react'
 import { TranscriptionDialog } from './TranscriptionDialog'
 import { BaseDialog } from '../Dialog/BaseDialog'
 import { useTranscriptionStore } from '../../stores/useTranscriptionStore'
@@ -169,6 +169,28 @@ describe('TranscriptionDialog', () => {
       render(<TranscriptionDialog />)
       const select = screen.getByTestId(TEST_IDS.TRANSCRIPTION_LANGUAGE_SELECT) as HTMLSelectElement
       expect(select.value).toBe('auto')
+    })
+
+    // The seed moved from an effect into render (plan item 19)
+    it('starts from the last used language on each open, after a change in between', () => {
+      useTranscriptionStore.setState({
+        isDialogOpen: true,
+        filePath: '/path/to/audio.mp3',
+        fileName: 'audio.mp3',
+        lastLanguage: 'de'
+      })
+      render(<TranscriptionDialog />)
+      const select = (): HTMLSelectElement =>
+        screen.getByTestId(TEST_IDS.TRANSCRIPTION_LANGUAGE_SELECT) as HTMLSelectElement
+      expect(select().value).toBe('de')
+
+      fireEvent.change(select(), { target: { value: 'fr' } })
+      expect(select().value).toBe('fr')
+
+      // Close and reopen: the choice goes back to the stored language
+      act(() => useTranscriptionStore.setState({ isDialogOpen: false }))
+      act(() => useTranscriptionStore.setState({ isDialogOpen: true }))
+      expect(select().value).toBe('de')
     })
 
     it('allows language selection change', () => {

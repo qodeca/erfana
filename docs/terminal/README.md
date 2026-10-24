@@ -516,6 +516,8 @@ See [Terminal Architecture Review](../architecture-reviews/reviews/terminal-pane
 
 **Start-up guard** (lens review [18]): every teardown bumps a generation counter, and a start checks it after each await (font load, WebGL import, `terminal:create`). A start that finds it changed gives up – disposing its xterm if it was never stored, and killing a PTY main created for it in the meantime – so its id is never set and its output never reaches the terminal that replaced it. Only one start runs per generation: a second `start()` joins the one in flight, and a `start()` while a session is live does nothing.
 
+**Failed start**: a start that fails for the current generation (font load, `open()`, or `terminal:create` answering with an error) disposes its own xterm instance and, if it was already stored, releases what it attached and clears `xtermRef` / `fitAddonRef`. Otherwise the stale instance would block every later start, and "Recheck" could never create a terminal again.
+
 ### State Management
 
 **File**: `src/renderer/src/stores/useTerminalStore.ts`

@@ -49,6 +49,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { logger } from '../utils/logger'
 import { CAMERA } from '../../../shared/constants'
+import { cameraGateway } from '../services/cameraGateway'
 
 /** LocalStorage key for persisting last used camera device */
 const STORAGE_KEY_LAST_DEVICE = 'erfana-camera-last-device'
@@ -541,7 +542,7 @@ export function useCameraCapture(): UseCameraCaptureReturn {
         }
 
         // Save via IPC to main process
-        const result = await window.api.camera.save({
+        const result = await cameraGateway.save({
           dataUrl: frameResult.dataUrl,
           timestamp: Date.now()
         })

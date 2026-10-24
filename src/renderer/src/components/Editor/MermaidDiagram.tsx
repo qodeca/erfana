@@ -12,6 +12,7 @@ import { useTerminalPortalOptional } from '../../context/TerminalPortalContext'
 import { scheduleScrollIfNeeded } from '../../utils/promptScrollScheduler.logic'
 import { logger } from '../../utils/logger'
 import { useIdleDebouncedValue } from '../../hooks/useIdleDebouncedValue'
+import { useLatestRef } from '../../hooks/useLatestRef'
 import { PreviewWorkContext } from './previewWork'
 
 /**
@@ -72,7 +73,6 @@ export function MermaidDiagram({
   const containerRef = useRef<HTMLDivElement>(null)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [initialized, setInitialized] = useState(false)
   const [svgContent, setSvgContent] = useState<string>('')
 
   // Store for persisting viewer state across component remounts
@@ -166,18 +166,23 @@ export function MermaidDiagram({
     }
   }
 
-  // Initialize mermaid with built-in theme
+  // Initialize mermaid with built-in theme. Declared before the draw effect on
+  // purpose: a component's effects run in declaration order, so the first draw
+  // (same commit) always follows this call – no "initialized" flag needed.
   useEffect(() => {
     const config = getMermaidConfig(true) // isDarkMode param ignored, uses ACTIVE_THEME
     mermaid.initialize(config)
-    setInitialized(true)
   }, [])
 
   // Render diagram whenever code changes
+  // The line range only labels the 'mermaid:rendered' event: read it through a
+  // ref so a range shift (an edit above the diagram) does not redraw it.
+  const lineRangeRef = useLatestRef({ startLine, endLine })
   useEffect(() => {
-    if (!initialized || !containerRef.current) {
+    if (!containerRef.current) {
       return
     }
+    const { startLine: drawStartLine, endLine: drawEndLine } = lineRangeRef.current
 
     const token = ++drawTokenRef.current
     const isCurrent = (): boolean => token === drawTokenRef.current
@@ -225,7 +230,7 @@ export function MermaidDiagram({
         if (target) {
           const event = new CustomEvent('mermaid:rendered', {
             bubbles: true,
-            detail: { startLine, endLine, ok: true }
+            detail: { startLine: drawStartLine, endLine: drawEndLine, ok: true }
           })
           target.dispatchEvent(event)
         }
@@ -247,7 +252,7 @@ export function MermaidDiagram({
         if (containerRef.current) {
           const event = new CustomEvent('mermaid:rendered', {
             bubbles: true,
-            detail: { startLine, endLine, ok: false }
+            detail: { startLine: drawStartLine, endLine: drawEndLine, ok: false }
           })
           containerRef.current.dispatchEvent(event)
         }
@@ -255,7 +260,7 @@ export function MermaidDiagram({
     }
 
     renderDiagram()
-  }, [code, initialized])
+  }, [code, lineRangeRef])
 
   const handleExpandClick = () => {
     if (svgContent && filePath) {

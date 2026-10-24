@@ -30,11 +30,13 @@ vi.mock('fs', () => ({
   existsSync: vi.fn(() => mockStatResult === 'exists')
 }))
 
+// A missing path fails the way Node reports it, with `code` set: only ENOENT
+// and ENOTDIR count as gone (`watcher/pathPresence`, #252)
 vi.mock('fs/promises', () => ({
   stat: vi.fn(() =>
     mockStatResult === 'exists'
       ? Promise.resolve({ isFile: () => true })
-      : Promise.reject(new Error('ENOENT'))
+      : Promise.reject(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }))
   )
 }))
 

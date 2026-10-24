@@ -33,3 +33,16 @@ export const DocxExportResponseSchema = z.object({
 })
 
 export type DocxExportResponse = z.infer<typeof DocxExportResponseSchema>
+
+/**
+ * Shared contract for the preload `docx` bridge.
+ *
+ * Implemented by `window.api.docx` (preload, `documentExportBridge.ts`) and
+ * consumed by the renderer document-export gateway.
+ *
+ * @see Issue #65 - DOCX export with Mermaid diagram support
+ */
+export interface DocxBridge {
+  /** Native save dialog, parse the HTML, write the DOCX. */
+  exportToDocx(request: DocxExportRequest): Promise<DocxExportResponse>
+}

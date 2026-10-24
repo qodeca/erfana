@@ -8,16 +8,14 @@
  * flag, which it does only for an unpackaged app with `ERFANA_E2E_TEST_HOOKS=1`
  * (`buildAdditionalArguments` in src/main/index.ts). In every other run the
  * preload reports `api.testHooks.enabled` as false, nothing is installed, and
- * terminals are not recorded.
+ * terminals are not recorded. The hook object is shared with the other e2e
+ * hooks: see testHookSurface.ts.
  */
 import type { Terminal } from '@xterm/xterm'
 
-const terminals = new Map<string, Terminal>()
+import { hooksEnabled, provideTestHook } from './testHookSurface'
 
-/** Whether the launcher switched the test hooks on for this window. */
-function hooksEnabled(): boolean {
-  return window.api?.testHooks?.enabled === true
-}
+const terminals = new Map<string, Terminal>()
 
 function terminalText(terminalId: string): string | null {
   const xterm = terminals.get(terminalId)
@@ -48,7 +46,8 @@ function terminalCursor(terminalId: string): { x: number; y: number } | null {
  */
 export function registerTestTerminal(terminalId: string, xterm: Terminal): () => void {
   if (!hooksEnabled()) return () => {}
-  window.__erfanaTest = { terminalText, terminalCursor }
+  provideTestHook('terminalText', terminalText)
+  provideTestHook('terminalCursor', terminalCursor)
   terminals.set(terminalId, xterm)
   return () => {
     if (terminals.get(terminalId) === xterm) terminals.delete(terminalId)

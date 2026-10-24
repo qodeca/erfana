@@ -132,7 +132,12 @@ describe.skipIf(!CAN_RUN)('git-status native path – repository config isolatio
   it('control: a plain status in this repo does run the configured commands', async () => {
     await clearMarkers()
     await dirtyWorktree()
-    await git(['status', '--porcelain'])
+    // process.sh writes its marker and exits before git's long-running filter handshake. Some
+    // git builds treat that dead filter process as fatal ("the remote end hung up unexpectedly",
+    // exit 128) where others carry on, so the exit code is not the signal here – the markers are.
+    // Both markers asserted below are written before that point (the fsmonitor runs first, and
+    // process.sh writes its marker before it exits), so they fire on either kind of git.
+    await git(['status', '--porcelain']).catch(() => undefined)
 
     const fired = await firedMarkers()
     // The included fsmonitor (listed last) overrides the direct one, so either marker proves
