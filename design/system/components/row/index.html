@@ -63,7 +63,7 @@
 
 <div class="stage">
   <div class="list-frame">
-    <ul class="erf-row-list" role="tree" aria-label="Project files" id="list" tabindex="0"></ul>
+    <ul class="erf-row-list" role="tree" aria-label="Project files" id="list"></ul>
   </div>
   <div class="notes">
     <h2 style="margin-top:0">The keyboard contract</h2>
@@ -78,8 +78,11 @@
     </table>
     <div class="ds-note" style="margin-top: var(--space-8)">
       <strong>One Tab stop, not one per row.</strong> A tree of 400 files with a Tab stop each is
-      unusable — that is why the roving pattern exists: the list holds the tab stop and moves focus
-      internally with arrows.
+      unusable. So the list presents one Tab stop: the active row carries <code>tabindex="0"</code>
+      and really holds focus, the rest carry <code>-1</code>, and the arrow keys move that focus
+      between rows. This is the roving pattern as the
+      <strong>Menu card decided it</strong> — with <code>aria-activedescendant</code> only a marker
+      attribute moves, and a focus ring you have to draw by hand.
       <br><br>
       <strong>The file tree now follows this contract</strong> (#87, #88, #89). It uses a
       <strong>roving tabindex</strong>, not the <code>aria-activedescendant</code> this demo uses: the row
@@ -268,6 +271,9 @@ function build() {
     li.setAttribute('aria-selected', String(i === active));
     if (f.kind === 'folder') li.setAttribute('aria-expanded', String(!!f.open));
     li.id = `row-${i}`;
+    // Roving tabindex, as the Menu card decided: exactly one row carries
+    // tabindex="0" and really holds focus; the rest are -1.
+    li.tabIndex = i === active ? 0 : -1;
     li.style.paddingLeft = `calc(var(--space-4) + ${(f.depth || 0)} * 16px)`;
     if (i === active) li.classList.add('erf-row--selected');
 
@@ -295,11 +301,14 @@ function build() {
       li.appendChild(badge);
     }
 
-    li.addEventListener('click', () => { active = i; build(); list.focus(); });
+    li.addEventListener('click', () => { active = i; build(); rowAt(i).focus(); });
     list.appendChild(li);
   });
-  list.setAttribute('aria-activedescendant', `row-${active}`);
 }
+
+// The row the keyboard is on after a rebuild: build() replaces the elements,
+// so focus is re-pointed at the active row by id.
+function rowAt(index) { return document.getElementById(`row-${index}`); }
 
 const opened = document.createElement('div');
 opened.className = 'ds-note';
@@ -317,11 +326,11 @@ list.addEventListener('keydown', (e) => {
   else if (e.key === 'End') next = last;
   else if (e.key === 'ArrowRight') {
     // On a closed folder, open it. On an open folder, step to its first child.
-    if (current.kind === 'folder' && !current.open) { current.open = true; build(); e.preventDefault(); return; }
+    if (current.kind === 'folder' && !current.open) { current.open = true; build(); rowAt(active).focus(); e.preventDefault(); return; }
     if (current.kind === 'folder') next = Math.min(active + 1, last);
   } else if (e.key === 'ArrowLeft') {
     // On an open folder, close it. On a leaf, jump to the parent.
-    if (current.kind === 'folder' && current.open) { current.open = false; build(); e.preventDefault(); return; }
+    if (current.kind === 'folder' && current.open) { current.open = false; build(); rowAt(active).focus(); e.preventDefault(); return; }
     for (let i = active - 1; i >= 0; i -= 1) {
       if ((FILES[i].depth || 0) < (current.depth || 0)) { next = i; break; }
     }
@@ -335,6 +344,7 @@ list.addEventListener('keydown', (e) => {
   e.preventDefault();
   active = next;
   build();
+  rowAt(active).focus();
 });
 
 build();
