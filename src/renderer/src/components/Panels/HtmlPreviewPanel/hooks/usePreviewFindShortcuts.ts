@@ -28,8 +28,9 @@
  * @see Issue #74 - HTML preview with CSS and JavaScript execution
  */
 
-import { useEffect, useRef } from 'react'
+import { useEffect } from 'react'
 import { previewGateway } from '../../../../services/previewGateway'
+import { useLatestRef } from '../../../../hooks/useLatestRef'
 
 /** The panel actions the forwarded accelerators drive. */
 export interface PreviewShortcutActions {
@@ -87,8 +88,7 @@ export function usePreviewFindShortcuts(
   // Read the latest actions from the stable subscription without resubscribing
   // on every render (the actions are memoised in the panel but their identity
   // can still change).
-  const actionsRef = useRef(actions)
-  actionsRef.current = actions
+  const actionsRef = useLatestRef(actions)
 
   useEffect(() => {
     const unsubscribe = previewGateway.onForwardedShortcut((payload) => {
@@ -124,5 +124,5 @@ export function usePreviewFindShortcuts(
     })
 
     return unsubscribe
-  }, [panelId])
+  }, [panelId, actionsRef])
 }

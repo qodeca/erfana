@@ -577,7 +577,7 @@ export function useCameraCapture(): UseCameraCaptureReturn {
 
   // Initial device enumeration on mount
   useEffect(() => {
-    refreshDevices()
+    refreshDevices() // eslint-disable-line react-hooks/set-state-in-effect -- enumerating is the effect's job; it sets state before its first await only when the camera API is missing
   }, [refreshDevices])
 
   // Latest values the `devicechange` handler needs. The handler is registered

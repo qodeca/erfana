@@ -25,7 +25,7 @@
  * @see design/system/components/permission-band/index.html - status="decided"
  * @see src/shared/ipc/preview-schema.ts - the measured ack timings
  */
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import {
   PREVIEW_BOUNDS_ACK_TIMEOUT_MS,
@@ -161,12 +161,12 @@ export function usePreviewChromeGate({
     [clearTimer]
   )
 
-  const ackControllerRef = useRef<PreviewAckController>({ provenInset, recordPush })
-  ackControllerRef.current = { provenInset, recordPush }
-  const ackController = useRef<PreviewAckController>({
-    provenInset: (...args) => ackControllerRef.current.provenInset(...args),
-    recordPush: (...args) => ackControllerRef.current.recordPush(...args)
-  }).current
+  // Both callbacks depend only on the stable `clearTimer`, so this object keeps
+  // one identity for the life of the panel.
+  const ackController = useMemo<PreviewAckController>(
+    () => ({ provenInset, recordPush }),
+    [provenInset, recordPush]
+  )
 
   // The page confirmed it repainted at the new size.
   useEffect(() => {
@@ -231,11 +231,21 @@ export function usePreviewChromeGate({
    * otherwise un-pause and re-pause on the next open — a flap whose timing the
    * untrusted page controls. Denying it that influence is worth a pause that
    * lasts slightly longer than it strictly had to.
+   *
+   * The state half is reset during render whenever `needsProof` changes to false
+   * (and on a mount without it), React's "adjust state when a prop changes"
+   * pattern; the ref and timer half stays in the effect.
    */
+  const [seenNeedsProof, setSeenNeedsProof] = useState<boolean | null>(null)
+  if (seenNeedsProof !== needsProof) {
+    setSeenNeedsProof(needsProof)
+    if (!needsProof) {
+      setSticky(null)
+      setProven(true)
+    }
+  }
   useEffect(() => {
     if (needsProof) return
-    setSticky(null)
-    setProven(true)
     epochRef.current = null
     clearTimer()
   }, [needsProof, clearTimer])
@@ -279,12 +289,18 @@ export function usePreviewChromeGate({
    * appear at all: unusable, permanent, and far worse than one early frame. The
    * same budget the bounds ack uses bounds this too, so the worst case is 300 ms
    * later than the old behaviour and never worse than it.
+   *
+   * Disarming (no gate, or the hide confirmed) resets the flag during render;
+   * the timer can only fire while armed, so a disarmed flag is always false.
    */
+  const hideArmed = gate !== null && !hideConfirmed
+  const [seenHideArmed, setSeenHideArmed] = useState(hideArmed)
+  if (seenHideArmed !== hideArmed) {
+    setSeenHideArmed(hideArmed)
+    if (!hideArmed) setHideUnconfirmed(false)
+  }
   useEffect(() => {
-    if (gate === null || hideConfirmed) {
-      setHideUnconfirmed(false)
-      return
-    }
+    if (gate === null || hideConfirmed) return
     const timer = setTimeout(() => setHideUnconfirmed(true), PREVIEW_BOUNDS_ACK_TIMEOUT_MS)
     return () => clearTimeout(timer)
   }, [gate, hideConfirmed])

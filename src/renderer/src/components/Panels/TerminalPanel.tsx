@@ -302,17 +302,19 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     return unsubscribe
   }, [])
 
-  async function checkAvailability() {
-    try {
-      const result = await terminalGateway.isAvailable()
-      setIsAvailable(result.available)
-    } catch (err) {
-      logger.error('Failed to check terminal availability', err instanceof Error ? err : undefined)
-      setIsAvailable(false)
-      const message = err instanceof Error ? err.message : String(err)
-      setError(message)
-    }
-  }
+  // A promise chain, not async/await: state is set only in its callbacks.
+  const checkAvailability = useCallback(
+    (): Promise<void> =>
+      Promise.resolve()
+        .then(() => terminalGateway.isAvailable())
+        .then((result) => setIsAvailable(result.available))
+        .catch((err: unknown) => {
+          logger.error('Failed to check terminal availability', err instanceof Error ? err : undefined)
+          setIsAvailable(false)
+          setError(err instanceof Error ? err.message : String(err))
+        }),
+    [setError]
+  )
 
   const handleRecheck = async () => {
     if (recheckCooldown) return
@@ -332,16 +334,13 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     if (recheckTimerRef.current) clearTimeout(recheckTimerRef.current)
   }, [])
 
-  const handleCopyFix = async () => {
-    const cmd = 'npm rebuild node-pty --build-from-source'
-    // Transport failures are logged + toasted centrally by the service (#203).
-    await textClipboard.writeText(cmd)
-  }
+  // Transport failures are logged + toasted centrally by the service (#203).
+  const handleCopyFix = async () => textClipboard.writeText('npm rebuild node-pty --build-from-source')
 
   // Check terminal availability on mount
   useEffect(() => {
-    checkAvailability()
-  }, [])
+    void checkAvailability()
+  }, [checkAvailability])
 
   // Create terminal when available; tear it down on unmount
   useEffect(() => {
