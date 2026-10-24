@@ -13,12 +13,22 @@ import { useXtermSession, type UseXtermSessionOptions } from './useXtermSession'
 import { resetKeyboardMenuEcho } from '../../../ContextMenu/contextMenuKey'
 
 type KeyHandler = (event: KeyboardEvent) => boolean
+
+function rect(left: number, top: number, width: number, height: number): DOMRect {
+  return { left, top, width, height, right: left + width, bottom: top + height, x: left, y: top, toJSON: () => ({}) } as DOMRect
+}
 let keyHandler: KeyHandler | null = null
 let contextMenuListener: ((e: MouseEvent) => void) | null = null
 
 vi.mock('@xterm/xterm', () => ({
   Terminal: vi.fn().mockImplementation(() => {
     const element = document.createElement('div')
+    // Panel at (100, 200); 80 x 24 cells of 8 x 16 px from (104, 204)
+    element.getBoundingClientRect = () => rect(100, 200, 700, 400)
+    const screen = document.createElement('div')
+    screen.className = 'xterm-screen'
+    screen.getBoundingClientRect = () => rect(104, 204, 640, 384)
+    element.appendChild(screen)
     const addListener = element.addEventListener.bind(element)
     element.addEventListener = ((type: string, listener: EventListener, options?: unknown) => {
       if (type === 'contextmenu') contextMenuListener = listener as (e: MouseEvent) => void
@@ -28,7 +38,11 @@ vi.mock('@xterm/xterm', () => ({
       cols: 80,
       rows: 24,
       element,
-      textarea: document.createElement('textarea'),
+      // Parked off-screen like the panel's CSS does: the menu must not anchor here
+      textarea: Object.assign(document.createElement('textarea'), {
+        getBoundingClientRect: () => ({ left: -9999, top: -9999, right: -9999, bottom: -9999, width: 0, height: 0 })
+      }),
+      buffer: { active: { cursorX: 2, cursorY: 1, baseY: 0, viewportY: 0 } },
       open: vi.fn(),
       loadAddon: vi.fn(),
       dispose: vi.fn(),
@@ -106,6 +120,8 @@ describe('useXtermSession menu key (#90)', () => {
     expect(keyHandler!(down)).toBe(false)
     expect(down.defaultPrevented).toBe(true)
     expect(options.onContextMenu).toHaveBeenCalledTimes(1)
+    // Below the cursor cell (col 2, row 1), not the parked textarea's corner
+    expect(options.onContextMenu).toHaveBeenCalledWith(104 + 2 * 8, 204 + 2 * 16)
     // The matching keyup is swallowed too, without opening a second menu
     expect(keyHandler!(key('keyup', { key: 'F10', shiftKey: true }))).toBe(false)
     expect(options.onContextMenu).toHaveBeenCalledTimes(1)

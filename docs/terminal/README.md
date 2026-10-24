@@ -518,6 +518,8 @@ See [Terminal Architecture Review](../architecture-reviews/reviews/terminal-pane
 
 **Failed start**: a start that fails for the current generation (font load, `open()`, or `terminal:create` answering with an error) disposes its own xterm instance and, if it was already stored, releases what it attached and clears `xtermRef` / `fitAddonRef`. Otherwise the stale instance would block every later start, and "Recheck" could never create a terminal again.
 
+The terminal container is rendered only while the panel is available and shows no error, so a start asked for while the error box is up (a project switch after a failed create) finds no container and returns. `TerminalPanel` therefore also starts the session when the container comes back; a start already running is joined.
+
 ### State Management
 
 **File**: `src/renderer/src/stores/useTerminalStore.ts`
