@@ -29,6 +29,7 @@ import { getBasename } from '../../../utils/fileUtils'
 import { logger } from '../../../utils/logger'
 import { isMacOS, isWindows } from '../../../utils/platform'
 import { showGlobalToast } from '../../Toast/toastService'
+import { browserGateway } from '../../../services/browserGateway'
 
 /** Title of every refusal toast (UX spec §7). */
 export const OPEN_IN_BROWSER_ERROR_TITLE = 'Could not open in browser'
@@ -135,7 +136,7 @@ function reportFailure(
 export async function openInDefaultBrowser(filePath: string): Promise<void> {
   let reply: unknown
   try {
-    reply = await window.api.browser.openFile(filePath)
+    reply = await browserGateway.openFile(filePath)
   } catch {
     reportFailure('INVOKE_REJECTED', filePath)
     return

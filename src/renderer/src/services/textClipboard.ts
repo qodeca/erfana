@@ -5,7 +5,8 @@
  *
  * Single chokepoint every in-scope text surface routes through for clipboard
  * read/write. Backed by Electron's native `clipboard` module in the main
- * process via the async, Zod-validated `window.api.clipboard` bridge.
+ * process via the async, Zod-validated `window.api.clipboard` bridge, reached
+ * through `clipboardGateway`.
  *
  * Transport-error chokepoint (design §4/§8): a failed `invoke` is retried once
  * after a short delay; if it still fails the service ALWAYS logs an error and
@@ -25,6 +26,7 @@
 import { logger } from '../utils/logger'
 import { showErrorToast } from '../utils/toastHelpers'
 import { isWithinClipboardCap } from '../../../shared/ipc/clipboard-schema'
+import { clipboardGateway } from './clipboardGateway'
 
 /** Delay before the single retry of a failed transport operation (ms). */
 const RETRY_DELAY_MS = 50
@@ -79,7 +81,7 @@ export class TextClipboardService {
       return false
     }
     // `false` is a real transport failure for write → treat it as such.
-    return this.retry(() => window.api.clipboard.writeText(text), false, (v) => v === false)
+    return this.retry(() => clipboardGateway.writeText(text), false, (v) => v === false)
   }
 
   /**
@@ -99,7 +101,7 @@ export class TextClipboardService {
   async readText(): Promise<string> {
     // Read uses the default `isFailure` (throw-only): a resolved value —
     // including '' for an empty clipboard — is returned as-is, never retried.
-    return this.retry(() => window.api.clipboard.readText(), '')
+    return this.retry(() => clipboardGateway.readText(), '')
   }
 
   /**

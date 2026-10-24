@@ -119,12 +119,14 @@ See [Fuses](./fuses.md) for the fuse configuration and the test-build carve-out,
 ### Packaging switches
 
 ```yaml
-asar: false        # see asar.md — isomorphic-git's dynamic require() tree
+asar:
+  smartUnpack: false  # see asar.md — file-level asarUnpack keeps all JS in the archive
+asarUnpack: [...]     # native addons and executables only
 npmRebuild: false  # dependencies are rebuilt by `postinstall`, not by the packager
 publish: null      # no auto-updater metadata
 ```
 
-- **`asar: false`** — ASAR is off, so `asarUnpack` is not applicable and native modules load straight from `app/node_modules/`. Full rationale in [asar.md](./asar.md).
+- **`asar` / `asarUnpack`** — the app ships in `app.asar`, integrity-checked at start-up; only native addons and executables are unpacked, file by file. Full rationale in [asar.md](./asar.md).
 - **`npmRebuild: false`** — the packager does not re-run `node-gyp`. This is why `afterPack` has to restore the `spawn-helper` execute bit by hand; see [fuses.md](./fuses.md#afterpack-also-chmods-node-pty-spawn-helper).
 - **`publish: null`** — deliberately `null`, not `provider: github`, so electron-builder emits no `latest*.yml` auto-update feed. The release workflow's `finalize` job also deletes any such file that leaks into the draft.
 

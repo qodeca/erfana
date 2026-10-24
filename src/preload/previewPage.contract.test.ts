@@ -11,7 +11,10 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { PREVIEW_PAGE_LINK_CHANNEL } from '../main/services/preview/previewLinkBridge'
+import {
+  PREVIEW_PAGE_LINK_CHANNEL,
+  PREVIEW_PAGE_LINK_NOTE_CHANNEL
+} from '../main/services/preview/previewLinkBridge'
 import { PREVIEW_PAGE_CSP_VIOLATION_CHANNEL } from '../main/services/preview/previewCspViolationBridge'
 
 const RAW = readFileSync(join(__dirname, 'previewPage.ts'), 'utf8')
@@ -39,6 +42,14 @@ describe('previewPage preload contract', () => {
    */
   it('inlines the same channel name the main process listens on', () => {
     expect(SOURCE).toContain(`'${PREVIEW_PAGE_LINK_CHANNEL}'`)
+  })
+
+  it('inlines the same link-note channel name main listens on', () => {
+    // Drift here leaves links working but racing again: main would never hear
+    // a click is coming, so a page busy for a moment after the click loses its
+    // `will-navigate` race, and an external link shows "Blocked link" instead
+    // of asking.
+    expect(SOURCE).toContain(`'${PREVIEW_PAGE_LINK_NOTE_CHANNEL}'`)
   })
 
   it('inlines the same CSP-violation channel name main listens on', () => {

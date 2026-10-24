@@ -44,6 +44,17 @@ export const GitStatusResponseSchema = z.object({
 })
 export type GitStatusResponse = z.infer<typeof GitStatusResponseSchema>
 
+/**
+ * Shared contract for the preload `git` bridge.
+ *
+ * Implemented by `window.api.git` (preload, `gitBridge.ts`) and consumed by the
+ * renderer git gateway.
+ */
+export interface GitBridge {
+  /** Branch name, file statuses and status counts for a project directory. */
+  getStatus(projectPath: string): Promise<GitStatusResponse>
+}
+
 /** Create an empty git status response (non-git repo or error fallback) */
 export function createEmptyGitStatusResponse(): GitStatusResponse {
   return {

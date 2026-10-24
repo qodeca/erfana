@@ -15,6 +15,7 @@ These are Erfana's app and panel shortcuts. The active panel matters: an editor 
 - [HTML preview](#html-preview)
 - [Image and diagram viewers](#image-and-diagram-viewers)
 - [Dialogs and file picker](#dialogs-and-file-picker)
+- [Menus](#menus)
 
 ## App and windows
 
@@ -45,7 +46,7 @@ The View zoom commands zoom a focused HTML page first; otherwise they zoom the E
 | Jump to a row by name | Type its first letters | Same |
 | Open the row's menu | <kbd>Shift</kbd>+<kbd>F10</kbd> | <kbd>Shift</kbd>+<kbd>F10</kbd> or the <kbd>Menu</kbd> key |
 
-The whole tree is a single <kbd>Tab</kbd> stop: <kbd>Tab</kbd> enters it on the last row you used, and the next <kbd>Tab</kbd> leaves it. The arrow keys move focus without changing the selected folder; <kbd>Enter</kbd> or a click selects one. Inside the row menu the arrow keys do not work yet ([issue #90](https://github.com/qodeca/erfana/issues/90)); <kbd>Esc</kbd> closes it. Refresh and import are ignored while typing in a text field; import also needs a selected folder.
+The whole tree is a single <kbd>Tab</kbd> stop: <kbd>Tab</kbd> enters it on the last row you used, and the next <kbd>Tab</kbd> leaves it. The arrow keys move focus without changing the selected folder; <kbd>Enter</kbd> or a click selects one. The row menu works like every other menu – see [Menus](#menus). Refresh and import are ignored while typing in a text field; import also needs a selected folder.
 
 ## Editor and Markdown preview
 
@@ -107,3 +108,15 @@ In the image viewer, the wheel zooms around the pointer, dragging pans, and doub
 | Move through file picker; choose file | <kbd>↑/↓</kbd>; <kbd>Enter</kbd> | Same |
 
 In ordinary dialogs, <kbd>Enter</kbd> activates the focused button, even when it is **Cancel**. Prompts that delete, discard or quit open with focus on **Cancel**, so pressing <kbd>Enter</kbd> straight away keeps everything as it was; <kbd>Tab</kbd> moves focus and <kbd>Space</kbd> activates the focused control. The file picker also copies a selected path with <kbd>Cmd</kbd>+<kbd>C</kbd> (Windows: <kbd>Ctrl</kbd>+<kbd>C</kbd>).
+
+## Menus
+
+| Action | macOS | Windows |
+| --- | --- | --- |
+| Open the menu of the focused row, tab, editor, terminal or text field | <kbd>Shift</kbd>+<kbd>F10</kbd> | <kbd>Shift</kbd>+<kbd>F10</kbd> or the <kbd>Menu</kbd> key |
+| Move to the previous or next item; first or last item | <kbd>↑</kbd>; <kbd>↓</kbd>; <kbd>Home</kbd>; <kbd>End</kbd> | Same |
+| Choose the focused item | <kbd>Enter</kbd> or <kbd>Space</kbd> | Same |
+| Jump to an item by name | Type its first letters | Same |
+| Close the menu | <kbd>Esc</kbd> or <kbd>Tab</kbd> | Same |
+
+A menu opens with focus on its first item, and closing it puts focus back where it was. Greyed-out items can be reached but do nothing. In the editor the menu opens under the text cursor, in the terminal at the terminal cursor. While the terminal has focus, <kbd>Shift</kbd>+<kbd>F10</kbd> opens the menu and is not sent to the program running there.

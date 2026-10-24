@@ -13,13 +13,15 @@
  * - Native tooltip showing filename and relative path
  */
 
-import { useState, useCallback, MouseEvent } from 'react'
+import { useState, useCallback, useRef, MouseEvent } from 'react'
 import { X } from 'lucide-react'
 import { IDockviewPanelHeaderProps } from 'dockview'
 import { useProjectStore } from '../../stores/useProjectStore'
 import { useDialog } from '../Dialog'
 import { ContextMenu } from '../ContextMenu/ContextMenu'
 import { useTabContextMenu } from './useTabContextMenu'
+import { useTabMenuKey } from './useTabMenuKey'
+import { isKeyboardMenuEcho } from '../ContextMenu/contextMenuKey'
 import { useTabTitle } from './useTabTitle'
 import { useProjectManagementContext } from '../../context/ProjectManagementContext'
 import { TEST_IDS, getDynamicTestId } from '../../constants/testids'
@@ -48,6 +50,9 @@ export function EditorTab(props: IDockviewPanelHeaderProps<EditorTabParams>) {
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
+  const rootRef = useRef<HTMLDivElement>(null)
+  // Shift+F10 / the Menu key on the focused tab (#90).
+  useTabMenuKey(rootRef, setContextMenu)
 
   // Get context menu items
   const contextMenuItems = useTabContextMenu(panelId, () => setContextMenu(null))
@@ -109,6 +114,8 @@ export function EditorTab(props: IDockviewPanelHeaderProps<EditorTabParams>) {
   const handleContextMenu = useCallback((e: MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
+    // The Windows Menu-key echo of a menu the keyboard already opened (#90).
+    if (isKeyboardMenuEcho()) return
     setContextMenu({ x: e.clientX, y: e.clientY })
   }, [])
 
@@ -123,6 +130,7 @@ export function EditorTab(props: IDockviewPanelHeaderProps<EditorTabParams>) {
   return (
     <>
       <div
+        ref={rootRef}
         className="editor-tab"
         title={tooltipContent}
         onAuxClick={handleAuxClick}

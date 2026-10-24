@@ -37,6 +37,7 @@ import { exportPreviewPdf } from '../previewPdfExport'
 import { openInDefaultBrowser } from '../previewOpenInBrowser'
 import { usePreviewFindShortcuts } from './usePreviewFindShortcuts'
 import type { PreviewNavigation } from './usePreviewNavigation'
+import { previewGateway } from '../../../../services/previewGateway'
 
 /** User-facing copy, centralised so a change is one edit (sentence case, en dashes). */
 const COPY = {
@@ -169,7 +170,7 @@ export function usePreviewPanelActions({
    * successful grant from a failed one, and the failure survived a restart.
    */
   const approveHost = useCallback(
-    (host: string) => window.api.preview.approveHost(panelId, host),
+    (host: string) => previewGateway.approveHost(panelId, host),
     [panelId]
   )
 
@@ -261,7 +262,7 @@ export function usePreviewPanelActions({
   }, [containerApi, filePath])
 
   const reload = useCallback(() => {
-    void window.api.preview.reload(panelId)
+    void previewGateway.reload(panelId)
   }, [panelId])
 
   return {

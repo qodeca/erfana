@@ -34,6 +34,7 @@
 
 import { useCallback, useEffect, useState, type KeyboardEvent } from 'react'
 import type { DockviewPanelApi } from 'dockview'
+import { previewGateway } from '../../../../services/previewGateway'
 
 /** Options for {@link usePreviewPageEntry}. */
 export interface UsePreviewPageEntryOptions {
@@ -97,7 +98,7 @@ export function usePreviewPageEntry(options: UsePreviewPageEntryOptions): Previe
       // the answer to that is to leave focus exactly where the reader put it.
       // A rejected invoke (the registry's sender gate, no handler) is the same
       // refusal, caught so it is not an unhandled rejection.
-      window.api.preview.focusPage(panelId).catch(() => {})
+      previewGateway.focusPage(panelId).catch(() => {})
     },
     [enabled, panelId]
   )

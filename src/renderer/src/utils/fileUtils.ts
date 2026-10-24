@@ -210,7 +210,7 @@ export function isMarkdownFile(fileName: string): boolean {
  * only – it decides whether a path is a candidate for the running preview and
  * for the "Open as source" affordance. It is NOT an eligibility check: whether
  * the file may actually run as a preview is decided main-side by
- * `window.api.preview.checkEligibility` (design §1.5), which `resolvePanelKind`
+ * `previewGateway.checkEligibility` (design §1.5), which `resolvePanelKind`
  * calls after this cheap extension gate passes.
  *
  * @param fileName - File name or full path to check.
