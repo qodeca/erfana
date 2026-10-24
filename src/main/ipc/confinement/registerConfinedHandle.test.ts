@@ -144,7 +144,7 @@ describe('registerConfinedHandle', () => {
         confinementDeps: {
           path,
           platform: process.platform,
-          fs: { lstat: record(lstat), stat: record(stat), realpath: record(realpath) }
+          fs: { lstat: record(lstat), stat: record(stat), realpath: record<string>(realpath) }
         },
         onRefusal: (error) => error.code,
         handler

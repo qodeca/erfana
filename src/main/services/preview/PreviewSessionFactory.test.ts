@@ -236,12 +236,13 @@ describe('PreviewSessionFactory', () => {
       'https://cdn.example.com',
       'https://later.example.com'
     ])
-    filterCtx?.onBlocked('blocked-host', 'https://evil.com', 'https://evil.com/x', true)
+    filterCtx?.onBlocked('blocked-host', 'https://evil.com', 'https://evil.com/x', true, 'script')
     expect(onBlocked).toHaveBeenCalledWith(
       'blocked-host',
       'https://evil.com',
       'https://evil.com/x',
-      true
+      true,
+      'script'
     )
 
     // teardown detaches everything the factory attached.

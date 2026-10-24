@@ -35,6 +35,9 @@ describe('useScrollAnomalyRecovery', () => {
     scrollToLine: vi.fn()
   }) as unknown as Terminal
 
+  // xterm's buffer position is read-only; a test moves it to simulate a scroll.
+  const bufferOf = (xterm: Terminal): { viewportY: number; baseY: number } => xterm.buffer.active
+
   // Create mock terminal ref (container element for scroll event listeners)
   const createMockTerminalRef = () => {
     const container = document.createElement('div')
@@ -142,7 +145,7 @@ describe('useScrollAnomalyRecovery', () => {
       let triggerAnomaly = false
       const originalHandler = vi.fn().mockImplementation(() => {
         if (triggerAnomaly) {
-          mockXterm.buffer.active.viewportY = 0
+          bufferOf(mockXterm).viewportY = 0
         }
       })
 
@@ -157,7 +160,7 @@ describe('useScrollAnomalyRecovery', () => {
 
       // Enable anomaly for subsequent calls
       triggerAnomaly = true
-      mockXterm.buffer.active.viewportY = 100
+      bufferOf(mockXterm).viewportY = 100
 
       // Second call triggers anomaly detection
       wrappedHandler({ terminalId: 'test', data: 'second' })
@@ -191,7 +194,7 @@ describe('useScrollAnomalyRecovery', () => {
       let triggerAnomaly = false
       const originalHandler = vi.fn().mockImplementation(() => {
         if (triggerAnomaly) {
-          mockXterm.buffer.active.viewportY = 0
+          bufferOf(mockXterm).viewportY = 0
         }
       })
 
@@ -211,7 +214,7 @@ describe('useScrollAnomalyRecovery', () => {
 
       // Trigger 5 rapid anomalies (each at 50ms apart = 250ms total, before 500ms interval)
       for (let i = 0; i < 5; i++) {
-        mockXterm.buffer.active.viewportY = 100
+        bufferOf(mockXterm).viewportY = 100
         wrappedHandler({ terminalId: 'test', data: `data-${i}` })
         await act(async () => {
           vi.advanceTimersByTime(50) // Less than interval
@@ -245,7 +248,7 @@ describe('useScrollAnomalyRecovery', () => {
       let triggerAnomaly = false
       const originalHandler = vi.fn().mockImplementation(() => {
         if (triggerAnomaly) {
-          mockXterm.buffer.active.viewportY = 0
+          bufferOf(mockXterm).viewportY = 0
         }
       })
 
@@ -260,7 +263,7 @@ describe('useScrollAnomalyRecovery', () => {
       triggerAnomaly = true
 
       // Trigger anomaly
-      mockXterm.buffer.active.viewportY = 100
+      bufferOf(mockXterm).viewportY = 100
       wrappedHandler({ terminalId: 'test', data: 'data-1' })
 
       // First interval fires
@@ -272,7 +275,7 @@ describe('useScrollAnomalyRecovery', () => {
       expect(onRecovery).toHaveBeenCalledWith(1)
 
       // Trigger another anomaly right after (simulating anomaly during scroll)
-      mockXterm.buffer.active.viewportY = 100
+      bufferOf(mockXterm).viewportY = 100
       wrappedHandler({ terminalId: 'test', data: 'data-2' })
 
       // Second interval fires
@@ -291,7 +294,7 @@ describe('useScrollAnomalyRecovery', () => {
       const terminalRef = createMockTerminalRef()
       const onRecovery = vi.fn()
       const originalHandler = vi.fn().mockImplementation(() => {
-        mockXterm.buffer.active.viewportY = 0
+        bufferOf(mockXterm).viewportY = 0
       })
 
       const { result } = renderHook(() =>
@@ -306,7 +309,7 @@ describe('useScrollAnomalyRecovery', () => {
       const wrappedHandler = result.current.wrapOnDataHandler(originalHandler)
 
       wrappedHandler({ terminalId: 'test', data: 'first' })
-      mockXterm.buffer.active.viewportY = 100
+      bufferOf(mockXterm).viewportY = 100
       wrappedHandler({ terminalId: 'test', data: 'second' })
 
       // After 500ms (default), should NOT have recovered yet
@@ -357,7 +360,7 @@ describe('useScrollAnomalyRecovery', () => {
       let triggerAnomaly = false
       const originalHandler = vi.fn().mockImplementation(() => {
         if (triggerAnomaly) {
-          mockXterm.buffer.active.viewportY = 0
+          bufferOf(mockXterm).viewportY = 0
         }
       })
 
@@ -377,7 +380,7 @@ describe('useScrollAnomalyRecovery', () => {
 
       // Trigger 3 anomalies (all within 150ms, before 500ms interval)
       for (let i = 0; i < 3; i++) {
-        mockXterm.buffer.active.viewportY = 100
+        bufferOf(mockXterm).viewportY = 100
         wrappedHandler({ terminalId: 'test', data: `data-${i}` })
         await act(async () => {
           vi.advanceTimersByTime(50) // Less than interval
@@ -413,7 +416,7 @@ describe('useScrollAnomalyRecovery', () => {
     let jumpOnWrite = false
     const originalHandler = vi.fn().mockImplementation(() => {
       if (jumpOnWrite) {
-        mockXterm.buffer.active.viewportY = 0
+        bufferOf(mockXterm).viewportY = 0
       }
     })
 
@@ -431,7 +434,7 @@ describe('useScrollAnomalyRecovery', () => {
 
     // Enable jump for second call
     jumpOnWrite = true
-    mockXterm.buffer.active.viewportY = 100 // Reset before capture
+    bufferOf(mockXterm).viewportY = 100 // Reset before capture
     wrappedHandler({ terminalId: 'test', data: 'second' })
 
     // Run interval
@@ -462,7 +465,7 @@ describe('useScrollAnomalyRecovery', () => {
       let triggerAnomaly = false
       const originalHandler = vi.fn().mockImplementation(() => {
         if (triggerAnomaly) {
-          mockXterm.buffer.active.viewportY = 0
+          bufferOf(mockXterm).viewportY = 0
         }
       })
 
@@ -482,7 +485,7 @@ describe('useScrollAnomalyRecovery', () => {
 
       // Now enable anomaly
       triggerAnomaly = true
-      mockXterm.buffer.active.viewportY = 100
+      bufferOf(mockXterm).viewportY = 100
       wrappedHandler({ terminalId: 'test', data: 'second' })
 
       // Run interval
@@ -508,7 +511,7 @@ describe('useScrollAnomalyRecovery', () => {
       let triggerAnomaly = false
       const originalHandler = vi.fn().mockImplementation(() => {
         if (triggerAnomaly) {
-          mockXterm.buffer.active.viewportY = 0
+          bufferOf(mockXterm).viewportY = 0
         }
       })
 
@@ -525,7 +528,7 @@ describe('useScrollAnomalyRecovery', () => {
       terminalRef.current.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
 
       triggerAnomaly = true
-      mockXterm.buffer.active.viewportY = 100
+      bufferOf(mockXterm).viewportY = 100
       wrappedHandler({ terminalId: 'test', data: 'second' })
 
       await act(async () => {
@@ -549,7 +552,7 @@ describe('useScrollAnomalyRecovery', () => {
       let triggerAnomaly = false
       const originalHandler = vi.fn().mockImplementation(() => {
         if (triggerAnomaly) {
-          mockXterm.buffer.active.viewportY = 0
+          bufferOf(mockXterm).viewportY = 0
         }
       })
 
@@ -567,7 +570,7 @@ describe('useScrollAnomalyRecovery', () => {
       terminalRef.current.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }))
 
       triggerAnomaly = true
-      mockXterm.buffer.active.viewportY = 100
+      bufferOf(mockXterm).viewportY = 100
       wrappedHandler({ terminalId: 'test', data: 'second' })
 
       await act(async () => {
@@ -587,7 +590,7 @@ describe('useScrollAnomalyRecovery', () => {
     const terminalRef = createMockTerminalRef()
     const onRecovery = vi.fn()
     const originalHandler = vi.fn().mockImplementation(() => {
-      mockXterm.buffer.active.viewportY = 5 // Small jump
+      bufferOf(mockXterm).viewportY = 5 // Small jump
     })
 
     const { result } = renderHook(() =>
@@ -597,7 +600,7 @@ describe('useScrollAnomalyRecovery', () => {
     const wrappedHandler = result.current.wrapOnDataHandler(originalHandler)
 
     wrappedHandler({ terminalId: 'test', data: 'first' })
-    mockXterm.buffer.active.viewportY = 10
+    bufferOf(mockXterm).viewportY = 10
     wrappedHandler({ terminalId: 'test', data: 'second' })
 
     await act(async () => {
@@ -613,7 +616,7 @@ describe('useScrollAnomalyRecovery', () => {
     const xtermRef = { current: mockXterm }
     const terminalRef = createMockTerminalRef()
     const originalHandler = vi.fn().mockImplementation(() => {
-      mockXterm.buffer.active.viewportY = 0
+      bufferOf(mockXterm).viewportY = 0
     })
 
     const { result, unmount } = renderHook(() =>
@@ -624,7 +627,7 @@ describe('useScrollAnomalyRecovery', () => {
 
     // Trigger anomaly
     wrappedHandler({ terminalId: 'test', data: 'first' })
-    mockXterm.buffer.active.viewportY = 100
+    bufferOf(mockXterm).viewportY = 100
     wrappedHandler({ terminalId: 'test', data: 'second' })
 
     // Unmount before interval completes

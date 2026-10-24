@@ -30,7 +30,7 @@ const APP_ENTRY = path.join(__dirname, '..')
  * test would then assert the wrong thing and pass for the wrong reason.
  */
 function baseEnv(): NodeJS.ProcessEnv {
-  const env = { ...process.env, NODE_ENV: 'development' }
+  const env: NodeJS.ProcessEnv = { ...process.env, NODE_ENV: 'development' }
   delete env.ERFANA_E2E_FORCE_CRASH
   return env
 }
@@ -41,7 +41,8 @@ async function launchApp(
 ): Promise<ElectronApplication> {
   return electron.launch({
     args: [APP_ENTRY, `--user-data-dir=${userDataDir}`],
-    env: { ...baseEnv(), ...extraEnv }
+    // ProcessEnv allows `undefined` values in its type only; a real environment holds strings.
+    env: { ...baseEnv(), ...extraEnv } as Record<string, string>
   })
 }
 

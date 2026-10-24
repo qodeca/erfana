@@ -27,7 +27,7 @@ const mockNativeImageCreateFromBuffer = vi.fn()
 const mockGetAllDisplays = vi.fn()
 const mockGetPrimaryDisplay = vi.fn()
 const mockWriteFile = vi.fn(async () => undefined)
-const mockTmpdir = vi.fn(() => REAL_TMPDIR)
+const mockTmpdir = vi.fn((..._args: unknown[]) => REAL_TMPDIR)
 
 vi.mock('electron', () => ({
   desktopCapturer: {

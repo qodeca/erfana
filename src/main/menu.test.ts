@@ -377,9 +377,10 @@ describe('Application Menu Creation', () => {
       const menu = await importMenuWithPlatform('darwin')
 
       // Our mock returns an object with _template
+      const built = menu as unknown as { _template: unknown }
       expect(menu).toBeDefined()
-      expect(menu._template).toBeDefined()
-      expect(Array.isArray(menu._template)).toBe(true)
+      expect(built._template).toBeDefined()
+      expect(Array.isArray(built._template)).toBe(true)
     })
   })
 })

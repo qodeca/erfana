@@ -8,6 +8,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
+import type { Terminal } from '@xterm/xterm'
 import { useTerminalDragDrop } from './useTerminalDragDrop'
 
 // Mock dependencies
@@ -43,7 +44,7 @@ vi.mock('../../../../utils/logger', () => ({
 describe('useTerminalDragDrop', () => {
   const mockTerminalPanelRef = { current: document.createElement('div') }
   const mockTerminalIdRef = { current: 'terminal-1' }
-  const mockXtermRef = { current: { focus: vi.fn() } as unknown as { current: null } }
+  const mockXtermRef = { current: { focus: vi.fn() } as unknown as Terminal }
 
   beforeEach(() => {
     vi.clearAllMocks()
@@ -59,7 +60,7 @@ describe('useTerminalDragDrop', () => {
       useTerminalDragDrop({
         terminalPanelRef: mockTerminalPanelRef,
         terminalIdRef: mockTerminalIdRef,
-        xtermRef: mockXtermRef as React.RefObject<null>,
+        xtermRef: mockXtermRef,
         enabled: true
       })
     )
@@ -72,7 +73,7 @@ describe('useTerminalDragDrop', () => {
       useTerminalDragDrop({
         terminalPanelRef: mockTerminalPanelRef,
         terminalIdRef: mockTerminalIdRef,
-        xtermRef: mockXtermRef as React.RefObject<null>,
+        xtermRef: mockXtermRef,
         enabled: true
       })
     )
@@ -91,7 +92,7 @@ describe('useTerminalDragDrop', () => {
       useTerminalDragDrop({
         terminalPanelRef: mockTerminalPanelRef,
         terminalIdRef: mockTerminalIdRef,
-        xtermRef: mockXtermRef as React.RefObject<null>,
+        xtermRef: mockXtermRef,
         enabled: true
       })
     )
@@ -127,7 +128,7 @@ describe('useTerminalDragDrop', () => {
       useTerminalDragDrop({
         terminalPanelRef: mockTerminalPanelRef,
         terminalIdRef: mockTerminalIdRef,
-        xtermRef: mockXtermRef as React.RefObject<null>,
+        xtermRef: mockXtermRef,
         enabled: false
       })
     )
@@ -146,7 +147,7 @@ describe('useTerminalDragDrop', () => {
       useTerminalDragDrop({
         terminalPanelRef: mockTerminalPanelRef,
         terminalIdRef: mockTerminalIdRef,
-        xtermRef: mockXtermRef as React.RefObject<null>,
+        xtermRef: mockXtermRef,
         enabled: true
       })
     )
@@ -172,7 +173,7 @@ describe('useTerminalDragDrop', () => {
       useTerminalDragDrop({
         terminalPanelRef: mockTerminalPanelRef,
         terminalIdRef: mockTerminalIdRef,
-        xtermRef: mockXtermRef as React.RefObject<null>,
+        xtermRef: mockXtermRef,
         enabled: true
       })
     )
@@ -195,7 +196,7 @@ describe('useTerminalDragDrop', () => {
       useTerminalDragDrop({
         terminalPanelRef: mockTerminalPanelRef,
         terminalIdRef: mockTerminalIdRef,
-        xtermRef: mockXtermRef as React.RefObject<null>,
+        xtermRef: mockXtermRef,
         enabled: true
       })
     )

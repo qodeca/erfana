@@ -13,7 +13,7 @@ vi.mock('fs/promises', () => {
     writeFile: vi.fn(),
     rename: vi.fn(),
     readdir: vi.fn(),
-  } satisfies Partial<FsProm>
+  } satisfies Partial<typeof FsProm>
 })
 
 function makeStats(opts: { isDir: boolean }) {

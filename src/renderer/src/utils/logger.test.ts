@@ -422,7 +422,7 @@ describe('RendererLogger', () => {
       // Trigger the handler by calling window's event listener directly
       const unhandledRejectionHandler = addEventListenerSpy.mock.calls.find(
         (call: any) => call[0] === 'unhandledrejection'
-      )?.[1]
+      )?.[1] as EventListener | undefined // the logger registers a plain function
 
       if (unhandledRejectionHandler) {
         unhandledRejectionHandler(event)
@@ -460,7 +460,7 @@ describe('RendererLogger', () => {
       // Trigger the handler by calling window's event listener directly
       const unhandledRejectionHandler = addEventListenerSpy.mock.calls.find(
         (call: any) => call[0] === 'unhandledrejection'
-      )?.[1]
+      )?.[1] as EventListener | undefined // the logger registers a plain function
 
       if (unhandledRejectionHandler) {
         unhandledRejectionHandler(event)

@@ -4,6 +4,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, act } from '@testing-library/react'
 import { MarkdownPreview } from './MarkdownPreview'
 import { ToastProvider } from '../Toast/ToastContext'
+import type { FileBridge } from '../../../../shared/ipc/file-schema'
+import { gatewayBridgeMock, type BridgeMock } from '../../test-utils/gatewayBridgeMock'
+
+const fileMock = (): BridgeMock<FileBridge> => gatewayBridgeMock('file')
 
 /**
  * Test wrapper that provides ToastContext
@@ -217,7 +221,7 @@ describe('MarkdownPreview Link Features', () => {
       await renderWithToastAsync(<MarkdownPreview content={markdown} filePath="/test/file.md" />)
 
       // Verify getProjectPath was called for link resolution
-      expect(window.api.file.getProjectPath).toHaveBeenCalled()
+      expect(fileMock().getProjectPath).toHaveBeenCalled()
     })
 
     it('should not resolve links when filePath is not provided', () => {
@@ -225,7 +229,7 @@ describe('MarkdownPreview Link Features', () => {
       renderWithToast(<MarkdownPreview content={markdown} />)
 
       // Should not call getProjectPath when no filePath
-      expect(window.api.file.getProjectPath).not.toHaveBeenCalled()
+      expect(fileMock().getProjectPath).not.toHaveBeenCalled()
     })
   })
 
@@ -266,7 +270,7 @@ describe('MarkdownPreview Link Features', () => {
       const { container } = await renderWithToastAsync(
         <MarkdownPreview content={markdown} filePath="/test/project/file.md" />
       )
-      const checked = (window.api.file.exists as ReturnType<typeof vi.fn>).mock.calls.map(
+      const checked = (fileMock().exists as ReturnType<typeof vi.fn>).mock.calls.map(
         ([request]) => (request as { filePath: string }).filePath
       )
       expect(checked).toContain('/test/project/raw.md')
@@ -279,7 +283,7 @@ describe('MarkdownPreview Link Features', () => {
       const { rerender } = await renderWithToastAsync(
         <MarkdownPreview content="[a](./x.md)" filePath="/test/project/one.md" />
       )
-      ;(window.api.file.exists as ReturnType<typeof vi.fn>).mockClear()
+      ;(fileMock().exists as ReturnType<typeof vi.fn>).mockClear()
       await act(async () => {
         rerender(
           <ToastProvider>
@@ -287,7 +291,7 @@ describe('MarkdownPreview Link Features', () => {
           </ToastProvider>
         )
       })
-      const checked = (window.api.file.exists as ReturnType<typeof vi.fn>).mock.calls.map(
+      const checked = (fileMock().exists as ReturnType<typeof vi.fn>).mock.calls.map(
         ([request]) => (request as { filePath: string }).filePath
       )
       expect(checked).toEqual(['/test/project/docs/x.md'])

@@ -15,7 +15,6 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import type { BrowserWindow } from 'electron'
 import { focusWindow, findWindowByWebContentsId, getMainWindow } from './focusWindow'
 
 // Mock Electron

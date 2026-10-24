@@ -11,6 +11,9 @@ import { pathToFileURL } from 'node:url'
 import { join } from 'node:path'
 import type { IpcMainInvokeEvent } from 'electron'
 
+// electron-vite declares ELECTRON_RENDERER_URL read-only; this file sets and clears it.
+const writableEnv: Record<string, string | undefined> = process.env
+
 // Controllable `is.dev`, mirroring index.ts / clipboard-handlers.test.ts.
 const mockIs = { dev: false }
 vi.mock('@electron-toolkit/utils', () => ({ is: mockIs }))
@@ -35,7 +38,7 @@ async function load(): Promise<
 describe('isTrustedPreviewSender', () => {
   beforeEach(() => {
     mockIs.dev = false
-    delete process.env['ELECTRON_RENDERER_URL']
+    delete writableEnv.ELECTRON_RENDERER_URL
   })
 
   afterEach(() => {
@@ -70,14 +73,14 @@ describe('isTrustedPreviewSender', () => {
   describe('development', () => {
     it('accepts the dev origin only when is.dev && ELECTRON_RENDERER_URL', async () => {
       mockIs.dev = true
-      process.env['ELECTRON_RENDERER_URL'] = DEV_URL
+      writableEnv.ELECTRON_RENDERER_URL = DEV_URL
       const isTrusted = await load()
       expect(isTrusted(makeEvent({ url: `${DEV_URL}/index.html`, parent: null }))).toBe(true)
     })
 
     it('rejects a mismatched dev origin', async () => {
       mockIs.dev = true
-      process.env['ELECTRON_RENDERER_URL'] = DEV_URL
+      writableEnv.ELECTRON_RENDERER_URL = DEV_URL
       const isTrusted = await load()
       expect(isTrusted(makeEvent({ url: 'http://evil.example/index.html', parent: null }))).toBe(
         false
@@ -86,7 +89,7 @@ describe('isTrustedPreviewSender', () => {
 
     it('does not use the dev origin when is.dev is false', async () => {
       mockIs.dev = false
-      process.env['ELECTRON_RENDERER_URL'] = DEV_URL
+      writableEnv.ELECTRON_RENDERER_URL = DEV_URL
       const isTrusted = await load()
       // Falls through to the prod pin, which the dev URL does not match.
       expect(isTrusted(makeEvent({ url: `${DEV_URL}/index.html`, parent: null }))).toBe(false)

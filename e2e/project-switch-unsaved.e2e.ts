@@ -103,7 +103,7 @@ async function openForEditing(page: Page): Promise<{ monaco: MonacoPage; panel: 
 }
 
 /** Change a.md behind the app's back and wait for the tab to notice. */
-async function makeConflict(page: Page, panel: EditorPanelPage, aPath: string): Promise<void> {
+async function makeConflict(_page: Page, panel: EditorPanelPage, aPath: string): Promise<void> {
   await writeFile(aPath, EXTERNAL_BODY, 'utf-8')
   await expect(panel.conflictNotification()).toBeVisible({ timeout: AUTOSAVE_BUDGET_MS })
 }

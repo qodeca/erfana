@@ -5,7 +5,7 @@
  * own type, and that each gateway is typed as its bridge contract.
  *
  * Nothing imports this file and it has no runtime content: `npm run typecheck`
- * compiles it, test files are not type-checked.
+ * compiles it.
  */
 import type { Api } from '../../../preload/index'
 import type { BrowserBridge } from '../../../shared/ipc/browser-schema'

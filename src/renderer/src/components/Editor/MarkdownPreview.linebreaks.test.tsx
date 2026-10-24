@@ -5,6 +5,7 @@ import { render, act } from '@testing-library/react'
 import { MarkdownPreview } from './MarkdownPreview'
 import { ToastProvider } from '../Toast/ToastContext'
 import { useGlobalSettingsStore } from '../../stores/useGlobalSettingsStore'
+import { globalSettings } from '../../test-utils/globalSettings'
 
 /**
  * Test wrapper that provides ToastContext
@@ -51,10 +52,10 @@ describe('MarkdownPreview Line Breaks Feature', () => {
 
     // Reset global settings store to default state
     useGlobalSettingsStore.setState({
-      settings: {
+      settings: globalSettings({
         logging: { level: 'info' },
         editor: { preserveLineBreaks: false }
-      },
+      }),
       isLoading: false,
       error: null,
       isInitialized: true,
@@ -66,10 +67,10 @@ describe('MarkdownPreview Line Breaks Feature', () => {
     it('should NOT create <br> tags for single newlines', () => {
       // Set preserveLineBreaks to false
       useGlobalSettingsStore.setState({
-        settings: {
+        settings: globalSettings({
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false }
-        },
+        }),
         isInitialized: true
       })
 
@@ -93,10 +94,10 @@ describe('MarkdownPreview Line Breaks Feature', () => {
 
     it('should still create separate paragraphs for double newlines', () => {
       useGlobalSettingsStore.setState({
-        settings: {
+        settings: globalSettings({
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false }
-        },
+        }),
         isInitialized: true
       })
 
@@ -114,10 +115,10 @@ describe('MarkdownPreview Line Breaks Feature', () => {
 
     it('should handle mixed single and double newlines correctly', () => {
       useGlobalSettingsStore.setState({
-        settings: {
+        settings: globalSettings({
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false }
-        },
+        }),
         isInitialized: true
       })
 
@@ -145,10 +146,10 @@ describe('MarkdownPreview Line Breaks Feature', () => {
     it('should create <br> tags for single newlines', () => {
       // Set preserveLineBreaks to true
       useGlobalSettingsStore.setState({
-        settings: {
+        settings: globalSettings({
           logging: { level: 'info' },
           editor: { preserveLineBreaks: true }
-        },
+        }),
         isInitialized: true
       })
 
@@ -172,10 +173,10 @@ describe('MarkdownPreview Line Breaks Feature', () => {
 
     it('should still create separate paragraphs for double newlines', () => {
       useGlobalSettingsStore.setState({
-        settings: {
+        settings: globalSettings({
           logging: { level: 'info' },
           editor: { preserveLineBreaks: true }
-        },
+        }),
         isInitialized: true
       })
 
@@ -193,10 +194,10 @@ describe('MarkdownPreview Line Breaks Feature', () => {
 
     it('should handle mixed single and double newlines with <br> tags', () => {
       useGlobalSettingsStore.setState({
-        settings: {
+        settings: globalSettings({
           logging: { level: 'info' },
           editor: { preserveLineBreaks: true }
-        },
+        }),
         isInitialized: true
       })
 
@@ -221,10 +222,10 @@ describe('MarkdownPreview Line Breaks Feature', () => {
 
     it('should handle trailing newlines correctly', () => {
       useGlobalSettingsStore.setState({
-        settings: {
+        settings: globalSettings({
           logging: { level: 'info' },
           editor: { preserveLineBreaks: true }
-        },
+        }),
         isInitialized: true
       })
 
@@ -259,10 +260,10 @@ describe('MarkdownPreview Line Breaks Feature', () => {
     it('should default to false when preserveLineBreaks is undefined', () => {
       // Simulate settings with editor object but preserveLineBreaks explicitly undefined
       useGlobalSettingsStore.setState({
-        settings: {
+        settings: globalSettings({
           logging: { level: 'info' },
           editor: { preserveLineBreaks: undefined as any }
-        },
+        }),
         isInitialized: true
       })
 
@@ -279,10 +280,10 @@ describe('MarkdownPreview Line Breaks Feature', () => {
     it('should update rendering when preserveLineBreaks changes from false to true', () => {
       // Start with false
       useGlobalSettingsStore.setState({
-        settings: {
+        settings: globalSettings({
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false }
-        },
+        }),
         isInitialized: true
       })
 
@@ -296,10 +297,10 @@ describe('MarkdownPreview Line Breaks Feature', () => {
       // Change setting to true wrapped in act()
       act(() => {
         useGlobalSettingsStore.setState({
-          settings: {
+          settings: globalSettings({
             logging: { level: 'info' },
             editor: { preserveLineBreaks: true }
-          }
+          })
         })
       })
 
@@ -318,10 +319,10 @@ describe('MarkdownPreview Line Breaks Feature', () => {
     it('should update rendering when preserveLineBreaks changes from true to false', () => {
       // Start with true
       useGlobalSettingsStore.setState({
-        settings: {
+        settings: globalSettings({
           logging: { level: 'info' },
           editor: { preserveLineBreaks: true }
-        },
+        }),
         isInitialized: true
       })
 
@@ -335,10 +336,10 @@ describe('MarkdownPreview Line Breaks Feature', () => {
       // Change setting to false wrapped in act()
       act(() => {
         useGlobalSettingsStore.setState({
-          settings: {
+          settings: globalSettings({
             logging: { level: 'info' },
             editor: { preserveLineBreaks: false }
-          }
+          })
         })
       })
 
@@ -358,10 +359,10 @@ describe('MarkdownPreview Line Breaks Feature', () => {
   describe('Edge cases', () => {
     it('should handle empty content', () => {
       useGlobalSettingsStore.setState({
-        settings: {
+        settings: globalSettings({
           logging: { level: 'info' },
           editor: { preserveLineBreaks: true }
-        },
+        }),
         isInitialized: true
       })
 
@@ -373,10 +374,10 @@ describe('MarkdownPreview Line Breaks Feature', () => {
 
     it('should handle content with only newlines', () => {
       useGlobalSettingsStore.setState({
-        settings: {
+        settings: globalSettings({
           logging: { level: 'info' },
           editor: { preserveLineBreaks: true }
-        },
+        }),
         isInitialized: true
       })
 
@@ -389,10 +390,10 @@ describe('MarkdownPreview Line Breaks Feature', () => {
 
     it('should work correctly with other markdown features', () => {
       useGlobalSettingsStore.setState({
-        settings: {
+        settings: globalSettings({
           logging: { level: 'info' },
           editor: { preserveLineBreaks: true }
-        },
+        }),
         isInitialized: true
       })
 
@@ -410,10 +411,10 @@ describe('MarkdownPreview Line Breaks Feature', () => {
 
     it('should work correctly with lists', () => {
       useGlobalSettingsStore.setState({
-        settings: {
+        settings: globalSettings({
           logging: { level: 'info' },
           editor: { preserveLineBreaks: true }
-        },
+        }),
         isInitialized: true
       })
 
@@ -431,10 +432,10 @@ describe('MarkdownPreview Line Breaks Feature', () => {
 
     it('should work correctly with code blocks', () => {
       useGlobalSettingsStore.setState({
-        settings: {
+        settings: globalSettings({
           logging: { level: 'info' },
           editor: { preserveLineBreaks: true }
-        },
+        }),
         isInitialized: true
       })
 

@@ -18,6 +18,7 @@ import { GIT_STATUS } from '../components/ProjectTree/constants'
 import { useGitStatus } from './useGitStatus'
 import { useGitStore } from '../stores/useGitStore'
 import { useGlobalSettingsStore } from '../stores/useGlobalSettingsStore'
+import { globalSettings } from '../test-utils/globalSettings'
 
 // Test the constants that control timing behavior
 describe('useGitStatus constants', () => {
@@ -279,11 +280,11 @@ describe('useGitStatus behavioral tests', () => {
     })
 
     useGlobalSettingsStore.setState({
-      settings: {
+      settings: globalSettings({
         logging: { level: 'info' },
         editor: { preserveLineBreaks: false },
         gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-      },
+      }),
       isLoading: false,
       error: null,
       isInitialized: true,

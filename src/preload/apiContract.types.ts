@@ -4,10 +4,10 @@
  * Compile-time proof that the preload object is its contracts.
  *
  * Nothing imports this file and it has no runtime content: `npm run typecheck`
- * compiles it (test files are not type-checked, so the same assertions in
- * `__tests__/api-contract.test.ts` alone would prove nothing in CI). A bridge
- * that drifts from its contract, or an `Api` that stops being `typeof api`,
- * fails the typecheck here.
+ * compiles it with the production program, so the proof does not rest on a
+ * test file (`__tests__/api-contract.test.ts` holds the same assertions and is
+ * type-checked too since #109). A bridge that drifts from its contract, or an
+ * `Api` that stops being `typeof api`, fails the typecheck here.
  */
 import type { BrowserBridge } from '../shared/ipc/browser-schema'
 import type { CameraBridge } from '../shared/ipc/camera-schema'
