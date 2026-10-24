@@ -27,7 +27,7 @@
  * @see Issue #74 - HTML preview with CSS and JavaScript execution
  */
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 import type { DockviewPanelApi } from 'dockview'
 
 import type { PreviewPageChangedPayload } from '../../../../../../shared/ipc/preview-navigation-schema'
@@ -35,6 +35,7 @@ import { usePreviewStore } from '../../../../stores/usePreviewStore'
 import { usePreviewTabStore } from '../../../../stores/usePreviewTabStore'
 import { afterTwoFrames, browserFrames } from '../../../../services/preview/previewDragFreeze'
 import { previewGateway } from '../../../../services/previewGateway'
+import { useLatestRef } from '../../../../hooks/useLatestRef'
 
 /** Options for {@link usePreviewEvents}: where a page change is written. */
 export interface UsePreviewEventsOptions {
@@ -97,15 +98,19 @@ export interface UsePreviewEventsOptions {
 export function usePreviewEvents(panelId: string, options: UsePreviewEventsOptions = {}): void {
   // Read through a ref: the page changes on every move, and resubscribing the
   // whole event stream for it would buy nothing.
-  const pageRef = useRef(options)
-  pageRef.current = options
+  const pageRef = useLatestRef(options)
 
   // The `filePath` last written through `updateParameters`, until the props
   // show it. Between the write and dockview's re-render the panel can render
   // with the OLD params (the same event's store writes re-render it), so the
   // props alone would make a second event write the same page again.
+  // Cleared on every commit whose props show it (no dependency array on
+  // purpose), before any event can read it – not during render.
   const pendingFilePathRef = useRef<string | null>(null)
-  if (pendingFilePathRef.current === options.filePath) pendingFilePathRef.current = null
+  const shownFilePath = options.filePath
+  useLayoutEffect(() => {
+    if (pendingFilePathRef.current === shownFilePath) pendingFilePathRef.current = null
+  })
 
   useEffect(() => {
     const {
@@ -259,5 +264,5 @@ export function usePreviewEvents(panelId: string, options: UsePreviewEventsOptio
       unsubscribeAllowlist()
       unsubscribePageChanged()
     }
-  }, [panelId])
+  }, [panelId, pageRef])
 }

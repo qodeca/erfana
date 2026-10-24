@@ -157,17 +157,17 @@ const watcher = chokidar.watch(filePath, {
 
 **Debug Steps:**
 1. Check directory watcher is active
-2. Verify the debounce: the main-process directory watcher runs with `awaitWriteFinish: false` (`DirectoryWatcherService.ts`); the renderer debounces the resulting `directory-watch:changed` events by `DIRECTORY_WATCHER.DEBOUNCE_DELAY` (250 ms, `ProjectTree/constants.ts`)
+2. Verify the debounce: the main-process directory watcher runs with `awaitWriteFinish: false` (`watcher/directoryWatchBuilders.ts`); the renderer debounces the resulting `directory-watch:changed` events by `DIRECTORY_WATCHER.DEBOUNCE_DELAY` (250 ms, `ProjectTree/constants.ts`)
 3. Check whether the path is dropped: excluded (`files.exclude`), hidden (`tree.hiddenPatterns`, e.g. `.git`) or ignored (`watcher.ignoreList`: `node_modules`, build output, virtualenvs, …)
 
 **Solution:**
-If the file is in a dropped directory, create it elsewhere or change the list that drops it. One project path filter (`ProjectPathFilter`, `src/main/utils/projectPathFilter.ts`) decides this for the tree walk and both watcher backends: its `shouldDrop(rel)` tests the **project-relative** path against the exclude list, the hidden names and the ignore patterns (default ignore list: `DEFAULT_WATCHER_IGNORE_PATTERNS` in `src/shared/constants.ts`). `DirectoryWatcherService.ts` asks it from chokidar's function-based `ignored` predicate (`shouldDropAbs`), from the Windows native watcher's `shouldDrop` option (`shouldDropWatchRel`) and, as a backstop for every event, in `queueEvent` (`shouldDropAbs`):
+If the file is in a dropped directory, create it elsewhere or change the list that drops it. One project path filter (`ProjectPathFilter`, `src/main/utils/projectPathFilter.ts`) decides this for the tree walk and both watcher backends: its `shouldDrop(rel)` tests the **project-relative** path against the exclude list, the hidden names and the ignore patterns (default ignore list: `DEFAULT_WATCHER_IGNORE_PATTERNS` in `src/shared/constants.ts`). The directory watcher asks it (`shouldDropAbs` / `shouldDropWatchRel` in `src/main/services/watcher/DirectoryWatcherCore.ts`) from chokidar's function-based `ignored` predicate, from the Windows native watcher's `shouldDrop` option and, as a backstop for every event, in `queueEvent` (`watcher/DirectoryWatcherEvents.ts`):
 ```typescript
-// src/main/services/DirectoryWatcherService.ts (createChokidarWatcher)
+// src/main/services/watcher/directoryWatchBuilders.ts (createChokidarWatcher)
 chokidar.watch(dirPath, {
   persistent: true,
   ignoreInitial: true,
-  ignored: (path: string) => this.shouldDropAbs(path, dirPath), // project path filter
+  ignored: (path: string) => shouldDropAbs(path), // project path filter (the service's shouldDropAbs)
   awaitWriteFinish: false,
   // ...
 })

@@ -43,6 +43,7 @@ import { usePreviewStore } from '../../../stores/usePreviewStore'
 import { usePreviewTabStore, type PreviewLinkMode } from '../../../stores/usePreviewTabStore'
 import { useSearchStore } from '../../../stores/useSearchStore'
 import { useOverlayOccluderStore } from '../../../stores/useOverlayOccluderStore'
+import { DOCKVIEW_PANEL_VISIBLE, useDockviewValue } from '../../../hooks/useDockviewValue'
 import { SearchBar } from '../../Search/SearchBar'
 import { PreviewChromeBand } from './components/PreviewChromeBand'
 import { usePreviewChromeGate } from './hooks/usePreviewChromeGate'
@@ -132,20 +133,13 @@ export function HtmlPreviewPanel(props: IDockviewPanelProps<HtmlPreviewPanelPara
 
   // dockview visibility tracks the active tab (the panel uses renderer:'always',
   // so its DOM stays mounted even when inactive — §5(a) X12).
-  const [isVisible, setIsVisible] = useState<boolean>(api?.isVisible ?? true)
-  useEffect(() => {
-    if (!api?.onDidVisibilityChange) return
-    setIsVisible(api.isVisible ?? true)
-    const disposable = api.onDidVisibilityChange((event) => setIsVisible(event.isVisible))
-    return () => disposable.dispose()
-  }, [api])
+  const isVisible = useDockviewValue(api, DOCKVIEW_PANEL_VISIBLE)
 
-  // Re-derive occlusion whenever the occluder store publishes (its microtask
-  // flush bumps `version`); `isOccluded()` reads the settled live counts.
-  const occluderVersion = useOverlayOccluderStore((s) => s.version)
-  const isOccluded = useMemo(
-    () => useOverlayOccluderStore.getState().isOccluded(),
-    [occluderVersion]
+  // Re-derive occlusion whenever the occluder store publishes: its microtask
+  // flush copies the settled live counts into `counts`, so the published
+  // snapshot is what a render reads.
+  const isOccluded = useOverlayOccluderStore((s) =>
+    Object.values(s.counts).some((count) => (count ?? 0) > 0)
   )
 
   // The native view is hidden when this tab is inactive OR something occludes it;

@@ -165,9 +165,7 @@ export function useFileChangeSubscription(
 
   // This consumer's single hold on the main-process watch. One slot per hook
   // instance, created lazily so every mount starts from "holds nothing".
-  const slotRef = useRef<FileWatchSlot | null>(null)
-  if (slotRef.current === null) slotRef.current = createFileWatchSlot()
-  const slot = slotRef.current
+  const [slot] = useState<FileWatchSlot>(createFileWatchSlot)
 
   useEffect(() => {
     isMountedRef.current = true
@@ -259,14 +257,22 @@ export function useFileChangeSubscription(
     recoverRef.current = recover
   }, [recover])
 
+  // A new path starts with neither degraded state. Reset during render, when
+  // the path changes, rather than in the subscription effect below.
+  const [seenFilePath, setSeenFilePath] = useState(filePath)
+  if (seenFilePath !== filePath) {
+    setSeenFilePath(filePath)
+    if (filePath) {
+      setIsFileDeleted(false)
+      setUnavailableReason(null)
+    }
+  }
+
   // Subscription. [filePath] only – see invariant 2.
   useEffect(() => {
     if (!filePath) return
 
     let isActive = true
-
-    setIsFileDeleted(false)
-    setUnavailableReason(null)
 
     void acquireFileWatch(slot, filePath).then(({ started, error, cause }) => {
       if (!isActive || started) return

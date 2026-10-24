@@ -170,7 +170,10 @@ describe('findByName – bounds (review of #320)', () => {
     expect(reads).toBe(FIND_BY_NAME_MAX_FOLDERS)
   })
 
-  it('yields to the event loop between batches of reads on a wide tree, with FIND_BY_NAME_CONCURRENCY reads in flight', async () => {
+  // The case runs thousands of event-loop turns on purpose: about 2 s under coverage on an
+  // emulated-x64 Windows host, so a loaded full run tipped it past the 5 s default. Budget
+  // only, same assertions – docs/windows/known-flakes.md, row "findByName.test.ts".
+  it('yields to the event loop between batches of reads on a wide tree, with FIND_BY_NAME_CONCURRENCY reads in flight', { timeout: 20_000 }, async () => {
     // 300 × 300 folders: 90,300 in all, far past the folder bound
     const WIDTH = 300
     let inFlight = 0

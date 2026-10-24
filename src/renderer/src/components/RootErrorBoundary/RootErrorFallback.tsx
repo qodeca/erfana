@@ -231,6 +231,7 @@ export function RootErrorFallback({ details }: RootErrorFallbackProps) {
 
   useEffect(() => {
     if (announcement.seq === 0) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the second commit is the point: a live region speaks only when its content mutates, so announce() empties it and this fills it one commit later
     setStatus(announcement.text)
   }, [announcement])
 
