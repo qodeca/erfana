@@ -317,6 +317,7 @@ export function wirePreviewLiveView(owner: PreviewLiveWiringOwner): PreviewLiveP
         },
         onConsoleMessage: (input) => owner.onConsoleMessage(input),
         onLinkActivated: (payload) => linkBridge.handleActivation(payload),
+        onLinkNote: (payload) => linkBridge.handleLinkNote(payload),
         onNavigationAttempt: (url) => linkBridge.handleWillNavigate(url),
         // Into the page on screen's own CSP dedupe, ledger and log (WI-29).
         onCspViolation: (payload) => pageScopes.committed().handleCspViolation(payload)

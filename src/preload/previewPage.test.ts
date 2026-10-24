@@ -8,10 +8,13 @@
  * and checks what reaches `ipcRenderer`, because that is the whole of what the
  * sealed page can tell main:
  *
- * - a trusted click or middle click on a link reports the link, once, with the
- *   button, the modifiers, the target and the `download` flag;
- * - a page-made (untrusted) event, a cancelled click, a non-link click, a right
- *   click and a same-document link report nothing;
+ * - a trusted click or middle click on a link sends a `seen` note during the
+ *   click, then reports the link, once, with the button, the modifiers, the
+ *   target, the `download` flag and the note's id;
+ * - a click a later page listener cancels sends a `cancelled` note in place of
+ *   the report;
+ * - a page-made (untrusted) event, a click cancelled before the preload sees
+ *   it, a non-link click, a right click and a same-document link send nothing;
  * - a trusted CSP refusal of an http(s) URI reports the URI and directive, even
  *   when the page stops the event's propagation; a keyword URI or a page-made
  *   event reports nothing.
@@ -24,6 +27,17 @@
  * `implForWrapper` and `_dispatch`; the first test checks the helper still
  * produces a trusted event, so a jsdom upgrade that changes them fails here
  * instead of making every "nothing is sent" test pass for the wrong reason.
+ *
+ * JSDOM ORDERING. `_dispatch` runs every listener synchronously and leaves all
+ * microtasks until the whole dispatch is over. Chromium does not, for a click
+ * the user made: it runs microtasks after EACH listener returns. So in jsdom a
+ * report deferred to a microtask would still look as if it waited for the
+ * page's later listeners, and the two tests that rely on that ordering ("a
+ * later page listener cancels", "the page removes the attribute afterwards")
+ * pass with either kind of deferral. The test "waits for a task, not a
+ * microtask" pins the ordering that matters in Chromium, and
+ * e2e/html-preview-links.e2e.ts ("a link the page cancels") checks it in a
+ * real browser.
  */
 import { createRequire } from 'node:module'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
@@ -35,7 +49,19 @@ const { send } = vi.hoisted(() => ({ send: vi.fn() }))
 vi.mock('electron', () => ({ ipcRenderer: { send } }))
 
 const LINK_CHANNEL = 'preview-page:linkActivated'
+const NOTE_CHANNEL = 'preview-page:linkNote'
 const CSP_CHANNEL = 'preview-page:cspViolation'
+
+/** What was sent on `channel`, in order. */
+function sentOn(channel: string): unknown[] {
+  return send.mock.calls.filter(([sent]) => sent === channel).map(([, payload]) => payload)
+}
+
+/** The id the click's `seen` note carried; the report and `cancelled` note repeat it. */
+function seenGestureId(): number {
+  const [seen] = sentOn(NOTE_CHANNEL) as Array<{ gestureId: number }>
+  return seen.gestureId
+}
 
 const requireFromHere = createRequire(import.meta.url)
 const { implForWrapper } = requireFromHere('jsdom/lib/jsdom/living/generated/utils.js') as {
@@ -72,7 +98,10 @@ function cspEvent(blockedURI: string, effectiveDirective?: string): Event {
   return event
 }
 
-/** Let the preload's deferred link report (a microtask) run. */
+/**
+ * Let the preload's deferred link report run. It is a `setTimeout(0)` queued
+ * during the dispatch, so it fires before the one queued here.
+ */
 async function settle(): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, 0))
 }
@@ -147,15 +176,77 @@ describe('previewPage preload – link activation', () => {
     userClick(link)
     await settle()
 
+    expect(send).toHaveBeenCalledTimes(2)
+    expect(sentOn(NOTE_CHANNEL)).toEqual([
+      { kind: 'seen', gestureId: expect.any(Number), href: resolved('other.html') }
+    ])
+    expect(sentOn(LINK_CHANNEL)).toEqual([
+      {
+        gestureId: seenGestureId(),
+        href: resolved('other.html'),
+        rawHref: 'other.html',
+        target: '',
+        download: false,
+        button: 0,
+        modifiers: NO_MODIFIERS
+      }
+    ])
+  })
+
+  it('tells main of the click during the click, before the browser can navigate', async () => {
+    // The browser attempts its own navigation as soon as the dispatch ends, and
+    // main must already know a report is coming when that `will-navigate`
+    // arrives. So the note goes out from inside the dispatch — observed here by
+    // a page listener that runs after the preload's.
+    const link = mount('<a href="soon.html">Soon</a>', 'a')
+    let notesDuringDispatch: unknown[] = []
+    const observe = (): void => {
+      notesDuringDispatch = sentOn(NOTE_CHANNEL)
+    }
+    window.addEventListener('click', observe)
+    try {
+      userClick(link)
+    } finally {
+      window.removeEventListener('click', observe)
+    }
+    await settle()
+
+    expect(notesDuringDispatch).toEqual([
+      { kind: 'seen', gestureId: expect.any(Number), href: resolved('soon.html') }
+    ])
+  })
+
+  it('gives every click its own id, so main pairs each report with its note', async () => {
+    const link = mount('<a href="twice.html">Twice</a>', 'a')
+
+    userClick(link)
+    await settle()
+    userClick(link)
+    await settle()
+
+    const notes = sentOn(NOTE_CHANNEL) as Array<{ gestureId: number }>
+    const reports = sentOn(LINK_CHANNEL) as Array<{ gestureId: number }>
+    expect(notes).toHaveLength(2)
+    expect(notes[0].gestureId).not.toBe(notes[1].gestureId)
+    expect(reports.map((report) => report.gestureId)).toEqual(notes.map((note) => note.gestureId))
+  })
+
+  it('waits for a task, not a microtask, before it reports', async () => {
+    // Chromium runs microtasks after each listener of a user click, so a report
+    // sent at a microtask checkpoint would go out before the page's later
+    // listeners could cancel the click (see JSDOM ORDERING above). Nothing may
+    // be sent until a task has passed.
+    const link = mount('<a href="later.html">Later</a>', 'a')
+
+    userClick(link)
+    // Queued after anything the dispatch queued, so every such microtask has run.
+    await new Promise<void>((resolve) => queueMicrotask(resolve))
+    // Only the `seen` note, which carries no decision, has gone out.
+    expect(sentOn(LINK_CHANNEL)).toEqual([])
     expect(send).toHaveBeenCalledTimes(1)
-    expect(send).toHaveBeenCalledWith(LINK_CHANNEL, {
-      href: resolved('other.html'),
-      rawHref: 'other.html',
-      target: '',
-      download: false,
-      button: 0,
-      modifiers: NO_MODIFIERS
-    })
+
+    await settle()
+    expect(sentOn(LINK_CHANNEL)).toEqual([expect.objectContaining({ rawHref: 'later.html' })])
   })
 
   it('reports a middle click (auxclick) with its target, download flag and modifiers', async () => {
@@ -164,15 +255,18 @@ describe('previewPage preload – link activation', () => {
     userClick(link, 'auxclick', { button: 1, ctrlKey: true, shiftKey: true })
     await settle()
 
-    expect(send).toHaveBeenCalledTimes(1)
-    expect(send).toHaveBeenCalledWith(LINK_CHANNEL, {
-      href: resolved('../up.pdf'),
-      rawHref: '../up.pdf',
-      target: '_blank',
-      download: true,
-      button: 1,
-      modifiers: { meta: false, ctrl: true, shift: true, alt: false }
-    })
+    expect(send).toHaveBeenCalledTimes(2)
+    expect(sentOn(LINK_CHANNEL)).toEqual([
+      {
+        gestureId: seenGestureId(),
+        href: resolved('../up.pdf'),
+        rawHref: '../up.pdf',
+        target: '_blank',
+        download: true,
+        button: 1,
+        modifiers: { meta: false, ctrl: true, shift: true, alt: false }
+      }
+    ])
   })
 
   it('reports the meta and alt modifiers', async () => {
@@ -260,7 +354,9 @@ describe('previewPage preload – link activation', () => {
 
   it('keeps the href read at click time when the page removes the attribute afterwards', async () => {
     // The resolved href is captured during the click; the raw attribute is read
-    // in the deferred report, after every page listener has run.
+    // in the deferred report, after every page listener has run. In jsdom this
+    // ordering holds for a microtask too (JSDOM ORDERING above); the
+    // task-not-microtask test is what keeps it true in Chromium.
     const link = mount('<a href="gone.html">Gone</a>', 'a')
     const strip = (): void => link.removeAttribute('href')
     window.addEventListener('click', strip)
@@ -298,9 +394,12 @@ describe('previewPage preload – link activation', () => {
     expect(send).not.toHaveBeenCalled()
   })
 
-  it('reports nothing when a later page listener cancels the click', async () => {
+  it('sends a cancelled note, and no report, when a later page listener cancels the click', async () => {
     // A window listener runs after the preload's document listener, so only the
-    // deferred re-check can see this cancellation.
+    // deferred re-check can see this cancellation. In jsdom a microtask would
+    // see it too (JSDOM ORDERING above); in Chromium only a task does, which
+    // the task-not-microtask test and the e2e "a link the page cancels" pin.
+    // The note lets main stop waiting for a report that will never come.
     const link = mount('<a href="router.html">Router</a>', 'a')
     const cancel = (event: Event): void => event.preventDefault()
     window.addEventListener('click', cancel)
@@ -311,7 +410,12 @@ describe('previewPage preload – link activation', () => {
       window.removeEventListener('click', cancel)
     }
 
-    expect(send).not.toHaveBeenCalled()
+    expect(sentOn(LINK_CHANNEL)).toEqual([])
+    expect(sentOn(NOTE_CHANNEL)).toEqual([
+      { kind: 'seen', gestureId: expect.any(Number), href: resolved('router.html') },
+      { kind: 'cancelled', gestureId: seenGestureId() }
+    ])
+    expect(send).toHaveBeenCalledTimes(2)
   })
 
   it('reports nothing for a right click', async () => {

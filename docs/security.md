@@ -634,7 +634,7 @@ The load-bearing boundary is that **Erfana exposes no scripted API to the page**
 | `setWebRTCIPHandlingPolicy('disable_non_proxied_udp')` | A1 | Narrows WebRTC local-IP exposure only – see accepted risk 3 |
 | `X-DNS-Prefetch-Control: off` | A1 | Suppresses `dns-prefetch`; does **not** cover `preconnect` – see risk 3 |
 | Enumerated keyboard forwarding – `f` / `s` / `w` / `Escape`, plus Back and Forward (#124) | A3 | Bounds the input bridge to a closed list |
-| Page→main reporting limited to two send-only, `webContents.ipc`-scoped channels (`preview-page:linkActivated`, `preview-page:cspViolation`), never on global `ipcMain`, each re-parsed and re-confined main-side | A3 | The page has a reporting path, not a control path. It cannot address anything else in the app, and neither payload is trusted as an instruction |
+| Page→main reporting limited to three send-only, `webContents.ipc`-scoped channels (`preview-page:linkActivated`, `preview-page:linkNote`, `preview-page:cspViolation`), never on global `ipcMain`, each re-parsed and re-confined main-side | A3 | The page has a reporting path, not a control path. It cannot address anything else in the app, and no payload is trusted as an instruction – a link note can only delay a navigation the page attempted, never route one |
 
 ### Risks knowingly accepted
 
