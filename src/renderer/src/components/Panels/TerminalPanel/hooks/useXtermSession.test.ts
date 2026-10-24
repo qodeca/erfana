@@ -16,6 +16,7 @@ import { FitAddon } from '@xterm/addon-fit'
 import { useTerminalStore } from '../../../../stores/useTerminalStore'
 import { useClaudeStatusStore } from '../../../../stores/useClaudeStatusStore'
 import { useXtermSession, type UseXtermSessionOptions } from './useXtermSession'
+import { gatewayBridgeMock } from '../../../../test-utils/gatewayBridgeMock'
 
 /** A fresh mock per `new Terminal()`, so tests can tell instances apart */
 function makeXterm() {
@@ -116,7 +117,7 @@ function renderSession() {
 
 /** Let the start run up to its pending `terminal:create` */
 async function untilCreates(count: number): Promise<void> {
-  await vi.waitFor(() => expect(window.api.terminal.create).toHaveBeenCalledTimes(count))
+  await vi.waitFor(() => expect(gatewayBridgeMock('terminal').create).toHaveBeenCalledTimes(count))
 }
 
 describe('useXtermSession start-up guard', () => {
@@ -152,7 +153,7 @@ describe('useXtermSession start-up guard', () => {
     })
 
     expect(instances).toHaveLength(1)
-    expect(window.api.terminal.create).toHaveBeenCalledTimes(1)
+    expect(gatewayBridgeMock('terminal').create).toHaveBeenCalledTimes(1)
     expect(hook.result.current.terminalId).toBe('pty-1')
   })
 
@@ -173,7 +174,7 @@ describe('useXtermSession start-up guard', () => {
     })
 
     expect(instances).toHaveLength(1)
-    expect(window.api.terminal.create).toHaveBeenCalledTimes(1)
+    expect(gatewayBridgeMock('terminal').create).toHaveBeenCalledTimes(1)
   })
 
   it('a restart during start kills the late PTY and keeps the new one', async () => {
@@ -202,15 +203,15 @@ describe('useXtermSession start-up guard', () => {
       await first
     })
 
-    expect(window.api.terminal.kill).toHaveBeenCalledWith('pty-late')
-    expect(window.api.terminal.kill).not.toHaveBeenCalledWith('pty-new')
+    expect(gatewayBridgeMock('terminal').kill).toHaveBeenCalledWith('pty-late')
+    expect(gatewayBridgeMock('terminal').kill).not.toHaveBeenCalledWith('pty-new')
     expect(hook.result.current.terminalId).toBe('pty-new')
     expect(useTerminalStore.getState().activeTerminalId).toBe('pty-new')
     expect(options.xtermRef.current).toBe(instances[1])
     // The late PTY's xterm never got an input handler: its keystrokes go nowhere
     expect(instances[0].onData).not.toHaveBeenCalled()
-    expect(window.api.claudeStatus.register).toHaveBeenCalledTimes(1)
-    expect(window.api.claudeStatus.register).toHaveBeenCalledWith('pty-new')
+    expect(gatewayBridgeMock('claudeStatus').register).toHaveBeenCalledTimes(1)
+    expect(gatewayBridgeMock('claudeStatus').register).toHaveBeenCalledWith('pty-new')
   })
 
   it('an unmount during start kills the PTY created afterwards and never activates it', async () => {
@@ -227,10 +228,10 @@ describe('useXtermSession start-up guard', () => {
     answerCreate(0, 'pty-orphan')
     await first
 
-    expect(window.api.terminal.kill).toHaveBeenCalledWith('pty-orphan')
+    expect(gatewayBridgeMock('terminal').kill).toHaveBeenCalledWith('pty-orphan')
     expect(instances[0].dispose).toHaveBeenCalledTimes(1)
     expect(useTerminalStore.getState().activeTerminalId).toBeNull()
-    expect(window.api.claudeStatus.register).not.toHaveBeenCalled()
+    expect(gatewayBridgeMock('claudeStatus').register).not.toHaveBeenCalled()
   })
 
   it('a teardown while the font loads never opens xterm or creates a PTY', async () => {
@@ -251,7 +252,7 @@ describe('useXtermSession start-up guard', () => {
     expect(instances).toHaveLength(1)
     expect(instances[0].open).not.toHaveBeenCalled()
     expect(instances[0].dispose).toHaveBeenCalledTimes(1)
-    expect(window.api.terminal.create).not.toHaveBeenCalled()
+    expect(gatewayBridgeMock('terminal').create).not.toHaveBeenCalled()
     expect(options.xtermRef.current).toBeNull()
   })
 
@@ -268,7 +269,7 @@ describe('useXtermSession start-up guard', () => {
     // No act(): the state update for the id is not committed yet
     await hook.result.current.teardownTerminal({ resetState: false })
 
-    expect(window.api.terminal.kill).toHaveBeenCalledWith('pty-1')
+    expect(gatewayBridgeMock('terminal').kill).toHaveBeenCalledWith('pty-1')
   })
 
   it('creates xterm with the screen-reader mode and toggles it live (lens review [23])', async () => {
@@ -400,7 +401,7 @@ describe('useXtermSession failed starts (review F1, F2)', () => {
     expect(instances).toHaveLength(1)
     expect(instances[0].open).not.toHaveBeenCalled()
     expect(instances[0].dispose).toHaveBeenCalledTimes(1)
-    expect(window.api.terminal.create).not.toHaveBeenCalled()
+    expect(gatewayBridgeMock('terminal').create).not.toHaveBeenCalled()
     expect(options.xtermRef.current).toBeNull()
     expect(hook.result.current.error).toBe('font failed')
   })
@@ -422,7 +423,7 @@ describe('useXtermSession failed starts (review F1, F2)', () => {
 
     expect(instances[0].dispose).toHaveBeenCalledTimes(1)
     expect(options.xtermRef.current).toBeNull()
-    expect(window.api.terminal.create).not.toHaveBeenCalled()
+    expect(gatewayBridgeMock('terminal').create).not.toHaveBeenCalled()
     expect(hook.result.current.error).toBe('open failed')
 
     // The next start is not blocked
@@ -519,7 +520,7 @@ describe('useXtermSession failed starts, no double work (review e, g)', () => {
         first = hook.result.current.start()
       })
       // 1 ms per check, far below the 50 ms fit delay, so the timer is still pending
-      await vi.waitFor(() => expect(window.api.terminal.create).toHaveBeenCalledTimes(1), { interval: 1, timeout: 40 })
+      await vi.waitFor(() => expect(gatewayBridgeMock('terminal').create).toHaveBeenCalledTimes(1), { interval: 1, timeout: 40 })
       const fitAddon = vi.mocked(FitAddon).mock.results[0].value as { fit: ReturnType<typeof vi.fn> }
       expect(fitAddon.fit).not.toHaveBeenCalled()
       // The fit timer is armed and waiting
@@ -584,7 +585,7 @@ describe('useXtermSession teardown always kills the PTY (review 1, 3)', () => {
       await hook.result.current.teardownTerminal({ resetState: true })
     })
 
-    expect(window.api.terminal.kill).toHaveBeenCalledWith('pty-1')
+    expect(gatewayBridgeMock('terminal').kill).toHaveBeenCalledWith('pty-1')
   })
 
   it('a throw before the dispose still disposes the instance, then kills, and reaches the caller', async () => {
@@ -605,11 +606,81 @@ describe('useXtermSession teardown always kills the PTY (review 1, 3)', () => {
     expect((thrown as Error | null)?.message).toBe('detach failed')
     expect(instances[0].dispose).toHaveBeenCalledTimes(1)
     expect(options.xtermRef.current).toBeNull()
-    expect(window.api.terminal.kill).toHaveBeenCalledWith('pty-1')
+    expect(gatewayBridgeMock('terminal').kill).toHaveBeenCalledWith('pty-1')
     // Disposed before the kill is sent
     expect(instances[0].dispose.mock.invocationCallOrder[0]).toBeLessThan(
-      vi.mocked(window.api.terminal.kill).mock.invocationCallOrder[0]
+      vi.mocked(gatewayBridgeMock('terminal').kill).mock.invocationCallOrder[0]
     )
+    // Every later step ran too: the session is gone from the refs and the store
+    expect(hook.result.current.terminalIdRef.current).toBeNull()
+    expect(hook.result.current.shellKindRef.current).toBeNull()
+    expect(useTerminalStore.getState().activeTerminalId).toBeNull()
+
+    // A later teardown has nothing left to kill or unregister
+    vi.mocked(options.detachFileDrop).mockReset()
+    gatewayBridgeMock('terminal').kill.mockClear()
+    gatewayBridgeMock('claudeStatus').unregister.mockClear()
+    await act(async () => {
+      await hook.result.current.teardownTerminal({ resetState: false })
+    })
+    expect(gatewayBridgeMock('terminal').kill).not.toHaveBeenCalled()
+    expect(gatewayBridgeMock('claudeStatus').unregister).not.toHaveBeenCalled()
+  })
+
+  it('keeps the first error when a later step throws too', async () => {
+    const { hook, options } = await liveSession()
+    vi.mocked(options.detachFileDrop).mockImplementation(() => {
+      throw new Error('first')
+    })
+    instances[0].dispose.mockImplementation(() => {
+      throw new Error('second')
+    })
+
+    expect(() => hook.result.current.teardownTerminal({ resetState: false })).toThrow('first')
+    expect(gatewayBridgeMock('terminal').kill).toHaveBeenCalledWith('pty-1')
+  })
+
+  it('a throwing parser hook still disposes xterm, and a later start works', async () => {
+    const parserHook = {
+      dispose: vi.fn(() => {
+        throw new Error('parser dispose failed')
+      })
+    }
+    const { hook, options } = renderSession()
+    vi.mocked(options.registerParserHooks).mockReturnValue([parserHook])
+    let first!: Promise<void>
+    act(() => {
+      first = hook.result.current.start()
+    })
+    await untilCreates(1)
+    await act(async () => {
+      answerCreate(0, 'pty-1')
+      await first
+    })
+
+    await act(async () => {
+      await hook.result.current.teardownTerminal({ resetState: true })
+    })
+    expect(parserHook.dispose).toHaveBeenCalledTimes(1)
+    expect(instances[0].dispose).toHaveBeenCalledTimes(1)
+    expect(options.xtermRef.current).toBeNull()
+    expect(gatewayBridgeMock('terminal').kill).toHaveBeenCalledWith('pty-1')
+
+    // A second teardown does not meet the throwing hook again, and a new start is not blocked
+    await act(async () => {
+      await hook.result.current.teardownTerminal({ resetState: true })
+    })
+    expect(parserHook.dispose).toHaveBeenCalledTimes(1)
+    let second!: Promise<void>
+    act(() => {
+      second = hook.result.current.start()
+    })
+    await untilCreates(2)
+    await act(async () => {
+      answerCreate(1, 'pty-2')
+      await second
+    })
+    expect(options.xtermRef.current).toBe(instances[1])
   })
 
   it('a teardown before React commits the id does not get the killed id written back', async () => {
@@ -623,17 +694,17 @@ describe('useXtermSession teardown always kills the PTY (review 1, 3)', () => {
     answerCreate(0, 'pty-1')
     await first
     await hook.result.current.teardownTerminal({ resetState: false })
-    expect(window.api.terminal.kill).toHaveBeenCalledWith('pty-1')
+    expect(gatewayBridgeMock('terminal').kill).toHaveBeenCalledWith('pty-1')
 
     // Now React commits the id; nothing may copy it back into the ref
     await act(async () => {})
     expect(hook.result.current.terminalIdRef.current).toBeNull()
 
     // So a second teardown has no id and sends no second kill
-    vi.mocked(window.api.terminal.kill).mockClear()
+    vi.mocked(gatewayBridgeMock('terminal').kill).mockClear()
     await act(async () => {
       await hook.result.current.teardownTerminal({ resetState: false })
     })
-    expect(window.api.terminal.kill).not.toHaveBeenCalled()
+    expect(gatewayBridgeMock('terminal').kill).not.toHaveBeenCalled()
   })
 })

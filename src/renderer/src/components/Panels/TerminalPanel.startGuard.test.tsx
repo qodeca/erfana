@@ -12,12 +12,7 @@ import { act, render, screen, waitFor } from '@testing-library/react'
 import { TEST_IDS } from '../../constants/testids'
 import { useTerminalStore } from '../../stores/useTerminalStore'
 import { useClaudeStatusStore } from '../../stores/useClaudeStatusStore'
-
-declare global {
-  interface Window {
-    api: any
-  }
-}
+import { gatewayBridgeMock } from '../../test-utils/gatewayBridgeMock'
 
 function makeXterm() {
   return {
@@ -62,6 +57,7 @@ type CreateResult = { success: true; terminalId: string; shellKind: 'posix' } | 
 const pendingCreates: Array<(result: CreateResult) => void> = []
 const projectListeners: Array<(data: { newPath: string | null }) => void> = []
 let dataListener: ((d: { terminalId: string; data: string }) => void) | null = null
+let errorListener: ((d: { terminalId: string; error: string }) => void) | null = null
 
 function installApi(): void {
   ;(window as any).api = {
@@ -77,7 +73,10 @@ function installApi(): void {
         return vi.fn()
       }),
       onExit: vi.fn().mockReturnValue(vi.fn()),
-      onError: vi.fn().mockReturnValue(vi.fn()),
+      onError: vi.fn((cb: typeof errorListener) => {
+        errorListener = cb
+        return vi.fn()
+      }),
       onClear: vi.fn().mockReturnValue(vi.fn()),
       markClearComplete: vi.fn(),
       ackOutput: vi.fn()
@@ -111,7 +110,7 @@ async function answerCreate(index: number, terminalId: string): Promise<void> {
 }
 
 /** Emit a project switch on the panel's restart listener (the second subscription) */
-async function switchProject(newPath: string): Promise<void> {
+async function switchProject(newPath: string | null): Promise<void> {
   await act(async () => {
     for (const listener of projectListeners) listener({ newPath })
   })
@@ -124,6 +123,7 @@ describe('TerminalPanel start-up guard', () => {
     pendingCreates.length = 0
     projectListeners.length = 0
     dataListener = null
+    errorListener = null
     installApi()
     useTerminalStore.setState({ activeTerminalId: null, activeShellKind: null, activityById: new Map(), userInputById: new Map() })
     useClaudeStatusStore.getState().reset()
@@ -131,16 +131,16 @@ describe('TerminalPanel start-up guard', () => {
 
   it('a remount during start leaves one live PTY and kills the first', async () => {
     const first = await mountPanel()
-    await waitFor(() => expect(window.api.terminal.create).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(gatewayBridgeMock('terminal').create).toHaveBeenCalledTimes(1))
     first.unmount()
 
     await mountPanel()
-    await waitFor(() => expect(window.api.terminal.create).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(gatewayBridgeMock('terminal').create).toHaveBeenCalledTimes(2))
     await answerCreate(1, 'pty-second')
     await answerCreate(0, 'pty-first')
 
-    await waitFor(() => expect(window.api.terminal.kill).toHaveBeenCalledWith('pty-first'))
-    expect(window.api.terminal.kill).not.toHaveBeenCalledWith('pty-second')
+    await waitFor(() => expect(gatewayBridgeMock('terminal').kill).toHaveBeenCalledWith('pty-first'))
+    expect(gatewayBridgeMock('terminal').kill).not.toHaveBeenCalledWith('pty-second')
     expect(useTerminalStore.getState().activeTerminalId).toBe('pty-second')
     // Two instances were made; only the first one is disposed
     expect(instances).toHaveLength(2)
@@ -150,21 +150,21 @@ describe('TerminalPanel start-up guard', () => {
 
   it('a fast project switch during start keeps only the last PTY and drops late output', async () => {
     await mountPanel()
-    await waitFor(() => expect(window.api.terminal.create).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(gatewayBridgeMock('terminal').create).toHaveBeenCalledTimes(1))
 
     await switchProject('/project/b')
-    await waitFor(() => expect(window.api.terminal.create).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(gatewayBridgeMock('terminal').create).toHaveBeenCalledTimes(2))
     await switchProject('/project/c')
-    await waitFor(() => expect(window.api.terminal.create).toHaveBeenCalledTimes(3))
+    await waitFor(() => expect(gatewayBridgeMock('terminal').create).toHaveBeenCalledTimes(3))
 
     // Main answers in the worst order: newest first, then the stale ones
     await answerCreate(2, 'pty-c')
     await answerCreate(0, 'pty-a')
     await answerCreate(1, 'pty-b')
 
-    await waitFor(() => expect(window.api.terminal.kill).toHaveBeenCalledWith('pty-a'))
-    await waitFor(() => expect(window.api.terminal.kill).toHaveBeenCalledWith('pty-b'))
-    expect(window.api.terminal.kill).not.toHaveBeenCalledWith('pty-c')
+    await waitFor(() => expect(gatewayBridgeMock('terminal').kill).toHaveBeenCalledWith('pty-a'))
+    await waitFor(() => expect(gatewayBridgeMock('terminal').kill).toHaveBeenCalledWith('pty-b'))
+    expect(gatewayBridgeMock('terminal').kill).not.toHaveBeenCalledWith('pty-c')
     expect(useTerminalStore.getState().activeTerminalId).toBe('pty-c')
     await waitFor(() => expect(dataListener).not.toBeNull())
 
@@ -180,19 +180,19 @@ describe('TerminalPanel start-up guard', () => {
 
   it('an unmount during start kills the PTY created afterwards', async () => {
     const view = await mountPanel()
-    await waitFor(() => expect(window.api.terminal.create).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(gatewayBridgeMock('terminal').create).toHaveBeenCalledTimes(1))
 
     view.unmount()
     await answerCreate(0, 'pty-orphan')
 
-    await waitFor(() => expect(window.api.terminal.kill).toHaveBeenCalledWith('pty-orphan'))
+    await waitFor(() => expect(gatewayBridgeMock('terminal').kill).toHaveBeenCalledWith('pty-orphan'))
     expect(useTerminalStore.getState().activeTerminalId).toBeNull()
     expect(instances[0].dispose).toHaveBeenCalledTimes(1)
   })
 
   it('a project switch after a failed create starts a new terminal (Windows: cwd with "&")', async () => {
     await mountPanel()
-    await waitFor(() => expect(window.api.terminal.create).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(gatewayBridgeMock('terminal').create).toHaveBeenCalledTimes(1))
     // terminal:create answers with an error (not a rejection), as main does for a bad cwd
     await act(async () => {
       pendingCreates[0]({ success: false, error: 'cwd contains unsupported character "&"' })
@@ -202,13 +202,85 @@ describe('TerminalPanel start-up guard', () => {
 
     // Opening a good project must create again, once the terminal container is back
     await switchProject('/good/project')
-    await waitFor(() => expect(window.api.terminal.create).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(gatewayBridgeMock('terminal').create).toHaveBeenCalledTimes(2))
     await answerCreate(1, 'pty-good')
 
     await waitFor(() => expect(useTerminalStore.getState().activeTerminalId).toBe('pty-good'))
     expect(screen.queryByTestId(TEST_IDS.TERMINAL_STATUS_ERROR)).toBeNull()
     expect(screen.getByTestId(TEST_IDS.TERMINAL_INSTANCE)).toBeTruthy()
     await waitFor(() => expect(screen.getByTestId(TEST_IDS.TERMINAL_BTN_RESTART)).toBeTruthy())
-    expect(window.api.terminal.create).toHaveBeenCalledTimes(2)
+    expect(gatewayBridgeMock('terminal').create).toHaveBeenCalledTimes(2)
+  })
+
+  /** Let React commit and effects run; no timers are faked in this file */
+  async function settle(): Promise<void> {
+    for (let i = 0; i < 3; i++) {
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      })
+    }
+  }
+
+  async function failFirstCreate(): Promise<void> {
+    await mountPanel()
+    await waitFor(() => expect(gatewayBridgeMock('terminal').create).toHaveBeenCalledTimes(1))
+    await act(async () => {
+      pendingCreates[0]({ success: false, error: 'cwd contains unsupported character "&"' })
+    })
+    await waitFor(() => expect(screen.getByTestId(TEST_IDS.TERMINAL_STATUS_ERROR)).toBeTruthy())
+  }
+
+  it('a switch to another bad project after a failed create tries once and stops', async () => {
+    await failFirstCreate()
+
+    await switchProject('/also/a&b')
+    await waitFor(() => expect(gatewayBridgeMock('terminal').create).toHaveBeenCalledTimes(2))
+    await act(async () => {
+      pendingCreates[1]({ success: false, error: 'cwd contains unsupported character "&"' })
+    })
+    await waitFor(() => expect(screen.getByTestId(TEST_IDS.TERMINAL_STATUS_ERROR)).toBeTruthy())
+
+    await settle()
+    expect(gatewayBridgeMock('terminal').create).toHaveBeenCalledTimes(2)
+  })
+
+  it('closing the project after a failed create starts no shell', async () => {
+    await failFirstCreate()
+
+    await switchProject(null)
+    await settle()
+
+    // The error is cleared and the container is back, but nobody asked for a start
+    expect(screen.queryByTestId(TEST_IDS.TERMINAL_STATUS_ERROR)).toBeNull()
+    expect(gatewayBridgeMock('terminal').create).toHaveBeenCalledTimes(1)
+  })
+
+  it('after a live terminal reports an error, a switch creates only once the old PTY is killed', async () => {
+    await mountPanel()
+    await waitFor(() => expect(gatewayBridgeMock('terminal').create).toHaveBeenCalledTimes(1))
+    await answerCreate(0, 'pty-live')
+    await waitFor(() => expect(errorListener).not.toBeNull())
+
+    // terminal:error for the live PTY (a failed write or resize): the error box replaces it
+    act(() => {
+      errorListener!({ terminalId: 'pty-live', error: 'write failed' })
+    })
+    await waitFor(() => expect(screen.getByTestId(TEST_IDS.TERMINAL_STATUS_ERROR)).toBeTruthy())
+
+    let answerKill!: () => void
+    gatewayBridgeMock('terminal').kill.mockImplementation(
+      () => new Promise((resolve) => { answerKill = () => resolve({ success: true }) })
+    )
+    await switchProject('/project/b')
+    await settle()
+
+    // The kill is sent and unanswered: the cleared error must not start a second PTY yet
+    expect(gatewayBridgeMock('terminal').kill).toHaveBeenCalledWith('pty-live')
+    expect(gatewayBridgeMock('terminal').create).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      answerKill()
+    })
+    await waitFor(() => expect(gatewayBridgeMock('terminal').create).toHaveBeenCalledTimes(2))
   })
 })

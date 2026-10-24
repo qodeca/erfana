@@ -24,6 +24,9 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
+// electron-vite declares ELECTRON_RENDERER_URL read-only; this file sets and clears it.
+const writableEnv: Record<string, string | undefined> = process.env
+
 const mockSetAlwaysOnTop = vi.fn()
 const mockSetVisibleOnAllWorkspaces = vi.fn()
 const mockSetFullScreen = vi.fn()
@@ -31,7 +34,7 @@ const mockDestroy = vi.fn()
 const mockShow = vi.fn()
 const mockFocus = vi.fn()
 const mockLoadURL = vi.fn(async () => undefined)
-const mockLoadFile = vi.fn(async () => undefined)
+const mockLoadFile = vi.fn(async (_filePath: string, _options?: unknown) => undefined)
 const mockRemoveAllListeners = vi.fn()
 const mockOn = vi.fn()
 const mockGetURL = vi.fn(() => 'http://localhost:5173/#overlay/screenshot?displayId=1')
@@ -90,11 +93,17 @@ function makeWindow() {
       }
     }
   }
+  return win
+}
+
+/** Build a window and record it, as the BrowserWindow constructor mock does. */
+function trackWindow(): ReturnType<typeof makeWindow> {
+  const win = makeWindow()
   windowInstances.push(win)
   return win
 }
 
-const BrowserWindowCtor = vi.fn().mockImplementation(() => makeWindow())
+const BrowserWindowCtor = vi.fn().mockImplementation(() => trackWindow())
 
 const defaultDisplays = [
   { id: 1, bounds: { x: 0, y: 0, width: 1920, height: 1080 } }
@@ -151,7 +160,7 @@ function emitCancelled(win: ReturnType<typeof makeWindow>): void {
 describe('AreaSelectOverlay.selectArea', () => {
   beforeEach(() => {
     vi.resetAllMocks()
-    BrowserWindowCtor.mockImplementation(() => makeWindow())
+    BrowserWindowCtor.mockImplementation(() => trackWindow())
     mockLoadURL.mockResolvedValue(undefined)
     mockLoadFile.mockResolvedValue(undefined)
     mockExistsSync.mockReturnValue(true)
@@ -160,7 +169,7 @@ describe('AreaSelectOverlay.selectArea', () => {
     mockDisplays = defaultDisplays
     windowInstances.length = 0
     isDev = true
-    process.env['ELECTRON_RENDERER_URL'] = 'http://localhost:5173'
+    writableEnv.ELECTRON_RENDERER_URL = 'http://localhost:5173'
   })
 
   it('resolves with the selection when renderer posts a valid token + payload', async () => {
@@ -265,7 +274,7 @@ describe('AreaSelectOverlay.selectArea', () => {
 
   it('uses loadFile with the route hash in production (no dev URL)', async () => {
     isDev = false
-    delete process.env['ELECTRON_RENDERER_URL']
+    delete writableEnv.ELECTRON_RENDERER_URL
 
     const { AreaSelectOverlay } = await import('./ScreenshotOverlayWindow')
     const overlay = new AreaSelectOverlay()

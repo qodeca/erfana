@@ -15,6 +15,9 @@ import type { IpcMainInvokeEvent } from 'electron'
 import { SCREENSHOT_CHANNELS } from '../../shared/ipc/screenshot-channels'
 import type { IScreenshotService } from '../services/ScreenshotService'
 
+// electron-vite declares ELECTRON_RENDERER_URL read-only; this file sets and clears it.
+const writableEnv: Record<string, string | undefined> = process.env
+
 const mockIpcMainHandle = vi.fn()
 
 vi.mock('electron', () => ({
@@ -77,7 +80,7 @@ describe('screenshot-handlers — getScreenPermission', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.resetModules()
-    delete process.env['ELECTRON_RENDERER_URL']
+    delete writableEnv.ELECTRON_RENDERER_URL
     mockIs.dev = false
   })
 

@@ -179,12 +179,23 @@ export interface UseXtermSessionReturn {
    */
   start: () => Promise<void>
   /**
-   * The single teardown. Synchronously, in this order: invalidates a start in
-   * flight (see the module doc), clears every timer,
-   * stops a deferred start, removes every listener, releases the session in
-   * the app stores, disposes xterm and nulls its refs; then kills the PTY.
+   * Start again only if the last start found no container – the panel showed
+   * its error box in its place – and nothing tore the session down since.
+   * The panel calls it when the container is rendered again. A teardown
+   * clears the claim, so closing a project or a restart that is still
+   * waiting for its kill never gets a shell from here.
+   */
+  startIfMissed: () => void
+  /**
+   * The single teardown. Synchronously, in this order: clears the session's
+   * id, invalidates a start in flight (see the module doc), clears every
+   * timer, stops a deferred start, removes every listener, releases the
+   * session in the app stores, disposes xterm and nulls its refs; then kills
+   * the PTY. Every step runs even if an earlier one throws.
    *
-   * @returns Resolves once the PTY kill has been answered (errors are logged)
+   * @returns Resolves once the PTY kill has been answered (kill errors are logged)
+   * @throws The first error a step threw, synchronously, after every step ran
+   *   and the kill was sent
    */
   teardownTerminal: (options: TeardownOptions) => Promise<void>
   /** Debounced Claude-status re-check for activity on `id` (#216) */
@@ -247,6 +258,9 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
 
   // Deferred start while the container is hidden
   const pendingStartRef = useRef(false)
+  // A start that found no container (the panel showed its error box instead).
+  // Only such a start is retried when the container returns, see startIfMissed.
+  const missedStartRef = useRef(false)
   const visibilityObserverRef = useRef<ResizeObserver | null>(null)
 
   // Clear handshake: id whose data listener is attached, and confirmations waiting for it
@@ -269,7 +283,7 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
     claudeNudgeTimerRef.current = setTimeout(() => {
       claudeNudgeTimerRef.current = null
       // Asked first: tests and non-Electron renders have no bridge (#352)
-      if (hasBridgeMethod('claudeStatus', 'nudge')) advisory(claudeStatusGateway.nudge(id))
+      if (hasBridgeMethod('claudeStatus', 'nudge')) advisory(() => claudeStatusGateway.nudge(id))
     }, CLAUDE_NUDGE_DEBOUNCE_MS)
   }, [])
 
@@ -325,21 +339,33 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
    */
   const releaseInstance = useCallback(
     (xterm: Terminal | null): void => {
-      for (const timerRef of [fitTimerRef, webglRecoveryTimerRef]) {
-        if (timerRef.current) clearTimeout(timerRef.current)
-        timerRef.current = null
-      }
-      if (xterm?.element && contextMenuHandlerRef.current) {
-        xterm.element.removeEventListener('contextmenu', contextMenuHandlerRef.current)
-      }
-      contextMenuHandlerRef.current = null
-      parserDisposablesRef.current.forEach((d) => d.dispose())
+      // Every ref is emptied before anything is disposed, and each dispose is
+      // guarded: a throwing parser hook or input disposable must not leave a
+      // ref set (a second release would throw on it again) or skip the
+      // dispose of xterm, whose ref would then block every later start.
+      const parserDisposables = parserDisposablesRef.current
+      const inputDisposable = inputDisposableRef.current
+      const contextMenuHandler = contextMenuHandlerRef.current
       parserDisposablesRef.current = []
-      inputDisposableRef.current?.dispose()
       inputDisposableRef.current = null
-      if (xterm) disposeQuietly(xterm)
-      xtermRef.current = null
-      fitAddonRef.current = null
+      contextMenuHandlerRef.current = null
+      try {
+        for (const timerRef of [fitTimerRef, webglRecoveryTimerRef]) {
+          if (timerRef.current) clearTimeout(timerRef.current)
+          timerRef.current = null
+        }
+        if (xterm?.element && contextMenuHandler) {
+          guarded('Failed to remove the terminal context-menu listener', () =>
+            xterm.element?.removeEventListener('contextmenu', contextMenuHandler)
+          )
+        }
+        for (const d of parserDisposables) guarded('Failed to dispose a terminal parser hook', () => d.dispose())
+        if (inputDisposable) guarded('Failed to dispose the terminal input listener', () => inputDisposable.dispose())
+      } finally {
+        if (xterm) disposeQuietly(xterm)
+        xtermRef.current = null
+        fitAddonRef.current = null
+      }
     },
     [xtermRef]
   )
@@ -347,54 +373,61 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
   const teardownTerminal = useCallback(
     ({ resetState }: TeardownOptions): Promise<void> => {
       const id = terminalIdRef.current
-      // Steps 0-5 run in a try and the kill in its finally: a throw on the
-      // way (a listener, a store subscriber, a disposable) must not leave the
-      // shell running with nothing attached. The kill still goes last, after
-      // the dispose, and the error still reaches the caller.
-      let killed: Promise<void> = Promise.resolve()
-      try {
-        // 0. Invalidate a start still in flight: it gives up at its next await
-        generationRef.current += 1
-        inFlightStartRef.current = null
+      // Cleared at once, before any step can throw: a later teardown must
+      // never see this id again and kill or unregister a dead PTY twice
+      terminalIdRef.current = null
+      shellKindRef.current = null
 
-        // 1. The Claude-nudge timer, so it never fires for the id cleared below
-        //    (the instance's own timers go with it in step 5)
-        if (claudeNudgeTimerRef.current) clearTimeout(claudeNudgeTimerRef.current)
-        claudeNudgeTimerRef.current = null
-
-        // 2. A start still waiting for the container to become visible
-        stopVisibilityWait()
-
-        // 3. Session listeners: clear handshake, test hook, file drop
-        releaseStartListeners()
-
-        // 4. The session in the app stores: no active terminal, no Claude tracking (#216)
-        terminalIdRef.current = null
-        shellKindRef.current = null
-        useTerminalStore.getState().setActiveTerminal(null)
-        if (id) {
-          if (hasBridgeMethod('claudeStatus', 'unregister')) advisory(claudeStatusGateway.unregister(id))
-          // Prune the slice, or the map keeps a stale entry per closed terminal
-          useClaudeStatusStore.getState().clearTerminal(id)
-        }
-
-        // 5. The instance: its timers and listeners first, then xterm itself
-        releaseInstance(xtermRef.current)
-
-        if (resetState) {
-          setTerminalId(null)
-          setError(null)
-        }
-      } finally {
+      // Every step runs even when an earlier one throws (a listener, a store
+      // subscriber, a disposable), so the shell is never left running with
+      // nothing attached. The first error is rethrown once the kill is sent.
+      let firstError: { error: unknown } | null = null
+      const step = (run: () => void): void => {
         try {
-          // A throw before step 5 skipped it: the instance still goes, before the kill
-          if (xtermRef.current) releaseInstance(xtermRef.current)
-        } finally {
-          // 6. The PTY. Last, and awaited by the callers that start a new session,
-          //    so the next one is never created while this one is still alive
-          if (id) killed = killTerminal(id)
+          run()
+        } catch (error) {
+          if (firstError) logger.warn('Terminal teardown step failed', errorFields(error))
+          else firstError = { error }
         }
       }
+
+      // 0. Invalidate a start still in flight: it gives up at its next await.
+      //    A start that found no container is not owed a retry any more.
+      generationRef.current += 1
+      inFlightStartRef.current = null
+      missedStartRef.current = false
+
+      // 1. The Claude-nudge timer, so it never fires for the id cleared below
+      //    (the instance's own timers go with it in step 5)
+      if (claudeNudgeTimerRef.current) clearTimeout(claudeNudgeTimerRef.current)
+      claudeNudgeTimerRef.current = null
+
+      // 2. A start still waiting for the container to become visible
+      step(stopVisibilityWait)
+
+      // 3. Session listeners: clear handshake, test hook, file drop
+      step(releaseStartListeners)
+
+      // 4. The session in the app stores: no active terminal, no Claude tracking (#216)
+      step(() => useTerminalStore.getState().setActiveTerminal(null))
+      if (id) {
+        if (hasBridgeMethod('claudeStatus', 'unregister')) advisory(() => claudeStatusGateway.unregister(id))
+        // Prune the slice, or the map keeps a stale entry per closed terminal
+        step(() => useClaudeStatusStore.getState().clearTerminal(id))
+      }
+
+      // 5. The instance: its timers and listeners first, then xterm itself
+      step(() => releaseInstance(xtermRef.current))
+
+      if (resetState) {
+        setTerminalId(null)
+        setError(null)
+      }
+
+      // 6. The PTY. Last, and awaited by the callers that start a new session,
+      //    so the next one is never created while this one is still alive
+      const killed = id ? killTerminal(id) : Promise.resolve()
+      if (firstError) throw (firstError as { error: unknown }).error
       return killed
     },
     [xtermRef, stopVisibilityWait, releaseStartListeners, releaseInstance]
@@ -414,6 +447,11 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
     inFlightStartRef.current = { generation, promise }
     return promise
   }, [])
+
+  // Retry a start that found no container, once the panel renders it again
+  const startIfMissed = useCallback((): void => {
+    if (missedStartRef.current && containerRef.current && !xtermRef.current) void start()
+  }, [containerRef, xtermRef, start])
 
   /** Defer the start until the container has a size (xterm cannot open hidden) */
   const waitForVisibility = (container: HTMLElement): void => {
@@ -507,7 +545,11 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
     // False once a teardown ran after this start began
     const isCurrent = (): boolean => generation === generationRef.current
     const container = containerRef.current
-    if (!container) return
+    if (!container) {
+      missedStartRef.current = true
+      return
+    }
+    missedStartRef.current = false
     // A session already lives in this generation; a second one would orphan it
     if (xtermRef.current) return
     if (!isElementVisible(container)) {
@@ -613,7 +655,7 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
       // Kept with the id so a screenshot path-paste quotes for this shell (#164)
       shellKindRef.current = result.shellKind ?? null
       useTerminalStore.getState().setActiveTerminal({ id, shellKind: result.shellKind ?? null })
-      if (hasBridgeMethod('claudeStatus', 'register')) advisory(claudeStatusGateway.register(id))
+      if (hasBridgeMethod('claudeStatus', 'register')) advisory(() => claudeStatusGateway.register(id))
       warmupUntilRef.current = Date.now() + WARMUP_MS
 
       inputDisposableRef.current = xterm.onData((data) => {
@@ -660,6 +702,7 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
     error,
     setError,
     start,
+    startIfMissed,
     teardownTerminal,
     nudgeClaudeStatus,
     onDataListenerAttached,
@@ -676,6 +719,15 @@ function applyScreenReaderMode(xterm: Terminal | null, enabled: boolean): void {
   const xtermOptions = xterm?.options
   if (xtermOptions && xtermOptions.screenReaderMode !== enabled) {
     xtermOptions.screenReaderMode = enabled
+  }
+}
+
+/** Run one cleanup call; a throw is logged, so the next cleanup still runs */
+function guarded(message: string, run: () => void): void {
+  try {
+    run()
+  } catch (err) {
+    logger.warn(message, errorFields(err))
   }
 }
 
@@ -716,10 +768,15 @@ function killOrphan(terminalId: string): void {
 
 /**
  * Fire-and-forget a Claude-status call (#216): tracking is advisory, so a
- * rejection is logged, never left unhandled.
+ * throw or a rejection is logged, never let through to a start or teardown.
  */
-function advisory(call: Promise<unknown>): void {
-  Promise.resolve(call).catch((err: unknown) => logger.warn('Claude status call failed', errorFields(err)))
+function advisory(call: () => Promise<unknown>): void {
+  const logFailure = (err: unknown): void => logger.warn('Claude status call failed', errorFields(err))
+  try {
+    Promise.resolve(call()).catch(logFailure)
+  } catch (err) {
+    logFailure(err)
+  }
 }
 
 /** Log fields for an unknown thrown value */

@@ -14,6 +14,8 @@ async function getTestIds() {
   return import('./testids')
 }
 
+type TestIdsModule = Awaited<ReturnType<typeof getTestIds>>
+
 describe('TEST_IDS', () => {
   describe('structure', () => {
     it('should have all expected component sections', async () => {
@@ -441,8 +443,8 @@ describe('getPathHash', () => {
 
 describe('getDynamicTestId', () => {
    
-  let getDynamicTestId: (prefix: string, path: string) => string
-  let TEST_IDS: Record<string, string>
+  let getDynamicTestId: TestIdsModule['getDynamicTestId']
+  let TEST_IDS: TestIdsModule['TEST_IDS']
 
   beforeEach(async () => {
     const module = await getTestIds()

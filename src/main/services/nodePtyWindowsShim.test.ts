@@ -4,9 +4,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { existsSync, readFileSync, statSync } from 'fs'
 import { join } from 'path'
 
-const logger = vi.hoisted(() => ({
-  trace: vi.fn(), debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), fatal: vi.fn()
-}))
+const logger = vi.hoisted(() => {
+  // Typed like the logger's methods, so the assertions below read the message as a string.
+  const logFn = () => vi.fn<(message: string, context?: Record<string, unknown>) => void>()
+  return { trace: logFn(), debug: logFn(), info: logFn(), warn: logFn(), error: logFn(), fatal: logFn() }
+})
 vi.mock('./LoggingService', () => ({ logger }))
 
 import {
@@ -256,9 +258,9 @@ describe('conout worker release (#305 quit hang)', () => {
   it('logs once and notes the version when node-pty has no _cleanUpProcess', () => {
     expect(installConoutWorkerRelease(() => ({ WindowsPtyAgent: { prototype: {} } }), () => '1.2.0')).toBe(false)
     expect(installConoutWorkerRelease(() => ({ WindowsPtyAgent: { prototype: {} } }), () => '1.2.0')).toBe(false)
-    const shape = logger.warn.mock.calls.filter(([m]: [string]) => m.includes('_cleanUpProcess'))
+    const shape = logger.warn.mock.calls.filter(([m]) => m.includes('_cleanUpProcess'))
     expect(shape).toHaveLength(1)
-    expect(logger.warn.mock.calls.some(([m]: [string]) => m.includes('node-pty 1.2.0'))).toBe(true)
+    expect(logger.warn.mock.calls.some(([m]) => m.includes('node-pty 1.2.0'))).toBe(true)
   })
 
   it('stops a running worker thread at once and logs counts and times only', async () => {
@@ -272,10 +274,10 @@ describe('conout worker release (#305 quit hang)', () => {
     expect(connection._isDisposed).toBe(true)
     await expect(exited).resolves.toBe(1)
     await vi.waitFor(() => expect(conoutWorkerStats()).toEqual({ released: 1, exited: 1 }))
-    const released = logger.info.mock.calls.find(([m]: [string]) => m === 'Conout worker released')
+    const released = logger.info.mock.calls.find(([m]) => m === 'Conout worker released')
     expect(Object.keys(released?.[1] ?? {}).sort()).toEqual(['exitToReleaseMs', 'released'])
-    expect(released?.[1].exitToReleaseMs).toBeGreaterThanOrEqual(1_000)
-    const gone = logger.info.mock.calls.find(([m]: [string]) => m === 'Conout worker exited')
+    expect(released?.[1]?.exitToReleaseMs).toBeGreaterThanOrEqual(1_000)
+    const gone = logger.info.mock.calls.find(([m]) => m === 'Conout worker exited')
     expect(Object.keys(gone?.[1] ?? {}).sort()).toEqual(['code', 'exited', 'releaseToExitMs'])
   })
 
@@ -285,6 +287,6 @@ describe('conout worker release (#305 quit hang)', () => {
     expect(releaseAgentConoutWorker({ _conoutSocketWorker: { _worker: {} } })).toBe(false)
     const throwing = { _conoutSocketWorker: { _worker: { terminate: () => { throw new Error('gone') } } } }
     expect(releaseAgentConoutWorker(throwing)).toBe(false)
-    expect(logger.warn.mock.calls.filter(([m]: [string]) => m.includes('conout worker not found'))).toHaveLength(1)
+    expect(logger.warn.mock.calls.filter(([m]) => m.includes('conout worker not found'))).toHaveLength(1)
   })
 })

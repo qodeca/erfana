@@ -142,7 +142,7 @@ describe('ImportToolStatusService', () => {
     await service.getStatus()
     clock += 3000
 
-    const results = []
+    const results: Awaited<ReturnType<typeof service.recheck>>[] = []
     for (let i = 0; i < 20; i++) {
       results.push(await service.recheck())
       clock += 10

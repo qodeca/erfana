@@ -18,6 +18,9 @@ import { pathToFileURL } from 'url'
 import type { IpcMainInvokeEvent } from 'electron'
 import { ClaudeStatusChannels } from '../../shared/ipc/claude-status-channels'
 
+// electron-vite declares ELECTRON_RENDERER_URL read-only; this file sets and clears it.
+const writableEnv: Record<string, string | undefined> = process.env
+
 // =============================================================================
 // Capture registered handlers via a mocked ipcMain
 // =============================================================================
@@ -127,7 +130,7 @@ describe('claude-status-handlers', () => {
     for (const k of Object.keys(handlers)) delete handlers[k]
     removedHandlers.length = 0
     mockIs.dev = false
-    delete process.env['ELECTRON_RENDERER_URL']
+    delete writableEnv.ELECTRON_RENDERER_URL
     mockGetAllWindows.mockReturnValue([])
   })
 

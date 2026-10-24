@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { describe, it, expect, vi } from 'vitest'
 import mermaidPurify from 'dompurify'
-// @ts-expect-error -- Monaco's internal ESM module ships no type declarations
+// Monaco's internal ESM module ships no type declarations, so this import is untyped.
 import { sanitizeHtml } from 'monaco-editor/esm/vs/base/browser/domSanitize.js'
 
 /**

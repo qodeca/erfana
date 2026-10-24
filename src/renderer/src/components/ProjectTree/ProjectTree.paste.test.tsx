@@ -4,12 +4,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { createClipboardStore } from '../../stores/useClipboardStore'
 import type { IFileOperations } from '../../interfaces/IFileOperations'
 
-declare global {
-  interface Window {
-    api: any
-  }
-}
-
 /**
  * Integration tests for clipboard store paste operations with replaceExisting parameter
  *

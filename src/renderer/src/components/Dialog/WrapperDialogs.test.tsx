@@ -24,7 +24,6 @@ describe('Wrapper Dialogs Integration Tests', () => {
   describe('NewFileDialog', () => {
     const defaultConfig: NewFileDialogConfig = {
       id: 'new-file-123',
-      type: 'newFile',
       title: 'Create New File',
       message: '',
       parentPath: '/project/docs',
@@ -145,7 +144,6 @@ describe('Wrapper Dialogs Integration Tests', () => {
   describe('NewFolderDialog', () => {
     const defaultConfig: NewFolderDialogConfig = {
       id: 'new-folder-123',
-      type: 'newFolder',
       title: 'Create New Folder',
       message: '',
       parentPath: '/project',
@@ -257,7 +255,6 @@ describe('Wrapper Dialogs Integration Tests', () => {
   describe('RenameDialog', () => {
     const fileConfig: RenameDialogConfig = {
       id: 'rename-file-123',
-      type: 'rename',
       title: 'Rename File',
       message: '',
       currentName: 'document.md',
@@ -269,12 +266,11 @@ describe('Wrapper Dialogs Integration Tests', () => {
 
     const folderConfig: RenameDialogConfig = {
       id: 'rename-folder-123',
-      type: 'rename',
       title: 'Rename Folder',
       message: '',
       currentName: 'old-folder',
       itemPath: '/project/old-folder',
-      itemType: 'folder',
+      itemType: 'directory',
       parentPath: '/project',
       existingNames: ['src', 'docs']
     }

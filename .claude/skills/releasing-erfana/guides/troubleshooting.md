@@ -237,6 +237,9 @@ npm run test:preload
 # Check specific config
 npm run typecheck:node
 npm run typecheck:web
+npm run typecheck:test:node   # main, preload and shared tests
+npm run typecheck:test:web    # renderer tests
+npm run typecheck:test:e2e    # Playwright specs
 ```
 
 ## Local signature verification

@@ -8,6 +8,8 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
+import type { Terminal } from '@xterm/xterm'
+import type { FitAddon } from '@xterm/addon-fit'
 import { useTerminalResize } from './useTerminalResize'
 
 // Mock logger
@@ -43,9 +45,9 @@ describe('useTerminalResize', () => {
 
   const createMockRefs = (terminalId: string | null = 'terminal-1') => ({
     terminalRef: { current: document.createElement('div') },
-    fitAddonRef: { current: { fit: mockFit } as unknown as { current: null } },
+    fitAddonRef: { current: { fit: mockFit } as unknown as FitAddon },
     xtermRef: {
-      current: { cols: 80, rows: 24 } as unknown as { current: null }
+      current: { cols: 80, rows: 24 } as unknown as Terminal
     },
     terminalId,
     resizePty: mockResizePty
@@ -67,8 +69,8 @@ describe('useTerminalResize', () => {
       useTerminalResize({
         ...refs,
         terminalRef: refs.terminalRef as React.RefObject<HTMLDivElement | null>,
-        fitAddonRef: refs.fitAddonRef as React.RefObject<null>,
-        xtermRef: refs.xtermRef as React.RefObject<null>
+        fitAddonRef: refs.fitAddonRef,
+        xtermRef: refs.xtermRef
       })
     )
 
@@ -82,8 +84,8 @@ describe('useTerminalResize', () => {
       useTerminalResize({
         ...refs,
         terminalRef: refs.terminalRef as React.RefObject<HTMLDivElement | null>,
-        fitAddonRef: refs.fitAddonRef as React.RefObject<null>,
-        xtermRef: refs.xtermRef as React.RefObject<null>
+        fitAddonRef: refs.fitAddonRef,
+        xtermRef: refs.xtermRef
       })
     )
 
@@ -97,8 +99,8 @@ describe('useTerminalResize', () => {
       useTerminalResize({
         ...refs,
         terminalRef: refs.terminalRef as React.RefObject<HTMLDivElement | null>,
-        fitAddonRef: refs.fitAddonRef as React.RefObject<null>,
-        xtermRef: refs.xtermRef as React.RefObject<null>
+        fitAddonRef: refs.fitAddonRef,
+        xtermRef: refs.xtermRef
       })
     )
 
@@ -114,8 +116,8 @@ describe('useTerminalResize', () => {
       useTerminalResize({
         ...refs,
         terminalRef: refs.terminalRef as React.RefObject<HTMLDivElement | null>,
-        fitAddonRef: refs.fitAddonRef as React.RefObject<null>,
-        xtermRef: refs.xtermRef as React.RefObject<null>
+        fitAddonRef: refs.fitAddonRef,
+        xtermRef: refs.xtermRef
       })
     )
 
@@ -138,8 +140,8 @@ describe('useTerminalResize', () => {
       useTerminalResize({
         ...refs,
         terminalRef: refs.terminalRef as React.RefObject<HTMLDivElement | null>,
-        fitAddonRef: refs.fitAddonRef as React.RefObject<null>,
-        xtermRef: refs.xtermRef as React.RefObject<null>
+        fitAddonRef: refs.fitAddonRef,
+        xtermRef: refs.xtermRef
       })
     )
 
@@ -158,8 +160,8 @@ describe('useTerminalResize', () => {
       useTerminalResize({
         ...refs,
         terminalRef: refs.terminalRef as React.RefObject<HTMLDivElement | null>,
-        fitAddonRef: refs.fitAddonRef as React.RefObject<null>,
-        xtermRef: refs.xtermRef as React.RefObject<null>
+        fitAddonRef: refs.fitAddonRef,
+        xtermRef: refs.xtermRef
       })
     )
 
@@ -180,8 +182,8 @@ describe('useTerminalResize', () => {
       useTerminalResize({
         ...refs,
         terminalRef: refs.terminalRef as React.RefObject<HTMLDivElement | null>,
-        fitAddonRef: refs.fitAddonRef as React.RefObject<null>,
-        xtermRef: refs.xtermRef as React.RefObject<null>
+        fitAddonRef: refs.fitAddonRef,
+        xtermRef: refs.xtermRef
       })
     )
 
