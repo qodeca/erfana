@@ -23,6 +23,7 @@ function makeXterm() {
   return {
     cols: 80,
     rows: 24,
+    options: {} as { screenReaderMode?: boolean },
     element: undefined as HTMLElement | undefined,
     open: vi.fn(),
     loadAddon: vi.fn(),
@@ -105,9 +106,12 @@ function renderSession() {
     wheelEventHandler: vi.fn(() => true),
     onContextMenu: vi.fn(),
     attachFileDrop: vi.fn(),
-    detachFileDrop: vi.fn()
+    detachFileDrop: vi.fn(),
+    screenReaderMode: false
   }
-  const hook = renderHook(() => useXtermSession(options))
+  const hook = renderHook((props: { screenReaderMode: boolean } = { screenReaderMode: false }) =>
+    useXtermSession({ ...options, screenReaderMode: props.screenReaderMode })
+  )
   return { hook, options }
 }
 
@@ -266,6 +270,27 @@ describe('useXtermSession start-up guard', () => {
     await hook.result.current.teardownTerminal({ resetState: false })
 
     expect(gatewayBridgeMock('terminal').kill).toHaveBeenCalledWith('pty-1')
+  })
+
+  it('creates xterm with the screen-reader mode and toggles it live (lens review [23])', async () => {
+    const { Terminal } = await import('@xterm/xterm')
+    const { hook } = renderSession()
+    hook.rerender({ screenReaderMode: true })
+    let first!: Promise<void>
+    act(() => {
+      first = hook.result.current.start()
+    })
+    await untilCreates(1)
+    await act(async () => {
+      answerCreate(0, 'pty-1')
+      await first
+    })
+    expect(vi.mocked(Terminal)).toHaveBeenCalledWith(expect.objectContaining({ screenReaderMode: true }))
+
+    hook.rerender({ screenReaderMode: false })
+    expect(instances[0].options.screenReaderMode).toBe(false)
+    hook.rerender({ screenReaderMode: true })
+    expect(instances[0].options.screenReaderMode).toBe(true)
   })
 
   it('a failed start that was superseded does not report its error', async () => {

@@ -27,5 +27,7 @@ export const terminalGateway: TerminalBridge = {
   onError: (...args) => bridge().onError(...args),
   onClear: (...args) => bridge().onClear(...args),
   markClearComplete: (...args) => bridge().markClearComplete(...args),
-  ackOutput: (...args) => bridge().ackOutput(...args)
+  ackOutput: (...args) => bridge().ackOutput(...args),
+  getScreenReaderSupport: (...args) => bridge().getScreenReaderSupport(...args),
+  onScreenReaderSupportChanged: (...args) => bridge().onScreenReaderSupportChanged(...args)
 }

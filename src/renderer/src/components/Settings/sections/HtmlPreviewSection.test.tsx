@@ -22,7 +22,8 @@ function settingsWith(enabled: boolean): GlobalSettings {
     gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
     transcription: { backend: 'openai', openaiApiKeyStored: false, whisperModel: 'base' },
     htmlPreview: { enabled },
-    files: { exclude: [] }
+    files: { exclude: [] },
+    terminal: { screenReaderMode: 'auto' }
   }
 }
 
