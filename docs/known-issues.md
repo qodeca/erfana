@@ -115,6 +115,16 @@ Phases 0–2 of Windows enablement shipped in **v0.9.3** (2026-04-22); Phase 4 (
 
 ---
 
+### Local Whisper: Windows needs the Microsoft VC++ redistributable
+
+**Issue**: The Windows whisper build (`whisper.exe` and its 4 DLLs) links the Microsoft C++ runtime dynamically – `MSVCP140`, `VCRUNTIME140`, `VCRUNTIME140_1`, and `VCOMP140` (OpenMP, imported by `ggml-cpu.dll`). The zip does not carry these DLLs. On a machine without the Microsoft Visual C++ 2015–2022 (x64) redistributable, `whisper.exe` cannot start, so local transcription fails.
+
+**Workaround**: Install the Microsoft Visual C++ 2015–2022 Redistributable (x64), which most Windows machines already have, or use the OpenAI API backend. `whisper-build-v1.8.4-erfana2` was checked against runtime 14.44 and newer (see [phase4-binary-spec.md](./windows/phase4-binary-spec.md#verification-evidence--erfana2)); an older runtime, or none at all, is untested.
+
+**Tracking**: Not a regression – `erfana1` had the same requirement. Shipping the runtime DLLs app-local in the zip would remove it.
+
+---
+
 ### Local Whisper: cancellation on Windows is abrupt
 
 **Issue**: On Windows, `child.kill('SIGTERM')` maps to `TerminateProcess` — no graceful shutdown. Any partially-written `${audioPath}.txt` from whisper.cpp's `-otxt` flag may be corrupted.
