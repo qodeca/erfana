@@ -19,6 +19,15 @@ type GatewayBridges =
   | 'system'
   | 'clipboard'
   | 'testHooks'
+  | 'import'
+  | 'transcription'
+  | 'whisper'
+  | 'camera'
+  | 'pdf'
+  | 'docx'
+  | 'imageExport'
+  | 'browser'
+  | 'markdownImage'
 
 declare global {
   interface Window {

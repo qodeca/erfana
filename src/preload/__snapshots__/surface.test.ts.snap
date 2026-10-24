@@ -33,6 +33,18 @@ exports[`preload surface > window.api has the expected top-level groups 1`] = `
 ]
 `;
 
+exports[`preload surface > window.api.browser exposes the expected members 1`] = `
+[
+  "openFile",
+]
+`;
+
+exports[`preload surface > window.api.camera exposes the expected members 1`] = `
+[
+  "save",
+]
+`;
+
 exports[`preload surface > window.api.clipboard exposes the expected members 1`] = `
 [
   "readText",
@@ -51,6 +63,12 @@ exports[`preload surface > window.api.directoryWatch exposes the expected member
   "start",
   "stop",
   "stopAll",
+]
+`;
+
+exports[`preload surface > window.api.docx exposes the expected members 1`] = `
+[
+  "exportToDocx",
 ]
 `;
 
@@ -154,12 +172,46 @@ exports[`preload surface > window.api.globalSettings exposes the expected member
 ]
 `;
 
+exports[`preload surface > window.api.imageExport exposes the expected members 1`] = `
+[
+  "run",
+]
+`;
+
+exports[`preload surface > window.api.import exposes the expected members 1`] = `
+[
+  "cancelDocument",
+  "documentImport",
+  "getDocumentExtensions",
+  "getSupportedExtensions",
+  "isSupported",
+  "onDependenciesReady",
+  "onDocumentProgress",
+  "process",
+  "selectFile",
+  "toolStatus",
+  "validate",
+]
+`;
+
 exports[`preload surface > window.api.logging exposes the expected members 1`] = `
 [
   "getLevel",
   "getLogsDir",
   "log",
   "openLogsFolder",
+]
+`;
+
+exports[`preload surface > window.api.markdownImage exposes the expected members 1`] = `
+[
+  "read",
+]
+`;
+
+exports[`preload surface > window.api.pdf exposes the expected members 1`] = `
+[
+  "exportToPdf",
 ]
 `;
 
@@ -203,5 +255,28 @@ exports[`preload surface > window.api.system exposes the expected members 1`] = 
 exports[`preload surface > window.api.testHooks exposes the expected members 1`] = `
 [
   "enabled",
+]
+`;
+
+exports[`preload surface > window.api.transcription exposes the expected members 1`] = `
+[
+  "cancel",
+  "clearApiKey",
+  "hasApiKey",
+  "import",
+  "onProgress",
+  "setApiKey",
+  "validate",
+]
+`;
+
+exports[`preload surface > window.api.whisper exposes the expected members 1`] = `
+[
+  "cancelDownload",
+  "deleteModel",
+  "ensureBinary",
+  "ensureModel",
+  "listModels",
+  "onDownloadProgress",
 ]
 `;

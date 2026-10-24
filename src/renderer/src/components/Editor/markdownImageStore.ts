@@ -61,7 +61,8 @@ import {
 import { onFileStructureChanged } from '../../services/fileStructureSignal'
 import { fileGateway } from '../../services/fileGateway'
 import { directoryWatchGateway } from '../../services/directoryWatchGateway'
-import { hasBridgeMethod } from '../../services/bridgePresence'
+import { hasBridge, hasBridgeMethod } from '../../services/bridgePresence'
+import { markdownImageGateway } from '../../services/markdownImageGateway'
 import { resolveDocumentRelativePath } from '../../utils/markdownLinkResolver'
 import { getRendererPlatform } from '../../utils/platform'
 import { logger } from '../../utils/logger'
@@ -170,9 +171,9 @@ async function decodeImage(url: string): Promise<void> {
 }
 
 const defaultDeps: MarkdownImageStoreDeps = {
-  // Optional chaining: a test renderer often installs no bridge; then nothing loads.
+  // A test renderer often installs no bridge (or a mock that answers nothing); then nothing loads.
   read: (request) =>
-    window.api?.markdownImage?.read(request) ??
+    (hasBridge('markdownImage') ? markdownImageGateway.read(request) : undefined) ??
     Promise.resolve({ status: 'refused', reason: 'unreadable' }),
   getProjectPath: () => fileGateway.getProjectPath(),
   decode: decodeImage,

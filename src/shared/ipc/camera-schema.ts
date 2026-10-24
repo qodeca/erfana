@@ -44,3 +44,16 @@ export const CameraSaveResponseSchema = z.object({
   errorCode: z.string().optional()
 })
 export type CameraSaveResponse = z.infer<typeof CameraSaveResponseSchema>
+
+/**
+ * Shared contract for the preload `camera` bridge.
+ *
+ * Implemented by `window.api.camera` (preload, `cameraBridge.ts`) and consumed
+ * by the renderer camera gateway.
+ *
+ * @see Spec #014 - Camera photo capture specification
+ */
+export interface CameraBridge {
+  /** Save a captured photo to a temp file. */
+  save(request: CameraSaveRequest): Promise<CameraSaveResponse>
+}

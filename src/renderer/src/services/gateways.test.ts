@@ -17,6 +17,14 @@ import type { LoggingBridge } from '../../../shared/ipc/logging-schema'
 import type { QuitBridge } from '../../../shared/ipc/quit-schema'
 import type { SettingsBridge } from '../../../shared/ipc/settings-schema'
 import type { SystemBridge } from '../../../shared/ipc/system-schema'
+import type { BrowserBridge } from '../../../shared/ipc/browser-schema'
+import type { CameraBridge } from '../../../shared/ipc/camera-schema'
+import type { DocxBridge } from '../../../shared/ipc/docx-schema'
+import type { ImageExportBridge } from '../../../shared/ipc/image-export-schema'
+import type { ImportBridge } from '../../../shared/ipc/import-schema'
+import type { MarkdownImageBridge } from '../../../shared/ipc/markdown-image-schema'
+import type { PdfBridge } from '../../../shared/ipc/pdf-schema'
+import type { TranscriptionBridge, WhisperBridge } from '../../../shared/ipc/transcription-schema'
 import { fileGateway } from './fileGateway'
 import { terminalGateway } from './terminalGateway'
 import { fileWatchGateway } from './fileWatchGateway'
@@ -28,6 +36,13 @@ import { quitGateway } from './quitGateway'
 import { systemGateway } from './systemGateway'
 import { clipboardGateway } from './clipboardGateway'
 import { testHooksGateway } from './testHooksGateway'
+import { importGateway } from './importGateway'
+import { transcriptionGateway, whisperGateway } from './transcriptionGateway'
+import { cameraGateway } from './cameraGateway'
+import { docxGateway, pdfGateway } from './documentExportGateway'
+import { imageExportGateway } from './imageExportGateway'
+import { browserGateway } from './browserGateway'
+import { markdownImageGateway } from './markdownImageGateway'
 import { getDefaultProjectTreeApi } from './projectTreeApi'
 import { onFileStructureChanged } from './fileStructureSignal'
 
@@ -160,6 +175,46 @@ const CLIPBOARD_METHODS: Record<keyof ClipboardBridge, true> = {
   writeText: true
 }
 
+const IMPORT_METHODS: Record<keyof ImportBridge, true> = {
+  selectFile: true,
+  validate: true,
+  process: true,
+  getSupportedExtensions: true,
+  isSupported: true,
+  documentImport: true,
+  cancelDocument: true,
+  getDocumentExtensions: true,
+  toolStatus: true,
+  onDocumentProgress: true,
+  onDependenciesReady: true
+}
+
+const TRANSCRIPTION_METHODS: Record<keyof TranscriptionBridge, true> = {
+  import: true,
+  cancel: true,
+  validate: true,
+  setApiKey: true,
+  hasApiKey: true,
+  clearApiKey: true,
+  onProgress: true
+}
+
+const WHISPER_METHODS: Record<keyof WhisperBridge, true> = {
+  ensureBinary: true,
+  ensureModel: true,
+  listModels: true,
+  deleteModel: true,
+  cancelDownload: true,
+  onDownloadProgress: true
+}
+
+const CAMERA_METHODS: Record<keyof CameraBridge, true> = { save: true }
+const PDF_METHODS: Record<keyof PdfBridge, true> = { exportToPdf: true }
+const DOCX_METHODS: Record<keyof DocxBridge, true> = { exportToDocx: true }
+const IMAGE_EXPORT_METHODS: Record<keyof ImageExportBridge, true> = { run: true }
+const BROWSER_METHODS: Record<keyof BrowserBridge, true> = { openFile: true }
+const MARKDOWN_IMAGE_METHODS: Record<keyof MarkdownImageBridge, true> = { read: true }
+
 type Anything = (...args: unknown[]) => unknown
 
 function fakeBridge(methods: string[]): Record<string, ReturnType<typeof vi.fn>> {
@@ -185,7 +240,16 @@ describe.each([
   ['loggingGateway', 'logging', loggingGateway, LOGGING_METHODS],
   ['quitGateway', 'quit', quitGateway, QUIT_METHODS],
   ['systemGateway', 'system', systemGateway, SYSTEM_METHODS],
-  ['clipboardGateway', 'clipboard', clipboardGateway, CLIPBOARD_METHODS]
+  ['clipboardGateway', 'clipboard', clipboardGateway, CLIPBOARD_METHODS],
+  ['importGateway', 'import', importGateway, IMPORT_METHODS],
+  ['transcriptionGateway', 'transcription', transcriptionGateway, TRANSCRIPTION_METHODS],
+  ['whisperGateway', 'whisper', whisperGateway, WHISPER_METHODS],
+  ['cameraGateway', 'camera', cameraGateway, CAMERA_METHODS],
+  ['pdfGateway', 'pdf', pdfGateway, PDF_METHODS],
+  ['docxGateway', 'docx', docxGateway, DOCX_METHODS],
+  ['imageExportGateway', 'imageExport', imageExportGateway, IMAGE_EXPORT_METHODS],
+  ['browserGateway', 'browser', browserGateway, BROWSER_METHODS],
+  ['markdownImageGateway', 'markdownImage', markdownImageGateway, MARKDOWN_IMAGE_METHODS]
 ] as const)('%s', (_name, key, gateway, methods) => {
   const names = Object.keys(methods)
 

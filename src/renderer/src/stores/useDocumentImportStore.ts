@@ -21,6 +21,8 @@ import type {
   ToolState,
   UnsafeTool
 } from '../../../shared/ipc/import-schema'
+import { importGateway } from '../services/importGateway'
+import { hasBridgeMethod } from '../services/bridgePresence'
 
 /**
  * State and actions for the document import workflow.
@@ -213,7 +215,7 @@ export const useDocumentImportStore = create<DocumentImportState>((set, get) => 
     })
 
     // Subscribe to progress events from the main process
-    progressCleanup = window.api.import.onDocumentProgress((progress) => {
+    progressCleanup = importGateway.onDocumentProgress((progress) => {
       get()._handleProgress(progress)
     })
 
@@ -228,7 +230,7 @@ export const useDocumentImportStore = create<DocumentImportState>((set, get) => 
         }
       }
 
-      const result = await window.api.import.documentImport(request)
+      const result = await importGateway.documentImport(request)
 
       // Unsubscribe from progress events after completion
       if (progressCleanup) {
@@ -273,7 +275,7 @@ export const useDocumentImportStore = create<DocumentImportState>((set, get) => 
     }
 
     try {
-      await window.api.import.cancelDocument()
+      await importGateway.cancelDocument()
     } catch {
       // Cancel is best-effort; the import may have already completed
     }
@@ -305,7 +307,7 @@ export const useDocumentImportStore = create<DocumentImportState>((set, get) => 
 
   fetchExtensions: async () => {
     try {
-      const extensions = await window.api.import.getDocumentExtensions()
+      const extensions = await importGateway.getDocumentExtensions()
       set({ documentExtensions: extensions })
     } catch {
       // Silently fail – extensions will remain empty until next fetch
@@ -313,10 +315,10 @@ export const useDocumentImportStore = create<DocumentImportState>((set, get) => 
   },
 
   initDependencyListener: () => {
-    if (!window.api?.import?.onDependenciesReady) {
+    if (!hasBridgeMethod('import', 'onDependenciesReady')) {
       return () => {}
     }
-    const cleanup = window.api.import.onDependenciesReady((event) => {
+    const cleanup = importGateway.onDependenciesReady((event) => {
       set({
         documentExtensions: event.extensions,
         hasLibreOffice: event.libreOffice === 'found',
@@ -330,10 +332,10 @@ export const useDocumentImportStore = create<DocumentImportState>((set, get) => 
 
   loadToolStatus: async (recheck: boolean) => {
     if (get().isCheckingTools) return
-    if (!window.api?.import?.toolStatus) return
+    if (!hasBridgeMethod('import', 'toolStatus')) return
     set({ isCheckingTools: true })
     try {
-      const response = await window.api.import.toolStatus({ recheck })
+      const response = await importGateway.toolStatus({ recheck })
       if (response.success) {
         set({
           documentExtensions: response.extensions,

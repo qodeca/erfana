@@ -8,7 +8,22 @@
  * compiles it, test files are not type-checked.
  */
 import type { Api } from '../../../preload/index'
+import type { BrowserBridge } from '../../../shared/ipc/browser-schema'
+import type { CameraBridge } from '../../../shared/ipc/camera-schema'
 import type { ClipboardBridge } from '../../../shared/ipc/clipboard-schema'
+import type { DocxBridge } from '../../../shared/ipc/docx-schema'
+import type { ImageExportBridge } from '../../../shared/ipc/image-export-schema'
+import type { ImportBridge } from '../../../shared/ipc/import-schema'
+import type { MarkdownImageBridge } from '../../../shared/ipc/markdown-image-schema'
+import type { PdfBridge } from '../../../shared/ipc/pdf-schema'
+import type { TranscriptionBridge, WhisperBridge } from '../../../shared/ipc/transcription-schema'
+import type { browserGateway } from './browserGateway'
+import type { cameraGateway } from './cameraGateway'
+import type { docxGateway, pdfGateway } from './documentExportGateway'
+import type { imageExportGateway } from './imageExportGateway'
+import type { importGateway } from './importGateway'
+import type { markdownImageGateway } from './markdownImageGateway'
+import type { transcriptionGateway, whisperGateway } from './transcriptionGateway'
 import type { DirectoryWatchBridge } from '../../../shared/ipc/directory-watch-schema'
 import type { FileBridge } from '../../../shared/ipc/file-schema'
 import type { FileWatchBridge } from '../../../shared/ipc/file-watch-schema'
@@ -52,6 +67,15 @@ type GatewayBridges =
   | 'system'
   | 'clipboard'
   | 'testHooks'
+  | 'import'
+  | 'transcription'
+  | 'whisper'
+  | 'camera'
+  | 'pdf'
+  | 'docx'
+  | 'imageExport'
+  | 'browser'
+  | 'markdownImage'
 
 export type WindowApiChecks = [
   Assert<Equal<Window['api'], Omit<Api, GatewayBridges>>>,
@@ -68,5 +92,14 @@ export type WindowApiChecks = [
   Assert<Equal<typeof quitGateway, QuitBridge>>,
   Assert<Equal<typeof systemGateway, SystemBridge>>,
   Assert<Equal<typeof clipboardGateway, ClipboardBridge>>,
-  Assert<Equal<typeof testHooksGateway, Api['testHooks']>>
+  Assert<Equal<typeof testHooksGateway, Api['testHooks']>>,
+  Assert<Equal<typeof importGateway, ImportBridge>>,
+  Assert<Equal<typeof transcriptionGateway, TranscriptionBridge>>,
+  Assert<Equal<typeof whisperGateway, WhisperBridge>>,
+  Assert<Equal<typeof cameraGateway, CameraBridge>>,
+  Assert<Equal<typeof pdfGateway, PdfBridge>>,
+  Assert<Equal<typeof docxGateway, DocxBridge>>,
+  Assert<Equal<typeof imageExportGateway, ImageExportBridge>>,
+  Assert<Equal<typeof browserGateway, BrowserBridge>>,
+  Assert<Equal<typeof markdownImageGateway, MarkdownImageBridge>>
 ]

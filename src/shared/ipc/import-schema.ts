@@ -12,6 +12,7 @@
  */
 import { z } from 'zod'
 import { UNSAFE_TOOL_NAMES, UNSAFE_TOOL_REASONS } from '../unsafeTool'
+import type { IpcAck } from './schema'
 
 /**
  * Import options for document conversion
@@ -134,3 +135,58 @@ export type ImportToolStatus = z.infer<typeof ImportToolStatusSchema>
 export type ImportToolStatusResponse =
   | ({ success: true } & ImportToolStatus)
   | { success: false; error: string }
+
+/** `import:selectFile`: the file the native dialog returned. */
+export interface ImportFileSelection {
+  path: string
+  name: string
+  sizeInMB: number
+  extension: string
+}
+
+/** `import:validate`: whether the file can be imported, and why not. */
+export interface ImportValidation {
+  valid: boolean
+  error?: string
+  sizeInMB: number
+  fileName: string
+}
+
+/** `import:process`: where the converted file was written, or why it was not. */
+export interface ImportProcessResult {
+  success: boolean
+  outputPath?: string
+  error?: string
+  errorCode?: string
+}
+
+/**
+ * Shared contract for the preload `import` bridge (PDF, text and document
+ * import into the project's `import/` folder).
+ *
+ * Implemented by `window.api.import` (preload, `importBridge.ts`) and consumed
+ * by the renderer import gateway. The event subscriptions return their
+ * unsubscribe function.
+ */
+export interface ImportBridge {
+  /** Native file dialog; `null` when cancelled. */
+  selectFile(): Promise<ImportFileSelection | null>
+  validate(filePath: string): Promise<ImportValidation>
+  /** Validate, convert and write to `import/`. */
+  process(filePath: string): Promise<ImportProcessResult>
+  getSupportedExtensions(): Promise<string[]>
+  isSupported(extension: string): Promise<boolean>
+  /** Import a document through the LiteParse converter. */
+  documentImport(request: DocumentImportRequest): Promise<DocumentImportResult>
+  cancelDocument(): Promise<IpcAck>
+  /** Document extensions the installed tools can read. */
+  getDocumentExtensions(): Promise<string[]>
+  /**
+   * LibreOffice found, missing or unsafe (#250). `{ recheck: true }` runs the
+   * detection again ("Check again"); main rate-limits it. Never rejects:
+   * failures arrive as `success: false`.
+   */
+  toolStatus(request: ImportToolStatusRequest): Promise<ImportToolStatusResponse>
+  onDocumentProgress(callback: (progress: DocumentImportProgress) => void): () => void
+  onDependenciesReady(callback: (event: DependencyReadyEvent) => void): () => void
+}
