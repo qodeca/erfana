@@ -17,6 +17,7 @@ import { useTerminalStore } from '../../../../stores/useTerminalStore'
 import { useClaudeStatusStore } from '../../../../stores/useClaudeStatusStore'
 import { useXtermSession, type UseXtermSessionOptions } from './useXtermSession'
 import { gatewayBridgeMock } from '../../../../test-utils/gatewayBridgeMock'
+import { logger } from '../../../../utils/logger'
 
 /** A fresh mock per `new Terminal()`, so tests can tell instances apart */
 function makeXterm() {
@@ -588,22 +589,17 @@ describe('useXtermSession teardown always kills the PTY (review 1, 3)', () => {
     expect(gatewayBridgeMock('terminal').kill).toHaveBeenCalledWith('pty-1')
   })
 
-  it('a throw before the dispose still disposes the instance, then kills, and reaches the caller', async () => {
+  it('a throw before the dispose still disposes the instance, then kills, and resolves', async () => {
     const { hook, options } = await liveSession()
     vi.mocked(options.detachFileDrop).mockImplementation(() => {
       throw new Error('detach failed')
     })
 
-    let thrown: unknown = null
-    act(() => {
-      try {
-        void hook.result.current.teardownTerminal({ resetState: false })
-      } catch (err) {
-        thrown = err
-      }
+    // Resolves: the callers (effect cleanups, project switch, restart) do not catch
+    await act(async () => {
+      await expect(hook.result.current.teardownTerminal({ resetState: false })).resolves.toBeUndefined()
     })
 
-    expect((thrown as Error | null)?.message).toBe('detach failed')
     expect(instances[0].dispose).toHaveBeenCalledTimes(1)
     expect(options.xtermRef.current).toBeNull()
     expect(gatewayBridgeMock('terminal').kill).toHaveBeenCalledWith('pty-1')
@@ -627,17 +623,114 @@ describe('useXtermSession teardown always kills the PTY (review 1, 3)', () => {
     expect(gatewayBridgeMock('claudeStatus').unregister).not.toHaveBeenCalled()
   })
 
-  it('keeps the first error when a later step throws too', async () => {
+  it('logs each step error and still kills', async () => {
+    const warn = vi.spyOn(logger, 'warn')
     const { hook, options } = await liveSession()
+    // Step 3 (session listeners) and step 4 (the Claude-status slice) both throw
     vi.mocked(options.detachFileDrop).mockImplementation(() => {
-      throw new Error('first')
+      throw new Error('detach failed')
     })
-    instances[0].dispose.mockImplementation(() => {
-      throw new Error('second')
+    const clearTerminal = vi.spyOn(useClaudeStatusStore.getState(), 'clearTerminal').mockImplementation(() => {
+      throw new Error('clear failed')
     })
 
-    expect(() => hook.result.current.teardownTerminal({ resetState: false })).toThrow('first')
-    expect(gatewayBridgeMock('terminal').kill).toHaveBeenCalledWith('pty-1')
+    try {
+      await act(async () => {
+        await expect(hook.result.current.teardownTerminal({ resetState: false })).resolves.toBeUndefined()
+      })
+
+      expect(warn).toHaveBeenCalledWith('Failed to detach the terminal file drop', expect.objectContaining({ error: 'detach failed' }))
+      expect(warn).toHaveBeenCalledWith('Terminal teardown step failed', expect.objectContaining({ error: 'clear failed' }))
+      expect(instances[0].dispose).toHaveBeenCalledTimes(1)
+      expect(gatewayBridgeMock('terminal').kill).toHaveBeenCalledTimes(1)
+      expect(gatewayBridgeMock('terminal').kill).toHaveBeenCalledWith('pty-1')
+    } finally {
+      // Restored even when an assertion fails, so later tests see the real store
+      clearTerminal.mockRestore()
+      warn.mockRestore()
+    }
+  })
+
+  it('a throwing start-up listener on a failed start leaves no xterm behind and start() resolves', async () => {
+    const { hook, options } = renderSession()
+    vi.mocked(options.detachFileDrop).mockImplementation(() => {
+      throw new Error('detach failed')
+    })
+    let first!: Promise<void>
+    act(() => {
+      first = hook.result.current.start()
+    })
+    await untilCreates(1)
+    await act(async () => {
+      pendingCreates[0]({ success: false, error: 'spawn failed' })
+      await expect(first).resolves.toBeUndefined()
+    })
+
+    expect(hook.result.current.error).toBe('spawn failed')
+    expect(instances[0].dispose).toHaveBeenCalledTimes(1)
+    expect(options.xtermRef.current).toBeNull()
+  })
+
+  it('a teardown drops a missed start: the container coming back starts nothing', async () => {
+    const { hook, options } = renderSession()
+    const container = options.containerRef.current
+    ;(options.containerRef as { current: HTMLDivElement | null }).current = null
+    await act(async () => {
+      await hook.result.current.start()
+    })
+
+    await act(async () => {
+      await hook.result.current.teardownTerminal({ resetState: true })
+    })
+    ;(options.containerRef as { current: HTMLDivElement | null }).current = container
+    await act(async () => {
+      hook.result.current.startIfMissed()
+    })
+
+    expect(gatewayBridgeMock('terminal').create).not.toHaveBeenCalled()
+  })
+
+  it('without a teardown, a missed start runs once when the container comes back', async () => {
+    const { hook, options } = renderSession()
+    const container = options.containerRef.current
+    ;(options.containerRef as { current: HTMLDivElement | null }).current = null
+    await act(async () => {
+      await hook.result.current.start()
+    })
+    expect(gatewayBridgeMock('terminal').create).not.toHaveBeenCalled()
+
+    ;(options.containerRef as { current: HTMLDivElement | null }).current = container
+    act(() => {
+      hook.result.current.startIfMissed()
+      // A second call while that start runs joins it
+      hook.result.current.startIfMissed()
+    })
+    await untilCreates(1)
+    expect(gatewayBridgeMock('terminal').create).toHaveBeenCalledTimes(1)
+  })
+
+  it('a container lost during the font load is owed a retry', async () => {
+    fontGate.held = true
+    const { hook, options } = renderSession()
+    const container = options.containerRef.current
+    let first!: Promise<void>
+    act(() => {
+      first = hook.result.current.start()
+    })
+    await vi.waitFor(() => expect(releaseFont).not.toBeNull())
+    ;(options.containerRef as { current: HTMLDivElement | null }).current = null
+    await act(async () => {
+      releaseFont!()
+      await first
+    })
+    expect(instances[0].dispose).toHaveBeenCalledTimes(1)
+
+    fontGate.held = false
+    ;(options.containerRef as { current: HTMLDivElement | null }).current = container
+    act(() => {
+      hook.result.current.startIfMissed()
+    })
+    await untilCreates(1)
   })
 
   it('a throwing parser hook still disposes xterm, and a later start works', async () => {

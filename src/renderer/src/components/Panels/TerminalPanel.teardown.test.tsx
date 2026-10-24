@@ -84,6 +84,7 @@ vi.mock('../../utils/domUtils', () => ({
 
 import { WebglAddon } from '@xterm/addon-webgl'
 import { gatewayBridgeMock } from '../../test-utils/gatewayBridgeMock'
+import { logger } from '../../utils/logger'
 
 /** One unsubscribe mock per onClear subscription, in subscription order */
 const clearUnsubscribes: Array<ReturnType<typeof vi.fn>> = []
@@ -193,6 +194,20 @@ describe('TerminalPanel teardown', () => {
     expect(mockXtermInstance.dispose.mock.invocationCallOrder[0]).toBeLessThan(
       gatewayBridgeMock('terminal').kill.mock.invocationCallOrder[0]
     )
+  })
+
+  it('a Claude-status call that throws synchronously is logged, and the PTY is still killed', async () => {
+    const warn = vi.spyOn(logger, 'warn')
+    const { unmount } = await renderPanel()
+    gatewayBridgeMock('claudeStatus').unregister.mockImplementation(() => {
+      throw new Error('bridge gone')
+    })
+
+    unmount()
+
+    expect(gatewayBridgeMock('terminal').kill).toHaveBeenCalledWith(TERMINAL_ID)
+    expect(warn).toHaveBeenCalledWith('Claude status call failed', expect.objectContaining({ error: 'bridge gone' }))
+    warn.mockRestore()
   })
 
   it('on unmount clears the pending fit and Claude-nudge timers', async () => {

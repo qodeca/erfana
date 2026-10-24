@@ -191,11 +191,10 @@ export interface UseXtermSessionReturn {
    * id, invalidates a start in flight (see the module doc), clears every
    * timer, stops a deferred start, removes every listener, releases the
    * session in the app stores, disposes xterm and nulls its refs; then kills
-   * the PTY. Every step runs even if an earlier one throws.
+   * the PTY. Every step runs even if an earlier one throws; such errors are
+   * logged, never thrown, so a caller that does not catch always gets here.
    *
    * @returns Resolves once the PTY kill has been answered (kill errors are logged)
-   * @throws The first error a step threw, synchronously, after every step ran
-   *   and the kill was sent
    */
   teardownTerminal: (options: TeardownOptions) => Promise<void>
   /** Debounced Claude-status re-check for activity on `id` (#216) */
@@ -323,11 +322,15 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
 
   /** Release what a start attached before it failed, or what outlives a session */
   const releaseStartListeners = useCallback(() => {
-    clearUnsubscribeRef.current?.()
+    // Refs emptied first and each call guarded: a throw never leaves one set
+    // for the next release, never skips the others, and never reaches start()
+    const clearUnsubscribe = clearUnsubscribeRef.current
+    const testTerminalUnregister = testTerminalUnregisterRef.current
     clearUnsubscribeRef.current = null
-    testTerminalUnregisterRef.current?.()
     testTerminalUnregisterRef.current = null
-    optionsRef.current.detachFileDrop()
+    if (clearUnsubscribe) guarded('Failed to remove the terminal clear listener', clearUnsubscribe)
+    if (testTerminalUnregister) guarded('Failed to unregister the terminal test hook', testTerminalUnregister)
+    guarded('Failed to detach the terminal file drop', () => optionsRef.current.detachFileDrop())
   }, [])
 
   /**
@@ -380,16 +383,10 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
 
       // Every step runs even when an earlier one throws (a listener, a store
       // subscriber, a disposable), so the shell is never left running with
-      // nothing attached. The first error is rethrown once the kill is sent.
-      let firstError: { error: unknown } | null = null
-      const step = (run: () => void): void => {
-        try {
-          run()
-        } catch (error) {
-          if (firstError) logger.warn('Terminal teardown step failed', errorFields(error))
-          else firstError = { error }
-        }
-      }
+      // nothing attached. Each error is logged and the teardown still resolves:
+      // its callers (effect cleanups, project switch, restart) do not catch,
+      // and a throw there would skip the next start or reach the root boundary.
+      const step = (run: () => void): void => guarded('Terminal teardown step failed', run)
 
       // 0. Invalidate a start still in flight: it gives up at its next await.
       //    A start that found no container is not owed a retry any more.
@@ -426,9 +423,7 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
 
       // 6. The PTY. Last, and awaited by the callers that start a new session,
       //    so the next one is never created while this one is still alive
-      const killed = id ? killTerminal(id) : Promise.resolve()
-      if (firstError) throw (firstError as { error: unknown }).error
-      return killed
+      return id ? killTerminal(id) : Promise.resolve()
     },
     [xtermRef, stopVisibilityWait, releaseStartListeners, releaseInstance]
   )
@@ -581,6 +576,9 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
       await ensureTerminalFontLoaded()
       // Not in the refs yet, so nothing else would dispose it
       if (!isCurrent() || !containerRef.current) {
+        // Still this session's start, but the error box took the container
+        // during the font load: owed a retry when it comes back
+        if (isCurrent()) missedStartRef.current = true
         xterm.dispose()
         return
       }
