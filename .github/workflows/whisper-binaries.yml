@@ -108,8 +108,8 @@ jobs:
     # Fork exfiltration guard — defense-in-depth alongside the
     # production-signing environment gate.
     if: github.repository == 'qodeca/erfana'
-    # Needed to access APPLE_CERT_P12 / APPLE_CERT_PASSWORD / APPLE_ID /
-    # APPLE_APP_PASSWORD / APPLE_TEAM_ID, which are scoped to this
+    # Needed to access MAC_CERT_P12_BASE64 / MAC_CERT_PASSWORD / APPLE_ID /
+    # APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID, which are scoped to this
     # environment (not repo-wide).
     environment: production-signing
     steps:
@@ -231,12 +231,12 @@ jobs:
       - name: Configure signing keychain
         # apple-actions/import-codesign-certs v3 (resolved 2026-04-25 to
         # commit 63fff01cd422d4b7b855d40ca1e9d34d2de9427d). This action
-        # consumes APPLE_CERT_P12 directly — SHA-pin is mandatory; a
+        # consumes MAC_CERT_P12_BASE64 directly — SHA-pin is mandatory; a
         # tag-move would be a credential-handling supply-chain incident.
         uses: apple-actions/import-codesign-certs@5142e029c445c10ffc7149d172e540235a065466
         with:
-          p12-file-base64: ${{ secrets.APPLE_CERT_P12 }}
-          p12-password: ${{ secrets.APPLE_CERT_PASSWORD }}
+          p12-file-base64: ${{ secrets.MAC_CERT_P12_BASE64 }}
+          p12-password: ${{ secrets.MAC_CERT_PASSWORD }}
 
       - name: Code-sign binary
         env:
@@ -253,14 +253,14 @@ jobs:
         if: ${{ !inputs.skip_notarization }}
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           set -euo pipefail
           ditto -c -k --keepParent staging/whisper-cli notarize.zip
           xcrun notarytool submit notarize.zip \
             --apple-id "$APPLE_ID" \
-            --password "$APPLE_APP_PASSWORD" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD" \
             --team-id "$APPLE_TEAM_ID" \
             --wait
           # stapler requires a bundle, not a raw binary — since whisper-cli is
@@ -340,7 +340,11 @@ jobs:
       - name: Configure (x64, no host-CPU auto-detect)
         shell: pwsh
         run: |
-          cmake -G "Visual Studio 17 2022" -A x64 `
+          # No -G: CMake picks the newest installed Visual Studio generator, so the
+          # job survives a windows-latest VS bump (VS 2022 -> 2026 broke a pinned
+          # -G). -A x64 is VS-generator-only, so a non-VS fallback fails loudly;
+          # VS stays multi-config, so output remains build\bin\Release.
+          cmake -A x64 `
                 -DCMAKE_BUILD_TYPE=Release `
                 -DGGML_NATIVE=OFF `
                 -B build
@@ -517,19 +521,22 @@ jobs:
 
       - name: Sign manifest with primary key
         env:
-          MANIFEST_SIGNING_KEY: ${{ secrets.MANIFEST_SIGNING_KEY }}
-          MANIFEST_SIGNING_KEY_PASSWORD: ${{ secrets.MANIFEST_SIGNING_KEY_PASSWORD }}
+          # Same key as release.yml's SHA256SUMS signing (key ID 4AEBCE8499845646,
+          # docs/release-pubkey.txt = whisper-pubkeys.ts primary).
+          MINISIGN_SECRET_KEY_BASE64: ${{ secrets.MINISIGN_SECRET_KEY_BASE64 }}
+          MINISIGN_KEY_PASSWORD: ${{ secrets.MINISIGN_KEY_PASSWORD }}
         run: |
           set -euo pipefail
-          echo "::add-mask::${MANIFEST_SIGNING_KEY}"
-          echo "::add-mask::${MANIFEST_SIGNING_KEY_PASSWORD}"
+          echo "::add-mask::${MINISIGN_SECRET_KEY_BASE64}"
+          echo "::add-mask::${MINISIGN_KEY_PASSWORD}"
           # minisign reads the key from a file; pipe via /dev/shm (tmpfs) so it
           # never hits persistent storage. Cleanup in trap.
           KEYFILE=$(mktemp --tmpdir=/dev/shm minisign-key.XXXXXX)
           trap 'shred -u "$KEYFILE" 2>/dev/null || rm -f "$KEYFILE"' EXIT
-          printf '%s' "${MANIFEST_SIGNING_KEY}" >"$KEYFILE"
+          # Decode exactly as release.yml does: the secret is the base64 of the key file.
+          printf '%s' "${MINISIGN_SECRET_KEY_BASE64}" | base64 -d >"$KEYFILE"
           # -s signs; -m is the data file; output is manifest.json.minisig
-          printf '%s\n' "${MANIFEST_SIGNING_KEY_PASSWORD}" \
+          printf '%s\n' "${MINISIGN_KEY_PASSWORD}" \
             | minisign -S -s "$KEYFILE" -m manifest.json
           test -f manifest.json.minisig
 
@@ -566,7 +573,7 @@ jobs:
             echo "No scannable output files produced — nothing to scan."
             exit 0
           fi
-          PATTERN='APPLE_APP_PASSWORD=|APPLE_CERT_PASSWORD=|WINDOWS_CERT_PASSWORD=|MANIFEST_SIGNING_KEY=|MANIFEST_SIGNING_KEY_PASSWORD=|-----BEGIN [A-Z ]*PRIVATE KEY-----|untrusted comment:.*minisign encrypted secret key'
+          PATTERN='APPLE_APP_SPECIFIC_PASSWORD=|MAC_CERT_PASSWORD=|WINDOWS_CERT_PASSWORD=|MINISIGN_SECRET_KEY_BASE64=|MINISIGN_KEY_PASSWORD=|-----BEGIN [A-Z ]*PRIVATE KEY-----|untrusted comment:.*minisign encrypted secret key'
           for target in "${SCAN_TARGETS[@]}"; do
             if grep -iE "$PATTERN" "$target"; then
               echo "::error::Credential pattern leaked in job output: $target"
