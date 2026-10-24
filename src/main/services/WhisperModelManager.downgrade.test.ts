@@ -83,15 +83,15 @@ vi.mock('./LoggingService', () => ({
 // ---------------------------------------------------------------------------
 
 const DARWIN_SPEC = {
-  filename: 'whisper-macos-universal-v1.8.4-erfana1.tar.gz',
+  filename: 'whisper-macos-universal-v1.8.4-erfana2.tar.gz',
   archiveFormat: 'tar.gz' as const,
-  sha256: '78fa53c26f62da7f842def18f57338908641449fcee5da533037237d09bc696b',
-  sizeBytes: 744_152,
+  sha256: '2f73a24866acbd7f446344856cc1a86112cd0235e31480117c54cfa499514ab2',
+  sizeBytes: 2_361_432,
   files: {
     main: {
       filename: 'whisper-cli',
-      sizeBytes: 1_778_400,
-      sha256: 'ff6de29f7a5581bea65a87c2437aabc8085cd21a6c476e78e11bc81b1edd8b9f'
+      sizeBytes: 6_387_792,
+      sha256: 'e533e2ae396115788235a2d0fd175cbed288f25dbd03d4c7be68c39de993c0de'
     },
     sidecars: []
   }
@@ -108,7 +108,7 @@ vi.mock('./whisper-assets', () => ({
   MANIFEST_SIG_MAX_BYTES: 8 * 1024,
   MANIFEST_SIG_URL: 'https://example.invalid/manifest.json.minisig',
   MANIFEST_URL: 'https://example.invalid/manifest.json',
-  MIN_REVISION_INDEX: 1,
+  MIN_REVISION_INDEX: 2,
   MODEL_SIZE_MARGIN_BYTES: 1024,
   MODEL_PINS: {
     tiny: { remoteFilename: 'ggml-tiny.bin', sizeBytes: 1000, sha256: 'a'.repeat(64) },
@@ -219,8 +219,8 @@ function arrangeDefaults(opts: {
         size: DARWIN_SPEC.sizeBytes
       },
       win64: {
-        filename: 'whisper-win-x64-v1.8.4-erfana1.zip',
-        sha256: '8e3c63e8e7112e3f04304a4d58937696d72881d88ad0c436665e194b7af846f1',
+        filename: 'whisper-win-x64-v1.8.4-erfana2.zip',
+        sha256: 'f4a459133c29911e484146917c1ada49aac8668d734db8c300a820be11be36f2',
         size: 1_000_000
       }
     },
@@ -270,8 +270,16 @@ describe('WhisperModelManager downgrade protection', () => {
     vi.restoreAllMocks()
   })
 
+  it('real pin refuses the erfana1 manifest (revisionIndex 1)', async () => {
+    // erfana1's macOS whisper-cli could not start on users' Macs (its dylibs
+    // were not in the tarball), so the shipped floor must stay above it.
+    const real = await vi.importActual<typeof import('./whisper-assets')>('./whisper-assets')
+    expect(real.MIN_REVISION_INDEX).toBeGreaterThanOrEqual(2)
+    expect(real.RELEASE_TAG).not.toContain('erfana1')
+  })
+
   it('rejects manifest whose revisionIndex is below MIN_REVISION_INDEX (source floor)', async () => {
-    arrangeDefaults({ manifestRevisionIndex: 0, lastSeenRevisionOnDisk: null })
+    arrangeDefaults({ manifestRevisionIndex: 1, lastSeenRevisionOnDisk: null })
 
     const { createWhisperModelManager } = await import('./WhisperModelManager')
     const { AppError } = await import('../../shared/errors')
@@ -335,7 +343,7 @@ describe('WhisperModelManager downgrade protection', () => {
 
   it('rejects manifest whose per-platform SHA does not match source pin (SOURCE_PIN_DRIFT)', async () => {
     arrangeDefaults({
-      manifestRevisionIndex: 1,
+      manifestRevisionIndex: 2,
       lastSeenRevisionOnDisk: null,
       manifestPlatformSha: '0000000000000000000000000000000000000000000000000000000000000000'
     })
@@ -349,7 +357,7 @@ describe('WhisperModelManager downgrade protection', () => {
   })
 
   it('wraps verifyManifest failure as WHISPER_MANIFEST_INVALID (granular error code)', async () => {
-    arrangeDefaults({ manifestRevisionIndex: 1, lastSeenRevisionOnDisk: null })
+    arrangeDefaults({ manifestRevisionIndex: 2, lastSeenRevisionOnDisk: null })
 
     // Make signature verify fail.
     const { VerifyManifestError } = await import('../utils/verifyManifest')

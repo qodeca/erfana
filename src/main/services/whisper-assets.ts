@@ -30,11 +30,11 @@
 import { LOCAL_WHISPER } from '../../shared/constants'
 
 /** Unique identity of the currently-pinned whisper-build release. */
-export const RELEASE_TAG = 'whisper-build-v1.8.4-erfana1'
+export const RELEASE_TAG = 'whisper-build-v1.8.4-erfana2'
 
 /** Base URL — join with `ARTIFACTS[x].filename` / `MANIFEST_*_FILENAME` for downloads. */
 export const RELEASE_URL_BASE =
-  'https://github.com/qodeca/erfana/releases/download/whisper-build-v1.8.4-erfana1'
+  'https://github.com/qodeca/erfana/releases/download/whisper-build-v1.8.4-erfana2'
 
 /** Manifest file served alongside every `whisper-build-*` release. */
 export const MANIFEST_FILENAME = 'manifest.json'
@@ -43,7 +43,7 @@ export const MANIFEST_URL = `${RELEASE_URL_BASE}/${MANIFEST_FILENAME}`
 export const MANIFEST_SIG_URL = `${RELEASE_URL_BASE}/${MANIFEST_SIG_FILENAME}`
 
 /** Reject manifests whose `revisionIndex` is strictly lower than this. */
-export const MIN_REVISION_INDEX = 1
+export const MIN_REVISION_INDEX = 2
 
 /** Bump on breaking bin/ layout change to trigger one-time migration cleanup. */
 export const SCHEMA_VERSION = 1
@@ -80,57 +80,61 @@ export interface PlatformArtifactSpec {
 }
 
 /**
- * Pinned per-platform specs for `whisper-build-v1.8.4-erfana1`.
+ * Pinned per-platform specs for `whisper-build-v1.8.4-erfana2`.
  *
  * SHAs sourced from `docs/windows/phase4-binary-spec.md` after the CI run
- * that published the release.
+ * that published the release (run 40104989427). The macOS `whisper-cli` is
+ * a static build: `libwhisper` and `libggml*` are linked in, so it links
+ * only system libraries and ships with no sidecars. `erfana1` was a shared
+ * build whose dylibs were not in the tarball, so it could not start on a
+ * user's Mac; `MIN_REVISION_INDEX = 2` refuses its manifest.
  */
 export const ARTIFACTS: Record<WhisperPlatform, PlatformArtifactSpec> = {
   'darwin-universal': {
-    filename: 'whisper-macos-universal-v1.8.4-erfana1.tar.gz',
+    filename: 'whisper-macos-universal-v1.8.4-erfana2.tar.gz',
     archiveFormat: 'tar.gz',
-    sha256: '78fa53c26f62da7f842def18f57338908641449fcee5da533037237d09bc696b',
-    sizeBytes: 744_152,
+    sha256: '2f73a24866acbd7f446344856cc1a86112cd0235e31480117c54cfa499514ab2',
+    sizeBytes: 2_361_432,
     files: {
       main: {
         filename: 'whisper-cli',
-        sizeBytes: 1_778_400,
-        sha256: 'ff6de29f7a5581bea65a87c2437aabc8085cd21a6c476e78e11bc81b1edd8b9f'
+        sizeBytes: 6_387_792,
+        sha256: 'e533e2ae396115788235a2d0fd175cbed288f25dbd03d4c7be68c39de993c0de'
       },
       sidecars: []
     }
   },
   'win32-x64': {
-    filename: 'whisper-win-x64-v1.8.4-erfana1.zip',
+    filename: 'whisper-win-x64-v1.8.4-erfana2.zip',
     archiveFormat: 'zip',
-    sha256: '8e3c63e8e7112e3f04304a4d58937696d72881d88ad0c436665e194b7af846f1',
-    sizeBytes: 909_525,
+    sha256: 'f4a459133c29911e484146917c1ada49aac8668d734db8c300a820be11be36f2',
+    sizeBytes: 1_014_883,
     files: {
       main: {
         filename: 'whisper.exe',
-        sizeBytes: 485_888,
-        sha256: '66caae86a60256b2fcde8d518a778608cb092554a173a6859cae080b0d3c4d6c'
+        sizeBytes: 475_136,
+        sha256: 'e24ea8774875dd47bc5f7c64ade9ade7513c4bfeabfca504381da80ae9d10b06'
       },
       sidecars: [
         {
           filename: 'whisper.dll',
-          sizeBytes: 483_840,
-          sha256: 'd3ab5b3356d5233640de9e972c62ac1af674cbd3c696084aed5261db5b442824'
+          sizeBytes: 1_364_480,
+          sha256: '2cfc88565c5b725aa8621203e5764b89671880dad446f08b93ab2cf3ec979cba'
         },
         {
           filename: 'ggml.dll',
-          sizeBytes: 67_072,
-          sha256: '08cafe44fbb8f463e77421f60cc57a6afa6cac8403a0281f7dedbeb9e68ab900'
+          sizeBytes: 68_608,
+          sha256: '606684847089843116b749cca2b8554b58b7ca231dea77bc5c8023f4aac416a2'
         },
         {
           filename: 'ggml-base.dll',
-          sizeBytes: 549_376,
-          sha256: '26e62b452554e22f9125e966975da37e1ec8119d3b09e67b6cd00999348ee40d'
+          sizeBytes: 565_248,
+          sha256: '732b316c65981f191df7d66162f2890c220d0a1eea28615c5936c26af265e7fc'
         },
         {
           filename: 'ggml-cpu.dll',
-          sizeBytes: 774_144,
-          sha256: 'eeea48c0ae3c7c375fd197ef865a38cc280ba3da5499d559aade473835557980'
+          sizeBytes: 776_704,
+          sha256: '5ee7263411f5e1f46d033530ed6572460040e2ab2f938bc11fd7366ca39dd6c5'
         }
       ]
     }
