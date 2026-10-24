@@ -149,6 +149,30 @@ describe('FilePickerDialog', () => {
       expect(items[2]).toHaveAttribute('aria-selected', 'true')
       expect(items[0]).toHaveAttribute('aria-selected', 'false')
     })
+
+    // The reset moved from an effect into render (react-hooks warnings, plan
+    // item 19); these pin that a new list still starts at the top and that a
+    // re-render with the same list keeps the reader's choice.
+    it('goes back to the first item when the candidates change', () => {
+      const { rerender } = render(<FilePickerDialog {...defaultProps} />)
+      fireEvent.mouseEnter(within(screen.getByRole('listbox')).getAllByRole('option')[2])
+
+      rerender(<FilePickerDialog {...defaultProps} candidates={[...mockCandidates]} />)
+
+      const items = within(screen.getByRole('listbox')).getAllByRole('option')
+      expect(items[0]).toHaveAttribute('aria-selected', 'true')
+      expect(items[2]).toHaveAttribute('aria-selected', 'false')
+    })
+
+    it('keeps the selection when re-rendered with the same candidates', () => {
+      const { rerender } = render(<FilePickerDialog {...defaultProps} />)
+      fireEvent.mouseEnter(within(screen.getByRole('listbox')).getAllByRole('option')[2])
+
+      rerender(<FilePickerDialog {...defaultProps} query="Button" />)
+
+      const items = within(screen.getByRole('listbox')).getAllByRole('option')
+      expect(items[2]).toHaveAttribute('aria-selected', 'true')
+    })
   })
 
   describe('keyboard navigation', () => {

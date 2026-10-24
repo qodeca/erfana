@@ -14,9 +14,10 @@
  *
  * @module useEditorSaveRegistration
  */
-import { useEffect, useRef } from 'react'
+import { useEffect } from 'react'
 
 import { editorSaveRegistry } from '../services/editorSaveRegistry'
+import { useLatestRef } from './useLatestRef'
 
 /**
  * Registers an editor tab for save-by-id while it is mounted.
@@ -45,8 +46,7 @@ export function useEditorSaveRegistration(
   holdAutosave: () => () => void,
   whenSaveSettled?: () => Promise<void>
 ): void {
-  const latest = useRef({ save, hasConflict, holdAutosave, whenSaveSettled })
-  latest.current = { save, hasConflict, holdAutosave, whenSaveSettled }
+  const latest = useLatestRef({ save, hasConflict, holdAutosave, whenSaveSettled })
 
   useEffect(() => {
     if (!panelId) return undefined
@@ -56,5 +56,5 @@ export function useEditorSaveRegistration(
       holdAutosave: () => latest.current.holdAutosave(),
       whenSaveSettled: () => latest.current.whenSaveSettled?.() ?? Promise.resolve()
     })
-  }, [panelId])
+  }, [panelId, latest])
 }

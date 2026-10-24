@@ -29,6 +29,7 @@ import { showGlobalToast } from '../components/Toast/toastService'
 import { logger } from '../utils/logger'
 import { recordTreeReadMs } from '../utils/treeReadTiming'
 import { noteProjectGeneration } from '../services/projectGeneration'
+import { useLatestRef } from './useLatestRef'
 import { confinementCodeFromMessage } from '../../../shared/ipc/confinement'
 import {
   createCoalescingRunner,
@@ -181,6 +182,7 @@ export function useProjectManagement(
   // Now shows welcome screen with recent projects instead of auto-loading.
   // Crash recovery relies on this: never reopen the last project here (#60).
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- kept as a mount effect so the first paint still reports loading, as consumers expect; starting at false would change that frame
     setLoading(false)
   }, [])
 
@@ -465,6 +467,9 @@ export function useProjectManagement(
       }
     }
   }
+  // runRefreshRead is rebuilt every render; refreshFiles reaches it through a
+  // ref so its own identity (which consumers depend on) stays stable.
+  const runRefreshReadRef = useLatestRef(runRefreshRead)
 
   /**
    * Refresh the file tree
@@ -490,13 +495,13 @@ export function useProjectManagement(
       // Defensive: a non-null project path is only ever set by beginRefreshScope,
       // which installs a runner, so this fallback does not run today.
       const runner = (refreshRunnerRef.current ??= createCoalescingRunner<void>())
-      await runner.run((info) => runRefreshRead(generation, info))
+      await runner.run((info) => runRefreshReadRef.current(generation, info))
     } catch {
       // Contract backstop: refreshFiles never rejects, whatever the task did
       // (a throwing logger or setter included). Errors are logged in the task.
     }
-    // runRefreshRead reads only refs, stable setters and api.file.
-  }, [projectPath, api.file])
+    // api.file is used only inside runRefreshRead, which the ref keeps current.
+  }, [projectPath, runRefreshReadRef])
 
   return {
     projectPath,

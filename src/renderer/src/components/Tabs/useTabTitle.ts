@@ -70,6 +70,7 @@ export function useTabTitle(api: TabTitleSource | undefined, fallbackName: strin
   useEffect(() => {
     // Re-seeded on every api change: a panel that set its title before this tab
     // mounted would otherwise never fire the event we are waiting for.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the re-seed on subscribe is deliberate (see above); the title lives in dockview, not React
     setTitle(api?.title ?? '')
 
     if (!api?.onDidTitleChange) return

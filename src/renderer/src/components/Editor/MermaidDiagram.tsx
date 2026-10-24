@@ -12,6 +12,7 @@ import { useTerminalPortalOptional } from '../../context/TerminalPortalContext'
 import { scheduleScrollIfNeeded } from '../../utils/promptScrollScheduler.logic'
 import { logger } from '../../utils/logger'
 import { useIdleDebouncedValue } from '../../hooks/useIdleDebouncedValue'
+import { useLatestRef } from '../../hooks/useLatestRef'
 import { PreviewWorkContext } from './previewWork'
 
 /**
@@ -170,14 +171,19 @@ export function MermaidDiagram({
   useEffect(() => {
     const config = getMermaidConfig(true) // isDarkMode param ignored, uses ACTIVE_THEME
     mermaid.initialize(config)
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the flag records that the external mermaid.initialize() call above has run; the draw effect below must wait for it
     setInitialized(true)
   }, [])
 
   // Render diagram whenever code changes
+  // The line range only labels the 'mermaid:rendered' event: read it through a
+  // ref so a range shift (an edit above the diagram) does not redraw it.
+  const lineRangeRef = useLatestRef({ startLine, endLine })
   useEffect(() => {
     if (!initialized || !containerRef.current) {
       return
     }
+    const { startLine: drawStartLine, endLine: drawEndLine } = lineRangeRef.current
 
     const token = ++drawTokenRef.current
     const isCurrent = (): boolean => token === drawTokenRef.current
@@ -225,7 +231,7 @@ export function MermaidDiagram({
         if (target) {
           const event = new CustomEvent('mermaid:rendered', {
             bubbles: true,
-            detail: { startLine, endLine, ok: true }
+            detail: { startLine: drawStartLine, endLine: drawEndLine, ok: true }
           })
           target.dispatchEvent(event)
         }
@@ -247,7 +253,7 @@ export function MermaidDiagram({
         if (containerRef.current) {
           const event = new CustomEvent('mermaid:rendered', {
             bubbles: true,
-            detail: { startLine, endLine, ok: false }
+            detail: { startLine: drawStartLine, endLine: drawEndLine, ok: false }
           })
           containerRef.current.dispatchEvent(event)
         }
@@ -255,7 +261,7 @@ export function MermaidDiagram({
     }
 
     renderDiagram()
-  }, [code, initialized])
+  }, [code, initialized, lineRangeRef])
 
   const handleExpandClick = () => {
     if (svgContent && filePath) {

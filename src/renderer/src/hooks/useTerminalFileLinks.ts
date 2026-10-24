@@ -250,6 +250,11 @@ export function useTerminalFileLinks(
   }, [terminalId, terminalReady, terminalRef])
 
   // Get terminal from ref (will be null until terminal is created)
+  // Read during render on purpose, and the reason for the block disable that
+  // runs to the end of this hook: the caller owns the instance in a ref, and
+  // `terminalReady` re-renders this hook when it appears. Mirroring it into
+  // state instead loops for a caller that passes a fresh ref object each render.
+  /* eslint-disable react-hooks/refs -- the terminal instance is read from the caller's ref during render; see above */
   const terminal = terminalRef.current
 
   // Use filename index for smart resolution
@@ -588,6 +593,7 @@ export function useTerminalFileLinks(
         }
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- terminalReady is the signal that `terminal` (read from a ref) has changed; the memo must recompute on it
   }, [
     terminal,
     terminalReady,
@@ -624,4 +630,5 @@ export function useTerminalFileLinks(
     linkProvider,
     isReady: !!linkProvider
   }
+  /* eslint-enable react-hooks/refs */
 }

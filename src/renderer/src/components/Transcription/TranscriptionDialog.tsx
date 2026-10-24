@@ -137,6 +137,7 @@ export function TranscriptionDialog(): JSX.Element | null {
   // Initialize language selection from last used language when dialog opens
   useEffect(() => {
     if (isDialogOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- seeds an editable choice from the store each time the dialog opens or its file changes; the user can then change it, so it cannot be derived
       setSelectedLanguage(lastLanguage)
     }
   }, [isDialogOpen, filePath, lastLanguage])

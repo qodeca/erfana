@@ -99,10 +99,14 @@ export function ChatBubble({
   const [isExpanded, setIsExpanded] = useState(false)
   const [message, setMessage] = useState('')
   const [showTooltip, setShowTooltip] = useState(false)
-  const [textareaContextMenu, setTextareaContextMenu] = useState<{ x: number; y: number } | null>(null)
+  const [textareaContextMenu, setTextareaContextMenu] = useState<{
+    x: number
+    y: number
+    hasSelection: boolean
+  } | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
-  const terminalContainerRef = useRef<HTMLDivElement>(null)
+  const terminalContainerRef = useRef<HTMLDivElement | null>(null)
 
   // Resize state
   const isResizing = useRef(false)
@@ -342,18 +346,28 @@ export function ChatBubble({
     setIsExpanded(true)
   }
 
+  // Read when the menu opens, not during render: the selection lives in the
+  // DOM, and the menu takes focus, so it cannot change while the menu is open.
+  const hasTextSelection = useCallback(() => {
+    if (!textareaRef.current) return false
+    const textarea = textareaRef.current
+    return textarea.selectionStart !== textarea.selectionEnd
+  }, [])
+
   // Context menu handlers for textarea copy/paste (issue #37)
   const handleTextareaContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
     // The Windows Menu-key echo of a menu the keyboard already opened (#90).
     if (isKeyboardMenuEcho()) return
-    setTextareaContextMenu({ x: e.clientX, y: e.clientY })
-  }, [])
+    setTextareaContextMenu({ x: e.clientX, y: e.clientY, hasSelection: hasTextSelection() })
+  }, [hasTextSelection])
 
   // Shift+F10 / the Menu key open the same menu under the field (#90).
   const handleTextareaMenuKey = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    openMenuFromKey(e, setTextareaContextMenu)
-  }, [])
+    openMenuFromKey(e, (anchor) =>
+      setTextareaContextMenu({ ...anchor, hasSelection: hasTextSelection() })
+    )
+  }, [hasTextSelection])
 
   const handleCloseTextareaContextMenu = useCallback(() => {
     setTextareaContextMenu(null)
@@ -391,11 +405,21 @@ export function ChatBubble({
     [handleSubmit]
   )
 
-  const hasTextSelection = useCallback(() => {
-    if (!textareaRef.current) return false
-    const textarea = textareaRef.current
-    return textarea.selectionStart !== textarea.selectionEnd
-  }, [])
+  // The terminal portal target is shared with the portal context, which moves
+  // the live terminal into it. Re-created only when the context's ref object
+  // changes; React then detaches the old ref (null) and attaches the new one.
+  const diagramViewerContainerRef = portalContext?.diagramViewerContainerRef
+  /* eslint-disable react-hooks/immutability -- the portal context hands out a mutable ref object to be filled with this element; writing it from a ref callback is its intended use, the compiler just cannot see a context value is a ref */
+  const setTerminalContainer = useCallback(
+    (el: HTMLDivElement | null) => {
+      terminalContainerRef.current = el
+      if (diagramViewerContainerRef) {
+        ;(diagramViewerContainerRef as React.MutableRefObject<HTMLDivElement | null>).current = el
+      }
+    },
+    [diagramViewerContainerRef]
+  )
+  /* eslint-enable react-hooks/immutability */
 
   // Note: Panel closes via click-outside or Escape key (no header close button - issue #37)
 
@@ -548,14 +572,7 @@ export function ChatBubble({
           <div className="chat-panel-body">
             {/* Terminal container - portal target (context menu handled by TerminalPanel) */}
             <div
-              ref={(el) => {
-                // Store ref locally
-                (terminalContainerRef as React.MutableRefObject<HTMLDivElement | null>).current = el
-                // Also set the portal context ref
-                if (portalContext?.diagramViewerContainerRef) {
-                  (portalContext.diagramViewerContainerRef as React.MutableRefObject<HTMLDivElement | null>).current = el
-                }
-              }}
+              ref={setTerminalContainer}
               className="chat-terminal-container"
             />
 
@@ -643,7 +660,7 @@ export function ChatBubble({
         <TextareaContextMenu
           x={textareaContextMenu.x}
           y={textareaContextMenu.y}
-          hasSelection={hasTextSelection()}
+          hasSelection={textareaContextMenu.hasSelection}
           onCut={handleCutText}
           onCopy={handleCopyText}
           onPaste={handlePasteText}

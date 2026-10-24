@@ -114,6 +114,7 @@ export function ImageViewerPanel(props: IDockviewPanelProps<ImageViewerPanelPara
   const [isVisible, setIsVisible] = useState<boolean>(api?.isVisible ?? true)
   useEffect(() => {
     if (!api?.onDidVisibilityChange) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- re-reads the external dockview flag when a new api arrives, so no change between render and subscribe is missed
     setIsVisible(api.isVisible ?? true)
     const disposable = api.onDidVisibilityChange((event) => setIsVisible(event.isVisible))
     return () => disposable.dispose()

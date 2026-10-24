@@ -141,6 +141,7 @@ export function PromptDialog({ config, zIndex, onSubmit, onCancel }: PromptDialo
   // Validate default value on mount if provided
   useEffect(() => {
     if (defaultValue && defaultValue.trim().length > 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- the error is editable state (typing clears it), so it cannot be derived; this only seeds it from the default value
       validateInput(defaultValue)
     }
   }, [defaultValue, validateInput])
