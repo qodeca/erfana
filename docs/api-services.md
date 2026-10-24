@@ -158,7 +158,7 @@ in [File Watching § Single-file watch internals](./file-watching/README.md#sing
 
 ## DirectoryWatcherService
 
-**File:** `src/main/services/DirectoryWatcherService.ts`
+**File:** `src/main/services/DirectoryWatcherService.ts` – the public lifecycle (watch, unwatch, stop, dispose, stats). The class extends three layers in `src/main/services/watcher/` (lens review finding [65]): `DirectoryWatcherCore.ts` (shared state, the path drop rules, backend choice, notices to windows), `DirectoryWatcherRecovery.ts` (error classification, EMFILE teardown, restart back-off) and `DirectoryWatcherEvents.ts` (the event pipeline and the pause API). Helpers beside them: `directoryWatchBuilders.ts` (builds the chokidar or native watcher), `DirectoryWatchListeners.ts` (removal and coverage listeners), `WatcherHealthLogger.ts` (the 120 s health line), `watchErrorTypes.ts` and `directoryWatchTypes.ts`. The test suites reach into the layers' `protected` members by name (`watchedDirectories`, `switchVersion`, `queueEvent`, `processEvents`, `pendingRestarts`, `restartAttempts`, `handleWatcherError`, `scheduleRestart`, `restartWatcher`, …), so keep those names when you move code.
 
 Watches directory tree for changes with auto-refresh and pause/resume pattern.
 
