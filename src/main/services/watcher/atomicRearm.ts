@@ -94,12 +94,20 @@ export async function resolveDeletedWatch(
   // deleted. Re-arming on it would hold a handle on it and end in a misleading
   // "outside the project" error when the confinement check cannot resolve it
   // either (#252).
-  if (wasAtomicSave || (await isPresentAfterSettle(filePath))) {
+  const present = wasAtomicSave || (await isPresentAfterSettle(filePath))
+
+  // That check can wait (a second look on Windows), and the path may be watched
+  // again by the time it answers - the same project closed and reopened, the
+  // tab restored. The newer watch gets neither this one's verdict nor its
+  // teardown: the re-arm branch reports a session change by path, which would
+  // reach the newer watch's windows and make them forget a watch main still
+  // holds (#346 review).
+  if (deps.isDisposing() || deps.getWatch(filePath) !== watched) return
+
+  if (present) {
     await rearmWatch(watched, deps)
     return
   }
-
-  if (deps.isDisposing() || deps.getWatch(filePath) !== watched) return
 
   deps.log(`🗑️  File deleted externally: ${filePath}`)
   deps.notifyDeleted(filePath)
