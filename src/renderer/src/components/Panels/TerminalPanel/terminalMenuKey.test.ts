@@ -55,7 +55,8 @@ describe('terminalCursorAnchor', () => {
   it('follows the cursor row on screen when the viewport is scrolled back', () => {
     // Cursor at buffer row 100 + 3; the viewport shows rows from 90, so it sits on screen row 13
     const anchor = terminalCursorAnchor(source(terminalAt(panel, screen), { x: 0, y: 3 }, { baseY: 100, viewportY: 90 }))
-    expect(anchor).toEqual({ x: 108, y: 204 + 14 * 16 })
+    // Column 0 stays on the screen's left edge, inside the panel: not pushed right
+    expect(anchor).toEqual({ x: 104, y: 204 + 14 * 16 })
   })
 
   it('keeps a cursor scrolled out of view inside the panel', () => {

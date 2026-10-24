@@ -243,7 +243,7 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
     claudeNudgeTimerRef.current = setTimeout(() => {
       claudeNudgeTimerRef.current = null
       // Asked first: tests and non-Electron renders have no bridge (#352)
-      if (hasBridgeMethod('claudeStatus', 'nudge')) advisory(claudeStatusGateway.nudge(id))
+      if (hasBridgeMethod('claudeStatus', 'nudge')) advisory(() => claudeStatusGateway.nudge(id))
     }, CLAUDE_NUDGE_DEBOUNCE_MS)
   }, [])
 
@@ -320,7 +320,7 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
       shellKindRef.current = null
       useTerminalStore.getState().setActiveTerminal(null)
       if (id) {
-        if (hasBridgeMethod('claudeStatus', 'unregister')) advisory(claudeStatusGateway.unregister(id))
+        if (hasBridgeMethod('claudeStatus', 'unregister')) advisory(() => claudeStatusGateway.unregister(id))
         // Prune the slice, or the map keeps a stale entry per closed terminal
         useClaudeStatusStore.getState().clearTerminal(id)
       }
@@ -529,7 +529,7 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
       // Kept with the id so a screenshot path-paste quotes for this shell (#164)
       shellKindRef.current = result.shellKind ?? null
       useTerminalStore.getState().setActiveTerminal({ id, shellKind: result.shellKind ?? null })
-      if (hasBridgeMethod('claudeStatus', 'register')) advisory(claudeStatusGateway.register(id))
+      if (hasBridgeMethod('claudeStatus', 'register')) advisory(() => claudeStatusGateway.register(id))
       warmupUntilRef.current = Date.now() + WARMUP_MS
 
       inputDisposableRef.current = xterm.onData((data) => {
@@ -569,10 +569,15 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
 
 /**
  * Fire-and-forget a Claude-status call (#216): tracking is advisory, so a
- * rejection is logged, never left unhandled.
+ * throw or a rejection is logged, never let through to a start or teardown.
  */
-function advisory(call: Promise<unknown>): void {
-  Promise.resolve(call).catch((err: unknown) => logger.warn('Claude status call failed', errorFields(err)))
+function advisory(call: () => Promise<unknown>): void {
+  const logFailure = (err: unknown): void => logger.warn('Claude status call failed', errorFields(err))
+  try {
+    Promise.resolve(call()).catch(logFailure)
+  } catch (err) {
+    logFailure(err)
+  }
 }
 
 /** Log fields for an unknown thrown value */
