@@ -315,10 +315,9 @@ class WhisperModelManager implements IWhisperModelManager {
    * is current. Any deviation returns `false`, which makes `ensureBinary()`
    * treat the bin/ dir as unverified and re-download.
    *
-   * Cost: reads ~3.25 MB on win32 (main + 4 DLLs) or ~6.4 MB on macOS
-   * (static universal binary) through a streaming SHA-256 pipe once per
-   * session. Tens of milliseconds on modern hardware — acceptable for
-   * startup.
+   * Cost: streams ~3.25 MB (win32: main + 4 DLLs) or ~6.4 MB (macOS: static
+   * binary) through SHA-256 once per session. Tens of milliseconds on modern
+   * hardware — acceptable for startup.
    */
   async isBinaryInstalled(): Promise<boolean> {
     const spec = this.safeSpec()
