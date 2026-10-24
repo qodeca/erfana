@@ -60,7 +60,10 @@ export interface AtomicRearmDeps {
    * @returns false when the entry is gone, so the new watcher is orphaned
    */
   replaceWatcher(filePath: string, watcher: FSWatcher): boolean
-  /** Cancel pending work for the watch, close it and drop the map entry. */
+  /**
+   * Cancel pending work for the watch, close it and drop the map entry - only
+   * while the map still holds this entry; a newer watch on the path stays.
+   */
   discardWatch(filePath: string, watched: RearmableWatch): void
   notifyDeleted(filePath: string): void
   notifyWatchDead(filePath: string, reason: string): void
@@ -86,10 +89,11 @@ export async function resolveDeletedWatch(
   // One final existence check even when the detector said "gone": a slow
   // temp-then-rename can land between its check and this callback, and a false
   // "file deleted" banner over a file that exists is worse than a late refresh
-  // (issue #70, H-4a). An unreadable file is asked about once more; one still
-  // unreadable is gone. Re-arming on it instead would hold a handle on a file
-  // Windows is deleting, and end in a misleading "outside the project" error
-  // when the confinement check cannot resolve it either (#252).
+  // (issue #70, H-4a). An unreadable file counts as there, except a Windows
+  // EPERM or EBUSY that persists past a second look: that file is being
+  // deleted. Re-arming on it would hold a handle on it and end in a misleading
+  // "outside the project" error when the confinement check cannot resolve it
+  // either (#252).
   if (wasAtomicSave || (await isPresentAfterSettle(filePath))) {
     await rearmWatch(watched, deps)
     return
@@ -128,8 +132,8 @@ async function rearmWatch(watched: RearmableWatch, deps: AtomicRearmDeps): Promi
   // project. `watchFile`'s entry check was lexical and ran before that write,
   // which is a TOCTOU window this re-check closes (issue #70, security).
   if (!(await deps.isPathConfined(filePath))) {
-    // A file that went away (or became unreadable) meanwhile cannot be
-    // resolved either: that is a delete, not an escape from the project (#252)
+    // A file that went away meanwhile (or, on Windows, is being deleted) cannot
+    // be resolved either: that is a delete, not an escape from the project (#252)
     const stillThere = await isPresentAfterSettle(filePath)
     if (deps.isDisposing() || deps.getWatch(filePath) !== watched) return
     if (stillThere) {
@@ -168,16 +172,20 @@ async function rearmWatch(watched: RearmableWatch, deps: AtomicRearmDeps): Promi
   // TOCTOU: the path can vanish between the detector's existence check and
   // chokidar.watch(). Without this the entry would hold a MAX_WATCHED_FILES
   // slot forever, watching nothing (issue #70, L-3).
-  if (!(await isPresentAfterSettle(filePath))) {
-    deps.notifyDeleted(filePath)
-    deps.discardWatch(filePath, watched)
+  const stillThere = await isPresentAfterSettle(filePath)
+
+  // The watch may have been torn down while the stat was in flight; the new
+  // watcher would then be orphaned. The path may even be watched again by now
+  // (a reopened tab, a restore, the same project reopened): that newer watch
+  // gets neither this one's verdict nor its teardown (#252 review).
+  if (deps.isDisposing() || deps.getWatch(filePath) !== watched) {
+    await closeQuietly(watcher)
     return
   }
 
-  // The watch may have been torn down while the stat was in flight; the new
-  // watcher would then be orphaned.
-  if (deps.isDisposing() || deps.getWatch(filePath) !== watched) {
-    await closeQuietly(watcher)
+  if (!stillThere) {
+    deps.notifyDeleted(filePath)
+    deps.discardWatch(filePath, watched)
     return
   }
 

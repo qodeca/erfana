@@ -119,6 +119,7 @@ const OWNER = 1
 const webContents = { id: OWNER } as unknown as WebContents
 /** Long enough for every flush, debounce, atomic-save window and re-check to finish. */
 const SETTLE_MS = 10_000
+const HOST_PLATFORM = process.platform
 
 const pad = (n: number, width: number): string => String(n).padStart(width, '0')
 const sub = (s: number): string => path.join(BIG, `sub${pad(s, 2)}`)
@@ -205,10 +206,16 @@ describe('a 1200-file folder delete with three tabs open inside it', () => {
 
   it('outside the app on Windows, with the tabs’ files still being deleted (EPERM to stat and realpath)', async () => {
     for (const open of OPEN) harness.disk.set(open, 'EPERM')
-
-    emitBigRemoval()
-    fireOwnUnlinks()
-    await vi.advanceTimersByTimeAsync(SETTLE_MS)
+    // Only the delete-pending rule reads the platform per event; the watchers
+    // were built for the host in beforeEach
+    Object.defineProperty(process, 'platform', { value: 'win32', configurable: true })
+    try {
+      emitBigRemoval()
+      fireOwnUnlinks()
+      await vi.advanceTimersByTimeAsync(SETTLE_MS)
+    } finally {
+      Object.defineProperty(process, 'platform', { value: HOST_PLATFORM, configurable: true })
+    }
 
     expectBoundedBurst()
   })

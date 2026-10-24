@@ -9,37 +9,53 @@
  *
  * - `present` - it succeeded;
  * - `missing` - ENOENT, or ENOTDIR when a folder on the way is now a file;
- * - `unreadable` - any other failure: a file Windows has locked for a moment
- *   (EBUSY), one we may not look at (EPERM, EACCES), a drive that failed (EIO).
+ * - `unreadable` - any other failure: a file locked for a moment (EBUSY), one
+ *   we may not look at (EPERM, EACCES), a drive that failed (EIO).
  *
- * Which way `unreadable` falls depends on the caller. The unseen-file probe
- * only polls, so for it an unreadable file is still there: a false banner is
- * worse than a late one. The unlink branch has just heard the file go away, so
- * it asks once more after a short wait and then takes a still-unreadable file
- * as gone: on Windows that is the usual sign of a file deleted while another
- * process held it open (delete pending), and keeping a watch on it would keep
- * its folder from being deleted at all.
+ * An unreadable file counts as present: a false banner is worse than a late
+ * one. There is one exception, in the unlink branch only
+ * ({@link isPresentAfterSettle}). On Windows a file deleted while another
+ * process holds it open answers EPERM or EBUSY until the last handle closes
+ * (delete pending). Just after an unlink, such a file is asked once more after
+ * a short wait and, if it answers the same way, taken as gone: keeping a watch
+ * on it would keep its folder from being deleted at all. On other platforms,
+ * and for every other code, an unreadable file stays present.
  */
 import { stat } from 'fs/promises'
 
 /** Errors that mean the path is gone, rather than unreadable for now. */
 const MISSING_CODES: ReadonlySet<string> = new Set(['ENOENT', 'ENOTDIR'])
 
-/** How long the unlink branch waits before asking again about an unreadable path. */
+/** What a Windows file answers while it is deleted under another process's open handle. */
+const DELETE_PENDING_CODES: ReadonlySet<string> = new Set(['EPERM', 'EBUSY'])
+
+/** How long the unlink branch waits before asking again about a possible delete pending. */
 export const UNREADABLE_RECHECK_MS = 250
 
 /** What one `stat` says about a path. */
 export type PathPresence = 'present' | 'missing' | 'unreadable'
 
-/** One `stat`, classified. Never throws. */
-export async function probePath(filePath: string): Promise<PathPresence> {
+/** One `stat`'s outcome, with the errno code when it failed. */
+interface StatOutcome {
+  presence: PathPresence
+  code?: string
+}
+
+/** One `stat`, classified, keeping the code. Never throws. */
+async function statPath(filePath: string): Promise<StatOutcome> {
   try {
     await stat(filePath)
-    return 'present'
+    return { presence: 'present' }
   } catch (error) {
     const code = (error as NodeJS.ErrnoException | null)?.code
-    return typeof code === 'string' && MISSING_CODES.has(code) ? 'missing' : 'unreadable'
+    if (typeof code !== 'string') return { presence: 'unreadable' }
+    return { presence: MISSING_CODES.has(code) ? 'missing' : 'unreadable', code }
   }
+}
+
+/** One `stat`, classified. Never throws. */
+export async function probePath(filePath: string): Promise<PathPresence> {
+  return (await statPath(filePath)).presence
 }
 
 /** True unless `stat` says the path is gone: an unreadable path counts as present. Never throws. */
@@ -47,14 +63,22 @@ export async function pathIsPresent(filePath: string): Promise<boolean> {
   return (await probePath(filePath)) !== 'missing'
 }
 
+/** Could this answer be a Windows delete pending? The platform is read per call, so tests can play either host. */
+function mayBeDeletePending(outcome: StatOutcome): boolean {
+  return process.platform === 'win32' && outcome.code !== undefined && DELETE_PENDING_CODES.has(outcome.code)
+}
+
 /**
- * For the unlink branch: true when the path is there, asking once more after
- * {@link UNREADABLE_RECHECK_MS} when it is unreadable, and false when it is
- * missing or still unreadable. Never throws.
+ * For the unlink branch: is the file there? The same answer as
+ * {@link pathIsPresent}, except for a possible Windows delete pending (EPERM or
+ * EBUSY on win32). That file is asked once more after
+ * {@link UNREADABLE_RECHECK_MS}, and is gone if it answers the same way again.
+ * Never throws.
  */
 export async function isPresentAfterSettle(filePath: string): Promise<boolean> {
-  const first = await probePath(filePath)
-  if (first !== 'unreadable') return first === 'present'
+  const first = await statPath(filePath)
+  if (!mayBeDeletePending(first)) return first.presence !== 'missing'
   await new Promise(resolve => setTimeout(resolve, UNREADABLE_RECHECK_MS))
-  return (await probePath(filePath)) === 'present'
+  const second = await statPath(filePath)
+  return second.presence !== 'missing' && !mayBeDeletePending(second)
 }

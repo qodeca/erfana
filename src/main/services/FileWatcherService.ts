@@ -342,10 +342,7 @@ export class FileWatcherService {
    */
   private cancelPendingWork(filePath: string, watched: RearmableWatch): void {
     this.atomicSaveDetector.cancelPending(filePath)
-    if (watched.debounceTimer) {
-      clearTimeout(watched.debounceTimer)
-      watched.debounceTimer = null
-    }
+    clearDebounce(watched)
   }
 
   /**
@@ -481,8 +478,15 @@ export class FileWatcherService {
    * nobody left to await the close
    */
   private discardWatch(filePath: string, watched: RearmableWatch): void {
-    this.cancelPendingWork(filePath, watched)
     void watched.watcher.close().catch(() => {})
+    // A newer watch may own the path by now (it was reopened while this one's
+    // check awaited the disk): its entry and its pending check stay, and only
+    // this entry's own timer goes (#252 review)
+    if (this.watchedFiles.get(filePath) !== watched) {
+      clearDebounce(watched)
+      return
+    }
+    this.cancelPendingWork(filePath, watched)
     this.watchedFiles.delete(filePath)
     this.unseenProbe.pathChanged(filePath)
   }
@@ -562,6 +566,14 @@ export class FileWatcherService {
       }
     }
     this.watchedFiles.clear()
+  }
+}
+
+/** Stop a watch's pending change notification, if it has one */
+function clearDebounce(watched: RearmableWatch): void {
+  if (watched.debounceTimer) {
+    clearTimeout(watched.debounceTimer)
+    watched.debounceTimer = null
   }
 }
 
