@@ -215,7 +215,7 @@ export function useProjectManagement(
         try {
           setLoading(true)
           const treeLoadStart = performance.now()
-          const fileTree = await api.file.readDirectory({ dirPath: newPath })
+          const fileTree = await api.file.readDirectory({ dirPath: newPath, generation: data.generation })
           const treeLoadDuration = Math.round(performance.now() - treeLoadStart)
           if (generation !== refreshGenerationRef.current) {
             // A newer switch or close superseded this load: no tree, no toast.

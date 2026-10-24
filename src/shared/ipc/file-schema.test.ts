@@ -106,6 +106,15 @@ describe('file request schemas', () => {
     expect(args.safeParse([{ filePath: 'p' }, 'second']).success).toBe(false)
   })
 
+  describe('ReadDirectoryRequestSchema', () => {
+    it('takes an optional integer generation and refuses anything else', () => {
+      expect(ReadDirectoryRequestSchema.safeParse({ dirPath: 'p', generation: 3 }).success).toBe(true)
+      expect(ReadDirectoryRequestSchema.safeParse({ dirPath: 'p', generation: undefined }).success).toBe(true)
+      expect(ReadDirectoryRequestSchema.safeParse({ dirPath: 'p', generation: '3' }).success).toBe(false)
+      expect(ReadDirectoryRequestSchema.safeParse({ dirPath: 'p', generation: 1.5 }).success).toBe(false)
+    })
+  })
+
   describe('WriteFileRequestSchema', () => {
     const base = { filePath: 'p/a.md', content: '' }
 
