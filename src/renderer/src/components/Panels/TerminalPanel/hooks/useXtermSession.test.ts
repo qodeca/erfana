@@ -497,19 +497,118 @@ describe('useXtermSession failed starts, no double work (review e, g)', () => {
       await vi.waitFor(() => expect(window.api.terminal.create).toHaveBeenCalledTimes(1), { interval: 1, timeout: 40 })
       const fitAddon = vi.mocked(FitAddon).mock.results[0].value as { fit: ReturnType<typeof vi.fn> }
       expect(fitAddon.fit).not.toHaveBeenCalled()
+      // The fit timer is armed and waiting
+      expect(vi.getTimerCount()).toBe(1)
 
       await act(async () => {
         pendingCreates[0]({ success: false, error: 'spawn failed' })
         await first
       })
+
+      // Cleared, not merely harmless: the fit callback checks xtermRef itself,
+      // so "fit was not called" alone would hold with the timer left armed
+      expect(vi.getTimerCount()).toBe(0)
+      expect(hook.result.current.error).toBe('spawn failed')
       act(() => {
         vi.advanceTimersByTime(1000)
       })
-
-      expect(hook.result.current.error).toBe('spawn failed')
       expect(fitAddon.fit).not.toHaveBeenCalled()
     } finally {
       vi.useRealTimers()
     }
+  })
+})
+
+describe('useXtermSession teardown always kills the PTY (review 1, 3)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    instances.length = 0
+    pendingCreates.length = 0
+    pendingCreateRejects.length = 0
+    fontGate.held = false
+    fontGate.error = null
+    releaseFont = null
+    rejectFont = null
+    installApi()
+    useTerminalStore.setState({ activeTerminalId: null, activeShellKind: null, activityById: new Map(), userInputById: new Map() })
+    useClaudeStatusStore.getState().reset()
+  })
+
+  async function liveSession() {
+    const session = renderSession()
+    let first!: Promise<void>
+    act(() => {
+      first = session.hook.result.current.start()
+    })
+    await untilCreates(1)
+    await act(async () => {
+      answerCreate(0, 'pty-1')
+      await first
+    })
+    expect(session.hook.result.current.terminalId).toBe('pty-1')
+    return session
+  }
+
+  it('a throwing xterm.dispose() during teardown still sends the kill', async () => {
+    const { hook } = await liveSession()
+    instances[0].dispose.mockImplementation(() => {
+      throw new Error('dispose failed')
+    })
+
+    await act(async () => {
+      await hook.result.current.teardownTerminal({ resetState: true })
+    })
+
+    expect(window.api.terminal.kill).toHaveBeenCalledWith('pty-1')
+  })
+
+  it('a throw before the dispose still disposes the instance, then kills, and reaches the caller', async () => {
+    const { hook, options } = await liveSession()
+    vi.mocked(options.detachFileDrop).mockImplementation(() => {
+      throw new Error('detach failed')
+    })
+
+    let thrown: unknown = null
+    act(() => {
+      try {
+        void hook.result.current.teardownTerminal({ resetState: false })
+      } catch (err) {
+        thrown = err
+      }
+    })
+
+    expect((thrown as Error | null)?.message).toBe('detach failed')
+    expect(instances[0].dispose).toHaveBeenCalledTimes(1)
+    expect(options.xtermRef.current).toBeNull()
+    expect(window.api.terminal.kill).toHaveBeenCalledWith('pty-1')
+    // Disposed before the kill is sent
+    expect(instances[0].dispose.mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(window.api.terminal.kill).mock.invocationCallOrder[0]
+    )
+  })
+
+  it('a teardown before React commits the id does not get the killed id written back', async () => {
+    const { hook } = renderSession()
+    let first!: Promise<void>
+    act(() => {
+      first = hook.result.current.start()
+    })
+    await untilCreates(1)
+    // No act(): setTerminalId('pty-1') is not committed yet when the teardown runs
+    answerCreate(0, 'pty-1')
+    await first
+    await hook.result.current.teardownTerminal({ resetState: false })
+    expect(window.api.terminal.kill).toHaveBeenCalledWith('pty-1')
+
+    // Now React commits the id; nothing may copy it back into the ref
+    await act(async () => {})
+    expect(hook.result.current.terminalIdRef.current).toBeNull()
+
+    // So a second teardown has no id and sends no second kill
+    vi.mocked(window.api.terminal.kill).mockClear()
+    await act(async () => {
+      await hook.result.current.teardownTerminal({ resetState: false })
+    })
+    expect(window.api.terminal.kill).not.toHaveBeenCalled()
   })
 })
