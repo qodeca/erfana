@@ -30,3 +30,14 @@ export const PdfExportResponseSchema = z.object({
 })
 
 export type PdfExportResponse = z.infer<typeof PdfExportResponseSchema>
+
+/**
+ * Shared contract for the preload `pdf` bridge.
+ *
+ * Implemented by `window.api.pdf` (preload, `documentExportBridge.ts`) and
+ * consumed by the renderer document-export gateway.
+ */
+export interface PdfBridge {
+  /** Native save dialog, render in a hidden window, write the PDF. */
+  exportToPdf(request: PdfExportRequest): Promise<PdfExportResponse>
+}

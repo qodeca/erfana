@@ -3,6 +3,7 @@
 import { create } from 'zustand'
 import type { GlobalSettings, LoggingLevel } from '../../../shared/ipc/global-settings-schema'
 import type { TranscriptionBackend, WhisperModel } from '../../../shared/ipc/transcription-schema'
+import { globalSettingsGateway } from '../services/settingsGateway'
 
 /**
  * Helper type for setting section keys
@@ -53,7 +54,7 @@ export const useGlobalSettingsStore = create<GlobalSettingsState>((set, get) => 
 
     set({ isLoading: true, error: null })
     try {
-      const result = await window.api.globalSettings.get()
+      const result = await globalSettingsGateway.get()
       if (result.success && result.settings) {
         set({ settings: result.settings, isInitialized: true })
       } else {
@@ -100,7 +101,7 @@ export const useGlobalSettingsStore = create<GlobalSettingsState>((set, get) => 
   resetSettings: async () => {
     set({ isLoading: true })
     try {
-      const result = await window.api.globalSettings.reset()
+      const result = await globalSettingsGateway.reset()
       if (!result.success) {
         set({ error: result.error })
       }
@@ -144,7 +145,7 @@ export const useGlobalSettingsStore = create<GlobalSettingsState>((set, get) => 
     })
 
     try {
-      const result = await window.api.globalSettings.set(section, newSectionValue)
+      const result = await globalSettingsGateway.set(section, newSectionValue)
       if (!result.success) {
         // Rollback on failure
         set({ settings: previousSettings, error: result.error })

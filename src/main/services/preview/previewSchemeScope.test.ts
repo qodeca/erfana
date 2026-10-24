@@ -398,7 +398,11 @@ describe('previewSchemeScope – the scanner', () => {
 })
 
 describe('previewSchemeScope – src/main', () => {
-  it('scans the real production tree (no vacuous pass)', () => {
+  // The first case to read the whole src/main tree pays for it: 4.35 s of the
+  // default 5 s under coverage on an emulated-x64 Windows host, so load tipped
+  // it over. Budget only, same assertions – docs/windows/known-flakes.md, row
+  // "previewSchemeScope.test.ts (scans the real production tree)".
+  it('scans the real production tree (no vacuous pass)', { timeout: 20_000 }, () => {
     const files = mainSources().map(entry => entry.file)
     expect(files.length).toBeGreaterThan(100)
     expect(files).toEqual(expect.arrayContaining([HANDLER_FILE, FACTORY_FILE]))

@@ -29,6 +29,14 @@
  *   this hook is a no-op. Local dev without any of these env vars still
  *   gets the ad-hoc consistency re-sign.
  *
+ * Windows: no re-signing. Once electron-builder has edited the executable's
+ * resources and Authenticode-signed it, verifySignedWindowsBundle reads the
+ * fuse wire and the embedded asar integrity hash back from the SIGNED
+ * Erfana.exe and checks them against buildFuseConfig and app.asar on disk, so
+ * a signing step that dropped or changed either fails the build. (afterSign
+ * runs only when electron-builder actually signed; an unsigned `--dir` build
+ * is covered by the same checks in afterPack.)
+ *
  * Build lifecycle:
  *   afterPack (fuses.js) → electron-builder signing → afterSign (this) → DMG/ZIP
  */
@@ -36,7 +44,33 @@
 const { execFileSync } = require('child_process');
 const path = require('path');
 
+/**
+ * Verify the signed Windows executable still carries the pinned fuses and the
+ * asar integrity hash of the archive that ships.
+ *
+ * @param {object} context electron-builder afterSign context
+ * @param {object} [deps] injectable `fuses` (scripts/fuses.js exports),
+ *   `getCurrentFuseWire`, plus the readEmbeddedAsarIntegrity deps (tests)
+ * @returns {Promise<{exe: string, integrity: {algorithm: string, hash: string}}>}
+ */
+async function verifySignedWindowsBundle(context, deps = {}) {
+  const fuses = deps.fuses || require('./fuses.js');
+  const getCurrentFuseWire = deps.getCurrentFuseWire || require('@electron/fuses').getCurrentFuseWire;
+  const exe = path.join(context.appOutDir, `${context.packager.appInfo.productFilename}.exe`);
+  const archive = path.join(context.appOutDir, 'resources', 'app.asar');
+  const isTestBuild = process.env.ERFANA_TEST_BUILD === 'true';
+
+  fuses.assertFuseWireMatches(await getCurrentFuseWire(exe), fuses.buildFuseConfig('win32', { isTestBuild }));
+  const integrity = fuses.assertEmbeddedIntegrityMatches('win32', exe, archive, deps);
+  console.log(`✅ Signed ${path.basename(exe)}: fuse wire matches; asar integrity ${integrity.algorithm} ${integrity.hash} matches app.asar`);
+  return { exe, integrity };
+}
+
 module.exports = async function afterSign(context) {
+  if (context.electronPlatformName === 'win32') {
+    await verifySignedWindowsBundle(context);
+    return;
+  }
   if (context.electronPlatformName !== 'darwin') {
     return;
   }
@@ -85,3 +119,5 @@ module.exports = async function afterSign(context) {
 
   console.log('✅ App bundle re-signed and verified successfully');
 };
+
+module.exports.verifySignedWindowsBundle = verifySignedWindowsBundle;

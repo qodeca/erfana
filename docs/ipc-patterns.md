@@ -26,10 +26,54 @@ registerHandle('file:readFile', async (_event, request: unknown) => {
 A channel that takes arguments takes **one request object**, validated by a strict Zod schema (`z.strictObject`, in `src/shared/ipc/*-schema.ts`): a key the schema does not list is refused, not ignored, and positional arguments are refused. The `file:*` channels register through `registerConfinedHandle`, whose `schema` is `payloadArgs(SomeRequestSchema)` and whose `paths` name the request key that holds each path (`{ arg: 0, key: 'filePath', mode: 'project' }`).
 Never call `ipcMain.handle(...)` or `ipcMain.on(...)` yourself. `src/main/ipc/registry.ts` (`registerHandle` / `registerHandleOnce` / `registerOn` / `registerOnce`, paired with `unregisterHandle` / `unregisterOn`) is the **only** place a global handler is registered, and every listener it registers is gated on the app's own top-level renderer (`isTrustedAppSender`, `src/main/ipc/senderValidation.ts`) before the payload is seen – an untrusted `invoke` rejects, an untrusted `send` is dropped and logged by origin. Importing `ipcMain` anywhere else under `src/main/**` is an ESLint error (`no-restricted-imports` in `eslint.config.mjs`), so the gate cannot be skipped by forgetting it. Frame-scoped listeners (`webContents.ipc`, `webContents.mainFrame.ipc`) are deliberately outside the registry; they carry their own per-call token or frame check. Why an explicit entry point rather than a wrapped `ipcMain`: see the header of `registry.ts` and [Security § Sender-frame gating](./security.md#sender-frame-gating).
 
-**3. Call from renderer**:
+**3. Call from renderer**, through the bridge's gateway (see [Renderer gateways](#renderer-gateways)):
 ```typescript
 const content = await fileGateway.readFile({ filePath: '/path/to/file.md' })
 ```
+
+## Renderer gateways
+
+Renderer code does not read a bridge off `window.api` once the bridge has a gateway. Such a bridge has three parts, and the renderer sees only the last:
+
+1. a **contract** in `src/shared/ipc/*-schema.ts` – an interface such as `FileBridge`, one method per member, written once;
+2. a **preload module** `src/preload/<name>Bridge.ts` typed as that contract, which `src/preload/index.ts` only references; event subscriptions go through `src/preload/ipcSubscribe.ts`, whose unsubscribe returns nothing (`removeListener` returns `ipcRenderer` itself, which must not reach the page);
+3. a **gateway** in `src/renderer/src/services/`, typed as the same contract, that forwards every method and reads `window.api` on each call, so a test that replaces `window.api` is honoured.
+
+| `window.api.*` | Contract | Preload module | Renderer gateway |
+|----------------|----------|----------------|------------------|
+| `file` | `FileBridge` (`file-schema.ts`) | `fileBridge.ts` | `fileGateway` |
+| `terminal` | `TerminalBridge` (`terminal-schema.ts`) | `terminalBridge.ts` | `terminalGateway` |
+| `fileWatch` | `FileWatchBridge` (`file-watch-schema.ts`) | `fileWatchBridge.ts` | `fileWatchGateway` |
+| `directoryWatch` | `DirectoryWatchBridge` (`directory-watch-schema.ts`) | `directoryWatchBridge.ts` | `directoryWatchGateway` |
+| `git` | `GitBridge` (`git-schema.ts`) | `gitBridge.ts` | `gitGateway` (`gitGateway.ts`) |
+| `gitWatcher` | `GitWatcherBridge` (`git-watcher-schema.ts`) | `gitBridge.ts` | `gitWatcherGateway` (`gitGateway.ts`) |
+| `gitPolling` | `GitPollingBridge` (`git-watcher-schema.ts`) | `gitBridge.ts` | `gitPollingGateway` (`gitGateway.ts`) |
+| `settings` | `SettingsBridge` (`settings-schema.ts`) | `settingsBridge.ts` | `settingsGateway` (`settingsGateway.ts`) |
+| `globalSettings` | `GlobalSettingsBridge` (`global-settings-schema.ts`) | `settingsBridge.ts` | `globalSettingsGateway` (`settingsGateway.ts`) |
+| `logging` | `LoggingBridge` (`logging-schema.ts`) | `loggingBridge.ts` | `loggingGateway` – log through `utils/logger`, which also serves the overlay window |
+| `quit` | `QuitBridge` (`quit-schema.ts`) | `quitBridge.ts` | `quitGateway` |
+| `system` | `SystemBridge` (`system-schema.ts`) | `systemBridge.ts` | `systemGateway` |
+| `clipboard` | `ClipboardBridge` (`clipboard-schema.ts`) | `clipboardBridge.ts` | `clipboardGateway` – copy and paste through `services/textClipboard`, the transport-error chokepoint |
+| `testHooks` | `Api['testHooks']` – a value the preload reads from its launch arguments, no IPC | inline in `index.ts` | `testHooksGateway` |
+| `import` | `ImportBridge` (`import-schema.ts`) | `importBridge.ts` | `importGateway` |
+| `transcription` | `TranscriptionBridge` (`transcription-schema.ts`) | `transcriptionBridge.ts` | `transcriptionGateway` (`transcriptionGateway.ts`) |
+| `whisper` | `WhisperBridge` (`transcription-schema.ts`) | `transcriptionBridge.ts` | `whisperGateway` (`transcriptionGateway.ts`) |
+| `camera` | `CameraBridge` (`camera-schema.ts`) | `cameraBridge.ts` | `cameraGateway` |
+| `pdf` | `PdfBridge` (`pdf-schema.ts`) | `documentExportBridge.ts` | `pdfGateway` (`documentExportGateway.ts`) |
+| `docx` | `DocxBridge` (`docx-schema.ts`) | `documentExportBridge.ts` | `docxGateway` (`documentExportGateway.ts`) |
+| `imageExport` | `ImageExportBridge` (`image-export-schema.ts`) | `imageExportBridge.ts` (`imageExport.ts` is the hidden rasterize window's own preload) | `imageExportGateway` |
+| `browser` | `BrowserBridge` (`browser-schema.ts`) | `browserBridge.ts` | `browserGateway` |
+| `markdownImage` | `MarkdownImageBridge` (`markdown-image-schema.ts`) | `markdownImageBridge.ts` | `markdownImageGateway` |
+| `projectLock` | `ProjectLockBridge` (`project-lock-schema.ts`) | `projectLockBridge.ts` | none – no renderer caller |
+
+What holds it in place:
+
+- **Types.** `Window['api']` (`src/preload/index.d.ts`) is `Api` without the bridges that have a gateway, so a direct read does not type-check. `src/preload/apiContract.types.ts` proves each `Api` member is exactly its contract and that no `any` is in `Api`; `src/renderer/src/services/windowApi.types.ts` proves each gateway is exactly its contract. Both are compiled by `npm run typecheck`.
+- **Lint.** `no-restricted-syntax` in `eslint.config.mjs` (`GATEWAY_BRIDGES`) rejects a read of those bridges and the ways round the type: destructuring or aliasing `window.api`, computed access, a cast, `globalThis` / `self`. The gateways (`RENDERER_GATEWAY_FILES`) are exempt, and tests and their helper folders may install mocks on `window.api`. The rule's own cases are in `scripts/eslint-layer-rules.test.mjs`.
+- **Tests.** The wire of each bridge (channel, arguments, events and their unsubscribe) is pinned in `src/preload/__tests__/api-contract.test.ts` and `*-bridges.test.ts`, written out as strings because the channel names must not change; `src/renderer/src/services/gateways.test.ts` checks that every gateway forwards every method.
+- **A bridge that may be missing.** A caller that must also work where the bridge is not there asks `hasBridge(domain)` or `hasBridgeMethod(domain, method)` from `services/bridgePresence.ts` first and then calls the gateway: code that unit tests run without installing one, the crash screen (`RootErrorFallback` offers only the actions whose bridge method is there), and the logger, which also runs in the screenshot-overlay window where there is no `window.api`. That module answers yes or no only; it never hands out the bridge.
+
+Adding a bridge or a method: change the contract first, then the preload module and the gateway (the type checks fail until all three agree), add the wire to the bridge tests, and for a new bridge add its name to the `GatewayBridges` lists in `index.d.ts` and `windowApi.types.ts` and to `GATEWAY_BRIDGES` / `RENDERER_GATEWAY_FILES` in `eslint.config.mjs`.
 
 ## Invoke round-trip for terminal writes (v0.3.3)
 
@@ -72,15 +116,14 @@ registerHandle('terminal:write', (_event, { terminalId, data }) => {
 })
 ```
 
-**3. Preload exposes the invoke** (`src/preload/index.ts`):
+**3. Preload exposes the invoke** (`src/preload/terminalBridge.ts`, typed as `TerminalBridge`):
 ```typescript
-write: (terminalId: string, data: string): Promise<{ success: boolean; error?: string }> =>
-  ipcRenderer.invoke('terminal:write', { terminalId, data })
+write: (terminalId, data) => ipcRenderer.invoke(TERMINAL_CHANNELS.write, { terminalId, data })
 ```
 
-**4. Renderer awaits the round-trip** (for example `src/renderer/src/components/ProjectTree/switchHelpers.ts`, which `await`s the write before sending a follow-up signal):
+**4. Renderer awaits the round-trip** through `terminalGateway` (for example `src/renderer/src/components/ProjectTree/switchHelpers.ts`, which `await`s the write before sending a follow-up signal):
 ```typescript
-const result = await window.api.terminal.write(terminalId, text)
+const result = await terminalGateway.write(terminalId, text)
 if (!result.success) {
   // the PTY was gone or refused the write – result.error carries the reason
 }
@@ -94,10 +137,10 @@ if (!result.success) {
 
 ## Adding New IPC Channel
 
-1. Add to preload API with TypeScript types
+1. Add the method to the domain's bridge contract and preload module (see [Renderer gateways](#renderer-gateways)); a domain that has no gateway yet is still declared inline in `src/preload/index.ts`
 2. Create handler in appropriate `src/main/ipc/*-handlers.ts`, registered through `registry.ts` (never `ipcMain` directly)
 3. Register handler in `src/main/index.ts`
-4. Call from renderer component
+4. Forward it in the domain's gateway and call the gateway from the renderer
 
 ## Security Rules
 

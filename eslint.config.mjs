@@ -40,13 +40,38 @@ const MAIN_LAYER_PATTERNS = [
   layerPattern('preload', 'src/main')
 ]
 const GATEWAY_MESSAGE =
-  'Reach the file and terminal bridges through services/fileGateway and services/terminalGateway, not window.api.'
-// The type system already hides `file` / `terminal` from `window.api` (see
-// preload/index.d.ts); these selectors are the backstop for the ways round it.
+  'Reach the preload bridges through their gateway in services/ (fileGateway, gitGateway, …), not window.api.'
+// The bridges that have a gateway. The type system already hides them from
+// `window.api` (see preload/index.d.ts); these selectors are the backstop for
+// the ways round it.
+const GATEWAY_BRIDGES = [
+  'file',
+  'terminal',
+  'fileWatch',
+  'directoryWatch',
+  'git',
+  'gitWatcher',
+  'gitPolling',
+  'settings',
+  'globalSettings',
+  'logging',
+  'quit',
+  'system',
+  'clipboard',
+  'testHooks',
+  'import',
+  'transcription',
+  'whisper',
+  'camera',
+  'pdf',
+  'docx',
+  'imageExport',
+  'browser',
+  'markdownImage'
+]
 const RENDERER_GATEWAY_SELECTORS = [
   {
-    selector:
-      "MemberExpression[object.object.name='window'][object.property.name='api'][property.name=/^(file|terminal)$/]",
+    selector: `MemberExpression[object.object.name='window'][object.property.name='api'][property.name=/^(${GATEWAY_BRIDGES.join('|')})$/]`,
     message: GATEWAY_MESSAGE
   },
   {
@@ -99,10 +124,28 @@ const RENDERER_PATTERN_OWNERS = [
   'src/renderer/src/services/preview/OverlayGuardService.ts'
 ]
 
-// The only files that read the bridges off `window.api`
+// The only files that read the bridges off `window.api`: the gateways, and the
+// presence check that answers only whether a bridge is there
 const RENDERER_GATEWAY_FILES = [
   'src/renderer/src/services/fileGateway.ts',
-  'src/renderer/src/services/terminalGateway.ts'
+  'src/renderer/src/services/terminalGateway.ts',
+  'src/renderer/src/services/fileWatchGateway.ts',
+  'src/renderer/src/services/directoryWatchGateway.ts',
+  'src/renderer/src/services/gitGateway.ts',
+  'src/renderer/src/services/settingsGateway.ts',
+  'src/renderer/src/services/loggingGateway.ts',
+  'src/renderer/src/services/quitGateway.ts',
+  'src/renderer/src/services/systemGateway.ts',
+  'src/renderer/src/services/clipboardGateway.ts',
+  'src/renderer/src/services/testHooksGateway.ts',
+  'src/renderer/src/services/importGateway.ts',
+  'src/renderer/src/services/transcriptionGateway.ts',
+  'src/renderer/src/services/cameraGateway.ts',
+  'src/renderer/src/services/documentExportGateway.ts',
+  'src/renderer/src/services/imageExportGateway.ts',
+  'src/renderer/src/services/browserGateway.ts',
+  'src/renderer/src/services/markdownImageGateway.ts',
+  'src/renderer/src/services/bridgePresence.ts'
 ]
 
 // Selectors every renderer file obeys; the gateway selectors are added on top for non-test code.
@@ -708,7 +751,7 @@ export default [
   // matches: the shared families above, plus the gateway selectors where they
   // apply. A block that listed only one set would silently disable the other.
   //
-  // 5. Reading the file and terminal bridges off `window.api`. The renderer's
+  // 5. Reading a bridge that has a gateway off `window.api`. The renderer's
   //    `window.api` type already omits them; the gateway selectors catch the
   //    ways round the type. Tests may install mocks; the gateways read them.
   //

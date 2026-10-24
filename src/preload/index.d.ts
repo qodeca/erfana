@@ -3,6 +3,32 @@
 import type { Api } from './index'
 import type { LogEntry } from '../shared/ipc/logging-schema'
 
+/** The bridges the renderer reaches through a gateway in `services/`, never off `window.api`. */
+type GatewayBridges =
+  | 'file'
+  | 'terminal'
+  | 'fileWatch'
+  | 'directoryWatch'
+  | 'git'
+  | 'gitWatcher'
+  | 'gitPolling'
+  | 'settings'
+  | 'globalSettings'
+  | 'logging'
+  | 'quit'
+  | 'system'
+  | 'clipboard'
+  | 'testHooks'
+  | 'import'
+  | 'transcription'
+  | 'whisper'
+  | 'camera'
+  | 'pdf'
+  | 'docx'
+  | 'imageExport'
+  | 'browser'
+  | 'markdownImage'
+
 declare global {
   interface Window {
     electron: {
@@ -12,10 +38,11 @@ declare global {
     }
     /**
      * Derived from the preload object itself, so it cannot drift from it. The
-     * `file` and `terminal` bridges are left out on purpose: the renderer reaches
-     * them through `services/fileGateway` and `terminalGateway`.
+     * bridges that have a gateway are left out on purpose: the renderer reaches
+     * them through their gateway in `services/` (see docs/ipc-patterns.md §
+     * Renderer gateways).
      */
-    api: Omit<Api, 'file' | 'terminal'>
+    api: Omit<Api, GatewayBridges>
     /**
      * Area-select overlay API exposed only by the per-display overlay
      * BrowserWindows via `src/preload/screenshotOverlay.ts`. `undefined`

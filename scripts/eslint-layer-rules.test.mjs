@@ -124,18 +124,57 @@ describe('layer import rules', () => {
 })
 
 describe('renderer gateway rule', () => {
-  const GATEWAY = /services\/fileGateway and services\/terminalGateway/
+  const GATEWAY = /through their gateway in services\//
   const gatewayMessages = async (rel, code) =>
     (await lint(rel, code)).filter((m) => GATEWAY.test(m.message))
 
   const READ_FILE = 'export const f = () => window.api.file.readFile("a")'
   const READ_TERMINAL = 'export const t = () => window.api.terminal.kill("a")'
-  const READ_OTHER = 'export const g = () => window.api.git.status("a")'
+  const READ_OTHER = 'export const g = () => window.api.preview.reload("p")'
 
   it('flags a renderer read of window.api.file and window.api.terminal', async () => {
     expect(await gatewayMessages(RENDERER, READ_FILE)).toHaveLength(1)
     expect(await gatewayMessages(RENDERER, READ_TERMINAL)).toHaveLength(1)
     expect(await gatewayMessages(RENDERER, 'export const f = () => window.api?.file?.exists("a")')).toHaveLength(1)
+  })
+
+  it.each([
+    'export const f = () => window.api.fileWatch.start("a")',
+    'export const f = () => window.api.directoryWatch.pause("a")',
+    'export const f = () => window.api?.directoryWatch?.onDirectoryChanged?.(() => {})',
+    'export const f = () => window.api.git.getStatus("a")',
+    'export const f = () => window.api.gitWatcher.stop()',
+    'export const f = () => window.api.gitPolling.setEnabled(true)'
+  ])('flags the watcher and git bridges: %s', async (code) => {
+    expect(await gatewayMessages(RENDERER, code)).toHaveLength(1)
+  })
+
+  it.each([
+    'export const f = () => window.api.settings.getRecentProjects()',
+    'export const f = () => window.api.globalSettings.reset()',
+    'export const f = () => window.api.logging.getLevel()',
+    'export const f = () => window.api?.logging?.log',
+    'export const f = () => window.api.quit.sendQuitResponse(true)',
+    'export const f = () => window.api.system.relaunchApp()',
+    'export const f = () => window.api.clipboard.readText()',
+    'export const f = () => window.api?.testHooks?.enabled'
+  ])('flags the app bridges: %s', async (code) => {
+    expect(await gatewayMessages(RENDERER, code)).toHaveLength(1)
+  })
+
+  it.each([
+    'export const f = () => window.api.import.selectFile()',
+    'export const f = () => window.api?.import?.toolStatus',
+    'export const f = () => window.api.transcription.cancel()',
+    'export const f = () => window.api.whisper.listModels()',
+    'export const f = () => window.api.camera.save({})',
+    'export const f = () => window.api.pdf.exportToPdf({})',
+    'export const f = () => window.api.docx.exportToDocx({})',
+    'export const f = () => window.api.imageExport.run({})',
+    'export const f = () => window.api.browser.openFile("a")',
+    'export const f = () => window.api?.markdownImage?.read({})'
+  ])('flags the import, media and export bridges: %s', async (code) => {
+    expect(await gatewayMessages(RENDERER, code)).toHaveLength(1)
   })
 
   it.each([
@@ -168,7 +207,24 @@ describe('renderer gateway rule', () => {
 
   it.each([
     'src/renderer/src/services/fileGateway.ts',
-    'src/renderer/src/services/terminalGateway.ts'
+    'src/renderer/src/services/terminalGateway.ts',
+    'src/renderer/src/services/fileWatchGateway.ts',
+    'src/renderer/src/services/directoryWatchGateway.ts',
+    'src/renderer/src/services/gitGateway.ts',
+    'src/renderer/src/services/settingsGateway.ts',
+    'src/renderer/src/services/loggingGateway.ts',
+    'src/renderer/src/services/quitGateway.ts',
+    'src/renderer/src/services/systemGateway.ts',
+    'src/renderer/src/services/clipboardGateway.ts',
+    'src/renderer/src/services/testHooksGateway.ts',
+    'src/renderer/src/services/importGateway.ts',
+    'src/renderer/src/services/transcriptionGateway.ts',
+    'src/renderer/src/services/cameraGateway.ts',
+    'src/renderer/src/services/documentExportGateway.ts',
+    'src/renderer/src/services/imageExportGateway.ts',
+    'src/renderer/src/services/browserGateway.ts',
+    'src/renderer/src/services/markdownImageGateway.ts',
+    'src/renderer/src/services/bridgePresence.ts'
   ])('exempts %s from the gateway rule only', async (file) => {
     expect(await gatewayMessages(file, READ_FILE)).toHaveLength(0)
     const messages = await lint(file, 'export const b = (p) => p.split("/").pop()')

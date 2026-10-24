@@ -41,6 +41,8 @@ Contained files (flat inside the tarball):
 | `LICENSE.whisper-cpp` | 1,078 | `94f29bbed6a22c35b992c5c6ebf0e7c92f13b836b90f36f461c9cf2f0f1d010d` |
 | `NOTICE.md` | 723 | `bb67a07b76afd5c7e67f2ecea06cbc08c7e70031cf25569fdfd3d8585b7089b8` |
 
+**Known defect**: this `whisper-cli` is a shared build. It loads `@rpath/libwhisper.1.dylib` and five `libggml*` dylibs, none of which are in the tarball, so it cannot start on a user's Mac. The workflow now builds macOS statically and checks what the binary links (see [macOS build is static](../build/whisper-binaries.md#macos-build-is-static)); the next pin replaces this build.
+
 ### Windows x64
 
 | Field | Value |

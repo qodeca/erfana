@@ -16,6 +16,8 @@ import { TEST_IDS } from '../../constants/testids'
 import { HtmlPreviewSection } from './sections/HtmlPreviewSection'
 import { ImportToolsSection } from './sections/ImportToolsSection'
 import './SettingsOverlay.css'
+import { loggingGateway } from '../../services/loggingGateway'
+import { transcriptionGateway, whisperGateway } from '../../services/transcriptionGateway'
 
 // Small delay to ensure overlay is fully rendered before focusing
 const FOCUS_DELAY_MS = 10
@@ -150,7 +152,7 @@ export function SettingsOverlay() {
    */
   useEffect(() => {
     if (!isOpen) return
-    window.api.transcription.hasApiKey()
+    transcriptionGateway.hasApiKey()
       .then((result) => setHasApiKey(result))
       .catch(() => setHasApiKey(false))
   }, [isOpen])
@@ -160,7 +162,7 @@ export function SettingsOverlay() {
    */
   useEffect(() => {
     if (!isOpen) return
-    window.api.logging.getLogsDir()
+    loggingGateway.getLogsDir()
       .then((dir) => setLogsDir(dir))
       .catch(() => setLogsDir(''))
   }, [isOpen])
@@ -170,7 +172,7 @@ export function SettingsOverlay() {
    */
   useEffect(() => {
     if (!isOpen) return
-    window.api.whisper.listModels()
+    whisperGateway.listModels()
       .then((result) => {
         if (result.success && result.models) {
           const installed = result.models
@@ -187,7 +189,7 @@ export function SettingsOverlay() {
    */
   useEffect(() => {
     if (!isOpen) return undefined
-    const cleanup = window.api.whisper.onDownloadProgress((progress) => {
+    const cleanup = whisperGateway.onDownloadProgress((progress) => {
       setDownloadProgress(progress)
       const percent = Math.round(progress.percent)
       const now = Date.now()
@@ -216,7 +218,7 @@ export function SettingsOverlay() {
    */
   const handleOpenLogsFolder = useCallback(async () => {
     try {
-      const result = await window.api.logging.openLogsFolder()
+      const result = await loggingGateway.openLogsFolder()
       if (result) {
         logger.error('Failed to open logs folder', undefined, { reason: result })
       }
@@ -241,7 +243,7 @@ export function SettingsOverlay() {
     let outcome: 'ready' | 'cancelled' | 'failed' = 'failed'
     try {
       // Ensure binary is available before downloading the model
-      const binaryResult = await window.api.whisper.ensureBinary()
+      const binaryResult = await whisperGateway.ensureBinary()
       if (binaryResult.cancelled || (binaryResult.success && cancelRequested.current)) {
         outcome = 'cancelled'
         return
@@ -253,7 +255,7 @@ export function SettingsOverlay() {
         return
       }
 
-      const result = await window.api.whisper.ensureModel(model)
+      const result = await whisperGateway.ensureModel(model)
       if (result.success) {
         outcome = 'ready'
         setInstalledModels((prev) => prev.includes(model) ? prev : [...prev, model])
@@ -287,7 +289,7 @@ export function SettingsOverlay() {
    */
   const handleCancelDownload = useCallback(() => {
     cancelRequested.current = true
-    window.api.whisper.cancelDownload().catch((error: unknown) => {
+    whisperGateway.cancelDownload().catch((error: unknown) => {
       logger.warn('Failed to cancel whisper download', { error: String(error) })
     })
   }, [])
@@ -302,7 +304,7 @@ export function SettingsOverlay() {
       if (!value || value.length < 8) return
 
       try {
-        const result = await window.api.transcription.setApiKey(value)
+        const result = await transcriptionGateway.setApiKey(value)
         if (result.success) {
           setApiKeyError(null)
           setHasApiKey(true)
@@ -324,7 +326,7 @@ export function SettingsOverlay() {
    */
   const handleClearApiKey = useCallback(async () => {
     try {
-      const result = await window.api.transcription.clearApiKey()
+      const result = await transcriptionGateway.clearApiKey()
       if (result.success) {
         setHasApiKey(false)
       } else {

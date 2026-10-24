@@ -1,8 +1,8 @@
 # ASAR packaging
 
-**Last updated**: September 2026 (`asar: false` re-verified in `electron-builder.yml` at v0.20.0)
+**Last updated**: October 2026 (`asar` enabled with integrity enforcement for v0.22.0)
 
-This document explains why ASAR packaging is disabled and the implications.
+This document explains how the app is packed into `app.asar`, what stays outside it, how the build checks both halves, and what the integrity check does and does not protect.
 
 ---
 
@@ -10,106 +10,95 @@ This document explains why ASAR packaging is disabled and the implications.
 
 ```yaml
 # electron-builder.yml
-asar: false
-```
-
----
-
-## Why ASAR is disabled
-
-### Attempted configuration (failed)
-
-```yaml
-asar: true
+asar:
+  smartUnpack: false
 asarUnpack:
-  - node_modules/isomorphic-git/**
-  - node_modules/sha.js/**
-  - node_modules/call-bind-apply-helpers/**
-  # ... many more transitive dependencies
+  - node_modules/node-pty/build/Release/*.node
+  - node_modules/node-pty/build/Release/*.{dll,exe}
+  - node_modules/node-pty/build/Release/spawn-helper
+  - node_modules/node-pty/prebuilds/*/*.{node,dll,exe}
+  - node_modules/node-pty/prebuilds/*/spawn-helper
+  - node_modules/ffmpeg-static/ffmpeg
+  - node_modules/ffmpeg-static/ffmpeg.exe
+  - node_modules/ffprobe-static/bin/*/*/ffprobe
+  - node_modules/ffprobe-static/bin/*/*/ffprobe.exe
+  - node_modules/@llamaindex/liteparse-*/*.{node,dylib,dll,so}
 ```
 
-### Runtime error
+`scripts/fuses.js` flips `EnableEmbeddedAsarIntegrityValidation` and `OnlyLoadAppFromAsar` on, so the packaged app refuses to start when `app.asar` changes and never loads an `app/` folder instead.
 
-```
-Error: Cannot find module 'call-bind-apply-helpers'
-Require stack:
-- app.asar/node_modules/dunder-proto/get.js
-- app.asar/node_modules/es-object-atoms/RequireObjectCoercible.js
-[... deep dependency chain through isomorphic-git]
-```
-
-### Root cause
-
-1. `isomorphic-git` has deep transitive dependencies (15+ levels deep)
-2. Dependencies use dynamic `require()` statements
-3. ASAR can't resolve these dynamically required modules from inside the archive
-4. Even with `asarUnpack`, the dependency tree is too complex to unpack completely
-
-### Decision
-
-Disable ASAR entirely (`asar: false`) to allow direct file system access to all node_modules.
+The list is pinned in three places that must change together: `ASAR_OPTIONS` / `ASAR_UNPACK` in `scripts/fuses.js`, a binding test in `scripts/fuses.test.mjs` (required Unit-tests job), and `assertEffectiveAsarConfig` in `afterPack`, which compares the build's **effective** config – YAML plus any `-c.asar*` CLI override and any `mac:`/`win:` key – with the constants, and refuses `electronFuses` and `disableAsarIntegrity`.
 
 ---
 
-## Security impact
+## What goes where
 
-### Lost features
+| Location | Contents | Integrity-checked |
+|---|---|---|
+| `Resources/app.asar` | `out/` (main, preload, renderer, the git-status worker and the DOCX utility process), `package.json`, every JavaScript and JSON file under `node_modules/` | Yes – header hash at start-up, block hashes on every read |
+| `Resources/app.asar.unpacked/` | The binaries listed in `asarUnpack`, nothing else | **No** |
 
-- ASAR integrity validation (SHA-256 hash verification)
-- Protection against post-installation code tampering
-- Two ASAR-dependent Electron fuses are unavailable and therefore cannot be set:
-  - `EnableEmbeddedAsarIntegrityValidation`
-  - `OnlyLoadAppFromAsar`
+Only what the operating system itself opens must be a real file: a native addon (`dlopen`), a library it loads from its own folder (`libpdfium`, `winpty.dll`), and an executable started as a process (`spawn-helper`, `ffmpeg`, `ffprobe`, `winpty-agent.exe`). Everything Node or Electron reads itself – `require`, `worker_threads`, `utilityProcess.fork`, `loadFile` – works from inside the archive.
 
-### Remaining security
+**Binaries only, never JavaScript or JSON.** An unpacked `package.json` decides which JavaScript a `require` runs (its `"main"`), so it is as sensitive as the code. Every `asarUnpack` pattern must end in a binary extension (`.node`, `.dylib`, `.dll`, `.so`, `.exe`) or name a known executable (`assertUnpackPatternsBinaryOnly`), and `assertPackagedAsarContents` refuses any `.js`, `.cjs`, `.mjs` or `.json` file, and any `out/`, under `app.asar.unpacked/`.
 
-`scripts/fuses.js` sets four fuses; the two above are the ones ASAR takes away.
+Why `smartUnpack: false`: electron-builder's smart unpacking moves the **whole package root** of any module with a binary in it. On this tree that put node-pty's JavaScript and all of jszip outside the integrity check.
 
-- `RunAsNode: false` and `EnableNodeOptionsEnvironmentVariable: false` – both unconditional
-- `EnableNodeCliInspectArguments: isTestBuild` – `false` on every production build, `true` only in an opt-in `ERFANA_TEST_BUILD=true` build that is never distributed
-- `EnableCookieEncryption: false` – a deliberate UX trade-off, not a hardening measure
-- Process sandboxing enabled
-- Context isolation enabled
-- Content Security Policy enforced
+Not packed at all: node-pty's Windows debug symbols (`*.pdb`) and its `conpty/` folder (Microsoft's `OpenConsole.exe` + `conpty.dll`, used only with node-pty's `useConptyDll` option, which `TerminalService` never sets). `files:` excludes both, so they are neither shipped nor re-signed.
 
-See [fuses.md](./fuses.md) for the full table and the test-build carve-out.
+### Paths that point into the archive
 
----
+A path computed from `__dirname` inside the archive reads fine through Electron's fs, but the OS cannot execute it:
 
-## Size impact
+- `node-pty` rewrites its own `spawn-helper` path (`app.asar` → `app.asar.unpacked`).
+- `ffmpeg-static` and `ffprobe-static` do not. In a packaged build `src/main/utils/mediaBinaries.ts` ignores their answer (and ffmpeg-static's `FFMPEG_BIN` override) and builds the path from `process.resourcesPath` + `app.asar.unpacked/node_modules/…`.
+- Native addons need nothing: Electron redirects a `require` of an unpacked `.node` file automatically.
 
-**Increased**: roughly +50 MB (ASAR disabled, so all of `node_modules` ships unpacked).
+A new dependency that spawns a bundled binary needs an `asarUnpack` entry, the matching `ASAR_UNPACK` change, and the same path handling.
 
-The figure is a v0.6.0-era estimate and has not been re-measured since; treat it as an order of magnitude, not a current number. The `afterPack` prunes added in v0.11.2 (foreign-arch `ffprobe-static` and `node-pty` prebuilds, ~260 MB off a mac build) dwarf it in the other direction.
+### Module search paths
 
-**Side effect**: `asarUnpack` is not applicable. Nothing is packed, so there is nothing to unpack, and native modules load straight from `app/node_modules/`.
+Electron keeps a packaged app's `require` lookups inside `process.resourcesPath` (and already keeps `NODE_PATH` and `~/.node_modules` out), but that still includes `Resources/node_modules/` and `Resources/app.asar.unpacked/node_modules/` – both outside the archive. A `require()` the archive cannot satisfy (an optional dependency a package probes for) would fall through to them, and an ESM `import()` goes through Node's ESM resolver, which Electron does not filter at all.
 
----
+`src/main/bootstrap/confineModulePaths.cjs` narrows both for callers inside the three bundles:
 
-## Future improvements
+- it narrows every CommonJS search path list to `app.asar/`, including the entry bundle's own `module.paths` – Node computed that list before any code in the file ran, so the intro is handed the real `module` (`(function(m){…})(module)`) and filters it too;
+- it registers a synchronous resolve hook (`module.registerHooks`, available in Electron 44's Node 24.22) that refuses any `require` or `import` resolution landing outside `app.asar/` – the layer that covers ESM and absolute paths. A refused `require` gets `MODULE_NOT_FOUND` (so an optional-dependency probe sees "absent"), a refused `import` `ERR_MODULE_NOT_FOUND`.
 
-### Option 1: bundle dependencies
+Scope: this covers code in the three bundles that carry the intro; third-party worker threads (node-pty's ConPTY output worker), resolvers rooted outside the archive and `process.dlopen` are not covered – none takes an outside path today.
 
-- Use webpack/esbuild to bundle all dependencies into single file
-- Eliminates node_modules complexity
-- Allows ASAR re-enablement
+It also empties `Module.globalPaths`, which Electron already does for a packaged app – belt and braces, not the fix.
 
-### Option 2: replace isomorphic-git
-
-- Find alternative git library with simpler dependency tree
-- May sacrifice functionality
-
-### Option 3: wait for ASAR improvements
-
-- Electron may improve dynamic `require()` handling in ASAR
+`electron.vite.config.ts` inlines it as the Rollup `intro` of every main-process bundle – the main process, the git-status worker thread and the DOCX utility process each have their own module system – and the `erfana:main-module-paths-confined` build check (in `generateBundle`) fails if the intro text does not come before a bundle's first dependency `require`. That check is about text order only; the runtime effect is checked by the packaged probe in the spike report.
 
 ---
 
-## Trade-off summary
+## Build-time guards
 
-**Lost**: Code integrity validation, tamper detection
-**Kept**: Critical security fuses, process isolation, CSP
-**Gained**: Build simplicity, guaranteed compatibility
+`afterPack` in `scripts/fuses.js`:
+
+1. `assertEffectiveAsarConfig` – the effective asar settings equal the pinned ones; no `electronFuses`, no `disableAsarIntegrity`.
+2. The ffprobe and node-pty prunes, the `spawn-helper` chmod and the `ffmpeg` staging run on `app.asar.unpacked/` (`packedPayloadDir()`). None of them touches `app.asar`, so the hash electron-builder computed before `afterPack` stays valid.
+3. `applyAndVerifyFuses` – refuses a bundle without `app.asar`; flips all nine fuses (`strictlyRequireAllFuses`); reads the fuse wire back and compares every fuse; reads the embedded integrity hash back (`Info.plist` `ElectronAsarIntegrity` on macOS, the `INTEGRITY`/`ELECTRONASAR` resource in the `.exe` on Windows) and compares it with the SHA-256 of the archive header on disk.
+4. `assertPackagedAsarContents` reads the archive header (no extraction): the top-level allowlist both ways (issue #43), every archive link stays inside and resolves, the `main` entry of the archived `package.json` is a file, `app.asar.unpacked/` holds binaries only and no escaping symlinks, and no `app/` folder sits beside `app.asar`.
+
+Anything that must change `app.asar` itself after electron-builder packs it would invalidate the embedded hash – step 3 fails the build. Do it before packing instead.
+
+---
+
+## Why ASAR was off until v0.21.0
+
+The v0.6.0 attempt used `asarUnpack` on `isomorphic-git` and a growing list of its dependencies, and failed with `Cannot find module 'call-bind-apply-helpers'`. The cause was partial unpacking: an unpacked package resolves its `require`s from `app.asar.unpacked/node_modules/`, where its still-packed dependencies are not. Keeping every JavaScript file inside the archive removes the problem; isomorphic-git loads and runs from `app.asar` in a packaged v0.22.0 build. The spike that re-enabled it: [docs/spikes/2026-10-22-asar-integrity.md](../spikes/2026-10-22-asar-integrity.md).
+
+---
+
+## Limits
+
+- **macOS:** the integrity hash lives in `Info.plist`, which the app's code signature seals, so changing the archive *and* the hash breaks the signature. Gatekeeper enforces that signature at first launch of a quarantined download; a same-user process that rewrites an already-installed app and strips the quarantine flag is limited by macOS app management protection, not by this check.
+- **Windows (per-user install):** the hash and the fuses live inside `Erfana.exe`, and that file, its DLLs and `resources\` are writable by the same user. The integrity check raises the bar and makes tampering visible (the archive no longer matches what was signed, and the Authenticode signature of `Erfana.exe` breaks), but it does not stop a same-user process, which can change `Erfana.exe` and its DLLs along with the archive. A per-machine install is a planned later change.
+- **Unpacked binaries are not integrity-checked.** A process that can write the install folder can replace `pty.node`, the LiteParse addon, `ffmpeg` or `ffprobe`. On macOS the code signature covers them; on Windows (per-user install) a same-user process can replace them.
+- **`Resources/node_modules` fallback:** narrowed by `confineModulePaths.cjs` for code in the three bundles that carry the intro – CommonJS search paths and, through the resolve hook, ESM and absolute-path resolutions (see [Module search paths](#module-search-paths)). Third-party worker threads (node-pty's ConPTY output worker), resolvers rooted outside the archive (`createRequire(<outside file>)`) and `process.dlopen` are not covered – none takes an outside path today.
+- **Windows signing step:** electron-builder 26.16.1 writes the integrity resource with `resedit` in `beforeCopyExtraFiles`, before `afterPack` and independent of `signAndEditExecutable`. The later resource edit (also `resedit`, `editWindowsResources`) and Authenticode signing run after `afterPack`; `afterSign` (`scripts/resign.js`, `verifySignedWindowsBundle`) then reads the fuse wire and the integrity resource back from the **signed** `Erfana.exe` and compares them with the pinned fuses and `app.asar`, and fails the build on a mismatch. It runs only when electron-builder actually signed (not on an unsigned `--dir` build).
 
 ---
 
