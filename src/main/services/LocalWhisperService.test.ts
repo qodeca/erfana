@@ -480,16 +480,16 @@ describe('LocalWhisperService', () => {
       mockSpawn.mockImplementation(() => makeWhisperSpawnChild(0))
       mockVerifyInstalledBinary.mockResolvedValueOnce({
         spec: {
-          filename: 'whisper-macos-universal-v1.8.4-erfana1.tar.gz',
+          filename: 'whisper-macos-universal-v1.8.4-erfana2.tar.gz',
           archiveFormat: 'tar.gz',
           sha256: 'aabbcc',
           sizeBytes: 1,
           files: {
-            main: { filename: 'whisper-cli', sizeBytes: 1, sha256: 'ff6de29f7a5581bea65a87c2437aabc8' },
+            main: { filename: 'whisper-cli', sizeBytes: 1, sha256: 'e533e2ae396115788235a2d0fd175cbe' },
             sidecars: []
           }
         },
-        mainSha: 'ff6de29f7a5581bea65a87c2437aabc8',
+        mainSha: 'e533e2ae396115788235a2d0fd175cbe',
         revisionIndex: 7
       })
 
@@ -513,7 +513,7 @@ describe('LocalWhisperService', () => {
         'Whisper spawn',
         expect.objectContaining({
           spawnedPath: '/userData/whisper/bin/whisper-cli',
-          computedSha: 'ff6de29f7a5581bea65a87c2437aabc8',
+          computedSha: 'e533e2ae396115788235a2d0fd175cbe',
           signatureValid: true,
           manifestRevision: 7,
           binaryVersion: 'whisper-cli'

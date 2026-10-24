@@ -739,8 +739,8 @@ export class LocalWhisperService {
     // Narrow the TOCTOU window: re-verify pinned binary + sidecars immediately before
     // every spawn. `{userData}/whisper/bin/` is user-writable, so an attacker
     // with local write access could swap the binary between install-time
-    // verification and spawn-time execution. Hashing 2.3 MB (binary + 4 DLLs
-    // on Windows) is <50 ms on modern hardware — acceptable per-chunk.
+    // verification and spawn-time execution. Hashing ~3.25 MB (Windows) or
+    // ~6.4 MB (macOS) takes tens of milliseconds — acceptable per-chunk.
     const verified = await this.modelManager.verifyInstalledBinary()
 
     // The model was hashed once for this job. Before each spawn, require that the
