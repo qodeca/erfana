@@ -35,13 +35,14 @@
  * @see Issue #74 - HTML preview with CSS and JavaScript execution
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { ErrorCode } from '../../../../../../shared/errors'
 import { usePreviewStore } from '../../../../stores/usePreviewStore'
 import { deriveBounds } from '../htmlPreview.logic'
 import { logger } from '../../../../utils/logger'
 import { getBasename, stablePathDigest } from '../../../../utils/fileUtils'
 import { previewGateway } from '../../../../services/previewGateway'
+import { useLatestRef } from '../../../../hooks/useLatestRef'
 
 /** Options for {@link usePreviewLifecycle}. */
 export interface UsePreviewLifecycleOptions {
@@ -118,15 +119,13 @@ export function usePreviewLifecycle(
 
   // `placeholderRef` is read once at open time only; excluding it from deps
   // keeps the open/close to exactly one run per panel id.
-  const placeholderRefStable = useRef(placeholderRef)
-  placeholderRefStable.current = placeholderRef
+  const placeholderRefStable = useLatestRef(placeholderRef)
 
   // The same for the page: a same-tab move changes `filePath` under a live
   // view, and an open/close keyed on it would destroy that view and its
   // history. Main is authoritative for the page of a live view; the renderer's
   // value matters only when an `open` is sent (first open, crash retry, resume).
-  const filePathRef = useRef(filePath)
-  filePathRef.current = filePath
+  const filePathRef = useLatestRef(filePath)
 
   /**
    * Ask main to open this preview. Shared by the mount effect and the resume
@@ -203,12 +202,13 @@ export function usePreviewLifecycle(
         })
       }
     },
-    [panelId]
+    [panelId, filePathRef, placeholderRefStable]
   )
 
   useEffect(() => {
     let cancelled = false
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sending the open is the effect's job; requestOpen clears the last attempt's banners before its first await
     void requestOpen(() => cancelled)
 
     return () => {
@@ -228,12 +228,9 @@ export function usePreviewLifecycle(
   const [resumeAttempt, setResumeAttempt] = useState(0)
 
   // Reset the budget once the panel is live again, so a later suspend/resume
-  // cycle does not inherit a spent one.
-  useEffect(() => {
-    if (loadState !== 'suspended') {
-      setResumeAttempt((attempt) => (attempt === 0 ? attempt : 0))
-    }
-  }, [loadState])
+  // cycle does not inherit a spent one. During render, not in an effect: the
+  // resume effect below acts only while suspended, so it never sees the gap.
+  if (loadState !== 'suspended' && resumeAttempt !== 0) setResumeAttempt(0)
 
   useEffect(() => {
     // The one line that would have found the Windows eviction fault in a
@@ -248,6 +245,7 @@ export function usePreviewLifecycle(
     if (!isVisible || loadState !== 'suspended') return
 
     let cancelled = false
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the re-open is the effect's job; requestOpen clears the last attempt's banners before its first await
     void requestOpen(
       () => cancelled,
       () => {
@@ -263,7 +261,7 @@ export function usePreviewLifecycle(
     return () => {
       cancelled = true
     }
-  }, [isVisible, loadState, requestOpen, resumeAttempt])
+  }, [isVisible, loadState, panelId, requestOpen, resumeAttempt])
 
   return { limitReached, holderPanelId, openFailed }
 }

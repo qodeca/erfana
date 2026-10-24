@@ -111,26 +111,33 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
   }, [])
 
   // todo018: Fix missing useEffect dependencies by wrapping in useCallback
-  const loadRecentProjects = useCallback(async () => {
-    try {
-      const result = await settingsGateway.getRecentProjects()
-      if (result.success && result.projects) {
-        setRecentProjects(result.projects)
-      } else if (result.error) {
-        showErrorToast('Failed to Load Recent Projects', result.error)
-      }
-    } catch (error) {
-      logger.error('Failed to load recent projects:', error instanceof Error ? error : undefined)
-      showErrorToast('Failed to Load Recent Projects', getUserFriendlyMessage(error))
-    } finally {
-      if (isMounted.current) {
-        setLoadingState({ type: 'idle' })
-      }
-    }
-  }, [])
+  // A promise chain, not async/await: state is set only in its callbacks, so
+  // the mount effect below starts the read without setting state itself.
+  const loadRecentProjects = useCallback(
+    (): Promise<void> =>
+      Promise.resolve()
+        .then(() => settingsGateway.getRecentProjects())
+        .then((result) => {
+          if (result.success && result.projects) {
+            setRecentProjects(result.projects)
+          } else if (result.error) {
+            showErrorToast('Failed to Load Recent Projects', result.error)
+          }
+        })
+        .catch((error: unknown) => {
+          logger.error('Failed to load recent projects:', error instanceof Error ? error : undefined)
+          showErrorToast('Failed to Load Recent Projects', getUserFriendlyMessage(error))
+        })
+        .finally(() => {
+          if (isMounted.current) {
+            setLoadingState({ type: 'idle' })
+          }
+        }),
+    []
+  )
 
   useEffect(() => {
-    loadRecentProjects()
+    void loadRecentProjects()
   }, [loadRecentProjects])
 
   // Auto-refresh recent projects when any project change occurs (open/close)

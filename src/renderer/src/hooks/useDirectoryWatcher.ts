@@ -39,6 +39,7 @@ import { DIRECTORY_WATCHER } from '../components/ProjectTree/constants'
 import { logger } from '../utils/logger'
 import { getTreeReadMs, resetTreeReadTiming } from '../utils/treeReadTiming'
 import { directoryWatchGateway } from '../services/directoryWatchGateway'
+import { useLatestRef } from './useLatestRef'
 
 interface UseDirectoryWatcherOptions {
   projectPath: string | null
@@ -59,14 +60,10 @@ export function useDirectoryWatcher({
 }: UseDirectoryWatcherOptions): void {
   // Store callbacks in refs to avoid effect re-runs on reference changes.
   // This prevents Chokidar watcher stop/start cycling on every render.
-  const onRefreshRef = useRef(onRefresh)
-  const onProjectDeletedRef = useRef(onProjectDeleted)
-  const onErrorRef = useRef(onError)
-
-  // Keep refs up to date with latest callbacks
-  onRefreshRef.current = onRefresh
-  onProjectDeletedRef.current = onProjectDeleted
-  onErrorRef.current = onError
+  // The refs are kept current after each commit, never during render.
+  const onRefreshRef = useLatestRef(onRefresh)
+  const onProjectDeletedRef = useLatestRef(onProjectDeleted)
+  const onErrorRef = useLatestRef(onError)
 
   // Debounce timer for refresh callbacks – consumer-side throttle for
   // bursts of 'directory-watch:changed' broadcasts (multi-file edits, save
@@ -149,5 +146,5 @@ export function useDirectoryWatcher({
         refreshTimerRef.current = null
       }
     }
-  }, [projectPath, initialLoadComplete, isInternalOperationRef])
+  }, [projectPath, initialLoadComplete, isInternalOperationRef, onRefreshRef, onProjectDeletedRef, onErrorRef])
 }

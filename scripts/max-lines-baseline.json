@@ -29,7 +29,7 @@
     "src/renderer/src/components/Editor/markdownImageStore.ts": 632,
     "src/renderer/src/components/Panels/ImageViewerPanel/imageViewer.logic.ts": 539,
     "src/renderer/src/components/Panels/MarkdownEditorPanel.tsx": 748,
-    "src/renderer/src/components/Panels/TerminalPanel.tsx": 987,
+    "src/renderer/src/components/Panels/TerminalPanel.tsx": 986,
     "src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts": 783,
     "src/renderer/src/components/Panels/markdownEditorPanel.logic.ts": 691,
     "src/renderer/src/components/ProjectTree/ProjectTree.tsx": 1731,
