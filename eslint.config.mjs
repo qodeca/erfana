@@ -6,6 +6,7 @@ import reactHooks from 'eslint-plugin-react-hooks'
 import * as tseslint from 'typescript-eslint'
 // Use flat-config-friendly Prettier rules directly
 import eslintConfigPrettier from 'eslint-config-prettier'
+import { readBaseline } from './scripts/lib/max-lines-baseline.mjs'
 
 // Layer rules (project-session design, section 6). The layers are `src/main`,
 // `src/preload`, `src/renderer` and `src/shared`; `shared` sits under all of
@@ -231,6 +232,31 @@ const E2E_EXECUTE_JAVASCRIPT_SELECTORS = [
   'ObjectPattern > Property[key.name=/^executeJavaScript/]',
   'ObjectPattern > Property[key.value=/^executeJavaScript/]'
 ].map((selector) => ({ selector, message: E2E_EXECUTE_JAVASCRIPT_MESSAGE }))
+
+// The max-lines ratchet (docs/technical-debt.md #26): a source file may shrink,
+// never grow. Every non-test `src/**/*.{ts,tsx}` is held to the baseline's
+// `limit` (pinned to 500); each file that was already over it is held to its
+// own size, from scripts/max-lines-baseline.json, read and validated by
+// scripts/lib/max-lines-baseline.mjs. scripts/check-max-lines.mjs (run by
+// `npm run lint`) counts every covered file itself too, so an inline directive
+// that switches this rule off cannot let a file grow, and keeps the list
+// current: it fails when a file shrinks and its allowance is not lowered, and
+// `npm run lint:max-lines -- --update` lowers it.
+// The rule must be "error": `eslint .` exits 0 on warnings. `e2e/` and
+// `scripts/` are not covered yet. The ignores mirror `isCovered()` in the check
+// script, and scripts/eslint-max-lines.test.mjs proves the two agree.
+const MAX_LINES_BASELINE = readBaseline(import.meta.dirname)
+const MAX_LINES_FILES = ['src/**/*.{ts,tsx}']
+const MAX_LINES_IGNORES = [
+  '**/*.test.{ts,tsx}',
+  '**/__test__/**',
+  '**/__tests__/**',
+  '**/__test-helpers__/**',
+  '**/__test-utils__/**',
+  '**/test-utils/**',
+  '**/__fixtures__/**',
+  '**/*.d.ts'
+]
 
 export default [
   // Ignore build outputs and vendored folders. `playwright-report/`,
@@ -793,5 +819,17 @@ export default [
     rules: {
       'no-restricted-syntax': ['error', ...RENDERER_GATEWAY_SELECTORS]
     }
-  }
+  },
+  // The max-lines ratchet (see MAX_LINES_BASELINE above). Last, so nothing
+  // after them can reset the rule; each baseline block replaces the base limit
+  // for its one file, because a later block's rule options win.
+  {
+    files: MAX_LINES_FILES,
+    ignores: MAX_LINES_IGNORES,
+    rules: { 'max-lines': ['error', { max: MAX_LINES_BASELINE.limit }] }
+  },
+  ...Object.entries(MAX_LINES_BASELINE.files).map(([file, max]) => ({
+    files: [file],
+    rules: { 'max-lines': ['error', { max }] }
+  }))
 ]
