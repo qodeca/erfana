@@ -39,6 +39,7 @@ import * as fs from 'fs'
 import * as fsp from 'fs/promises'
 import * as path from 'path'
 
+import type { ElectronApplication } from '@playwright/test'
 import type { BaseWindow, MessageBoxOptions } from 'electron'
 
 import { test, expect } from './fixtures/index'
@@ -422,9 +423,92 @@ test.describe('HTML preview — the link table in new-tab mode (#124, P3-AC5)', 
   })
 })
 
+/**
+ * The preview preload's link channels as main listens on them, plus the
+ * browser's own navigation attempt. The channel names are copied, like the
+ * preload's own (`previewLinkBridge.ts` holds the constants); if they drift the
+ * tap hears nothing and the test's wait times out rather than passing.
+ */
+const LINK_REPORT_CHANNEL = 'preview-page:linkActivated'
+const LINK_NOTE_CHANNEL = 'preview-page:linkNote'
+const WILL_NAVIGATE = 'will-navigate'
+
+/** Where the tap keeps what it heard, in the main process. */
+const LINK_TAP_KEY = '__erfanaE2eLinkTap'
+
+/** One thing the page sent main, in the order main heard it. */
+interface HeardLinkMessage {
+  readonly channel: string
+  readonly payload: { readonly kind?: string; readonly gestureId?: number; readonly href?: string }
+}
+
+/**
+ * Listen, main-side, beside the link bridge of the preview showing `urlIncludes`.
+ *
+ * Read-only: one more listener on that page's `webContents`, so it hears what
+ * the bridge hears, in the same order, and changes nothing. The app is
+ * launched per test, so the listeners go with it.
+ */
+async function tapLinkMessages(app: ElectronApplication, urlIncludes: string): Promise<boolean> {
+  return app.evaluate(
+    ({ webContents }, { wanted, channels, key, willNavigate }) => {
+      const wc = webContents.getAllWebContents().find((c) => {
+        try {
+          return c.getURL().startsWith('erfana-preview://') && c.getURL().includes(wanted)
+        } catch {
+          return false
+        }
+      })
+      if (!wc) return false
+      const heard: unknown[] = []
+      ;(globalThis as Record<string, unknown>)[key] = heard
+      for (const channel of channels) {
+        wc.ipc.on(channel, (_event, payload: unknown) => heard.push({ channel, payload }))
+      }
+      wc.on('will-navigate', (_event, url: string) => heard.push({ channel: willNavigate, payload: { href: url } }))
+      return true
+    },
+    {
+      wanted: urlIncludes,
+      channels: [LINK_REPORT_CHANNEL, LINK_NOTE_CHANNEL],
+      key: LINK_TAP_KEY,
+      willNavigate: WILL_NAVIGATE
+    }
+  )
+}
+
+/** Everything the tap has heard so far. */
+async function heardLinkMessages(app: ElectronApplication): Promise<HeardLinkMessage[]> {
+  return app.evaluate((_electron, key) => {
+    const heard = (globalThis as Record<string, unknown>)[key]
+    return Array.isArray(heard) ? (heard as HeardLinkMessage[]) : []
+  }, LINK_TAP_KEY)
+}
+
+/** Whether main heard the click on a link to `target` withdrawn, reported, or neither yet. */
+function clickOutcome(heard: readonly HeardLinkMessage[], target: string): 'pending' | 'cancelled' | 'reported' {
+  const pointsAtTarget = (message: HeardLinkMessage): boolean => message.payload.href?.endsWith(`/${target}`) === true
+  if (heard.some((message) => message.channel === LINK_REPORT_CHANNEL && pointsAtTarget(message))) {
+    return 'reported'
+  }
+  const seen = heard.find(
+    (message) => message.channel === LINK_NOTE_CHANNEL && message.payload.kind === 'seen' && pointsAtTarget(message)
+  )
+  const withdrawn =
+    seen !== undefined &&
+    heard.some(
+      (message) =>
+        message.channel === LINK_NOTE_CHANNEL &&
+        message.payload.kind === 'cancelled' &&
+        message.payload.gestureId === seen.payload.gestureId
+    )
+  return withdrawn ? 'cancelled' : 'pending'
+}
+
 test.describe('HTML preview — a link the page cancels', () => {
   const PAGE = 'links/cancelling.html'
   const KEPT_TARGET = 'links/target.html'
+  const CANCELLED_TARGET = 'links/cancelled-target.html'
 
   test('is not followed when the page cancels it after the preload has seen the click', async ({
     windowWithTestProject,
@@ -439,6 +523,7 @@ test.describe('HTML preview — a link the page cancels', () => {
     const preview = new HtmlPreviewPage(windowWithTestProject, appWithTestProject)
     await preview.open(PAGE)
     await preview.waitForTitled('-CANCEL-PAGE-')
+    expect(await tapLinkMessages(appWithTestProject, `/${PAGE}`)).toBe(true)
 
     expect(await clickLink(appWithTestProject, 'cancelled', HtmlPreviewPage.target(PAGE))).toBe(true)
 
@@ -450,13 +535,39 @@ test.describe('HTML preview — a link the page cancels', () => {
       })
       .toBe('1')
 
-    // Barrier: a real click on the link the page leaves alone goes through the
-    // same preload → main → policy path, so once its target is live the
-    // cancelled click has had its full chance to open something.
+    // Barrier, causal rather than timed: wait until main has HEARD the
+    // preload's decision on this click. It sends either the report or the
+    // `cancelled` note, never both, so once either has arrived nothing more
+    // can come for it.
+    await expect
+      .poll(async () => clickOutcome(await heardLinkMessages(appWithTestProject), CANCELLED_TARGET), {
+        timeout: PREVIEW_BUDGET_MS,
+        message: 'main never heard what became of the cancelled click'
+      })
+      .toMatch(/^(cancelled|reported)$/)
+    expect(clickOutcome(await heardLinkMessages(appWithTestProject), CANCELLED_TARGET)).toBe('cancelled')
+
+    // A real click on the link the page leaves alone still opens: the page and
+    // the preload are working, so the absence below means something. The
+    // browser handles one frame's navigations in order, so once this click's
+    // own `will-navigate` is heard, none for the cancelled click can follow.
     expect(await clickLink(appWithTestProject, 'kept', HtmlPreviewPage.target(PAGE))).toBe(true)
     await waitForLivePages(appWithTestProject, [PAGE, KEPT_TARGET])
+    await expect
+      .poll(
+        async () =>
+          (await heardLinkMessages(appWithTestProject)).some(
+            (message) => message.channel === WILL_NAVIGATE && message.payload.href?.endsWith(`/${KEPT_TARGET}`)
+          ),
+        { timeout: PREVIEW_BUDGET_MS, message: 'main never heard the kept link’s navigation' }
+      )
+      .toBe(true)
 
-    // Settled: the cancelled link's target never opened.
+    // Settled: nothing ever asked for the cancelled link's target, and it never opened.
+    const towardCancelled = (await heardLinkMessages(appWithTestProject)).filter(
+      (message) => message.channel !== LINK_NOTE_CHANNEL && message.payload.href?.endsWith(`/${CANCELLED_TARGET}`)
+    )
+    expect(towardCancelled).toEqual([])
     expect(await livePages(appWithTestProject)).toEqual([PAGE, KEPT_TARGET].sort())
     await expect(previewTabs(windowWithTestProject)).toHaveCount(2)
   })
