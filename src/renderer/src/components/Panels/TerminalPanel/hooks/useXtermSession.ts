@@ -37,7 +37,7 @@ import { terminalGateway } from '../../../../services/terminalGateway'
 import { claudeStatusGateway } from '../../../../services/claudeStatusGateway'
 import { hasBridgeMethod } from '../../../../services/bridgePresence'
 import { createTerminalLinkHandler, ensureTerminalFontLoaded } from '../terminalPanel.logic'
-import { routeTerminalMenuKey } from '../terminalMenuKey'
+import { routeTerminalMenuKey, terminalCursorAnchor } from '../terminalMenuKey'
 import { isKeyboardMenuEcho } from '../../../ContextMenu/contextMenuKey'
 
 /**
@@ -413,12 +413,11 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
     parserDisposablesRef.current = handlers.registerParserHooks(xterm)
     xterm.attachCustomKeyEventHandler((event) => {
       // Shift+F10 / the Menu key open the terminal's context menu (#90)
-      // instead of reaching the shell. xterm keeps its helper textarea at
-      // the cursor, so its box is where the menu opens.
-      const caret = xterm.textarea ?? xterm.element ?? null
+      // instead of reaching the shell, just below the cursor cell (not the
+      // helper textarea: the panel parks that off-screen)
       const open = (x: number, y: number): void => optionsRef.current.onContextMenu(x, y)
       /* deviates: design/system/components/menu/index.html — no aria-haspopup/expanded: xterm owns its textarea. */
-      if (routeTerminalMenuKey(event, caret, open)) return false
+      if (routeTerminalMenuKey(event, () => terminalCursorAnchor(xterm), open)) return false
       return handlers.keyEventHandler(event)
     })
     xterm.attachCustomWheelEventHandler(handlers.wheelEventHandler)
