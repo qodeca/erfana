@@ -57,6 +57,7 @@ type CreateResult = { success: true; terminalId: string; shellKind: 'posix' } | 
 const pendingCreates: Array<(result: CreateResult) => void> = []
 const projectListeners: Array<(data: { newPath: string | null }) => void> = []
 let dataListener: ((d: { terminalId: string; data: string }) => void) | null = null
+let errorListener: ((d: { terminalId: string; error: string }) => void) | null = null
 
 function installApi(): void {
   ;(window as any).api = {
@@ -72,7 +73,10 @@ function installApi(): void {
         return vi.fn()
       }),
       onExit: vi.fn().mockReturnValue(vi.fn()),
-      onError: vi.fn().mockReturnValue(vi.fn()),
+      onError: vi.fn((cb: typeof errorListener) => {
+        errorListener = cb
+        return vi.fn()
+      }),
       onClear: vi.fn().mockReturnValue(vi.fn()),
       markClearComplete: vi.fn(),
       ackOutput: vi.fn()
@@ -106,7 +110,7 @@ async function answerCreate(index: number, terminalId: string): Promise<void> {
 }
 
 /** Emit a project switch on the panel's restart listener (the second subscription) */
-async function switchProject(newPath: string): Promise<void> {
+async function switchProject(newPath: string | null): Promise<void> {
   await act(async () => {
     for (const listener of projectListeners) listener({ newPath })
   })
@@ -119,6 +123,7 @@ describe('TerminalPanel start-up guard', () => {
     pendingCreates.length = 0
     projectListeners.length = 0
     dataListener = null
+    errorListener = null
     installApi()
     useTerminalStore.setState({ activeTerminalId: null, activeShellKind: null, activityById: new Map(), userInputById: new Map() })
     useClaudeStatusStore.getState().reset()
@@ -205,5 +210,77 @@ describe('TerminalPanel start-up guard', () => {
     expect(screen.getByTestId(TEST_IDS.TERMINAL_INSTANCE)).toBeTruthy()
     await waitFor(() => expect(screen.getByTestId(TEST_IDS.TERMINAL_BTN_RESTART)).toBeTruthy())
     expect(gatewayBridgeMock('terminal').create).toHaveBeenCalledTimes(2)
+  })
+
+  /** Let React commit and effects run; no timers are faked in this file */
+  async function settle(): Promise<void> {
+    for (let i = 0; i < 3; i++) {
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      })
+    }
+  }
+
+  async function failFirstCreate(): Promise<void> {
+    await mountPanel()
+    await waitFor(() => expect(gatewayBridgeMock('terminal').create).toHaveBeenCalledTimes(1))
+    await act(async () => {
+      pendingCreates[0]({ success: false, error: 'cwd contains unsupported character "&"' })
+    })
+    await waitFor(() => expect(screen.getByTestId(TEST_IDS.TERMINAL_STATUS_ERROR)).toBeTruthy())
+  }
+
+  it('a switch to another bad project after a failed create tries once and stops', async () => {
+    await failFirstCreate()
+
+    await switchProject('/also/a&b')
+    await waitFor(() => expect(gatewayBridgeMock('terminal').create).toHaveBeenCalledTimes(2))
+    await act(async () => {
+      pendingCreates[1]({ success: false, error: 'cwd contains unsupported character "&"' })
+    })
+    await waitFor(() => expect(screen.getByTestId(TEST_IDS.TERMINAL_STATUS_ERROR)).toBeTruthy())
+
+    await settle()
+    expect(gatewayBridgeMock('terminal').create).toHaveBeenCalledTimes(2)
+  })
+
+  it('closing the project after a failed create starts no shell', async () => {
+    await failFirstCreate()
+
+    await switchProject(null)
+    await settle()
+
+    // The error is cleared and the container is back, but nobody asked for a start
+    expect(screen.queryByTestId(TEST_IDS.TERMINAL_STATUS_ERROR)).toBeNull()
+    expect(gatewayBridgeMock('terminal').create).toHaveBeenCalledTimes(1)
+  })
+
+  it('after a live terminal reports an error, a switch creates only once the old PTY is killed', async () => {
+    await mountPanel()
+    await waitFor(() => expect(gatewayBridgeMock('terminal').create).toHaveBeenCalledTimes(1))
+    await answerCreate(0, 'pty-live')
+    await waitFor(() => expect(errorListener).not.toBeNull())
+
+    // terminal:error for the live PTY (a failed write or resize): the error box replaces it
+    act(() => {
+      errorListener!({ terminalId: 'pty-live', error: 'write failed' })
+    })
+    await waitFor(() => expect(screen.getByTestId(TEST_IDS.TERMINAL_STATUS_ERROR)).toBeTruthy())
+
+    let answerKill!: () => void
+    gatewayBridgeMock('terminal').kill.mockImplementation(
+      () => new Promise((resolve) => { answerKill = () => resolve({ success: true }) })
+    )
+    await switchProject('/project/b')
+    await settle()
+
+    // The kill is sent and unanswered: the cleared error must not start a second PTY yet
+    expect(gatewayBridgeMock('terminal').kill).toHaveBeenCalledWith('pty-live')
+    expect(gatewayBridgeMock('terminal').create).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      answerKill()
+    })
+    await waitFor(() => expect(gatewayBridgeMock('terminal').create).toHaveBeenCalledTimes(2))
   })
 })
