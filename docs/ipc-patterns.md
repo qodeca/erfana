@@ -70,7 +70,7 @@ Renderer code never reads `window.api`: every bridge has a gateway, and only the
 | `utils` | `Api['utils']` – answered by the preload itself (`webUtils.getPathForFile`, `process.platform`, `process.arch`), no IPC | inline in `index.ts` | `utilsGateway` – for the platform, prefer `isMacOS()` / `isWindows()` from `utils/platform` |
 | `projectLock` | `ProjectLockBridge` (`project-lock-schema.ts`) | `projectLockBridge.ts` | none – no renderer caller |
 
-**Not finished yet: two TerminalPanel hooks.** `useScreenshotCapture` still reads `window.api.screenshot` and the unused `useTerminalDragDrop` still reads `window.api.utils` directly. Until they move to `screenshotGateway` and `utilsGateway`, `Window['api']` keeps those two bridges and ESLint allows exactly those reads in exactly those two files (`RENDERER_TERMINAL_PANEL_FILES`). Remove both once they have moved. (`TerminalPanel.tsx` and its session hooks already use `claudeStatusGateway` and `utilsGateway`.)
+**Not finished yet: two TerminalPanel hooks.** `useScreenshotCapture` still reads `window.api.screenshot` and the unused `useTerminalDragDrop` still reads `window.api.utils` directly. Until they move to `screenshotGateway` and `utilsGateway`, `Window['api']` keeps those two bridges and ESLint allows exactly those reads in exactly those two files (`RENDERER_TERMINAL_PANEL_FILES`). Remove both once they have moved. (`TerminalPanel.tsx` itself reads no bridge directly; its session hooks `useXtermSession` and `useTerminalFileDrop` already use `claudeStatusGateway` and `utilsGateway`.)
 
 What holds it in place:
 

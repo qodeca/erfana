@@ -30,7 +30,7 @@
  * @module TerminalPanel/hooks/useXtermSession
  */
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MutableRefObject, type RefObject } from 'react'
+import { useCallback, useLayoutEffect, useRef, useState, type MutableRefObject, type RefObject } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
@@ -253,9 +253,9 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
   const dataListeningIdRef = useRef<string | null>(null)
   const clearConfirmWaitersRef = useRef(new Map<string, () => void>())
 
-  useEffect(() => {
-    terminalIdRef.current = terminalId
-  }, [terminalId])
+  // No effect mirrors `terminalId` into the ref: start sets the ref as soon
+  // as create resolves and teardown clears it. A mirror could write a killed
+  // id back after a teardown({ resetState: false }), which keeps the state.
 
   // Live toggle. Also re-run on a new session id: the mode may have changed
   // between the constructor reading it and the session coming up
@@ -269,7 +269,7 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
     claudeNudgeTimerRef.current = setTimeout(() => {
       claudeNudgeTimerRef.current = null
       // Asked first: tests and non-Electron renders have no bridge (#352)
-      if (hasBridgeMethod('claudeStatus', 'nudge')) void claudeStatusGateway.nudge(id)
+      if (hasBridgeMethod('claudeStatus', 'nudge')) advisory(claudeStatusGateway.nudge(id))
     }, CLAUDE_NUDGE_DEBOUNCE_MS)
   }, [])
 
@@ -347,52 +347,55 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
   const teardownTerminal = useCallback(
     ({ resetState }: TeardownOptions): Promise<void> => {
       const id = terminalIdRef.current
+      // Steps 0-5 run in a try and the kill in its finally: a throw on the
+      // way (a listener, a store subscriber, a disposable) must not leave the
+      // shell running with nothing attached. The kill still goes last, after
+      // the dispose, and the error still reaches the caller.
+      let killed: Promise<void> = Promise.resolve()
+      try {
+        // 0. Invalidate a start still in flight: it gives up at its next await
+        generationRef.current += 1
+        inFlightStartRef.current = null
 
-      // 0. Invalidate a start still in flight: it gives up at its next await
-      generationRef.current += 1
-      inFlightStartRef.current = null
+        // 1. The Claude-nudge timer, so it never fires for the id cleared below
+        //    (the instance's own timers go with it in step 5)
+        if (claudeNudgeTimerRef.current) clearTimeout(claudeNudgeTimerRef.current)
+        claudeNudgeTimerRef.current = null
 
-      // 1. The Claude-nudge timer, so it never fires for the id cleared below
-      //    (the instance's own timers go with it in step 5)
-      if (claudeNudgeTimerRef.current) clearTimeout(claudeNudgeTimerRef.current)
-      claudeNudgeTimerRef.current = null
+        // 2. A start still waiting for the container to become visible
+        stopVisibilityWait()
 
-      // 2. A start still waiting for the container to become visible
-      stopVisibilityWait()
+        // 3. Session listeners: clear handshake, test hook, file drop
+        releaseStartListeners()
 
-      // 3. Session listeners: clear handshake, test hook, file drop
-      releaseStartListeners()
-
-      // 4. The session in the app stores: no active terminal, no Claude tracking (#216)
-      terminalIdRef.current = null
-      shellKindRef.current = null
-      useTerminalStore.getState().setActiveTerminal(null)
-      if (id) {
-        if (hasBridgeMethod('claudeStatus', 'unregister')) void claudeStatusGateway.unregister(id)
-        // Prune the slice, or the map keeps a stale entry per closed terminal
-        useClaudeStatusStore.getState().clearTerminal(id)
-      }
-
-      // 5. The instance: its timers and listeners first, then xterm itself
-      releaseInstance(xtermRef.current)
-
-      if (resetState) {
-        setTerminalId(null)
-        setError(null)
-      }
-
-      // 6. The PTY. Last, and awaited by the callers that start a new session,
-      //    so the next one is never created while this one is still alive
-      if (!id) return Promise.resolve()
-      // An async IIFE calls kill synchronously, before the first await, so an
-      // unmount still sends it in the same tick
-      return (async () => {
-        try {
-          await terminalGateway.kill(id)
-        } catch (err) {
-          logger.error('Failed to kill terminal', err instanceof Error ? err : undefined)
+        // 4. The session in the app stores: no active terminal, no Claude tracking (#216)
+        terminalIdRef.current = null
+        shellKindRef.current = null
+        useTerminalStore.getState().setActiveTerminal(null)
+        if (id) {
+          if (hasBridgeMethod('claudeStatus', 'unregister')) advisory(claudeStatusGateway.unregister(id))
+          // Prune the slice, or the map keeps a stale entry per closed terminal
+          useClaudeStatusStore.getState().clearTerminal(id)
         }
-      })()
+
+        // 5. The instance: its timers and listeners first, then xterm itself
+        releaseInstance(xtermRef.current)
+
+        if (resetState) {
+          setTerminalId(null)
+          setError(null)
+        }
+      } finally {
+        try {
+          // A throw before step 5 skipped it: the instance still goes, before the kill
+          if (xtermRef.current) releaseInstance(xtermRef.current)
+        } finally {
+          // 6. The PTY. Last, and awaited by the callers that start a new session,
+          //    so the next one is never created while this one is still alive
+          if (id) killed = killTerminal(id)
+        }
+      }
+      return killed
     },
     [xtermRef, stopVisibilityWait, releaseStartListeners, releaseInstance]
   )
@@ -610,7 +613,7 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
       // Kept with the id so a screenshot path-paste quotes for this shell (#164)
       shellKindRef.current = result.shellKind ?? null
       useTerminalStore.getState().setActiveTerminal({ id, shellKind: result.shellKind ?? null })
-      if (hasBridgeMethod('claudeStatus', 'register')) void claudeStatusGateway.register(id)
+      if (hasBridgeMethod('claudeStatus', 'register')) advisory(claudeStatusGateway.register(id))
       warmupUntilRef.current = Date.now() + WARMUP_MS
 
       inputDisposableRef.current = xterm.onData((data) => {
@@ -685,6 +688,20 @@ function disposeQuietly(xterm: Terminal): void {
   }
 }
 
+/**
+ * Send the kill for a session's PTY. An async IIFE calls kill synchronously,
+ * before the first await, so an unmount still sends it in the same tick.
+ */
+function killTerminal(terminalId: string): Promise<void> {
+  return (async () => {
+    try {
+      await terminalGateway.kill(terminalId)
+    } catch (err) {
+      logger.error('Failed to kill terminal', err instanceof Error ? err : undefined)
+    }
+  })()
+}
+
 /** End a PTY that main created for a start that was torn down meanwhile */
 function killOrphan(terminalId: string): void {
   logger.info('Killing a terminal created after its start was superseded')
@@ -695,6 +712,14 @@ function killOrphan(terminalId: string): void {
       logger.error('Failed to kill superseded terminal', err instanceof Error ? err : undefined)
     }
   })()
+}
+
+/**
+ * Fire-and-forget a Claude-status call (#216): tracking is advisory, so a
+ * rejection is logged, never left unhandled.
+ */
+function advisory(call: Promise<unknown>): void {
+  Promise.resolve(call).catch((err: unknown) => logger.warn('Claude status call failed', errorFields(err)))
 }
 
 /** Log fields for an unknown thrown value */
