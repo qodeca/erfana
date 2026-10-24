@@ -34,7 +34,7 @@ import {
   type WhisperModel,
   WhisperModelSchema
 } from '../../shared/ipc/transcription-schema'
-import { ErrorCode, getUserFriendlyMessage } from '../../shared/errors'
+import { AppError, ErrorCode, getUserFriendlyMessage } from '../../shared/errors'
 import { IMPORT, VIDEO_IMPORT, TRANSCRIPTION } from '../../shared/constants'
 import { transcriptionService } from '../services/TranscriptionService'
 import { localWhisperService } from '../services/LocalWhisperService'
@@ -50,27 +50,67 @@ import { fileService } from '../services/FileService'
 import { logger } from '../services/LoggingService'
 import { changeExtension, sanitizeFileName, findAvailableFileName, formatDuration } from '../utils/fileUtils'
 import { isVideoExtension } from '../services/import/extensions'
+import { isAbortError } from '../utils/isAbortError'
+import { redactedLogError } from '../utils/redactUserInput'
 import { registerHandle } from './registry'
 
 /** Active AbortController for current transcription */
 let activeController: AbortController | null = null
 
+/** A whisper ensure request still running; `controller` feeds the manager's signal. */
+interface DownloadRequest {
+  cancelled: boolean
+  controller: AbortController
+}
+
 /**
- * Whisper ensure requests still running. Cancel marks each one, so its failure
- * is reported as cancelled; the abort itself is the manager's own
- * (`whisperModelManager.cancelDownloads()`), which also deletes the partials.
+ * Whisper ensure requests still running. Cancel marks each one, so its abort
+ * is reported as cancelled, and aborts its controller. The signal is handed to
+ * the manager, so it also stops a download the manager has not registered yet
+ * (while it checks the install and prepares its folders), which
+ * `whisperModelManager.cancelDownloads()` cannot reach. The manager deletes
+ * the partials either way.
+ *
+ * No sender is recorded: cancel is app-wide by design, because there is one
+ * model store per app, so Cancel in any window stops every running download.
  */
-const runningDownloads = new Set<{ cancelled: boolean }>()
+const runningDownloads = new Set<DownloadRequest>()
 
 /** Result of a whisper download; `cancelled` marks a user cancel, not an error to show */
 type WhisperDownloadResult = { success: boolean; path?: string; error?: string; cancelled?: boolean }
 const DOWNLOAD_CANCELLED: WhisperDownloadResult = { success: false, cancelled: true, error: 'Download cancelled' }
 
 /** Start tracking a whisper ensure request; `release` stops tracking it. */
-function trackDownload(): { request: { cancelled: boolean }; release: () => void } {
-  const request = { cancelled: false }
+function trackDownload(): { request: DownloadRequest; release: () => void } {
+  const request: DownloadRequest = { cancelled: false, controller: new AbortController() }
   runningDownloads.add(request)
   return { request, release: () => runningDownloads.delete(request) }
+}
+
+/** The manager reports an abort as an `AppError` whose cause is the AbortError. */
+function isDownloadAbort(error: unknown): boolean {
+  return isAbortError(error instanceof AppError ? error.originalError : error)
+}
+
+/**
+ * The IPC result for a failed whisper ensure call. Only an abort after Cancel
+ * is reported as cancelled: an error that lands after Cancel (an integrity
+ * failure, say) stays an error. Both are logged, the abort at debug level.
+ */
+function downloadFailure(
+  error: unknown,
+  request: DownloadRequest,
+  artifact: 'binary' | 'model'
+): WhisperDownloadResult {
+  if (request.cancelled && isDownloadAbort(error)) {
+    logger.debug(`Whisper ${artifact} download cancelled`, { error: redactedLogError(error)?.message })
+    return DOWNLOAD_CANCELLED
+  }
+  logger.error(`Failed to ensure whisper ${artifact}`, redactedLogError(error))
+  return {
+    success: false,
+    error: error instanceof Error ? error.message : `Failed to download whisper ${artifact}`
+  }
 }
 
 /**
@@ -609,15 +649,13 @@ export function registerTranscriptionHandlers(): void {
 
       const download = trackDownload()
       try {
-        const path = await whisperModelManager.ensureBinary({ onProgress })
+        const path = await whisperModelManager.ensureBinary({
+          onProgress,
+          signal: download.request.controller.signal
+        })
         return { success: true, path }
       } catch (error) {
-        if (download.request.cancelled) return DOWNLOAD_CANCELLED
-        logger.error('Failed to ensure whisper binary', error instanceof Error ? error : undefined)
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Failed to download whisper binary'
-        }
+        return downloadFailure(error, download.request, 'binary')
       } finally {
         download.release()
       }
@@ -654,15 +692,13 @@ export function registerTranscriptionHandlers(): void {
 
       const download = trackDownload()
       try {
-        const path = await whisperModelManager.ensureModel(parsed.data, { onProgress })
+        const path = await whisperModelManager.ensureModel(parsed.data, {
+          onProgress,
+          signal: download.request.controller.signal
+        })
         return { success: true, path }
       } catch (error) {
-        if (download.request.cancelled) return DOWNLOAD_CANCELLED
-        logger.error('Failed to ensure whisper model', error instanceof Error ? error : undefined)
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Failed to download whisper model'
-        }
+        return downloadFailure(error, download.request, 'model')
       } finally {
         download.release()
       }
@@ -673,7 +709,9 @@ export function registerTranscriptionHandlers(): void {
    * Cancel the running whisper binary or model download.
    *
    * The pending ensure call then resolves with `cancelled: true`; the manager
-   * has deleted the partial file by then.
+   * has deleted the partial file by then. Cancel is app-wide by design (one
+   * model store per app): it stops the download of every window, not only the
+   * sender's.
    */
   registerHandle(
     TRANSCRIPTION_CHANNELS.WHISPER_CANCEL_DOWNLOAD,
@@ -681,7 +719,13 @@ export function registerTranscriptionHandlers(): void {
       if (runningDownloads.size === 0) {
         return { success: false, error: 'No active download' }
       }
-      for (const request of runningDownloads) request.cancelled = true
+      for (const request of runningDownloads) {
+        request.cancelled = true
+        // Reaches the download even before the manager has registered it
+        request.controller.abort()
+      }
+      // How many downloads the manager had registered: 0 means Cancel came
+      // while it was still preparing, and only the signals above stop them
       const aborted = whisperModelManager.cancelDownloads()
       logger.info('Whisper download cancelled by user', { aborted })
       return { success: true }
