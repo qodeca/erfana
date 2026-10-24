@@ -16,6 +16,7 @@ import { ShieldAlert } from 'lucide-react'
 import type { ScreenRecordingPermission } from '../../../../shared/ipc/screenshot-schema'
 import { BaseDialog } from './BaseDialog'
 import { TEST_IDS } from '../../constants/testids'
+import { systemGateway } from '../../services/systemGateway'
 
 interface ScreenPermissionDialogProps {
   /** Whether the dialog is visible */
@@ -38,11 +39,11 @@ export function ScreenPermissionDialog({
   const bodyId = `screen-permission-body-${useId()}`
 
   const handleOpenSettings = (): void => {
-    void window.api.system.openScreenRecordingSettings()
+    void systemGateway.openScreenRecordingSettings()
   }
 
   const handleRelaunch = (): void => {
-    void window.api.system.relaunchApp()
+    void systemGateway.relaunchApp()
   }
 
   return (

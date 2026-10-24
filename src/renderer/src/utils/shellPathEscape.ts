@@ -26,6 +26,7 @@
 
 import type { ShellKind } from '../../../shared/shellKind'
 import { quotePowerShellLiteral } from '../../../shared/powershellQuote'
+import { utilsGateway } from '../services/utilsGateway'
 
 export type { ShellKind }
 
@@ -97,5 +98,5 @@ export function formatPathsForTerminal(
  * mis-quotes paths for the dominant shell).
  */
 export function platformDefaultShellKind(): ShellKind {
-  return window.api.utils.getPlatform() === 'win32' ? 'powershell' : 'posix'
+  return utilsGateway.getPlatform() === 'win32' ? 'powershell' : 'posix'
 }

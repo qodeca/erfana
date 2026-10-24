@@ -89,7 +89,6 @@ export function AppDockLayout() {
   const terminalExpanded = useActivityBarStore((s) => s.terminalExpanded)
   const togglePanel = useActivityBarStore((s) => s.togglePanel)
   const setSidebarWidth = useActivityBarStore((s) => s.setSidebarWidth)
-  const setActivePanel = useActivityBarStore((s) => s.setActivePanel)
 
   // Get project path from context to control terminal availability
   const { projectPath } = useProjectManagementContext()
@@ -317,6 +316,7 @@ export function AppDockLayout() {
           '[data-testid="terminal-instance"] textarea'
         ) as HTMLElement | null
         termInput?.focus()
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- announces the imperative dockview layout change this effect just made (both branches); there is no render-time value to derive it from
         setA11yAnnouncement('Terminal maximized')
       } else {
         dockviewApiRef.current?.activePanel?.focus()
@@ -327,11 +327,14 @@ export function AppDockLayout() {
   }, [terminalExpanded, rightActivePanel, isSplitviewReady, projectPath])
 
   // Sanitize persisted state: remove legacy 'git'/'claude' active panel if present
+  // Runs once on mount: the store is read directly rather than through the
+  // subscribed values, so a later panel change never re-runs the check.
   useEffect(() => {
-    if (rightActivePanel === 'git' || rightActivePanel === 'claude') {
-      setActivePanel(null, 'right')
+    const { rightActivePanel: persisted, setActivePanel: resetPanel } =
+      useActivityBarStore.getState()
+    if (persisted === 'git' || persisted === 'claude') {
+      resetPanel(null, 'right')
     }
-    // run once on mount
   }, [])
 
   // Listen for project change events to clear editor tabs

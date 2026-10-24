@@ -66,10 +66,14 @@ export function FilePickerDialog({
   const [selectedIndex, setSelectedIndex] = useState(0)
   const listRef = useRef<HTMLUListElement>(null)
 
-  // Reset selection when candidates change
-  useEffect(() => {
+  // Reset selection when candidates change. Adjusted during render (React's
+  // "storing information from previous renders" pattern) rather than in an
+  // effect, so a new list is never painted with the old index highlighted.
+  const [prevCandidates, setPrevCandidates] = useState(candidates)
+  if (candidates !== prevCandidates) {
+    setPrevCandidates(candidates)
     setSelectedIndex(0)
-  }, [candidates])
+  }
 
   // Scroll selected item into view
   useEffect(() => {

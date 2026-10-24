@@ -40,47 +40,63 @@ const MAIN_LAYER_PATTERNS = [
   layerPattern('preload', 'src/main')
 ]
 const GATEWAY_MESSAGE =
-  'Reach the file and terminal bridges through services/fileGateway and services/terminalGateway, not window.api.'
-// The type system already hides `file` / `terminal` from `window.api` (see
+  'Reach the preload bridges through their gateway in services/ (fileGateway, gitGateway, …), not window.api.'
+// Every way to reach `window.api` outside a gateway. The renderer's `window.api`
+// type already lists only the bridges the TerminalPanel files still read (see
 // preload/index.d.ts); these selectors are the backstop for the ways round it.
-const RENDERER_GATEWAY_SELECTORS = [
-  {
-    selector:
-      "MemberExpression[object.object.name='window'][object.property.name='api'][property.name=/^(file|terminal)$/]",
-    message: GATEWAY_MESSAGE
-  },
-  {
-    // window.api['file'], window.api[key]
-    selector: "MemberExpression[computed=true][object.object.name='window'][object.property.name='api']",
-    message: GATEWAY_MESSAGE
-  },
+const GLOBAL_OBJECTS = '/^(window|globalThis|self)$/'
+const WINDOW_API = `MemberExpression[computed=false][object.name=${GLOBAL_OBJECTS}][property.name='api']`
+// Where the global sits in a destructure's source: bare, or under one or two
+// casts (`as`, `!`, `satisfies`, `<T>`), each of which keeps it in `.expression`
+const GLOBAL_SOURCE_PATHS = ['name', 'expression.name', 'expression.expression.name']
+// The `api` key of a destructure, as an identifier or a string. Tied to the
+// global on the right: a bare `{ api }` is everyday code (`const { api } = props`)
+const API_PROPERTY = "Property:matches([key.name='api'], [key.value='api'])"
+const DESTRUCTURE_API_SELECTORS = GLOBAL_SOURCE_PATHS.flatMap((path) => [
+  // const { api } = window
+  `VariableDeclarator[init.${path}=${GLOBAL_OBJECTS}] > ObjectPattern.id > ${API_PROPERTY}`,
+  // ({ api } = window)
+  `AssignmentExpression[right.${path}=${GLOBAL_OBJECTS}] > ObjectPattern.left > ${API_PROPERTY}`,
+  // ({ api } = window) => …, a default value in a parameter or a nested pattern
+  `AssignmentPattern[right.${path}=${GLOBAL_OBJECTS}] > ObjectPattern.left > ${API_PROPERTY}`
+]).map((selector) => ({ selector, message: GATEWAY_MESSAGE }))
+const RENDERER_API_BYPASS_SELECTORS = [
   {
     // window['api'], globalThis[k], self[k]
-    selector: "MemberExpression[computed=true][object.name=/^(window|globalThis|self)$/]",
+    selector: `MemberExpression[computed=true][object.name=${GLOBAL_OBJECTS}]`,
     message: GATEWAY_MESSAGE
   },
   {
-    // globalThis.api, self.api
-    selector: "MemberExpression[object.name=/^(globalThis|self)$/][property.name='api']",
-    message: GATEWAY_MESSAGE
-  },
-  {
-    // (window as X).api
-    selector: "MemberExpression[property.name='api'][object.type=/^TS(As|NonNull|Satisfies)Expression$/]",
-    message: GATEWAY_MESSAGE
-  },
-  {
-    // const a = window.api ; a = window.api
+    // (window as X).api, (<X>window).api
     selector:
-      "VariableDeclarator[id.type!='ObjectPattern'][init.type='MemberExpression'][init.object.name='window'][init.property.name='api'], VariableDeclarator[id.type!='ObjectPattern'][init.type='ChainExpression'][init.expression.object.name='window'][init.expression.property.name='api'], AssignmentExpression[right.type='MemberExpression'][right.object.name='window'][right.property.name='api'], AssignmentExpression[right.type='ChainExpression'][right.expression.object.name='window'][right.expression.property.name='api']",
+      "MemberExpression[property.name='api'][object.type=/^TS(AsExpression|NonNullExpression|SatisfiesExpression|TypeAssertion)$/]",
     message: GATEWAY_MESSAGE
   },
+  ...DESTRUCTURE_API_SELECTORS
+]
+const RENDERER_GATEWAY_SELECTORS = [
+  // window.api, window?.api, globalThis.api, self.api: read, aliased or destructured
+  { selector: WINDOW_API, message: GATEWAY_MESSAGE },
+  ...RENDERER_API_BYPASS_SELECTORS
+]
+
+// TEMPORARY. These files still read three bridges off `window.api` and are being
+// changed by another PR, so they keep exactly those reads until they move to
+// claudeStatusGateway, utilsGateway and screenshotGateway. Any other read, an
+// alias of `window.api` or a computed key is still an error here. Delete this
+// list, its selectors and its block below once they have moved.
+const RENDERER_TERMINAL_PANEL_FILES = [
+  'src/renderer/src/components/Panels/TerminalPanel.tsx',
+  'src/renderer/src/components/Panels/TerminalPanel/hooks/useScreenshotCapture.ts',
+  'src/renderer/src/components/Panels/TerminalPanel/hooks/useTerminalDragDrop.ts'
+]
+const TERMINAL_PANEL_BRIDGES = ['claudeStatus', 'utils', 'screenshot']
+const RENDERER_TERMINAL_PANEL_SELECTORS = [
   {
-    // const { file } = window.api
-    selector:
-      "VariableDeclarator[id.type='ObjectPattern'][init.object.name='window'][init.property.name='api'], VariableDeclarator[id.type='ObjectPattern'][init.type='ChainExpression'][init.expression.object.name='window'][init.expression.property.name='api']",
+    selector: `${WINDOW_API}:not(MemberExpression[property.name=/^(${TERMINAL_PANEL_BRIDGES.join('|')})$/] > .object)`,
     message: GATEWAY_MESSAGE
-  }
+  },
+  ...RENDERER_API_BYPASS_SELECTORS
 ]
 
 // Where the renderer may stand in for the bridges: tests install mocks on `window.api`
@@ -99,10 +115,32 @@ const RENDERER_PATTERN_OWNERS = [
   'src/renderer/src/services/preview/OverlayGuardService.ts'
 ]
 
-// The only files that read the bridges off `window.api`
+// The only files that read the bridges off `window.api`: the gateways, and the
+// presence check that answers only whether a bridge is there
 const RENDERER_GATEWAY_FILES = [
   'src/renderer/src/services/fileGateway.ts',
-  'src/renderer/src/services/terminalGateway.ts'
+  'src/renderer/src/services/terminalGateway.ts',
+  'src/renderer/src/services/fileWatchGateway.ts',
+  'src/renderer/src/services/directoryWatchGateway.ts',
+  'src/renderer/src/services/gitGateway.ts',
+  'src/renderer/src/services/settingsGateway.ts',
+  'src/renderer/src/services/loggingGateway.ts',
+  'src/renderer/src/services/quitGateway.ts',
+  'src/renderer/src/services/systemGateway.ts',
+  'src/renderer/src/services/clipboardGateway.ts',
+  'src/renderer/src/services/testHooksGateway.ts',
+  'src/renderer/src/services/importGateway.ts',
+  'src/renderer/src/services/transcriptionGateway.ts',
+  'src/renderer/src/services/cameraGateway.ts',
+  'src/renderer/src/services/documentExportGateway.ts',
+  'src/renderer/src/services/imageExportGateway.ts',
+  'src/renderer/src/services/browserGateway.ts',
+  'src/renderer/src/services/markdownImageGateway.ts',
+  'src/renderer/src/services/previewGateway.ts',
+  'src/renderer/src/services/claudeStatusGateway.ts',
+  'src/renderer/src/services/screenshotGateway.ts',
+  'src/renderer/src/services/utilsGateway.ts',
+  'src/renderer/src/services/bridgePresence.ts'
 ]
 
 // Selectors every renderer file obeys; the gateway selectors are added on top for non-test code.
@@ -145,13 +183,13 @@ const RENDERER_RESTRICTED_SYNTAX = [
       'Preview panel ids are built in one place. Use openFileInPanel({ kind: "preview" }) from utils/openFileInPanel.'
   },
   // The running preview's visibility has a single owner (§1.8). Forbid the
-  // `api.preview.setVisibility` bridge call and the raw
+  // `setVisibility` call on the preview gateway or bridge and the raw
   // `preview:setVisibility` channel everywhere except OverlayGuardService.
   {
     selector:
-      "CallExpression[callee.property.name='setVisibility'][callee.object.property.name='preview'], Literal[value='preview:setVisibility']",
+      "CallExpression[callee.property.name='setVisibility'][callee.object.property.name='preview'], CallExpression[callee.property.name='setVisibility'][callee.object.name='previewGateway'], Literal[value='preview:setVisibility']",
     message:
-      'Preview visibility is owned by services/preview/OverlayGuardService. Do not call api.preview.setVisibility or reference the preview:setVisibility channel elsewhere (issue #74, design §1.8).'
+      'Preview visibility is owned by services/preview/OverlayGuardService. Do not call previewGateway.setVisibility (or api.preview.setVisibility) or reference the preview:setVisibility channel elsewhere (issue #74, design §1.8).'
   },
   {
     selector:
@@ -182,6 +220,18 @@ const RENDERER_LAYER_PATTERNS = [
     message: RENDERER_PRELOAD_MESSAGE
   }
 ]
+
+// Every way an e2e file can reach `executeJavaScript` without the bounded
+// helper (lens review finding 34) – see the `e2e/**` block below.
+const E2E_EXECUTE_JAVASCRIPT_MESSAGE =
+  'Unbounded executeJavaScript can hang a test forever. Use the bounded exec from e2e/utils/bounded-exec.ts (installBoundedExec + globalThis.__erfanaE2eExec).'
+const E2E_EXECUTE_JAVASCRIPT_SELECTORS = [
+  'MemberExpression[property.name=/^executeJavaScript/]',
+  'MemberExpression[computed=true][property.value=/^executeJavaScript/]',
+  "MemberExpression[computed=true][property.type='TemplateLiteral'][property.quasis.0.value.raw=/^executeJavaScript/]",
+  'ObjectPattern > Property[key.name=/^executeJavaScript/]',
+  'ObjectPattern > Property[key.value=/^executeJavaScript/]'
+].map((selector) => ({ selector, message: E2E_EXECUTE_JAVASCRIPT_MESSAGE }))
 
 export default [
   // Ignore build outputs and vendored folders. `playwright-report/`,
@@ -308,6 +358,26 @@ export default [
           ]
         }
       ]
+    }
+  },
+  // E2E suite: no direct `executeJavaScript` (lens review finding 34).
+  // `webContents.executeJavaScript` / `WebFrameMain.executeJavaScript` have no
+  // timeout, and a call whose document is replaced under it can stay pending
+  // forever, stalling the caller's poll past its deadline with no word about
+  // which call hung (#255). Every call goes through the bounded helper in
+  // e2e/utils/bounded-exec.ts, the one file exempt here. No other block sets
+  // `no-restricted-syntax` for `e2e/**`, so this list is complete for it.
+  //
+  // The selectors ban the REFERENCE, not just the call, so an alias
+  // (`const run = wc.executeJavaScript`), `.call` / `.bind` and a destructure
+  // (`const { executeJavaScript } = wc`) are caught too: member access in dot,
+  // string and template form, and a destructured key in either form. Matches
+  // `executeJavaScriptInIsolatedWorld` as well.
+  {
+    files: ['e2e/**/*.{ts,js,cjs,mjs}'],
+    ignores: ['e2e/utils/bounded-exec.ts'],
+    rules: {
+      'no-restricted-syntax': ['error', ...E2E_EXECUTE_JAVASCRIPT_SELECTORS]
     }
   },
   // Build scripts: CommonJS Node.js environment
@@ -658,11 +728,11 @@ export default [
   //    in the wrong panel type; `utils/openFileInPanel.ts` owns that (and is
   //    therefore exempt). The `preview-` prefix is issue #74's running HTML
   //    preview. See issues #70 and #74.
-  // 3. The running preview's visibility. `api.preview.setVisibility` and the
-  //    `preview:setVisibility` channel have exactly ONE permitted caller,
-  //    `services/preview/OverlayGuardService.ts` (exempt), so the "single
-  //    hide/show owner" invariant is enforced by the linter, not by convention.
-  //    See issue #74 design §1.8.
+  // 3. The running preview's visibility. `previewGateway.setVisibility` (and
+  //    `api.preview.setVisibility`) and the `preview:setVisibility` channel
+  //    have exactly ONE permitted caller, `services/preview/OverlayGuardService.ts`
+  //    (exempt), so the "single hide/show owner" invariant is enforced by the
+  //    linter, not by convention. See issue #74 design §1.8.
   // 4. Creating an `object` / `embed` / `iframe` element. Those load an SVG AS
   //    A DOCUMENT, which executes script — the one route the image-export
   //    harness (#73) must never acquire. The selector lives HERE rather than in
@@ -676,16 +746,31 @@ export default [
   // matches: the shared families above, plus the gateway selectors where they
   // apply. A block that listed only one set would silently disable the other.
   //
-  // 5. Reading the file and terminal bridges off `window.api`. The renderer's
-  //    `window.api` type already omits them; the gateway selectors catch the
-  //    ways round the type. Tests may install mocks; the gateways read them.
+  // 5. Reading `window.api` at all. Every bridge has a gateway in `services/`,
+  //    and only the gateways (and the yes/no presence check) read `window.api`.
+  //    The renderer's `window.api` type already leaves the bridges out; the
+  //    gateway selectors catch the ways round the type. Tests may install
+  //    mocks; the gateways read them.
   //
   //  - ordinary renderer code: shared families + gateway selectors
   {
     files: ['src/renderer/**/*.{ts,tsx}'],
-    ignores: [...RENDERER_PATTERN_OWNERS, ...RENDERER_TEST_FILES, ...RENDERER_GATEWAY_FILES],
+    ignores: [
+      ...RENDERER_PATTERN_OWNERS,
+      ...RENDERER_TEST_FILES,
+      ...RENDERER_GATEWAY_FILES,
+      ...RENDERER_TERMINAL_PANEL_FILES
+    ],
     rules: {
       'no-restricted-syntax': ['error', ...RENDERER_GATEWAY_SELECTORS, ...RENDERER_RESTRICTED_SYNTAX]
+    }
+  },
+  //  - TEMPORARY, the TerminalPanel files: shared families + gateway selectors
+  //    that still let them read their three bridges (see RENDERER_TERMINAL_PANEL_FILES)
+  {
+    files: RENDERER_TERMINAL_PANEL_FILES,
+    rules: {
+      'no-restricted-syntax': ['error', ...RENDERER_TERMINAL_PANEL_SELECTORS, ...RENDERER_RESTRICTED_SYNTAX]
     }
   },
   //  - tests and their helpers: shared families only

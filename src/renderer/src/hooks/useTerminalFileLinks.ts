@@ -33,6 +33,7 @@ import {
   isSearchableBareName
 } from '../utils/filePathLinks.logic'
 import { useFilenameIndex } from './useFilenameIndex'
+import { useLatestRef } from './useLatestRef'
 import {
   extractFilenameFromPath,
   mergeNameSearch,
@@ -224,16 +225,33 @@ export function useTerminalFileLinks(
   } =
     options
 
-  // Track terminal readiness with state to trigger re-renders when terminal is created
-  const [terminalReady, setTerminalReady] = useState(false)
+  // The terminal instance, mirrored from the caller's ref into state so render
+  // never reads the ref (null until the terminal is created). The caller
+  // (TerminalPanel) sets its ref before it reports the new terminal's id and
+  // clears it together with the id, so re-reading on an id change sees every
+  // instance. The mirror remembers which id it was read for and counts only
+  // for that id: on the render where the id changes (a teardown disposes the
+  // old xterm first) the stale instance is already gone, so nothing is ever
+  // registered on a disposed terminal while the effect catches up.
+  const [mirror, setMirror] = useState<{ terminalId: string | null; terminal: Terminal | null }>({
+    terminalId: null,
+    terminal: null
+  })
+  const terminal = mirror.terminalId === terminalId ? mirror.terminal : null
+  // The ref object itself is read through a latest ref, NOT listed as a
+  // dependency: a caller that builds a fresh `{ current }` each render (the
+  // tests do) would otherwise re-run the check every render, find a "new"
+  // instance every time and loop.
+  const terminalRefLatest = useLatestRef(terminalRef)
 
   // Check terminal availability when terminalId changes (terminal created)
   useEffect(() => {
     const checkTerminal = () => {
-      const hasTerminal = !!terminalRef.current
-      if (hasTerminal !== terminalReady) {
-        setTerminalReady(hasTerminal)
-      }
+      const current = terminalRefLatest.current.current
+      // Same id and instance: keep the old object, so React bails out
+      setMirror((prev) =>
+        prev.terminalId === terminalId && prev.terminal === current ? prev : { terminalId, terminal: current }
+      )
     }
 
     // Check immediately
@@ -241,16 +259,13 @@ export function useTerminalFileLinks(
 
     // If no terminal yet but we have terminalId, poll briefly
     // (terminal ref is set synchronously after terminal creation)
-    if (terminalId && !terminalRef.current) {
+    if (terminalId && !terminalRefLatest.current.current) {
       const timeoutId = setTimeout(checkTerminal, 100)
       return () => clearTimeout(timeoutId)
     }
 
     return undefined
-  }, [terminalId, terminalReady, terminalRef])
-
-  // Get terminal from ref (will be null until terminal is created)
-  const terminal = terminalRef.current
+  }, [terminalId, terminalRefLatest])
 
   // Use filename index for smart resolution
   const { getIndex } = useFilenameIndex({ files })
@@ -590,7 +605,6 @@ export function useTerminalFileLinks(
     }
   }, [
     terminal,
-    terminalReady,
     fetchCwd,
     validatePath,
     projectRoot,
@@ -622,6 +636,8 @@ export function useTerminalFileLinks(
 
   return {
     linkProvider,
-    isReady: !!linkProvider
+    // The provider is null exactly when there is no terminal (see the memo);
+    // reading the provider object here would count as reading its refs
+    isReady: terminal !== null
   }
 }

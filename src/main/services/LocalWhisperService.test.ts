@@ -146,17 +146,23 @@ vi.mock('../../shared/errors', async () => {
 const mockEnsureBinary = vi.fn()
 const mockEnsureModel = vi.fn()
 const mockVerifyInstalledBinary = vi.fn()
+const mockVerifyInstalledModelFile = vi.fn()
+const mockAssertModelUnchanged = vi.fn()
 
 vi.mock('./WhisperModelManager', () => ({
   whisperModelManager: {
     ensureBinary: (...args: unknown[]) => mockEnsureBinary(...args),
     ensureModel: (...args: unknown[]) => mockEnsureModel(...args),
-    verifyInstalledBinary: (...args: unknown[]) => mockVerifyInstalledBinary(...args)
+    verifyInstalledBinary: (...args: unknown[]) => mockVerifyInstalledBinary(...args),
+    verifyInstalledModelFile: (...args: unknown[]) => mockVerifyInstalledModelFile(...args),
+    assertVerifiedModelUnchanged: (...args: unknown[]) => mockAssertModelUnchanged(...args)
   },
   createWhisperModelManager: () => ({
     ensureBinary: (...args: unknown[]) => mockEnsureBinary(...args),
     ensureModel: (...args: unknown[]) => mockEnsureModel(...args),
-    verifyInstalledBinary: (...args: unknown[]) => mockVerifyInstalledBinary(...args)
+    verifyInstalledBinary: (...args: unknown[]) => mockVerifyInstalledBinary(...args),
+    verifyInstalledModelFile: (...args: unknown[]) => mockVerifyInstalledModelFile(...args),
+    assertVerifiedModelUnchanged: (...args: unknown[]) => mockAssertModelUnchanged(...args)
   })
 }))
 
@@ -318,6 +324,8 @@ describe('LocalWhisperService', () => {
     vi.clearAllMocks()
 
     mockEnsureBinary.mockResolvedValue('/userData/whisper/bin/whisper-cli')
+    mockVerifyInstalledModelFile.mockResolvedValue({ path: '/userData/whisper/models/ggml-tiny.bin', dev: 1, ino: 2, size: 3, mtimeMs: 4, ctimeMs: 5 })
+    mockAssertModelUnchanged.mockResolvedValue(undefined)
     mockEnsureModel.mockResolvedValue('/userData/whisper/models/ggml-tiny.bin')
     // `verifyInstalledBinary` returns the `VerifiedBinary` shape consumed
     // by `LocalWhisperService.runWhisper` for the spawn-path forensic log.
@@ -358,7 +366,9 @@ describe('LocalWhisperService', () => {
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
         ensureModel: mockEnsureModel,
-        verifyInstalledBinary: mockVerifyInstalledBinary
+        verifyInstalledBinary: mockVerifyInstalledBinary,
+        verifyInstalledModelFile: mockVerifyInstalledModelFile,
+        assertVerifiedModelUnchanged: mockAssertModelUnchanged
       } as never)
 
       await service.transcribe({
@@ -372,6 +382,66 @@ describe('LocalWhisperService', () => {
       expect(mockEnsureModel).toHaveBeenCalledWith('tiny', expect.objectContaining({ signal: undefined }))
     })
 
+    it('verifies the model once per job before spawning and does not spawn when it fails', async () => {
+      setupDualExecFileMock('0:01:00.00')
+      mockSpawn.mockImplementation(() => makeWhisperSpawnChild(0))
+      mockVerifyInstalledModelFile.mockRejectedValueOnce(
+        new Error('The tiny model failed its integrity check and was removed.')
+      )
+
+      const { createLocalWhisperService } = await import('./LocalWhisperService')
+      const service = createLocalWhisperService({
+        ensureBinary: mockEnsureBinary,
+        ensureModel: mockEnsureModel,
+        verifyInstalledBinary: mockVerifyInstalledBinary,
+        verifyInstalledModelFile: mockVerifyInstalledModelFile,
+        assertVerifiedModelUnchanged: mockAssertModelUnchanged
+      } as never)
+
+      const result = await service.transcribe({
+        filePath: '/audio/test.wav',
+        language: 'en',
+        model: 'tiny',
+        onProgress
+      })
+
+      expect(mockVerifyInstalledModelFile).toHaveBeenCalledWith(
+        'tiny',
+        expect.objectContaining({ signal: undefined })
+      )
+      expect(result.success).toBe(false)
+      expect(mockSpawn).not.toHaveBeenCalled()
+    })
+
+    it('stops the job without spawning when the model file changed after it was verified', async () => {
+      setupDualExecFileMock('0:01:00.00')
+      mockSpawn.mockImplementation(() => makeWhisperSpawnChild(0))
+      mockAssertModelUnchanged.mockRejectedValueOnce(new Error('The tiny model changed after it was checked.'))
+
+      const { createLocalWhisperService } = await import('./LocalWhisperService')
+      const service = createLocalWhisperService({
+        ensureBinary: mockEnsureBinary,
+        ensureModel: mockEnsureModel,
+        verifyInstalledBinary: mockVerifyInstalledBinary,
+        verifyInstalledModelFile: mockVerifyInstalledModelFile,
+        assertVerifiedModelUnchanged: mockAssertModelUnchanged
+      } as never)
+
+      const result = await service.transcribe({
+        filePath: '/audio/test.wav',
+        language: 'en',
+        model: 'tiny',
+        onProgress
+      })
+
+      expect(mockAssertModelUnchanged).toHaveBeenCalledWith(
+        'tiny',
+        { path: '/userData/whisper/models/ggml-tiny.bin', dev: 1, ino: 2, size: 3, mtimeMs: 4, ctimeMs: 5 }
+      )
+      expect(result.success).toBe(false)
+      expect(mockSpawn).not.toHaveBeenCalled()
+    })
+
     it('spawns whisper-cli with correct arguments', async () => {
       setupDualExecFileMock('0:01:00.00')
       mockSpawn.mockImplementation(() => makeWhisperSpawnChild(0))
@@ -380,7 +450,9 @@ describe('LocalWhisperService', () => {
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
         ensureModel: mockEnsureModel,
-        verifyInstalledBinary: mockVerifyInstalledBinary
+        verifyInstalledBinary: mockVerifyInstalledBinary,
+        verifyInstalledModelFile: mockVerifyInstalledModelFile,
+        assertVerifiedModelUnchanged: mockAssertModelUnchanged
       } as never)
 
       await service.transcribe({
@@ -425,7 +497,9 @@ describe('LocalWhisperService', () => {
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
         ensureModel: mockEnsureModel,
-        verifyInstalledBinary: mockVerifyInstalledBinary
+        verifyInstalledBinary: mockVerifyInstalledBinary,
+        verifyInstalledModelFile: mockVerifyInstalledModelFile,
+        assertVerifiedModelUnchanged: mockAssertModelUnchanged
       } as never)
 
       await service.transcribe({
@@ -456,7 +530,9 @@ describe('LocalWhisperService', () => {
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
         ensureModel: mockEnsureModel,
-        verifyInstalledBinary: mockVerifyInstalledBinary
+        verifyInstalledBinary: mockVerifyInstalledBinary,
+        verifyInstalledModelFile: mockVerifyInstalledModelFile,
+        assertVerifiedModelUnchanged: mockAssertModelUnchanged
       } as never)
 
       const result = await service.transcribe({
@@ -479,7 +555,9 @@ describe('LocalWhisperService', () => {
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
         ensureModel: mockEnsureModel,
-        verifyInstalledBinary: mockVerifyInstalledBinary
+        verifyInstalledBinary: mockVerifyInstalledBinary,
+        verifyInstalledModelFile: mockVerifyInstalledModelFile,
+        assertVerifiedModelUnchanged: mockAssertModelUnchanged
       } as never)
 
       const result = await service.transcribe({
@@ -501,7 +579,9 @@ describe('LocalWhisperService', () => {
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
         ensureModel: mockEnsureModel,
-        verifyInstalledBinary: mockVerifyInstalledBinary
+        verifyInstalledBinary: mockVerifyInstalledBinary,
+        verifyInstalledModelFile: mockVerifyInstalledModelFile,
+        assertVerifiedModelUnchanged: mockAssertModelUnchanged
       } as never)
 
       const result = await service.transcribe({
@@ -523,7 +603,9 @@ describe('LocalWhisperService', () => {
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
         ensureModel: mockEnsureModel,
-        verifyInstalledBinary: mockVerifyInstalledBinary
+        verifyInstalledBinary: mockVerifyInstalledBinary,
+        verifyInstalledModelFile: mockVerifyInstalledModelFile,
+        assertVerifiedModelUnchanged: mockAssertModelUnchanged
       } as never)
 
       const result = await service.transcribe({
@@ -551,7 +633,9 @@ describe('LocalWhisperService', () => {
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
         ensureModel: mockEnsureModel,
-        verifyInstalledBinary: mockVerifyInstalledBinary
+        verifyInstalledBinary: mockVerifyInstalledBinary,
+        verifyInstalledModelFile: mockVerifyInstalledModelFile,
+        assertVerifiedModelUnchanged: mockAssertModelUnchanged
       } as never)
 
       await service.transcribe({
@@ -584,7 +668,9 @@ describe('LocalWhisperService', () => {
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
         ensureModel: mockEnsureModel,
-        verifyInstalledBinary: mockVerifyInstalledBinary
+        verifyInstalledBinary: mockVerifyInstalledBinary,
+        verifyInstalledModelFile: mockVerifyInstalledModelFile,
+        assertVerifiedModelUnchanged: mockAssertModelUnchanged
       } as never)
 
       await service.transcribe({
@@ -608,7 +694,9 @@ describe('LocalWhisperService', () => {
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
         ensureModel: mockEnsureModel,
-        verifyInstalledBinary: mockVerifyInstalledBinary
+        verifyInstalledBinary: mockVerifyInstalledBinary,
+        verifyInstalledModelFile: mockVerifyInstalledModelFile,
+        assertVerifiedModelUnchanged: mockAssertModelUnchanged
       } as never)
 
       await service.transcribe({
@@ -635,7 +723,9 @@ describe('LocalWhisperService', () => {
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
         ensureModel: mockEnsureModel,
-        verifyInstalledBinary: mockVerifyInstalledBinary
+        verifyInstalledBinary: mockVerifyInstalledBinary,
+        verifyInstalledModelFile: mockVerifyInstalledModelFile,
+        assertVerifiedModelUnchanged: mockAssertModelUnchanged
       } as never)
 
       const result = await service.transcribe({
@@ -659,7 +749,9 @@ describe('LocalWhisperService', () => {
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
         ensureModel: mockEnsureModel,
-        verifyInstalledBinary: mockVerifyInstalledBinary
+        verifyInstalledBinary: mockVerifyInstalledBinary,
+        verifyInstalledModelFile: mockVerifyInstalledModelFile,
+        assertVerifiedModelUnchanged: mockAssertModelUnchanged
       } as never)
 
       const result = await service.transcribe({
@@ -685,7 +777,9 @@ describe('LocalWhisperService', () => {
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
         ensureModel: mockEnsureModel,
-        verifyInstalledBinary: mockVerifyInstalledBinary
+        verifyInstalledBinary: mockVerifyInstalledBinary,
+        verifyInstalledModelFile: mockVerifyInstalledModelFile,
+        assertVerifiedModelUnchanged: mockAssertModelUnchanged
       } as never)
 
       const result = await service.transcribe({
@@ -709,7 +803,9 @@ describe('LocalWhisperService', () => {
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
         ensureModel: mockEnsureModel,
-        verifyInstalledBinary: mockVerifyInstalledBinary
+        verifyInstalledBinary: mockVerifyInstalledBinary,
+        verifyInstalledModelFile: mockVerifyInstalledModelFile,
+        assertVerifiedModelUnchanged: mockAssertModelUnchanged
       } as never)
 
       const result = await service.transcribe({
@@ -737,7 +833,9 @@ describe('LocalWhisperService', () => {
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
         ensureModel: mockEnsureModel,
-        verifyInstalledBinary: mockVerifyInstalledBinary
+        verifyInstalledBinary: mockVerifyInstalledBinary,
+        verifyInstalledModelFile: mockVerifyInstalledModelFile,
+        assertVerifiedModelUnchanged: mockAssertModelUnchanged
       } as never)
 
       const result = await service.transcribe({
@@ -765,7 +863,9 @@ describe('LocalWhisperService', () => {
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
         ensureModel: mockEnsureModel,
-        verifyInstalledBinary: mockVerifyInstalledBinary
+        verifyInstalledBinary: mockVerifyInstalledBinary,
+        verifyInstalledModelFile: mockVerifyInstalledModelFile,
+        assertVerifiedModelUnchanged: mockAssertModelUnchanged
       } as never)
 
       const result = await service.transcribe({
@@ -811,7 +911,9 @@ describe('LocalWhisperService', () => {
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
         ensureModel: mockEnsureModel,
-        verifyInstalledBinary: mockVerifyInstalledBinary
+        verifyInstalledBinary: mockVerifyInstalledBinary,
+        verifyInstalledModelFile: mockVerifyInstalledModelFile,
+        assertVerifiedModelUnchanged: mockAssertModelUnchanged
       } as never)
 
       const transcribePromise = service.transcribe({
@@ -848,7 +950,9 @@ describe('LocalWhisperService', () => {
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
         ensureModel: mockEnsureModel,
-        verifyInstalledBinary: mockVerifyInstalledBinary
+        verifyInstalledBinary: mockVerifyInstalledBinary,
+        verifyInstalledModelFile: mockVerifyInstalledModelFile,
+        assertVerifiedModelUnchanged: mockAssertModelUnchanged
       } as never)
 
       await service.transcribe({
@@ -874,7 +978,9 @@ describe('LocalWhisperService', () => {
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
         ensureModel: mockEnsureModel,
-        verifyInstalledBinary: mockVerifyInstalledBinary
+        verifyInstalledBinary: mockVerifyInstalledBinary,
+        verifyInstalledModelFile: mockVerifyInstalledModelFile,
+        assertVerifiedModelUnchanged: mockAssertModelUnchanged
       } as never)
 
       await service.transcribe({
@@ -899,7 +1005,9 @@ describe('LocalWhisperService', () => {
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
         ensureModel: mockEnsureModel,
-        verifyInstalledBinary: mockVerifyInstalledBinary
+        verifyInstalledBinary: mockVerifyInstalledBinary,
+        verifyInstalledModelFile: mockVerifyInstalledModelFile,
+        assertVerifiedModelUnchanged: mockAssertModelUnchanged
       } as never)
 
       const result = await service.transcribe({
@@ -929,7 +1037,9 @@ describe('LocalWhisperService', () => {
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
         ensureModel: mockEnsureModel,
-        verifyInstalledBinary: mockVerifyInstalledBinary
+        verifyInstalledBinary: mockVerifyInstalledBinary,
+        verifyInstalledModelFile: mockVerifyInstalledModelFile,
+        assertVerifiedModelUnchanged: mockAssertModelUnchanged
       } as never)
 
       const result = await service.transcribe({
@@ -955,7 +1065,9 @@ describe('LocalWhisperService', () => {
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
         ensureModel: mockEnsureModel,
-        verifyInstalledBinary: mockVerifyInstalledBinary
+        verifyInstalledBinary: mockVerifyInstalledBinary,
+        verifyInstalledModelFile: mockVerifyInstalledModelFile,
+        assertVerifiedModelUnchanged: mockAssertModelUnchanged
       } as never)
 
       const result = await service.transcribe({
@@ -981,7 +1093,9 @@ describe('LocalWhisperService', () => {
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
         ensureModel: mockEnsureModel,
-        verifyInstalledBinary: mockVerifyInstalledBinary
+        verifyInstalledBinary: mockVerifyInstalledBinary,
+        verifyInstalledModelFile: mockVerifyInstalledModelFile,
+        assertVerifiedModelUnchanged: mockAssertModelUnchanged
       } as never)
 
       await service.transcribe({
@@ -1017,7 +1131,9 @@ describe('LocalWhisperService', () => {
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
         ensureModel: mockEnsureModel,
-        verifyInstalledBinary: mockVerifyInstalledBinary
+        verifyInstalledBinary: mockVerifyInstalledBinary,
+        verifyInstalledModelFile: mockVerifyInstalledModelFile,
+        assertVerifiedModelUnchanged: mockAssertModelUnchanged
       } as never)
 
       await service.transcribe({
@@ -1029,6 +1145,9 @@ describe('LocalWhisperService', () => {
 
       // 600 / 480 = ceil(1.25) = 2 chunks
       expect(spawnCallCount).toBe(2)
+      // The model is hashed once for the job but re-checked before every chunk's spawn.
+      expect(mockVerifyInstalledModelFile).toHaveBeenCalledTimes(1)
+      expect(mockAssertModelUnchanged).toHaveBeenCalledTimes(2)
     })
 
     it('joins chunk transcripts with spaces', async () => {
@@ -1045,7 +1164,9 @@ describe('LocalWhisperService', () => {
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
         ensureModel: mockEnsureModel,
-        verifyInstalledBinary: mockVerifyInstalledBinary
+        verifyInstalledBinary: mockVerifyInstalledBinary,
+        verifyInstalledModelFile: mockVerifyInstalledModelFile,
+        assertVerifiedModelUnchanged: mockAssertModelUnchanged
       } as never)
 
       const result = await service.transcribe({
@@ -1069,7 +1190,9 @@ describe('LocalWhisperService', () => {
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
         ensureModel: mockEnsureModel,
-        verifyInstalledBinary: mockVerifyInstalledBinary
+        verifyInstalledBinary: mockVerifyInstalledBinary,
+        verifyInstalledModelFile: mockVerifyInstalledModelFile,
+        assertVerifiedModelUnchanged: mockAssertModelUnchanged
       } as never)
 
       await service.transcribe({
@@ -1092,7 +1215,9 @@ describe('LocalWhisperService', () => {
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
         ensureModel: mockEnsureModel,
-        verifyInstalledBinary: mockVerifyInstalledBinary
+        verifyInstalledBinary: mockVerifyInstalledBinary,
+        verifyInstalledModelFile: mockVerifyInstalledModelFile,
+        assertVerifiedModelUnchanged: mockAssertModelUnchanged
       } as never)
 
       await service.transcribe({
@@ -1131,7 +1256,9 @@ describe('LocalWhisperService', () => {
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
         ensureModel: mockEnsureModel,
-        verifyInstalledBinary: mockVerifyInstalledBinary
+        verifyInstalledBinary: mockVerifyInstalledBinary,
+        verifyInstalledModelFile: mockVerifyInstalledModelFile,
+        assertVerifiedModelUnchanged: mockAssertModelUnchanged
       } as never)
 
       const result = await service.transcribe({
@@ -1160,7 +1287,9 @@ describe('LocalWhisperService', () => {
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
         ensureModel: mockEnsureModel,
-        verifyInstalledBinary: mockVerifyInstalledBinary
+        verifyInstalledBinary: mockVerifyInstalledBinary,
+        verifyInstalledModelFile: mockVerifyInstalledModelFile,
+        assertVerifiedModelUnchanged: mockAssertModelUnchanged
       } as never)
 
       await service.transcribe({
@@ -1183,7 +1312,9 @@ describe('LocalWhisperService', () => {
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
         ensureModel: mockEnsureModel,
-        verifyInstalledBinary: mockVerifyInstalledBinary
+        verifyInstalledBinary: mockVerifyInstalledBinary,
+        verifyInstalledModelFile: mockVerifyInstalledModelFile,
+        assertVerifiedModelUnchanged: mockAssertModelUnchanged
       } as never)
 
       const result = await service.transcribe({
@@ -1212,7 +1343,9 @@ describe('LocalWhisperService', () => {
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
         ensureModel: mockEnsureModel,
-        verifyInstalledBinary: mockVerifyInstalledBinary
+        verifyInstalledBinary: mockVerifyInstalledBinary,
+        verifyInstalledModelFile: mockVerifyInstalledModelFile,
+        assertVerifiedModelUnchanged: mockAssertModelUnchanged
       } as never)
 
       // Should not throw despite cleanup failing
@@ -1234,7 +1367,9 @@ describe('LocalWhisperService', () => {
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
         ensureModel: mockEnsureModel,
-        verifyInstalledBinary: mockVerifyInstalledBinary
+        verifyInstalledBinary: mockVerifyInstalledBinary,
+        verifyInstalledModelFile: mockVerifyInstalledModelFile,
+        assertVerifiedModelUnchanged: mockAssertModelUnchanged
       } as never)
 
       await service.transcribe({
@@ -1267,7 +1402,9 @@ describe('LocalWhisperService', () => {
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
         ensureModel: mockEnsureModel,
-        verifyInstalledBinary: mockVerifyInstalledBinary
+        verifyInstalledBinary: mockVerifyInstalledBinary,
+        verifyInstalledModelFile: mockVerifyInstalledModelFile,
+        assertVerifiedModelUnchanged: mockAssertModelUnchanged
       } as never)
 
       const result = await service.transcribe({
@@ -1291,7 +1428,9 @@ describe('LocalWhisperService', () => {
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
         ensureModel: mockEnsureModel,
-        verifyInstalledBinary: mockVerifyInstalledBinary
+        verifyInstalledBinary: mockVerifyInstalledBinary,
+        verifyInstalledModelFile: mockVerifyInstalledModelFile,
+        assertVerifiedModelUnchanged: mockAssertModelUnchanged
       } as never)
 
       const result = await service.transcribe({
@@ -1321,7 +1460,9 @@ describe('LocalWhisperService', () => {
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
         ensureModel: mockEnsureModel,
-        verifyInstalledBinary: mockVerifyInstalledBinary
+        verifyInstalledBinary: mockVerifyInstalledBinary,
+        verifyInstalledModelFile: mockVerifyInstalledModelFile,
+        assertVerifiedModelUnchanged: mockAssertModelUnchanged
       } as never)
 
       const result = await service.transcribe({
@@ -1345,7 +1486,9 @@ describe('LocalWhisperService', () => {
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
         ensureModel: mockEnsureModel,
-        verifyInstalledBinary: mockVerifyInstalledBinary
+        verifyInstalledBinary: mockVerifyInstalledBinary,
+        verifyInstalledModelFile: mockVerifyInstalledModelFile,
+        assertVerifiedModelUnchanged: mockAssertModelUnchanged
       } as never)
 
       const result = await service.transcribe({
@@ -1377,7 +1520,9 @@ describe('LocalWhisperService', () => {
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
         ensureModel: mockEnsureModel,
-        verifyInstalledBinary: mockVerifyInstalledBinary
+        verifyInstalledBinary: mockVerifyInstalledBinary,
+        verifyInstalledModelFile: mockVerifyInstalledModelFile,
+        assertVerifiedModelUnchanged: mockAssertModelUnchanged
       } as never)
 
       expect(service).not.toBe(localWhisperService)
@@ -1419,12 +1564,16 @@ describe('LocalWhisperService', () => {
         whisperModelManager: {
           ensureBinary: (...args: unknown[]) => mockEnsureBinary(...args),
           ensureModel: (...args: unknown[]) => mockEnsureModel(...args),
-          verifyInstalledBinary: (...args: unknown[]) => mockVerifyInstalledBinary(...args)
+          verifyInstalledBinary: (...args: unknown[]) => mockVerifyInstalledBinary(...args),
+          verifyInstalledModelFile: (...args: unknown[]) => mockVerifyInstalledModelFile(...args),
+          assertVerifiedModelUnchanged: (...args: unknown[]) => mockAssertModelUnchanged(...args)
         },
         createWhisperModelManager: () => ({
           ensureBinary: (...args: unknown[]) => mockEnsureBinary(...args),
           ensureModel: (...args: unknown[]) => mockEnsureModel(...args),
-          verifyInstalledBinary: (...args: unknown[]) => mockVerifyInstalledBinary(...args)
+          verifyInstalledBinary: (...args: unknown[]) => mockVerifyInstalledBinary(...args),
+          verifyInstalledModelFile: (...args: unknown[]) => mockVerifyInstalledModelFile(...args),
+          assertVerifiedModelUnchanged: (...args: unknown[]) => mockAssertModelUnchanged(...args)
         })
       }))
       vi.doMock('../../shared/constants', () => ({
@@ -1477,7 +1626,9 @@ describe('LocalWhisperService', () => {
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
         ensureModel: mockEnsureModel,
-        verifyInstalledBinary: mockVerifyInstalledBinary
+        verifyInstalledBinary: mockVerifyInstalledBinary,
+        verifyInstalledModelFile: mockVerifyInstalledModelFile,
+        assertVerifiedModelUnchanged: mockAssertModelUnchanged
       } as never)
 
       await service.transcribe({
@@ -1507,7 +1658,9 @@ describe('LocalWhisperService', () => {
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
         ensureModel: mockEnsureModel,
-        verifyInstalledBinary: mockVerifyInstalledBinary
+        verifyInstalledBinary: mockVerifyInstalledBinary,
+        verifyInstalledModelFile: mockVerifyInstalledModelFile,
+        assertVerifiedModelUnchanged: mockAssertModelUnchanged
       } as never)
 
       // resolveFfmpegPath() throws before any ffmpeg spawn; transcribe() maps

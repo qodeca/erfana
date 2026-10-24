@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { useEffect, useRef, useState } from 'react'
+import { useLatestRef } from '../../hooks/useLatestRef'
 import './ResizableDivider.css'
 
 interface ResizableDividerProps {
@@ -14,6 +15,9 @@ export function ResizableDivider({ onResize, onResizeEnd, orientation = 'vertica
   const dividerRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLElement | null>(null)
   const lastPercentageRef = useRef<number>(50)
+  // Read at mouse-up rather than subscribed to, so a new onResizeEnd identity
+  // does not tear down and re-add the drag listeners.
+  const onResizeEndRef = useLatestRef(onResizeEnd)
 
   useEffect(() => {
     // Find the parent container (.editor-content) to calculate relative position
@@ -61,9 +65,7 @@ export function ResizableDivider({ onResize, onResizeEnd, orientation = 'vertica
       document.body.style.cursor = ''
       document.body.style.userSelect = ''
       // Notify resize end with the last computed percentage
-      if (onResizeEnd) {
-        onResizeEnd(lastPercentageRef.current)
-      }
+      onResizeEndRef.current?.(lastPercentageRef.current)
     }
 
     // Set cursor globally during drag based on orientation
@@ -80,7 +82,7 @@ export function ResizableDivider({ onResize, onResizeEnd, orientation = 'vertica
       document.body.style.cursor = ''
       document.body.style.userSelect = ''
     }
-  }, [isDragging, onResize, orientation])
+  }, [isDragging, onResize, onResizeEndRef, orientation])
 
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault()

@@ -62,6 +62,58 @@ function assertSelfContainedPreloads(): Plugin {
 }
 
 /**
+ * Source of the module-path confinement every main-process bundle runs first
+ * (src/main/bootstrap/confineModulePaths.cjs). Inlined as Rollup's `intro`,
+ * which lands ahead of the bundle's own `require()` calls, so not even the
+ * first dependency is resolved with the wider default search path.
+ */
+// A property name the minifier keeps, so the check below can find the intro.
+export const CONFINE_MODULE_PATHS_MARKER = '__erfanaConfinedTo'
+// The bundle's real `module` is passed in as `m` BEFORE the local `module`
+// shim shadows it, so the confinement can also narrow the entry's own
+// `module.paths` (computed by Node before any code in the file ran).
+const confineModulePathsIntro = [
+  ';(function(m){',
+  'var module={exports:{}};var exports=module.exports;',
+  readFileSync(resolve('src/main/bootstrap/confineModulePaths.cjs'), 'utf-8').replace(/^'use strict'$/m, ''),
+  ';module.exports.confineModuleSearchPaths(require("module"),require("path"),__filename,m,require("url"));',
+  '})(module);'
+].join('\n')
+
+/**
+ * Fail the build when a main-process entry does not confine its module search
+ * paths BEFORE its first `require()` of a dependency. Rollup's `intro` is
+ * documented to land first; this proves it on every build (local, CI's Build
+ * job, the release legs), so a bundler change cannot silently reorder it.
+ */
+function assertModulePathsConfinedFirst(): Plugin {
+  const BUILTIN_REQUIRE = /^(electron|module|path|url|node:.+)$/
+  return {
+    name: 'erfana:main-module-paths-confined',
+    apply: 'build',
+    // generateBundle sees the final (minified) chunk text before it is written.
+    // This checks TEXT order only – the intro string sits before the first
+    // dependency `require(` in the file – which is what Rollup's `intro`
+    // guarantees; the packaged probe in the spike report checks the runtime effect.
+    generateBundle(_options, bundle): void {
+      for (const output of Object.values(bundle)) {
+        if (output.type !== 'chunk' || !output.isEntry) continue
+        const marker = output.code.indexOf(CONFINE_MODULE_PATHS_MARKER)
+        const firstDependency = [...output.code.matchAll(/require\((['"])([^'"]+)\1\)/g)].find(
+          (m) => !BUILTIN_REQUIRE.test(m[2])
+        )
+        if (marker < 0 || (firstDependency?.index !== undefined && firstDependency.index < marker)) {
+          throw new Error(
+            `Main-process entry ${output.fileName} does not confine its module search paths before its first ` +
+              `dependency require (src/main/bootstrap/confineModulePaths.cjs). Relaxing this check is not a fix.`
+          )
+        }
+      }
+    }
+  }
+}
+
+/**
  * Minimum DOMPurify version the renderer may ship. It fixes GHSA-p98j-92pf-mc4p,
  * GHSA-6688-9rhm-gjv2, GHSA-cg2g-xh64-v4q7, GHSA-mrv2-3pqr-j5jr and GHSA-c6gr-qvv4-5v3f.
  */
@@ -112,8 +164,13 @@ function assertSingleDompurify(): Plugin {
 
 export default defineConfig({
   main: {
+    plugins: [assertModulePathsConfinedFirst()],
     build: {
       rollupOptions: {
+        output: {
+          // Runs before every main-process bundle's first require() – see above.
+          intro: confineModulePathsIntro
+        },
         input: {
           index: resolve('src/main/index.ts'),
           'git-status.worker': resolve('src/main/services/workers/git-status.worker.ts'),

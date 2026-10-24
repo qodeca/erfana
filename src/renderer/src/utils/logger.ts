@@ -16,6 +16,8 @@
  */
 import type { LogLevel, LogEntry } from '../../../shared/ipc/logging-schema'
 import { shouldLog } from '../../../shared/ipc/logging-schema'
+import { loggingGateway } from '../services/loggingGateway'
+import { hasBridgeMethod } from '../services/bridgePresence'
 
 /** Console prefix used when no log entry can be delivered over IPC. */
 const SEND_FAILURE_PREFIX = 'Failed to send log to main process:'
@@ -99,7 +101,8 @@ function describeError(error: Error): LogEntry['error'] {
 /**
  * Resolve the log transport available in THIS renderer.
  *
- * The editor window is given `window.api.logging.log` by `preload/index.ts`.
+ * The editor window is given `window.api.logging.log` by the preload
+ * (`preload/loggingBridge.ts`), reached through `services/loggingGateway`.
  * The screenshot-overlay window has no `window.api` at all — its split preload
  * (`preload/screenshotOverlay.ts`, #164 F[6]) exposes `window.overlayApi.log`
  * over the same `logging:log` channel, which is the only evidence trail that
@@ -111,9 +114,8 @@ function describeError(error: Error): LogEntry['error'] {
  * @returns A send function, or `undefined` when no bridge is present
  */
 function resolveLogSink(): ((entry: LogEntry) => void) | undefined {
-  const mainBridge = window.api?.logging
-  if (typeof mainBridge?.log === 'function') {
-    return (entry) => mainBridge.log(entry)
+  if (hasBridgeMethod('logging', 'log')) {
+    return (entry) => loggingGateway.log(entry)
   }
 
   const overlayBridge = window.overlayApi
@@ -138,7 +140,7 @@ export class RendererLogger {
   async initialize(): Promise<void> {
     try {
       // Get initial level from main process
-      const level = await window.api.logging.getLevel()
+      const level = await loggingGateway.getLevel()
       this.currentLevel = level as LogLevel
 
       // Install global error handlers

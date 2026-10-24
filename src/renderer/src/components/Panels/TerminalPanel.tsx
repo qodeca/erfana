@@ -61,6 +61,8 @@ import { getRestartRisk, buildRestartConfirm } from './TerminalPanel/restartGuar
 import { createOutputAcker } from './TerminalPanel/outputAck'
 import { ensureTerminalFontLoaded, createTerminalLinkHandler } from './TerminalPanel/terminalPanel.logic'
 import type { TerminalState } from './TerminalPanel/types'
+import { routeTerminalMenuKey } from './TerminalPanel/terminalMenuKey'
+import { isKeyboardMenuEcho } from '../ContextMenu/contextMenuKey'
 import { fileGateway } from '../../services/fileGateway'
 import { terminalGateway } from '../../services/terminalGateway'
 
@@ -499,7 +501,16 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
 
       // Attach clipboard key handler wrapped with scroll lock (issue #60)
       const wrappedKeyHandler = wrapKeyHandler(handleKeyEvent)
-      xterm.attachCustomKeyEventHandler(wrappedKeyHandler)
+      xterm.attachCustomKeyEventHandler((event) => {
+        // Shift+F10 / the Menu key open the terminal's context menu (#90)
+        // instead of reaching the shell. xterm keeps its helper textarea at
+        // the cursor, so its box is where the menu opens.
+        const caret = xterm.textarea ?? xterm.element ?? null
+        const open = (x: number, y: number): void => portalContext?.openTerminalContextMenu(x, y)
+        /* deviates: design/system/components/menu/index.html — no aria-haspopup/expanded: xterm owns its textarea. */
+        if (routeTerminalMenuKey(event, caret, open)) return false
+        return wrappedKeyHandler(event)
+      })
 
       // Attach wheel event handler for scroll lock (issue #60)
       xterm.attachCustomWheelEventHandler(handleWheelEvent)
@@ -511,7 +522,12 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
         const handleNativeContextMenu = (e: MouseEvent) => {
           e.preventDefault()
           e.stopPropagation()
-          xterm.blur() // Release focus so context menu is interactive
+          // Windows also sends a native contextmenu for the Menu key, after
+          // the key handler above already opened the menu at the cursor.
+          if (isKeyboardMenuEcho()) return
+          // No xterm.blur() any more: the menu moves focus into itself on open
+          // (#90), and it must see the terminal as its opener so that Escape
+          // hands focus back to the terminal rather than to <body>.
           portalContext?.openTerminalContextMenu(e.clientX, e.clientY)
         }
         xterm.element.addEventListener('contextmenu', handleNativeContextMenu)
@@ -749,8 +765,17 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
         }
       })
 
-      // Phase 1.2: Success - clear cleanup registry (handlers now owned by component lifecycle)
-      cleanupRegistryRef.current = []
+      // Phase 1.2: Success - clear cleanup registry (handlers now owned by component lifecycle).
+      // The one-time clear listener stays registered until a clear arrives (a shell whose
+      // marker never comes sends none), so unmount removes it.
+      cleanupRegistryRef.current = [
+        () => {
+          if (clearUnsubscribe) {
+            clearUnsubscribe()
+            clearUnsubscribe = null
+          }
+        }
+      ]
     } catch (err) {
       // Phase 1.2 bug fix: Run all registered cleanups on error
       runAllCleanups()
@@ -784,6 +809,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       // Use centralized cleanup (Phase 1.1 bug fix - race condition)
       // Fire-and-forget in cleanup, but properly awaited internally
       void cleanupTerminalInstance(terminalIdRef.current)
+      runAllCleanups()
       shellKindRef.current = null
       setActiveTerminal(null)
       // Cleanup parser hooks before disposing xterm
@@ -806,7 +832,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
         visibilityObserverRef.current = null
       }
     }
-  }, [isAvailable, setActiveTerminal, cleanupTerminalInstance, cleanupDragHandlers])
+  }, [isAvailable, setActiveTerminal, cleanupTerminalInstance, cleanupDragHandlers, runAllCleanups])
 
   // Restart terminal on project change
   useEffect(() => {

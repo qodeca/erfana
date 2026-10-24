@@ -59,6 +59,8 @@ import {
   type PreviewMoveRequest,
   type PreviewTabMove
 } from './previewTabMove'
+import { previewGateway } from '../previewGateway'
+import { hasBridge } from '../bridgePresence'
 
 /** A mounted router; call {@link PreviewLinkRouter.dispose} to unsubscribe. */
 export interface PreviewLinkRouter {
@@ -202,7 +204,7 @@ export function mountPreviewLinkRouter(deps: MountPreviewLinkRouterDeps): Previe
   const getDockviewApi = (): DockviewApi | null => useProjectStore.getState().dockviewApi
   const tabMove = createPreviewTabMove({
     getDockviewApi,
-    navigate: (request) => window.api.preview.navigate(request),
+    navigate: (request) => previewGateway.navigate(request),
     closePanel: deps.closePanel,
     isDirty: (panelId) => useProjectStore.getState().dirtyPanelIds.has(panelId),
     hasConflict: (panelId) => editorSaveRegistry.hasConflict(panelId),
@@ -218,12 +220,11 @@ export function mountPreviewLinkRouter(deps: MountPreviewLinkRouterDeps): Previe
       // Always there in the app. Without it, routing is off rather than the
       // editor area crashing in this mount effect; a move's `navigate` then
       // fails too, which the coordinator reads as "not ready".
-      const bridge = window.api?.preview
-      if (!bridge) {
+      if (!hasBridge('preview')) {
         logger.warn('Preview link router: no preview bridge; links from pages are not routed')
         return () => {}
       }
-      return bridge.onOpenFileRequested(callback)
+      return previewGateway.onOpenFileRequested(callback)
     },
     getDockviewApi,
     tabMove

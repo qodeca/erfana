@@ -16,6 +16,7 @@ import {
 } from './previewViewLifecycle'
 import type { PreviewWebContentsHandle } from './PreviewSessionFactory'
 import { PREVIEW_PAGE_CSP_VIOLATION_CHANNEL } from './previewCspViolationBridge'
+import { PREVIEW_PAGE_LINK_NOTE_CHANNEL } from './previewLinkBridge'
 
 /** A WebContents test double that records listeners keyed by event name. */
 /** The object the fake uses as its top-level frame identity. */
@@ -83,7 +84,8 @@ function makeHooks(): PreviewLifecycleHooks {
     onDidFailLoad: vi.fn(),
     onForwardedShortcut: vi.fn(),
     onConsoleMessage: vi.fn(),
-    onCspViolation: vi.fn()
+    onCspViolation: vi.fn(),
+    onLinkNote: vi.fn()
   }
 }
 
@@ -159,6 +161,40 @@ describe('wirePreviewLifecycle CSP-violation wiring', () => {
       { blockedURI: 'https://cdn.example.com/a.js', effectiveDirective: 'script-src' }
     )
     expect(hooks.onCspViolation).not.toHaveBeenCalled()
+  })
+})
+
+describe('wirePreviewLifecycle link-note wiring', () => {
+  // The preload's `seen` note is what keeps a plain click's `will-navigate`
+  // waiting for the click's report; unwired, every click races again.
+  const NOTE = { kind: 'seen', gestureId: 1, href: 'erfana-preview://project/a.html' }
+
+  it('routes a note from the page to onLinkNote, and none from a sub-frame', () => {
+    // Both halves in one test, for the reason the CSP sub-frame test gives:
+    // "not called" alone also holds for a channel that was never wired.
+    const { wc, emitIpc } = makeWebContents()
+    const hooks = makeHooks()
+    wirePreviewLifecycle(makeParams(wc), hooks)
+
+    emitIpc(PREVIEW_PAGE_LINK_NOTE_CHANNEL, { senderFrame: { id: 'some-iframe' } }, NOTE)
+    expect(hooks.onLinkNote).not.toHaveBeenCalled()
+
+    emitIpc(PREVIEW_PAGE_LINK_NOTE_CHANNEL, { senderFrame: MAIN_FRAME }, NOTE)
+    expect(hooks.onLinkNote).toHaveBeenCalledTimes(1)
+    expect(hooks.onLinkNote).toHaveBeenCalledWith(NOTE)
+  })
+
+  it('detaches the note listener on dispose', async () => {
+    const { wc, emitIpc, hasIpcListener } = makeWebContents()
+    const hooks = makeHooks()
+    const lifecycle = wirePreviewLifecycle(makeParams(wc), hooks)
+
+    expect(hasIpcListener(PREVIEW_PAGE_LINK_NOTE_CHANNEL)).toBe(true)
+    await lifecycle.dispose()
+    expect(hasIpcListener(PREVIEW_PAGE_LINK_NOTE_CHANNEL)).toBe(false)
+
+    emitIpc(PREVIEW_PAGE_LINK_NOTE_CHANNEL, { senderFrame: MAIN_FRAME }, NOTE)
+    expect(hooks.onLinkNote).not.toHaveBeenCalled()
   })
 })
 

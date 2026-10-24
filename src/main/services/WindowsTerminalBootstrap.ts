@@ -68,8 +68,8 @@ export function validateWindowsCwd(cwd: string): CwdValidationResult {
  * Normalize trailing path separators in a Windows cwd. Drive roots like
  * `C:\` MUST keep their trailing slash because `C:` means "current
  * directory of drive C", not the drive root. Longer paths have any
- * trailing `\` or `/` stripped because cmd.exe `/K` may parse a closing
- * `\"` as an escaped quote, breaking the bootstrap argument.
+ * trailing `\` or `/` stripped so the spawn cwd and the path the shell
+ * reports back agree. The cwd is no longer embedded in the cmd command line.
  */
 export function normalizeWindowsCwd(cwd: string): string {
   return cwd.length > 3 ? cwd.replace(/[\\/]+$/, '') : cwd
@@ -114,7 +114,7 @@ export interface WindowsBootstrapBuilder {
    * handshake at `TerminalService.ts:215-254` parses
    * `lines[markerIdx - 1]` as the cwd.
    */
-  build(args: { shell: string; cwd: string; marker: string }): string[]
+  build(args: { shell: string; cwd: string; marker: string }): string[] | string
 }
 
 /**
@@ -241,6 +241,17 @@ export class GitBashBootstrapBuilder implements WindowsBootstrapBuilder {
 }
 
 /**
+ * True when the shell is cmd.exe itself: the file name is `cmd` or `cmd.exe`
+ * (case-insensitive, either separator), after trimming whitespace and
+ * surrounding quotes. The single test shared by the cmd bootstrap (which emits
+ * `pause`) and `TerminalService` (which sends the key that ends it).
+ */
+export function isCmdExe(shell: string): boolean {
+  const path = shell.trim().replace(/^"+|"+$/g, '').trim()
+  return /(?:^|[\\/])cmd(?:\.exe)?$/i.test(path)
+}
+
+/**
  * cmd.exe catch-all bootstrap builder. MUST be last in the dispatch chain.
  *
  * - `/D` disables AutoRun.
@@ -248,23 +259,27 @@ export class GitBashBootstrapBuilder implements WindowsBootstrapBuilder {
  * - `@echo off` runs FIRST so cmd.exe does not echo the bootstrap commands
  *   back into the PTY. Without it, `markerDetector` would mis-parse the
  *   echoed `echo <marker>` line as the cwd.
- * - `cd /d "<cwd>"` changes directory.
+ * - The cwd is set by `pty.spawn`, not by the command line (see `build`).
  * - Bare `cd` (no args) prints the current directory – cmd.exe's analog of
  *   POSIX `pwd`.
  * - `echo <marker>` prints the marker.
- * - `cls` wipes ConPTY's visible viewport before the interactive prompt
- *   takes over. See `GitBashBootstrapBuilder.build` for the reflow-leak
- *   rationale. Note: on Windows 10 ≥ 1809 ConPTY `cls` emits `CSI 2J` +
- *   `CSI H` but *not* `CSI 3J`, so scrollback is not cleared – this is a
- *   known limitation (see `docs/known-issues.md` Windows section); users
- *   hitting scrollback-reflow can switch $SHELL to pwsh or Git Bash, both
- *   of which emit the full three-sequence clear.
+ * - `pause >nul` waits for a key between the marker and `cls`. ConPTY sends
+ *   the final screen, not every line: a `cls` right after `echo <marker>`
+ *   lands in the same frame and the cd line and the marker never reach the PTY
+ *   stream. While cmd sits idle in `pause`, ConPTY flushes the marker frame.
+ *   `TerminalService` then writes `\r` (on marker detection, or on the
+ *   missing-marker timeout) and holds typed input until it has.
+ * - `cls` wipes ConPTY's own screen buffer in a frame of its own, so a later
+ *   resize repaint cannot bring the cd line and the marker back. On Windows 10
+ *   ≥ 1809 it emits `CSI 2J` + `CSI H` but *not* `CSI 3J`, so scrollback is not
+ *   cleared – a known limitation (see `docs/known-issues.md`); users hitting
+ *   scrollback-reflow can switch $SHELL to pwsh or Git Bash, both of which emit
+ *   the full three-sequence clear.
+ * - `& echo on` (unconditional) restores the prompt `@echo off` hid.
  *
- * Documented limitation: cwds containing `%` may have `%VAR%`-style
- * substrings expanded by cmd.exe. The deny-list does not cover `%` because
- * Windows users routinely have legitimate paths containing it (`100%done`).
- * The expansion is deterministic and silent; documented in
- * `docs/windows/implementation-plan.md`.
+ * The cwd never enters the command line, so `%` / `!` in a cwd are inert
+ * (they used to be expanded by cmd.exe). UNC cwds fall back to cmd's own
+ * Windows-directory default (see `build`).
  */
 export class CmdExeBootstrapBuilder implements WindowsBootstrapBuilder {
   readonly kind = 'cmd.exe' as const
@@ -274,9 +289,29 @@ export class CmdExeBootstrapBuilder implements WindowsBootstrapBuilder {
     return true
   }
 
-  build({ cwd, marker }: { shell: string; cwd: string; marker: string }): string[] {
-    const script = `@echo off && cd /d "${cwd}" && cd && echo ${marker} && cls`
-    return ['/D', '/K', script]
+  /**
+   * Returns a ready-made command-line STRING, not an argv array. node-pty
+   * (`argsToCommandLine`) would wrap an array argument in quotes and turn each
+   * inner `"` into `\"` (the MSVCRT rule), which cmd.exe does not understand.
+   * With `/S`, cmd strips exactly the outer quote pair and runs the rest
+   * verbatim.
+   *
+   * The cwd is NOT part of the command line: `pty.spawn` already starts the
+   * shell in the validated, normalized cwd, and the bare `cd` prints it for the
+   * marker handshake. That removes every path-quoting risk and `%VAR%` / `!VAR!`
+   * expansion of the cwd. `& echo on` is unconditional so that a failed step
+   * never leaves echo off with no prompt.
+   *
+   * UNC cwds: cmd.exe refuses a UNC current folder, prints its own warning
+   * (dropped, it comes before the marker) and starts in the Windows directory;
+   * `cd` then reports that directory and the handshake still completes.
+   */
+  build({ shell, marker }: { shell: string; cwd: string; marker: string }): string[] | string {
+    // `pause >nul && cls` only for a real cmd.exe: TerminalService sends the release
+    // key under the same `isCmdExe` test, so a shell that falls to this catch-all
+    // (TCC, a COMSPEC the test misses) must not be left waiting in `pause`.
+    const pauseAndClear = isCmdExe(shell) ? ' && pause >nul && cls' : ''
+    return `/D /S /K "@echo off && cd && echo ${marker}${pauseAndClear} & echo on"`
   }
 }
 
@@ -302,7 +337,7 @@ export const DEFAULT_WINDOWS_BOOTSTRAP_BUILDERS: ReadonlyArray<WindowsBootstrapB
 export function buildWindowsBootstrap(
   args: { shell: string; cwd: string; marker: string },
   builders: ReadonlyArray<WindowsBootstrapBuilder> = DEFAULT_WINDOWS_BOOTSTRAP_BUILDERS
-): { kind: WindowsBootstrapKind; shellKind: ShellKind; shellArgs: string[] } {
+): { kind: WindowsBootstrapKind; shellKind: ShellKind; shellArgs: string[] | string } {
   for (const builder of builders) {
     if (builder.canHandle(args.shell)) {
       return {

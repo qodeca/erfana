@@ -34,6 +34,8 @@ import { useDocumentImportStore } from '../stores/useDocumentImportStore'
 import { useSettingsStore } from '../stores/useSettingsStore'
 import type { ToolState, UnsafeTool } from '../../../shared/ipc/import-schema'
 import { untrustedToolMessage } from '../../../shared/errors'
+import { importGateway } from '../services/importGateway'
+import { transcriptionGateway } from '../services/transcriptionGateway'
 
 /** Size threshold for confirmation dialog (in MB) */
 const LARGE_FILE_THRESHOLD_MB = IMPORT.SIZE_WARNING_THRESHOLD / BYTES_PER_MB
@@ -244,7 +246,7 @@ export function useImport(): UseImportReturn {
 
         // Process import
         try {
-          const result = await window.api.import.process(file.path)
+          const result = await importGateway.process(file.path)
 
           if (result.success) {
             if (!result.outputPath) {
@@ -318,7 +320,7 @@ export function useImport(): UseImportReturn {
     // 1. Select file via native file dialog
     let selectedFile: { path: string; name: string; sizeInMB: number; extension: string } | null
     try {
-      selectedFile = await window.api.import.selectFile()
+      selectedFile = await importGateway.selectFile()
     } catch (error) {
       logger.error('Failed to open file dialog:', error instanceof Error ? error : undefined)
       showErrorToast('File selection failed', 'Could not open file selection dialog')
@@ -334,7 +336,7 @@ export function useImport(): UseImportReturn {
     if (isAudioFile(selectedFile.name)) {
       // Validate audio file before opening dialog (spec FR-018)
       try {
-        const validation = await window.api.transcription.validate(selectedFile.path)
+        const validation = await transcriptionGateway.validate(selectedFile.path)
         if (!validation.valid) {
           showErrorToast(
             'Invalid audio file',

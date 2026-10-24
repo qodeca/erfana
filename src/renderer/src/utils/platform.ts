@@ -7,7 +7,7 @@
  *
  * Single source of truth for operating-system detection in the renderer.
  * The authoritative value comes from the preload bridge
- * (`window.api.utils.getPlatform()`), which forwards the main process's
+ * (`utilsGateway.getPlatform()`), which forwards the main process's
  * `process.platform`. In a sandboxed renderer `process` is unavailable and
  * `navigator.platform` is deprecated/unreliable, so the bridge is preferred.
  *
@@ -17,6 +17,9 @@
  * site must go through {@link getRendererPlatform}, {@link isMacOS}, or
  * {@link isWindows}.
  */
+
+import { hasBridgeMethod } from '../services/bridgePresence'
+import { utilsGateway } from '../services/utilsGateway'
 
 // Latch so the missing-bridge warning is emitted at most once per session,
 // avoiding log spam when many call sites hit the fallback path in succession.
@@ -41,7 +44,7 @@ function mapNavigatorPlatform(navPlatform: string): NodeJS.Platform {
 /**
  * Resolves the current OS platform in the renderer.
  *
- * Prefers the preload bridge (`window.api.utils.getPlatform()`). When the
+ * Prefers the preload bridge (`utilsGateway.getPlatform()`). When the
  * bridge is unavailable, falls back to mapping `navigator.platform` and emits a
  * one-time `console.warn`.
  *
@@ -55,7 +58,7 @@ function mapNavigatorPlatform(navPlatform: string): NodeJS.Platform {
  * ```
  */
 export function getRendererPlatform(): NodeJS.Platform {
-  const fromBridge = window.api?.utils?.getPlatform?.()
+  const fromBridge = hasBridgeMethod('utils', 'getPlatform') ? utilsGateway.getPlatform() : undefined
   if (fromBridge) {
     return fromBridge
   }

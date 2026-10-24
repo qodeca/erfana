@@ -30,7 +30,7 @@
 
 import type { PreviewFailureInput } from '../../../shared/ipc/preview-types'
 import type { PreviewWebContentsHandle } from './PreviewSessionFactory'
-import { PREVIEW_PAGE_LINK_CHANNEL } from './previewLinkBridge'
+import { PREVIEW_PAGE_LINK_CHANNEL, PREVIEW_PAGE_LINK_NOTE_CHANNEL } from './previewLinkBridge'
 import { PREVIEW_PAGE_CSP_VIOLATION_CHANNEL } from './previewCspViolationBridge'
 import { classifyConsoleMessage } from './previewConsoleClassify'
 import { attachInputForwarding } from './previewInputForward'
@@ -74,6 +74,11 @@ export interface PreviewLifecycleHooks {
    * (sd-074b §5.1). The payload is UNVALIDATED — the bridge parses it.
    */
   onLinkActivated?(payload: unknown): void
+  /**
+   * The preload's `seen` / `cancelled` note about a click it reports one task
+   * later (see previewNavigationHold). UNVALIDATED — the bridge parses it.
+   */
+  onLinkNote?(payload: unknown): void
   /** The page's CSP refused a subresource (see previewCspViolationBridge). */
   onCspViolation?(payload: unknown): void
   /**
@@ -189,24 +194,29 @@ export function wirePreviewLifecycle(
   // and needs no sender predicate, because only this WebContents can reach it.
   // WebContents-scoped rather than frame-scoped because a `WebFrameMain` is
   // replaced when a navigated page replaces it (sd-074b §5.3).
-  const onLinkActivated = (event: unknown, payload: unknown): void => {
-    // Sub-frames are not trusted to speak for the page.
+  /** Sub-frames are not trusted to speak for the page. */
+  const fromMainFrame = (event: unknown): boolean => {
     const senderFrame = (event as { senderFrame?: unknown })?.senderFrame
-    if (senderFrame !== undefined && senderFrame !== wc.mainFrame) {
-      return
-    }
+    return senderFrame === undefined || senderFrame === wc.mainFrame
+  }
+  const onLinkActivated = (event: unknown, payload: unknown): void => {
+    if (!fromMainFrame(event)) return
     hooks.onLinkActivated?.(payload)
   }
   wc.ipc?.on(PREVIEW_PAGE_LINK_CHANNEL, onLinkActivated as (...args: never[]) => void)
+
+  // The link report's early half, on its own channel with the same gate.
+  const onLinkNote = (event: unknown, payload: unknown): void => {
+    if (!fromMainFrame(event)) return
+    hooks.onLinkNote?.(payload)
+  }
+  wc.ipc?.on(PREVIEW_PAGE_LINK_NOTE_CHANNEL, onLinkNote as (...args: never[]) => void)
 
   // Same channel discipline as the link one above, and the same main-frame gate:
   // a sub-frame does not speak for the page. This is the CSP half of the
   // blocked-host signal — the half `onBeforeRequest` structurally cannot see.
   const onCspViolation = (event: unknown, payload: unknown): void => {
-    const senderFrame = (event as { senderFrame?: unknown })?.senderFrame
-    if (senderFrame !== undefined && senderFrame !== wc.mainFrame) {
-      return
-    }
+    if (!fromMainFrame(event)) return
     hooks.onCspViolation?.(payload)
   }
   wc.ipc?.on(PREVIEW_PAGE_CSP_VIOLATION_CHANNEL, onCspViolation as (...args: never[]) => void)
@@ -232,6 +242,7 @@ export function wirePreviewLifecycle(
         PREVIEW_PAGE_LINK_CHANNEL,
         onLinkActivated as (...args: never[]) => void
       )
+      wc.ipc?.removeListener(PREVIEW_PAGE_LINK_NOTE_CHANNEL, onLinkNote as (...args: never[]) => void)
       wc.ipc?.removeListener(
         PREVIEW_PAGE_CSP_VIOLATION_CHANNEL,
         onCspViolation as (...args: never[]) => void

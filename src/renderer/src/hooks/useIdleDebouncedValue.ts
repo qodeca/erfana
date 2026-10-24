@@ -97,6 +97,7 @@ export function useIdleDebouncedValue<T>(value: T, options: UseIdleDebouncedValu
       // Pass-through mode already returns `value`; catch the stored copy up so
       // turning the debounce back on starts from what is on screen.
       pendingSinceRef.current = null
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- catch-up only: render already returns `value` while disabled, so this paints nothing new; it keeps the stored copy in step for when the debounce turns back on
       setReleased({ value, urgent: false })
       return
     }

@@ -38,6 +38,7 @@ import {
   type ExportAnnouncement
 } from '../imageExportToast.logic'
 import { IMAGE_EXPORT_COPY, IMAGE_EXPORT_TOAST_COPY } from '../imageViewerStatus.logic'
+import { imageExportGateway } from '../../../../services/imageExportGateway'
 
 // ============================================================================
 // Types
@@ -109,7 +110,7 @@ export interface UseImageExportHandlersResult {
 // ============================================================================
 
 /**
- * Wires the three export controls to `window.api.imageExport.run`.
+ * Wires the three export controls to `imageExportGateway.run`.
  *
  * @param options - The file to export and which surface is on top
  * @returns Busy flags, the live-region announcement and the three click handlers
@@ -217,7 +218,7 @@ export function useImageExportHandlers(
       let toast: GlobalToastPayload | null = null
 
       try {
-        const result: ImageExportResponse = await window.api.imageExport.run({ filePath, target })
+        const result: ImageExportResponse = await imageExportGateway.run({ filePath, target })
         toast = formatExportToast(result, { target })
       } catch {
         // The invoke itself rejected - the bridge or the handler failed before

@@ -67,6 +67,12 @@ export interface FindByNameOptions {
   readonly isCurrent?: () => boolean
   /** Clock, for tests */
   readonly now?: () => number
+  /**
+   * The deadline, in ms after the start ({@link FIND_BY_NAME_TIME_LIMIT_MS}).
+   * For tests that count reads: a generous limit lets a bound other than the
+   * timer stop the walk, however slow the machine.
+   */
+  readonly timeLimitMs?: number
   /** Folder listing, for tests */
   readonly readdir?: ReadFolder
 }
@@ -112,7 +118,7 @@ export function findByName(base: string, name: string, options: FindByNameOption
 export function startFindByName(base: string, name: string, options: FindByNameOptions): FindByNameRun {
   const now = options.now ?? (() => performance.now())
   const read = options.readdir ?? defaultReaddir
-  const deadline = now() + FIND_BY_NAME_TIME_LIMIT_MS
+  const deadline = now() + (options.timeLimitMs ?? FIND_BY_NAME_TIME_LIMIT_MS)
   const wanted = name.toLowerCase()
   const paths: string[] = []
   // Every folder ever listed for reading; `head` is the next one to read

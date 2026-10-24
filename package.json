@@ -28,6 +28,7 @@
     "test:cov": "node scripts/test-cov.mjs",
     "check:headers": "node scripts/check-spdx-headers.mjs",
     "check:links": "node scripts/check-links.mjs",
+    "check:version-drift": "node scripts/check-version-drift.mjs",
     "docs:screenshots": "node scripts/capture/run.mjs",
     "docs:brand": "node scripts/capture/brand.mjs",
     "design": "node scripts/design-sync.mjs",
