@@ -23,6 +23,31 @@ const props = {
   onCancel: vi.fn()
 }
 
+/**
+ * Renders the dialog and waits until BaseDialog's own initial-focus pass has
+ * run, not just until the field has focus.
+ *
+ * FileSystemDialog focuses its field synchronously on mount, so "the field is
+ * focused" is already true before BaseDialog's delayed pass (FOCUS_DELAY_MS,
+ * 10 ms) fires. Under CI load that pass could then land after Shift+F10 had
+ * opened the menu and pull focus back out of it to the field. A person cannot
+ * press a key inside those 10 ms, so the test waits for the second `focus()`
+ * call on the field – BaseDialog's – before pressing anything.
+ *
+ * @returns The dialog's text field, focused and settled
+ */
+async function renderSettled(): Promise<HTMLElement> {
+  render(<FileSystemDialog {...props} />)
+  const input = screen.getByRole('textbox')
+  // Installed after render: the mount-time focus has already happened, and the
+  // 10 ms timer cannot fire in between, so the next call is BaseDialog's.
+  const focusSpy = vi.spyOn(input, 'focus')
+  await waitFor(() => expect(focusSpy).toHaveBeenCalled())
+  focusSpy.mockRestore()
+  expect(document.activeElement).toBe(input)
+  return input
+}
+
 describe('FileSystemDialog field menu by keyboard (#90)', () => {
   beforeEach(() => {
     const portalRoot = document.createElement('div')
@@ -40,12 +65,10 @@ describe('FileSystemDialog field menu by keyboard (#90)', () => {
   })
 
   it('opens with Shift+F10, takes the arrows, and Escape returns focus to the field', async () => {
-    render(<FileSystemDialog {...props} />)
-    const input = screen.getByRole('textbox')
-    expect(input).toHaveAttribute('aria-haspopup', 'menu')
     // Let BaseDialog's initial-focus pass (~10 ms after open) land first, as
     // it always has by the time a person can press a key.
-    await waitFor(() => expect(document.activeElement).toBe(input))
+    const input = await renderSettled()
+    expect(input).toHaveAttribute('aria-haspopup', 'menu')
 
     fireEvent.keyDown(input, { key: 'F10', shiftKey: true })
 
@@ -66,9 +89,7 @@ describe('FileSystemDialog field menu by keyboard (#90)', () => {
   })
 
   it('does not reopen the menu for the native contextmenu Windows sends after the Menu key', async () => {
-    render(<FileSystemDialog {...props} />)
-    const input = screen.getByRole('textbox')
-    await waitFor(() => expect(document.activeElement).toBe(input))
+    const input = await renderSettled()
 
     fireEvent.keyDown(input, { key: 'ContextMenu' })
     const menu = await screen.findByRole('menu')

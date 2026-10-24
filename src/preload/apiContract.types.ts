@@ -11,6 +11,7 @@
  */
 import type { BrowserBridge } from '../shared/ipc/browser-schema'
 import type { CameraBridge } from '../shared/ipc/camera-schema'
+import type { ClaudeStatusBridge } from '../shared/ipc/claude-status-schema'
 import type { ClipboardBridge } from '../shared/ipc/clipboard-schema'
 import type { DocxBridge } from '../shared/ipc/docx-schema'
 import type { ImageExportBridge } from '../shared/ipc/image-export-schema'
@@ -29,6 +30,7 @@ import type { LoggingBridge } from '../shared/ipc/logging-schema'
 import type { ProjectLockBridge } from '../shared/ipc/project-lock-schema'
 import type { QuitBridge } from '../shared/ipc/quit-schema'
 import type { SettingsBridge } from '../shared/ipc/settings-schema'
+import type { ScreenshotBridge } from '../shared/ipc/screenshot-schema'
 import type { SystemBridge } from '../shared/ipc/system-schema'
 import type { TerminalBridge } from '../shared/ipc/terminal-schema'
 import type { Api } from './index'
@@ -88,6 +90,8 @@ export type ApiContractChecks = [
   Assert<Equal<Api['browser'], BrowserBridge>>,
   Assert<Equal<Api['markdownImage'], MarkdownImageBridge>>,
   Assert<Equal<Api['preview'], PreviewBridge>>,
+  Assert<Equal<Api['claudeStatus'], ClaudeStatusBridge>>,
+  Assert<Equal<Api['screenshot'], ScreenshotBridge>>,
   // A bridge method that returns the unchecked `ipcRenderer.invoke` result would put `any` in the renderer
   Assert<Equal<AnyIn<Api>, never>>
 ]

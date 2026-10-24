@@ -14,6 +14,7 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { AUTO_EXPAND } from '../components/ProjectTree/constants'
 import { logger } from '../utils/logger'
 import { isPathInside } from '../utils/fileUtils'
+import { utilsGateway } from '../services/utilsGateway'
 
 /**
  * Represents a file dropped from an external source.
@@ -136,7 +137,7 @@ export function extractDroppedFiles(files: FileList): ExternalDropFile[] {
 
     try {
       // Use Electron's webUtils.getPathForFile() exposed via preload
-      filePath = window.api.utils.getPathForFile(file)
+      filePath = utilsGateway.getPathForFile(file)
     } catch {
       logger.warn('Failed to get file path via webUtils', { fileName: file.name })
     }

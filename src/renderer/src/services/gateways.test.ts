@@ -45,6 +45,12 @@ import { browserGateway } from './browserGateway'
 import { markdownImageGateway } from './markdownImageGateway'
 import { previewGateway } from './previewGateway'
 import type { PreviewBridge } from '../../../shared/ipc/preview-bridge-types'
+import { claudeStatusGateway } from './claudeStatusGateway'
+import { screenshotGateway } from './screenshotGateway'
+import { utilsGateway } from './utilsGateway'
+import type { ClaudeStatusBridge } from '../../../shared/ipc/claude-status-schema'
+import type { ScreenshotBridge } from '../../../shared/ipc/screenshot-schema'
+import type { Api } from '../../../preload/index'
 import { getDefaultProjectTreeApi } from './projectTreeApi'
 import { onFileStructureChanged } from './fileStructureSignal'
 
@@ -245,6 +251,27 @@ const PREVIEW_METHODS: Record<keyof PreviewBridge, true> = {
   onResizeHold: true
 }
 
+const CLAUDE_STATUS_METHODS: Record<keyof ClaudeStatusBridge, true> = {
+  register: true,
+  unregister: true,
+  nudge: true,
+  onChanged: true
+}
+
+const SCREENSHOT_METHODS: Record<keyof ScreenshotBridge, true> = {
+  getDisplays: true,
+  enumerateWindows: true,
+  capture: true,
+  getCapabilities: true,
+  getScreenPermission: true
+}
+
+const UTILS_METHODS: Record<keyof Api['utils'], true> = {
+  getPathForFile: true,
+  getPlatform: true,
+  getArch: true
+}
+
 type Anything = (...args: unknown[]) => unknown
 
 function fakeBridge(methods: string[]): Record<string, ReturnType<typeof vi.fn>> {
@@ -280,7 +307,10 @@ describe.each([
   ['imageExportGateway', 'imageExport', imageExportGateway, IMAGE_EXPORT_METHODS],
   ['browserGateway', 'browser', browserGateway, BROWSER_METHODS],
   ['markdownImageGateway', 'markdownImage', markdownImageGateway, MARKDOWN_IMAGE_METHODS],
-  ['previewGateway', 'preview', previewGateway, PREVIEW_METHODS]
+  ['previewGateway', 'preview', previewGateway, PREVIEW_METHODS],
+  ['claudeStatusGateway', 'claudeStatus', claudeStatusGateway, CLAUDE_STATUS_METHODS],
+  ['screenshotGateway', 'screenshot', screenshotGateway, SCREENSHOT_METHODS],
+  ['utilsGateway', 'utils', utilsGateway, UTILS_METHODS]
 ] as const)('%s', (_name, key, gateway, methods) => {
   const names = Object.keys(methods)
 
