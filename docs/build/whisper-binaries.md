@@ -31,10 +31,10 @@ Requires an active [Apple Developer Program](https://developer.apple.com/program
 2. In "Certificates, Identifiers & Profiles" → create a **Developer ID Application** certificate. Download the .cer, add to Keychain Access, then export the combined cert + private key as a `.p12` file (with a strong password).
 3. Generate an App-Specific password at https://appleid.apple.com → Sign-In & Security → App-Specific Passwords → label it "Erfana notarytool CI".
 4. Add GitHub repo secrets (Settings → Environments → `production-signing` → Add secret):
-   - `APPLE_CERT_P12` — base64 of the .p12 file: `base64 -w0 DeveloperID.p12` (macOS: `base64 -i DeveloperID.p12 | tr -d '\n'`)
-   - `APPLE_CERT_PASSWORD` — the .p12 export password
+   - `MAC_CERT_P12_BASE64` — base64 of the .p12 file: `base64 -w0 DeveloperID.p12` (macOS: `base64 -i DeveloperID.p12 | tr -d '\n'`)
+   - `MAC_CERT_PASSWORD` — the .p12 export password
    - `APPLE_ID` — your Apple ID email
-   - `APPLE_APP_PASSWORD` — the app-specific password from step 3
+   - `APPLE_APP_SPECIFIC_PASSWORD` — the app-specific password from step 3
    - `APPLE_TEAM_ID` — 10-char alphanumeric Team ID from the developer account page
 
 ### 2. Windows code-signing
@@ -72,8 +72,9 @@ minisign -G -p rotation.pub -s rotation.key
 ```
 
 Then:
-- Upload `primary.key` contents as `MANIFEST_SIGNING_KEY` in `production-signing` environment.
-- Upload the passphrase as `MANIFEST_SIGNING_KEY_PASSWORD`.
+- Upload the base64 of `primary.key` as `MINISIGN_SECRET_KEY_BASE64` in `production-signing` environment (`base64 -i primary.key | tr -d '\n'`); the workflow decodes it with `base64 -d`, as `release.yml` does.
+- Upload the passphrase as `MINISIGN_KEY_PASSWORD`.
+- These are the same two secrets `release.yml` signs `SHA256SUMS` with: the whisper manifest primary key is the release key (key ID `4AEBCE8499845646`, also in [`docs/release-pubkey.txt`](../release-pubkey.txt)), so rotating it affects both workflows.
 - Commit **both** public keys (`primary.pub` + `rotation.pub`) to the Erfana repo at `src/main/services/whisper-pubkeys.ts` (embedded as constants; consumed by `verifyManifest.ts`).
 - Move `rotation.key` to offline storage (USB + paper backup in a secure location). Never put it in CI.
 
@@ -152,7 +153,7 @@ This checklist and ["Security pre-check before the PR merge"](#security-pre-chec
 
 1. Revoke in [Apple developer portal](https://developer.apple.com/account/resources/certificates/list).
 2. Generate new Developer ID Application cert, export as .p12.
-3. Update `APPLE_CERT_P12` + `APPLE_CERT_PASSWORD` in `production-signing` environment.
+3. Update `MAC_CERT_P12_BASE64` + `MAC_CERT_PASSWORD` in `production-signing` environment.
 4. Trigger `whisper-binaries` workflow with `erfana_revision` bumped by 1 (e.g. `erfana2`).
 5. Update `src/main/services/whisper-assets.ts` in a hot-fix Erfana release pointing at the new `whisper-build-*` tag.
 6. **Time budget**: ~6 hours end-to-end (cert provisioning is slow).
@@ -160,7 +161,7 @@ This checklist and ["Security pre-check before the PR merge"](#security-pre-chec
 ### Minisign primary key compromised
 
 1. Generate new primary keypair on Marcin's Mac.
-2. Update `MANIFEST_SIGNING_KEY` + `MANIFEST_SIGNING_KEY_PASSWORD` in `production-signing`.
+2. Update `MINISIGN_SECRET_KEY_BASE64` + `MINISIGN_KEY_PASSWORD` in `production-signing` (shared with `release.yml` – update `docs/release-pubkey.txt` too).
 3. Commit new `primary.pub` to `src/main/services/whisper-pubkeys.ts` (rotation pubkey remains unchanged). Existing installs still trust the rotation key, so there's no trust gap.
 4. Trigger `whisper-binaries` workflow with `erfana_revision` bumped. Manifest will be signed by the new primary.
 5. Ship hot-fix Erfana release with the updated pubkey file.
@@ -277,7 +278,7 @@ See [ADR 0002](../adrs/0002-minisign-over-cosign-sigstore.md) for the full decis
 
 ### Dual-pubkey architecture (primary + rotation)
 
-See [ADR 0003](../adrs/0003-dual-pubkey-trust-primary-rotation.md). Primary key lives in the `production-signing` GitHub Environment secret `MANIFEST_SIGNING_KEY`; rotation key lives **offline on a hardware token** and is only used during an incident. Both pubkeys are embedded in `src/main/services/whisper-pubkeys.ts`.
+See [ADR 0003](../adrs/0003-dual-pubkey-trust-primary-rotation.md). Primary key lives in the `production-signing` GitHub Environment secret `MINISIGN_SECRET_KEY_BASE64` (shared with `release.yml`); rotation key lives **offline on a hardware token** and is only used during an incident. Both pubkeys are embedded in `src/main/services/whisper-pubkeys.ts`.
 
 ### Known minisign gotchas
 
