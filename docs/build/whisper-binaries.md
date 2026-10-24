@@ -115,7 +115,7 @@ Typical end-to-end time once approved: ~25–30 minutes (macOS build ~15 min + W
 
 ## macOS build is static
 
-The macOS tarball ships `whisper-cli` with no libraries beside it, so `build-macos` configures with `-DBUILD_SHARED_LIBS=OFF`: `libwhisper` and every `libggml*` library are linked into the binary. Do not add `-DGGML_STATIC=ON` – on Apple it passes `-static` to the linker, which macOS does not support for executables. Two steps keep the binary self-contained:
+The macOS tarball ships `whisper-cli` with no libraries beside it, so `build-macos` configures with `-DBUILD_SHARED_LIBS=OFF`: `libwhisper` and every `libggml*` library are linked into the binary. It also sets `-DGGML_OPENMP=OFF`, as upstream's own Apple build (`build-xcframework.sh`) does, so the binary cannot pick up a `libomp` dependency, even if a runner image makes OpenMP findable. Do not add `-DGGML_STATIC=ON` – on Apple it passes `-static` to the linker, which macOS does not support for executables. Two steps keep the binary self-contained:
 
 - **"Verify whisper-cli links system libraries only"** runs after staging, before signing. It fails if `otool -arch all -L staging/whisper-cli` lists anything outside `/usr/lib/` and `/System/Library/` (an `@rpath/`, `@loader_path/` or `@executable_path/` entry, or any other path), or if `otool -l` shows an `LC_RPATH` into the runner workspace.
 - **"Smoke test (transcribe JFK sample)"** runs a copy of `staging/` from `$RUNNER_TEMP/whisper-smoke`, with `build/` moved aside, so a library missing from the tarball fails the run.
