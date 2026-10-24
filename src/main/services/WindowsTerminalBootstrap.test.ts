@@ -489,7 +489,9 @@ describe('normalizeWindowsCwd', () => {
 describe.skipIf(spawnSync('pwsh', ['-NoProfile', '-Command', '1'], { timeout: 15000 }).status !== 0)(
   'PowerShellBootstrapBuilder script run with pwsh',
   () => {
-    it('opens a folder named with a curly apostrophe', () => {
+    // Own budget: this spawns a real pwsh, whose start-up alone has taken
+    // 6.5 s under coverage on Linux CI – past the 5 s default.
+    it('opens a folder named with a curly apostrophe', { timeout: 20_000 }, () => {
       const base = mkdtempSync(join(realpathSync.native(tmpdir()), 'erfana-bootstrap-'))
       const dir = join(base, 'Bob\u2019s Files')
       mkdirSync(dir)
