@@ -338,6 +338,45 @@ describe('useProjectManagement – stale results are dropped (#208)', () => {
     expect(result.current.loading).toBe(false)
   })
 
+  it('AC4: a load main refused as superseded shows no error, even before the newer open arrives', async () => {
+    // Rapid double open: main has already switched to B and refuses A's read,
+    // but B's project-changed event has not reached the renderer yet.
+    const { result } = renderHook(() => useProjectManagement())
+    const openA = emitProjectChanged('/projA')
+    const readA = reads[0]
+
+    await act(async () => {
+      readA.gate.reject(
+        new Error(
+          "Error invoking remote method 'file:readDirectory': ConfinementError: The project changed while the request was running"
+        )
+      )
+      await openA
+    })
+
+    expect(result.current.error).toBeNull()
+    expect(toastTitles()).not.toContain('Failed to Load Project')
+    expect(mocks.logger.error).not.toHaveBeenCalled()
+
+    // B's event then lands and B opens normally
+    await openViaListener('/projB', tree('/projB', 'b.md'))
+    expect(result.current.files).toEqual(tree('/projB', 'b.md'))
+    expect(result.current.loading).toBe(false)
+    expect(toastTitles()).toEqual(['Project Opened'])
+  })
+
+  it('AC4: any other failure of the current load still shows the error', async () => {
+    const { result } = renderHook(() => useProjectManagement())
+    const openA = emitProjectChanged('/projA')
+    await act(async () => {
+      reads[0].gate.reject(new Error('EACCES: permission denied'))
+      await openA
+    })
+
+    expect(toastTitles()).toContain('Failed to Load Project')
+    expect(result.current.error).not.toBeNull()
+  })
+
   it('AC4: a close during a pending open stops the spinner and shows no tree', async () => {
     const { result } = renderHook(() => useProjectManagement())
     const openA = emitProjectChanged('/projA')

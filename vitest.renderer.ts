@@ -33,13 +33,19 @@ export default defineConfig({
       reporter: ['text-summary', 'lcov', 'html'],
       reportsDirectory: 'coverage/renderer',
       include: ['src/renderer/src/**/*.{ts,tsx}'],
-      all: false,
+      // Count an included file that no test loads, at 0 %, so an untested
+      // module lowers the totals instead of vanishing from them.
+      all: true,
       cleanOnRerun: true,
       thresholds: {
-        lines: 10,
-        functions: 10,
-        branches: 5,
-        statements: 10,
+        // Project-wide floors: the measured value rounded down, minus one point.
+        // Measured 2026-10-23 with `all: true`: lines/statements 86.78,
+        // functions 91.09, branches 90.89. Raise them as coverage grows; never
+        // lower one to make a change pass.
+        lines: 85,
+        functions: 90,
+        branches: 89,
+        statements: 85,
         // Multi-page HTML preview (#124), renderer side. These modules own the
         // geometry and lifecycle the native BrowserView is slaved to — bounds,
         // clipping, drag freeze and tab moves — where a regression shows up as a
@@ -68,9 +74,22 @@ export default defineConfig({
         '**/__tests__/**',
         '**/__test__/**',
         '**/__test-helpers__/**',
+        '**/__fixtures__/**',
+        '**/__test-utils__/**',
+        '**/test-utils/**',
+        'src/renderer/src/utils/testHelpers.ts',
         'vitest.*.ts',
         'electron.vite.config.ts',
         'src/renderer/index.html',
+        // Type-only: declarations and interface modules compile to nothing. A
+        // type-only `types.ts` elsewhere reports 0 of 0 lines and moves no total.
+        '**/*.d.ts',
+        '**/*.types.ts',
+        'src/renderer/src/interfaces/**',
+        // The app entry mounts React as soon as it loads. Its tests read the
+        // source rather than loading it (main.*.test.ts), and every e2e run
+        // starts it.
+        'src/renderer/src/main.tsx',
         // The image-export rasterize harness (#73) runs only inside a hidden
         // Chromium page: it needs createImageBitmap, OffscreenCanvas and a real
         // image decoder, none of which jsdom provides, so no renderer unit test

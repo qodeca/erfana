@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+import { MODEL_PINS } from './whisper-model-pins'
+
 /**
  * Shared Application Constants
  *
@@ -383,13 +385,13 @@ export const LOCAL_WHISPER = {
   WHISPER_DIR: 'whisper',
   /** Supported model sizes */
   SUPPORTED_MODELS: ['tiny', 'base', 'small', 'medium', 'large'] as const,
-  /** Approximate download sizes in bytes per model */
+  /** Exact download sizes in bytes per model (from the pinned model list) */
   MODEL_SIZES: {
-    tiny: 75_000_000,
-    base: 142_000_000,
-    small: 466_000_000,
-    medium: 1_500_000_000,
-    large: 2_900_000_000
+    tiny: MODEL_PINS.tiny.sizeBytes,
+    base: MODEL_PINS.base.sizeBytes,
+    small: MODEL_PINS.small.sizeBytes,
+    medium: MODEL_PINS.medium.sizeBytes,
+    large: MODEL_PINS.large.sizeBytes
   },
   /** Download timeout in ms (10 minutes – large models) */
   DOWNLOAD_TIMEOUT: 600_000,
