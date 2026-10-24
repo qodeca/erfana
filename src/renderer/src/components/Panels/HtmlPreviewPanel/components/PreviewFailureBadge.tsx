@@ -88,6 +88,7 @@ export function PreviewFailureBadge({ summary }: PreviewFailureBadgeProps): JSX.
   // while open, so a one-shot measure is enough.
   useLayoutEffect(() => {
     if (!open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- the position is measured from the trigger's DOM rect in this layout effect, before paint; clearing it on close belongs to the same measurement
       setPosition(null)
       return
     }
@@ -134,6 +135,7 @@ export function PreviewFailureBadge({ summary }: PreviewFailureBadgeProps): JSX.
   // by closing the tab. Closing here lets the occluder cleanup fire and the
   // document listeners detach. Must run before the early return (hook ordering).
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- deliberate effect (see the comment above and HtmlPreviewPanel/CLAUDE.md "Empty-badge cleanup"): it must release the menu occluder after the count reaches 0
     if (summary.count === 0) setOpen(false)
   }, [summary.count])
 

@@ -321,3 +321,36 @@ export const ScreenshotCaptureResponseSchema = z.object({
   errorCode: ScreenshotErrorCodeSchema.optional()
 })
 export type ScreenshotCaptureResponse = z.infer<typeof ScreenshotCaptureResponseSchema>
+
+/**
+ * Shared contract for the preload screenshot bridge (`window.api.screenshot`).
+ *
+ * Cross-platform as of #164: macOS uses the native screencapture binary,
+ * Windows and the Linux fallback use Electron's desktopCapturer and an in-app
+ * area-select overlay window. The overlay-only verbs (`areaSelected` /
+ * `areaCancelled`) are deliberately not part of it: they live in
+ * `src/preload/screenshotOverlay.ts`, loaded only by the overlay windows
+ * (#164 lens-review F[6]).
+ */
+export interface ScreenshotBridge {
+  /** Available displays for multi-monitor support (id, label, isPrimary, bounds). */
+  getDisplays(): Promise<GetDisplaysResponse>
+  /**
+   * Capturable windows for the in-app picker dialog. Empty on macOS
+   * (`screencapture -iw` handles the picker natively); one entry per visible
+   * window, with a thumbnail data URL, on Windows and Linux.
+   */
+  enumerateWindows(request?: EnumerateWindowsRequest): Promise<EnumerateWindowsResponse>
+  /** Capture a screenshot (`{ mode, displayId?, windowId? }`) into the temp directory. */
+  capture(request: ScreenshotCaptureRequest): Promise<ScreenshotCaptureResponse>
+  /**
+   * What the running platform can do (#164 lens-review F[31]), so platform
+   * routing stays single-sourced in main.
+   */
+  getCapabilities(): Promise<ScreenshotCapabilities>
+  /**
+   * Advisory macOS Screen Recording status; `'unknown'` elsewhere. Used ONLY
+   * to enrich the denial dialog, never to gate a capture.
+   */
+  getScreenPermission(): Promise<ScreenRecordingPermission>
+}

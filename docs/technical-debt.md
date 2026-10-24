@@ -225,7 +225,7 @@ After the heartbeat hardening (Phase A4 resume-refresh, B1 symlink defense, D3 H
 **Severity**: Low
 **Impact**: The issue #55 packaging guard `assertResourcesSiblingsAllowlist` (L2a-2) — the full Electron-owned sibling enumeration beside `app/` — is **fatal on macOS but advisory (`console.warn`) on Windows**. On win32 an unexpected sibling only warns; it cannot block a release.
 
-**Problem**: `EXPECTED_RESOURCES_ENTRIES` (the Electron-owned names `app`/`app.asar`/`icon.icns`/`elevate.exe` plus the config slots) was enumerated on a **macOS-only** packed-tree baseline, and CI never runs an electron-builder pack on Windows (the `Windows checks` job runs only typecheck, the design-sync check and `test:main`; the separate `npm audit signatures` job does not pack either). Keeping the enumeration fatal on win32 would rest a release-blocking gate on an unverified baseline and risk a first-Windows-release false-fail. The softening touches **only** this enumeration; the config leak vector — `assertResourcesDestNoRepoLeak` (L2a-1, leak-name tripwire) and `assertExtraFilesDestNoRepoLeak` (L2b) — stays both-platforms-fatal.
+**Problem**: `EXPECTED_RESOURCES_ENTRIES` (the Electron-owned names `app`/`app.asar`/`app.asar.unpacked`/`icon.icns`/`elevate.exe` plus the config slots) was enumerated on a **macOS-only** packed-tree baseline, and CI never runs an electron-builder pack on Windows (the `Windows checks` job runs only typecheck, the design-sync check and `test:main`; the separate `npm audit signatures` job does not pack either). Keeping the enumeration fatal on win32 would rest a release-blocking gate on an unverified baseline and risk a first-Windows-release false-fail. The softening touches **only** this enumeration; the config leak vector — `assertResourcesDestNoRepoLeak` (L2a-1, leak-name tripwire) and `assertExtraFilesDestNoRepoLeak` (L2b) — stays both-platforms-fatal.
 
 **Recommended Solution**: capture a real Windows electron-builder packed-tree baseline, reconcile `EXPECTED_RESOURCES_ENTRIES` against it, then promote L2a-2 to fatal on win32.
 
@@ -364,9 +364,11 @@ After the heartbeat hardening (Phase A4 resume-refresh, B1 symlink defense, D3 H
 
 **Recommended Solution**: route `watchFile` through `assertInsideProject` from `src/main/utils/projectConfinement.ts`, keeping the existing "file does not exist" throw (the guard lets a `missing` verdict through on purpose).
 
-**Files**: `src/main/services/FileWatcherService.ts` (`watchFile`), `src/main/utils/projectConfinement.ts`.
+**The confined-path wrapper (#252 review, 2026-10).** The fuller fix is to register `file-watch:start` through `registerConfinedHandle`, as every `file:*` channel is. It is not a small change: the channel takes a positional string rather than a request object ([IPC patterns](./ipc-patterns.md)), so it needs a strict request schema, a preload and renderer API change, a project session passed into `registerFileWatcherHandlers`, and a refusal mapped to `{ success: false, error }`, whose wording the renderer's `classifyWatchStartFailure` reads. The handler must also watch the `requested` spelling, since every event is matched against it. `stop`, `pause` and `resume` only look up the map, so they touch no file. Meanwhile, #252's unseen-file probe `stat`s only this session's paths lexically inside the project (`FileWatcherService.probeablePaths`), so it never reaches outside it.
 
-**Status**: Open — recorded by the #70 design (§9.1) and its review rounds. **A follow-up issue should be filed.**
+**Files**: `src/main/services/FileWatcherService.ts` (`watchFile`), `src/main/utils/projectConfinement.ts`; for the wrapper also `src/main/ipc/file-watcher-handlers.ts` and `src/preload/index.ts`.
+
+**Status**: Open — recorded by the #70 design (§9.1) and its review rounds; the wrapper note added by the #252 review. **A follow-up issue should be filed.**
 
 ---
 

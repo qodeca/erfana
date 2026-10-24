@@ -11,16 +11,16 @@ Erfana follows **2025 Electron security best practices** with comprehensive hard
 | Context Isolation | ✅ Enabled | v0.1.0 |
 | Node Integration | ✅ Disabled | v0.1.0 |
 | Process Sandboxing | ✅ Enabled (default) | v0.6.0 |
-| Electron Fuses | ⚠️ 4 of 6 configured (2 need ASAR) | v0.6.0 |
-| ASAR Packaging | ❌ Disabled | v0.6.0 |
-| ASAR Integrity | ❌ N/A (requires ASAR) | N/A |
-| Cookie Encryption | ❌ Disabled | v0.6.0 |
+| Electron Fuses | ✅ all 9 pinned (`strictlyRequireAllFuses`); 5 hardening fuses on | v0.6.0 (all pinned since v0.22.0) |
+| ASAR Packaging | ✅ Enabled (native addons and executables unpacked) | v0.22.0 |
+| ASAR Integrity | ✅ Checked at start-up (`EnableEmbeddedAsarIntegrityValidation` + `OnlyLoadAppFromAsar`); see the limits below | v0.22.0 |
+| Cookie Encryption | ❌ Disabled (no persistent cookies to protect – re-evaluated v0.22.0) | v0.6.0 |
 | Content Security Policy | ✅ Strict | v0.1.0 |
 
 **Notes**:
-- ASAR is currently disabled due to runtime dependency loading issues with isomorphic-git (2 fuses unavailable)
-- Cookie encryption disabled to avoid macOS keychain prompts (settings stored in plaintext)
-- `scripts/fuses.js` sets 4 of the 6 fuses. Three of them harden the build — RunAsNode, NodeOptions and NodeCliInspect (the last one only in production builds; see below) — while the fourth, EnableCookieEncryption, is deliberately set to `false`
+- The app's JavaScript ships inside `app.asar`, and the app refuses to start if a single byte of the archive changes while the embedded hash stays the same – see [ASAR Configuration](#asar-configuration) and its limits: on Windows (per-user install) the check raises the bar and makes tampering visible but does not stop a same-user process, which can change `Erfana.exe` too. Native addons and executables (`node-pty`, `ffmpeg`, `ffprobe`, LiteParse) stay real files in `app.asar.unpacked/`, which the check does **not** cover
+- Cookie encryption stays off: Erfana keeps no persistent cookies worth protecting (spike: [docs/spikes/2026-10-22-asar-integrity.md](spikes/2026-10-22-asar-integrity.md))
+- `scripts/fuses.js` pins all 9 fuses of Electron 44 (`strictlyRequireAllFuses`, read back after the flip). Five harden the build — RunAsNode, NodeOptions, NodeCliInspect (the last one only in production builds; see below), EnableEmbeddedAsarIntegrityValidation and OnlyLoadAppFromAsar. EnableCookieEncryption is deliberately `false`; LoadBrowserProcessSpecificV8Snapshot, GrantFileProtocolExtraPrivileges and WasmTrapHandlers stay at Electron's defaults
 - Test builds (`ERFANA_TEST_BUILD=true`) enable NodeCliInspect for Playwright E2E testing - see [Test Builds](#test-builds-erfana_test_build)
 - `ERFANA_E2E_FORCE_CRASH=1` injects a renderer crash for the error-boundary E2E scenario. Double-gated on `!app.isPackaged`, so a packaged build ignores it - see [Crash Injection](#crash-injection-erfana_e2e_force_crash)
 
@@ -69,7 +69,7 @@ The `sandbox: false` pattern is **3+ year old outdated information**. Modern Ele
 
 ## Electron Fuses (2025 Critical Security)
 
-**Status**: ✅ 4 of 6 critical fuses configured (2 ASAR-dependent fuses unavailable); 3 of the 4 are hardening fuses
+**Status**: ✅ all 9 fuses pinned and read back after the flip; 5 are hardening fuses (since v0.22.0)
 
 Fuses are **compile-time feature toggles** that disable unused Electron features to prevent "Living Off The Land" (LOTL) attacks.
 
@@ -82,11 +82,14 @@ Attackers exploit legitimate Electron features (like `ELECTRON_RUN_AS_NODE`) to 
 | Fuse | Value | Security Impact |
 |------|-------|-----------------|
 | `RunAsNode` | `false` | Disables `ELECTRON_RUN_AS_NODE` env var (prevents arbitrary code execution) |
-| `EnableCookieEncryption` | `false` | Disabled to avoid keychain prompts (settings stored in plaintext) |
+| `EnableCookieEncryption` | `false` | Off: no persistent cookies to protect (file:// main window, in-memory preview partitions); settings are not cookies and are unaffected either way |
 | `EnableNodeOptionsEnvironmentVariable` | `false` | Disables `NODE_OPTIONS` env var (prevents command injection) |
 | `EnableNodeCliInspectArguments` | `isTestBuild` – `false` on every production build | Disables `--inspect` CLI args (prevents remote debugging). `true` only under `ERFANA_TEST_BUILD=true` — see [Test Builds](#test-builds-erfana_test_build) |
-| `EnableEmbeddedAsarIntegrityValidation` | ❌ N/A | Requires ASAR enabled (see ASAR Configuration below) |
-| `OnlyLoadAppFromAsar` | ❌ N/A | Requires ASAR enabled (see ASAR Configuration below) |
+| `EnableEmbeddedAsarIntegrityValidation` | `true` | Refuses to start when `app.asar` no longer matches the header hash embedded at build time (see ASAR Configuration below) |
+| `OnlyLoadAppFromAsar` | `true` | Loads the app only from `app.asar`, never from an `app/` folder beside it, which Electron would otherwise load first |
+| `LoadBrowserProcessSpecificV8Snapshot` | `false` | Electron's default; no browser-process snapshot is used |
+| `GrantFileProtocolExtraPrivileges` | `true` | Electron's default, kept because the app window loads from `file://`. Follow-up: move the app to a custom protocol, then turn it off |
+| `WasmTrapHandlers` | `true` | Electron's default |
 
 ### Implementation:
 
@@ -98,18 +101,24 @@ const { flipFuses, FuseVersion, FuseV1Options } = require('@electron/fuses');
 // Test builds enable the Node CLI inspector; production builds never do.
 const isTestBuild = process.env.ERFANA_TEST_BUILD === 'true';
 
+// buildFuseConfig() returns this object; scripts/fuses.test.mjs pins every value.
 await flipFuses(electronBinaryPath, {
   version: FuseVersion.V1,
   resetAdHocDarwinSignature: context.electronPlatformName === 'darwin',
   [FuseV1Options.RunAsNode]: false,
-  [FuseV1Options.EnableCookieEncryption]: false,  // Disabled to avoid keychain prompts
+  [FuseV1Options.EnableCookieEncryption]: false,  // no persistent cookies to protect
   [FuseV1Options.EnableNodeOptionsEnvironmentVariable]: false,
   [FuseV1Options.EnableNodeCliInspectArguments]: isTestBuild,  // false in production
-  // NOTE: ASAR integrity validation disabled because asar: false
-  // When ASAR is disabled, these fuses cannot be used:
-  // - EnableEmbeddedAsarIntegrityValidation
-  // - OnlyLoadAppFromAsar
+  [FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: true,
+  [FuseV1Options.OnlyLoadAppFromAsar]: true,
+  [FuseV1Options.LoadBrowserProcessSpecificV8Snapshot]: false,
+  [FuseV1Options.GrantFileProtocolExtraPrivileges]: true,  // until a custom protocol
+  [FuseV1Options.WasmTrapHandlers]: true,
+  strictlyRequireAllFuses: true,
 });
+// applyAndVerifyFuses() refuses a bundle without app.asar (it could not start),
+// reads the fuse wire back, and compares the embedded integrity hash with the
+// archive on disk.
 ```
 
 ### Verification:
@@ -120,11 +129,11 @@ Build logs show fuses applied during `npm run build:mac`:
 🔒 Applying Electron fuses to: release/{version}/mac-arm64/Erfana.app
 ✅ Electron fuses applied successfully
    - RunAsNode: disabled
-   - CookieEncryption: disabled (no keychain prompt)
+   - CookieEncryption: disabled
    - NodeOptions: disabled
    - NodeCliInspect: disabled
-   - AsarIntegrity: N/A (asar disabled)
-   - OnlyLoadAppFromAsar: N/A (asar disabled)
+   - AsarIntegrity: enabled
+   - OnlyLoadAppFromAsar: enabled
 ```
 
 ### References:
@@ -229,65 +238,60 @@ Worst case if the gate were bypassed: the renderer throws and the user sees the 
 
 ## ASAR Configuration
 
-**Status**: ❌ DISABLED
+**Status**: ✅ ENABLED, with integrity enforcement (since v0.22.0)
 
-ASAR packaging is currently disabled due to runtime dependency loading issues with deep transitive dependencies.
+The app's JavaScript – `out/` and every pure-JS dependency – ships inside `Resources/app.asar`. Electron checks the archive against a SHA-256 header hash that electron-builder embeds at build time (`ElectronAsarIntegrity` in `Info.plist` on macOS, an `INTEGRITY`/`ELECTRONASAR` resource in `Erfana.exe` on Windows) and refuses to start on a mismatch. Each file read from the archive is checked against its own block hashes too.
 
-### Why ASAR Is Disabled:
+While `asar: false` shipped the app as plain files in `resources/app/`, any process running as the user could change `out/main/index.js` inside a signed app without any check noticing. With the archive and the integrity fuse, such a change stops the app from starting. How far that goes depends on who can write the file that holds the hash – see [Limits](#limits).
 
-During production builds with ASAR enabled, the app failed at runtime with:
+### What stays outside the archive
 
-```
-Error: Cannot find module 'call-bind-apply-helpers'
-Require stack:
-- app.asar/node_modules/dunder-proto/get.js
-- app.asar/node_modules/es-object-atoms/RequireObjectCoercible.js
-- app.asar/node_modules/es-to-primitive/es2015.js
-[... deep dependency chain through isomorphic-git]
-```
+`asarUnpack` in `electron-builder.yml` keeps only the binaries the operating system itself must open in `Resources/app.asar.unpacked/` – never a `.js` or `.json` file, because an unpacked `package.json` decides which JavaScript a `require` runs:
 
-**Root Cause**: Deep transitive dependencies in the `isomorphic-git` dependency tree couldn't be loaded from inside the ASAR archive, even with `asarUnpack` configuration.
+| Unpacked | Why |
+|---|---|
+| `node-pty/build/Release/*.{node,dll,exe}`, `node-pty/prebuilds/*/*.{node,dll,exe}`, `spawn-helper` | Native addon (`dlopen`) and `spawn-helper` (`posix_spawn`); on Windows also `winpty.dll` and `winpty-agent.exe` |
+| `ffmpeg-static/ffmpeg(.exe)`, `ffprobe-static/bin/*/*/ffprobe(.exe)` | Spawned as child processes; in a packaged build `src/main/utils/mediaBinaries.ts` builds their paths from `process.resourcesPath` |
+| `@llamaindex/liteparse-*/*.{node,dylib,dll,so}` | Native addon plus `libpdfium` it loads from its own folder |
 
-**Solution**: Disabled ASAR packaging (`asar: false` in `electron-builder.yml`) to allow direct file system access to all node_modules.
+`smartUnpack` is off, because smart unpacking moves the **whole package** of any module with a binary in it – node-pty's JavaScript, all of jszip – out of the archive. node-pty's Windows `*.pdb` files and its unused `conpty/` folder are not packed at all.
 
-### Security Impact:
+### Packaging guards
 
-With ASAR disabled:
+`scripts/fuses.js` verifies the asar build before signing, with the same fail-closed bar as the `app/` tree had (issue #43):
 
-**Lost Security Features**:
-- ❌ ASAR Integrity Validation (2 of 6 fuses unavailable)
-  - `EnableEmbeddedAsarIntegrityValidation`
-  - `OnlyLoadAppFromAsar`
-- ❌ Code tampering detection via SHA-256 hash
-- ❌ Protection against post-installation code injection
+- `assertEffectiveAsarConfig` compares the build's effective `asar`/`asarUnpack` (CLI overrides and `mac:`/`win:` keys included) with the pinned constants and refuses `electronFuses` and `disableAsarIntegrity`.
+- `assertUnpackPatternsBinaryOnly` refuses an unpack pattern that could match anything but a binary.
+- `assertPackagedAsarContents` reads the archive header and checks the top-level allowlist both ways, every archive link, the main entry, and the `app.asar.unpacked/` tree (binaries only, no `out/`, no escaping symlinks). A stray `app/` folder beside `app.asar` is refused.
+- `applyAndVerifyFuses` reads the fuse wire back after the flip and compares the embedded integrity hash with the SHA-256 of the archive header on disk.
+- On a signed Windows build, `afterSign` (`scripts/resign.js`, `verifySignedWindowsBundle`) repeats both checks on the **signed** `Erfana.exe`, so a resource edit or signing step that dropped or changed them fails the build.
 
-**Remaining Security**:
-- ✅ 3 of the 4 configured fuses still harden the build (RunAsNode, NodeOptions, NodeCliInspect)
-- ✅ Process sandboxing enabled
-- ✅ Context isolation enabled
-- ✅ CSP enforced
-- ✅ Input validation on all IPC
+The afterPack prunes, chmods and `ffmpeg` staging operate on `app.asar.unpacked/`, which leaves the archive – and so its hash – untouched.
 
-**Note**: Cookie encryption is also disabled to avoid macOS keychain prompts. This means settings are stored in plaintext on disk.
+### Module search paths
 
-### ASAR Integrity (Reference)
+Electron limits a packaged app's `require` lookups to `process.resourcesPath` (and already keeps `NODE_PATH` and the home-folder global paths out), which still includes `Resources/node_modules/` and `Resources/app.asar.unpacked/node_modules/` – outside the archive. ESM `import()` goes through Node's ESM resolver, which Electron does not filter. `src/main/bootstrap/confineModulePaths.cjs`, inlined first into every main-process bundle (main process, git-status worker, DOCX utility process):
 
-**What it would provide** (if enabled):
+- narrows every CommonJS search path list to `app.asar/`, including the entry bundle's own `module.paths` (computed before any code in it ran);
+- registers a synchronous resolve hook (`module.registerHooks`, Node 24) that refuses any `require` or `import` resolution landing outside `app.asar/` for a caller inside the app – the layer that covers ESM and absolute paths (`MODULE_NOT_FOUND` for a `require`, `ERR_MODULE_NOT_FOUND` for an `import`).
 
-ASAR integrity validation computes a SHA-256 hash of `app.asar` at build time and validates it at runtime:
+A `require()` or `import()` the archive cannot satisfy therefore fails instead of loading a planted file. Scope: this covers code in the three bundles that carry the intro; third-party worker threads (node-pty's ConPTY output worker), resolvers rooted outside the archive and `process.dlopen` are not covered – none takes an outside path today. A build check fails if the confinement text does not come before a bundle's first dependency `require`.
 
-1. **Build time**: electron-builder computes hash of `app.asar`
-2. **Runtime**: Electron validates hash before loading app code
-3. **Tampering detected**: App forcefully terminates if hash mismatch
+### Limits
 
-**Status**: stable, no longer experimental (recorded under Electron 39; the app now runs Electron 44)
+- **What the check protects against.** It detects an archive that no longer matches the hash embedded in the binary. It cannot detect an attacker who rewrites the archive **and** the hash, so it is only as strong as the protection of the file that holds the hash.
+- **macOS:** the hash is in `Info.plist`, sealed by the app's code signature; rewriting both breaks the signature.
+- **Windows (per-user install):** the hash and the fuses are inside `Erfana.exe`, and that file, its DLLs and `resources\` are writable by the same user. The integrity check raises the bar and makes tampering visible – the archive stops matching what was signed, and the Authenticode signature breaks – but it does not stop a same-user process, which can change `Erfana.exe` and its DLLs together with the archive. A per-machine install is a planned later change.
+- **Unpacked binaries** (`pty.node`, the LiteParse addon, `ffmpeg`, `ffprobe`) are not covered by the check. On macOS the code signature covers them; on Windows (per-user install) a same-user process can replace them.
+- **`Resources/node_modules` fallback:** narrowed by the module-path confinement above for code in the three bundles that carry the intro – CommonJS search paths and, through the resolve hook, ESM and absolute-path resolutions. Third-party worker threads (node-pty's ConPTY output worker), resolvers rooted outside the archive and `process.dlopen` are not covered – none takes an outside path today.
 
-### Future Improvement:
+### History
 
-Investigate alternative approaches to enable ASAR:
-1. Bundling dependencies with webpack/esbuild to eliminate deep node_modules
-2. Using different git library without complex native dependencies
-3. Selective unpacking with proper runtime path resolution
+From v0.6.0 to v0.21.0 ASAR was off. The recorded failure (`Cannot find module 'call-bind-apply-helpers'` through isomorphic-git) came from **partial** unpacking: a package moved to `app.asar.unpacked/` resolves its own dependencies from there, and they were still inside the archive. With every JavaScript file inside the archive, isomorphic-git loads and runs from `app.asar` (verified in the v0.22.0 spike). Detail, evidence and the Windows checks: [docs/spikes/2026-10-22-asar-integrity.md](spikes/2026-10-22-asar-integrity.md).
+
+### Cookie encryption
+
+`EnableCookieEncryption` stays `false`. The main window loads `file://`, HTML previews run in in-memory partitions (`PreviewStorageSeal`), and API keys and the project-lock secret already use `safeStorage`, so the fuse would encrypt nothing of value. It would add a keychain read to every start, and turning it off again later makes encrypted cookies unreadable. Revisit it if Erfana ever keeps a signed-in web session.
 
 ---
 
@@ -513,7 +517,7 @@ The overlay windows have their own, tighter channel path: `screenshot:areaSelect
 
 ## Known vulnerabilities
 
-Run `npm audit` to check. **Policy**: zero high/critical production advisories at release. Pre-release: `npm audit --omit=dev --json` and diff against the **Accepted exceptions for v0.20.1** table below.
+Run `npm audit` to check. **Policy**: zero high/critical production advisories at release. Pre-release: `npm audit --omit=dev --json` and diff against the previous release's table of accepted exceptions (the `### Accepted exceptions for v<version>` heading below). A release with no such table shipped with no accepted exceptions, so every advisory the audit reports is new.
 
 **Current state** (audited 2026-10-18, after v0.20.1): `npm audit --omit=dev` reports **0** production advisories. The four v0.20.1 highs are cleared (see below), `chokidar` 5.0.0 took `braces` (GHSA-vfj7-8cjw-p6xm) out of the production tree, and `fast-uri` moved to 3.1.8 (GHSA-hrr3-gc8f-f4qj, a lock-only update inside `ajv`'s range). The full tree (`npm audit`) reports 28 (2 critical, 11 high, 12 moderate, 3 low); all of them run only while dependencies install or the app builds, or under the test runner, and never ship.
 
@@ -630,7 +634,7 @@ The load-bearing boundary is that **Erfana exposes no scripted API to the page**
 | `setWebRTCIPHandlingPolicy('disable_non_proxied_udp')` | A1 | Narrows WebRTC local-IP exposure only – see accepted risk 3 |
 | `X-DNS-Prefetch-Control: off` | A1 | Suppresses `dns-prefetch`; does **not** cover `preconnect` – see risk 3 |
 | Enumerated keyboard forwarding – `f` / `s` / `w` / `Escape`, plus Back and Forward (#124) | A3 | Bounds the input bridge to a closed list |
-| Page→main reporting limited to two send-only, `webContents.ipc`-scoped channels (`preview-page:linkActivated`, `preview-page:cspViolation`), never on global `ipcMain`, each re-parsed and re-confined main-side | A3 | The page has a reporting path, not a control path. It cannot address anything else in the app, and neither payload is trusted as an instruction |
+| Page→main reporting limited to three send-only, `webContents.ipc`-scoped channels (`preview-page:linkActivated`, `preview-page:linkNote`, `preview-page:cspViolation`), never on global `ipcMain`, each re-parsed and re-confined main-side | A3 | The page has a reporting path, not a control path. It cannot address anything else in the app, and no payload is trusted as an instruction – a link note can only delay a navigation the page attempted, never route one |
 
 ### Risks knowingly accepted
 

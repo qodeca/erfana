@@ -36,8 +36,8 @@ import { removeDirWithRetry } from './fixtures/isolation'
 import { HtmlPreviewPage, PREVIEW_BUDGET_MS } from './pages/html-preview.page'
 import {
   armFrameTrail,
+  clickInFrame,
   dismissToasts,
-  evalInFrame,
   frameTree,
   readBadgeGroups,
   readFrameTrail,
@@ -133,15 +133,17 @@ async function framesWhen(
   message: string
 ): Promise<Awaited<ReturnType<typeof frameTree>>> {
   let tree = await frameTree(h.app, target(relPath))
-  await expect
-    .poll(
-      async () => {
-        tree = await frameTree(h.app, target(relPath))
-        return ready(tree.map((f) => f.title))
-      },
-      { timeout: PREVIEW_BUDGET_MS, message }
-    )
-    .toBe(true)
+  await h.preview.withReadError(
+    expect
+      .poll(
+        async () => {
+          tree = await frameTree(h.app, target(relPath))
+          return ready(tree.map((f) => f.title))
+        },
+        { timeout: PREVIEW_BUDGET_MS, message }
+      )
+      .toBe(true)
+  )
   return tree
 }
 
@@ -187,7 +189,9 @@ async function swapPageCss(h: Frames, relPath: string, value: string): Promise<v
   await expect(async () => {
     round += 1
     await edit(h, 'frames/page.css', /--page-mark: [^;]+;/, `--page-mark: ${value}-${round};`)
-    await expect.poll(() => h.preview.eval(PAGE_MARK, target(relPath)), { timeout: 3_000 }).toBe(`${value}-${round}`)
+    await h.preview.withReadError(
+      expect.poll(() => h.preview.eval(PAGE_MARK, target(relPath)), { timeout: 3_000 }).toBe(`${value}-${round}`)
+    )
   }).toPass({ timeout: PREVIEW_BUDGET_MS })
 }
 
@@ -380,7 +384,7 @@ test.describe('HTML preview frames – frame caps and frame links (P2-AC4)', () 
 
     // A synthetic click in the frame: the guard judges the frame's navigation,
     // whoever started it.
-    expect(await evalInFrame(h.app, 'frame-nav-b.html', "document.getElementById('to-child').click(), true", target(top))).toBe(true)
+    expect(await clickInFrame(h.app, 'frame-nav-b.html', 'to-child', target(top))).toBe(true)
 
     await framesWhen(h, top, (t) => t.length === 1 && t[0] === CHILD_TITLE, 'the frame did not follow its link')
     expect((await h.preview.snapshot(target(top)))?.docTitle).toBe('Frame links -FRAMENAV-')
@@ -394,7 +398,7 @@ test.describe('HTML preview frames – frame caps and frame links (P2-AC4)', () 
     await openAndSettle(h, top, '-FRAMENAV-')
     await framesWhen(h, top, (t) => t.includes(NAV_TARGET_TITLE), 'the link frame never loaded')
 
-    expect(await evalInFrame(h.app, 'frame-nav-b.html', "document.getElementById('to-remote').click(), true", target(top))).toBe(true)
+    expect(await clickInFrame(h.app, 'frame-nav-b.html', 'to-remote', target(top))).toBe(true)
 
     await waitForBadgeCount(h.preview, 1)
     const { groups, writer } = await badgeWithWriters(h)
@@ -413,7 +417,9 @@ test.describe('HTML preview frames – blocked hosts inside frames (P2-AC2)', ()
   test('should list a host blocked inside a frame in the band, and load it there after Allow and Confirm', async ({ frames: h, localServer }) => {
     await edit(h, 'frames/cdn-child.html', CDN_SCRIPT_URL, localServer.probeUrl)
     await openAndSettle(h, CDN, '-FRAMES-CDN-')
-    await expect.poll(() => h.preview.eval('document.body.dataset.remote', target(CDN)), { timeout: PREVIEW_BUDGET_MS }).toBe('blocked')
+    await h.preview.withReadError(
+      expect.poll(() => h.preview.eval('document.body.dataset.remote', target(CDN)), { timeout: PREVIEW_BUDGET_MS }).toBe('blocked')
+    )
 
     const chip = h.preview.chip()
     // The loopback script origin and the frame's fetch host.
@@ -435,7 +441,9 @@ test.describe('HTML preview frames – blocked hosts inside frames (P2-AC2)', ()
 
   test("should list a fetch inside a frame as a network request, and ignore the frame's own console.log look-alike", async ({ frames: h }) => {
     await openAndSettle(h, CDN, '-FRAMES-CDN-')
-    await expect.poll(() => h.preview.eval('document.body.dataset.remote', target(CDN)), { timeout: PREVIEW_BUDGET_MS }).toBe('blocked')
+    await h.preview.withReadError(
+      expect.poll(() => h.preview.eval('document.body.dataset.remote', target(CDN)), { timeout: PREVIEW_BUDGET_MS }).toBe('blocked')
+    )
 
     // The look-alike is printed first; the two real refusals come after it.
     await expect(h.preview.chip()).toContainText('2 blocked · 0 allowed', { timeout: PREVIEW_BUDGET_MS })

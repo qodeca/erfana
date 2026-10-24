@@ -25,6 +25,14 @@
  *   for a resync, #211 D13) counts as one structural drop that no own change
  *   can explain; a completed owner read that began after it covers it.
  *
+ * It also answers a second question at resume (#252): which paths did an
+ * outside program remove during the pause? A tree read redraws the tree but
+ * tells no open tab that its folder is gone, so those removals are handed to
+ * the single-file watches whether or not a read covered them. Removals are
+ * kept as their top-most removed folder, so a deleted folder costs one entry
+ * however many children it had; and the operation's own removals – noted
+ * after their events arrived, as they usually are – are filtered at resume.
+ *
  * Pure: no Electron, no filesystem access.
  */
 
@@ -51,6 +59,34 @@ export interface InternalChange {
  * trusted to stay cheap, so the episode simply asks for a catch-up at resume.
  */
 export const MAX_INTERNAL_CHANGES = 256
+
+/**
+ * Cap on removals remembered per episode. Past it the deepest ones are folded
+ * into their parent folder, which is then re-checked on disk, not reported.
+ */
+export const MAX_REMEMBERED_REMOVALS = 256
+
+/**
+ * The removals an outside program made during one pause (#252).
+ *
+ * `paths` were seen removed, each the top-most of its removed subtree.
+ * `recheckUnder` are folders that removals were folded into past the cap: not
+ * known to be removed themselves, so the open files under them are checked on
+ * disk. `complete` is false when some removals cannot be placed at all – a
+ * resync, or the internal-change cap, past which an own change can no longer
+ * be told from an outside one; both lists are then empty.
+ */
+export interface ExternalRemovals {
+  paths: string[]
+  recheckUnder: string[]
+  complete: boolean
+}
+
+/** A remembered removal; `exact` is false for a folder that removals were folded into. */
+interface RememberedRemoval {
+  path: string
+  exact: boolean
+}
 
 /** Watcher event types by the change kind that explains them; `null` for content-only. */
 const STRUCTURAL_EVENT_KIND: Readonly<Record<FileChangeType, InternalChangeKind | null>> = {
@@ -79,6 +115,10 @@ export class PauseEpisode {
   private coveredUpTo = 0
   private readonly changes: RecordedChange[] = []
   private forceCatchUp = false
+  /** Top-most removals not yet known as own changes; none is under another (#252). */
+  private removals: RememberedRemoval[] = []
+  /** Some removal cannot be placed in {@link removals}. */
+  private removalsLost = false
 
   /**
    * @param ownerSenderId - webContents id of the window that paused; only its
@@ -91,11 +131,14 @@ export class PauseEpisode {
    * operation's own changes are ignored.
    */
   recordDrop(type: FileChangeType, eventPath: string): void {
+    const kind = STRUCTURAL_EVENT_KIND[type]
+    if (kind === 'removed') {
+      this.rememberRemoval(eventPath)
+    }
     // Once the cap forced a catch-up, counting further drops changes nothing
     if (this.forceCatchUp) {
       return
     }
-    const kind = STRUCTURAL_EVENT_KIND[type]
     if (!kind || this.isOwnChange(kind, eventPath)) {
       return
     }
@@ -108,11 +151,36 @@ export class PauseEpisode {
    * change, since nothing says where the lost changes were.
    */
   recordUnknownDrop(): void {
+    // A resync may have swallowed a removal, and nothing says where
+    this.removalsLost = true
     // Once the cap forced a catch-up, counting further drops changes nothing
     if (this.forceCatchUp) {
       return
     }
     this.droppedTotal++
+  }
+
+  /**
+   * The paths an outside program removed during this pause, for the open files
+   * under them (#252). Asked at resume, when the operation has noted every own
+   * change – an event can arrive before its operation notes it, so the filter
+   * runs again here rather than only at drop time.
+   */
+  externalRemovals(): ExternalRemovals {
+    if (this.removalsLost || this.forceCatchUp) {
+      return { paths: [], recheckUnder: [], complete: false }
+    }
+    const outside = this.removals.filter(removal => !this.isOwnRemoval(removal.path))
+    return {
+      paths: outside.filter(removal => removal.exact).map(removal => removal.path),
+      recheckUnder: outside.filter(removal => !removal.exact).map(removal => removal.path),
+      complete: true
+    }
+  }
+
+  /** Whether an own change noted so far removed this path or a folder above it. */
+  isOwnRemoval(filePath: string): boolean {
+    return this.isOwnChange('removed', filePath)
   }
 
   /**
@@ -165,6 +233,50 @@ export class PauseEpisode {
   }
 
   /**
+   * Keep a removed path for {@link externalRemovals}, as its top-most removed
+   * folder: a path under a kept one adds nothing, and a removed folder takes
+   * the place of the kept paths under it. A path already known as an own
+   * change is not kept. Past the cap, the deepest entries are folded.
+   */
+  private rememberRemoval(eventPath: string): void {
+    if (this.removalsLost || this.isOwnChange('removed', eventPath)) {
+      return
+    }
+    const removed = path.resolve(eventPath)
+    const holder = this.removals.find(kept => isAtOrUnder(removed, kept.path))
+    if (holder) {
+      // A folded folder that is now seen removed itself is exact again
+      if (holder.path === removed) holder.exact = true
+      return
+    }
+    this.removals = this.removals.filter(kept => !isAtOrUnder(kept.path, removed))
+    this.removals.push({ path: removed, exact: true })
+    this.foldRemovals()
+  }
+
+  /**
+   * Past {@link MAX_REMEMBERED_REMOVALS}, fold the deepest entries into their
+   * parent folder until the rest fit. An outside `rm -r` and the app's own
+   * folder delete alike send a folder's children before the folder, so this
+   * is what keeps both from overflowing before the folder's own event arrives.
+   * Nothing above the file-system root: lost.
+   */
+  private foldRemovals(): void {
+    while (this.removals.length > MAX_REMEMBERED_REMOVALS) {
+      const deepest = Math.max(...this.removals.map(removal => depthOf(removal.path)))
+      if (deepest === 0) {
+        this.removals = []
+        this.removalsLost = true
+        return
+      }
+      const folded = this.removals.map(removal =>
+        depthOf(removal.path) === deepest ? { path: path.dirname(removal.path), exact: false } : removal
+      )
+      this.removals = topMost(folded)
+    }
+  }
+
+  /**
    * The exact path, or – for a subtree change – anything under it at a separator
    * boundary, so `copied-2` is not inside `copied`. Unlike `isLexicallyInside`
    * this compares spelling exactly, which is right: both sides are paths this
@@ -179,4 +291,34 @@ export class PauseEpisode {
           (change.subtreePrefix !== null && resolvedEvent.startsWith(change.subtreePrefix)))
     )
   }
+}
+
+/** `candidate` is `folder` or inside it; both already resolved. */
+function isAtOrUnder(candidate: string, folder: string): boolean {
+  if (candidate === folder) return true
+  return candidate.startsWith(folder.endsWith(path.sep) ? folder : folder + path.sep)
+}
+
+/** Steps from a resolved path up to its file-system root. */
+function depthOf(resolvedPath: string): number {
+  let depth = 0
+  for (let current = resolvedPath; path.dirname(current) !== current; current = path.dirname(current)) {
+    depth++
+  }
+  return depth
+}
+
+/** Drop the removals inside another one; for a path kept twice, exact wins. */
+function topMost(removals: readonly RememberedRemoval[]): RememberedRemoval[] {
+  const shallowFirst = [...removals].sort((a, b) => depthOf(a.path) - depthOf(b.path))
+  const kept: RememberedRemoval[] = []
+  for (const removal of shallowFirst) {
+    const holder = kept.find(k => isAtOrUnder(removal.path, k.path))
+    if (!holder) {
+      kept.push({ ...removal })
+    } else if (holder.path === removal.path && removal.exact) {
+      holder.exact = true
+    }
+  }
+  return kept
 }

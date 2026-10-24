@@ -47,10 +47,11 @@ describe('useFileChangeSubscription – deletion', () => {
 
     await waitFor(() => expect(onExternalChange).toHaveBeenCalledTimes(1))
     expect(result.current.isFileDeleted).toBe(false)
-    // The re-start is preceded by a release, so the subscriber count this
-    // consumer holds main-side stays at exactly one (security MEDIUM-1).
+    // Main dropped the watch with the delete, so the slot forgot its hold:
+    // the re-start rebuilds the count from zero, and no `stop` goes out that
+    // could take another consumer's count for the same file (#252).
     expect(h.fileWatch.start).toHaveBeenCalledTimes(2)
-    expect(h.fileWatch.stop).toHaveBeenCalledTimes(1)
+    expect(h.fileWatch.stop).not.toHaveBeenCalled()
   })
 
   it('clears a stale deleted state on the next change event', async () => {
@@ -82,9 +83,27 @@ describe('useFileChangeSubscription – recover()', () => {
     expect(recovered).toBe(true)
     expect(result.current.isFileDeleted).toBe(false)
     expect(result.current.isWatchUnavailable).toBe(false)
-    // Release then re-acquire: never two live subscriptions for one consumer.
+    // After a delete only the acquire talks to main: the hold was forgotten
+    // when main dropped the watch (#252).
     expect(h.fileWatch.start).toHaveBeenCalledTimes(2)
+    expect(h.fileWatch.stop).not.toHaveBeenCalled()
+  })
+
+  it('releases a live watch before re-acquiring, after a watcher error', async () => {
+    const { result } = renderSubscription()
+    await waitFor(() => expect(h.fileWatch.start).toHaveBeenCalledTimes(1))
+    h.emitError(WATCHED_PATH, 'watcher died')
+
+    await act(async () => {
+      await result.current.recover()
+    })
+
+    // Never two live subscriptions for one consumer
     expect(h.fileWatch.stop).toHaveBeenCalledTimes(1)
+    expect(h.fileWatch.start).toHaveBeenCalledTimes(2)
+    expect(h.fileWatch.stop.mock.invocationCallOrder[0]).toBeLessThan(
+      h.fileWatch.start.mock.invocationCallOrder[1]
+    )
   })
 
   it('stays deleted when the file is still gone', async () => {

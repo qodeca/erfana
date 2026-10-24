@@ -269,6 +269,10 @@ function ProjectTreeNodeRow({
         aria-level={level + 1}
         aria-posinset={posInSet}
         aria-setsize={setSize}
+        /* deviates: design/system/components/menu/index.html — aria-expanded on a
+           treeitem already means "folder open", so it cannot also report the
+           row menu; the menu is announced as a menu when it takes focus. See
+           the card's Exceptions. */
         aria-expanded={node.type === 'directory' ? isExpanded : undefined}
         aria-busy={isBusy ? true : undefined}
         aria-selected={isSelected}

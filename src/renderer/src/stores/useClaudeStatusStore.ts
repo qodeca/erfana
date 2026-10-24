@@ -58,7 +58,7 @@ interface ClaudeStatusState {
  *
  * @example Push a snapshot from the global subscription
  * ```ts
- * window.api.claudeStatus.onChanged((payload) => {
+ * claudeStatusGateway.onChanged((payload) => {
  *   useClaudeStatusStore.getState().setSnapshot(payload)
  * })
  * ```

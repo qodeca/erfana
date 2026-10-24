@@ -58,6 +58,7 @@ import {
 } from './hooks'
 import { previewPlaceholderLabel, selectFallback, selectPanelView } from './htmlPreview.logic'
 import './HtmlPreviewPanel.css'
+import { previewGateway } from '../../../services/previewGateway'
 
 /** Parameters passed to {@link HtmlPreviewPanel} via dockview. */
 export interface HtmlPreviewPanelParams {
@@ -265,7 +266,7 @@ export function HtmlPreviewPanel(props: IDockviewPanelProps<HtmlPreviewPanelPara
   // ========================================
 
   const searchProvider = useMemo(
-    () => new PreviewPageSearchProvider(panelId, window.api.preview),
+    () => new PreviewPageSearchProvider(panelId, previewGateway),
     [panelId]
   )
   useEffect(() => () => searchProvider.dispose(), [searchProvider])

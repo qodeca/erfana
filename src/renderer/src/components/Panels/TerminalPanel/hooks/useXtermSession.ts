@@ -41,7 +41,24 @@ import { isElementVisible } from '../../../../utils/domUtils'
 import { logger } from '../../../../utils/logger'
 import type { ShellKind } from '../../../../utils/shellPathEscape'
 import { terminalGateway } from '../../../../services/terminalGateway'
+import { claudeStatusGateway } from '../../../../services/claudeStatusGateway'
 import { createTerminalLinkHandler, ensureTerminalFontLoaded } from '../terminalPanel.logic'
+import { routeTerminalMenuKey } from '../terminalMenuKey'
+import { isKeyboardMenuEcho } from '../../../ContextMenu/contextMenuKey'
+
+/**
+ * Call the Claude-status bridge, fire-and-forget. The panel has always
+ * tolerated a window without that bridge (`window.api?.claudeStatus?.…`
+ * before the gateways, #352): status tracking is advisory and must never
+ * break a terminal start or teardown.
+ */
+function claudeStatus(call: (bridge: typeof claudeStatusGateway) => Promise<unknown>): void {
+  try {
+    void call(claudeStatusGateway)
+  } catch {
+    // No bridge in this window – nothing to track
+  }
+}
 
 /**
  * Options of the xterm instance.
@@ -252,7 +269,7 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
     claudeNudgeTimerRef.current = setTimeout(() => {
       claudeNudgeTimerRef.current = null
       // Optional chaining: tests and non-Electron renders have no bridge
-      void window.api?.claudeStatus?.nudge(id)
+      claudeStatus((bridge) => bridge.nudge(id))
     }, CLAUDE_NUDGE_DEBOUNCE_MS)
   }, [])
 
@@ -334,7 +351,7 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
       shellKindRef.current = null
       useTerminalStore.getState().setActiveTerminal(null)
       if (id) {
-        void window.api?.claudeStatus?.unregister(id)
+        claudeStatus((bridge) => bridge.unregister(id))
         // Prune the slice, or the map keeps a stale entry per closed terminal
         useClaudeStatusStore.getState().clearTerminal(id)
       }
@@ -438,7 +455,16 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
     const handlers = optionsRef.current
     // After open(), when the parser API exists
     parserDisposablesRef.current = handlers.registerParserHooks(xterm)
-    xterm.attachCustomKeyEventHandler(handlers.keyEventHandler)
+    xterm.attachCustomKeyEventHandler((event) => {
+      // Shift+F10 / the Menu key open the terminal's context menu (#90)
+      // instead of reaching the shell. xterm keeps its helper textarea at
+      // the cursor, so its box is where the menu opens.
+      const caret = xterm.textarea ?? xterm.element ?? null
+      const open = (x: number, y: number): void => optionsRef.current.onContextMenu(x, y)
+      /* deviates: design/system/components/menu/index.html — no aria-haspopup/expanded: xterm owns its textarea. */
+      if (routeTerminalMenuKey(event, caret, open)) return false
+      return handlers.keyEventHandler(event)
+    })
     xterm.attachCustomWheelEventHandler(handlers.wheelEventHandler)
 
     if (!xterm.element) return
@@ -447,7 +473,12 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
     const handleContextMenu = (e: MouseEvent): void => {
       e.preventDefault()
       e.stopPropagation()
-      xterm.blur() // release focus so the menu is interactive
+      // Windows also sends a native contextmenu for the Menu key, after
+      // the key handler above already opened the menu at the cursor.
+      if (isKeyboardMenuEcho()) return
+      // No xterm.blur() any more: the menu moves focus into itself on open
+      // (#90), and it must see the terminal as its opener so that Escape
+      // hands focus back to the terminal rather than to <body>.
       optionsRef.current.onContextMenu(e.clientX, e.clientY)
     }
     xterm.element.addEventListener('contextmenu', handleContextMenu)
@@ -559,7 +590,7 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
       // Kept with the id so a screenshot path-paste quotes for this shell (#164)
       shellKindRef.current = result.shellKind ?? null
       useTerminalStore.getState().setActiveTerminal({ id, shellKind: result.shellKind ?? null })
-      void window.api?.claudeStatus?.register(id)
+      claudeStatus((bridge) => bridge.register(id))
       warmupUntilRef.current = Date.now() + WARMUP_MS
 
       inputDisposableRef.current = xterm.onData((data) => {

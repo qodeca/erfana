@@ -12,7 +12,7 @@
  * - Memoized: Prevents unnecessary rebuilds
  */
 
-import { useRef, useCallback, useMemo } from 'react'
+import { useRef, useCallback, useState } from 'react'
 import type { FileNode } from '../../../preload/index'
 import { createFilenameIndex, type FilenameIndex } from '../utils/filenameIndex'
 
@@ -51,27 +51,18 @@ export interface UseFilenameIndexReturn {
 export function useFilenameIndex(options: UseFilenameIndexOptions): UseFilenameIndexReturn {
   const { files } = options
 
-  // Store the index in a ref to maintain instance across renders
-  const indexRef = useRef<FilenameIndex | null>(null)
+  // One index instance for the hook's lifetime, created on the first render.
+  // State rather than a ref so render may read `isBuilt` from it.
+  const [index] = useState<FilenameIndex>(createFilenameIndex)
 
   // Track the files array reference to detect changes
   const filesRef = useRef<FileNode[]>(files)
-
-  // Memoize the index instance creation
-  const getOrCreateIndex = useMemo(() => {
-    if (!indexRef.current) {
-      indexRef.current = createFilenameIndex()
-    }
-    return indexRef.current
-  }, [])
 
   /**
    * Get the index, building it lazily if needed.
    * Also rebuilds if files have changed since last build.
    */
   const getIndex = useCallback((): FilenameIndex => {
-    const index = getOrCreateIndex
-
     // Check if files changed
     const filesChanged = files !== filesRef.current
 
@@ -82,20 +73,19 @@ export function useFilenameIndex(options: UseFilenameIndexOptions): UseFilenameI
     }
 
     return index
-  }, [files, getOrCreateIndex])
+  }, [files, index])
 
   /**
    * Force rebuild the index
    */
   const rebuild = useCallback(() => {
-    const index = getOrCreateIndex
     index.rebuild(files)
     filesRef.current = files
-  }, [files, getOrCreateIndex])
+  }, [files, index])
 
   return {
     getIndex,
     rebuild,
-    isBuilt: indexRef.current?.isBuilt ?? false
+    isBuilt: index.isBuilt
   }
 }

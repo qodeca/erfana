@@ -17,6 +17,7 @@
  */
 
 import { logger } from '../../utils/logger'
+import { directoryWatchGateway } from '../../services/directoryWatchGateway'
 
 export async function withWatcherPause<T>(
   projectPath: string | null,
@@ -30,7 +31,7 @@ export async function withWatcherPause<T>(
 
     // Pause watcher before operation
     if (projectPath) {
-      await window.api.directoryWatch.pause(projectPath)
+      await directoryWatchGateway.pause(projectPath)
     }
 
     // Execute the operation
@@ -42,7 +43,7 @@ export async function withWatcherPause<T>(
 
     // Resume watcher after success
     if (projectPath) {
-      await window.api.directoryWatch.resume(projectPath)
+      await directoryWatchGateway.resume(projectPath)
     }
 
     return result
@@ -54,7 +55,7 @@ export async function withWatcherPause<T>(
     // Resume watcher even on error
     if (projectPath) {
       try {
-        await window.api.directoryWatch.resume(projectPath)
+        await directoryWatchGateway.resume(projectPath)
       } catch (resumeErr) {
         logger.error('Failed to resume directory watcher', resumeErr instanceof Error ? resumeErr : undefined)
       }

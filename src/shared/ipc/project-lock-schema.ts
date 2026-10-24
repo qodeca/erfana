@@ -11,6 +11,7 @@
  * @see Issue #27 - Multiple independent instances
  */
 import { z } from 'zod'
+import type { IpcAck } from './schema'
 
 /**
  * Lock file content schema
@@ -116,3 +117,23 @@ export const FocusRequestedEventSchema = z.object({
   requesterPid: z.number()
 })
 export type FocusRequestedEvent = z.infer<typeof FocusRequestedEventSchema>
+
+/**
+ * Shared contract for the preload `projectLock` bridge.
+ *
+ * Implemented by `window.api.projectLock` (preload, `projectLockBridge.ts`).
+ * No renderer code calls it today, so it has no renderer gateway.
+ */
+export interface ProjectLockBridge {
+  /** Lock a project path: `acquired`, `already_locked` or `error`. */
+  acquire(projectPath: string): Promise<LockResult>
+  release(projectPath: string): Promise<IpcAck>
+  /** `unlocked`, `locked_by_self`, `locked_by_other` or `error`. */
+  check(projectPath: string): Promise<LockStatus>
+  /** Ask the instance that holds the lock to come to the front. */
+  requestFocus(projectPath: string): Promise<IpcAck>
+  /** Remove stale locks (dead processes, timed-out network locks). */
+  cleanup(): Promise<{ success: boolean; removedCount?: number; error?: string }>
+  /** Another instance asked this one to come to the front; returns the unsubscribe function. */
+  onFocused(callback: (event: FocusRequestedEvent) => void): () => void
+}

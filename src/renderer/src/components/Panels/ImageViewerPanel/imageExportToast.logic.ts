@@ -195,7 +195,7 @@ export function buildSelectionQualifier(
 /**
  * Turn an export response into the toast to show, if any.
  *
- * @param result - Response from `window.api.imageExport.run`
+ * @param result - Response from `imageExportGateway.run`
  * @param options - The action the user invoked
  * @returns The toast payload, or `null` when nothing should be shown
  *

@@ -9,7 +9,29 @@
  * that drifts from its contract, or an `Api` that stops being `typeof api`,
  * fails the typecheck here.
  */
+import type { BrowserBridge } from '../shared/ipc/browser-schema'
+import type { CameraBridge } from '../shared/ipc/camera-schema'
+import type { ClaudeStatusBridge } from '../shared/ipc/claude-status-schema'
+import type { ClipboardBridge } from '../shared/ipc/clipboard-schema'
+import type { DocxBridge } from '../shared/ipc/docx-schema'
+import type { ImageExportBridge } from '../shared/ipc/image-export-schema'
+import type { ImportBridge } from '../shared/ipc/import-schema'
+import type { MarkdownImageBridge } from '../shared/ipc/markdown-image-schema'
+import type { PdfBridge } from '../shared/ipc/pdf-schema'
+import type { PreviewBridge } from '../shared/ipc/preview-bridge-types'
+import type { TranscriptionBridge, WhisperBridge } from '../shared/ipc/transcription-schema'
+import type { DirectoryWatchBridge } from '../shared/ipc/directory-watch-schema'
 import type { FileBridge } from '../shared/ipc/file-schema'
+import type { FileWatchBridge } from '../shared/ipc/file-watch-schema'
+import type { GitBridge } from '../shared/ipc/git-schema'
+import type { GitPollingBridge, GitWatcherBridge } from '../shared/ipc/git-watcher-schema'
+import type { GlobalSettingsBridge } from '../shared/ipc/global-settings-schema'
+import type { LoggingBridge } from '../shared/ipc/logging-schema'
+import type { ProjectLockBridge } from '../shared/ipc/project-lock-schema'
+import type { QuitBridge } from '../shared/ipc/quit-schema'
+import type { SettingsBridge } from '../shared/ipc/settings-schema'
+import type { ScreenshotBridge } from '../shared/ipc/screenshot-schema'
+import type { SystemBridge } from '../shared/ipc/system-schema'
 import type { TerminalBridge } from '../shared/ipc/terminal-schema'
 import type { Api } from './index'
 
@@ -45,6 +67,31 @@ type AnyIn<T, Depth extends unknown[] = []> = Depth['length'] extends 14
 export type ApiContractChecks = [
   Assert<Equal<Api['file'], FileBridge>>,
   Assert<Equal<Api['terminal'], TerminalBridge>>,
+  Assert<Equal<Api['fileWatch'], FileWatchBridge>>,
+  Assert<Equal<Api['directoryWatch'], DirectoryWatchBridge>>,
+  Assert<Equal<Api['git'], GitBridge>>,
+  Assert<Equal<Api['gitWatcher'], GitWatcherBridge>>,
+  Assert<Equal<Api['gitPolling'], GitPollingBridge>>,
+  Assert<Equal<Api['settings'], SettingsBridge>>,
+  Assert<Equal<Api['globalSettings'], GlobalSettingsBridge>>,
+  Assert<Equal<Api['logging'], LoggingBridge>>,
+  Assert<Equal<Api['quit'], QuitBridge>>,
+  Assert<Equal<Api['system'], SystemBridge>>,
+  Assert<Equal<Api['clipboard'], ClipboardBridge>>,
+  Assert<Equal<Api['projectLock'], ProjectLockBridge>>,
+  Assert<Equal<Api['testHooks'], { readonly enabled: boolean }>>,
+  Assert<Equal<Api['import'], ImportBridge>>,
+  Assert<Equal<Api['transcription'], TranscriptionBridge>>,
+  Assert<Equal<Api['whisper'], WhisperBridge>>,
+  Assert<Equal<Api['camera'], CameraBridge>>,
+  Assert<Equal<Api['pdf'], PdfBridge>>,
+  Assert<Equal<Api['docx'], DocxBridge>>,
+  Assert<Equal<Api['imageExport'], ImageExportBridge>>,
+  Assert<Equal<Api['browser'], BrowserBridge>>,
+  Assert<Equal<Api['markdownImage'], MarkdownImageBridge>>,
+  Assert<Equal<Api['preview'], PreviewBridge>>,
+  Assert<Equal<Api['claudeStatus'], ClaudeStatusBridge>>,
+  Assert<Equal<Api['screenshot'], ScreenshotBridge>>,
   // A bridge method that returns the unchecked `ipcRenderer.invoke` result would put `any` in the renderer
   Assert<Equal<AnyIn<Api>, never>>
 ]

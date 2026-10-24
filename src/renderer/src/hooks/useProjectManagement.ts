@@ -29,6 +29,8 @@ import { showGlobalToast } from '../components/Toast/toastService'
 import { logger } from '../utils/logger'
 import { recordTreeReadMs } from '../utils/treeReadTiming'
 import { noteProjectGeneration } from '../services/projectGeneration'
+import { useLatestRef } from './useLatestRef'
+import { confinementCodeFromMessage } from '../../../shared/ipc/confinement'
 import {
   createCoalescingRunner,
   type CoalescedRunInfo,
@@ -176,12 +178,9 @@ export function useProjectManagement(
     return true
   }
 
-  // Load last project on mount - DISABLED
-  // Now shows welcome screen with recent projects instead of auto-loading.
-  // Crash recovery relies on this: never reopen the last project here (#60).
-  useEffect(() => {
-    setLoading(false)
-  }, [])
+  // No "load last project on mount": the welcome screen shows recent projects
+  // instead, and `loading` starts false. Crash recovery relies on this: never
+  // reopen the last project on mount (#60).
 
   // Listen for external project changes (e.g., from menu bar, shortcuts)
   useEffect(() => {
@@ -234,6 +233,13 @@ export function useProjectManagement(
         } catch (err) {
           if (generation !== refreshGenerationRef.current) {
             logger.debug('[useProjectManagement] Stale project load failed; ignored')
+            return
+          }
+          // Main refused the read because a newer open had already replaced
+          // this project. Its project-changed event can still be on the way,
+          // so the generation check above has not seen it: the load is stale.
+          if (confinementCodeFromMessage(err instanceof Error ? err.message : String(err)) === 'PROJECT_CHANGED') {
+            logger.debug('[useProjectManagement] Project load refused as superseded; ignored')
             return
           }
           logger.error(createNewProjectTreeErrorLog(), err instanceof Error ? err : undefined)
@@ -457,6 +463,9 @@ export function useProjectManagement(
       }
     }
   }
+  // runRefreshRead is rebuilt every render; refreshFiles reaches it through a
+  // ref so its own identity (which consumers depend on) stays stable.
+  const runRefreshReadRef = useLatestRef(runRefreshRead)
 
   /**
    * Refresh the file tree
@@ -482,13 +491,13 @@ export function useProjectManagement(
       // Defensive: a non-null project path is only ever set by beginRefreshScope,
       // which installs a runner, so this fallback does not run today.
       const runner = (refreshRunnerRef.current ??= createCoalescingRunner<void>())
-      await runner.run((info) => runRefreshRead(generation, info))
+      await runner.run((info) => runRefreshReadRef.current(generation, info))
     } catch {
       // Contract backstop: refreshFiles never rejects, whatever the task did
       // (a throwing logger or setter included). Errors are logged in the task.
     }
-    // runRefreshRead reads only refs, stable setters and api.file.
-  }, [projectPath, api.file])
+    // api.file is used only inside runRefreshRead, which the ref keeps current.
+  }, [projectPath, runRefreshReadRef])
 
   return {
     projectPath,

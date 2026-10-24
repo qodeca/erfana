@@ -17,7 +17,7 @@
 
 import type { FileBridge, FileNode } from '../../../shared/ipc/file-schema'
 import type { TerminalBridge } from '../../../shared/ipc/terminal-schema'
-import type { DirectoryChangedPayload } from '../../../shared/ipc/directory-watch-schema'
+import type { DirectoryWatchBridge } from '../../../shared/ipc/directory-watch-schema'
 
 /** File node type – defined in shared/ipc/file-schema */
 export type { FileNode }
@@ -47,17 +47,16 @@ export interface IProjectTreeApi {
   /**
    * Directory watching operations
    */
-  directoryWatch: {
-    start(projectPath: string): Promise<{ success: boolean }>
-    stop(projectPath: string): Promise<{ success: boolean }>
-    pause(projectPath: string): Promise<{ success: boolean }>
-    resume(projectPath: string): Promise<{ success: boolean }>
-    onDirectoryChanged(
-      callback: (data: DirectoryChangedPayload) => void
-    ): () => void
-    onProjectDeleted(callback: () => void): () => void
-    onDirectoryError(callback: (data: { error: string }) => void): () => void
-  }
+  directoryWatch: Pick<
+    DirectoryWatchBridge,
+    | 'start'
+    | 'stop'
+    | 'pause'
+    | 'resume'
+    | 'onDirectoryChanged'
+    | 'onProjectDeleted'
+    | 'onDirectoryError'
+  >
 
   /**
    * Terminal operations (limited scope for ProjectTree)

@@ -30,6 +30,7 @@ import { useOverlayOccluderStore } from '../stores/useOverlayOccluderStore'
 import { usePreviewCollapsedStore } from '../stores/usePreviewCollapsedStore'
 import { usePreviewStore } from '../stores/usePreviewStore'
 import { logger } from '../utils/logger'
+import { previewGateway } from '../services/previewGateway'
 
 /**
  * Each mounted preview panel's forced bounds push, by panel id. The release
@@ -109,7 +110,7 @@ export function createSplitterDragFreezeDeps(): DragFreezeDeps {
     isPanelLive: hasLiveView,
     subscribeLive: (listener) => usePreviewStore.subscribe(listener),
     subscribeVisibilityApplied: (listener) =>
-      window.api.preview.onVisibilityApplied((payload) => listener(payload.panelId, payload.visible)),
+      previewGateway.onVisibilityApplied((payload) => listener(payload.panelId, payload.visible)),
     beginHide: (panelId) => {
       // The latch first, so the render the occluder causes already carries it.
       usePreviewStore.getState().latchDragHide(panelId)

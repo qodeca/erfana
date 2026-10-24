@@ -20,7 +20,7 @@ import { createFileSaveGuard, isEchoEvent, useFileWatcher } from './useFileWatch
 
 type FileChangedCallback = (data: { filePath: string }) => void
 type FileDeletedCallback = (data: { filePath: string }) => void
-type FileErrorCallback = (data: { filePath: string; error: string }) => void
+type FileErrorCallback = (data: { filePath: string; error: string; ended?: boolean }) => void
 
 let fileChangedListeners: FileChangedCallback[] = []
 let fileDeletedListeners: FileDeletedCallback[] = []
@@ -62,6 +62,13 @@ Object.defineProperty(window, 'api', {
 // Emit a simulated file change event from chokidar
 function emitFileChanged(filePath: string): void {
   for (const listener of fileChangedListeners) {
+    listener({ filePath })
+  }
+}
+
+// Emit a simulated delete: main has ended the watch by the time this arrives
+function emitFileDeleted(filePath: string): void {
+  for (const listener of fileDeletedListeners) {
     listener({ filePath })
   }
 }
@@ -694,6 +701,143 @@ describe('useFileWatcher', () => {
       // Event for a different file is filtered at the listener level (not our file)
       expect(mockReadFile).not.toHaveBeenCalled()
       expect(onContentUpdate).not.toHaveBeenCalled()
+    })
+  })
+
+  // #252: the main process ends a watch when its file is deleted, so a tab a
+  // save restored stayed deaf to outside edits until it was reopened
+  describe('watching a restored file again', () => {
+    async function renderWatching() {
+      const rendered = renderFileWatcher()
+      await waitFor(() => expect(mockFileWatch.start).toHaveBeenCalledTimes(1))
+      return rendered
+    }
+
+    it('starts a new watch once a save restores a file deleted on disk', async () => {
+      const { result } = await renderWatching()
+      act(() => {
+        emitFileDeleted(TEST_PATH)
+      })
+      expect(result.current.isFileDeleted).toBe(true)
+
+      act(() => {
+        result.current.clearDeletedState()
+      })
+
+      expect(result.current.isFileDeleted).toBe(false)
+      await waitFor(() => expect(mockFileWatch.start).toHaveBeenCalledTimes(2))
+      // Main dropped the old watch with the delete: a `stop` now could take
+      // another consumer's count for the same file
+      expect(mockFileWatch.stop).not.toHaveBeenCalled()
+    })
+
+    it('starts a new watch when a deleted file is reloaded from disk', async () => {
+      const { result } = await renderWatching()
+      act(() => {
+        emitFileDeleted(TEST_PATH)
+      })
+      mockReadFile.mockResolvedValueOnce('# back')
+
+      await act(async () => {
+        await result.current.reloadFromDisk()
+      })
+
+      expect(result.current.isFileDeleted).toBe(false)
+      await waitFor(() => expect(mockFileWatch.start).toHaveBeenCalledTimes(2))
+      expect(mockFileWatch.stop).not.toHaveBeenCalled()
+    })
+
+    it('sends no stop on unmount for a watch main ended with an error (#252)', async () => {
+      let emitError: FileErrorCallback = () => {}
+      mockFileWatch.onFileError.mockImplementation((cb: FileErrorCallback) => {
+        emitError = cb
+        return vi.fn()
+      })
+      const { unmount } = await renderWatching()
+
+      act(() => {
+        emitError({ filePath: TEST_PATH, error: 'File watch ended: could not re-arm', ended: true })
+      })
+      unmount()
+      await act(async () => {})
+
+      expect(mockFileWatch.stop).not.toHaveBeenCalled()
+    })
+
+    it('still sends its stop after a plain watcher error the watch survived', async () => {
+      let emitError: FileErrorCallback = () => {}
+      mockFileWatch.onFileError.mockImplementation((cb: FileErrorCallback) => {
+        emitError = cb
+        return vi.fn()
+      })
+      const { unmount } = await renderWatching()
+
+      act(() => {
+        emitError({ filePath: TEST_PATH, error: 'EMFILE' })
+      })
+      unmount()
+
+      await waitFor(() => expect(mockFileWatch.stop).toHaveBeenCalledTimes(1))
+    })
+
+    it('sends no stop on unmount for a watch the delete already ended', async () => {
+      const { unmount } = await renderWatching()
+      act(() => {
+        emitFileDeleted(TEST_PATH)
+      })
+
+      unmount()
+      await act(async () => {})
+
+      expect(mockFileWatch.stop).not.toHaveBeenCalled()
+    })
+
+    it('leaves a live watch alone after an ordinary save', async () => {
+      const { result } = await renderWatching()
+
+      act(() => {
+        result.current.clearDeletedState()
+      })
+      await act(async () => {})
+
+      expect(mockFileWatch.start).toHaveBeenCalledTimes(1)
+      expect(mockFileWatch.stop).not.toHaveBeenCalled()
+    })
+
+    it('restarts the watch once per restore, not on every later save', async () => {
+      const { result } = await renderWatching()
+      act(() => {
+        emitFileDeleted(TEST_PATH)
+      })
+      act(() => {
+        result.current.clearDeletedState()
+      })
+      await waitFor(() => expect(mockFileWatch.start).toHaveBeenCalledTimes(2))
+
+      act(() => {
+        result.current.clearDeletedState()
+      })
+      await act(async () => {})
+
+      expect(mockFileWatch.start).toHaveBeenCalledTimes(2)
+    })
+
+    it('ends the restarted watch on unmount', async () => {
+      const { result, unmount } = await renderWatching()
+      act(() => {
+        emitFileDeleted(TEST_PATH)
+      })
+      act(() => {
+        result.current.clearDeletedState()
+      })
+      await waitFor(() => expect(mockFileWatch.start).toHaveBeenCalledTimes(2))
+
+      unmount()
+
+      // One stop for the one live watch: the ended one sends none
+      await waitFor(() => expect(mockFileWatch.stop).toHaveBeenCalledTimes(1))
+      await act(async () => {})
+      expect(mockFileWatch.stop).toHaveBeenCalledTimes(1)
     })
   })
 })

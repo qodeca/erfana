@@ -104,12 +104,14 @@ export function DiagramViewer() {
     }
   }, [isOpen, svgContent])
 
-  // Reset hasInitialized when viewer closes
-  useEffect(() => {
-    if (!isOpen) {
-      setHasInitialized(false)
-    }
-  }, [isOpen])
+  // Reset hasInitialized when viewer closes. Adjusted during render rather
+  // than in an effect (React's "storing information from previous renders"
+  // pattern); it starts false, so only the open -> closed edge matters.
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen)
+  if (isOpen !== prevIsOpen) {
+    setPrevIsOpen(isOpen)
+    if (!isOpen) setHasInitialized(false)
+  }
 
   // Fit to view on FIRST open only (not on every svgContent change)
   // This preserves zoom/pan when file is edited while viewer is open

@@ -41,6 +41,7 @@ import { usePreviewStore } from '../../../../stores/usePreviewStore'
 import { deriveBounds } from '../htmlPreview.logic'
 import { logger } from '../../../../utils/logger'
 import { getBasename, stablePathDigest } from '../../../../utils/fileUtils'
+import { previewGateway } from '../../../../services/previewGateway'
 
 /** Options for {@link usePreviewLifecycle}. */
 export interface UsePreviewLifecycleOptions {
@@ -142,7 +143,7 @@ export function usePreviewLifecycle(
 
       const filePath = filePathRef.current
       try {
-        const result = await window.api.preview.open({
+        const result = await previewGateway.open({
           panelId,
           filePath,
           bounds: initialBounds(placeholderRefStable.current.current)
@@ -213,7 +214,7 @@ export function usePreviewLifecycle(
     return () => {
       cancelled = true
       // Bounded destroy main-side; idempotent (design §5(f)).
-      void window.api.preview.close(panelId).catch(() => {})
+      void previewGateway.close(panelId).catch(() => {})
       const store = usePreviewStore.getState()
       store.removePanel(panelId)
       if (store.holderPanelId === panelId) store.clearHolder()

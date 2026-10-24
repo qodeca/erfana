@@ -14,7 +14,9 @@
  *    check.
  *  - **De-duplication.** The preload does not cancel the click, so the browser
  *    also attempts the navigation and `will-navigate` fires for the SAME click.
- *    Without this, one click would open two tabs.
+ *    Without this, one click would open two tabs. The `will-navigate` half is
+ *    held until the preload's report of that click has claimed the href
+ *    (`previewNavigationHold`).
  *
  * Extracted from `PreviewLiveView`, so the live view holds no link rules.
  */
@@ -28,9 +30,17 @@ import {
   type PreviewLinkContext,
   type PreviewLinkNavigationDeps
 } from './previewLinkNavigation'
+import { createNavigationHold } from './previewNavigationHold'
 
 /** Channel name; must match the inlined constant in `src/preload/previewPage.ts`. */
 export const PREVIEW_PAGE_LINK_CHANNEL = 'preview-page:linkActivated'
+
+/**
+ * Channel for the preload's notes about a click it will report one task later:
+ * `seen` during the click, `cancelled` in place of the report. Must match the
+ * inlined constant in `src/preload/previewPage.ts`.
+ */
+export const PREVIEW_PAGE_LINK_NOTE_CHANNEL = 'preview-page:linkNote'
 
 /**
  * At most this many link activations are honoured per second, per view, per
@@ -50,20 +60,11 @@ const MAX_ACTIVATIONS_PER_SECOND: Record<LinkProvenance, number> = {
 /** A repeat of the same href inside this window is the same click. */
 const DEDUPE_WINDOW_MS = 1000
 
-/**
- * How long a `will-navigate` report waits for the preload's report of the same
- * click before it is routed on its own.
- *
- * One click reaches main twice: the preload's `ipcRenderer.send` and Chromium's
- * `will-navigate`, over two different pipes that nothing orders. Measured on
- * Windows the navigation half lands ~10 ms after the gesture half, but nothing
- * guarantees it, and when it won the race the bridge routed the click as
- * `navigation` — refused for an external link, with a badge — and then dropped
- * the genuine gesture as its duplicate. Holding the navigation half for a
- * moment lets the gesture claim the href first whichever order they arrive in;
- * a page that navigates itself (no preload, no click) is merely 50 ms slower.
- */
-const NAVIGATION_GRACE_MS = 50
+/** The longest href either entry point acts on. */
+const MAX_HREF_LENGTH = 2048
+
+/** The preload's per-document click counter, pairing a click's notes with its report. */
+const GestureIdSchema = z.number().int().min(1).max(Number.MAX_SAFE_INTEGER)
 
 /**
  * What the preload sends. Strict and bounded: an over-long href is refused
@@ -71,7 +72,7 @@ const NAVIGATION_GRACE_MS = 50
  */
 const LinkActivationPayloadSchema = z
   .object({
-    href: z.string().min(1).max(2048),
+    href: z.string().min(1).max(MAX_HREF_LENGTH),
     /**
      * The `href` ATTRIBUTE as the page wrote it, before Chromium resolved it.
      * Refusal-only input: it never selects a file, it only lets a link that
@@ -81,7 +82,7 @@ const LinkActivationPayloadSchema = z
      */
     // Refusal-only label data (never selects a file): an over-long value
     // costs the label, never the activation — `.catch` drops just this field.
-    rawHref: z.string().max(2048).optional().catch(undefined),
+    rawHref: z.string().max(MAX_HREF_LENGTH).optional().catch(undefined),
     target: z.string().max(64).default(''),
     download: z.boolean().default(false),
     /**
@@ -97,14 +98,32 @@ const LinkActivationPayloadSchema = z
         shift: z.boolean(),
         alt: z.boolean()
       })
-      .optional()
+      .optional(),
+    /** Pairs this report with the click's `seen` note. Absent from `will-navigate`. */
+    gestureId: GestureIdSchema.optional()
   })
   .strict()
+
+type LinkActivationPayload = z.infer<typeof LinkActivationPayloadSchema>
+
+/** A note on {@link PREVIEW_PAGE_LINK_NOTE_CHANNEL}. Strict, like the report. */
+const LinkNoteSchema = z.discriminatedUnion('kind', [
+  z
+    .object({
+      kind: z.literal('seen'),
+      gestureId: GestureIdSchema,
+      href: z.string().min(1).max(MAX_HREF_LENGTH)
+    })
+    .strict(),
+  z.object({ kind: z.literal('cancelled'), gestureId: GestureIdSchema }).strict()
+])
 
 /** The bridge a live view holds. */
 export interface PreviewLinkBridge {
   /** Handle a payload from the preview page's preload. */
   handleActivation(payload: unknown): void
+  /** Handle a `seen` or `cancelled` note about a click the preload will report. */
+  handleLinkNote(payload: unknown): void
   /**
    * Handle a same-tab navigation the page attempted.
    *
@@ -128,7 +147,7 @@ export function createPreviewLinkBridge(
     navigation: { startedAt: now(), used: 0 }
   }
   let disposed = false
-  const pendingNavigations = new Set<ReturnType<typeof setTimeout>>()
+  const navigationHold = createNavigationHold()
 
   /** `false` when this activation exceeds its provenance's per-second allowance. */
   const withinRateLimit = (provenance: LinkProvenance): boolean => {
@@ -183,31 +202,54 @@ export function createPreviewLinkBridge(
       return
     }
 
-    if (!withinRateLimit(provenance)) {
+    const { gestureId, ...activation } = parsed.data
+    if (withinRateLimit(provenance)) {
+      admit(activation, provenance)
+    } else {
       // Never silent: a click that goes nowhere with no trace is the failure
       // mode this whole feature exists to remove.
       deps.recordFailure(rateLimitedFailure())
-      return
     }
+    // After the gesture has claimed its href, so a navigation held for this
+    // click is let go only to be dropped as its duplicate.
+    if (gestureId !== undefined) navigationHold.clickSettled(gestureId)
+  }
+
+  /** Route a gesture now, and a navigation once the click behind it, if any, has settled. */
+  const admit = (
+    activation: Omit<LinkActivationPayload, 'gestureId'>,
+    provenance: LinkProvenance
+  ): void => {
     const dispatch = (): void => {
       if (disposed) return
-      if (isDuplicate(parsed.data.href)) return
-      void routeLinkActivation({ ...parsed.data, provenance }, context, deps)
+      if (isDuplicate(activation.href)) return
+      void routeLinkActivation({ ...activation, provenance }, context, deps)
     }
     if (provenance === 'gesture') {
       dispatch()
       return
     }
-    const timer = setTimeout(() => {
-      pendingNavigations.delete(timer)
-      dispatch()
-    }, NAVIGATION_GRACE_MS)
-    pendingNavigations.add(timer)
+    navigationHold.hold(activation.href, dispatch)
   }
 
   return {
     handleActivation(payload: unknown): void {
       route(payload, 'gesture')
+    },
+
+    handleLinkNote(payload: unknown): void {
+      if (disposed) return
+      const parsed = LinkNoteSchema.safeParse(payload)
+      if (!parsed.success) {
+        deps.recordFailure(malformedPayloadFailure())
+        return
+      }
+      const note = parsed.data
+      if (note.kind === 'seen') {
+        navigationHold.clickSeen(note.gestureId, note.href)
+      } else {
+        navigationHold.clickSettled(note.gestureId)
+      }
     },
 
     handleWillNavigate(url: string): void {
@@ -216,8 +258,7 @@ export function createPreviewLinkBridge(
 
     dispose(): void {
       disposed = true
-      for (const timer of pendingNavigations) clearTimeout(timer)
-      pendingNavigations.clear()
+      navigationHold.dispose()
       recentHrefs.clear()
     }
   }

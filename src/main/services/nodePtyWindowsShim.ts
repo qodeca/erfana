@@ -53,8 +53,9 @@ function reportOnce(message: string, detail?: Record<string, unknown>): void {
  * is left as a native ESM import there, which needs the file extension and fails
  * with ERR_MODULE_NOT_FOUND. `require` resolves the package the way node-pty's
  * own code does and returns the module from the same cache, so the prototype
- * that is patched is the one in use. The app ships with `asar: false`
- * (electron-builder.yml), so the path is the plain node_modules one.
+ * that is patched is the one in use. In a packaged build node-pty's JavaScript
+ * lives inside `app.asar` (only its native files are unpacked, see
+ * electron-builder.yml), and `require` reads it from there like any other module.
  */
 export function loadWindowsPtyAgent(): unknown {
   return createRequire(__filename)('node-pty/lib/windowsPtyAgent')

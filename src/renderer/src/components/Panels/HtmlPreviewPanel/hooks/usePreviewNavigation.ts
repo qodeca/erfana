@@ -44,6 +44,7 @@ import {
   type PreviewMoveOrigin,
   type PreviewTabState
 } from '../../../../stores/usePreviewTabStore'
+import { useLatestRef } from '../../../../hooks/useLatestRef'
 import { getBasename } from '../../../../utils/fileUtils'
 import { getRendererPlatform } from '../../../../utils/platform'
 import type { PreviewBannerReturnAction } from '../components/PreviewBanner'
@@ -199,8 +200,7 @@ export function usePreviewNavigation({
   const announcer = usePreviewMoveAnnouncer(panelId, schedule)
   const { expectFocus, focusSettled } = announcer
 
-  const containerApiRef = useRef(containerApi)
-  containerApiRef.current = containerApi
+  const containerApiRef = useLatestRef(containerApi)
 
   const step = useCallback(
     async (action: PreviewNavAction, origin: PreviewMoveOrigin) => {
@@ -225,7 +225,7 @@ export function usePreviewNavigation({
         })
       }
     )(panelId)
-  }, [panelId, schedule, expectFocus, focusSettled])
+  }, [panelId, schedule, expectFocus, focusSettled, containerApiRef])
 
   // The failed banner's return button (RU2-2). Its move unmounts the banner –
   // with focus on the pressed button – and mounts the band in one render, so
