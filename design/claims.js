@@ -95,7 +95,7 @@ window.ERFANA_CLAIMS = {
     "card": "system/components/feedback/index.html"
   },
   "context-menu-dependants": {
-    "value": 17,
+    "value": 18,
     "label": "files that import a context menu component",
     "card": "system/components/menu/index.html"
   },
