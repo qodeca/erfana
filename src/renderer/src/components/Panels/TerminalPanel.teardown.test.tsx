@@ -206,7 +206,12 @@ describe('TerminalPanel teardown', () => {
     inputHandler!('a')
     fit.mockClear()
 
+    // Both still pending: the fit (50 ms) and the nudge (1 s)
+    expect(vi.getTimerCount()).toBeGreaterThanOrEqual(2)
     unmount()
+    // The fit callback checks xtermRef itself, so `fit` not running proves
+    // little: the timers must be gone, not merely harmless
+    expect(vi.getTimerCount()).toBe(0)
     act(() => {
       vi.advanceTimersByTime(5000)
     })
