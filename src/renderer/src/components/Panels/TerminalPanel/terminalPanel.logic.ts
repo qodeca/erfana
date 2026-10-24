@@ -90,7 +90,7 @@ export const TERMINAL_OPTIONS = {
   cursorBlink: true,
   fontSize: 12,
   // 'Cascadia Mono' is bundled (styles/fonts.css) and loaded before the terminal
-  // opens (see TerminalPanel.initializeTerminal). Mirrors the --font-mono token.
+  // opens (see useXtermSession.start). Mirrors the --font-mono token.
   fontFamily: "'Cascadia Mono', 'SF Mono', 'Monaco', Consolas, 'Courier New', monospace",
   fontWeight: 'normal' as const,
   fontWeightBold: 'bold' as const,
