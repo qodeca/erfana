@@ -168,18 +168,18 @@ export function registerFileHandlers(): void {
   // leads is never taken. Handlers act on the checked canonical path (`real`)
   // and answer with paths built from the one the renderer sent (`requested`).
 
-  // Read directory structure
   registerConfinedHandle(
     FILE_CHANNELS.readDirectory,
     {
       schema: payloadArgs(ReadDirectoryRequestSchema),
       paths: { dirPath: { arg: 0, key: 'dirPath', mode: 'project', mustExist: true } },
       staleCheck: 'after',
+      // The first load after a switch names its project: a read left over from an earlier one is refused
+      expectedGeneration: ([request]) => request.generation,
       handler: async ({ sender }, [request], { dirPath }) => {
         try {
           const start = performance.now()
-          // The tree's node paths are built from the walk's base, so the walk takes
-          // the path as sent; it was shown to resolve inside the project.
+          // Node paths are built from the walk's base: it takes the path as sent (shown to resolve inside)
           // #210: a successful read of a paused root shows every change dropped
           // before it began, so the watcher need not catch up on those at resume.
           const commitRead = directoryWatcherService.beginTreeRead(dirPath.requested, sender.id)
