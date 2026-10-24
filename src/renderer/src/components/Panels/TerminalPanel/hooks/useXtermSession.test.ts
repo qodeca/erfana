@@ -52,13 +52,16 @@ vi.mock('@xterm/addon-webgl', () => ({
 vi.mock('../../../../utils/domUtils', () => ({ isElementVisible: vi.fn().mockReturnValue(true) }))
 
 let releaseFont: (() => void) | null = null
-const fontGate = { held: false }
+let rejectFont: ((err: Error) => void) | null = null
+const fontGate = { held: false, error: null as Error | null }
 vi.mock('../terminalPanel.logic', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../terminalPanel.logic')>()
   return {
     ...actual,
-    ensureTerminalFontLoaded: () =>
-      fontGate.held ? new Promise<void>((resolve) => { releaseFont = resolve }) : Promise.resolve()
+    ensureTerminalFontLoaded: () => {
+      if (fontGate.error) return Promise.reject(fontGate.error)
+      return fontGate.held ? new Promise<void>((resolve, reject) => { releaseFont = resolve; rejectFont = reject }) : Promise.resolve()
+    }
   }
 })
 
@@ -109,7 +112,9 @@ describe('useXtermSession start-up guard', () => {
     instances.length = 0
     pendingCreates.length = 0
     fontGate.held = false
+    fontGate.error = null
     releaseFont = null
+    rejectFont = null
     installApi()
     useTerminalStore.setState({ activeTerminalId: null, activeShellKind: null, activityById: new Map(), userInputById: new Map() })
     useClaudeStatusStore.getState().reset()
@@ -266,6 +271,158 @@ describe('useXtermSession start-up guard', () => {
       await first
     })
 
+    expect(hook.result.current.error).toBeNull()
+  })
+})
+
+describe('useXtermSession failed starts (review F1, F2)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    instances.length = 0
+    pendingCreates.length = 0
+    fontGate.held = false
+    fontGate.error = null
+    releaseFont = null
+    rejectFont = null
+    installApi()
+    useTerminalStore.setState({ activeTerminalId: null, activeShellKind: null, activityById: new Map(), userInputById: new Map() })
+    useClaudeStatusStore.getState().reset()
+  })
+
+  it('a failed create disposes the instance and clears the refs, so a later start creates again', async () => {
+    const { hook, options } = renderSession()
+    let first!: Promise<void>
+    act(() => {
+      first = hook.result.current.start()
+    })
+    await untilCreates(1)
+    await act(async () => {
+      pendingCreates[0]({ success: false, error: 'spawn failed' })
+      await first
+    })
+
+    expect(hook.result.current.error).toBe('spawn failed')
+    expect(instances[0].dispose).toHaveBeenCalledTimes(1)
+    expect(options.xtermRef.current).toBeNull()
+    expect(hook.result.current.fitAddonRef.current).toBeNull()
+    expect(options.detachFileDrop).toHaveBeenCalled()
+
+    // What "Recheck" leads to: a new start, which must not be blocked by the dead instance
+    let second!: Promise<void>
+    act(() => {
+      second = hook.result.current.start()
+    })
+    await untilCreates(2)
+    await act(async () => {
+      answerCreate(1, 'pty-2')
+      await second
+    })
+
+    expect(instances).toHaveLength(2)
+    expect(options.xtermRef.current).toBe(instances[1])
+    expect(instances[1].dispose).not.toHaveBeenCalled()
+    expect(hook.result.current.terminalId).toBe('pty-2')
+  })
+
+  it('a failed create releases the context-menu listener and parser hooks of its instance', async () => {
+    const { hook, options } = renderSession()
+    const parserHook = { dispose: vi.fn() }
+    vi.mocked(options.registerParserHooks).mockReturnValue([parserHook])
+    const element = document.createElement('div')
+    const removeListener = vi.spyOn(element, 'removeEventListener')
+    // Every instance gets the element, so the one this start builds has it at attach time
+    vi.mocked((await import('@xterm/xterm')).Terminal).mockImplementationOnce(() => {
+      const xterm = makeXterm()
+      xterm.element = element
+      instances.push(xterm)
+      return xterm as unknown as Terminal
+    })
+
+    let first!: Promise<void>
+    act(() => {
+      first = hook.result.current.start()
+    })
+    await untilCreates(1)
+    await act(async () => {
+      pendingCreates[0]({ success: false, error: 'spawn failed' })
+      await first
+    })
+
+    expect(removeListener).toHaveBeenCalledWith('contextmenu', expect.any(Function))
+    expect(parserHook.dispose).toHaveBeenCalledTimes(1)
+    expect(instances[0].dispose).toHaveBeenCalledTimes(1)
+  })
+
+  it('a font load that throws disposes the instance it built and reports the error', async () => {
+    fontGate.error = new Error('font failed')
+    const { hook, options } = renderSession()
+
+    await act(async () => {
+      await hook.result.current.start()
+    })
+
+    expect(instances).toHaveLength(1)
+    expect(instances[0].open).not.toHaveBeenCalled()
+    expect(instances[0].dispose).toHaveBeenCalledTimes(1)
+    expect(window.api.terminal.create).not.toHaveBeenCalled()
+    expect(options.xtermRef.current).toBeNull()
+    expect(hook.result.current.error).toBe('font failed')
+  })
+
+  it('an open() that throws disposes the instance and leaves the refs empty', async () => {
+    const { hook, options } = renderSession()
+    vi.mocked((await import('@xterm/xterm')).Terminal).mockImplementationOnce(() => {
+      const xterm = makeXterm()
+      xterm.open.mockImplementation(() => {
+        throw new Error('open failed')
+      })
+      instances.push(xterm)
+      return xterm as unknown as Terminal
+    })
+
+    await act(async () => {
+      await hook.result.current.start()
+    })
+
+    expect(instances[0].dispose).toHaveBeenCalledTimes(1)
+    expect(options.xtermRef.current).toBeNull()
+    expect(window.api.terminal.create).not.toHaveBeenCalled()
+    expect(hook.result.current.error).toBe('open failed')
+
+    // The next start is not blocked
+    let second!: Promise<void>
+    act(() => {
+      second = hook.result.current.start()
+    })
+    await untilCreates(1)
+    await act(async () => {
+      answerCreate(0, 'pty-1')
+      await second
+    })
+    expect(options.xtermRef.current).toBe(instances[1])
+  })
+
+  it('a superseded start whose font load throws still disposes its instance', async () => {
+    fontGate.held = true
+    const { hook } = renderSession()
+    let first!: Promise<void>
+    act(() => {
+      first = hook.result.current.start()
+    })
+    await vi.waitFor(() => expect(releaseFont).not.toBeNull())
+
+    // The teardown cannot reach this instance: it was never in the refs
+    await act(async () => {
+      await hook.result.current.teardownTerminal({ resetState: true })
+    })
+    expect(instances[0].dispose).not.toHaveBeenCalled()
+
+    await act(async () => {
+      rejectFont!(new Error('font failed late'))
+      await first
+    })
+    expect(instances[0].open).not.toHaveBeenCalled()
+    expect(instances[0].dispose).toHaveBeenCalledTimes(1)
     expect(hook.result.current.error).toBeNull()
   })
 })

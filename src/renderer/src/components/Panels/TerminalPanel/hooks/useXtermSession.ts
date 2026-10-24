@@ -486,6 +486,29 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
     handlers.attachFileDrop(xterm, terminalIdRef)
   }
 
+  /**
+   * Undo what a failed start attached to its instance once it was in the
+   * refs – timers, context menu, parser hooks, input – then dispose it and
+   * clear the refs. The PTY was never created, so there is nothing to kill.
+   */
+  const releaseFailedInstance = (xterm: Terminal): void => {
+    for (const timerRef of [fitTimerRef, webglRecoveryTimerRef]) {
+      if (timerRef.current) clearTimeout(timerRef.current)
+      timerRef.current = null
+    }
+    if (xterm.element && contextMenuHandlerRef.current) {
+      xterm.element.removeEventListener('contextmenu', contextMenuHandlerRef.current)
+    }
+    contextMenuHandlerRef.current = null
+    parserDisposablesRef.current.forEach((d) => d.dispose())
+    parserDisposablesRef.current = []
+    inputDisposableRef.current?.dispose()
+    inputDisposableRef.current = null
+    xtermRef.current = null
+    fitAddonRef.current = null
+    disposeQuietly(xterm)
+  }
+
   const startImpl = async (generation: number): Promise<void> => {
     // False once a teardown ran after this start began
     const isCurrent = (): boolean => generation === generationRef.current
@@ -498,9 +521,12 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
       return
     }
 
+    // Outside the try, so a failure at any step can still dispose it (no leak)
+    let started: Terminal | null = null
     try {
       // --- create ---
       const xterm = new Terminal(XTERM_OPTIONS)
+      started = xterm
       const fitAddon = new FitAddon()
       // Links go through the checked IPC path, never the addon's default window.open
       const webLinksAddon = new WebLinksAddon(
@@ -603,11 +629,22 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
       })
     } catch (err) {
       if (!isCurrent()) {
-        // The listeners in the refs now belong to the next session, or to none
+        // The listeners in the refs now belong to the next session, or to none.
+        // An instance that never reached the refs was not disposed by that
+        // teardown, so it is disposed here.
+        if (started && xtermRef.current !== started) disposeQuietly(started)
         logger.warn('Superseded terminal start failed', errorFields(err))
         return
       }
       releaseStartListeners()
+      // This start's instance must not survive it: one left in the refs would
+      // block every later start (the `xtermRef.current` guard above), so
+      // "Recheck" could never create a terminal again. One that failed before
+      // reaching the refs (font load, open()) would simply leak.
+      if (started) {
+        if (xtermRef.current === started) releaseFailedInstance(started)
+        else disposeQuietly(started)
+      }
       logger.error('Failed to initialize terminal', err instanceof Error ? err : undefined)
       setError(err instanceof Error ? err.message : String(err))
     }
@@ -630,6 +667,15 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
     nudgeClaudeStatus,
     onDataListenerAttached,
     onDataListenerDetached
+  }
+}
+
+/** Dispose an instance on a failure path, where a second error must not mask the first */
+function disposeQuietly(xterm: Terminal): void {
+  try {
+    xterm.dispose()
+  } catch (err) {
+    logger.warn('Failed to dispose terminal instance', errorFields(err))
   }
 }
 
