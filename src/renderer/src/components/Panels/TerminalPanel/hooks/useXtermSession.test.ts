@@ -586,6 +586,76 @@ describe('useXtermSession teardown always kills the PTY (review 1, 3)', () => {
     expect(instances[0].dispose.mock.invocationCallOrder[0]).toBeLessThan(
       vi.mocked(gatewayBridgeMock('terminal').kill).mock.invocationCallOrder[0]
     )
+    // Every later step ran too: the session is gone from the refs and the store
+    expect(hook.result.current.terminalIdRef.current).toBeNull()
+    expect(hook.result.current.shellKindRef.current).toBeNull()
+    expect(useTerminalStore.getState().activeTerminalId).toBeNull()
+
+    // A later teardown has nothing left to kill or unregister
+    vi.mocked(options.detachFileDrop).mockReset()
+    gatewayBridgeMock('terminal').kill.mockClear()
+    gatewayBridgeMock('claudeStatus').unregister.mockClear()
+    await act(async () => {
+      await hook.result.current.teardownTerminal({ resetState: false })
+    })
+    expect(gatewayBridgeMock('terminal').kill).not.toHaveBeenCalled()
+    expect(gatewayBridgeMock('claudeStatus').unregister).not.toHaveBeenCalled()
+  })
+
+  it('keeps the first error when a later step throws too', async () => {
+    const { hook, options } = await liveSession()
+    vi.mocked(options.detachFileDrop).mockImplementation(() => {
+      throw new Error('first')
+    })
+    instances[0].dispose.mockImplementation(() => {
+      throw new Error('second')
+    })
+
+    expect(() => hook.result.current.teardownTerminal({ resetState: false })).toThrow('first')
+    expect(gatewayBridgeMock('terminal').kill).toHaveBeenCalledWith('pty-1')
+  })
+
+  it('a throwing parser hook still disposes xterm, and a later start works', async () => {
+    const parserHook = {
+      dispose: vi.fn(() => {
+        throw new Error('parser dispose failed')
+      })
+    }
+    const { hook, options } = renderSession()
+    vi.mocked(options.registerParserHooks).mockReturnValue([parserHook])
+    let first!: Promise<void>
+    act(() => {
+      first = hook.result.current.start()
+    })
+    await untilCreates(1)
+    await act(async () => {
+      answerCreate(0, 'pty-1')
+      await first
+    })
+
+    await act(async () => {
+      await hook.result.current.teardownTerminal({ resetState: true })
+    })
+    expect(parserHook.dispose).toHaveBeenCalledTimes(1)
+    expect(instances[0].dispose).toHaveBeenCalledTimes(1)
+    expect(options.xtermRef.current).toBeNull()
+    expect(gatewayBridgeMock('terminal').kill).toHaveBeenCalledWith('pty-1')
+
+    // A second teardown does not meet the throwing hook again, and a new start is not blocked
+    await act(async () => {
+      await hook.result.current.teardownTerminal({ resetState: true })
+    })
+    expect(parserHook.dispose).toHaveBeenCalledTimes(1)
+    let second!: Promise<void>
+    act(() => {
+      second = hook.result.current.start()
+    })
+    await untilCreates(2)
+    await act(async () => {
+      answerCreate(1, 'pty-2')
+      await second
+    })
+    expect(options.xtermRef.current).toBe(instances[1])
   })
 
   it('a teardown before React commits the id does not get the killed id written back', async () => {
