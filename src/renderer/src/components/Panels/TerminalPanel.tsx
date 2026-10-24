@@ -180,6 +180,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     error,
     setError,
     start: startSession,
+    startIfMissed,
     teardownTerminal,
     nudgeClaudeStatus,
     onDataListenerAttached,
@@ -347,6 +348,19 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       void teardownTerminal({ resetState: false })
     }
   }, [isAvailable, startSession, teardownTerminal])
+
+  // The terminal container is rendered only while the panel is available and
+  // shows no error. A start asked for while the error box replaced it – a
+  // project switch after a failed create (Windows: a cwd with "&") – found no
+  // container and returned, and nothing asked again: the panel stayed black.
+  // So once the container is back, retry exactly that missed start – nothing
+  // else: an error cleared by a teardown (closing the project, or a switch
+  // still waiting for the old PTY's kill) must not start a shell from here.
+  // No cleanup: the effect above owns the teardown.
+  const showsTerminalContainer = isAvailable === true && !error
+  useEffect(() => {
+    if (showsTerminalContainer) startIfMissed()
+  }, [showsTerminalContainer, startIfMissed])
 
   // Restart terminal on project change
   useEffect(() => {
