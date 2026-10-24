@@ -11,12 +11,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { TEST_IDS } from '../../constants/testids'
+import type { ISplitviewPanelProps } from 'dockview'
 
-declare global {
-  interface Window {
-    api: any
-  }
-}
+// TerminalPanel ignores its dockview props, so an empty object stands in for them.
+const PANEL_PROPS = {} as ISplitviewPanelProps
 
 // Mock xterm with dimension tracking
 const mockXtermInstance = {
@@ -128,7 +126,7 @@ describe('TerminalPanel toolbar tooltips (#143)', () => {
   it('shows Ctrl+Shift+M, not ⌘, on the maximize button on Windows', async () => {
     installApi('win32')
     const { TerminalPanel } = await import('./TerminalPanel')
-    render(<TerminalPanel /> as any)
+    render(<TerminalPanel {...PANEL_PROPS} />)
 
     const expand = await screen.findByTestId(TEST_IDS.TERMINAL_BTN_EXPAND)
     expect(expand).toHaveAttribute('title', 'Maximize terminal (Ctrl+Shift+M)')
@@ -138,7 +136,7 @@ describe('TerminalPanel toolbar tooltips (#143)', () => {
   it('keeps the macOS glyphs on macOS', async () => {
     installApi('darwin')
     const { TerminalPanel } = await import('./TerminalPanel')
-    render(<TerminalPanel /> as any)
+    render(<TerminalPanel {...PANEL_PROPS} />)
 
     const expand = await screen.findByTestId(TEST_IDS.TERMINAL_BTN_EXPAND)
     expect(expand).toHaveAttribute('title', 'Maximize terminal (⇧⌘M)')

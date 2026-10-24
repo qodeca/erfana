@@ -1859,7 +1859,8 @@ async function createId(
       vi.resetModules()
     })
 
-    async function getArgs(shell: string): Promise<string[]> {
+    // node-pty takes an argv array, or on Windows a pre-quoted command line (cmd.exe)
+    async function getArgs(shell: string): Promise<string[] | string> {
       vi.doMock('os', async () => {
         const actual = await vi.importActual<any>('os')
         return { ...actual, platform: () => 'win32' }

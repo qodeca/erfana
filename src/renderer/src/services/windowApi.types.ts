@@ -5,7 +5,7 @@
  * own type, and that each gateway is typed as its bridge contract.
  *
  * Nothing imports this file and it has no runtime content: `npm run typecheck`
- * compiles it, test files are not type-checked.
+ * compiles it.
  */
 import type { Api } from '../../../preload/index'
 import type { BrowserBridge } from '../../../shared/ipc/browser-schema'
@@ -60,7 +60,7 @@ type Assert<T extends true> = T
 
 export type WindowApiChecks = [
   // Only the bridges the TerminalPanel files still read directly (see preload/index.d.ts)
-  Assert<Equal<Window['api'], Pick<Api, 'claudeStatus' | 'utils' | 'screenshot'>>>,
+  Assert<Equal<Window['api'], Pick<Api, 'utils' | 'screenshot'>>>,
   Assert<Equal<typeof fileGateway, FileBridge>>,
   Assert<Equal<typeof terminalGateway, TerminalBridge>>,
   Assert<Equal<typeof fileWatchGateway, FileWatchBridge>>,

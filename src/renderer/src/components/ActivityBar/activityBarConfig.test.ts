@@ -18,6 +18,7 @@ import {
   getPanelById
 } from './activityBarConfig'
 import { isMacOS } from '../../utils/platform'
+import { Circle } from 'lucide-react'
 
 vi.mock('../../utils/platform', () => ({
   isMacOS: vi.fn(() => true)
@@ -34,7 +35,7 @@ describe('activityBarConfig', () => {
     it('should allow requiresProject field', () => {
       const panel: ActivityBarPanel = {
         id: 'test',
-        icon: () => null,
+        icon: Circle,
         label: 'Test',
         tooltip: 'Test Panel',
         side: 'left',
@@ -49,7 +50,7 @@ describe('activityBarConfig', () => {
     it('should allow optional requiresProject field', () => {
       const panel: ActivityBarPanel = {
         id: 'test',
-        icon: () => null,
+        icon: Circle,
         label: 'Test',
         tooltip: 'Test Panel',
         side: 'left',

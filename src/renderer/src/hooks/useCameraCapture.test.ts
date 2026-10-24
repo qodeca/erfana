@@ -68,12 +68,12 @@ class MockMediaStream {
   }
 }
 
-// Create mock MediaStreamTrack
-const createMockTrack = (kind: 'video' | 'audio' = 'video', readyState: 'live' | 'ended' = 'live') => ({
-  kind,
-  readyState,
-  stop: vi.fn()
-})
+// Create mock MediaStreamTrack: a stand-in carrying only the members the hook
+// touches (jsdom has no MediaStreamTrack).
+const createMockTrack = (
+  kind: 'video' | 'audio' = 'video',
+  readyState: 'live' | 'ended' = 'live'
+): MediaStreamTrack => ({ kind, readyState, stop: vi.fn() }) as unknown as MediaStreamTrack
 
 Object.defineProperty(global.navigator, 'mediaDevices', {
   writable: true,
@@ -289,7 +289,8 @@ const MUTATING_TRANSFORMS = [
   'resetTransform'
 ] as const
 
-const mockGetContext = vi.fn(() => mockCanvasContext)
+// `null` is what a real canvas returns when no 2D context is available.
+const mockGetContext = vi.fn((): typeof mockCanvasContext | null => mockCanvasContext)
 
 Object.defineProperty(HTMLCanvasElement.prototype, 'toDataURL', {
   writable: true,

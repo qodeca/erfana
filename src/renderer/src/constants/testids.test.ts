@@ -14,6 +14,8 @@ async function getTestIds() {
   return import('./testids')
 }
 
+type TestIdsModule = Awaited<ReturnType<typeof getTestIds>>
+
 describe('TEST_IDS', () => {
   describe('structure', () => {
     it('should have all expected component sections', async () => {
@@ -120,10 +122,10 @@ describe('TEST_IDS', () => {
       expect(gitIds).toHaveLength(4)
     })
 
-    it('should have 30 Settings Overlay IDs', async () => {
+    it('should have 33 Settings Overlay IDs', async () => {
       const { TEST_IDS } = await getTestIds()
       const settingsIds = Object.keys(TEST_IDS).filter((k) => k.startsWith('SETTINGS_'))
-      expect(settingsIds).toHaveLength(30)
+      expect(settingsIds).toHaveLength(33)
     })
 
     it('should have 10 Transcription Dialog IDs', async () => {
@@ -441,8 +443,8 @@ describe('getPathHash', () => {
 
 describe('getDynamicTestId', () => {
    
-  let getDynamicTestId: (prefix: string, path: string) => string
-  let TEST_IDS: Record<string, string>
+  let getDynamicTestId: TestIdsModule['getDynamicTestId']
+  let TEST_IDS: TestIdsModule['TEST_IDS']
 
   beforeEach(async () => {
     const module = await getTestIds()

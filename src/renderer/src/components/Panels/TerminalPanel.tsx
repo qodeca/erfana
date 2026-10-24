@@ -8,14 +8,16 @@
  *
  * Supports portal rendering to DiagramViewer via TerminalPortalContext.
  * When DiagramViewer is open, the terminal UI portals into its split view.
+ *
+ * The session itself – creating xterm, attaching it to a PTY and the single
+ * teardown – lives in `useXtermSession`; external file drops in
+ * `useTerminalFileDrop`. This component wires them to the panel UI.
  */
 
 import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react'
 import { ISplitviewPanelProps } from 'dockview'
 import { Terminal as TerminalIcon, RotateCw, ArrowDownToLine, LockKeyhole, LockKeyholeOpen, Camera, AppWindow, BoxSelect, Webcam, Maximize2, Minimize2 } from 'lucide-react'
-import { Terminal } from '@xterm/xterm'
-import { FitAddon } from '@xterm/addon-fit'
-import { WebLinksAddon } from '@xterm/addon-web-links'
+import type { Terminal } from '@xterm/xterm'
 import { useTerminalStore } from '../../stores/useTerminalStore'
 import { useProjectStore } from '../../stores/useProjectStore'
 import { useActivityBarStore } from '../../stores/useActivityBarStore'
@@ -41,167 +43,46 @@ import {
   ScreenPermissionDialog
 } from '../Dialog'
 import { useScreenshotCapture } from './TerminalPanel/hooks/useScreenshotCapture'
+import { useTerminalFileDrop } from './TerminalPanel/hooks/useTerminalFileDrop'
+import { useXtermSession } from './TerminalPanel/hooks/useXtermSession'
+import { useTerminalScreenReaderMode } from '../../hooks/useTerminalScreenReaderMode'
 import { getBasename } from '../../utils/fileUtils'
 import { openFileInPanel } from '../../utils/openFileInPanel'
 import { resolvePanelKind } from '../../utils/resolvePanelKind'
 import { formatShortcut } from '../../utils/shortcutLabel'
-import { registerTestTerminal } from '../../testHooks/terminalTestHook'
-import { escapePathForShell, platformDefaultShellKind, type ShellKind } from '../../utils/shellPathEscape'
+import { escapePathForShell, platformDefaultShellKind } from '../../utils/shellPathEscape'
 import { logger } from '../../utils/logger'
 import { TEST_IDS } from '../../constants/testids'
 import '@xterm/xterm/css/xterm.css'
 import './TerminalPanel.css'
-import { isElementVisible } from '../../utils/domUtils'
-import { isPointInElement } from '../../utils/domGeometry'
 import { TerminalStatusContent } from './TerminalPanel/components/TerminalStatusContent'
 import { ClaudeStatusBar } from './TerminalPanel/components/ClaudeStatusBar'
-import { useClaudeStatusStore } from '../../stores/useClaudeStatusStore'
 import { useOptionalDialog } from '../Dialog/DialogContext'
 import { getRestartRisk, buildRestartConfirm } from './TerminalPanel/restartGuard'
 import { createOutputAcker } from './TerminalPanel/outputAck'
-import { ensureTerminalFontLoaded, createTerminalLinkHandler } from './TerminalPanel/terminalPanel.logic'
 import type { TerminalState } from './TerminalPanel/types'
-import { routeTerminalMenuKey } from './TerminalPanel/terminalMenuKey'
-import { isKeyboardMenuEcho } from '../ContextMenu/contextMenuKey'
 import { fileGateway } from '../../services/fileGateway'
 import { terminalGateway } from '../../services/terminalGateway'
 
 /** One empty tree, so a missing project context does not defeat the merge's memo */
 const EMPTY_FILES: FileNode[] = []
+/** How long "Recheck" stays disabled after a click */
+const RECHECK_COOLDOWN_MS = 1000
+/** Pause between tearing a session down and starting the next on restart */
+const RESTART_DELAY_MS = 100
 
 export function TerminalPanel(_props: ISplitviewPanelProps) {
   const [isAvailable, setIsAvailable] = useState<boolean | null>(null)
-  const [terminalId, setTerminalId] = useState<string | null>(null)
-  // Id whose terminal:data listener is attached, and clear confirmations waiting for it
-  const dataListeningIdRef = useRef<string | null>(null)
-  const clearConfirmWaitersRef = useRef(new Map<string, () => void>())
-  const confirmWhenDataListening = useCallback((id: string, confirm: () => void) => {
-    if (dataListeningIdRef.current === id) {
-      confirm()
-    } else {
-      clearConfirmWaitersRef.current.set(id, confirm)
-    }
-  }, [])
-  const [error, setError] = useState<string | null>(null)
   const [recheckCooldown, setRecheckCooldown] = useState(false)
+  const recheckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const terminalRef = useRef<HTMLDivElement>(null)
+  // Shared with the scroll, clipboard and screenshot hooks; the session sets and nulls it
   const xtermRef = useRef<Terminal | null>(null)
-  const fitAddonRef = useRef<FitAddon | null>(null)
-  const terminalIdRef = useRef<string | null>(null)
-  // Trailing-debounce timer for the Claude-status activity nudge (#216).
-  // Main also gates re-checks, so a light ~1s renderer debounce is enough to
-  // avoid a nudge per PTY chunk / keystroke.
-  const claudeNudgeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  // Quoting flavour for the active terminal. Populated from the
-  // `terminal:create` response (#164 round-2 F#1). The screenshot hook reads
-  // this directly so a path-paste never needs an extra IPC round-trip.
-  const shellKindRef = useRef<ShellKind | null>(null)
-  const pendingInitRef = useRef<boolean>(false)
-  const visibilityObserverRef = useRef<ResizeObserver | null>(null)
-  const warmupUntilRef = useRef<number>(0)
-  const contextMenuHandlerRef = useRef<((e: MouseEvent) => void) | null>(null)
-  const parserDisposablesRef = useRef<{ dispose: () => void }[]>([])
-  const dragHandlersRef = useRef<{
-    dragover: (e: DragEvent) => void
-    dragenter: (e: DragEvent) => void
-    dragleave: (e: DragEvent) => void
-    drop: (e: DragEvent) => void
-    dragend: () => void
-  } | null>(null)
   const [projectPath, setProjectPath] = useState<string | null>(null)
-  const [isDropTarget, setIsDropTarget] = useState(false)
   // Camera capture state (Spec #014)
   const [isCameraDialogOpen, setIsCameraDialogOpen] = useState(false)
-
-  // Screenshot capture state (issue #86 → cross-platform in #164)
-  const {
-    isScreenshotSupported,
-    hasNativeWindowPicker,
-    capturingMode,
-    displays,
-    windowSources,
-    showScreenSelectDialog,
-    setShowScreenSelectDialog,
-    showWindowPickerDialog,
-    setShowWindowPickerDialog,
-    refreshDisplays,
-    refreshWindowSources,
-    handleScreenshot,
-    screenPermissionDialogOpen,
-    screenPermissionStatus,
-    closeScreenPermissionDialog
-  } = useScreenshotCapture({ terminalIdRef, shellKindRef, xtermRef })
   const [isLoadingWindowSources, setIsLoadingWindowSources] = useState(false)
-
-  // Cleanup helper for drag handlers (issue #85 - DRY principle)
-  // Centralized cleanup to avoid duplication across unmount, project change, and restart
-  const cleanupDragHandlers = useCallback(() => {
-    if (dragHandlersRef.current) {
-      document.removeEventListener('dragover', dragHandlersRef.current.dragover, { capture: true })
-      document.removeEventListener('dragenter', dragHandlersRef.current.dragenter, { capture: true })
-      document.removeEventListener('dragleave', dragHandlersRef.current.dragleave, { capture: true })
-      document.removeEventListener('drop', dragHandlersRef.current.drop, { capture: true })
-      document.removeEventListener('dragend', dragHandlersRef.current.dragend, { capture: true })
-      dragHandlersRef.current = null
-    }
-  }, [])
-
-  // Debounced Claude-status nudge (#216). Funnels every activity signal
-  // (PTY output + user input) into a trailing ~1s nudge so claude start/stop
-  // is detected without a nudge-per-chunk. Guarded so test/non-Electron
-  // environments without the bridge do not crash.
-  const nudgeClaudeStatus = useCallback((id: string) => {
-    if (claudeNudgeTimerRef.current) {
-      clearTimeout(claudeNudgeTimerRef.current)
-    }
-    claudeNudgeTimerRef.current = setTimeout(() => {
-      claudeNudgeTimerRef.current = null
-      void window.api?.claudeStatus?.nudge(id)
-    }, 1000)
-  }, [])
-
-  // Centralized terminal cleanup function (Phase 1.1 bug fix - race condition)
-  // Awaits terminal kill to prevent orphaned PTY processes
-  const cleanupTerminalInstance = useCallback(async (id: string | null) => {
-    if (!id) return
-    // Stop tracking Claude status for this panel and cancel any pending nudge
-    // (#216). Every teardown path (unmount, project change, restart) funnels
-    // through here, so this is the single unregister chokepoint.
-    if (claudeNudgeTimerRef.current) {
-      clearTimeout(claudeNudgeTimerRef.current)
-      claudeNudgeTimerRef.current = null
-    }
-    void window.api?.claudeStatus?.unregister(id)
-    // Prune this terminal's slice so the store map does not grow a stale `null`
-    // entry per closed terminal forever (#216).
-    useClaudeStatusStore.getState().clearTerminal(id)
-    try {
-      await terminalGateway.kill(id)
-    } catch (err) {
-      logger.error('Failed to kill terminal', err instanceof Error ? err : undefined)
-    }
-  }, [])
-
-  // Cleanup registry for error path handling (Phase 1.2 bug fix - memory leak)
-  // Ensures drag handlers are cleaned up if terminal init fails after attaching them
-  const cleanupRegistryRef = useRef<Array<() => void>>([])
-  const registerCleanup = useCallback((fn: () => void) => {
-    cleanupRegistryRef.current.push(fn)
-  }, [])
-  const runAllCleanups = useCallback(() => {
-    cleanupRegistryRef.current.forEach((fn) => {
-      try {
-        fn()
-      } catch (e) {
-        logger.warn('Cleanup function failed', e instanceof Error ? { error: e.message } : { error: String(e) })
-      }
-    })
-    cleanupRegistryRef.current = []
-  }, [])
-
-  // Terminal store for cross-component communication
-  const setActiveTerminal = useTerminalStore((state) => state.setActiveTerminal)
 
   // Project store for file opening functionality (issue #26)
   const dockviewApi = useProjectStore((state) => state.dockviewApi)
@@ -266,15 +147,8 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       onLockEngage: resetAll // Clear anomaly recovery queue when lock engages
     }
   )
-
-  // Get project files for smart path resolution (issue #26 enhancement)
-  // Use safe version to gracefully degrade in tests without provider
-  const projectContext = useProjectManagementContextSafe()
-  // With the lazy folders read so far (finding 32), and whether the tree is incomplete
-  const { files, truncated: treeTruncated } = useMergedProjectFiles(projectContext?.files ?? EMPTY_FILES)
-
-  // File picker for disambiguation when multiple files match (issue #26 enhancement)
-  const { showPicker, pickerProps } = useFilePicker({ projectRoot: projectPath })
+  // Clipboard keys, with the scroll-lock keys checked first (issue #60)
+  const keyEventHandler = useMemo(() => wrapKeyHandler(handleKeyEvent), [wrapKeyHandler, handleKeyEvent])
 
   // Portal context for rendering in DiagramViewer (optional - may not have provider yet)
   const portalContext = useTerminalPortalOptional()
@@ -288,6 +162,72 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   const portalTarget = portalContext?.portalTarget ?? 'main'
   const mainContainerRef = useRef<HTMLDivElement>(null)
   const terminalPanelRef = useRef<HTMLDivElement>(null)
+
+  // External file drops insert the dropped paths at the prompt (issue #85)
+  const { isDropTarget, attachFileDrop, detachFileDrop } = useTerminalFileDrop({ terminalPanelRef })
+
+  const openTerminalContextMenu = portalContext?.openTerminalContextMenu
+  const onContextMenu = useCallback(
+    (x: number, y: number) => openTerminalContextMenu?.(x, y),
+    [openTerminalContextMenu]
+  )
+
+  // Screen reader access to the output: Settings override applied to the OS state ([23])
+  const screenReaderMode = useTerminalScreenReaderMode()
+
+  const {
+    terminalId,
+    terminalIdRef,
+    shellKindRef,
+    fitAddonRef,
+    warmupUntilRef,
+    error,
+    setError,
+    start: startSession,
+    startIfMissed,
+    teardownTerminal,
+    nudgeClaudeStatus,
+    onDataListenerAttached,
+    onDataListenerDetached
+  } = useXtermSession({
+    xtermRef,
+    containerRef: terminalRef,
+    registerParserHooks: registerHooks,
+    keyEventHandler,
+    wheelEventHandler: handleWheelEvent,
+    onContextMenu,
+    attachFileDrop,
+    detachFileDrop,
+    screenReaderMode
+  })
+
+  // Screenshot capture state (issue #86 → cross-platform in #164)
+  const {
+    isScreenshotSupported,
+    hasNativeWindowPicker,
+    capturingMode,
+    displays,
+    windowSources,
+    showScreenSelectDialog,
+    setShowScreenSelectDialog,
+    showWindowPickerDialog,
+    setShowWindowPickerDialog,
+    refreshDisplays,
+    refreshWindowSources,
+    handleScreenshot,
+    screenPermissionDialogOpen,
+    screenPermissionStatus,
+    closeScreenPermissionDialog
+  } = useScreenshotCapture({ terminalIdRef, shellKindRef, xtermRef })
+
+  // Get project files for smart path resolution (issue #26 enhancement)
+  // Use safe version to gracefully degrade in tests without provider
+  const projectContext = useProjectManagementContextSafe()
+  // With the lazy folders read so far (finding 32), and whether the tree is incomplete
+  const { files, truncated: treeTruncated } = useMergedProjectFiles(projectContext?.files ?? EMPTY_FILES)
+
+  // File picker for disambiguation when multiple files match (issue #26 enhancement)
+  const { showPicker, pickerProps } = useFilePicker({ projectRoot: projectPath })
 
   // File path link support (issue #26)
   // Handler to open files from terminal links
@@ -345,11 +285,6 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     }
   })
 
-  // Keep ref in sync with state for cleanup
-  useEffect(() => {
-    terminalIdRef.current = terminalId
-  }, [terminalId])
-
   // Fetch project path on mount and update when project changes
   useEffect(() => {
     const fetchProjectPath = async () => {
@@ -385,9 +320,17 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     try {
       await checkAvailability()
     } finally {
-      setTimeout(() => setRecheckCooldown(false), 1000)
+      recheckTimerRef.current = setTimeout(() => {
+        recheckTimerRef.current = null
+        setRecheckCooldown(false)
+      }, RECHECK_COOLDOWN_MS)
     }
   }
+
+  // The cooldown timer must not fire into an unmounted panel ([52])
+  useEffect(() => () => {
+    if (recheckTimerRef.current) clearTimeout(recheckTimerRef.current)
+  }, [])
 
   const handleCopyFix = async () => {
     const cmd = 'npm rebuild node-pty --build-from-source'
@@ -395,477 +338,46 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     await textClipboard.writeText(cmd)
   }
 
-  const initializeTerminal = async () => {
-    if (!terminalRef.current) return
-
-    // Check if container is visible before initializing xterm
-    // xterm.js cannot render properly if opened on hidden element (display:none or 0 dimensions)
-    if (!isElementVisible(terminalRef.current)) {
-      logger.warn('Terminal container not visible, waiting for visibility...')
-      pendingInitRef.current = true
-      // Set up a ResizeObserver to detect when the panel becomes visible
-      if (visibilityObserverRef.current) {
-        try { visibilityObserverRef.current.disconnect() } catch (e) {
-          logger.warn('Failed to disconnect visibility observer', e instanceof Error ? { error: e.message, stack: e.stack } : { error: String(e) })
-        }
-      }
-      visibilityObserverRef.current = new ResizeObserver(() => {
-        if (terminalRef.current && pendingInitRef.current && isElementVisible(terminalRef.current)) {
-          // Now visible: stop observing and initialize
-          try { visibilityObserverRef.current?.disconnect() } catch (e) {
-            logger.warn('Failed to disconnect visibility observer (callback)', e instanceof Error ? { error: e.message, stack: e.stack } : { error: String(e) })
-          }
-          visibilityObserverRef.current = null
-          pendingInitRef.current = false
-          void initializeTerminalRef.current()
-        }
-      })
-      try {
-        visibilityObserverRef.current.observe(terminalRef.current)
-      } catch (e) {
-        logger.warn('Failed to observe terminal visibility', e instanceof Error ? { error: e.message, stack: e.stack } : { error: String(e) })
-      }
-      return
-    }
-
-    try {
-      // Create xterm.js instance
-      const xterm = new Terminal({
-        cursorBlink: true,
-        fontSize: 12,
-        fontFamily: "'Cascadia Mono', 'SF Mono', 'Monaco', Consolas, 'Courier New', monospace",
-        fontWeight: 'normal',
-        fontWeightBold: 'bold',
-        allowTransparency: false,
-        theme: {
-          background: '#000000',
-          foreground: '#ffffff',
-          cursor: '#4fc1ff',
-          cursorAccent: '#000000',
-          selectionBackground: '#264f78',
-          black: '#000000',
-          red: '#cd3131',
-          green: '#0dbc79',
-          yellow: '#e5e510',
-          blue: '#2472c8',
-          magenta: '#bc3fbc',
-          cyan: '#11a8cd',
-          white: '#e5e5e5',
-          brightBlack: '#666666',
-          brightRed: '#f14c4c',
-          brightGreen: '#23d18b',
-          brightYellow: '#f5f543',
-          brightBlue: '#3b8eea',
-          brightMagenta: '#d670d6',
-          brightCyan: '#29b8db',
-          brightWhite: '#ffffff'
-        },
-        scrollback: 10000,
-        // Scroll behavior configuration to prevent unwanted viewport jumps
-        scrollOnUserInput: false,  // Don't auto-scroll when user types (preserve manual scroll position)
-        smoothScrollDuration: 0,   // Disable smooth scroll for instant response (no animation lag)
-        allowProposedApi: true
-      })
-
-      // Add addons (load fit and weblinks BEFORE open)
-      const fitAddon = new FitAddon()
-      // Links go through the checked IPC path, never the addon's default window.open
-      const webLinksAddon = new WebLinksAddon(
-        createTerminalLinkHandler(
-          (url) => window.electron.shell.openExternal(url),
-          (error) => logger.warn('Terminal link not opened', { error: error instanceof Error ? error.message : String(error) })
-        )
-      )
-
-      xterm.loadAddon(fitAddon)
-      xterm.loadAddon(webLinksAddon)
-
-      // Ensure the bundled font is loaded before open(): xterm measures glyph
-      // metrics on a canvas at open() time, so a not-yet-loaded web font would
-      // be cached as fallback metrics and misalign the grid after it swaps in.
-      await ensureTerminalFontLoaded()
-
-      // The await above is an async gap: bail if the panel unmounted meanwhile.
-      if (!terminalRef.current) {
-        xterm.dispose()
-        return
-      }
-
-      // Open terminal in DOM
-      xterm.open(terminalRef.current)
-
-      // Register parser hooks for same-frame scroll preservation
-      // Must be after open() when parser API is available
-      const parserDisposables = registerHooks(xterm)
-      parserDisposablesRef.current = parserDisposables
-
-      // Attach clipboard key handler wrapped with scroll lock (issue #60)
-      const wrappedKeyHandler = wrapKeyHandler(handleKeyEvent)
-      xterm.attachCustomKeyEventHandler((event) => {
-        // Shift+F10 / the Menu key open the terminal's context menu (#90)
-        // instead of reaching the shell. xterm keeps its helper textarea at
-        // the cursor, so its box is where the menu opens.
-        const caret = xterm.textarea ?? xterm.element ?? null
-        const open = (x: number, y: number): void => portalContext?.openTerminalContextMenu(x, y)
-        /* deviates: design/system/components/menu/index.html — no aria-haspopup/expanded: xterm owns its textarea. */
-        if (routeTerminalMenuKey(event, caret, open)) return false
-        return wrappedKeyHandler(event)
-      })
-
-      // Attach wheel event handler for scroll lock (issue #60)
-      xterm.attachCustomWheelEventHandler(handleWheelEvent)
-
-      // Attach native context menu handler to xterm.element (issue #37)
-      // Must be on xterm.element, not parent container, because xterm captures events internally
-      // This ensures context menu works regardless of where terminal is portaled
-      if (xterm.element) {
-        const handleNativeContextMenu = (e: MouseEvent) => {
-          e.preventDefault()
-          e.stopPropagation()
-          // Windows also sends a native contextmenu for the Menu key, after
-          // the key handler above already opened the menu at the cursor.
-          if (isKeyboardMenuEcho()) return
-          // No xterm.blur() any more: the menu moves focus into itself on open
-          // (#90), and it must see the terminal as its opener so that Escape
-          // hands focus back to the terminal rather than to <body>.
-          portalContext?.openTerminalContextMenu(e.clientX, e.clientY)
-        }
-        xterm.element.addEventListener('contextmenu', handleNativeContextMenu)
-        contextMenuHandlerRef.current = handleNativeContextMenu
-
-        // Attach document-level drag handlers for external file drops (issue #85)
-        // Uses capture phase to intercept events before they reach xterm's DOM
-        // Checks if coordinates are over terminal panel using bounding rect
-        const terminalPanelRef = terminalRef.current?.closest('[data-testid="terminal-panel"]')
-
-        const isOverTerminalPanel = (e: DragEvent): boolean => {
-          return isPointInElement(e.clientX, e.clientY, terminalPanelRef)
-        }
-
-        const nativeDragOver = (e: DragEvent) => {
-          // Only handle if over terminal panel and has files (external drag)
-          if (!isOverTerminalPanel(e)) return
-          if (!e.dataTransfer?.types.includes('Files')) return
-
-          e.preventDefault()
-          if (e.dataTransfer) {
-            e.dataTransfer.dropEffect = 'copy'
-          }
-        }
-
-        const nativeDragEnter = (e: DragEvent) => {
-          if (!isOverTerminalPanel(e)) return
-          if (!e.dataTransfer?.types.includes('Files')) return
-
-          e.preventDefault()
-          setIsDropTarget(true)
-          logger.info('External drag entered terminal panel')
-        }
-
-        const nativeDragLeave = (e: DragEvent) => {
-          if (!e.dataTransfer?.types.includes('Files')) return
-
-          // Check if we're still over the terminal panel
-          if (isOverTerminalPanel(e)) return
-          setIsDropTarget(false)
-        }
-
-        const nativeDrop = async (e: DragEvent) => {
-          if (!isOverTerminalPanel(e)) return
-          if (!e.dataTransfer?.files.length) return
-
-          e.preventDefault()
-          setIsDropTarget(false)
-
-          if (!terminalIdRef.current) return
-
-          // Use webUtils.getPathForFile via preload API (File.path not available in sandbox)
-          const paths = Array.from(e.dataTransfer.files)
-            .map((f) => {
-              try {
-                return window.api.utils.getPathForFile(f)
-              } catch (err) {
-                logger.warn('Failed to get path for dropped file', {
-                  fileName: f.name,
-                  error: err instanceof Error ? err.message : String(err)
-                })
-                return null
-              }
-            })
-            .filter((p): p is string => Boolean(p))
-
-          if (paths.length === 0) {
-            logger.warn('External drop: no valid file paths found')
-            return
-          }
-
-          logger.info('External file drop on terminal', { pathCount: paths.length, paths })
-
-          const formattedPaths = useTerminalStore.getState().formatPathsForActiveTerminal(paths)
-          const success = await useTerminalStore.getState().sendToTerminal(formattedPaths, false)
-
-          if (!success) {
-            showWarningToast('Drop failed', 'Could not insert path into terminal')
-            return
-          }
-
-          xterm.focus()
-        }
-
-        // Cleanup drop target state when drag ends (e.g., cancelled outside panel)
-        const nativeDragEnd = () => {
-          setIsDropTarget(false)
-        }
-
-        // Use capture phase to intercept before any other handlers
-        document.addEventListener('dragover', nativeDragOver, { capture: true })
-        document.addEventListener('dragenter', nativeDragEnter, { capture: true })
-        document.addEventListener('dragleave', nativeDragLeave, { capture: true })
-        document.addEventListener('drop', nativeDrop, { capture: true })
-        document.addEventListener('dragend', nativeDragEnd, { capture: true })
-
-        dragHandlersRef.current = {
-          dragover: nativeDragOver,
-          dragenter: nativeDragEnter,
-          dragleave: nativeDragLeave,
-          drop: nativeDrop,
-          dragend: nativeDragEnd
-        }
-
-        // Phase 1.2 bug fix: Register cleanup in case init fails after this point
-        registerCleanup(cleanupDragHandlers)
-      }
-
-      // Clear terminal immediately and write clear sequences to ensure clean start
-      // This clears both the buffer and any pending data
-      xterm.clear()
-      xterm.write('\x1b[2J\x1b[3J\x1b[H')
-
-      // Load WebGL renderer AFTER open (fixes canvas rendering issues in Electron)
-      try {
-        const { WebglAddon } = await import('@xterm/addon-webgl')
-        const webglAddon = new WebglAddon()
-
-        webglAddon.onContextLoss(() => {
-          logger.warn('WebGL context lost, attempting recovery')
-          webglAddon.dispose()
-
-          // Attempt one recovery after brief delay to let GPU stabilize
-          setTimeout(() => {
-            try {
-              const recoveryAddon = new WebglAddon()
-              recoveryAddon.onContextLoss(() => {
-                logger.warn('Second WebGL context loss, staying with canvas renderer')
-                recoveryAddon.dispose()
-              })
-              xterm.loadAddon(recoveryAddon)
-              logger.info('WebGL context recovered successfully')
-            } catch (err) {
-              logger.warn('WebGL recovery failed, canvas renderer active', err instanceof Error ? { error: err.message, stack: err.stack } : { error: String(err) })
-            }
-          }, 100)
-        })
-
-        xterm.loadAddon(webglAddon)
-      } catch (error) {
-        logger.warn('WebGL renderer failed, falling back to canvas', error instanceof Error ? { error: error.message, stack: error.stack } : { error: String(error) })
-        // Continue with canvas renderer if WebGL fails
-      }
-
-      // Store refs
-      xtermRef.current = xterm
-      fitAddonRef.current = fitAddon
-
-      // Fit terminal to container
-      setTimeout(() => {
-        fitAddon.fit()
-      }, 50)
-
-      // Set up clear event handler BEFORE creating PTY to avoid race condition
-      // The PTY immediately starts marker detection, so we must subscribe first
-      let clearUnsubscribe: (() => void) | null = null
-      // The terminal id is only known once create resolves, but the clear event can
-      // arrive first. Clear events seen before that are held, and every clear event
-      // is checked against the id so another terminal's start-up cannot clear this one.
-      let createdId: string | null = null
-      const earlyClearIds = new Set<string>()
-      const runClear = (id: string) => {
-        logger.info(`[INIT] Received clear event for terminal ${id}`)
-        // Write clear sequence with callback for deterministic confirmation
-        xterm.write('\x1b[2J\x1b[3J\x1b[H', () => {
-          logger.info(`[INIT] Clear sequence complete, confirming once the data listener is attached`)
-          // Main flushes the shell output it held back as soon as it gets this
-          // confirmation, so the data listener must exist by then.
-          confirmWhenDataListening(id, () => terminalGateway.markClearComplete(id))
-
-          // Cleanup this one-time handler
-          if (clearUnsubscribe) {
-            clearUnsubscribe()
-            clearUnsubscribe = null
-          }
-        })
-      }
-      const handleClearForInit = (data: { terminalId: string }) => {
-        if (createdId === null) {
-          earlyClearIds.add(data.terminalId)
-          return
-        }
-        if (data.terminalId !== createdId) return
-        runClear(createdId)
-      }
-      clearUnsubscribe = terminalGateway.onClear(handleClearForInit)
-
-      // Phase 1.3 bug fix: Register cleanup in case PTY creation fails
-      registerCleanup(() => {
-        if (clearUnsubscribe) {
-          clearUnsubscribe()
-          clearUnsubscribe = null
-        }
-      })
-
-      // Create PTY
-      const result = await terminalGateway.create({
-        // No cwd: the project root is what a terminal opens in, and main reads it from
-        // the session, so a stale path during a project switch cannot fail the start
-        cols: xterm.cols,
-        rows: xterm.rows
-      })
-
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to create terminal')
-      }
-
-      createdId = result.terminalId
-      setTerminalId(result.terminalId)
-      if (earlyClearIds.has(result.terminalId)) runClear(result.terminalId)
-      registerCleanup(registerTestTerminal(result.terminalId, xterm))
-      // Record the resolved shellKind so the screenshot path-paste quotes
-      // correctly without an extra IPC (#164 round-2 F#1). Main always
-      // returns a value when terminalId is present, but guard defensively.
-      shellKindRef.current = result.shellKind ?? null
-      // Register in store, together with its shell kind
-      setActiveTerminal({ id: result.terminalId, shellKind: result.shellKind ?? null })
-      // Begin tracking Claude Code context status for this panel (#216).
-      // Guarded so environments without the bridge (tests) do not crash.
-      void window.api?.claudeStatus?.register(result.terminalId)
-      warmupUntilRef.current = Date.now() + 500
-
-      // Don't manually clear - let the bypass channel clear handle it
-
-      // Handle user input
-      xterm.onData((data) => {
-        if (result.terminalId) {
-          // Mark activity on user input to catch long-running commands with sparse output
-          const store = useTerminalStore.getState()
-          store.markActivity(result.terminalId)
-          store.markUserInput(result.terminalId)
-          // Light Claude-status re-check on input (#216, debounced).
-          nudgeClaudeStatus(result.terminalId)
-          terminalGateway.write(result.terminalId, data)
-        }
-      })
-
-      // Phase 1.2: Success - clear cleanup registry (handlers now owned by component lifecycle).
-      // The one-time clear listener stays registered until a clear arrives (a shell whose
-      // marker never comes sends none), so unmount removes it.
-      cleanupRegistryRef.current = [
-        () => {
-          if (clearUnsubscribe) {
-            clearUnsubscribe()
-            clearUnsubscribe = null
-          }
-        }
-      ]
-    } catch (err) {
-      // Phase 1.2 bug fix: Run all registered cleanups on error
-      runAllCleanups()
-      logger.error('Failed to initialize terminal', err instanceof Error ? err : undefined)
-      const message = err instanceof Error ? err.message : String(err)
-      setError(message)
-    }
-  }
-
-  // initializeTerminal closes over per-render state and is not memoized. Effects
-  // and callbacks that must NOT re-run when it changes (project-change restart,
-  // manual restart) call it through this ref, which always holds the latest one.
-  const initializeTerminalRef = useRef(initializeTerminal)
-  useEffect(() => {
-    initializeTerminalRef.current = initializeTerminal
-  })
-
   // Check terminal availability on mount
   useEffect(() => {
     checkAvailability()
   }, [])
 
-  // Create terminal when available
+  // Create terminal when available; tear it down on unmount
   useEffect(() => {
     if (isAvailable && terminalRef.current && !xtermRef.current) {
-      void initializeTerminalRef.current()
+      void startSession()
     }
-
-    // Cleanup on unmount only
+    // Fire-and-forget: the kill is sent synchronously, its answer is not needed
     return () => {
-      // Use centralized cleanup (Phase 1.1 bug fix - race condition)
-      // Fire-and-forget in cleanup, but properly awaited internally
-      void cleanupTerminalInstance(terminalIdRef.current)
-      runAllCleanups()
-      shellKindRef.current = null
-      setActiveTerminal(null)
-      // Cleanup parser hooks before disposing xterm
-      parserDisposablesRef.current.forEach((d) => d.dispose())
-      parserDisposablesRef.current = []
-      // Cleanup context menu handler before disposing xterm
-      if (xtermRef.current?.element && contextMenuHandlerRef.current) {
-        xtermRef.current.element.removeEventListener('contextmenu', contextMenuHandlerRef.current)
-        contextMenuHandlerRef.current = null
-      }
-      // Cleanup drag handlers (attached to document, not xterm.element)
-      cleanupDragHandlers()
-      if (xtermRef.current) {
-        xtermRef.current.dispose()
-      }
-      if (visibilityObserverRef.current) {
-        try { visibilityObserverRef.current.disconnect() } catch (e) {
-          logger.warn('Failed to disconnect visibility observer on cleanup', e instanceof Error ? { error: e.message, stack: e.stack } : { error: String(e) })
-        }
-        visibilityObserverRef.current = null
-      }
+      void teardownTerminal({ resetState: false })
     }
-  }, [isAvailable, setActiveTerminal, cleanupTerminalInstance, cleanupDragHandlers, runAllCleanups])
+  }, [isAvailable, startSession, teardownTerminal])
+
+  // The terminal container is rendered only while the panel is available and
+  // shows no error. A start asked for while the error box replaced it – a
+  // project switch after a failed create (Windows: a cwd with "&") – found no
+  // container and returned, and nothing asked again: the panel stayed black.
+  // So once the container is back, retry exactly that missed start – nothing
+  // else: an error cleared by a teardown (closing the project, or a switch
+  // still waiting for the old PTY's kill) must not start a shell from here.
+  // No cleanup: the effect above owns the teardown.
+  const showsTerminalContainer = isAvailable === true && !error
+  useEffect(() => {
+    if (showsTerminalContainer) startIfMissed()
+  }, [showsTerminalContainer, startIfMissed])
 
   // Restart terminal on project change
   useEffect(() => {
     const unsubscribe = fileGateway.onProjectChanged(async (data) => {
-      // Kill current terminal session (Phase 1.1 bug fix - use centralized cleanup)
-      await cleanupTerminalInstance(terminalIdRef.current)
-      shellKindRef.current = null
-      setActiveTerminal(null)
-      // Cleanup parser hooks before disposing xterm
-      parserDisposablesRef.current.forEach((d) => d.dispose())
-      parserDisposablesRef.current = []
-      // Cleanup context menu handler before disposing xterm
-      if (xtermRef.current?.element && contextMenuHandlerRef.current) {
-        xtermRef.current.element.removeEventListener('contextmenu', contextMenuHandlerRef.current)
-        contextMenuHandlerRef.current = null
-      }
-      // Cleanup drag handlers (attached to document, not xterm.element)
-      cleanupDragHandlers()
-      // Dispose xterm
-      if (xtermRef.current) {
-        xtermRef.current.dispose()
-        xtermRef.current = null
-      }
-      setTerminalId(null)
-      setError(null)
-      // Wait briefly then initialize new terminal in new CWD (if a project is open)
+      await teardownTerminal({ resetState: true })
+      // Only when a project is open; a hidden panel defers the start until visible
       if (data.newPath) {
-        // Try initialize; if hidden, visibility observer will defer until visible
-        void initializeTerminalRef.current()
+        void startSession()
       }
     })
     return () => unsubscribe()
-  }, [setActiveTerminal, cleanupTerminalInstance, cleanupDragHandlers])
+  }, [startSession, teardownTerminal])
 
   // Handle terminal data
   useEffect(() => {
@@ -907,12 +419,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     })
 
     const unsubscribeData = terminalGateway.onData(dataHandler)
-    dataListeningIdRef.current = terminalId
-    const waiting = clearConfirmWaitersRef.current.get(terminalId)
-    if (waiting) {
-      clearConfirmWaitersRef.current.delete(terminalId)
-      waiting()
-    }
+    onDataListenerAttached(terminalId)
 
     const unsubscribeExit = terminalGateway.onExit((data) => {
       if (data.terminalId === terminalId) {
@@ -929,12 +436,10 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       }
     })
 
-    // Note: Clear event is handled by one-time handler in initializeTerminal()
-    // No need for duplicate handler here - clear only happens once during init
+    // The clear event is handled by the session's one-time start-up listener
 
     return () => {
-      if (dataListeningIdRef.current === terminalId) dataListeningIdRef.current = null
-      clearConfirmWaitersRef.current.delete(terminalId)
+      onDataListenerDetached(terminalId)
       unsubscribeData()
       document.removeEventListener('visibilitychange', onVisibilityChange)
       // Writes still being parsed may never call back once the panel is gone
@@ -942,7 +447,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       unsubscribeExit()
       unsubscribeError()
     }
-  }, [terminalId, wrapOnDataHandler, nudgeClaudeStatus])
+  }, [terminalId, wrapOnDataHandler, nudgeClaudeStatus, warmupUntilRef, onDataListenerAttached, onDataListenerDetached, setError])
 
   // Handle resize (panel drag, window resize, show/hide)
   useEffect(() => {
@@ -999,7 +504,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       pendingTimeouts.forEach(clearTimeout)
       resizeObserver.disconnect()
     }
-  }, [terminalId])
+  }, [terminalId, fitAddonRef])
 
   // Issue #22 Enhanced: Reset scroll recovery state on terminal change (project switch)
   useEffect(() => {
@@ -1034,7 +539,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       if (pendingTimeout) clearTimeout(pendingTimeout)
       unsubscribe()
     }
-  }, [portalContext, terminalId])
+  }, [portalContext, terminalId, fitAddonRef])
 
   // DOM-based portal: physically move terminal panel between containers
   // CRITICAL: We use appendChild() instead of React's createPortal because:
@@ -1076,7 +581,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
         mainContainer.appendChild(terminalPanel)
       }
     }
-  }, [portalTarget, portalContext?.diagramViewerContainerRef, terminalId])
+  }, [portalTarget, portalContext?.diagramViewerContainerRef, terminalId, fitAddonRef])
 
   // Polling watcher for scroll lock (catches scrollbar drag) - issue #60
   useEffect(() => {
@@ -1160,43 +665,17 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
         xtermRef.current?.focus()
       })
     },
-    []
+    [terminalIdRef, shellKindRef]
   )
 
   const handleRestartTerminal = useCallback(async () => {
-    // Kill current terminal session (Phase 1.1 bug fix - use centralized cleanup)
-    await cleanupTerminalInstance(terminalIdRef.current)
-    shellKindRef.current = null
-    setActiveTerminal(null)
-
-    // Cleanup parser hooks before disposing xterm
-    parserDisposablesRef.current.forEach((d) => d.dispose())
-    parserDisposablesRef.current = []
-    // Cleanup context menu handler before disposing xterm
-    if (xtermRef.current?.element && contextMenuHandlerRef.current) {
-      xtermRef.current.element.removeEventListener('contextmenu', contextMenuHandlerRef.current)
-      contextMenuHandlerRef.current = null
-    }
-    // Cleanup drag handlers (attached to document, not xterm.element)
-    cleanupDragHandlers()
-    // Dispose xterm instance
-    if (xtermRef.current) {
-      xtermRef.current.dispose()
-      xtermRef.current = null
-    }
-
-    // Reset state
-    setTerminalId(null)
-    setError(null)
-
+    await teardownTerminal({ resetState: true })
     // Wait a moment for cleanup
-    await new Promise((resolve) => setTimeout(resolve, 100))
-
-    // Create new terminal
+    await new Promise((resolve) => setTimeout(resolve, RESTART_DELAY_MS))
     if (terminalRef.current && isAvailable) {
-      await initializeTerminalRef.current()
+      await startSession()
     }
-  }, [setActiveTerminal, isAvailable, cleanupDragHandlers, cleanupTerminalInstance])
+  }, [isAvailable, teardownTerminal, startSession])
 
   /**
    * User-facing restart: asks first when the terminal looks busy, because a
@@ -1224,17 +703,13 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     } finally {
       restartInProgressRef.current = false
     }
-  }, [showConfirm, handleRestartTerminal])
+  }, [showConfirm, handleRestartTerminal, terminalIdRef])
 
   const handleScrollToBottom = useCallback(() => {
     if (xtermRef.current) {
       xtermRef.current.scrollToBottom()
     }
   }, [])
-
-  // Note: Drag-and-drop for file path insertion (issue #85) is handled by
-  // native document-level event listeners attached in initializeTerminal().
-  // This approach is required because xterm.js DOM elements intercept drag events.
 
   const handleToggleScrollLock = useCallback(() => {
     const newState = !scrollLocked

@@ -45,7 +45,7 @@ let mockHighlights: HighlightRegistry
 
 describe('PreviewSearchProvider', () => {
   let provider: PreviewSearchProvider
-  let containerRef: React.RefObject<HTMLDivElement | null>
+  let containerRef: React.MutableRefObject<HTMLDivElement | null>
   let container: HTMLDivElement
 
   beforeEach(() => {
@@ -150,7 +150,9 @@ describe('PreviewSearchProvider', () => {
       const results = await provider.search('test', { caseSensitive: false, wholeWord: false })
 
       expect(results[0]?.meta).toHaveProperty('range')
-      expect(results[0]?.meta?.range).toBeInstanceOf(Range)
+      // `meta` is provider-specific (`unknown` on SearchMatch); this provider puts a Range in it.
+      const meta = results[0]?.meta as { range?: unknown } | undefined
+      expect(meta?.range).toBeInstanceOf(Range)
     })
 
     it('logs debug message with match count', async () => {

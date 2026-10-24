@@ -20,7 +20,6 @@
 import { isMacOS } from '../../utils/platform'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor, act, fireEvent } from '@testing-library/react'
-import React from 'react'
 import { ProjectTree } from './ProjectTree'
 import { placeholderKey } from './visibleRows'
 import { DialogProvider } from '../Dialog'
@@ -32,12 +31,6 @@ import { installTreeViewport } from '../../test-utils/treeViewport'
 
 // The tree is virtualised; give it a viewport so every fixture row is mounted.
 installTreeViewport()
-
-declare global {
-  interface Window {
-    api: any
-  }
-}
 
 const PROJECT_PATH = '/projA'
 

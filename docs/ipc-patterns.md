@@ -70,11 +70,11 @@ Renderer code never reads `window.api`: every bridge has a gateway, and only the
 | `utils` | `Api['utils']` – answered by the preload itself (`webUtils.getPathForFile`, `process.platform`, `process.arch`), no IPC | inline in `index.ts` | `utilsGateway` – for the platform, prefer `isMacOS()` / `isWindows()` from `utils/platform` |
 | `projectLock` | `ProjectLockBridge` (`project-lock-schema.ts`) | `projectLockBridge.ts` | none – no renderer caller |
 
-**Not finished yet: the TerminalPanel files.** `components/Panels/TerminalPanel.tsx` and its `useScreenshotCapture` / `useTerminalDragDrop` hooks still read `window.api.claudeStatus`, `window.api.utils` and `window.api.screenshot` directly, because another change owns those files. Until they move to `claudeStatusGateway`, `utilsGateway` and `screenshotGateway`, `Window['api']` keeps those three bridges and ESLint allows exactly those reads in exactly those three files (`RENDERER_TERMINAL_PANEL_FILES`). Remove both once they have moved.
+**Not finished yet: two TerminalPanel hooks.** `useScreenshotCapture` still reads `window.api.screenshot` and the unused `useTerminalDragDrop` still reads `window.api.utils` directly. Until they move to `screenshotGateway` and `utilsGateway`, `Window['api']` keeps those two bridges and ESLint allows exactly those reads in exactly those two files (`RENDERER_TERMINAL_PANEL_FILES`). Remove both once they have moved. (`TerminalPanel.tsx` itself reads no bridge directly; its session hooks `useXtermSession` and `useTerminalFileDrop` already use `claudeStatusGateway` and `utilsGateway`.)
 
 What holds it in place:
 
-- **Types.** `Window['api']` (`src/preload/index.d.ts`) lists no bridge but the three above, so a direct read does not type-check. `src/preload/apiContract.types.ts` proves each `Api` member is exactly its contract and that no `any` is in `Api`; `src/renderer/src/services/windowApi.types.ts` proves each gateway is exactly its contract. Both are compiled by `npm run typecheck`.
+- **Types.** `Window['api']` (`src/preload/index.d.ts`) lists no bridge but the two above, so a direct read does not type-check. `src/preload/apiContract.types.ts` proves each `Api` member is exactly its contract and that no `any` is in `Api`; `src/renderer/src/services/windowApi.types.ts` proves each gateway is exactly its contract. Both are compiled by `npm run typecheck`.
 - **Lint.** `no-restricted-syntax` in `eslint.config.mjs` rejects every `window.api` expression (`window?.api`, `globalThis.api` and `self.api` too), so reading, aliasing and destructuring it all fail, plus the ways round the type: computed access on `window` / `globalThis` / `self`, a cast (`as`, `!`, `satisfies`, `<T>`), and destructuring `api` off the global itself (`const { api } = window`, also through a cast, in an assignment and as a default value such as `({ api } = window) => …`). A bare `{ api }` destructure of anything else is everyday code (`const { api } = props`) and passes. Not caught, so review for them: an alias of `window` itself (`const w = window; w.api`), and reaching it through `globalThis.window` (`globalThis.window.api`, `const { api } = globalThis.window`). The gateways and `bridgePresence.ts` (`RENDERER_GATEWAY_FILES`) are exempt, and tests and their helper folders may install mocks on `window.api`. The rule's own cases are in `scripts/eslint-layer-rules.test.mjs`.
 - **Tests.** The wire of each bridge (channel, arguments, events and their unsubscribe) is pinned in `src/preload/__tests__/api-contract.test.ts` and `*-bridges.test.ts`, written out as strings because the channel names must not change; `src/renderer/src/services/gateways.test.ts` checks that every gateway forwards every method.
 - **A bridge that may be missing.** A caller that must also work where the bridge is not there asks `hasBridge(domain)` or `hasBridgeMethod(domain, method)` from `services/bridgePresence.ts` first and then calls the gateway: code that unit tests run without installing one, the crash screen (`RootErrorFallback` offers only the actions whose bridge method is there), and the logger, which also runs in the screenshot-overlay window where there is no `window.api`. That module answers yes or no only; it never hands out the bridge.
@@ -273,6 +273,8 @@ Note the `file:` prefix – these are **not** `external-file:*`.
 | `terminal:exit` | Event: PTY exited, with exit code and signal |
 | `terminal:error` | Event: PTY error |
 | `terminal:clear` | Event: main asks the renderer to clear the xterm buffer |
+| `terminal:getScreenReaderSupport` | Payload-free and sender-gated (`isTrustedSender`, in `terminal-screen-reader-handlers.ts`): `{ enabled }` from `app.isAccessibilitySupportEnabled()` – whether the OS reports a screen reader. Always `false` on Linux and for an untrusted sender. Drives the terminal's screen-reader mode in Auto (lens review [23]) |
+| `terminal:screenReaderSupportChanged` | Event: `{ enabled }`, broadcast to every window when Electron emits `accessibility-support-changed` (macOS, Windows) |
 
 ### Settings (`settings-handlers.ts`, `global-settings-handlers.ts`)
 
@@ -342,7 +344,7 @@ Three further `image-export:*` names exist in `src/shared/ipc/image-export-chann
 | `transcription:whisperEnsureModel` | Ensure a whisper model is downloaded and verified |
 | `transcription:whisperListModels` | List locally available whisper models |
 | `transcription:whisperDeleteModel` | Delete a downloaded whisper model |
-| `transcription:whisperCancelDownload` | Cancel the running binary or model download; the pending ensure call resolves with `cancelled: true` and the partial file is deleted |
+| `transcription:whisperCancelDownload` | Cancel the running binary or model download; the pending ensure call resolves with `cancelled: true` and the partial file is deleted. Only the abort is reported as cancelled: an error that lands after Cancel (an integrity failure, say) stays an error. Cancel is app-wide by design (one model store per app): it stops the download of every window, not only the sender's |
 | `transcription:progress` | Event: progress update (main → renderer) |
 | `transcription:whisperDownloadProgress` | Event: binary/model download progress (main → renderer) |
 

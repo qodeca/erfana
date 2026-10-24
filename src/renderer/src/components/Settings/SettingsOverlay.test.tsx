@@ -42,6 +42,15 @@ const { mockLogger } = vi.hoisted(() => ({
 }))
 vi.mock('../../utils/logger', () => ({ logger: mockLogger }))
 
+// The settings sections no test in this file varies. Every fixture spreads
+// them so it is a complete GlobalSettings; `enabled: true` is also what the
+// HTML preview section falls back to when the section is absent.
+const UNVARIED_SECTIONS: Pick<GlobalSettings, 'htmlPreview' | 'files' | 'terminal'> = {
+  htmlPreview: { enabled: true },
+  files: { exclude: [] },
+  terminal: { screenReaderMode: 'auto' }
+}
+
 describe('SettingsOverlay', () => {
   beforeEach(() => {
     // Create portal-root div for portal rendering
@@ -398,7 +407,8 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
+          ...UNVARIED_SECTIONS
         },
         isLoading: false,
         error: null,
@@ -428,7 +438,8 @@ describe('SettingsOverlay', () => {
         logging: { level: 'debug' },
         editor: { preserveLineBreaks: false },
         gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-        transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+        transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
+        ...UNVARIED_SECTIONS
       }
       useGlobalSettingsStore.setState({
         settings: mockSettings,
@@ -461,7 +472,8 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
+          ...UNVARIED_SECTIONS
         },
         isLoading: false,
         error: null,
@@ -506,7 +518,8 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
+          ...UNVARIED_SECTIONS
         },
         isLoading: false,
         error: null,
@@ -595,7 +608,8 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
+          ...UNVARIED_SECTIONS
         },
         isLoading: false,
         error: null,
@@ -626,7 +640,8 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
+          ...UNVARIED_SECTIONS
         },
         isLoading: false,
         error: null,
@@ -657,7 +672,8 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: true },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
+          ...UNVARIED_SECTIONS
         },
         isLoading: false,
         error: null,
@@ -689,7 +705,8 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
+          ...UNVARIED_SECTIONS
         },
         isLoading: false,
         error: null,
@@ -753,7 +770,8 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
+          ...UNVARIED_SECTIONS
         },
         isLoading: false,
         error: null,
@@ -784,7 +802,8 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
+          ...UNVARIED_SECTIONS
         },
         isLoading: false,
         error: null,
@@ -815,7 +834,8 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: false, pollingInterval: 5000 },
-          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
+          ...UNVARIED_SECTIONS
         },
         isLoading: false,
         error: null,
@@ -847,7 +867,8 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: false, pollingInterval: 5000 },
-          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
+          ...UNVARIED_SECTIONS
         },
         isLoading: false,
         error: null,
@@ -880,7 +901,8 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 7000 },
-          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
+          ...UNVARIED_SECTIONS
         },
         isLoading: false,
         error: null,
@@ -911,7 +933,8 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
+          ...UNVARIED_SECTIONS
         },
         isLoading: false,
         error: null,
@@ -952,7 +975,8 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
+          ...UNVARIED_SECTIONS
         },
         isLoading: false,
         error: null,
@@ -985,7 +1009,8 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: false, pollingInterval: 5000 },
-          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
+          ...UNVARIED_SECTIONS
         },
         isLoading: false,
         error: null,
@@ -1015,7 +1040,8 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
+          ...UNVARIED_SECTIONS
         },
         isLoading: false,
         error: null,
@@ -1101,7 +1127,8 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
+          ...UNVARIED_SECTIONS
         },
         isLoading: false,
         error: null,
@@ -1132,7 +1159,8 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
+          ...UNVARIED_SECTIONS
         },
         isLoading: false,
         error: null,
@@ -1163,7 +1191,8 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'local' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+          transcription: { backend: 'local' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
+          ...UNVARIED_SECTIONS
         },
         isLoading: false,
         error: null,
@@ -1194,7 +1223,8 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
+          ...UNVARIED_SECTIONS
         },
         isLoading: false,
         error: null,
@@ -1226,7 +1256,8 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
+          ...UNVARIED_SECTIONS
         },
         isLoading: false,
         error: null,
@@ -1260,7 +1291,8 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
+          ...UNVARIED_SECTIONS
         },
         isLoading: false,
         error: null,
@@ -1292,7 +1324,8 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'local' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+          transcription: { backend: 'local' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
+          ...UNVARIED_SECTIONS
         },
         isLoading: false,
         error: null,
@@ -1328,7 +1361,8 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'local' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+          transcription: { backend: 'local' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
+          ...UNVARIED_SECTIONS
         },
         isLoading: false,
         error: null,
@@ -1365,7 +1399,8 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'local' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+          transcription: { backend: 'local' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
+          ...UNVARIED_SECTIONS
         },
         isLoading: false,
         error: null,
@@ -1400,7 +1435,8 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
+          ...UNVARIED_SECTIONS
         },
         isLoading: false,
         error: null,
@@ -1439,7 +1475,8 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
+          ...UNVARIED_SECTIONS
         },
         isLoading: false,
         error: null,
@@ -1478,7 +1515,8 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
+          ...UNVARIED_SECTIONS
         },
         isLoading: false,
         error: null,
@@ -1516,7 +1554,8 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
+          ...UNVARIED_SECTIONS
         },
         isLoading: false,
         error: null,
@@ -1550,7 +1589,8 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'local' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+          transcription: { backend: 'local' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
+          ...UNVARIED_SECTIONS
         },
         isLoading: false,
         error: null,
@@ -1587,7 +1627,8 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'local' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+          transcription: { backend: 'local' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
+          ...UNVARIED_SECTIONS
         },
         isLoading: false,
         error: null,
@@ -1639,7 +1680,8 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'local' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+          transcription: { backend: 'local' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
+          ...UNVARIED_SECTIONS
         },
         isLoading: false,
         error: null,
@@ -1689,7 +1731,8 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'local' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+          transcription: { backend: 'local' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
+          ...UNVARIED_SECTIONS
         },
         isLoading: false,
         error: null,
@@ -1722,7 +1765,8 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
+          ...UNVARIED_SECTIONS
         },
         isLoading: false,
         error: null,
@@ -1762,7 +1806,8 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
+          ...UNVARIED_SECTIONS
         },
         isLoading: false,
         error: null,
@@ -1801,7 +1846,8 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
+          ...UNVARIED_SECTIONS
         },
         isLoading: false,
         error: null,
@@ -1870,7 +1916,8 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'local' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+          transcription: { backend: 'local' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
+          ...UNVARIED_SECTIONS
         },
         isLoading: false,
         error: null,
@@ -1909,7 +1956,8 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
+          ...UNVARIED_SECTIONS
         },
         isLoading: false,
         error: null,
@@ -1951,7 +1999,8 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'local' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+          transcription: { backend: 'local' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
+          ...UNVARIED_SECTIONS
         },
         isLoading: false,
         error: null,
@@ -1996,7 +2045,8 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'local' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+          transcription: { backend: 'local' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
+          ...UNVARIED_SECTIONS
         },
         isLoading: false,
         error: null,
@@ -2044,7 +2094,8 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'local' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+          transcription: { backend: 'local' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
+          ...UNVARIED_SECTIONS
         },
         isLoading: false,
         error: null,
@@ -2087,7 +2138,8 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'local' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+          transcription: { backend: 'local' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
+          ...UNVARIED_SECTIONS
         },
         isLoading: false,
         error: null,
@@ -2139,7 +2191,8 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'local' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+          transcription: { backend: 'local' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
+          ...UNVARIED_SECTIONS
         },
         isLoading: false,
         error: null,
@@ -2188,7 +2241,8 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
+          ...UNVARIED_SECTIONS
         },
         isLoading: false,
         error: null,
@@ -2228,7 +2282,8 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
+          ...UNVARIED_SECTIONS
         },
         isLoading: false,
         error: null,
@@ -2266,7 +2321,8 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
+          ...UNVARIED_SECTIONS
         },
         isLoading: false,
         error: null,
@@ -2314,7 +2370,8 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'local' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+          transcription: { backend: 'local' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
+          ...UNVARIED_SECTIONS
         },
         isLoading: false,
         error: null,
@@ -2368,7 +2425,8 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
+          ...UNVARIED_SECTIONS
         },
         isLoading: false,
         error: null,
@@ -2412,7 +2470,9 @@ describe('SettingsOverlay', () => {
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
           transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const },
-          htmlPreview: { enabled: true }
+          htmlPreview: { enabled: true },
+          files: UNVARIED_SECTIONS.files,
+          terminal: UNVARIED_SECTIONS.terminal
         }
       })
 

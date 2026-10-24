@@ -81,17 +81,16 @@ const RENDERER_GATEWAY_SELECTORS = [
   ...RENDERER_API_BYPASS_SELECTORS
 ]
 
-// TEMPORARY. These files still read three bridges off `window.api` and are being
-// changed by another PR, so they keep exactly those reads until they move to
-// claudeStatusGateway, utilsGateway and screenshotGateway. Any other read, an
-// alias of `window.api` or a computed key is still an error here. Delete this
-// list, its selectors and its block below once they have moved.
+// TEMPORARY. These files still read two bridges off `window.api` (screenshot in
+// useScreenshotCapture, utils in the unused useTerminalDragDrop), so they keep
+// exactly those reads until they move to screenshotGateway and utilsGateway.
+// Any other read, an alias of `window.api` or a computed key is still an error
+// here. Delete this list, its selectors and its block below once they have moved.
 const RENDERER_TERMINAL_PANEL_FILES = [
-  'src/renderer/src/components/Panels/TerminalPanel.tsx',
   'src/renderer/src/components/Panels/TerminalPanel/hooks/useScreenshotCapture.ts',
   'src/renderer/src/components/Panels/TerminalPanel/hooks/useTerminalDragDrop.ts'
 ]
-const TERMINAL_PANEL_BRIDGES = ['claudeStatus', 'utils', 'screenshot']
+const TERMINAL_PANEL_BRIDGES = ['utils', 'screenshot']
 const RENDERER_TERMINAL_PANEL_SELECTORS = [
   {
     selector: `${WINDOW_API}:not(MemberExpression[property.name=/^(${TERMINAL_PANEL_BRIDGES.join('|')})$/] > .object)`,
@@ -790,7 +789,7 @@ export default [
     }
   },
   //  - TEMPORARY, the TerminalPanel files: shared families + gateway selectors
-  //    that still let them read their three bridges (see RENDERER_TERMINAL_PANEL_FILES)
+  //    that still let them read their two bridges (see RENDERER_TERMINAL_PANEL_FILES)
   {
     files: RENDERER_TERMINAL_PANEL_FILES,
     rules: {

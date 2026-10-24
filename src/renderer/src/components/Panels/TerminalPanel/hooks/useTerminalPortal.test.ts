@@ -8,6 +8,8 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
+import type { Terminal } from '@xterm/xterm'
+import type { FitAddon } from '@xterm/addon-fit'
 import { useTerminalPortal } from './useTerminalPortal'
 
 // Mock the context
@@ -33,9 +35,9 @@ describe('useTerminalPortal', () => {
   const mockResizePty = vi.fn()
 
   const createMockRefs = (terminalId: string | null = 'terminal-1') => ({
-    fitAddonRef: { current: { fit: mockFit } as unknown as { current: null } },
+    fitAddonRef: { current: { fit: mockFit } as unknown as FitAddon },
     xtermRef: {
-      current: { cols: 80, rows: 24 } as unknown as { current: null }
+      current: { cols: 80, rows: 24 } as unknown as Terminal
     },
     terminalId,
     resizePty: mockResizePty
@@ -57,8 +59,8 @@ describe('useTerminalPortal', () => {
     const { result } = renderHook(() =>
       useTerminalPortal({
         ...refs,
-        fitAddonRef: refs.fitAddonRef as React.RefObject<null>,
-        xtermRef: refs.xtermRef as React.RefObject<null>
+        fitAddonRef: refs.fitAddonRef,
+        xtermRef: refs.xtermRef
       })
     )
 
@@ -71,8 +73,8 @@ describe('useTerminalPortal', () => {
     const { result } = renderHook(() =>
       useTerminalPortal({
         ...refs,
-        fitAddonRef: refs.fitAddonRef as React.RefObject<null>,
-        xtermRef: refs.xtermRef as React.RefObject<null>
+        fitAddonRef: refs.fitAddonRef,
+        xtermRef: refs.xtermRef
       })
     )
 
@@ -86,8 +88,8 @@ describe('useTerminalPortal', () => {
     const { result } = renderHook(() =>
       useTerminalPortal({
         ...refs,
-        fitAddonRef: refs.fitAddonRef as React.RefObject<null>,
-        xtermRef: refs.xtermRef as React.RefObject<null>
+        fitAddonRef: refs.fitAddonRef,
+        xtermRef: refs.xtermRef
       })
     )
 
@@ -101,8 +103,8 @@ describe('useTerminalPortal', () => {
     const { result } = renderHook(() =>
       useTerminalPortal({
         ...refs,
-        fitAddonRef: refs.fitAddonRef as React.RefObject<null>,
-        xtermRef: refs.xtermRef as React.RefObject<null>
+        fitAddonRef: refs.fitAddonRef,
+        xtermRef: refs.xtermRef
       })
     )
 
@@ -115,8 +117,8 @@ describe('useTerminalPortal', () => {
     renderHook(() =>
       useTerminalPortal({
         ...refs,
-        fitAddonRef: refs.fitAddonRef as React.RefObject<null>,
-        xtermRef: refs.xtermRef as React.RefObject<null>
+        fitAddonRef: refs.fitAddonRef,
+        xtermRef: refs.xtermRef
       })
     )
 
@@ -135,8 +137,8 @@ describe('useTerminalPortal', () => {
     renderHook(() =>
       useTerminalPortal({
         ...refs,
-        fitAddonRef: refs.fitAddonRef as React.RefObject<null>,
-        xtermRef: refs.xtermRef as React.RefObject<null>
+        fitAddonRef: refs.fitAddonRef,
+        xtermRef: refs.xtermRef
       })
     )
 
@@ -158,8 +160,8 @@ describe('useTerminalPortal', () => {
     const { unmount } = renderHook(() =>
       useTerminalPortal({
         ...refs,
-        fitAddonRef: refs.fitAddonRef as React.RefObject<null>,
-        xtermRef: refs.xtermRef as React.RefObject<null>
+        fitAddonRef: refs.fitAddonRef,
+        xtermRef: refs.xtermRef
       })
     )
 

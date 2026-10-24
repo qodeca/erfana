@@ -32,12 +32,6 @@ import { installTreeViewport, treeRowCount } from '../../test-utils/treeViewport
 // The tree is virtualised; give it a viewport so every fixture row is mounted.
 installTreeViewport()
 
-declare global {
-  interface Window {
-    api: any
-  }
-}
-
 const PROJECT_A = '/projA'
 const PROJECT_B = '/projB'
 

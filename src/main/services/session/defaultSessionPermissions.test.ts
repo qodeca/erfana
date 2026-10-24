@@ -18,6 +18,9 @@ vi.mock('@electron-toolkit/utils', () => ({
 import { installDefaultSessionPermissions } from './defaultSessionPermissions'
 import { RENDERER_FILE_URL } from '../../ipc/senderValidation'
 
+// electron-vite declares ELECTRON_RENDERER_URL read-only; this file sets and clears it.
+const writableEnv: Record<string, string | undefined> = process.env
+
 type RequestHandler = (
   wc: unknown,
   permission: string,
@@ -66,12 +69,12 @@ describe('default session permissions', () => {
 
   beforeEach(() => {
     isDev.value = false
-    delete process.env['ELECTRON_RENDERER_URL']
+    delete writableEnv.ELECTRON_RENDERER_URL
   })
 
   afterEach(() => {
-    if (originalDevUrl === undefined) delete process.env['ELECTRON_RENDERER_URL']
-    else process.env['ELECTRON_RENDERER_URL'] = originalDevUrl
+    if (originalDevUrl === undefined) delete writableEnv.ELECTRON_RENDERER_URL
+    else writableEnv.ELECTRON_RENDERER_URL = originalDevUrl
   })
 
   const app = { requestingUrl: RENDERER_FILE_URL, isMainFrame: true }
@@ -128,7 +131,7 @@ describe('default session permissions', () => {
 
   it('in dev, trusts the dev-server origin and still denies others', () => {
     isDev.value = true
-    process.env['ELECTRON_RENDERER_URL'] = 'http://localhost:5173'
+    writableEnv.ELECTRON_RENDERER_URL = 'http://localhost:5173'
     const media = { isMainFrame: true, mediaTypes: ['video'] }
 
     expect(ask('media', { ...media, requestingUrl: 'http://localhost:5173/' }).request).toBe(true)

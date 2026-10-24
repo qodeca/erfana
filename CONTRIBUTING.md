@@ -78,7 +78,7 @@ Run the same checks CI runs before opening a PR:
 npm run lint            # eslint --fix, then the no-shebang check (lint:shebang) and the max-lines baseline check (lint:max-lines)
 npm run lint:css        # stylelint over src/ CSS and the design/ cards
 npm run design -- --check   # fails if a generated file under design/ is stale
-npm run typecheck       # tsc (node + web projects)
+npm run typecheck       # tsc (node + web projects, their tests, and e2e)
 npm run test:ci         # vitest workspace (main / renderer / preload)
 npm run test:cov        # coverage floors - a REQUIRED check that test:ci does not run
 npx electron-vite build # production build
