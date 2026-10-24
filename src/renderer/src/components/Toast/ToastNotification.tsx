@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FocusEvent } from 'react'
 import { CheckCircle, XCircle, AlertCircle, Info, X } from 'lucide-react'
 import { useToast, Toast } from './ToastContext'
 import { TEST_IDS } from '../../constants/testids'
 import { useOccluder } from '../../hooks/useOccluder'
 import { readPreviewRects, usePreviewViewportStore } from '../../stores/usePreviewViewportStore'
 import { placeToastContainer, type ToastPlacement } from './toastPlacement'
+import { useToastDwellTimer } from './toastDwell'
 import './Toast.css'
 
 const ICON_MAP = {
@@ -194,6 +195,70 @@ export function ToastNotification() {
 
 function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
   const Icon = ICON_MAP[toast.type]
+  const rootRef = useRef<HTMLDivElement>(null)
+  // `duration` was already resolved by the provider (errors persist, warnings
+  // are floored). The countdown pauses while the pointer or focus is on the
+  // toast, so a reader is never cut off mid-sentence (WCAG 2.2.1).
+  const { paused, onFocus: pauseOnFocus, ...dwellHandlers } = useToastDwellTimer(
+    toast.duration ?? 0,
+    onClose,
+    rootRef
+  )
+
+  // Where focus was before it entered the toast, so a dismissal hands it back
+  // instead of dropping it on <body>. Recorded on ENTRY only; moving between
+  // the toast's own buttons keeps the original. (Ported from #340.)
+  const returnFocusTo = useRef<HTMLElement | null>(null)
+  const handleFocus = (event: FocusEvent<HTMLDivElement>): void => {
+    const from = event.relatedTarget
+    if (!(from instanceof Node && event.currentTarget.contains(from))) {
+      returnFocusTo.current = from instanceof HTMLElement ? from : null
+    }
+    pauseOnFocus()
+  }
+
+  // Focus goes back when the toast LEAVES, however it leaves: the Close button,
+  // the action, Escape, a `removeToast` call elsewhere, or the sticky cap in
+  // `toastStack.ts`. Doing it in the unmount cleanup covers every one of those.
+  // A layout-effect cleanup runs while the toast is still in the DOM, so it can
+  // still see whether focus is inside it. Focus moves only if it was inside the
+  // toast (a mouse click on Close focuses Close first) and the element it came
+  // from still exists.
+  useLayoutEffect(() => {
+    const root = rootRef.current
+    return () => {
+      const back = returnFocusTo.current
+      if (root?.contains(document.activeElement) && back?.isConnected) back.focus()
+    }
+  }, [])
+
+  const dismissRef = useRef<() => void>(() => {})
+  const dismiss = (): void => {
+    onClose()
+  }
+  useLayoutEffect(() => {
+    dismissRef.current = dismiss
+  })
+
+  // Escape on a focused toast closes the toast and nothing else. The dialogs
+  // and menus take Escape in ONE capture-phase listener on `document`
+  // (overlayStack.ts), which runs before any handler on this element could, so
+  // a React onKeyDown with stopPropagation would be too late: the dialog
+  // underneath would close too (finding [28]). A capture listener on `window`
+  // runs first, and stopping the event there keeps it from the document.
+  // Toasts are not modal, so they are deliberately not on the overlay stack.
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (event.key !== 'Escape' || event.repeat) return
+      const root = rootRef.current
+      if (!root || !(event.target instanceof Node) || !root.contains(event.target)) return
+      event.stopPropagation()
+      event.preventDefault()
+      dismissRef.current()
+    }
+    window.addEventListener('keydown', handleKeyDown, true)
+    return () => window.removeEventListener('keydown', handleKeyDown, true)
+  }, [])
 
   // No live role on the visual item: announcements are owned by the two hidden
   // live regions (see ToastNotification). An ACTIONABLE toast (e.g. approve a
@@ -201,8 +266,13 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
   // and reach its action button, which otherwise sits unnamed at the DOM's end.
   return (
     <div
+      ref={rootRef}
       className={`toast toast-${toast.type}`}
       data-testid={`${TEST_IDS.TOAST}-${toast.type}`}
+      data-toast-id={toast.id}
+      data-paused={paused ? 'true' : undefined}
+      {...dwellHandlers}
+      onFocus={handleFocus}
       role={toast.action ? 'group' : undefined}
       aria-label={toast.action ? toast.title : undefined}
     >
@@ -210,7 +280,16 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
         <Icon size={20} strokeWidth={2} />
       </div>
       <div className="toast-content">
-        <div className="toast-title">{toast.title}</div>
+        <div className="toast-title">
+          {toast.title}
+          {/* Repeats merge into one toast (toastStack.ts). The count is not
+              re-announced: the live region already read this message once. */}
+          {(toast.count ?? 1) > 1 && (
+            <span className="toast-count" data-testid={TEST_IDS.TOAST_COUNT}>
+              ×{toast.count}
+            </span>
+          )}
+        </div>
         <div className="toast-message" data-testid={TEST_IDS.TOAST_MESSAGE}>{toast.message}</div>
         {toast.action && (
           <button
@@ -219,7 +298,7 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
               // Run the action, then dismiss — an actionable toast is
               // manual-dismiss (duration 0), so it does not clear on its own.
               toast.action?.onClick()
-              onClose()
+              dismiss()
             }}
             data-testid={TEST_IDS.TOAST_BTN_ACTION}
           >
@@ -229,7 +308,7 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
       </div>
       <button
         className="toast-close"
-        onClick={onClose}
+        onClick={dismiss}
         aria-label="Close"
         data-testid={TEST_IDS.TOAST_BTN_DISMISS}
       >

@@ -578,6 +578,8 @@ export const TEST_IDS = {
   TOAST: 'toast',
   /** Toast message text */
   TOAST_MESSAGE: 'toast-message',
+  /** Repeat count ("×3") on a toast that merged identical repeats */
+  TOAST_COUNT: 'toast-count',
   /** Toast dismiss button */
   TOAST_BTN_DISMISS: 'toast-btn-dismiss',
   /** Toast action button (e.g. "Approve"); present only on actionable toasts */
