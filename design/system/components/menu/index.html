@@ -122,6 +122,51 @@
   today.
 </div>
 
+<h2>Exceptions</h2>
+<p style="max-width: 72ch; color: var(--color-text-tertiary)">
+  Where the shipping openers depart from "the trigger carries <code>aria-haspopup="menu"</code> and
+  <code>aria-expanded</code>", with the reason. Every opener here still opens its menu with
+  <kbd>Shift</kbd>+<kbd>F10</kbd> and the <kbd>Menu</kbd> key, and the menu itself keeps the whole keyboard
+  contract above (#90). An undocumented deviation is a bug; a documented one is a decision.
+</p>
+<table>
+  <thead><tr><th>Where</th><th>The card</th><th>The component, and why</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>Project-tree rows</td>
+      <td>The opener carries <code>aria-haspopup</code> and <code>aria-expanded</code>.</td>
+      <td>Neither. On a <code>treeitem</code>, <code>aria-expanded</code> already means "this folder is open",
+        so it cannot also report the row menu. The menu announces itself as a menu when it takes focus. See
+        <code>ProjectTreeNode.tsx</code>.</td>
+    </tr>
+    <tr>
+      <td>Dock tabs (editor, image, HTML preview)</td>
+      <td>The opener carries <code>aria-haspopup</code> and <code>aria-expanded</code>.</td>
+      <td>Neither. The focusable element is dockview's <code>.dv-tab</code>, which has no role, and both
+        attributes are invalid on a role-less element. Giving it <code>role="tab"</code> needs a tablist
+        around it, which is dockview's markup, not Erfana's. See <code>Tabs/useTabMenuKey.ts</code>.</td>
+    </tr>
+    <tr>
+      <td>Markdown editor</td>
+      <td>The opener carries <code>aria-haspopup</code> and <code>aria-expanded</code>.</td>
+      <td>Neither. The focused element is Monaco's own input textarea, whose ARIA Monaco manages. See
+        <code>MonacoMarkdownEditor.tsx</code>.</td>
+    </tr>
+    <tr>
+      <td>Terminal</td>
+      <td>The opener carries <code>aria-haspopup</code> and <code>aria-expanded</code>.</td>
+      <td>Neither. The focused element is xterm's helper textarea, whose ARIA xterm manages. See
+        <code>TerminalPanel.tsx</code>.</td>
+    </tr>
+    <tr>
+      <td>Text fields (new file, rename, prompt, diagram chat)</td>
+      <td>The opener carries <code>aria-haspopup</code> and <code>aria-expanded</code>.</td>
+      <td><code>aria-haspopup="menu"</code> only. ARIA does not allow <code>aria-expanded</code> on a
+        <code>textbox</code>.</td>
+    </tr>
+  </tbody>
+</table>
+
 <h2>What this card does not decide</h2>
 <table>
   <thead><tr><th>Question</th><th>Where it belongs</th></tr></thead>
