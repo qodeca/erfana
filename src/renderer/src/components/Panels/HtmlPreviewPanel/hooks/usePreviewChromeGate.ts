@@ -25,7 +25,7 @@
  * @see design/system/components/permission-band/index.html - status="decided"
  * @see src/shared/ipc/preview-schema.ts - the measured ack timings
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import {
   PREVIEW_BOUNDS_ACK_TIMEOUT_MS,
@@ -76,7 +76,7 @@ export function usePreviewChromeGate({
    * been acked — the reservation arrived a commit late. Starting false costs
    * nothing: the FIRST push takes the baseline branch in `recordPush` and sets
    * this true immediately, and a panel that needs no proof at all is set true by
-   * the `!needsProof` effect below.
+   * the render-phase reset below.
    */
   const [proven, setProven] = useState(false)
   const [sticky, setSticky] = useState<PreviewChromeGateReason | null>(null)
@@ -161,12 +161,10 @@ export function usePreviewChromeGate({
     [clearTimer]
   )
 
-  // Both callbacks depend only on the stable `clearTimer`, so this object keeps
-  // one identity for the life of the panel.
-  const ackController = useMemo<PreviewAckController>(
-    () => ({ provenInset, recordPush }),
-    [provenInset, recordPush]
-  )
+  // Both callbacks close over refs, state setters and the stable `clearTimer`
+  // only, so the first pair serves for the life of the panel. State, not a
+  // memo: a memo is only a hint React may drop and recompute.
+  const [ackController] = useState<PreviewAckController>(() => ({ provenInset, recordPush }))
 
   // The page confirmed it repainted at the new size.
   useEffect(() => {
