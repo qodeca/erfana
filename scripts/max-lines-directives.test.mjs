@@ -8,7 +8,11 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { findMaxLinesDirectives, touchesMaxLines } from './lib/max-lines-directives.mjs'
+import {
+  findMaxLinesDirectives,
+  MAX_DIRECTIVE_CHARS,
+  touchesMaxLines
+} from './lib/max-lines-directives.mjs'
 
 describe('findMaxLinesDirectives', () => {
   it.each([
@@ -27,9 +31,33 @@ describe('findMaxLinesDirectives', () => {
     '/* eslint-disable no-console,\r\n   max-lines */',
     '/* eslint\n   max-lines: off */',
     '/* eslint\n  "max-lines": ["error", 9000] */',
-    '/*\n  eslint-disable\n*/'
+    '/*\n  eslint-disable\n*/',
+    '/* eslint "max-lines": "off" */',
+    // ESLint parses an inline config as JSON, so an escape spells max-lines unseen
+    '/* eslint "max\\u002dlines": "off" */',
+    '/* eslint "\\u006dax-lines": 0 */'
   ])('flags %j at the line the comment starts on', (comment) => {
     expect(findMaxLinesDirectives(`ok\n${comment}\nexport {}\n`)).toEqual([2])
+  })
+
+  // Padding pushes `max-lines` past any length the scan reads, so a directive
+  // longer than MAX_DIRECTIVE_CHARS is reported unread
+  it.each([
+    ['2,000 spaces', `/* eslint-disable no-console,${' '.repeat(MAX_DIRECTIVE_CHARS)} max-lines */`],
+    ['2,000 newlines', `/* eslint-disable no-console,${'\n'.repeat(MAX_DIRECTIVE_CHARS)} max-lines */`],
+    ['150 rules', `/* eslint ${'no-console: 0, '.repeat(150)}max-lines: 0 */`],
+    ['a padded line comment', `// eslint-disable-line no-console,${' '.repeat(MAX_DIRECTIVE_CHARS)} max-lines`],
+    ['padding and no max-lines', `/* eslint-disable no-console${' '.repeat(MAX_DIRECTIVE_CHARS)} */`]
+  ])('fails closed on a directive padded with %s', (_label, comment) => {
+    expect(findMaxLinesDirectives(`ok\n${comment}\nexport {}\n`)).toEqual([2])
+  })
+
+  it.each([
+    ['prose', `/* ${'a'.repeat(3 * MAX_DIRECTIVE_CHARS)} eslint-disable max-lines */`],
+    ['eslint-env', `/* eslint-env node${' '.repeat(MAX_DIRECTIVE_CHARS)} */`],
+    ['eslintrc', `/* eslintrc${' '.repeat(MAX_DIRECTIVE_CHARS)} */`]
+  ])('leaves a long comment that is not a directive alone: %s', (_label, comment) => {
+    expect(findMaxLinesDirectives(`${comment}\n`)).toEqual([])
   })
 
   it.each([
@@ -45,7 +73,9 @@ describe('findMaxLinesDirectives', () => {
     '/**\n * eslint-disable max-lines\n */',
     '/* see the eslint docs */ const rule = "max-lines"',
     '// a comment\neslint-disable max-lines',
-    'eslint.lintText(code) // max-lines'
+    'eslint.lintText(code) // max-lines',
+    // A backslash only matters in a config: a disable's rule list is not unescaped
+    '/* eslint-disable no-console -- see C:\\temp */'
   ])('leaves %j alone', (text) => {
     expect(findMaxLinesDirectives(`${text}\n`)).toEqual([])
   })
@@ -62,9 +92,17 @@ describe('findMaxLinesDirectives', () => {
   })
 
   it('stays linear on a file full of unclosed comment openers', () => {
-    const line = "export const s = '/* eslint-disable no-console'\n"
-    expect(findMaxLinesDirectives(line.repeat(50_000))).toEqual([])
-    expect(findMaxLinesDirectives('// eslint-disable no-console '.repeat(50_000))).toEqual([])
+    const plain = "export const s = '/* not a directive'\n"
+    expect(findMaxLinesDirectives(`// eslint\n${plain.repeat(50_000)}`)).toEqual([])
+    // An unclosed `/* eslint-disable` in a string runs to the end of the file,
+    // past the cap, so it fails closed: every line is reported except the last
+    // few dozen, whose rest of the file fits in the cap and is read
+    const directive = "export const s = '/* eslint-disable no-console'\n"
+    const lines = 50_000
+    const found = findMaxLinesDirectives(directive.repeat(lines))
+    expect(found.length).toBeGreaterThan(lines - 100)
+    expect(found.length).toBeLessThan(lines)
+    expect(findMaxLinesDirectives('// eslint-disable no-console '.repeat(lines))).toEqual([1])
   })
 })
 

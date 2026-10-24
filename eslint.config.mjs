@@ -238,8 +238,10 @@ const E2E_EXECUTE_JAVASCRIPT_SELECTORS = [
 // `limit` (pinned to 500); each file that was already over it is held to its
 // own size, from scripts/max-lines-baseline.json, read and validated by
 // scripts/lib/max-lines-baseline.mjs. scripts/check-max-lines.mjs (run by
-// `npm run lint`) keeps that list current: it fails when a file shrinks and its
-// allowance is not lowered, and `npm run lint:max-lines -- --update` lowers it.
+// `npm run lint`) counts every covered file itself too, so an inline directive
+// that switches this rule off cannot let a file grow, and keeps the list
+// current: it fails when a file shrinks and its allowance is not lowered, and
+// `npm run lint:max-lines -- --update` lowers it.
 // The rule must be "error": `eslint .` exits 0 on warnings. `e2e/` and
 // `scripts/` are not covered yet. The ignores mirror `isCovered()` in the check
 // script, and scripts/eslint-max-lines.test.mjs proves the two agree.

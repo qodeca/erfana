@@ -133,7 +133,7 @@ describe('parseBaseline', () => {
 })
 
 describe('judgeEntry', () => {
-  it('keeps an allowance that a file has grown past: ESLint reports that, nothing raises it', () => {
+  it('keeps an allowance that a file has grown past: the size check reports it, nothing raises it', () => {
     const verdict = judgeEntry({ allowance: over(9), lines: over(12), limit: LIMIT })
     expect(verdict).toEqual({ value: over(9), reason: null })
   })
@@ -155,7 +155,42 @@ describe('check-max-lines', () => {
     expect(trackedSources(dir).sort()).toEqual([BIG, OTHER])
     const { code, text } = run()
     expect(code).toBe(0)
-    expect(text).toMatch(/baseline is current \(1 files over the 500-line limit\)/)
+    expect(text).toContain(
+      'all 2 source files are within their allowance (1 baselined over the 500-line limit)'
+    )
+  })
+
+  it('fails a new file over the limit, which ESLint alone would also catch', () => {
+    put(OTHER, lines(LIMIT + 1))
+    putBaseline({})
+    track()
+    const { code, text } = run()
+    expect(code).toBe(1)
+    expect(text).toContain(`${OTHER} has 501 lines; its allowance is 500 – split it`)
+  })
+
+  it('fails a baselined file that grew past its allowance', () => {
+    put(BIG, lines(over(12)))
+    putBaseline({ [BIG]: over(10) })
+    track()
+    const { code, text } = run()
+    expect(code).toBe(1)
+    expect(text).toContain(`${BIG} has 512 lines; its allowance is 510 – split it`)
+  })
+
+  // The count does not go through ESLint, so no directive form can switch it off
+  it.each([
+    '/* eslint-disable max-lines */',
+    '/* eslint "max\\u002dlines": "off" */',
+    `/* eslint-disable no-console,${' '.repeat(3000)} max-lines */`
+  ])('fails a file over its allowance that switches the ESLint rule off: %#', (directive) => {
+    put(BIG, `${directive}\n${lines(over(9))}`)
+    putBaseline({ [BIG]: over(9) })
+    track()
+    const { code, text } = run()
+    expect(code).toBe(1)
+    expect(text).toContain(`${BIG} has 510 lines; its allowance is 509 – split it`)
+    expect(text).toContain(`  ${BIG}:1`)
   })
 
   it('fails an allowance above the file size and asks to lower it', () => {
@@ -273,26 +308,30 @@ describe('check-max-lines', () => {
 })
 
 describe('check-max-lines --update', () => {
-  it('lowers and removes entries, and never raises or adds one', () => {
+  it('lowers and removes entries', () => {
     put('src/a.ts', lines(over(8))) // shrank from over(9): lowered
     put('src/b.ts', lines(LIMIT - 3)) // under the limit: removed
-    put('src/c.ts', lines(over(12))) // grew past over(10): left for ESLint, not raised
-    put('src/d.ts', lines(over(20))) // over the limit, never baselined: not added
     put('src/e.ts', lines(over(9))) // current: kept
-    putBaseline({
-      'src/a.ts': over(9),
-      'src/b.ts': over(9),
-      'src/c.ts': over(10),
-      'src/e.ts': over(9),
-      'src/gone.ts': over(9)
-    })
+    putBaseline({ 'src/a.ts': over(9), 'src/b.ts': over(9), 'src/e.ts': over(9), 'src/gone.ts': over(9) })
     track()
     const { code, text } = run(['--update'])
     expect(code).toBe(0)
-    expect(readBaselineFiles()).toEqual({ 'src/a.ts': 508, 'src/c.ts': 510, 'src/e.ts': 509 })
-    expect(text).toContain('rewrote scripts/max-lines-baseline.json (3 entries)')
+    expect(readBaselineFiles()).toEqual({ 'src/a.ts': 508, 'src/e.ts': 509 })
+    expect(text).toContain('rewrote scripts/max-lines-baseline.json (2 entries)')
     expect(run().code).toBe(0)
     expect(run(['--update']).text).toContain('is already current')
+  })
+
+  it('never raises or adds an entry, and still fails a file over its allowance', () => {
+    put('src/c.ts', lines(over(12))) // grew past over(10): not raised
+    put('src/d.ts', lines(over(20))) // over the limit, never baselined: not added
+    putBaseline({ 'src/c.ts': over(10) })
+    track()
+    const { code, text } = run(['--update'])
+    expect(code).toBe(1)
+    expect(readBaselineFiles()).toEqual({ 'src/c.ts': 510 })
+    expect(text).toContain('src/c.ts has 512 lines; its allowance is 510')
+    expect(text).toContain('src/d.ts has 520 lines; its allowance is 500')
   })
 
   it('rewrites a non-canonical baseline', () => {

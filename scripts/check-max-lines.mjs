@@ -2,19 +2,23 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 // The max-lines ratchet (docs/technical-debt.md #26): a source file may shrink, never grow.
 //
-// ESLint enforces the size (eslint.config.mjs): `max-lines` at LIMIT (500) for every
-// non-test `src/**/*.{ts,tsx}`, and at its own size for each file listed in
-// scripts/max-lines-baseline.json – the files that were already over the
-// limit. ESLint cannot keep that list honest, so this check does. It fails when
+// Every non-test `src/**/*.{ts,tsx}` may have LIMIT (500) lines, and each file
+// listed in scripts/max-lines-baseline.json – the files that were already over
+// the limit – may have its listed size. ESLint's `max-lines` enforces that
+// (eslint.config.mjs), and this check enforces it again by counting every
+// covered file itself: an inline directive can switch the ESLint rule off, but
+// not this count. This check also keeps the baseline honest. It fails when
 //
+//   * a file has more lines than its allowance (its entry, or LIMIT);
 //   * an allowance is above its file's current size (the file shrank, so the
 //     allowance must come down with it, or the room would be regrown later);
 //   * an entry is at or under the limit, or names a file the limit no longer
 //     applies to (deleted, renamed or excluded);
-//   * a source the limit applies to turns the rule off with an inline ESLint
+//   * a source the limit applies to turns the ESLint rule off with an inline
 //     directive (an `eslint-disable…` naming max-lines or naming no rule at all,
 //     or an inline `/* eslint max-lines: … */` config), on one line or spread
-//     over several (scripts/lib/max-lines-directives.mjs);
+//     over several, or has a directive the scan cannot read with certainty
+//     (scripts/lib/max-lines-directives.mjs);
 //   * the baseline's `limit` is not LIMIT, or the baseline is not in its
 //     canonical form (sorted, one entry per line) – the format and its
 //     validation live in scripts/lib/max-lines-baseline.mjs.
@@ -40,7 +44,11 @@ import {
   parseBaseline,
   printable
 } from './lib/max-lines-baseline.mjs'
-import { findMaxLinesDirectives, LINE_BREAK } from './lib/max-lines-directives.mjs'
+import {
+  findMaxLinesDirectives,
+  LINE_BREAK,
+  MAX_DIRECTIVE_CHARS
+} from './lib/max-lines-directives.mjs'
 
 export const UPDATE_COMMAND = 'npm run lint:max-lines -- --update'
 
@@ -98,7 +106,8 @@ function readSource(root, rel) {
 /**
  * The verdict on one baseline entry. `value` is the allowance the entry should
  * hold (undefined: remove it); `reason` is null when the entry is current. A
- * file that grew past its allowance keeps it: ESLint reports the growth.
+ * file that grew past its allowance keeps it: nothing here raises an entry,
+ * and the size check in audit() reports the growth.
  */
 export function judgeEntry({ allowance, lines, limit }) {
   const remove = (why) => ({ value: undefined, reason: `${why}; remove the entry` })
@@ -118,28 +127,58 @@ export function judgeEntry({ allowance, lines, limit }) {
   return { value: allowance, reason: null }
 }
 
+// The allowance a covered file is held to: its baseline entry, or the limit
+const allowanceOf = (baseline, file) =>
+  Object.hasOwn(baseline.files, file) ? baseline.files[file] : baseline.limit
+
 /**
- * Compare the baseline with the tracked sources.
- * @returns {{ stale: {file: string, reason: string}[], next: object, directives: string[] }}
+ * Read every covered source once: its line count, whether that is over its
+ * allowance, and the directives in it that switch max-lines off.
  */
-export function audit(root, baseline, sources) {
-  const covered = new Set(sources)
-  const stale = []
-  const next = { limit: baseline.limit, files: {} }
-  for (const [file, allowance] of Object.entries(baseline.files)) {
-    const text = covered.has(file) ? readSource(root, file) : null
-    const lines = text === null ? null : countLines(text)
-    const { value, reason } = judgeEntry({ allowance, lines, limit: baseline.limit })
-    if (reason) stale.push({ file, reason })
-    if (value !== undefined) next.files[file] = value
-  }
+function measureSources(root, baseline, sources) {
+  const sizes = new Map()
+  const oversize = []
   const directives = []
   for (const file of sources) {
     const text = readSource(root, file)
     if (text === null) continue
+    const lines = countLines(text)
+    sizes.set(file, lines)
+    const allowance = allowanceOf(baseline, file)
+    if (lines > allowance) oversize.push({ file: printable(file), lines, allowance })
     for (const line of findMaxLinesDirectives(text)) directives.push(`${printable(file)}:${line}`)
   }
-  return { stale, next, directives }
+  return { sizes, oversize, directives }
+}
+
+/**
+ * Compare the baseline with the tracked sources.
+ * @returns {{ oversize: {file: string, lines: number, allowance: number}[],
+ *   stale: {file: string, reason: string}[], next: object, directives: string[] }}
+ */
+export function audit(root, baseline, sources) {
+  const { sizes, oversize, directives } = measureSources(root, baseline, sources)
+  const stale = []
+  const next = { limit: baseline.limit, files: {} }
+  for (const [file, allowance] of Object.entries(baseline.files)) {
+    const lines = sizes.get(file) ?? null
+    const { value, reason } = judgeEntry({ allowance, lines, limit: baseline.limit })
+    if (reason) stale.push({ file, reason })
+    if (value !== undefined) next.files[file] = value
+  }
+  return { oversize, stale, next, directives }
+}
+
+function reportOversize(oversize, log) {
+  log.error(`max-lines: ${oversize.length} file(s) have more lines than their allowance:`)
+  for (const { file, lines, allowance } of oversize) {
+    log.error(`  ${file} has ${lines} lines; its allowance is ${allowance} – split it`)
+  }
+  log.error(
+    `The allowance is a file's entry in ${BASELINE_PATH}, or the limit for any other file. ` +
+      'Nothing raises an entry automatically; a raise is a hand edit that review must accept ' +
+      '(docs/technical-debt.md #26).'
+  )
 }
 
 function reportDirectives(directives, log) {
@@ -147,7 +186,9 @@ function reportDirectives(directives, log) {
   for (const where of directives) log.error(`  ${where}`)
   log.error(
     'Delete the directive and shrink the file instead. A bare eslint-disable switches every ' +
-      'rule off, max-lines included, so name the rules it is for (docs/technical-debt.md #26).'
+      'rule off, max-lines included, so name the rules it is for. A directive over ' +
+      `${MAX_DIRECTIVE_CHARS} characters, or an eslint config with a backslash in it, is ` +
+      'reported because it cannot be read with certainty (docs/technical-debt.md #26).'
   )
 }
 
@@ -197,15 +238,17 @@ export function main(root = process.cwd(), argv = [], log = console) {
     return 1
   }
   const sources = trackedSources(root)
-  const { stale, next, directives } = audit(root, baseline, sources)
+  const { oversize, stale, next, directives } = audit(root, baseline, sources)
+  if (oversize.length) reportOversize(oversize, log)
   let staleFound = false
   if (argv.includes('--update')) applyUpdate(root, raw, next, stale, log)
   else staleFound = reportStale(raw, next, stale, log)
   if (directives.length) reportDirectives(directives, log)
-  if (staleFound || directives.length) return 1
+  if (oversize.length || staleFound || directives.length) return 1
   log.log(
-    `max-lines: the baseline is current (${Object.keys(next.files).length} files over the ` +
-      `${baseline.limit}-line limit) and none of ${sources.length} source files switches the rule off.`
+    `max-lines: all ${sources.length} source files are within their allowance ` +
+      `(${Object.keys(next.files).length} baselined over the ${baseline.limit}-line limit), ` +
+      'the baseline is current, and no file switches the rule off.'
   )
   return 0
 }

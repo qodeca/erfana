@@ -15,6 +15,15 @@
 // only add candidates, so a real comment is never skipped; a false match needs
 // text that itself reads as a max-lines directive.
 //
+// Where the scan cannot be sure, it fails closed and reports the comment: a
+// directive longer than MAX_DIRECTIVE_CHARS (its rule list is not read), and an
+// inline `eslint` config with a backslash in it (ESLint parses the config as
+// JSON, so `"max\u002dlines"` names the rule without spelling it).
+//
+// This scan is a second layer: scripts/check-max-lines.mjs counts every
+// covered file's lines itself, so a directive it misses still cannot let a file
+// grow. It names the directive so the author can delete it.
+//
 // The file content is contributor-controlled, so the work is linear in its
 // size: the search for each `*/` resumes where the last one ended, and at most
 // MAX_DIRECTIVE_CHARS of a comment are read, and only of one that starts with
@@ -23,9 +32,10 @@
 // ESLint's line-break pattern (eslint/lib/shared/ast-utils.js)
 export const LINE_BREAK = /\r\n|[\r\n\u2028\u2029]/u
 const LINE_BREAKS = new RegExp(LINE_BREAK.source, 'gu')
-// A rule list longer than this is a comment of thousands of characters, which
-// review sees; the cap only bounds the work on a file full of `/*` in strings.
-const MAX_DIRECTIVE_CHARS = 2000
+// The longest directive the scan reads; a longer one is reported unread
+export const MAX_DIRECTIVE_CHARS = 2000
+// Enough text to hold the longest keyword, `eslint-disable-next-line`, and the space after it
+const KEYWORD_PROBE_CHARS = 32
 const SPACE = /\s/
 // The keyword a directive starts with, and the ` -- ` that ends its rule list
 const DIRECTIVE = /^(eslint-disable(?:-next-line|-line)?|eslint)(?:\s|$)/
@@ -34,13 +44,15 @@ const RULE_SEPARATOR = /[\s,:"'[\]{}]+/
 
 /**
  * True when one comment's text is a directive that switches max-lines off or
- * reconfigures it: an `eslint-disable…` naming it or naming no rule (which
- * switches every rule off), or an inline `eslint` config naming it.
+ * reconfigures it, or may: an `eslint-disable…` naming it or naming no rule
+ * (which switches every rule off), or an inline `eslint` config naming it or
+ * holding a backslash escape.
  */
 export function touchesMaxLines(comment) {
   const body = comment.trimStart()
   const match = DIRECTIVE.exec(body)
   if (!match) return false
+  if (match[1] === 'eslint' && body.includes('\\')) return true
   const [ruleText] = body.slice(match[1].length).split(DESCRIPTION)
   const rules = ruleText.split(RULE_SEPARATOR).filter(Boolean)
   if (match[1] !== 'eslint' && rules.length === 0) return true
@@ -71,13 +83,19 @@ function lineIndex(starts, offset) {
   return lo
 }
 
-// True when the comment text from `from` to `to` is a max-lines directive.
-// Leading space is skipped first, so only text starting `eslint` is sliced.
+// True when the comment text from `from` to `to` is a max-lines directive, or a
+// directive too long to read. Leading space is skipped first, so only text
+// starting `eslint` is sliced, and never more than MAX_DIRECTIVE_CHARS of it.
 function isMaxLinesDirective(text, from, to) {
   let at = from
   while (at < to && SPACE.test(text[at])) at++
   if (!text.startsWith('eslint', at)) return false
-  return touchesMaxLines(text.slice(at, Math.min(to, at + MAX_DIRECTIVE_CHARS)))
+  if (to - at > MAX_DIRECTIVE_CHARS) {
+    // Fail closed: padding can push `max-lines` past any length read
+    const keyword = text.slice(at, Math.min(to, at + KEYWORD_PROBE_CHARS))
+    return DIRECTIVE.test(keyword)
+  }
+  return touchesMaxLines(text.slice(at, to))
 }
 
 /** 1-based start lines of every comment in `text` that switches max-lines off. */
