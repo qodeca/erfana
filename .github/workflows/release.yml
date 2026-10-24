@@ -329,7 +329,7 @@ jobs:
         # Note: job-level `outputs` are not retrievable via the REST API after
         # a workflow run completes; an artifact gives us a durable, API-reachable
         # handle that the skill can diff against.
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: sha256sums-digest
           path: dl/SHA256SUMS
