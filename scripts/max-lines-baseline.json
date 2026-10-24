@@ -4,7 +4,6 @@
     "src/main/index.ts": 846,
     "src/main/ipc/file-handlers.ts": 763,
     "src/main/ipc/transcription-handlers.ts": 788,
-    "src/main/services/DirectoryWatcherService.ts": 1605,
     "src/main/services/ExternalFileService.ts": 909,
     "src/main/services/FileService.ts": 1148,
     "src/main/services/FileWatcherService.ts": 581,

@@ -73,7 +73,7 @@ src/
 │   ├── services/                # Business logic (OOP)
 │   │   ├── FileService.ts       # File operations + rename
 │   │   ├── FileWatcherService.ts    # File content auto-refresh
-│   │   ├── DirectoryWatcherService.ts  # Directory tree auto-refresh
+│   │   ├── DirectoryWatcherService.ts  # Directory tree auto-refresh (public lifecycle; layers in watcher/)
 │   │   ├── SettingsService.ts   # Persistent settings (electron-store)
 │   │   ├── GlobalSettingsService.ts  # App-wide settings (~/.erfana/)
 │   │   ├── LoggingService.ts    # File-based logging with rotation
@@ -121,7 +121,10 @@ src/
 │   │   ├── docx/                # DOCX conversion isolation: docxImageStrip (parse5 SSRF strip),
 │   │   │                        #   DocxConvertProcessAdapter (utilityProcess lifecycle), docx-convert.process (child)
 │   │   ├── watcher/             # ThrottledWorker (offset-deque, #173), EventCoalescer, GitEventCoalescer,
-│   │   │                        #   AtomicSaveDetector, RepoPresenceWatcher, WatcherMetrics, PlatformConfig
+│   │   │                        #   AtomicSaveDetector, RepoPresenceWatcher, WatcherMetrics, PlatformConfig,
+│   │   │                        #   DirectoryWatcherCore ← DirectoryWatcherRecovery ← DirectoryWatcherEvents
+│   │   │                        #   (the directory watcher's layers, finding [65]), directoryWatchBuilders,
+│   │   │                        #   DirectoryWatchListeners, WatcherHealthLogger, watchErrorTypes, directoryWatchTypes
 │   │   └── import/              # ImportService, ConverterRegistry, DependencyDetector, extensions,
 │   │                            #   converters/ (LiteParseConverter, Audio/VideoConverter, TextConverter – IConverter)
 │   ├── interfaces/              # 9 service interfaces (DIP seams)

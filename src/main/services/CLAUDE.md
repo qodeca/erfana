@@ -6,6 +6,7 @@ Rules for `src/main/services/` that are not readable from a module's own header.
 
 - `singleFileWatch` is the one place a single-file chokidar watcher is built. chokidar 5 has no globbing, so a glob-looking name (`[draft] {v2}.md`) is literal – `singleFileWatch.rename.integration.test.ts` pins that.
 - `atomicRearm` owns the unlink branch (atomic save re-arm vs genuine delete) and re-checks realpath confinement there.
+- `DirectoryWatcherService` is layered (finding [65]): `watcher/DirectoryWatcherCore` ← `DirectoryWatcherRecovery` ← `DirectoryWatcherEvents` ← the service. Members are `protected`, not `private`, because the suites read and spy on them by name (`watchedDirectories`, `switchVersion`, `queueEvent`, `processEvents`, `scheduleRestart`, `restartWatcher`, …) – keep the names, and call them through `this` so a spy still sees the call.
 - Reuse `rearmingSingleFileWatch` (singleFileWatch + atomicRearm) for any single-file watcher that must keep firing across atomic editor saves.
 
 **Media / export**
