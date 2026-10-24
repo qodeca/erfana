@@ -30,6 +30,7 @@ import {
 } from './fileWatchSlot'
 import { logger } from '../utils/logger'
 import { fileGateway } from '../services/fileGateway'
+import { fileWatchGateway } from '../services/fileWatchGateway'
 
 /**
  * Why auto-refresh stopped working for a path.
@@ -275,14 +276,14 @@ export function useFileChangeSubscription(
       setUnavailableReason(classifyWatchStartFailure(error))
     })
 
-    const unsubscribeChanged = window.api.fileWatch.onFileChanged((data) => {
+    const unsubscribeChanged = fileWatchGateway.onFileChanged((data) => {
       if (!isActive || data.filePath !== filePath) return
       // A change proves the file is back; clear a stale deleted banner.
       setIsFileDeleted(false)
       onExternalChangeRef.current()
     })
 
-    const unsubscribeDeleted = window.api.fileWatch.onFileDeleted((data) => {
+    const unsubscribeDeleted = fileWatchGateway.onFileDeleted((data) => {
       if (!isActive || data.filePath !== filePath) return
 
       // Whatever the disk says, the main process dropped the watch before
@@ -307,7 +308,7 @@ export function useFileChangeSubscription(
         })
     })
 
-    const unsubscribeError = window.api.fileWatch.onFileError((data) => {
+    const unsubscribeError = fileWatchGateway.onFileError((data) => {
       if (!isActive || data.filePath !== filePath) return
       // The main process ended the watch: forget the hold, as on a delete,
       // so Reload restarts it without a `stop` (#252, invariant 5)

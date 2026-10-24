@@ -627,6 +627,12 @@ export const TEST_IDS = {
   SETTINGS_WHISPER_MODEL_STATUS: 'settings-whisper-model-status',
   /** Whisper download error message */
   SETTINGS_WHISPER_DOWNLOAD_ERROR: 'settings-whisper-download-error',
+  /** Cancel button shown while the whisper binary or model downloads */
+  SETTINGS_BTN_WHISPER_CANCEL: 'settings-btn-whisper-cancel',
+  /** Always-mounted, visually hidden status region announcing download progress */
+  SETTINGS_WHISPER_DOWNLOAD_LIVE: 'settings-whisper-download-live',
+  /** Always-mounted, visually hidden alert region announcing a failed download */
+  SETTINGS_WHISPER_DOWNLOAD_ALERT: 'settings-whisper-download-alert',
   SETTINGS_API_KEY_ERROR: 'settings-api-key-error',
   /** Logs folder path display */
   SETTINGS_LOGS_FOLDER_PATH: 'settings-logs-folder-path',

@@ -2,13 +2,10 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { contextBridge, ipcRenderer, IpcRendererEvent, webUtils } from 'electron'
 import { FORCE_CRASH_ARG, TEST_HOOKS_ARG } from '../shared/constants'
-import type { GitStatusResponse } from '../shared/ipc/git-schema'
-import type { DirectoryChangedPayload } from '../shared/ipc/directory-watch-schema'
 import type { PdfExportRequest, PdfExportResponse } from '../shared/ipc/pdf-schema'
 import type { DocxExportRequest, DocxExportResponse } from '../shared/ipc/docx-schema'
 import type { GlobalSettings, GlobalSettingsChanged } from '../shared/ipc/global-settings-schema'
 import type { LogEntry } from '../shared/ipc/logging-schema'
-import type { GitStateChangeEvent, GitWatcherStatus, GitPollTriggeredEvent } from '../shared/ipc/git-watcher-schema'
 import type { LockResult, LockStatus } from '../shared/ipc/project-lock-schema'
 import type {
   ScreenshotCaptureRequest,
@@ -56,6 +53,9 @@ import type {
 import { fileBridge } from './fileBridge'
 import { terminalBridge } from './terminalBridge'
 import { markdownImageBridge } from './markdownImageBridge'
+import { fileWatchBridge } from './fileWatchBridge'
+import { directoryWatchBridge } from './directoryWatchBridge'
+import { gitBridge, gitPollingBridge, gitWatcherBridge } from './gitBridge'
 import type { FileNode, FileStats } from '../shared/ipc/file-schema'
 
 export type { FileNode, FileStats }
@@ -72,176 +72,26 @@ const api = {
   // File operations (see fileBridge.ts)
   file: fileBridge,
 
-  // File watching operations
-  fileWatch: {
-    start: (filePath: string): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke('file-watch:start', filePath),
-    stop: (filePath: string): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke('file-watch:stop', filePath),
-    stopAll: (): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke('file-watch:stopAll'),
-    pause: (filePath: string): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke('file-watch:pause', filePath),
-    resume: (filePath: string): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke('file-watch:resume', filePath),
-    getStats: (): Promise<{ success: boolean; stats?: unknown; error?: string }> =>
-      ipcRenderer.invoke('file-watch:stats'),
+  // File watching operations (see fileWatchBridge.ts)
+  fileWatch: fileWatchBridge,
 
-    // Event listeners
-    onFileChanged: (callback: (data: { filePath: string }) => void): (() => void) => {
-      const listener = (_event: unknown, data: { filePath: string }) => callback(data)
-      ipcRenderer.on('file-watch:changed', listener)
-      return () => {
-        ipcRenderer.removeListener('file-watch:changed', listener)
-      }
-    },
-    onFileDeleted: (callback: (data: { filePath: string }) => void): (() => void) => {
-      const listener = (_event: unknown, data: { filePath: string }) => callback(data)
-      ipcRenderer.on('file-watch:deleted', listener)
-      return () => {
-        ipcRenderer.removeListener('file-watch:deleted', listener)
-      }
-    },
-    // `ended`: the main process dropped the watch (every count with it) - #252
-    onFileError: (
-      callback: (data: { filePath: string; error: string; ended?: boolean }) => void
-    ): (() => void) => {
-      const listener = (_event: unknown, data: { filePath: string; error: string; ended?: boolean }) =>
-        callback(data)
-      ipcRenderer.on('file-watch:error', listener)
-      return () => {
-        ipcRenderer.removeListener('file-watch:error', listener)
-      }
-    }
-  },
-
-  // Directory watching operations
-  directoryWatch: {
-    start: (dirPath: string): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke('directory-watch:start', dirPath),
-    stop: (dirPath: string): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke('directory-watch:stop', dirPath),
-    stopAll: (): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke('directory-watch:stop-all'),
-    pause: (dirPath: string): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke('directory-watch:pause', dirPath),
-    resume: (dirPath: string): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke('directory-watch:resume', dirPath),
-    getStats: (): Promise<{ success: boolean; stats?: unknown; error?: string }> =>
-      ipcRenderer.invoke('directory-watch:get-stats'),
-
-    // Event listeners
-    onDirectoryChanged: (callback: (data: DirectoryChangedPayload) => void): (() => void) => {
-      const listener = (_event: unknown, data: DirectoryChangedPayload) => callback(data)
-      ipcRenderer.on('directory-watch:changed', listener)
-      return () => {
-        ipcRenderer.removeListener('directory-watch:changed', listener)
-      }
-    },
-    onProjectDeleted: (callback: (data: { dirPath: string }) => void): (() => void) => {
-      const listener = (_event: unknown, data: { dirPath: string }) => callback(data)
-      ipcRenderer.on('directory-watch:project-deleted', listener)
-      return () => {
-        ipcRenderer.removeListener('directory-watch:project-deleted', listener)
-      }
-    },
-    onDirectoryError: (callback: (data: { dirPath: string; error: string }) => void): (() => void) => {
-      const listener = (_event: unknown, data: { dirPath: string; error: string }) => callback(data)
-      ipcRenderer.on('directory-watch:error', listener)
-      return () => {
-        ipcRenderer.removeListener('directory-watch:error', listener)
-      }
-    }
-  },
+  // Directory watching operations (see directoryWatchBridge.ts)
+  directoryWatch: directoryWatchBridge,
 
   // gitIndexWatch API removed (Issue #74 review fix)
   // Replaced by gitWatcher API which provides broader coverage
 
   /**
-   * Git watcher - monitors .git directory for state changes
-   * Watches: index, HEAD, refs, fetch, stash
+   * Git watcher - monitors .git directory for state changes (see gitBridge.ts)
    * @see Issue #74 - real-time git status refresh
    */
-  gitWatcher: {
-    /**
-     * Start watching git directory for a project
-     * @param projectPath - Root path of the git repository
-     */
-    start: (projectPath: string): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke('git-watcher:start', projectPath),
-
-    /**
-     * Stop the current git watcher
-     */
-    stop: (): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke('git-watcher:stop'),
-
-    /**
-     * Get current watcher status for debugging/monitoring
-     */
-    getStatus: (): Promise<GitWatcherStatus> =>
-      ipcRenderer.invoke('git-watcher:status'),
-
-    /**
-     * Subscribe to git state change events
-     * @param callback - Called when git state changes (index, HEAD, refs, etc.)
-     * @returns Cleanup function to remove listener
-     */
-    onStateChanged: (callback: (event: GitStateChangeEvent) => void): (() => void) => {
-      const handler = (_event: IpcRendererEvent, data: GitStateChangeEvent): void => callback(data)
-      ipcRenderer.on('git:state-changed', handler)
-      return () => {
-        ipcRenderer.removeListener('git:state-changed', handler)
-      }
-    }
-  },
+  gitWatcher: gitWatcherBridge,
 
   /**
-   * Git polling - fallback timer-based status refresh
-   * Complements gitWatcher for cases where file watching misses changes
+   * Git polling - fallback timer-based status refresh (see gitBridge.ts)
    * @see Issue #74 - real-time git status refresh
    */
-  gitPolling: {
-    /**
-     * Start polling for git status updates
-     * @param projectPath - Root path of the git repository
-     */
-    start: (projectPath: string): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke('git-polling:start', projectPath),
-
-    /**
-     * Stop polling
-     */
-    stop: (): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke('git-polling:stop'),
-
-    /**
-     * Set polling interval
-     * @param ms - Interval in milliseconds
-     */
-    setInterval: (ms: number): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke('git-polling:set-interval', ms),
-
-    /**
-     * Enable or disable polling
-     * @param enabled - Whether polling should be active
-     */
-    setEnabled: (enabled: boolean): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke('git-polling:set-enabled', enabled),
-
-    /**
-     * Subscribe to poll triggered events
-     * @param callback - Called when polling interval fires
-     * @returns Cleanup function to remove listener
-     */
-    onPollTriggered: (callback: (event: GitPollTriggeredEvent) => void): (() => void) => {
-      const handler = (_event: IpcRendererEvent, data: GitPollTriggeredEvent): void => callback(data)
-      ipcRenderer.on('git:poll-triggered', handler)
-      return () => {
-        ipcRenderer.removeListener('git:poll-triggered', handler)
-      }
-    }
-  },
+  gitPolling: gitPollingBridge,
 
   // Settings operations
   settings: {
@@ -366,15 +216,8 @@ const api = {
     }
   },
 
-  // Git operations
-  git: {
-    /**
-     * Get git status for a project directory
-     * Returns branch name, file statuses, and status counts
-     */
-    getStatus: (projectPath: string): Promise<GitStatusResponse> =>
-      ipcRenderer.invoke('git:getStatus', projectPath)
-  },
+  // Git status (see gitBridge.ts)
+  git: gitBridge,
 
   // PDF export operations
   pdf: {
@@ -604,7 +447,7 @@ const api = {
      *
      * @returns Success status with binary path or error
      */
-    ensureBinary: (): Promise<{ success: boolean; path?: string; error?: string }> =>
+    ensureBinary: (): Promise<{ success: boolean; path?: string; error?: string; cancelled?: boolean }> =>
       ipcRenderer.invoke(TRANSCRIPTION_CHANNELS.WHISPER_ENSURE_BINARY),
 
     /**
@@ -615,7 +458,7 @@ const api = {
      * @param model - Model size to ensure (tiny, base, small, medium, large)
      * @returns Success status with model path or error
      */
-    ensureModel: (model: WhisperModel): Promise<{ success: boolean; path?: string; error?: string }> =>
+    ensureModel: (model: WhisperModel): Promise<{ success: boolean; path?: string; error?: string; cancelled?: boolean }> =>
       ipcRenderer.invoke(TRANSCRIPTION_CHANNELS.WHISPER_ENSURE_MODEL, model),
 
     /**
@@ -636,6 +479,15 @@ const api = {
      */
     deleteModel: (model: WhisperModel): Promise<{ success: boolean; error?: string }> =>
       ipcRenderer.invoke(TRANSCRIPTION_CHANNELS.WHISPER_DELETE_MODEL, model),
+
+    /**
+     * Cancel the running binary or model download. Its pending ensure call
+     * resolves with `cancelled: true` and the partial file is deleted.
+     *
+     * @returns Success status (false when nothing was downloading)
+     */
+    cancelDownload: (): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke(TRANSCRIPTION_CHANNELS.WHISPER_CANCEL_DOWNLOAD),
 
     /**
      * Subscribe to whisper model download progress events

@@ -40,13 +40,14 @@ const MAIN_LAYER_PATTERNS = [
   layerPattern('preload', 'src/main')
 ]
 const GATEWAY_MESSAGE =
-  'Reach the file and terminal bridges through services/fileGateway and services/terminalGateway, not window.api.'
-// The type system already hides `file` / `terminal` from `window.api` (see
-// preload/index.d.ts); these selectors are the backstop for the ways round it.
+  'Reach the preload bridges through their gateway in services/ (fileGateway, gitGateway, …), not window.api.'
+// The bridges that have a gateway. The type system already hides them from
+// `window.api` (see preload/index.d.ts); these selectors are the backstop for
+// the ways round it.
+const GATEWAY_BRIDGES = ['file', 'terminal', 'fileWatch', 'directoryWatch', 'git', 'gitWatcher', 'gitPolling']
 const RENDERER_GATEWAY_SELECTORS = [
   {
-    selector:
-      "MemberExpression[object.object.name='window'][object.property.name='api'][property.name=/^(file|terminal)$/]",
+    selector: `MemberExpression[object.object.name='window'][object.property.name='api'][property.name=/^(${GATEWAY_BRIDGES.join('|')})$/]`,
     message: GATEWAY_MESSAGE
   },
   {
@@ -99,10 +100,15 @@ const RENDERER_PATTERN_OWNERS = [
   'src/renderer/src/services/preview/OverlayGuardService.ts'
 ]
 
-// The only files that read the bridges off `window.api`
+// The only files that read the bridges off `window.api`: the gateways, and the
+// presence check that answers only whether a bridge is there
 const RENDERER_GATEWAY_FILES = [
   'src/renderer/src/services/fileGateway.ts',
-  'src/renderer/src/services/terminalGateway.ts'
+  'src/renderer/src/services/terminalGateway.ts',
+  'src/renderer/src/services/fileWatchGateway.ts',
+  'src/renderer/src/services/directoryWatchGateway.ts',
+  'src/renderer/src/services/gitGateway.ts',
+  'src/renderer/src/services/bridgePresence.ts'
 ]
 
 // Selectors every renderer file obeys; the gateway selectors are added on top for non-test code.
@@ -182,6 +188,18 @@ const RENDERER_LAYER_PATTERNS = [
     message: RENDERER_PRELOAD_MESSAGE
   }
 ]
+
+// Every way an e2e file can reach `executeJavaScript` without the bounded
+// helper (lens review finding 34) – see the `e2e/**` block below.
+const E2E_EXECUTE_JAVASCRIPT_MESSAGE =
+  'Unbounded executeJavaScript can hang a test forever. Use the bounded exec from e2e/utils/bounded-exec.ts (installBoundedExec + globalThis.__erfanaE2eExec).'
+const E2E_EXECUTE_JAVASCRIPT_SELECTORS = [
+  'MemberExpression[property.name=/^executeJavaScript/]',
+  'MemberExpression[computed=true][property.value=/^executeJavaScript/]',
+  "MemberExpression[computed=true][property.type='TemplateLiteral'][property.quasis.0.value.raw=/^executeJavaScript/]",
+  'ObjectPattern > Property[key.name=/^executeJavaScript/]',
+  'ObjectPattern > Property[key.value=/^executeJavaScript/]'
+].map((selector) => ({ selector, message: E2E_EXECUTE_JAVASCRIPT_MESSAGE }))
 
 export default [
   // Ignore build outputs and vendored folders. `playwright-report/`,
@@ -308,6 +326,26 @@ export default [
           ]
         }
       ]
+    }
+  },
+  // E2E suite: no direct `executeJavaScript` (lens review finding 34).
+  // `webContents.executeJavaScript` / `WebFrameMain.executeJavaScript` have no
+  // timeout, and a call whose document is replaced under it can stay pending
+  // forever, stalling the caller's poll past its deadline with no word about
+  // which call hung (#255). Every call goes through the bounded helper in
+  // e2e/utils/bounded-exec.ts, the one file exempt here. No other block sets
+  // `no-restricted-syntax` for `e2e/**`, so this list is complete for it.
+  //
+  // The selectors ban the REFERENCE, not just the call, so an alias
+  // (`const run = wc.executeJavaScript`), `.call` / `.bind` and a destructure
+  // (`const { executeJavaScript } = wc`) are caught too: member access in dot,
+  // string and template form, and a destructured key in either form. Matches
+  // `executeJavaScriptInIsolatedWorld` as well.
+  {
+    files: ['e2e/**/*.{ts,js,cjs,mjs}'],
+    ignores: ['e2e/utils/bounded-exec.ts'],
+    rules: {
+      'no-restricted-syntax': ['error', ...E2E_EXECUTE_JAVASCRIPT_SELECTORS]
     }
   },
   // Build scripts: CommonJS Node.js environment
@@ -676,7 +714,7 @@ export default [
   // matches: the shared families above, plus the gateway selectors where they
   // apply. A block that listed only one set would silently disable the other.
   //
-  // 5. Reading the file and terminal bridges off `window.api`. The renderer's
+  // 5. Reading a bridge that has a gateway off `window.api`. The renderer's
   //    `window.api` type already omits them; the gateway selectors catch the
   //    ways round the type. Tests may install mocks; the gateways read them.
   //

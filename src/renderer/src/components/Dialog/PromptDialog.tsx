@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { Info, MessageSquare } from 'lucide-react'
 import { BaseDialog } from './BaseDialog'
 import { TextareaContextMenu } from '../ContextMenu/TextareaContextMenu'
+import { isKeyboardMenuEcho, openMenuFromKey } from '../ContextMenu/contextMenuKey'
 import { CharacterCount } from '../shared'
 import { validateTextInput } from '../../utils/textInputValidation'
 import { formatShortcut } from '../../utils/shortcutLabel'
@@ -198,9 +199,22 @@ export function PromptDialog({ config, zIndex, onSubmit, onCancel }: PromptDialo
   // Context menu handlers
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
+    // The Windows Menu-key echo of a menu the keyboard already opened (#90).
+    if (isKeyboardMenuEcho()) return
     setContextMenu({ x: e.clientX, y: e.clientY })
     handleSelect()
   }, [handleSelect])
+
+  // Shift+F10 / the Menu key open the same menu under the field (#90).
+  const handleMenuKey = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      openMenuFromKey(e, (anchor) => {
+        setContextMenu(anchor)
+        handleSelect()
+      })
+    },
+    [handleSelect]
+  )
 
   const handleCloseContextMenu = useCallback(() => {
     setContextMenu(null)
@@ -304,7 +318,12 @@ export function PromptDialog({ config, zIndex, onSubmit, onCancel }: PromptDialo
               value={inputValue}
               onChange={handleChange}
               onKeyDown={handleKeyDown}
+              onKeyDownCapture={handleMenuKey}
               onContextMenu={handleContextMenu}
+              /* deviates: design/system/components/menu/index.html — aria-haspopup
+                 only: ARIA does not allow aria-expanded on a textbox. See the
+                 card's Exceptions. */
+              aria-haspopup="menu"
               onSelect={handleSelect}
               placeholder={inputPlaceholder}
               rows={6}

@@ -49,4 +49,12 @@ describe('preload surface', () => {
     expect(Object.keys(api.file).sort()).toMatchSnapshot('file')
     expect(Object.keys(api.terminal).sort()).toMatchSnapshot('terminal')
   })
+
+  it.each(['fileWatch', 'directoryWatch', 'git', 'gitWatcher', 'gitPolling'])(
+    'window.api.%s exposes the expected members',
+    (domain) => {
+      const api = exposed.get('api') as Record<string, object>
+      expect(Object.keys(api[domain]).sort()).toMatchSnapshot()
+    }
+  )
 })

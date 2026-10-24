@@ -17,6 +17,7 @@ import userEvent from '@testing-library/user-event'
 import { EditorTab } from './EditorTab'
 import { TEST_IDS, getDynamicTestId } from '../../constants/testids'
 import type { IDockviewPanelHeaderProps } from 'dockview'
+import { resetKeyboardMenuEcho } from '../ContextMenu/contextMenuKey'
 
 // Mock useProjectStore
 const mockDirtyPanelIds = new Set<string>()
@@ -436,6 +437,32 @@ describe('EditorTab', () => {
   })
 
   describe('Context Menu', () => {
+    // The echo guard is module state; never let one test's keyboard open
+    // swallow the next test's right-click.
+    afterEach(() => resetKeyboardMenuEcho())
+
+    it('drops the native contextmenu Windows sends after the Menu key, but a right-click still opens (#90)', () => {
+      const props = createMockProps()
+      render(<EditorTab {...props} />)
+      const tab = screen.getByTitle(/document\.md/)
+
+      // Keyboard open (Menu key on the focused tab).
+      fireEvent.keyDown(tab, { key: 'ContextMenu' })
+      expect(screen.getByTestId('context-menu')).toBeInTheDocument()
+      // Close it from the menu (no pointer press involved).
+      fireEvent.click(screen.getByText('Close'))
+      expect(screen.queryByTestId('context-menu')).not.toBeInTheDocument()
+
+      // The echo: a native contextmenu with no pointer press since the key.
+      fireEvent.contextMenu(tab)
+      expect(screen.queryByTestId('context-menu')).not.toBeInTheDocument()
+
+      // A real right-click: a pointer press, then the contextmenu.
+      fireEvent.pointerDown(tab)
+      fireEvent.contextMenu(tab)
+      expect(screen.getByTestId('context-menu')).toBeInTheDocument()
+    })
+
     it('should open context menu on right-click', async () => {
       const props = createMockProps()
 

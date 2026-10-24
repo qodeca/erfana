@@ -142,8 +142,12 @@ export const MANIFEST_MAX_BYTES = 64 * 1024
 export const MANIFEST_SIG_MAX_BYTES = 8 * 1024
 /** Max binary archive size cap per plan. */
 export const BINARY_ARCHIVE_MAX_BYTES = 20 * 1024 * 1024
-/** Max model size cap per plan. */
-export const MODEL_MAX_BYTES = 2 * 1024 * 1024 * 1024
+
+/** Slack above a model's pinned size for the per-download byte cap. */
+export const MODEL_SIZE_MARGIN_BYTES = 1024 * 1024
+
+/** Pinned model hashes + sizes live in `shared/` (display sizes derive from them). */
+export { MODEL_PINS, type ModelPin } from '../../shared/whisper-model-pins'
 
 /** Name of the schema sentinel file under `{userData}/whisper/`. */
 export const SCHEMA_SENTINEL_FILENAME = '.schema-version'

@@ -26,6 +26,7 @@ import { registerQuitHandlers } from './ipc/quit-handlers'
 import { registerProjectLockHandlers } from './ipc/project-lock-handlers'
 import { registerExternalFileHandlers } from './ipc/external-file-handlers'
 import { registerTranscriptionHandlers } from './ipc/transcription-handlers'
+import { whisperModelManager } from './services/WhisperModelManager'
 import { registerClipboardHandlers } from './ipc/clipboard-handlers'
 import { registerImageExportHandlers } from './ipc/image-export-handlers'
 import { registerBrowserHandlers } from './ipc/browser-handlers'
@@ -810,7 +811,9 @@ app.on('before-quit', (event): Promise<void> | undefined => {
               claudeStatusHandlers ? claudeStatusHandlers.dispose() : Promise.resolve(),
               previewHandlers ? previewHandlers.dispose() : Promise.resolve(),
               gitWatcherService.dispose(),
-              gitStatusService.dispose()
+              gitStatusService.dispose(),
+              // Abort an in-flight model download so its temp file is removed now.
+              whisperModelManager.dispose()
             ])
           },
           SHUTDOWN_TIMEOUT_MS
