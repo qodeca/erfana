@@ -35,23 +35,10 @@ import { logger } from '../../../../utils/logger'
 import type { ShellKind } from '../../../../utils/shellPathEscape'
 import { terminalGateway } from '../../../../services/terminalGateway'
 import { claudeStatusGateway } from '../../../../services/claudeStatusGateway'
+import { hasBridgeMethod } from '../../../../services/bridgePresence'
 import { createTerminalLinkHandler, ensureTerminalFontLoaded } from '../terminalPanel.logic'
 import { routeTerminalMenuKey } from '../terminalMenuKey'
 import { isKeyboardMenuEcho } from '../../../ContextMenu/contextMenuKey'
-
-/**
- * Call the Claude-status bridge, fire-and-forget. The panel has always
- * tolerated a window without that bridge (`window.api?.claudeStatus?.…`
- * before the gateways, #352): status tracking is advisory and must never
- * break a terminal start or teardown.
- */
-function claudeStatus(call: (bridge: typeof claudeStatusGateway) => Promise<unknown>): void {
-  try {
-    void call(claudeStatusGateway)
-  } catch {
-    // No bridge in this window – nothing to track
-  }
-}
 
 /**
  * Options of the xterm instance.
@@ -255,8 +242,8 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
     if (claudeNudgeTimerRef.current) clearTimeout(claudeNudgeTimerRef.current)
     claudeNudgeTimerRef.current = setTimeout(() => {
       claudeNudgeTimerRef.current = null
-      // Optional chaining: tests and non-Electron renders have no bridge
-      claudeStatus((bridge) => bridge.nudge(id))
+      // Asked first: tests and non-Electron renders have no bridge (#352)
+      if (hasBridgeMethod('claudeStatus', 'nudge')) void claudeStatusGateway.nudge(id)
     }, CLAUDE_NUDGE_DEBOUNCE_MS)
   }, [])
 
@@ -333,7 +320,7 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
       shellKindRef.current = null
       useTerminalStore.getState().setActiveTerminal(null)
       if (id) {
-        claudeStatus((bridge) => bridge.unregister(id))
+        if (hasBridgeMethod('claudeStatus', 'unregister')) void claudeStatusGateway.unregister(id)
         // Prune the slice, or the map keeps a stale entry per closed terminal
         useClaudeStatusStore.getState().clearTerminal(id)
       }
@@ -534,13 +521,16 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
 
       const id = result.terminalId
       createdId = id
+      // Synchronously, not only through the state effect: a teardown before
+      // the next commit must still see the id, or it could not kill the PTY
+      terminalIdRef.current = id
       setTerminalId(id)
       if (earlyClearIds.has(id)) runClear(id)
       testTerminalUnregisterRef.current = registerTestTerminal(id, xterm)
       // Kept with the id so a screenshot path-paste quotes for this shell (#164)
       shellKindRef.current = result.shellKind ?? null
       useTerminalStore.getState().setActiveTerminal({ id, shellKind: result.shellKind ?? null })
-      claudeStatus((bridge) => bridge.register(id))
+      if (hasBridgeMethod('claudeStatus', 'register')) void claudeStatusGateway.register(id)
       warmupUntilRef.current = Date.now() + WARMUP_MS
 
       inputDisposableRef.current = xterm.onData((data) => {
