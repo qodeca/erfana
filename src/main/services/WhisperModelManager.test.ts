@@ -269,7 +269,7 @@ const mockDownloadToFile = vi.fn()
 vi.mock('../utils/secureDownloader', () => ({
   downloadToFile: (...args: unknown[]) => mockDownloadToFile(...args),
   SecureDownloaderError: class SecureDownloaderError extends Error {
-    constructor(msg: string) { super(msg); this.name = 'SecureDownloaderError' }
+    constructor(public readonly code: string, msg: string) { super(msg); this.name = 'SecureDownloaderError' }
   }
 }))
 
@@ -890,7 +890,7 @@ describe('WhisperModelManager', () => {
       const err = Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
       mockAccess.mockRejectedValue(err)
       const { SecureDownloaderError } = await import('../utils/secureDownloader')
-      mockDownloadToFile.mockRejectedValue(new SecureDownloaderError('SHA-256 mismatch'))
+      mockDownloadToFile.mockRejectedValue(new SecureDownloaderError('sha-mismatch', 'SHA-256 mismatch'))
       const { createWhisperModelManager } = await import('./WhisperModelManager')
       const manager = createWhisperModelManager()
       await expect(manager.ensureModel('tiny')).rejects.toMatchObject({

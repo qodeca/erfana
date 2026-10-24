@@ -1,30 +1,21 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import type { Mock } from 'vitest'
-import type { FileBridge } from '../../../shared/ipc/file-schema'
-import type { TerminalBridge } from '../../../shared/ipc/terminal-schema'
+import type { Api } from '../../../preload/index'
 
 /** Each method of a bridge, as the `vi.fn()` a test installed in its place. */
 export type BridgeMock<T> = { [K in keyof T]: Mock }
 
-/** The bridges `Window['api']` leaves out of its type. */
-interface GatewayBridges {
-  file: FileBridge
-  terminal: TerminalBridge
-}
-
 /**
- * Read back the mock a test installed as `window.api.file` or
- * `window.api.terminal`.
+ * Read back the mock a test installed as `window.api.<bridge>`.
  *
- * `Window['api']` omits both bridges on purpose: production code reaches them
- * only through `services/fileGateway` and `services/terminalGateway`. A test
- * that installs them on `window.api` and then asserts on the mocks reads them
- * through here, so the assertions stay typed.
+ * `Window['api']` leaves almost every bridge out of its type on purpose:
+ * production code reaches them only through their gateways in `services/`
+ * (see docs/ipc-patterns.md § Renderer gateways). A test that installs a
+ * bridge on `window.api` and then asserts on (or replaces) its mocks reads it
+ * through here, so the assertions stay typed against the real preload bridge.
  */
-export function gatewayBridgeMock<K extends keyof GatewayBridges>(
-  name: K
-): BridgeMock<GatewayBridges[K]> {
-  const api = (window as unknown as { api: { [P in keyof GatewayBridges]: BridgeMock<GatewayBridges[P]> } }).api
+export function gatewayBridgeMock<K extends keyof Api>(name: K): BridgeMock<Api[K]> {
+  const api = (window as unknown as { api: { [P in keyof Api]: BridgeMock<Api[P]> } }).api
   return api[name]
 }

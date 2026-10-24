@@ -13,7 +13,7 @@ test.describe('terminal test hook', () => {
     const terminalPage = new TerminalPage(page)
     await terminalPage.open()
 
-    expect(await page.evaluate(() => window.api.testHooks.enabled)).toBe(true)
+    expect(await page.evaluate(() => (window.api as Api).testHooks.enabled)).toBe(true)
 
     const viaHook = await page.evaluate(async () => {
       const listed = await (window.api as Api).terminal.list()

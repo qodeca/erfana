@@ -23,9 +23,11 @@ import { ProjectManagementProvider } from '../../context/ProjectManagementContex
 import type { FileNode } from '../../../../preload/index'
 import { installTreeViewport } from '../../test-utils/treeViewport'
 import type { FileBridge } from '../../../../shared/ipc/file-schema'
+import type { DirectoryWatchBridge } from '../../../../shared/ipc/directory-watch-schema'
 import { gatewayBridgeMock, type BridgeMock } from '../../test-utils/gatewayBridgeMock'
 
 const fileMock = (): BridgeMock<FileBridge> => gatewayBridgeMock('file')
+const directoryWatchMock = (): BridgeMock<DirectoryWatchBridge> => gatewayBridgeMock('directoryWatch')
 
 // The tree is virtualised; give it a viewport so every fixture row is mounted.
 installTreeViewport()
@@ -288,7 +290,7 @@ describe('ProjectTree project switching (AC-009)', () => {
   describe('AC-009c: No stale events from old project (5s observation)', () => {
     it('directory watcher stops for old project after switch', async () => {
       const { readDirectory } = setupMockApi()
-      const stopWatcher = window.api.directoryWatch.stop
+      const stopWatcher = directoryWatchMock().stop
 
       renderProjectTree()
 
@@ -305,7 +307,7 @@ describe('ProjectTree project switching (AC-009)', () => {
 
       // The watcher starts once the first read has been applied (#211, D12)
       await waitFor(() => {
-        expect(window.api.directoryWatch.start).toHaveBeenCalledWith('/projA')
+        expect(directoryWatchMock().start).toHaveBeenCalledWith('/projA')
       })
 
       // Switch to project B
@@ -322,7 +324,7 @@ describe('ProjectTree project switching (AC-009)', () => {
 
       // Watcher should be started for new project B, after its first read
       await waitFor(() => {
-        expect(window.api.directoryWatch.start).toHaveBeenCalledWith('/projB')
+        expect(directoryWatchMock().start).toHaveBeenCalledWith('/projB')
       })
     })
 
@@ -336,7 +338,7 @@ describe('ProjectTree project switching (AC-009)', () => {
 
       // Track unsubscribe calls
       let unsubscribeCallCount = 0
-      window.api.directoryWatch.onDirectoryChanged = vi.fn((_cb: any) => {
+      directoryWatchMock().onDirectoryChanged = vi.fn((_cb: any) => {
         const unsubscribe = () => {
           unsubscribeCallCount++
         }
@@ -357,7 +359,7 @@ describe('ProjectTree project switching (AC-009)', () => {
       })
 
       // Directory watcher should be subscribed
-      expect(window.api.directoryWatch.onDirectoryChanged).toHaveBeenCalled()
+      expect(directoryWatchMock().onDirectoryChanged).toHaveBeenCalled()
       const initialUnsubscribeCount = unsubscribeCallCount
 
       // Switch to project B
@@ -437,7 +439,7 @@ describe('AC-014: In-flight event from project A silently dropped', () => {
     const callbacks: Array<(data: any) => void> = []
     let unsubscribeCallCount = 0
 
-    window.api.directoryWatch.onDirectoryChanged = vi.fn((cb: any) => {
+    directoryWatchMock().onDirectoryChanged = vi.fn((cb: any) => {
       callbacks.push(cb)
       return () => {
         unsubscribeCallCount++

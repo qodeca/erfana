@@ -120,6 +120,11 @@ export interface IWhisperModelManager {
   assertVerifiedModelUnchanged(model: WhisperModel, verified: VerifiedModelFile): Promise<void>
   /** Abort in-flight model downloads and remove their temp files (app quit). */
   dispose(): Promise<void>
+  /**
+   * Abort every binary or model download in flight (Settings → Cancel).
+   * @returns How many downloads were running
+   */
+  cancelDownloads(): number
   listInstalledModels(): Promise<WhisperModel[]>
   ensureBinary(options?: {
     onProgress?: ProgressCallback
