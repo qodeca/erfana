@@ -2,11 +2,10 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 // The max-lines ratchet (docs/technical-debt.md #26): a source file may shrink, never grow.
 //
-// ESLint enforces the size (eslint.config.mjs): `max-lines` at the baseline's
-// `limit` for every non-test `src/**/*.{ts,tsx}`, and at its own size for each
-// file listed in scripts/max-lines-baseline.json – the files that were already
-// over the limit. ESLint cannot keep that list honest, so this check does. It
-// fails when
+// ESLint enforces the size (eslint.config.mjs): `max-lines` at LIMIT (500) for every
+// non-test `src/**/*.{ts,tsx}`, and at its own size for each file listed in
+// scripts/max-lines-baseline.json – the files that were already over the
+// limit. ESLint cannot keep that list honest, so this check does. It fails when
 //
 //   * an allowance is above its file's current size (the file shrank, so the
 //     allowance must come down with it, or the room would be regrown later);
@@ -14,8 +13,11 @@
 //     applies to (deleted, renamed or excluded);
 //   * a source the limit applies to turns the rule off with an inline ESLint
 //     directive (an `eslint-disable…` naming max-lines or naming no rule at all,
-//     or an inline `/* eslint max-lines: … */` config);
-//   * the baseline is not in its canonical form (sorted, one entry per line).
+//     or an inline `/* eslint max-lines: … */` config), on one line or spread
+//     over several (scripts/lib/max-lines-directives.mjs);
+//   * the baseline's `limit` is not LIMIT, or the baseline is not in its
+//     canonical form (sorted, one entry per line) – the format and its
+//     validation live in scripts/lib/max-lines-baseline.mjs.
 //
 // It only checks. `--update` lowers and removes entries and rewrites the file
 // canonically; it never raises or adds one, so the only way past the limit is a
@@ -32,29 +34,29 @@ import { execFileSync } from 'node:child_process'
 import { lstatSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import {
+  BASELINE_PATH,
+  formatBaseline,
+  parseBaseline,
+  printable
+} from './lib/max-lines-baseline.mjs'
+import { findMaxLinesDirectives, LINE_BREAK } from './lib/max-lines-directives.mjs'
 
-export const BASELINE_PATH = 'scripts/max-lines-baseline.json'
 export const UPDATE_COMMAND = 'npm run lint:max-lines -- --update'
 
 const ROOT_DIR = 'src'
 const EXTS = new Set(['.ts', '.tsx'])
-// Test-support folders; keep in step with MAX_LINES_IGNORES in eslint.config.mjs
-// (scripts/eslint-max-lines.test.mjs proves the two agree on every tracked file).
+// Test-support folders, test fixtures included; keep in step with
+// MAX_LINES_IGNORES in eslint.config.mjs (scripts/eslint-max-lines.test.mjs
+// proves the two agree on every tracked file).
 const TEST_SEGMENTS = new Set([
   '__test__',
   '__tests__',
   '__test-helpers__',
   '__test-utils__',
-  'test-utils'
+  'test-utils',
+  '__fixtures__'
 ])
-// ESLint's line-break pattern (eslint/lib/shared/ast-utils.js)
-const LINE_BREAK = /\r\n|[\r\n\u2028\u2029]/u
-// A baseline key becomes an ESLint `files` pattern, so it may hold no glob syntax
-const SAFE_PATH = /^[A-Za-z0-9._/-]+$/
-// The start of a comment ESLint reads as a directive, and the ` -- ` that ends its rule list
-const DIRECTIVE = /^(eslint-disable(?:-next-line|-line)?|eslint)(?:\s|$)/
-const DESCRIPTION = /\s-{2,}\s/
-const RULE_SEPARATOR = /[\s,:"'[\]{}]+/
 
 /** True when the ratchet applies to `rel`, a repository-relative path with `/`. */
 export function isCovered(rel) {
@@ -72,69 +74,6 @@ export function countLines(text) {
   const lines = body.split(LINE_BREAK)
   if (lines.length > 1 && lines.at(-1) === '') lines.pop()
   return lines.length
-}
-
-/** True when one comment body is a directive that switches max-lines off or reconfigures it. */
-export function touchesMaxLines(body) {
-  const match = DIRECTIVE.exec(body)
-  if (!match) return false
-  const [ruleText] = body.slice(match[1].length).split(DESCRIPTION)
-  const rules = ruleText.split(RULE_SEPARATOR).filter(Boolean)
-  // A disable that names no rule turns every rule off, max-lines included
-  if (match[1] !== 'eslint' && rules.length === 0) return true
-  return rules.includes('max-lines')
-}
-
-// What ESLint may read as a directive on one line: the text after each `//` and
-// `/*`, and the line itself (a line inside a multi-line block comment).
-function commentBodies(line) {
-  const bodies = [line]
-  for (const opener of ['//', '/*']) {
-    for (let at = line.indexOf(opener); at !== -1; at = line.indexOf(opener, at + opener.length)) {
-      bodies.push(line.slice(at + opener.length))
-    }
-  }
-  return bodies.map((body) => {
-    const end = body.indexOf('*/')
-    return (end === -1 ? body : body.slice(0, end)).trim()
-  })
-}
-
-/** 1-based line numbers of every directive in `text` that switches max-lines off. */
-export function findMaxLinesDirectives(text) {
-  const found = []
-  text.split(LINE_BREAK).forEach((line, index) => {
-    if (line.includes('eslint') && commentBodies(line).some(touchesMaxLines)) found.push(index + 1)
-  })
-  return found
-}
-
-/** Parse and validate the baseline JSON; throws on a malformed file. */
-export function parseBaseline(raw) {
-  const data = JSON.parse(raw)
-  const isRecord = (v) => typeof v === 'object' && v !== null && !Array.isArray(v)
-  if (!isRecord(data) || !isRecord(data.files)) throw new Error('expected { "limit", "files" }')
-  if (!Number.isInteger(data.limit) || data.limit < 1) {
-    throw new Error('"limit" must be a positive integer')
-  }
-  for (const [file, allowance] of Object.entries(data.files)) {
-    const parts = file.split('/')
-    if (!SAFE_PATH.test(file) || parts.some((p) => p === '' || p === '.' || p === '..')) {
-      throw new Error(`"${printable(file)}" is not a plain repository-relative path`)
-    }
-    if (!Number.isInteger(allowance) || allowance < 1) {
-      throw new Error(`"${file}" must map to a positive integer line count`)
-    }
-  }
-  return { limit: data.limit, files: { ...data.files } }
-}
-
-/** The canonical text of a baseline: sorted entries, one per line, LF, final newline. */
-export function formatBaseline({ limit, files }) {
-  const sorted = Object.fromEntries(
-    Object.entries(files).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-  )
-  return `${JSON.stringify({ limit, files: sorted }, null, 2)}\n`
 }
 
 /** Git-tracked files the ratchet applies to, repository-relative with `/`. */
@@ -201,14 +140,6 @@ export function audit(root, baseline, sources) {
     for (const line of findMaxLinesDirectives(text)) directives.push(`${printable(file)}:${line}`)
   }
   return { stale, next, directives }
-}
-
-// Paths are contributor-controlled: a control character (an ESC sequence could
-// rewrite the terminal) is shown as `?`.
-function printable(text) {
-  let out = ''
-  for (const ch of text) out += ch < ' ' || ch === '\u007f' ? '?' : ch
-  return out
 }
 
 function reportDirectives(directives, log) {

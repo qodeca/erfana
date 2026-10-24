@@ -13,18 +13,20 @@
  */
 
 import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { ESLint } from 'eslint'
 import { describe, expect, it } from 'vitest'
-import { BASELINE_PATH, isCovered, parseBaseline } from './check-max-lines.mjs'
+import { isCovered } from './check-max-lines.mjs'
+import { LIMIT, readBaseline } from './lib/max-lines-baseline.mjs'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const eslint = new ESLint({ cwd: ROOT })
-const baseline = parseBaseline(readFileSync(path.join(ROOT, BASELINE_PATH), 'utf8'))
-const LIMIT = baseline.limit
-const [BASELINED, ALLOWANCE] = Object.entries(baseline.files)[0]
+const baseline = readBaseline(ROOT)
+// The per-entry cases need one baselined file; once every file is split under
+// the limit the baseline is empty and they have nothing to lint.
+const [BASELINED, ALLOWANCE] = Object.entries(baseline.files)[0] ?? []
+const NO_ENTRY = BASELINED === undefined
 const NEW_FILE = 'src/main/services/maxLinesProbe.ts'
 const ERROR = 2
 
@@ -50,7 +52,12 @@ describe('max-lines ratchet', () => {
     expect(await maxLines(NEW_FILE, source(LIMIT))).toHaveLength(0)
   })
 
-  it('holds a baselined file to its own size: one line more fails, its size passes', async () => {
+  it('counts a CRLF checkout the same', async () => {
+    expect(await maxLines(NEW_FILE, source(LIMIT + 1, '\r\n'))).toHaveLength(1)
+    expect(await maxLines(NEW_FILE, source(LIMIT, '\r\n'))).toHaveLength(0)
+  })
+
+  it.skipIf(NO_ENTRY)('holds a baselined file to its own size: one more line fails', async () => {
     const messages = await maxLines(BASELINED, source(ALLOWANCE + 1))
     expect(messages).toHaveLength(1)
     expect(messages[0].severity).toBe(ERROR)
@@ -58,7 +65,7 @@ describe('max-lines ratchet', () => {
     expect(await maxLines(BASELINED, source(ALLOWANCE))).toHaveLength(0)
   })
 
-  it('counts a CRLF checkout the same', async () => {
+  it.skipIf(NO_ENTRY)('counts a baselined file in a CRLF checkout the same', async () => {
     expect(await maxLines(BASELINED, source(ALLOWANCE + 1, '\r\n'))).toHaveLength(1)
     expect(await maxLines(BASELINED, source(ALLOWANCE, '\r\n'))).toHaveLength(0)
   })
@@ -71,6 +78,7 @@ describe('max-lines ratchet', () => {
     'src/main/__test-helpers__/maxLinesProbe.ts',
     'src/renderer/src/__test-utils__/maxLinesProbe.ts',
     'src/renderer/src/test-utils/maxLinesProbe.tsx',
+    'src/main/services/__fixtures__/maxLinesProbe.ts',
     'src/renderer/src/types/maxLinesProbe.d.ts',
     'e2e/maxLinesProbe.ts',
     'scripts/maxLinesProbe.mjs'

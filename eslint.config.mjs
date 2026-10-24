@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { readFileSync } from 'node:fs'
-import { URL } from 'node:url'
 import pluginJs from '@eslint/js'
 import pluginReact from 'eslint-plugin-react'
 import reactHooks from 'eslint-plugin-react-hooks'
 import * as tseslint from 'typescript-eslint'
 // Use flat-config-friendly Prettier rules directly
 import eslintConfigPrettier from 'eslint-config-prettier'
+import { readBaseline } from './scripts/lib/max-lines-baseline.mjs'
 
 // Layer rules (project-session design, section 6). The layers are `src/main`,
 // `src/preload`, `src/renderer` and `src/shared`; `shared` sits under all of
@@ -237,16 +236,15 @@ const E2E_EXECUTE_JAVASCRIPT_SELECTORS = [
 
 // The max-lines ratchet (docs/technical-debt.md #26): a source file may shrink,
 // never grow. Every non-test `src/**/*.{ts,tsx}` is held to the baseline's
-// `limit`; each file that was already over it is held to its own size, from
-// scripts/max-lines-baseline.json. scripts/check-max-lines.mjs (run by
+// `limit` (pinned to 500); each file that was already over it is held to its
+// own size, from scripts/max-lines-baseline.json, read and validated by
+// scripts/lib/max-lines-baseline.mjs. scripts/check-max-lines.mjs (run by
 // `npm run lint`) keeps that list current: it fails when a file shrinks and its
 // allowance is not lowered, and `npm run lint:max-lines -- --update` lowers it.
 // The rule must be "error": `eslint .` exits 0 on warnings. `e2e/` and
 // `scripts/` are not covered yet. The ignores mirror `isCovered()` in the check
 // script, and scripts/eslint-max-lines.test.mjs proves the two agree.
-const MAX_LINES_BASELINE = JSON.parse(
-  readFileSync(new URL('./scripts/max-lines-baseline.json', import.meta.url), 'utf8')
-)
+const MAX_LINES_BASELINE = readBaseline(import.meta.dirname)
 const MAX_LINES_FILES = ['src/**/*.{ts,tsx}']
 const MAX_LINES_IGNORES = [
   '**/*.test.{ts,tsx}',
@@ -255,6 +253,7 @@ const MAX_LINES_IGNORES = [
   '**/__test-helpers__/**',
   '**/__test-utils__/**',
   '**/test-utils/**',
+  '**/__fixtures__/**',
   '**/*.d.ts'
 ]
 
