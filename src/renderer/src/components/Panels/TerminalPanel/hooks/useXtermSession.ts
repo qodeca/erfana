@@ -42,23 +42,10 @@ import { logger } from '../../../../utils/logger'
 import type { ShellKind } from '../../../../utils/shellPathEscape'
 import { terminalGateway } from '../../../../services/terminalGateway'
 import { claudeStatusGateway } from '../../../../services/claudeStatusGateway'
+import { hasBridgeMethod } from '../../../../services/bridgePresence'
 import { createTerminalLinkHandler, ensureTerminalFontLoaded } from '../terminalPanel.logic'
 import { routeTerminalMenuKey } from '../terminalMenuKey'
 import { isKeyboardMenuEcho } from '../../../ContextMenu/contextMenuKey'
-
-/**
- * Call the Claude-status bridge, fire-and-forget. The panel has always
- * tolerated a window without that bridge (`window.api?.claudeStatus?.…`
- * before the gateways, #352): status tracking is advisory and must never
- * break a terminal start or teardown.
- */
-function claudeStatus(call: (bridge: typeof claudeStatusGateway) => Promise<unknown>): void {
-  try {
-    void call(claudeStatusGateway)
-  } catch {
-    // No bridge in this window – nothing to track
-  }
-}
 
 /**
  * Options of the xterm instance.
@@ -281,8 +268,8 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
     if (claudeNudgeTimerRef.current) clearTimeout(claudeNudgeTimerRef.current)
     claudeNudgeTimerRef.current = setTimeout(() => {
       claudeNudgeTimerRef.current = null
-      // Optional chaining: tests and non-Electron renders have no bridge
-      claudeStatus((bridge) => bridge.nudge(id))
+      // Asked first: tests and non-Electron renders have no bridge (#352)
+      if (hasBridgeMethod('claudeStatus', 'nudge')) void claudeStatusGateway.nudge(id)
     }, CLAUDE_NUDGE_DEBOUNCE_MS)
   }, [])
 
@@ -329,27 +316,19 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
     optionsRef.current.detachFileDrop()
   }, [])
 
-  const teardownTerminal = useCallback(
-    ({ resetState }: TeardownOptions): Promise<void> => {
-      const id = terminalIdRef.current
-
-      // 0. Invalidate a start still in flight: it gives up at its next await
-      generationRef.current += 1
-      inFlightStartRef.current = null
-
-      // 1. Timers, so none fires on what is torn down below
-      for (const timerRef of [fitTimerRef, webglRecoveryTimerRef, claudeNudgeTimerRef]) {
+  /**
+   * Release one xterm instance: the timers that act on it (fit, WebGL
+   * recovery), what is attached to it (context menu, parser hooks, user
+   * input), then the instance itself and its refs. The one place this happens
+   * – used by {@link teardownTerminal} and by a start that failed after its
+   * instance reached the refs.
+   */
+  const releaseInstance = useCallback(
+    (xterm: Terminal | null): void => {
+      for (const timerRef of [fitTimerRef, webglRecoveryTimerRef]) {
         if (timerRef.current) clearTimeout(timerRef.current)
         timerRef.current = null
       }
-
-      // 2. A start still waiting for the container to become visible
-      stopVisibilityWait()
-
-      // 3. Listeners: clear handshake, test hook, file drop, context menu,
-      //    parser hooks, user input – all before the instance they point at goes
-      releaseStartListeners()
-      const xterm = xtermRef.current
       if (xterm?.element && contextMenuHandlerRef.current) {
         xterm.element.removeEventListener('contextmenu', contextMenuHandlerRef.current)
       }
@@ -358,21 +337,44 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
       parserDisposablesRef.current = []
       inputDisposableRef.current?.dispose()
       inputDisposableRef.current = null
+      if (xterm) disposeQuietly(xterm)
+      xtermRef.current = null
+      fitAddonRef.current = null
+    },
+    [xtermRef]
+  )
+
+  const teardownTerminal = useCallback(
+    ({ resetState }: TeardownOptions): Promise<void> => {
+      const id = terminalIdRef.current
+
+      // 0. Invalidate a start still in flight: it gives up at its next await
+      generationRef.current += 1
+      inFlightStartRef.current = null
+
+      // 1. The Claude-nudge timer, so it never fires for the id cleared below
+      //    (the instance's own timers go with it in step 5)
+      if (claudeNudgeTimerRef.current) clearTimeout(claudeNudgeTimerRef.current)
+      claudeNudgeTimerRef.current = null
+
+      // 2. A start still waiting for the container to become visible
+      stopVisibilityWait()
+
+      // 3. Session listeners: clear handshake, test hook, file drop
+      releaseStartListeners()
 
       // 4. The session in the app stores: no active terminal, no Claude tracking (#216)
       terminalIdRef.current = null
       shellKindRef.current = null
       useTerminalStore.getState().setActiveTerminal(null)
       if (id) {
-        claudeStatus((bridge) => bridge.unregister(id))
+        if (hasBridgeMethod('claudeStatus', 'unregister')) void claudeStatusGateway.unregister(id)
         // Prune the slice, or the map keeps a stale entry per closed terminal
         useClaudeStatusStore.getState().clearTerminal(id)
       }
 
-      // 5. The instance itself
-      xterm?.dispose()
-      xtermRef.current = null
-      fitAddonRef.current = null
+      // 5. The instance: its timers and listeners first, then xterm itself
+      releaseInstance(xtermRef.current)
 
       if (resetState) {
         setTerminalId(null)
@@ -392,7 +394,7 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
         }
       })()
     },
-    [xtermRef, stopVisibilityWait, releaseStartListeners]
+    [xtermRef, stopVisibilityWait, releaseStartListeners, releaseInstance]
   )
 
   // Stable identity; the implementation below is republished each render
@@ -499,29 +501,6 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
     handlers.attachFileDrop(xterm, terminalIdRef)
   }
 
-  /**
-   * Undo what a failed start attached to its instance once it was in the
-   * refs – timers, context menu, parser hooks, input – then dispose it and
-   * clear the refs. The PTY was never created, so there is nothing to kill.
-   */
-  const releaseFailedInstance = (xterm: Terminal): void => {
-    for (const timerRef of [fitTimerRef, webglRecoveryTimerRef]) {
-      if (timerRef.current) clearTimeout(timerRef.current)
-      timerRef.current = null
-    }
-    if (xterm.element && contextMenuHandlerRef.current) {
-      xterm.element.removeEventListener('contextmenu', contextMenuHandlerRef.current)
-    }
-    contextMenuHandlerRef.current = null
-    parserDisposablesRef.current.forEach((d) => d.dispose())
-    parserDisposablesRef.current = []
-    inputDisposableRef.current?.dispose()
-    inputDisposableRef.current = null
-    xtermRef.current = null
-    fitAddonRef.current = null
-    disposeQuietly(xterm)
-  }
-
   const startImpl = async (generation: number): Promise<void> => {
     // False once a teardown ran after this start began
     const isCurrent = (): boolean => generation === generationRef.current
@@ -536,6 +515,8 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
 
     // Outside the try, so a failure at any step can still dispose it (no leak)
     let started: Terminal | null = null
+    // True once it is in xtermRef: from then on a teardown disposes it
+    let inRefs = false
     try {
       // --- create ---
       const xterm = new Terminal({ ...XTERM_OPTIONS, screenReaderMode: optionsRef.current.screenReaderMode })
@@ -564,6 +545,7 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
       // disposes this instance and releases what is attached to it
       xtermRef.current = xterm
       fitAddonRef.current = fitAddon
+      inRefs = true
 
       // --- attach ---
       attachHandlers(xterm)
@@ -629,7 +611,7 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
       // Kept with the id so a screenshot path-paste quotes for this shell (#164)
       shellKindRef.current = result.shellKind ?? null
       useTerminalStore.getState().setActiveTerminal({ id, shellKind: result.shellKind ?? null })
-      claudeStatus((bridge) => bridge.register(id))
+      if (hasBridgeMethod('claudeStatus', 'register')) void claudeStatusGateway.register(id)
       warmupUntilRef.current = Date.now() + WARMUP_MS
 
       inputDisposableRef.current = xterm.onData((data) => {
@@ -645,7 +627,7 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
         // The listeners in the refs now belong to the next session, or to none.
         // An instance that never reached the refs was not disposed by that
         // teardown, so it is disposed here.
-        if (started && xtermRef.current !== started) disposeQuietly(started)
+        if (started && !inRefs) disposeQuietly(started)
         logger.warn('Superseded terminal start failed', errorFields(err))
         return
       }
@@ -655,7 +637,7 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
       // "Recheck" could never create a terminal again. One that failed before
       // reaching the refs (font load, open()) would simply leak.
       if (started) {
-        if (xtermRef.current === started) releaseFailedInstance(started)
+        if (inRefs) releaseInstance(started)
         else disposeQuietly(started)
       }
       logger.error('Failed to initialize terminal', err instanceof Error ? err : undefined)

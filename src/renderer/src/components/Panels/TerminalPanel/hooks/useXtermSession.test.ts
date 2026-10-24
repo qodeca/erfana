@@ -12,6 +12,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import type { Terminal } from '@xterm/xterm'
+import { FitAddon } from '@xterm/addon-fit'
 import { useTerminalStore } from '../../../../stores/useTerminalStore'
 import { useClaudeStatusStore } from '../../../../stores/useClaudeStatusStore'
 import { useXtermSession, type UseXtermSessionOptions } from './useXtermSession'
@@ -69,6 +70,8 @@ vi.mock('../terminalPanel.logic', async (importOriginal) => {
 type CreateResult = { success: true; terminalId: string; shellKind: 'posix' } | { success: false; error: string }
 /** Pending `terminal:create` answers, oldest first */
 const pendingCreates: Array<(result: CreateResult) => void> = []
+/** Their rejections, same order: a transport failure rather than an `{ error }` answer */
+const pendingCreateRejects: Array<(err: Error) => void> = []
 
 function answerCreate(index: number, terminalId: string): void {
   pendingCreates[index]({ success: true, terminalId, shellKind: 'posix' })
@@ -77,7 +80,13 @@ function answerCreate(index: number, terminalId: string): void {
 function installApi(): void {
   ;(window as any).api = {
     terminal: {
-      create: vi.fn(() => new Promise<CreateResult>((resolve) => { pendingCreates.push(resolve) })),
+      create: vi.fn(
+        () =>
+          new Promise<CreateResult>((resolve, reject) => {
+            pendingCreates.push(resolve)
+            pendingCreateRejects.push(reject)
+          })
+      ),
       write: vi.fn(),
       kill: vi.fn().mockResolvedValue({ success: true }),
       onClear: vi.fn(() => vi.fn()),
@@ -115,6 +124,7 @@ describe('useXtermSession start-up guard', () => {
     vi.clearAllMocks()
     instances.length = 0
     pendingCreates.length = 0
+    pendingCreateRejects.length = 0
     fontGate.held = false
     fontGate.error = null
     releaseFont = null
@@ -305,6 +315,7 @@ describe('useXtermSession failed starts (review F1, F2)', () => {
     vi.clearAllMocks()
     instances.length = 0
     pendingCreates.length = 0
+    pendingCreateRejects.length = 0
     fontGate.held = false
     fontGate.error = null
     releaseFont = null
@@ -449,5 +460,81 @@ describe('useXtermSession failed starts (review F1, F2)', () => {
     expect(instances[0].open).not.toHaveBeenCalled()
     expect(instances[0].dispose).toHaveBeenCalledTimes(1)
     expect(hook.result.current.error).toBeNull()
+  })
+})
+
+describe('useXtermSession failed starts, no double work (review e, g)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    instances.length = 0
+    pendingCreates.length = 0
+    pendingCreateRejects.length = 0
+    fontGate.held = false
+    fontGate.error = null
+    releaseFont = null
+    rejectFont = null
+    installApi()
+    useTerminalStore.setState({ activeTerminalId: null, activeShellKind: null, activityById: new Map(), userInputById: new Map() })
+    useClaudeStatusStore.getState().reset()
+  })
+
+  it('a restart during start whose late create rejects disposes the first instance once', async () => {
+    const { hook } = renderSession()
+    let first!: Promise<void>
+    act(() => {
+      first = hook.result.current.start()
+    })
+    await untilCreates(1)
+
+    // The teardown disposes the instance that is already in the refs
+    let second!: Promise<void>
+    await act(async () => {
+      await hook.result.current.teardownTerminal({ resetState: true })
+      second = hook.result.current.start()
+    })
+    await untilCreates(2)
+    expect(instances[0].dispose).toHaveBeenCalledTimes(1)
+
+    // The first create now fails late: the superseded start must not dispose again
+    await act(async () => {
+      pendingCreateRejects[0](new Error('ipc failed'))
+      await first
+    })
+    expect(instances[0].dispose).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      answerCreate(1, 'pty-2')
+      await second
+    })
+    expect(instances[1].dispose).not.toHaveBeenCalled()
+    expect(hook.result.current.error).toBeNull()
+  })
+
+  it('the pending fit timer does not fire after a failed create', async () => {
+    vi.useFakeTimers()
+    try {
+      const { hook } = renderSession()
+      let first!: Promise<void>
+      act(() => {
+        first = hook.result.current.start()
+      })
+      // 1 ms per check, far below the 50 ms fit delay, so the timer is still pending
+      await vi.waitFor(() => expect(window.api.terminal.create).toHaveBeenCalledTimes(1), { interval: 1, timeout: 40 })
+      const fitAddon = vi.mocked(FitAddon).mock.results[0].value as { fit: ReturnType<typeof vi.fn> }
+      expect(fitAddon.fit).not.toHaveBeenCalled()
+
+      await act(async () => {
+        pendingCreates[0]({ success: false, error: 'spawn failed' })
+        await first
+      })
+      act(() => {
+        vi.advanceTimersByTime(1000)
+      })
+
+      expect(hook.result.current.error).toBe('spawn failed')
+      expect(fitAddon.fit).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

@@ -11,7 +11,7 @@
 import type { ClaudeStatusBridge } from '../../../shared/ipc/claude-status-schema'
 
 /** The bridge is read per call, so a test that swaps `window.api` is honoured. */
-// `Window['api']` still lists this bridge, for the TerminalPanel files only (see preload/index.d.ts)
+// Not on `Window['api']`'s type any more: this gateway is the only reader
 const bridge = (): ClaudeStatusBridge =>
   (window as unknown as { api: { claudeStatus: ClaudeStatusBridge } }).api.claudeStatus
 
