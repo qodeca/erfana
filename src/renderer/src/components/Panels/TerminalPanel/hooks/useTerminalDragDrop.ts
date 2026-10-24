@@ -11,6 +11,8 @@
  *
  * @module TerminalPanel/hooks/useTerminalDragDrop
  * @see Issue #85 - Drag-drop file path insertion
+ * @deprecated Never wired into the panel. Use `useTerminalFileDrop`, which the
+ *   terminal session attaches and detaches with each xterm instance.
  */
 
 import { useState, useRef, useCallback } from 'react'
@@ -78,6 +80,8 @@ export interface UseTerminalDragDropReturn {
  * // In cleanup:
  * cleanupDragHandlers()
  * ```
+ *
+ * @deprecated Use `useTerminalFileDrop` (same listeners, attached per xterm instance)
  */
 export function useTerminalDragDrop(
   options: UseTerminalDragDropOptions

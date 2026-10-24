@@ -484,7 +484,9 @@ Output reaches `onData` in batches (every 8 ms or at 64 KiB per terminal, in ord
 **Main Component**: `src/renderer/src/components/Panels/TerminalPanel.tsx`
 
 **Extracted Hooks** (`src/renderer/src/components/Panels/TerminalPanel/hooks/`):
-- `useTerminalDragDrop.ts` - External file drag-drop handling
+- `useXtermSession.ts` - One terminal session: creates xterm, attaches it to a PTY (clear handshake, `terminal:create`, input) and owns `teardownTerminal()`, the single teardown every exit path (unmount, project switch, restart) uses. Every timer id and unsubscribe function is held in a ref so the teardown reaches all of them
+- `useTerminalFileDrop.ts` - External file drops onto the panel (document-level capture listeners, attached and detached by the session)
+- `useTerminalDragDrop.ts` - Deprecated, not used by the panel; use `useTerminalFileDrop`
 - `useScreenshotCapture.ts` - Cross-platform screenshot capture workflow (full-screen, window and area modes; #164)
 - `useTerminalResize.ts` - ResizeObserver-based terminal resize
 - `useTerminalPortal.ts` - DOM portal management for xterm
@@ -506,7 +508,9 @@ See [Terminal Architecture Review](../architecture-reviews/reviews/terminal-pane
 - useRef pattern to avoid useEffect cleanup issues
 - Clean screen on mount (`\x1b[2J\x1b[H`)
 
-**Critical Implementation Detail**: Terminal cleanup uses `useRef` for `terminalId` instead of including it in `useEffect` dependencies. Including `terminalId` in deps causes cleanup to run on ID change, disposing xterm before it can render. The cleanup effect depends only on `isAvailable`.
+**Critical Implementation Detail**: Terminal cleanup uses `useRef` for `terminalId` instead of including it in `useEffect` dependencies. Including `terminalId` in deps causes cleanup to run on ID change, disposing xterm before it can render. The cleanup effect depends only on `isAvailable` (and the session's stable `start` / `teardownTerminal`).
+
+**Teardown order** (`teardownTerminal`, fixed): clear the fit, WebGL-recovery and Claude-nudge timers; stop a start that is waiting for visibility; remove the start-up clear listener, the test-hook registration, the file-drop, context-menu and input listeners and the parser hooks; clear the active terminal and Claude tracking; dispose xterm and null its refs; then kill the PTY. Restart and project switch await the kill before starting the next session.
 
 ### State Management
 
