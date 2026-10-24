@@ -90,12 +90,12 @@ window.ERFANA_CLAIMS = {
     "card": "system/components/feedback/index.html"
   },
   "alert-role-files": {
-    "value": 11,
+    "value": 12,
     "label": "files announcing with role=\"alert\"",
     "card": "system/components/feedback/index.html"
   },
   "context-menu-dependants": {
-    "value": 14,
+    "value": 18,
     "label": "files that import a context menu component",
     "card": "system/components/menu/index.html"
   },

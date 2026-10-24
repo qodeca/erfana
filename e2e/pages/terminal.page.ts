@@ -18,6 +18,7 @@
 import { Page, Locator, expect } from '@playwright/test'
 import { TEST_IDS } from '../../src/renderer/src/constants/testids'
 import { byTestId } from '../utils/locators'
+import type { Api } from '../../src/preload/index'
 
 /** How long `waitForPrompt` waits for a settled prompt by default. */
 export const PROMPT_TIMEOUT_MS = 30_000
@@ -93,8 +94,9 @@ function readScreenInPage(selector: string): TerminalScreen {
 async function readScreenViaHook(): Promise<TerminalScreen | null> {
   const hook = window.__erfanaTest
   if (!hook) return null
-  const listed = await window.api.terminal.list()
-  const ids = listed.terminals?.map((t) => t.id) ?? []
+  // The page exposes the whole preload object; the renderer's `Window['api']` type leaves `terminal` out.
+  const listed = await (window.api as Api).terminal.list()
+  const ids = listed.success ? listed.terminals.map((t) => t.id) : []
   for (const id of ids.reverse()) {
     const text = hook.terminalText(id)
     const cursor = hook.terminalCursor(id)

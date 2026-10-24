@@ -71,7 +71,7 @@ Erfana is an agent-native Markdown workspace – an Electron app that runs a ter
   - [Known test flakes](./windows/known-flakes.md) - Windows-host flake register with status, issue link, and remediation-patterns cheat-sheet (fake timers, mocked-fs splits, per-platform e2e budgets, offset-deque)
   - [Whisper Trust Chain](./windows/whisper-trust-chain.md) - **4-layer client-side trust model with composition diagram and attacker model**
   - [Whisper Support Runbook](./windows/whisper-support-runbook.md) - **Operator playbook for Phase 4 error codes** (`WHISPER_MANIFEST_INVALID`, `WHISPER_DOWNGRADE_BLOCKED`, `WHISPER_CPU_UNSUPPORTED`, etc.) with diagnostic trails + stuck-user procedures
-  - [Phase 4 binary spec](./windows/phase4-binary-spec.md) - Pinned SHAs for `whisper-build-v1.8.4-erfana1`
+  - [Phase 4 binary spec](./windows/phase4-binary-spec.md) - Pinned SHAs for `whisper-build-v1.8.4-erfana2` (and the retired `erfana1`)
   - [Build Setup (Windows)](./build/windows.md) - Node 24, Python 3.12, VS 2022, Developer Mode, long paths
   - [Whisper-binaries CI runbook](./build/whisper-binaries.md) - Ops procedure for self-hosted whisper.cpp rebuilds + cert-revocation + monthly canary + **app-side pin-bump checklist** + **minisign gotchas** + **rejected approaches**
 - [Large Project Performance Plan](./large-project-performance-plan.md) - EMFILE mitigation, worker threads, diagnostics, single-flight tree reads (#208), the Windows watcher and exclude list (#211); content-only saves skip the tree re-read, [measured](./performance/watcher-structural-refresh.md)

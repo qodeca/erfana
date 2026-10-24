@@ -95,7 +95,7 @@ const PARENT_WINDOW = { id: 1 } as never
 function harnessStub(results: Array<Record<string, unknown>>) {
   const queue = [...results]
   return {
-    render: vi.fn(async () => queue.shift() ?? { ok: false, reason: 'decode' }),
+    render: vi.fn(async (_instruction: unknown) => queue.shift() ?? { ok: false, reason: 'decode' }),
     printToPdf: vi.fn(async () => Buffer.from('%PDF')),
     destroy: vi.fn()
   }

@@ -198,6 +198,15 @@ describe('fileUtils', () => {
   })
 
   describe('findAvailableFileName', () => {
+    // The default `maxAttempts = IMPORT.MAX_COPY_ATTEMPTS` comes from an `as const`
+    // object, so TypeScript types the parameter as the literal 1000. These tests pass
+    // other limits on purpose, through a signature that takes any number.
+    const findWithLimit = findAvailableFileName as (
+      dirPath: string,
+      fileName: string,
+      maxAttempts?: number
+    ) => Promise<string>
+
     describe('no conflict scenarios', () => {
       it('should return original name when no conflict exists', async () => {
         mockedAccess.mockRejectedValue(new Error('ENOENT'))
@@ -253,7 +262,7 @@ describe('fileUtils', () => {
       it('should throw AppError when max attempts exceeded', async () => {
         // All calls return exists (file exists)
         mockedAccess.mockResolvedValue(undefined)
-        await expect(findAvailableFileName(TEST_DIR, 'document.md', 3)).rejects.toMatchObject({
+        await expect(findWithLimit(TEST_DIR, 'document.md', 3)).rejects.toMatchObject({
           code: ErrorCode.IMPORT_WRITE_FAILED,
           message: expect.stringContaining('Cannot create more than 3 copies')
         })
@@ -268,7 +277,7 @@ describe('fileUtils', () => {
 
       it('should respect custom max attempts parameter', async () => {
         mockedAccess.mockResolvedValue(undefined)
-        await expect(findAvailableFileName(TEST_DIR, 'file.md', 5)).rejects.toMatchObject({
+        await expect(findWithLimit(TEST_DIR, 'file.md', 5)).rejects.toMatchObject({
           message: expect.stringContaining('Cannot create more than 5 copies')
         })
       })

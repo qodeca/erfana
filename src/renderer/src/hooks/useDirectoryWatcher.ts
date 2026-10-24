@@ -38,6 +38,7 @@ import {
 import { DIRECTORY_WATCHER } from '../components/ProjectTree/constants'
 import { logger } from '../utils/logger'
 import { getTreeReadMs, resetTreeReadTiming } from '../utils/treeReadTiming'
+import { directoryWatchGateway } from '../services/directoryWatchGateway'
 
 interface UseDirectoryWatcherOptions {
   projectPath: string | null
@@ -85,7 +86,7 @@ export function useDirectoryWatcher({
     resetTreeReadTiming()
 
     // Start watching the project directory
-    window.api.directoryWatch.start(projectPath as string).catch((err) => {
+    directoryWatchGateway.start(projectPath as string).catch((err) => {
       logger.error(createWatcherErrorMessage(), err instanceof Error ? err : undefined)
     })
 
@@ -96,7 +97,7 @@ export function useDirectoryWatcher({
     // walk of the project directory. A content-only batch (`structural:
     // false`) leaves names and folders as they were: useGitStatus refreshes
     // the badges for it, the tree is not re-read.
-    const unsubscribeChanged = window.api.directoryWatch.onDirectoryChanged((data) => {
+    const unsubscribeChanged = directoryWatchGateway.onDirectoryChanged((data) => {
       // Only refresh if not during our own internal operations – a catch-up
       // refresh (changes dropped during a pause, #210) always goes through
       if (!shouldHandleDirectoryChange(isInternalOperationRef.current, data.catchUp === true)) {
@@ -127,19 +128,19 @@ export function useDirectoryWatcher({
     })
 
     // Listen for project deletion
-    const unsubscribeDeleted = window.api.directoryWatch.onProjectDeleted(() => {
+    const unsubscribeDeleted = directoryWatchGateway.onProjectDeleted(() => {
       onProjectDeletedRef.current()
     })
 
     // Listen for errors
-    const unsubscribeError = window.api.directoryWatch.onDirectoryError((data) => {
+    const unsubscribeError = directoryWatchGateway.onDirectoryError((data) => {
       logger.error(createDirectoryErrorMessage(), undefined, { error: data.error })
       onErrorRef.current(data.error)
     })
 
     // Cleanup on unmount or when project changes
     return () => {
-      window.api.directoryWatch.stop(projectPath as string)
+      directoryWatchGateway.stop(projectPath as string)
       unsubscribeChanged()
       unsubscribeDeleted()
       unsubscribeError()

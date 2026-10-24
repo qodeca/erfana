@@ -15,12 +15,13 @@
  * run `setInterval(() => location.href = …)` and reach `shell.openExternal` at
  * ten dialogs a second with nobody touching the mouse.
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ErrorCode } from '../../../shared/errors'
 import { createPreviewLinkBridge, type PreviewLinkBridge } from './previewLinkBridge'
 import type { PreviewLinkContext, PreviewLinkNavigationDeps } from './previewLinkNavigation'
 import type { ConfineVerdict } from './previewPathResolve'
+import { CLICK_SETTLE_CAP_MS, NAVIGATION_GRACE_MS } from './previewNavigationHold'
 
 // A fake 32-hex preview root token. Not a credential: the real one is minted
 // per view by PreviewRootRegistry and never leaves the main process.
@@ -360,5 +361,275 @@ describe('createPreviewLinkBridge — the page on screen (issue #124, WI-17b)', 
     bridge.handleActivation(payload(`${IN_PROJECT}#faq`))
     await new Promise((r) => setImmediate(r))
     expect(deps.requestOpenFile).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('createPreviewLinkBridge — a click whose report lands late (fake timers)', () => {
+  // The preload reports a click one task after it, so a later page listener can
+  // cancel it first — and the browser's `will-navigate` for the same click
+  // starts as soon as the click's dispatch ends, so it normally reaches main
+  // FIRST. On a page that is busy after the click the report can trail it by
+  // far more than the 50 ms grace. The preload's `seen` note, sent during the
+  // click, is what tells the bridge to keep holding that navigation.
+
+  /** Past the old fixed 50 ms grace, well inside the cap. */
+  const WELL_PAST_GRACE_MS = 200
+
+  const seen = (gestureId: number, href: string): unknown => ({ kind: 'seen', gestureId, href })
+  const cancelled = (gestureId: number): unknown => ({ kind: 'cancelled', gestureId })
+  const report = (gestureId: number, href: string, extra: object = {}): unknown => ({
+    ...(payload(href) as object),
+    gestureId,
+    ...extra
+  })
+
+  /** Advance the fake clock and let the routing's promises run. */
+  const advance = async (ms: number): Promise<void> => {
+    await vi.advanceTimersByTimeAsync(ms)
+  }
+
+  /** Deps whose eligibility check says every page runs as a preview. */
+  function eligibleDeps(): SpiedDeps {
+    return { ...makeDeps(), runsAsPreview: vi.fn().mockResolvedValue(true), platform: 'darwin' }
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it.each([
+    ['49 ms, just inside the grace', NAVIGATION_GRACE_MS - 1],
+    ['200 ms, well past the grace', WELL_PAST_GRACE_MS]
+  ])('asks before opening an external link whose report lands %s after will-navigate', async (_label, lateMs) => {
+    const deps = makeDeps()
+    const bridge = makeBridge(deps)
+
+    bridge.handleLinkNote(seen(1, EXTERNAL))
+    bridge.handleWillNavigate(EXTERNAL)
+    await advance(lateMs)
+    expect(deps.recordFailure).not.toHaveBeenCalled()
+
+    bridge.handleActivation(report(1, EXTERNAL))
+    await advance(0)
+    expect(deps.openExternal).toHaveBeenCalledTimes(1)
+
+    // The held navigation half is let go as the click's duplicate: no
+    // "Blocked link", even once every timer has run out.
+    await advance(CLICK_SETTLE_CAP_MS * 2)
+    expect(deps.recordFailure).not.toHaveBeenCalled()
+    expect(deps.openExternal).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps a late-reported click on a page that can stay in its tab', async () => {
+    // Routed as the navigation, this click would open a new tab whatever the
+    // tab's mode (the security invariant above). As the gesture it stays.
+    const deps = eligibleDeps()
+    const bridge = makeBridge(deps)
+
+    bridge.handleLinkNote(seen(1, IN_PROJECT))
+    bridge.handleWillNavigate(IN_PROJECT)
+    await advance(WELL_PAST_GRACE_MS)
+    bridge.handleActivation(report(1, IN_PROJECT))
+    await advance(CLICK_SETTLE_CAP_MS * 2)
+
+    expect(deps.requestOpenFile).toHaveBeenCalledTimes(1)
+    expect(deps.requestOpenFile.mock.calls[0]?.[4]).toBe('by-mode')
+  })
+
+  it('keeps the escape label of a late-reported link that climbed out of the project', async () => {
+    // Only the report carries the attribute as written; `will-navigate` has
+    // the collapsed href alone, which would read as a missing file.
+    const deps = makeDeps({ ok: false, reason: 'missing' })
+    const bridge = makeBridge(deps)
+
+    bridge.handleLinkNote(seen(1, IN_PROJECT))
+    bridge.handleWillNavigate(IN_PROJECT)
+    await advance(WELL_PAST_GRACE_MS)
+    bridge.handleActivation(report(1, IN_PROJECT, { rawHref: '../../../outside.html' }))
+    await advance(CLICK_SETTLE_CAP_MS * 2)
+
+    expect(deps.recordFailure).toHaveBeenCalledTimes(1)
+    expect(deps.recordFailure).toHaveBeenCalledWith(expect.objectContaining({ type: 'path-escape' }))
+  })
+
+  it('still holds the navigation when the seen note lands just after it', async () => {
+    const deps = makeDeps()
+    const bridge = makeBridge(deps)
+
+    bridge.handleWillNavigate(EXTERNAL)
+    await advance(NAVIGATION_GRACE_MS - 1)
+    bridge.handleLinkNote(seen(1, EXTERNAL))
+    await advance(WELL_PAST_GRACE_MS)
+    expect(deps.recordFailure).not.toHaveBeenCalled()
+
+    bridge.handleActivation(report(1, EXTERNAL))
+    await advance(CLICK_SETTLE_CAP_MS * 2)
+    expect(deps.openExternal).toHaveBeenCalledTimes(1)
+    expect(deps.recordFailure).not.toHaveBeenCalled()
+  })
+
+  it('routes a navigation with no seen click after the grace alone', async () => {
+    // A page that navigates itself has no preload click behind it, so it waits
+    // only the grace — not the cap.
+    const deps = makeDeps()
+    const bridge = makeBridge(deps)
+
+    bridge.handleWillNavigate(IN_PROJECT)
+    await advance(NAVIGATION_GRACE_MS - 1)
+    expect(deps.requestOpenFile).not.toHaveBeenCalled()
+
+    await advance(1)
+    expect(deps.requestOpenFile).toHaveBeenCalledTimes(1)
+    expect(deps.requestOpenFile.mock.calls[0]?.[4]).toBe('new-tab')
+  })
+
+  it('lets a held navigation go as the page’s own when the click is cancelled', async () => {
+    // A navigation behind a cancelled click is one the page made itself (a
+    // router that cancels the click and sets `location`): today's rules.
+    const deps = makeDeps()
+    const bridge = makeBridge(deps)
+
+    bridge.handleLinkNote(seen(1, EXTERNAL))
+    bridge.handleWillNavigate(EXTERNAL)
+    await advance(WELL_PAST_GRACE_MS)
+    expect(deps.recordFailure).not.toHaveBeenCalled()
+
+    bridge.handleLinkNote(cancelled(1))
+    await advance(0)
+    expect(deps.recordFailure).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'blocked-link', reasonCode: ErrorCode.PREVIEW_LINK_BLOCKED })
+    )
+    expect(deps.openExternal).not.toHaveBeenCalled()
+  })
+
+  it('stops waiting for a cancelled click, so a later navigation waits only the grace', async () => {
+    const deps = makeDeps()
+    const bridge = makeBridge(deps)
+
+    bridge.handleLinkNote(seen(1, IN_PROJECT))
+    bridge.handleLinkNote(cancelled(1))
+    bridge.handleWillNavigate(IN_PROJECT)
+    await advance(NAVIGATION_GRACE_MS)
+
+    expect(deps.requestOpenFile).toHaveBeenCalledTimes(1)
+  })
+
+  it('routes the navigation on its own once the cap passes with no report', async () => {
+    const deps = makeDeps()
+    const bridge = makeBridge(deps)
+
+    bridge.handleLinkNote(seen(1, IN_PROJECT))
+    bridge.handleWillNavigate(IN_PROJECT)
+    await advance(CLICK_SETTLE_CAP_MS - 1)
+    expect(deps.requestOpenFile).not.toHaveBeenCalled()
+
+    await advance(1)
+    expect(deps.requestOpenFile).toHaveBeenCalledTimes(1)
+    expect(deps.requestOpenFile.mock.calls[0]?.[4]).toBe('new-tab')
+  })
+
+  it('caps the wait from the navigation’s arrival, even while new clicks keep its href pending', async () => {
+    // Each seen click expires on its own, but a stream of them on one href
+    // would otherwise hold its navigation for as long as the stream lasts.
+    const deps = makeDeps()
+    const bridge = makeBridge(deps)
+
+    bridge.handleLinkNote(seen(1, IN_PROJECT))
+    bridge.handleWillNavigate(IN_PROJECT)
+    await advance(CLICK_SETTLE_CAP_MS - WELL_PAST_GRACE_MS)
+    bridge.handleLinkNote(seen(2, IN_PROJECT))
+    await advance(WELL_PAST_GRACE_MS - 1)
+    expect(deps.requestOpenFile).not.toHaveBeenCalled()
+
+    await advance(1)
+    expect(deps.requestOpenFile).toHaveBeenCalledTimes(1)
+  })
+
+  it('waits for every pending click on the same href before letting its navigation go', async () => {
+    // Two clicks on one link in quick succession: the first is cancelled, the
+    // second is not. The cancelled note must not release the navigation that
+    // belongs to the second click.
+    const deps = makeDeps()
+    const bridge = makeBridge(deps)
+
+    bridge.handleLinkNote(seen(1, EXTERNAL))
+    bridge.handleLinkNote(seen(2, EXTERNAL))
+    bridge.handleWillNavigate(EXTERNAL)
+    bridge.handleLinkNote(cancelled(1))
+    await advance(WELL_PAST_GRACE_MS)
+    expect(deps.recordFailure).not.toHaveBeenCalled()
+
+    bridge.handleActivation(report(2, EXTERNAL))
+    await advance(CLICK_SETTLE_CAP_MS * 2)
+    expect(deps.openExternal).toHaveBeenCalledTimes(1)
+    expect(deps.recordFailure).not.toHaveBeenCalled()
+  })
+
+  it('tracks a bounded number of pending clicks, forgetting the oldest', async () => {
+    const deps = makeDeps()
+    const bridge = makeBridge(deps)
+
+    bridge.handleLinkNote(seen(1, IN_PROJECT))
+    for (let gestureId = 2; gestureId <= 17; gestureId += 1) {
+      bridge.handleLinkNote(seen(gestureId, `${IN_PROJECT}?n=${gestureId}`))
+    }
+    bridge.handleWillNavigate(IN_PROJECT)
+    await advance(NAVIGATION_GRACE_MS)
+
+    // The first click was forgotten to make room, so nothing holds this one.
+    expect(deps.requestOpenFile).toHaveBeenCalledTimes(1)
+  })
+
+  it.each([
+    ['an unknown kind', { kind: 'opened', gestureId: 1 }],
+    ['a zero id', { kind: 'seen', gestureId: 0, href: IN_PROJECT }],
+    ['a fractional id', { kind: 'cancelled', gestureId: 1.5 }],
+    ['a missing href', { kind: 'seen', gestureId: 1 }],
+    ['an over-long href', { kind: 'seen', gestureId: 1, href: `${IN_PROJECT}?${'a'.repeat(2048)}` }],
+    ['an extra key', { kind: 'cancelled', gestureId: 1, href: IN_PROJECT }],
+    ['a non-object', 'seen']
+  ])('refuses a note with %s and holds nothing for it', async (_label, note) => {
+    const deps = makeDeps()
+    const bridge = makeBridge(deps)
+
+    bridge.handleLinkNote(note)
+    expect(deps.recordFailure).toHaveBeenCalledWith(
+      expect.objectContaining({ resourceUrlOrHost: '(malformed link message)' })
+    )
+
+    bridge.handleWillNavigate(IN_PROJECT)
+    await advance(NAVIGATION_GRACE_MS)
+    expect(deps.requestOpenFile).toHaveBeenCalledTimes(1)
+  })
+
+  it('refuses a report whose id is not a positive whole number', () => {
+    const deps = makeDeps()
+    makeBridge(deps).handleActivation(report(0, IN_PROJECT))
+
+    expect(deps.recordFailure).toHaveBeenCalledWith(
+      expect.objectContaining({ resourceUrlOrHost: '(malformed link message)' })
+    )
+    expect(deps.requestOpenFile).not.toHaveBeenCalled()
+  })
+
+  it('routes nothing held or pending after dispose', async () => {
+    const deps = makeDeps()
+    const bridge = makeBridge(deps)
+
+    bridge.handleLinkNote(seen(1, IN_PROJECT))
+    bridge.handleWillNavigate(IN_PROJECT)
+    bridge.handleWillNavigate(EXTERNAL)
+    bridge.dispose()
+    // Nothing is left to fire: no held navigation, no pending click's expiry.
+    expect(vi.getTimerCount()).toBe(0)
+
+    bridge.handleLinkNote(seen(2, EXTERNAL))
+    await advance(CLICK_SETTLE_CAP_MS * 2)
+    expect(deps.requestOpenFile).not.toHaveBeenCalled()
+    expect(deps.recordFailure).not.toHaveBeenCalled()
   })
 })

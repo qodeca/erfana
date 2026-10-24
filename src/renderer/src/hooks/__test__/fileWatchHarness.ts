@@ -35,7 +35,7 @@ export const CAP_ERROR = 'Maximum watched files limit reached (100)'
 export const JOIN_ERROR = `File watch ended while joining: ${WATCHED_PATH}`
 
 type WatchCallback = (data: { filePath: string }) => void
-type WatchErrorCallback = (data: { filePath: string; error: string }) => void
+type WatchErrorCallback = (data: { filePath: string; error: string; ended?: boolean }) => void
 
 /** The fake `window.api.fileWatch` bridge. */
 export interface MockFileWatch {
@@ -65,8 +65,11 @@ export interface FileWatchHarness {
   emitChanged: (filePath: string) => void
   /** Emits a watcher `deleted` event to every subscribed listener. */
   emitDeleted: (filePath: string) => void
-  /** Emits a watcher `error` event to every subscribed listener. */
-  emitError: (filePath: string, error: string) => void
+  /**
+   * Emits a watcher `error` event to every subscribed listener. `ended`: the
+   * main process dropped the watch with it (`notifyWatchDead`, #252).
+   */
+  emitError: (filePath: string, error: string, ended?: boolean) => void
   /** Live listener counts, so teardown can be asserted rather than assumed. */
   listenerCounts: () => ListenerCounts
 }
@@ -166,7 +169,8 @@ export function installFileWatchHarness(): FileWatchHarness {
     getStats,
     emitChanged: (filePath) => emit(changedListeners, { filePath }),
     emitDeleted: (filePath) => emit(deletedListeners, { filePath }),
-    emitError: (filePath, error) => emit(errorListeners, { filePath, error }),
+    emitError: (filePath, error, ended) =>
+      emit(errorListeners, ended === undefined ? { filePath, error } : { filePath, error, ended }),
     listenerCounts: () => ({
       changed: changedListeners.length,
       deleted: deletedListeners.length,

@@ -150,22 +150,49 @@ describe('createRearmingSingleFileWatcher', () => {
   })
 
   it('refuses to re-arm a path that no longer resolves inside the project', async () => {
+    // A file that is on disk, so the failed confinement check is an escape
+    const dir = await mkdtemp(join(tmpdir(), 'erfana-rearm-escape-'))
+    const file = join(dir, 'a.css')
+    await writeFile(file, 'a{}')
+    try {
+      const { factory, created } = makeFactory()
+      const { detector, fire } = makeFakeDetector()
+      const onChange = vi.fn()
+      const onWatchDead = vi.fn()
+      createRearmingSingleFileWatcher(
+        file,
+        { onChange, onDeleted: vi.fn(), onError: vi.fn(), onWatchDead },
+        { createWatcher: factory, createDetector: () => detector, isPathConfined: async () => false }
+      )
+
+      created[0].handlers.onUnlink()
+      fire(true)
+
+      await vi.waitFor(() => expect(onWatchDead).toHaveBeenCalledWith(WATCH_DEAD_OUTSIDE_PROJECT))
+      expect(created).toHaveLength(1)
+      expect(onChange).not.toHaveBeenCalled()
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('reports a delete, not an escape, when the path cannot be resolved because it is gone (#252)', async () => {
     const { factory, created } = makeFactory()
     const { detector, fire } = makeFakeDetector()
-    const onChange = vi.fn()
+    const onDeleted = vi.fn()
     const onWatchDead = vi.fn()
     createRearmingSingleFileWatcher(
-      '/proj/a.css',
-      { onChange, onDeleted: vi.fn(), onError: vi.fn(), onWatchDead },
+      join(tmpdir(), 'erfana-rearm-gone', 'a.css'),
+      { onChange: vi.fn(), onDeleted, onError: vi.fn(), onWatchDead },
       { createWatcher: factory, createDetector: () => detector, isPathConfined: async () => false }
     )
 
     created[0].handlers.onUnlink()
     fire(true)
 
-    await vi.waitFor(() => expect(onWatchDead).toHaveBeenCalledWith(WATCH_DEAD_OUTSIDE_PROJECT))
+    await vi.waitFor(() => expect(onDeleted).toHaveBeenCalledTimes(1))
+    expect(onWatchDead).not.toHaveBeenCalled()
     expect(created).toHaveLength(1)
-    expect(onChange).not.toHaveBeenCalled()
   })
 
   it('disposes the detector and closes the watcher on close', async () => {

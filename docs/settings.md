@@ -30,11 +30,16 @@ Settings persist to `~/.erfana/settings.json` via GlobalSettingsService. The fil
 **Parse strictness.** A global file that fails `GlobalSettingsSchema` is treated as corrupt: it is copied to `settings.json.bak` and **every** setting is reset to its default. A project's `.erfana/settings.json` is read by `ProjectSettingsService` on every project open, and any failure there blocks the project from opening. Two blocks are therefore parsed leniently so that a mistake in them can do neither:
 
 - `htmlPreview` in the project file – `z.unknown()`, parsed separately by `PreviewAllowlistStore` (see [Remote-host approval storage](#remote-host-approval-storage)).
+- `terminal` in the global file (lens review [23]) – `TerminalSettingsSchema`: an unknown `screenReaderMode` becomes `auto`, and a malformed section becomes `{ screenReaderMode: 'auto' }`.
 - `files` in **both** files (#211) – the shared `FilesSettingsSchema` (`src/shared/ipc/files-exclude-schema.ts`): a non-array list becomes `[]`, a non-string entry becomes `''` (kept, so a rejection index still points at the user's line), and a malformed section becomes `{ exclude: [] }`. Entry rules (normalisation, caps, rejected shapes) are applied afterwards by `validateExcludeEntries` in `src/main/utils/excludeMatcher.ts`, per source.
 
 ## Exclude list (`files.exclude`)
 
 Added in #211. `ProjectSettingsService` resolves the list on every project open: the global entries first (through a provider that `src/main/ipc/file-handlers.ts` wires to `globalSettingsService.getSetting('files').exclude`), then the project's, each source validated on its own and the accepted entries de-duplicated. The project list only adds; there is no `replace` mode. The result carries `excludePatterns` and `excludeRejections` (`{ source, index, reason }`, never the entry text). `ProjectService` logs the rejections and builds one `ProjectPathFilter` for the tree walk and the directory watcher. Syntax and limits for users: [settings reference § Excluded folders](./user-guide/reference/settings.md#excluded-folders); how it reaches the watcher: [File watching § Watched files](./file-watching/README.md#watched-files).
+
+## Terminal screen-reader mode (`terminal.screenReaderMode`)
+
+Added for lens review [23]. xterm.js draws output on a canvas, so a screen reader reads nothing unless xterm's `screenReaderMode` is on (an offscreen accessibility tree plus a live region). `useTerminalScreenReaderMode` (`src/renderer/src/hooks/`) resolves it: `on` and `off` win; `auto` follows `terminal:getScreenReaderSupport` and `terminal:screenReaderSupportChanged` (Electron's accessibility support, macOS and Windows only). `useXtermSession` passes the result to the `Terminal` constructor and sets `xterm.options.screenReaderMode` live, so a change in Settings or in the OS applies to running terminals without a restart. Chromium also reports some non-screen-reader tools that use the accessibility APIs, which is what `off` is for; on Linux, Auto stays off and `on` is the way in.
 
 ## Implementation
 

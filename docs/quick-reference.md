@@ -17,7 +17,7 @@ npm run build:mac        # macOS package (.dmg)
 npm run build:win        # Windows package (NSIS .exe; needs Developer Mode)
 
 # Quality
-npm run typecheck        # Type checking (node + web)
+npm run typecheck        # Type checking (node + web, and their tests + e2e)
 npm run lint             # Linting (eslint, JS/TS only)
 npm run lint:css         # stylelint: src/ CSS + the design/ cards' inline styles
 npm run design           # Rebuild design/ (index, token copy, claims)

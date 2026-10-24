@@ -8,10 +8,10 @@ const randomizedEncrypt = (s: string): Buffer =>
 const randomizedDecrypt = (b: Buffer): string => b.toString().split('|').slice(1).join('|')
 
 const mockSafeStorage = vi.hoisted(() => ({
-  isEncryptionAvailable: vi.fn<[], boolean>(() => true),
-  encryptString: vi.fn<[string], Buffer>(),
-  decryptString: vi.fn<[Buffer], string>(),
-  getSelectedStorageBackend: vi.fn<[], string>(() => 'gnome_libsecret')
+  isEncryptionAvailable: vi.fn<() => boolean>(() => true),
+  encryptString: vi.fn<(...args: [string]) => Buffer>(),
+  decryptString: vi.fn<(...args: [Buffer]) => string>(),
+  getSelectedStorageBackend: vi.fn<() => string>(() => 'gnome_libsecret')
 }))
 
 vi.mock('electron', () => ({

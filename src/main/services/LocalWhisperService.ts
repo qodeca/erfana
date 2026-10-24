@@ -32,7 +32,7 @@ import type {
   WhisperModel
 } from '../../shared/ipc/transcription-schema'
 import { logger } from './LoggingService'
-import type { IWhisperModelManager } from './WhisperModelManager'
+import type { IWhisperModelManager, VerifiedModelFile } from './WhisperModelManager'
 import { whisperModelManager } from './WhisperModelManager'
 
 // ---------------------------------------------------------------------------
@@ -331,7 +331,7 @@ export class LocalWhisperService {
       }
 
       progress({ percent: 4, phase: 'Checking whisper model' })
-      const modelPath = await this.modelManager.ensureModel(model, { signal })
+      await this.modelManager.ensureModel(model, { signal })
 
       if (signal?.aborted) {
         return {
@@ -352,13 +352,19 @@ export class LocalWhisperService {
 
       let transcript: string
 
+      // Model integrity: one streaming SHA-256 per transcription job (all chunks
+      // of the job share it; a new job hashes again, nothing is cached across
+      // jobs). A mismatch deletes the file and throws WHISPER_MODEL_INTEGRITY_FAILED
+      // ("download it again"); nothing is re-downloaded here.
+      const verifiedModel = await this.modelManager.verifyInstalledModelFile(model, { signal })
+
       if (needsChunking) {
         transcript = await this.transcribeChunked(
-          wavPath, duration, binaryPath, modelPath, language, tempFiles, progress, signal
+          wavPath, duration, binaryPath, model, verifiedModel, language, tempFiles, progress, signal
         )
       } else {
         transcript = await this.transcribeSingle(
-          wavPath, binaryPath, modelPath, language, progress, signal
+          wavPath, binaryPath, model, verifiedModel, language, progress, signal
         )
       }
 
@@ -544,7 +550,8 @@ export class LocalWhisperService {
   private async transcribeSingle(
     wavPath: string,
     binaryPath: string,
-    modelPath: string,
+    model: WhisperModel,
+    verifiedModel: VerifiedModelFile,
     language: string,
     onProgress: (progress: TranscriptionProgress) => void,
     signal?: AbortSignal
@@ -552,7 +559,7 @@ export class LocalWhisperService {
     onProgress({ percent: 10, phase: 'Transcribing' })
 
     const text = await this.runWhisper(
-      wavPath, binaryPath, modelPath, language,
+      wavPath, binaryPath, model, verifiedModel, language,
       (whisperPercent) => {
         // Map whisper 0-100 to overall 10-90
         const overall = 10 + (whisperPercent / 100) * 80
@@ -579,7 +586,8 @@ export class LocalWhisperService {
     wavPath: string,
     duration: number,
     binaryPath: string,
-    modelPath: string,
+    model: WhisperModel,
+    verifiedModel: VerifiedModelFile,
     language: string,
     tempFiles: Set<string>,
     onProgress: (progress: TranscriptionProgress) => void,
@@ -629,7 +637,7 @@ export class LocalWhisperService {
 
       // Transcribe the chunk
       const chunkText = await this.runWhisper(
-        chunkPath, binaryPath, modelPath, language,
+        chunkPath, binaryPath, model, verifiedModel, language,
         (whisperPercent) => {
           const overall = chunkStartPercent + (whisperPercent / 100) * (chunkEndPercent - chunkStartPercent)
           onProgress({
@@ -721,17 +729,23 @@ export class LocalWhisperService {
   private async runWhisper(
     audioPath: string,
     binaryPath: string,
-    modelPath: string,
+    model: WhisperModel,
+    verifiedModel: VerifiedModelFile,
     language: string,
     onWhisperProgress: (percent: number) => void,
     signal?: AbortSignal
   ): Promise<string> {
-    // TOCTOU close: re-verify pinned binary + sidecars immediately before
+    // Narrow the TOCTOU window: re-verify pinned binary + sidecars immediately before
     // every spawn. `{userData}/whisper/bin/` is user-writable, so an attacker
     // with local write access could swap the binary between install-time
-    // verification and spawn-time execution. Hashing 2.3 MB (binary + 4 DLLs
-    // on Windows) is <50 ms on modern hardware — acceptable per-chunk.
+    // verification and spawn-time execution. Hashing ~3.25 MB (Windows) or
+    // ~6.4 MB (macOS) takes tens of milliseconds — acceptable per-chunk.
     const verified = await this.modelManager.verifyInstalledBinary()
+
+    // The model was hashed once for this job. Before each spawn, require that the
+    // path still names the exact file we hashed (same dev, ino, size, mtime, ctime).
+    // A mismatch stops the job and deletes nothing.
+    await this.modelManager.assertVerifiedModelUnchanged(model, verifiedModel)
 
     // Forensic-logging shape, spawn-path half of the 7-tuple the plan commits
     // to (install-time keys `url` + `expectedSha` are logged separately in
@@ -755,7 +769,7 @@ export class LocalWhisperService {
 
     return new Promise<string>((resolve, reject) => {
       const args = [
-        '-m', modelPath,
+        '-m', verifiedModel.path,
         '-l', language,
         '-otxt',
         '--no-timestamps',

@@ -25,6 +25,7 @@
 import { vi, beforeEach, afterEach, type Mock } from 'vitest'
 import { cleanup } from '@testing-library/react'
 import type { IDockviewPanelProps } from 'dockview'
+import type { PreviewBridge } from '../../../../../../shared/ipc/preview-bridge-types'
 
 import type { HtmlPreviewPanelParams } from '../HtmlPreviewPanel'
 import { usePreviewStore } from '../../../../stores/usePreviewStore'
@@ -70,7 +71,8 @@ export interface Listeners {
  * The fake `window.api.preview` bridge: EVERY member of the real bridge type,
  * as a mock.
  *
- * Derived from `Window['api']['preview']` on purpose (QG-8 TQ3). A hand-written
+ * Derived from the bridge contract `PreviewBridge` (what `window.api.preview`
+ * is typed as) on purpose (QG-8 TQ3). A hand-written
  * member list drifted silently: a method renamed or dropped in `src/preload`
  * left all five panel suites green while the app broke. Now a member the real
  * bridge no longer has, or one it gained and the fake lacks, is a type error
@@ -79,7 +81,7 @@ export interface Listeners {
  * contract declares").
  */
 export type MockPreview = {
-  [Member in keyof Window['api']['preview']]: Mock
+  [Member in keyof PreviewBridge]: Mock
 }
 
 /** Handles returned by {@link installHtmlPreviewPanelHarness}. */
@@ -244,7 +246,7 @@ export function installHtmlPreviewPanelHarness(): HtmlPreviewPanelHarness {
       // Issue #124, QG-8 U1: the keyboard route into the page. A press nobody
       // scripted is a refusal, so focus never lands anywhere by accident.
       focusPage: vi.fn().mockResolvedValue({ ok: false })
-    } satisfies MockPreview & Window['api']['preview'])
+    } satisfies MockPreview & PreviewBridge)
 
     ;(window as unknown as { api: unknown }).api = { preview }
 

@@ -32,6 +32,8 @@ const touch = (...parts: string[]): void => {
 }
 
 const noSkip = { baseRel: '', skip: () => false }
+/** For tests that count reads: a clock that never moves and a limit no run reaches, so only the count bounds apply */
+const unhurried = { ...noSkip, now: () => 0, timeLimitMs: 10 * 60_000 }
 
 beforeEach(() => {
   base = realpathSync.native(mkdtempSync(path.join(tmpdir(), 'erfana-find-by-name-')))
@@ -107,6 +109,21 @@ describe('findByName', () => {
     expect(result).toEqual({ paths: [], truncated: true })
   })
 
+  it('takes its deadline from `timeLimitMs`, and FIND_BY_NAME_TIME_LIMIT_MS when none is given', async () => {
+    touch('a', 'b', 'c', 'x.md')
+    // Every read of the clock moves it a second on
+    const ticking = (): (() => number) => {
+      let clock = 0
+      return () => (clock += 1_000)
+    }
+
+    const byDefault = await findByName(root, 'x.md', { ...noSkip, now: ticking() })
+    const generous = await findByName(root, 'x.md', { ...noSkip, now: ticking(), timeLimitMs: 60_000 })
+
+    expect(byDefault).toEqual({ paths: [], truncated: true })
+    expect(generous).toEqual({ paths: [path.join(root, 'a', 'b', 'c', 'x.md')], truncated: false })
+  })
+
   it('never follows a junction (Windows) or a folder link to a folder inside the base', async () => {
     touch('real', 'a.md')
     // 'junction' needs no privilege on Windows; elsewhere it makes a symlink
@@ -146,38 +163,53 @@ describe('findByName – bounds (review of #320)', () => {
       return later(dir === '/r' ? Array.from({ length: FIND_BY_NAME_MAX_FOLDERS * 2 }, (_, i) => fakeDirent(`d${i}`, 'dir')) : [])
     }
 
-    const result = await findByName('/r', 'x.md', { ...noSkip, readdir })
+    // A frozen clock and a generous limit: the folder cap, not the timer, ends the walk however loaded the machine
+    const result = await findByName('/r', 'x.md', { ...unhurried, readdir })
 
     expect(result.truncated).toBe(true)
     expect(reads).toBe(FIND_BY_NAME_MAX_FOLDERS)
   })
 
-  it('keeps the event loop moving on a wide tree (no turn over 50 ms) and FIND_BY_NAME_CONCURRENCY reads in flight', async () => {
+  it('yields to the event loop between batches of reads on a wide tree, with FIND_BY_NAME_CONCURRENCY reads in flight', async () => {
     // 300 × 300 folders: 90,300 in all, far past the folder bound
+    const WIDTH = 300
     let inFlight = 0
     let maxInFlight = 0
+    // A turn of the event loop: a self-rescheduling setImmediate runs once per turn (its re-arm lands in the next one)
+    let turn = 0
+    let ticking = true
+    const tick = (): void => {
+      turn++
+      if (ticking) setImmediate(tick)
+    }
+    setImmediate(tick)
+    const readsPerTurn = new Map<number, number>()
+    const entriesPerTurn = new Map<number, number>()
+    const bump = (counts: Map<number, number>): void => void counts.set(turn, (counts.get(turn) ?? 0) + 1)
     const readdir = async (dir: string): Promise<Dirent[]> => {
+      bump(readsPerTurn)
       inFlight++
       maxInFlight = Math.max(maxInFlight, inFlight)
       const depth = dir.split('/').length - 1
-      const entries = await later(depth < 3 ? Array.from({ length: 300 }, (_, i) => fakeDirent(`d${i}`, 'dir')) : [])
+      const entries = await later(depth < 3 ? Array.from({ length: WIDTH }, (_, i) => fakeDirent(`d${i}`, 'dir')) : [])
       inFlight--
       return entries
     }
-    let maxLag = 0
-    let last = performance.now()
-    const probe = setInterval(() => {
-      const t = performance.now()
-      maxLag = Math.max(maxLag, t - last - 5)
-      last = t
-    }, 5)
+    // `skip` sees every entry the search handles: a count of its synchronous work
+    const skip = (): boolean => (bump(entriesPerTurn), false)
 
-    const result = await findByName('/r', 'x.md', { ...noSkip, readdir })
-    clearInterval(probe)
+    const result = await findByName('/r', 'x.md', { ...unhurried, skip, readdir })
+    ticking = false
 
     expect(result.truncated).toBe(true)
     expect(maxInFlight).toBe(FIND_BY_NAME_CONCURRENCY)
-    expect(maxLag).toBeLessThan(50)
+    const reads = [...readsPerTurn.values()].reduce((a, b) => a + b, 0)
+    expect(reads).toBe(FIND_BY_NAME_MAX_FOLDERS)
+    // Each turn starts at most one pool's worth of reads (two when a pool straddles the tick) and handles
+    // at most that many folders' entries – never the whole tree in one go, however many turns that takes
+    expect(Math.max(...readsPerTurn.values())).toBeLessThanOrEqual(2 * FIND_BY_NAME_CONCURRENCY)
+    expect(Math.max(...entriesPerTurn.values())).toBeLessThanOrEqual(2 * FIND_BY_NAME_CONCURRENCY * WIDTH)
+    expect(readsPerTurn.size).toBeGreaterThanOrEqual(FIND_BY_NAME_MAX_FOLDERS / (2 * FIND_BY_NAME_CONCURRENCY))
   })
 
   it('ends when the project changes, without reading further', async () => {
@@ -304,7 +336,7 @@ describe('createFindByNameGate', () => {
     const gate = createFindByNameGate({ maxSearches: 2, maxWaiting: 8, waitLimitMs: 20 })
     const search = () => startFindByName('/r', 'x.md', { ...noSkip, readdir, now: clock() })
 
-    const answers = []
+    const answers: Awaited<ReturnType<typeof gate.run>>[] = []
     for (let i = 0; i < 6; i++) answers.push(await gate.run(`k${i}`, search))
 
     expect(gate.running).toBe(2)

@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { useEffect, useRef } from 'react'
+import { useEffect } from 'react'
 import { useSearchStore } from '../stores/useSearchStore'
 import type { MonacoEditorHandle } from '../components/Editor/MonacoMarkdownEditor'
 import { getSelectedText } from '../utils/selectionHelpers'
 import { isMacOS } from '../utils/platform'
+import { useLatestRef } from './useLatestRef'
 
 /**
  * Options for the useSearchKeyboard hook.
@@ -47,8 +48,7 @@ interface UseSearchKeyboardOptions {
  */
 export function useSearchKeyboard(options?: UseSearchKeyboardOptions): void {
   // Store options in ref to avoid re-registering listener when options change
-  const optionsRef = useRef(options)
-  optionsRef.current = options
+  const optionsRef = useLatestRef(options)
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent): void => {
@@ -73,5 +73,5 @@ export function useSearchKeyboard(options?: UseSearchKeyboardOptions): void {
     return () => {
       window.removeEventListener('keydown', handleKeyDown, { capture: true })
     }
-  }, [])
+  }, [optionsRef]) // optionsRef is stable: registers once
 }

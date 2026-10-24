@@ -27,6 +27,7 @@ import { memo, useId, useState, useCallback, useEffect, useRef } from 'react'
 import { Camera, AlertCircle, Loader2, RefreshCw, CameraOff } from 'lucide-react'
 import { useCameraCapture } from '../../hooks/useCameraCapture'
 import { useCameraMirrorPreference } from '../../hooks/useCameraMirrorPreference'
+import { useLatestRef } from '../../hooks/useLatestRef'
 import { BaseDialog } from './BaseDialog'
 import { TEST_IDS } from '../../constants/testids'
 import { logger } from '../../utils/logger'
@@ -211,17 +212,26 @@ export const CameraDialog = memo(function CameraDialog({
 
   /**
    * Restart preview when device selection changes.
+   *
+   * Only a device change may trigger this: `isOpen`, `isLoading` and
+   * `startPreview` are read through latest-value refs so that opening the
+   * dialog or a load finishing does not schedule a second restart (the
+   * open effect above already starts the preview).
    */
+  const isOpenRef = useLatestRef(isOpen)
+  const isLoadingRef = useLatestRef(isLoading)
+  const startPreviewRef = useLatestRef(startPreview)
   useEffect(() => {
-    if (isOpen && selectedDeviceId && !isLoading) {
+    if (isOpenRef.current && selectedDeviceId && !isLoadingRef.current) {
+      const start = startPreviewRef.current
       // Small delay to avoid rapid restarts
       const timer = setTimeout(() => {
-        startPreview()
+        start()
       }, 100)
       return () => clearTimeout(timer)
     }
     return undefined
-  }, [selectedDeviceId]) // Only react to device changes, not other deps
+  }, [selectedDeviceId, isOpenRef, isLoadingRef, startPreviewRef])
 
   /**
    * Handle photo capture with shutter animation.

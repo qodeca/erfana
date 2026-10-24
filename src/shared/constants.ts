@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+import { MODEL_PINS } from './whisper-model-pins'
+
 /**
  * Shared Application Constants
  *
@@ -16,6 +18,16 @@
  * @see Issue #21 - graph R1 architecture
  */
 export { GRAPH, MCP, DEFAULT_GRAPH_EXCLUDE_PATTERNS } from './graph-constants'
+
+/**
+ * Application ID. Single source of truth for the Windows AppUserModelID.
+ *
+ * Must equal `appId` in `electron-builder.yml`: the NSIS installer stamps that value on the
+ * Start menu and desktop shortcuts, and the running app must report the same one so the taskbar
+ * groups it with the pinned shortcut and toast notifications resolve the app name and icon.
+ * `appId.test.ts` enforces the match.
+ */
+export const APP_ID = 'com.erfana.app'
 
 /** Maximum number of recent projects to track */
 export const MAX_RECENT_PROJECTS = 5
@@ -60,11 +72,18 @@ export const FORCE_CRASH_ARG = '--erfana-force-crash'
  */
 export const TEST_HOOKS_ARG = '--erfana-test-hooks'
 
-/** Toast notification durations in milliseconds */
+/**
+ * Toast notification durations in milliseconds; `0` means "until dismissed".
+ *
+ * These are the defaults the `toastHelpers` request. The renderer's
+ * `resolveToastDuration` (`components/Toast/toastDwell.ts`) has the last word:
+ * an error always persists and a warning is never shown for less than 8 s,
+ * whatever a caller asks for (WCAG 2.2.1).
+ */
 export const TOAST_DURATION = {
-  ERROR: 5000,
+  ERROR: 0,
   SUCCESS: 3000,
-  WARNING: 3000,
+  WARNING: 8000,
   INFO: 3000
 } as const
 
@@ -379,13 +398,13 @@ export const LOCAL_WHISPER = {
   WHISPER_DIR: 'whisper',
   /** Supported model sizes */
   SUPPORTED_MODELS: ['tiny', 'base', 'small', 'medium', 'large'] as const,
-  /** Approximate download sizes in bytes per model */
+  /** Exact download sizes in bytes per model (from the pinned model list) */
   MODEL_SIZES: {
-    tiny: 75_000_000,
-    base: 142_000_000,
-    small: 466_000_000,
-    medium: 1_500_000_000,
-    large: 2_900_000_000
+    tiny: MODEL_PINS.tiny.sizeBytes,
+    base: MODEL_PINS.base.sizeBytes,
+    small: MODEL_PINS.small.sizeBytes,
+    medium: MODEL_PINS.medium.sizeBytes,
+    large: MODEL_PINS.large.sizeBytes
   },
   /** Download timeout in ms (10 minutes – large models) */
   DOWNLOAD_TIMEOUT: 600_000,
@@ -613,6 +632,17 @@ export const PREVIEW = {
    * A step that overruns is logged and skipped; the destroy still happens.
    */
   TEARDOWN_STEP_TIMEOUT_MS: 2000,
+  /**
+   * How long the previewed page gets to prove it repainted below newly revealed
+   * chrome (ms). ONE number for both sides: the renderer's absolute deadline
+   * for the permission band, and main's life for one confirmation script, which
+   * a page that never runs its frames (hidden, frozen) would otherwise hold
+   * for ever.
+   *
+   * Measured on Electron 39: ~17 ms for an idle page, ~130 ms for a heavy one,
+   * and NEVER for a page that refuses to yield.
+   */
+  BOUNDS_ACK_TIMEOUT_MS: 300,
   /**
    * Bound on the purge that runs when a partition is handed back for reuse
    * and again before it is handed out (ms). Fail-closed: a purge that fails or

@@ -22,9 +22,10 @@ interface Setup {
   owner?: unknown
   canShow?: (owner: unknown) => boolean
   allow?: boolean
+  schedule?: (ask: () => void) => void
 }
 
-function make({ response = 0, owner = OWNER, canShow, allow = true }: Setup = {}) {
+function make({ response = 0, owner = OWNER, canShow, allow = true, schedule }: Setup = {}) {
   const clock = { now: 1_000 }
   const identities = new Map<string, string>()
   const showBox = vi.fn(async (_owner: unknown, _options: MoveBoxOptions) => {
@@ -38,6 +39,7 @@ function make({ response = 0, owner = OWNER, canShow, allow = true }: Setup = {}
     resolveOwner,
     canShow,
     coalesceMs: 0,
+    schedule,
     homeDir: HOME,
     path: posix,
     now: () => clock.now,
@@ -221,23 +223,51 @@ describe('ExternalMoveConfirmer', () => {
   })
 
   it('opens one box at a time per window', async () => {
-    const { confirmer, showBox } = make()
+    // The test runs each batch window and closes each box itself, so the order
+    // is fixed: no real timer decides whether the second file arrives while the
+    // first box is open
+    const asks: Array<() => void> = []
+    const { confirmer, showBox } = make({ schedule: (ask) => asks.push(ask) })
+    const closes: Array<() => void> = []
     let open = 0
     let most = 0
-    showBox.mockImplementation(async () => {
-      open++
-      most = Math.max(most, open)
-      await new Promise((resolve) => setTimeout(resolve, 5))
-      open--
-      return { response: 0 }
-    })
+    showBox.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          open++
+          most = Math.max(most, open)
+          closes.push(() => {
+            open--
+            resolve({ response: 0 })
+          })
+        })
+    )
+    // Every pending promise callback runs before a setImmediate callback
+    const settle = (): Promise<void> => new Promise((resolve) => setImmediate(resolve))
 
     const first = confirmer.confirm(SENDER, file('a.md'))
-    await new Promise((resolve) => setTimeout(resolve, 2)) // first box is open now
-    const second = confirmer.confirm(SENDER, file('b.md'))
-    await Promise.all([first, second])
+    await settle()
+    expect(asks).toHaveLength(1)
+    asks.shift()?.()
+    await settle()
+    expect(showBox).toHaveBeenCalledTimes(1) // the first box is open now
 
+    const second = confirmer.confirm(SENDER, file('b.md'))
+    await settle()
+    expect(asks).toHaveLength(0) // waits for the open box, not for a batch window
+    expect(showBox).toHaveBeenCalledTimes(1)
+
+    closes.shift()?.()
+    expect(await first).toBe('move')
+    await settle()
+    expect(asks).toHaveLength(1) // asked once the first box closed
+    asks.shift()?.()
+    await settle()
     expect(showBox).toHaveBeenCalledTimes(2)
+    expect(showBox.mock.calls[1][1].message).toBe('Move "b.md" into the project?')
+
+    closes.shift()?.()
+    expect(await second).toBe('move')
     expect(most).toBe(1)
   })
 })

@@ -2,12 +2,10 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react'
+import type { ISplitviewPanelProps } from 'dockview'
 
-declare global {
-  interface Window {
-    api: any
-  }
-}
+// TerminalPanel ignores its dockview props, so an empty object stands in for them.
+const PANEL_PROPS = {} as ISplitviewPanelProps
 
 // Mock xterm and addons to avoid canvas usage in jsdom
 vi.mock('@xterm/xterm', () => {
@@ -87,7 +85,7 @@ describe('TerminalPanel unavailable flow', () => {
     vi.useFakeTimers()
     try {
       const { TerminalPanel } = await import('./TerminalPanel')
-      render(<TerminalPanel /> as any)
+      render(<TerminalPanel {...PANEL_PROPS} />)
 
       // Drive the async unavailable-header render under fake timers.
       await vi.waitFor(() => {
@@ -115,7 +113,7 @@ describe('TerminalPanel unavailable flow', () => {
 
   it('copies fix command to clipboard', async () => {
     const { TerminalPanel } = await import('./TerminalPanel')
-    render(<TerminalPanel /> as any)
+    render(<TerminalPanel {...PANEL_PROPS} />)
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /copy fix command/i })).toBeInTheDocument()

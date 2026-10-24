@@ -115,6 +115,16 @@ Phases 0–2 of Windows enablement shipped in **v0.9.3** (2026-04-22); Phase 4 (
 
 ---
 
+### Local Whisper: Windows needs the Microsoft VC++ redistributable
+
+**Issue**: The Windows whisper build (`whisper.exe` and its 4 DLLs) links the Microsoft C++ runtime dynamically – `MSVCP140`, `VCRUNTIME140`, `VCRUNTIME140_1`, and `VCOMP140` (OpenMP, imported by `ggml-cpu.dll`). The zip does not carry these DLLs. On a machine without the Microsoft Visual C++ 2015–2022 (x64) redistributable, `whisper.exe` cannot start, so local transcription fails.
+
+**Workaround**: Install the Microsoft Visual C++ 2015–2022 Redistributable (x64), which most Windows machines already have, or use the OpenAI API backend. `whisper-build-v1.8.4-erfana2` was checked against runtime 14.44 and newer (see [phase4-binary-spec.md](./windows/phase4-binary-spec.md#verification-evidence--erfana2)); an older runtime, or none at all, is untested.
+
+**Tracking**: Not a regression – `erfana1` had the same requirement. Shipping the runtime DLLs app-local in the zip would remove it.
+
+---
+
 ### Local Whisper: cancellation on Windows is abrupt
 
 **Issue**: On Windows, `child.kill('SIGTERM')` maps to `TerminateProcess` — no graceful shutdown. Any partially-written `${audioPath}.txt` from whisper.cpp's `-otxt` flag may be corrupted.
@@ -164,7 +174,7 @@ Pipeline contributors on Windows:
 
 ### cmd.exe terminals can leak pre-bootstrap text into scrollback after aggressive resizing
 
-**Issue**: On Windows, ConPTY keeps its own screen buffer and re-emits the buffer contents back through the PTY stream on every terminal resize. The Git Bash and PowerShell bootstraps emit a full CSI 2J / CSI 3J / CSI H sequence after the startup marker so ConPTY's buffer is wiped before the interactive shell takes over, leaving nothing for a later reflow to replay. cmd.exe can only clear the visible viewport (`cls` → CSI 2J + CSI H); `CSI 3J` (scrollback clear) isn't available from cmd without spawning a child process. In rare cases, a user who opens a fresh cmd.exe terminal and immediately drags the panel splitter may see faint reflowed pwd / marker text appear in scrollback history (not the visible viewport).
+**Issue**: On Windows, ConPTY keeps its own screen buffer and re-emits the buffer contents back through the PTY stream on every terminal resize. The Git Bash and PowerShell bootstraps emit a full CSI 2J / CSI 3J / CSI H sequence after the startup marker so ConPTY's buffer is wiped before the interactive shell takes over, leaving nothing for a later reflow to replay. The cmd.exe bootstrap waits in `pause >nul` after the marker, then runs `cls` once main has written `\r` (so the marker frame is flushed first and the cd line and marker are wiped from ConPTY's buffer; a resize repaint no longer brings them back). cmd.exe can only clear the visible viewport (`cls` → CSI 2J + CSI H); `CSI 3J` (scrollback clear) isn't available from cmd without spawning a child process. In rare cases, a user who opens a fresh cmd.exe terminal and immediately drags the panel splitter may see faint reflowed pwd / marker text appear in scrollback history (not the visible viewport).
 
 **Workaround**: Set `$env:SHELL` to `pwsh.exe` or Git Bash (`C:\Program Files\Git\usr\bin\bash.exe`) before launching Erfana — both emit the full three-sequence clear and have no scrollback-reflow leak.
 

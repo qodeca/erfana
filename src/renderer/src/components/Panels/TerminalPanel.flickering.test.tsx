@@ -13,12 +13,14 @@
 
 import { beforeEach, describe, expect, it, vi, afterEach } from 'vitest'
 import { render, waitFor } from '@testing-library/react'
+import type { ISplitviewPanelProps } from 'dockview'
+import type { TerminalBridge } from '../../../../shared/ipc/terminal-schema'
+import { gatewayBridgeMock, type BridgeMock } from '../../test-utils/gatewayBridgeMock'
 
-declare global {
-  interface Window {
-    api: any
-  }
-}
+// TerminalPanel ignores its dockview props, so an empty object stands in for them.
+const PANEL_PROPS = {} as ISplitviewPanelProps
+
+const terminalMock = (): BridgeMock<TerminalBridge> => gatewayBridgeMock('terminal')
 
 // Mock xterm with dimension tracking
 const mockXtermInstance = {
@@ -146,11 +148,11 @@ describe('TerminalPanel flickering prevention', () => {
 
   it('should enforce integer dimensions during resize', async () => {
     const { TerminalPanel } = await import('./TerminalPanel')
-    const { container } = render(<TerminalPanel /> as any)
+    const { container } = render(<TerminalPanel {...PANEL_PROPS} />)
 
     // Wait for terminal creation and clear handler
     await waitFor(() => {
-      expect(window.api.terminal.create).toHaveBeenCalled()
+      expect(terminalMock().create).toHaveBeenCalled()
       expect(mockOnClearCallback).not.toBeNull()
     })
 
@@ -187,7 +189,7 @@ describe('TerminalPanel flickering prevention', () => {
     // Verify Math.floor() was applied to dimensions
     // The resize should have been called with floored integers
     await waitFor(() => {
-      const resizeCalls = window.api.terminal.resize.mock.calls
+      const resizeCalls = terminalMock().resize.mock.calls
       if (resizeCalls.length > 0) {
         const lastCall = resizeCalls[resizeCalls.length - 1]
         expect(lastCall[1]).toBe(79) // Math.floor(79.7)
@@ -198,10 +200,10 @@ describe('TerminalPanel flickering prevention', () => {
 
   it('should apply threshold to prevent dimension oscillation', async () => {
     const { TerminalPanel } = await import('./TerminalPanel')
-    render(<TerminalPanel /> as any)
+    render(<TerminalPanel {...PANEL_PROPS} />)
 
     await waitFor(() => {
-      expect(window.api.terminal.create).toHaveBeenCalled()
+      expect(terminalMock().create).toHaveBeenCalled()
       expect(mockOnClearCallback).not.toBeNull()
     })
 
@@ -218,7 +220,7 @@ describe('TerminalPanel flickering prevention', () => {
 
     // Wait for initial resize
     await new Promise(resolve => setTimeout(resolve, 200))
-    const initialResizeCount = window.api.terminal.resize.mock.calls.length
+    const initialResizeCount = terminalMock().resize.mock.calls.length
 
     // Simulate tiny oscillation (1 column change - below threshold)
     mockXtermInstance.cols = 81
@@ -227,17 +229,17 @@ describe('TerminalPanel flickering prevention', () => {
     await new Promise(resolve => setTimeout(resolve, 150))
 
     // Should NOT have called resize (1 column is below 2-column threshold)
-    expect(window.api.terminal.resize).toHaveBeenCalledTimes(initialResizeCount)
+    expect(terminalMock().resize).toHaveBeenCalledTimes(initialResizeCount)
   })
 
   it('should resize when change exceeds threshold', async () => {
     // Note: This test verifies threshold logic exists in the component.
     // Actual ResizeObserver triggering is tested in integration/E2E tests.
     const { TerminalPanel } = await import('./TerminalPanel')
-    render(<TerminalPanel /> as any)
+    render(<TerminalPanel {...PANEL_PROPS} />)
 
     await waitFor(() => {
-      expect(window.api.terminal.create).toHaveBeenCalled()
+      expect(terminalMock().create).toHaveBeenCalled()
       expect(mockOnClearCallback).not.toBeNull()
     })
 
@@ -254,7 +256,7 @@ describe('TerminalPanel flickering prevention', () => {
 
     // Verify component initialized successfully
     // ResizeObserver integration tested via manual/E2E testing
-    expect(window.api.terminal.create).toHaveBeenCalledWith(
+    expect(terminalMock().create).toHaveBeenCalledWith(
       expect.not.objectContaining({ cwd: expect.anything() })
     )
   })
@@ -263,10 +265,10 @@ describe('TerminalPanel flickering prevention', () => {
     const { WebglAddon } = await import('@xterm/addon-webgl')
     const { TerminalPanel } = await import('./TerminalPanel')
 
-    render(<TerminalPanel /> as any)
+    render(<TerminalPanel {...PANEL_PROPS} />)
 
     await waitFor(() => {
-      expect(window.api.terminal.create).toHaveBeenCalled()
+      expect(terminalMock().create).toHaveBeenCalled()
       expect(mockOnClearCallback).not.toBeNull()
     })
 
@@ -307,10 +309,10 @@ describe('TerminalPanel flickering prevention', () => {
 
   it('should validate dimensions before resizing', async () => {
     const { TerminalPanel } = await import('./TerminalPanel')
-    render(<TerminalPanel /> as any)
+    render(<TerminalPanel {...PANEL_PROPS} />)
 
     await waitFor(() => {
-      expect(window.api.terminal.create).toHaveBeenCalled()
+      expect(terminalMock().create).toHaveBeenCalled()
       expect(mockOnClearCallback).not.toBeNull()
     })
 
@@ -335,17 +337,17 @@ describe('TerminalPanel flickering prevention', () => {
     await new Promise(resolve => setTimeout(resolve, 150))
 
     // Should NOT call resize with invalid dimensions
-    expect(window.api.terminal.resize).not.toHaveBeenCalled()
+    expect(terminalMock().resize).not.toHaveBeenCalled()
   })
 
   it('should handle row changes that meet threshold', async () => {
     // Note: This test verifies row threshold logic exists in the component.
     // Actual ResizeObserver triggering is tested in integration/E2E tests.
     const { TerminalPanel } = await import('./TerminalPanel')
-    render(<TerminalPanel /> as any)
+    render(<TerminalPanel {...PANEL_PROPS} />)
 
     await waitFor(() => {
-      expect(window.api.terminal.create).toHaveBeenCalled()
+      expect(terminalMock().create).toHaveBeenCalled()
       expect(mockOnClearCallback).not.toBeNull()
     })
 
@@ -362,7 +364,7 @@ describe('TerminalPanel flickering prevention', () => {
 
     // Verify component initialized successfully with resize handling
     // Row threshold logic (1 row >= threshold) tested via manual/E2E testing
-    expect(window.api.terminal.create).toHaveBeenCalledWith(
+    expect(terminalMock().create).toHaveBeenCalledWith(
       expect.not.objectContaining({ cwd: expect.anything() })
     )
   })

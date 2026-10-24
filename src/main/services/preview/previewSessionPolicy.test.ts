@@ -23,8 +23,8 @@ interface SessionMock {
   setPermissionCheckHandler: ReturnType<typeof vi.fn<(h: PermCheckHandler) => void>>
   on: ReturnType<typeof vi.fn<(event: string, listener: WillDownloadListener) => void>>
   removeListener: ReturnType<typeof vi.fn<(event: string, listener: WillDownloadListener) => void>>
-  onHeadersReceived: ReturnType<typeof vi.fn>
-  onBeforeSendHeaders: ReturnType<typeof vi.fn>
+  /** Every `webRequest.<hook>` property production READ, by name -- whatever it is called. */
+  webRequestHooksTouched: string[]
 }
 
 function makeSessionMock(): SessionMock {
@@ -32,15 +32,27 @@ function makeSessionMock(): SessionMock {
   const setPermissionCheckHandler = vi.fn<(h: PermCheckHandler) => void>()
   const on = vi.fn<(event: string, listener: WillDownloadListener) => void>()
   const removeListener = vi.fn<(event: string, listener: WillDownloadListener) => void>()
-  const onHeadersReceived = vi.fn()
-  const onBeforeSendHeaders = vi.fn()
+  // A Proxy rather than two hand-named spies: a spy named `onHeadersReceived`
+  // only notices a call to a hook the mock's author thought of, so production
+  // reaching for any other hook (`onSendHeaders`, `onResponseStarted`) -- or a
+  // mock whose name differs from production's -- left the test green.
+  const webRequestHooksTouched: string[] = []
+  const webRequest = new Proxy(
+    {},
+    {
+      get(_target, property) {
+        webRequestHooksTouched.push(String(property))
+        return vi.fn()
+      }
+    }
+  )
 
   const session = {
     setPermissionRequestHandler,
     setPermissionCheckHandler,
     on,
     removeListener,
-    webRequest: { onHeadersReceived, onBeforeSendHeaders }
+    webRequest
   } as unknown as Session
 
   return {
@@ -49,8 +61,7 @@ function makeSessionMock(): SessionMock {
     setPermissionCheckHandler,
     on,
     removeListener,
-    onHeadersReceived,
-    onBeforeSendHeaders
+    webRequestHooksTouched
   }
 }
 
@@ -187,14 +198,23 @@ describe('hardenPreviewSession', () => {
     expect(wc.setWebRTCIPHandlingPolicy).toHaveBeenCalledWith('disable_non_proxied_udp')
   })
 
-  it('does NOT touch response headers (CSP has a single owner)', () => {
+  it('records a webRequest hook read by name, so the next test can fail', () => {
+    // POSITIVE CONTROL for the recorder: a read of the response-headers hook must
+    // show up in the list, or an empty list below would prove nothing.
+    const mock = makeSessionMock()
+
+    void mock.session.webRequest.onHeadersReceived
+
+    expect(mock.webRequestHooksTouched).toEqual(['onHeadersReceived'])
+  })
+
+  it('reads no webRequest hook at all (CSP has a single owner of response headers)', () => {
     const mock = makeSessionMock()
     const { webContents } = makeWebContentsMock()
 
     hardenPreviewSession(mock.session, webContents)
 
-    expect(mock.onHeadersReceived).not.toHaveBeenCalled()
-    expect(mock.onBeforeSendHeaders).not.toHaveBeenCalled()
+    expect(mock.webRequestHooksTouched).toEqual([])
   })
 
   it('the disposer resets the handlers and removes the download listener', () => {

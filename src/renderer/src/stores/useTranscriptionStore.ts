@@ -19,6 +19,7 @@ import type {
   TranscriptionProgress,
   TranscriptionImportResult
 } from '../../../shared/ipc/transcription-schema'
+import { transcriptionGateway } from '../services/transcriptionGateway'
 
 /**
  * State and actions for the transcription workflow.
@@ -140,12 +141,12 @@ export const useTranscriptionStore = create<TranscriptionState>((set, get) => ({
     })
 
     // Subscribe to progress events from the main process
-    progressCleanup = window.api.transcription.onProgress((progress) => {
+    progressCleanup = transcriptionGateway.onProgress((progress) => {
       get()._handleProgress(progress)
     })
 
     try {
-      const result = await window.api.transcription.import({
+      const result = await transcriptionGateway.import({
         filePath,
         language
       })
@@ -192,7 +193,7 @@ export const useTranscriptionStore = create<TranscriptionState>((set, get) => ({
     }
 
     try {
-      await window.api.transcription.cancel()
+      await transcriptionGateway.cancel()
     } catch {
       // Cancel is best-effort; the transcription may have already completed
     }

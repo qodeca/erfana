@@ -75,10 +75,10 @@ The one exception is the **graph engine** (spec 004 and the [#21](https://github
 Run the same checks CI runs before opening a PR:
 
 ```bash
-npm run lint            # eslint --fix, then the no-shebang check (lint:shebang)
+npm run lint            # eslint --fix, then the no-shebang check (lint:shebang) and the max-lines baseline check (lint:max-lines)
 npm run lint:css        # stylelint over src/ CSS and the design/ cards
 npm run design -- --check   # fails if a generated file under design/ is stale
-npm run typecheck       # tsc (node + web projects)
+npm run typecheck       # tsc (node + web projects, their tests, and e2e)
 npm run test:ci         # vitest workspace (main / renderer / preload)
 npm run test:cov        # coverage floors - a REQUIRED check that test:ci does not run
 npx electron-vite build # production build
@@ -88,10 +88,18 @@ npm audit signatures    # advisory in CI, but it catches a lockfile written by t
 pipx run --spec "reuse[charset-normalizer]" reuse lint   # REUSE compliance
 ```
 
+`npm run lint` holds every non-test `src/**/*.{ts,tsx}` file to 500 lines, and
+each file already over that to its size in `scripts/max-lines-baseline.json`: a
+file may shrink but never grow. When your change shrinks a listed file, lint
+fails until you run `npm run lint:max-lines -- --update` and commit the lowered
+baseline. That command never raises an allowance; split a file that would grow
+past it ([technical debt #26](docs/technical-debt.md#26-files-over-the-500-line-guideline-after-70-2026-08)).
+
 `npm run test:ci` runs without coverage, so the coverage floors cannot fire
-locally. They sit in all three vitest configs: per-file floors in
-`vitest.main.ts`, global floors in `vitest.preload.ts`, and per-file floors for
-the HTML-preview modules (#124) in `vitest.renderer.ts`. `npm run test:cov` runs
+locally. They sit in all three vitest configs: a project-wide floor in each
+(with `all: true`, so a file no test loads counts at 0 %), plus per-file floors
+in `vitest.main.ts` and for the HTML-preview modules (#124) in
+`vitest.renderer.ts`. `npm run test:cov` runs
 all three and is the only way to reproduce the `Coverage` job before pushing.
 It cannot pass on a Windows host (at least two `vitest.main.ts` floors miss
 because their symlink cases skip on win32, and the #124 floors have not been run

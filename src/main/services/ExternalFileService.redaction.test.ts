@@ -62,7 +62,11 @@ function makeFileService(): IFileService {
     copyItem: vi.fn(),
     checkNameConflict: vi.fn(),
     setHiddenPatterns: vi.fn(),
-    getHiddenPatterns: vi.fn()
+    getHiddenPatterns: vi.fn(),
+    findByName: vi.fn(),
+    isImageFile: vi.fn(),
+    readImage: vi.fn(),
+    setPathFilter: vi.fn()
   }
 }
 

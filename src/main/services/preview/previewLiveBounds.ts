@@ -16,6 +16,7 @@
  */
 
 import { logger } from '../LoggingService'
+import { PREVIEW } from '../../../shared/constants'
 import type { BoundsDrop } from '../../../shared/dropReporter'
 import type { PreviewBounds, PreviewEmitters } from '../../../shared/ipc/preview-types'
 import { stablePathDigest } from '../../../shared/stablePathDigest'
@@ -66,6 +67,8 @@ export interface PreviewLiveBounds {
    * @returns whether it reached the view – only such bounds end a resize hold.
    */
   apply(cssRect: PreviewBounds, seq: number, ack: boolean): boolean
+  /** Teardown: forget the wanted confirmation and clear every timer. */
+  dispose(): void
   /** The last DIP rect handed to `view.setBounds`, or `null` before the first. */
   lastRect(): PreviewBounds | null
   /**
@@ -166,7 +169,7 @@ export function createPreviewLiveBounds(deps: PreviewLiveBoundsDeps): PreviewLiv
    * "assume it is still covering you": a page that never yields never repaints
    * either, so its stale texture really is still at the old geometry.
    */
-  async function confirmRepaint(seq: number): Promise<void> {
+  async function confirmRepaint(seq: number, settled: () => void): Promise<void> {
     try {
       const height = await deps.contents.executeJavaScriptInIsolatedWorld(BOUNDS_ACK_WORLD_ID, [
         { code: REPAINTED_SCRIPT }
@@ -189,7 +192,75 @@ export function createPreviewLiveBounds(deps: PreviewLiveBoundsDeps): PreviewLiv
     } catch {
       // A page that tore down mid-frame, or a world that could not run. Silence
       // is the safe answer, and the caller already has to handle it.
+    } finally {
+      // In the same tick as the answer, so the next wanted script starts at once.
+      settled()
     }
+  }
+
+  /*
+   * AT MOST TWO runs main is waiting on at any time (#120). A burst of growth
+   * pushes (a window-edge resize hold, repeated growth) used to start one script
+   * per asking push. Now an asking push starts its script immediately while
+   * fewer than two runs are being waited on: the renderer's deadline for a
+   * confirmation is absolute (`BOUNDS_ACK_TIMEOUT_MS`), and queueing the second
+   * push behind the first would roughly double its latency. The older run's
+   * answer is then superseded and dropped, as `confirmRepaint` has always done.
+   *
+   * THE LIMIT: a third asking push, with two runs waited on, is only recorded
+   * as `ackWanted` and starts when either settles or expires. So a burst of
+   * three or more pushes can take up to about twice the script time to confirm.
+   *
+   * A page that runs no frames (hidden, frozen) never settles its script, so
+   * main stops waiting on a run after `BOUNDS_ACK_TIMEOUT_MS`; that expired
+   * script may stay pending in such a page. A run that expired and answers late
+   * finds its own `released` flag set, so it frees nothing a later run holds.
+   */
+  const MAX_ACK_SCRIPTS = 2
+  let ackAlive = 0
+  let ackWanted: number | null = null
+  const ackTimers = new Set<ReturnType<typeof setTimeout>>()
+
+  function startConfirmation(seq: number): void {
+    ackAlive += 1
+    let released = false
+    const expiry = setTimeout(() => release(), PREVIEW.BOUNDS_ACK_TIMEOUT_MS)
+    ackTimers.add(expiry)
+    const release = (): void => {
+      if (released) {
+        return
+      }
+      released = true
+      ackAlive -= 1
+      clearTimeout(expiry)
+      ackTimers.delete(expiry)
+      if (deps.isDefunct()) {
+        ackWanted = null
+        return
+      }
+      if (ackWanted !== null && ackAlive < MAX_ACK_SCRIPTS) {
+        const next = ackWanted
+        ackWanted = null
+        startConfirmation(next)
+      }
+    }
+    void confirmRepaint(seq, release)
+  }
+
+  function requestConfirmation(seq: number): void {
+    if (ackAlive < MAX_ACK_SCRIPTS) {
+      startConfirmation(seq)
+    } else {
+      ackWanted = seq
+    }
+  }
+
+  function dispose(): void {
+    ackWanted = null
+    for (const timer of ackTimers) {
+      clearTimeout(timer)
+    }
+    ackTimers.clear()
   }
 
   function place(cssRect: PreviewBounds): void {
@@ -238,10 +309,10 @@ export function createPreviewLiveBounds(deps: PreviewLiveBoundsDeps): PreviewLiv
     // dropped push is exactly a case where it must: the view is not where the
     // renderer believes it is.
     if (ack) {
-      void confirmRepaint(seq)
+      requestConfirmation(seq)
     }
     return true
   }
 
-  return { place, apply, lastRect: () => last, lastCssSize: () => lastCss }
+  return { place, apply, dispose, lastRect: () => last, lastCssSize: () => lastCss }
 }

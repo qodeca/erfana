@@ -39,6 +39,8 @@ export {
 
 // Hooks
 export {
+  useXtermSession,
+  useTerminalFileDrop,
   useTerminalDragDrop,
   useScreenshotCapture,
   useTerminalResize,

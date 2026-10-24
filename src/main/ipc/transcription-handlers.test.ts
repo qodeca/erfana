@@ -13,6 +13,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import * as path from 'path'
 import * as os from 'os'
 import type { IpcMainInvokeEvent } from 'electron'
+import { AppError, ErrorCode } from '../../shared/errors'
 
 // Platform-safe absolute paths (see #157)
 const TEST_PROJECT = path.join(os.tmpdir(), 'erfana-test', 'project')
@@ -85,7 +86,8 @@ vi.mock('../services/WhisperModelManager', () => ({
     ensureModel: vi.fn(),
     listInstalledModels: vi.fn().mockResolvedValue([]),
     getModelInfo: vi.fn(() => ({ size: 0, installed: false })),
-    deleteModel: vi.fn()
+    deleteModel: vi.fn(),
+    cancelDownloads: vi.fn(() => 0)
   }
 }))
 
@@ -156,13 +158,20 @@ vi.mock('../services/LoggingService', () => ({
 // Mock shared modules
 // =============================================================================
 
-vi.mock('../../shared/errors', () => ({
-  ErrorCode: {
-    TRANSCRIPTION_NO_API_KEY: 'TRANSCRIPTION_NO_API_KEY',
-    TRANSCRIPTION_FAILED: 'TRANSCRIPTION_FAILED',
-    TRANSCRIPTION_CANCELLED: 'TRANSCRIPTION_CANCELLED'
+vi.mock('../../shared/errors', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../shared/errors')>()
+  return {
+    // The real class: the whisper download handlers tell a cancel by its cause
+    AppError: actual.AppError,
+    ErrorCode: {
+      TRANSCRIPTION_NO_API_KEY: 'TRANSCRIPTION_NO_API_KEY',
+      TRANSCRIPTION_FAILED: 'TRANSCRIPTION_FAILED',
+      TRANSCRIPTION_CANCELLED: 'TRANSCRIPTION_CANCELLED',
+      WHISPER_MODEL_DOWNLOAD_FAILED: 'WHISPER_MODEL_DOWNLOAD_FAILED',
+      WHISPER_MODEL_INTEGRITY_FAILED: 'WHISPER_MODEL_INTEGRITY_FAILED'
+    }
   }
-}))
+})
 
 vi.mock('../../shared/constants', () => ({
   IMPORT: { DIR_NAME: 'import' }
@@ -319,7 +328,7 @@ describe('transcription-handlers', () => {
       const request = { filePath: TEST_AUDIO, language: 'en' }
       await handler!(mockEvent, request)
 
-      const sender = (mockEvent as { sender: { send: ReturnType<typeof vi.fn> } }).sender
+      const sender = mockEvent.sender
       expect(sender.send).toHaveBeenCalledWith(
         'transcription:progress',
         expect.objectContaining({ percent: 50, phase: 'Processing' })
@@ -554,8 +563,8 @@ describe('transcription-handlers', () => {
 
     it('should stream download progress to renderer', async () => {
       const { whisperModelManager } = await import('../services/WhisperModelManager')
-      vi.mocked(whisperModelManager.ensureBinary).mockImplementation(async ({ onProgress }) => {
-        onProgress?.({ percent: 42, phase: 'Downloading' })
+      vi.mocked(whisperModelManager.ensureBinary).mockImplementation(async (options) => {
+        options?.onProgress?.({ percent: 42, downloadedBytes: 420, totalBytes: 1000 })
         return '/usr/local/bin/whisper'
       })
 
@@ -565,10 +574,10 @@ describe('transcription-handlers', () => {
       const handler = getHandler('transcription:whisperEnsureBinary')
       await handler!(mockEvent)
 
-      const sender = (mockEvent as { sender: { send: ReturnType<typeof vi.fn> } }).sender
+      const sender = mockEvent.sender
       expect(sender.send).toHaveBeenCalledWith(
         'transcription:whisperDownloadProgress',
-        expect.objectContaining({ percent: 42, phase: 'Downloading' })
+        expect.objectContaining({ percent: 42, downloadedBytes: 420, totalBytes: 1000 })
       )
     })
   })
@@ -626,8 +635,8 @@ describe('transcription-handlers', () => {
 
     it('should stream download progress to renderer', async () => {
       const { whisperModelManager } = await import('../services/WhisperModelManager')
-      vi.mocked(whisperModelManager.ensureModel).mockImplementation(async (_model, { onProgress }) => {
-        onProgress?.({ percent: 75, phase: 'Downloading model' })
+      vi.mocked(whisperModelManager.ensureModel).mockImplementation(async (_model, options) => {
+        options?.onProgress?.({ percent: 75, downloadedBytes: 750, totalBytes: 1000 })
         return '/models/whisper/small.bin'
       })
 
@@ -637,10 +646,10 @@ describe('transcription-handlers', () => {
       const handler = getHandler('transcription:whisperEnsureModel')
       await handler!(mockEvent, 'small')
 
-      const sender = (mockEvent as { sender: { send: ReturnType<typeof vi.fn> } }).sender
+      const sender = mockEvent.sender
       expect(sender.send).toHaveBeenCalledWith(
         'transcription:whisperDownloadProgress',
-        expect.objectContaining({ percent: 75, phase: 'Downloading model' })
+        expect.objectContaining({ percent: 75, downloadedBytes: 750, totalBytes: 1000 })
       )
     })
   })
@@ -735,6 +744,220 @@ describe('transcription-handlers', () => {
 
       expect(result.success).toBe(false)
       expect(result.error).toBe('File not found')
+    })
+  })
+
+  // ===========================================================================
+  // transcription:whisperCancelDownload
+  // ===========================================================================
+
+  describe('transcription:whisperCancelDownload', () => {
+    type DownloadResult = { success: boolean; path?: string; error?: string; cancelled?: boolean }
+
+    /**
+     * A manager download that runs until the manager's `cancelDownloads()` is
+     * called, then rejects like a real cancelled download: an AppError whose
+     * cause is the AbortError.
+     */
+    function untilCancelled(manager: { cancelDownloads: () => number }): Promise<string> {
+      return new Promise((_resolve, reject) => {
+        vi.mocked(manager.cancelDownloads).mockImplementationOnce(() => {
+          reject(new AppError(
+            'Model download was cancelled',
+            ErrorCode.WHISPER_MODEL_DOWNLOAD_FAILED,
+            new DOMException('aborted', 'AbortError')
+          ))
+          return 1
+        })
+      })
+    }
+
+    /**
+     * A manager download still preparing (checking the install, creating its
+     * folders), so not yet registered with the manager, until the test lets it
+     * go on. Like the real manager, it then honours a caller signal that was
+     * aborted meanwhile.
+     */
+    function preparing(): { start: (signal?: AbortSignal) => Promise<string>; goOn: () => void } {
+      let goOn!: () => void
+      const prepared = new Promise<void>((resolve) => {
+        goOn = resolve
+      })
+      const start = async (signal?: AbortSignal): Promise<string> => {
+        await prepared
+        if (signal?.aborted) {
+          throw new AppError('Download was cancelled', ErrorCode.WHISPER_MODEL_DOWNLOAD_FAILED, signal.reason as Error)
+        }
+        return '/models/whisper/base.bin'
+      }
+      return { start, goOn }
+    }
+
+    /** A manager download the test fails by hand, after it has sent Cancel. */
+    function failsByHand(): { promise: Promise<string>; fail: (error: Error) => void } {
+      let fail!: (error: Error) => void
+      const promise = new Promise<string>((_resolve, reject) => {
+        fail = reject
+      })
+      return { promise, fail }
+    }
+
+    it('is registered', async () => {
+      const { registerTranscriptionHandlers } = await import('./transcription-handlers')
+      registerTranscriptionHandlers()
+
+      const channels = mockIpcMainHandle.mock.calls.map((c) => c[0])
+      expect(channels).toContain('transcription:whisperCancelDownload')
+    })
+
+    it('reports failure when nothing is downloading', async () => {
+      const { registerTranscriptionHandlers } = await import('./transcription-handlers')
+      registerTranscriptionHandlers()
+
+      const result = await getHandler('transcription:whisperCancelDownload')!(mockEvent) as DownloadResult
+      expect(result).toEqual({ success: false, error: 'No active download' })
+    })
+
+    it('aborts a running model download, which resolves as cancelled, not as an error', async () => {
+      const { whisperModelManager } = await import('../services/WhisperModelManager')
+      vi.mocked(whisperModelManager.ensureModel).mockImplementation(() => untilCancelled(whisperModelManager))
+
+      const { registerTranscriptionHandlers } = await import('./transcription-handlers')
+      registerTranscriptionHandlers()
+
+      const pending = getHandler('transcription:whisperEnsureModel')!(mockEvent, 'base') as Promise<DownloadResult>
+      const cancel = await getHandler('transcription:whisperCancelDownload')!(mockEvent) as DownloadResult
+
+      expect(cancel).toEqual({ success: true })
+      // The downloads the manager has registered are aborted too
+      expect(whisperModelManager.cancelDownloads).toHaveBeenCalledTimes(1)
+      expect(await pending).toEqual({ success: false, cancelled: true, error: 'Download cancelled' })
+      expect(mockLogger.error).not.toHaveBeenCalled()
+      // Still logged, at debug level
+      expect(mockLogger.debug).toHaveBeenCalledWith('Whisper model download cancelled', {
+        error: 'Model download was cancelled'
+      })
+
+      // The finished download is no longer tracked
+      const again = await getHandler('transcription:whisperCancelDownload')!(mockEvent) as DownloadResult
+      expect(again.success).toBe(false)
+    })
+
+    it('aborts a running binary download the same way', async () => {
+      const { whisperModelManager } = await import('../services/WhisperModelManager')
+      vi.mocked(whisperModelManager.ensureBinary).mockImplementation(() => untilCancelled(whisperModelManager))
+
+      const { registerTranscriptionHandlers } = await import('./transcription-handlers')
+      registerTranscriptionHandlers()
+
+      const pending = getHandler('transcription:whisperEnsureBinary')!(mockEvent) as Promise<DownloadResult>
+      await getHandler('transcription:whisperCancelDownload')!(mockEvent)
+
+      expect(await pending).toEqual({ success: false, cancelled: true, error: 'Download cancelled' })
+    })
+
+    it('aborts a model download that Cancel reached before the manager had registered it', async () => {
+      const { whisperModelManager } = await import('../services/WhisperModelManager')
+      const download = preparing()
+      vi.mocked(whisperModelManager.ensureModel).mockImplementation((_model, options) => download.start(options?.signal))
+
+      const { registerTranscriptionHandlers } = await import('./transcription-handlers')
+      registerTranscriptionHandlers()
+
+      const pending = getHandler('transcription:whisperEnsureModel')!(mockEvent, 'base') as Promise<DownloadResult>
+      const cancel = await getHandler('transcription:whisperCancelDownload')!(mockEvent) as DownloadResult
+      expect(cancel).toEqual({ success: true })
+      // The manager had nothing registered: only the request's own signal can stop it
+      expect(whisperModelManager.cancelDownloads).toHaveReturnedWith(0)
+
+      download.goOn()
+      expect(await pending).toEqual({ success: false, cancelled: true, error: 'Download cancelled' })
+    })
+
+    it('aborts a binary download that Cancel reached before the manager had registered it', async () => {
+      const { whisperModelManager } = await import('../services/WhisperModelManager')
+      const download = preparing()
+      vi.mocked(whisperModelManager.ensureBinary).mockImplementation((options) => download.start(options?.signal))
+
+      const { registerTranscriptionHandlers } = await import('./transcription-handlers')
+      registerTranscriptionHandlers()
+
+      const pending = getHandler('transcription:whisperEnsureBinary')!(mockEvent) as Promise<DownloadResult>
+      await getHandler('transcription:whisperCancelDownload')!(mockEvent)
+
+      download.goOn()
+      expect(await pending).toEqual({ success: false, cancelled: true, error: 'Download cancelled' })
+    })
+
+    it('reports a real failure as an error, not as cancelled', async () => {
+      const { whisperModelManager } = await import('../services/WhisperModelManager')
+      vi.mocked(whisperModelManager.ensureModel).mockRejectedValue(new Error('SHA-256 mismatch'))
+
+      const { registerTranscriptionHandlers } = await import('./transcription-handlers')
+      registerTranscriptionHandlers()
+
+      const result = await getHandler('transcription:whisperEnsureModel')!(mockEvent, 'base') as DownloadResult
+      expect(result).toEqual({ success: false, error: 'SHA-256 mismatch' })
+    })
+
+    it('keeps an integrity failure that lands after Cancel as an error, and logs it', async () => {
+      const { whisperModelManager } = await import('../services/WhisperModelManager')
+      const download = failsByHand()
+      vi.mocked(whisperModelManager.ensureModel).mockReturnValue(download.promise)
+
+      const { registerTranscriptionHandlers } = await import('./transcription-handlers')
+      registerTranscriptionHandlers()
+
+      const pending = getHandler('transcription:whisperEnsureModel')!(mockEvent, 'base') as Promise<DownloadResult>
+      const cancel = await getHandler('transcription:whisperCancelDownload')!(mockEvent) as DownloadResult
+      expect(cancel).toEqual({ success: true })
+
+      const integrity = new AppError(
+        'The base model failed its integrity check and was removed. Download it again from Settings.',
+        ErrorCode.WHISPER_MODEL_INTEGRITY_FAILED
+      )
+      download.fail(integrity)
+
+      expect(await pending).toEqual({ success: false, error: integrity.message })
+      expect(mockLogger.error).toHaveBeenCalledWith('Failed to ensure whisper model', integrity)
+      expect(mockLogger.debug).not.toHaveBeenCalledWith('Whisper model download cancelled', expect.anything())
+    })
+
+    it('keeps a binary failure that lands after Cancel as an error, and logs it', async () => {
+      const { whisperModelManager } = await import('../services/WhisperModelManager')
+      const download = failsByHand()
+      vi.mocked(whisperModelManager.ensureBinary).mockReturnValue(download.promise)
+
+      const { registerTranscriptionHandlers } = await import('./transcription-handlers')
+      registerTranscriptionHandlers()
+
+      const pending = getHandler('transcription:whisperEnsureBinary')!(mockEvent) as Promise<DownloadResult>
+      await getHandler('transcription:whisperCancelDownload')!(mockEvent)
+      const tampered = new Error('Whisper binary failed its integrity check')
+      download.fail(tampered)
+
+      expect(await pending).toEqual({ success: false, error: tampered.message })
+      expect(mockLogger.error).toHaveBeenCalledWith('Failed to ensure whisper binary', tampered)
+    })
+
+    it('logs a failure with its absolute paths redacted, and returns it in full', async () => {
+      const { whisperModelManager } = await import('../services/WhisperModelManager')
+      const modelFile = path.join(TEST_PROJECT, 'models', 'ggml-base.bin')
+      const diskFull = Object.assign(new Error(`ENOSPC: no space left on device, rename '${modelFile}'`), {
+        code: 'ENOSPC',
+        syscall: 'rename'
+      })
+      vi.mocked(whisperModelManager.ensureModel).mockRejectedValue(diskFull)
+
+      const { registerTranscriptionHandlers } = await import('./transcription-handlers')
+      registerTranscriptionHandlers()
+
+      const result = await getHandler('transcription:whisperEnsureModel')!(mockEvent, 'base') as DownloadResult
+      expect(result).toEqual({ success: false, error: diskFull.message })
+
+      const logged = mockLogger.error.mock.calls[0][1] as Error
+      expect(logged.message).toBe('ENOSPC: no space left on device, rename [redacted-path]')
+      expect(logged.stack).not.toContain(modelFile)
     })
   })
 

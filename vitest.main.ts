@@ -38,26 +38,28 @@ export default defineConfig({
       reportsDirectory: 'coverage/main',
       // `scripts/**` is instrumented so the packaging-integrity guards in
       // scripts/fuses.js (issue #43 / #55) carry a real per-file floor (F4).
-      // `src/shared/ipc/browser-schema.ts` is instrumented explicitly (not the
-      // whole of src/shared) so the #124 browser-launch IPC payload validator can
-      // carry a per-file floor below; the shared tests that exercise it already
-      // run in this project.
-      include: ['src/main/**/*.{ts,tsx}', 'scripts/**/*.{js,mjs}', 'src/shared/ipc/browser-schema.ts'],
-      // `all: false` is load-bearing for the required Coverage job's determinism:
-      // with `all: true`, an included-but-untested file (any script the main
-      // suite does not execute) emits a synthetic 0%-baseline row, which for
-      // scripts/fuses.js would collide with its real ~88% row and let the
-      // per-file threshold match the 0% row — a spurious required-job failure.
-      // Keeping this false means only files a test actually executes are
-      // reported, so scripts/fuses.js appears exactly once. The checks.yml
-      // Coverage job additionally scopes to `--project main` (issue #55, F4).
-      all: false,
+      // `src/shared/**` is instrumented here because the shared tests run in
+      // this project; it includes the #124 browser-launch IPC payload validator
+      // (`src/shared/ipc/browser-schema.ts`), which carries a per-file floor below.
+      include: ['src/main/**/*.{ts,tsx}', 'src/shared/**/*.{ts,tsx}', 'scripts/**/*.{js,mjs}'],
+      // `all: true` counts an included file that no test loads, at 0 %, so an
+      // untested module lowers the totals instead of vanishing from them.
+      // vitest adds such a file only when the run did not already cover it, so
+      // scripts/fuses.js (loaded by scripts/fuses.test.mjs) still reports one
+      // row at its real coverage. That was checked when this was switched on:
+      // one fuses.js row in coverage/main/lcov.info under `--project main`.
+      // The checks.yml Coverage job keeps scoping to `--project main` (#55, F4).
+      all: true,
       cleanOnRerun: true,
       thresholds: {
-        lines: 10,
-        functions: 10,
-        branches: 5,
-        statements: 10,
+        // Project-wide floors: the measured value rounded down, minus one point.
+        // Measured 2026-10-23 with `all: true`: lines/statements 91.42,
+        // functions 93.18, branches 91.37. Raise them as coverage grows; never
+        // lower one to make a change pass.
+        lines: 90,
+        functions: 92,
+        branches: 90,
+        statements: 90,
         // Trust-chain modules (Phase 4 whisper download verification —
         // minisign-signed manifest, hostname-allowlisted streaming SHA-256
         // downloader, safe zip/tar extraction) carry user-facing security
@@ -141,8 +143,32 @@ export default defineConfig({
         '**/__tests__/**',
         '**/__test__/**',
         '**/__test-helpers__/**',
+        '**/__fixtures__/**',
         'vitest.*.ts',
-        'electron.vite.config.ts'
+        'electron.vite.config.ts',
+        // Type-only: declarations and interface modules compile to nothing. A
+        // type-only `types.ts` elsewhere reports 0 of 0 lines and moves no
+        // total; it is not excluded by name, because some `types.ts` files
+        // hold runtime code (src/main/services/import/types.ts).
+        '**/*.d.ts',
+        '**/*.types.ts',
+        'src/main/interfaces/**',
+        // Script entry points: each runs its command as soon as it is loaded, so
+        // importing one would run it. They run as their own process (an npm
+        // script, or a child process in their test). Scripts that export their
+        // logic stay counted, tested or not – the build hooks included.
+        'scripts/add-spdx-headers.mjs',
+        'scripts/check-spdx-headers.mjs',
+        'scripts/design-sync.mjs',
+        'scripts/prebuild.mjs',
+        'scripts/run-mcp.js',
+        'scripts/test-cov.mjs',
+        // Imported natively by eslint.config.mjs, so every test that runs ESLint
+        // in-process (eslint-*.test.mjs) loads a second copy outside vitest's
+        // transform, and v8 maps that copy onto the transformed source: the
+        // report shows each function twice, half of them unrun. Its behaviour
+        // is tested in scripts/check-max-lines.test.mjs.
+        'scripts/lib/max-lines-baseline.mjs'
       ],
     },
   },

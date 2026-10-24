@@ -127,7 +127,7 @@ The Windows leg builds on its own runner and produces `erfana-{version}-setup.ex
 For detailed information on specific build aspects, see:
 
 - **[Electron Builder Configuration](./electron-builder.md)** - Version pin, the `aproba` shim, build hooks, and an annotated tour of `electron-builder.yml`
-- **[ASAR Packaging](./asar.md)** - Why ASAR is disabled, security implications
+- **[ASAR Packaging](./asar.md)** - What ships in `app.asar`, what is unpacked, and the integrity check
 - **[Preload Bundling](./preload.md)** - Sandbox compatibility requirements
 - **[Architecture Builds](./architectures.md)** - why macOS ships a single arm64 DMG (x64 dropped in v0.11.2, universal never adopted)
 - **[Electron Fuses](./fuses.md)** - Security fuses configuration

@@ -48,7 +48,6 @@ import { useLazyFolderChildren } from './useLazyFolderChildren'
 import { logger } from '../../utils/logger'
 import { getLastSeenProjectGeneration } from '../../services/projectGeneration'
 import { useTerminalStore } from '../../stores/useTerminalStore'
-import { formatPathsForTerminal } from '../../utils/shellPathEscape'
 import { formatShortcut } from '../../utils/shortcutLabel'
 import { TEST_IDS as TERMINAL_TEST_IDS } from '../../constants/testids'
 import { useDirectoryWatcher } from '../../hooks/useDirectoryWatcher'
@@ -73,6 +72,7 @@ import { useTreeFocusRecovery, findTreeFocusFallback } from './useTreeFocusRecov
 import { fileGateway } from '../../services/fileGateway'
 import { moveExternalBatch, type PendingExternalMove } from './externalMoveBatch'
 import { refuseOversizedDrop } from './externalDropLimit'
+import { importGateway } from '../../services/importGateway'
 
 interface ProjectTreeProps {
   onFileSelect: (filePath: string) => void
@@ -686,7 +686,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
         const sourcePath = active.id as string
         logger.info('Drag to terminal SUCCESS', { sourcePath, x: lastPos.x, y: lastPos.y })
 
-        const formattedPath = formatPathsForTerminal([sourcePath])
+        const formattedPath = useTerminalStore.getState().formatPathsForActiveTerminal([sourcePath])
         const success = await useTerminalStore.getState().sendToTerminal(formattedPath, false)
 
         if (!success) {
@@ -1014,7 +1014,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     // Note: isSupported expects a filename/path, not just the extension
     let hasImportableFiles = false
     for (const file of droppedFiles) {
-      if (await window.api.import.isSupported(file.name)) {
+      if (await importGateway.isSupported(file.name)) {
         hasImportableFiles = true
         break
       }

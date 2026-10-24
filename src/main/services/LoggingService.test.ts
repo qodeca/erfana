@@ -103,6 +103,9 @@ import { globalSettingsService } from './GlobalSettingsService'
 import { readdir, stat, unlink, statfs } from 'fs/promises'
 import { existsSync, unlinkSync, renameSync, lstatSync } from 'fs'
 
+// electron-vite declares ELECTRON_RENDERER_URL read-only; this file sets and clears it.
+const writableEnv: Record<string, string | undefined> = process.env
+
 // Get references to mocked modules
 const mockGlobalSettingsService = globalSettingsService as any
 const mockReaddir = readdir as any
@@ -253,7 +256,7 @@ describe('LoggingService', () => {
 
     it('disables console transport in production for all loggers', async () => {
       const originalEnv = process.env.ELECTRON_RENDERER_URL
-      delete process.env.ELECTRON_RENDERER_URL
+      delete writableEnv.ELECTRON_RENDERER_URL
 
       await service.initialize()
 
@@ -263,13 +266,13 @@ describe('LoggingService', () => {
 
       // Restore
       if (originalEnv) {
-        process.env.ELECTRON_RENDERER_URL = originalEnv
+        writableEnv.ELECTRON_RENDERER_URL = originalEnv
       }
     })
 
     it('keeps console transport only for combinedLogger in development', async () => {
       const originalEnv = process.env.ELECTRON_RENDERER_URL
-      process.env.ELECTRON_RENDERER_URL = 'http://localhost:3000'
+      writableEnv.ELECTRON_RENDERER_URL = 'http://localhost:3000'
 
       mockCombinedLogger.transports.console.level = 'info'
       mockMainLogger.transports.console.level = 'info'
@@ -285,9 +288,9 @@ describe('LoggingService', () => {
 
       // Restore
       if (originalEnv !== undefined) {
-        process.env.ELECTRON_RENDERER_URL = originalEnv
+        writableEnv.ELECTRON_RENDERER_URL = originalEnv
       } else {
-        delete process.env.ELECTRON_RENDERER_URL
+        delete writableEnv.ELECTRON_RENDERER_URL
       }
     })
 
@@ -1370,7 +1373,7 @@ describe('LoggingService', () => {
       // We just verify it doesn't crash and logs errors
       expect(consoleErrorSpy).toHaveBeenCalled()
       expect(consoleErrorSpy.mock.calls.some(call =>
-        call[0]?.includes('Failed to shift')
+        typeof call[0] === 'string' && call[0].includes('Failed to shift')
       )).toBe(true)
     })
   })

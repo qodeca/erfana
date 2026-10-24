@@ -18,6 +18,7 @@ import { getBasename } from '../../../../utils/fileUtils'
 import { logger } from '../../../../utils/logger'
 import type { MarkdownPreviewHandle } from '../../MarkdownPreview'
 import type { EditorFile } from '../types'
+import { pdfGateway, docxGateway } from '../../../../services/documentExportGateway'
 
 // Re-export EditorFile for consumers who import from this module
 export type { EditorFile } from '../types'
@@ -190,7 +191,7 @@ export function useExportHandlers(
       const contentElement = previewElement.querySelector('.markdown-preview-content')
       const html = contentElement?.innerHTML || previewElement.innerHTML
 
-      const result = await window.api.pdf.exportToPdf({ html, fileName })
+      const result = await pdfGateway.exportToPdf({ html, fileName })
 
       if (result.success && result.filePath) {
         // Show success with just the filename
@@ -286,7 +287,7 @@ export function useExportHandlers(
         })
       }
 
-      const result = await window.api.docx.exportToDocx({
+      const result = await docxGateway.exportToDocx({
         html: conversionResult.html,
         fileName
       })

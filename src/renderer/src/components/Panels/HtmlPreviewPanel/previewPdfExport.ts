@@ -3,7 +3,7 @@
 /**
  * Shared PDF-export action for the HTML preview (Issue #74, UX-003).
  *
- * Triggers `window.api.preview.exportPdf` and surfaces the outcome as a toast.
+ * Triggers `previewGateway.exportPdf` and surfaces the outcome as a toast.
  * Extracted so both entry points — the tab context menu ({@link HtmlPreviewTab})
  * and the forwarded Cmd/Ctrl+S accelerator ({@link usePreviewFindShortcuts}) —
  * share one implementation with identical feedback.
@@ -20,6 +20,7 @@ import { ErrorCode } from '../../../../../shared/errors'
 import type { PdfExportResult } from '../../../../../shared/ipc/preview-types'
 import { getBasename } from '../../../utils/fileUtils'
 import { showGlobalToast } from '../../Toast/toastService'
+import { previewGateway } from '../../../services/previewGateway'
 
 /**
  * Exports the given preview panel to PDF and toasts the result.
@@ -35,7 +36,7 @@ import { showGlobalToast } from '../../Toast/toastService'
 export async function exportPreviewPdf(panelId: string): Promise<void> {
   let result: PdfExportResult
   try {
-    result = await window.api.preview.exportPdf(panelId)
+    result = await previewGateway.exportPdf(panelId)
   } catch {
     // A rejected invoke (IPC gate refusal, no handler) is still a failed
     // export to the reader – toast it and resolve, so callers chaining

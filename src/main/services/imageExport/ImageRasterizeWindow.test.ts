@@ -23,7 +23,7 @@ const { windows, mockBrowserWindow, mockExistsSync, mockIs, mockLogger, mockPrep
   vi.hoisted(() => ({
     windows: [] as ReturnType<typeof buildWindowStub>[],
     mockBrowserWindow: vi.fn(),
-    mockExistsSync: vi.fn(() => true),
+    mockExistsSync: vi.fn((..._args: unknown[]) => true),
     mockIs: { dev: false },
     mockLogger: {
       trace: vi.fn(),
@@ -55,6 +55,9 @@ vi.mock('./rasterizeSession', async (importOriginal) => {
 import { IMAGE_EXPORT_CHANNELS } from '../../../shared/ipc/image-export-channels'
 import { IMAGE_EXPORT, type HarnessRender } from '../../../shared/ipc/image-export-schema'
 import { HARNESS_PDF_OPTIONS, ImageRasterizeWindow } from './ImageRasterizeWindow'
+
+// electron-vite declares ELECTRON_RENDERER_URL read-only; this file sets and clears it.
+const writableEnv: Record<string, string | undefined> = process.env
 
 type FrameListener = (event: unknown, payload?: unknown) => void
 
@@ -129,7 +132,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   mockExistsSync.mockReturnValue(true)
   mockIs.dev = false
-  delete process.env['ELECTRON_RENDERER_URL']
+  delete writableEnv.ELECTRON_RENDERER_URL
 })
 
 afterEach(() => {

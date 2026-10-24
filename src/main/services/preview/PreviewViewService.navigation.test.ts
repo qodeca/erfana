@@ -360,4 +360,26 @@ describe('PreviewViewService — link routing in project space (part 3 §3.1, §
       ['panel-A', h.file('c.html'), null, 1, 'new-tab']
     ])
   })
+
+  it('keeps a plain click in its tab when its report trails the browser’s own navigation', async () => {
+    // The preload reports a click one task after it; the browser's
+    // `will-navigate` starts as soon as the click ends, so on a page busy for a
+    // moment it arrives well ahead. The preload's early note, wired through to
+    // the bridge, keeps that navigation waiting for the report.
+    const h = makeHarness()
+    await h.service.open(h.request('panel-A', 'a.html'), h.window)
+    const page = h.pages[0]
+
+    page.note({ kind: 'seen', gestureId: 1, href: h.url('b.html') })
+    page.emit('will-navigate', { preventDefault: () => undefined }, h.url('b.html'))
+    await vi.advanceTimersByTimeAsync(200)
+    page.click(h.url('b.html'), 0, 1)
+    await vi.waitFor(() => expect(h.emit.openFileRequested).toHaveBeenCalledTimes(1))
+    await vi.advanceTimersByTimeAsync(2_000)
+
+    // Routed as the navigation instead, it would have opened a new tab.
+    expect(h.emit.openFileRequested.mock.calls).toEqual([
+      ['panel-A', h.file('b.html'), null, 1, 'by-mode']
+    ])
+  })
 })

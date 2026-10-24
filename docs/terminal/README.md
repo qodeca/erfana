@@ -408,7 +408,7 @@ See [Scroll Fixes](./scroll-fixes.md) for related scroll preservation features.
 
 **Shell Arguments** (Platform-Specific):
 - **macOS/Linux**: `-l` (login shell) - Sources RC files (.zprofile, .bash_profile) to load environment, Homebrew paths, and user configuration
-- **Windows (PowerShell)**: `-NoProfile` - Skips the user profile for a fast, isolated bootstrap; the bootstrap then launches the interactive `pwsh`/`powershell` with `-NoLogo` (see [Bootstrap Pattern](./bootstrap-pattern.md))
+- **Windows (PowerShell)**: `-NoLogo -NoProfile -NoExit` - One process: the bootstrap script sets the cwd, then dot-sources the user's profiles itself, and `-NoExit` keeps the same shell interactive (see [Bootstrap Pattern](./bootstrap-pattern.md))
 - **Windows (cmd.exe)**: No arguments - Uses default environment
 
 ### Terminal Initialization
@@ -484,7 +484,9 @@ Output reaches `onData` in batches (every 8 ms or at 64 KiB per terminal, in ord
 **Main Component**: `src/renderer/src/components/Panels/TerminalPanel.tsx`
 
 **Extracted Hooks** (`src/renderer/src/components/Panels/TerminalPanel/hooks/`):
-- `useTerminalDragDrop.ts` - External file drag-drop handling
+- `useXtermSession.ts` - One terminal session: creates xterm, attaches it to a PTY (clear handshake, `terminal:create`, input) and owns `teardownTerminal()`, the single teardown every exit path (unmount, project switch, restart) uses. Every timer id and unsubscribe function is held in a ref so the teardown reaches all of them
+- `useTerminalFileDrop.ts` - External file drops onto the panel (document-level capture listeners, attached and detached by the session)
+- `useTerminalDragDrop.ts` - Deprecated, not used by the panel; use `useTerminalFileDrop`
 - `useScreenshotCapture.ts` - Cross-platform screenshot capture workflow (full-screen, window and area modes; #164)
 - `useTerminalResize.ts` - ResizeObserver-based terminal resize
 - `useTerminalPortal.ts` - DOM portal management for xterm
@@ -506,7 +508,17 @@ See [Terminal Architecture Review](../architecture-reviews/reviews/terminal-pane
 - useRef pattern to avoid useEffect cleanup issues
 - Clean screen on mount (`\x1b[2J\x1b[H`)
 
-**Critical Implementation Detail**: Terminal cleanup uses `useRef` for `terminalId` instead of including it in `useEffect` dependencies. Including `terminalId` in deps causes cleanup to run on ID change, disposing xterm before it can render. The cleanup effect depends only on `isAvailable`.
+**Critical Implementation Detail**: Terminal cleanup uses `useRef` for `terminalId` instead of including it in `useEffect` dependencies. Including `terminalId` in deps causes cleanup to run on ID change, disposing xterm before it can render. The cleanup effect depends only on `isAvailable` (and the session's stable `start` / `teardownTerminal`).
+
+**Teardown order** (`teardownTerminal`, fixed): clear the session's id refs; clear the Claude-nudge timer; stop a start that is waiting for visibility; remove the start-up clear listener, the test-hook registration and the file-drop listeners; clear the active terminal and Claude tracking; release the instance (`releaseInstance`: its fit and WebGL-recovery timers, context-menu and input listeners and parser hooks, then dispose xterm and null its refs); then kill the PTY. A start that fails after its instance reached the refs goes through the same `releaseInstance`. Every step runs even when an earlier one throws, and `releaseInstance` empties its refs before disposing and guards each dispose, so xterm is always disposed and the PTY always killed. A step that throws is logged (`Terminal teardown step failed`) and the teardown still resolves: its callers – effect cleanups, project switch, restart – do not catch, so a throw would reach the root error boundary or skip the next start. Restart and project switch await the kill before starting the next session.
+
+**Screen-reader mode** (lens review [23]): `useXtermSession` takes `screenReaderMode` from `useTerminalScreenReaderMode` (Settings > Terminal: Auto / On / Off, Auto following the OS through `terminal:getScreenReaderSupport` and `terminal:screenReaderSupportChanged`). It is passed to the `Terminal` constructor and set live on `xterm.options`, so xterm adds or removes its accessibility tree without a restart. Details: [settings.md § Terminal screen-reader mode](../settings.md#terminal-screen-reader-mode-terminalscreenreadermode).
+
+**Start-up guard** (lens review [18]): every teardown bumps a generation counter, and a start checks it after each await (font load, WebGL import, `terminal:create`). A start that finds it changed gives up – disposing its xterm if it was never stored, and killing a PTY main created for it in the meantime – so its id is never set and its output never reaches the terminal that replaced it. Only one start runs per generation: a second `start()` joins the one in flight, and a `start()` while a session is live does nothing.
+
+**Failed start**: a start that fails for the current generation (font load, `open()`, or `terminal:create` answering with an error) disposes its own xterm instance and, if it was already stored, releases what it attached and clears `xtermRef` / `fitAddonRef`. Otherwise the stale instance would block every later start, and "Recheck" could never create a terminal again.
+
+The terminal container is rendered only while the panel is available and shows no error, so a start asked for while the error box is up (a project switch after a failed create) finds no container and returns. Such a start records that it was missed, and `TerminalPanel` calls `startIfMissed()` when the container comes back, which retries only that start. A teardown clears the record, so an error cleared by closing the project, or by a switch still waiting for the old PTY's kill, never starts a shell from there.
 
 ### State Management
 
