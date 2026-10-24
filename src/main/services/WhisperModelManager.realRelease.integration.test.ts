@@ -30,23 +30,16 @@ import { readFile, rm, writeFile } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
 
-const { userDataDir } = vi.hoisted(() => {
-  // Hoisted above the imports, so it cannot use them.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const fs = require('fs') as typeof import('fs')
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const os = require('os') as typeof import('os')
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const path = require('path') as typeof import('path')
-  return { userDataDir: fs.mkdtempSync(path.join(os.tmpdir(), 'erfana-whisper-real-')) }
-})
+// Created inside the test, so a skipped run (env var unset) leaves nothing in tmp.
+const state = vi.hoisted(() => ({ userDataDir: '' }))
 
 vi.mock('electron', () => ({
   app: {
     isPackaged: false,
     getPath: (name: string): string => {
       if (name !== 'userData') throw new Error(`unexpected app.getPath(${name})`)
-      return userDataDir
+      if (!state.userDataDir) throw new Error('userData requested before the test created it')
+      return state.userDataDir
     }
   }
 }))
@@ -60,14 +53,22 @@ const SUPPORTED =
 const JFK_URL = 'https://github.com/ggml-org/whisper.cpp/raw/master/samples/jfk.wav'
 const JFK_SHA256 = '59dfb9a4acb36fe2a2affc14bacbee2920ff435cb13cc314a08c13f66ba7860e'
 
-describe.runIf(ENABLED && SUPPORTED)('pinned whisper-build release – real install and transcription', () => {
-  afterAll(async () => {
-    await rm(userDataDir, { recursive: true, force: true })
-  })
+/**
+ * On Windows a sidecar DLL can stay mapped for a moment after whisper.exe
+ * exits, so the first unlink fails with EPERM – retry instead of failing.
+ */
+const RM_OPTIONS = { recursive: true, force: true, maxRetries: 10, retryDelay: 200 } as const
 
+afterAll(async () => {
+  if (state.userDataDir) await rm(state.userDataDir, RM_OPTIONS)
+})
+
+describe.runIf(ENABLED && SUPPORTED)('pinned whisper-build release – real install and transcription', () => {
   it(
     'installs the pinned binary into userData and transcribes the JFK sample with it',
     async () => {
+      state.userDataDir = mkdtempSync(join(tmpdir(), 'erfana-whisper-real-'))
+      const userDataDir = state.userDataDir
       const { logger } = await import('./LoggingService')
       const infoSpy = vi.spyOn(logger, 'info')
       const { MIN_REVISION_INDEX, RELEASE_TAG } = await import('./whisper-assets')
@@ -110,7 +111,7 @@ describe.runIf(ENABLED && SUPPORTED)('pinned whisper-build release – real inst
         expect(result.success).toBe(true)
         expect(result.transcript?.toLowerCase()).toContain('ask not what your country')
       } finally {
-        await rm(audioDir, { recursive: true, force: true })
+        await rm(audioDir, RM_OPTIONS)
       }
     },
     10 * 60 * 1000

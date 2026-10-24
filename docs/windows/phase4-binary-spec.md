@@ -136,7 +136,15 @@ Pin bump checked on 2026-10-24 from a fresh `gh release download` of `whisper-bu
 - `manifest.json.minisig` server digest: `sha256:a1eb518dab2d7cad88ad3cc69367da546d2e01b9e5f63a8bcafb0cc4eaf8908d`
 - macOS (Apple silicon, macOS 26): `spctl -a -vv -t install whisper-cli` → `accepted`, `source=Notarized Developer ID`. Run from a folder outside the extracted tree on `ggml-tiny.bin` + upstream `samples/jfk.wav`, it printed "And so my fellow Americans ask not what your country can do for you, ask what you can do for your country." The x86_64 slice was not run (no Rosetta on the test machine).
 - macOS in-app path, headless: `ERFANA_WHISPER_REAL_RELEASE=1` with `src/main/services/WhisperModelManager.realRelease.integration.test.ts` ran the shipped `ensureBinary()` (signed manifest, download, extraction into a temp `userData`, quarantine strip, chmod, re-hash) and then `LocalWhisperService.transcribe()` on `ggml-tiny`. Logged `Whisper binary installed` with `manifestRevision: 2` and `signingKeyRole: primary`, then `Whisper spawn` with `computedSha: e533e2ae…c0de`, and transcribed the same JFK sentence. Gatekeeper's first-launch check of a quarantined download is not covered, because Node's fetch sets no quarantine attribute.
-- Windows: the build toolchain changed for this release – #372 dropped the VS 2022 pin, so the runner's current Visual Studio (2026) built the zip. Windows results: _pending – to be added after the Windows session tests this build._
+- Windows: the build toolchain changed for this release – #372 dropped the VS 2022 pin, so the runner's current Visual Studio (2026) built the zip. Tested on Windows 11 25H2 (build 26200.9711) at PR #373 head `f1b30fc6`:
+  - Zip SHA-256 `f4a45913…36f2` and all 5 PE hashes (`whisper.exe` + 4 DLLs) match the pins.
+  - `dumpbin /dependents`: all 5 PE files import only `KERNEL32` / `ADVAPI32`, the `api-ms-win-crt-*` set, `MSVCP140`, `VCRUNTIME140` and `VCRUNTIME140_1`; `ggml-cpu.dll` also imports `VCOMP140.DLL` (OpenMP). The Microsoft VC++ 2015–2022 (x64) redistributable is therefore required, as it was for `erfana1`.
+  - Installed redistributable on the test VM: v14.51.36231.00.
+  - Static check against the VS 2022 14.44 redistributable DLLs: every imported function exists (`MSVCP140` 119 imported / 0 missing, `VCRUNTIME140` 16 / 0, `VCRUNTIME140_1` 1 / 0, `VCOMP140` 7 / 0).
+  - Live: `whisper.exe` with app-local 14.44.35211.0 runtime DLLs → exit 0, correct transcript.
+  - In-app (sandboxed e2e profile): upgrade from `erfana1` → `Whisper binary installed … "manifestRevision":2` and a correct transcript; fresh install OK; Cancel OK (`{"cancelled":true}`, `bin/` empty, no temp files left, no `whisper.exe` left running). No integrity, missing-DLL or SmartScreen errors.
+  - `WhisperModelManager.realRelease.integration.test.ts` transcribes correctly on Windows.
+  - Not tested: a runtime older than 14.44, or no redistributable installed.
 
 ## First-run verification evidence (erfana1)
 
