@@ -12,12 +12,7 @@ import { act, render, screen, waitFor } from '@testing-library/react'
 import { TEST_IDS } from '../../constants/testids'
 import { useTerminalStore } from '../../stores/useTerminalStore'
 import { useClaudeStatusStore } from '../../stores/useClaudeStatusStore'
-
-declare global {
-  interface Window {
-    api: any
-  }
-}
+import { gatewayBridgeMock } from '../../test-utils/gatewayBridgeMock'
 
 function makeXterm() {
   return {
@@ -131,16 +126,16 @@ describe('TerminalPanel start-up guard', () => {
 
   it('a remount during start leaves one live PTY and kills the first', async () => {
     const first = await mountPanel()
-    await waitFor(() => expect(window.api.terminal.create).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(gatewayBridgeMock('terminal').create).toHaveBeenCalledTimes(1))
     first.unmount()
 
     await mountPanel()
-    await waitFor(() => expect(window.api.terminal.create).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(gatewayBridgeMock('terminal').create).toHaveBeenCalledTimes(2))
     await answerCreate(1, 'pty-second')
     await answerCreate(0, 'pty-first')
 
-    await waitFor(() => expect(window.api.terminal.kill).toHaveBeenCalledWith('pty-first'))
-    expect(window.api.terminal.kill).not.toHaveBeenCalledWith('pty-second')
+    await waitFor(() => expect(gatewayBridgeMock('terminal').kill).toHaveBeenCalledWith('pty-first'))
+    expect(gatewayBridgeMock('terminal').kill).not.toHaveBeenCalledWith('pty-second')
     expect(useTerminalStore.getState().activeTerminalId).toBe('pty-second')
     // Two instances were made; only the first one is disposed
     expect(instances).toHaveLength(2)
@@ -150,21 +145,21 @@ describe('TerminalPanel start-up guard', () => {
 
   it('a fast project switch during start keeps only the last PTY and drops late output', async () => {
     await mountPanel()
-    await waitFor(() => expect(window.api.terminal.create).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(gatewayBridgeMock('terminal').create).toHaveBeenCalledTimes(1))
 
     await switchProject('/project/b')
-    await waitFor(() => expect(window.api.terminal.create).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(gatewayBridgeMock('terminal').create).toHaveBeenCalledTimes(2))
     await switchProject('/project/c')
-    await waitFor(() => expect(window.api.terminal.create).toHaveBeenCalledTimes(3))
+    await waitFor(() => expect(gatewayBridgeMock('terminal').create).toHaveBeenCalledTimes(3))
 
     // Main answers in the worst order: newest first, then the stale ones
     await answerCreate(2, 'pty-c')
     await answerCreate(0, 'pty-a')
     await answerCreate(1, 'pty-b')
 
-    await waitFor(() => expect(window.api.terminal.kill).toHaveBeenCalledWith('pty-a'))
-    await waitFor(() => expect(window.api.terminal.kill).toHaveBeenCalledWith('pty-b'))
-    expect(window.api.terminal.kill).not.toHaveBeenCalledWith('pty-c')
+    await waitFor(() => expect(gatewayBridgeMock('terminal').kill).toHaveBeenCalledWith('pty-a'))
+    await waitFor(() => expect(gatewayBridgeMock('terminal').kill).toHaveBeenCalledWith('pty-b'))
+    expect(gatewayBridgeMock('terminal').kill).not.toHaveBeenCalledWith('pty-c')
     expect(useTerminalStore.getState().activeTerminalId).toBe('pty-c')
     await waitFor(() => expect(dataListener).not.toBeNull())
 
@@ -180,19 +175,19 @@ describe('TerminalPanel start-up guard', () => {
 
   it('an unmount during start kills the PTY created afterwards', async () => {
     const view = await mountPanel()
-    await waitFor(() => expect(window.api.terminal.create).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(gatewayBridgeMock('terminal').create).toHaveBeenCalledTimes(1))
 
     view.unmount()
     await answerCreate(0, 'pty-orphan')
 
-    await waitFor(() => expect(window.api.terminal.kill).toHaveBeenCalledWith('pty-orphan'))
+    await waitFor(() => expect(gatewayBridgeMock('terminal').kill).toHaveBeenCalledWith('pty-orphan'))
     expect(useTerminalStore.getState().activeTerminalId).toBeNull()
     expect(instances[0].dispose).toHaveBeenCalledTimes(1)
   })
 
   it('a project switch after a failed create starts a new terminal (Windows: cwd with "&")', async () => {
     await mountPanel()
-    await waitFor(() => expect(window.api.terminal.create).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(gatewayBridgeMock('terminal').create).toHaveBeenCalledTimes(1))
     // terminal:create answers with an error (not a rejection), as main does for a bad cwd
     await act(async () => {
       pendingCreates[0]({ success: false, error: 'cwd contains unsupported character "&"' })
@@ -202,13 +197,13 @@ describe('TerminalPanel start-up guard', () => {
 
     // Opening a good project must create again, once the terminal container is back
     await switchProject('/good/project')
-    await waitFor(() => expect(window.api.terminal.create).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(gatewayBridgeMock('terminal').create).toHaveBeenCalledTimes(2))
     await answerCreate(1, 'pty-good')
 
     await waitFor(() => expect(useTerminalStore.getState().activeTerminalId).toBe('pty-good'))
     expect(screen.queryByTestId(TEST_IDS.TERMINAL_STATUS_ERROR)).toBeNull()
     expect(screen.getByTestId(TEST_IDS.TERMINAL_INSTANCE)).toBeTruthy()
     await waitFor(() => expect(screen.getByTestId(TEST_IDS.TERMINAL_BTN_RESTART)).toBeTruthy())
-    expect(window.api.terminal.create).toHaveBeenCalledTimes(2)
+    expect(gatewayBridgeMock('terminal').create).toHaveBeenCalledTimes(2)
   })
 })
