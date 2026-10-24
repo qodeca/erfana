@@ -199,7 +199,7 @@ Manual trigger: `gh workflow run whisper-binaries-canary.yml`.
 
 CMake embeds a git commit SHA + build timestamp into the compiled artifact. Re-running the workflow with the same `upstream_sha` + `erfana_revision` **does not** produce bit-identical binaries. The SHA-256 pin in `src/main/services/whisper-assets.ts` is "the hash of the build we published" — not "the hash of any deterministic rebuild".
 
-Quarterly integrity task: download and re-verify a random shipped binary against its pinned SHA-256 (e.g. `curl -sL https://github.com/qodeca/erfana/releases/download/whisper-build-v1.8.4-erfana1/whisper-win-x64-v1.8.4-erfana1.zip | shasum -a 256`).
+Quarterly integrity task: download and re-verify a random shipped binary against its pinned SHA-256 (e.g. `curl -sL https://github.com/qodeca/erfana/releases/download/whisper-build-v1.8.4-erfana2/whisper-win-x64-v1.8.4-erfana2.zip | shasum -a 256`).
 
 ## Cost
 
@@ -251,6 +251,7 @@ After CI publishes a new `whisper-build-<label>-erfana<N>` release, the app-side
    - Delete `{userData}/whisper/` to force a fresh install.
    - Launch Erfana → Settings → Transcription → Backend = Local → Download model → transcribe a test audio file.
    - Expected log: `INFO: Whisper binary installed` with the new `manifestRevision` value.
+   - Without a usable desktop session, run the same path headless: `ERFANA_WHISPER_REAL_RELEASE=1 npx vitest --run --config vitest.main.ts src/main/services/WhisperModelManager.realRelease.integration.test.ts`. It installs the pinned release into a temp `userData` through the shipped `WhisperModelManager` and transcribes the JFK sample with `ggml-tiny` through `LocalWhisperService` (~80 MB download). It does not cover Gatekeeper's first-launch check of a quarantined download.
 9. **Commit** with a conventional message: `feat(whisper): pin whisper-build-<label>-erfana<N> (upstream <whisper.cpp version>)`.
 10. **PR review** — reviewer should confirm: (a) SHAs match manifest, (b) `MIN_REVISION_INDEX` monotonic, (c) `CHANGELOG.md` mentions the security-relevant upstream changes (see the [diff-review checklist](#diff-review-checklist-every-upstream-bump) above).
 
@@ -287,7 +288,7 @@ Hard-won knowledge from Phase 4 implementation — documented here so future mai
 1. **Key-ID byte order is reversed for display only.** The on-wire key ID in the signature file header is 8 bytes in little-endian order; the `minisign` CLI and `.pub` files show the hex reversed (big-endian). `verifyManifest.ts:95` reverses those bytes in a single statement, purely so the `signingKeyId` we report and log matches what a maintainer sees in the `.pub` file and the release description. The actual key-ID **comparison** runs on the raw, un-reversed bytes via `timingSafeEqual` (`verifyManifest.ts:112`). Future maintainers comparing hex dumps of `.pub` files vs `.minisig` payload: the bytes are reversed.
 2. **Signature algorithm variants**: public keys always carry `Ed` (magic bytes `0x45 0x64`); signatures must be `ED` (prehashed via BLAKE2b-512, then Ed25519 over the 64-byte digest – magic bytes `0x45 0x44`, the minisign >= 0.7 default). `parseSignature` (`verifyManifest.ts`) refuses a legacy `Ed` signature and anything else with `unsupported-algorithm`. It also requires the trusted-comment and global-signature lines, and checks the global signature (same key, over signature || trusted comment). The BLAKE2b-512 is computed with the pure-JS `@noble/hashes`, because Electron's BoringSSL has no `blake2b512` (`crypto.createHash` throws "Digest method not supported").
 3. **Pure-JS verifier via `@noble/ed25519`.** We chose this over `sodium-native` to keep the verifier a pure-function with no native bindings. Tradeoff: ~100µs per verify vs ~10µs native — negligible for once-per-install use.
-4. **Test fixture pattern**: `src/main/utils/verifyManifest.test.ts` uses a real published manifest + signature from `whisper-build-v1.8.4-erfana1` as fixture bytes. When the pin advances, either (a) the fixture stays pointing at the old release (still cryptographically valid) or (b) refresh the fixture to the new release. Do NOT generate synthetic manifests with test keypairs — that would miss the `Ed`/`ED` variant-detection path.
+4. **Test fixture pattern**: `src/main/utils/verifyManifest.test.ts` uses a real published manifest + signature from `whisper-build-v1.8.4-erfana1` as fixture bytes. It still points there after the `erfana2` bump: the old signature stays valid, and the test pins its trusted-comment timestamp. When the pin advances, either (a) the fixture stays pointing at the old release (still cryptographically valid) or (b) refresh the fixture to the new release. Do NOT generate synthetic manifests with test keypairs — that would miss the `Ed`/`ED` variant-detection path.
 
 ## Security baseline
 
