@@ -191,6 +191,8 @@ Step 6's re-check exists because revision 1 had the ordering backwards: a preloa
 
 *Revised after the build.* The preload never calls `preventDefault()` (the page's own handlers must win, and the navigation is refused anyway), and the re-check is deferred to a **task** (`setTimeout`), not a microtask. For a click the user made, the browser runs microtasks after each listener returns, so a microtask re-check ran before the page's later listeners – a `window`-level one, for example – and a link the page cancelled there was still followed.
 
+Deferring the report to a task lets the browser's own navigation attempt (`will-navigate`, which starts when the click's dispatch ends) reach main first, where on its own it counts as the page navigating itself. So the preload sends a short `seen` note (href and a per-click id) on `preview-page:linkNote` **during** the click, and one task later either the report or a `cancelled` note. Main holds a `will-navigate` for a 50 ms grace and, while a seen click on the same href is pending, until that click's report or `cancelled` note arrives, capped at 1 s, after which it routes the navigation on its own as before (`previewNavigationHold.ts`). Holding only delays a navigation; it never turns one into a gesture.
+
 **Documented blind spots**: a page that calls `stopPropagation()` on its own handler, and links inside **closed** shadow roots, both stay inert — the same behaviour as today.
 
 ### 5.2 Wiring the preload

@@ -39,12 +39,19 @@
  * navigation the browser would attempt is already refused by the sandbox and by
  * main's `will-navigate` deny. So the click is observed, the decision is
  * deferred to a task (`setTimeout`), and if the page cancelled it in the
- * meantime nothing is sent.
+ * meantime no report is sent.
+ *
+ * TWO MESSAGES PER CLICK. Deferring the report lets the browser's own
+ * navigation attempt — `will-navigate`, which starts as soon as the click's
+ * dispatch ends — reach main first, where on its own it would count as the page
+ * navigating itself. So a short `seen` note goes out DURING the click, telling
+ * main a report is coming, and one task later either the report or a
+ * `cancelled` note follows (see main's previewNavigationHold).
  *
  * BUILD CONSTRAINT: preload entries must be self-contained. Importing a shared
  * module BY VALUE makes Rollup hoist a chunk that a sandboxed preload cannot
  * `require`, and the packaged app then opens on the root error screen (#73).
- * The channel name is therefore inlined here rather than imported.
+ * The channel names are therefore inlined here rather than imported.
  *
  * @see src/main/services/preview/PreviewNavigationPolicy.ts - what main does with this
  */
@@ -60,6 +67,12 @@ import { ipcRenderer } from 'electron'
 const LINK_ACTIVATED_CHANNEL = 'preview-page:linkActivated'
 
 /**
+ * Page → main channel for the `seen` and `cancelled` notes about a click.
+ * INLINED for the same build reason; must match `previewLinkBridge.ts`.
+ */
+const LINK_NOTE_CHANNEL = 'preview-page:linkNote'
+
+/**
  * Page → main channel for a CSP refusal. INLINED for the same build reason as
  * the channel above; must match `previewCspViolationBridge.ts`.
  */
@@ -67,6 +80,9 @@ const CSP_VIOLATION_CHANNEL = 'preview-page:cspViolation'
 
 /** Primary (left) and auxiliary (middle) buttons both open links. */
 const ACTIVATING_BUTTONS = new Set([0, 1])
+
+/** The last click's id, pairing its `seen` note with what follows it. */
+let lastGestureId = 0
 
 /**
  * The nearest link in the event's composed path.
@@ -117,6 +133,9 @@ function isFragmentOfCurrentDocument(href: string): boolean {
 /**
  * Report an activated link to main, unless the page handled it itself.
  *
+ * Main hears of the click twice: a `seen` note at once, then the report — or a
+ * `cancelled` note — one task later.
+ *
  * The report is deferred to a TASK so every other listener has run and
  * `defaultPrevented` reflects the page's decision, not just this listener's
  * position in the queue. A microtask is not enough: for a click the user made,
@@ -143,13 +162,22 @@ function onLinkActivation(event: MouseEvent): void {
 
   const target = link.getAttribute('target') ?? documentBaseTarget()
   const download = link.hasAttribute('download')
+  lastGestureId += 1
+  const gestureId = lastGestureId
+
+  // Now, during the click: main holds this href's `will-navigate` for the rest.
+  ipcRenderer.send(LINK_NOTE_CHANNEL, { kind: 'seen', gestureId, href })
 
   setTimeout(() => {
     // The page's own handler may have cancelled the click after this listener
-    // ran. Respect that.
-    if (event.defaultPrevented) return
+    // ran. Respect that, and let main stop waiting for a report.
+    if (event.defaultPrevented) {
+      ipcRenderer.send(LINK_NOTE_CHANNEL, { kind: 'cancelled', gestureId })
+      return
+    }
 
     ipcRenderer.send(LINK_ACTIVATED_CHANNEL, {
+      gestureId,
       href,
       // The attribute as written, so main can tell "climbed out of the
       // project" from "file not found" — `href` above is already resolved and

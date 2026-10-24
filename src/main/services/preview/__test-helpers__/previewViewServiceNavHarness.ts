@@ -29,7 +29,7 @@ import type {
   PreviewViewHandle,
   PreviewWebContentsHandle
 } from '../PreviewSessionFactory'
-import { PREVIEW_PAGE_LINK_CHANNEL } from '../previewLinkBridge'
+import { PREVIEW_PAGE_LINK_CHANNEL, PREVIEW_PAGE_LINK_NOTE_CHANNEL } from '../previewLinkBridge'
 import type { PreviewEligibilityCheck } from '../previewLiveTypes'
 import {
   PreviewViewService,
@@ -159,10 +159,20 @@ function makePage() {
     },
     finish: (): void => emit('did-finish-load'),
     stop: (): void => emit('did-stop-loading'),
-    /** A link the preload reports; `button` 1 is a middle click. */
-    click(href: string, button = 0): void {
+    /**
+     * A link the preload reports; `button` 1 is a middle click. `gestureId`
+     * pairs the report with an earlier {@link note}.
+     */
+    click(href: string, button = 0, gestureId?: number): void {
+      const report = { href, target: '', download: false, button, ...(gestureId === undefined ? {} : { gestureId }) }
       for (const listener of ipcListeners.get(PREVIEW_PAGE_LINK_CHANNEL) ?? []) {
-        listener({ senderFrame: mainFrame }, { href, target: '', download: false, button })
+        listener({ senderFrame: mainFrame }, report)
+      }
+    },
+    /** The preload's `seen` or `cancelled` note about a click it reports a task later. */
+    note(note: object): void {
+      for (const listener of ipcListeners.get(PREVIEW_PAGE_LINK_NOTE_CHANNEL) ?? []) {
+        listener({ senderFrame: mainFrame }, note)
       }
     }
   }
