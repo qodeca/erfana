@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { useEffect } from 'react'
 import { useGlobalSettingsStore } from '../stores/useGlobalSettingsStore'
+import { globalSettingsGateway } from '../services/settingsGateway'
 
 /**
  * Initialize global settings store and subscribe to changes from main process.
@@ -21,7 +22,7 @@ export function useGlobalSettingsInit(): void {
 
   useEffect(() => {
     // Subscribe to settings changes from main process
-    const unsubscribe = window.api.globalSettings.onSettingsChanged((data) => {
+    const unsubscribe = globalSettingsGateway.onSettingsChanged((data) => {
       _handleSettingsChanged(data.settings)
     })
 

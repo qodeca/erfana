@@ -27,3 +27,13 @@ export {
   type TerminalExit,
   type TerminalError
 } from './terminal-schema'
+
+/**
+ * The `{ success, error? }` reply most of the older request channels answer
+ * with: `success` says whether main did it, `error` carries the reason when it
+ * did not.
+ */
+export interface IpcAck {
+  success: boolean
+  error?: string
+}

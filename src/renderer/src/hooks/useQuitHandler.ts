@@ -15,6 +15,7 @@ import { useEffect, useCallback } from 'react'
 import { useDialog } from '../components/Dialog/DialogContext'
 import { checkQuitBlocked, buildQuitConfirmMessage } from '../utils/quitHelpers'
 import { logger } from '../utils/logger'
+import { quitGateway } from '../services/quitGateway'
 
 /**
  * Hook to handle quit confirmation from main process
@@ -34,7 +35,7 @@ export function useQuitHandler(): void {
       if (!state.isBlocked) {
         // No blockers, proceed with quit
         logger.info('Quit proceeding - no blockers')
-        window.api.quit.sendQuitResponse(true)
+        quitGateway.sendQuitResponse(true)
         return
       }
 
@@ -51,16 +52,16 @@ export function useQuitHandler(): void {
       })
 
       logger.info('Quit confirmation result', { confirmed })
-      window.api.quit.sendQuitResponse(confirmed)
+      quitGateway.sendQuitResponse(confirmed)
     } catch (error) {
       logger.error('Error handling quit request', error instanceof Error ? error : undefined)
       // On error, allow quit to prevent user being stuck
-      window.api.quit.sendQuitResponse(true)
+      quitGateway.sendQuitResponse(true)
     }
   }, [showConfirm])
 
   useEffect(() => {
-    const cleanup = window.api.quit.onQuitRequested(() => {
+    const cleanup = quitGateway.onQuitRequested(() => {
       handleQuitRequest()
     })
 

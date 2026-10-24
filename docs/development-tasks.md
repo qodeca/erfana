@@ -56,19 +56,19 @@ Never import `ipcMain` in a handler module: ESLint (`no-restricted-imports` in `
 
 4. Call the register function once at startup in `src/main/index.ts`, beside the others (`registerBrowserHandlers()` is there).
 
-5. Expose it in `src/preload/index.ts`, sending the channel constant:
+5. Give the bridge a `MyBridge` contract in the schema file, and expose it from a preload module `src/preload/myBridge.ts` typed as that contract, sending the channel constant:
    ```typescript
-   my: {
-     doSomething: (filePath: string): Promise<MyResponse> =>
-       ipcRenderer.invoke(MY_CHANNELS.DO_SOMETHING, { filePath })
+   export const myBridge: MyBridge = {
+     doSomething: (filePath) => ipcRenderer.invoke(MY_CHANNELS.DO_SOMETHING, { filePath })
    }
    ```
-   `Api = typeof api` is exported from `src/preload/index.ts`, and `Window['api']` is that type, so there is no second declaration to keep in step. Give the bridge a `MyBridge` contract in the schema file and type the preload object with it (`fileBridge.ts`, `terminalBridge.ts` are the model). The `file` and `terminal` bridges are left out of `Window['api']` on purpose: the renderer reaches them only through `services/fileGateway.ts` and `terminalGateway.ts`, and ESLint rejects any other way round.
+   and reference it from the `api` object in `src/preload/index.ts` (`my: myBridge`). `Api = typeof api` is exported from there, so there is no second declaration to keep in step (`fileBridge.ts`, `terminalBridge.ts` are the model).
 
-6. Call from the renderer:
+6. Add a gateway, `src/renderer/src/services/myGateway.ts`, typed as the same contract (`fileGateway.ts` is the model), list it in `RENDERER_GATEWAY_FILES` in `eslint.config.mjs`, and call it from the renderer:
    ```typescript
-   const result = await window.api.my.doSomething(filePath)
+   const result = await myGateway.doSomething(filePath)
    ```
+   Renderer code never reads `window.api` itself: its type does not list the bridges, and ESLint rejects any read outside the gateways – see [IPC patterns § Renderer gateways](./ipc-patterns.md#renderer-gateways).
 
 7. Add the channel to the index in [IPC patterns](./ipc-patterns.md) and any new codes to [Error codes](./error-codes.md).
 

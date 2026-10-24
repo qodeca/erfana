@@ -15,7 +15,7 @@
  * @module components/Panels/MarkdownEditorPanel
  */
 
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react'
 import { IDockviewPanelProps } from 'dockview'
 import * as monaco from 'monaco-editor'
 import { MonacoEditorHandle } from '../Editor/MonacoMarkdownEditor'
@@ -43,6 +43,7 @@ import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts'
 import { useEditorSaveRegistration } from '../../hooks/useEditorSaveRegistration'
 import { useEditorReadOnlyHold } from '../../hooks/useEditorReadOnlyHold'
 import { useLatestFileLoad } from '../../hooks/useLatestFileLoad'
+import { DOCKVIEW_PANEL_ACTIVE, DOCKVIEW_PANEL_VISIBLE, useDockviewValue } from '../../hooks/useDockviewValue'
 
 // Extracted components
 import { MarkdownToolbar, EditorErrorBoundary } from '../Editor/MarkdownEditorPanel/components'
@@ -130,18 +131,24 @@ export function MarkdownEditorPanel(
    * Dockview keeps every opened panel mounted, so background editors are live
    * React trees with live `window` listeners. This flag is what stops them
    * acting on keystrokes aimed at the foreground tab.
+   *
+   * Followed through useSyncExternalStore (`useDockviewValue`), which re-reads
+   * `isActive` after subscribing: a panel can become active between render and
+   * subscribe, and the event would never fire for that transition.
    */
-  const [isActivePanel, setIsActivePanel] = useState<boolean>(() => props.api.isActive)
+  const isActivePanel = useDockviewValue(props.api, DOCKVIEW_PANEL_ACTIVE)
   /**
    * Whether dockview is drawing this panel. A hidden preview holds its link
    * re-checks until it is shown again (see `linkTargetCache`).
    */
-  const [isPanelVisible, setIsPanelVisible] = useState<boolean>(() => props.api?.isVisible ?? true)
+  const isPanelVisible = useDockviewValue(props.api, DOCKVIEW_PANEL_VISIBLE)
 
   // =========================================================================
   // Refs
   // =========================================================================
-  const panelIdRef = useRef<string | undefined>(props.params?.panelId)
+  // The id the tab was opened with, read once: nothing re-points a live editor
+  // panel at another id. State rather than a ref so render may read it.
+  const [panelId] = useState<string | undefined>(() => props.params?.panelId)
   const editorRef = useRef<MonacoEditorHandle>(null)
   const previewRef = useRef<HTMLDivElement>(null)
   const previewHandleRef = useRef<MarkdownPreviewHandle>(null)
@@ -197,10 +204,10 @@ export function MarkdownEditorPanel(
     // The buffer now matches the disk ("Reload from Disk" or a clean file
     // taking an external change), so the tab's dirty dot goes too. It reads
     // the store, not `modified`, and used to stay on after a Reload.
-    if (panelIdRef.current) {
-      useProjectStore.getState().setEditorDirty(panelIdRef.current, false)
+    if (panelId) {
+      useProjectStore.getState().setEditorDirty(panelId, false)
     }
-  }, [])
+  }, [panelId])
   const {
     externalChangeDetected,
     isFileDeleted,
@@ -236,6 +243,27 @@ export function MarkdownEditorPanel(
   // =========================================================================
   // Save Handler (defined early so hooks can reference it)
   // =========================================================================
+
+  // =========================================================================
+  // Auto-Save Hook
+  // =========================================================================
+
+  // handleSave needs setIsAutoSaving from useAutoSave, and useAutoSave needs a
+  // save callback: the hook is called first and reaches handleSave through
+  // this ref, which a layout effect below points at the latest handleSave.
+  const handleSaveRef = useRef<(trigger?: SaveTrigger) => Promise<boolean>>(async () => false)
+  const { isAutoSaving, setIsAutoSaving, holdAutoSave, signalChange } = useAutoSave(
+    currentFile?.modified ?? false,
+    async () => {
+      // A file that changed on disk while the tab holds unsaved edits waits for
+      // the user's choice in the conflict bar; an autosave would overwrite the
+      // newer file and dismiss the bar.
+      if (externalChangeDetected) return
+      // `false` (a failed write) makes autosave back off until the next edit
+      return handleSaveRef.current('autosave')
+    },
+    { delay: 2000, enabled: true, maxInterval: 30000 }
+  )
 
   // The running save, so a project switch can wait for it (see trackSaveInFlight)
   const saveInFlightRef = useRef<Promise<void> | null>(null)
@@ -317,9 +345,9 @@ export function MarkdownEditorPanel(
       // avoid a stale-closure overwrite).
       const bufferNow = editorRef.current?.getEditor()?.getValue()
       setCurrentFile((prev) => settleSavedFile(prev, contentToSave, bufferNow))
-      if (panelIdRef.current) {
+      if (panelId) {
         useProjectStore.getState().setEditorDirty(
-          panelIdRef.current,
+          panelId,
           bufferNow !== undefined && bufferNow !== contentToSave
         )
       }
@@ -357,23 +385,10 @@ export function MarkdownEditorPanel(
       unmarkSaving()
       finishInFlight()
     }
-  }, [currentFile, isFileDeleted, dismissConflict, clearDeletedState, markSaving, unmarkSaving, notifySaveComplete, showToast])
-
-  // =========================================================================
-  // Auto-Save Hook
-  // =========================================================================
-  const { isAutoSaving, setIsAutoSaving, holdAutoSave, signalChange } = useAutoSave(
-    currentFile?.modified ?? false,
-    async () => {
-      // A file that changed on disk while the tab holds unsaved edits waits for
-      // the user's choice in the conflict bar; an autosave would overwrite the
-      // newer file and dismiss the bar.
-      if (externalChangeDetected) return
-      // `false` (a failed write) makes autosave back off until the next edit
-      return handleSave('autosave')
-    },
-    { delay: 2000, enabled: true, maxInterval: 30000 }
-  )
+  }, [currentFile, isFileDeleted, dismissConflict, clearDeletedState, markSaving, unmarkSaving, notifySaveComplete, showToast, setIsAutoSaving, panelId])
+  useLayoutEffect(() => {
+    handleSaveRef.current = handleSave
+  }, [handleSave])
 
   // When the conflict bar goes away with edits still unsaved ("Keep My
   // Version", Dismiss), autosave resumes without waiting for another keystroke.
@@ -385,7 +400,7 @@ export function MarkdownEditorPanel(
   // (view-mode switch) while the hold is active – see handleEditorMount
   const readOnlyHold = useEditorReadOnlyHold(() => editorRef.current?.getEditor())
 
-  useEditorSaveRegistration(panelIdRef.current, () => handleSave('registry'), externalChangeDetected, () => {
+  useEditorSaveRegistration(panelId, () => handleSave('registry'), externalChangeDetected, () => {
     // A hold stops autosave for real (no re-arming by typing or the modified
     // effect) and makes the editor read-only, so nothing new can be typed
     // between a flush and the end of the hold.
@@ -465,25 +480,7 @@ export function MarkdownEditorPanel(
   // =========================================================================
   // Keyboard Shortcuts Hook
   // =========================================================================
-  // Keep the active flag in step with dockview. Re-read `isActive` on
-  // subscribe as well as on the event: a panel can become active between
-  // render and effect, and the event would never fire for that transition.
-  useEffect(() => {
-    setIsActivePanel(props.api.isActive)
-    const disposable = props.api.onDidActiveChange((event) => {
-      setIsActivePanel(event.isActive)
-    })
-    return () => disposable.dispose()
-  }, [props.api])
-
-  useEffect(() => {
-    const api = props.api
-    if (!api?.onDidVisibilityChange) return
-    setIsPanelVisible(api.isVisible ?? true)
-    const disposable = api.onDidVisibilityChange((event) => setIsPanelVisible(event.isVisible))
-    return () => disposable.dispose()
-  }, [props.api])
-
+  // `isActivePanel` (declared with the state above) gates every shortcut.
   useKeyboardShortcuts({
     onSave: () => handleSave('user'),
     onClose: () => props.api.close(),
@@ -491,8 +488,8 @@ export function MarkdownEditorPanel(
     // time. `currentFile.modified` is React state and can lag the edit, so a
     // quick ⌘W after typing saw a clean file and discarded the change.
     isModified: () =>
-      panelIdRef.current !== undefined
-        ? useProjectStore.getState().dirtyPanelIds.has(panelIdRef.current)
+      panelId !== undefined
+        ? useProjectStore.getState().dirtyPanelIds.has(panelId)
         : (currentFile?.modified ?? false),
     showConfirm,
     fileName: currentFile?.path ? getBasename(currentFile.path) : null,
@@ -504,10 +501,12 @@ export function MarkdownEditorPanel(
   // =========================================================================
   // Document Statistics
   // =========================================================================
+  // Keyed on the text alone, so a save that only flips `modified` does not recount
+  const currentContent = currentFile?.content
   const documentStats = useMemo(() => {
-    if (!currentFile) return null
-    return calculateStats(currentFile.content)
-  }, [currentFile?.content])
+    if (currentContent === undefined) return null
+    return calculateStats(currentContent)
+  }, [currentContent])
 
   // =========================================================================
   // File Operations
@@ -550,12 +549,12 @@ export function MarkdownEditorPanel(
       return { ...prev, content: newContent, modified: true }
     })
     // Mark panel as dirty in global store
-    if (panelIdRef.current) {
-      useProjectStore.getState().setEditorDirty(panelIdRef.current, true)
+    if (panelId) {
+      useProjectStore.getState().setEditorDirty(panelId, true)
     }
     // Reset autosave debounce timer – save fires after user stops typing
     signalChange()
-  }, [signalChange])
+  }, [signalChange, panelId])
 
   /**
    * Opens a markdown file from an internal link.
@@ -607,35 +606,39 @@ export function MarkdownEditorPanel(
   // =========================================================================
 
   // Handle initial line/column positioning from terminal file links
+  const initialLine = props.params?.initialLine
+  const initialColumn = props.params?.initialColumn
   useEffect(() => {
-    const { initialLine, initialColumn } = props.params || {}
     if (!isEditorReady || !initialLine || !editorRef.current) return
 
     editorRef.current.setPositionAndReveal(initialLine, initialColumn)
     logger.info(`Positioned editor at line ${initialLine}${initialColumn ? `:${initialColumn}` : ''}`)
-  }, [isEditorReady, props.params?.initialLine, props.params?.initialColumn])
+  }, [isEditorReady, initialLine, initialColumn])
 
   // Update tab title when modified state changes
+  // Keyed on path and flag only, so typing (a content change) does not re-set it
+  const titlePath = currentFile?.path
+  const titleModified = currentFile?.modified ?? false
   useEffect(() => {
-    if (!currentFile) return
-    const fileName = extractFileName(currentFile.path)
-    const title = formatTabTitle(fileName, currentFile.modified, isFileDeleted)
+    if (titlePath === undefined) return
+    const fileName = extractFileName(titlePath)
+    const title = formatTabTitle(fileName, titleModified, isFileDeleted)
     props.api.setTitle(title)
-  }, [currentFile?.modified, currentFile?.path, isFileDeleted, props.api])
+  }, [titleModified, titlePath, isFileDeleted, props.api])
 
   // Cleanup: ensure panel is not marked dirty on unmount, and drop a pending
   // indicator reset
   useEffect(() => {
     return () => {
-      if (panelIdRef.current) {
-        useProjectStore.getState().setEditorDirty(panelIdRef.current, false)
+      if (panelId) {
+        useProjectStore.getState().setEditorDirty(panelId, false)
       }
       if (autoSaveIndicatorTimerRef.current) {
         clearTimeout(autoSaveIndicatorTimerRef.current)
         autoSaveIndicatorTimerRef.current = null
       }
     }
-  }, [])
+  }, [panelId]) // panelId never changes, so this still runs on unmount only
 
   // Debug logging
   logger.debug('MarkdownEditorPanel render', {

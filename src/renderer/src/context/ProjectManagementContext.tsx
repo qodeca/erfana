@@ -19,7 +19,8 @@
  * - Use useOpenProjectByPath() for focused ISP-compliant subset
  */
 
-import { createContext, useContext, useEffect, useRef, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, type ReactNode } from 'react'
+import { useLatestRef } from '../hooks/useLatestRef'
 import { useProjectManagement } from '../hooks/useProjectManagement'
 import type { IUseProjectManagementReturn } from '../interfaces/IProjectManagement'
 import { logger } from '../utils/logger'
@@ -126,8 +127,7 @@ export function useOpenProjectByPath() {
  */
 export function useProjectChangedEffect(onProjectChanged: ProjectChangedCallback): void {
   // Store callback in ref to avoid re-registration on callback changes
-  const callbackRef = useRef(onProjectChanged)
-  callbackRef.current = onProjectChanged
+  const callbackRef = useLatestRef(onProjectChanged)
 
   useEffect(() => {
     // Register a stable wrapper that calls the latest callback
@@ -140,5 +140,5 @@ export function useProjectChangedEffect(onProjectChanged: ProjectChangedCallback
     return () => {
       unregister()
     }
-  }, []) // Empty deps - register once, use ref for latest callback
+  }, [callbackRef]) // callbackRef is stable - registers once, calls the latest callback
 }

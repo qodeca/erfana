@@ -23,7 +23,14 @@ const GOOD_SHA = createHash('sha256').update(GOOD).digest('hex')
 const env = vi.hoisted(() => ({ userData: '' }))
 
 /** Lets a test make the PATH stat disagree with the open handle (Windows dev/ino quirks). */
-const statControl = vi.hoisted(() => ({ skewIno: false }))
+const statControl = vi.hoisted(() => ({
+  skewIno: false,
+  /**
+   * An inode that can never equal the real one. Not `ino + 1`: NTFS file ids are
+   * above 2^53, where a number has no room for +1 and rounds back to the same id.
+   */
+  skewed: (ino: number | bigint): number | bigint => (typeof ino === 'bigint' ? -ino - 1n : -ino - 1)
+}))
 
 vi.mock('fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs/promises')>()
@@ -31,7 +38,7 @@ vi.mock('fs/promises', async (importOriginal) => {
     ...actual,
     stat: async (...args: Parameters<typeof actual.stat>) => {
       const result = await actual.stat(...args)
-      return statControl.skewIno ? { ...result, ino: Number(result.ino) + 1 } : result
+      return statControl.skewIno ? { ...result, ino: statControl.skewed(result.ino) } : result
     }
   }
 })
@@ -208,6 +215,15 @@ describe('WhisperModelManager model integrity (real fs)', () => {
       ).rejects.toMatchObject({ code: 'TRANSCRIPTION_CANCELLED' })
       expect(await readFile(tinyPath())).toEqual(GOOD)
       await expect(manager.verifyInstalledModelFile('tiny')).resolves.toBeDefined()
+    })
+
+    it('the skewed inode always differs, even for an NTFS file id above 2^53', () => {
+      // An NTFS-sized id (Windows hosts report ~9.8e15) where `id + 1 === id`
+      const ntfsId = 9851624188281704
+      expect(ntfsId + 1).toBe(ntfsId)
+      expect(statControl.skewed(ntfsId)).not.toBe(ntfsId)
+      expect(statControl.skewed(0)).not.toBe(0)
+      expect(statControl.skewed(BigInt(ntfsId))).not.toBe(BigInt(ntfsId))
     })
 
     it('a "changed while verifying" result fails the job but never deletes a good model', async () => {

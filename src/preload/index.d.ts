@@ -3,6 +3,16 @@
 import type { Api } from './index'
 import type { LogEntry } from '../shared/ipc/logging-schema'
 
+/**
+ * The only bridges still on `window.api`'s type. Every bridge has a gateway in
+ * `src/renderer/src/services/`; these three stay typed only because
+ * `components/Panels/TerminalPanel.tsx` and its `useScreenshotCapture` /
+ * `useTerminalDragDrop` hooks still read them directly, and ESLint allows
+ * exactly those reads in exactly those files. Empty this list when they move
+ * to `claudeStatusGateway`, `utilsGateway` and `screenshotGateway`.
+ */
+type TerminalPanelBridges = 'claudeStatus' | 'utils' | 'screenshot'
+
 declare global {
   interface Window {
     electron: {
@@ -12,10 +22,11 @@ declare global {
     }
     /**
      * Derived from the preload object itself, so it cannot drift from it. The
-     * `file` and `terminal` bridges are left out on purpose: the renderer reaches
-     * them through `services/fileGateway` and `terminalGateway`.
+     * renderer reaches every bridge through its gateway in `services/` (see
+     * docs/ipc-patterns.md § Renderer gateways), so only the bridges the
+     * TerminalPanel files still read are on this type.
      */
-    api: Omit<Api, 'file' | 'terminal'>
+    api: Pick<Api, TerminalPanelBridges>
     /**
      * Area-select overlay API exposed only by the per-display overlay
      * BrowserWindows via `src/preload/screenshotOverlay.ts`. `undefined`
