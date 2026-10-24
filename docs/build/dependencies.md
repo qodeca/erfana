@@ -48,7 +48,7 @@ Issue #43 turned `files:` from a negation-only list into an allowlist (two posit
 
 ## Native modules
 
-`asar: false`, so nothing is packed and `asarUnpack` does not apply — native modules load straight from `app/node_modules/`. See [asar.md](./asar.md).
+The app is packed into `app.asar`; native addons and executables are listed file by file in `asarUnpack` and load from `app.asar.unpacked/node_modules/`. A new native or spawned dependency needs an `asarUnpack` entry. See [asar.md](./asar.md).
 
 ### node-pty (terminal)
 
@@ -144,15 +144,15 @@ To confirm the exclusions took effect after a macOS build:
 npm run build:mac
 
 # The arm64-only build emits mac-arm64/, not mac/
-ls release/*/mac-arm64/Erfana.app/Contents/Resources/app/node_modules/ \
-  | grep -E "jsdom|canvas|node-pre-gyp"
+npx @electron/asar list release/*/mac-arm64/Erfana.app/Contents/Resources/app.asar \
+  | grep -E "^/node_modules/(jsdom|canvas|@mapbox/node-pre-gyp)/"
 # Should return nothing
 ```
 
 To confirm the foreign-arch prunes ran, check that only the target arch survives:
 
 ```bash
-ls release/*/mac-arm64/Erfana.app/Contents/Resources/app/node_modules/ffprobe-static/bin/
+ls release/*/mac-arm64/Erfana.app/Contents/Resources/app.asar.unpacked/node_modules/ffprobe-static/bin/
 # Should list darwin/ only, containing arm64/ only
 ```
 
