@@ -133,6 +133,26 @@ describe('PreviewStillFrameCache', () => {
     expect(cache.get(PANEL)?.dataUrl).toBe(SHORT_DATA_URL)
   })
 
+  it('does no downscale or encoding for a replacement the caller discards (#120)', async () => {
+    // Encoding is the costly part (up to ~2 MB of base64), so the veto is asked
+    // BEFORE it, not after.
+    const cache = createPreviewStillFrameCache({ now: () => 7 })
+    await cache.captureIfStale(
+      makeWc(vi.fn(async () => makeImage({ width: 10, height: 10 }, SHORT_DATA_URL))),
+      PANEL,
+      SIZE
+    )
+
+    const discarded = makeImage({ width: 2048, height: 1024 }, 'data:image/png;base64,BBBB')
+    await cache.captureIfStale(makeWc(vi.fn(async () => discarded)), PANEL, SIZE, {
+      shouldKeep: () => false
+    })
+
+    expect(discarded.resize).not.toHaveBeenCalled()
+    expect(discarded.toDataURL).not.toHaveBeenCalled()
+    expect(cache.get(PANEL)?.dataUrl).toBe(SHORT_DATA_URL)
+  })
+
   it('stores the frame on an EMPTY slot even when the caller says to discard it', async () => {
     // The veto above guards a REPLACEMENT. With nothing cached there is nothing
     // to protect, and honouring it leaves the tab on a bare backdrop for good —

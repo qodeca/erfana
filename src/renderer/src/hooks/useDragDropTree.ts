@@ -330,6 +330,7 @@ export function useDragDropTree(
 ) {
   // Single pass: the flattened array and its path index are produced by the
   // same loop, so a 170k-node tree is traversed and allocated exactly once.
+  /* eslint-disable react-hooks/purity -- the clock reads time the flatten itself; the duration is only reported (from the effect below), never rendered */
   const { flattenedItems, nodeIndex, flattenDurationMs } = useMemo(() => {
     const startedAt = performance.now()
     const items: FlattenedNode[] = []
@@ -343,6 +344,7 @@ export function useDragDropTree(
       flattenDurationMs: Math.round(performance.now() - startedAt)
     }
   }, [files])
+  /* eslint-enable react-hooks/purity */
 
   // Timing is measured in the memo but reported from an effect: memo bodies
   // must stay pure and StrictMode double-invokes them in development.

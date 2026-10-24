@@ -46,7 +46,13 @@ const mockNodePty = {
 }
 
 vi.mock('./terminalTreeKill', () => ({ killProcessTrees: vi.fn(() => Promise.resolve(true)) }))
-vi.mock('./nodePtyWindowsShim', () => ({ installNoForkConsoleList: vi.fn(() => true) }))
+vi.mock('./nodePtyWindowsShim', () => ({
+  installNoForkConsoleList: vi.fn(() => true),
+  installExitTimeRecorder: vi.fn(() => true),
+  installConoutWorkerRelease: vi.fn(() => true),
+  nativeExitAtMs: vi.fn(() => undefined),
+  conoutWorkerStats: vi.fn(() => ({ released: 0, exited: 0 }))
+}))
 vi.mock('./LoggingService', () => ({
   logger: { trace: vi.fn(), debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), fatal: vi.fn() }
 }))
@@ -70,7 +76,7 @@ async function started(platform: Platform = 'darwin') {
   const result = await terminalService.createTerminal(config, OWNER)
   if ('error' in result) throw new Error(result.error)
   const { args, pty } = spawned[spawned.length - 1]
-  const marker = args.join(' ').match(/__ERFANA_PWD_MARKER_\d+__/)![0]
+  const marker = [args].flat().join(' ').match(/__ERFANA_PWD_MARKER_\d+__/)![0]
 
   const events: Array<{ type: string; data?: string; webContentsId?: number }> = []
   terminalService.on('data', (e: { data: string; webContentsId: number }) =>

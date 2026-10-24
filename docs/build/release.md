@@ -117,7 +117,7 @@ sequenceDiagram
 
 **Scope of this table: `release.yml` only.** Every secret and variable below is a repo-level Actions secret on `qodeca/erfana` (Settings → Secrets and variables → Actions); variables (non-secret) live in the same UI under Variables. Verified live on **2026-08-23** with `gh api repos/qodeca/erfana/actions/secrets`. The signing jobs also require a GitHub Environment named `production-signing` with required reviewers — this is what gates human approval before any credential is touched.
 
-`whisper-binaries.yml` is a **separate** credential set and is not covered here. It consumes five further names — `APPLE_CERT_P12`, `APPLE_CERT_PASSWORD`, `APPLE_APP_PASSWORD`, `MANIFEST_SIGNING_KEY`, `MANIFEST_SIGNING_KEY_PASSWORD` — which [`whisper-binaries.md`](./whisper-binaries.md) documents as **environment** secrets on `production-signing`, not repo Actions secrets. Provisioning and rotation for those live in that runbook.
+`whisper-binaries.yml` is a **separate** credential set and is not covered here. It reads the same names as this workflow — `MAC_CERT_P12_BASE64`, `MAC_CERT_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`, `MINISIGN_SECRET_KEY_BASE64`, `MINISIGN_KEY_PASSWORD` — which [`whisper-binaries.md`](./whisper-binaries.md) documents as **environment** secrets on `production-signing`. Provisioning and rotation for those live in that runbook.
 
 | Secret or variable | Scope | Purpose | Rotation policy |
 |---|---|---|---|

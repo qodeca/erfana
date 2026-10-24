@@ -48,6 +48,9 @@ import {
   prepareRasterizeSession
 } from './rasterizeSession'
 
+// electron-vite declares ELECTRON_RENDERER_URL read-only; this file sets and clears it.
+const writableEnv: Record<string, string | undefined> = process.env
+
 const RENDERER_DIR = resolve('/app/out/renderer')
 const DEV_URL = 'http://localhost:5173'
 
@@ -79,7 +82,7 @@ beforeEach(() => {
   calls.length = 0
   vi.clearAllMocks()
   mockIs.dev = false
-  delete process.env['ELECTRON_RENDERER_URL']
+  delete writableEnv.ELECTRON_RENDERER_URL
 })
 
 describe('prepareRasterizeSession', () => {
@@ -222,13 +225,13 @@ describe('isAllowedHarnessUrl (development)', () => {
 describe('harnessUrlContext', () => {
   it('uses the dev server only when the app itself would', () => {
     mockIs.dev = true
-    process.env['ELECTRON_RENDERER_URL'] = DEV_URL
+    writableEnv.ELECTRON_RENDERER_URL = DEV_URL
     expect(harnessUrlContext(RENDERER_DIR).devServerUrl).toBe(DEV_URL)
   })
 
   it('ignores a stray dev URL in a production build', () => {
     mockIs.dev = false
-    process.env['ELECTRON_RENDERER_URL'] = DEV_URL
+    writableEnv.ELECTRON_RENDERER_URL = DEV_URL
     expect(harnessUrlContext(RENDERER_DIR).devServerUrl).toBeNull()
   })
 })

@@ -8,6 +8,12 @@
  * @module TerminalPanel/hooks
  */
 
+export { useXtermSession } from './useXtermSession'
+export type { UseXtermSessionOptions, UseXtermSessionReturn, TeardownOptions } from './useXtermSession'
+
+export { useTerminalFileDrop } from './useTerminalFileDrop'
+export type { UseTerminalFileDropOptions, UseTerminalFileDropReturn } from './useTerminalFileDrop'
+
 export { useTerminalDragDrop } from './useTerminalDragDrop'
 export type { UseTerminalDragDropOptions, UseTerminalDragDropReturn } from './useTerminalDragDrop'
 

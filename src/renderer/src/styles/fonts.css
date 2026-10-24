@@ -12,7 +12,7 @@
  * `font-display: block` keeps the canvas-rendered terminal (xterm.js) from
  * briefly measuring a fallback font before Cascadia Mono loads. The terminal
  * also explicitly awaits `document.fonts.load(...)` before opening (see
- * TerminalPanel.initializeTerminal), so this is belt-and-suspenders.
+ * useXtermSession.start), so this is belt-and-suspenders.
  *
  * Vite resolves the relative url() below, fingerprinting the woff2 into the
  * build (works in dev and inside the packaged ASAR — the same asset path the

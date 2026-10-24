@@ -120,15 +120,13 @@ describe('useFileOperations.logic', () => {
 
   describe('getSiblingNames', () => {
     const mockFiles: FileNode[] = [
-      { name: 'file1.txt', path: '/project/file1.txt', type: 'file', size: 0, modified: 0 },
-      { name: 'file2.txt', path: '/project/file2.txt', type: 'file', size: 0, modified: 0 },
-      { name: 'folder1', path: '/project/folder1', type: 'directory', size: 0, modified: 0 },
+      { name: 'file1.txt', path: '/project/file1.txt', type: 'file' },
+      { name: 'file2.txt', path: '/project/file2.txt', type: 'file' },
+      { name: 'folder1', path: '/project/folder1', type: 'directory' },
       {
         name: 'nested.txt',
         path: '/project/folder1/nested.txt',
-        type: 'file',
-        size: 0,
-        modified: 0
+        type: 'file'
       }
     ]
 
@@ -153,9 +151,9 @@ describe('useFileOperations.logic', () => {
 
     it('should group root-level siblings together', () => {
       const rootFiles: FileNode[] = [
-        { name: 'c.md', path: '/c.md', type: 'file', size: 0, modified: 0 },
-        { name: 'd.md', path: '/d.md', type: 'file', size: 0, modified: 0 },
-        { name: 'nested.md', path: '/sub/nested.md', type: 'file', size: 0, modified: 0 }
+        { name: 'c.md', path: '/c.md', type: 'file' },
+        { name: 'd.md', path: '/d.md', type: 'file' },
+        { name: 'nested.md', path: '/sub/nested.md', type: 'file' }
       ]
       const siblings = getSiblingNames(rootFiles, '/c.md', 'c.md')
       expect(siblings).toEqual(['d.md'])
@@ -491,7 +489,8 @@ describe('useFileOperations.logic', () => {
       expect(isValidTargetPath(targetPath)).toBe(true)
 
       // Get relative path for display
-      const relativePath = getRelativePath(targetPath, projectPath)
+      // Non-null: asserted equal to '/project/subfolder' above.
+      const relativePath = getRelativePath(targetPath!, projectPath)
       expect(relativePath).toBe('/subfolder')
 
       // Simulate error
@@ -520,8 +519,8 @@ describe('useFileOperations.logic', () => {
 
     it('should handle complete rename flow logic', () => {
       const mockFiles: FileNode[] = [
-        { name: 'file1.txt', path: '/project/file1.txt', type: 'file', size: 0, modified: 0 },
-        { name: 'file2.txt', path: '/project/file2.txt', type: 'file', size: 0, modified: 0 }
+        { name: 'file1.txt', path: '/project/file1.txt', type: 'file' },
+        { name: 'file2.txt', path: '/project/file2.txt', type: 'file' }
       ]
 
       // Extract parent path

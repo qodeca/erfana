@@ -14,11 +14,13 @@ import { INDICATOR_DURATION_MS } from '../constants/fileWatch'
 import {
   acquireFileWatch,
   createFileWatchSlot,
+  forgetFileWatch,
   releaseFileWatch,
   type FileWatchSlot
 } from './fileWatchSlot'
 import { logger } from '../utils/logger'
 import { fileGateway } from '../services/fileGateway'
+import { fileWatchGateway } from '../services/fileWatchGateway'
 
 /**
  * Normalizes line endings to LF for cross-platform content comparison.
@@ -73,7 +75,10 @@ export interface FileWatcherActions {
   keepLocal: () => void
   /** Dismiss external change notification without action */
   dismissConflict: () => void
-  /** Clear the file deleted state (e.g., after saving) */
+  /**
+   * Clear the file deleted state (e.g., after saving). When the tab was marked
+   * deleted, the save restored the file, so it is watched again (#252).
+   */
   clearDeletedState: () => void
   /** Mark that a save operation is starting (prevents race conditions) */
   markSaving: () => void
@@ -172,6 +177,10 @@ export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcherRe
   const [isFileDeleted, setIsFileDeleted] = useState(false)
   const [isReloading, setIsReloading] = useState(false)
 
+  // Mirrors isFileDeleted for clearDeletedState, which must know synchronously
+  // whether the main-process watch is gone (it ends the watch on a delete).
+  const isFileDeletedRef = useRef(false)
+
   // Track save operations to prevent race conditions
   // Exposed via markSaving/unmarkSaving so parent component can coordinate saves
   const isSavingRef = useRef(false)
@@ -212,6 +221,27 @@ export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcherRe
   }, [])
 
   /**
+   * Clear the file deleted state.
+   *
+   * The main process ended the watch when it reported the delete, and the slot
+   * forgot its hold then, so a file that is back – restored by a save, or
+   * reloaded – is watched again with a plain acquire; without it the tab would
+   * stay deaf to outside edits until it was reopened (#252). No release first:
+   * a `stop` here could take the count of another consumer of the same file.
+   */
+  const clearDeletedState = useCallback(() => {
+    const wasDeleted = isFileDeletedRef.current
+    isFileDeletedRef.current = false
+    setIsFileDeleted(false)
+    if (!wasDeleted || !filePath) return
+    void acquireFileWatch(slot, filePath).then(({ started, error, cause }) => {
+      if (!started) {
+        logger.error('Failed to watch the restored file again', cause, { error })
+      }
+    })
+  }, [filePath, slot])
+
+  /**
    * Reload file content from disk.
    *
    * @param prefetchedContent - If provided, uses this content instead of reading from disk.
@@ -232,7 +262,8 @@ export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcherRe
       onContentUpdate(content)
       pendingSavedContentsRef.current.clear() // Disk content is now authoritative
       setExternalChangeDetected(false)
-      setIsFileDeleted(false)
+      // The file was read, so it is there: watch it again if it had been deleted
+      clearDeletedState()
       onReload?.()
       logger.info('File reloaded successfully', { filePath })
 
@@ -242,7 +273,7 @@ export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcherRe
       logger.error('Error reloading file', error instanceof Error ? error : undefined)
       setIsReloading(false)
     }
-  }, [filePath, onContentUpdate, onReload])
+  }, [filePath, onContentUpdate, onReload, clearDeletedState])
 
   /**
    * Keep local version and dismiss conflict notification
@@ -258,13 +289,6 @@ export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcherRe
    */
   const dismissConflict = useCallback(() => {
     setExternalChangeDetected(false)
-  }, [])
-
-  /**
-   * Clear the file deleted state
-   */
-  const clearDeletedState = useCallback(() => {
-    setIsFileDeleted(false)
   }, [])
 
   /**
@@ -343,9 +367,13 @@ export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcherRe
    */
   const handleFileDeleted = useCallback(() => {
     logger.warn('File deleted externally', { filePath })
+    // The main process dropped the watch, every count with it, before sending
+    // this: the slot holds nothing now, and must not send a `stop` (#252)
+    forgetFileWatch(slot)
+    isFileDeletedRef.current = true
     setIsFileDeleted(true)
     setExternalChangeDetected(false) // Clear conflict notification if shown
-  }, [filePath])
+  }, [filePath, slot])
 
   // Set up file watching
   useEffect(() => {
@@ -364,21 +392,25 @@ export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcherRe
     })
 
     // Set up event listeners
-    const unsubscribeChanged = window.api.fileWatch.onFileChanged((data) => {
+    const unsubscribeChanged = fileWatchGateway.onFileChanged((data) => {
       if (data.filePath === filePath) {
         handleExternalChange()
       }
     })
 
-    const unsubscribeDeleted = window.api.fileWatch.onFileDeleted((data) => {
+    const unsubscribeDeleted = fileWatchGateway.onFileDeleted((data) => {
       if (data.filePath === filePath) {
         handleFileDeleted()
       }
     })
 
-    const unsubscribeError = window.api.fileWatch.onFileError((data) => {
+    const unsubscribeError = fileWatchGateway.onFileError((data) => {
       if (data.filePath === filePath) {
-        logger.error('File watch error', undefined, { error: data.error })
+        // The main process ended the watch: forget the hold, as on a delete
+        // (#252). The editor has no degraded state for this yet, so outside
+        // edits stop reaching the tab until it is reopened - logged only.
+        if (data.ended) forgetFileWatch(slot)
+        logger.error('File watch error', undefined, { error: data.error, ended: data.ended === true })
       }
     })
 
@@ -442,10 +474,10 @@ export interface FileSaveGuard {
 export function createFileSaveGuard(filePath: string): FileSaveGuard {
   return {
     pauseWatch: async () => {
-      await window.api.fileWatch.pause(filePath)
+      await fileWatchGateway.pause(filePath)
     },
     resumeWatch: async () => {
-      await window.api.fileWatch.resume(filePath)
+      await fileWatchGateway.resume(filePath)
     }
   }
 }

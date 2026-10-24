@@ -508,9 +508,8 @@ describe('FileSystemDialog', () => {
 // with portaled context menus have limitations in the JSDOM environment.
 // See: TextareaContextMenu component for the reusable context menu.
 
-/* istanbul ignore next */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const _clipboardTestsRemoved = `
+// The removed tests, kept for reference (a comment, so nothing compiles or runs them):
+/*
   describe('Clipboard Operations', () => {
     const mockWriteText = vi.fn()
     const mockReadText = vi.fn()
@@ -920,4 +919,4 @@ const _clipboardTestsRemoved = `
     })
   })
 })
-`
+*/

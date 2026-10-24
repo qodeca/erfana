@@ -23,7 +23,7 @@ vi.mock('./logger', () => ({ logger: mockLogger }))
 const mockState = {
   activeTerminalId: null as string | null,
   setActivePanel: vi.fn(),
-  sendToTerminal: vi.fn(() => Promise.resolve(true)),
+  sendToTerminal: vi.fn((_text: string, _autoExecute?: boolean) => Promise.resolve(true)),
   subscribeCallback: null as ((state: { activeTerminalId: string | null }) => void) | null,
   unsubscribe: vi.fn()
 }
@@ -40,7 +40,7 @@ vi.mock('../stores/useTerminalStore', () => ({
   useTerminalStore: {
     getState: () => ({
       activeTerminalId: mockState.activeTerminalId,
-      sendToTerminal: (...args: unknown[]) => mockState.sendToTerminal(...args)
+      sendToTerminal: (...args: Parameters<typeof mockState.sendToTerminal>) => mockState.sendToTerminal(...args)
     }),
     subscribe: (callback: (state: { activeTerminalId: string | null }) => void) => {
       mockState.subscribeCallback = callback

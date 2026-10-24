@@ -16,13 +16,21 @@ import { logger } from './LoggingService'
 import { redactPath } from '../utils/redactUserInput'
 import {
   buildWindowsBootstrap,
+  isCmdExe,
   normalizeWindowsCwd,
   validateWindowsCwd
 } from './WindowsTerminalBootstrap'
 import { isWindowsLongPath } from './watcher/PlatformConfig'
 import { isForegroundBusy, shellProcessNames } from './terminalForeground'
 import { killProcessTrees } from './terminalTreeKill'
-import { installNoForkConsoleList } from './nodePtyWindowsShim'
+import type { LiveShell } from './conptyHostReaper'
+import {
+  conoutWorkerStats,
+  installConoutWorkerRelease,
+  installExitTimeRecorder,
+  installNoForkConsoleList,
+  nativeExitAtMs
+} from './nodePtyWindowsShim'
 import { TerminalOutputFlow } from './terminalOutputFlow'
 
 /**
@@ -43,6 +51,19 @@ export type TerminalCreateResult =
  */
 export const TERMINAL_CWD_TOO_LONG_MESSAGE =
   "This folder's path is longer than Windows allows for a terminal (260 characters). Move the project to a shorter path."
+
+/**
+ * Diagnostics only (#305): set to `1` to skip the Windows tree kill on quit and window
+ * close, so a process a terminal started is left for the quit helper
+ * (`conptyHostReaper.ts`) to find. Lets a Windows tester force a leftover on purpose.
+ * Honoured only after {@link TerminalService.allowDiagnostics} (dev builds and e2e,
+ * `!app.isPackaged`); a packaged build ignores it silently, so a stray environment
+ * variable cannot change quit cleanup. Logged as a warning when used.
+ */
+export const SKIP_TREE_KILL_ENV = 'ERFANA_DIAG_SKIP_TREE_KILL'
+
+/** Returned by `createTerminal` once the app has started to quit (#305). */
+export const TERMINAL_SHUTTING_DOWN_MESSAGE = 'The app is closing, so no new terminal can be opened.'
 
 // Dynamic import for node-pty (optional dependency)
 type NodePtyModule = typeof import('node-pty')
@@ -79,6 +100,17 @@ interface TerminalInstance {
   initializationComplete: boolean // Track whether terminal has finished init
   isClearing: boolean // Track clearing phase to prevent forwarding clear sequence
   clearFallbackTimeout?: NodeJS.Timeout // Safety timeout for clear confirmation
+  markerTimeout?: NodeJS.Timeout // Safety timeout for a marker that never arrives
+  /**
+   * cmd.exe only: the bootstrap waits in `pause` after the marker so ConPTY
+   * flushes the marker frame before `cls` runs. While this array exists the
+   * shell is still paused: typed input is held here (a key would be swallowed by
+   * `pause`). `releaseCmdPause` sends the release key; `finishCmdPause` sends the
+   * held input when the clear handshake ends.
+   */
+  cmdPauseHold?: string[]
+  /** cmd.exe only: the release key has been written (it is written once). */
+  cmdKeySent?: boolean
   hasReceivedMarker: boolean // Track if marker was detected (prevents late data forwarding)
   /** Output that arrived after the marker line while the clear handshake was open; flushed in order once it ends. */
   pendingOutput: string
@@ -90,6 +122,7 @@ interface TerminalInstance {
   exited: Promise<void> // Settles when node-pty reports the shell exit (#214)
   hasExited?: boolean // Set when node-pty reports the exit; the shell's pid may be reused after that (#296)
   killRequested?: boolean // A pty kill is under way or done; cleared again if it throws (#296)
+  killRequestedAtMs?: number // First moment this service asked for the shell to end (tree or pty kill, #305)
 }
 
 /**
@@ -126,12 +159,66 @@ export const TERMINAL_KILL_BUDGET_MS = 500
 /** Most output kept while waiting for the bootstrap marker (64 KiB). */
 export const MARKER_BUFFER_MAX_CHARS = 64 * 1024
 
+/** How long to wait for the bootstrap marker before showing output anyway. */
+const MARKER_TIMEOUT_MS = 10_000
+
+/** Tail kept while still watching for a marker that arrives after the timeout. */
+const LATE_MARKER_BUFFER_MAX_CHARS = 4096
+
 /** Most post-marker output held while the clear handshake is open (64 KiB, newest kept). */
 export const PENDING_OUTPUT_MAX_CHARS = 64 * 1024
 
 const ESC = String.fromCharCode(0x1b)
 const MARKER_LINE_END = new RegExp(`^(?:[ \\t]|${ESC}\\[[0-9;]*K)*\\r?\\n`)
 const MARKER_LINE_END_PARTIAL = new RegExp(`^(?:[ \\t]|${ESC}\\[[0-9;]*K)*\\r?$`)
+
+/** Cap on a cursor-forward move turned into spaces (a hostile `ESC[999999999C`). */
+const MAX_CURSOR_FORWARD = 1024
+const ST_CHAR = String.fromCharCode(0x9c)
+const BEL_CHAR = String.fromCharCode(0x07)
+// A complete OSC sequence: ESC ] body, ended by BEL, ESC \, the 0x9C string terminator, or
+// (as xterm does) the start of another escape sequence
+const OSC_SEQUENCE = new RegExp(`${ESC}\\][^${BEL_CHAR}${ESC}${ST_CHAR}]*(?:${BEL_CHAR}|${ESC}\\\\|${ST_CHAR}|(?=${ESC}))`, 'g')
+const CSI_CURSOR_FORWARD = new RegExp(`${ESC}\\[([0-9]*)C`, 'g')
+const CSI_CURSOR_POSITION = new RegExp(`${ESC}\\[[0-9;:]*[Hf]`, 'g')
+const CSI_SEQUENCE = new RegExp(`${ESC}\\[[0-9;:?<=>]*[ -/]*[@-~]`, 'g')
+// Charset selection and other short escapes: ESC ( B, ESC =, ESC 7, ESC M ...
+const SHORT_ESCAPE = new RegExp(`${ESC}[ -/]*[0-~]`, 'g')
+
+/**
+ * Turns raw PTY output into plain lines for reading the cwd back. ConPTY
+ * redraws the screen with VT sequences (title, modes, cursor moves) instead of
+ * plain line breaks: a cursor move starts a new line, a cursor-forward move
+ * becomes spaces, every other sequence is dropped.
+ */
+export function plainLinesForCwd(text: string): string[] {
+  return text
+    .replace(OSC_SEQUENCE, '')
+    .replace(CSI_CURSOR_FORWARD, (_m, n: string) => ' '.repeat(Math.min(Number(n) || 1, MAX_CURSOR_FORWARD)))
+    .replace(CSI_CURSOR_POSITION, '\n')
+    .replace(CSI_SEQUENCE, '')
+    .replace(SHORT_ESCAPE, '')
+    .replaceAll(ST_CHAR, '')
+    .split(/\r?\n|\r/)
+    .filter((line) => line.trim() !== '')
+}
+
+/**
+ * The buffer as the marker search should see it: same length (so indices still
+ * match the raw buffer), complete OSC sequences blanked out, and everything
+ * from an unterminated OSC on cut off. A marker inside a window title must not
+ * match, and an open OSC means more data is needed first.
+ */
+export function markerSearchView(buffer: string): string {
+  const view = buffer.replace(OSC_SEQUENCE, (m) => '\0'.repeat(m.length))
+  const open = view.lastIndexOf(`${ESC}]`)
+  return open === -1 ? view : view.slice(0, open)
+}
+
+/** True when a read-back cwd line looks like an absolute path for the platform. */
+export function looksLikeCwd(candidate: string, windows: boolean): boolean {
+  return windows ? /^(?:[A-Za-z]:\\|\\\\)/.test(candidate) : candidate.startsWith('/')
+}
 
 /**
  * Drops the rest of the marker's own line from output that follows the marker.
@@ -195,6 +282,16 @@ export class TerminalService extends EventEmitter {
   private pendingExits = new Set<Promise<void>>()
   /** Window-close kill batches still running on Windows; `dispose()` waits for them (#296). */
   private pendingKills = new Set<Promise<void>>()
+  /**
+   * Shells whose exit node-pty has not reported yet, by terminal id, with the moment
+   * node-pty returned the pid; handed to the quit helper (#305). Keyed by terminal, not
+   * by pid, so a later shell that got a reused pid cannot be removed by an old exit.
+   */
+  private liveShells = new Map<string, { pid: number; spawnedAtMs: number; terminal: TerminalInstance }>()
+  /** Set when `dispose()` starts: no terminal may be created after it (#305). */
+  private shuttingDown = false
+  /** Whether {@link SKIP_TREE_KILL_ENV} is honoured; off unless the app says so (#305). */
+  private diagnosticsAllowed = false
 
   /**
    * @param fsExists - injected for `resolveWindowsShell()` testability;
@@ -293,8 +390,22 @@ export class TerminalService extends EventEmitter {
       }
     }
 
+    // Checked after the only await: a shell started now would never be ended, and the
+    // quit helper only knows terminals created before the quit moment (#305)
+    if (this.shuttingDown) {
+      logger.warn('Terminal not created: the app is shutting down')
+      return { error: TERMINAL_SHUTTING_DOWN_MESSAGE }
+    }
+
     // node-pty's Windows kill must not fork a helper (#296); see nodePtyWindowsShim.ts
-    if (osPlatform() === 'win32') installNoForkConsoleList()
+    if (osPlatform() === 'win32') {
+      installNoForkConsoleList()
+      // When each shell's native exit fires: bounds what the quit helper may take as ours (#305)
+      installExitTimeRecorder()
+      // node-pty ends a terminal's conout worker thread only in kill(); a shell that ends
+      // without kill() (the user typed `exit`) kept it until the app's teardown (#305)
+      installConoutWorkerRelease()
+    }
 
     const terminalId = `terminal-${++this.terminalCounter}`
 
@@ -315,11 +426,15 @@ export class TerminalService extends EventEmitter {
 
       // Build bootstrap script that verifies CWD non-interactively, then execs into interactive shell
       // This prevents TTY echo of verification commands (no interactive input = no echo)
-      const shellArgs: string[] = []
+      let shellArgs: string[] | string = []
       // `shellKind` is recorded on the TerminalInstance AND returned to the
       // renderer via the create response so renderer-side path-quoting can
       // pick the right flavour per terminal (#164 round-2 F#1).
       let shellKind: ShellKind = 'posix'
+      // The cmd.exe bootstrap carries no cwd: the shell starts in the validated, normalized path
+      let spawnCwd = cwd
+      // True for the cmd.exe bootstrap, which ends in `pause` (see CmdExeBootstrapBuilder)
+      let cmdPauses = false
 
       if (osPlatform() === 'win32') {
         // Win32 CreateProcess hard-fails on a cwd over MAX_PATH and node-pty
@@ -347,7 +462,12 @@ export class TerminalService extends EventEmitter {
           marker
         })
         logger.info(`🔵 Windows shell kind: ${kind} (quoting=${winShellKind})`)
-        shellArgs.push(...winShellArgs)
+        shellArgs = winShellArgs
+        if (kind === 'cmd.exe') {
+          spawnCwd = winCwd
+          // Only a real cmd.exe sits in `pause`; the catch-all builder also takes unknown shells
+          cmdPauses = isCmdExe(shell)
+        }
         shellKind = winShellKind
       } else {
         // POSIX bootstrap. We use a single-quoted argument so `$`, backtick,
@@ -397,18 +517,22 @@ export class TerminalService extends EventEmitter {
         COLORTERM: 'truecolor',
         // Set traditional prompt: username directory $
         // %n = username, %~ = current directory (~ for home)
-        PROMPT: '%n %~ $ ',
+        // cmd.exe also reads PROMPT and would show these codes literally, so it
+        // keeps its own (default $P$G) prompt.
+        ...(shellKind === 'cmd' ? {} : { PROMPT: '%n %~ $ ' }),
         PS1: '%n %~ $ ',
         // Disable macOS session restoration (prevents "Restored session" message)
         SHELL_SESSIONS_DISABLE: '1'
       }
 
       // Spawn PTY process with bootstrap script
+      // Taken BEFORE the spawn: the shell cannot be older than this (quit helper, #305)
+      const spawnStartedAtMs = Date.now()
       const ptyProcess = pty.spawn(shell, shellArgs, {
         name: 'xterm-256color',
         cols,
         rows,
-        cwd,
+        cwd: spawnCwd,
         env: spawnEnv
       })
 
@@ -450,6 +574,7 @@ export class TerminalService extends EventEmitter {
         initializationComplete: false, // Will be set to true after cwd verification
         isClearing: false, // Will be set to true during terminal clear phase
         hasReceivedMarker: false, // Will be set to true when marker is detected
+        cmdPauseHold: cmdPauses ? [] : undefined,
         pendingOutput: '',
         output,
         // Track owning webContents for cleanup on window close (issue #59)
@@ -466,10 +591,17 @@ export class TerminalService extends EventEmitter {
       }
 
       this.terminals.set(terminalId, terminal)
+      const shellPid = terminal.pid
+      if (typeof shellPid === 'number' && Number.isSafeInteger(shellPid) && shellPid > 0) {
+        this.liveShells.set(terminalId, { pid: shellPid, spawnedAtMs: spawnStartedAtMs, terminal })
+      }
 
       // Marker detection: buffer data until we see the marker from bootstrap script
       let markerBuffer = ''
       let markerDetected = false
+      // Set when the missing-marker timeout fired: output is already flowing, but a
+      // late marker still runs the normal clear handshake
+      let markerTimedOut = false
       // True while the line break that ends the marker line has not been seen yet
       let markerLineEndPending = false
       // Set by the detector for the chunk that held the marker, so the forwarder
@@ -480,20 +612,33 @@ export class TerminalService extends EventEmitter {
         markerBuffer += data
         // Output before the marker is bounded: keep the tail (the marker and the
         // line before it are at the end)
-        if (markerBuffer.length > MARKER_BUFFER_MAX_CHARS) {
-          markerBuffer = markerBuffer.slice(-MARKER_BUFFER_MAX_CHARS)
+        const bufferCap = markerTimedOut ? LATE_MARKER_BUFFER_MAX_CHARS : MARKER_BUFFER_MAX_CHARS
+        if (markerBuffer.length > bufferCap) {
+          markerBuffer = markerBuffer.slice(-bufferCap)
         }
-        const markerAt = markerBuffer.indexOf(marker)
+        const isWindows = osPlatform() === 'win32'
+        const markerAt = (isWindows ? markerSearchView(markerBuffer) : markerBuffer).indexOf(marker)
         if (markerAt !== -1) {
           markerDetected = true
           markerChunkHandled = true
+          const pendingMarkerTimer = this.terminals.get(terminalId)
+          if (pendingMarkerTimer?.markerTimeout) {
+            clearTimeout(pendingMarkerTimer.markerTimeout)
+            pendingMarkerTimer.markerTimeout = undefined
+          }
 
-          // Parse PWD from output (line before marker)
-          const lines = markerBuffer.split(/\r?\n/).filter(Boolean)
+          // Parse PWD from output (line before marker). ConPTY output carries VT
+          // sequences, so it is flattened first (Windows only). The line is only
+          // trusted when it looks like a path: a wrapped long cwd reads back as
+          // its tail and a stray escape must not leave junk in `terminal.cwd`.
+          const beforeMarker = markerBuffer.slice(0, markerAt + marker.length)
+          const lines = isWindows
+            ? plainLinesForCwd(beforeMarker)
+            : beforeMarker.split(/\r?\n/).filter(Boolean)
           const markerIdx = lines.findIndex((l) => l.includes(marker))
           if (markerIdx > 0) {
             const detectedCwd = lines[markerIdx - 1].trim()
-            if (detectedCwd) {
+            if (detectedCwd && looksLikeCwd(detectedCwd, isWindows)) {
               const term = this.terminals.get(terminalId)
               if (term) term.cwd = detectedCwd
             }
@@ -506,6 +651,10 @@ export class TerminalService extends EventEmitter {
             logger.info(`[MARKER DETECTED] Setting hasReceivedMarker=true, isClearing=true`)
             term.hasReceivedMarker = true
             term.isClearing = true
+            // Output after the marker is held (isClearing) until the renderer
+            // confirms its clear, so releasing the cmd pause here is safe: the
+            // `cls` frame and the prompt reach the screen after the clear.
+            this.releaseCmdPause(term)
 
             // Output that followed the marker in the same chunk (a fast shell can
             // draw its prompt right behind it) is real: hold it until the clear
@@ -526,12 +675,37 @@ export class TerminalService extends EventEmitter {
                 t.initializationComplete = true
                 t.clearFallbackTimeout = undefined
                 this.flushPendingOutput(t)
+                this.finishCmdPause(t)
               }
             }, 3000)
           }
         }
       }
       ptyProcess.onData(markerDetector)
+
+      // Safety net: a bootstrap that fails (bad cwd, shell quirk) never prints
+      // the marker, and output stays suppressed for the whole life of the shell.
+      // After a grace period, give up on the handshake and show what arrived.
+      terminal.markerTimeout = setTimeout(() => {
+        const t = this.terminals.get(terminalId)
+        if (!t) return
+        t.markerTimeout = undefined
+        if (markerDetected || t.hasReceivedMarker) return
+        // Lengths and counts only – PTY output is user content.
+        logger.warn(
+          `⚠️ Terminal ${terminalId} marker not seen after ${MARKER_TIMEOUT_MS}ms, forcing output on (buffered ${markerBuffer.length} chars, ${markerBuffer.split(/\r?\n/).length} lines)`
+        )
+        // Keep watching: a slow shell may still print the marker. Then the normal
+        // clear handshake runs and the cwd is updated from the reported line.
+        markerTimedOut = true
+        t.hasReceivedMarker = true
+        t.isClearing = false
+        t.initializationComplete = true
+        // cmd would otherwise wait in `pause` forever; input typed meanwhile goes out too
+        this.finishCmdPause(t)
+        if (markerBuffer) t.output.push(markerBuffer)
+        markerBuffer = markerBuffer.slice(-LATE_MARKER_BUFFER_MAX_CHARS)
+      }, MARKER_TIMEOUT_MS)
 
       // Forward PTY output to renderer (only after initialization).
       // These log lines fire on every PTY data chunk and are pure debug
@@ -589,10 +763,15 @@ export class TerminalService extends EventEmitter {
         logger.info(`🏁 Terminal ${terminalId} exited`, event)
         markExited()
         terminal.hasExited = true
+        this.liveShells.delete(terminalId)
         // A shell that fails during the handshake still said why: show it before the exit
         if (terminal.clearFallbackTimeout) {
           clearTimeout(terminal.clearFallbackTimeout)
           terminal.clearFallbackTimeout = undefined
+        }
+        if (terminal.markerTimeout) {
+          clearTimeout(terminal.markerTimeout)
+          terminal.markerTimeout = undefined
         }
         terminal.isClearing = false
         terminal.initializationComplete = true
@@ -658,10 +837,17 @@ export class TerminalService extends EventEmitter {
         clearTimeout(terminal.clearFallbackTimeout)
         terminal.clearFallbackTimeout = undefined
       }
+      if (terminal.markerTimeout) {
+        clearTimeout(terminal.markerTimeout)
+        terminal.markerTimeout = undefined
+      }
 
       terminal.isClearing = false
       terminal.initializationComplete = true
       this.flushPendingOutput(terminal)
+      // The marker timer was the backstop that releases the cmd pause; with it
+      // cleared, release here so input is never held forever
+      this.finishCmdPause(terminal)
 
       // Note: We intentionally do NOT send a newline here
       // Sending '\r' would cause the shell to flush its output buffer,
@@ -682,6 +868,12 @@ export class TerminalService extends EventEmitter {
       return false
     }
 
+    // cmd.exe is still waiting in `pause`: a typed key would be swallowed by it
+    if (terminal.cmdPauseHold) {
+      terminal.cmdPauseHold.push(data)
+      return true
+    }
+
     try {
       // Simple synchronous write - no callback needed
       // The PTY will buffer and handle the write internally
@@ -693,6 +885,7 @@ export class TerminalService extends EventEmitter {
       if (code === 'EPIPE') {
         logger.info(`ℹ️ Terminal ${terminalId} PTY closed (terminal likely exited)`)
         // Clean up the closed terminal
+        this.clearHandshakeTimers(terminal)
         this.terminals.delete(terminalId)
         terminal.output.dispose()
         this.emit('exit', { terminalId, exitCode: 0, webContentsId: terminal.webContentsId })
@@ -703,6 +896,58 @@ export class TerminalService extends EventEmitter {
       const message = error instanceof Error ? error.message : String(error)
       this.emit('error', { terminalId, error: message, webContentsId: terminal.webContentsId })
       return false
+    }
+  }
+
+  /**
+   * cmd.exe only: end the bootstrap's `pause` with a carriage return. The input
+   * typed meanwhile stays held until `finishCmdPause`. A no-op for every other
+   * shell and once released (a late marker after the timeout must not send a
+   * second key).
+   */
+  private releaseCmdPause(terminal: TerminalInstance): void {
+    if (!terminal.cmdPauseHold || terminal.cmdKeySent) return
+    terminal.cmdKeySent = true
+    try {
+      terminal.ptyProcess.write('\r')
+    } catch (error) {
+      logger.warn(
+        `⚠️ Terminal ${terminal.id} could not release the cmd pause`,
+        error instanceof Error ? { error: error.message } : undefined
+      )
+    }
+  }
+
+  /**
+   * cmd.exe only: end the pause hold when the clear handshake ends (renderer
+   * confirmation or a fallback timer). Sends the key if it was not sent yet,
+   * then the input typed meanwhile, in order. Sending it only now keeps a held
+   * Ctrl+C from landing on `cls & echo on` right behind the key.
+   */
+  private finishCmdPause(terminal: TerminalInstance): void {
+    this.releaseCmdPause(terminal)
+    const held = terminal.cmdPauseHold
+    if (!held) return
+    terminal.cmdPauseHold = undefined
+    try {
+      for (const data of held) terminal.ptyProcess.write(data)
+    } catch (error) {
+      logger.warn(
+        `⚠️ Terminal ${terminal.id} could not send held input`,
+        error instanceof Error ? { error: error.message } : undefined
+      )
+    }
+  }
+
+  /** Clear the clear-confirmation and missing-marker timers of a terminal. */
+  private clearHandshakeTimers(terminal: TerminalInstance): void {
+    if (terminal.clearFallbackTimeout) {
+      clearTimeout(terminal.clearFallbackTimeout)
+      terminal.clearFallbackTimeout = undefined
+    }
+    if (terminal.markerTimeout) {
+      clearTimeout(terminal.markerTimeout)
+      terminal.markerTimeout = undefined
     }
   }
 
@@ -732,6 +977,7 @@ export class TerminalService extends EventEmitter {
       // emitting an 'error' event the renderer would surface.
       if (message.includes('already exited')) {
         logger.debug(`Terminal ${terminalId} resize ignored (pty already exited)`)
+        this.clearHandshakeTimers(terminal)
         this.terminals.delete(terminalId)
         terminal.output.dispose()
         return false
@@ -759,6 +1005,10 @@ export class TerminalService extends EventEmitter {
       if (terminal.clearFallbackTimeout) {
         clearTimeout(terminal.clearFallbackTimeout)
         terminal.clearFallbackTimeout = undefined
+      }
+      if (terminal.markerTimeout) {
+        clearTimeout(terminal.markerTimeout)
+        terminal.markerTimeout = undefined
       }
     } catch (error) {
       logger.warn(`⚠️  Failed to clear fallback timeout for terminal ${terminalId}`, error instanceof Error ? { error: error.message } : undefined)
@@ -855,6 +1105,47 @@ export class TerminalService extends EventEmitter {
   }
 
   /**
+   * Every shell started by this service whose exit has not been reported, including
+   * shells already detached by a window close, with its spawn time (#305). Main-only:
+   * read once at quit for the quit helper (`conptyHostReaper.ts`), never sent anywhere.
+   */
+  getLiveShells(): LiveShell[] {
+    return [...this.liveShells.values()].map(({ pid, spawnedAtMs, terminal }) => {
+      // The shell is not known to hold its pid after we asked it to end, or after its
+      // native exit fired (node-pty reports that to JavaScript only later)
+      const ends = [terminal.killRequestedAtMs, nativeExitAtMs(terminal.ptyProcess)].filter(
+        (t): t is number => typeof t === 'number'
+      )
+      return ends.length > 0 ? { pid, spawnedAtMs, endBeforeMs: Math.min(...ends) } : { pid, spawnedAtMs }
+    })
+  }
+
+  /**
+   * Lets {@link SKIP_TREE_KILL_ENV} take effect. `src/main/index.ts` passes
+   * `!app.isPackaged`, so only dev builds and e2e honour it (#305).
+   */
+  allowDiagnostics(allowed: boolean): void {
+    this.diagnosticsAllowed = allowed
+  }
+
+  /**
+   * Whether {@link SKIP_TREE_KILL_ENV} is in effect: allowed, and set to `1`. The quit
+   * helper is told, so it does not report a quit it could not check as clean (#305).
+   */
+  treeKillSkipped(): boolean {
+    return this.diagnosticsAllowed && process.env[SKIP_TREE_KILL_ENV] === '1'
+  }
+
+  /**
+   * Refuses every later `createTerminal` (#305). Called at the quit moment, before the
+   * quit helper reads {@link getLiveShells}, so the helper's list is complete and
+   * no console host appears after the moment it records. `dispose()` calls it too.
+   */
+  beginShutdown(): void {
+    this.shuttingDown = true
+  }
+
+  /**
    * List all terminals
    */
   listTerminals(): Array<{ id: string; title: string }> {
@@ -872,6 +1163,7 @@ export class TerminalService extends EventEmitter {
    */
   async dispose(): Promise<void> {
     logger.info('🛑 Disposing TerminalService...')
+    this.beginShutdown()
     const deadline = Date.now() + TERMINAL_DISPOSE_BOUND_MS
 
     const shells = this.detachTerminals([...this.terminals.keys()])
@@ -882,6 +1174,8 @@ export class TerminalService extends EventEmitter {
     await this.waitForPendingExits(
       Math.max(TERMINAL_MIN_EXIT_WAIT_MS, Math.min(TERMINAL_EXIT_WAIT_MS, deadline - Date.now()))
     )
+    // Counts only: lets a Windows quit log show the conout workers were ended (#305)
+    if (osPlatform() === 'win32') logger.info('Conout workers released before quit', conoutWorkerStats())
     logger.info('✅ TerminalService disposed')
   }
 
@@ -897,6 +1191,10 @@ export class TerminalService extends EventEmitter {
       if (terminal.clearFallbackTimeout) {
         clearTimeout(terminal.clearFallbackTimeout)
         terminal.clearFallbackTimeout = undefined
+      }
+      if (terminal.markerTimeout) {
+        clearTimeout(terminal.markerTimeout)
+        terminal.markerTimeout = undefined
       }
       // The owner is gone or the app is quitting: never leave a shell paused
       terminal.output.dispose()
@@ -922,7 +1220,11 @@ export class TerminalService extends EventEmitter {
    */
   private async endShells(shells: TerminalInstance[]): Promise<void> {
     const win32 = osPlatform() === 'win32'
-    if (win32) {
+    if (win32 && this.treeKillSkipped()) {
+      logger.warn(`Tree kill skipped: ${SKIP_TREE_KILL_ENV}=1 (diagnostics only)`)
+    } else if (win32) {
+      const now = Date.now()
+      for (const t of shells) t.killRequestedAtMs ??= now
       await killProcessTrees(shells.filter((t) => !t.hasExited).map((t) => t.pid))
     }
     const startedAt = Date.now()
@@ -940,6 +1242,7 @@ export class TerminalService extends EventEmitter {
   private ptyKill(terminal: TerminalInstance): void {
     if (terminal.killRequested) return
     terminal.killRequested = true
+    terminal.killRequestedAtMs ??= Date.now()
     try {
       // Safety net only. In node-pty 1.1.0 WindowsTerminal.kill() returns undefined,
       // so this branch never runs there; the #296 error box is prevented by the

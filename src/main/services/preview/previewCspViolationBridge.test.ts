@@ -339,19 +339,54 @@ describe('previewCspViolationBridge', () => {
       expect(onBlockedHost.mock.calls[30][0]).toBe('https://burst-35.example.com')
     })
 
-    it('still bounds the work a hostile page can force', () => {
-      // The budget above is about REPORTS. A page that references thousands of
-      // hosts still costs a URL parse each, so a separate, much larger ceiling
-      // bounds that independently.
-      const { bridge, onBlockedHost } = makeBridge(() => 1_000_000)
+    describe('still bounds the work a hostile page can force', () => {
+      // The report budget (30) is about REPORTS. The parse ceiling (500 a second)
+      // is about WORK: a page can make the bridge parse thousands of violations
+      // that never reach a report because they are duplicates. So the ceiling is
+      // only observable with a violation that would otherwise be REPORTED after
+      // 500 parses have been spent on duplicates -- a flood of distinct hosts is
+      // stopped by the report budget long before the ceiling matters.
+      const PARSE_CEILING = 500
 
-      for (let i = 0; i < 2000; i += 1) {
-        bridge.handleViolation(violation(`https://flood-${i}.example.com/a.js`))
+      /** Spend `count` parses on one already-reported origin: no report, only work. */
+      function spendParses(bridge: ReturnType<typeof makeBridge>['bridge'], count: number): void {
+        for (let i = 0; i < count; i += 1) {
+          bridge.handleViolation(violation('https://dup.example.com/a.js'))
+        }
       }
 
-      // Capped by the report budget long before the parse ceiling matters; the
-      // point is that it terminates and reports a bounded number.
-      expect(onBlockedHost.mock.calls.length).toBeLessThanOrEqual(30)
+      it('reports a novel host that is the last parse the ceiling allows', () => {
+        // POSITIVE CONTROL. Same setup as the next test, one parse fewer: the
+        // novel host IS reported, so the next test's silence is the ceiling and
+        // not a bridge that never reports.
+        const { bridge, onBlockedHost } = makeBridge(() => 1_000_000)
+
+        spendParses(bridge, PARSE_CEILING - 1)
+        bridge.handleViolation(violation('https://novel.example.com/a.js'))
+
+        expect(onBlockedHost.mock.calls.map((c) => c[0])).toEqual([
+          'https://dup.example.com',
+          'https://novel.example.com'
+        ])
+      })
+
+      it('drops a novel host once the second has spent its parses, and recovers after it', () => {
+        let clock = 1_000_000
+        const { bridge, onBlockedHost } = makeBridge(() => clock)
+
+        spendParses(bridge, PARSE_CEILING)
+        // Report budget has 29 left, the host is novel and approvable: only the
+        // parse ceiling can be what refuses it.
+        bridge.handleViolation(violation('https://novel.example.com/a.js'))
+        expect(onBlockedHost.mock.calls.map((c) => c[0])).toEqual(['https://dup.example.com'])
+
+        clock += 1000
+        bridge.handleViolation(violation('https://novel.example.com/a.js'))
+        expect(onBlockedHost.mock.calls.map((c) => c[0])).toEqual([
+          'https://dup.example.com',
+          'https://novel.example.com'
+        ])
+      })
     })
 
     it('rate-limits a burst, and recovers in the next second', () => {

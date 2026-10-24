@@ -12,6 +12,7 @@ import { useImport } from '../../hooks/useImport'
 import { logger } from '../../utils/logger'
 import { TEST_IDS, getDynamicTestId } from '../../constants/testids'
 import { fileGateway } from '../../services/fileGateway'
+import { settingsGateway } from '../../services/settingsGateway'
 
 interface RecentProject {
   path: string
@@ -112,7 +113,7 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
   // todo018: Fix missing useEffect dependencies by wrapping in useCallback
   const loadRecentProjects = useCallback(async () => {
     try {
-      const result = await window.api.settings.getRecentProjects()
+      const result = await settingsGateway.getRecentProjects()
       if (result.success && result.projects) {
         setRecentProjects(result.projects)
       } else if (result.error) {
@@ -234,7 +235,7 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
       // If project doesn't exist, remove it from recent list
       if (isNotFound) {
         try {
-          await window.api.settings.removeRecentProject(projectPath)
+          await settingsGateway.removeRecentProject(projectPath)
           keepFocusInListAfterRemoving(projectPath)
           loadRecentProjects()
         } catch (removeError) {
@@ -256,7 +257,7 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
 
     setLoadingState({ type: 'removing', path: projectPath })
     try {
-      const result = await window.api.settings.removeRecentProject(projectPath)
+      const result = await settingsGateway.removeRecentProject(projectPath)
       if (result.success) {
         keepFocusInListAfterRemoving(projectPath)
         loadRecentProjects()

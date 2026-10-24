@@ -49,7 +49,7 @@ import { TabBarPage } from './pages/tab-bar.page'
  * disk before Electron opens the project, so the tree is never at the mercy of
  * the directory watcher.
  */
-const imageViewerVisualTest = visualTest.extend<Record<string, never>>({
+const imageViewerVisualTest = visualTest.extend({
   visualTestProject: async ({ visualTestProject }, use) => {
     writeImageFixtures(visualTestProject)
     await use(visualTestProject)
@@ -155,7 +155,7 @@ visualTest.describe('Visual regression – no project', () => {
 
   visualTest('(a) welcome panel', async ({ visualWindow }, testInfo) => {
     assertBaselineExists('welcome-empty', testInfo)
-    await expect(visualWindow).toHaveScreenshot({ name: 'welcome-empty.png', clip: PAGE_CLIP })
+    await expect(visualWindow).toHaveScreenshot('welcome-empty.png', { clip: PAGE_CLIP })
   })
 })
 
@@ -188,7 +188,7 @@ visualTest.describe('Visual regression – with project', () => {
       byTestId(page, TEST_IDS.TOAST_CONTAINER)
     ]
 
-    await expect(page).toHaveScreenshot({ name: 'editor-loaded.png', mask: masks, clip: PAGE_CLIP })
+    await expect(page).toHaveScreenshot('editor-loaded.png', { mask: masks, clip: PAGE_CLIP })
   })
 
   visualTest('(c) terminal open', async ({ visualWindowWithProject }, testInfo) => {
@@ -211,7 +211,7 @@ visualTest.describe('Visual regression – with project', () => {
       byTestId(page, TEST_IDS.TERMINAL_INSTANCE)
     ]
 
-    await expect(page).toHaveScreenshot({ name: 'terminal-open.png', mask: masks, clip: PAGE_CLIP })
+    await expect(page).toHaveScreenshot('terminal-open.png', { mask: masks, clip: PAGE_CLIP })
   })
 
   visualTest('(d) settings overlay', async ({ visualWindowWithProject }, testInfo) => {
@@ -224,7 +224,7 @@ visualTest.describe('Visual regression – with project', () => {
 
     // Element-level screenshot of the settings overlay only
     const settingsOverlay = byTestId(page, TEST_IDS.SETTINGS_OVERLAY)
-    await expect(settingsOverlay).toHaveScreenshot({ name: 'settings-overlay.png' })
+    await expect(settingsOverlay).toHaveScreenshot('settings-overlay.png')
   })
 
   visualTest('(e) confirm dialog', async ({ visualAppWithProject, visualWindowWithProject }, testInfo) => {
@@ -262,7 +262,7 @@ visualTest.describe('Visual regression – with project', () => {
     await expect(dialogOverlay).toBeVisible({ timeout: 5000 })
 
     // Element-level screenshot of the dialog
-    await expect(dialogOverlay).toHaveScreenshot({ name: 'confirm-dialog.png' })
+    await expect(dialogOverlay).toHaveScreenshot('confirm-dialog.png')
 
     // Click cancel to keep the app open (fixture cleanup handles closing)
     await byTestId(page, TEST_IDS.DIALOG_BTN_CANCEL).click()
@@ -295,8 +295,6 @@ imageViewerVisualTest.describe('Visual regression – image viewer toolbar', () 
     // the status slot is empty at rest, and the zoom label is the settled
     // fit-to-view value. `toHaveScreenshot`'s two-pass stability check is the
     // wait — there is no sleep.
-    await expect(viewer.toolbar()).toHaveScreenshot({
-      name: 'image-viewer-toolbar-narrow.png'
-    })
+    await expect(viewer.toolbar()).toHaveScreenshot('image-viewer-toolbar-narrow.png')
   })
 })

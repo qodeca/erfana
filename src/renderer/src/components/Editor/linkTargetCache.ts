@@ -38,6 +38,9 @@
 
 import { fileGateway } from '../../services/fileGateway'
 import { onFileStructureChanged } from '../../services/fileStructureSignal'
+import { directoryWatchGateway } from '../../services/directoryWatchGateway'
+import { hasBridgeMethod } from '../../services/bridgePresence'
+import type { DirectoryChangedPayload } from '../../../../shared/ipc/directory-watch-schema'
 
 /** How long (ms) an answer is trusted without a structural event. */
 export const LINK_TARGET_TTL_MS = 30_000
@@ -45,11 +48,6 @@ export const LINK_TARGET_TTL_MS = 30_000
 export const LINK_TARGET_SETTLE_MS = 400
 /** Longest (ms) a burst of invalidations postpones the re-check. */
 export const LINK_TARGET_MAX_WAIT_MS = 2_000
-
-/** The `directory-watch:changed` payload, as the preload declares it. */
-type DirectoryChangedPayload = Parameters<
-  Parameters<Window['api']['directoryWatch']['onDirectoryChanged']>[0]
->[0]
 
 /**
  * The payload plus `structural`, which the main process may set to say outright
@@ -71,11 +69,13 @@ export function isStructuralChange(change: DirectoryChange): boolean {
 }
 
 /**
- * Listen for `directory-watch:changed`. Optional chaining because a test
- * renderer often installs no directory-watch bridge; then nothing is heard.
+ * Listen for `directory-watch:changed`. Asks for the bridge first because a
+ * test renderer often installs no directory-watch bridge; then nothing is heard.
  */
 function onDirectoryChanged(callback: (change: DirectoryChange) => void): () => void {
-  return window.api?.directoryWatch?.onDirectoryChanged?.(callback) ?? (() => {})
+  if (!hasBridgeMethod('directoryWatch', 'onDirectoryChanged')) return () => {}
+  // A test mock may hand back no unsubscribe
+  return directoryWatchGateway.onDirectoryChanged(callback) ?? (() => {})
 }
 
 interface Answer {

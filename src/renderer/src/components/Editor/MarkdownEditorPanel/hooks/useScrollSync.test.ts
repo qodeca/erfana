@@ -9,8 +9,8 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
-import { useScrollSync, UseScrollSyncOptions } from './useScrollSync'
-import { buildScrollMapEntries } from '../../../../components/Panels/markdownEditorPanel.logic'
+import { useScrollSync, UseScrollSyncOptions, type UseScrollSyncReturn } from './useScrollSync'
+import { buildScrollMapEntries, type ScrollMapEntry } from '../../../../components/Panels/markdownEditorPanel.logic'
 import type { MonacoEditorHandle } from '../../MonacoMarkdownEditor'
 import * as monaco from 'monaco-editor'
 
@@ -25,6 +25,11 @@ vi.mock('../../../../utils/logger', () => ({
 }))
 
 // Store mock return values so we can control them per test
+/** The hook owns this ref; a test writes it directly to stand in for a map build. */
+function setScrollMap(ref: UseScrollSyncReturn['scrollMapRef'], entries: ScrollMapEntry[]): void {
+  ;(ref as React.MutableRefObject<ScrollMapEntry[]>).current = entries
+}
+
 const mockScrollMapEntries = [
   { line: 1, editorOffset: 0, previewOffset: 0 },
   { line: 10, editorOffset: 200, previewOffset: 200 }
@@ -403,7 +408,7 @@ describe('useScrollSync', () => {
 
       // Manually populate scroll map for this test
       act(() => {
-        result.current.scrollMapRef.current = mockScrollMapEntries
+        setScrollMap(result.current.scrollMapRef, mockScrollMapEntries)
       })
 
       // Trigger editor scroll
@@ -448,7 +453,7 @@ describe('useScrollSync', () => {
 
       // Manually populate scroll map for this test
       act(() => {
-        result.current.scrollMapRef.current = mockScrollMapEntries
+        setScrollMap(result.current.scrollMapRef, mockScrollMapEntries)
       })
 
       // Trigger preview scroll
@@ -574,7 +579,7 @@ describe('useScrollSync', () => {
 
       act(() => {
         result.current.setIsEditorReady(true)
-        result.current.scrollMapRef.current = mockScrollMapEntries
+        setScrollMap(result.current.scrollMapRef, mockScrollMapEntries)
       })
 
       // Should not throw when element is detached
@@ -636,7 +641,7 @@ describe('useScrollSync', () => {
 
       act(() => {
         result.current.setIsEditorReady(true)
-        result.current.scrollMapRef.current = mockScrollMapEntries
+        setScrollMap(result.current.scrollMapRef, mockScrollMapEntries)
       })
 
       // Should not throw
@@ -677,7 +682,7 @@ describe('useScrollSync', () => {
 
       act(() => {
         result.current.setIsEditorReady(true)
-        result.current.scrollMapRef.current = mockScrollMapEntries
+        setScrollMap(result.current.scrollMapRef, mockScrollMapEntries)
       })
 
       // First scroll should work - should not throw

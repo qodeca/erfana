@@ -49,15 +49,18 @@ vi.mock('fs/promises', () => ({
   readdir: (...args: unknown[]) => mockReaddir(...args),
   chmod: (...args: unknown[]) => mockChmod(...args),
   unlink: (...args: unknown[]) => mockUnlink(...args),
-  rename: vi.fn()
+  rename: vi.fn(),
+  stat: vi.fn()
 }))
 
-// `fs` (sync) for `createReadStream` used by streaming SHA in verifyAllFiles
-// — we don't hit that path in these tests (all 3 tests fail before extract).
+// `fs` (sync) for `createReadStream` used by streaming SHA in verifyAllFiles.
+// Only the successful-upgrade test reaches it; it arranges the stream itself.
+const mockCreateReadStream = vi.fn((_path: string): unknown => {
+  throw new Error('not expected to reach verifyAllFiles in this downgrade test')
+})
+
 vi.mock('fs', () => ({
-  createReadStream: vi.fn(() => {
-    throw new Error('not expected to reach verifyAllFiles in downgrade tests')
-  }),
+  createReadStream: (path: string) => mockCreateReadStream(path),
   constants: { R_OK: 4, X_OK: 1 }
 }))
 
@@ -82,15 +85,15 @@ vi.mock('./LoggingService', () => ({
 // ---------------------------------------------------------------------------
 
 const DARWIN_SPEC = {
-  filename: 'whisper-macos-universal-v1.8.4-erfana1.tar.gz',
+  filename: 'whisper-macos-universal-v1.8.4-erfana2.tar.gz',
   archiveFormat: 'tar.gz' as const,
-  sha256: '78fa53c26f62da7f842def18f57338908641449fcee5da533037237d09bc696b',
-  sizeBytes: 744_152,
+  sha256: '2f73a24866acbd7f446344856cc1a86112cd0235e31480117c54cfa499514ab2',
+  sizeBytes: 2_361_432,
   files: {
     main: {
       filename: 'whisper-cli',
-      sizeBytes: 1_778_400,
-      sha256: 'ff6de29f7a5581bea65a87c2437aabc8085cd21a6c476e78e11bc81b1edd8b9f'
+      sizeBytes: 6_387_792,
+      sha256: 'e533e2ae396115788235a2d0fd175cbed288f25dbd03d4c7be68c39de993c0de'
     },
     sidecars: []
   }
@@ -107,8 +110,15 @@ vi.mock('./whisper-assets', () => ({
   MANIFEST_SIG_MAX_BYTES: 8 * 1024,
   MANIFEST_SIG_URL: 'https://example.invalid/manifest.json.minisig',
   MANIFEST_URL: 'https://example.invalid/manifest.json',
-  MIN_REVISION_INDEX: 1,
-  MODEL_MAX_BYTES: 2 * 1024 * 1024 * 1024,
+  MIN_REVISION_INDEX: 2,
+  MODEL_SIZE_MARGIN_BYTES: 1024,
+  MODEL_PINS: {
+    tiny: { remoteFilename: 'ggml-tiny.bin', sizeBytes: 1000, sha256: 'a'.repeat(64) },
+    base: { remoteFilename: 'ggml-base.bin', sizeBytes: 2000, sha256: 'b'.repeat(64) },
+    small: { remoteFilename: 'ggml-small.bin', sizeBytes: 3000, sha256: 'c'.repeat(64) },
+    medium: { remoteFilename: 'ggml-medium.bin', sizeBytes: 4000, sha256: 'd'.repeat(64) },
+    large: { remoteFilename: 'ggml-large-v3.bin', sizeBytes: 5000, sha256: 'e'.repeat(64) }
+  },
   SCHEMA_SENTINEL_FILENAME: '.schema-version',
   SCHEMA_VERSION: 1,
   artifactUrl: (filename: string) => `https://example.invalid/${filename}`,
@@ -195,10 +205,6 @@ function arrangeDefaults(opts: {
   mockDownloadToFile.mockResolvedValue(undefined)
 
   // verifyManifest passes with primary key.
-  mockVerifyManifest.mockResolvedValue({
-    signingKeyRole: 'primary',
-    signingKeyId: 'test-key-id'
-  })
 
   const manifestBody = {
     schemaVersion: 1,
@@ -215,9 +221,9 @@ function arrangeDefaults(opts: {
         size: DARWIN_SPEC.sizeBytes
       },
       win64: {
-        filename: 'whisper-win-x64-v1.8.4-erfana1.zip',
-        sha256: '8e3c63e8e7112e3f04304a4d58937696d72881d88ad0c436665e194b7af846f1',
-        size: 1_000_000
+        filename: 'whisper-win-x64-v1.8.4-erfana2.zip',
+        sha256: 'f4a459133c29911e484146917c1ada49aac8668d734db8c300a820be11be36f2',
+        size: 1_014_883
       }
     },
     signingKey: 'primary' as const
@@ -227,6 +233,12 @@ function arrangeDefaults(opts: {
   //   - manifest.json path → return manifest JSON bytes
   //   - .last-seen-revision → return sentinel or reject ENOENT
   //   - schema-version sentinel → reject ENOENT (triggers slow path)
+  mockVerifyManifest.mockResolvedValue({
+    signingKeyRole: 'primary',
+    signingKeyId: 'test-key-id',
+    content: Buffer.from(JSON.stringify(manifestBody))
+  })
+
   mockReadFile.mockImplementation(async (p: string) => {
     if (typeof p === 'string' && p.includes('manifest.json') && !p.includes('.minisig')) {
       return JSON.stringify(manifestBody)
@@ -260,8 +272,45 @@ describe('WhisperModelManager downgrade protection', () => {
     vi.restoreAllMocks()
   })
 
+  it('real pin floor is above erfana1', async () => {
+    // erfana1's macOS whisper-cli could not start on users' Macs (its dylibs
+    // were not in the tarball), so the shipped floor must stay above it.
+    const real = await vi.importActual<typeof import('./whisper-assets')>('./whisper-assets')
+    expect(real.MIN_REVISION_INDEX).toBeGreaterThanOrEqual(2)
+    expect(real.RELEASE_TAG).not.toContain('erfana1')
+  })
+
+  it('upgrades an erfana1 install: stored floor 1 + manifest 2 → accepted, floor written as 2', async () => {
+    arrangeDefaults({ manifestRevisionIndex: 2, lastSeenRevisionOnDisk: 1 })
+
+    // verifyAllFiles streams the extracted main binary. Serve bytes whose
+    // SHA-256 is the pin for the duration of this test.
+    const { Readable } = await vi.importActual<typeof import('stream')>('stream')
+    const { createHash } = await vi.importActual<typeof import('crypto')>('crypto')
+    const fakeBinary = Buffer.from('erfana2 whisper-cli stand-in')
+    const originalSha = DARWIN_SPEC.files.main.sha256
+    DARWIN_SPEC.files.main.sha256 = createHash('sha256').update(fakeBinary).digest('hex')
+    mockCreateReadStream.mockImplementation(() => Readable.from([fakeBinary]))
+
+    try {
+      const { createWhisperModelManager } = await import('./WhisperModelManager')
+      const manager = createWhisperModelManager()
+
+      await expect(manager.ensureBinary()).resolves.toMatch(/whisper-cli$/)
+
+      const floorWrites = mockWriteFile.mock.calls.filter(
+        ([p]) => typeof p === 'string' && p.endsWith('.last-seen-revision')
+      )
+      expect(floorWrites).toHaveLength(1)
+      expect(floorWrites[0][1]).toBe('2')
+    } finally {
+      DARWIN_SPEC.files.main.sha256 = originalSha
+      mockCreateReadStream.mockReset()
+    }
+  })
+
   it('rejects manifest whose revisionIndex is below MIN_REVISION_INDEX (source floor)', async () => {
-    arrangeDefaults({ manifestRevisionIndex: 0, lastSeenRevisionOnDisk: null })
+    arrangeDefaults({ manifestRevisionIndex: 1, lastSeenRevisionOnDisk: null })
 
     const { createWhisperModelManager } = await import('./WhisperModelManager')
     const { AppError } = await import('../../shared/errors')
@@ -325,7 +374,7 @@ describe('WhisperModelManager downgrade protection', () => {
 
   it('rejects manifest whose per-platform SHA does not match source pin (SOURCE_PIN_DRIFT)', async () => {
     arrangeDefaults({
-      manifestRevisionIndex: 1,
+      manifestRevisionIndex: 2,
       lastSeenRevisionOnDisk: null,
       manifestPlatformSha: '0000000000000000000000000000000000000000000000000000000000000000'
     })
@@ -339,12 +388,12 @@ describe('WhisperModelManager downgrade protection', () => {
   })
 
   it('wraps verifyManifest failure as WHISPER_MANIFEST_INVALID (granular error code)', async () => {
-    arrangeDefaults({ manifestRevisionIndex: 1, lastSeenRevisionOnDisk: null })
+    arrangeDefaults({ manifestRevisionIndex: 2, lastSeenRevisionOnDisk: null })
 
     // Make signature verify fail.
     const { VerifyManifestError } = await import('../utils/verifyManifest')
     mockVerifyManifest.mockRejectedValue(
-      new VerifyManifestError('signature verification failed for both keys')
+      new VerifyManifestError('ed25519-rejected', 'signature verification failed for both keys')
     )
 
     const { createWhisperModelManager } = await import('./WhisperModelManager')

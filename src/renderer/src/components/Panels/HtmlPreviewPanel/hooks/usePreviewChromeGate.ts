@@ -36,6 +36,7 @@ import {
   usePreviewChromeGateStore,
   type PreviewChromeGateReason
 } from '../../../../stores/usePreviewChromeGateStore'
+import { previewGateway } from '../../../../services/previewGateway'
 
 /** What `usePreviewBounds` calls to record what it just pushed. */
 export interface PreviewAckController {
@@ -169,7 +170,7 @@ export function usePreviewChromeGate({
 
   // The page confirmed it repainted at the new size.
   useEffect(() => {
-    return window.api.preview.onBoundsApplied((payload) => {
+    return previewGateway.onBoundsApplied((payload) => {
       if (payload.panelId !== panelId) return
       const epoch = epochRef.current
       // Accept any ack at or after the epoch's first push: every push inside an
@@ -185,7 +186,7 @@ export function usePreviewChromeGate({
 
   // Main confirms the hide actually landed.
   useEffect(() => {
-    return window.api.preview.onVisibilityApplied((payload) => {
+    return previewGateway.onVisibilityApplied((payload) => {
       if (payload.panelId !== panelId) return
       pageHiddenRef.current = !payload.visible
       setHideConfirmed(!payload.visible)

@@ -43,7 +43,7 @@ The goal is **full Windows parity** — every feature that works on macOS must w
 | [`deferred-work.md`](deferred-work.md) | D1–D8 deferred items (Phase 2 review aftermath) with severity, promotion criteria, risk-if-forgotten. |
 | [`deferred-work-phase4.md`](deferred-work-phase4.md) | D9–D12 deferred items (Phase 4 audit aftermath). Same template as D1-D8; split for file-size compliance (500-line cap). |
 | [`known-flakes.md`](known-flakes.md) | Windows test-flake remediation register — symptom, status, issue link per test. Includes remediation patterns cheat-sheet and follow-up audit candidates. |
-| [`phase4-binary-spec.md`](phase4-binary-spec.md) | Pinned SHAs for the first published `whisper-build-v1.8.4-erfana1` release (source-of-truth cross-checked against `src/main/services/whisper-assets.ts`). |
+| [`phase4-binary-spec.md`](phase4-binary-spec.md) | Pinned SHAs for the current `whisper-build-v1.8.4-erfana2` release, plus the retired first release `erfana1` (source-of-truth cross-checked against `src/main/services/whisper-assets.ts`). |
 | [`whisper-trust-chain.md`](whisper-trust-chain.md) | 4-layer client-side trust model for the local whisper.cpp subprocess — composition diagram, per-layer guarantees, attacker model. |
 | [`whisper-support-runbook.md`](whisper-support-runbook.md) | Operator playbook for the `WHISPER_*` error codes — diagnostic trails, log paths, stuck-user procedures. |
 | [`../build/windows.md`](../build/windows.md) | Windows dev environment setup (Node 24, Python 3.12 known good – 3.14.3 verified 2026-09-03 on Windows 11 – VS 2022 Build Tools, Developer Mode, long paths, troubleshooting, contributor expectations). |

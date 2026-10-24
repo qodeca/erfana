@@ -11,13 +11,14 @@
  *
  * @module TerminalPanel/hooks/useTerminalDragDrop
  * @see Issue #85 - Drag-drop file path insertion
+ * @deprecated Never wired into the panel. Use `useTerminalFileDrop`, which the
+ *   terminal session attaches and detaches with each xterm instance.
  */
 
 import { useState, useRef, useCallback } from 'react'
 import type { Terminal } from '@xterm/xterm'
 import { useTerminalStore } from '../../../../stores/useTerminalStore'
 import { showWarningToast } from '../../../../utils/toastHelpers'
-import { formatPathsForTerminal } from '../../../../utils/shellPathEscape'
 import { isPointInElement } from '../../../../utils/domGeometry'
 import { logger } from '../../../../utils/logger'
 import type { DragHandlerRefs } from '../types'
@@ -79,6 +80,8 @@ export interface UseTerminalDragDropReturn {
  * // In cleanup:
  * cleanupDragHandlers()
  * ```
+ *
+ * @deprecated Use `useTerminalFileDrop` (same listeners, attached per xterm instance)
  */
 export function useTerminalDragDrop(
   options: UseTerminalDragDropOptions
@@ -193,7 +196,7 @@ export function useTerminalDragDrop(
 
       logger.info('External file drop on terminal', { pathCount: paths.length, paths })
 
-      const formattedPaths = formatPathsForTerminal(paths)
+      const formattedPaths = useTerminalStore.getState().formatPathsForActiveTerminal(paths)
 
       try {
         const success = await useTerminalStore.getState().sendToTerminal(formattedPaths, false)

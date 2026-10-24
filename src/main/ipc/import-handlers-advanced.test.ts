@@ -334,7 +334,7 @@ describe('registerDocumentImportHandlers – advanced', () => {
       const mockEvent = createMockEvent({ isDestroyed: () => true })
       await handler!(mockEvent, { filePath: TEST_DOC_PATH })
 
-      const sender = (mockEvent as { sender: { send: ReturnType<typeof vi.fn> } }).sender
+      const sender = mockEvent.sender
       expect(sender.send).not.toHaveBeenCalled()
     })
   })

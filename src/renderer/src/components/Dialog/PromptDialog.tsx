@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { Info, MessageSquare } from 'lucide-react'
 import { BaseDialog } from './BaseDialog'
 import { TextareaContextMenu } from '../ContextMenu/TextareaContextMenu'
+import { isKeyboardMenuEcho, openMenuFromKey } from '../ContextMenu/contextMenuKey'
 import { CharacterCount } from '../shared'
 import { validateTextInput } from '../../utils/textInputValidation'
 import { formatShortcut } from '../../utils/shortcutLabel'
@@ -86,7 +87,21 @@ export function PromptDialog({ config, zIndex, onSubmit, onCancel }: PromptDialo
 
   const [inputValue, setInputValue] = useState(defaultValue)
   const [dropdownValue, setDropdownValue] = useState(initialDropdownValue)
-  const [validationError, setValidationError] = useState<string | null>(null)
+  // Effective minimum length: 0 when textarea is optional, otherwise use configured minLength
+  const effectiveMinLength = textareaOptional ? 0 : minLength
+  // Seeded from the default value in the initializer, not an effect:
+  // DialogManager keys every dialog by its own id, so each open is a fresh
+  // mount. After that the error is editable state (typing clears it).
+  const [validationError, setValidationError] = useState<string | null>(() => {
+    if (!defaultValue || defaultValue.trim().length === 0) return null
+    const result = validateTextInput(defaultValue, {
+      minLength: effectiveMinLength,
+      maxLength,
+      warningThreshold: TEXT_INPUT_LIMITS.WARNING_THRESHOLD,
+      customValidation: validation
+    })
+    return result.canSubmit ? null : result.message
+  })
   const [showTooltip, setShowTooltip] = useState(false)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
   const [hasSelection, setHasSelection] = useState(false)
@@ -105,9 +120,6 @@ export function PromptDialog({ config, zIndex, onSubmit, onCancel }: PromptDialo
       textareaRef.current.focus()
     }
   }, [])
-
-  // Effective minimum length: 0 when textarea is optional, otherwise use configured minLength
-  const effectiveMinLength = textareaOptional ? 0 : minLength
 
   // Memoized validation result using shared validation utility
   const validationResult = useMemo(() => {
@@ -136,13 +148,6 @@ export function PromptDialog({ config, zIndex, onSubmit, onCancel }: PromptDialo
     setValidationError(null)
     return true
   }, [effectiveMinLength, maxLength, validation])
-
-  // Validate default value on mount if provided
-  useEffect(() => {
-    if (defaultValue && defaultValue.trim().length > 0) {
-      validateInput(defaultValue)
-    }
-  }, [defaultValue, validateInput])
 
   const handleSubmit = () => {
     const trimmed = inputValue.trim()
@@ -198,9 +203,22 @@ export function PromptDialog({ config, zIndex, onSubmit, onCancel }: PromptDialo
   // Context menu handlers
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
+    // The Windows Menu-key echo of a menu the keyboard already opened (#90).
+    if (isKeyboardMenuEcho()) return
     setContextMenu({ x: e.clientX, y: e.clientY })
     handleSelect()
   }, [handleSelect])
+
+  // Shift+F10 / the Menu key open the same menu under the field (#90).
+  const handleMenuKey = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      openMenuFromKey(e, (anchor) => {
+        setContextMenu(anchor)
+        handleSelect()
+      })
+    },
+    [handleSelect]
+  )
 
   const handleCloseContextMenu = useCallback(() => {
     setContextMenu(null)
@@ -304,7 +322,12 @@ export function PromptDialog({ config, zIndex, onSubmit, onCancel }: PromptDialo
               value={inputValue}
               onChange={handleChange}
               onKeyDown={handleKeyDown}
+              onKeyDownCapture={handleMenuKey}
               onContextMenu={handleContextMenu}
+              /* deviates: design/system/components/menu/index.html — aria-haspopup
+                 only: ARIA does not allow aria-expanded on a textbox. See the
+                 card's Exceptions. */
+              aria-haspopup="menu"
               onSelect={handleSelect}
               placeholder={inputPlaceholder}
               rows={6}

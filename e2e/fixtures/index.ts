@@ -358,8 +358,7 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
   // its project folder is removed. Without it the folder went first and, on
   // Windows, stayed locked by the still-running app (EBUSY, #134).
   appWithTestProject: async (
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    { userDataDir, homeDir, extraLaunchArgs, resetRendererStorage, testProject },
+    { userDataDir, homeDir, extraLaunchArgs, resetRendererStorage, testProject: _testProject },
     use
   ) => {
     await launchApp(
@@ -582,8 +581,7 @@ export const visualTest = base.extend<VisualTestFixtures, WorkerFixtures>({
 
   // `visualTestProject` is a dependency only for teardown order: the app closes
   // before its project folder is removed (see appWithTestProject).
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  visualAppWithProject: async ({ userDataDir, homeDir, visualTestProject }, use) => {
+  visualAppWithProject: async ({ userDataDir, homeDir, visualTestProject: _visualTestProject }, use) => {
     const opts = buildVisualLaunchOptions(userDataDir, undefined, homeDir)
     const app = await electron.launch(opts)
     await resizeBrowserWindow(app, VISUAL_CONTENT_SIZE.width, VISUAL_CONTENT_SIZE.height)

@@ -3,6 +3,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { APP_ID } from '../shared/constants'
 
 /**
  * Main Process Window Creation Tests
@@ -20,6 +21,17 @@ import { join } from 'node:path'
  * applies when the import is genuinely slow; a hung test still fails.
  */
 vi.setConfig({ testTimeout: 20_000 })
+
+/**
+ * The quit helper is mocked for the whole file: the real one would start PowerShell on
+ * Windows, take the test runner for the app, end its console hosts and force-end it
+ * after the grace period (#305). One test replaces it with its own mock.
+ */
+const reaperMock = (): Record<string, unknown> => ({
+  QUIT_TRACE_FILE: 'quit-cleanup.log',
+  startConptyHostReaper: vi.fn(() => ({ started: false, launcherDone: Promise.resolve() }))
+})
+vi.mock('./services/conptyHostReaper', () => reaperMock())
 
 /** Renderer token file — the source of truth for the window's paint colour. */
 const DESIGN_TOKENS_PATH = join(__dirname, '../renderer/src/styles/design-tokens.css')
@@ -153,7 +165,10 @@ describe('Main Process - Window Creation', () => {
       ipcMain: {
         on: vi.fn(),
         handle: vi.fn(),
-        removeHandler: vi.fn()
+        removeHandler: vi.fn(),
+        // The preview handlers dispose their `on` listeners through
+        // registry.unregisterOn on quit, which calls removeListener.
+        removeListener: vi.fn()
       },
       // #216: claude-status handler imports `webContents` for the targeted send.
       webContents: {
@@ -202,7 +217,9 @@ describe('Main Process - Window Creation', () => {
         dispose: vi.fn(),
         setProjectPath: vi.fn(), // issue #59: clear project state on destroy
         cleanupForWebContentsId: vi.fn(() => Promise.resolve()), // issue #59
-        handleAncestorRemovals: vi.fn() // save after a folder rename
+        handleAncestorRemovals: vi.fn(), // save after a folder rename
+        checkWatchedFilesUnder: vi.fn(() => Promise.resolve()), // #252
+        watchUnseenFiles: vi.fn() // #252
       }
     }))
     vi.doMock('./services/DirectoryWatcherService', () => ({
@@ -210,13 +227,18 @@ describe('Main Process - Window Creation', () => {
         dispose: vi.fn(),
         setProjectPath: vi.fn(), // issue #59: clear project state on destroy
         cleanupForWebContentsId: vi.fn(() => Promise.resolve()), // issue #59
-        onPathsRemoved: vi.fn(() => () => {}) // save after a folder rename
+        onPathsRemoved: vi.fn(() => () => {}), // save after a folder rename
+        onRemovalsLost: vi.fn(() => () => {}) // #252
       }
     }))
     vi.doMock('./services/TerminalService', () => ({
       terminalService: {
         dispose: vi.fn(),
-        cleanupForWebContentsId: vi.fn() // issue #59
+        cleanupForWebContentsId: vi.fn(), // issue #59
+        allowDiagnostics: vi.fn(), // #305
+        beginShutdown: vi.fn(),
+        getLiveShells: vi.fn(() => []),
+        treeKillSkipped: vi.fn(() => false)
       }
     }))
     vi.doMock('./services/SettingsService', () => ({
@@ -292,7 +314,9 @@ describe('Main Process - Window Creation', () => {
           if (key === 'logging') return { level: 'info', console: true }
           return undefined
         }),
-        onSettingsChanged: vi.fn()
+        // Returns an unsubscribe, like the real service: the preview teardown
+        // calls it on quit.
+        onSettingsChanged: vi.fn(() => () => {})
       }
     }))
 
@@ -301,6 +325,8 @@ describe('Main Process - Window Creation', () => {
       loggingService: {
         initialize: vi.fn(() => Promise.resolve()),
         cleanupOldLogs: vi.fn(() => Promise.resolve()),
+        // the quit step reads it for the quit-helper trace path (#305)
+        getLogsDir: vi.fn(() => '/tmp/erfana-test-logs'),
         info: vi.fn(),
         debug: vi.fn(),
         warn: vi.fn(),
@@ -439,6 +465,29 @@ describe('Main Process - Window Creation', () => {
       const listener = onPathsRemoved.mock.calls[0][0] as (paths: readonly string[]) => void
       listener(['/proj/docs'])
       expect(fileWatcherService.handleAncestorRemovals).toHaveBeenCalledWith(['/proj/docs'])
+    })
+
+    it('re-checks the open files where the project watcher cannot tell (#252)', async () => {
+      await import('./index')
+      await flushStartup()
+      const { directoryWatcherService } = await import('./services/DirectoryWatcherService')
+      const { fileWatcherService } = await import('./services/FileWatcherService')
+
+      // Removals a paused watch lost without their paths: check the disk under that root
+      const onRemovalsLost = directoryWatcherService.onRemovalsLost as unknown as ReturnType<typeof vi.fn>
+      expect(onRemovalsLost).toHaveBeenCalledTimes(1)
+      const lost = onRemovalsLost.mock.calls[0][0] as (
+        root: string,
+        isOwnRemoval: (filePath: string) => boolean
+      ) => void
+      const isOwnRemoval = (): boolean => false
+      lost('/proj', isOwnRemoval)
+      expect(fileWatcherService.checkWatchedFilesUnder).toHaveBeenCalledWith('/proj', isOwnRemoval)
+
+      // Files the project watcher cannot see: the project watcher itself says which those are
+      const watchUnseen = fileWatcherService.watchUnseenFiles as unknown as ReturnType<typeof vi.fn>
+      expect(watchUnseen).toHaveBeenCalledTimes(1)
+      expect(watchUnseen).toHaveBeenCalledWith(directoryWatcherService)
     })
   })
 
@@ -640,7 +689,10 @@ describe('Main Process - Window Creation', () => {
           ipcMain: {
             on: vi.fn(),
             handle: vi.fn(),
-            removeHandler: vi.fn()
+            removeHandler: vi.fn(),
+            // The preview handlers dispose their `on` listeners through
+            // registry.unregisterOn on quit, which calls removeListener.
+            removeListener: vi.fn()
           },
           webContents: {
             fromId: vi.fn(() => null)
@@ -1038,6 +1090,36 @@ describe('Main Process - Window Creation', () => {
       }
     })
 
+    it('waits at most 3 s for the quit-helper launcher, last, and logs the wait (#305)', async () => {
+      vi.doMock('./services/conptyHostReaper', () => ({
+        QUIT_TRACE_FILE: 'quit-cleanup.log',
+        startConptyHostReaper: vi.fn(() => ({ started: true, launcherDone: new Promise<void>(() => {}) }))
+      }))
+      const { logger } = (await import('./services/LoggingService')) as any
+      const { run, cleanup } = await loadAndGetBeforeQuit()
+
+      try {
+        vi.useFakeTimers()
+        const shutdown = run({ preventDefault: vi.fn() })
+        await vi.advanceTimersByTimeAsync(2_999)
+        expect(mockApp.exit).not.toHaveBeenCalled()
+        await vi.advanceTimersByTimeAsync(1)
+        await shutdown
+
+        expect(mockApp.exit).toHaveBeenCalledWith(0)
+        const waitLog = logger.info.mock.calls.find(([m]: [string]) => m === 'App quit: quit helper launcher wait')
+        expect(waitLog?.[1]).toEqual({ settled: false, waitedMs: 3_000 })
+        // the wait comes after the disposers
+        const order = logger.info.mock.calls.map(([m]: [string]) => m)
+        expect(order.indexOf('App quit: disposers done, exiting')).toBeLessThan(
+          order.indexOf('App quit: quit helper launcher wait')
+        )
+      } finally {
+        cleanup()
+        vi.doMock('./services/conptyHostReaper', () => reaperMock())
+      }
+    })
+
     it('should reach app.exit(0) when the lock disposal rejects', async () => {
       const { projectLockService } = (await import('./services/ProjectLockService')) as any
       projectLockService.dispose.mockRejectedValue(new Error('EBUSY'))
@@ -1131,6 +1213,25 @@ describe('Main Process - Window Creation', () => {
     })
   })
 
+  describe('Tree-kill diagnostics switch (#305)', () => {
+    it('allows the switch in a dev build', async () => {
+      mockApp.isPackaged = false
+      await import('./index')
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      const { terminalService } = await import('./services/TerminalService')
+      expect(terminalService.allowDiagnostics).toHaveBeenCalledWith(true)
+    })
+
+    it('never allows it in a packaged build', async () => {
+      mockApp.isPackaged = true
+      await import('./index')
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      const { terminalService } = await import('./services/TerminalService')
+      expect(terminalService.allowDiagnostics).toHaveBeenCalledWith(false)
+      expect(terminalService.allowDiagnostics).not.toHaveBeenCalledWith(true)
+    })
+  })
+
   describe('Application Menu Configuration', () => {
     it('should set application menu on startup', async () => {
       mockIs.dev = false
@@ -1147,6 +1248,17 @@ describe('Main Process - Window Creation', () => {
       // Verify Menu.setApplicationMenu was called with the menu
       expect(Menu.setApplicationMenu).toHaveBeenCalledTimes(1)
       expect(Menu.setApplicationMenu).toHaveBeenCalledWith({})
+    })
+  })
+
+  describe('Windows AppUserModelID', () => {
+    it('sets the AppUserModelID to the installer appId', async () => {
+      mockIs.dev = false
+
+      await import('./index')
+
+      const { electronApp } = await import('@electron-toolkit/utils')
+      expect(electronApp.setAppUserModelId).toHaveBeenCalledWith(APP_ID)
     })
   })
 

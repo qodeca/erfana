@@ -129,6 +129,8 @@ function createFakeEditor(initial: string) {
     },
     onContextMenu: () => ({ dispose: () => {} }),
     addCommand: () => null,
+    // The keyboard context-menu action (#90); not exercised here.
+    addAction: () => ({ dispose: () => {} }),
     updateOptions: (opts: { readOnly?: boolean }) => {
       if (opts.readOnly !== undefined) readOnly = opts.readOnly
     },

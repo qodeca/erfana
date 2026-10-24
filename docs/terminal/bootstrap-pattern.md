@@ -28,13 +28,13 @@ shell -c 'cd '\''/target/path'\''; pwd; echo __ERFANA_PWD_MARKER_...; exec -l "$
 bash.exe -c 'cd '\''C:\Users\me\Dev\proj'\''; pwd; echo __ERFANA_PWD_MARKER_...; printf '\''\033[2J\033[3J\033[H'\''; exec -l '\''C:\Program Files\Git\usr\bin\bash.exe'\'' -i'
 
 # Windows PowerShell (cwd single-quote-doubled '→''; `[Console]::Write` wipes ConPTY buffer)
-pwsh.exe -NoProfile -Command "Set-Location -LiteralPath 'C:\Users\me\Dev\proj' ; (Get-Location).Path ; Write-Output '__ERFANA_PWD_MARKER_...' ; [Console]::Write([char]27 + '[2J' + [char]27 + '[3J' + [char]27 + '[H') ; & 'pwsh.exe' -NoLogo"
+pwsh.exe -NoLogo -NoProfile -NoExit -Command "Set-Location -LiteralPath 'C:\Users\me\Dev\proj' ; (Get-Location).Path ; Write-Output '__ERFANA_PWD_MARKER_...' ; [Console]::Write([char]27 + '[2J' + [char]27 + '[3J' + [char]27 + '[H') ; <dot-source the user's profiles>"
 
-# Windows cmd.exe (cwd validated against metachar deny-list; `cls` wipes ConPTY viewport)
-cmd.exe /D /K "@echo off && cd /d "C:\Users\me\Dev\proj" && cd && echo __ERFANA_PWD_MARKER_... && cls"
+# Windows cmd.exe (cwd validated against metachar deny-list and passed as the spawn cwd; `pause` then `cls` wipes the ConPTY buffer, main writes `\r` after the marker)
+cmd.exe /D /S /K "@echo off && cd && echo __ERFANA_PWD_MARKER_... && pause >nul && cls & echo on"   # started with cwd = C:\Users\me\Dev\proj
 ```
 
-The trailing screen-clear step (`printf`, `[Console]::Write`, or `cls`) is Windows-specific and exists purely to wipe the ConPTY internal screen buffer before the interactive shell takes over – see [ConPTY resize-reflow mitigation](#4-conpty-resize-reflow-mitigation-windows) below.
+The trailing screen-clear step (`printf`, `[Console]::Write`, or `pause` + `cls` for cmd.exe) is Windows-specific and exists purely to wipe the ConPTY internal screen buffer before the interactive shell takes over – see [ConPTY resize-reflow mitigation](#4-conpty-resize-reflow-mitigation-windows) below.
 
 ## Why the specific shell flags
 
@@ -49,18 +49,30 @@ When the main process sees `process.env.ERFANA_E2E_FAST_SHELL === '1'`, the POSI
 
 ### PowerShell
 
-- `-NoProfile`: Skip profile loading (faster bootstrap; isolates from user RC)
-- `-Command`: Execute the bootstrap script. `-NoExit` is **not** emitted (`PowerShellBootstrapBuilder.build` returns `['-NoProfile', '-Command', script]`): PowerShell has no POSIX `exec` equivalent, so the script's last step `& '<shell>' -NoLogo` launches the interactive session itself, and the bootstrap process stays alive as its parent
+- `-NoProfile`: PowerShell does not load the profiles before the script; the script's last step dot-sources them itself (all users all hosts, all users this host, current user all hosts, current user this host – PowerShell's own order), each in its own `try`, so they still run after the cwd is set and after the screen clear, as before
+- `-NoExit`: the same process stays as the interactive session once the script ends (`PowerShellBootstrapBuilder.build` returns `['-NoLogo', '-NoProfile', '-NoExit', '-Command', script]`). Until #305 round 8 the script ended with `& '<shell>' -NoLogo`, so the pid node-pty reported was a bootstrap PowerShell and the interactive shell was its child; on quit both ended with the console, and a program the user had started in its own console was left with a parent the quit cleanup had never been told about. Now the reported pid is the shell that runs the user's commands
+- `-Command`: Execute the bootstrap script
 - `Set-Location -LiteralPath`: `-LiteralPath` disables wildcard expansion and variable interpolation. Single-quoting the path further disables `$`-expansion. cwd apostrophes are doubled (`'` → `''`).
 - `Write-Output '<marker>'` with the marker also single-quoted: defensive — protects against marker format changes that might include shell-sensitive characters.
 
 ### cmd.exe
 
 - `/D`: Disable AutoRun from registry (prevents `HKLM\...\AutoRun` commands from polluting the bootstrap)
+- `/S`: With `/S`, cmd strips exactly the first and last quote of the `/K` argument and runs the rest verbatim, so the inner quotes survive.
 - `/K`: Keep cmd.exe interactive after the command runs
+- **Passed as one command-line string, not an argv array.** node-pty's `argsToCommandLine` wraps an array argument in quotes and rewrites each inner `"` as `\"` (the MSVCRT rule). cmd.exe does not understand that: a quoted `cd /d` fails, `&&` skips the marker, and the terminal stays blank because output is suppressed until the marker arrives. node-pty passes a `string` through as the ready-made command line. The cwd is **not** part of the string: `pty.spawn` starts the shell in the validated, normalized cwd, so there is no path quoting and no `%VAR%` / `!VAR!` expansion of the cwd. The deny-list (`"&|^<>`) stays as defense in depth.
+- **UNC cwds**: cmd.exe refuses a UNC current folder, prints its own warning (before the marker, so it is dropped) and starts in the Windows directory. `cd` then reports that directory and the handshake completes, so the terminal opens, but not in the UNC path.
+- `& echo on` (unconditional, not `&&`): restores the prompt even if an earlier step failed, so a failure never leaves echo off with no prompt.
+- `echo on` (last): `@echo off` would otherwise stay on and hide the prompt.
 - `@echo off`: **Critical**. Without it, cmd.exe echoes the bootstrap commands back into the PTY, and `markerDetector` mis-parses the echoed `echo <marker>` line as the cwd, resulting in junk stored as `terminal.cwd`.
-- `&&` chain (not `&`): Short-circuit — stop if `cd /d` fails (e.g., invalid drive), rather than plowing through and printing the wrong cwd.
+- `&&` chain: `@echo off`, `cd`, `echo <marker>`, `pause` and `cls` short-circuit; only `echo on` runs unconditionally.
+- **`pause >nul` before `cls`**: ConPTY sends the final screen, not every line. A `cls` right after the marker lands in the same frame, so the cd line and the marker never reach the PTY stream and the missing-marker timeout fires after 10 s (found on a Windows run of #335). While cmd is idle in `pause`, ConPTY flushes the marker frame; main then writes `\r` (on marker detection, or on the timeout) and `cls` runs in its own frame, wiping ConPTY's buffer so a resize repaint cannot bring the cd line and marker back. Typed input is held until the `\r` has been sent (see § 4).
+- **`PROMPT` is not overridden for cmd**: cmd reads `PROMPT`, so the app's `%n %~ $` would show literally. cmd keeps its default (or the user's own) prompt.
 - `cd` with no args: cmd.exe's analog of `pwd`. Prints the working directory without needing a separate binary.
+
+### Missing-marker safety net
+
+`TerminalService` arms a 10 s timer at spawn. If the marker has not been seen by then (broken bootstrap, bad cwd, shell quirk), it logs a warning with lengths and counts only, marks the marker as received and the initialization as complete, and flushes the buffered output to the renderer, so the user sees the shell's error instead of a blank screen. The detector clears the timer when the marker does arrive. After a timeout it keeps watching a short tail of the output: a marker that arrives late runs the normal clear handshake and updates the cwd from the reported line. and every cleanup path (kill, exit, window close) clears it too.
 
 ## Initialization Phases
 
@@ -93,7 +105,7 @@ Before any Windows bootstrap is constructed, the cwd is validated and normalized
 
 **Normalization** — `normalizeWindowsCwd(cwd)`:
 - Strips trailing `\` or `/` separators (preserving drive roots like `C:\` → `C:\`)
-- Prevents `cd /d "C:\path\"` from being parsed as an escaped quote (`\"`)
+- Keeps the spawn cwd and the path the shell reports back in agreement (the cmd bootstrap no longer embeds the cwd)
 
 **POSIX parity**: the POSIX bootstrap rejects cwds containing `\r` or `\n` and uses canonical single-quote escaping (`'` → `'\''`) on the rest.
 
@@ -106,7 +118,7 @@ Before any Windows bootstrap is constructed, the cwd is validated and normalized
 - Emits `terminal:clear` on a bypass channel to the renderer
 - Awaits renderer confirmation (`markClearComplete`, which sends `terminal:clearComplete`) before unblocking output forwarding
 
-**Renderer-Side Clear** (`TerminalPanel.tsx`):
+**Renderer-Side Clear** (`TerminalPanel/hooks/useXtermSession.ts`):
 
 - Listens for `terminal:clear` on the bypass channel (`window.api.terminal.onClear`)
 - Clears xterm buffer and screen (`\x1b[2J\x1b[H`)
@@ -124,7 +136,11 @@ Before any Windows bootstrap is constructed, the cwd is validated and normalized
 |---|---|---|
 | Git Bash | `printf '\033[2J\033[3J\033[H'` | Viewport + scrollback + cursor home |
 | PowerShell / pwsh | `[Console]::Write([char]27 + '[2J' + [char]27 + '[3J' + [char]27 + '[H')` | Viewport + scrollback + cursor home |
-| cmd.exe | `cls` | Viewport + cursor home only (no scrollback clear – see [Known issues](../known-issues.md#cmdexe-terminals-can-leak-pre-bootstrap-text-into-scrollback-after-aggressive-resizing)) |
+| cmd.exe | `pause >nul && cls` (main writes `\r` after the marker) | Viewport + cursor home only, no scrollback clear – see [Known issues](../known-issues.md#cmdexe-terminals-can-leak-pre-bootstrap-text-into-scrollback-after-aggressive-resizing) |
+
+cmd.exe needs the `pause`: ConPTY sends the final screen, not every line, so a `cls` right after `echo <marker>` lands in the same frame and the cd line and the marker never reach the PTY stream. While cmd sits idle in `pause`, ConPTY flushes the marker frame. On marker detection (or on the 10 s missing-marker timeout) `TerminalService` writes `\r`; `cls` then runs in a frame of its own and wipes ConPTY's buffer, so a later resize cannot repaint the cd line and marker. Without the clear (the previous `& echo on`-only design), every resize repainted the whole screen from `ESC[H` and sent the cd line and the marker again. Output after the marker is held until the renderer confirms its clear, so the `cls` frame and the prompt arrive after it; the renderer handshake stays (it also gates initialization). Input typed before the `\r` would be swallowed by `pause`, so `TerminalService.write` holds it and sends it, in order, when the clear handshake ends (renderer confirmation or the 3 s / 10 s fallback), not right behind the `\r` – a held Ctrl+C could otherwise cancel `cls & echo on`. The clear confirmation also sends the `\r` if the marker never arrived, so input is never held forever. The key is only written for a shell whose file name is `cmd` or `cmd.exe` (`isCmdExe`, on the trimmed, unquoted path), never for PowerShell, Git Bash or POSIX shells. The same test decides whether the builder emits `pause >nul && cls` at all: any other shell that falls to the catch-all builder (for example TCC) gets `/D /S /K "@echo off && cd && echo <marker> & echo on"`, with no pause and no `cls`.
+
+The cwd read back from the output is accepted only if it looks like a Windows path (`C:\…` or `\\server\share`) on Windows, or an absolute path on POSIX. A Git Bash `/c/Users/…` line or a PowerShell `Microsoft.PowerShell.Core\FileSystem::\\srv\share` line is deliberately rejected, so `terminal.cwd` keeps the Windows spawn path that file links and the Claude status lookup expect.
 
 The xterm.js-side handshake (§ 5) is unaffected — xterm still clears its own buffer via `\x1b[2J\x1b[3J\x1b[H` when the renderer receives `terminal:clear`.
 
@@ -151,7 +167,7 @@ The xterm.js-side handshake (§ 5) is unaffected — xterm still clears its own 
 
 **Shell behavior**:
 - POSIX login shell sources RC files (`.zshrc`, `.bash_profile`) — Homebrew paths, aliases, functions available
-- PowerShell runs without profile (`-NoProfile`) for fast and isolated startup
+- PowerShell loads the user's profiles after the cwd is set (the script dot-sources them; `-NoProfile` only stops PowerShell loading them before the script)
 - cmd.exe runs without AutoRun (`/D`) for the same reason
 
 ## Windows shell selection and fallback chain
@@ -240,26 +256,28 @@ bash.exe -c 'cd '\''C:\path'\''; pwd; echo MARKER; printf '\''\033[2J\033[3J\033
 ### Windows PowerShell (5.1 and 7+)
 
 ```
-pwsh.exe -NoProfile -Command "Set-Location -LiteralPath 'C:\path' ; (Get-Location).Path ; Write-Output 'MARKER' ; [Console]::Write([char]27 + '[2J' + [char]27 + '[3J' + [char]27 + '[H') ; & 'pwsh.exe' -NoLogo"
+pwsh.exe -NoLogo -NoProfile -NoExit -Command "Set-Location -LiteralPath 'C:\path' ; (Get-Location).Path ; Write-Output 'MARKER' ; [Console]::Write([char]27 + '[2J' + [char]27 + '[3J' + [char]27 + '[H') ; foreach ($erfanaProfile in @($PROFILE.AllUsersAllHosts, …, $PROFILE.CurrentUserCurrentHost)) { … try { . $erfanaProfile } catch { Write-Error $_ } }"
 ```
 
-- `-NoProfile`: skip profile loading (faster, isolated)
+- `-NoProfile`: PowerShell skips its own profile loading; the script dot-sources the profiles at its end instead, so they run after the cwd is set
+- `-NoExit`: this process stays as the interactive session (one process, so the pid node-pty reports is the user's shell – #305)
 - `-Command`: run the script string
 - `Set-Location -LiteralPath`: disable glob/variable expansion; cwd apostrophes doubled (`'` → `''`)
 - `[Console]::Write([char]27 + '[2J' + ...)`: wipes ConPTY's screen buffer + scrollback before the interactive session takes over (see § 4)
-- `& '<shell>' -NoLogo`: launch interactive PowerShell (no `-NoExit` needed; the new shell *is* the interactive session)
+- the profile loader: dot-sources each existing profile in PowerShell's order; a failing one prints its error and the next still runs
 - cwd rejected if it contains `\r` / `\n`
 
 ### Windows cmd.exe
 
 ```cmd
-cmd.exe /D /K "@echo off && cd /d "C:\path" && cd && echo MARKER && cls"
+cmd.exe /D /S /K "@echo off && cd && echo MARKER && pause >nul && cls & echo on"
 ```
 
 - `/D`: disable AutoRun
+- `/S`: strip exactly the outer quote pair of the `/K` argument
 - `/K`: keep cmd.exe interactive after the bootstrap completes
 - `@echo off`: critical — without it, cmd.exe echoes bootstrap commands back into PTY, and `markerDetector` mis-parses the echoed `echo MARKER` line as the cwd
-- `cls`: wipes ConPTY's viewport before the interactive prompt appears (only CSI 2J + CSI H; scrollback clear is not available from cmd without a subprocess — see the [cmd.exe caveat](../known-issues.md#cmdexe-terminals-can-leak-pre-bootstrap-text-into-scrollback-after-aggressive-resizing))
+- `pause >nul && cls`: see the cmd.exe section above; the [cmd.exe caveat](../known-issues.md#cmdexe-terminals-can-leak-pre-bootstrap-text-into-scrollback-after-aggressive-resizing) covers the ConPTY buffer
 - cwd rejected if it contains any of `"&|^<>\r\n` (parens are allowed — unblocks `C:\Program Files (x86)\…`)
 
 ### Shell kind classification regex (code)
@@ -294,7 +312,7 @@ Handles: `C:\tools\pwsh\pwsh.exe`, `/c/Program Files/PowerShell/7/pwsh.exe` (Git
 - `src/main/services/TerminalService.ts` – service, bootstrap dispatch, marker detection, three-flag gating, `resolveWindowsShell` fallback chain
 - `src/main/services/WindowsTerminalBootstrap.ts` — strategy interface + `PowerShellBootstrapBuilder` / `GitBashBootstrapBuilder` / `CmdExeBootstrapBuilder` + `validateWindowsCwd` / `normalizeWindowsCwd` helpers
 - `src/main/services/WindowsTerminalBootstrap.test.ts` — unit tests for the strategy layer (added during Phase-2 UAT hardening)
-- `src/renderer/src/components/Panels/TerminalPanel.tsx` — clear handler + `markClearComplete` confirmation
+- `src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts` — clear handler + `markClearComplete` confirmation (sent once `TerminalPanel.tsx` reports its data listener attached)
 - `src/main/ipc/terminal-handlers.ts` — clear event bypass channel
 - `src/preload/index.ts` — `onClear()` and `markClearComplete()` API
 

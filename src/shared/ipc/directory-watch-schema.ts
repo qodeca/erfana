@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Wire shape of the `directory-watch:changed` push (main → renderer).
+ * Wire shape of the `directory-watch:changed` push (main → renderer), and the
+ * `directoryWatch` bridge contract.
  *
  * One type for the sender (`DirectoryWatcherService`), the preload bridge and
  * the renderer's `IProjectTreeApi`, so a field added on one side cannot be
  * missed on the other.
  */
+import type { WatchStatsResponse } from './file-watch-schema'
+import type { IpcAck } from './schema'
 
 /** Event kinds a batch is summarised by. */
 export type DirectoryChangeKind = 'add' | 'addDir' | 'unlink' | 'unlinkDir' | 'change'
@@ -28,4 +31,35 @@ export interface DirectoryChangedPayload {
   structural: boolean
   /** #210: set only on a catch-up refresh, which passes the internal-operation gate. */
   catchUp?: boolean
+}
+
+/** `directory-watch:project-deleted` (main → window): the project folder itself is gone. */
+export interface DirectoryProjectDeletedPayload {
+  dirPath: string
+}
+
+/** `directory-watch:error` (main → window). */
+export interface DirectoryWatchErrorPayload {
+  dirPath: string
+  error: string
+}
+
+/**
+ * Shared contract for the preload `directoryWatch` bridge.
+ *
+ * Implemented by `window.api.directoryWatch` (preload,
+ * `directoryWatchBridge.ts`) and consumed by the renderer directory-watch
+ * gateway. The event subscriptions return their unsubscribe function.
+ */
+export interface DirectoryWatchBridge {
+  start(dirPath: string): Promise<IpcAck>
+  stop(dirPath: string): Promise<IpcAck>
+  stopAll(): Promise<IpcAck>
+  /** Hold the watch while the app changes the tree itself (see `ProjectTree/withWatcherPause.ts`). */
+  pause(dirPath: string): Promise<IpcAck>
+  resume(dirPath: string): Promise<IpcAck>
+  getStats(): Promise<WatchStatsResponse>
+  onDirectoryChanged(callback: (data: DirectoryChangedPayload) => void): () => void
+  onProjectDeleted(callback: (data: DirectoryProjectDeletedPayload) => void): () => void
+  onDirectoryError(callback: (data: DirectoryWatchErrorPayload) => void): () => void
 }

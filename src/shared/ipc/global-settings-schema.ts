@@ -9,6 +9,7 @@
 import { z } from 'zod'
 import { TranscriptionSettingsSchema } from './transcription-schema'
 import { FilesSettingsSchema } from './files-exclude-schema'
+import type { IpcAck } from './schema'
 
 /**
  * Logging level enum
@@ -80,6 +81,28 @@ export const HtmlPreviewSettingsSchema = z.object({
 export type HtmlPreviewSettings = z.infer<typeof HtmlPreviewSettingsSchema>
 
 /**
+ * Terminal screen-reader mode (lens review [23]).
+ *
+ * - `auto` – on while the OS reports a screen reader (macOS, Windows), else off
+ * - `on` – always on, for a screen reader Electron cannot detect (Linux)
+ * - `off` – always off, for a tool Chromium mistakes for a screen reader
+ */
+export const TerminalScreenReaderModeSchema = z.enum(['auto', 'on', 'off'])
+export type TerminalScreenReaderMode = z.infer<typeof TerminalScreenReaderModeSchema>
+
+/**
+ * Terminal configuration. Lenient like `files`: a missing or malformed value
+ * resolves to the default instead of tripping the corruption reset that would
+ * replace every other setting.
+ */
+export const TerminalSettingsSchema = z
+  .object({
+    screenReaderMode: TerminalScreenReaderModeSchema.catch('auto')
+  })
+  .catch(() => ({ screenReaderMode: 'auto' as const }))
+export type TerminalSettings = z.infer<typeof TerminalSettingsSchema>
+
+/**
  * Root schema for ~/.erfana/settings.json
  */
 export const GlobalSettingsSchema = z.object({
@@ -106,7 +129,9 @@ export const GlobalSettingsSchema = z.object({
    * section resolves to `{ exclude: [] }`, so it never triggers the corruption
    * reset that would replace every other setting.
    */
-  files: FilesSettingsSchema
+  files: FilesSettingsSchema,
+  /** Terminal configuration (lens review [23]) */
+  terminal: TerminalSettingsSchema
 })
 export type GlobalSettings = z.infer<typeof GlobalSettingsSchema>
 
@@ -124,4 +149,21 @@ export interface GlobalSettingsChanged {
   settings: GlobalSettings
   changedKey: string
   previousValue?: unknown
+}
+
+/**
+ * Shared contract for the preload `globalSettings` bridge.
+ *
+ * Implemented by `window.api.globalSettings` (preload, `settingsBridge.ts`)
+ * and consumed by the renderer settings gateway.
+ */
+export interface GlobalSettingsBridge {
+  /** All global settings from ~/.erfana/settings.json */
+  get(): Promise<{ success: boolean; settings?: GlobalSettings; error?: string }>
+  /** Set one setting; sent as `{ key, value }`. */
+  set(key: string, value: unknown): Promise<IpcAck>
+  /** Reset every global setting to its default. */
+  reset(): Promise<IpcAck>
+  /** Subscribe to setting changes; returns the unsubscribe function. */
+  onSettingsChanged(callback: (data: GlobalSettingsChanged) => void): () => void
 }

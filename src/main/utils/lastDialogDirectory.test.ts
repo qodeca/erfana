@@ -7,13 +7,16 @@ import { rememberDialogResult, resetLastDialogDirectory, withLastDirectory } fro
 
 const PROJECT = resolve('/work/project')
 
+/** The part of Electron's dialog options these tests pass: a title, and maybe a path. */
+type DialogOptions = { title?: string; defaultPath?: string }
+
 describe('lastDialogDirectory', () => {
   afterEach(() => resetLastDialogDirectory())
 
   it('leaves options unchanged before any dialog completed', () => {
     const options = { title: 'Export', defaultPath: 'report.pdf' }
     expect(withLastDirectory(options)).toBe(options)
-    expect(withLastDirectory({ title: 'Open' })).toEqual({ title: 'Open' })
+    expect(withLastDirectory<DialogOptions>({ title: 'Open' })).toEqual({ title: 'Open' })
   })
 
   it('remembers the folder of a saved file and puts a bare name inside it', () => {
@@ -25,7 +28,7 @@ describe('lastDialogDirectory', () => {
 
   it('fills a missing defaultPath with the remembered folder', () => {
     rememberDialogResult([join(PROJECT, 'a.md'), join(PROJECT, 'b.md')])
-    expect(withLastDirectory({ title: 'Add files' })).toEqual({ title: 'Add files', defaultPath: PROJECT })
+    expect(withLastDirectory<DialogOptions>({ title: 'Add files' })).toEqual({ title: 'Add files', defaultPath: PROJECT })
     expect(withLastDirectory({ defaultPath: '' })).toEqual({ defaultPath: PROJECT })
   })
 

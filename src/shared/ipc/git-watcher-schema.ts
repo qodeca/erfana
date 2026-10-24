@@ -8,6 +8,7 @@
  * @see Issue #74 - real-time git status refresh
  */
 import { z } from 'zod'
+import type { IpcAck } from './schema'
 
 /**
  * Git event types that trigger status updates.
@@ -123,4 +124,39 @@ export interface GitPollingMetrics {
   lastPollTimestamp: number
   /** Timestamp of last refresh */
   lastRefreshTimestamp: number
+}
+
+/**
+ * Shared contract for the preload `gitWatcher` bridge: the watch on a
+ * project's `.git` folder (index, HEAD, refs, fetch, stash).
+ *
+ * Implemented by `window.api.gitWatcher` (preload, `gitBridge.ts`) and
+ * consumed by the renderer git gateway.
+ */
+export interface GitWatcherBridge {
+  /** Start watching the `.git` folder of the repository at `projectPath`. */
+  start(projectPath: string): Promise<IpcAck>
+  /** Stop the current git watcher. */
+  stop(): Promise<IpcAck>
+  /** Current watcher status, for debugging and monitoring. */
+  getStatus(): Promise<GitWatcherStatus>
+  /** Subscribe to git state changes; returns the unsubscribe function. */
+  onStateChanged(callback: (event: GitStateChangeEvent) => void): () => void
+}
+
+/**
+ * Shared contract for the preload `gitPolling` bridge: the timer-based status
+ * refresh that backs up the git watcher where file watching misses a change.
+ *
+ * Implemented by `window.api.gitPolling` (preload, `gitBridge.ts`) and
+ * consumed by the renderer git gateway.
+ */
+export interface GitPollingBridge {
+  start(projectPath: string): Promise<IpcAck>
+  stop(): Promise<IpcAck>
+  /** Polling interval in milliseconds. */
+  setInterval(ms: number): Promise<IpcAck>
+  setEnabled(enabled: boolean): Promise<IpcAck>
+  /** Subscribe to the poll timer firing; returns the unsubscribe function. */
+  onPollTriggered(callback: (event: GitPollTriggeredEvent) => void): () => void
 }

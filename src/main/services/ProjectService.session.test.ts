@@ -99,6 +99,7 @@ describe('ProjectService – main-owned project session', () => {
         Promise.resolve({
           treeHiddenPatterns: [],
           watcherIgnorePatterns: [],
+          graphExcludePatterns: [],
           excludePatterns: [],
           excludeRejections: []
         })
@@ -160,6 +161,7 @@ describe('ProjectService – main-owned project session', () => {
         return {
           treeHiddenPatterns: [],
           watcherIgnorePatterns: [],
+          graphExcludePatterns: [],
           excludePatterns: [],
           excludeRejections: []
         }
@@ -438,6 +440,7 @@ describe('ProjectService – main-owned project session', () => {
     const loaded = {
       treeHiddenPatterns: ['.git'],
       watcherIgnorePatterns: [],
+      graphExcludePatterns: [],
       excludePatterns: [],
       excludeRejections: []
     }

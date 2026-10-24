@@ -84,9 +84,10 @@ export interface PreviewLivePipelineDeps {
   /** Photograph the page now that it is ready (the visibility module). */
   readonly captureWhileVisible: () => void
   /**
-   * The view's teardown latch. Every guard here has always read this alone,
-   * never the wider `isDefunct`, so a webContents that dies outside a teardown
-   * still reaches the reload calls exactly as it did before the split.
+   * Whether the view is torn down or its webContents is gone (#120). Not the
+   * wider `isDefunct`, which also reads `closing`: these guards have never read
+   * it, and a closing view's reload is harmless. `closing` is set only after
+   * `destroyed` (inside the teardown), so this latch is already true by then.
    */
   readonly isTornDown: () => boolean
 }
@@ -202,6 +203,10 @@ export function createPreviewLivePipeline(deps: PreviewLivePipelineDeps): Previe
 
   /** Hot-swap a stylesheet in an isolated world; any non-`true` outcome reloads. */
   async function swap(absPath: string): Promise<boolean> {
+    // Nothing to script in a page that is gone; `reload` would refuse as well.
+    if (deps.isTornDown()) {
+      return false
+    }
     const base = deps.urlFor(absPath)
     swapVersion += 1
     const script = buildCssSwapScript(base, buildCacheBustHref(base, swapVersion))

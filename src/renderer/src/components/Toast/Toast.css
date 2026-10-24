@@ -95,6 +95,13 @@
   color: var(--color-info);
 }
 
+/* Repeat count on a merged toast ("×3"), see toastStack.ts */
+.toast-count {
+  margin-left: var(--space-2);
+  font-weight: var(--font-normal);
+  color: var(--color-text-secondary);
+}
+
 .toast-content {
   flex: 1;
   min-width: 0;

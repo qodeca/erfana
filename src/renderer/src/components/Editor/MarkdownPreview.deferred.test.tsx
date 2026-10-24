@@ -22,6 +22,10 @@ import {
 } from './MarkdownPreview'
 import { ToastProvider } from '../Toast/ToastContext'
 import { useGlobalSettingsStore } from '../../stores/useGlobalSettingsStore'
+import type { FileBridge } from '../../../../shared/ipc/file-schema'
+import { gatewayBridgeMock, type BridgeMock } from '../../test-utils/gatewayBridgeMock'
+
+const fileMock = (): BridgeMock<FileBridge> => gatewayBridgeMock('file')
 
 vi.mock('./MermaidDiagram', () => ({
   MermaidDiagram: ({ code }: { code: string }) => <div data-testid="mermaid-stub" data-code={code} />
@@ -239,7 +243,7 @@ describe('MarkdownPreview – heading anchors', () => {
 
 describe('MarkdownPreview – link checks', () => {
   it('does not re-check links when an edit leaves the set of links unchanged', async () => {
-    const getProjectPath = window.api.file.getProjectPath as ReturnType<typeof vi.fn>
+    const getProjectPath = fileMock().getProjectPath as ReturnType<typeof vi.fn>
     let rerender!: ReturnType<typeof render>['rerender']
     await act(async () => {
       ;({ rerender } = render(ui('See [other](./other.md).\n\ntext 1')))
@@ -259,7 +263,7 @@ describe('MarkdownPreview – link checks', () => {
     // check, for the same link read from another folder, answers at once.
     // (The same target asked twice shares one answer – see linkcache tests.)
     let releaseFirst!: (v: boolean) => void
-    const exists = window.api.file.exists as ReturnType<typeof vi.fn>
+    const exists = fileMock().exists as ReturnType<typeof vi.fn>
     exists.mockImplementationOnce(() => new Promise<boolean>((r) => (releaseFirst = r)))
     exists.mockResolvedValue(false)
 

@@ -34,6 +34,7 @@ import type { PreviewPageChangedPayload } from '../../../../../../shared/ipc/pre
 import { usePreviewStore } from '../../../../stores/usePreviewStore'
 import { usePreviewTabStore } from '../../../../stores/usePreviewTabStore'
 import { afterTwoFrames, browserFrames } from '../../../../services/preview/previewDragFreeze'
+import { previewGateway } from '../../../../services/previewGateway'
 
 /** Options for {@link usePreviewEvents}: where a page change is written. */
 export interface UsePreviewEventsOptions {
@@ -122,24 +123,24 @@ export function usePreviewEvents(panelId: string, options: UsePreviewEventsOptio
     } =
       usePreviewStore.getState()
 
-    const unsubscribeLoadState = window.api.preview.onLoadStateChanged((payload) => {
+    const unsubscribeLoadState = previewGateway.onLoadStateChanged((payload) => {
       if (payload.panelId !== panelId) return
       setLoadState(panelId, payload.state, payload.dropped)
     })
 
     // Main paints this colour behind the page; the placeholder paints the same
     // value so the two never disagree at a seam.
-    const unsubscribeBackdrop = window.api.preview.onBackdropChanged((payload) => {
+    const unsubscribeBackdrop = previewGateway.onBackdropChanged((payload) => {
       if (payload.panelId !== panelId) return
       setBackdrop(panelId, payload.color)
     })
 
-    const unsubscribeFailures = window.api.preview.onFailuresChanged((payload) => {
+    const unsubscribeFailures = previewGateway.onFailuresChanged((payload) => {
       if (payload.panelId !== panelId) return
       pushFailures(panelId, payload.failures, payload.truncated)
     })
 
-    const unsubscribeStillFrame = window.api.preview.onStillFrameChanged((payload) => {
+    const unsubscribeStillFrame = previewGateway.onStillFrameChanged((payload) => {
       if (payload.panelId !== panelId) return
       setStillFrame(panelId, {
         dataUrl: payload.dataUrl,
@@ -154,7 +155,7 @@ export function usePreviewEvents(panelId: string, options: UsePreviewEventsOptio
       })
     })
 
-    const unsubscribeHostBlocked = window.api.preview.onHostBlocked((payload) => {
+    const unsubscribeHostBlocked = previewGateway.onHostBlocked((payload) => {
       if (payload.panelId !== panelId) return
 
       // The permission band renders this. NOTHING pops up.
@@ -183,14 +184,14 @@ export function usePreviewEvents(panelId: string, options: UsePreviewEventsOptio
     // What this project has ALREADY approved. Seeded on open and re-sent after
     // every approval, fanned out to every live view of the project — which is
     // how a second panel on the same project stays in step without polling.
-    const unsubscribeAllowlist = window.api.preview.onAllowlistChanged((payload) => {
+    const unsubscribeAllowlist = previewGateway.onAllowlistChanged((payload) => {
       if (payload.panelId !== panelId) return
       setAllowedHosts(panelId, payload.hosts)
     })
 
     // A load main started has committed (part 3 §3.4). Main's history is the
     // record; the tab store mirrors its Back and Forward state for the toolbar.
-    const unsubscribePageChanged = window.api.preview.onPageChanged((payload) => {
+    const unsubscribePageChanged = previewGateway.onPageChanged((payload) => {
       if (payload.panelId !== panelId) return
 
       usePreviewTabStore.getState().setHistory(panelId, payload)
@@ -223,7 +224,7 @@ export function usePreviewEvents(panelId: string, options: UsePreviewEventsOptio
       cancelSettledPush?.()
       cancelSettledPush = null
     }
-    const unsubscribeResizeHold = window.api.preview.onResizeHold((payload) => {
+    const unsubscribeResizeHold = previewGateway.onResizeHold((payload) => {
       if (payload.panelId !== panelId) return
       dropSettledPush()
       if (payload.held) {
@@ -239,7 +240,7 @@ export function usePreviewEvents(panelId: string, options: UsePreviewEventsOptio
 
     // Main's report of what it did with the view: either value ends a resize
     // hold (its release emits exactly one); only a show ends the drag latch.
-    const unsubscribeVisibility = window.api.preview.onVisibilityApplied((payload) => {
+    const unsubscribeVisibility = previewGateway.onVisibilityApplied((payload) => {
       if (payload.panelId !== panelId) return
       applyVisibility(panelId, payload.visible)
     })

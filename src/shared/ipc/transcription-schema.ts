@@ -11,6 +11,7 @@
  * @see Spec #009 - Media import with transcription specification
  */
 import { z } from 'zod'
+import type { IpcAck } from './schema'
 
 /**
  * Transcription backend selection
@@ -101,3 +102,72 @@ export const TranscriptionSettingsSchema = z.object({
   whisperModel: WhisperModelSchema.default('base')
 })
 export type TranscriptionSettings = z.infer<typeof TranscriptionSettingsSchema>
+
+/** `transcription:validate`: whether an audio file can be transcribed. */
+export interface TranscriptionValidation {
+  valid: boolean
+  error?: string
+  durationSeconds?: number
+  sizeInMB: number
+}
+
+/**
+ * Shared contract for the preload `transcription` bridge.
+ *
+ * Implemented by `window.api.transcription` (preload,
+ * `transcriptionBridge.ts`) and consumed by the renderer transcription gateway.
+ *
+ * @see Issue #75 - Media import with transcription
+ */
+export interface TranscriptionBridge {
+  /** Validate, transcribe (in chunks for long files) and write Markdown to `import/`; progress arrives through `onProgress`. */
+  import(request: TranscriptionImportRequest): Promise<TranscriptionImportResult>
+  /** Stop the running transcription and remove its temp files. */
+  cancel(): Promise<IpcAck>
+  validate(filePath: string): Promise<TranscriptionValidation>
+  /** Store the API key in Electron safeStorage; settings keep only a flag. */
+  setApiKey(apiKey: string): Promise<IpcAck>
+  hasApiKey(): Promise<boolean>
+  clearApiKey(): Promise<IpcAck>
+  onProgress(callback: (progress: TranscriptionProgress) => void): () => void
+}
+
+/** `transcription:whisperDownloadProgress`: a model download's progress. */
+export interface WhisperDownloadProgress {
+  percent: number
+  downloadedBytes: number
+  totalBytes: number
+}
+
+/**
+ * Shared contract for the preload `whisper` bridge: the whisper.cpp binary
+ * and models of the local transcription backend.
+ *
+ * Implemented by `window.api.whisper` (preload, `transcriptionBridge.ts`) and
+ * consumed by the renderer transcription gateway.
+ *
+ * @see Issue #111 - Local Whisper transcription backend
+ */
+export interface WhisperBridge {
+  /** Download the whisper.cpp binary if it is not there yet; `cancelled` after `cancelDownload`. */
+  ensureBinary(): Promise<{ success: boolean; path?: string; error?: string; cancelled?: boolean }>
+  /**
+   * Download a model if it is not there yet; progress arrives through
+   * `onDownloadProgress`, and `cancelled` is set after `cancelDownload`.
+   */
+  ensureModel(
+    model: WhisperModel
+  ): Promise<{ success: boolean; path?: string; error?: string; cancelled?: boolean }>
+  listModels(): Promise<{
+    success: boolean
+    models: Array<{ name: WhisperModel; size: number; installed: boolean }>
+  }>
+  deleteModel(model: WhisperModel): Promise<IpcAck>
+  /**
+   * Cancel the running binary or model download. Its pending ensure call
+   * resolves with `cancelled: true` and the partial file is deleted; `success`
+   * is false when nothing was downloading.
+   */
+  cancelDownload(): Promise<IpcAck>
+  onDownloadProgress(callback: (progress: WhisperDownloadProgress) => void): () => void
+}

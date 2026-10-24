@@ -46,6 +46,42 @@ describe('MermaidDiagram redraw scheduling', () => {
     expect(renderMock).toHaveBeenLastCalledWith(expect.any(String), 'graph TD; A-->B')
   })
 
+  it('initializes mermaid before the first draw, and draws once per mount', async () => {
+    // The "initialized" state flag is gone (plan item 19): the init effect is
+    // declared first, so it runs before the draw effect in the same commit.
+    const mermaid = (await import('mermaid')).default
+    const initialize = vi.mocked(mermaid.initialize)
+    initialize.mockClear()
+
+    render(<MermaidDiagram code="graph TD; A-->B" />)
+    await flush()
+
+    expect(initialize).toHaveBeenCalledTimes(1)
+    expect(renderMock).toHaveBeenCalledTimes(1)
+    expect(initialize.mock.invocationCallOrder[0]).toBeLessThan(renderMock.mock.invocationCallOrder[0])
+  })
+
+  it('labels the rendered event with the drawn line range, and a range shift alone does not redraw', async () => {
+    const seen: Array<{ startLine?: number; endLine?: number }> = []
+    const onRendered = (e: Event) => seen.push((e as CustomEvent).detail)
+    document.addEventListener('mermaid:rendered', onRendered)
+    try {
+      const { rerender } = render(<MermaidDiagram code="graph TD; A-->B" startLine={3} endLine={5} />)
+      await flush()
+      expect(seen).toEqual([{ startLine: 3, endLine: 5, ok: true }])
+
+      // An edit above the diagram moves it down without changing its source
+      rerender(<MermaidDiagram code="graph TD; A-->B" startLine={4} endLine={6} />)
+      await act(async () => {
+        vi.advanceTimersByTime(MERMAID_IDLE_DELAY_MS)
+      })
+      await flush()
+      expect(renderMock).toHaveBeenCalledTimes(1)
+    } finally {
+      document.removeEventListener('mermaid:rendered', onRendered)
+    }
+  })
+
   it('redraws once, with the latest source, after edits pause', async () => {
     const { rerender } = render(<MermaidDiagram code="graph TD; A-->B" />)
     await flush()

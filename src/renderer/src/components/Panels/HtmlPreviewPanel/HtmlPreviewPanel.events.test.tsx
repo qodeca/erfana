@@ -52,7 +52,7 @@ describe('HtmlPreviewPanel – event feed', () => {
         {
           id: '1',
           type: 'blocked-host',
-          resourceUrlOrHost: 'cdn.example',
+          resourceUrlOrHost: 'https://cdn.example',
           reasonCode: ErrorCode.PREVIEW_HOST_NOT_APPROVABLE,
           timestamp: 1
         }
@@ -73,17 +73,19 @@ describe('HtmlPreviewPanel – event feed', () => {
     render(<HtmlPreviewPanel {...makeProps('/proj/page.html')} />)
     await waitFor(() => expect(listeners.hostBlocked).not.toBeNull())
 
-    listeners.hostBlocked?.({
-      panelId: 'preview-1',
-      host: 'fourth.example',
-      approvable: true,
-      kinds: ['image'],
-      notify: false
+    act(() => {
+      listeners.hostBlocked?.({
+        panelId: 'preview-1',
+        host: 'https://fourth.example',
+        approvable: true,
+        kinds: ['image'],
+        truncated: false
+      })
     })
 
     await waitFor(() =>
       expect(usePreviewStore.getState().panels.get('preview-1')?.blockedHosts).toEqual([
-        { host: 'fourth.example', kinds: ['image'], approvable: true }
+        { host: 'https://fourth.example', kinds: ['image'], approvable: true }
       ])
     )
   })
@@ -95,12 +97,14 @@ describe('HtmlPreviewPanel – event feed', () => {
     render(<HtmlPreviewPanel {...makeProps('/proj/page.html')} />)
     await waitFor(() => expect(listeners.hostBlocked).not.toBeNull())
 
-    listeners.hostBlocked?.({
-      panelId: 'preview-1',
-      host: 'cdn.example',
-      approvable: true,
-      kinds: ['script'],
-      notify: true
+    act(() => {
+      listeners.hostBlocked?.({
+        panelId: 'preview-1',
+        host: 'https://cdn.example',
+        approvable: true,
+        kinds: ['script'],
+        truncated: false
+      })
     })
     await waitFor(() =>
       expect(usePreviewStore.getState().panels.get('preview-1')?.blockedHosts).toHaveLength(1)
@@ -117,19 +121,23 @@ describe('HtmlPreviewPanel – event feed', () => {
     render(<HtmlPreviewPanel {...makeProps('/proj/page.html')} />)
     await waitFor(() => expect(listeners.hostBlocked).not.toBeNull())
 
-    listeners.hostBlocked?.({
-      panelId: 'preview-1',
-      host: 'cdn.example',
-      approvable: true,
-      kinds: ['style'],
-      notify: true
+    act(() => {
+      listeners.hostBlocked?.({
+        panelId: 'preview-1',
+        host: 'https://cdn.example',
+        approvable: true,
+        kinds: ['style'],
+        truncated: false
+      })
     })
-    listeners.hostBlocked?.({
-      panelId: 'preview-1',
-      host: 'cdn.example',
-      approvable: true,
-      kinds: ['style', 'script'],
-      notify: false
+    act(() => {
+      listeners.hostBlocked?.({
+        panelId: 'preview-1',
+        host: 'https://cdn.example',
+        approvable: true,
+        kinds: ['style', 'script'],
+        truncated: false
+      })
     })
 
     await waitFor(() => {
@@ -149,12 +157,14 @@ describe('HtmlPreviewPanel – event feed', () => {
     try {
       render(<HtmlPreviewPanel {...makeProps('/proj/page.html')} />)
       await waitFor(() => expect(listeners.hostBlocked).not.toBeNull())
-      listeners.hostBlocked?.({
-        panelId: 'preview-other',
-        host: 'cdn.example',
-        approvable: true,
-        kinds: ['script'],
-        notify: true
+      act(() => {
+        listeners.hostBlocked?.({
+          panelId: 'preview-other',
+          host: 'https://cdn.example',
+          approvable: true,
+          kinds: ['script'],
+          truncated: false
+        })
       })
       // A microtask settle is enough; no toast must be dispatched.
       await Promise.resolve()
@@ -162,5 +172,54 @@ describe('HtmlPreviewPanel – event feed', () => {
     } finally {
       window.removeEventListener('app:toast', capture)
     }
+  })
+
+  describe('allowlist-changed event', () => {
+    const HOST = 'https://cdn.example'
+
+    it('moves the host from blocked to allowed in the rendered band', async () => {
+      // THE VISIBLE OUTCOME OF THE WHOLE FEATURE. If this event is dropped, or the
+      // panel stops passing the stored hosts to the band, the approved host is
+      // never subtracted from the blocked list and the Allow button stays for good.
+      render(<HtmlPreviewPanel {...makeProps('/proj/page.html')} />)
+      await waitFor(() => expect(listeners.hostBlocked).not.toBeNull())
+      await waitFor(() => expect(listeners.allowlist).not.toBeNull())
+
+      act(() => {
+        listeners.hostBlocked?.({
+          panelId: 'preview-1',
+          host: HOST,
+          approvable: true,
+          kinds: ['script'],
+          truncated: false
+        })
+      })
+      const chip = await screen.findByTestId('preview-band-chip')
+      await waitFor(() => expect(chip).toHaveTextContent('1 blocked · 0 allowed'))
+
+      act(() => {
+        listeners.allowlist?.({ panelId: 'preview-1', hosts: [HOST] })
+      })
+
+      await waitFor(() => expect(chip).toHaveTextContent('0 blocked · 1 allowed'))
+    })
+
+    it('ignores an allowlist event addressed to another panel', async () => {
+      render(<HtmlPreviewPanel {...makeProps('/proj/page.html')} />)
+      await waitFor(() => expect(listeners.allowlist).not.toBeNull())
+
+      // Control: the same payload for THIS panel is stored.
+      act(() => {
+        listeners.allowlist?.({ panelId: 'preview-1', hosts: [HOST] })
+      })
+      expect(usePreviewStore.getState().panels.get('preview-1')?.allowedHosts).toEqual([HOST])
+
+      act(() => {
+        listeners.allowlist?.({ panelId: 'preview-other', hosts: ['https://other.example'] })
+      })
+
+      expect(usePreviewStore.getState().panels.get('preview-1')?.allowedHosts).toEqual([HOST])
+      expect(usePreviewStore.getState().panels.get('preview-other')).toBeUndefined()
+    })
   })
 })

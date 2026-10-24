@@ -74,7 +74,7 @@ describe('ChatBubble', () => {
 
   describe('rendering behavior', () => {
     it('does not render when filePath is missing', () => {
-      // @ts-expect-error - Testing behavior when filePath is undefined
+      // filePath is optional; this checks the bubble stays hidden without it
       render(
         <ChatBubble
           mermaidCode="flowchart TD"

@@ -211,6 +211,9 @@ describe('useImageSource', () => {
       act(() => result.current.refresh())
 
       await waitFor(() => expect(mockReadBytes).toHaveBeenCalledTimes(2))
+      // The read resolving is not the end of the refresh: the failed decode lands a
+      // tick later, so wait for its flag before checking the rest.
+      await waitFor(() => expect(result.current.isStale).toBe(true))
       expect(result.current.source?.url).toBe('data:image/png;base64,AAAA')
       expect(result.current.error).toBeNull()
       // ...but it reports that the pixels are behind the file (QG-11a H2).

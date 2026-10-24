@@ -325,7 +325,7 @@ describe('MarkdownEditorPanel Integration', () => {
       const calls = source.match(/useEditorSaveRegistration\(/g) ?? []
       expect(calls).toHaveLength(1)
       expect(source).toContain(
-        "useEditorSaveRegistration(panelIdRef.current, () => handleSave('registry'), externalChangeDetected, () => {\n" +
+        "useEditorSaveRegistration(panelId, () => handleSave('registry'), externalChangeDetected, () => {\n" +
           '    // A hold stops autosave for real (no re-arming by typing or the modified\n' +
           '    // effect) and makes the editor read-only, so nothing new can be typed\n' +
           '    // between a flush and the end of the hold.\n' +
@@ -333,7 +333,7 @@ describe('MarkdownEditorPanel Integration', () => {
       )
       expect(source).toContain('}, () => saveInFlightRef.current ?? Promise.resolve())')
       // Registered below useAutoSave, whose holdAutoSave it uses.
-      expect(source.indexOf('useEditorSaveRegistration(panelIdRef')).toBeGreaterThan(source.indexOf('= useAutoSave('))
+      expect(source.indexOf('useEditorSaveRegistration(panelId,')).toBeGreaterThan(source.indexOf('= useAutoSave('))
     })
 
     it('handleSave answers true after a write and false with no file or a failed write', () => {
@@ -387,7 +387,7 @@ describe('MarkdownEditorPanel Integration', () => {
       // The log line drops the absolute path the errno message quotes; the toast keeps it
       expect(catchBlock).toContain("logger.error('Error saving file', loggableError(error))")
       // The tab is marked clean only after a write that succeeded
-      expect(catchBlock).not.toContain('setEditorDirty(panelIdRef.current, false)')
+      expect(catchBlock).not.toContain('setEditorDirty(panelId, false)')
     })
 
     it('one failure, one toast: a save by id leaves the toast to the registry caller', () => {
@@ -399,13 +399,16 @@ describe('MarkdownEditorPanel Integration', () => {
 
     it('wires each caller to its trigger: Cmd+S is user, autosave is autosave, the registry is registry', () => {
       expect(source).toContain("onSave: () => handleSave('user'),")
-      expect(source).toContain("return handleSave('autosave')")
+      // useAutoSave is called before handleSave exists, so it reaches it through
+      // a ref that a layout effect keeps on the latest handleSave
+      expect(source).toContain("return handleSaveRef.current('autosave')")
+      expect(source).toContain('handleSaveRef.current = handleSave')
       // an autosave never overwrites a file that changed on disk
       expect(source.indexOf('if (externalChangeDetected) return')).toBeLessThan(
-        source.indexOf("return handleSave('autosave')")
+        source.indexOf("return handleSaveRef.current('autosave')")
       )
       expect(source).toContain("() => handleSave('registry'), externalChangeDetected")
-      expect(source.match(/handleSave\(/g)).toHaveLength(3)
+      expect(source.match(/handleSave(?:Ref\.current)?\(/g)).toHaveLength(3)
     })
 
     it('only the tab’s own Cmd+S of a deleted tab may recreate the missing folder', () => {
@@ -437,7 +440,7 @@ describe('MarkdownEditorPanel Integration', () => {
         source.indexOf('const {\n    externalChangeDetected')
       )
       expect(watcherUpdate).toContain('modified: false')
-      expect(watcherUpdate).toContain('setEditorDirty(panelIdRef.current, false)')
+      expect(watcherUpdate).toContain('setEditorDirty(panelId, false)')
     })
 
     it('keeps a remounted editor read-only while an autosave hold is active', () => {
@@ -494,7 +497,7 @@ describe('MarkdownEditorPanel Integration', () => {
     })
 
     it('hands autosave the save result, so a failed write backs off', () => {
-      expect(source).toContain("return handleSave('autosave')")
+      expect(source).toContain("return handleSaveRef.current('autosave')")
     })
 
     it('keeps one pending indicator reset, cleared when an autosave starts and on unmount', () => {

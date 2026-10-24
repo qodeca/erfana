@@ -5,7 +5,7 @@
  *
  * The HTML preview renders inside a `WebContentsView` in its own process, so the
  * renderer has NO access to its DOM. Search therefore rides Chromium's native
- * find-in-page API over IPC (`window.api.preview.find` / `stopFind` /
+ * find-in-page API over IPC (`previewGateway.find` / `stopFind` /
  * `onFindResult`), which only ever reports two integers — how many matches and
  * which one is active — never the match list and never random access.
  *
@@ -35,7 +35,7 @@ const ZERO_COUNT: SearchCount = { total: 0, activeOrdinal: 0 }
  * @example
  * ```ts
  * const provider = useMemo(
- *   () => new PreviewPageSearchProvider(panelId, window.api.preview),
+ *   () => new PreviewPageSearchProvider(panelId, previewGateway),
  *   [panelId]
  * )
  * ```

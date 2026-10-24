@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { create } from 'zustand'
-import type { GlobalSettings, LoggingLevel } from '../../../shared/ipc/global-settings-schema'
+import type { GlobalSettings, LoggingLevel, TerminalScreenReaderMode } from '../../../shared/ipc/global-settings-schema'
 import type { TranscriptionBackend, WhisperModel } from '../../../shared/ipc/transcription-schema'
+import { globalSettingsGateway } from '../services/settingsGateway'
 
 /**
  * Helper type for setting section keys
@@ -29,6 +30,7 @@ interface GlobalSettingsState {
   updateTranscriptionBackend: (backend: TranscriptionBackend) => Promise<void>
   updateWhisperModel: (model: WhisperModel) => Promise<void>
   updateHtmlPreviewEnabled: (enabled: boolean) => Promise<void>
+  updateTerminalScreenReaderMode: (mode: TerminalScreenReaderMode) => Promise<void>
   resetSettings: () => Promise<void>
   clearCorruptionFlag: () => void
 
@@ -53,7 +55,7 @@ export const useGlobalSettingsStore = create<GlobalSettingsState>((set, get) => 
 
     set({ isLoading: true, error: null })
     try {
-      const result = await window.api.globalSettings.get()
+      const result = await globalSettingsGateway.get()
       if (result.success && result.settings) {
         set({ settings: result.settings, isInitialized: true })
       } else {
@@ -97,10 +99,15 @@ export const useGlobalSettingsStore = create<GlobalSettingsState>((set, get) => 
     await get()._updateSection('htmlPreview', (current) => ({ ...current, enabled }))
   },
 
+  // Read live by every terminal panel (useTerminalScreenReaderMode), no restart needed
+  updateTerminalScreenReaderMode: async (mode: TerminalScreenReaderMode) => {
+    await get()._updateSection('terminal', (current) => ({ ...current, screenReaderMode: mode }))
+  },
+
   resetSettings: async () => {
     set({ isLoading: true })
     try {
-      const result = await window.api.globalSettings.reset()
+      const result = await globalSettingsGateway.reset()
       if (!result.success) {
         set({ error: result.error })
       }
@@ -144,7 +151,7 @@ export const useGlobalSettingsStore = create<GlobalSettingsState>((set, get) => 
     })
 
     try {
-      const result = await window.api.globalSettings.set(section, newSectionValue)
+      const result = await globalSettingsGateway.set(section, newSectionValue)
       if (!result.success) {
         // Rollback on failure
         set({ settings: previousSettings, error: result.error })

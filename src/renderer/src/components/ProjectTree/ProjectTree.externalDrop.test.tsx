@@ -7,7 +7,6 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor, act, fireEvent } from '@testing-library/react'
-import React from 'react'
 import { ProjectTree } from './ProjectTree'
 import { DialogProvider } from '../Dialog'
 import { ProjectManagementProvider } from '../../context/ProjectManagementContext'

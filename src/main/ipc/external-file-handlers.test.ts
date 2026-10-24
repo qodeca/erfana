@@ -80,7 +80,8 @@ import { registerExternalFileHandlers } from './external-file-handlers'
 import {
   ExternalMoveConfirmerImpl,
   MAX_FILES_PER_BOX,
-  MAX_WAITING_PER_WINDOW
+  MAX_WAITING_PER_WINDOW,
+  type MoveConfirmerDeps
 } from '../services/ExternalMoveConfirmer'
 import { EXTERNAL_MOVE_BATCH_MAX } from '../../shared/ipc/external-file-schema'
 import { getConfinedChannels } from './confinement/registerConfinedHandle'
@@ -559,7 +560,7 @@ describe('External File Handlers', () => {
 
     it('asks once for a batch, in a box modal to the window that owns the project', async () => {
       const ownerWindow = { id: 'owner-window' }
-      const showBox = vi.fn(async () => ({ response: 0 }))
+      const showBox = vi.fn<MoveConfirmerDeps['showBox']>(async () => ({ response: 0 }))
       const resolveOwner = vi.fn(() => ownerWindow)
       // The batch window closes only when the test says so, after both moves
       // have reached the confirmer, however slow the file checks before it are
@@ -600,7 +601,7 @@ describe('External File Handlers', () => {
     })
 
     it('asks once for a whole dialog pick even when the moves arrive one by one', async () => {
-      const showBox = vi.fn(async () => ({ response: 0 }))
+      const showBox = vi.fn<MoveConfirmerDeps['showBox']>(async () => ({ response: 0 }))
       registerExternalFileHandlers(
         projectService.session,
         new ExternalMoveConfirmerImpl({ showBox, resolveOwner: () => ({}), coalesceMs: 0 })
@@ -639,7 +640,7 @@ describe('External File Handlers', () => {
       })
     /** The real confirmer behind a box that answers `response` (0 = Move). */
     const useBox = (response: number, deps: Record<string, unknown> = {}) => {
-      const showBox = vi.fn(async () => ({ response }))
+      const showBox = vi.fn<MoveConfirmerDeps['showBox']>(async () => ({ response }))
       registerExternalFileHandlers(
         projectService.session,
         new ExternalMoveConfirmerImpl({ showBox, resolveOwner: () => ({}), coalesceMs: 0, ...deps })
@@ -879,7 +880,7 @@ describe('External File Handlers', () => {
     })
 
     it('cancels every file when the project changed while the box was open', async () => {
-      const showBox = vi.fn(async () => {
+      const showBox = vi.fn<MoveConfirmerDeps['showBox']>(async () => {
         // The user opens another project before answering
         await openTestProject(root, { ownerWebContentsId: OWNER_ID, generation: 2 })
         return { response: 0 }
@@ -907,7 +908,7 @@ describe('External File Handlers', () => {
       writeFileSync(swapped, 'shown to the user')
       const replacement = path.join(outside, 'swap-replacement.md')
       writeFileSync(replacement, 'something else')
-      const showBox = vi.fn(async () => {
+      const showBox = vi.fn<MoveConfirmerDeps['showBox']>(async () => {
         // Same name, different file: the replacement is made first and renamed over
         // the original, so both inodes are alive at once (no number is reused)
         renameSync(replacement, swapped)
@@ -932,7 +933,7 @@ describe('External File Handlers', () => {
       // The freed inode number is reused on some systems; the times differ either way
       const swapped = path.join(outside, 'rewrite.md')
       writeFileSync(swapped, 'shown to the user')
-      const showBox = vi.fn(async () => {
+      const showBox = vi.fn<MoveConfirmerDeps['showBox']>(async () => {
         // The box is open for seconds in practice; a few ticks keep coarse clocks apart
         await new Promise((resolve) => setTimeout(resolve, 30))
         rmSync(swapped)
@@ -959,7 +960,7 @@ describe('External File Handlers', () => {
       mkdirSync(dir)
       const file = path.join(dir, 'moved.md')
       writeFileSync(file, 'content')
-      const showBox = vi.fn(async () => {
+      const showBox = vi.fn<MoveConfirmerDeps['showBox']>(async () => {
         // The same file answers at the same path, but the folder is now a link to another one
         renameSync(dir, `${dir}-away`)
         symlinkSync(`${dir}-away`, dir)

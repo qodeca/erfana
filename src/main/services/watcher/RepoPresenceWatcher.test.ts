@@ -44,7 +44,7 @@ function makeWatcher(): any {
 }
 
 const mockChokidar = {
-  watch: vi.fn((arg: unknown) => {
+  watch: vi.fn((arg: unknown, _options?: unknown) => {
     const w = makeWatcher()
     createdWatchers.push({ watchPath: String(arg), w })
     return w

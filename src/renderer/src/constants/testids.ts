@@ -578,6 +578,8 @@ export const TEST_IDS = {
   TOAST: 'toast',
   /** Toast message text */
   TOAST_MESSAGE: 'toast-message',
+  /** Repeat count ("×3") on a toast that merged identical repeats */
+  TOAST_COUNT: 'toast-count',
   /** Toast dismiss button */
   TOAST_BTN_DISMISS: 'toast-btn-dismiss',
   /** Toast action button (e.g. "Approve"); present only on actionable toasts */
@@ -627,6 +629,12 @@ export const TEST_IDS = {
   SETTINGS_WHISPER_MODEL_STATUS: 'settings-whisper-model-status',
   /** Whisper download error message */
   SETTINGS_WHISPER_DOWNLOAD_ERROR: 'settings-whisper-download-error',
+  /** Cancel button shown while the whisper binary or model downloads */
+  SETTINGS_BTN_WHISPER_CANCEL: 'settings-btn-whisper-cancel',
+  /** Always-mounted, visually hidden status region announcing download progress */
+  SETTINGS_WHISPER_DOWNLOAD_LIVE: 'settings-whisper-download-live',
+  /** Always-mounted, visually hidden alert region announcing a failed download */
+  SETTINGS_WHISPER_DOWNLOAD_ALERT: 'settings-whisper-download-alert',
   SETTINGS_API_KEY_ERROR: 'settings-api-key-error',
   /** Logs folder path display */
   SETTINGS_LOGS_FOLDER_PATH: 'settings-logs-folder-path',
@@ -636,6 +644,12 @@ export const TEST_IDS = {
   SETTINGS_SECTION_HTML_PREVIEW: 'settings-section-html-preview',
   /** HTML preview enabled toggle (Issue #74, AC21) */
   SETTINGS_TOGGLE_HTML_PREVIEW: 'settings-toggle-html-preview',
+  /** Terminal settings section (lens review [23]) */
+  SETTINGS_SECTION_TERMINAL: 'settings-section-terminal',
+  /** Terminal screen-reader mode select: Auto / On / Off */
+  SETTINGS_SELECT_SCREEN_READER_MODE: 'settings-select-screen-reader-mode',
+  /** What Auto currently detects (screen reader reported or not) */
+  SETTINGS_SCREEN_READER_STATUS: 'settings-screen-reader-status',
   /** Import tools section (Issue #250) */
   SETTINGS_SECTION_IMPORT_TOOLS: 'settings-section-import-tools',
   /** One format row's status; the row carries `data-format` and `data-ready` */
