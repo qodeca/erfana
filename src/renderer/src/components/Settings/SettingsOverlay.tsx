@@ -16,6 +16,7 @@ import { TEST_IDS } from '../../constants/testids'
 import { HtmlPreviewSection } from './sections/HtmlPreviewSection'
 import { ImportToolsSection } from './sections/ImportToolsSection'
 import './SettingsOverlay.css'
+import { loggingGateway } from '../../services/loggingGateway'
 
 // Small delay to ensure overlay is fully rendered before focusing
 const FOCUS_DELAY_MS = 10
@@ -160,7 +161,7 @@ export function SettingsOverlay() {
    */
   useEffect(() => {
     if (!isOpen) return
-    window.api.logging.getLogsDir()
+    loggingGateway.getLogsDir()
       .then((dir) => setLogsDir(dir))
       .catch(() => setLogsDir(''))
   }, [isOpen])
@@ -216,7 +217,7 @@ export function SettingsOverlay() {
    */
   const handleOpenLogsFolder = useCallback(async () => {
     try {
-      const result = await window.api.logging.openLogsFolder()
+      const result = await loggingGateway.openLogsFolder()
       if (result) {
         logger.error('Failed to open logs folder', undefined, { reason: result })
       }

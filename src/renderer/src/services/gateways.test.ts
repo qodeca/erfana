@@ -11,11 +11,23 @@ import type { FileWatchBridge } from '../../../shared/ipc/file-watch-schema'
 import type { GitBridge } from '../../../shared/ipc/git-schema'
 import type { GitPollingBridge, GitWatcherBridge } from '../../../shared/ipc/git-watcher-schema'
 import type { TerminalBridge } from '../../../shared/ipc/terminal-schema'
+import type { ClipboardBridge } from '../../../shared/ipc/clipboard-schema'
+import type { GlobalSettingsBridge } from '../../../shared/ipc/global-settings-schema'
+import type { LoggingBridge } from '../../../shared/ipc/logging-schema'
+import type { QuitBridge } from '../../../shared/ipc/quit-schema'
+import type { SettingsBridge } from '../../../shared/ipc/settings-schema'
+import type { SystemBridge } from '../../../shared/ipc/system-schema'
 import { fileGateway } from './fileGateway'
 import { terminalGateway } from './terminalGateway'
 import { fileWatchGateway } from './fileWatchGateway'
 import { directoryWatchGateway } from './directoryWatchGateway'
 import { gitGateway, gitPollingGateway, gitWatcherGateway } from './gitGateway'
+import { globalSettingsGateway, settingsGateway } from './settingsGateway'
+import { loggingGateway } from './loggingGateway'
+import { quitGateway } from './quitGateway'
+import { systemGateway } from './systemGateway'
+import { clipboardGateway } from './clipboardGateway'
+import { testHooksGateway } from './testHooksGateway'
 import { getDefaultProjectTreeApi } from './projectTreeApi'
 import { onFileStructureChanged } from './fileStructureSignal'
 
@@ -109,6 +121,45 @@ const GIT_POLLING_METHODS: Record<keyof GitPollingBridge, true> = {
   onPollTriggered: true
 }
 
+const SETTINGS_METHODS: Record<keyof SettingsBridge, true> = {
+  getProjectFilterMode: true,
+  setProjectFilterMode: true,
+  getDirectoryWatchDepth: true,
+  setDirectoryWatchDepth: true,
+  getRecentProjects: true,
+  addRecentProject: true,
+  removeRecentProject: true
+}
+
+const GLOBAL_SETTINGS_METHODS: Record<keyof GlobalSettingsBridge, true> = {
+  get: true,
+  set: true,
+  reset: true,
+  onSettingsChanged: true
+}
+
+const LOGGING_METHODS: Record<keyof LoggingBridge, true> = {
+  log: true,
+  getLevel: true,
+  getLogsDir: true,
+  openLogsFolder: true
+}
+
+const QUIT_METHODS: Record<keyof QuitBridge, true> = {
+  onQuitRequested: true,
+  sendQuitResponse: true
+}
+
+const SYSTEM_METHODS: Record<keyof SystemBridge, true> = {
+  openScreenRecordingSettings: true,
+  relaunchApp: true
+}
+
+const CLIPBOARD_METHODS: Record<keyof ClipboardBridge, true> = {
+  readText: true,
+  writeText: true
+}
+
 type Anything = (...args: unknown[]) => unknown
 
 function fakeBridge(methods: string[]): Record<string, ReturnType<typeof vi.fn>> {
@@ -128,7 +179,13 @@ describe.each([
   ['directoryWatchGateway', 'directoryWatch', directoryWatchGateway, DIRECTORY_WATCH_METHODS],
   ['gitGateway', 'git', gitGateway, GIT_METHODS],
   ['gitWatcherGateway', 'gitWatcher', gitWatcherGateway, GIT_WATCHER_METHODS],
-  ['gitPollingGateway', 'gitPolling', gitPollingGateway, GIT_POLLING_METHODS]
+  ['gitPollingGateway', 'gitPolling', gitPollingGateway, GIT_POLLING_METHODS],
+  ['settingsGateway', 'settings', settingsGateway, SETTINGS_METHODS],
+  ['globalSettingsGateway', 'globalSettings', globalSettingsGateway, GLOBAL_SETTINGS_METHODS],
+  ['loggingGateway', 'logging', loggingGateway, LOGGING_METHODS],
+  ['quitGateway', 'quit', quitGateway, QUIT_METHODS],
+  ['systemGateway', 'system', systemGateway, SYSTEM_METHODS],
+  ['clipboardGateway', 'clipboard', clipboardGateway, CLIPBOARD_METHODS]
 ] as const)('%s', (_name, key, gateway, methods) => {
   const names = Object.keys(methods)
 
@@ -168,6 +225,19 @@ describe.each([
 
     expect(first[names[0]]).toHaveBeenCalledTimes(1)
     expect(second[names[0]]).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('testHooksGateway', () => {
+  it('has only the enabled switch', () => {
+    expect(Object.keys(testHooksGateway)).toEqual(['enabled'])
+  })
+
+  it.each([true, false])('reads enabled = %s from the current window.api', (enabled) => {
+    window.api = { testHooks: { enabled: !enabled } } as unknown as typeof window.api
+    expect(testHooksGateway.enabled).toBe(!enabled)
+    window.api = { testHooks: { enabled } } as unknown as typeof window.api
+    expect(testHooksGateway.enabled).toBe(enabled)
   })
 })
 

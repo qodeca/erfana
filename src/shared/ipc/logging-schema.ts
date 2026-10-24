@@ -172,3 +172,21 @@ export function validateLogLevel(level: unknown): LogLevel {
   }
   return result.data
 }
+
+/**
+ * Shared contract for the preload `logging` bridge of the app window.
+ *
+ * Implemented by `window.api.logging` (preload, `loggingBridge.ts`) and
+ * consumed by the renderer logging gateway. The screenshot-overlay window has
+ * only `window.overlayApi.log` over the same `logging:log` channel.
+ */
+export interface LoggingBridge {
+  /** Fire-and-forget: one log entry to the main process. */
+  log(entry: LogEntry): void
+  /** The current log level. */
+  getLevel(): Promise<string>
+  /** The logs folder path. */
+  getLogsDir(): Promise<string>
+  /** Open the logs folder in the file manager; `''` on success, the error text on failure. */
+  openLogsFolder(): Promise<string>
+}

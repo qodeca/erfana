@@ -1,12 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { contextBridge, ipcRenderer, IpcRendererEvent, webUtils } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import { FORCE_CRASH_ARG, TEST_HOOKS_ARG } from '../shared/constants'
 import type { PdfExportRequest, PdfExportResponse } from '../shared/ipc/pdf-schema'
 import type { DocxExportRequest, DocxExportResponse } from '../shared/ipc/docx-schema'
-import type { GlobalSettings, GlobalSettingsChanged } from '../shared/ipc/global-settings-schema'
-import type { LogEntry } from '../shared/ipc/logging-schema'
-import type { LockResult, LockStatus } from '../shared/ipc/project-lock-schema'
 import type {
   ScreenshotCaptureRequest,
   ScreenshotCaptureResponse,
@@ -28,7 +25,6 @@ import type {
 } from '../shared/ipc/transcription-schema'
 import { TRANSCRIPTION_CHANNELS } from '../shared/ipc/transcription-channels'
 import { IMPORT_CHANNELS } from '../shared/ipc/import-channels'
-import { CLIPBOARD_CHANNELS } from '../shared/ipc/clipboard-channels'
 import { IMAGE_EXPORT_CHANNELS } from '../shared/ipc/image-export-channels'
 import { BROWSER_CHANNELS } from '../shared/ipc/browser-channels'
 import type { BrowserOpenFileResponse } from '../shared/ipc/browser-schema'
@@ -56,6 +52,12 @@ import { markdownImageBridge } from './markdownImageBridge'
 import { fileWatchBridge } from './fileWatchBridge'
 import { directoryWatchBridge } from './directoryWatchBridge'
 import { gitBridge, gitPollingBridge, gitWatcherBridge } from './gitBridge'
+import { globalSettingsBridge, settingsBridge } from './settingsBridge'
+import { loggingBridge } from './loggingBridge'
+import { quitBridge } from './quitBridge'
+import { systemBridge } from './systemBridge'
+import { clipboardBridge } from './clipboardBridge'
+import { projectLockBridge } from './projectLockBridge'
 import type { FileNode, FileStats } from '../shared/ipc/file-schema'
 
 export type { FileNode, FileStats }
@@ -93,25 +95,8 @@ const api = {
    */
   gitPolling: gitPollingBridge,
 
-  // Settings operations
-  settings: {
-    getProjectFilterMode: (): Promise<{ success: boolean; mode?: string; error?: string }> =>
-      ipcRenderer.invoke('settings:getProjectFilterMode'),
-    setProjectFilterMode: (mode: string): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke('settings:setProjectFilterMode', mode),
-    // Directory watcher depth
-    getDirectoryWatchDepth: (): Promise<{ success: boolean; depth?: number; error?: string }> =>
-      ipcRenderer.invoke('settings:getDirectoryWatchDepth'),
-    setDirectoryWatchDepth: (depth: number | null): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke('settings:setDirectoryWatchDepth', depth),
-    // Recent projects
-    getRecentProjects: (): Promise<{ success: boolean; projects?: Array<{ path: string; name: string; lastOpened: number }>; error?: string }> =>
-      ipcRenderer.invoke('settings:getRecentProjects'),
-    addRecentProject: (path: string, name: string): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke('settings:addRecentProject', path, name),
-    removeRecentProject: (path: string): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke('settings:removeRecentProject', path)
-  },
+  // Settings operations (see settingsBridge.ts)
+  settings: settingsBridge,
 
   // Copilot/Claude Code removed
 
@@ -311,20 +296,10 @@ const api = {
   },
 
   /**
-   * System / OS-integration actions for the screen-recording permission flow.
-   * Both are sender-gated main-side.
+   * System / OS-integration actions for the screen-recording permission flow
+   * (see systemBridge.ts). Both are sender-gated main-side.
    */
-  system: {
-    /** Open the macOS Screen Recording privacy pane (no-op off macOS). */
-    openScreenRecordingSettings: (): Promise<void> =>
-      ipcRenderer.invoke('system:openScreenRecordingSettings'),
-
-    /**
-     * Relaunch the app (macOS applies a fresh Screen Recording grant only to
-     * a newly-launched process). Runs graceful shutdown before restarting.
-     */
-    relaunchApp: (): Promise<void> => ipcRenderer.invoke('system:relaunchApp')
-  },
+  system: systemBridge,
 
   /**
    * Camera photo capture operations
@@ -504,78 +479,17 @@ const api = {
     }
   },
 
-  // Global settings operations
-  globalSettings: {
-    /**
-     * Get all global settings from ~/.erfana/settings.json
-     */
-    get: (): Promise<{ success: boolean; settings?: GlobalSettings; error?: string }> =>
-      ipcRenderer.invoke('globalSettings:get'),
+  // Global settings operations (see settingsBridge.ts)
+  globalSettings: globalSettingsBridge,
 
-    /**
-     * Set a specific global setting
-     * @param key - Setting key to update
-     * @param value - New value for the setting
-     */
-    set: (key: string, value: unknown): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke('globalSettings:set', { key, value }),
-
-    /**
-     * Reset all global settings to defaults
-     */
-    reset: (): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke('globalSettings:reset'),
-
-    /**
-     * Subscribe to global settings changes
-     * @param callback - Called when any global setting changes
-     * @returns Cleanup function to remove listener
-     */
-    onSettingsChanged: (callback: (data: GlobalSettingsChanged) => void): (() => void) => {
-      const listener = (_event: unknown, data: GlobalSettingsChanged): void => callback(data)
-      ipcRenderer.on('globalSettings:changed', listener)
-      return () => {
-        ipcRenderer.removeListener('globalSettings:changed', listener)
-      }
-    }
-  },
-
-  // Logging operations
-  logging: {
-    /**
-     * Send log entry to main process
-     * One-way channel for performance
-     */
-    log: (entry: LogEntry): void => ipcRenderer.send('logging:log', entry),
-
-    /**
-     * Get current log level from main process
-     */
-    getLevel: (): Promise<string> => ipcRenderer.invoke('logging:getLevel'),
-
-    /**
-     * Get logs directory path
-     */
-    getLogsDir: (): Promise<string> => ipcRenderer.invoke('logging:getLogsDir'),
-
-    /**
-     * Open logs folder in the system file manager
-     * Returns empty string on success, error string on failure
-     */
-    openLogsFolder: (): Promise<string> => ipcRenderer.invoke('logging:openLogsFolder')
-  },
+  // Logging operations (see loggingBridge.ts)
+  logging: loggingBridge,
 
   /**
-   * Central text-clipboard bridge (sandbox-safe, async)
+   * Central text-clipboard bridge, sandbox-safe and async (see clipboardBridge.ts)
    * @see Issue #203 - Central text-clipboard service
    */
-  clipboard: {
-    /** Read plain text from the OS clipboard ('' on failure) */
-    readText: (): Promise<string> => ipcRenderer.invoke(CLIPBOARD_CHANNELS.readText),
-    /** Write plain text to the OS clipboard (false on failure/reject) */
-    writeText: (text: string): Promise<boolean> =>
-      ipcRenderer.invoke(CLIPBOARD_CHANNELS.writeText, text)
-  },
+  clipboard: clipboardBridge,
 
   /**
    * Image export bridge (#73).
@@ -641,115 +555,14 @@ const api = {
   // Running HTML preview bridge (#74): WebContentsView-backed preview control
   preview: previewBridge,
 
-  // Quit confirmation operations
-  quit: {
-    /**
-     * Listen for quit request from main process
-     * Main sends this when user tries to close window or quit app
-     *
-     * @param callback - Called when quit is requested
-     * @returns Cleanup function to remove listener
-     */
-    onQuitRequested: (callback: (data: { reason?: string }) => void): (() => void) => {
-      const listener = (_event: unknown, data: { reason?: string }): void => callback(data)
-      ipcRenderer.on('quit:requested', listener)
-      return () => {
-        ipcRenderer.removeListener('quit:requested', listener)
-      }
-    },
-
-    /**
-     * Send quit response to main process
-     * Tells main whether to proceed with quit or cancel it
-     *
-     * @param proceed - true to quit, false to cancel
-     */
-    sendQuitResponse: (proceed: boolean): void => {
-      ipcRenderer.send('quit:confirmResponse', { proceed })
-    }
-  },
+  // Quit confirmation operations (see quitBridge.ts)
+  quit: quitBridge,
 
   /**
-   * Project lock operations for multi-instance support
-   *
-   * Prevents duplicate project opens across Erfana instances.
-   * Uses file-based locking with focus request support.
-   *
+   * Project lock operations for multi-instance support (see projectLockBridge.ts)
    * @see Issue #27 - Multiple independent instances
-   * @see Spec #010 - Multi-instance support specification
    */
-  projectLock: {
-    /**
-     * Acquire lock for a project path
-     *
-     * @param projectPath - Absolute path to the project directory
-     * @returns LockResult - 'acquired', 'already_locked', or 'error'
-     */
-    acquire: (projectPath: string): Promise<LockResult> =>
-      ipcRenderer.invoke('project-lock:acquire', { projectPath }),
-
-    /**
-     * Release lock for a project path
-     *
-     * @param projectPath - Absolute path to the project directory
-     * @returns { success: boolean, error?: string }
-     */
-    release: (projectPath: string): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke('project-lock:release', { projectPath }),
-
-    /**
-     * Check lock status for a project path
-     *
-     * @param projectPath - Absolute path to the project directory
-     * @returns LockStatus - 'unlocked', 'locked_by_self', 'locked_by_other', or 'error'
-     */
-    check: (projectPath: string): Promise<LockStatus> =>
-      ipcRenderer.invoke('project-lock:check', { projectPath }),
-
-    /**
-     * Request focus from the instance that holds the lock
-     *
-     * Used when user attempts to open a project that's already open
-     * in another Erfana instance.
-     *
-     * @param projectPath - Absolute path to the project directory
-     * @returns { success: boolean, error?: string }
-     */
-    requestFocus: (projectPath: string): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke('project-lock:requestFocus', { projectPath }),
-
-    /**
-     * Cleanup stale locks at application startup
-     *
-     * Removes locks from dead processes or timed-out network locks.
-     *
-     * @returns { success: boolean, removedCount?: number, error?: string }
-     */
-    cleanup: (): Promise<{ success: boolean; removedCount?: number; error?: string }> =>
-      ipcRenderer.invoke('project-lock:cleanup'),
-
-    /**
-     * Listen for focus requests from other instances
-     *
-     * When another instance tries to open a project locked by this instance,
-     * it can request focus. This callback is triggered when focus is requested.
-     *
-     * @param callback - Called when focus is requested
-     * @returns Cleanup function to remove listener
-     */
-    onFocused: (
-      callback: (event: { projectPath: string; requesterPid: number }) => void
-    ): (() => void) => {
-      const handler = (
-        _event: IpcRendererEvent,
-        data: { projectPath: string; requesterPid: number }
-      ): void => callback(data)
-      ipcRenderer.on('project-lock:focused', handler)
-      return () => {
-        ipcRenderer.removeListener('project-lock:focused', handler)
-      }
-    }
-  },
+  projectLock: projectLockBridge,
 
   /**
    * Utility operations for web content

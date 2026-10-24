@@ -48,13 +48,21 @@ Renderer code does not read a bridge off `window.api` once the bridge has a gate
 | `git` | `GitBridge` (`git-schema.ts`) | `gitBridge.ts` | `gitGateway` (`gitGateway.ts`) |
 | `gitWatcher` | `GitWatcherBridge` (`git-watcher-schema.ts`) | `gitBridge.ts` | `gitWatcherGateway` (`gitGateway.ts`) |
 | `gitPolling` | `GitPollingBridge` (`git-watcher-schema.ts`) | `gitBridge.ts` | `gitPollingGateway` (`gitGateway.ts`) |
+| `settings` | `SettingsBridge` (`settings-schema.ts`) | `settingsBridge.ts` | `settingsGateway` (`settingsGateway.ts`) |
+| `globalSettings` | `GlobalSettingsBridge` (`global-settings-schema.ts`) | `settingsBridge.ts` | `globalSettingsGateway` (`settingsGateway.ts`) |
+| `logging` | `LoggingBridge` (`logging-schema.ts`) | `loggingBridge.ts` | `loggingGateway` – log through `utils/logger`, which also serves the overlay window |
+| `quit` | `QuitBridge` (`quit-schema.ts`) | `quitBridge.ts` | `quitGateway` |
+| `system` | `SystemBridge` (`system-schema.ts`) | `systemBridge.ts` | `systemGateway` |
+| `clipboard` | `ClipboardBridge` (`clipboard-schema.ts`) | `clipboardBridge.ts` | `clipboardGateway` – copy and paste through `services/textClipboard`, the transport-error chokepoint |
+| `testHooks` | `Api['testHooks']` – a value the preload reads from its launch arguments, no IPC | inline in `index.ts` | `testHooksGateway` |
+| `projectLock` | `ProjectLockBridge` (`project-lock-schema.ts`) | `projectLockBridge.ts` | none – no renderer caller |
 
 What holds it in place:
 
 - **Types.** `Window['api']` (`src/preload/index.d.ts`) is `Api` without the bridges that have a gateway, so a direct read does not type-check. `src/preload/apiContract.types.ts` proves each `Api` member is exactly its contract and that no `any` is in `Api`; `src/renderer/src/services/windowApi.types.ts` proves each gateway is exactly its contract. Both are compiled by `npm run typecheck`.
 - **Lint.** `no-restricted-syntax` in `eslint.config.mjs` (`GATEWAY_BRIDGES`) rejects a read of those bridges and the ways round the type: destructuring or aliasing `window.api`, computed access, a cast, `globalThis` / `self`. The gateways (`RENDERER_GATEWAY_FILES`) are exempt, and tests and their helper folders may install mocks on `window.api`. The rule's own cases are in `scripts/eslint-layer-rules.test.mjs`.
 - **Tests.** The wire of each bridge (channel, arguments, events and their unsubscribe) is pinned in `src/preload/__tests__/api-contract.test.ts` and `*-bridges.test.ts`, written out as strings because the channel names must not change; `src/renderer/src/services/gateways.test.ts` checks that every gateway forwards every method.
-- **A bridge that may be missing.** A caller that must also work where the bridge is not there – code that unit tests run without installing one – asks `hasBridge(domain)` or `hasBridgeMethod(domain, method)` from `services/bridgePresence.ts` first and then calls the gateway. That module answers yes or no only; it never hands out the bridge.
+- **A bridge that may be missing.** A caller that must also work where the bridge is not there asks `hasBridge(domain)` or `hasBridgeMethod(domain, method)` from `services/bridgePresence.ts` first and then calls the gateway: code that unit tests run without installing one, the crash screen (`RootErrorFallback` offers only the actions whose bridge method is there), and the logger, which also runs in the screenshot-overlay window where there is no `window.api`. That module answers yes or no only; it never hands out the bridge.
 
 Adding a bridge or a method: change the contract first, then the preload module and the gateway (the type checks fail until all three agree), add the wire to the bridge tests, and for a new bridge add its name to the `GatewayBridges` lists in `index.d.ts` and `windowApi.types.ts` and to `GATEWAY_BRIDGES` / `RENDERER_GATEWAY_FILES` in `eslint.config.mjs`.
 

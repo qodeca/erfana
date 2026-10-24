@@ -44,7 +44,22 @@ const GATEWAY_MESSAGE =
 // The bridges that have a gateway. The type system already hides them from
 // `window.api` (see preload/index.d.ts); these selectors are the backstop for
 // the ways round it.
-const GATEWAY_BRIDGES = ['file', 'terminal', 'fileWatch', 'directoryWatch', 'git', 'gitWatcher', 'gitPolling']
+const GATEWAY_BRIDGES = [
+  'file',
+  'terminal',
+  'fileWatch',
+  'directoryWatch',
+  'git',
+  'gitWatcher',
+  'gitPolling',
+  'settings',
+  'globalSettings',
+  'logging',
+  'quit',
+  'system',
+  'clipboard',
+  'testHooks'
+]
 const RENDERER_GATEWAY_SELECTORS = [
   {
     selector: `MemberExpression[object.object.name='window'][object.property.name='api'][property.name=/^(${GATEWAY_BRIDGES.join('|')})$/]`,
@@ -108,6 +123,12 @@ const RENDERER_GATEWAY_FILES = [
   'src/renderer/src/services/fileWatchGateway.ts',
   'src/renderer/src/services/directoryWatchGateway.ts',
   'src/renderer/src/services/gitGateway.ts',
+  'src/renderer/src/services/settingsGateway.ts',
+  'src/renderer/src/services/loggingGateway.ts',
+  'src/renderer/src/services/quitGateway.ts',
+  'src/renderer/src/services/systemGateway.ts',
+  'src/renderer/src/services/clipboardGateway.ts',
+  'src/renderer/src/services/testHooksGateway.ts',
   'src/renderer/src/services/bridgePresence.ts'
 ]
 

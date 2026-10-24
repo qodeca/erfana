@@ -47,6 +47,9 @@ import { textClipboard } from '../../services/textClipboard'
 import { formatErrorReport, type ErrorDetails } from './errorDetails'
 import './RootErrorBoundary.css'
 import { fileGateway } from '../../services/fileGateway'
+import { loggingGateway } from '../../services/loggingGateway'
+import { systemGateway } from '../../services/systemGateway'
+import { hasBridgeMethod } from '../../services/bridgePresence'
 
 /** Copy deck (design §2.3). */
 const HEADING = 'Erfana stopped unexpectedly.'
@@ -102,7 +105,7 @@ const DEGRADED_INSTRUCTION =
 /**
  * Where `LoggingService` writes, spelled as platform-neutral prose.
  *
- * Degraded mode is exactly the case where `window.api.logging.getLogsDir()`
+ * Degraded mode is exactly the case where `loggingGateway.getLogsDir()`
  * cannot be called, so neither the real path nor the platform can be read from
  * the bridge. `~/…` would be wrong on Windows and `process.platform` is
  * `undefined` under the sandbox, so the folder is described instead of spelled
@@ -127,19 +130,6 @@ export const CLOSE_PROJECT_TIMEOUT_MS = 1500
 export interface RootErrorFallbackProps {
   /** Extracted crash details; the raw message is rendered inside details only */
   details: ErrorDetails
-}
-
-/**
- * Is a bridge method callable right now?
- *
- * Per-action rather than one "is the bridge present" flag: a partially exposed
- * `window.api` must disable only the affected action, not the whole screen.
- *
- * @param method - The candidate bridge method, read through optional chaining
- * @returns `true` when it can be invoked
- */
-function isCallable(method: unknown): boolean {
-  return typeof method === 'function'
 }
 
 /**
@@ -206,10 +196,12 @@ export function RootErrorFallback({ details }: RootErrorFallbackProps) {
 
   // Capability probes. Read per render rather than memoised: the bridge is
   // injected before first paint and never changes, and a stale memo here would
-  // be a dead button on the one screen that must not have any.
-  const canRestart = isCallable(window.api?.system?.relaunchApp)
-  const canCopy = isCallable(window.api?.clipboard?.writeText)
-  const canOpenLogs = isCallable(window.api?.logging?.openLogsFolder)
+  // be a dead button on the one screen that must not have any. Per action
+  // rather than one "is the bridge present" flag: a partially exposed
+  // `window.api` must disable only the affected action, not the whole screen.
+  const canRestart = hasBridgeMethod('system', 'relaunchApp')
+  const canCopy = hasBridgeMethod('clipboard', 'writeText')
+  const canOpenLogs = hasBridgeMethod('logging', 'openLogsFolder')
   const isDegraded = !canRestart && !canCopy && !canOpenLogs
 
   // The description branches on CAPABILITY, never on taste: promising that
@@ -273,7 +265,7 @@ export function RootErrorFallback({ details }: RootErrorFallbackProps) {
     await closeProjectBestEffort()
 
     try {
-      await window.api.system.relaunchApp()
+      await systemGateway.relaunchApp()
     } catch {
       clearStalledTimer()
       setIsRestarting(false)
@@ -294,7 +286,7 @@ export function RootErrorFallback({ details }: RootErrorFallbackProps) {
   const handleOpenLogs = useCallback(async () => {
     try {
       // Resolves to '' on success, or an error string on failure.
-      const failure = await window.api.logging.openLogsFolder()
+      const failure = await loggingGateway.openLogsFolder()
       announce(failure ? STATUS_LOGS_FAILED : STATUS_LOGS_OPENED)
     } catch {
       announce(STATUS_LOGS_FAILED)
