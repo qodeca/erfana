@@ -165,7 +165,10 @@ describe('Main Process - Window Creation', () => {
       ipcMain: {
         on: vi.fn(),
         handle: vi.fn(),
-        removeHandler: vi.fn()
+        removeHandler: vi.fn(),
+        // The preview handlers dispose their `on` listeners through
+        // registry.unregisterOn on quit, which calls removeListener.
+        removeListener: vi.fn()
       },
       // #216: claude-status handler imports `webContents` for the targeted send.
       webContents: {
@@ -308,7 +311,9 @@ describe('Main Process - Window Creation', () => {
           if (key === 'logging') return { level: 'info', console: true }
           return undefined
         }),
-        onSettingsChanged: vi.fn()
+        // Returns an unsubscribe, like the real service: the preview teardown
+        // calls it on quit.
+        onSettingsChanged: vi.fn(() => () => {})
       }
     }))
 
@@ -658,7 +663,10 @@ describe('Main Process - Window Creation', () => {
           ipcMain: {
             on: vi.fn(),
             handle: vi.fn(),
-            removeHandler: vi.fn()
+            removeHandler: vi.fn(),
+            // The preview handlers dispose their `on` listeners through
+            // registry.unregisterOn on quit, which calls removeListener.
+            removeListener: vi.fn()
           },
           webContents: {
             fromId: vi.fn(() => null)
