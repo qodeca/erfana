@@ -851,7 +851,7 @@ describe('WhisperModelManager', () => {
         call += 1
         if (call < 3) return undefined
         cancelDownloads()
-        throw new SecureDownloaderError('SHA-256 mismatch')
+        throw new SecureDownloaderError('sha-mismatch', 'SHA-256 mismatch')
       })
       const { createWhisperModelManager } = await import('./WhisperModelManager')
       const manager = createWhisperModelManager()
@@ -1046,7 +1046,7 @@ describe('WhisperModelManager', () => {
       let cancelDownloads: () => number = () => 0
       mockDownloadToFile.mockImplementation(async () => {
         cancelDownloads()
-        throw new SecureDownloaderError('SHA-256 mismatch')
+        throw new SecureDownloaderError('sha-mismatch', 'SHA-256 mismatch')
       })
       const { createWhisperModelManager } = await import('./WhisperModelManager')
       const manager = createWhisperModelManager()
