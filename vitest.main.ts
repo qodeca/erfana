@@ -148,7 +148,13 @@ export default defineConfig({
         'scripts/design-sync.mjs',
         'scripts/prebuild.mjs',
         'scripts/run-mcp.js',
-        'scripts/test-cov.mjs'
+        'scripts/test-cov.mjs',
+        // Imported natively by eslint.config.mjs, so every test that runs ESLint
+        // in-process (eslint-*.test.mjs) loads a second copy outside vitest's
+        // transform, and v8 maps that copy onto the transformed source: the
+        // report shows each function twice, half of them unrun. Its behaviour
+        // is tested in scripts/check-max-lines.test.mjs.
+        'scripts/lib/max-lines-baseline.mjs'
       ],
     },
   },
