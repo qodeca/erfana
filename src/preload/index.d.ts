@@ -28,6 +28,7 @@ type GatewayBridges =
   | 'imageExport'
   | 'browser'
   | 'markdownImage'
+  | 'preview'
 
 declare global {
   interface Window {

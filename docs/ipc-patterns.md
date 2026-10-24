@@ -64,6 +64,7 @@ Renderer code does not read a bridge off `window.api` once the bridge has a gate
 | `imageExport` | `ImageExportBridge` (`image-export-schema.ts`) | `imageExportBridge.ts` (`imageExport.ts` is the hidden rasterize window's own preload) | `imageExportGateway` |
 | `browser` | `BrowserBridge` (`browser-schema.ts`) | `browserBridge.ts` | `browserGateway` |
 | `markdownImage` | `MarkdownImageBridge` (`markdown-image-schema.ts`) | `markdownImageBridge.ts` | `markdownImageGateway` |
+| `preview` | `PreviewBridge` (`preview-bridge-types.ts`) | `previewBridge.ts` | `previewGateway` – `setVisibility` only from `services/preview/OverlayGuardService` (lint-enforced) |
 | `projectLock` | `ProjectLockBridge` (`project-lock-schema.ts`) | `projectLockBridge.ts` | none – no renderer caller |
 
 What holds it in place:

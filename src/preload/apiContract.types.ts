@@ -17,6 +17,7 @@ import type { ImageExportBridge } from '../shared/ipc/image-export-schema'
 import type { ImportBridge } from '../shared/ipc/import-schema'
 import type { MarkdownImageBridge } from '../shared/ipc/markdown-image-schema'
 import type { PdfBridge } from '../shared/ipc/pdf-schema'
+import type { PreviewBridge } from '../shared/ipc/preview-bridge-types'
 import type { TranscriptionBridge, WhisperBridge } from '../shared/ipc/transcription-schema'
 import type { DirectoryWatchBridge } from '../shared/ipc/directory-watch-schema'
 import type { FileBridge } from '../shared/ipc/file-schema'
@@ -86,6 +87,7 @@ export type ApiContractChecks = [
   Assert<Equal<Api['imageExport'], ImageExportBridge>>,
   Assert<Equal<Api['browser'], BrowserBridge>>,
   Assert<Equal<Api['markdownImage'], MarkdownImageBridge>>,
+  Assert<Equal<Api['preview'], PreviewBridge>>,
   // A bridge method that returns the unchecked `ipcRenderer.invoke` result would put `any` in the renderer
   Assert<Equal<AnyIn<Api>, never>>
 ]
