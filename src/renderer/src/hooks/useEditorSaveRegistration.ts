@@ -33,7 +33,7 @@ import { useLatestRef } from './useLatestRef'
  *
  * @example
  * ```tsx
- * useEditorSaveRegistration(panelIdRef.current, () => handleSave(false), externalChangeDetected, () => {
+ * useEditorSaveRegistration(panelId, () => handleSave('registry'), externalChangeDetected, () => {
  *   cancelAutoSave()
  *   return () => signalChange()
  * })

@@ -73,7 +73,6 @@ export function MermaidDiagram({
   const containerRef = useRef<HTMLDivElement>(null)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [initialized, setInitialized] = useState(false)
   const [svgContent, setSvgContent] = useState<string>('')
 
   // Store for persisting viewer state across component remounts
@@ -167,12 +166,12 @@ export function MermaidDiagram({
     }
   }
 
-  // Initialize mermaid with built-in theme
+  // Initialize mermaid with built-in theme. Declared before the draw effect on
+  // purpose: a component's effects run in declaration order, so the first draw
+  // (same commit) always follows this call – no "initialized" flag needed.
   useEffect(() => {
     const config = getMermaidConfig(true) // isDarkMode param ignored, uses ACTIVE_THEME
     mermaid.initialize(config)
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- the flag records that the external mermaid.initialize() call above has run; the draw effect below must wait for it
-    setInitialized(true)
   }, [])
 
   // Render diagram whenever code changes
@@ -180,7 +179,7 @@ export function MermaidDiagram({
   // ref so a range shift (an edit above the diagram) does not redraw it.
   const lineRangeRef = useLatestRef({ startLine, endLine })
   useEffect(() => {
-    if (!initialized || !containerRef.current) {
+    if (!containerRef.current) {
       return
     }
     const { startLine: drawStartLine, endLine: drawEndLine } = lineRangeRef.current
@@ -261,7 +260,7 @@ export function MermaidDiagram({
     }
 
     renderDiagram()
-  }, [code, initialized, lineRangeRef])
+  }, [code, lineRangeRef])
 
   const handleExpandClick = () => {
     if (svgContent && filePath) {

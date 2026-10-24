@@ -178,13 +178,9 @@ export function useProjectManagement(
     return true
   }
 
-  // Load last project on mount - DISABLED
-  // Now shows welcome screen with recent projects instead of auto-loading.
-  // Crash recovery relies on this: never reopen the last project here (#60).
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- kept as a mount effect so the first paint still reports loading, as consumers expect; starting at false would change that frame
-    setLoading(false)
-  }, [])
+  // No "load last project on mount": the welcome screen shows recent projects
+  // instead, and `loading` starts false. Crash recovery relies on this: never
+  // reopen the last project on mount (#60).
 
   // Listen for external project changes (e.g., from menu bar, shortcuts)
   useEffect(() => {

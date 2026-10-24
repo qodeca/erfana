@@ -29,7 +29,7 @@
  * @see Issue #73 - PNG / PDF / clipboard export controls
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { IDockviewPanelProps } from 'dockview'
 import { Loader2, AlertCircle, ImageIcon } from 'lucide-react'
@@ -39,6 +39,7 @@ import { getBasename, sanitizeFileName } from '../../../utils/fileUtils'
 import { formatTabTitle } from '../../../utils/tabTitle'
 import { TEST_IDS } from '../../../constants/testids'
 import { useFileChangeSubscription } from '../../../hooks/useFileChangeSubscription'
+import { DOCKVIEW_PANEL_VISIBLE, useDockviewValue } from '../../../hooks/useDockviewValue'
 import { ImageViewerBanner, ImageViewerToolbar } from './components'
 import {
   useFullScreenOverlay,
@@ -110,15 +111,8 @@ export function ImageViewerPanel(props: IDockviewPanelProps<ImageViewerPanelPara
 
   // The watch is always live; only the multi-MB base64 re-read waits for the
   // tab to be looked at. Written against a plain boolean so swapping dockview's
-  // `isVisible` for `isActive` is a one-line change here.
-  const [isVisible, setIsVisible] = useState<boolean>(api?.isVisible ?? true)
-  useEffect(() => {
-    if (!api?.onDidVisibilityChange) return
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- re-reads the external dockview flag when a new api arrives, so no change between render and subscribe is missed
-    setIsVisible(api.isVisible ?? true)
-    const disposable = api.onDidVisibilityChange((event) => setIsVisible(event.isVisible))
-    return () => disposable.dispose()
-  }, [api])
+  // `isVisible` for `isActive` is a one-line change here (DOCKVIEW_PANEL_ACTIVE).
+  const isVisible = useDockviewValue(api, DOCKVIEW_PANEL_VISIBLE)
 
   // ========================================
   // Source + watch

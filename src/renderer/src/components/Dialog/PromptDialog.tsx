@@ -87,7 +87,21 @@ export function PromptDialog({ config, zIndex, onSubmit, onCancel }: PromptDialo
 
   const [inputValue, setInputValue] = useState(defaultValue)
   const [dropdownValue, setDropdownValue] = useState(initialDropdownValue)
-  const [validationError, setValidationError] = useState<string | null>(null)
+  // Effective minimum length: 0 when textarea is optional, otherwise use configured minLength
+  const effectiveMinLength = textareaOptional ? 0 : minLength
+  // Seeded from the default value in the initializer, not an effect:
+  // DialogManager keys every dialog by its own id, so each open is a fresh
+  // mount. After that the error is editable state (typing clears it).
+  const [validationError, setValidationError] = useState<string | null>(() => {
+    if (!defaultValue || defaultValue.trim().length === 0) return null
+    const result = validateTextInput(defaultValue, {
+      minLength: effectiveMinLength,
+      maxLength,
+      warningThreshold: TEXT_INPUT_LIMITS.WARNING_THRESHOLD,
+      customValidation: validation
+    })
+    return result.canSubmit ? null : result.message
+  })
   const [showTooltip, setShowTooltip] = useState(false)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
   const [hasSelection, setHasSelection] = useState(false)
@@ -106,9 +120,6 @@ export function PromptDialog({ config, zIndex, onSubmit, onCancel }: PromptDialo
       textareaRef.current.focus()
     }
   }, [])
-
-  // Effective minimum length: 0 when textarea is optional, otherwise use configured minLength
-  const effectiveMinLength = textareaOptional ? 0 : minLength
 
   // Memoized validation result using shared validation utility
   const validationResult = useMemo(() => {
@@ -137,14 +148,6 @@ export function PromptDialog({ config, zIndex, onSubmit, onCancel }: PromptDialo
     setValidationError(null)
     return true
   }, [effectiveMinLength, maxLength, validation])
-
-  // Validate default value on mount if provided
-  useEffect(() => {
-    if (defaultValue && defaultValue.trim().length > 0) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- the error is editable state (typing clears it), so it cannot be derived; this only seeds it from the default value
-      validateInput(defaultValue)
-    }
-  }, [defaultValue, validateInput])
 
   const handleSubmit = () => {
     const trimmed = inputValue.trim()

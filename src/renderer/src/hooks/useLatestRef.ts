@@ -18,9 +18,11 @@ import { useLayoutEffect, useRef, type MutableRefObject } from 'react'
  * re-running (re-subscribing IPC, restarting a listener) whenever the parent
  * passes a new function identity.
  *
- * Constraint: do not read `.current` during render – it holds the value from
- * the previous commit there. Read it in effects, event handlers and
- * subscription callbacks only.
+ * Constraint: do not read `.current` during render, nor in a layout effect –
+ * during render it holds the value from the previous commit, and a layout
+ * effect declared before this hook's own (or in a child, whose layout effects
+ * run first) sees the same stale value. Read it in passive effects, event
+ * handlers and subscription callbacks only.
  *
  * @typeParam T - Type of the tracked value
  * @param value - The value to track; usually a callback prop

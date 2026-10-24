@@ -19,7 +19,7 @@
  * @see Spec #009 - Media import with transcription specification
  */
 
-import { useState, useEffect, useId } from 'react'
+import { useState, useId } from 'react'
 import { FileAudio, FileVideo } from 'lucide-react'
 import { VIDEO_IMPORT } from '../../../../shared/constants'
 import { useTranscriptionStore } from '../../stores/useTranscriptionStore'
@@ -134,13 +134,24 @@ export function TranscriptionDialog(): JSX.Element | null {
 
   const [selectedLanguage, setSelectedLanguage] = useState<TranscriptionLanguage>('auto')
 
-  // Initialize language selection from last used language when dialog opens
-  useEffect(() => {
-    if (isDialogOpen) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- seeds an editable choice from the store each time the dialog opens or its file changes; the user can then change it, so it cannot be derived
-      setSelectedLanguage(lastLanguage)
-    }
-  }, [isDialogOpen, filePath, lastLanguage])
+  // Initialize language selection from last used language when the dialog
+  // opens, its file changes or the stored language changes. Adjusted during
+  // render (React's "storing information from previous renders" pattern)
+  // rather than in an effect; the user can still change the choice after.
+  const [seededFor, setSeededFor] = useState<{
+    isDialogOpen: boolean
+    filePath: typeof filePath
+    lastLanguage: TranscriptionLanguage
+  } | null>(null)
+  if (
+    seededFor === null ||
+    seededFor.isDialogOpen !== isDialogOpen ||
+    seededFor.filePath !== filePath ||
+    seededFor.lastLanguage !== lastLanguage
+  ) {
+    setSeededFor({ isDialogOpen, filePath, lastLanguage })
+    if (isDialogOpen) setSelectedLanguage(lastLanguage)
+  }
 
   if (!isDialogOpen) return null
 

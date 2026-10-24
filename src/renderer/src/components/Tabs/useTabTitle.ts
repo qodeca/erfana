@@ -13,8 +13,7 @@
  * @see Issue #70 - preview tabs show stale content when the file changes
  */
 
-import { useEffect, useState } from 'react'
-
+import { useDockviewValue, type DockviewValueSource } from '../../hooks/useDockviewValue'
 import { parseTabTitle } from '../../utils/tabTitle'
 
 /**
@@ -31,6 +30,18 @@ export interface TabTitleSource {
   readonly onDidTitleChange?: (listener: (event: { title: string }) => void) => {
     dispose: () => void
   }
+}
+
+/**
+ * The panel title, followed through {@link useDockviewValue}. It is re-read
+ * whenever the api changes as well as on the event: a panel that set its
+ * title before this tab mounted would otherwise never fire the event we are
+ * waiting for.
+ */
+const PANEL_TITLE: DockviewValueSource<TabTitleSource, { title: string }, string> = {
+  read: (api) => api?.title ?? '',
+  subscribe: (api, listener) => api.onDidTitleChange?.(listener),
+  fromEvent: (event) => event.title
 }
 
 /** What {@link useTabTitle} gives a tab component to render. */
@@ -65,18 +76,7 @@ export interface TabTitleState {
  * ```
  */
 export function useTabTitle(api: TabTitleSource | undefined, fallbackName: string): TabTitleState {
-  const [title, setTitle] = useState<string>(api?.title ?? '')
-
-  useEffect(() => {
-    // Re-seeded on every api change: a panel that set its title before this tab
-    // mounted would otherwise never fire the event we are waiting for.
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- the re-seed on subscribe is deliberate (see above); the title lives in dockview, not React
-    setTitle(api?.title ?? '')
-
-    if (!api?.onDidTitleChange) return
-    const disposable = api.onDidTitleChange((event) => setTitle(event.title))
-    return () => disposable.dispose()
-  }, [api])
+  const title = useDockviewValue(api, PANEL_TITLE)
 
   const parsed = parseTabTitle(title)
 

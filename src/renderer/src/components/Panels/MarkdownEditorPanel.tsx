@@ -43,6 +43,7 @@ import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts'
 import { useEditorSaveRegistration } from '../../hooks/useEditorSaveRegistration'
 import { useEditorReadOnlyHold } from '../../hooks/useEditorReadOnlyHold'
 import { useLatestFileLoad } from '../../hooks/useLatestFileLoad'
+import { DOCKVIEW_PANEL_ACTIVE, DOCKVIEW_PANEL_VISIBLE, useDockviewValue } from '../../hooks/useDockviewValue'
 
 // Extracted components
 import { MarkdownToolbar, EditorErrorBoundary } from '../Editor/MarkdownEditorPanel/components'
@@ -130,13 +131,17 @@ export function MarkdownEditorPanel(
    * Dockview keeps every opened panel mounted, so background editors are live
    * React trees with live `window` listeners. This flag is what stops them
    * acting on keystrokes aimed at the foreground tab.
+   *
+   * Followed through useSyncExternalStore (`useDockviewValue`), which re-reads
+   * `isActive` after subscribing: a panel can become active between render and
+   * subscribe, and the event would never fire for that transition.
    */
-  const [isActivePanel, setIsActivePanel] = useState<boolean>(() => props.api.isActive)
+  const isActivePanel = useDockviewValue(props.api, DOCKVIEW_PANEL_ACTIVE)
   /**
    * Whether dockview is drawing this panel. A hidden preview holds its link
    * re-checks until it is shown again (see `linkTargetCache`).
    */
-  const [isPanelVisible, setIsPanelVisible] = useState<boolean>(() => props.api?.isVisible ?? true)
+  const isPanelVisible = useDockviewValue(props.api, DOCKVIEW_PANEL_VISIBLE)
 
   // =========================================================================
   // Refs
@@ -475,27 +480,7 @@ export function MarkdownEditorPanel(
   // =========================================================================
   // Keyboard Shortcuts Hook
   // =========================================================================
-  // Keep the active flag in step with dockview. Re-read `isActive` on
-  // subscribe as well as on the event: a panel can become active between
-  // render and effect, and the event would never fire for that transition.
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- the re-read on subscribe is deliberate (see above): an activation between render and effect fires no event
-    setIsActivePanel(props.api.isActive)
-    const disposable = props.api.onDidActiveChange((event) => {
-      setIsActivePanel(event.isActive)
-    })
-    return () => disposable.dispose()
-  }, [props.api])
-
-  useEffect(() => {
-    const api = props.api
-    if (!api?.onDidVisibilityChange) return
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- same re-read on subscribe as the active flag above, for visibility
-    setIsPanelVisible(api.isVisible ?? true)
-    const disposable = api.onDidVisibilityChange((event) => setIsPanelVisible(event.isVisible))
-    return () => disposable.dispose()
-  }, [props.api])
-
+  // `isActivePanel` (declared with the state above) gates every shortcut.
   useKeyboardShortcuts({
     onSave: () => handleSave('user'),
     onClose: () => props.api.close(),
