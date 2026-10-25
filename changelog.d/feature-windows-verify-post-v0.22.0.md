@@ -4,6 +4,11 @@
   certificates, with patch releases of vite (Windows argument escaping in `launch-editor`),
   brace-expansion, fast-uri, postcss-selector-parser and source-map-js from `npm audit fix`.
 
+- **Mermaid 12.2.0.** Clears the KaTeX prototype-pollution advisory that reached the preview
+  through Mermaid 11. Mermaid 12 defaults to a new look and the ELK layout; Erfana pins the
+  classic look and the dagre layout, so existing diagrams keep their shape, and a diagram can
+  still opt in through its own front matter.
+
 ### Internal
 
 - **vitest 5.** Upgraded vitest and `@vitest/coverage-v8` from 3.2 to 5.0.5, which removes
