@@ -132,6 +132,8 @@ Not to be confused with **[`docs/design-system/`](design-system/index.html)**, w
 - [`http://` and IPv6 in the preview](./designs/108-http-and-ipv6-in-the-preview.md) - What Chromium does with `http://` and IPv6 hosts in the HTML preview (issue #108)
 - [Illustrated user guide](./designs/138-user-guide/README.md) - Guide outline, screenshot list, demo project and capture script (issue #138, proposed); [feature inventory](./user-guide/feature-inventory.md), [research](./designs/138-user-guide/research.md), [spec and plan](./features/138-user-guide.md)
 - [README and GitHub presentation](./designs/139-readme-redesign/README.md) - Banner, demo loop, page structure and fact audit for the README redesign (issue #139)
+- [HTML preview with CSS and JavaScript](./designs/sd-074-html-preview.md) - Sealed-box live preview that runs a project's real CSS and JavaScript (spec 074, issue #74)
+- [Preview link navigation and multiple views](./designs/sd-074b-preview-navigation-and-multiview.md) - In-page link navigation and independent preview tabs (spec 074; superseded in part by #124)
 
 ### Future Features (Planned)
 - [Graph Engine](./future/graph-engine.md) – SQLite + vec + FTS5 knowledge graph (not yet implemented). The full specification lives in [`future/graph-engine/`](./future/graph-engine/), covering the data model, embeddings, hybrid search, MCP server, packaging and performance, plus a milestone-by-milestone [implementation guide](./future/graph-engine/implementation-guide/) and [wireframes](./future/graph-engine/wireframes/)
