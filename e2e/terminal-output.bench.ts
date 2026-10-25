@@ -49,6 +49,7 @@ import {
   createTempUserDataDir
 } from './utils/helpers'
 import type { Api } from '../src/preload/index'
+import { E2E_CHROMIUM_ARGS } from './fixtures/isolation'
 
 const BYTES = Number(process.env.ERFANA_BENCH_BYTES ?? 50_000_000)
 const RUNS = Number(process.env.ERFANA_BENCH_RUNS ?? 3)
@@ -139,7 +140,7 @@ test.describe('terminal output flood benchmark', () => {
       let page: Page | undefined
       try {
         app = await electron.launch({
-          args: [path.join(__dirname, '..'), `--user-data-dir=${userDataDir}`],
+          args: [path.join(__dirname, '..'), `--user-data-dir=${userDataDir}`, ...E2E_CHROMIUM_ARGS],
           env: {
             ...process.env,
             NODE_ENV: 'development',

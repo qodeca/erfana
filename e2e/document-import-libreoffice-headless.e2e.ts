@@ -35,6 +35,7 @@ import { pathToFileURL } from 'url'
 import { promisify } from 'util'
 import yazl from 'yazl'
 import { stubDialog } from 'electron-playwright-helpers'
+import { E2E_CHROMIUM_ARGS } from './fixtures/isolation'
 import {
   TEST_IDS,
   byTestId,
@@ -367,7 +368,7 @@ test.describe('Document import – LibreOffice runs headless', () => {
     const { projectPath, cleanup: cleanupProject } = await createTestProject({ 'test.md': '# Test\n' })
     const { userDataDir, cleanup: cleanupUserData } = await createTempUserDataDir('document-import-headless')
     const electronApp = await electron.launch({
-      args: [path.join(__dirname, '..'), `--user-data-dir=${userDataDir}`],
+      args: [path.join(__dirname, '..'), `--user-data-dir=${userDataDir}`, ...E2E_CHROMIUM_ARGS],
       env: { ...process.env, NODE_ENV: 'development' }
     })
     let window: Awaited<ReturnType<typeof electronApp.firstWindow>> | undefined

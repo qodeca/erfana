@@ -24,3 +24,7 @@
   line 1), the tree focus-ring check expects 2 px snapped to device pixels as Chromium draws it
   at 125 % scaling, and the tree right-click lands well inside the row instead of 10 px from an
   edge that moves. Recorded in `docs/windows/known-flakes.md`.
+- **Two-worker e2e runs on Windows no longer freeze the covered window.** Chromium stops
+  rendering a window another one covers, so the HTML-preview and editor checks in the hidden
+  worker's app timed out. Every e2e launch now passes `E2E_CHROMIUM_ARGS`
+  (`--disable-features=CalculateNativeWinOcclusion` on Windows).

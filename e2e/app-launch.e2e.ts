@@ -3,6 +3,7 @@
 import { test, expect, _electron as electron } from '@playwright/test'
 import * as path from 'path'
 import { TEST_IDS, byTestId, createTempUserDataDir } from './utils/helpers'
+import { E2E_CHROMIUM_ARGS } from './fixtures/isolation'
 
 test.describe('Erfana App Launch', () => {
   test('should launch and display main window with testids', async () => {
@@ -11,7 +12,7 @@ test.describe('Erfana App Launch', () => {
     try {
       // Launch Electron app in dev mode with isolated user data directory
       const electronApp = await electron.launch({
-        args: [path.join(__dirname, '..'), `--user-data-dir=${userDataDir}`],
+        args: [path.join(__dirname, '..'), `--user-data-dir=${userDataDir}`, ...E2E_CHROMIUM_ARGS],
         env: {
           ...process.env,
           NODE_ENV: 'development'
@@ -49,7 +50,7 @@ test.describe('Erfana App Launch', () => {
 
     try {
       const electronApp = await electron.launch({
-        args: [path.join(__dirname, '..'), `--user-data-dir=${userDataDir}`],
+        args: [path.join(__dirname, '..'), `--user-data-dir=${userDataDir}`, ...E2E_CHROMIUM_ARGS],
         env: {
           ...process.env,
           NODE_ENV: 'development'

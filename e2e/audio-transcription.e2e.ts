@@ -33,7 +33,7 @@ import {
   createTempUserDataDir
 } from './utils/helpers'
 import { IMPORT } from '../src/shared/constants'
-import { buildAppEnv } from './fixtures/isolation'
+import { buildAppEnv, E2E_CHROMIUM_ARGS } from './fixtures/isolation'
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -96,7 +96,7 @@ test.describe('Audio transcription', () => {
     )
 
     const electronApp = await electron.launch({
-      args: [path.join(__dirname, '..'), `--user-data-dir=${userDataDir}`],
+      args: [path.join(__dirname, '..'), `--user-data-dir=${userDataDir}`, ...E2E_CHROMIUM_ARGS],
       // The one spec that is meant to see the key (it is set via IPC below, but
       // the transcription project owns it); everything else comes from the
       // allowlist.

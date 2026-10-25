@@ -19,6 +19,7 @@
 
 import { test, expect, _electron as electron } from '@playwright/test'
 import * as path from 'path'
+import { E2E_CHROMIUM_ARGS } from './fixtures/isolation'
 import {
   TEST_IDS,
   byTestId,
@@ -44,7 +45,7 @@ test.describe('Dockview drag-to-resize (#211 AC #7 regression guard)', () => {
     )
 
     const electronApp = await electron.launch({
-      args: [path.join(__dirname, '..'), `--user-data-dir=${userDataDir}`],
+      args: [path.join(__dirname, '..'), `--user-data-dir=${userDataDir}`, ...E2E_CHROMIUM_ARGS],
       env: { ...process.env, NODE_ENV: 'development' }
     })
 

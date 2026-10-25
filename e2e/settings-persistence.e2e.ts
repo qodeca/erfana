@@ -44,6 +44,7 @@ import * as path from 'path'
 import { TEST_IDS } from '../src/renderer/src/constants/testids'
 import { byTestId, waitForTestId, waitForTestIdHidden } from './utils/locators'
 import { createTempUserDataDir } from './utils/helpers'
+import { E2E_CHROMIUM_ARGS } from './fixtures/isolation'
 
 const APP_ROOT = path.join(__dirname, '..')
 
@@ -81,7 +82,7 @@ async function withApp(
   body: (window: Page, app: ElectronApplication) => Promise<void>
 ): Promise<void> {
   const app = await electron.launch({
-    args: [APP_ROOT, `--user-data-dir=${sandbox.userDataDir}`],
+    args: [APP_ROOT, `--user-data-dir=${sandbox.userDataDir}`, ...E2E_CHROMIUM_ARGS],
     env: {
       ...process.env,
       NODE_ENV: 'development',
