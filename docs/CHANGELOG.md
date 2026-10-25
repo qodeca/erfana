@@ -337,19 +337,7 @@ Changes merged since the last release are not listed here. Each pull request add
   accepted.
 - **Windows taskbar grouping.** On Windows, the running app now groups with its pinned taskbar
   shortcut instead of showing a second icon.
-- **On Windows, relative links in the preview now show when their file is missing, and open the linked file.** Links with percent-escapes such as `my%20file.md` or `#%C3%A9t%C3%A9` now resolve on every platform, and links with backslashes, spaces in `<...>`, or non-ASCII names get the same broken-link styling as any other. A link can no longer reach outside the project, and a link that leaves the project and comes back in (`../<project>/x.md`) is now refused too. Windows device names such as `CON`, `NUL` or `CONIN# Erfana Changelog
-
-Per-version release notes for Erfana, v0.9.0 onwards. Earlier: v0.8.0–v0.8.3 in [archive/changelog-v08.md](./archive/changelog-v08.md), v0.3.0–v0.5.4 in [archive/changelog-v03-v05.md](./archive/changelog-v03-v05.md); v0.6.x–v0.7.x have no entries at all, as recorded under "Earlier versions (archived)" at the foot of this file. For in-flight Windows enablement work not yet released, see [`docs/windows/implementation-plan.md`](./windows/implementation-plan.md) "Status snapshot".
-
-> **Note:** In v0.7.2, BRS (Business Requirements Specifications) were renamed to "specs" and relocated from `specs/business-reqs/` to `specs/spec-t{tier}-{id}-{slug}/`. All references in code and docs now use `Spec #XXX`. Historical entries below have been updated accordingly.
-
-Each version uses the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) groups, plus one intentional extension: `### Internal`, for changes only contributors see (build, tests, tooling).
-
-## [Unreleased]
-
-Changes merged since the last release are not listed here. Each pull request adds a fragment to [`changelog.d/`](../changelog.d/README.md) instead, so no two pull requests edit the same lines of this file. At release time the fragments are folded into a new `## X.Y.Z` section directly below this one and deleted in the same commit; this section stays as it is. To see what is pending, read the fragments, or run `npx git-cliff --unreleased`, which lists the Conventional Commits since the last `v*` tag – the same command drafts the technical half of the release notes.
-
- are refused as file paths. (#300)
+- **On Windows, relative links in the preview now show when their file is missing, and open the linked file.** Links with percent-escapes such as `my%20file.md` or `#%C3%A9t%C3%A9` now resolve on every platform, and links with backslashes, spaces in `<...>`, or non-ASCII names get the same broken-link styling as any other. A link can no longer reach outside the project, and a link that leaves the project and comes back in (`../<project>/x.md`) is now refused too. Windows device names such as `CON`, `NUL` or `CONIN$` are refused as file paths. (#300)
 - **One name for a project on Windows.** A project opened with a different spelling of its path (other letter case, or a short 8.3 name) now shows one consistent name in the title, the recent projects list and the project tree.
 - **Folder links show as folders.** Junctions and folder links that lead to another folder inside the project now appear as folders in the project tree and can be expanded. Links that lead outside the project, or that loop back on themselves, are not followed.
 - **Faster file access on network projects.** Opening folders and files in a project on a network share makes fewer file-system calls, with the same checks as before.
