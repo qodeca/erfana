@@ -21,7 +21,7 @@
  *   failure when the underlying `invoke` THROWS — never when it resolves `''`.
  *
  * @see Issue #203 - Central text-clipboard service
- * @see docs/design/issue-203-clipboard-service.md §4 (renderer service API)
+ * @see docs/designs/issue-203-clipboard-service.md §4 (renderer service API)
  */
 import { logger } from '../utils/logger'
 import { showErrorToast } from '../utils/toastHelpers'

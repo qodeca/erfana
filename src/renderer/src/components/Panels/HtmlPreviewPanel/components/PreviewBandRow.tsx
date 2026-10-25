@@ -4,7 +4,7 @@
  * One row of the permission band's list. Presentational — every string it shows
  * is decided in `permissionBand.logic.ts`.
  *
- * @see design/system/components/permission-band/index.html - status="decided"
+ * @see docs/design-system/system/components/permission-band/index.html - status="decided"
  */
 import { HostName } from '../../../HostName/HostName'
 import { describeRefusal, type BandRow } from '../permissionBand.logic'

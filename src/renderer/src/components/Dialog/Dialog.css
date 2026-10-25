@@ -127,7 +127,7 @@
   letter-spacing: 0.2px;
 }
 
-/* The one focus ring, per design/system/foundations/focus.html.
+/* The one focus ring, per docs/design-system/system/foundations/focus.html.
  *
  * Three things changed here and none of them is visible today:
  *   :focus -> :focus-visible   a bare :focus paints the ring after a MOUSE click
@@ -374,7 +374,7 @@
   align-items: center;
   justify-content: center;
   /* A 24 x 24 target (WCAG 2.2 SC 2.5.8, #96) with the 16px glyph centred in it:
-     the standard pairing on design/system/components/icon. */
+     the standard pairing on docs/design-system/system/components/icon. */
   width: var(--btn-height-sm);
   height: var(--btn-height-sm);
   color: var(--color-text-secondary);

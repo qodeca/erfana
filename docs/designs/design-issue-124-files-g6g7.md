@@ -27,7 +27,7 @@ As built ([impl doc](design-issue-124-impl.md), G6; part 1 §1.5): the forced-pu
 - ↑ `src/renderer/src/services/preview/OverlayGuardService.ts` (the resize-hold exception in the header comment and, as built, `visiblePanelId()`; 459 lines; WI-9 added the `collapsed` gate) and its test (`visiblePanelId()`, a follow-up)
 - M `src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewFallback.tsx`
 - C `src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewFallback.test.tsx`
-- M `design/product/html-waiting/index.html` (precedence row: drag freeze and window-edge hold; 791 → 799 lines)
+- M `docs/design-system/product/html-waiting/index.html` (precedence row: drag freeze and window-edge hold; 791 → 799 lines)
 
 ### WI-17b – page navigator, check and commit, navigation handlers
 
@@ -219,7 +219,7 @@ The QG-6 judge's batches B0–B5 (with QG-7's security fixes folded in), then QG
 - M `src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewBandConfirm.tsx` (busy label in a span; 220 lines)
 - C `src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewBandConfirm.test.tsx` (47 lines)
 - M `src/renderer/src/components/Panels/HtmlPreviewPanel/HtmlPreviewPanel.tokens.test.ts` (the ring guards; 401 lines)
-- ↑ `PreviewChromeBand.css` (485 – over §3's 440, debt), `HtmlPreviewPanel.css` (the placeholder ring; 268), `PreviewBanner.tsx` (172) and its test, `PreviewNavControls.css` (U4 wording; 119), the permission-band card (1 109), `band.css`, `nav.css`, `design/claims.json` (three focus-ring claims) and `design/claims.js`
+- ↑ `PreviewChromeBand.css` (485 – over §3's 440, debt), `HtmlPreviewPanel.css` (the placeholder ring; 268), `PreviewBanner.tsx` (172) and its test, `PreviewNavControls.css` (U4 wording; 119), the permission-band card (1 109), `band.css`, `nav.css`, `docs/design-system/claims.json` (three focus-ring claims) and `docs/design-system/claims.js`
 
 ### QG-8 J1 to J3, and QG-9 C1
 

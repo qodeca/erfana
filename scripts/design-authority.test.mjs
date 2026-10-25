@@ -2,13 +2,13 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 
 /**
- * Guards the one-source-of-truth property that `design/` was given.
+ * Guards the one-source-of-truth property that `docs/design-system/` was given.
  *
  * Before this, `docs/ui-style-guide.md` was mandatory reading and specified the
  * focus ring THREE different ways — a 2px border, a 3px glow and a 1px outline,
  * all normative, with no rule for which applied where. A second file,
  * `docs/ui-style-guide-reference.md`, held a fourth set of component patterns.
- * Nothing pointed at `design/` at all, so anyone following the project's own
+ * Nothing pointed at `docs/design-system/` at all, so anyone following the project's own
  * instructions read the documents the cards contradict.
  *
  * The visual sections were RETIRED TO STUBS rather than deleted: a stub keeps
@@ -75,13 +75,13 @@ describe('design system authority', () => {
       expect(
         section.body,
         `"${section.heading}" in ${section.file} must name the card that decides it.`
-      ).toMatch(/design\/\S+\.html/)
+      ).toMatch(/docs\/design-system\/\S+\.html/)
     })
 
     it.each(STUBS.map(s => [`${s.file} § ${s.heading}`, s]))(
       '%s points at a card that exists',
       (_label, section) => {
-        const cards = [...section.body.matchAll(/(design\/[\w/-]+\.html)/g)].map(m => m[1])
+        const cards = [...section.body.matchAll(/(docs\/design-system\/[\w/-]+\.html)/g)].map(m => m[1])
         expect(cards.length, 'no card path found').toBeGreaterThan(0)
         for (const card of new Set(cards)) {
           expect(existsSync(path.join(ROOT, card)), `${section.file} points at missing ${card}`).toBe(
@@ -95,12 +95,12 @@ describe('design system authority', () => {
   describe('the mandate points at the design system', () => {
     const CLAUDE_MD = readFileSync(path.join(ROOT, 'CLAUDE.md'), 'utf8')
 
-    it('CLAUDE.md sends UI work to design/ first', () => {
-      expect(CLAUDE_MD).toMatch(/design\/index\.html/)
+    it('CLAUDE.md sends UI work to docs/design-system/ first', () => {
+      expect(CLAUDE_MD).toMatch(/docs\/design-system\/index\.html/)
     })
 
     it('CONTRIBUTING.md agrees with it', () => {
-      expect(readFileSync(path.join(ROOT, 'CONTRIBUTING.md'), 'utf8')).toMatch(/design\/index\.html/)
+      expect(readFileSync(path.join(ROOT, 'CONTRIBUTING.md'), 'utf8')).toMatch(/docs\/design-system\/index\.html/)
     })
   })
 

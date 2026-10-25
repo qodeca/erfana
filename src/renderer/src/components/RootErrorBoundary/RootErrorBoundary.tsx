@@ -35,7 +35,7 @@
  * `LOG_LEVEL_PRIORITY`, so `shouldLog('fatal', …)` is true at every configured
  * level — there is no "off" level to suppress it.
  *
- * @see docs/design/design-issue-60.md §2.3, §5
+ * @see docs/designs/design-issue-60.md §2.3, §5
  * @module components/RootErrorBoundary/RootErrorBoundary
  */
 

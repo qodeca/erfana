@@ -6,7 +6,7 @@ SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 # Designs
 
 One folder per designed feature: `docs/designs/<feature>/README.md`, with these headings. The
-design system itself is in `design/` (open `design/index.html`). The single-file notes already in
+design system itself is in `docs/design-system/` (open `docs/design-system/index.html`). The single-file notes already in
 this folder predate this layout and stay where they are.
 
 ## Purpose

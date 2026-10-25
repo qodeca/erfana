@@ -84,7 +84,7 @@ export default defineConfig({
         // record it — these handlers are the only evidence the next incident
         // gets, so a silent coverage regression here is a diagnostics outage.
         // The module is small and fully unit-reachable; measured at 100% when
-        // this entry landed. See: docs/design/design-issue-60.md §2.6, §5
+        // this entry landed. See: docs/designs/design-issue-60.md §2.6, §5
         'src/main/utils/rendererCrashHandlers.ts': { lines: 90, functions: 90, branches: 90, statements: 90 },
         // Multi-page HTML preview (#124). These modules decide what the preview
         // BrowserView is allowed to load and where it may navigate — frame/scheme

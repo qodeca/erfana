@@ -662,7 +662,7 @@ merges, and the result goes into the pull request.
 | Gate | State |
 |---|---|
 | QA gate | On. Browser tool: `playwright` (Electron) |
-| Design gate | Awake: the renderer, its panels, dialogs and the preview. The design system is `design/` (open `design/index.html`); a card marked `status="decided"` is binding. Designs: `docs/designs/` |
+| Design gate | Awake: the renderer, its panels, dialogs and the preview. The design system is `docs/design-system/` (open `docs/design-system/index.html`); a card marked `status="decided"` is binding. Designs: `docs/designs/` |
 | Verdicts name the head | Yes (`gates.requireVerdictHead: true`) |
 | Deploy | Asleep: Erfana ships as signed desktop releases |
 | Performance budgets, localisation | Asleep (`[]`) |

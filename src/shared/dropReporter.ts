@@ -24,7 +24,7 @@
  * which spells the file path; QG-7 S3), sequence numbers and a rect rounded to
  * whole pixels.
  *
- * @see docs/design/design-issue-124-part1.md §1.2
+ * @see docs/designs/design-issue-124-part1.md §1.2
  */
 import { PREVIEW_LIMITS } from './preview-limits'
 import { stablePathDigest } from './stablePathDigest'

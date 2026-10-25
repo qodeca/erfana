@@ -6,7 +6,7 @@
  *
  * - One Tab stop for the whole tree; arrows, Home/End, Enter, type-ahead and
  *   Shift+F10 operate it (the Rows card's contract,
- *   design/system/components/row/index.html).
+ *   docs/design-system/system/components/row/index.html).
  * - The focused row draws the standard focus ring, inset (Focus card).
  * - Rows are a flat, virtualised list: a big folder mounts a screenful, and
  *   pointer drag-and-drop still moves a file into a folder.

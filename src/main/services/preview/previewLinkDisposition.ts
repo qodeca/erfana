@@ -24,7 +24,7 @@
  * Inputs are injected – the platform for row 2, the eligibility verdict for
  * row 6 – so nothing here reads `process` or the disk.
  *
- * @see docs/design/design-issue-124-part3.md §3.2
+ * @see docs/designs/design-issue-124-part3.md §3.2
  */
 import { extname } from 'node:path'
 

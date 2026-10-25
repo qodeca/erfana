@@ -18,7 +18,7 @@
       "proposal": "on",
       "evidence": [
         "src/renderer (React UI)",
-        "design/ design system"
+        "docs/design-system/ design system"
       ]
     },
     "browser": {
@@ -36,7 +36,7 @@
       "proposal": []
     },
     "paths": {
-      "designSystem": "design",
+      "designSystem": "docs/design-system",
       "designs": "docs/designs",
       "architecture": "docs/adrs",
       "spikes": "docs/spikes",

@@ -27,7 +27,7 @@
 
 > **The graph chain (004–008) is already underway on the `graph` branch, not here.** Before starting any of 004–008, branch off `graph` (`git checkout -b feature/<name> graph`) and read its `specs/` and design set first; starting from `develop` means re-implementing work that already exists. See the Branching model section in `CLAUDE.md`.
 
-**What the R1 contract freeze already landed on `graph`**, and what `develop` therefore deliberately does not carry: the schemas, the STRICT DDL, the `IGraph*` interfaces, the `GRAPH_*` / `MCP_*` error codes and the `specs/designs/sd-021-*` design set. The refreshed spec requirements for 004–008 live there too.
+**What the R1 contract freeze already landed on `graph`**, and what `develop` therefore deliberately does not carry: the schemas, the STRICT DDL, the `IGraph*` interfaces, the `GRAPH_*` / `MCP_*` error codes and the `docs/designs/sd-021-*` design set. The refreshed spec requirements for 004–008 live there too.
 
 > **Chain status (re-verified 2026-10-25, at the v0.22.0 release, with `gh issue view` on each issue; unchanged since 2026-09-04):** the release-1 umbrella is [#17](https://github.com/qodeca/erfana/issues/17) "Graph engine R1: project search (spec 004)", still open. The analysis and architecture issues [#19](https://github.com/qodeca/erfana/issues/19), [#20](https://github.com/qodeca/erfana/issues/20) and [#21](https://github.com/qodeca/erfana/issues/21) are all **closed** – the contract freeze they describe has landed on `graph`. The implementation chain [#22](https://github.com/qodeca/erfana/issues/22)–[#32](https://github.com/qodeca/erfana/issues/32) (DB layer, preprocessing, indexing, search API, the three UI surfaces, MCP server, testing) is open and is where graph work now happens.
 

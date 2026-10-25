@@ -31,7 +31,7 @@
  * checks that a link the page cancels in its own listener is not followed.
  *
  * @see docs/html-preview/README.md#links
- * @see specs/designs/sd-074b-preview-navigation-and-multiview.md
+ * @see docs/designs/sd-074b-preview-navigation-and-multiview.md
  */
 
 import * as crypto from 'crypto'

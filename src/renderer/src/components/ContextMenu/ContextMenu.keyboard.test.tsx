@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * The keyboard contract `role="menu"` promises (issue #90, part of #87),
- * as decided by design/system/components/menu: focus on open, roving
+ * as decided by docs/design-system/system/components/menu: focus on open, roving
  * tabindex, arrows with wrap, Home / End, Enter / Space, typeahead, Escape and
  * Tab close and return focus to the opener.
  */

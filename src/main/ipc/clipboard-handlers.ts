@@ -26,7 +26,7 @@ import { registerHandle } from './registry'
  * - Payload bound: `writeText` is Zod-validated (`z.string().max(N)`); oversize
  *   or non-string payloads are rejected with `false`.
  *
- * @see docs/design/issue-203-clipboard-service.md §1–§3
+ * @see docs/designs/issue-203-clipboard-service.md §1–§3
  */
 
 /**

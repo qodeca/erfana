@@ -52,7 +52,7 @@ declare global {
      * `ERFANA_E2E_FORCE_CRASH=1`). `undefined` in every normal run — declared
      * optional and literal `true` so callers must test for it explicitly.
      *
-     * @see docs/design/design-issue-60.md §2.8
+     * @see docs/designs/design-issue-60.md §2.8
      */
     __ERFANA_FORCE_CRASH__?: true
     /** Installed by the renderer only when `api.testHooks.enabled` is true. */

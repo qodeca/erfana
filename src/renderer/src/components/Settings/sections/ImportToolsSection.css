@@ -4,7 +4,7 @@
  *
  * Secondary text here uses --color-text-tertiary (6.33:1 on --color-bg-secondary),
  * not .settings-description's --color-text-secondary (3.72:1, fails AA), per
- * design/system/foundations/colors.html. */
+ * docs/design-system/system/foundations/colors.html. */
 
 .import-tools-title:focus-visible {
   outline: var(--border-width-thick) solid var(--color-border-focus);
@@ -42,7 +42,7 @@
   word-spacing: var(--space-1);
 }
 
-/* Words plus an icon, so the state never rests on colour alone (design/feedback). */
+/* Words plus an icon, so the state never rests on colour alone (docs/design-system/system/components/feedback). */
 .import-tools-status {
   display: inline-flex;
   align-items: center;
@@ -111,7 +111,7 @@
   cursor: progress;
 }
 
-/* Reserve one line so the announcement does not push the row down (design/feedback). */
+/* Reserve one line so the announcement does not push the row down (docs/design-system/system/components/feedback). */
 .import-tools-live {
   min-height: calc(var(--text-sm) * var(--leading-normal));
 }

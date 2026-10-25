@@ -68,7 +68,7 @@ Not one of the six issues above, but it landed in the same problem space and cha
 - **per-window entry-module capture** – renderer console errors (`error` level only) and preload errors, the only trace of a boot failure that leaves the window blank without killing the process. Every renderer-supplied string is length-bounded at 1 000 characters and the console trail is capped at 20 records per window per 10 s, followed by one summary line carrying the dropped count. Log-only, like the rest;
 - **flatten instrumentation** – `[ProjectTree] flatten completed` with `{ nodeCount, durationMs }`, at `info` above a 50 ms threshold and `debug` below.
 
-Design of record: [`docs/design/design-issue-60.md`](./design/design-issue-60.md).
+Design of record: [`docs/designs/design-issue-60.md`](./designs/design-issue-60.md).
 
 **Follow-up trigger.** Two `[ProjectTree] flatten completed` log lines within 3 s of opening a project ⇒ **file the tree-rebuild dedup against #149/#150**. A double build at open is suspected but unconfirmed; the instrumentation above exists so the next report carries evidence instead of a hunch.
 

@@ -138,8 +138,8 @@
 }
 
 /* Cut: fading alone would read as "disabled", so add a shape. */
-/* deviates: design/system/components/row/index.html — tokens only
-   (design/README.md). 0.6 sits between --opacity-disabled (0.4) and opaque –
+/* deviates: docs/design-system/system/components/row/index.html — tokens only
+   (docs/design-system/README.md). 0.6 sits between --opacity-disabled (0.4) and opaque –
    the fade ProjectTree.css ships today – and 3px is off the
    2px spacing scale. Left as literals rather than quietly restyled:
    adoption tokenises them, and that is a visual decision, not a side effect of a

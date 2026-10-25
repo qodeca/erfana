@@ -12,7 +12,7 @@
  * Every text here fits the failure schema's entry rule: at most 2048
  * characters and no line breaks.
  *
- * @see docs/design/design-issue-124-part2.md §2.7, §2.12
+ * @see docs/designs/design-issue-124-part2.md §2.7, §2.12
  */
 import { PREVIEW_LIMITS } from './preview-limits'
 

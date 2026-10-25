@@ -18,7 +18,7 @@
  *
  * Dropping rather than collapsing into a "N more" line: it needs no new UI,
  * and the newest errors are the ones that describe the current state. The
- * Feedback card (design/system/components/feedback, proposed) sets no rule for
+ * Feedback card (docs/design-system/system/components/feedback, proposed) sets no rule for
  * stacking, so this is not a deviation from it.
  */
 import type { Toast } from './ToastContext'

@@ -24,7 +24,7 @@
  *
  * Local gate only: e2e is disabled in CI. Condition-based waits only.
  *
- * @see docs/design/design-issue-124-part1.md
+ * @see docs/designs/design-issue-124-part1.md
  */
 
 import { BOUNDS_PROJECT_FILES, SLIDE_PX, expect, test } from './html-preview-bounds.harness'

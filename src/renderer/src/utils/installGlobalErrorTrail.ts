@@ -29,7 +29,7 @@
  * `window` after `componentDidCatch`, so in dev a single crash can appear twice.
  * Production does not do this (design §1, §6).
  *
- * @see docs/design/design-issue-60.md §2.3 (global error trail)
+ * @see docs/designs/design-issue-60.md §2.3 (global error trail)
  * @module utils/installGlobalErrorTrail
  */
 

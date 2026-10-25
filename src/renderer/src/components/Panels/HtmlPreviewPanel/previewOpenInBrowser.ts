@@ -16,7 +16,7 @@
  * Success is silent: the browser coming to the front is the feedback.
  *
  * @module previewOpenInBrowser
- * @see docs/design/design-issue-124-part4.md §4.5
+ * @see docs/designs/design-issue-124-part4.md §4.5
  * @see src/shared/ipc/browser-schema.ts for the wire contract
  */
 

@@ -87,7 +87,7 @@ function lastItem(items: ContextMenuItem[]): number {
 
 /**
  * The shared right-click menu, with the keyboard contract `role="menu"`
- * promises (issue #90, design/system/components/menu – decided).
+ * promises (issue #90, docs/design-system/system/components/menu – decided).
  *
  * - Focus moves to the first item when the menu opens.
  * - Roving `tabindex`: the active item is `0`, every other item `-1`, so the

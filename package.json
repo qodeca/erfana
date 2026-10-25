@@ -12,7 +12,7 @@
     "lint:check": "eslint . --ext .js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts && npm run lint:shebang && npm run lint:max-lines",
     "lint:shebang": "node scripts/check-shebangs.mjs",
     "lint:max-lines": "node scripts/check-max-lines.mjs",
-    "lint:css": "stylelint \"src/**/*.css\" \"design/**/*.css\" \"design/**/*.html\"",
+    "lint:css": "stylelint \"src/**/*.css\" \"docs/design-system/**/*.css\" \"docs/design-system/**/*.html\"",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
     "typecheck:test:node": "tsc --noEmit -p tsconfig.node.test.json",

@@ -10,7 +10,7 @@
   "last_modified": "2026-03-26T22:04:00.000Z",
   "documents": {
     "architecture": ["architecture/001-drive-integration-architecture.md"],
-    "design": ["design/001-technical-design.md"],
+    "design": ["./design/001-technical-design.md"],
     "solution": ["solution/001-implementation-design.md"],
     "ux": ["ux/001-user-experience.md"]
   },

@@ -1421,7 +1421,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
 
   /**
    * The tree's keyboard contract (WAI-ARIA APG tree view, decided by
-   * design/system/components/row/index.html); the key → action mapping lives
+   * docs/design-system/system/components/row/index.html); the key → action mapping lives
    * in `treeKeyboard.ts`. Keys only count when a row has focus, so nothing
    * here reaches a keystroke meant for a dialog or input elsewhere.
    */

@@ -34,19 +34,19 @@ Index and descriptions live in [docs/README.md](docs/README.md) — read that ra
 
 ## Design system (MANDATORY)
 
-**Before implementing ANY UI changes**: open [`design/index.html`](design/index.html) in a browser. It is the design system — plain HTML cards that each **decide** one rule and render it live, loading a synced copy of the app's real `src/renderer/src/styles/design-tokens.css` and its real bundled font. A card shows every state rather than describing it, which is how its defects get found.
+**Before implementing ANY UI changes**: open [`docs/design-system/index.html`](docs/design-system/index.html) in a browser. It is the design system — plain HTML cards that each **decide** one rule and render it live, loading a synced copy of the app's real `src/renderer/src/styles/design-tokens.css` and its real bundled font. A card shows every state rather than describing it, which is how its defects get found.
 
 Read the card for what you are changing. A card marked `status="decided"` is binding; `status="proposed"` means it is still a sketch — use it as the direction of travel, not as settled law.
 
-**Key rules**: Use `var(--color-*)`, `var(--space-*)`, `var(--text-*)` tokens. No hardcoded values. `border-radius: 0` always. `npm run lint:css` in the required `Lint` job enforces **four** of these mechanically — no hex colours, no bare `z-index`, `border-radius` from the token only, and the `erf-` class namespace on design-system component CSS. A fifth rule, scoped to `design/**`, bans retired tokens (`--shadow-focus`, `--color-warning-bright`, `--color-warning-icon`, `--color-error-bright`, `--color-error-text-light`), so a card that reaches for one fails the job. **Spacing and typography tokens are convention, not enforcement**: `padding: 11px` and `font-size: 13px` both pass lint, so review for them by hand.
+**Key rules**: Use `var(--color-*)`, `var(--space-*)`, `var(--text-*)` tokens. No hardcoded values. `border-radius: 0` always. `npm run lint:css` in the required `Lint` job enforces **four** of these mechanically — no hex colours, no bare `z-index`, `border-radius` from the token only, and the `erf-` class namespace on design-system component CSS. A fifth rule, scoped to `docs/design-system/**`, bans retired tokens (`--shadow-focus`, `--color-warning-bright`, `--color-warning-icon`, `--color-error-bright`, `--color-error-text-light`), so a card that reaches for one fails the job. **Spacing and typography tokens are convention, not enforcement**: `padding: 11px` and `font-size: 13px` both pass lint, so review for them by hand.
 
-**Numbers in a card are generated**, never typed: they come from `design/claims.json` and are re-derived on every CI run. Do not hand-edit a number into a card – add a ledger entry.
+**Numbers in a card are generated**, never typed: they come from `docs/design-system/claims.json` and are re-derived on every CI run. Do not hand-edit a number into a card – add a ledger entry.
 
-**Deviating is allowed if the code says so at the site**: `/* deviates: design/<card> — why */`, plus a row in that card's Exceptions section. An undocumented deviation is a bug.
+**Deviating is allowed if the code says so at the site**: `/* deviates: docs/design-system/<card> — why */`, plus a row in that card's Exceptions section. An undocumented deviation is a bug.
 
 [docs/ui-style-guide.md](docs/ui-style-guide.md) holds only the text-selection policy and the dark-only stance – do not put a new visual rule there.
 
-**Naming, because it is confusable**: `design/` (repo root) is the design system. `docs/design/` and `docs/designs/` are per-issue design notes and are unrelated.
+**Naming, because it is confusable**: `docs/design-system/` is the design system. `docs/designs/` holds per-issue design notes and is unrelated.
 
 ## Testing
 - E2E: Playwright with Electron, Page Object Model pattern — POM classes, composed fixtures, and the shared locator/wait helpers are catalogued in [docs/testing/e2e-testing.md](docs/testing/e2e-testing.md)
@@ -78,5 +78,5 @@ The full channel index is [docs/ipc-patterns.md](docs/ipc-patterns.md) § Curren
 Added by `xez-onboard-opinionated`. How work moves: [SDLC.md](SDLC.md); what every agent runs: [AGENTS.md](AGENTS.md); review rules: [CODE_REVIEW.md](CODE_REVIEW.md).
 - The project leader is started with `./scripts/xezar-leader.sh`; only that session leads. Every other Claude Code session here is an ordinary session.
 - The pipeline's base branch is `develop`. Graph-engine work stays on `graph` and is started by the owner, not dispatched by the leader.
-- The pipeline adds these `docs/` folders, each created with its first document: `spikes/`, `runbooks/`, `deprecations/`, `performance/`, `migrations/`. Designs go in `docs/designs/`, decision records in `docs/adrs/`, and the design system stays in `design/`.
+- The pipeline adds these `docs/` folders, each created with its first document: `spikes/`, `runbooks/`, `deprecations/`, `performance/`, `migrations/`. Designs go in `docs/designs/`, decision records in `docs/adrs/`, and the design system stays in `docs/design-system/`.
 - Pipeline files: `.xezar/` (kit files are MIT, see `REUSE.toml`). Agent-kit rules: @.xezar/CLAUDE.md

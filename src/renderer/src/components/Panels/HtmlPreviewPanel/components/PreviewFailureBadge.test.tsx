@@ -16,7 +16,7 @@
  * labels and the grouping are the ones the tab passes in.
  *
  * @see PreviewFailureBadge.tsx
- * @see docs/design/design-issue-124-part2.md §2.12
+ * @see docs/designs/design-issue-124-part2.md §2.12
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'

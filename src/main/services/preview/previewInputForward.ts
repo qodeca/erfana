@@ -18,7 +18,7 @@
  * plain typing all stay with the page.
  *
  * @see docs/designs/sd-074-html-preview.md §1.9, §0 (Enumerated keystrokes)
- * @see docs/design/design-issue-124-part3.md §3.7
+ * @see docs/designs/design-issue-124-part3.md §3.7
  */
 
 import { matchPreviewNavKey, type PreviewNavAction } from '../../../shared/previewNavKeys'

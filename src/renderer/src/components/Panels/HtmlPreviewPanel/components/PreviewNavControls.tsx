@@ -21,7 +21,7 @@
  * callbacks, so the design card and the tests can render every state directly.
  *
  * @module HtmlPreviewPanel/components/PreviewNavControls
- * @see design/system/components/permission-band/index.html - status="decided"
+ * @see docs/design-system/system/components/permission-band/index.html - status="decided"
  */
 import './PreviewNavControls.css'
 

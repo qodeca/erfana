@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * "Disabled beats danger" - the precedence rule the decided Menu card
- * (design/system/components/menu) sets for a disabled destructive item.
+ * (docs/design-system/system/components/menu) sets for a disabled destructive item.
  *
  * It shipped the other way round: `.disabled` was declared BEFORE `.danger`
  * at equal specificity, so a greyed-out Delete still rendered red - a colour

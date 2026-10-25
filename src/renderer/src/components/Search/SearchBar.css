@@ -4,8 +4,8 @@
  * SearchBar.css - Unified search overlay styles
  *
  * Uses design tokens ONLY - no hardcoded values.
- * Governed by design/system/components/form/index.html (input) and
- * design/system/foundations/focus.html (focus ring).
+ * Governed by docs/design-system/system/components/form/index.html (input) and
+ * docs/design-system/system/foundations/focus.html (focus ring).
  */
 
 /* Search bar container - positioned absolutely in parent pane */

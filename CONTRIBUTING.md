@@ -67,8 +67,8 @@ Run the same checks CI runs before opening a PR:
 
 ```bash
 npm run lint            # eslint --fix, then the no-shebang check (lint:shebang) and the max-lines baseline check (lint:max-lines)
-npm run lint:css        # stylelint over src/ CSS and the design/ cards
-npm run design -- --check   # fails if a generated file under design/ is stale
+npm run lint:css        # stylelint over src/ CSS and the docs/design-system/ cards
+npm run design -- --check   # fails if a generated file under docs/design-system/ is stale
 npm run typecheck       # tsc (node + web projects, their tests, and e2e)
 npm run test:cov        # every unit test once, plus the coverage floors (the Unit tests and Coverage jobs)
 npx electron-vite build # production build
@@ -142,7 +142,7 @@ Never commit a real secret, even to history – rewrite it out and rotate the cr
 
 - TypeScript strict mode; React functional components with hooks; Zustand for state.
 - IPC pattern: `shared/ipc` schemas → `main/services` → `main/ipc` handlers → preload bridge → renderer.
-- UI: open the design system first – [`design/index.html`](design/index.html) – and use design tokens (`var(--color-*)`, `var(--space-*)`, `var(--text-*)`); `border-radius: 0` always. `npm run lint:css` enforces the token rules. (`design/` is the design system; `docs/design*/` are per-issue notes.)
+- UI: open the design system first – [`docs/design-system/index.html`](docs/design-system/index.html) – and use design tokens (`var(--color-*)`, `var(--space-*)`, `var(--text-*)`); `border-radius: 0` always. `npm run lint:css` enforces the token rules. (`docs/design-system/` is the design system; `docs/design*/` are per-issue notes.)
 - Prose: **sentence case**, en dashes (not em dashes).
 - New source files must carry the SPDX header (`npm run check:headers` enforces it; the Xezar kit under `.xezar/` is MIT and exempt, see `REUSE.toml`); new binary assets are covered by the `REUSE.toml` catch-all – add a `.license` sidecar only to *override* it (e.g. a third-party asset). `reuse lint` must pass.
 

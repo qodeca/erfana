@@ -511,7 +511,7 @@ export function useXtermSession(options: UseXtermSessionOptions): UseXtermSessio
       // instead of reaching the shell, just below the cursor cell (not the
       // helper textarea: the panel parks that off-screen)
       const open = (x: number, y: number): void => optionsRef.current.onContextMenu(x, y)
-      /* deviates: design/system/components/menu/index.html — no aria-haspopup/expanded: xterm owns its textarea. */
+      /* deviates: docs/design-system/system/components/menu/index.html — no aria-haspopup/expanded: xterm owns its textarea. */
       if (routeTerminalMenuKey(event, () => terminalCursorAnchor(xterm), open)) return false
       return handlers.keyEventHandler(event)
     })

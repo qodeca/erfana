@@ -13,11 +13,11 @@ that runs in a browser — no build step, no framework, no server.
 > decide. Check a card's `status` first: `decided` is binding, `proposed` is a
 > direction of travel, not settled law.
 
-Open `design/index.html`. Everything needed to render it is committed, so a fresh
+Open `docs/design-system/index.html`. Everything needed to render it is committed, so a fresh
 clone works with nothing run first. After changing a card or a token:
 
 ```bash
-npm run design && open design/index.html
+npm run design && open docs/design-system/index.html
 ```
 
 ## Why it is here and not in a design tool
@@ -150,7 +150,7 @@ A card decides, but it cannot know everything. A deviation is legitimate **if th
 code says so at the site**:
 
 ```css
-/* deviates: design/system/foundations/focus.html — Monaco owns its own focus
+/* deviates: docs/design-system/system/foundations/focus.html — Monaco owns its own focus
    ring and re-applies it on every render. */
 ```
 

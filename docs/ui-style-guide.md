@@ -6,11 +6,11 @@
 
 > **Version**: 3.0
 > **Last Updated**: August 2026
-> **Design System**: the cards in [`design/`](../design/index.html); this file keeps only what they do not decide
+> **Design System**: the cards in [`docs/design-system/`](design-system/index.html); this file keeps only what they do not decide
 
-> **The visual decisions have moved to [`design/`](../design/index.html).**
+> **The visual decisions have moved to [`docs/design-system/`](design-system/index.html).**
 > Colours, typography, spacing, surfaces and interactive states are now decided by
-> cards that render each rule live — open `design/index.html`. Those sections
+> cards that render each rule live — open `docs/design-system/index.html`. Those sections
 > below are stubs: they keep their headings so existing links resolve, and they
 > hold no rules, so they cannot contradict a card.
 >
@@ -20,7 +20,7 @@
 > which its own scale omitted. Two documents describing one system is how that
 > happens; the fix is one document, not a better second one.
 
-What is left here is the part `design/` does not decide: the text selection
+What is left here is the part `docs/design-system/` does not decide: the text selection
 policy (a dockview cascade fact with a test behind it), the dark-only stance, and
 the token discipline that `npm run lint:css` now enforces.
 
@@ -44,7 +44,7 @@ the token discipline that `npm run lint:css` now enforces.
 
 ## Design Philosophy
 
-> **Decided by the cards in [`design/`](../design/index.html)** – brand colours by [`colors.html`](../design/system/foundations/colors.html), corners, shadows and depth by [`surfaces.html`](../design/system/foundations/surfaces.html), focus by [`focus.html`](../design/system/foundations/focus.html).
+> **Decided by the cards in [`docs/design-system/index.html`](design-system/index.html)** – brand colours by [`colors.html`](design-system/system/foundations/colors.html), corners, shadows and depth by [`surfaces.html`](design-system/system/foundations/surfaces.html), focus by [`focus.html`](design-system/system/foundations/focus.html).
 >
 > This section is a stub. It keeps its heading so existing links still
 > resolve, and it holds no visual rule, so it cannot contradict the cards.
@@ -53,41 +53,41 @@ the token discipline that `npm run lint:css` now enforces.
 
 - **Light Mode** - Erfana is dark-mode only. Do not add `prefers-color-scheme` queries.
 
-> Everything else this list used to hold (corner radius, browser scrollbar support) is decided by the `design/` cards above.
+> Everything else this list used to hold (corner radius, browser scrollbar support) is decided by the `docs/design-system/` cards above.
 
 ---
 
 ## Color System
 
-> **Decided by [`design/system/foundations/colors.html`](../design/system/foundations/colors.html).** Every swatch is painted with the shipping token and every ratio is computed in the page, so a colour that fails is visibly red rather than described as safe.
+> **Decided by [`docs/design-system/system/foundations/colors.html`](design-system/system/foundations/colors.html).** Every swatch is painted with the shipping token and every ratio is computed in the page, so a colour that fails is visibly red rather than described as safe.
 >
 > This section is a stub. It keeps its heading so existing links still
 > resolve, and it holds no rule, so it cannot contradict the card.
 
 ## Typography
 
-> **Decided by [`design/system/foundations/type.html`](../design/system/foundations/type.html).** Rendered at real size in the real bundled font.
+> **Decided by [`docs/design-system/system/foundations/type.html`](design-system/system/foundations/type.html).** Rendered at real size in the real bundled font.
 >
 > This section is a stub. It keeps its heading so existing links still
 > resolve, and it holds no rule, so it cannot contradict the card.
 
 ## Spacing System
 
-> **Decided by [`design/system/foundations/spacing.html`](../design/system/foundations/spacing.html).** Drawn to scale, because the token names mislead: the number is a scale step, not a pixel count, and `--space-2` is 4px.
+> **Decided by [`docs/design-system/system/foundations/spacing.html`](design-system/system/foundations/spacing.html).** Drawn to scale, because the token names mislead: the number is a scale step, not a pixel count, and `--space-2` is 4px.
 >
 > This section is a stub. It keeps its heading so existing links still
 > resolve, and it holds no rule, so it cannot contradict the card.
 
 ## Borders & Shadows
 
-> **Decided by [`design/system/foundations/surfaces.html`](../design/system/foundations/surfaces.html).** Borders, shadows, control heights and the zero-radius rule, with `npm run lint:css` enforcing the last one.
+> **Decided by [`docs/design-system/system/foundations/surfaces.html`](design-system/system/foundations/surfaces.html).** Borders, shadows, control heights and the zero-radius rule, with `npm run lint:css` enforcing the last one.
 >
 > This section is a stub. It keeps its heading so existing links still
 > resolve, and it holds no rule, so it cannot contradict the card.
 
 ## Interactive States
 
-> **Decided by [`design/system/foundations/focus.html`](../design/system/foundations/focus.html).** One focus ring. This section specified it three different ways - a 2px border, a 3px glow and a 1px outline - all normative, with no rule for which applied where.
+> **Decided by [`docs/design-system/system/foundations/focus.html`](design-system/system/foundations/focus.html).** One focus ring. This section specified it three different ways - a 2px border, a 3px glow and a 1px outline - all normative, with no rule for which applied where.
 >
 > This section is a stub. It keeps its heading so existing links still
 > resolve, and it holds no rule, so it cannot contradict the card.
@@ -125,9 +125,9 @@ See #211 (pre-migration issue number; it does not resolve in the current reposit
 
 ## CSS class namespacing (`erf-`)
 
-Component CSS that belongs to the design system is namespaced `erf-`, and `.stylelintrc.json` enforces it with `selector-class-pattern` – every class must match `^erf-[a-z0-9]+(-[a-z0-9]+)*(__[a-z0-9]+(-[a-z0-9]+)*)?(--[a-z0-9]+(-[a-z0-9]+)*)?$`, i.e. an `erf-` prefix, kebab-case words, an optional BEM `__element` and an optional `--modifier` (`erf-band`, `erf-band__row`, `erf-band--open`). The rule applies to `design/system/components/**/*.css` and follows a file when it is adopted into `src/`: today that is `src/renderer/src/styles/hostName.css` and `src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewChromeBand.css`, listed by path in the config. When a design-system stylesheet moves into `src/`, add its new path to that override – scoping the rule to `design/` alone would switch the guard off at the exact moment the CSS became shipping code.
+Component CSS that belongs to the design system is namespaced `erf-`, and `.stylelintrc.json` enforces it with `selector-class-pattern` – every class must match `^erf-[a-z0-9]+(-[a-z0-9]+)*(__[a-z0-9]+(-[a-z0-9]+)*)?(--[a-z0-9]+(-[a-z0-9]+)*)?$`, i.e. an `erf-` prefix, kebab-case words, an optional BEM `__element` and an optional `--modifier` (`erf-band`, `erf-band__row`, `erf-band--open`). The rule applies to `docs/design-system/system/components/**/*.css` and follows a file when it is adopted into `src/`: today that is `src/renderer/src/styles/hostName.css` and `src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewChromeBand.css`, listed by path in the config. When a design-system stylesheet moves into `src/`, add its new path to that override – scoping the rule to `docs/design-system/` alone would switch the guard off at the exact moment the CSS became shipping code.
 
-The prefix is not cosmetic. Mermaid emits `class="row"` on gitGraph commit labels and on its generic label path, and the app injects that SVG with `innerHTML`, so a bare global `.row` reaches into diagram labels in the Markdown preview and in exported images. That collision was found by luck, not by review; the namespace makes it impossible. The cards' own documentation chrome under `design/` (`.stage`, `.list-frame`, `.readout`) is not shipped UI and is exempt from the naming rule, though not from the token rules.
+The prefix is not cosmetic. Mermaid emits `class="row"` on gitGraph commit labels and on its generic label path, and the app injects that SVG with `innerHTML`, so a bare global `.row` reaches into diagram labels in the Markdown preview and in exported images. That collision was found by luck, not by review; the namespace makes it impossible. The cards' own documentation chrome under `docs/design-system/` (`.stage`, `.list-frame`, `.readout`) is not shipped UI and is exempt from the naming rule, though not from the token rules.
 
 ---
 
@@ -187,7 +187,7 @@ which runs in the required `Lint` job:
 - Colours use tokens; no raw hex outside `design-tokens.css`
 - No bare `z-index`
 - No `border-radius` other than `0` or `var(--border-radius-circle)`
-- No retired token reaches `design/`
+- No retired token reaches `docs/design-system/`
 
 **Nobody checks these but you.** They are the ones that actually break for
 people, and none of them is expressible as a lint rule:
@@ -206,7 +206,7 @@ people, and none of them is expressible as a lint rule:
 
 **Token Source**: `src/renderer/src/styles/design-tokens.css`
 
-**The rules**: [`design/index.html`](../design/index.html) — open it in a browser.
+**The rules**: [`docs/design-system/index.html`](design-system/index.html) — open it in a browser.
 
 **Still here**: the [text selection policy](#text-selection-policy) and the
 [token gotchas](./ui-style-guide-reference.md#common-gotchas).

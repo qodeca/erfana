@@ -27,7 +27,7 @@
  * keeps its app handle private, so these take the `ElectronApplication`.
  * Nothing here sleeps; the waits are Playwright polls on a condition.
  *
- * @see docs/design/design-issue-124-part2.md §2.4–§2.7
+ * @see docs/designs/design-issue-124-part2.md §2.4–§2.7
  */
 
 import { expect } from '@playwright/test'

@@ -19,7 +19,7 @@
  * position; these pure functions only describe the range + replacement text.
  *
  * @see Issue #203 - Central text-clipboard service
- * @see docs/design/issue-203-clipboard-service.md §5 (Monaco override strategy)
+ * @see docs/designs/issue-203-clipboard-service.md §5 (Monaco override strategy)
  */
 
 import type * as monaco from 'monaco-editor'

@@ -11,7 +11,7 @@
  * `console.error` is suppressed per the `EditorErrorBoundary.test.tsx` pattern —
  * React logs every boundary-caught error, and these tests throw on purpose.
  *
- * @see docs/design/design-issue-60.md §5 (`RootErrorBoundary` row)
+ * @see docs/designs/design-issue-60.md §5 (`RootErrorBoundary` row)
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'

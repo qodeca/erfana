@@ -10,7 +10,7 @@
 @import './styles/utilities.css';
 
 /* The hostname primitive. A shared design-system component, synced back into
-   design/ by scripts/design-sync.mjs — see the file header. */
+   docs/design-system/ by scripts/design-sync.mjs — see the file header. */
 @import './styles/hostName.css';
 
 html, body, #root {
@@ -21,7 +21,7 @@ html, body, #root {
   overflow: hidden;
 }
 
-/* Reduced motion, once for the whole app (#96, design/system/foundations/motion.html).
+/* Reduced motion, once for the whole app (#96, docs/design-system/system/foundations/motion.html).
    Every keyframe animation runs once and ends at once: a spinner rests as a still
    ring, the camera flash (which ends at opacity 0) never shows, and a slide-in
    appears in place. Per-file opt-in is how twelve stylesheets were missed, so the

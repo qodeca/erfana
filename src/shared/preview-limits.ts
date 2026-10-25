@@ -10,7 +10,7 @@
  * it is recorded debt). Main and the renderer both read these, so this module
  * imports nothing.
  *
- * @see docs/design/design-issue-124.md §2 (New constants)
+ * @see docs/designs/design-issue-124.md §2 (New constants)
  */
 export const PREVIEW_LIMITS = {
   /**

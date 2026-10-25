@@ -34,7 +34,7 @@
  * ```
  *
  * @module usePreviewTabStore
- * @see docs/design/design-issue-124-part3.md §3.3, §3.4
+ * @see docs/designs/design-issue-124-part3.md §3.3, §3.4
  */
 import { create } from 'zustand'
 

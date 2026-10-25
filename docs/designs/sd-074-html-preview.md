@@ -637,7 +637,7 @@ form-action 'none'; base-uri 'none';
 sandbox allow-scripts
 ```
 
-> **#124:** `frame-src 'none'` above no longer describes the build. The policy now carries `frame-src erfana-preview://<own-token>` (a malformed token still degrades to `'none'`) and no `frame-ancestors`, so a page can frame pages from its own project; remote, `data:`, `blob:` and other-token frames stay refused. See `previewCsp.ts` and `docs/design/design-issue-124-part2.md` §2.1.
+> **#124:** `frame-src 'none'` above no longer describes the build. The policy now carries `frame-src erfana-preview://<own-token>` (a malformed token still degrades to `'none'`) and no `frame-ancestors`, so a page can frame pages from its own project; remote, `data:`, `blob:` and other-token frames stay refused. See `previewCsp.ts` and `docs/designs/design-issue-124-part2.md` §2.1.
 
 `'unsafe-inline'`/`'unsafe-eval'` are deliberate: agent-built single-file tools *are* inline scripts.
 Isolation comes from the process, the opaque origin and the absent bridge — not from `script-src`.
