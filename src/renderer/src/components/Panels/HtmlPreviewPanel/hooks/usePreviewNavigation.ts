@@ -20,7 +20,7 @@
  * forwarded instead (`usePreviewFindShortcuts`), with origin `page`.
  *
  * @module usePreviewNavigation
- * @see docs/design/design-issue-124-part3.md §3.7, §3.8
+ * @see docs/designs/design-issue-124-part3.md §3.7, §3.8
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'

@@ -16,7 +16,7 @@
  * pinned alongside.
  *
  * @module MarkdownPreview.frames.test
- * @see docs/design/design-issue-124-part2.md §2.11
+ * @see docs/designs/design-issue-124-part2.md §2.11
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'

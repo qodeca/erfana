@@ -37,7 +37,7 @@
  * would flash the *current* page dark on every autosave. Only the first load has
  * nothing painted to lose.
  *
- * @see specs/designs/sd-074-html-preview.md §1.8
+ * @see docs/designs/sd-074-html-preview.md §1.8
  */
 
 /** ARGB, matching `--color-brand-black` and the panel's placeholder CSS. */

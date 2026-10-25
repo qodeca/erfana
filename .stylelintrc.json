@@ -1,6 +1,6 @@
 {
   "//": [
-    "Until this file existed, every token rule design/ states was unenforceable prose:",
+    "Until this file existed, every token rule docs/design-system/ states was unenforceable prose:",
     "`npm run lint` is eslint over .js/.ts only, and `npm run format` never runs in CI.",
     "'No hardcoded values' and 'border-radius: 0 always' have been in CLAUDE.md for the",
     "life of the project with nothing checking either.",
@@ -33,7 +33,7 @@
       "//": "The token file IS where literal colours are defined. Exempting it is the point of having it.",
       "files": [
         "src/renderer/src/styles/design-tokens.css",
-        "design/tokens.css"
+        "docs/design-system/tokens.css"
       ],
       "rules": {
         "color-no-hex": null,
@@ -42,27 +42,27 @@
     },
     {
       "//": [
-        "design/ cards are HTML with inline <style>. Their documentation chrome (.stage,",
+        "docs/design-system/ cards are HTML with inline <style>. Their documentation chrome (.stage,",
         ".list-frame, .readout) is not shipped UI, so it is not held to the erf- naming",
         "rule below \u2014 but it IS held to the token rules, because a card that hardcodes a",
         "colour to make a point is exactly how the wrong colour gets copied out of it."
       ],
       "files": [
-        "design/**/*.html"
+        "docs/design-system/**/*.html"
       ],
       "customSyntax": "postcss-html"
     },
     {
       "//": [
-        "Component CSS under design/ is destined for src/. Every class is prefixed erf-.",
+        "Component CSS under docs/design-system/ is destined for src/. Every class is prefixed erf-.",
         "Not cosmetic: Mermaid emits class=\"row\" on gitGraph commit labels and on its",
         "generic label path, and the app injects that SVG with innerHTML \u2014 so a bare",
         "global .row would reach into diagram labels in the preview and in exported",
         "images. That collision was found by luck, not by review.",
-        "Adopted files keep the rule when they move to src/. Scoping this to design/ only would silently switch the guard off at the exact moment the CSS became shipping code."
+        "Adopted files keep the rule when they move to src/. Scoping this to docs/design-system/ only would silently switch the guard off at the exact moment the CSS became shipping code."
       ],
       "files": [
-        "design/system/components/**/*.css",
+        "docs/design-system/system/components/**/*.css",
         "src/renderer/src/styles/hostName.css",
         "src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewChromeBand.css",
         "src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewNavControls.css"
@@ -96,8 +96,8 @@
     {
       "//": [
         "--shadow-focus has no remaining use in src/ (#230), so its ban follows the",
-        "migration out of design/. The four retired colours are still referenced in src/",
-        "and stay banned in design/ only until their own migration lands."
+        "migration out of docs/design-system/. The four retired colours are still referenced in src/",
+        "and stay banned in docs/design-system/ only until their own migration lands."
       ],
       "files": [
         "src/**/*.css"
@@ -123,8 +123,8 @@
         "it cannot be one of the three competing focus-ring definitions at all."
       ],
       "files": [
-        "design/**/*.css",
-        "design/**/*.html"
+        "docs/design-system/**/*.css",
+        "docs/design-system/**/*.html"
       ],
       "rules": {
         "declaration-property-value-disallowed-list": {

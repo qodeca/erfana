@@ -17,7 +17,7 @@
  *
  * Local gate only: e2e is disabled in CI. Condition-based waits only.
  *
- * @see docs/design/design-issue-124-part3.md §3.2–§3.4
+ * @see docs/designs/design-issue-124-part3.md §3.2–§3.4
  */
 
 import * as fs from 'fs'

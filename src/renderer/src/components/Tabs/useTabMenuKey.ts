@@ -40,7 +40,7 @@ export function useTabMenuKey(
     // the closest thing to a focusable tab.
     const tab = content?.closest<HTMLElement>('.dv-tab') ?? content
     if (!tab) return undefined
-    /* deviates: design/system/components/menu/index.html — no aria-haspopup /
+    /* deviates: docs/design-system/system/components/menu/index.html — no aria-haspopup /
        aria-expanded here: dockview's .dv-tab has no role, and both attributes
        are invalid on a role-less div. See the card's Exceptions. */
 

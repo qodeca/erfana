@@ -37,7 +37,7 @@ exercise the AC7 blocked path.
 - `runaway-loop/index.html` — a recoverable event-loop flood.
 
 [issue #74]: https://github.com/qodeca/erfana/issues/74
-[`sd-074-html-preview.md`]: ../../../specs/designs/sd-074-html-preview.md
+[`sd-074-html-preview.md`]: ../../../docs/designs/sd-074-html-preview.md
 
 ## `links/`
 

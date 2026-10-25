@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * One focus ring, everywhere: the decided Focus card
- * (design/system/foundations/focus.html) says a focus ring is a
+ * (docs/design-system/system/foundations/focus.html) says a focus ring is a
  * `--border-width-thick` outline in `--color-border-focus`, offset
  * `--space-1` outward - or the same distance inward inside a scroller.
  *
@@ -13,7 +13,7 @@
  * glow is now banned by stylelint in src/; this test covers the part a value
  * ban cannot see - the WIDTH and OFFSET of every ring that is drawn.
  *
- * A rule may depart from the card only with a `deviates: design/system/
+ * A rule may depart from the card only with a `deviates: docs/design-system/system/
  * foundations/focus.html` comment directly above it, which is the format the
  * card's Exceptions section is keyed to.
  */
@@ -52,7 +52,7 @@ function hasDeviationMarker(css: string, selector: string): boolean {
     .join('\\s+')
   const re = new RegExp(`/\\*([\\s\\S]*?)\\*/\\s*${escaped}\\s*\\{`)
   const match = re.exec(css)
-  return match !== null && match[1].includes('deviates: design/system/foundations/focus.html')
+  return match !== null && match[1].includes('deviates: docs/design-system/system/foundations/focus.html')
 }
 
 const RINGS: Ring[] = SHEETS.flatMap((sheet) =>

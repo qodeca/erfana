@@ -93,7 +93,7 @@ A toast moves out of a live preview's way instead of hiding it, and that is not 
 
 ## The permission band, and the fail-safe under it
 
-`components/PreviewChromeBand.tsx` is where a host permission is asked: it is both the preview's chrome bar and its approve prompt, and there is no separate approve toast. Read `design/system/components/permission-band/index.html` (`status="decided"`) before changing it — the stylesheet lives in `components/PreviewChromeBand.css` and is synced back into `design/` by `scripts/design-sync.mjs`, so **edit the `src/` copy**.
+`components/PreviewChromeBand.tsx` is where a host permission is asked: it is both the preview's chrome bar and its approve prompt, and there is no separate approve toast. Read `docs/design-system/system/components/permission-band/index.html` (`status="decided"`) before changing it — the stylesheet lives in `components/PreviewChromeBand.css` and is synced back into `docs/design-system/` by `scripts/design-sync.mjs`, so **edit the `src/` copy**.
 
 **Never draw a button a page could be sitting on top of.** The previewed page paints above all sibling DOM and takes input over its own rectangle whatever the DOM says. Opening the host list claims space the page held a frame ago, so:
 

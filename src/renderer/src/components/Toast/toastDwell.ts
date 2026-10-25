@@ -15,7 +15,7 @@
  *    toast or focus is inside it, and resumes with the time that was left.
  *
  * @see https://www.w3.org/WAI/WCAG22/Understanding/timing-adjustable.html
- * @see design/system/components/feedback/index.html — "Toast, or banner?"
+ * @see docs/design-system/system/components/feedback/index.html — "Toast, or banner?"
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FocusEvent, type RefObject } from 'react'
 import type { Toast } from './ToastContext'

@@ -39,7 +39,7 @@
  * carry their own per-call token or frame check.
  *
  * @see src/main/ipc/senderValidation.ts — the predicate
- * @see specs/designs/sd-074b-preview-navigation-and-multiview.md §7
+ * @see docs/designs/sd-074b-preview-navigation-and-multiview.md §7
  */
 import { ipcMain } from 'electron'
 import type { IpcMainEvent, IpcMainInvokeEvent } from 'electron'

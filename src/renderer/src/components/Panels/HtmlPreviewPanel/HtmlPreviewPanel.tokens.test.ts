@@ -253,7 +253,7 @@ describe('a dimmed control keeps a full-strength focus ring', () => {
       offenders,
       'These rules dim the element that draws the focus ring, which takes the ring ' +
         'under 3:1 (WCAG 1.4.11). Dim the content instead, or restore opacity: 1 on ' +
-        ':focus-visible. See design/system/components/permission-band/index.html.'
+        ':focus-visible. See docs/design-system/system/components/permission-band/index.html.'
     ).toEqual([])
   })
 

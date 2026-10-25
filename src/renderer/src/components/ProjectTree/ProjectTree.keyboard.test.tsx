@@ -5,7 +5,7 @@
  *
  * The tree is one Tab stop (roving tabindex) that the arrow keys, Home, End,
  * Enter, type-ahead and Shift+F10 operate – the WAI-ARIA APG tree view
- * contract the Rows card decides (design/system/components/row/index.html).
+ * contract the Rows card decides (docs/design-system/system/components/row/index.html).
  * Before this, dnd-kit gave every row its own Tab stop and no key did
  * anything.
  *

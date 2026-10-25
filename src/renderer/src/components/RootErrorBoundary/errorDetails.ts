@@ -18,7 +18,7 @@
  *   copies it (capped at {@link MAX_REPORT_CHARS}) — which is what makes the
  *   elision marker's "use Copy error details for the full stack" truthful.
  *
- * @see docs/design/design-issue-60.md §2.3 (error containment) and §5 (test rows)
+ * @see docs/designs/design-issue-60.md §2.3 (error containment) and §5 (test rows)
  * @module components/RootErrorBoundary/errorDetails
  */
 

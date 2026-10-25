@@ -10,7 +10,7 @@
  *
  * `console.error` is suppressed per the `EditorErrorBoundary.test.tsx` pattern.
  *
- * @see docs/design/design-issue-60.md §5 (`PanelErrorBoundary` row)
+ * @see docs/designs/design-issue-60.md §5 (`PanelErrorBoundary` row)
  */
 
 import { useEffect, useState } from 'react'

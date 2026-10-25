@@ -8,7 +8,7 @@
  * paste-on-empty-clipboard no-op. Deps are mocked with `vi.fn()`; the async
  * clipboard primitives use `mockResolvedValue`.
  *
- * @see docs/design/issue-203-clipboard-service.md §5, §10
+ * @see docs/designs/issue-203-clipboard-service.md §5, §10
  */
 
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'

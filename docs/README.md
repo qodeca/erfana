@@ -51,7 +51,7 @@ Erfana is an agent-native Markdown workspace – an Electron app that runs a ter
 - [Settings](./settings.md) - Settings overlay implementation notes: storage and parse rules, API-key and model storage, the `files.exclude` list, terminal screen-reader mode. The user-facing list of settings is the [settings reference](./user-guide/reference/settings.md)
 
 ### UI/UX
-- **[Design system](../design/index.html)** - the cards that decide colours, type, spacing, surfaces, focus, motion, layering and each component (MANDATORY for UI changes; open it in a browser)
+- **[Design system](design-system/index.html)** - the cards that decide colours, type, spacing, surfaces, focus, motion, layering and each component (MANDATORY for UI changes; open it in a browser)
 - [UI Style Guide](./ui-style-guide.md) - text-selection policy and the dark-only stance; its visual sections are stubs pointing at the cards
 - [UI Style Guide Reference](./ui-style-guide-reference.md) - common token gotchas left over from the v0.5.3 token migration
 - [UI Components](./ui-components.md) - React component architecture
@@ -62,7 +62,6 @@ Erfana is an agent-native Markdown workspace – an Electron app that runs a ter
 - [Continuous Integration](./ci.md) - GitHub Actions workflows (`checks.yml` on every push, carrying six of the seven required checks – the seventh, `Secret scan`, is `secret-scan.yml`; the macOS `e2e.yml` **disabled** since 2026-04-25, with the advisory `E2E (Linux, xvfb)` job in `e2e-linux.yml` as the only e2e run on pull requests; `release.yml` and `whisper-binaries*.yml` for release flow), retry patterns, visual-on-CI gap
 - [Build](./build/README.md) - electron-builder, ASAR, fuses, troubleshooting
 - [Release signing keys](./release-pubkey.txt) - Published minisign public keys (primary + standby rotation) for verifying release artifacts
-- [Release handoffs](./handoffs/) - Point-in-time release-verification handoffs - a checklist handed to the next session, and the report handed back; each file is dated and anchored on a commit, and is not maintained after that release ships
 - [Windows Enablement](./windows/README.md) - Phase roadmap, Windows-only behaviour and the test-flake register. **[`implementation-plan.md`](./windows/implementation-plan.md) § Status snapshot is the canonical status.** Issue, PR and release numbers from before the public-repo migration do not resolve on `qodeca/erfana`; the provenance banner at the top of each `docs/windows/` file explains how they are kept
   - [Implementation Plan](./windows/implementation-plan.md) - Canonical phased roadmap + status snapshot + Phase 4 test inventory
   - [Gap Analysis](./windows/gap-analysis.md) - Feature-parity baseline (P0/P1/P2 with file:line refs)
@@ -112,24 +111,19 @@ Erfana is an agent-native Markdown workspace – an Electron app that runs a ter
 ### Technical Details
 - [HTML Rendering](./rendering/README.md) - Markdown to HTML conversion architecture
 
-### Architecture Reviews
-- [Code Review – Drag-Drop](./architecture-reviews/code-review-drag-drop-2025-01.md) - Drag-drop refactoring review
-- [Markdown Editor Panel Refactoring](./architecture-reviews/reviews/markdown-editor-panel-refactoring-review.md) - Editor panel architecture review
-- [Terminal Panel Architecture](./architecture-reviews/reviews/terminal-panel-architecture-review.md) - Terminal panel design review
-
 ### Design records and plans
 
-Not to be confused with **[`design/`](../design/index.html)** at the repo root, which is the design system. Design *notes* live in **two** directories here, and that split is historical rather than meaningful: `docs/designs/` (plural) holds the older set and mixes two file-naming conventions (`<issue>-<slug>.md` and `issue-<issue>-<slug>.md`), while `docs/design/` (singular) holds the newer `design-issue-<n>.md` notes. Both are indexed below; check both when looking for the rationale behind a change.
+Not to be confused with **[`docs/design-system/`](design-system/index.html)**, which is the design system. All design *notes* live in `docs/designs/`. They mix three file-naming conventions (`<issue>-<slug>.md`, `issue-<issue>-<slug>.md` and the older `design-issue-<n>.md`), because two folders were merged into one; spec design notes use `sd-<spec>-<slug>.md`.
 
-- [Packaging guards for `extraFiles` / `extraResources`](./design/design-issue-55.md) - Build-time leak guards beyond the `files:` allowlist (issue #55)
-- [Renderer crash on very large projects](./design/design-issue-60.md) - `flattenTree` stack overflow, error containment (root + panel boundaries), crash trail (issue #60)
-- [Multi-page HTML preview](./design/design-issue-124.md) - Frames, same-tab links with history, and Open in default browser (issue #124)
-  - [Part 1: the preview stays inside its panel](./design/design-issue-124-part1.md)
-  - [Part 2: frames show pages from the same project](./design/design-issue-124-part2.md)
-  - [Part 3: links can open in the same tab](./design/design-issue-124-part3.md)
-  - [Part 4: open in default browser](./design/design-issue-124-part4.md)
-  - [Phase 5 as built – deviations log](./design/design-issue-124-impl.md)
-  - [Planned files](./design/design-issue-124-files.md) and [planned files, G6 and G7](./design/design-issue-124-files-g6g7.md)
+- [Packaging guards for `extraFiles` / `extraResources`](./designs/design-issue-55.md) - Build-time leak guards beyond the `files:` allowlist (issue #55)
+- [Renderer crash on very large projects](./designs/design-issue-60.md) - `flattenTree` stack overflow, error containment (root + panel boundaries), crash trail (issue #60)
+- [Multi-page HTML preview](./designs/design-issue-124.md) - Frames, same-tab links with history, and Open in default browser (issue #124)
+  - [Part 1: the preview stays inside its panel](./designs/design-issue-124-part1.md)
+  - [Part 2: frames show pages from the same project](./designs/design-issue-124-part2.md)
+  - [Part 3: links can open in the same tab](./designs/design-issue-124-part3.md)
+  - [Part 4: open in default browser](./designs/design-issue-124-part4.md)
+  - [Phase 5 as built – deviations log](./designs/design-issue-124-impl.md)
+  - [Planned files](./designs/design-issue-124-files.md) and [planned files, G6 and G7](./designs/design-issue-124-files-g6g7.md)
 - [Claude Code status bar](./designs/216-claude-status-bar.md) - Per-terminal context status bar design (issue #216; Windows follow-up #217)
 - [Model capability registry](./designs/41-model-capability-registry.md) - Shared model-id parser + context-window capability table (issue #41)
 - [Context-meter freeze after compaction](./designs/47-context-meter-freeze.md) - Bounded fallback read + per-file-version result cache (issue #47)
@@ -147,7 +141,7 @@ Not to be confused with **[`design/`](../design/index.html)** at the repo root, 
 
 **New to the project?** Start with [Getting Started](./getting-started.md), then browse [Quick Reference](./quick-reference.md) and [Glossary](./glossary.md).
 
-**Building features?** Read [Architecture](./architecture.md) → pick your area (Editor, Terminal, etc.) → review [IPC Patterns](./ipc-patterns.md) and, for anything with a UI, the [design system](../design/index.html).
+**Building features?** Read [Architecture](./architecture.md) → pick your area (Editor, Terminal, etc.) → review [IPC Patterns](./ipc-patterns.md) and, for anything with a UI, the [design system](design-system/index.html).
 
 **Testing?** Run `npm run test` for unit tests, `npm run test:e2e` for E2E tests. See [Testing](./testing/README.md) for strategies.
 
@@ -155,23 +149,23 @@ Not to be confused with **[`design/`](../design/index.html)** at the repo root, 
 
 ## Changelog
 
-- [CHANGELOG](./CHANGELOG.md) – Per-version release notes (v0.9.0 onward; v0.8.x and v0.3–v0.5 in `docs/archive/`; v0.6.x–v0.7.x have no entries). Latest release: v0.22.0 (2026-10-25), which also ships the never-released 0.21.0 changes
+- [CHANGELOG](./CHANGELOG.md) – Per-version release notes (v0.9.0 onward; v0.8.x and v0.3–v0.5 in the [Archive](#archive); v0.6.x–v0.7.x have no entries). Latest release: v0.22.0 (2026-10-25), which also ships the never-released 0.21.0 changes
 - [Changelog fragments](../changelog.d/README.md) – where a pull request records its change instead of editing the changelog; folded into the changelog at release
 - [Release notes](./release-notes/README.md) – Per-version release-notes files used as GitHub release bodies (v0.9.5 onward)
 - [Release incidents](./release-incidents/index.md) – Running log of `release.yml` failures with matched signatures and fixes
 
 ## Archive
 
-Archived documentation is located in [`./archive/`](./archive/):
-- [Resolved Issues](./archive/resolved-issues.md) – Issues fixed in past versions
-- [Changelog v0.3–v0.5](./archive/changelog-v03-v05.md) – Historical changelog entries
-- [Changelog v0.8.x](./archive/changelog-v08.md) – Historical changelog entries for the v0.8 series
-- [Video import fixes (2026-03-07)](./archive/2026-03-07-video-import-fixes.md) – Completed implementation plan for video import (#110)
-- [Phase 2 closure (2026-04)](./archive/phase2-closure-2026-04.md) – Seven-stream closure plan for Windows enablement Phase 2, archived 2026-08-07
+Archived documentation was removed from the tree on 2026-10-25. It stays in git history, at these links:
+- [Resolved Issues](https://github.com/qodeca/erfana/blob/1d814e05d98b3005e5c13c0624b09653708136f7/docs/archive/resolved-issues.md) – Issues fixed in past versions
+- [Changelog v0.3–v0.5](https://github.com/qodeca/erfana/blob/1d814e05d98b3005e5c13c0624b09653708136f7/docs/archive/changelog-v03-v05.md) – Historical changelog entries
+- [Changelog v0.8.x](https://github.com/qodeca/erfana/blob/1d814e05d98b3005e5c13c0624b09653708136f7/docs/archive/changelog-v08.md) – Historical changelog entries for the v0.8 series
+- [Video import fixes (2026-03-07)](https://github.com/qodeca/erfana/blob/1d814e05d98b3005e5c13c0624b09653708136f7/docs/archive/2026-03-07-video-import-fixes.md) – Completed implementation plan for video import (#110)
+- [Phase 2 closure (2026-04)](https://github.com/qodeca/erfana/blob/1d814e05d98b3005e5c13c0624b09653708136f7/docs/archive/phase2-closure-2026-04.md) – Seven-stream closure plan for Windows enablement Phase 2, archived 2026-08-07
 
 ## Folders added by the Xezar pipeline
 
-The pipeline's process documents sit at the repository root: [SDLC.md](../SDLC.md) (how work moves), [AGENTS.md](../AGENTS.md) (what every agent runs), [CODE_REVIEW.md](../CODE_REVIEW.md) and [BACKWARD_COMPATIBILITY.md](../BACKWARD_COMPATIBILITY.md). New pipeline designs go in `designs/<feature>/`; the single-file notes already in `designs/` and `design/` stay as they are.
+The pipeline's process documents sit at the repository root: [SDLC.md](../SDLC.md) (how work moves), [AGENTS.md](../AGENTS.md) (what every agent runs), [CODE_REVIEW.md](../CODE_REVIEW.md) and [BACKWARD_COMPATIBILITY.md](../BACKWARD_COMPATIBILITY.md). New pipeline designs go in `designs/<feature>/`; the single-file notes already in `designs/` stay as they are.
 
 A folder appears when its first document does, so some of these do not exist yet.
 

@@ -5,9 +5,9 @@
  * toolbar, and the band's narrow-width tiers (issue #124, UX spec §1.1-§1.5).
  *
  * SOURCE OF TRUTH. scripts/design-sync.mjs copies this file to
- * design/system/components/permission-band/nav.css so the card renders what
+ * docs/design-system/system/components/permission-band/nav.css so the card renders what
  * actually ships, and `npm run design -- --check` fails CI on drift. Edit this
- * copy; never the one under design/.
+ * copy; never the one under docs/design-system/.
  *
  * A second file rather than more rules in PreviewChromeBand.css, which is at
  * its line budget. Every selector here starts at `.erf-band`: this file can load

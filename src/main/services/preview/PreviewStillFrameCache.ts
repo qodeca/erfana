@@ -47,7 +47,7 @@
  * (`markStale`; omitted while false). Input that arrives while a capture runs
  * may be missing from it, so that frame is stored stale.
  *
- * @see specs/designs/sd-074-html-preview.md §1.4
+ * @see docs/designs/sd-074-html-preview.md §1.4
  */
 import { PREVIEW } from '../../../shared/constants'
 import { stablePathDigest } from '../../../shared/stablePathDigest'

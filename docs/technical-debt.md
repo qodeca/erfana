@@ -146,7 +146,7 @@ Moving the block would require synchronized edits to checks.yml + skill + README
 **Severity**: Low
 **Impact**: `zIndex={10000}` is hardcoded on the TranscriptionDialog instance instead of going through the dialog-stack manager or the `var(--z-dialog)` design token. Diverges from the project's tokens-only rule for spacing/colors/typography and from the dialog stack's contract.
 
-**Note (2026-08-31)**: `npm run lint:css` now bans a bare `z-index` in CSS and runs in the required `Lint` job. This instance is **not** caught by it — the literal is a TSX prop, not a CSS declaration, and stylelint does not read TSX. Bare stacking values in TypeScript stay unenforced; see [`design/system/foundations/layering.html`](../design/system/foundations/layering.html).
+**Note (2026-08-31)**: `npm run lint:css` now bans a bare `z-index` in CSS and runs in the required `Lint` job. This instance is **not** caught by it — the literal is a TSX prop, not a CSS declaration, and stylelint does not read TSX. Bare stacking values in TypeScript stay unenforced; see [`docs/design-system/system/foundations/layering.html`](design-system/system/foundations/layering.html).
 
 **Fix**: Replace the literal with the dialog-stack manager value, or with `var(--z-dialog)` if the dialog is not stack-managed.
 
@@ -339,7 +339,7 @@ After the heartbeat hardening (Phase A4 resume-refresh, B1 symlink defense, D3 H
 
 **2026-08-24 update (#73) — the blocker is gone.** The recommended solution assumed the renderer had no multi-entry build, which was true: `electron.vite.config.ts` declared no `renderer.build.rollupOptions.input` at all. The image-export work needed a second renderer page for its rasterize harness and therefore introduced exactly that map, `{ index, imageExport }`, for the same reason stated here — a hash route on the app entry would evaluate the whole app module graph, `window.api` included, inside a window that must not have it. Giving the overlay its own `screenshotOverlay.html` is now adding a third key to an existing map plus one `loadFile` change, not a build-config redesign, and the four guards can then be retired. The preload side has been multi-entry since #164, so both halves of the split now have precedent.
 
-**Status**: Deferred — build-config housekeeping; also listed in [`design/design-issue-60.md`](./design/design-issue-60.md) §8 with the allowlist as the interim control. **Promotion criterion now met**: the multi-entry renderer build exists, so the cost objection no longer holds.
+**Status**: Deferred — build-config housekeeping; also listed in [`docs/designs/design-issue-60.md`](./designs/design-issue-60.md) §8 with the allowlist as the interim control. **Promotion criterion now met**: the multi-entry renderer build exists, so the cost objection no longer holds.
 
 ---
 
@@ -738,8 +738,8 @@ One extra obstacle found since: `PreviewViewService.applyApprovedHosts` returns 
 | `src/renderer/src/components/ProjectTree/ProjectTree.tsx` | 1,468 | 1,471 |
 | `src/preload/index.ts` | 1,179 | 1,190 |
 | `src/renderer/src/components/ProjectTree/context-menu/commands.test.tsx` | 845 | 879 |
-| `design/system/components/permission-band/index.html` | 759 | 1,109 (a design card is one self-contained page; accepted) |
-| `design/product/html-waiting/index.html` | 791 | 799 |
+| `docs/design-system/system/components/permission-band/index.html` | 759 | 1,109 (a design card is one self-contained page; accepted) |
+| `docs/design-system/product/html-waiting/index.html` | 791 | 799 |
 | `src/main/index.ts` | 670 | 677 |
 | `src/renderer/src/components/Panels/MarkdownEditorPanel.tsx` | 615 | 623 |
 | `src/renderer/src/hooks/useAutoSave.test.ts` | 524 | 539 |

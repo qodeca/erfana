@@ -1,0 +1,385 @@
+{
+  "$comment": [
+    "Every number a card states lives here, with the code that derives it.",
+    "A card writes <span data-claim=\"id\"></span> and has nowhere to type a digit.",
+    "Values are computed by scripts/lib/design-claims.mjs into the generated",
+    "docs/design-system/claims.js, and re-derived by scripts/design-claims.test.mjs on every CI run.",
+    "Adding a number to a card without an entry here fails that test.",
+    "See scripts/lib/design-claims.mjs for why this is a mechanism and not a rule."
+  ],
+  "spinner-keyframes": {
+    "kind": "count",
+    "card": "system/foundations/motion.html",
+    "label": "spin keyframes in the renderer",
+    "dir": "src/renderer",
+    "ext": [
+      ".css"
+    ],
+    "match": "@keyframes\\s+[A-Za-z0-9_-]*[Ss]pin\\b",
+    "unit": "matches"
+  },
+  "spinner-durations": {
+    "kind": "distinct",
+    "card": "system/foundations/motion.html",
+    "label": "distinct durations those spinners run at",
+    "dir": "src/renderer",
+    "ext": [
+      ".css"
+    ],
+    "match": "animation:\\s*[A-Za-z0-9_-]*[Ss]pin\\s+([0-9.]+m?s)",
+    "group": 1
+  },
+  "icon-registry-bypass": {
+    "kind": "countWithout",
+    "card": "system/components/icon/index.html",
+    "label": "files importing the icon library directly instead of the registry",
+    "dir": "src/renderer",
+    "ext": [
+      ".ts",
+      ".tsx"
+    ],
+    "excludePath": "\\.test\\.|iconRegistry",
+    "match": "from 'lucide-react'",
+    "without": "iconRegistry"
+  },
+  "prefers-color-scheme-blocks": {
+    "kind": "count",
+    "card": "system/foundations/colors.html",
+    "label": "prefers-color-scheme blocks shipping in the renderer",
+    "dir": "src/renderer",
+    "ext": [
+      ".css"
+    ],
+    "match": "@media[^{]*prefers-color-scheme",
+    "unit": "matches"
+  },
+  "aria-invalid-uses": {
+    "kind": "count",
+    "card": "system/components/form/index.html",
+    "label": "places the renderer marks a field invalid to assistive tech",
+    "dir": "src/renderer",
+    "ext": [
+      ".ts",
+      ".tsx"
+    ],
+    "excludePath": "\\.test\\.",
+    "match": "aria-invalid",
+    "unit": "matches"
+  },
+  "zindex-css-literals": {
+    "kind": "count",
+    "card": "system/foundations/layering.html",
+    "label": "stylesheets setting a bare z-index instead of a token",
+    "dir": "src/renderer",
+    "ext": [
+      ".css"
+    ],
+    "excludePath": "design-tokens\\.css",
+    "match": "z-index:\\s*[0-9]",
+    "unit": "files"
+  },
+  "zindex-js-literals": {
+    "kind": "count",
+    "card": "system/foundations/layering.html",
+    "label": "renderer files mirroring a z-index into TypeScript",
+    "dir": "src/renderer",
+    "ext": [
+      ".ts",
+      ".tsx"
+    ],
+    "excludePath": "\\.test\\.",
+    "match": "[Zz]_?[Ii][Nn][Dd][Ee][Xx]\\s*[:=]\\s*\\{?\\s*-?[0-9]",
+    "unit": "files"
+  },
+  "colour-tokens": {
+    "kind": "count",
+    "card": "system/foundations/colors.html",
+    "label": "colour tokens declared in design-tokens.css",
+    "dir": "src/renderer/src/styles",
+    "ext": [
+      ".css"
+    ],
+    "includePath": "design-tokens\\.css",
+    "match": "^\\s*--color-[\\w-]+\\s*:",
+    "unit": "matches"
+  },
+  "animating-stylesheets": {
+    "kind": "count",
+    "card": "system/foundations/motion.html",
+    "label": "renderer stylesheets that declare a keyframe animation",
+    "dir": "src/renderer",
+    "ext": [
+      ".css"
+    ],
+    "match": "@keyframes",
+    "unit": "files"
+  },
+  "reduced-motion-entry-rules": {
+    "kind": "count",
+    "card": "system/foundations/motion.html",
+    "label": "app-wide reduced-motion blocks in the renderer entry stylesheet",
+    "dir": "src/renderer/src",
+    "ext": [
+      ".css"
+    ],
+    "includePath": "^src/renderer/src/index\\.css$",
+    "match": "@media[^{]*prefers-reduced-motion:\\s*reduce",
+    "unit": "matches"
+  },
+  "contrast-secondary-on-panel": {
+    "kind": "contrast",
+    "card": "system/foundations/colors.html",
+    "label": "--color-text-secondary on --color-bg-secondary",
+    "foreground": "--color-text-secondary",
+    "background": "--color-bg-secondary"
+  },
+  "contrast-tertiary-on-panel": {
+    "kind": "contrast",
+    "card": "system/components/permission-band/index.html",
+    "label": "--color-text-tertiary on --color-bg-primary",
+    "foreground": "--color-text-tertiary",
+    "background": "--color-bg-primary"
+  },
+  "contrast-secondary-on-band": {
+    "kind": "contrast",
+    "card": "system/components/permission-band/index.html",
+    "label": "--color-text-secondary on --color-bg-primary",
+    "foreground": "--color-text-secondary",
+    "background": "--color-bg-primary"
+  },
+  "contrast-input-border": {
+    "kind": "contrast",
+    "card": "system/components/form/index.html",
+    "label": "--color-border-input against --color-bg-secondary",
+    "foreground": "--color-border-input",
+    "background": "--color-bg-secondary"
+  },
+  "contrast-placeholder": {
+    "kind": "contrast",
+    "card": "system/components/form/index.html",
+    "label": "--color-text-placeholder on --color-bg-input",
+    "foreground": "--color-text-placeholder",
+    "background": "--color-bg-input"
+  },
+  "warning-tokens": {
+    "kind": "count",
+    "card": "system/components/feedback/index.html",
+    "label": "tokens declared for the meaning \"warning\"",
+    "dir": "src/renderer/src/styles",
+    "ext": [
+      ".css"
+    ],
+    "includePath": "design-tokens\\.css",
+    "unit": "matches",
+    "match": "^\\s*--color-warning[\\w-]*\\s*:"
+  },
+  "error-tokens": {
+    "kind": "count",
+    "card": "system/components/feedback/index.html",
+    "label": "tokens declared for the meaning \"error\"",
+    "dir": "src/renderer/src/styles",
+    "ext": [
+      ".css"
+    ],
+    "includePath": "design-tokens\\.css",
+    "unit": "matches",
+    "match": "^\\s*--color-error[\\w-]*\\s*:"
+  },
+  "alert-role-files": {
+    "kind": "count",
+    "card": "system/components/feedback/index.html",
+    "label": "files announcing with role=\"alert\"",
+    "dir": "src/renderer",
+    "ext": [
+      ".tsx"
+    ],
+    "excludePath": "\\.test\\.",
+    "match": "role=\"alert\"",
+    "unit": "files"
+  },
+  "context-menu-dependants": {
+    "kind": "count",
+    "card": "system/components/menu/index.html",
+    "label": "files that import a context menu component",
+    "dir": "src/renderer",
+    "ext": [
+      ".tsx",
+      ".ts"
+    ],
+    "excludePath": "\\.test\\.|components/ContextMenu/",
+    "match": "import[^\n]*ContextMenu",
+    "unit": "files"
+  },
+  "outline-none-unreplaced": {
+    "kind": "countWithout",
+    "card": "system/foundations/focus.html",
+    "label": "stylesheets that remove an outline with no :focus-visible rule in the same file",
+    "dir": "src/renderer",
+    "ext": [
+      ".css"
+    ],
+    "match": "outline:\\s*none",
+    "without": "focus-visible"
+  },
+  "contrast-focus-ring": {
+    "kind": "contrast",
+    "card": "system/foundations/focus.html",
+    "label": "--color-border-focus against --color-bg-secondary",
+    "foreground": "--color-border-focus",
+    "background": "--color-bg-secondary"
+  },
+  "contrast-warning-on-panel": {
+    "kind": "contrast",
+    "card": "system/components/permission-band/index.html",
+    "label": "--color-warning on --color-bg-tertiary",
+    "foreground": "--color-warning",
+    "background": "--color-bg-tertiary"
+  },
+  "contrast-band-icon": {
+    "kind": "contrast",
+    "card": "system/components/permission-band/index.html",
+    "label": "--color-text-primary on --color-bg-primary",
+    "foreground": "--color-text-primary",
+    "background": "--color-bg-primary"
+  },
+  "contrast-pressed-edge": {
+    "kind": "contrast",
+    "card": "system/components/permission-band/index.html",
+    "label": "--color-brand-lime on --color-bg-primary",
+    "foreground": "--color-brand-lime",
+    "background": "--color-bg-primary"
+  },
+  "contrast-focus-ring-on-band": {
+    "kind": "contrast",
+    "card": "system/components/permission-band/index.html",
+    "label": "--color-border-focus on --color-bg-primary, the ring a disabled or busy control keeps",
+    "foreground": "--color-border-focus",
+    "background": "--color-bg-primary"
+  },
+  "contrast-focus-ring-on-confirm": {
+    "kind": "contrast",
+    "card": "system/components/permission-band/index.html",
+    "label": "--color-border-focus on --color-bg-tertiary, where Confirm's outward ring lands",
+    "foreground": "--color-border-focus",
+    "background": "--color-bg-tertiary"
+  },
+  "contrast-focus-ring-on-confirm-fill": {
+    "kind": "contrast",
+    "card": "system/components/permission-band/index.html",
+    "label": "--color-border-focus on --color-accent-primary, the ring Confirm used to draw inside its own fill",
+    "foreground": "--color-border-focus",
+    "background": "--color-accent-primary"
+  },
+  "contrast-gp-wordmark-dark": {
+    "kind": "contrast",
+    "card": "product/github-presentation/index.html",
+    "label": "--color-brand-white on --color-brand-black, the wordmark on the dark banner",
+    "foreground": "--color-brand-white",
+    "background": "--color-brand-black"
+  },
+  "contrast-gp-wordmark-light": {
+    "kind": "contrast",
+    "card": "product/github-presentation/index.html",
+    "label": "--color-brand-black on --color-brand-white, the wordmark on the light banner",
+    "foreground": "--color-brand-black",
+    "background": "--color-brand-white"
+  },
+  "contrast-gp-prompt": {
+    "kind": "contrast",
+    "card": "product/github-presentation/index.html",
+    "label": "--color-text-primary on --color-brand-black, the prompt glyph on the terminal strip",
+    "foreground": "--color-text-primary",
+    "background": "--color-brand-black"
+  },
+  "contrast-gp-cursor": {
+    "kind": "contrast",
+    "card": "product/github-presentation/index.html",
+    "label": "--color-brand-lime on --color-brand-black, the cursor on the terminal strip",
+    "foreground": "--color-brand-lime",
+    "background": "--color-brand-black"
+  },
+  "contrast-gp-indigo-light": {
+    "kind": "contrast",
+    "card": "product/github-presentation/index.html",
+    "label": "--color-brand-indigo on --color-brand-white, the light banner accent",
+    "foreground": "--color-brand-indigo",
+    "background": "--color-brand-white"
+  },
+  "contrast-gp-lime-light": {
+    "kind": "contrast",
+    "card": "product/github-presentation/index.html",
+    "label": "--color-brand-lime on --color-brand-white, why lime never sits on the light banner",
+    "foreground": "--color-brand-lime",
+    "background": "--color-brand-white"
+  },
+  "contrast-gp-violet-light": {
+    "kind": "contrast",
+    "card": "product/github-presentation/index.html",
+    "label": "--color-brand-violet on --color-brand-white, why violet is only a muted fill on light",
+    "foreground": "--color-brand-violet",
+    "background": "--color-brand-white"
+  },
+  "contrast-muted-on-panel": {
+    "kind": "contrast",
+    "card": "system/foundations/colors.html",
+    "label": "--color-text-muted on --color-bg-secondary, why muted is not a label colour",
+    "foreground": "--color-text-muted",
+    "background": "--color-bg-secondary"
+  },
+  "contrast-on-accent": {
+    "kind": "contrast",
+    "card": "system/foundations/colors.html",
+    "label": "--color-text-on-accent on --color-btn-primary-bg",
+    "foreground": "--color-text-on-accent",
+    "background": "--color-btn-primary-bg"
+  },
+  "contrast-white-on-accent": {
+    "kind": "contrast",
+    "card": "system/foundations/colors.html",
+    "label": "--color-white on --color-btn-primary-bg, the pairing #231 removed",
+    "foreground": "--color-white",
+    "background": "--color-btn-primary-bg"
+  },
+  "contrast-primary-label": {
+    "kind": "contrast",
+    "card": "system/components/button/index.html",
+    "label": "--color-btn-primary-text on --color-btn-primary-bg",
+    "foreground": "--color-btn-primary-text",
+    "background": "--color-btn-primary-bg"
+  },
+  "contrast-primary-label-hover": {
+    "kind": "contrast",
+    "card": "system/components/button/index.html",
+    "label": "--color-btn-primary-text on --color-btn-primary-hover",
+    "foreground": "--color-btn-primary-text",
+    "background": "--color-btn-primary-hover"
+  },
+  "contrast-primary-white": {
+    "kind": "contrast",
+    "card": "system/components/button/index.html",
+    "label": "--color-white on --color-btn-primary-bg, the historical label",
+    "foreground": "--color-white",
+    "background": "--color-btn-primary-bg"
+  },
+  "contrast-wait-text": {
+    "kind": "contrast",
+    "card": "product/html-waiting/index.html",
+    "label": "--color-text-tertiary on --color-brand-black, the waiting message's body text on the pre-paint backdrop",
+    "foreground": "--color-text-tertiary",
+    "background": "--color-brand-black"
+  },
+  "contrast-wait-aside": {
+    "kind": "contrast",
+    "card": "product/html-waiting/index.html",
+    "label": "--color-text-secondary on --color-brand-black, the waiting message's aside on the pre-paint backdrop",
+    "foreground": "--color-text-secondary",
+    "background": "--color-brand-black"
+  },
+  "contrast-wait-aside-muted": {
+    "kind": "contrast",
+    "card": "product/html-waiting/index.html",
+    "label": "--color-text-muted on --color-brand-black, the aside colour the card used to render",
+    "foreground": "--color-text-muted",
+    "background": "--color-brand-black"
+  }
+}

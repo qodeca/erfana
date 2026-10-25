@@ -34,8 +34,8 @@
  * the app had run out of toasts. That cap was the only thing bounding the list,
  * so it was load-bearing by accident.
  *
- * @see design/system/components/permission-band/index.html - status="decided"
- * @see design/product/html-approval/index.html - the nine-state journey
+ * @see docs/design-system/system/components/permission-band/index.html - status="decided"
+ * @see docs/design-system/product/html-approval/index.html - the nine-state journey
  */
 import { useCallback, useEffect, useId, useMemo, useReducer, useRef } from 'react'
 

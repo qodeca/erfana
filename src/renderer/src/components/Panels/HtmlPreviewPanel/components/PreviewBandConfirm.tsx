@@ -7,7 +7,7 @@
  * one-way door being opened by a stray Return — and the door really is one-way:
  * `PreviewAllowlistStore` has `approveHost` and no revoke, at any layer.
  *
- * @see design/system/components/permission-band/index.html - status="decided"
+ * @see docs/design-system/system/components/permission-band/index.html - status="decided"
  */
 import { useEffect, useId, useRef } from 'react'
 

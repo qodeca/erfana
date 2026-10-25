@@ -19,7 +19,7 @@
  * per-frame loop that store's own header warns about. The gate hides the page;
  * the rect keeps describing where the page's box is.
  *
- * @see design/system/components/permission-band/index.html - status="decided"
+ * @see docs/design-system/system/components/permission-band/index.html - status="decided"
  */
 import { create } from 'zustand'
 

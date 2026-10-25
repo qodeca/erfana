@@ -16,7 +16,7 @@
  * it lets the guard show the page again. Nothing here calls `setVisibility`.
  *
  * @module hooks/useSplitterDragFreeze
- * @see docs/design/design-issue-124-part1.md §1.5
+ * @see docs/designs/design-issue-124-part1.md §1.5
  */
 
 import { useEffect } from 'react'

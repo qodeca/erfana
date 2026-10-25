@@ -1,6 +1,6 @@
 # Known Issues & Workarounds
 
-Current issues and their workarounds. For historical resolved issues, see [archive/resolved-issues.md](./archive/resolved-issues.md).
+Current issues and their workarounds. For historical resolved issues, see [archive/resolved-issues.md](https://github.com/qodeca/erfana/blob/1d814e05d98b3005e5c13c0624b09653708136f7/docs/archive/resolved-issues.md).
 
 **Issue numbers**: a number written as a link (for example [#60](https://github.com/qodeca/erfana/issues/60)) is on the public `qodeca/erfana` tracker. A bare number without a link (#146, #147, #149, #150, #163, #164, #166, #177, #213, #241) is from the private pre-migration tracker: it does not resolve on `qodeca/erfana`, and a pre-migration number that the public tracker has since reached points at an unrelated issue. Treat bare numbers as provenance only – see [`docs/windows/implementation-plan.md`](./windows/implementation-plan.md).
 
@@ -12,7 +12,7 @@ An audit of the renderer on 2026-08-31 found nine defects. They share a cause: a
 role or an ARIA attribute was declared without the behaviour it promises, which is
 worse than declaring nothing – a screen reader changes its own behaviour on the
 strength of that promise and then gets nothing back. The design system decides the
-correct pattern for each; see [`design/README.md`](../design/README.md) for which
+correct pattern for each; see [`docs/design-system/README.md`](design-system/README.md) for which
 card governs which defect.
 
 **Fixed in v0.22.0:** the project tree works with the keyboard and announces each

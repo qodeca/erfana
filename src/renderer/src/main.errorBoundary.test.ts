@@ -23,7 +23,7 @@
  *    import is expected on BOTH branches — it is module-level and deliberately
  *    branch-agnostic.
  *
- * @see docs/design/design-issue-60.md §2.3, §5 (`main.tsx` row)
+ * @see docs/designs/design-issue-60.md §2.3, §5 (`main.tsx` row)
  */
 
 import { readFileSync } from 'node:fs'

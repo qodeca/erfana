@@ -145,7 +145,7 @@ Standing rules the owner added with `xez-add-rule`, each in their exact words wi
 Base branch `develop`. `main` holds released code only; `graph` is the integration branch for the
 graph engine, and graph-engine work branches from `graph` only when the owner starts it.
 Source in `src/main`, `src/preload`, `src/renderer`, `src/shared`; unit tests beside the code
-(`*.test.ts(x)`), e2e in `e2e/`; documents in `docs/`; the design system in `design/`.
+(`*.test.ts(x)`), e2e in `e2e/`; documents in `docs/`; the design system in `docs/design-system/`.
 Gate: `.xezar/checks/repo-gates.sh` - npm ci, security scan, lint:check (no --fix), lint:css, design sync check,
 typecheck, test:cov, electron-vite build, check:headers, then the repository checks. Since #186 the application steps run in two lanes (coverage then build in one; lint, css, design, typecheck, headers in the other). Since #191 there is no test:ci step: test:cov runs every unit test once (CI still runs test:ci as the Unit tests check).
 Required GitHub checks: Lint, Typecheck, Unit tests, Build, Coverage, License compliance, Secret scan.

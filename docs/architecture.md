@@ -1,5 +1,5 @@
 # Architecture
-*Live architecture overview. Past refactoring reviews and retrospectives → [`architecture-reviews/`](./architecture-reviews/).*
+*Live architecture overview.*
 
 ## Three-Process Model
 
@@ -64,7 +64,7 @@ The tree below covers `src/` and is annotated rather than exhaustive: `interface
 
 Two tracked trees sit outside `src/` and are not shown below:
 
-- **`design/`** — the design system. Plain HTML cards, opened in a browser, that decide the visual rules and render them live. Built by `scripts/design-sync.mjs`; see [`design/README.md`](../design/README.md).
+- **`docs/design-system/`** — the design system. Plain HTML cards, opened in a browser, that decide the visual rules and render them live. Built by `scripts/design-sync.mjs`; see [`docs/design-system/README.md`](design-system/README.md).
 - **`scripts/`** — build and check tooling (`.mjs`/`.js`, no shell or Python), including `scripts/lib/` for shared helpers.
 
 ```
@@ -231,7 +231,7 @@ src/
         │                        #   Project, Search, Settings, Terminal, Transcription
         ├── styles/              # Global stylesheets
         │   ├── fonts.css            # @font-face declarations (Cascadia Mono)
-        │   ├── design-tokens.css    # Design tokens - governed by the cards in design/
+        │   ├── design-tokens.css    # Design tokens - governed by the cards in docs/design-system/
         │   ├── hostName.css         # HostName badge styles
         │   ├── utilities.css        # Cross-cutting CSS policies (text-selection, etc.)
         │   └── userSelect.audit.test.ts  # Raw-CSS policy audit (#211/#228)

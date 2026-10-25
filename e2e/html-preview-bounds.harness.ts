@@ -13,7 +13,7 @@
  * "Settled" means two reads 100 ms apart agree (part 1 §1.3). Condition-based
  * waits only.
  *
- * @see docs/design/design-issue-124-part1.md
+ * @see docs/designs/design-issue-124-part1.md
  */
 
 import * as path from 'path'

@@ -23,7 +23,7 @@
  * `ElectronApplication` or the `Page`. Nothing here sleeps; waits are
  * Playwright polls on a condition.
  *
- * @see docs/design/design-issue-124-part4.md §4.3–§4.5
+ * @see docs/designs/design-issue-124-part4.md §4.3–§4.5
  */
 
 import { expect } from '@playwright/test'

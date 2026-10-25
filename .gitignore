@@ -55,7 +55,7 @@ playwright-report/
 # Superpowers visual brainstorm scratch
 .superpowers/
 
-# design/ is the app's design system and is committed in full, generated files
+# docs/design-system/ is the app's design system and is committed in full, generated files
 # included, so the folder renders on a fresh clone with nothing run first.
 # `npm run design -- --check` is what keeps the generated copies honest.
 

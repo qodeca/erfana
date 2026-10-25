@@ -216,7 +216,7 @@ const electron = {
  * Exposed ONLY when true — absent (`undefined`) in every normal run, so a
  * `=== true` check in the renderer is the whole contract.
  *
- * @see docs/design/design-issue-60.md §2.8
+ * @see docs/designs/design-issue-60.md §2.8
  */
 const forceCrash = process.argv.includes(FORCE_CRASH_ARG)
 

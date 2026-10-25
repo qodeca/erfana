@@ -53,7 +53,7 @@ body,
   cursor: crosshair;
 }
 
-/* deviates: design/system/foundations/colors.html — literal white on a 65%
+/* deviates: docs/design-system/system/foundations/colors.html — literal white on a 65%
    black scrim, no tokens: the overlay window cannot load design-tokens.css,
    and it paints over arbitrary desktop content rather than an app surface. */
 .screenshot-overlay-hint {
@@ -70,7 +70,7 @@ body,
   pointer-events: none;
 }
 
-/* deviates: design/system/foundations/colors.html — literal white edge and
+/* deviates: docs/design-system/system/foundations/colors.html — literal white edge and
    scrim, no tokens: same reason as the hint above. */
 .screenshot-overlay-selection {
   position: absolute;
@@ -85,7 +85,7 @@ body,
   border-width: 2px;
 }
 
-/* deviates: design/system/foundations/colors.html — literal white on a 65%
+/* deviates: docs/design-system/system/foundations/colors.html — literal white on a 65%
    black scrim, no tokens: same reason as the hint above. */
 .screenshot-overlay-size {
   position: absolute;
@@ -107,7 +107,7 @@ body,
   cursor: default;
 }
 
-/* deviates: design/system/foundations/focus.html — dashed white ring, not the
+/* deviates: docs/design-system/system/foundations/focus.html — dashed white ring, not the
    violet --color-border-focus: no tokens reach this window, and a white edge
    reads against the desktop under it where violet may not. */
 .screenshot-overlay-keyboard-handle:focus-visible {

@@ -8,7 +8,7 @@
  *   the download runs, and a Cancel button stops it;
  * - progress reaches an always-mounted status region at most every 10 % or 5 s;
  * - an error goes to an always-mounted alert region, a cancel to the status
- *   region (design/system/components/feedback), and focus is handed on when
+ *   region (docs/design-system/system/components/feedback), and focus is handed on when
  *   the control that held it goes away.
  *
  * Split from SettingsOverlay.test.tsx (its own mocks and a fake clock).

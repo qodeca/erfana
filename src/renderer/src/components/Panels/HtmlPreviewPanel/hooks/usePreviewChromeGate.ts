@@ -22,7 +22,7 @@
  * rows become visible on the ack. `visibility` changes no layout, so the reveal
  * causes no second push and no loop.
  *
- * @see design/system/components/permission-band/index.html - status="decided"
+ * @see docs/design-system/system/components/permission-band/index.html - status="decided"
  * @see src/shared/ipc/preview-schema.ts - the measured ack timings
  */
 import { useCallback, useEffect, useRef, useState } from 'react'

@@ -348,7 +348,7 @@ See: [UI Components](./ui-components.md#panel-communication)
 
 ## Keyboard Navigation
 
-Since v0.22.0 (#87, #88, #89) the tree is **one Tab stop** (roving `tabindex`), and the keys follow the WAI-ARIA tree pattern. The contract is data in `ProjectTree/treeKeyboard.ts` (`resolveTreeKey`, `findTypeAheadMatch`), decided by the design card `design/system/components/row/`:
+Since v0.22.0 (#87, #88, #89) the tree is **one Tab stop** (roving `tabindex`), and the keys follow the WAI-ARIA tree pattern. The contract is data in `ProjectTree/treeKeyboard.ts` (`resolveTreeKey`, `findTypeAheadMatch`), decided by the design card `docs/design-system/system/components/row/`:
 
 | Key | Action |
 |-----|--------|

@@ -6,7 +6,7 @@
  * Reads `docs/designs/41-model-capability-registry.md` §7.1 (exact-id map) and
  * §7.1.1 (undecomposable-id map) and returns their rows. It reads THE DOCUMENT
  * and never `modelId.ts`, so a test comparing this against the oracle table
- * detects design/code divergence in either direction. Had it existed on
+ * detects design-versus-code divergence in either direction. Had it existed on
  * 2026-08-07 it would have failed the moment the oracle was edited to say 200k
  * while §7.1 still said 1M — the defect that started this.
  *

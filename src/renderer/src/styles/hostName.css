@@ -4,9 +4,9 @@
  * The hostname primitive — `.erf-host`.
  *
  * SOURCE OF TRUTH. scripts/design-sync.mjs copies this file to
- * design/system/components/row/host.css so the Rows and Permission band cards
+ * docs/design-system/system/components/row/host.css so the Rows and Permission band cards
  * render what actually ships, and `npm run design -- --check` fails CI on drift.
- * Edit this copy; never the one under design/.
+ * Edit this copy; never the one under docs/design-system/.
  *
  * Split out of the Rows card's row.css rather than moving that file whole: the
  * `.erf-row*` half is a consolidation of five divergent implementations already

@@ -183,7 +183,7 @@
   color: var(--color-error);
 }
 
-/* The keyboard focus ring (design/system/foundations/focus.html): the rows
+/* The keyboard focus ring (docs/design-system/system/foundations/focus.html): the rows
    sit in a scroll container, so the ring is drawn inward, where it is not
    clipped. */
 .project-tree-item:focus-visible {

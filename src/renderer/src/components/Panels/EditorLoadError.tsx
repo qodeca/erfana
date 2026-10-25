@@ -8,13 +8,13 @@
  * the way out is the "Try again" button here.
  *
  * Screen readers hear the failure from the error toast, which announces it;
- * this box carries no `role="alert"` (design/system/components/feedback:
+ * this box carries no `role="alert"` (docs/design-system/system/components/feedback:
  * an alert role on a box that mounts with its text is unreliable).
  *
  * @module components/Panels/EditorLoadError
  */
 
-// The design-system button (design/system/components/button)
+// The design-system button (docs/design-system/system/components/button)
 import '../Dialog/Dialog.css'
 
 /** Props for {@link EditorLoadError}. */

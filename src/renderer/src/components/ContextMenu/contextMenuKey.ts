@@ -3,7 +3,7 @@
 /**
  * The keyboard route INTO a context menu (issue #90): Shift+F10 and the Menu
  * key, the standard way to open a context menu without a pointer on every
- * desktop platform (design/system/components/menu, decided).
+ * desktop platform (docs/design-system/system/components/menu, decided).
  *
  * The project tree solved this first (#321, `ProjectTree/contextMenuOrigin.ts`);
  * this module is the same contract for every other surface that opens a menu

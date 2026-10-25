@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Reduced motion, app-wide (#96, design/system/foundations/motion.html).
+ * Reduced motion, app-wide (#96, docs/design-system/system/foundations/motion.html).
  *
  * The app holds one reduce block in its entry stylesheet. These tests run every
  * keyframe animation the shipped stylesheets define – read from the page, so a

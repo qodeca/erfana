@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * E2E: context menus are keyboard-operable (#90, part of #87), per the decided
- * Menu card (design/system/components/menu/index.html).
+ * Menu card (docs/design-system/system/components/menu/index.html).
  *
  * - The tree row's menu: Shift+F10 opens it with focus on the first item, the
  *   arrows move with wrap, Home / End jump, typeahead jumps, Escape closes it

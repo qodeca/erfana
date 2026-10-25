@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Pointer targets of at least 24 x 24 (#96, WCAG 2.2 SC 2.5.8,
- * design/system/foundations/surfaces.html and components/icon).
+ * docs/design-system/system/foundations/surfaces.html and components/icon).
  *
  * The editor and image tabs' close buttons and the settings checkboxes are
  * measured in the real UI. The other listed controls – the HTML preview tab's
