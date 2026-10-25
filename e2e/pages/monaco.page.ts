@@ -32,9 +32,13 @@ export class MonacoPage {
     await expect(editor).toBeVisible({ timeout: 4000 })
     // Visible is not laid out. Right after a view-mode switch Monaco is still
     // building its text area, and on a slow Windows host a click that lands then
-    // presses on the bare frame and releases over the freshly laid-out lines –
-    // which Monaco reads as a drag and turns into a selection of line 1. Wait
-    // until the text area exists and holds still for two frames.
+    // presses on the bare frame and releases over the freshly laid-out lines,
+    // and Monaco turns that into a selection of all of line 1. Wait until
+    // the text area exists and holds still for two rendered frames – the frames
+    // in which Monaco applies its own layout. A window covered by another one
+    // renders no frames on Windows, so bring it to the front first, and give
+    // up on a check after 1 s so the poll retries instead of hanging.
+    await this.page.bringToFront()
     await expect
       .poll(
         () =>
@@ -44,6 +48,7 @@ export class MonacoPage {
                 const lines = el.querySelector('.view-lines')
                 if (!lines) return resolve(false)
                 const a = lines.getBoundingClientRect()
+                setTimeout(() => resolve(false), 1000)
                 requestAnimationFrame(() =>
                   requestAnimationFrame(() => {
                     const b = lines.getBoundingClientRect()
@@ -55,7 +60,7 @@ export class MonacoPage {
                 )
               })
           ),
-        { timeout: 4000 }
+        { timeout: 10_000 }
       )
       .toBe(true)
     // `focused` is Monaco's own focus class. The cursor element is not a stable
