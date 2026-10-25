@@ -52,6 +52,7 @@ const {
   REPO_ROOT_SENTINELS,
   SUSPICIOUS_SIBLING_NAMES,
   EXTRA_CONTENT_LEAK_NAMES,
+  readEmbeddedAsarIntegrity,
 } = require('./fuses.js');
 const { Arch } = require('electron-builder');
 const { FuseV1Options, FuseVersion } = require('@electron/fuses');
@@ -2236,8 +2237,9 @@ describe('applyAndVerifyFuses', () => {
     const exe = path.join(tmpRoot, 'win', 'Erfana.exe');
     fs.writeFileSync(exe, 'MZ');
     const bin = Buffer.from(JSON.stringify([{ file: 'resources\\app.asar', alg: 'SHA256', value: HASH }]));
+    const from = vi.fn(() => ({}));
     const resedit = {
-      NtExecutable: { from: () => ({}) },
+      NtExecutable: { from },
       NtExecutableResource: { from: () => ({ entries: [{ type: 'INTEGRITY', id: 'ELECTRONASAR', bin }] }) },
     };
     const result = await applyAndVerifyFuses(
@@ -2245,6 +2247,18 @@ describe('applyAndVerifyFuses', () => {
       { flipFuses: vi.fn(), getCurrentFuseWire: async () => wireFor(buildFuseConfig('win32')), asar: fakeAsar, resedit }
     );
     expect(result.integrity).toEqual({ algorithm: 'SHA256', hash: HASH });
+    // The afterSign pass reads a signed exe, which resedit refuses without ignoreCert.
+    expect(from).toHaveBeenCalledWith(expect.any(Buffer), { ignoreCert: true });
+  });
+
+  it('reads a signed Windows exe with the real resedit', () => {
+    // node-pty ships Microsoft-signed OpenConsole.exe on every host. It has no
+    // INTEGRITY resource, so null proves the parse got past the certificate.
+    const signedExe = path.join(
+      path.dirname(require.resolve('node-pty/package.json')),
+      'prebuilds', 'win32-x64', 'conpty', 'OpenConsole.exe'
+    );
+    expect(readEmbeddedAsarIntegrity('win32', signedExe)).toBeNull();
   });
 });
 
