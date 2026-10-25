@@ -33,6 +33,12 @@ export function getMermaidConfig(_isDarkMode: boolean): MermaidConfig {
     startOnLoad: false,
     securityLevel: 'strict',
     theme: ACTIVE_THEME,
+    // Mermaid 12 switched the defaults to the `neo` look and the ELK layout.
+    // Pin the look and layout Erfana has always rendered, so diagrams in
+    // existing documents keep their shape. A document can still opt in with
+    // its own front matter (`layout: elk`, `look: neo`), which wins.
+    look: 'classic',
+    layout: 'dagre',
     flowchart: {
       htmlLabels: true,
       curve: 'basis'

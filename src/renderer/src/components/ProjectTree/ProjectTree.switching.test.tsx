@@ -15,7 +15,7 @@
  * full integration of project switching in the rendered component.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import { render, screen, waitFor, act } from '@testing-library/react'
 import { ProjectTree } from './ProjectTree'
 import { DialogProvider } from '../Dialog'
@@ -62,7 +62,7 @@ const projCFiles: FileNode[] = [
  * (e.g. AC-009d needs path-dependent git repo detection).
  */
 function setupMockApi(
-  getStatusOverride?: ReturnType<typeof vi.fn>
+  getStatusOverride?: Mock
 ) {
   const readDirectory = vi.fn(async ({ dirPath: path }: { dirPath: string }) => {
     if (path === '/projA') return projAFiles

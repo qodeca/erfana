@@ -12,7 +12,7 @@
  * Split from `usePreviewBounds.test.ts`, which sits near the 500-line cap.
  */
 import { renderHook } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 
 import { usePreviewBounds, type UsePreviewBoundsOptions } from './usePreviewBounds'
 import { usePreviewViewportStore } from '../../../../stores/usePreviewViewportStore'
@@ -28,7 +28,7 @@ type Rect = typeof LAID_OUT
 
 let rafQueue = new Map<number, FrameRequestCallback>()
 let nextFrameId = 1
-let setBounds: ReturnType<typeof vi.fn>
+let setBounds: Mock
 
 function frame(): void {
   const due = [...rafQueue.values()]

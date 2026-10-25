@@ -8,7 +8,7 @@
  * @module MarkdownPreview.deferred.test
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
 import { render, cleanup, act } from '@testing-library/react'
 
 import { createRef } from 'react'
@@ -243,7 +243,7 @@ describe('MarkdownPreview – heading anchors', () => {
 
 describe('MarkdownPreview – link checks', () => {
   it('does not re-check links when an edit leaves the set of links unchanged', async () => {
-    const getProjectPath = fileMock().getProjectPath as ReturnType<typeof vi.fn>
+    const getProjectPath = fileMock().getProjectPath as Mock
     let rerender!: ReturnType<typeof render>['rerender']
     await act(async () => {
       ;({ rerender } = render(ui('See [other](./other.md).\n\ntext 1')))
@@ -263,7 +263,7 @@ describe('MarkdownPreview – link checks', () => {
     // check, for the same link read from another folder, answers at once.
     // (The same target asked twice shares one answer – see linkcache tests.)
     let releaseFirst!: (v: boolean) => void
-    const exists = fileMock().exists as ReturnType<typeof vi.fn>
+    const exists = fileMock().exists as Mock
     exists.mockImplementationOnce(() => new Promise<boolean>((r) => (releaseFirst = r)))
     exists.mockResolvedValue(false)
 

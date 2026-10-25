@@ -16,7 +16,7 @@
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { ErrorCode } from '../../../shared/errors'
 import { createPreviewFailureLog } from './PreviewFailureLog'
 import { attach as attachHandler } from './PreviewProtocolHandler'
@@ -44,7 +44,7 @@ interface SessionHarness {
   readonly token: string
   readonly realRoot: string
   readonly holder: PreviewPageScopeHolder
-  readonly onBlocked: ReturnType<typeof vi.fn>
+  readonly onBlocked: Mock
   /** The URL of a file inside the real root, built as the live view builds it. */
   url(...segments: string[]): string
   /** The filter's half of a request: `true` when it let it through (and noted it). */

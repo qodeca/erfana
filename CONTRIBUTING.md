@@ -91,9 +91,9 @@ is the only way to reproduce the `Coverage` job before pushing. Running
 `test:ci` as well repeats the suite for no extra signal
 ([#170](https://github.com/qodeca/erfana/issues/170)); use it, or `npm test`,
 for a quicker pass without coverage. The coverage floors sit in all three
-vitest configs: a project-wide floor in each (with `all: true`, so a file no
-test loads counts at 0 %), plus per-file floors in `vitest.main.ts` and for the
-HTML-preview modules (#124) in `vitest.renderer.ts`. Each project-wide floor
+vitest configs: a project-wide floor in each (with an explicit coverage
+`include`, so a file no test loads counts at 0 %), plus per-file floors in `vitest.main.config.ts` and for the
+HTML-preview modules (#124) in `vitest.renderer.config.ts`. Each project-wide floor
 is the value measured when it was set, rounded down, minus one point, so a
 change that drops coverage by one to two points can already fail it. `npm run test:cov` also passes on a Windows host
 ([known flakes § test:cov](docs/windows/known-flakes.md#npm-run-testcov-cannot-pass-on-a-windows-host));

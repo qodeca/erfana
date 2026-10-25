@@ -9,7 +9,7 @@ import { ErrorCode, untrustedToolMessage } from '../../../../shared/errors'
 
 const mockParse = vi.fn()
 vi.mock('@llamaindex/liteparse', () => ({
-  LiteParse: vi.fn().mockImplementation(() => ({ parse: mockParse, screenshot: vi.fn() }))
+  LiteParse: vi.fn().mockImplementation(function () { return ({ parse: mockParse, screenshot: vi.fn() }) })
 }))
 vi.mock('electron', () => ({ app: { isPackaged: false, getAppPath: () => '/mock/app/path' } }))
 vi.mock('../../../utils/fileUtils', async (importOriginal) => ({

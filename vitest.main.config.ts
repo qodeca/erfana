@@ -28,24 +28,28 @@ export default defineConfig({
       // this project; it includes the #124 browser-launch IPC payload validator
       // (`src/shared/ipc/browser-schema.ts`), which carries a per-file floor below.
       include: ['src/main/**/*.{ts,tsx}', 'src/shared/**/*.{ts,tsx}', 'scripts/**/*.{js,mjs}'],
-      // `all: true` counts an included file that no test loads, at 0 %, so an
-      // untested module lowers the totals instead of vanishing from them.
-      // vitest adds such a file only when the run did not already cover it, so
+      // An explicit `include` counts an included file that no test loads, at
+      // 0 %, so an untested module lowers the totals instead of vanishing from
+      // them (vitest 4 removed `all: true`, which did this before). vitest adds
+      // such a file only when the run did not already cover it, so
       // scripts/fuses.js (loaded by scripts/fuses.test.mjs) still reports one
-      // row at its real coverage. That was checked when this was switched on:
-      // one fuses.js row in coverage/main/lcov.info under `--project main`.
-      // The checks.yml Coverage job keeps scoping to `--project main` (#55, F4).
-      all: true,
+      // row at its real coverage under `--project main`. The checks.yml
+      // Coverage job keeps scoping to `--project main` (#55, F4).
       cleanOnRerun: true,
       thresholds: {
         // Project-wide floors: the measured value rounded down, minus one point.
-        // Measured 2026-10-23 with `all: true`: lines/statements 91.42,
-        // functions 93.18, branches 91.37. Raise them as coverage grows; never
-        // lower one to make a change pass.
-        lines: 90,
-        functions: 92,
-        branches: 90,
-        statements: 90,
+        // Re-measured 2026-10-25 after the vitest 3 → 5 upgrade, whose v8
+        // provider maps coverage through the AST instead of v8-to-istanbul and
+        // counts more branches: the same code read lines/statements 91.42,
+        // functions 93.18, branches 91.37 on vitest 3 and reads lines 90.28,
+        // statements 89.19, functions 89.58, branches 82.85 now. A change in
+        // how coverage is measured, not a drop in what is tested (owner
+        // decision). Raise them as coverage grows; never lower one to make a
+        // change pass.
+        lines: 89,
+        functions: 88,
+        branches: 81,
+        statements: 88,
         // Trust-chain modules (Phase 4 whisper download verification —
         // minisign-signed manifest, hostname-allowlisted streaming SHA-256
         // downloader, safe zip/tar extraction) carry user-facing security
@@ -54,15 +58,19 @@ export default defineConfig({
         // 10% aggregate. Fires only under `--coverage` (npm run test:cov);
         // does not affect the regular test:ci run.
         // See: docs/windows/whisper-trust-chain.md, ADRs 0001–0004
+        // The two branch floors below 90 were re-measured on vitest 5's
+        // AST-based branch count (2026-10-25: secureDownloader 89.13,
+        // zipArchive 86.48); every other axis still meets 90.
         'src/main/utils/verifyManifest.ts': { lines: 90, functions: 90, branches: 90, statements: 90 },
-        'src/main/utils/secureDownloader.ts': { lines: 90, functions: 90, branches: 90, statements: 90 },
-        'src/main/utils/zipArchive.ts': { lines: 90, functions: 90, branches: 90, statements: 90 },
+        'src/main/utils/secureDownloader.ts': { lines: 90, functions: 90, branches: 88, statements: 90 },
+        'src/main/utils/zipArchive.ts': { lines: 90, functions: 90, branches: 85, statements: 90 },
         'src/main/utils/tarArchive.ts': { lines: 90, functions: 90, branches: 90, statements: 90 },
         // Packaging-integrity guards + Electron fuses (issue #43 / #55). This is
         // a build-time hook, so its afterPack orchestration body and the test-only
         // rename path are not unit-reachable; the floor is set to what the
         // 165-test suite meets today (F4) and should ratchet up if that changes.
-        'scripts/fuses.js': { lines: 86, functions: 88, branches: 93, statements: 86 },
+        // Branches re-measured on vitest 5's AST-based count (2026-10-25: 77.35).
+        'scripts/fuses.js': { lines: 86, functions: 88, branches: 76, statements: 86 },
         // Shared model-id parser + context-window capability registry (#41). It is
         // the SINGLE source of truth behind both the meter's window size and the
         // model label, and a coverage gap here means an unexercised capability row

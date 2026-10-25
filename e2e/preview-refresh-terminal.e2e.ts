@@ -40,6 +40,7 @@ import {
 } from './utils/helpers'
 import { ImageViewerPage } from './pages/image-viewer.page'
 import { existsSync } from 'fs'
+import { E2E_CHROMIUM_ARGS } from './fixtures/isolation'
 
 // =============================================================================
 // Constants and helpers
@@ -168,7 +169,7 @@ test.describe('Terminal file links route images to the image viewer', () => {
 
     try {
       electronApp = await electron.launch({
-        args: [path.join(__dirname, '..'), `--user-data-dir=${userDataDir}`],
+        args: [path.join(__dirname, '..'), `--user-data-dir=${userDataDir}`, ...E2E_CHROMIUM_ARGS],
         env: {
           ...process.env,
           NODE_ENV: 'development',

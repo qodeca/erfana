@@ -47,9 +47,9 @@ describe('resolveMaxWorkers (issue #171)', () => {
 })
 
 describe('vitest configs carry the cap (issue #171)', () => {
-  // vitest 3 sizes its pool from the root config only, so every file a run can
+  // vitest sizes its pool from the root config only, so every file a run can
   // start from must set it: the root config and each per-project `--config`.
-  for (const file of ['vitest.config.ts', 'vitest.main.ts', 'vitest.preload.ts', 'vitest.renderer.ts']) {
+  for (const file of ['vitest.config.ts', 'vitest.main.config.ts', 'vitest.preload.config.ts', 'vitest.renderer.config.ts']) {
     it(`${file} sets maxWorkers from vitest.workers`, () => {
       const source = readFileSync(join(root, file), 'utf8')
       expect(source).toMatch(/import \{ maxWorkers \} from '\.\/vitest\.workers'/)

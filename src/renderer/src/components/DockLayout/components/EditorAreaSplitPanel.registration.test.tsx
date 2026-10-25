@@ -18,7 +18,7 @@
  * @see openFileInPanel.ts (PANEL_KIND_DESCRIPTORS)
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
 import { render } from '@testing-library/react'
 import type { ISplitviewPanelProps } from 'dockview'
 
@@ -66,7 +66,7 @@ const routers = vi.hoisted(
   () =>
     [] as Array<{
       deps: { prompt?: unknown; closePanel: (panelId: string) => void }
-      dispose: ReturnType<typeof vi.fn>
+      dispose: Mock
     }>
 )
 vi.mock('../../../services/preview/PreviewLinkRouter', () => ({

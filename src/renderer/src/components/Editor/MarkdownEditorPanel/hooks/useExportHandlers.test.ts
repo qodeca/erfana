@@ -12,7 +12,7 @@
  * @module useExportHandlers.test
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useExportHandlers, type EditorFile } from './useExportHandlers'
 import type { MarkdownPreviewHandle } from '../../MarkdownPreview'
@@ -36,7 +36,7 @@ vi.mock('../../../../utils/logger', () => ({
 import { convertMermaidDiagramsToImages } from '../../../../utils/svgToImage'
 
 // Type assertion for mocked function
-const mockConvertMermaidDiagramsToImages = convertMermaidDiagramsToImages as ReturnType<typeof vi.fn>
+const mockConvertMermaidDiagramsToImages = convertMermaidDiagramsToImages as Mock
 
 // Mock window.api
 const mockExportToPdf = vi.fn()

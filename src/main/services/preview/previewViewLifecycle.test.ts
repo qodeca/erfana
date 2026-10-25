@@ -8,7 +8,7 @@
  * failure input (uncaught exceptions ⇒ `script-error`, bad ES-module specifiers
  * ⇒ `unresolved-specifier`), and the listener must detach on `dispose`.
  */
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi, type Mock } from 'vitest'
 import {
   wirePreviewLifecycle,
   type PreviewLifecycleHooks,
@@ -292,7 +292,7 @@ describe('wirePreviewLifecycle navigation guards', () => {
     const { wc } = makeWebContents()
     wirePreviewLifecycle(makeParams(wc), makeHooks())
 
-    const setWindowOpenHandler = wc.setWindowOpenHandler as unknown as ReturnType<typeof vi.fn>
+    const setWindowOpenHandler = wc.setWindowOpenHandler as unknown as Mock
     expect(setWindowOpenHandler).toHaveBeenCalledTimes(1)
 
     const handler = setWindowOpenHandler.mock.calls[0][0] as (details: unknown) => unknown
@@ -315,7 +315,7 @@ describe('wirePreviewLifecycle navigation guards', () => {
 })
 
 describe('wirePreviewLifecycle did-fail-load (issue #124, RX2-3)', () => {
-  function makeLoadHooks(): PreviewLifecycleHooks & { onDidFailLoad: ReturnType<typeof vi.fn> } {
+  function makeLoadHooks(): PreviewLifecycleHooks & { onDidFailLoad: Mock } {
     return {
       ...makeHooks(),
       onDidStartLoading: vi.fn(),

@@ -20,19 +20,19 @@ export default defineConfig({
       reporter: ['text-summary', 'lcov', 'html'],
       reportsDirectory: 'coverage/preload',
       include: ['src/preload/**/*.{ts,tsx}'],
-      // Count an included file that no test loads, at 0 %, so an untested
-      // module lowers the totals instead of vanishing from them.
-      all: true,
+      // The explicit `include` counts an included file that no test loads, at
+      // 0 %, so an untested module lowers the totals instead of vanishing from
+      // them (vitest 4 removed `all: true`, which did this before).
       cleanOnRerun: true,
-      // Floor = the measured value rounded down, minus one point (measured
-      // 2026-10-23 with `all: true`: lines/statements 75.03, functions 54.05,
-      // branches 98.77). Every other file is at 100 % lines; the remaining
-      // headroom is `index.ts` (201 of 358 lines, 14 of 99 functions), so raise
-      // these again as that file gets covered. The margin is small: one
-      // untested bridge function costs about half a point of `functions`, so a
-      // new bridge method needs a preload test. Never lower one to make a
-      // change pass.
-      thresholds: { lines: 74, functions: 53, branches: 97, statements: 74 },
+      // Floor = the measured value rounded down, minus one point. Re-measured
+      // 2026-10-25 after the vitest 3 → 5 upgrade, whose v8 provider maps
+      // coverage through the AST and counts `index.ts` (the bulk of this
+      // project) very differently: lines 98.97, statements 99.03, functions 98.96,
+      // branches 98.33 (vitest 3 read 75.03 / 75.03 / 54.05 / 98.77). The
+      // margin is small: one untested bridge function costs about half a point
+      // of `functions`, so a new bridge method needs a preload test. Never
+      // lower one to make a change pass.
+      thresholds: { lines: 97, functions: 97, branches: 97, statements: 98 },
       exclude: [
         'node_modules/**',
         'out/**',

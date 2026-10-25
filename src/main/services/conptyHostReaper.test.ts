@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, type Mock } from 'vitest'
 import { EventEmitter } from 'events'
 import type { spawn } from 'child_process'
 
@@ -33,7 +33,7 @@ function commandLineLength(file: string, args: string[]): number {
   return parts.reduce((n, a) => n + (/[ \t"]/.test(a) ? a.length + 2 : a.length), 0) + parts.length - 1
 }
 
-function fakeChild(): EventEmitter & { kill: ReturnType<typeof vi.fn>; unref: ReturnType<typeof vi.fn> } {
+function fakeChild(): EventEmitter & { kill: Mock; unref: Mock } {
   return Object.assign(new EventEmitter(), { kill: vi.fn(), unref: vi.fn() })
 }
 

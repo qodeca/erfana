@@ -14,7 +14,7 @@
  * `usePreviewBounds.repro.test.ts`.
  */
 import { renderHook } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 
 import { SEARCH_BAR_INSET_PX, usePreviewBounds, type UsePreviewBoundsOptions } from './usePreviewBounds'
 import { usePreviewViewportStore } from '../../../../stores/usePreviewViewportStore'
@@ -34,7 +34,7 @@ type Rect = typeof LAID_OUT
 /** Pending animation-frame callbacks by id, flushed explicitly by `frame()`. */
 let rafQueue = new Map<number, FrameRequestCallback>()
 let nextFrameId = 1
-let setBounds: ReturnType<typeof vi.fn>
+let setBounds: Mock
 
 /** Run every currently-queued animation frame once. */
 function frame(): void {

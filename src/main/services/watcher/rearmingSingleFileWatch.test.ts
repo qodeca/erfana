@@ -7,7 +7,7 @@
  * the branch behaviour without real timers; one real temp file exercises the
  * re-arm success path, which does a genuine `fs.stat` existence check.
  */
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, type Mock } from 'vitest'
 import { mkdtemp, writeFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -19,7 +19,7 @@ import { createRearmingSingleFileWatcher } from './rearmingSingleFileWatch'
 interface FakeWatcher {
   path: string
   handlers: { onChange: () => void; onUnlink: () => void; onError: (e: unknown) => void }
-  close: ReturnType<typeof vi.fn>
+  close: Mock
   closed: boolean
 }
 
@@ -46,7 +46,7 @@ function makeFactory(): {
 function makeFakeDetector(): {
   detector: AtomicSaveDetector
   fire: (wasAtomicSave: boolean) => void
-  dispose: ReturnType<typeof vi.fn>
+  dispose: Mock
 } {
   let captured: ((path: string, wasAtomicSave: boolean) => void) | null = null
   let capturedPath = ''

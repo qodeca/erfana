@@ -22,7 +22,7 @@
  * Hoisted-mock harness mirrors the existing crlf/fallback tests.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import { resolve } from 'path'
 
 const hoisted = vi.hoisted(() => {
@@ -36,7 +36,7 @@ const hoisted = vi.hoisted(() => {
     mockAccess: vi.fn(),
     mockStat: vi.fn(),
     mockStatusMatrix: vi.fn().mockResolvedValue([]),
-    mockRun: vi.fn() as ReturnType<typeof vi.fn>,
+    mockRun: vi.fn() as Mock,
   }
 })
 const { mockParentPort, mockAccess, mockStat, mockStatusMatrix, mockRun } = hoisted

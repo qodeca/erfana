@@ -9,10 +9,10 @@
 // percentage of the cores, never a fixed number: a worker ceiling is a property
 // of a machine, not of the project.
 //
-// vitest 3 reads `maxWorkers` from the ROOT config only (the one the run was
-// started with), so this value is set in `vitest.config.ts` (bare `vitest` and
-// `--workspace` runs) and in each `vitest.<project>.ts` (`--config` runs).
-// A per-project value under the workspace is ignored.
+// vitest reads `maxWorkers` from the ROOT config only (the one the run was
+// started with), so this value is set in `vitest.config.ts` (bare `vitest`
+// runs over all projects) and in each `vitest.<project>.config.ts` (`--config`
+// runs). A per-project value under the root config is ignored.
 //
 // Override per machine or per run with VITEST_MAX_WORKERS: a positive integer
 // ("8") or a percentage of the cores ("75%"). vitest's own VITEST_MAX_FORKS also

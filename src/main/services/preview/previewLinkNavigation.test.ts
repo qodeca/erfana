@@ -10,7 +10,7 @@
  */
 import { resolve } from 'node:path'
 
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi, type Mock } from 'vitest'
 import { ErrorCode } from '../../../shared/errors'
 import { logger } from '../LoggingService'
 import { routeLinkActivation, type PreviewLinkNavigationDeps } from './previewLinkNavigation'
@@ -35,10 +35,10 @@ const CONTEXT = {
 }
 
 type SpiedDeps = PreviewLinkNavigationDeps & {
-  requestOpenFile: ReturnType<typeof vi.fn>
-  openExternal: ReturnType<typeof vi.fn>
-  recordFailure: ReturnType<typeof vi.fn>
-  confine: ReturnType<typeof vi.fn>
+  requestOpenFile: Mock
+  openExternal: Mock
+  recordFailure: Mock
+  confine: Mock
 }
 
 function makeDeps(
@@ -366,7 +366,7 @@ describe('routeLinkActivation — where an in-project page opens (issue #124, pa
   const PAGE_HREF = `erfana-preview://${TOKEN}/other.html`
   const NO_KEYS = { meta: false, ctrl: false, shift: false, alt: false }
 
-  type EligibleDeps = SpiedDeps & { runsAsPreview: ReturnType<typeof vi.fn> }
+  type EligibleDeps = SpiedDeps & { runsAsPreview: Mock }
 
   /** Deps whose eligibility check answers `eligible` (or fails with `error`). */
   function eligibleDeps(

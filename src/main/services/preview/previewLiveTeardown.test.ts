@@ -13,7 +13,7 @@
  *
  * @see previewLiveTeardown.ts
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 
 vi.mock('../LoggingService', () => ({
   logger: {
@@ -42,10 +42,10 @@ const PANEL_ID = 'preview-/Users/reader/Secret Project/page.html'
 const DIGEST = stablePathDigest(PANEL_ID)
 
 interface WcMock {
-  isDestroyed: ReturnType<typeof vi.fn>
-  destroy: ReturnType<typeof vi.fn>
-  close: ReturnType<typeof vi.fn>
-  once: ReturnType<typeof vi.fn>
+  isDestroyed: Mock
+  destroy: Mock
+  close: Mock
+  once: Mock
 }
 
 function makeWc(overrides: Partial<WcMock> = {}): WcMock {
@@ -61,10 +61,10 @@ function makeWc(overrides: Partial<WcMock> = {}): WcMock {
 interface Parts {
   parts: PreviewLiveTeardownParts
   wc: WcMock
-  removeChildView: ReturnType<typeof vi.fn>
-  onClosing: ReturnType<typeof vi.fn>
-  detach: ReturnType<typeof vi.fn>
-  release: ReturnType<typeof vi.fn>
+  removeChildView: Mock
+  onClosing: Mock
+  detach: Mock
+  release: Mock
 }
 
 function makeParts(
@@ -73,8 +73,8 @@ function makeParts(
     mode?: PreviewLiveTeardownParts['mode']
     windowDestroyed?: boolean
     wc?: WcMock
-    detach?: ReturnType<typeof vi.fn>
-    release?: ReturnType<typeof vi.fn>
+    detach?: Mock
+    release?: Mock
   } = {}
 ): Parts {
   const wc = overrides.wc ?? makeWc()

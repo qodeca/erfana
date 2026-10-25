@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { EventEmitter } from 'events'
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -26,7 +26,7 @@ vi.mock('./registry', () => ({
   }
 }))
 
-const windowsById = new Map<number, { isDestroyed: () => boolean; send: ReturnType<typeof vi.fn> }>()
+const windowsById = new Map<number, { isDestroyed: () => boolean; send: Mock }>()
 vi.mock('electron', () => ({
   webContents: { fromId: (id: number) => windowsById.get(id) ?? null }
 }))

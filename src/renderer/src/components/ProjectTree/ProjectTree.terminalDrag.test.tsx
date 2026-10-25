@@ -4,7 +4,7 @@
  * Dragging a tree item onto the terminal inserts its path quoted for the
  * terminal's own shell (the kind kept in the terminal store).
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
 import { render, screen, waitFor, act } from '@testing-library/react'
 import { ProjectTree } from './ProjectTree'
 import { DialogProvider } from '../Dialog'
@@ -109,7 +109,7 @@ async function dragToTerminal(sourcePath: string): Promise<void> {
   })
 }
 
-let sendToTerminal: ReturnType<typeof vi.fn>
+let sendToTerminal: Mock
 
 beforeEach(() => {
   vi.clearAllMocks()

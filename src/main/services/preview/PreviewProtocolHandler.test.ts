@@ -21,7 +21,7 @@
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, truncateSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { PREVIEW } from '../../../shared/constants'
 import { ErrorCode } from '../../../shared/errors'
 import type { PreviewFailureInput } from '../../../shared/ipc/preview-types'
@@ -50,8 +50,8 @@ type ProtocolListener = (request: GlobalRequest) => Promise<GlobalResponse>
 /** A fake partition session whose `protocol.handle` captures the listener. */
 function makeSession(): {
   session: Parameters<typeof attach>[0]
-  handle: ReturnType<typeof vi.fn>
-  unhandle: ReturnType<typeof vi.fn>
+  handle: Mock
+  unhandle: Mock
 } {
   const handle = vi.fn<(scheme: string, listener: ProtocolListener) => void>()
   const unhandle = vi.fn<(scheme: string) => void>()

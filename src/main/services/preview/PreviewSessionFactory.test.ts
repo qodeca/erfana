@@ -11,7 +11,7 @@
  * partition recycling in `PreviewSessionFactory.partitionRecycling.test.ts`, and
  * the shared fakes in `__test-helpers__/previewSessionFactoryMocks.ts`.
  */
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi, type Mock } from 'vitest'
 import { ErrorCode } from '../../../shared/errors'
 import type { PreviewFailureInput } from '../../../shared/ipc/preview-types'
 
@@ -52,7 +52,7 @@ describe('PreviewSessionFactory', () => {
       resourceUrlOrHost: '.erfana/settings.json',
       reasonCode: ErrorCode.PROJECT_SETTINGS_VALIDATION_FAILED
     }
-    ;(store.drainBadges as ReturnType<typeof vi.fn>).mockReturnValueOnce([badge])
+    ;(store.drainBadges as Mock).mockReturnValueOnce([badge])
     const factory = new PreviewSessionFactory({
       registry: makeRegistry(),
       allowlistStore: store,
@@ -84,7 +84,7 @@ describe('PreviewSessionFactory', () => {
       reasonCode: ErrorCode.PROJECT_SETTINGS_VALIDATION_FAILED
     }
     const store = makeStore([])
-    ;(store.drainBadges as ReturnType<typeof vi.fn>).mockReturnValueOnce([badge])
+    ;(store.drainBadges as Mock).mockReturnValueOnce([badge])
     let protocolCtx: PreviewProtocolContext | undefined
     const factory = new PreviewSessionFactory({
       registry: makeRegistry(),

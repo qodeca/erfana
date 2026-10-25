@@ -14,14 +14,14 @@
  * `NativeRecursiveWatcher.win32.test.ts` (real file system).
  */
 import path from 'path'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import type { WebContents } from 'electron'
 import type { NativeRecursiveWatcherOptions } from './watcher'
 
 interface FakeNative {
   readonly root: string
   readonly options: NativeRecursiveWatcherOptions
-  readonly close: ReturnType<typeof vi.fn>
+  readonly close: Mock
   emit(event: string, ...args: unknown[]): boolean
 }
 

@@ -7,7 +7,7 @@
  * live view, a view belonging to another window, a view that refuses because it
  * is not drawn, and a live, drawn view in the asking window.
  */
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi, type Mock } from 'vitest'
 
 import {
   createPreviewViewFocus,
@@ -20,7 +20,7 @@ const WINDOW_ID = 7
 /** A registry holding one entry, plus the view's `focusPage` spy. */
 function harness(entry: PreviewFocusableEntry | null): {
   focusPage: (panelId: string, windowId: number) => boolean
-  entry: ReturnType<typeof vi.fn>
+  entry: Mock
 } {
   const lookup = vi.fn((panelId: string) => (panelId === PANEL ? entry : null))
   return { focusPage: createPreviewViewFocus({ registry: { entry: lookup } }), entry: lookup }
@@ -28,7 +28,7 @@ function harness(entry: PreviewFocusableEntry | null): {
 
 /** An entry whose view answers `answer` when asked to take focus. */
 function entryOf(windowId: number, answer: boolean): PreviewFocusableEntry & {
-  view: { focusPage: ReturnType<typeof vi.fn> }
+  view: { focusPage: Mock }
 } {
   return { view: { focusPage: vi.fn(() => answer) }, windowId }
 }

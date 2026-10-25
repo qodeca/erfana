@@ -173,11 +173,11 @@ describe('useScrollSync', () => {
     })
 
     // Mock ResizeObserver
-    global.ResizeObserver = vi.fn().mockImplementation(() => ({
+    global.ResizeObserver = vi.fn().mockImplementation(function () { return ({
       observe: vi.fn(),
       unobserve: vi.fn(),
       disconnect: vi.fn()
-    }))
+    }) })
   })
 
   afterEach(() => {
@@ -657,6 +657,11 @@ describe('useScrollSync', () => {
       throwingEditor.getTopForLineNumber = vi.fn(() => {
         throw new Error('Test error')
       })
+      // The module mock returns a fixed map without asking the editor, so let
+      // this build call through to the editor offset like the real one does.
+      vi.mocked(buildScrollMapEntries).mockImplementationOnce((_lineToOffset, getEditorOffset) => [
+        { line: 1, editorOffset: getEditorOffset(1), previewOffset: 0 }
+      ])
 
       const { result } = renderHook(() =>
         useScrollSync({
@@ -672,6 +677,7 @@ describe('useScrollSync', () => {
         })
       }).not.toThrow()
 
+      expect(throwingEditor.getTopForLineNumber).toHaveBeenCalled()
       expect(result.current.scrollMapRef.current).toEqual([])
     })
   })
@@ -699,11 +705,11 @@ describe('useScrollSync', () => {
 
   describe('ResizeObserver integration', () => {
     it('should create ResizeObserver in split mode when editor is ready', () => {
-      const resizeObserverMock = vi.fn().mockImplementation(() => ({
+      const resizeObserverMock = vi.fn().mockImplementation(function () { return ({
         observe: vi.fn(),
         unobserve: vi.fn(),
         disconnect: vi.fn()
-      }))
+      }) })
       global.ResizeObserver = resizeObserverMock
 
       const { result } = renderHook(() => useScrollSync(defaultOptions))
@@ -720,13 +726,13 @@ describe('useScrollSync', () => {
 
     it('should not create new ResizeObserver when switching from split to non-split mode', () => {
       const observeCallsMade: number[] = []
-      const resizeObserverMock = vi.fn().mockImplementation(() => ({
+      const resizeObserverMock = vi.fn().mockImplementation(function () { return ({
         observe: vi.fn(() => {
           observeCallsMade.push(1)
         }),
         unobserve: vi.fn(),
         disconnect: vi.fn()
-      }))
+      }) })
       global.ResizeObserver = resizeObserverMock
 
       const { rerender, result } = renderHook(

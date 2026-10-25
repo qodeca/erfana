@@ -14,7 +14,7 @@
  *
  * Off by default (downloads ~80 MB). Run it when bumping the pin:
  *
- *   ERFANA_WHISPER_REAL_RELEASE=1 npx vitest --run --config vitest.main.ts \
+ *   ERFANA_WHISPER_REAL_RELEASE=1 npx vitest --run --config vitest.main.config.ts \
  *     src/main/services/WhisperModelManager.realRelease.integration.test.ts
  *
  * Only `electron`'s `app.getPath('userData')` is stubbed (to a temp dir);

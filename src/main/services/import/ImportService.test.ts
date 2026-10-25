@@ -15,7 +15,7 @@
  * - importService singleton
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
 import path from 'path'
 import { ErrorCode, AppError } from '../../../shared/errors'
 
@@ -342,7 +342,7 @@ describe('ImportService', () => {
         sizeInMB: 2.5,
         fileName: 'document.pdf'
       }
-      ;(pdfConverter.validate as ReturnType<typeof vi.fn>).mockResolvedValue(expectedResult)
+      ;(pdfConverter.validate as Mock).mockResolvedValue(expectedResult)
 
       const result = await service.validate('/path/to/document.pdf')
 
@@ -362,7 +362,7 @@ describe('ImportService', () => {
         sizeInMB: 0.1,
         fileName: 'script.js'
       }
-      ;(textConverter.validate as ReturnType<typeof vi.fn>).mockResolvedValue(expectedResult)
+      ;(textConverter.validate as Mock).mockResolvedValue(expectedResult)
 
       const result = await service.validate('/path/to/script.js')
 
@@ -395,7 +395,7 @@ describe('ImportService', () => {
         sizeInMB: 60,
         fileName: 'large.txt'
       }
-      ;(textConverter.validate as ReturnType<typeof vi.fn>).mockResolvedValue(validationResult)
+      ;(textConverter.validate as Mock).mockResolvedValue(validationResult)
 
       const result = await service.validate('/path/to/large.txt')
 
@@ -423,12 +423,12 @@ describe('ImportService', () => {
       it('should successfully import PDF (converted to .md)', async () => {
         mockedGetExtension.mockReturnValue('pdf')
         mockRegistry.getConverter.mockReturnValue(pdfConverter)
-        ;(pdfConverter.validate as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ;(pdfConverter.validate as Mock).mockResolvedValue({
           valid: true,
           sizeInMB: 1,
           fileName: 'document.pdf'
         })
-        ;(pdfConverter.convert as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ;(pdfConverter.convert as Mock).mockResolvedValue({
           success: true,
           content: '# PDF Content'
         })
@@ -452,12 +452,12 @@ describe('ImportService', () => {
       it('should successfully import text file (keeps extension)', async () => {
         mockedGetExtension.mockReturnValue('txt')
         mockRegistry.getConverter.mockReturnValue(textConverter)
-        ;(textConverter.validate as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ;(textConverter.validate as Mock).mockResolvedValue({
           valid: true,
           sizeInMB: 0.5,
           fileName: 'notes.txt'
         })
-        ;(textConverter.convert as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ;(textConverter.convert as Mock).mockResolvedValue({
           success: true,
           content: 'Text content here'
         })
@@ -480,12 +480,12 @@ describe('ImportService', () => {
       it('should return correct outputPath on success', async () => {
         mockedGetExtension.mockReturnValue('md')
         mockRegistry.getConverter.mockReturnValue(textConverter)
-        ;(textConverter.validate as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ;(textConverter.validate as Mock).mockResolvedValue({
           valid: true,
           sizeInMB: 0.1,
           fileName: 'readme.md'
         })
-        ;(textConverter.convert as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ;(textConverter.convert as Mock).mockResolvedValue({
           success: true,
           content: '# README'
         })
@@ -519,7 +519,7 @@ describe('ImportService', () => {
       it('should return error when validation fails', async () => {
         mockedGetExtension.mockReturnValue('pdf')
         mockRegistry.getConverter.mockReturnValue(pdfConverter)
-        ;(pdfConverter.validate as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ;(pdfConverter.validate as Mock).mockResolvedValue({
           valid: false,
           error: ErrorCode.IMPORT_ENCRYPTED,
           sizeInMB: 0,
@@ -537,13 +537,13 @@ describe('ImportService', () => {
         mockedGetExtension.mockReturnValue('pdf')
         mockRegistry.getConverter.mockReturnValue(pdfConverter)
         // IMPORT_TOO_LARGE is valid=false but should still proceed
-        ;(pdfConverter.validate as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ;(pdfConverter.validate as Mock).mockResolvedValue({
           valid: false,
           error: ErrorCode.IMPORT_TOO_LARGE,
           sizeInMB: 60,
           fileName: 'large.pdf'
         })
-        ;(pdfConverter.convert as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ;(pdfConverter.convert as Mock).mockResolvedValue({
           success: true,
           content: '# Large PDF Content'
         })
@@ -561,7 +561,7 @@ describe('ImportService', () => {
       it('should return error for IMPORT_EMPTY validation failure', async () => {
         mockedGetExtension.mockReturnValue('pdf')
         mockRegistry.getConverter.mockReturnValue(pdfConverter)
-        ;(pdfConverter.validate as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ;(pdfConverter.validate as Mock).mockResolvedValue({
           valid: false,
           error: ErrorCode.IMPORT_EMPTY,
           sizeInMB: 0,
@@ -579,12 +579,12 @@ describe('ImportService', () => {
       it('should return error when conversion fails', async () => {
         mockedGetExtension.mockReturnValue('pdf')
         mockRegistry.getConverter.mockReturnValue(pdfConverter)
-        ;(pdfConverter.validate as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ;(pdfConverter.validate as Mock).mockResolvedValue({
           valid: true,
           sizeInMB: 1,
           fileName: 'corrupt.pdf'
         })
-        ;(pdfConverter.convert as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ;(pdfConverter.convert as Mock).mockResolvedValue({
           success: false,
           error: 'PDF parsing failed',
           errorCode: ErrorCode.IMPORT_CORRUPT
@@ -600,12 +600,12 @@ describe('ImportService', () => {
       it('should use default error code when conversion fails without errorCode', async () => {
         mockedGetExtension.mockReturnValue('pdf')
         mockRegistry.getConverter.mockReturnValue(pdfConverter)
-        ;(pdfConverter.validate as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ;(pdfConverter.validate as Mock).mockResolvedValue({
           valid: true,
           sizeInMB: 1,
           fileName: 'file.pdf'
         })
-        ;(pdfConverter.convert as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ;(pdfConverter.convert as Mock).mockResolvedValue({
           success: false,
           error: 'Unknown conversion error'
         })
@@ -619,12 +619,12 @@ describe('ImportService', () => {
       it('should use default error message when conversion fails without error message', async () => {
         mockedGetExtension.mockReturnValue('pdf')
         mockRegistry.getConverter.mockReturnValue(pdfConverter)
-        ;(pdfConverter.validate as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ;(pdfConverter.validate as Mock).mockResolvedValue({
           valid: true,
           sizeInMB: 1,
           fileName: 'file.pdf'
         })
-        ;(pdfConverter.convert as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ;(pdfConverter.convert as Mock).mockResolvedValue({
           success: false
         })
 
@@ -637,12 +637,12 @@ describe('ImportService', () => {
       it('should return error when conversion returns no content', async () => {
         mockedGetExtension.mockReturnValue('pdf')
         mockRegistry.getConverter.mockReturnValue(pdfConverter)
-        ;(pdfConverter.validate as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ;(pdfConverter.validate as Mock).mockResolvedValue({
           valid: true,
           sizeInMB: 1,
           fileName: 'file.pdf'
         })
-        ;(pdfConverter.convert as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ;(pdfConverter.convert as Mock).mockResolvedValue({
           success: true,
           content: undefined
         })
@@ -658,12 +658,12 @@ describe('ImportService', () => {
       it('should create import directory if not exists', async () => {
         mockedGetExtension.mockReturnValue('txt')
         mockRegistry.getConverter.mockReturnValue(textConverter)
-        ;(textConverter.validate as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ;(textConverter.validate as Mock).mockResolvedValue({
           valid: true,
           sizeInMB: 0.1,
           fileName: 'file.txt'
         })
-        ;(textConverter.convert as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ;(textConverter.convert as Mock).mockResolvedValue({
           success: true,
           content: 'content'
         })
@@ -678,12 +678,12 @@ describe('ImportService', () => {
       it('should return error if mkdir fails', async () => {
         mockedGetExtension.mockReturnValue('txt')
         mockRegistry.getConverter.mockReturnValue(textConverter)
-        ;(textConverter.validate as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ;(textConverter.validate as Mock).mockResolvedValue({
           valid: true,
           sizeInMB: 0.1,
           fileName: 'file.txt'
         })
-        ;(textConverter.convert as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ;(textConverter.convert as Mock).mockResolvedValue({
           success: true,
           content: 'content'
         })
@@ -700,12 +700,12 @@ describe('ImportService', () => {
       it('should handle non-Error thrown from mkdir', async () => {
         mockedGetExtension.mockReturnValue('txt')
         mockRegistry.getConverter.mockReturnValue(textConverter)
-        ;(textConverter.validate as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ;(textConverter.validate as Mock).mockResolvedValue({
           valid: true,
           sizeInMB: 0.1,
           fileName: 'file.txt'
         })
-        ;(textConverter.convert as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ;(textConverter.convert as Mock).mockResolvedValue({
           success: true,
           content: 'content'
         })
@@ -723,12 +723,12 @@ describe('ImportService', () => {
       it('should handle filename conflicts with findAvailableFileName', async () => {
         mockedGetExtension.mockReturnValue('txt')
         mockRegistry.getConverter.mockReturnValue(textConverter)
-        ;(textConverter.validate as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ;(textConverter.validate as Mock).mockResolvedValue({
           valid: true,
           sizeInMB: 0.1,
           fileName: 'file.txt'
         })
-        ;(textConverter.convert as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ;(textConverter.convert as Mock).mockResolvedValue({
           success: true,
           content: 'content'
         })
@@ -749,12 +749,12 @@ describe('ImportService', () => {
       it('should return error if findAvailableFileName throws AppError', async () => {
         mockedGetExtension.mockReturnValue('txt')
         mockRegistry.getConverter.mockReturnValue(textConverter)
-        ;(textConverter.validate as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ;(textConverter.validate as Mock).mockResolvedValue({
           valid: true,
           sizeInMB: 0.1,
           fileName: 'file.txt'
         })
-        ;(textConverter.convert as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ;(textConverter.convert as Mock).mockResolvedValue({
           success: true,
           content: 'content'
         })
@@ -773,12 +773,12 @@ describe('ImportService', () => {
       it('should return error if findAvailableFileName throws generic error', async () => {
         mockedGetExtension.mockReturnValue('txt')
         mockRegistry.getConverter.mockReturnValue(textConverter)
-        ;(textConverter.validate as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ;(textConverter.validate as Mock).mockResolvedValue({
           valid: true,
           sizeInMB: 0.1,
           fileName: 'file.txt'
         })
-        ;(textConverter.convert as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ;(textConverter.convert as Mock).mockResolvedValue({
           success: true,
           content: 'content'
         })
@@ -795,12 +795,12 @@ describe('ImportService', () => {
       it('should handle non-Error thrown from findAvailableFileName', async () => {
         mockedGetExtension.mockReturnValue('txt')
         mockRegistry.getConverter.mockReturnValue(textConverter)
-        ;(textConverter.validate as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ;(textConverter.validate as Mock).mockResolvedValue({
           valid: true,
           sizeInMB: 0.1,
           fileName: 'file.txt'
         })
-        ;(textConverter.convert as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ;(textConverter.convert as Mock).mockResolvedValue({
           success: true,
           content: 'content'
         })
@@ -819,12 +819,12 @@ describe('ImportService', () => {
       it('should return error if writeFile fails', async () => {
         mockedGetExtension.mockReturnValue('txt')
         mockRegistry.getConverter.mockReturnValue(textConverter)
-        ;(textConverter.validate as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ;(textConverter.validate as Mock).mockResolvedValue({
           valid: true,
           sizeInMB: 0.1,
           fileName: 'file.txt'
         })
-        ;(textConverter.convert as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ;(textConverter.convert as Mock).mockResolvedValue({
           success: true,
           content: 'content'
         })
@@ -843,12 +843,12 @@ describe('ImportService', () => {
       it('should handle non-Error thrown from writeFile', async () => {
         mockedGetExtension.mockReturnValue('txt')
         mockRegistry.getConverter.mockReturnValue(textConverter)
-        ;(textConverter.validate as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ;(textConverter.validate as Mock).mockResolvedValue({
           valid: true,
           sizeInMB: 0.1,
           fileName: 'file.txt'
         })
-        ;(textConverter.convert as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ;(textConverter.convert as Mock).mockResolvedValue({
           success: true,
           content: 'content'
         })
@@ -869,12 +869,12 @@ describe('ImportService', () => {
         mockRegistry.getConverter.mockReturnValue(undefined)
         mockRegistry.mightBeTextFile.mockReturnValue(true)
         mockRegistry.getConverterByCategory.mockReturnValue(textConverter)
-        ;(textConverter.validate as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ;(textConverter.validate as Mock).mockResolvedValue({
           valid: true,
           sizeInMB: 0.1,
           fileName: 'script.js'
         })
-        ;(textConverter.convert as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ;(textConverter.convert as Mock).mockResolvedValue({
           success: true,
           content: 'const x = 1;'
         })
@@ -901,9 +901,9 @@ describe('ImportService', () => {
 
     // Build a configurable converter whose createConfigured returns a distinct
     // converter with its own convert mock so we can assert which one ran.
-    let mockConfiguredConvert: ReturnType<typeof vi.fn>
-    let mockCreateConfigured: ReturnType<typeof vi.fn>
-    let configurableConverter: IConverter & { createConfigured: ReturnType<typeof vi.fn> }
+    let mockConfiguredConvert: Mock
+    let mockCreateConfigured: Mock
+    let configurableConverter: IConverter & { createConfigured: Mock }
 
     beforeEach(() => {
       mockedMkdir.mockResolvedValue(undefined)
@@ -965,12 +965,12 @@ describe('ImportService', () => {
     it('should NOT call createConfigured when converter is not configurable', async () => {
       mockedGetExtension.mockReturnValue('txt')
       mockRegistry.getConverter.mockReturnValue(textConverter)
-      ;(textConverter.validate as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ;(textConverter.validate as Mock).mockResolvedValue({
         valid: true,
         sizeInMB: 0.1,
         fileName: 'notes.txt'
       })
-      ;(textConverter.convert as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ;(textConverter.convert as Mock).mockResolvedValue({
         success: true,
         content: 'text content'
       })
@@ -1011,12 +1011,12 @@ describe('ImportService', () => {
     function setupSuccessfulImport(screenshotDir?: string): void {
       mockedGetExtension.mockReturnValue('pdf')
       mockRegistry.getConverter.mockReturnValue(pdfConverter)
-      ;(pdfConverter.validate as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ;(pdfConverter.validate as Mock).mockResolvedValue({
         valid: true,
         sizeInMB: 1,
         fileName: 'doc.pdf'
       })
-      ;(pdfConverter.convert as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ;(pdfConverter.convert as Mock).mockResolvedValue({
         success: true,
         content: '# Content',
         ...(screenshotDir ? { screenshotDir } : {})
@@ -1098,12 +1098,12 @@ describe('ImportService', () => {
       const screenshotDir = '/tmp/erfana-screenshots-partial'
       mockedGetExtension.mockReturnValue('pdf')
       mockRegistry.getConverter.mockReturnValue(pdfConverter)
-      ;(pdfConverter.validate as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ;(pdfConverter.validate as Mock).mockResolvedValue({
         valid: true,
         sizeInMB: 1,
         fileName: 'doc.pdf'
       })
-      ;(pdfConverter.convert as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ;(pdfConverter.convert as Mock).mockResolvedValue({
         success: false,
         error: 'Parse failed',
         errorCode: ErrorCode.IMPORT_CONVERSION_FAILED,

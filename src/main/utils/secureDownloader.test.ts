@@ -8,7 +8,7 @@
  * hermetic and don't depend on network reachability.
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { createHash } from 'crypto'
 import { mkdtemp, readFile, rm, stat } from 'fs/promises'
 import { tmpdir } from 'os'
@@ -51,7 +51,7 @@ function mockResponse(opts: {
 describe('secureDownloader.downloadToFile', () => {
   let workDir: string
   let destPath: string
-  let fetchMock: ReturnType<typeof vi.fn>
+  let fetchMock: Mock
 
   beforeEach(async () => {
     workDir = await mkdtemp(join(tmpdir(), 'erfana-dl-'))

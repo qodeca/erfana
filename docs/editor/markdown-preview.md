@@ -38,11 +38,17 @@ stylesheet is loaded.
 - And 12 more (see full list below)
 
 Erfana passes every `mermaid` fenced block straight to `mermaid.render` and filters nothing, so
-any type the bundled Mermaid version supports will render. Verified against Mermaid 11.16.1,
+any type the bundled Mermaid version supports will render. Verified against Mermaid 11.16.1
+(each keyword is still registered in the bundled 12.2.0, which adds UML `usecase` diagrams),
 that also includes `info`, `flowchart-elk`, `C4Container` / `C4Component` / `C4Dynamic` /
 `C4Deployment`, `wardley-beta`, `cynefin-beta`, `ishikawa`, `treeView-beta`,
 `railroad-beta` (and its `-ebnf` / `-peg` variants), `venn-beta`, `swimlane-beta` and
 `eventmodeling`. The list of 22 is the documented, supported set – not a technical limit.
+
+Mermaid 12 changed its defaults to the `neo` look and the ELK layout. Erfana pins
+`look: 'classic'` and `layout: 'dagre'` in `src/renderer/src/utils/mermaidThemes.ts`, so existing
+diagrams keep their shape; a diagram can still opt in through its own front matter
+(`layout: elk`, `look: neo`).
 
 **`zenuml` is a known exception.** `src/renderer/src/utils/mermaidDirections.ts` lists it as
 a known chart type, but `@mermaid-js/mermaid-zenuml` is not a dependency, so a `zenuml`

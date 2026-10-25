@@ -11,7 +11,7 @@
  * a hide publishes. Fake timers only.
  */
 import { EventEmitter } from 'node:events'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 
 vi.mock('../LoggingService', () => ({
   logger: {
@@ -59,8 +59,8 @@ function makePage(): {
 
 function watch(): {
   page: ReturnType<typeof makePage>
-  markStale: ReturnType<typeof vi.fn>
-  refresh: ReturnType<typeof vi.fn>
+  markStale: Mock
+  refresh: Mock
   dispose: () => void
   takeRecentGesture: () => boolean
   setNow: (ms: number) => void

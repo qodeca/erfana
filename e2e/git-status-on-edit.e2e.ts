@@ -38,6 +38,7 @@ import {
   byTestId
 } from './utils/helpers'
 import { expectToStayVisible } from './utils/wait-helpers'
+import { E2E_CHROMIUM_ARGS } from './fixtures/isolation'
 
 const execFileAsync = promisify(execFile)
 
@@ -112,7 +113,7 @@ test.describe('Git status badge auto-refresh on editor save', () => {
 
     try {
       electronApp = await electron.launch({
-        args: [path.join(__dirname, '..'), `--user-data-dir=${userDataDir}`],
+        args: [path.join(__dirname, '..'), `--user-data-dir=${userDataDir}`, ...E2E_CHROMIUM_ARGS],
         env: {
           ...process.env,
           NODE_ENV: 'development',

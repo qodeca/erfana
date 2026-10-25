@@ -17,10 +17,10 @@
 // This script replaces a bash one-liner that could not run on Windows
 // (issue #153 — Phase 0 of the Windows enablement roadmap).
 //
-// Issue #133: each per-project config auto-discovers `vitest.workspace.ts`, so a
-// bare `--config vitest.<project>.ts` run expands to ALL THREE projects. Without
-// `--project`, one `test:cov` invocation executed the whole suite three times.
-// `--project` is therefore load-bearing, exactly as it is in checks.yml.
+// Issue #133: under vitest 3 each per-project config auto-discovered
+// `vitest.workspace.ts`, so a bare `--config` run expanded to ALL THREE
+// projects and one `test:cov` invocation executed the whole suite three times.
+// `--project` stays as a guard, exactly as it is in checks.yml.
 
 import { spawnSync } from 'node:child_process'
 import { existsSync, rmSync } from 'node:fs'

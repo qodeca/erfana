@@ -48,6 +48,7 @@ import {
   buildAppEnv,
   closeAppAndWait,
   createWorkerHome,
+  E2E_CHROMIUM_ARGS,
   removeDirWithRetry
 } from './isolation'
 
@@ -120,7 +121,7 @@ async function launchApp(
   }
 
   const app = await electron.launch({
-    args: [...args, `--user-data-dir=${userDataDir}`],
+    args: [...args, `--user-data-dir=${userDataDir}`, ...E2E_CHROMIUM_ARGS],
     env: buildAppEnv({ homeDir })
   })
 

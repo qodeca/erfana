@@ -6,7 +6,7 @@
  * never reach the shell; every other key goes to the panel's handler.
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import type { Terminal } from '@xterm/xterm'
 import { useXtermSession, type UseXtermSessionOptions } from './useXtermSession'
@@ -21,7 +21,7 @@ let keyHandler: KeyHandler | null = null
 let contextMenuListener: ((e: MouseEvent) => void) | null = null
 
 vi.mock('@xterm/xterm', () => ({
-  Terminal: vi.fn().mockImplementation(() => {
+  Terminal: vi.fn().mockImplementation(function () {
     const element = document.createElement('div')
     // Panel at (100, 200); 80 x 24 cells of 8 x 16 px from (104, 204)
     element.getBoundingClientRect = () => rect(100, 200, 700, 400)
@@ -58,10 +58,10 @@ vi.mock('@xterm/xterm', () => ({
     }
   })
 }))
-vi.mock('@xterm/addon-fit', () => ({ FitAddon: vi.fn().mockImplementation(() => ({ fit: vi.fn() })) }))
-vi.mock('@xterm/addon-web-links', () => ({ WebLinksAddon: vi.fn().mockImplementation(() => ({})) }))
+vi.mock('@xterm/addon-fit', () => ({ FitAddon: vi.fn().mockImplementation(function () { return ({ fit: vi.fn() }) }) }))
+vi.mock('@xterm/addon-web-links', () => ({ WebLinksAddon: vi.fn().mockImplementation(function () { return ({}) }) }))
 vi.mock('@xterm/addon-webgl', () => ({
-  WebglAddon: vi.fn().mockImplementation(() => ({ onContextLoss: vi.fn(), dispose: vi.fn() }))
+  WebglAddon: vi.fn().mockImplementation(function () { return ({ onContextLoss: vi.fn(), dispose: vi.fn() }) })
 }))
 vi.mock('../../../../utils/domUtils', () => ({ isElementVisible: vi.fn().mockReturnValue(true) }))
 vi.mock('../terminalPanel.logic', async (importOriginal) => {
@@ -146,7 +146,7 @@ describe('useXtermSession menu key (#90)', () => {
 
     contextMenuListener!(new MouseEvent('contextmenu', { cancelable: true, clientX: 12, clientY: 34 }))
     expect(options.onContextMenu).toHaveBeenCalledWith(12, 34)
-    const xterm = options.xtermRef.current as unknown as { blur: ReturnType<typeof vi.fn> }
+    const xterm = options.xtermRef.current as unknown as { blur: Mock }
     expect(xterm.blur).not.toHaveBeenCalled()
   })
 

@@ -8,7 +8,7 @@
  * @module linkTargetCache.test
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
 import {
   LinkTargetCache,
   isStructuralChange,
@@ -19,7 +19,7 @@ import {
 } from './linkTargetCache'
 import { notifyFileStructureChanged } from '../../services/fileStructureSignal'
 
-let exists: ReturnType<typeof vi.fn>
+let exists: Mock
 let directoryListeners: Array<(change: DirectoryChange) => void>
 
 beforeEach(() => {

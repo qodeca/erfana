@@ -13,7 +13,7 @@
  * - closeProjectWithTokenGuard: Race-guarded project closing
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
 import type { MutableRefObject } from 'react'
 import {
   checkHasDirtyEditors,
@@ -387,7 +387,7 @@ describe('switchHelpers', () => {
 
   describe('openProjectWithTokenGuard', () => {
     let switchTokenRef: MutableRefObject<number>
-    let setProjectPath: ReturnType<typeof vi.fn>
+    let setProjectPath: Mock
 
     beforeEach(() => {
       switchTokenRef = { current: 0 }
@@ -440,7 +440,7 @@ describe('switchHelpers', () => {
 
   describe('closeProjectWithTokenGuard', () => {
     let switchTokenRef: MutableRefObject<number>
-    let setProjectPath: ReturnType<typeof vi.fn>
+    let setProjectPath: Mock
 
     beforeEach(() => {
       switchTokenRef = { current: 0 }

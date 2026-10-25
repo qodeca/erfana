@@ -5,7 +5,7 @@
  * Tests panel management, terminal readiness, and prompt execution
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
 import {
   waitForTerminalReady,
   openPanelAndSendContent,
@@ -75,10 +75,10 @@ vi.mock('../prompts/renderer', () => ({
 
 // Helper to create mock managers
 function createMockManagers(): {
-  panelManager: IPanelManager & { setActivePanel: ReturnType<typeof vi.fn> }
+  panelManager: IPanelManager & { setActivePanel: Mock }
   terminalManager: ITerminalManager & {
-    isReady: ReturnType<typeof vi.fn>
-    sendToTerminal: ReturnType<typeof vi.fn>
+    isReady: Mock
+    sendToTerminal: Mock
   }
 } {
   return {

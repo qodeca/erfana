@@ -15,7 +15,7 @@
  * Harness mirrors git-status.worker.crlf.test.ts.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import { resolve } from 'path'
 
 const hoisted = vi.hoisted(() => {
@@ -28,7 +28,7 @@ const hoisted = vi.hoisted(() => {
     mockParentPort: new FakePort(),
     mockAccess: vi.fn(),
     mockStatusMatrix: vi.fn().mockResolvedValue([]),
-    mockRun: vi.fn() as ReturnType<typeof vi.fn>,
+    mockRun: vi.fn() as Mock,
   }
 })
 // vi.mock factories reference `hoisted.*` (not the destructured consts) – the

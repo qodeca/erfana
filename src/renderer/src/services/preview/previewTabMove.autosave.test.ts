@@ -12,7 +12,7 @@
  * a move that closes them does not release, so nothing re-arms a write.
  * Split from `previewTabMove.test.ts`, which is at the 500-line cap.
  */
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi, type Mock } from 'vitest'
 
 import { ErrorCode } from '../../../../shared/errors'
 import type { PreviewNavigateRequest } from '../../../../shared/ipc/preview-navigation-schema'
@@ -83,7 +83,7 @@ function setup(options: SetupOptions) {
 }
 
 /** Each dirty editor's release was called exactly `times` times. */
-function expectReleased(releases: Map<string, ReturnType<typeof vi.fn>>, times: number): void {
+function expectReleased(releases: Map<string, Mock>, times: number): void {
   for (const id of DIRTY) expect(releases.get(id), id).toHaveBeenCalledTimes(times)
 }
 

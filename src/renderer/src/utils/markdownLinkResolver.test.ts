@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import {
   resolveMarkdownLink,
   isPathWithinProject,
@@ -593,7 +593,7 @@ describe('markdownLinkResolver', () => {
 
     it('logs no part of the link or the path when a link is rejected', async () => {
       await resolveMarkdownLink('../../secret-name.md', file, root, win)
-      const logged = JSON.stringify((logger.warn as ReturnType<typeof vi.fn>).mock.calls)
+      const logged = JSON.stringify((logger.warn as Mock).mock.calls)
       expect(logged).not.toContain('secret-name')
       expect(logged).not.toContain('erf')
     })

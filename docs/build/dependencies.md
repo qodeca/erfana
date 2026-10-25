@@ -27,7 +27,7 @@ files:
 | `node_modules/canvas/**` | **No** | No-op |
 | `node_modules/@mapbox/node-pre-gyp/**` | **No** | No-op |
 
-Only `jsdom` is installed. It is the DOM environment for two Vitest projects — renderer and preload (`vitest.renderer.ts` and `vitest.preload.ts` both set `environment: 'jsdom'`; `vitest.main.ts` uses `node`) — and is never imported by `src/main/`, `src/preload/`, or `src/renderer/` at runtime, so excluding it is safe.
+Only `jsdom` is installed. It is the DOM environment for two Vitest projects — renderer and preload (`vitest.renderer.config.ts` and `vitest.preload.config.ts` both set `environment: 'jsdom'`; `vitest.main.config.ts` uses `node`) — and is never imported by `src/main/`, `src/preload/`, or `src/renderer/` at runtime, so excluding it is safe.
 
 `canvas` and `@mapbox/node-pre-gyp` appear in neither `package.json` nor `node_modules`. jsdom 25 no longer pulls `canvas` in (it is an optional peer, not a dependency), and with `canvas` gone its `@mapbox/node-pre-gyp` installer went too. Their globs are inert.
 

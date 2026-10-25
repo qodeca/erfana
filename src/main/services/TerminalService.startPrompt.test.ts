@@ -5,16 +5,16 @@
  * must not leave the terminal blank: output after the marker line is held and
  * flushed in order, output before it stays hidden.
  */
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { EventEmitter } from 'events'
 import { tmpdir } from 'node:os'
 import { TERMINAL_OUTPUT_FLUSH_MS } from './terminalOutputFlow'
 
 interface MockPTY extends EventEmitter {
   pid: number
-  write: ReturnType<typeof vi.fn>
-  resize: ReturnType<typeof vi.fn>
-  kill: ReturnType<typeof vi.fn>
+  write: Mock
+  resize: Mock
+  kill: Mock
   onData: (cb: (d: string) => void) => void
   onExit: (cb: (event: { exitCode: number; signal?: number }) => void) => void
 }

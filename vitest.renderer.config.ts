@@ -33,19 +33,23 @@ export default defineConfig({
       reporter: ['text-summary', 'lcov', 'html'],
       reportsDirectory: 'coverage/renderer',
       include: ['src/renderer/src/**/*.{ts,tsx}'],
-      // Count an included file that no test loads, at 0 %, so an untested
-      // module lowers the totals instead of vanishing from them.
-      all: true,
+      // The explicit `include` counts an included file that no test loads, at
+      // 0 %, so an untested module lowers the totals instead of vanishing from
+      // them (vitest 4 removed `all: true`, which did this before).
       cleanOnRerun: true,
       thresholds: {
         // Project-wide floors: the measured value rounded down, minus one point.
-        // Measured 2026-10-23 with `all: true`: lines/statements 86.78,
-        // functions 91.09, branches 90.89. Raise them as coverage grows; never
-        // lower one to make a change pass.
-        lines: 85,
-        functions: 90,
-        branches: 89,
-        statements: 85,
+        // Re-measured 2026-10-25 after the vitest 3 → 5 upgrade, whose v8
+        // provider maps coverage through the AST and counts more branches: the
+        // same code read lines/statements 86.78, functions 91.09, branches
+        // 90.89 on vitest 3 and reads lines 85.94, statements 85.11, functions
+        // 86.24, branches 79.7 now. A change in how coverage is measured, not a
+        // drop in what is tested (owner decision). Raise them as coverage
+        // grows; never lower one to make a change pass.
+        lines: 84,
+        functions: 85,
+        branches: 78,
+        statements: 84,
         // Multi-page HTML preview (#124), renderer side. These modules own the
         // geometry and lifecycle the native BrowserView is slaved to — bounds,
         // clipping, drag freeze and tab moves — where a regression shows up as a
@@ -57,8 +61,8 @@ export default defineConfig({
         'src/renderer/src/components/Panels/HtmlPreviewPanel/hooks/usePreviewBounds.ts': { lines: 98, functions: 98, branches: 96, statements: 98 },
         // measured 100/100/100/100
         'src/renderer/src/components/Panels/HtmlPreviewPanel/previewClip.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
-        // measured 99.39/100/98.66/99.39
-        'src/renderer/src/services/preview/previewDragFreeze.ts': { lines: 97, functions: 98, branches: 96, statements: 97 },
+        // measured 99.39/100/98.66/99.39; branches 95.65 on vitest 5 (2026-10-25)
+        'src/renderer/src/services/preview/previewDragFreeze.ts': { lines: 97, functions: 98, branches: 94, statements: 97 },
         // measured 99.22/100/94.89/99.22
         'src/renderer/src/services/preview/previewTabMove.ts': { lines: 97, functions: 98, branches: 92, statements: 97 },
       },

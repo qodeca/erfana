@@ -9,7 +9,7 @@
  * counts it pushes to onCountChange subscribers.
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, vi, type Mock } from 'vitest'
 import { PreviewPageSearchProvider } from './PreviewPageSearchProvider'
 import type { PreviewBridge } from '../../../../shared/ipc/preview-schema'
 import type { PreviewFindResult } from '../../../../shared/ipc/preview-types'
@@ -28,7 +28,7 @@ const OPTIONS = { caseSensitive: false, wholeWord: false }
 describe('PreviewPageSearchProvider', () => {
   let bridge: FindBridge
   let findResultCb: ((r: PreviewFindResult) => void) | null
-  let unsubscribe: ReturnType<typeof vi.fn>
+  let unsubscribe: Mock
   let provider: PreviewPageSearchProvider
 
   beforeEach(() => {
@@ -97,7 +97,7 @@ describe('PreviewPageSearchProvider', () => {
 
   it('nextMatch issues a forward findNext with the active query', async () => {
     await provider.search('term', OPTIONS)
-    ;(bridge.find as ReturnType<typeof vi.fn>).mockClear()
+    ;(bridge.find as Mock).mockClear()
 
     provider.nextMatch()
     expect(bridge.find).toHaveBeenCalledWith({
@@ -111,7 +111,7 @@ describe('PreviewPageSearchProvider', () => {
 
   it('previousMatch issues a backward findNext', async () => {
     await provider.search('term', OPTIONS)
-    ;(bridge.find as ReturnType<typeof vi.fn>).mockClear()
+    ;(bridge.find as Mock).mockClear()
 
     provider.previousMatch()
     expect(bridge.find).toHaveBeenCalledWith(
@@ -129,7 +129,7 @@ describe('PreviewPageSearchProvider', () => {
     provider.onCountChange((c) => {
       order.push(`count:${c.total}:${c.activeOrdinal}`)
     })
-    ;(bridge.stopFind as ReturnType<typeof vi.fn>).mockImplementation(async () => {
+    ;(bridge.stopFind as Mock).mockImplementation(async () => {
       order.push('stop')
     })
 
