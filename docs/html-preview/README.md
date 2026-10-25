@@ -49,6 +49,8 @@ That question is a native message box **owned by the window whose preview asked*
 
 Every path is re-checked by Erfana itself before anything opens: the page's own idea of where a link points is never trusted.
 
+**A link the page cancels is not followed.** Erfana waits until all of the page's own click handlers have run before it acts on a click, so a page that calls `preventDefault()` in any of them – including a handler on `window` that runs after Erfana's – keeps the link closed. Before v0.22.0 a cancel in one of the page's later handlers was missed and the link opened anyway. (The preview preload, `src/preload/previewPage.ts`, tells main about the click at once, then sends the link – or a "cancelled" note – one task later, after the whole click has been dispatched; a microtask was not enough, because the browser runs microtasks after each listener.)
+
 **Two cases where a link stays dead**, both the same as before this feature existed:
 
 - a page whose own JavaScript calls `stopPropagation()` on the click, which hides it from Erfana;

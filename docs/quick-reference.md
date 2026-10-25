@@ -18,7 +18,7 @@ npm run build:win        # Windows package (NSIS .exe; needs Developer Mode)
 
 # Quality
 npm run typecheck        # Type checking (node + web, and their tests + e2e)
-npm run lint             # Linting (eslint, JS/TS only)
+npm run lint             # eslint (JS/TS) + shebang check + 500-line file limit
 npm run lint:css         # stylelint: src/ CSS + the design/ cards' inline styles
 npm run design           # Rebuild design/ (index, token copy, claims)
 npm run design -- --check # Fail if a generated file under design/ is stale
@@ -30,6 +30,10 @@ npm run test:cov         # Coverage report (all 3 projects)
 npm run test:e2e         # E2E tests (Playwright + Electron)
 npm run test:e2e:visual            # Visual regression baselines
 npm run test:e2e:update-screenshots # Refresh visual baselines
+
+# Docs
+npm run check:links          # Relative links and heading anchors in docs
+npm run check:version-drift  # Docs that state a stale version
 ```
 
 ## Keyboard Shortcuts

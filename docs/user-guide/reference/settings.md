@@ -13,6 +13,7 @@ Open **Settings** with the gear at the bottom of the left activity bar. <kbd>Esc
 - [Git status](#git-status)
 - [Logging](#logging)
 - [Transcription](#transcription)
+- [Import tools](#import-tools)
 - [HTML preview](#html-preview)
 - [Terminal](#terminal)
 - [Per-project settings](#per-project-settings)
@@ -44,7 +45,7 @@ Open **Settings** with the gear at the bottom of the left activity bar. <kbd>Esc
 | Option | Default | Effect |
 | --- | --- | --- |
 | **Log level** | Info | Choose Trace, Debug, Info, Warn, Error or Fatal. |
-| **Logs folder** and **Open** | `~/.erfana/logs/` | Shows the resolved path and opens it in Finder or File Explorer. Logs are kept for seven days. |
+| **Logs folder** and **Open** | `~/.erfana/logs/` | Shows the resolved path and opens it in Finder or File Explorer. Logs are kept for seven days, with at most five older files per log. |
 
 ![Screenshot of Logging and HTML preview settings.](../images/settings/logging-and-html-preview.png)
 
@@ -54,12 +55,26 @@ Open **Settings** with the gear at the bottom of the left activity bar. <kbd>Esc
 
 | Option | Default | Effect |
 | --- | --- | --- |
-| **Backend** | OpenAI | Choose OpenAI API, which sends audio to that service, or **Local (whisper.cpp)**, which runs offline. Local is unavailable on Windows ARM64. |
-| **OpenAI API key** | Empty | Enter a key for the OpenAI backend; **Remove key** deletes the stored key. |
+| **Backend** | OpenAI | Choose **OpenAI**, which sends audio to the OpenAI API, or **Local (whisper.cpp)**, which runs offline. Local is unavailable on Windows ARM64. |
+| **OpenAI API key** | Empty | Enter a key for the OpenAI backend; **Remove key** deletes the stored key. The key is always stored encrypted: if the system cannot encrypt it (for example Linux without a keyring), Erfana says so and does not save it. |
 | **Whisper model** | Base | For Local, choose Tiny, Base, Small, Medium or Large. |
-| **Model status** / **Download model** | Model not downloaded until installed | Shows Ready or download progress for the selected local model; download it before using Local. |
+| **Model status** / **Download model** | Model not downloaded until installed | Shows Ready or download progress for the selected local model; download it before using Local. While it downloads, **Cancel** stops the download and leaves no partial file behind. |
 
 ![Screenshot of the Transcription settings section.](../images/transcribe/settings-transcription.png)
+
+## Import tools
+
+**What it does:** Shows which [import](import-and-transcription.md#import-documents) formats work on this computer before you pick a file. **How to reach it:** **Settings > Import tools**. The **Open import tools** button in the "LibreOffice required" message also opens Settings at this section.
+
+| Row | Status | Effect |
+| --- | --- | --- |
+| **PDF documents** | Ready – built in | PDF imports need nothing extra. |
+| **Images (reads the text in them)** | Ready – built in | JPG, JPEG, PNG, GIF, BMP, TIFF, TIF and WebP import with no extra tool. |
+| **Office documents** | Depends on LibreOffice | Shows **Ready – LibreOffice found**, **LibreOffice not found** or **LibreOffice found in an unsafe location**. |
+
+LibreOffice is a free office suite that Erfana does not include. When it is not found, the section says how to get it: on macOS the Homebrew command `brew install --cask libreoffice` with a copy button, on Windows a **Download LibreOffice** button (install it in its default folder), and on Linux the `libreoffice` package name. After installing, choose **Check again** – no restart is needed. If it still shows as not found, restart Erfana.
+
+A copy found in the open project, a temporary folder, a network share or through a relative `PATH` entry is "in an unsafe location": Erfana never runs it, and Office imports are refused until that folder is removed from `PATH`.
 
 ## HTML preview
 
@@ -143,4 +158,4 @@ For example, to leave out the scratch folder that test runs fill:
 - A file inside an excluded folder that is already open in a tab keeps refreshing when it changes on disk.
 - Nothing in the tree shows that something was excluded.
 
-**Windows:** a folder nested inside another folder that starts to match a *pattern* in your list only after the project opened (for example a new `src/test-tmp` matching `**/test-tmp`) is not fully left out until you reopen the project: its changes are still ignored one by one, but very heavy churn there can cause an extra refresh of the whole tree. Path entries such as `.local/test-tmp` are not affected. See [Known issues § Excluded folders](../../known-issues.md#excluded-folders-filesexclude-known-limits) for the full list of limits.
+**macOS and Windows:** a folder nested inside another folder that starts to match a *pattern* in your list only after the project opened (for example a new `src/test-tmp` matching `**/test-tmp`) is not fully left out until you reopen the project: its changes are still ignored one by one, but very heavy churn there can cause an extra refresh of the whole tree. Path entries such as `.local/test-tmp` are not affected. See [Known issues § Excluded folders](../../known-issues.md#excluded-folders-filesexclude-known-limits) for the full list of limits.

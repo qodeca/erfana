@@ -23,7 +23,7 @@ registerHandle('file:readFile', async (_event, request: unknown) => {
 })
 ```
 
-A channel that takes arguments takes **one request object**, validated by a strict Zod schema (`z.strictObject`, in `src/shared/ipc/*-schema.ts`): a key the schema does not list is refused, not ignored, and positional arguments are refused. The `file:*` channels register through `registerConfinedHandle`, whose `schema` is `payloadArgs(SomeRequestSchema)` and whose `paths` name the request key that holds each path (`{ arg: 0, key: 'filePath', mode: 'project' }`).
+New channels take **one request object**, validated by a Zod schema in `src/shared/ipc/*-schema.ts`. Every `file:*` channel does this with a strict schema (`z.strictObject`): a key the schema does not list is refused, not ignored, and positional arguments are refused. The `file:*` channels with a path register through `registerConfinedHandle` (see [Path checks in the main process](#path-checks-in-the-main-process)), whose `schema` is `payloadArgs(SomeRequestSchema)` and whose `paths` name the request key that holds each path (`{ arg: 0, key: 'filePath', mode: 'project' }`). Older domains still take positional arguments – `file-watch:*`, `directory-watch:*`, `git:*`, `git-watcher:*`, `git-polling:*`, `settings:*`, `import:validate` / `process` / `isSupported`, and the terminal-id channels (`terminal:kill`, `getInfo`, `getActivity`, `isAvailable`, which take a bare `terminalId`). Do not copy that shape into a new channel.
 Never call `ipcMain.handle(...)` or `ipcMain.on(...)` yourself. `src/main/ipc/registry.ts` (`registerHandle` / `registerHandleOnce` / `registerOn` / `registerOnce`, paired with `unregisterHandle` / `unregisterOn`) is the **only** place a global handler is registered, and every listener it registers is gated on the app's own top-level renderer (`isTrustedAppSender`, `src/main/ipc/senderValidation.ts`) before the payload is seen – an untrusted `invoke` rejects, an untrusted `send` is dropped and logged by origin. Importing `ipcMain` anywhere else under `src/main/**` is an ESLint error (`no-restricted-imports` in `eslint.config.mjs`), so the gate cannot be skipped by forgetting it. Frame-scoped listeners (`webContents.ipc`, `webContents.mainFrame.ipc`) are deliberately outside the registry; they carry their own per-call token or frame check. Why an explicit entry point rather than a wrapped `ipcMain`: see the header of `registry.ts` and [Security § Sender-frame gating](./security.md#sender-frame-gating).
 
 **3. Call from renderer**, through the bridge's gateway (see [Renderer gateways](#renderer-gateways)):
@@ -85,13 +85,18 @@ Adding a bridge or a method: change the contract first, then the preload module 
 
 `terminal:write` is an `invoke`/`handle` channel, but the only promise in the chain is the IPC round-trip itself. The service write is **synchronous**: `TerminalService.write()` returns a boolean that says whether the PTY accepted the data, and the handler returns that boolean as `{ success }` without awaiting anything.
 
-**1. Service layer – synchronous write** (`src/main/services/TerminalService.ts`):
+**1. Service layer – synchronous write** (`src/main/services/TerminalService.ts`, shortened):
 ```typescript
 write(terminalId: string, data: string): boolean {
   const terminal = this.terminals.get(terminalId)
   if (!terminal) {
-    logger.error(`Terminal ${terminalId} not found`)
+    logger.error(`❌ Terminal ${terminalId} not found`)
     return false
+  }
+  // cmd.exe is still in its bootstrap `pause`: hold the keys until it ends
+  if (terminal.cmdPauseHold) {
+    terminal.cmdPauseHold.push(data)
+    return true
   }
   try {
     terminal.ptyProcess.write(data)   // node-pty buffers internally; no callback
@@ -100,24 +105,30 @@ write(terminalId: string, data: string): boolean {
     const code = (error as { code?: unknown }).code
     if (code === 'EPIPE') {
       // PTY already closed – drop the entry and report it as an exit
+      this.clearHandshakeTimers(terminal)
       this.terminals.delete(terminalId)
-      this.emit('exit', { terminalId, exitCode: 0 })
+      terminal.output.dispose()
+      this.emit('exit', { terminalId, exitCode: 0, webContentsId: terminal.webContentsId })
       return false
     }
-    this.emit('error', { terminalId, error: String(error) })
+    this.emit('error', { terminalId, error: message, webContentsId: terminal.webContentsId })
     return false
   }
 }
 ```
 
-**2. IPC handler returns the boolean** (`src/main/ipc/terminal-handlers.ts`):
+**2. IPC handler parses, checks the owner, returns the boolean** (`src/main/ipc/terminal-handlers.ts`):
 ```typescript
-registerHandle('terminal:write', (_event, { terminalId, data }) => {
+registerHandle(TERMINAL_CHANNELS.write, (event, payload: unknown) => {
+  const parsed = TerminalWriteRequestSchema.safeParse(payload)
+  if (!parsed.success) return { success: false, error: 'Invalid request' }
+  const { terminalId, data } = parsed.data
+  if (!ownsTerminal(event.sender?.id, terminalId)) return { success: false, error: NOT_FOUND }
   try {
     const success = terminalService.write(terminalId, data)
     return { success }
   } catch (error) {
-    return { success: false, error: String(error) }
+    return { success: false, error: errorMessage(error) }
   }
 })
 ```
@@ -137,14 +148,15 @@ if (!result.success) {
 
 **What the promise does and does not guarantee**:
 - Resolving means main has handed the bytes to node-pty (or refused to). It does **not** mean the shell has consumed them – node-pty buffers the write internally and no completion callback is used.
-- `{ success: false }` without `error` means the terminal id was unknown or the PTY was already closed (EPIPE); `error` is set only when the write threw something else.
+- `{ success: false, error: 'Invalid request' }` means the payload failed `TerminalWriteRequestSchema` (a malformed id, or `data` over `TERMINAL_WRITE_MAX_CHARS`, 1 Mi characters). `{ success: false, error: 'Terminal not found' }` means the calling window does not own that terminal – another window's id gets the same answer as an unknown one.
+- `{ success: false }` without `error` means the service did not have the id, the PTY was already closed (EPIPE, reported as an exit), or node-pty threw (reported as a `terminal:error` event). `error` is set by the handler's own `catch` only for an unexpected throw.
 - Sequencing (write text, then send Enter) is ordered by the `invoke` calls themselves, not by a write-complete signal.
 - See [AutoExecute Reference](./prompts/autoexecute-reference.md) for the autoExecute flow that relies on this ordering
 
 ## Adding New IPC Channel
 
 1. Add the method to the domain's bridge contract and preload module (see [Renderer gateways](#renderer-gateways)); a domain that has no gateway yet is still declared inline in `src/preload/index.ts`
-2. Create handler in appropriate `src/main/ipc/*-handlers.ts`, registered through `registry.ts` (never `ipcMain` directly)
+2. Create handler in appropriate `src/main/ipc/*-handlers.ts`, registered through `registry.ts` (never `ipcMain` directly). A channel that takes a path registers through `registerConfinedHandle` instead, and lists every path argument in `paths`
 3. Register handler in `src/main/index.ts`
 4. Forward it in the domain's gateway and call the gateway from the renderer
 
@@ -154,6 +166,20 @@ if (!result.success) {
 - **Never trust** renderer data
 - **Use TypeScript** for type safety across IPC boundary
 - **Return serializable** data only (no functions, class instances)
+
+## Path checks in the main process
+
+Since v0.22.0 the main process decides whether a path is inside the open project; the renderer's word for it is never taken. `src/main/ipc/confinement/registerConfinedHandle.ts` wraps `registerHandle` and runs, for every call and in this order: the registry's sender gate, an optional stricter `senderGate`, the argument schema, an optional `expectedGeneration` check, one `resolveConfinedPath` per listed path, then the handler. The handler gets each path back as `{ requested, real }`: it acts on `real` (the canonical path) and answers with paths built from `requested` (the spelling the renderer sent).
+
+| Mode | What is checked | Used by |
+|------|-----------------|---------|
+| `project` | The nearest existing ancestor of the whole path is canonicalised and must be inside the project's real root; links are followed. Options: `mustExist`, `kind` (`file` / `directory`), `allowRoot` | Reads, writes, `file:readDirectory`, `file:findByName`, `file:revealInFileManager`, `markdown-image:read`, the `cwd` of `terminal:create` |
+| `project-entry` | The same walk on the parent folder; the last segment is kept as written, so a link inside the project can be renamed or deleted as a link | `file:deleteFile`, `file:deleteFolder`, `file:rename`, the source of `file:moveItem` and `file:copyItem` |
+| `external` | Form checks only; `check: 'escape'` also refuses a path that looks inside the project but resolves out of it | `file:getStats`, `file:exists`, external-file sources, `file:validatePath`, `file:openProjectByPath` |
+
+Refusals are `ConfinementError`s. Their codes and fixed messages are in `src/shared/ipc/confinement.ts` (`INVALID_PATH`, `NO_PROJECT`, `OUTSIDE_PROJECT`, `UNVERIFIABLE`, `PERMISSION_DENIED`, `ROOT_FORBIDDEN`, `NOT_FOUND`, `WRONG_KIND`, `PROJECT_CHANGED`, `NOT_SESSION_OWNER`); the renderer reads a code back from a rejected `invoke` with `confinementCodeFromMessage`. A `project` or `project-entry` path from a window that did not open the project is refused with `NOT_SESSION_OWNER`. A channel that answers with a value instead of rejecting (`file:revealInFileManager`, `file:validatePath`, `file:exists`, the external-file channels, `terminal:create`, `markdown-image:read`) maps the refusal in its `onRefusal`. Service-level detail: [API services § Path confinement](./api-services.md#path-confinement-for-the-file-ipc-handlers).
+
+**Project generation.** The open project lives in one place, the `ProjectSession` that `ProjectService` owns (`src/main/services/session/ProjectSession.ts`): root, real root, case sensitivity, owning window and a `generation` that goes up by one on every open or close. Opens, switches and closes run one at a time; a failed open leaves the session as it was. The renderer learns the generation from `file:getSession` and from every `project:changed`, and sends it back on `file:readDirectory` (`generation`), `file:writeFile` (`generation`) and `file:closeProject` (`expectedGeneration`). A read or write for an older generation is refused with `PROJECT_CHANGED` before any file is touched; a close for an older generation does nothing.
 
 ## Current IPC Channels
 
@@ -178,24 +204,26 @@ Note that several domains register through channel **constants**
 | `file:closeProject` | Close the current project. Optional request `{ expectedGeneration? }`: the project session generation the renderer last saw; a close for an older generation does nothing |
 | `file:getSession` | The open project as the main process holds it: `{ root, generation }`, or `null` when none is open |
 | `file:getProjectPath` | Get current project path |
-| `file:readDirectory` | Read directory tree. Single-flight per resolved path (#208): at most one walk of a path runs; every request made during it shares one follow-up walk that starts after it settles, and a failed walk rejects only its own requests. See [File watching § Tree refresh is single-flight](./file-watching/technical-details.md#tree-refresh-is-single-flight-208). Ignored folders and folders past the 50,000-entry cap come back as `lazy` rows; `shallow: true` reads one level, which is how the tree expands one (finding [32]) |
+| `file:readDirectory` | Read directory tree. Request `{ dirPath, shallow?, generation? }`; a read whose `generation` is not the open project's is refused with `PROJECT_CHANGED`, and so is one the project changed under while it ran. Single-flight per resolved path (#208): at most one walk of a path runs; every request made during it shares one follow-up walk that starts after it settles, and a failed walk rejects only its own requests. See [File watching § Tree refresh is single-flight](./file-watching/technical-details.md#tree-refresh-is-single-flight-208). Ignored folders and folders past the 50,000-entry cap come back as `lazy` rows; `shallow: true` reads one level, which is how the tree expands one (finding [32]) |
 | `file:findByName` | Files of one name in the project: `dirPath` must be the project root (confined like a tree read; the real root is walked, results use the requested spelling). Bounded – 20 results, 20,000 folders, 16 reads in flight, a hard 1.5 s deadline; at most 2 searches per process with reads in flight (a search keeps its slot until its last read settles, so hung reads stay bounded), one per session + root + spelling + name, 8 waiting for at most 1.5 s, the rest answer `truncated` – and never through a link; skips hidden, excluded and ignored folders; a project switch ends it. The terminal's file links call it on a click when the tree is incomplete (finding [32]) |
-| `file:readFile` | Read file content |
+| `file:readFile` | Read file content. Request `{ filePath }`; must be a file inside the project |
 | `file:readImage` | Read an image as a base64 data URL, or answer `unchanged` when the caller's version still matches (#70) |
 | `file:writeFile` | Write file content. Request `{ filePath, content, createParentDirs?, generation? }`: `createParentDirs` (literal `true` only) recreates missing folders inside the project for the editor's "Save to restore it"; `generation` is the project session generation the file was opened under, and a write is refused with `PROJECT_CHANGED` (before anything is touched) when the open project is a different one |
 | `file:getStats` | Get file metadata |
 | `file:exists` | Existence check |
-| `file:createFile` | Create new empty file |
-| `file:createFolder` | Create new folder |
-| `file:rename` | Rename file or folder |
-| `file:deleteFile` | Delete file |
-| `file:deleteFolder` | Delete folder recursively |
-| `file:moveItem` | Move file/folder – `fs.rename` with copy+delete fallback on EXDEV (drag-drop, cut/paste) |
-| `file:copyItem` | Copy file/folder with automatic `(1)`, `(2)` name numbering |
-| `file:checkConflict` | Case-insensitive name-conflict probe before a move/copy |
+| `file:createFile` | Create new empty file. Request `{ dirPath, name }` |
+| `file:createFolder` | Create new folder. Request `{ dirPath, name }` |
+| `file:rename` | Rename file or folder. Request `{ oldPath, newName }` |
+| `file:deleteFile` | Delete file. Request `{ filePath }` |
+| `file:deleteFolder` | Delete folder recursively. Request `{ filePath }` |
+| `file:moveItem` | Move file/folder – `fs.rename` with copy+delete fallback on EXDEV (drag-drop, cut/paste). Request `{ sourcePath, targetParentPath, newName?, replaceExisting? }` |
+| `file:copyItem` | Copy file/folder with automatic `(1)`, `(2)` name numbering. Request `{ sourcePath, targetParentPath, newName? }` |
+| `file:checkConflict` | Case-insensitive name-conflict probe before a move/copy. Request `{ targetParentPath, itemName }` |
 | `file:validatePath` | Validate a path against the project boundary. Request `{ filePath }`; the answer's `insideProject` is computed from the open project, never from anything the renderer sends |
-| `file:revealInFileManager` | Reveal the item in Finder / Explorer |
-| `project:changed` | Event: project switched (main → renderer). Broadcast to every window by `ProjectService`, its only sender; payload `{ oldPath, newPath, generation }`, where `generation` is the project session's counter (+1 per open or close) |
+| `file:revealInFileManager` | Reveal the item in Finder / Explorer. Request `{ filePath }`; answers `''` or an error sentence, never rejects |
+| `project:changed` | Event: project opened, switched or closed (main → renderer). Broadcast to every window by `ProjectService`, its only sender; payload `{ oldPath, newPath, generation }`, where `generation` is the project session's counter (+1 per open or close) |
+
+`file:getLastProjectPath` was removed in v0.22.0: nothing in the renderer called it. The last path is still stored main-side (`SettingsService.setLastProjectPath`), and start-up still never reopens it (see [Architecture § Project persistence](./architecture.md#key-design-decisions)). A refused project open rejects with the reason and its code marker, for example `… [PATH_SYSTEM_DIR]`, so the folder dialog, the recent list and a drop all show the same plain sentence.
 
 ### External files (`external-file-handlers.ts`)
 
@@ -259,17 +287,17 @@ Note the `file:` prefix – these are **not** `external-file:*`.
 
 | Channel | Purpose |
 |---------|---------|
-| `terminal:isAvailable` | Whether node-pty loaded and a PTY can be spawned |
-| `terminal:create` | Spawn a PTY from strict `{ cwd?, cols, rows }` (`cwd` must be an existing folder inside the open project; none means the project folder, or home with no project open); returns `{ success: true, terminalId, shellKind }` or `{ success: false, error }`, the reason passed through verbatim from `TerminalService.createTerminal` |
-| `terminal:write` | Write to the PTY; returns `{ success, error? }` from a synchronous PTY write – the promise is only the invoke round-trip (see the invoke round-trip section above) |
-| `terminal:resize` | `ipcMain.on` – resize the PTY (fire-and-forget) |
+| `terminal:isAvailable` | Whether node-pty loaded and a PTY can be spawned. Takes an optional bare `terminalId`; with one, also whether that terminal finished starting (`initialized`) – another window's id answers `initialized: false` |
+| `terminal:create` | Spawn a PTY from strict `{ cwd?, cols, rows }` (`cwd` must be an existing folder inside the open project; none means the project folder, or home with no project open); returns `{ success: true, terminalId, shellKind }` or `{ success: false, error }`, the reason passed through verbatim from `TerminalService.createTerminal`. `cols` and `rows` are integers 1–2000 (`TERMINAL_MAX_DIM`); a window may hold at most 32 terminals (`TERMINAL_MAX_PER_WINDOW`), and a create past that answers "Too many terminals are open". A refused `cwd` answers `{ success: false, error }` with the path-check message |
+| `terminal:write` | Write to the PTY. Request `{ terminalId, data }`, `data` at most 1 Mi characters (`TERMINAL_WRITE_MAX_CHARS`); returns `{ success, error? }` from a synchronous PTY write – the promise is only the invoke round-trip (see the invoke round-trip section above) |
+| `terminal:resize` | `ipcMain.on` – resize the PTY (fire-and-forget). Payload `{ terminalId, cols, rows }`; an invalid one is dropped, with at most one warning per 5 s |
 | `terminal:kill` | Kill a PTY (owner-checked, like `write`, `resize`, `getInfo`, `getActivity` and `clearComplete`: another window gets the answer for an unknown id) |
 | `terminal:getInfo` | Metadata for one terminal |
 | `terminal:list` | List the calling window's live terminals |
 | `terminal:getActivity` | Whether a program other than the shell is running in the terminal: `{ success, busy, known }` (`known: false` on Windows). Owner-checked |
 | `terminal:clearComplete` | `ipcMain.on` – renderer acknowledges that a clear finished |
 | `terminal:ackOutput` | `ipcMain.on` – flow control: strict `{ terminalId, chars }` (an integer count of UTF-16 code units, 1–16 Mi), how much output xterm has parsed; sent once per 32 KiB, and on receipt while the window is hidden. Owner-checked – an ack from another window is ignored. Main pauses the PTY above 512 KiB unacknowledged and resumes below 128 KiB, or after 5 s with no ack progress (POSIX only; Windows is batched, never paused). See `src/main/services/terminalOutputFlow.ts` and [performance/terminal-output-batching.md](performance/terminal-output-batching.md) |
-| `terminal:data` | Event: PTY output (main → the owning window), batched per terminal – every 8 ms or at 64 KiB, in order, and always before that terminal's `terminal:exit` |
+| `terminal:data` | Event: PTY output (main → the owning window; `exit`, `error` and `clear` also go only to the window that created the terminal), batched per terminal – every 8 ms or at 64 KiB, in order, and always before that terminal's `terminal:exit` |
 | `terminal:exit` | Event: PTY exited, with exit code and signal |
 | `terminal:error` | Event: PTY error |
 | `terminal:clear` | Event: main asks the renderer to clear the xterm buffer |
@@ -471,8 +499,10 @@ See: [Architecture](./architecture.md) | [Security](./security.md) | [File Watch
 To keep IPC payloads consistent across processes, shared zod schemas live at `src/shared/ipc/schema.ts`.
 
 - `ProjectChangedSchema` — payload for `project:changed` events
-  - Shape: `{ oldPath: string | null; newPath: string | null }`
+  - Shape: `{ oldPath: string | null; newPath: string | null; generation: number }`, where `generation` is the project session's counter after the change
   - Used in main when broadcasting, and in preload typings for `onProjectChanged`
+- `ProjectSessionInfoSchema` – the `file:getSession` answer, `{ root: string; generation: number }` (or `null` when no project is open)
+- Error-code marker – `src/shared/errorCodeMarker.ts`. A thrown error reaches the renderer as a plain `Error` with only its message, so main appends the `ErrorCode` (`… [PATH_SYSTEM_DIR]`, `withErrorCodeMarker`) and the renderer reads it back with `errorCodeInMessage` (`src/shared/errors.ts`). Used by the project-open handlers today; see [Error codes](./error-codes.md#how-codes-cross-ipc)
 - Terminal event schemas — `TerminalDataSchema`, `TerminalExitSchema`, `TerminalErrorSchema`; the `TerminalBridge` contract (`terminal-schema.ts`) and channel constants (`terminal-channels.ts`)
 - File bridge — the `FileBridge` contract and `FileNode` / `FileStats` (`src/shared/ipc/file-schema.ts`), channel constants in `src/shared/ipc/file-channels.ts` (`FILE_CHANNELS`, `FILE_EVENTS`). The preload implements both bridges in `src/preload/fileBridge.ts` and `terminalBridge.ts`; the renderer reaches them through `services/fileGateway.ts` and `terminalGateway.ts`
 - Transcription schemas — `TranscriptionImportRequestSchema`, `TranscriptionProgress`, `TranscriptionImportResult`, `TranscriptionSettingsSchema` (see `src/shared/ipc/transcription-schema.ts`)
@@ -512,6 +542,7 @@ For long-running async operations during project switching (watcher shutdown, tr
 This pattern avoids stale updates from previous switches.
 
 Applied in services:
+- Project session: `ProjectSession.generation` (`src/main/services/session/ProjectSession.ts`) is the one app-wide counter. The renderer carries it on tree reads, writes and closes, and main refuses stale ones (see [Project generation](#path-checks-in-the-main-process))
 - File watcher: src/main/services/FileWatcherService.ts (`switchVersion` guards change/delete/notify)
 - Directory watcher: src/main/services/DirectoryWatcherService.ts and its layers in src/main/services/watcher/ (`DirectoryWatcherEvents.ts`, `DirectoryWatcherCore.ts`; `switchVersion` guards queue/process/notify)
 

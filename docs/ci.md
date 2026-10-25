@@ -2,7 +2,7 @@
 
 Erfana runs GitHub Actions workflows on pushes (and, for the required checks, on the `develop` merge queue – see [Merge queue](#merge-queue-develop)). The author-controlled workflows are listed below; vendor-installed workflows (Dependabot, Copilot review, Security Risk Assessment) are managed by their respective GitHub Apps and not covered here.
 
-**Dependabot configuration** ([`.github/dependabot.yml`](../.github/dependabot.yml), #176): weekly npm and GitHub Actions updates against `develop`. Minor and patch updates are grouped – one PR for npm production dependencies, one for npm development dependencies, one for actions – while every major update opens its own PR so a breaking upgrade is reviewed alone. Groups cover version updates only; security updates still arrive one per PR. Pre-1.0 packages (`async-mutex`, the `@xterm/addon-*` packages, `lucide-react`, `monaco-editor`, `shx`) are excluded from the groups, because a 0.x to 0.(x+1) bump is breaking by convention but counts as minor, so each still opens its own PR. `chokidar` (exact 5.0.0) and the `overrides` pins (`lodash`, `lodash-es`, `@electron/rebuild`, `dompurify`) are ignored, so no update moves a pin (see [security.md § Dependency overrides](./security.md#dependency-overrides-packagejson)); bump them by hand when a pin is lifted.
+**Dependabot configuration** ([`.github/dependabot.yml`](../.github/dependabot.yml), #176): weekly npm and GitHub Actions updates against `develop`. Minor and patch updates are grouped – one PR for npm production dependencies, one for npm development dependencies, one for actions – while every major update opens its own PR so a breaking upgrade is reviewed alone. Groups cover version updates only; security updates still arrive one per PR. Pre-1.0 packages (`async-mutex`, the `@xterm/addon-*` packages, `lucide-react`, `monaco-editor`, `shx`) are excluded from the groups, because a 0.x to 0.(x+1) bump is breaking by convention but counts as minor, so each still opens its own PR. `chokidar` (exact 5.0.0) and the other `overrides` pins (`lodash`, `lodash-es`, `dompurify`) are ignored, so no update moves a pin (see [security.md § Dependency overrides](./security.md#dependency-overrides-packagejson)); bump them by hand when a pin is lifted.
 
 | Workflow | File | Status | Trigger | Runner | Wall-clock | Purpose |
 |----------|------|--------|---------|--------|-----------|---------|
@@ -36,7 +36,7 @@ Nine jobs run in parallel (all `ubuntu-latest` except `windows-checks`). The **R
 | `test` (Unit tests) | `npm run test:ci` | yes | full vitest workspace (main / renderer / preload), **no coverage**. Also carries two extra gates — see below |
 | `coverage` (Coverage) | three steps: `npx vitest --run --config vitest.main.ts --project main --coverage`, then the same with `vitest.preload.ts --project preload` and `vitest.renderer.ts --project renderer` | yes | enforces the coverage **floors** of all three vitest configs. Main: the per-file floors in `vitest.main.ts` `test.coverage.thresholds` — `scripts/fuses.js` (the #43/#55 packaging-integrity guards + Electron fuses, floor lines/statements 86, functions 88, branches 93; met at ~88) and the whisper trust-chain modules `verifyManifest` / `secureDownloader` / `zipArchive` / `tarArchive` (90% each) plus the #41 `modelId` registry (95%) and the #60 `src/main/utils/rendererCrashHandlers.ts` crash trail (90% each metric). Since `test` runs `test:ci` **without** coverage, these floors gate only here. Scoped to `--project main` so `scripts/fuses.js` reports a single deterministic row — see the design note below (issue #55, F4). Preload (#124): the project-wide floors in `vitest.preload.ts`. Renderer (#124): the per-file floors in `vitest.renderer.ts` for `usePreviewBounds`, `previewClip`, `previewDragFreeze` and `previewTabMove`, plus the project-wide floor. All three configs set `all: true`, so a file no test loads counts at 0 %, and each project-wide floor sits one point under its measured value, rounded down – see **Project-wide coverage floors** below. None of the preload or renderer floors depend on symlink cases, so they hold on the Linux runner. Added to the branch-protection required set on `main` |
 | `build` (Build) | `npx electron-vite build` | yes | also the only gate on the **preload self-containment** guard — see below |
-| `license` (License compliance) | `npm run check:headers` + `pipx run reuse lint` | yes | SPDX headers on all sources + REUSE conformance. `check-spdx-headers.mjs` covers `.ts .tsx .js .mjs .cjs .css .html` and skips `.xezar/`, whose Xezar kit files keep their own MIT licence (annotated in `REUSE.toml`, text in `LICENSES/MIT.txt`); a script that *emits* an SPDX header in a string literal must wrap it in `REUSE-IgnoreStart` / `REUSE-IgnoreEnd`, or `reuse lint` parses the literal as that file's own licensing and fails (see `scripts/design-sync.mjs`, `scripts/check-spdx-headers.mjs`) |
+| `license` (License compliance) | `npm run check:headers` + `pipx run --spec "reuse[charset-normalizer]" reuse lint` | yes | SPDX headers on all sources + REUSE conformance. `check-spdx-headers.mjs` covers `.ts .tsx .js .mjs .cjs .css .html` and skips `.xezar/`, whose Xezar kit files keep their own MIT licence (annotated in `REUSE.toml`, text in `LICENSES/MIT.txt`); a script that *emits* an SPDX header in a string literal must wrap it in `REUSE-IgnoreStart` / `REUSE-IgnoreEnd`, or `reuse lint` parses the literal as that file's own licensing and fails (see `scripts/design-sync.mjs`, `scripts/check-spdx-headers.mjs`) |
 | `audit-signatures` (npm audit signatures) | `npm audit signatures` | no | also records the `package-lock.json` digest artifact that `release.yml` byte-verifies at tag time |
 | `release-guards` (Release readiness guards) | guard scripts | no | fails the build on a `pull_request_target` trigger, forbidden plist entitlements, legacy signing credentials, release-pubkey drift across docs, and a non-allowlist `files:` block in `electron-builder.yml` (`Guard - electron-builder packaging allowlist`, issue #43 — awk/grep only, since the job is checkout-only; extended in issue #55 to also hard-fail any `extraFiles:` block, at column 0 or indented under `mac:`/`win:`, and warn on `extraResources:` edits). Its checkout uses `fetch-depth: 0` so the `extraResources:` warning can compare against the push/PR base — see the note below |
 | `windows-checks` (Windows checks) | `npm run typecheck` + `npm run design -- --check` + `npm run test:main` on `windows-latest` | no | advisory Windows gate; excluded from the required set until proven stable |
@@ -92,20 +92,23 @@ The preload margin is small – one untested bridge function costs about half a 
 
 ## Merge queue (`develop`)
 
-`develop` is meant to land PRs through a GitHub merge queue (#173). Strict required checks alone made every push to `develop` – each merge and each campaign-record push – put every open PR behind, forcing an update and a full CI re-run. A queue tests each PR against the latest `develop` instead, so an open PR no longer has to be up to date by hand.
+`develop` lands PRs through a GitHub merge queue (#173), live at <https://github.com/qodeca/erfana/queue/develop>. Strict required checks alone made every push to `develop` – each merge and each campaign-record push – put every open PR behind, forcing an update and a full CI re-run. A queue tests each PR against the latest `develop` instead, so an open PR no longer has to be up to date by hand.
 
-How a PR lands once the queue is on:
+How a PR lands:
 
 1. The PR's own branch goes green on the seven required checks (from its `push` runs).
-2. Adding it to the queue (**Merge when ready**) makes GitHub build a temporary `gh-readonly-queue/develop/pr-<n>-<sha>` branch holding `develop` plus the PR (plus any PRs ahead of it).
+2. Adding it to the queue (**Merge when ready** in the UI, or `gh pr merge <n>` – no strategy flag, since the queue sets it) makes GitHub build a temporary `gh-readonly-queue/develop/pr-<n>-<sha>` branch holding `develop` plus the PR (plus any PRs ahead of it).
 3. `checks.yml` and `secret-scan.yml` run on that ref as a `merge_group` event. Every required job carries only the `github.repository == 'qodeca/erfana'` guard, which always holds for a merge group, so all seven checks – `Lint`, `Typecheck`, `Unit tests`, `Build`, `Coverage`, `License compliance`, `Secret scan` – report under the same names branch protection expects. The advisory jobs run there too.
-4. When all seven are green, GitHub fast-forwards `develop` to the tested commit; a red check drops the PR from the queue.
+4. When all seven are green, GitHub moves `develop` to the tested commit; a red check drops the PR from the queue.
+
+Queue settings, read with the GraphQL `mergeQueue(branch: "develop")` field on 2026-10-25: merge method `MERGE` (a merge commit), up to 5 entries built at once, a minimum of 1 entry per merge, and a 60-minute (`3600` s) check timeout. They live GitHub-side, not in the repo.
 
 Notes:
 - The concurrency groups key on `github.ref`, and every queue entry has its own ref, so a queue run never cancels a branch run or another entry. `checks.yml` and `secret-scan.yml` exclude `gh-readonly-queue/**` from their `push` trigger for exactly this reason: without it the queue branch fired both a `push` and a `merge_group` run on the same ref, and `cancel-in-progress` cancelled the `merge_group` run, which the queue read as `failed_checks` (#173).
 - `release.yml` looks up a green `checks.yml` run by commit SHA. A `merge_group` run for the same SHA qualifies too; it ran the same `npm audit signatures` job on the same tree, so its `package-lock-digest` is identical.
 - Direct pushes to `develop` (the leader's record pushes, the develop-first release step) are not affected: administrators are not enforced on `develop`.
-- **The setting is not in the repo.** After the `merge_group` triggers are on `develop`, the owner enables **Require merge queue** in `develop`'s branch protection (Settings → Branches, or the equivalent ruleset). Turning it on before the triggers land would leave every queued PR waiting for checks that never start.
+- **The setting is not in the repo.** **Require merge queue** is switched on in `develop`'s branch protection (Settings → Branches). Removing the `merge_group` trigger from `checks.yml` or `secret-scan.yml` while it is on would leave every queued PR waiting for checks that never start.
+- **No one-shot merge-and-delete.** `gh pr merge <n> --delete-branch` is the habit from a branch without a queue; here the PR is only enqueued, so delete the branch after the queue has merged it. `--admin` bypasses the queue – do not use it to land ordinary work.
 - `main` is unchanged: no merge queue, the same seven required checks, `enforce_admins` on, and releases still land by direct push after `develop` is green.
 
 ## Secret scan (`secret-scan.yml`)
@@ -194,16 +197,21 @@ For historical reference, when the workflow was active it ran on `push` to `deve
 
 ## Local reproduction
 
-All CI checks are runnable locally (commands match exactly what CI executes):
+Six of the seven required checks have a local equivalent (`Secret scan` runs gitleaks and trufflehog in CI only). Run them before pushing to save CI minutes:
 
 ```bash
-npm run lint
-npm run typecheck
-npm run test:ci           # same as Quality Checks job – basic reporter
-npx electron-vite build
-npm run test:e2e          # electron project — local-only today (e2e.yml is disabled)
-npm run test:e2e:visual   # visual project — local-only today (visual hang on macos-latest)
+npm run lint              # Lint, step 1 – ESLint (with --fix), lint:shebang, lint:max-lines
+npm run lint:css          # Lint, step 2 – stylelint
+npm run design -- --check # Lint, step 3 – design/ is in sync
+npm run typecheck         # Typecheck – node, web, then the node / web / e2e test configs
+npm run test:cov          # Unit tests + Coverage – every unit test once, plus the coverage floors
+npx electron-vite build   # Build – also runs the preload self-containment check
+npm run check:headers     # License compliance, first half (reuse lint needs pipx)
+npm run test:e2e          # electron project – local-only today (e2e.yml is disabled)
+npm run test:e2e:visual   # visual project – local-only today (visual hang on macos-latest)
 ```
+
+`npm run lint` passes `--fix` to ESLint, so it can rewrite files; `npm run lint:check` runs the same checks without fixing. `test:cov` already runs the whole unit suite, so a separate `npm run test:ci` (what the `Unit tests` job runs, with the dot reporter) adds no signal ([#170](https://github.com/qodeca/erfana/issues/170)). Neither runs the `Unit tests` job's two extra gates – the chokidar guard and the deprecation tripwire, above – which run in CI only. To type-check one part only, the `typecheck` script is split into `typecheck:node`, `typecheck:web`, `typecheck:test:node`, `typecheck:test:web` and `typecheck:test:e2e`.
 
 ## Troubleshooting
 

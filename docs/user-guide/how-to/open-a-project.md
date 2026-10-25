@@ -24,6 +24,8 @@ Open a folder to show its files and terminal. Select **Open project** on Home, t
 2. Select **Close project** to return to Home.
 3. Select a recent project on Home to reopen it, or remove it from the list.
 
+Before it switches or closes, Erfana saves every edited tab. It asks only about tabs it could not save, for example "1 tab could not be saved"; **Cancel** keeps the current project open.
+
 ![Screenshot of the project header with Change project and Close project controls.](../images/open-a-project/project-header.png)
 
 > [!NOTE]
@@ -31,7 +33,7 @@ Open a folder to show its files and terminal. Select **Open project** on Home, t
 
 ## What happens next / If something goes wrong
 
-The terminal opens when a project loads. If the tree is unavailable, use [troubleshooting](../reference/troubleshooting.md).
+The terminal opens when a project loads. Erfana refuses the top of a drive, a network share or a system folder as a project – see [troubleshooting](../reference/troubleshooting.md#a-folder-cannot-be-opened-as-a-project). If the tree is unavailable, use [troubleshooting](../reference/troubleshooting.md#project-tree-unavailable).
 
 ## Related
 

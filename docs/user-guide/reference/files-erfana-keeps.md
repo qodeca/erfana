@@ -17,19 +17,19 @@ Project documents stay in the folder you open. Erfana also keeps app settings an
 
 ## Autosave
 
-**What it does:** Markdown edits are saved two seconds after typing stops and at least every 30 seconds during continued editing. **How to reach it:** Edit a Markdown file; autosave runs automatically. There is no autosave setting. A close prompt protects an unsaved buffer, and a disk-change notice lets you choose the version to keep. See [editing](../how-to/edit-and-preview-markdown.md).
+**What it does:** Markdown edits are saved two seconds after typing stops and at least every 30 seconds during continued editing. Each save writes a temporary file first and swaps it in only when it is complete, so a crash or power cut during a save cannot leave a half-written file. Autosave waits while a tab shows the file-changed-on-disk notice, and a save that failed is tried again on your next edit. **How to reach it:** Edit a Markdown file; autosave runs automatically. There is no autosave setting. A close prompt protects an unsaved buffer, and a disk-change notice lets you choose the version to keep. See [editing](../how-to/edit-and-preview-markdown.md).
 
 ## Global settings
 
-**What it does:** App-wide preferences persist between launches. **How to reach it:** Use the gear in the left activity bar; values are stored under `~/.erfana/settings.json`. The OpenAI API key is stored separately by the app's secure storage path; the settings JSON records only whether a key is stored.
+**What it does:** App-wide preferences persist between launches. **How to reach it:** Use the gear in the left activity bar; values are stored under `~/.erfana/settings.json`. The OpenAI API key is stored separately and always encrypted by the system's secure storage; the settings JSON records only whether a key is stored. If the settings file cannot be read at start-up, Erfana opens with default settings, says so, and keeps a copy of the old file before it ever replaces it.
 
 ## Project settings and lock
 
-**What it does:** `.erfana/settings.json` in a project holds that project's watcher ignores, hidden tree patterns, and approved HTML remote hosts. Erfana also uses a project lock so opening a project already in another window focuses that window. **How to reach it:** The settings file is inside the project; the lock is handled automatically when you open a project. See [settings](settings.md#per-project-settings).
+**What it does:** `.erfana/settings.json` in a project holds that project's watcher ignores, hidden tree patterns, [excluded folders](settings.md#excluded-folders), and approved HTML remote hosts. Erfana also uses a project lock so opening a project already in another window focuses that window. **How to reach it:** The settings file is inside the project; the lock is handled automatically when you open a project. See [settings](settings.md#per-project-settings).
 
 ## Logs
 
-**What it does:** Erfana writes logs under `~/.erfana/logs/` and keeps them for seven days. **How to reach it:** **Settings > Logging > Open** reveals the resolved folder. The log level defaults to **Info**.
+**What it does:** Erfana writes logs under `~/.erfana/logs/` and keeps them for seven days, with at most five older files per log. Start-up problems and crashes are also written to `crash.log` in the same folder, with file paths and user names removed. Logs record terminal output only by size and files only by name. **How to reach it:** **Settings > Logging > Open** reveals the resolved folder. The log level defaults to **Info**.
 
 ## New versions
 

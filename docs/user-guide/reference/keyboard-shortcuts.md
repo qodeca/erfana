@@ -6,6 +6,7 @@ SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 # Use keyboard shortcuts
 
 These are Erfana's app and panel shortcuts. The active panel matters: an editor command acts on the foreground tab, and a terminal command acts in the terminal.
+
 **On this page**
 
 - [App and windows](#app-and-windows)
@@ -27,10 +28,13 @@ These are Erfana's app and panel shortcuts. The active panel matters: an editor 
 | Refresh project tree | <kbd>Cmd</kbd>+<kbd>Alt</kbd>+<kbd>R</kbd> | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>R</kbd> |
 | New Window | <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>N</kbd> | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>N</kbd> |
 | Actual size; zoom in; zoom out | <kbd>Cmd</kbd>+<kbd>0</kbd>; <kbd>Cmd</kbd>+<kbd>+</kbd>; <kbd>Cmd</kbd>+<kbd>-</kbd> | <kbd>Ctrl</kbd>+<kbd>0</kbd>; <kbd>Ctrl</kbd>+<kbd>+</kbd>; <kbd>Ctrl</kbd>+<kbd>-</kbd> |
-| Minimize; hide; quit | <kbd>Cmd</kbd>+<kbd>M</kbd>; <kbd>Cmd</kbd>+<kbd>H</kbd>; <kbd>Cmd</kbd>+<kbd>Q</kbd> | <kbd>Ctrl</kbd>+<kbd>M</kbd>; —; **File > Exit** |
+| Minimize; hide; quit | <kbd>Cmd</kbd>+<kbd>M</kbd>; <kbd>Cmd</kbd>+<kbd>H</kbd>; <kbd>Cmd</kbd>+<kbd>Q</kbd> | <kbd>Ctrl</kbd>+<kbd>M</kbd>; none; **File > Exit** |
 | Close window; full screen | Use the window close control; **View > Toggle Full Screen** | <kbd>Alt</kbd>+<kbd>F4</kbd>; <kbd>F11</kbd> |
 
-The View zoom commands zoom a focused HTML page first; otherwise they zoom the Erfana window. **Settings** has no opening shortcut: select the gear. <kbd>Esc</kbd> closes it.
+| Move through recent projects on the Welcome tab; open one | <kbd>↑</kbd>; <kbd>↓</kbd>; <kbd>Home</kbd>; <kbd>End</kbd>; <kbd>Enter</kbd> or <kbd>Space</kbd> | Same |
+| Close a message (toast) that has focus | <kbd>Esc</kbd> | Same |
+
+The View zoom commands zoom a focused HTML page first; otherwise they zoom the Erfana window. **Settings** has no opening shortcut: select the gear. <kbd>Esc</kbd> closes it. <kbd>Tab</kbd> reaches the recent-projects list as one stop. Closing a message puts focus back where it was.
 
 ## Project tree
 
@@ -46,7 +50,7 @@ The View zoom commands zoom a focused HTML page first; otherwise they zoom the E
 | Jump to a row by name | Type its first letters | Same |
 | Open the row's menu | <kbd>Shift</kbd>+<kbd>F10</kbd> | <kbd>Shift</kbd>+<kbd>F10</kbd> or the <kbd>Menu</kbd> key |
 
-The whole tree is a single <kbd>Tab</kbd> stop: <kbd>Tab</kbd> enters it on the last row you used, and the next <kbd>Tab</kbd> leaves it. The arrow keys move focus without changing the selected folder; <kbd>Enter</kbd> or a click selects one. The row menu works like every other menu – see [Menus](#menus). Refresh and import are ignored while typing in a text field; import also needs a selected folder.
+Cut, copy and paste act on the tree only while the tree has focus, so they never copy a folder you clicked earlier when you meant the text selected elsewhere. The whole tree is a single <kbd>Tab</kbd> stop: <kbd>Tab</kbd> enters it on the last row you used, and the next <kbd>Tab</kbd> leaves it. The arrow keys move focus without changing the selected folder; <kbd>Enter</kbd> or a click selects one. The row menu works like every other menu – see [Menus](#menus). Refresh and import are ignored while typing in a text field; import also needs a selected folder.
 
 ## Editor and Markdown preview
 

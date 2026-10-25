@@ -38,6 +38,9 @@ Project-specific terminology used in Erfana documentation and code.
 | **Tesseract.js** | JavaScript OCR engine used by LiteParse for local text extraction (no external API calls) |
 | **tessdata** | Pre-trained Tesseract language models bundled in `resources/tessdata/` for offline OCR |
 | **Preview tab** | A dockview tab showing an HTML preview. It opens with a `preview-` panel id and keeps that id when it moves to another page, so never read a path back out of it |
+| **Import tools** | Settings section (#250) that lists which import formats work on this computer and whether LibreOffice was found, with an install hint per platform |
+| **Screen reader mode** | xterm.js option that keeps an offscreen accessibility tree of the terminal text so screen readers can read it. Setting `terminal.screenReaderMode`: `auto` (follows the OS on macOS and Windows), `on`, `off` |
+| **Native watcher** | The `native-recursive` directory-watch backend (`NativeRecursiveWatcher`, Node's `fs.watch`) used on macOS and Windows; Linux uses chokidar |
 | **Same-tab navigation** | Per-tab **Open links in this tab** mode of the HTML preview (#124): a plain link to another project page replaces the page in the same tab, which then has its own Back and Forward history. Off by default and kept in memory only |
 
 ## Services
@@ -46,7 +49,7 @@ Project-specific terminology used in Erfana documentation and code.
 |------|------------|
 | **FileService** | Handles file read/write operations |
 | **TerminalService** | Manages PTY instances for terminal emulation |
-| **DirectoryWatcherService** | Monitors file system changes for auto-refresh |
+| **DirectoryWatcherService** | Monitors file system changes for auto-refresh; picks the native watcher on macOS and Windows and chokidar on Linux |
 | **FileWatcherService** | Watches individual files for external changes |
 | **GitStatusService** | Tracks git status via a worker thread (`git-status.worker.ts`); native git when a binary is found, isomorphic-git as the fallback |
 | **SettingsService** | Application-level state persisted with electron-store – `lastProjectPath`, `recentProjects`, `projectFilterMode`, `directoryWatchDepth`. Not per-project settings |
@@ -70,7 +73,7 @@ Project-specific terminology used in Erfana documentation and code.
 | **BrowserLaunchService** | `src/main/services/browserLaunch/` – opens a project `.html` / `.htm` file in the default browser after seven ordered checks; never rejects, answers with an `OPEN_IN_BROWSER_*` code (#124) |
 | **editorSaveRegistry** | `src/renderer/src/services/editorSaveRegistry.ts` – saves an editor tab by panel id, so a preview tab move can save another tab's edits; editors register through `useEditorSaveRegistration`. An unregistered id answers `false` (#124) |
 | **stablePathDigest** | `src/shared/stablePathDigest.ts` – 16-hex FNV-1a digest of a path, shared by main and renderer, for over-long panel ids and log lines. Not cryptographic (#124) |
-| **DependencyDetector** | Async detection of LibreOffice (found / missing / unsafe location) with 5s timeout and session caching; Settings → Import tools shows the result and its "Check again" clears the cache without a restart (#250) |
+| **DependencyDetector** | Async detection of LibreOffice (found / missing / unsafe location) with session caching. On macOS and Linux a found copy must answer `--version` within 5 s; on Windows it is found by its install location and never started (#329). **Settings > Import tools** shows the result and its "Check again" clears the cache without a restart (#250) |
 
 ## State Management
 

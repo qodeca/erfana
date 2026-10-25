@@ -9,7 +9,7 @@ Erfana automatically detects and responds to external file system changes using 
 
 FileWatcherService uses [Chokidar](https://github.com/paulmillr/chokidar) on every platform. DirectoryWatcherService uses chokidar on Linux, and on Windows and macOS a native recursive watcher built on Node's own `fs.watch` ([#211](https://github.com/qodeca/erfana/issues/211)) – see [Watch backends](#watch-backends-211). Both share the debouncing and race-condition guards described below.
 
-> **Chokidar is pinned to exact `5.0.0`.** chokidar 3 pulled `braces` (GHSA-vfj7-8cjw-p6xm, no patched release) into the production tree. chokidar 4+ has no globbing (a name such as `[draft] {v2}.md` is literal) and no macOS FSEvents: it watches each file via kqueue / `fs.watch` (one FD per file), which exhausts the process FD table on large projects and breaks spawning child processes – PDF export's hidden render window crashed with `Failed to initialize sandbox` on a 20k-file folder (the reason for the earlier 3.6.0 pin, commit `68cfab8` – pre-migration; no longer resolvable, that history was rewritten at the 2026-06 migration – shipped in v0.12.0). That is why the project directory watcher on macOS runs on the native backend instead; single-file watches stay on chokidar. The rationale is also in the comment in the `chokidar.watch(...)` options of `DirectoryWatcherService`.
+> **Chokidar is pinned to exact `5.0.0`.** chokidar 3 pulled `braces` (GHSA-vfj7-8cjw-p6xm, no patched release) into the production tree. chokidar 4+ has no globbing (a name such as `[draft] {v2}.md` is literal) and no macOS FSEvents: it watches each file via kqueue / `fs.watch` (one FD per file), which exhausts the process FD table on large projects and breaks spawning child processes – PDF export's hidden render window crashed with `Failed to initialize sandbox` on a 20k-file folder (the reason for the earlier 3.6.0 pin, commit `68cfab8` – pre-migration; no longer resolvable, that history was rewritten at the 2026-06 migration – shipped in v0.12.0). That is why the project directory watcher on macOS runs on the native backend instead; single-file watches stay on chokidar. The rationale is also in the comment in the `chokidar.watch(...)` options of `createChokidarWatcher` (`src/main/services/watcher/directoryWatchBuilders.ts`).
 
 ---
 
@@ -34,7 +34,7 @@ Monitors open files for external content modifications.
 | File modified externally, no local changes | Auto-reload silently, show "Reloaded from disk" in toolbar (1s) |
 | File modified externally, has unsaved changes | Show orange conflict bar with options |
 | File replaced atomically (write temp + rename) | Surfaces as `file-watch:changed`, not a delete — see [Single-file watch internals](#single-file-watch-internals-70) |
-| Erfana's own save of a document or of `~/.erfana/settings.json` | Crash-safe: `atomicWriteText` / `atomicWriteJSON` (`src/main/utils/atomicWrite.ts`) write a same-folder temp file named `.erfana-tmp-<uuid>` (settings use `.<uuid>.tmp`), fsync it, then rename it over the target – so the editor's own save is the atomic-replace row above. Symlinked, hard-linked, read-only, foreign-owned files and mounts that cannot rename are written in place instead. `.erfana-tmp-*` is dropped by `DirectoryWatcherService.shouldDropRel` (both backends) and skipped by the tree walk, so it never shows in the tree or triggers a reload; temp files older than 10 minutes left by a crash are swept in the background when a project opens (`atomicTempSweep.ts`) |
+| Erfana's own save of a document or of `~/.erfana/settings.json` | Crash-safe: `atomicWriteText` / `atomicWriteJSON` (`src/main/utils/atomicWrite.ts`) write a same-folder temp file named `.erfana-tmp-<uuid>` (settings use `.<uuid>.tmp`), fsync it, then rename it over the target – so the editor's own save is the atomic-replace row above. Symlinked, hard-linked, read-only, foreign-owned files and mounts that cannot rename are written in place instead. `.erfana-tmp-*` is dropped by `shouldDropRel` in `watcher/DirectoryWatcherCore.ts` (both backends) and skipped by the tree walk, so it never shows in the tree or triggers a reload; temp files older than 10 minutes left by a crash are swept in the background when a project opens (`atomicTempSweep.ts`) |
 | File deleted externally | Show red warning banner, keep editor state |
 | Parent folder renamed, moved or deleted externally | Same as a delete: banner, `(deleted)` in the tab. A single-file chokidar watch hears nothing when its parent folder is renamed, so the project watcher's removals are forwarded to `FileWatcherService.handleAncestorRemovals` (both backends), which runs the affected watch through the normal unlink branch, existence re-check included. A removal that lands while the project watch is paused for one of the app's own operations is forwarded when the pause ends (`PauseEpisode.externalRemovals`, kept as the top-most removed folder). The operation's own removals are left out when it noted them (`noteInternalChange`, usually after their events arrived). Past 256 remembered removals the deepest are folded into their folder, and the open files under that folder are checked on disk instead of being reported; after a resync, or past the internal-change cap, the same check covers the whole watch (`checkWatchedFilesUnder`, which skips the paths the operation removed itself) (#252) |
 | Folder above an open file renamed or deleted where the project watcher cannot see | Same banner. The project watcher never reports an excluded, hidden or ignored folder (`dist`, `node_modules`, a `files.exclude` entry), so `FileWatcherService` re-checks the files `DirectoryWatcherService.reportsRemovalsAbove` cannot speak for (`watcher/unseenWatchProbe.ts`, #252): only this session's files inside the project, one `stat` at a time with a 1 s time box (a timeout counts as present), every 2 s plus the last round's duration, and only while some open file is unseen. A file is reported after two rounds in a row found it gone, and never while the app's own operation is removing it. Here only ENOENT/ENOTDIR count as gone, and a locked or unreadable file (EBUSY, EPERM, EACCES, EIO) is still there (`watcher/pathPresence.ts`) |
@@ -359,7 +359,11 @@ One consequence, pre-existing in another form: a change made during the first re
 
 ### Implementation Location
 
-- **Service**: `src/main/services/DirectoryWatcherService.ts`
+- **Service**: `src/main/services/DirectoryWatcherService.ts` – the public lifecycle (`watchDirectory`, `stopAll`, `setPathFilter`, `reportsRemovalsAbove`). Since v0.22.0 it is split into layers, each a class the next one extends (lens review finding [65]); the public API, IPC channels and log lines did not change:
+  - `watcher/DirectoryWatcherCore.ts` – shared state, the path rules (`shouldDropRel`) and how a notice reaches the watching windows
+  - `watcher/DirectoryWatcherRecovery.ts` – error classification, EMFILE teardown, restarts with back-off (`handleWatcherError`, `scheduleRestart`)
+  - `watcher/DirectoryWatcherEvents.ts` – the event pipeline and the pause API (`queueEvent`, `handleResync`, `pauseWatch`, `resumeWatch`)
+  - helpers: `watcher/directoryWatchBuilders.ts` (builds the chokidar or native backend), `watcher/directoryWatchTypes.ts` (shapes and batch rules such as `isStructuralBatch`), `watcher/DirectoryWatchListeners.ts` (removal and coverage listeners, #252)
 - **IPC Handlers**: `src/main/ipc/directory-watcher-handlers.ts`
 - **Renderer Hook**: `src/renderer/src/hooks/useDirectoryWatcher.ts` (lifecycle, event handling, AC-010 guard)
 - **Pure Logic**: `src/renderer/src/hooks/useDirectoryWatcher.logic.ts` (state guards, message creation)
@@ -414,7 +418,7 @@ After 3 failed restart attempts the service stops retrying and sends `directory-
 
 **EMFILE log deduplication**: Uses `RateLimitedLogger` (10s cooldown) to prevent EMFILE error log spam during cascading FD exhaustion. See `src/main/utils/RateLimitedLogger.ts`.
 
-**Implementation:** `DirectoryWatcherService.ts`, `WatcherMetrics.ts`, `RateLimitedLogger.ts`
+**Implementation:** `watcher/DirectoryWatcherRecovery.ts` (the restart layer of `DirectoryWatcherService`), `WatcherMetrics.ts`, `RateLimitedLogger.ts`
 
 ---
 
@@ -615,16 +619,16 @@ The service integrates these components:
   - Additional: all 5 event types, correlation ID, WatcherMetrics, disposal guards, circuit breaker
 - Watcher resilience tests in `src/main/services/WatcherResilience.test.ts` (14 tests, #100)
   - AC-011 (polling fallback), AC-015 (redundant polling suppression), AC-016 (exponential backoff restart)
-- Window visibility gating tests in `src/renderer/src/hooks/useGitStatus.test.ts` – 5 of the file's 38 tests cover the visibility-gating case (#102)
+- Window visibility gating tests in `src/renderer/src/hooks/useGitStatus.test.ts` – 5 of the file's 39 tests (counted 2026-10-25) cover the visibility-gating case (#102)
   - AC-012: git status refreshes dropped while hidden, single catch-up on restore, cooldown respected
 - Event buffer overflow tests in `src/main/services/watcher/ThrottledWorker.test.ts` (24 tests, #102 + #173)
   - AC-017: 30,000-event cap, FIFO eviction, no crash/hang, post-burst recovery
   - Offset-deque coverage: 60 k-event stress burst runs in <1 s cross-platform after the refactor
 - 016-NFR-001 main-process latency integration tests in `DirectoryWatcherService.pipeline.test.ts`
   - Isolates chokidar + Defender noise via fake timers; asserts <200 ms virtual latency for single add + atomic-save flows
-- Hook tests in `src/renderer/src/hooks/useDirectoryWatcher.test.ts` (14 tests)
+- Hook tests in `src/renderer/src/hooks/useDirectoryWatcher.test.ts`
 - Pause/resume tests in `src/renderer/src/components/ProjectTree/withWatcherPause.test.ts` (18 tests)
-- Project switching tests in `src/main/services/ProjectService.switching.test.ts` (20 tests, #101)
+- Project switching tests in `src/main/services/ProjectService.switching.test.ts` (#101)
   - Session token guards, step ordering, in-flight event handling during project switches
 - Renderer switching tests in `src/renderer/src/components/ProjectTree/ProjectTree.switching.test.tsx` (11 tests, #101)
   - Tree clearing, new project loading, stale event rejection, git status updates

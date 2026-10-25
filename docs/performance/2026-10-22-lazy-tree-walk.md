@@ -6,6 +6,7 @@ SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 # Opening a large project: the lazy tree walk (finding [32])
 
 - **Finding:** [32] "Serial tree walk including ignored folders" (lens review of v0.21.0, Wave 4 of v0.22.0). Branch `perf/lazy-tree-walk`.
+- **Shipped:** in v0.22.0 (2026-10-25) – see the [changelog](../CHANGELOG.md#0220).
 - **Date:** 2026-10-22. **Host:** Apple M5 Max, 128 GB, macOS 26.6.2, APFS on the internal SSD, Node 24.20.0 under vitest (the main-process walk only, no Electron window). 1-minute load average 4.7–5.1 during the runs.
 - **Data:** 3 interleaved rounds (before, after, before, after, before, after); each round is 6 walks of the project root, the first one discarded to warm the OS file cache. The table gives the median of the three rounds' medians per side, and in brackets the range over all 15 kept walks. Warm cache only – a cold cache needs `sudo purge` and was not measured.
 

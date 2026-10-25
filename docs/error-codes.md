@@ -2,7 +2,7 @@
 
 Project-wide index of `ErrorCode` values in `src/shared/errors.ts`, grouped by category. For each code: the enum name, the user-facing message (from `ERROR_MESSAGES` map), and the primary throw site. For whisper + transcription codes, also the operator action on encounter.
 
-**Why this document exists**: Phase 4 introduced 6 new whisper codes (see [ADR 0001](./adrs/0001-self-host-whisper-binaries.md)); the full enum has grown to 140 codes. A single mapping table saves every future maintainer a `grep -r ErrorCode` sweep.
+**Why this document exists**: Phase 4 introduced 6 new whisper codes (see [ADR 0001](./adrs/0001-self-host-whisper-binaries.md)); the full enum has grown to 150 codes (counted on 2026-10-25, v0.22.0). A single mapping table saves every future maintainer a `grep -r ErrorCode` sweep.
 
 **Source of truth**: `src/shared/errors.ts`. If this doc drifts, `errors.ts` wins — file an issue.
 
@@ -12,6 +12,15 @@ throw new AppError('human-readable message', ErrorCode.XYZ, originalError?)
 ```
 
 IPC layer sanitises raw messages to prevent internal-detail leaks; user sees only the `ERROR_MESSAGES[code]` mapping. See `getUserFriendlyMessage()` in `errors.ts`.
+
+### How codes cross IPC
+
+An `AppError` thrown in the main process reaches the renderer as a plain `Error` that keeps only its message, so its `code` is lost on the way. Two ways around that are in use:
+
+- **Result objects.** Most domains return `{ success: false, error, errorCode }` instead of throwing (image export, open in browser, external files, document import).
+- **The code marker** (`src/shared/errorCodeMarker.ts`, v0.22.0). Main appends the code to the message – `withErrorCodeMarker(message, code)` gives `… [PATH_SYSTEM_DIR]` – and the renderer reads it back with `errorCodeInMessage()`. `getUserFriendlyMessage()` and `getDisplayMessage()` both understand the marker, and `cleanErrorMessage()` strips it and Electron's `Error invoking remote method …` prefix from text that is shown as is. The project-open handlers use it, so a refused folder reads the same in the folder dialog, the recent list and a drop.
+
+Path refusals from the main-process path checks use a third vocabulary, see [Path refusal codes](#path-refusal-codes-not-errorcode) below.
 
 ---
 
@@ -42,9 +51,9 @@ See `src/main/services/SettingsService.ts`, `ProjectSettingsService.ts`, `Global
 
 ---
 
-## Import & export (30 codes)
+## Import & export (31 codes)
 
-5 `PDF_*` (legacy import) + 12 generic `IMPORT_*` + 5 document-import `IMPORT_*` + 4 `PDF_EXPORT_*` + 4 `DOCX_EXPORT_*` in `src/shared/errors.ts`. Image export has its own 15 codes — see [Image export](#image-export-15-codes) below; they are **not** counted here.
+5 `PDF_*` (legacy import) + 12 generic `IMPORT_*` + 6 document-import `IMPORT_*` + 4 `PDF_EXPORT_*` + 4 `DOCX_EXPORT_*` in `src/shared/errors.ts`. Image export has its own 15 codes – see [Image export](#image-export-15-codes) below; they are **not** counted here.
 
 Grouped by pipeline stage. See `docs/api-services-features.md` §LiteParseConverter and §DocxService for full flows.
 
@@ -52,9 +61,11 @@ Grouped by pipeline stage. See `docs/api-services-features.md` §LiteParseConver
 |----------|-------|
 | PDF-legacy | `PDF_ENCRYPTED`, `PDF_EMPTY`, `PDF_CORRUPT`, `PDF_TOO_LARGE`, `PDF_CONVERSION_FAILED` |
 | Generic import | `IMPORT_FILE_NOT_FOUND`, `IMPORT_FILE_UNREADABLE`, `IMPORT_ENCRYPTED`, `IMPORT_EMPTY`, `IMPORT_CORRUPT`, `IMPORT_TOO_LARGE`, `IMPORT_EXCEEDS_SIZE_LIMIT`, `IMPORT_CONVERSION_FAILED`, `IMPORT_UNSUPPORTED_TYPE`, `IMPORT_TEXT_ENCODING_ERROR`, `IMPORT_DIR_CREATE_FAILED`, `IMPORT_WRITE_FAILED` |
-| Document-import (#132) | `IMPORT_DEPENDENCY_MISSING`, `IMPORT_OCR_FAILED`, `IMPORT_PAGE_LIMIT_EXCEEDED`, `IMPORT_TIMEOUT`, `IMPORT_BUSY` |
+| Document-import (#132) | `IMPORT_DEPENDENCY_MISSING`, `IMPORT_OCR_FAILED`, `IMPORT_PAGE_LIMIT_EXCEEDED`, `IMPORT_TIMEOUT`, `IMPORT_BUSY`, `IMPORT_UNTRUSTED_TOOL` |
 | PDF-export | `PDF_EXPORT_CANCELLED`, `PDF_EXPORT_FAILED`, `PDF_EXPORT_NO_CONTENT`, `PDF_EXPORT_INVALID_REQUEST` |
 | DOCX-export | `DOCX_EXPORT_CANCELLED`, `DOCX_EXPORT_FAILED`, `DOCX_EXPORT_NO_CONTENT`, `DOCX_EXPORT_INVALID_REQUEST` |
+
+`IMPORT_UNTRUSTED_TOOL` (#250, v0.22.0) is raised by `LiteParseConverter` before an Office conversion when the LibreOffice it would run sits in the open project, a temporary folder or a network share, comes from a relative PATH entry, or cannot be pinned to one real path (`unresolvable`, `ambiguous`). Erfana does not run it. The message names the program and the reason through `untrustedToolMessage()` (`src/shared/errors.ts`); the log line redacts the path. Operator action: remove that folder from PATH, or install LibreOffice in its usual place. See [API services – features § DependencyDetector](./api-services-features.md#dependencydetector).
 
 ---
 
@@ -79,7 +90,7 @@ Unlike most domains, these never travel as a thrown `AppError`. `ImageExportServ
 | `IMAGE_EXPORT_ICO_SIZE_MISMATCH` | "Could not export the largest size in this icon file" | Decoded dimensions disagree with the largest entry in the `.ico` directory and the entry is not a PNG slice. Never a silent wrong-size export |
 | `IMAGE_EXPORT_SOURCE_COLLISION` | "That would overwrite the image you are exporting" | The chosen destination resolves to the source, or cannot be *proven* not to (a non-ENOENT `realpath` error refuses rather than failing open) |
 | `IMAGE_EXPORT_WRITE_FAILED` | "Could not write to that folder" | Writing the exported file threw |
-| `IMAGE_EXPORT_CLIPBOARD_FAILED` | "The clipboard rejected the image" | The decoded image was empty, or `clipboard.writeImage` threw |
+| `IMAGE_EXPORT_CLIPBOARD_FAILED` | "The clipboard rejected the image" | The decoded image was empty, or `clipboard.write` rejected the `image/png` item (Electron 44 removed `clipboard.writeImage`) |
 | `IMAGE_EXPORT_FAILED` | "Image export failed" | Catch-all, including harness timeout and hidden-window load failure |
 
 ---
@@ -126,11 +137,23 @@ Unlike most domains, these never travel as a thrown `AppError`. `ImageExportServ
 
 ---
 
-## External file drop (7 codes)
+## External file drop (14 codes)
 
-7 `EXTERNAL_FILE_*` in `src/shared/errors.ts`.
+14 `EXTERNAL_FILE_*` in `src/shared/errors.ts`. Returned in the `{ success: false, error, errorCode }` answer of the `file:*FromExternal` channels, never thrown across IPC.
 
-`EXTERNAL_FILE_NOT_FOUND`, `EXTERNAL_FILE_IS_DIRECTORY`, `EXTERNAL_FILE_NOT_REGULAR`, `EXTERNAL_FILE_SYMLINK_SYSTEM`, `EXTERNAL_FILE_COPY_FAILED`, `EXTERNAL_FILE_MOVE_FAILED`, `EXTERNAL_FILE_SOURCE_DELETED`. See `src/main/services/ExternalFileService.ts` + Spec #012.
+The original seven: `EXTERNAL_FILE_NOT_FOUND`, `EXTERNAL_FILE_IS_DIRECTORY`, `EXTERNAL_FILE_NOT_REGULAR`, `EXTERNAL_FILE_SYMLINK_SYSTEM`, `EXTERNAL_FILE_COPY_FAILED`, `EXTERNAL_FILE_MOVE_FAILED`, `EXTERNAL_FILE_SOURCE_DELETED`. See `src/main/services/ExternalFileService.ts` + Spec #012.
+
+Seven more came with the move confirmation (a move now deletes the original only after the user answers Move in a native box):
+
+| Code | User copy | Raised when |
+|------|-----------|-------------|
+| `EXTERNAL_FILE_MOVE_CANCELLED` | "Move cancelled" | The user answered Cancel. Not an error: the renderer shows no failure toast for it |
+| `EXTERNAL_FILE_MOVE_NOT_GRANTED` | "Moving needs a file chosen with the Add files dialog; copy the file instead" | The box could not be shown (no confirmer, a hidden window, or the window's box limit used up). In a batch, every file of the drop answers it and the renderer shows one toast |
+| `EXTERNAL_FILE_MOVE_CHANGED` | "The files changed while waiting; nothing was moved" | After the answer, the source or the target folder no longer matched what the box showed |
+| `EXTERNAL_FILE_SAME_FILE` | "The file is already there" | The copy would land on the source itself, so the source is never deleted |
+| `EXTERNAL_FILE_MOVE_SYMLINK` | "A link can be copied but not moved; copy it instead" | The source is a symbolic link |
+| `EXTERNAL_FILE_SOURCE_CHANGED` | "The original changed during the move, so it was left in place; the copy was kept" | The entry or its folder changed while the copy ran |
+| `EXTERNAL_FILE_IN_PROJECT` | "This file is already in the project; move it from the project tree" | `external-file-handlers.ts`: the source is inside the open project |
 
 ---
 
@@ -144,9 +167,9 @@ See `src/main/services/TranscriptionService.ts`. Retry semantics documented in `
 
 ---
 
-## Local Whisper (14 codes) — highest operator-visibility
+## Local Whisper (16 codes) – highest operator-visibility
 
-14 `WHISPER_*` in `src/shared/errors.ts`.
+16 `WHISPER_*` in `src/shared/errors.ts`.
 
 Most Phase 4 / issue #165. See also [`docs/windows/whisper-support-runbook.md`](./windows/whisper-support-runbook.md) for diagnostic trail, log paths, and stuck-user procedures.
 
@@ -227,6 +250,25 @@ Not an error: when the default-browser lookup fails, times out or returns an unu
 
 ---
 
+## Path refusal codes (not `ErrorCode`)
+
+The main-process path checks (`registerConfinedHandle`, [IPC patterns § Path checks](./ipc-patterns.md#path-checks-in-the-main-process)) throw a `ConfinementError` with its own code, not an `ErrorCode`. The codes and their fixed messages live in `src/shared/ipc/confinement.ts` (`CONFINEMENT_MESSAGES`), shared by both processes; the renderer's file gateway reads the code back from the rejected `invoke` with `confinementCodeFromMessage()` and raises a `FileGatewayError` that carries it.
+
+| Code | Default message | Meaning |
+|------|-----------------|---------|
+| `INVALID_PATH` | "Invalid file path" | Not a usable absolute path (empty, too long, a device name, a Windows device prefix) |
+| `NO_PROJECT` | "No project is open" | The channel needs an open project |
+| `OUTSIDE_PROJECT` | "Cannot read files outside the project directory" (or "Cannot change files outside the project directory, or through a link that leads outside it" for a change) | The path, or a link on the way, leads out of the project |
+| `UNVERIFIABLE` | "Cannot verify this path is inside the project directory" | Where the path leads could not be established |
+| `PERMISSION_DENIED` | "Cannot open this file: permission denied" | A file in a verified folder the system will not let Erfana resolve (Windows "Deny Read") |
+| `ROOT_FORBIDDEN` | "Cannot change the project root directory" | The action would write, move or delete the project root |
+| `NOT_FOUND` | "Item not found" (or "The project folder no longer exists") | The path, or the project folder itself, is gone |
+| `WRONG_KIND` | "Path is not the kind of item this action needs" | A folder where a file is needed, or the reverse |
+| `PROJECT_CHANGED` | "The project changed while the request was running" | The request named an older project generation, or the project changed while it ran |
+| `NOT_SESSION_OWNER` | "This window does not own the open project" | A window other than the one that opened the project asked for a project path |
+
+---
+
 ## Generic (1 code)
 
 1 code (`UNKNOWN_ERROR`) in `src/shared/errors.ts`.
@@ -251,4 +293,4 @@ Keep this doc under 500 lines — split into subfiles if categories grow beyond 
 
 - `src/shared/errors.ts` — source of truth (`AppError` class, `ErrorCode` enum, `ERROR_MESSAGES` map, `getUserFriendlyMessage()`, `isProjectNotFoundError()`).
 - [`docs/windows/whisper-support-runbook.md`](./windows/whisper-support-runbook.md) — whisper + transcription operator playbook.
-- [`docs/ipc-patterns.md`](./ipc-patterns.md) — `AppError.code` → IPC serialisation via `INVALID_FILENAME_MARKER` workaround; tracked as D4 / D8 in `deferred-work.md`.
+- [`docs/ipc-patterns.md`](./ipc-patterns.md) – how a code crosses IPC: the `INVALID_FILENAME_MARKER` text test, the `[CODE]` marker (`errorCodeMarker.ts`) and the path refusal codes (`confinement.ts`). The structured-error IPC work is still open as D4 ([#220](https://github.com/qodeca/erfana/issues/220)) and D8 in [`windows/deferred-work.md`](./windows/deferred-work.md).

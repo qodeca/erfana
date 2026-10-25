@@ -11,7 +11,7 @@ SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 - **Status:** proposed – design review by a reviewer agent on a different model, not the owner
   (owner's decision, 2026-09-25).
 - **Design:** [docs/designs/138-user-guide/](../designs/138-user-guide/README.md), with the
-  [feature inventory](../designs/138-user-guide/feature-inventory.md) and
+  [feature inventory](../user-guide/feature-inventory.md) (moved there in #158) and
   [research notes](../designs/138-user-guide/research.md).
 
 This page is the build contract. The design explains *what* and *why*; this page says *in which

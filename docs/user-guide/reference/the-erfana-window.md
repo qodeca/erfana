@@ -16,7 +16,7 @@ Erfana opens a project beside the editor and terminal. The Home tab and activity
 
 ## Welcome and Home
 
-**What it does:** With no project, the welcome view shows the app version, **Open project**, and up to five recent projects; a recent entry can be reopened or removed from the list. The **Home** tab remains available after opening a project. **How to reach it:** Launch Erfana or select the Home tab. The project panel also offers **Change project** and **Close project**. Closing a project returns to the welcome view; it does not delete the folder.
+**What it does:** With no project, the welcome view shows the app version, **Open project**, and up to five recent projects; a recent entry can be reopened or removed from the list, with the mouse or the keyboard (<kbd>Tab</kbd> to the list, then the arrow keys and <kbd>Enter</kbd>). The **Home** tab remains available after opening a project. **How to reach it:** Launch Erfana or select the Home tab. The project panel also offers **Change project** and **Close project**. Closing a project returns to the welcome view; it does not delete the folder. Before switching or closing, Erfana saves every edited tab; it asks only about tabs that could not be saved, such as a file that changed on disk.
 
 ## Activity bars
 

@@ -24,7 +24,7 @@ Select an audio or video file and choose the transcription backend. OpenAI proce
 
 ## What happens next / If something goes wrong
 
-Progress can be retried and long recordings are split into chunks.
+Progress can be retried and long recordings are split into chunks. A local model download can be stopped with **Cancel** in Settings; nothing partial is left behind.
 
 ## Related
 

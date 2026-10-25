@@ -57,11 +57,13 @@ function safeConsoleWrite(method: ConsoleMethod, ...args: unknown[]): void {
 }
 ```
 
-**Installation**: Called early in `src/main/index.ts` before any other code
+**Installation**: Called early in `src/main/index.ts`, before the services start
 ```typescript
 import { installSafeConsole } from './utils/safeConsole'
 installSafeConsole()
 ```
+
+> **Known gap (found 2026-10-25).** `installSafeConsole()` replaces `console.log` (and `error`, `warn`, `info`, `debug`) with wrappers that call `console[method]` – which by then is the wrapper itself. Each call recurses until the stack overflows, the overflow is caught, and nothing is printed: in the main process, console output after installation is silently dropped rather than EPIPE-guarded. Running the module on its own under Node 24 reproduces it (`console.log` after `installSafeConsole()` prints nothing). It does not affect the log files, which `LoggingService` writes through electron-log's file transport. The fix belongs in `src/main/utils/safeConsole.ts` (keep the original methods and call those).
 
 ### 2. TerminalService PTY protection
 
@@ -71,8 +73,8 @@ Protects against EPIPE when writing to a terminal PTY that has closed.
 
 **Methods Enhanced**:
 - `write()`: Suppress EPIPE, emit exit event, clean up terminal
-- `killTerminal()`: Suppress EPIPE and ESRCH (process not found)
-- `dispose()`: Suppress EPIPE and ESRCH during bulk cleanup
+- `killTerminal()`: Suppress EPIPE and ESRCH (process not found); the entry is dropped and the call answers `true`
+- `dispose()`, and on Windows the window-close cleanup (`cleanupForWebContentsId`): end shells through `ptyKillQuietly()`, which suppresses EPIPE and ESRCH (elsewhere the window-close cleanup calls `killTerminal()`). `dispose()` then waits up to `TERMINAL_EXIT_WAIT_MS` (1.5 s) for the shells to report their exit, so a late exit report cannot arrive while the app shuts down (#214)
 
 **Code Pattern**:
 ```typescript
@@ -83,8 +85,10 @@ try {
   const code = (error as { code?: unknown }).code
   if (code === 'EPIPE') {
     logger.info(`ℹ️ Terminal ${terminalId} PTY closed (terminal likely exited)`)
+    this.clearHandshakeTimers(terminal)
     this.terminals.delete(terminalId)
-    this.emit('exit', { terminalId, exitCode: 0 })
+    terminal.output.dispose()
+    this.emit('exit', { terminalId, exitCode: 0, webContentsId: terminal.webContentsId })
     return false
   }
   // Handle other errors

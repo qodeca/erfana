@@ -1,6 +1,6 @@
 # E2E selector catalog
 
-All `data-testid` attributes available for E2E testing – **259 testids** across 37 sections.
+All `data-testid` attributes available for E2E testing – **274 testids** across 37 sections (counted against `testids.ts` on 2026-10-25).
 
 **Related documentation**:
 - [E2E Testing Guide](./e2e-testing.md) – Main E2E documentation
@@ -22,7 +22,7 @@ All `data-testid` attributes available for E2E testing – **259 testids** acros
 
 ---
 
-## Project tree (16 testids)
+## Project tree (17 testids)
 
 | Testid | Element | Type |
 |--------|---------|------|
@@ -42,6 +42,7 @@ All `data-testid` attributes available for E2E testing – **259 testids** acros
 | `project-tree-error` | Error state container | static |
 | `project-tree-loading` | Loading spinner | static |
 | `project-tree-drop-target-{hash}` | Folder drop target | dynamic |
+| `project-tree-placeholder-{hash}` | "Loading…" or "Could not read this folder" line under an expanded folder whose contents are read on expand (#320) | dynamic |
 
 **Dynamic testid example**:
 ```typescript
@@ -284,7 +285,7 @@ Full-window crash recovery screen (issue #60). Action buttons are capability-gat
 
 ---
 
-## Dialogs – file picker (5 testids)
+## Dialogs – file picker (6 testids)
 
 | Testid | Element | Type |
 |--------|---------|------|
@@ -293,6 +294,7 @@ Full-window crash recovery screen (issue #60). Action buttons are capability-gat
 | `file-picker-item-{hash}` | File item | dynamic |
 | `file-picker-btn-select` | Select button | static |
 | `file-picker-btn-cancel` | Cancel button | static |
+| `file-picker-incomplete` | Note that the project is too large to list in full, so other files of this name may be missing (#320) | static |
 
 ---
 
@@ -441,7 +443,7 @@ Full-window crash recovery screen (issue #60). Action buttons are capability-gat
 
 ---
 
-## Toast notifications (7 testids)
+## Toast notifications (8 testids)
 
 | Testid | Element | Type |
 |--------|---------|------|
@@ -452,10 +454,11 @@ Full-window crash recovery screen (issue #60). Action buttons are capability-gat
 | `toast-btn-action` | Action button (present only on a toast carrying an action; such a toast never auto-dismisses) | static |
 | `toast-live-polite` | Persistent visually-hidden polite live region (info/success/warning) | static |
 | `toast-live-alert` | Persistent visually-hidden alert live region (errors) | static |
+| `toast-count` | Repeat count ("×3") on a toast that merged identical repeats | static |
 
 ---
 
-## Settings overlay (22 testids)
+## Settings overlay (33 testids)
 
 | Testid | Element | Type |
 |--------|---------|------|
@@ -481,6 +484,17 @@ Full-window crash recovery screen (issue #60). Action buttons are capability-gat
 | `settings-whisper-download-error` | Whisper download error | static |
 | `settings-section-html-preview` | HTML preview settings section | static |
 | `settings-toggle-html-preview` | HTML preview enabled toggle | static |
+| `settings-api-key-error` | API key error message | static |
+| `settings-btn-whisper-cancel` | Cancel button shown while the Whisper binary or model downloads | static |
+| `settings-whisper-download-live` | Always-mounted, visually hidden status region announcing download progress | static |
+| `settings-whisper-download-alert` | Always-mounted, visually hidden alert region announcing a failed download | static |
+| `settings-section-terminal` | Terminal settings section (lens review [23]) | static |
+| `settings-select-screen-reader-mode` | Terminal screen-reader mode select: Auto / On / Off | static |
+| `settings-screen-reader-status` | What Auto currently detects (screen reader reported or not) | static |
+| `settings-section-import-tools` | Import tools section (#250) | static |
+| `settings-import-tool-status` | One format row's status; the row carries `data-format` and `data-state` | static |
+| `settings-btn-import-tools-recheck` | "Check again" button (#250) | static |
+| `settings-import-tools-live` | Polite live region announcing the outcome of "Check again" | static |
 
 ---
 
@@ -520,7 +534,7 @@ Full-window crash recovery screen (issue #60). Action buttons are capability-gat
 
 ---
 
-## Welcome panel (5 testids)
+## Welcome panel (6 testids)
 
 | Testid | Element | Type |
 |--------|---------|------|
@@ -529,6 +543,7 @@ Full-window crash recovery screen (issue #60). Action buttons are capability-gat
 | `welcome-recent-projects` | Recent projects list | static |
 | `welcome-recent-project-{hash}` | Recent project item | dynamic |
 | `welcome-recent-project-btn-remove-{hash}` | Remove recent project | dynamic |
+| `welcome-recent-project-btn-open-{hash}` | Keyboard "open" button of a recent project row | dynamic |
 
 ---
 

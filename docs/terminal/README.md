@@ -8,7 +8,7 @@ Integrated terminal emulator with xterm.js and node-pty for native shell access 
 
 The Terminal Panel provides a full-featured terminal emulator using:
 - **xterm.js v6.0.0** - Modern terminal emulator for web
-- **node-pty v1.0.0** - Native pseudo-terminal (PTY) backend
+- **node-pty v1.1.0** (`^1.0.0` in `package.json`, 1.1.0 in the lock file) - Native pseudo-terminal (PTY) backend
 - **WebGL rendering** - Hardware-accelerated rendering for performance
 
 ## Quick Access
@@ -18,7 +18,7 @@ The Terminal Panel provides a full-featured terminal emulator using:
 - **Maximize**: ⛶ button in panel header / `Cmd/Ctrl+Shift+M` - Expand the terminal over the editor
 - **Scroll to Bottom**: ⬇️ button in panel header - Jump to latest output
 - **Scroll Lock**: 🔒 button in panel header - Lock scroll to always stay at bottom
-- **Restart**: 🔄 button in panel header - Kill and restart terminal session
+- **Restart**: 🔄 button in panel header - Kill and restart terminal session (asks first while the terminal is busy – see [Restart confirmation](#restart-confirmation))
 
 ## Features
 
@@ -50,12 +50,14 @@ A thin status bar pinned to the bottom of a terminal panel — its height matche
 
 **Behavior**:
 - Data is read **non-invasively** (read-only) from Claude Code's own transcript JSONL under `~/.claude/projects/<encoded-cwd>/*.jsonl` — Erfana never writes the user's Claude Code config
+- The transcript folder is watched with **one non-recursive `fs.watch` per folder**, shared by every panel that needs it (`claudeStatus/ClaudeTranscriptWatcher.ts`, v0.22.0). Before, chokidar watched each transcript on its own, so on macOS a long-lived project with hundreds of sessions held hundreds of file handles. A folder that does not exist yet (Claude creates it after the terminal opened), or whose watch died, is tried again on the next refresh and after a back-off of 5 s doubling to 60 s; a watch that comes back reports one change. Events under `subagents/` and non-`.jsonl` names are ignored
 - Per-panel detection inspects the panel's own PTY child-process tree for a `claude` process (macOS `ps`/`lsof`; Windows a single static `powershell.exe` `Get-CimInstance Win32_Process` snapshot, BFS over the tree) and uses that process's cwd to locate the transcript (Windows v1 falls back to the panel's spawn cwd rather than Claude's live cwd)
 - Window size resolves through one shared model-id parser + exact-id capability registry (`claudeStatus/modelId.ts`, [#41](https://github.com/qodeca/erfana/issues/41); table verified 2026-08-07 against platform.claude.com + code.claude.com): **1M** for `claude-opus-5` / `4-8` / `4-7`, `claude-sonnet-5`, `claude-fable-5` and Mythos; **200k** for `claude-opus-4-6` and older Opus, `claude-sonnet-4-6` and older Sonnet, and all Haiku. The two 4.6 rows are **plan-conditional defaults, not ceilings** — Opus 4.6 runs at 1M where the plan includes extended context (auto-granted on Max/Team/Enterprise) and Sonnet 4.6 runs at 1M with usage credits, which no plan includes by default, Max included. 200k is the metered default in both cases, and an entitled session self-corrects via R2 once observed usage crosses 200k
 - Extrapolation for an unrecognised id is **per major generation, not family-wide** (design §7.2.1). `newestByMajor` is consulted first and, when the id's major is known, it *decides*: the id inherits **that major's** newest known window within `MAX_MINOR_LOOKAHEAD` (4) minor releases, and the family-wide value is never reached. So `claude-sonnet-4-7` reports **200k**, inheriting Sonnet 4.6, even though the family's newest known entry `claude-sonnet-5` is 1M. Only an **unknown** major inherits the family's newest window, and only `MAX_MAJOR_LOOKAHEAD` (1) generation ahead. Unknown families and bare aliases (`opus`) get no opinion and default to 200k
 - The window is **not** purely a property of the model id — plan and provider decide it too (Bedrock / Google Cloud / Foundry cap Opus at 200k). Sizing is therefore a **strict first-match chain, not a set of independent overrides** (`detectWindowDetail`, design §8): **R2** observed usage > 200k → **R0** explicit `/model …[1m]` → **R0'** explicit `/model <id>` with no marker (forces 200k) → **R1m** a `[1m]` marker on the id itself → **R1** the capability registry → **R3** a `settings.json` `[1m]` model → **R4** default 200k. R2 leads because a 200k window physically cannot hold 250k tokens. R1 precedes R3 deliberately: only a registry **1M** short-circuits, so a registry 200k falls through and a settings marker can still upgrade it
 - The **environment rule is gone**. An earlier `R_ENV` forced 200k from a spawn-env signal; it was withdrawn because three of its four signals were unreachable by construction (`TerminalService.cleanEnvironment` strips `CLAUDE_CODE_*` from the merged spawn env), the survivor (`ANTHROPIC_BASE_URL`) is a routing fact rather than a capacity fact, and the rule outranked explicit user configuration. A narrowed, settings-based replacement is tracked as [#48](https://github.com/qodeca/erfana/issues/48)
-- Only the R1 answer is **provisional**: the tooltip marks it `(inferred)`, the meter's `aria-valuetext` appends the same marker after the token counts, it is recomputed on every refresh, and the sticky-window bit never latches it — only a corroborated 1M (R2 observed usage, R0 `/model …[1m]`, R1m a `[1m]` on the id, R3 `settings.json` `[1m]`) latches
+- **Cloud-platform model ids** (v0.22.0, [#49](https://github.com/qodeca/erfana/issues/49)): before parsing, `normaliseProviderId` (`claudeStatus/modelId.ts`) reduces a Bedrock id (`us.anthropic.claude-opus-4-8`, with the `us`, `eu`, `apac`, `jp`, `au`, `global` or `us-gov` prefix), a Bedrock ARN (`arn:aws…:bedrock:…:inference-profile/…` or `…:foundation-model/…`) or a Google Cloud pinned snapshot (`claude-haiku-4-5@20251001`) to the bare Claude name, so it gets the same window size and friendly name, and a `/model` choice that uses one is honoured. A Bedrock ARN no longer shows the AWS account number in the model label
+- Only the R1 answer and the default for an id the parser cannot read are **provisional**. An unrecognised id – including plain names outside the grammar such as `claude-3-7-sonnet-20250219`, or a bare alias such as `opus` – gets 200k marked `(inferred)` (v0.22.0, #49), and is logged once per id. The R1 answer: the tooltip marks it `(inferred)`, the meter's `aria-valuetext` appends the same marker after the token counts, it is recomputed on every refresh, and the sticky-window bit never latches it — only a corroborated 1M (R2 observed usage, R0 `/model …[1m]`, R1m a `[1m]` on the id, R3 `settings.json` `[1m]`) latches
 - Colour bands track usage against the active window: a true green safe band (`--color-context-safe` #3fb950, distinct from the Qodeca-lime brand colour) below 30%, orange at 30–60%, red at ≥60% (on a 1M window that's 300k / 600k tokens; on 200k it's 60k / 120k)
 - On any detection/parse failure the bar hides gracefully — no error, no stale data
 - macOS and Windows are both supported (Windows support was cut for 0.16.0, which was never tagged; it first reached users in v0.16.3 — pre-migration issue #217); on Linux the process detector is a no-op so the bar never appears there
@@ -90,7 +92,7 @@ Full copy/paste operations with keyboard shortcuts and context menu.
 - **Ctrl+Shift+C / Ctrl+Shift+V**: Explicit copy/paste (Windows/Linux style)
 
 **Context Menu**:
-- Right-click opens context menu with Copy and Paste options
+- Right-click (or Shift+F10 / the Menu key, #90) opens context menu with Copy and Paste options
 - Copy is disabled when no text is selected
 - Platform-specific shortcut display (⌘C/⌘V on macOS, Ctrl+C/Ctrl+V on Windows)
 
@@ -170,10 +172,10 @@ Drag files or folders from project tree or Finder to insert shell-escaped paths 
 - Folders: Inserts folder path (not contents)
 - Visual feedback: Drop target indicator appears on terminal panel
 
-**Path Escaping** (POSIX shell-safe):
-- Single-quote wrapping for all paths
+**Path Escaping** (per terminal shell, `escapePathForShell(path, shellKind)`):
+- The quoting follows the shell of the terminal the paths go to (`shellKind` from the `terminal:create` response): `posix` (macOS, Linux, Git Bash) wraps in single quotes with `'\''` for an inner `'`; `cmd` wraps in double quotes; `powershell` wraps in single quotes and doubles every single-quote character, including the typographic `‘ ’ ‚ ‛` (`quotePowerShellLiteral` in `src/shared/powershellQuote.ts`). Before v0.22.0 drops, tree drags and camera photos always used POSIX quoting
+- With no active terminal yet, `platformDefaultShellKind()` picks `powershell` on Windows and `posix` elsewhere
 - Null byte sanitization
-- Special characters properly escaped
 
 **Example**:
 ```bash
@@ -305,6 +307,18 @@ Capture photos from connected cameras directly from the terminal toolbar.
 - #93 - Camera photo capture from terminal toolbar
 - #42 - Un-mirrored preview by default, per-camera mirror toggle, full-frame preview
 
+### Restart confirmation
+
+Restart ends everything running in the terminal, so `getRestartRisk()` (`TerminalPanel/restartGuard.ts`, lens review [25]) asks first when any one of three signals says the terminal is busy:
+
+| Signal | Source | Message |
+|---|---|---|
+| Claude Code is running | the Claude status store holds a snapshot for this terminal | "Claude Code is running in this terminal. …" |
+| Used moments ago | the user (or the app, through `sendToTerminal`) gave it input and it was active within `TERMINAL.RECENT_ACTIVITY_WINDOW` – the same window the quit prompt uses | "This terminal was in use moments ago. …" |
+| A program is running | `terminal:getActivity` reports a foreground process other than the shell (node-pty `IPty.process`) | "A program is running in this terminal. …" |
+
+The prompt is a danger `ConfirmDialog` ("Restart terminal?", Restart / Cancel) that opens with focus on Cancel. The third signal works on macOS and Linux only: on Windows node-pty reports the shell's own name for the life of the terminal, so `getActivity` answers `{ busy: false, known: false }` and only the first two signals apply. A failed lookup counts as "not busy", so a broken call never blocks a restart. A terminal with none of the three signals restarts straight away.
+
 ### Scroll Lock Toggle (v0.6.0)
 
 Proactive scroll protection via a toggle button that locks terminal to always stay at bottom.
@@ -401,7 +415,7 @@ See [Scroll Fixes](./scroll-fixes.md) for related scroll preservation features.
 
 **Environment Variables**:
 - `PS1='%n %~ $ '` - Traditional zsh prompt
-- `PROMPT='%n %~ $ '` - Zsh synonym for PS1
+- `PROMPT='%n %~ $ '` - Zsh synonym for PS1 (not set for cmd.exe, which reads `PROMPT` too and would show the codes literally)
 - `SHELL_SESSIONS_DISABLE='1'` - Disables macOS "Restored session" messages
 - `TERM='xterm-256color'` - 256-color support
 - `COLORTERM='truecolor'` - True color support
@@ -409,11 +423,13 @@ See [Scroll Fixes](./scroll-fixes.md) for related scroll preservation features.
 **Shell Arguments** (Platform-Specific):
 - **macOS/Linux**: `-l` (login shell) - Sources RC files (.zprofile, .bash_profile) to load environment, Homebrew paths, and user configuration
 - **Windows (PowerShell)**: `-NoLogo -NoProfile -NoExit` - One process: the bootstrap script sets the cwd, then dot-sources the user's profiles itself, and `-NoExit` keeps the same shell interactive (see [Bootstrap Pattern](./bootstrap-pattern.md))
-- **Windows (cmd.exe)**: No arguments - Uses default environment
+- **Windows (cmd.exe)**: `/D /S /K "…"`, passed as one ready-made command line rather than an argument array (v0.22.0 – the quoted array form left Command Prompt terminals blank). The shell starts in the validated project folder; see [Bootstrap Pattern § cmd.exe](./bootstrap-pattern.md#cmdexe)
 
 ### Terminal Initialization
 
 **Clean Start Behavior**: Terminal uses a non-interactive bootstrap pattern to eliminate initialization artifacts and provide a clean user experience.
+
+If a shell's start-up never reports in (the marker never arrives), the terminal shows whatever the shell printed after 10 seconds instead of staying blank. A prompt the shell draws in the same chunk as the marker is kept and shown (#302).
 
 See [Bootstrap Pattern](./bootstrap-pattern.md) for detailed initialization documentation.
 
@@ -421,7 +437,7 @@ See [Bootstrap Pattern](./bootstrap-pattern.md) for detailed initialization docu
 
 ### Service Layer
 
-**File**: `src/main/services/TerminalService.ts` (~700 lines)
+**File**: `src/main/services/TerminalService.ts` (about 1,400 lines as of v0.22.0; output batching lives in `terminalOutputFlow.ts`, foreground-process matching in `terminalForeground.ts`, the Windows tree kill in `terminalTreeKill.ts`)
 
 ```typescript
 class TerminalService extends EventEmitter {
@@ -439,6 +455,12 @@ class TerminalService extends EventEmitter {
   // Info
   getTerminalInfo(terminalId: string): {...} | null
   listTerminals(): Array<{id: string; title: string}>
+  getActivity(terminalId: string): { busy: boolean; known: boolean } | null  // known: false on Windows
+  getOwner(terminalId: string): number | undefined  // owning webContents id
+
+  // Flow control and start-up handshake
+  ackOutput(terminalId: string, chars: number): void
+  markInitializationComplete(terminalId: string): void
 }
 
 export const terminalService = new TerminalService()
@@ -456,12 +478,17 @@ export const terminalService = new TerminalService()
 ```typescript
 window.api.terminal = {
   isAvailable: (terminalId?) => Promise<{success, available, initialized?}>
-  create: (config) => Promise<{success, terminalId?, shellKind?, error?}>  // shellKind: 'posix' | 'cmd' | 'powershell' (#164)
+  create: ({ cwd?, cols, rows }) => Promise<{success, terminalId?, shellKind?, error?}>  // shellKind: 'posix' | 'cmd' | 'powershell' (#164)
   write: (terminalId, data) => Promise<{success, error?}>  // invoke round-trip; main-side write() is synchronous
   resize: (terminalId, cols, rows) => void
   kill: (terminalId) => Promise<{success, error?}>
   getInfo: (terminalId) => Promise<{success, info?: {id, cwd, title}, error?}>
   list: () => Promise<{success, terminals?: Array<{id, title}>, error?}>
+  getActivity: (terminalId) => Promise<{success, busy?, known?, error?}>  // restart guard
+
+  // Screen-reader support reported by the OS (macOS, Windows)
+  getScreenReaderSupport: () => Promise<ScreenReaderSupport>  // sender-gated, payload-free
+  onScreenReaderSupportChanged: (callback) => unsubscribe
 
   // Events
   onData: (callback) => unsubscribe
@@ -476,6 +503,13 @@ window.api.terminal = {
   ackOutput: (terminalId, chars) => void
 }
 ```
+
+**Request contract** (`src/main/ipc/terminal-handlers.ts`, `src/shared/ipc/terminal-schema.ts`):
+- Every request is parsed against its schema first; oversized or malformed requests are refused with an error.
+- `terminal:create` takes `{ cwd?, cols, rows }` only. The renderer cannot choose the shell or its environment. `cwd` goes through the confinement wrapper (`registerConfinedHandle`): it must be an existing folder inside the open project. With no `cwd`, the terminal opens in the project root, or in the home folder when no project is open.
+- A window may own at most `TERMINAL_MAX_PER_WINDOW` (32) terminals; past that `create` answers "Too many terminals are open (the limit is 32). Close one and try again."
+- A terminal belongs to the window that created it. `write`, `resize`, `kill`, `getInfo`, `getActivity` and `clearComplete` from another window answer like an unknown id, `list` shows a window only its own terminals, and data, exit, error and clear events go to the owning window only.
+- `TerminalService` builds the spawn environment from the merged environment and then removes development variables and the Claude Code session markers (`CLAUDECODE`, `CLAUDE_CODE_*`), so a `claude` started in the terminal is a clean top-level session. Terminal output is never written to the log – only its length.
 
 Output reaches `onData` in batches (every 8 ms or at 64 KiB per terminal, in order, always before that terminal's exit). The panel acknowledges parsed output with `ackOutput` once per 32 KiB, and on macOS and Linux main pauses the PTY while more than 512 KiB is unacknowledged; a hidden window acknowledges on receipt, so background work is never held back, and Windows terminals are batched only. Design and measurements: [docs/performance/terminal-output-batching.md](../performance/terminal-output-batching.md).
 
@@ -498,6 +532,10 @@ Output reaches `onData` in batches (every 8 ms or at 64 KiB per terminal, in ord
 **Supporting Files**:
 - `types.ts` - TerminalState, ScreenshotCaptureMode types
 - `terminalPanel.logic.ts` - Pure functions and constants
+- `restartGuard.ts` - Decides whether Restart must ask first (see [Restart confirmation](#restart-confirmation))
+- `outputAck.ts` - Renderer half of flow control: adds up parsed output and sends `terminal:ackOutput` once per 32 KiB; acks on receipt while the window is hidden
+- `terminalMenuKey.ts` - Shift+F10 and the Menu key open the terminal's context menu at the cursor (#90). A program in the terminal no longer receives Shift+F10
+- `nameNotFoundToast.ts` - The toast for a clicked file name the project search did not find; says "Search not finished" instead of "File not found" when the search was cut short (#320)
 
 See [Terminal Architecture Review](../architecture-reviews/reviews/terminal-panel-architecture-review.md) for detailed refactoring documentation.
 
