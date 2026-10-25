@@ -76,7 +76,7 @@ Full detail in [fuses.md](./fuses.md#afterpack-also-prunes-foreign-arch-native-b
 
 ### @llamaindex/liteparse (document import) and its native binary
 
-`@llamaindex/liteparse` is pinned exactly (`2.14.7`). From 2.x it is a Rust/NAPI package: the
+`@llamaindex/liteparse` is pinned exactly (`2.15.1`). From 2.x it is a Rust/NAPI package: the
 platform-specific native binary ships as an optional dependency (`@llamaindex/liteparse-<platform>`,
 e.g. `@llamaindex/liteparse-darwin-arm64`) alongside `libpdfium`. It no longer drags in `sharp`
 (with its `@img/*` platform binaries), `@hyzyla/pdfium` or `tesseract.js`; OCR is built into the

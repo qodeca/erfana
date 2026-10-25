@@ -460,7 +460,7 @@ The same project check applies to `terminal:create`: its strict `{ cwd?, cols, r
 
 ### electron-builder Version
 
-**Current**: 26.16.1 (`package.json` devDependency, exact pin). The workaround below was recorded for 26.0.0; whether 26.16.1 still needs it has not been re-checked
+**Current**: 26.18.0 (`package.json` devDependency, exact pin). The workaround below was recorded for 26.0.0; whether 26.18.0 still needs it has not been re-checked
 
 **Known Issue**: electron-builder 26.0.0 has a [known bug](https://github.com/electron-userland/electron-builder/issues/8068) with npm's dependency flattening that causes builds to fail with:
 
@@ -600,6 +600,8 @@ Run `npm audit` to check. **Policy**: zero high/critical production advisories a
 | `electron` 44.9.0 | GHSA-jr5w-w6x2-84p9 – mitigation for compromised eMudhra intermediate certificates | high (CVSS 7.4) | 44.9.1 | The runtime's TLS certificate trust, for every HTTPS request the app or a preview makes |
 | `zod` 4.6.5 | GHSA-mrhx-c7xc-m3w5 – memory exhaustion while validating oversized constrained collections | high (CVSS 7.5) | 4.6.6 | The IPC schemas in `src/shared/ipc/*-schema.ts`, which parse every handler payload |
 | `fast-uri` 3.1.8 | GHSA-w74x-v6f9-j3xg, GHSA-xhq7-xmqj-769h, GHSA-wjr9-j795-jxcr, GHSA-333x-w4r6-6crp – URI scheme, host and path parsing flaws | moderate (CVSS ≤ 6.1) | 3.1.9 | Transitive: `electron-store` → `conf` → `ajv`. Erfana creates its store without a `schema` option (`SettingsService.ts`) |
+
+**On `develop` since PR #239** (2026-10-25): `zod` is 4.6.7, which clears GHSA-mrhx-c7xc-m3w5, so `npm audit --omit=dev` there reports **2** (1 high `electron`, 1 moderate `fast-uri`). Both are tracked in [#409](https://github.com/qodeca/erfana/issues/409).
 
 The reachability column says where the package runs, not that a flaw is exploitable there – that analysis has not been done. The full tree (`npm audit`, same day) reports 14 (2 critical, 5 high, 5 moderate, 2 low).
 

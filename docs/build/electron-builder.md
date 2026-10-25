@@ -1,6 +1,6 @@
 # Electron Builder configuration
 
-**Last updated**: October 2026 (v0.22.0, electron-builder 26.16.1)
+**Last updated**: October 2026 (electron-builder 26.18.0, PR #325)
 
 This document explains the electron-builder version choice, the `aproba` build-time shim, and the parts of `electron-builder.yml` that are easy to get wrong.
 
@@ -12,7 +12,7 @@ This document explains the electron-builder version choice, the `aproba` build-t
 
 ```json
 // package.json → devDependencies
-"electron-builder": "26.16.1"
+"electron-builder": "26.18.0"
 ```
 
 The version is pinned **exactly** — no caret. electron-builder minors have repeatedly changed schema shape (the `win.signtoolOptions` nesting below is one example), and a release build is not the place to discover that. Bumps are deliberate.

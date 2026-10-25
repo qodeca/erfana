@@ -426,7 +426,7 @@ git cliff --tag v0.22.0 --ignore-tags "whisper-build.*" v0.20.1..HEAD
 
 ### 3. Bump the lockfile version by hand
 
-The version bump touches two fields in `package-lock.json` – the top-level `"version"` and `packages[""].version` – besides `package.json`. Do **not** regenerate them with `npm install --package-lock-only`: under npm 11 that drops `encoding@0.1.13` (an optional peer of `node-fetch`) from the lock, and `npm ci` then fails every CI job with `Missing: encoding@0.1.13 from lock file` (see [ci.md § Troubleshooting](../ci.md#troubleshooting)). Edit the two version fields directly, then confirm the lock diff is exactly those two lines:
+The version bump touches two fields in `package-lock.json` – the top-level `"version"` and `packages[""].version` – besides `package.json`. Edit the two version fields directly, or run `npm install --package-lock-only --ignore-scripts` (the skill does), then confirm the lock diff is exactly those two lines. Anything more is a stray rewrite – see [ci.md § Troubleshooting](../ci.md#troubleshooting):
 
 ```bash
 git diff --stat package-lock.json   # expect: 1 file changed, 2 insertions(+), 2 deletions(-)
