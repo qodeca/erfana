@@ -1728,7 +1728,9 @@ function readEmbeddedAsarIntegrity(platform, electronBinaryPath, deps = {}) {
   }
   if (platform === 'win32') {
     const resedit = deps.resedit || requireViaBuilder('resedit');
-    const exe = resedit.NtExecutable.from(fs.readFileSync(electronBinaryPath));
+    // afterSign reads the exe again once Azure has signed it, and resedit refuses a
+    // signed binary unless told to. Read-only here, so the signature is left intact.
+    const exe = resedit.NtExecutable.from(fs.readFileSync(electronBinaryPath), { ignoreCert: true });
     const res = resedit.NtExecutableResource.from(exe);
     const entry = res.entries.find((e) => e.type === 'INTEGRITY' && e.id === 'ELECTRONASAR');
     if (!entry) return null;
