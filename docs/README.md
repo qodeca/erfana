@@ -62,7 +62,6 @@ Erfana is an agent-native Markdown workspace – an Electron app that runs a ter
 - [Continuous Integration](./ci.md) - GitHub Actions workflows (`checks.yml` on every push, carrying six of the seven required checks – the seventh, `Secret scan`, is `secret-scan.yml`; the macOS `e2e.yml` **disabled** since 2026-04-25, with the advisory `E2E (Linux, xvfb)` job in `e2e-linux.yml` as the only e2e run on pull requests; `release.yml` and `whisper-binaries*.yml` for release flow), retry patterns, visual-on-CI gap
 - [Build](./build/README.md) - electron-builder, ASAR, fuses, troubleshooting
 - [Release signing keys](./release-pubkey.txt) - Published minisign public keys (primary + standby rotation) for verifying release artifacts
-- [Release handoffs](./handoffs/) - Point-in-time release-verification handoffs - a checklist handed to the next session, and the report handed back; each file is dated and anchored on a commit, and is not maintained after that release ships
 - [Windows Enablement](./windows/README.md) - Phase roadmap, Windows-only behaviour and the test-flake register. **[`implementation-plan.md`](./windows/implementation-plan.md) § Status snapshot is the canonical status.** Issue, PR and release numbers from before the public-repo migration do not resolve on `qodeca/erfana`; the provenance banner at the top of each `docs/windows/` file explains how they are kept
   - [Implementation Plan](./windows/implementation-plan.md) - Canonical phased roadmap + status snapshot + Phase 4 test inventory
   - [Gap Analysis](./windows/gap-analysis.md) - Feature-parity baseline (P0/P1/P2 with file:line refs)
@@ -112,11 +111,6 @@ Erfana is an agent-native Markdown workspace – an Electron app that runs a ter
 ### Technical Details
 - [HTML Rendering](./rendering/README.md) - Markdown to HTML conversion architecture
 
-### Architecture Reviews
-- [Code Review – Drag-Drop](./architecture-reviews/code-review-drag-drop-2025-01.md) - Drag-drop refactoring review
-- [Markdown Editor Panel Refactoring](./architecture-reviews/reviews/markdown-editor-panel-refactoring-review.md) - Editor panel architecture review
-- [Terminal Panel Architecture](./architecture-reviews/reviews/terminal-panel-architecture-review.md) - Terminal panel design review
-
 ### Design records and plans
 
 Not to be confused with **[`docs/design-system/`](design-system/index.html)**, which is the design system. All design *notes* live in `docs/designs/`. They mix three file-naming conventions (`<issue>-<slug>.md`, `issue-<issue>-<slug>.md` and the older `design-issue-<n>.md`), because two folders were merged into one; spec design notes use `sd-<spec>-<slug>.md`.
@@ -155,19 +149,19 @@ Not to be confused with **[`docs/design-system/`](design-system/index.html)**, w
 
 ## Changelog
 
-- [CHANGELOG](./CHANGELOG.md) – Per-version release notes (v0.9.0 onward; v0.8.x and v0.3–v0.5 in `docs/archive/`; v0.6.x–v0.7.x have no entries). Latest release: v0.22.0 (2026-10-25), which also ships the never-released 0.21.0 changes
+- [CHANGELOG](./CHANGELOG.md) – Per-version release notes (v0.9.0 onward; v0.8.x and v0.3–v0.5 in the [Archive](#archive); v0.6.x–v0.7.x have no entries). Latest release: v0.22.0 (2026-10-25), which also ships the never-released 0.21.0 changes
 - [Changelog fragments](../changelog.d/README.md) – where a pull request records its change instead of editing the changelog; folded into the changelog at release
 - [Release notes](./release-notes/README.md) – Per-version release-notes files used as GitHub release bodies (v0.9.5 onward)
 - [Release incidents](./release-incidents/index.md) – Running log of `release.yml` failures with matched signatures and fixes
 
 ## Archive
 
-Archived documentation is located in [`./archive/`](./archive/):
-- [Resolved Issues](./archive/resolved-issues.md) – Issues fixed in past versions
-- [Changelog v0.3–v0.5](./archive/changelog-v03-v05.md) – Historical changelog entries
-- [Changelog v0.8.x](./archive/changelog-v08.md) – Historical changelog entries for the v0.8 series
-- [Video import fixes (2026-03-07)](./archive/2026-03-07-video-import-fixes.md) – Completed implementation plan for video import (#110)
-- [Phase 2 closure (2026-04)](./archive/phase2-closure-2026-04.md) – Seven-stream closure plan for Windows enablement Phase 2, archived 2026-08-07
+Archived documentation was removed from the tree on 2026-10-25. It stays in git history, at these links:
+- [Resolved Issues](https://github.com/qodeca/erfana/blob/1d814e05d98b3005e5c13c0624b09653708136f7/docs/archive/resolved-issues.md) – Issues fixed in past versions
+- [Changelog v0.3–v0.5](https://github.com/qodeca/erfana/blob/1d814e05d98b3005e5c13c0624b09653708136f7/docs/archive/changelog-v03-v05.md) – Historical changelog entries
+- [Changelog v0.8.x](https://github.com/qodeca/erfana/blob/1d814e05d98b3005e5c13c0624b09653708136f7/docs/archive/changelog-v08.md) – Historical changelog entries for the v0.8 series
+- [Video import fixes (2026-03-07)](https://github.com/qodeca/erfana/blob/1d814e05d98b3005e5c13c0624b09653708136f7/docs/archive/2026-03-07-video-import-fixes.md) – Completed implementation plan for video import (#110)
+- [Phase 2 closure (2026-04)](https://github.com/qodeca/erfana/blob/1d814e05d98b3005e5c13c0624b09653708136f7/docs/archive/phase2-closure-2026-04.md) – Seven-stream closure plan for Windows enablement Phase 2, archived 2026-08-07
 
 ## Folders added by the Xezar pipeline
 

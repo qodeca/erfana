@@ -537,7 +537,7 @@ Output reaches `onData` in batches (every 8 ms or at 64 KiB per terminal, in ord
 - `terminalMenuKey.ts` - Shift+F10 and the Menu key open the terminal's context menu at the cursor (#90). A program in the terminal no longer receives Shift+F10
 - `nameNotFoundToast.ts` - The toast for a clicked file name the project search did not find; says "Search not finished" instead of "File not found" when the search was cut short (#320)
 
-See [Terminal Architecture Review](../architecture-reviews/reviews/terminal-panel-architecture-review.md) for detailed refactoring documentation.
+See [Terminal Architecture Review](https://github.com/qodeca/erfana/blob/1d814e05d98b3005e5c13c0624b09653708136f7/docs/architecture-reviews/reviews/terminal-panel-architecture-review.md) for detailed refactoring documentation.
 
 **Key Features**:
 - Visibility check before xterm initialization (prevents rendering issues)

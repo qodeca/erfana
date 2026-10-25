@@ -169,7 +169,7 @@ Write Call → Socket Buffer → PTY Buffer → Shell Input → Terminal Render 
 
 ---
 
-The v0.3.2–v0.3.4 write-operation evolution is archived in [AutoExecute v0.3 history](../archive/autoexecute-v0.3-history.md#write-operations-evolution).
+The v0.3.2–v0.3.4 write-operation evolution is archived in [AutoExecute v0.3 history](https://github.com/qodeca/erfana/blob/1d814e05d98b3005e5c13c0624b09653708136f7/docs/archive/autoexecute-v0.3-history.md#write-operations-evolution).
 
 ---
 

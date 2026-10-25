@@ -18,7 +18,7 @@ The prompt template system sends the selected text, with instructions, to the CL
 
 Waiting on node-pty's write callback hung the IPC reply ("reply was never sent"): the callback only means the socket buffer flushed, not that the shell or the renderer is ready, and it did not fire reliably. Writes are fire-and-forget, followed by a fixed 200ms delay before Enter – do not bring the callback back. For why 200ms and the alternatives considered, see [AutoExecute Technical](./autoexecute-technical.md#why-200ms).
 
-The version-by-version fix history now lives in [AutoExecute v0.3 history](../archive/autoexecute-v0.3-history.md).
+The version-by-version fix history now lives in [AutoExecute v0.3 history](https://github.com/qodeca/erfana/blob/1d814e05d98b3005e5c13c0624b09653708136f7/docs/archive/autoexecute-v0.3-history.md).
 
 ### Key Architectural Changes
 

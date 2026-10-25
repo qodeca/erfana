@@ -1,6 +1,6 @@
 # Known Issues & Workarounds
 
-Current issues and their workarounds. For historical resolved issues, see [archive/resolved-issues.md](./archive/resolved-issues.md).
+Current issues and their workarounds. For historical resolved issues, see [archive/resolved-issues.md](https://github.com/qodeca/erfana/blob/1d814e05d98b3005e5c13c0624b09653708136f7/docs/archive/resolved-issues.md).
 
 **Issue numbers**: a number written as a link (for example [#60](https://github.com/qodeca/erfana/issues/60)) is on the public `qodeca/erfana` tracker. A bare number without a link (#146, #147, #149, #150, #163, #164, #166, #177, #213, #241) is from the private pre-migration tracker: it does not resolve on `qodeca/erfana`, and a pre-migration number that the public tracker has since reached points at an unrelated issue. Treat bare numbers as provenance only – see [`docs/windows/implementation-plan.md`](./windows/implementation-plan.md).
 
