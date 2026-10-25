@@ -39,12 +39,6 @@
   padding: 0;
 }
 
-.erf-row-list:focus { outline: none; }
-.erf-row-list:focus-visible {
-  outline: var(--border-width-thick) solid var(--color-border-focus);
-  outline-offset: calc(var(--space-1) * -1);
-}
-
 .erf-row {
   display: flex;
   align-items: center;
@@ -119,7 +113,12 @@
   border-left-color: var(--color-brand-lime);
 }
 
-.erf-row--focus {
+/* Focused row — the Focus card's ring, inset because rows scroll. Under roving
+   (#100) the arrow keys give a row real DOM focus, so :focus-visible paints the
+   ring in the live demo itself; the class exists only so the state gallery
+   renders the same ring without real focus. One ring, reached two ways. */
+.erf-row--focus,
+.erf-row:focus-visible {
   outline: var(--border-width-thick) solid var(--color-border-focus);
   outline-offset: calc(var(--space-1) * -1);
 }
