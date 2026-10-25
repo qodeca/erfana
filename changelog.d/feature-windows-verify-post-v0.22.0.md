@@ -19,3 +19,8 @@
   mocks as `Mock` rather than `ReturnType<typeof vi.fn>`. The coverage floors were
   re-measured: vitest 5 maps v8 coverage through the AST and counts more branches, so the same
   code reads lower (main branches 91.37 → 82.85). The CI deprecation allowlist is now empty.
+- **Three e2e tests that failed on a Windows host now pass.** `MonacoPage.focus()` waits for
+  Monaco's text area to settle before it clicks (an early click became a drag that selected
+  line 1), the tree focus-ring check expects 2 px snapped to device pixels as Chromium draws it
+  at 125 % scaling, and the tree right-click lands well inside the row instead of 10 px from an
+  edge that moves. Recorded in `docs/windows/known-flakes.md`.
