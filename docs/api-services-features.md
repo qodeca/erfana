@@ -507,7 +507,7 @@ Document import converter for 50+ formats via `@llamaindex/liteparse` with local
 
 **File:** `src/main/services/import/DependencyDetector.ts`
 
-Runtime detection of LibreOffice, the one optional system tool document import uses. PDF and images need nothing extra: LiteParse 2.14.7 reads images with the Rust `image` crate and OCRs them itself (its native module contains no ImageMagick strings, and png/jpg/webp/bmp/tiff/gif imported with ImageMagick off PATH – #250), so their extensions are registered at startup.
+Runtime detection of LibreOffice, the one optional system tool document import uses. PDF and images need nothing extra: LiteParse (pinned at 2.15.1; this was read from 2.14.7) reads images with the Rust `image` crate and OCRs them itself (its native module contains no ImageMagick strings, and png/jpg/webp/bmp/tiff/gif imported with ImageMagick off PATH – #250), so their extensions are registered at startup.
 
 ### Key features
 - One resolver for detection and conversion (#250, `resolveLibreOffice` in `conversionToolGuard.ts`): it replays the lookup LiteParse's native module does – read from its 2.14.7 strings, since it takes no binary-path option. That is `which libreoffice-fresh` / `libreoffice` / `soffice` (only when `which` itself resolves), then the fixed `/Applications/LibreOffice.app/Contents/MacOS/soffice` and `.../libreoffice`, then the literal `C:\Program Files\Libreoffice\program\soffice.exe`. There is no `(x86)` fallback, because LiteParse never looks there. The result is `found` (with a path), `missing`, or `unsafe` (with the name and path that would run, and a reason: `project`, `temp`, `network`, `relative`, `unresolvable` or `ambiguous`)

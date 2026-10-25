@@ -37,19 +37,10 @@ npm ci                        # NOT `npm install` – see below
 npm run dev                   # start the development app
 ```
 
-**Use `npm ci`, and do not commit a `package-lock.json` that `npm install` rewrote.** The two commands do not
-agree here: `npm install` under npm 11 drops `encoding@0.1.13`, an optional peer of `node-fetch`, from the lock,
-while `npm ci` – locally and on every CI runner – requires it. A lock written by `npm install` therefore installs
-with `npm install` and fails everywhere else:
-
-```
-npm error `npm ci` can only install packages when your package.json and package-lock.json are in sync.
-npm error Missing: encoding@0.1.13 from lock file
-```
-
-If you need to change dependencies, run `npm install` deliberately, then check `git diff package-lock.json` and
-keep only the change you meant to make. If the diff shows `encoding` disappearing and a shuffle of `peer` /
-`optional` flags and nothing else, discard it – that is this quirk, not your change.
+**Use `npm ci`.** It installs exactly what `package-lock.json` records, which is what every CI job does. If you
+need to change dependencies, run `npm install` deliberately, then check `git diff package-lock.json` and keep only
+the change you meant to make. If a lock fails `npm ci` with `Missing: <package> from lock file`, see
+[ci.md § Troubleshooting](docs/ci.md#troubleshooting).
 
 npm 11.19 ends `npm ci` with `npm warn install-scripts … not yet covered by allowScripts` for `electron`,
 `node-pty`, `esbuild` and a few others. On that version it is only a warning: the scripts still run, and the app

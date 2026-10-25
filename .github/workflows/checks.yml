@@ -51,7 +51,7 @@ jobs:
     timeout-minutes: 10
     if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
     steps:
-      # actions/checkout v6.0.3 — MUST run before the local composite action
+      # actions/checkout v7.0.1 — MUST run before the local composite action
       # below so the action.yml file can be loaded from the workspace.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: ./.github/actions/setup-node-with-retry
@@ -74,7 +74,7 @@ jobs:
     timeout-minutes: 10
     if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
     steps:
-      # actions/checkout v6.0.3 — MUST run before the local composite action
+      # actions/checkout v7.0.1 — MUST run before the local composite action
       # below so the action.yml file can be loaded from the workspace.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: ./.github/actions/setup-node-with-retry
@@ -87,7 +87,7 @@ jobs:
     timeout-minutes: 10
     if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
     steps:
-      # actions/checkout v6.0.3 — MUST run before the local composite action
+      # actions/checkout v7.0.1 — MUST run before the local composite action
       # below so the action.yml file can be loaded from the workspace.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: ./.github/actions/setup-node-with-retry
@@ -175,7 +175,7 @@ jobs:
     # main` keeps the instrumented set (and therefore the threshold match)
     # unambiguous and deterministic. Do NOT drop `--project main`.
     steps:
-      # actions/checkout v6.0.3 — MUST run before the local composite action
+      # actions/checkout v7.0.1 — MUST run before the local composite action
       # below so the action.yml file can be loaded from the workspace.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: ./.github/actions/setup-node-with-retry
@@ -208,7 +208,7 @@ jobs:
     timeout-minutes: 10
     if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
     steps:
-      # actions/checkout v6.0.3 — MUST run before the local composite action
+      # actions/checkout v7.0.1 — MUST run before the local composite action
       # below so the action.yml file can be loaded from the workspace.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: ./.github/actions/setup-node-with-retry
@@ -225,7 +225,7 @@ jobs:
     timeout-minutes: 10
     if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
     steps:
-      # actions/checkout v6.0.3 — MUST run before the local composite action
+      # actions/checkout v7.0.1 — MUST run before the local composite action
       # below so the action.yml file can be loaded from the workspace.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: ./.github/actions/setup-node-with-retry
@@ -246,7 +246,7 @@ jobs:
     # how e2e is kept out of the required set. The concurrency block above
     # already cancels in-flight runs on the same ref.
     steps:
-      # actions/checkout v6.0.3 — MUST run before the local composite action
+      # actions/checkout v7.0.1 — MUST run before the local composite action
       # below so the action.yml file can be loaded from the workspace.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: ./.github/actions/setup-node-with-retry
@@ -276,7 +276,7 @@ jobs:
     timeout-minutes: 10
     if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
     steps:
-      # actions/checkout v6.0.3 — MUST run before the local composite action
+      # actions/checkout v7.0.1 — MUST run before the local composite action
       # below so the action.yml file can be loaded from the workspace.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: ./.github/actions/setup-node-with-retry
@@ -298,7 +298,7 @@ jobs:
           echo "package-lock.json digest: $(cat package-lock.sha256)"
 
       - name: Upload package-lock digest artifact
-        # actions/upload-artifact v7.0.1 — keep SHA aligned with build_*.yml
+        # actions/upload-artifact v7.0.2 — keep SHA aligned with build_*.yml
         # (Dependabot will keep these in lockstep once #B2 lands).
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
