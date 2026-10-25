@@ -29,7 +29,7 @@ const mockForcefullyCrashRenderer = vi.fn()
 const mockSetWindowOpenHandler = vi.fn()
 const mockWebContentsOn = vi.fn()
 
-const mockBrowserWindow = vi.fn(() => ({
+const mockBrowserWindow = vi.fn(function () { return ({
   loadFile: mockLoadFile,
   close: mockClose,
   destroy: mockDestroy,
@@ -41,7 +41,7 @@ const mockBrowserWindow = vi.fn(() => ({
     setWindowOpenHandler: mockSetWindowOpenHandler,
     on: mockWebContentsOn
   }
-}))
+}) })
 
 // The partition's session: records the controls installed on it
 const mockOnBeforeRequest = vi.fn()

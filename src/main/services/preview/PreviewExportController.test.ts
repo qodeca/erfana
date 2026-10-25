@@ -9,7 +9,7 @@
  */
 import { join } from 'node:path'
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 
 import { ErrorCode } from '../../../shared/errors'
 import {
@@ -21,7 +21,7 @@ import {
 } from './PreviewExportController'
 
 interface WcMock extends PreviewPrintContents {
-  printToPDF: ReturnType<typeof vi.fn>
+  printToPDF: Mock
 }
 
 function makeWc(): WcMock {
@@ -31,14 +31,14 @@ function makeWc(): WcMock {
 function makeController(overrides: {
   dialogResult?: PreviewSaveDialogResult
   showSaveDialog?: PreviewExportControllerDeps['showSaveDialog']
-  writeFile?: ReturnType<typeof vi.fn>
+  writeFile?: Mock
 }): {
   controller: ReturnType<typeof createPreviewExportController>
-  showSaveDialog: ReturnType<typeof vi.fn>
-  writeFile: ReturnType<typeof vi.fn>
+  showSaveDialog: Mock
+  writeFile: Mock
 } {
   const showSaveDialog =
-    (overrides.showSaveDialog as ReturnType<typeof vi.fn>) ??
+    (overrides.showSaveDialog as Mock) ??
     vi.fn(async () => overrides.dialogResult ?? { canceled: false, filePath: '/out/file.pdf' })
   const writeFile = overrides.writeFile ?? vi.fn(async () => undefined)
   const controller = createPreviewExportController({ showSaveDialog, writeFile })

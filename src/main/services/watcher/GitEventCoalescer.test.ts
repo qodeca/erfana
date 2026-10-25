@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, vi, type Mock } from 'vitest'
 import { GitEventCoalescer, classifyGitPath, type GitEventType } from './GitEventCoalescer'
 
 describe('GitEventCoalescer', () => {
   let coalescer: GitEventCoalescer
-  let callbackSpy: ReturnType<typeof vi.fn>
+  let callbackSpy: Mock
 
   beforeEach(() => {
     vi.useFakeTimers()

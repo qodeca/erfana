@@ -7,18 +7,18 @@
 // (.github/workflows/checks.yml). `name` is the vitest project name passed to
 // `--project`; `config` supplies that project's coverage thresholds.
 //
-// `--project` is load-bearing: each per-project config auto-discovers
-// `vitest.workspace.ts`, so a bare `--config vitest.<project>.ts` run expands to
-// ALL THREE projects. Without `--project`, one `test:cov` invocation executed
-// the whole suite three times.
+// `--project` stays as a guard: under vitest 3 each per-project config
+// auto-discovered `vitest.workspace.ts`, so a bare `--config` run expanded to
+// ALL THREE projects and one `test:cov` invocation executed the whole suite
+// three times.
 //
 // Kept in its own side-effect-free module so `scripts/test-cov.test.mjs` can
 // assert the scoping without importing — and therefore running — the runner.
 
 export const projects = [
-  { name: 'main', config: 'vitest.main.ts' },
-  { name: 'preload', config: 'vitest.preload.ts' },
-  { name: 'renderer', config: 'vitest.renderer.ts' },
+  { name: 'main', config: 'vitest.main.config.ts' },
+  { name: 'preload', config: 'vitest.preload.config.ts' },
+  { name: 'renderer', config: 'vitest.renderer.config.ts' },
 ]
 
 /** The vitest argument array for one project's coverage pass. */

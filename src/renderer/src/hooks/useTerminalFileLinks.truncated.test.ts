@@ -7,7 +7,7 @@
  * may be incomplete. A bare name the tree lacks is a link whose click
  * searches for it.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
 import type { ILink, Terminal } from '@xterm/xterm'
 import type { FileNode } from '../../../shared/ipc/file-schema'
@@ -45,9 +45,9 @@ beforeEach(() => {
 })
 
 interface Callbacks {
-  onShowPicker: ReturnType<typeof vi.fn>
-  onFileOpen: ReturnType<typeof vi.fn>
-  onNameNotFound: ReturnType<typeof vi.fn>
+  onShowPicker: Mock
+  onFileOpen: Mock
+  onNameNotFound: Mock
 }
 
 async function linksFor(line: string, treeTruncated: boolean, callbacks: Callbacks): Promise<ILink[]> {

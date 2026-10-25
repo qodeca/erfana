@@ -27,7 +27,7 @@
  * `usePreviewBounds.clip.test.ts`.
  */
 import { renderHook } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 
 import { usePreviewBounds, SEARCH_BAR_INSET_PX, type UsePreviewBoundsOptions } from './usePreviewBounds'
 import { usePreviewViewportStore } from '../../../../stores/usePreviewViewportStore'
@@ -48,7 +48,7 @@ const NO_BOX = { left: 0, top: 0, width: 0, height: 0 }
 
 /** Queue of pending animation-frame callbacks, flushed explicitly by `frame()`. */
 let rafQueue: FrameRequestCallback[] = []
-let setBounds: ReturnType<typeof vi.fn>
+let setBounds: Mock
 /** What `performance.now()` returns – the drop reporter's clock. */
 let clock = 0
 

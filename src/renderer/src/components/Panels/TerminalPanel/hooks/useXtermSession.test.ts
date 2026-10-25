@@ -9,7 +9,7 @@
  * or a teardown.
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import type { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
@@ -42,16 +42,16 @@ type MockXterm = ReturnType<typeof makeXterm>
 const instances: MockXterm[] = []
 
 vi.mock('@xterm/xterm', () => ({
-  Terminal: vi.fn().mockImplementation(() => {
+  Terminal: vi.fn().mockImplementation(function () {
     const xterm = makeXterm()
     instances.push(xterm)
     return xterm
   })
 }))
-vi.mock('@xterm/addon-fit', () => ({ FitAddon: vi.fn().mockImplementation(() => ({ fit: vi.fn() })) }))
-vi.mock('@xterm/addon-web-links', () => ({ WebLinksAddon: vi.fn().mockImplementation(() => ({})) }))
+vi.mock('@xterm/addon-fit', () => ({ FitAddon: vi.fn().mockImplementation(function () { return ({ fit: vi.fn() }) }) }))
+vi.mock('@xterm/addon-web-links', () => ({ WebLinksAddon: vi.fn().mockImplementation(function () { return ({}) }) }))
 vi.mock('@xterm/addon-webgl', () => ({
-  WebglAddon: vi.fn().mockImplementation(() => ({ onContextLoss: vi.fn(), dispose: vi.fn() }))
+  WebglAddon: vi.fn().mockImplementation(function () { return ({ onContextLoss: vi.fn(), dispose: vi.fn() }) })
 }))
 vi.mock('../../../../utils/domUtils', () => ({ isElementVisible: vi.fn().mockReturnValue(true) }))
 
@@ -369,7 +369,7 @@ describe('useXtermSession failed starts (review F1, F2)', () => {
     const element = document.createElement('div')
     const removeListener = vi.spyOn(element, 'removeEventListener')
     // Every instance gets the element, so the one this start builds has it at attach time
-    vi.mocked((await import('@xterm/xterm')).Terminal).mockImplementationOnce(() => {
+    vi.mocked((await import('@xterm/xterm')).Terminal).mockImplementationOnce(function () {
       const xterm = makeXterm()
       xterm.element = element
       instances.push(xterm)
@@ -409,7 +409,7 @@ describe('useXtermSession failed starts (review F1, F2)', () => {
 
   it('an open() that throws disposes the instance and leaves the refs empty', async () => {
     const { hook, options } = renderSession()
-    vi.mocked((await import('@xterm/xterm')).Terminal).mockImplementationOnce(() => {
+    vi.mocked((await import('@xterm/xterm')).Terminal).mockImplementationOnce(function () {
       const xterm = makeXterm()
       xterm.open.mockImplementation(() => {
         throw new Error('open failed')
@@ -522,7 +522,7 @@ describe('useXtermSession failed starts, no double work (review e, g)', () => {
       })
       // 1 ms per check, far below the 50 ms fit delay, so the timer is still pending
       await vi.waitFor(() => expect(gatewayBridgeMock('terminal').create).toHaveBeenCalledTimes(1), { interval: 1, timeout: 40 })
-      const fitAddon = vi.mocked(FitAddon).mock.results[0].value as { fit: ReturnType<typeof vi.fn> }
+      const fitAddon = vi.mocked(FitAddon).mock.results[0].value as { fit: Mock }
       expect(fitAddon.fit).not.toHaveBeenCalled()
       // The fit timer is armed and waiting
       expect(vi.getTimerCount()).toBe(1)

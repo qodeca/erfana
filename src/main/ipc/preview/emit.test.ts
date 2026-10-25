@@ -9,7 +9,7 @@
  * the latest snapshot). A fake target and an injected `scheduleFlush` make the
  * coalescing deterministic without fake timers.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import { ErrorCode } from '../../../shared/errors'
 import { PreviewEvents } from '../../../shared/ipc/preview-channels'
 import type {
@@ -26,7 +26,7 @@ vi.mock('../../services/LoggingService', () => ({
 
 interface FakeTarget extends PreviewEmitTarget {
   isDestroyed: () => boolean
-  send: ReturnType<typeof vi.fn>
+  send: Mock
 }
 
 function makeTarget(destroyed = false): FakeTarget {

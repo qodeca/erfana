@@ -14,7 +14,7 @@
  *
  * @see previewCspViolationBridge.ts
  */
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, type Mock } from 'vitest'
 
 import { PREVIEW } from '../../../shared/constants'
 import { createPreviewCspViolationBridge } from './previewCspViolationBridge'
@@ -26,7 +26,7 @@ import {
 /** A bridge plus the sink it reports to. */
 function makeBridge(now?: () => number): {
   bridge: ReturnType<typeof createPreviewCspViolationBridge>
-  onBlockedHost: ReturnType<typeof vi.fn>
+  onBlockedHost: Mock
 } {
   const onBlockedHost = vi.fn()
   const bridge = createPreviewCspViolationBridge({ onBlockedHost, now })
@@ -425,7 +425,7 @@ describe('previewCspViolationBridge', () => {
     }
 
     /** The origins `onBlockedHost` was called with, in order. */
-    function reported(onBlockedHost: ReturnType<typeof vi.fn>): string[] {
+    function reported(onBlockedHost: Mock): string[] {
       return onBlockedHost.mock.calls.map((call) => call[0] as string)
     }
 

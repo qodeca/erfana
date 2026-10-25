@@ -17,7 +17,7 @@
  * Total: 26 tests
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import { renderHook } from '@testing-library/react'
 import { useKeyboardShortcuts } from './useKeyboardShortcuts'
 import { isMacOS } from '../utils/platform'
@@ -33,9 +33,9 @@ const mockIsMacOS = vi.mocked(isMacOS)
 describe('useKeyboardShortcuts', () => {
   let addEventListenerSpy: ReturnType<typeof vi.spyOn>
   let removeEventListenerSpy: ReturnType<typeof vi.spyOn>
-  let mockOnSave: ReturnType<typeof vi.fn>
-  let mockOnClose: ReturnType<typeof vi.fn>
-  let mockShowConfirm: ReturnType<typeof vi.fn>
+  let mockOnSave: Mock
+  let mockOnClose: Mock
+  let mockShowConfirm: Mock
 
   beforeEach(() => {
     vi.clearAllMocks()

@@ -9,7 +9,7 @@
 import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi, type Mock } from 'vitest'
 
 import { PREVIEW } from '../../../shared/constants'
 import { ErrorCode } from '../../../shared/errors'
@@ -141,7 +141,7 @@ function makePage() {
 }
 
 type FakePage = ReturnType<typeof makePage>
-type SpiedLog = IPreviewFailureLog & { drop: ReturnType<typeof vi.fn> }
+type SpiedLog = IPreviewFailureLog & { drop: Mock }
 
 /** `root` is the project's real root and path; `extra` adds deps (issue #124, RS3-3). */
 function makeHarness(root = '/proj', extra: Partial<PreviewViewDeps> = {}) {

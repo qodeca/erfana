@@ -4,7 +4,7 @@
  * Terminal owner and foreground-process lookups (`getOwner`, `getActivity`),
  * and the owner id carried by every event.
  */
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { EventEmitter } from 'events'
 import { tmpdir } from 'node:os'
 
@@ -12,9 +12,9 @@ interface MockPTY extends EventEmitter {
   pid: number
   /** What node-pty reports as the foreground process */
   process: string | undefined
-  write: ReturnType<typeof vi.fn>
-  resize: ReturnType<typeof vi.fn>
-  kill: ReturnType<typeof vi.fn>
+  write: Mock
+  resize: Mock
+  kill: Mock
   onData: (cb: (d: string) => void) => void
   onExit: (cb: (event: { exitCode: number; signal?: number }) => void) => void
 }

@@ -4,7 +4,7 @@
  * The frame guard's decisions (issue #124, WI-14; part 2 §2.5–§2.7). The caps
  * are imported, never typed here, so a changed limit moves these tests with it.
  */
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi, type Mock } from 'vitest'
 
 import { PREVIEW_LIMITS } from '../../../shared/preview-limits'
 import {
@@ -55,7 +55,7 @@ function facts(overrides: Partial<PreviewFrameFacts> = {}) {
 function navigation(
   url: string,
   overrides: Partial<PreviewFrameNavigationFacts> = {}
-): PreviewFrameNavigationFacts & { depth: ReturnType<typeof vi.fn>; framesInTree: ReturnType<typeof vi.fn> } {
+): PreviewFrameNavigationFacts & { depth: Mock; framesInTree: Mock } {
   const { facts: base } = facts()
   return { url, ownToken: OWN_TOKEN, ...base, ...overrides } as never
 }

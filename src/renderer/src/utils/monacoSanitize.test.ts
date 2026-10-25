@@ -8,7 +8,7 @@ import { sanitizeHtml } from 'monaco-editor/esm/vs/base/browser/domSanitize.js'
 /**
  * Monaco renders hover and markdown content through its own sanitizer. The
  * Vite plugin in electron.vite.monaco-dompurify.ts swaps its vendored DOMPurify
- * for an instance built from the npm code. vitest.renderer.ts inlines
+ * for an instance built from the npm code. vitest.renderer.config.ts inlines
  * monaco-editor and loads that plugin, so these tests run through the redirect.
  */
 describe('Monaco HTML sanitizer', () => {

@@ -20,10 +20,10 @@ const mockParse = vi.fn()
 const mockScreenshot = vi.fn()
 
 vi.mock('@llamaindex/liteparse', () => ({
-  LiteParse: vi.fn().mockImplementation(() => ({
+  LiteParse: vi.fn().mockImplementation(function () { return ({
     parse: mockParse,
     screenshot: mockScreenshot
-  }))
+  }) })
 }))
 
 vi.mock('electron', () => ({

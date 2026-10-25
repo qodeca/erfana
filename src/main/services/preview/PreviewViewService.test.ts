@@ -9,7 +9,7 @@
  * type-clean even though test files are outside `npm run typecheck`.
  */
 import { dirname, resolve } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 
 // A test that switches to fake timers and then fails never reaches its own
 // cleanup; without this every later test in the file inherits the fake clock.
@@ -887,11 +887,11 @@ describe('PreviewViewService — bounds clamp + zoom', () => {
   it('drops a stale seq and a collapsed rect', async () => {
     const h = makeHarness()
     await h.service.open(REQUEST_A, h.window)
-    ;(h.view.setBounds as ReturnType<typeof vi.fn>).mockClear()
+    ;(h.view.setBounds as Mock).mockClear()
 
     h.service.setBounds('panel-A', { x: 0, y: 0, width: 200, height: 100 }, 5)
     expect(h.view.setBounds).toHaveBeenCalledWith({ x: 0, y: 0, width: 200, height: 100 })
-    ;(h.view.setBounds as ReturnType<typeof vi.fn>).mockClear()
+    ;(h.view.setBounds as Mock).mockClear()
 
     // seq <= last applied ⇒ dropped.
     h.service.setBounds('panel-A', { x: 1, y: 1, width: 50, height: 50 }, 5)
@@ -1254,7 +1254,7 @@ describe('PreviewViewService — a window that closes mid-open (#83, #112)', () 
     // the watch coordinator with no reference and no owner.
     const h = makeHarness()
     const entryClose = vi.fn<() => Promise<void>>(() => Promise.resolve())
-    ;(h.deps.createEntryWatcher as unknown as ReturnType<typeof vi.fn>).mockImplementationOnce(
+    ;(h.deps.createEntryWatcher as unknown as Mock).mockImplementationOnce(
       () => ({ close: entryClose })
     )
     h.addChildView.mockImplementationOnce(() => {
@@ -1265,8 +1265,8 @@ describe('PreviewViewService — a window that closes mid-open (#83, #112)', () 
 
     expect(result).toEqual({ ok: false, errorCode: ErrorCode.PREVIEW_CSP_INVALID })
     await vi.waitFor(() => expect(entryClose).toHaveBeenCalledTimes(1))
-    const coordinator = (h.deps.createWatchCoordinator as unknown as ReturnType<typeof vi.fn>).mock
-      .results[0]?.value as { dispose: ReturnType<typeof vi.fn> }
+    const coordinator = (h.deps.createWatchCoordinator as unknown as Mock).mock
+      .results[0]?.value as { dispose: Mock }
     // The unwind is async and ordered; the coordinator goes after the watcher.
     await vi.waitFor(() => expect(coordinator.dispose).toHaveBeenCalled())
     expect(h.factory.destroy).toHaveBeenCalled()
@@ -1284,7 +1284,7 @@ describe('PreviewViewService — partition hand-back', () => {
 
     expect(h.session.release).toHaveBeenCalledTimes(1)
     const destroyedAt = h.factory.destroy.mock.invocationCallOrder[0]
-    const releasedAt = (h.session.release as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0]
+    const releasedAt = (h.session.release as Mock).mock.invocationCallOrder[0]
     expect(destroyedAt).toBeLessThan(releasedAt)
   })
 
@@ -1299,7 +1299,7 @@ describe('PreviewViewService — partition hand-back', () => {
     await h.service.close('panel-A')
 
     const destroyedAt = h.factory.destroy.mock.invocationCallOrder[0]
-    const detachedAt = (h.session.teardown as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0]
+    const detachedAt = (h.session.teardown as Mock).mock.invocationCallOrder[0]
     expect(detachedAt).toBeGreaterThan(destroyedAt)
   })
 
@@ -1307,7 +1307,7 @@ describe('PreviewViewService — partition hand-back', () => {
     // A name that goes back with a stale handler attached would make the next
     // open on it fail at `attachProtocol`; dropping it is the safe outcome.
     const h = makeHarness()
-    ;(h.session.teardown as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {
+    ;(h.session.teardown as Mock).mockImplementationOnce(() => {
       throw new Error('unhandle failed')
     })
     await h.service.open(REQUEST_A, h.window)
@@ -1370,8 +1370,8 @@ describe('PreviewViewService — live-view budget', () => {
     const h = makeHarness()
     await h.service.open(REQUEST_A, h.window)
 
-    const capture = h.deps.stillFrameCache.captureIfStale as unknown as ReturnType<typeof vi.fn>
-    const setVisible = h.view.setVisible as unknown as ReturnType<typeof vi.fn>
+    const capture = h.deps.stillFrameCache.captureIfStale as unknown as Mock
+    const setVisible = h.view.setVisible as unknown as Mock
     capture.mockClear()
     setVisible.mockClear()
 
@@ -1383,7 +1383,7 @@ describe('PreviewViewService — live-view budget', () => {
 
   it('captures the still frame once the page is ready, while the view is drawn', async () => {
     const h = makeHarness()
-    const capture = h.deps.stillFrameCache.captureIfStale as unknown as ReturnType<typeof vi.fn>
+    const capture = h.deps.stillFrameCache.captureIfStale as unknown as Mock
 
     await h.service.open(REQUEST_A, h.window)
     capture.mockClear()
@@ -1406,7 +1406,7 @@ describe('PreviewViewService — live-view budget', () => {
     const h = makeHarness()
     await h.service.open(REQUEST_A, h.window)
     await h.service.setVisibility('panel-A', false, 'dialog')
-    const invalidate = h.deps.stillFrameCache.invalidate as unknown as ReturnType<typeof vi.fn>
+    const invalidate = h.deps.stillFrameCache.invalidate as unknown as Mock
     invalidate.mockClear()
     h.loadStateChanged.mockClear()
 
@@ -1419,10 +1419,10 @@ describe('PreviewViewService — live-view budget', () => {
   it('publishes the cached frame on hide, so the panel is never a blank rectangle', async () => {
     const h = makeHarness()
     const frame = { dataUrl: 'data:image/png;base64,AAAA', width: 4, height: 4, capturedAt: 1 }
-    ;(h.deps.stillFrameCache.get as unknown as ReturnType<typeof vi.fn>).mockReturnValue(frame)
+    ;(h.deps.stillFrameCache.get as unknown as Mock).mockReturnValue(frame)
 
     await h.service.open(REQUEST_A, h.window)
-    const changed = h.deps.emit.stillFrameChanged as unknown as ReturnType<typeof vi.fn>
+    const changed = h.deps.emit.stillFrameChanged as unknown as Mock
     changed.mockClear()
 
     await h.service.setVisibility('panel-A', false, 'dialog')
@@ -1437,11 +1437,11 @@ describe('PreviewViewService — live-view budget', () => {
    */
   it('reports the hide to the renderer in the same tick it applies it', async () => {
     const h = makeHarness()
-    const capture = h.deps.stillFrameCache.captureIfStale as unknown as ReturnType<typeof vi.fn>
+    const capture = h.deps.stillFrameCache.captureIfStale as unknown as Mock
     capture.mockReturnValue(new Promise<void>(() => {}))
 
     await h.service.open(REQUEST_A, h.window)
-    const applied = h.deps.emit.visibilityApplied as unknown as ReturnType<typeof vi.fn>
+    const applied = h.deps.emit.visibilityApplied as unknown as Mock
     applied.mockClear()
 
     await h.service.setVisibility('panel-A', false, 'dialog')
@@ -1456,7 +1456,7 @@ describe('PreviewViewService — live-view budget', () => {
     const h = makeHarness()
     await h.service.open(REQUEST_A, h.window)
     await h.service.setVisibility('panel-A', false, 'dialog')
-    const applied = h.deps.emit.visibilityApplied as unknown as ReturnType<typeof vi.fn>
+    const applied = h.deps.emit.visibilityApplied as unknown as Mock
     applied.mockClear()
 
     await h.service.setVisibility('panel-A', true, 'dialog')
@@ -1480,7 +1480,7 @@ describe('PreviewViewService — live-view budget', () => {
     // so nothing races the destruction of its own subject.
     const h = makeHarness()
     const order: string[] = []
-    const capture = h.deps.stillFrameCache.captureIfStale as unknown as ReturnType<typeof vi.fn>
+    const capture = h.deps.stillFrameCache.captureIfStale as unknown as Mock
     capture.mockImplementation(async () => {
       order.push('capture')
     })
@@ -1533,7 +1533,7 @@ describe('PreviewViewService — live-view budget', () => {
     vi.useFakeTimers()
     try {
       const h = makeHarness()
-      const capture = h.deps.stillFrameCache.captureIfStale as unknown as ReturnType<typeof vi.fn>
+      const capture = h.deps.stillFrameCache.captureIfStale as unknown as Mock
       capture.mockReturnValue(new Promise<void>(() => {}))
 
       const opened = openPanels(h, PREVIEW.MAX_LIVE_VIEWS + 1)
@@ -1572,7 +1572,7 @@ describe('PreviewViewService — live-view budget', () => {
 
   it('still tears the view down when the still-frame capture rejects', async () => {
     const h = makeHarness()
-    const capture = h.deps.stillFrameCache.captureIfStale as unknown as ReturnType<typeof vi.fn>
+    const capture = h.deps.stillFrameCache.captureIfStale as unknown as Mock
     capture.mockRejectedValue(new Error('capture failed'))
 
     await openPanels(h, PREVIEW.MAX_LIVE_VIEWS + 1)
@@ -2174,7 +2174,7 @@ describe('PreviewViewService — the still-frame barrier', () => {
 
   it('waits for a capture still in flight after a later one short-circuits', async () => {
     const h = makeHarness({ now: () => 0 })
-    const capture = h.deps.stillFrameCache.captureIfStale as unknown as ReturnType<typeof vi.fn>
+    const capture = h.deps.stillFrameCache.captureIfStale as unknown as Mock
 
     let releaseFirst: () => void = () => {}
     const firstCapture = new Promise<void>((resolve) => {

@@ -53,7 +53,7 @@ const mockXtermInstance = {
 
 vi.mock('@xterm/xterm', () => {
   return {
-    Terminal: vi.fn().mockImplementation((opts) => {
+    Terminal: vi.fn().mockImplementation(function (opts) {
       mockXtermInstance.constructor(opts)
       return mockXtermInstance
     })
@@ -61,13 +61,13 @@ vi.mock('@xterm/xterm', () => {
 })
 
 vi.mock('@xterm/addon-fit', () => ({
-  FitAddon: vi.fn().mockImplementation(() => ({
+  FitAddon: vi.fn().mockImplementation(function () { return ({
     fit: vi.fn()
-  }))
+  }) })
 }))
 
 vi.mock('@xterm/addon-web-links', () => ({
-  WebLinksAddon: vi.fn().mockImplementation(() => ({}))
+  WebLinksAddon: vi.fn().mockImplementation(function () { return ({}) })
 }))
 
 // Mock WebGL addon with context loss tracking
@@ -77,7 +77,7 @@ const mockWebglAddon = {
 }
 
 vi.mock('@xterm/addon-webgl', () => ({
-  WebglAddon: vi.fn().mockImplementation(() => mockWebglAddon)
+  WebglAddon: vi.fn().mockImplementation(function () { return mockWebglAddon })
 }))
 
 vi.mock('../../utils/domUtils', () => ({

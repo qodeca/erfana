@@ -16,7 +16,7 @@
  *    object is reused between calls.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import path from 'path'
 import os from 'os'
 
@@ -45,7 +45,7 @@ const { mockParentPort, mockStatusMatrix, mockCurrentBranch, mockStat } = vi.hoi
   }
 
   return {
-    mockParentPort: new FakePort() as InstanceType<typeof FakePort> & { postMessage: ReturnType<typeof vi.fn> },
+    mockParentPort: new FakePort() as InstanceType<typeof FakePort> & { postMessage: Mock },
     mockStatusMatrix: vi.fn(),
     mockCurrentBranch: vi.fn(),
     mockStat: vi.fn(),

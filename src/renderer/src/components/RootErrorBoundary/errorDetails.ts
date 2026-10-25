@@ -68,7 +68,7 @@ const UNKNOWN = 'unknown'
  * Build-time app version, resolved defensively.
  *
  * `__APP_VERSION__` is inlined by the renderer build (`electron.vite.config.ts`)
- * and mirrored in `vitest.renderer.ts`. The guard costs nothing and keeps this
+ * and mirrored in `vitest.renderer.config.ts`. The guard costs nothing and keeps this
  * module usable from any host that forgot the `define`.
  */
 export const APP_VERSION: string = ((): string => {

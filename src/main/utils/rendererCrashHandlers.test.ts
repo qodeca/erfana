@@ -26,7 +26,7 @@
  * reference, so a re-imported module still sees the SAME spies these tests
  * assert on.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
 import type { BrowserWindow } from 'electron'
 
 type Listener = (...args: unknown[]) => void
@@ -82,12 +82,12 @@ interface FakeWindow {
   listenerCount: (event: string) => number
   webContentsListenerCount: (event: string) => number
   spies: {
-    reload: ReturnType<typeof vi.fn>
-    destroy: ReturnType<typeof vi.fn>
-    close: ReturnType<typeof vi.fn>
-    webContentsReload: ReturnType<typeof vi.fn>
-    webContentsForcefullyCrashRenderer: ReturnType<typeof vi.fn>
-    webContentsOn: ReturnType<typeof vi.fn>
+    reload: Mock
+    destroy: Mock
+    close: Mock
+    webContentsReload: Mock
+    webContentsForcefullyCrashRenderer: Mock
+    webContentsOn: Mock
   }
 }
 

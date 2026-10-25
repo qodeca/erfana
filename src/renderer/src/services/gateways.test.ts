@@ -4,7 +4,7 @@
  * The gateways forward every bridge method, with the same arguments and
  * result, and read `window.api` on each call.
  */
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi, type Mock } from 'vitest'
 import type { DirectoryWatchBridge } from '../../../shared/ipc/directory-watch-schema'
 import type { FileBridge } from '../../../shared/ipc/file-schema'
 import type { FileWatchBridge } from '../../../shared/ipc/file-watch-schema'
@@ -276,7 +276,7 @@ const UTILS_METHODS: Record<keyof Api['utils'], true> = {
 
 type Anything = (...args: unknown[]) => unknown
 
-function fakeBridge(methods: string[]): Record<string, ReturnType<typeof vi.fn>> {
+function fakeBridge(methods: string[]): Record<string, Mock> {
   return Object.fromEntries(methods.map((name) => [name, vi.fn(() => `${name}-result`)]))
 }
 

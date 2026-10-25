@@ -11,7 +11,7 @@
  * including the two states the service cannot easily produce (a port that
  * refuses the swap, a `createWatcher` that throws).
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
 import type { FSWatcher } from 'chokidar'
 import { mkdtempSync, rmSync, writeFileSync, unlinkSync } from 'node:fs'
 import { join } from 'node:path'
@@ -26,7 +26,7 @@ import {
 } from './atomicRearm'
 
 interface FakeWatcher {
-  close: ReturnType<typeof vi.fn>
+  close: Mock
 }
 
 const makeWatcher = (onClose?: () => void): FakeWatcher => ({

@@ -10,7 +10,7 @@
  */
 import { PreviewForwardedShortcutSchema } from '../../../shared/ipc/preview-schema'
 import { previewNavKeyRows } from '../../../shared/previewNavKeys'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi, type Mock } from 'vitest'
 import {
   PREVIEW_FORWARDED_SHORTCUTS,
   attachInputForwarding,
@@ -222,7 +222,7 @@ describe('matchForwardedShortcut — Back and Forward (issue #124, part 3 §3.7)
 describe('attachInputForwarding', () => {
   function makeTarget(): {
     target: InputForwardTarget
-    fire: (input: ForwardableInput) => { preventDefault: ReturnType<typeof vi.fn> }
+    fire: (input: ForwardableInput) => { preventDefault: Mock }
     removed: () => boolean
   } {
     let listener:

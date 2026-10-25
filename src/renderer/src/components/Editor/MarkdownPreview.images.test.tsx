@@ -9,7 +9,7 @@
  * @module MarkdownPreview.images.test
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
 import { render, cleanup, act, fireEvent } from '@testing-library/react'
 
 import { MarkdownPreview, type PreviewRenderedInfo } from './MarkdownPreview'
@@ -28,7 +28,7 @@ vi.mock('./MermaidDiagram', () => ({
 const FILE_PATH = '/proj/docs/notes.md'
 
 let files: Map<string, string>
-let read: ReturnType<typeof vi.fn>
+let read: Mock
 let directoryListeners: Array<(change: unknown) => void>
 
 const ui = (content: string, isVisible = true, onRendered?: (info: PreviewRenderedInfo) => void) => (

@@ -22,7 +22,7 @@
  * @see Issue #164 - Windows Phase 3 screenshot parity (Phase 2/9 hardening)
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 
 // electron-vite declares ELECTRON_RENDERER_URL read-only; this file sets and clears it.
 const writableEnv: Record<string, string | undefined> = process.env
@@ -103,7 +103,7 @@ function trackWindow(): ReturnType<typeof makeWindow> {
   return win
 }
 
-const BrowserWindowCtor = vi.fn().mockImplementation(() => trackWindow())
+const BrowserWindowCtor = vi.fn().mockImplementation(function () { return trackWindow() })
 
 const defaultDisplays = [
   { id: 1, bounds: { x: 0, y: 0, width: 1920, height: 1080 } }
@@ -160,7 +160,7 @@ function emitCancelled(win: ReturnType<typeof makeWindow>): void {
 describe('AreaSelectOverlay.selectArea', () => {
   beforeEach(() => {
     vi.resetAllMocks()
-    BrowserWindowCtor.mockImplementation(() => trackWindow())
+    BrowserWindowCtor.mockImplementation(function () { return trackWindow() })
     mockLoadURL.mockResolvedValue(undefined)
     mockLoadFile.mockResolvedValue(undefined)
     mockExistsSync.mockReturnValue(true)
@@ -297,7 +297,7 @@ describe('AreaSelectOverlay.selectArea', () => {
     const promise = overlay.selectArea()
     await vi.waitFor(() => expect(windowInstances[0]?.on).toHaveBeenCalled())
 
-    const closedCall = (windowInstances[0].on as ReturnType<typeof vi.fn>).mock.calls.find(
+    const closedCall = (windowInstances[0].on as Mock).mock.calls.find(
       ([channel]) => channel === 'closed'
     )
     expect(closedCall).toBeDefined()

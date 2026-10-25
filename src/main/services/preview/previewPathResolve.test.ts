@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 
 /**
  * `node:fs/promises` is mocked so we can (a) observe every FileHandle.close()
@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
  * Everything except `open` and `lstat` passes straight through to the real
  * implementation, so realpath/symlink/write behaviour is genuine.
  */
-const closeSpies: Array<ReturnType<typeof vi.fn>> = []
+const closeSpies: Array<Mock> = []
 let lstatOverride: ((path: string) => Promise<{ dev: number; ino: number }>) | null = null
 
 vi.mock('node:fs/promises', async (importOriginal) => {

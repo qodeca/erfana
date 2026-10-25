@@ -19,7 +19,7 @@
  * Split from `usePreviewBounds.test.ts`, which sits near the 500-line cap.
  */
 import { renderHook } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 
 import { usePreviewBounds, type UsePreviewBoundsOptions } from './usePreviewBounds'
 import { clipsDescendants, intersectRects, visibleArea } from '../previewClip'
@@ -47,8 +47,8 @@ const NO_BOX = { left: 0, top: 0, width: 0, height: 0 }
 type Rect = typeof LAID_OUT
 
 let rafQueue: FrameRequestCallback[] = []
-let setBounds: ReturnType<typeof vi.fn>
-let setVisibility: ReturnType<typeof vi.fn>
+let setBounds: Mock
+let setVisibility: Mock
 /** Computed-style overrides per element; any other element gets jsdom's own. */
 const styleOverrides = new Map<Element, Record<string, string>>()
 

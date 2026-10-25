@@ -22,10 +22,10 @@ npm run lint             # eslint (JS/TS) + shebang check + 500-line file limit
 npm run lint:css         # stylelint: src/ CSS + the design/ cards' inline styles
 npm run design           # Rebuild design/ (index, token copy, claims)
 npm run design -- --check # Fail if a generated file under design/ is stale
-npm run test             # All tests (vitest workspace: main + renderer + preload)
-npm run test:main        # vitest.main.ts config: src/main + src/shared + scripts
-npm run test:renderer    # vitest.renderer.ts config: src/renderer/src only (jsdom)
-npm run test:preload     # vitest.preload.ts config: preload tests
+npm run test             # All tests (vitest projects: main + renderer + preload)
+npm run test:main        # vitest.main.config.ts config: src/main + src/shared + scripts
+npm run test:renderer    # vitest.renderer.config.ts config: src/renderer/src only (jsdom)
+npm run test:preload     # vitest.preload.config.ts config: preload tests
 npm run test:cov         # Coverage report (all 3 projects)
 npm run test:e2e         # E2E tests (Playwright + Electron)
 npm run test:e2e:visual            # Visual regression baselines

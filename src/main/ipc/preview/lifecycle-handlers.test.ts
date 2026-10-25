@@ -56,11 +56,11 @@ const FAKE_WINDOW = {
 } as never
 
 function makeService(): PreviewLifecycleService & {
-  open: ReturnType<typeof vi.fn>
-  close: ReturnType<typeof vi.fn>
-  setBounds: ReturnType<typeof vi.fn>
-  setVisibility: ReturnType<typeof vi.fn>
-  reload: ReturnType<typeof vi.fn>
+  open: Mock
+  close: Mock
+  setBounds: Mock
+  setVisibility: Mock
+  reload: Mock
 } {
   return {
     open: vi.fn(async () => ({ ok: true }) as const),
@@ -73,7 +73,7 @@ function makeService(): PreviewLifecycleService & {
 
 function setup(overrides?: Partial<PreviewLifecycleHandlerDeps>): {
   service: ReturnType<typeof makeService>
-  eligibilityCheck: ReturnType<typeof vi.fn>
+  eligibilityCheck: Mock
   trusted: { value: boolean }
   dispose: () => void
 } {

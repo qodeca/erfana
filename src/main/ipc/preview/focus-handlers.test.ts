@@ -8,7 +8,7 @@
  * `{ ok: false }`, and none of them throws. `electron`'s `ipcMain` is mocked to
  * capture the registered handler, as in `navigation-handlers.errors.test.ts`.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { BrowserWindow } from 'electron'
 
 import { PreviewChannels } from '../../../shared/ipc/preview-channels'
@@ -45,7 +45,7 @@ function register(options: {
   focusPage?: (panelId: string, windowId: number) => boolean
   trusted?: boolean
   window?: { id: number } | null
-}): { focusPage: ReturnType<typeof vi.fn> } {
+}): { focusPage: Mock } {
   const focusPage = vi.fn(options.focusPage ?? (() => true))
   dispose = registerPreviewFocusHandlers({
     service: { focusPage },
@@ -122,7 +122,7 @@ describe('preview:focusPage', () => {
 
   describe('the default window resolver', () => {
     /** Register without `resolveWindow`, so the handler falls back to Electron's. */
-    function registerDefault(): { focusPage: ReturnType<typeof vi.fn> } {
+    function registerDefault(): { focusPage: Mock } {
       const focusPage = vi.fn(() => true)
       dispose = registerPreviewFocusHandlers({
         service: { focusPage },

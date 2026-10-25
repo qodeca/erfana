@@ -7,7 +7,7 @@
  * `child_process` is armed only inside the `runLaunchCommand` block, where it
  * runs this test's own Node binary.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import * as childProcess from 'node:child_process'
@@ -287,7 +287,7 @@ describe('the default seams are call-time lambdas', () => {
 })
 
 describe('resolveLauncher – the e2e seam (§4.4)', () => {
-  const armedScope = (): { __erfanaE2eBrowserLaunch: ReturnType<typeof vi.fn> } => ({
+  const armedScope = (): { __erfanaE2eBrowserLaunch: Mock } => ({
     __erfanaE2eBrowserLaunch: vi.fn()
   })
 

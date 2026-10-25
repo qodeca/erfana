@@ -175,7 +175,7 @@ function setupGlobalMocks() {
   mockImages = []
 
   // Mock Image constructor - creates new instance each time
-  global.Image = vi.fn(() => {
+  global.Image = vi.fn(function () {
     const img: MockImage = {
       onload: null,
       onerror: null,
@@ -225,7 +225,7 @@ function setupGlobalMocks() {
   mockXMLSerializer = {
     serializeToString: vi.fn(() => '<svg></svg>')
   }
-  global.XMLSerializer = vi.fn(() => mockXMLSerializer) as any
+  global.XMLSerializer = vi.fn(function () { return mockXMLSerializer }) as any
 
   // Mock btoa/atob
   global.btoa = vi.fn((str: string) => Buffer.from(str, 'binary').toString('base64'))
@@ -412,7 +412,7 @@ describe('convertMermaidDiagramsToImages', () => {
       ])
 
       // Set up auto-trigger: when src is set, immediately trigger onload
-      vi.spyOn(global, 'Image').mockImplementation(() => {
+      vi.spyOn(global, 'Image').mockImplementation(function () {
         const img: MockImage = {
           onload: null,
           onerror: null,
@@ -443,7 +443,7 @@ describe('convertMermaidDiagramsToImages', () => {
       ])
 
       // Auto-trigger image loads
-      vi.spyOn(global, 'Image').mockImplementation(() => {
+      vi.spyOn(global, 'Image').mockImplementation(function () {
         const img: MockImage = {
           onload: null,
           onerror: null,
@@ -631,7 +631,7 @@ describe('convertMermaidDiagramsToImages', () => {
       ])
 
       // Auto-trigger image loads
-      vi.spyOn(global, 'Image').mockImplementation(() => {
+      vi.spyOn(global, 'Image').mockImplementation(function () {
         const img: MockImage = {
           onload: null,
           onerror: null,
@@ -958,7 +958,7 @@ describe('convertMermaidDiagramsToImages', () => {
 
     it('cleanup happens even if drawImage throws', async () => {
       // Simulate drawImage throwing an error
-      mockContext.drawImage = vi.fn(() => {
+      mockContext.drawImage = vi.fn(function () {
         throw new Error('Draw failed')
       })
 
@@ -1079,7 +1079,7 @@ describe('convertMermaidDiagramsToImages', () => {
       ])
 
       // Auto-trigger image loads
-      vi.spyOn(global, 'Image').mockImplementation(() => {
+      vi.spyOn(global, 'Image').mockImplementation(function () {
         const img: MockImage = {
           onload: null,
           onerror: null,

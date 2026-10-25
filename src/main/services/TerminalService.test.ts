@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
 import { EventEmitter } from 'events'
 import { TERMINAL_OUTPUT_FLUSH_MS } from './terminalOutputFlow'
 
@@ -348,7 +348,7 @@ async function createId(
 
     it('releases the cmd pause with a carriage return when the marker is detected', async () => {
       const { terminalService, tid, pty } = await spawnCmd()
-      const write = pty.write as ReturnType<typeof vi.fn>
+      const write = pty.write as Mock
       expect(write).not.toHaveBeenCalled()
 
       pty.emit('data', `C:\\Projects\\test\r\n${markerOf()}\r\n`)
@@ -366,7 +366,7 @@ async function createId(
 
     it('an early clear confirmation with no marker releases the pause and the held input', async () => {
       const { terminalService, tid, pty } = await spawnCmd()
-      const write = pty.write as ReturnType<typeof vi.fn>
+      const write = pty.write as Mock
       terminalService.write(tid, 'x')
       terminalService.markInitializationComplete(tid)
       expect(write.mock.calls.map((c) => c[0])).toEqual(['\r', 'x'])
@@ -377,7 +377,7 @@ async function createId(
 
     it('the 3 s clear fallback also sends the held input, after the key', async () => {
       const { terminalService, tid, pty } = await spawnCmd()
-      const write = pty.write as ReturnType<typeof vi.fn>
+      const write = pty.write as Mock
       terminalService.write(tid, '\x03')
       pty.emit('data', `C:\\Projects\\test\r\n${markerOf()}\r\n`)
       expect(write.mock.calls.map((c) => c[0])).toEqual(['\r'])
@@ -393,7 +393,7 @@ async function createId(
       })
       const { terminalService } = await import('./TerminalService')
       const tid = await createId(terminalService, { shell: 'C:\\tools\\mystery.exe', cwd: 'C:\\Projects\\test' })
-      const write = spawnedPTYs[0].pty.write as ReturnType<typeof vi.fn>
+      const write = spawnedPTYs[0].pty.write as Mock
       // The bootstrap has no pause either, so nothing waits for the key
       expect(String(spawnedPTYs[0].args)).not.toContain('pause')
       terminalService.write(tid!, 'a')
@@ -409,14 +409,14 @@ async function createId(
       })
       const { terminalService } = await import('./TerminalService')
       const tid = await createId(terminalService, { shell: 'C:\\WINDOWS\\SYSTEM32\\CMD.EXE', cwd: 'C:\\Projects\\test' })
-      const write = spawnedPTYs[0].pty.write as ReturnType<typeof vi.fn>
+      const write = spawnedPTYs[0].pty.write as Mock
       terminalService.write(tid!, 'a')
       expect(write).not.toHaveBeenCalled()
     })
 
     it('releases the cmd pause on the missing-marker timeout too', async () => {
       const { pty } = await spawnCmd()
-      const write = pty.write as ReturnType<typeof vi.fn>
+      const write = pty.write as Mock
       vi.advanceTimersByTime(9_999)
       expect(write).not.toHaveBeenCalled()
       vi.advanceTimersByTime(1)
@@ -426,7 +426,7 @@ async function createId(
 
     it('does not send a second key when the marker arrives after the timeout', async () => {
       const { pty } = await spawnCmd()
-      const write = pty.write as ReturnType<typeof vi.fn>
+      const write = pty.write as Mock
       vi.advanceTimersByTime(10_000)
       pty.emit('data', `C:\\Late\\dir\r\n${markerOf()}\r\n`)
       expect(write).toHaveBeenCalledTimes(1)
@@ -434,7 +434,7 @@ async function createId(
 
     it('holds input typed before the release and sends it in order after the key', async () => {
       const { terminalService, tid, pty } = await spawnCmd()
-      const write = pty.write as ReturnType<typeof vi.fn>
+      const write = pty.write as Mock
       expect(terminalService.write(tid, 'd')).toBe(true)
       expect(terminalService.write(tid, 'ir\r')).toBe(true)
       expect(write).not.toHaveBeenCalled()
@@ -448,7 +448,7 @@ async function createId(
 
     it('flushes held input after the key on the timeout as well', async () => {
       const { terminalService, tid, pty } = await spawnCmd()
-      const write = pty.write as ReturnType<typeof vi.fn>
+      const write = pty.write as Mock
       terminalService.write(tid, 'x')
       vi.advanceTimersByTime(10_000)
       expect(write.mock.calls.map((c) => c[0])).toEqual(['\r', 'x'])
@@ -466,7 +466,7 @@ async function createId(
       const { terminalService } = await import('./TerminalService')
       const tid = await createId(terminalService, { shell, cwd: 'C:\\Projects\\test' })
       const { pty, args } = spawnedPTYs[0]
-      const write = pty.write as ReturnType<typeof vi.fn>
+      const write = pty.write as Mock
       terminalService.write(tid!, 'a')
       expect(write.mock.calls.map((c) => c[0])).toEqual(['a'])
       const marker = [args].flat().join(' ').match(/__ERFANA_PWD_MARKER_\d+__/)![0]
@@ -484,7 +484,7 @@ async function createId(
       const { terminalService } = await import('./TerminalService')
       const tid = await createId(terminalService, { cwd: '/tmp' })
       const { pty, args } = spawnedPTYs[0]
-      const write = pty.write as ReturnType<typeof vi.fn>
+      const write = pty.write as Mock
       terminalService.write(tid!, 'a')
       const marker = [args].flat().join(' ').match(/__ERFANA_PWD_MARKER_\d+__/)![0]
       pty.emit('data', `/tmp\n${marker}\n`)

@@ -8,7 +8,7 @@
  * ONLY on a change, and `sync()` recomputes on active-tab change. All fakes —
  * no real `window.api` or zustand store is touched.
  */
-import { afterEach, describe, it, expect, vi } from 'vitest'
+import { afterEach, describe, it, expect, vi, type Mock } from 'vitest'
 import { usePreviewChromeGateStore } from '../../stores/usePreviewChromeGateStore'
 import { usePreviewCollapsedStore } from '../../stores/usePreviewCollapsedStore'
 import { usePreviewStore } from '../../stores/usePreviewStore'
@@ -23,7 +23,7 @@ import {
 /** A mutable fake environment plus the constructed guard. */
 function makeGuard(overrides: Partial<OverlayGuardDeps> = {}): {
   guard: ReturnType<typeof createOverlayGuard>
-  setVisibility: ReturnType<typeof vi.fn>
+  setVisibility: Mock
   state: { occluded: boolean; livePanelIds: readonly string[]; gates: Map<string, PreviewPanelGate> }
   fireOccluded: () => void
   firePreview: () => void

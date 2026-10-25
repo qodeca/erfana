@@ -14,7 +14,7 @@
  * Covers #160 (Windows git allowlist + F_OK + `git --version` liveness).
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
 
 // ---------------------------------------------------------------------------
 // Platform stub state
@@ -47,7 +47,7 @@ const hoisted = vi.hoisted(() => {
   return {
     mockParentPort: new FakePort(),
     mockAccess: vi.fn(),
-    mockRun: vi.fn() as ReturnType<typeof vi.fn>,
+    mockRun: vi.fn() as Mock,
   }
 })
 const { mockParentPort, mockAccess, mockRun } = hoisted

@@ -6,11 +6,11 @@
  * remounts Monaco), and ends only with the last release.
  */
 
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, type Mock } from 'vitest'
 import { renderHook } from '@testing-library/react'
 import { useEditorReadOnlyHold, type ReadOnlyCapableEditor } from './useEditorReadOnlyHold'
 
-function fakeEditor(): ReadOnlyCapableEditor & { updateOptions: ReturnType<typeof vi.fn> } {
+function fakeEditor(): ReadOnlyCapableEditor & { updateOptions: Mock } {
   return { updateOptions: vi.fn() }
 }
 

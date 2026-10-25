@@ -14,7 +14,7 @@
  * @module MarkdownPreview.typing.measure.test
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
 import { render, cleanup, act } from '@testing-library/react'
 import { Profiler } from 'react'
 
@@ -66,7 +66,7 @@ function buildDocument(): string {
   return lines.join('\n')
 }
 
-let exists: ReturnType<typeof vi.fn>
+let exists: Mock
 let directoryListeners: Array<(change: { summary: Record<string, number> }) => void>
 
 beforeEach(() => {

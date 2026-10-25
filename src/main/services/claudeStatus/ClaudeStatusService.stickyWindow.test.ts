@@ -20,7 +20,7 @@
  * @see Issue #41 - Context meter reads the 200k window for Opus 5 sessions
  * @see docs/designs/41-model-capability-registry.md §5.3, §9.6, §13 (decision (b))
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
 import os from 'node:os'
 import path from 'node:path'
 
@@ -44,7 +44,7 @@ const ABSENT_SETTINGS = path.join(os.tmpdir(), 'erfana-sticky-absent-settings.js
  * point of the test is the detector's own rule order (R0'), which the harness's
  * deliberately-simplified fake does not model.
  */
-function realDetectWindowSize(): ReturnType<typeof vi.fn> {
+function realDetectWindowSize(): Mock {
   return vi.fn(
     (
       modelId: string,

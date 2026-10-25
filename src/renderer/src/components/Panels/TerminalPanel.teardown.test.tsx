@@ -13,7 +13,7 @@
  * delay, so a timer armed at start-up is still pending when a test acts.
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { act, render, screen } from '@testing-library/react'
 import { TEST_IDS } from '../../constants/testids'
 import { useTerminalStore } from '../../stores/useTerminalStore'
@@ -56,26 +56,26 @@ const mockXtermInstance = {
 }
 
 vi.mock('@xterm/xterm', () => ({
-  Terminal: vi.fn().mockImplementation(() => mockXtermInstance)
+  Terminal: vi.fn().mockImplementation(function () { return mockXtermInstance })
 }))
 
 const fit = vi.fn()
 vi.mock('@xterm/addon-fit', () => ({
-  FitAddon: vi.fn().mockImplementation(() => ({ fit }))
+  FitAddon: vi.fn().mockImplementation(function () { return ({ fit }) })
 }))
 
 vi.mock('@xterm/addon-web-links', () => ({
-  WebLinksAddon: vi.fn().mockImplementation(() => ({}))
+  WebLinksAddon: vi.fn().mockImplementation(function () { return ({}) })
 }))
 
 let contextLoss: Listener | null = null
 vi.mock('@xterm/addon-webgl', () => ({
-  WebglAddon: vi.fn().mockImplementation(() => ({
+  WebglAddon: vi.fn().mockImplementation(function () { return ({
     onContextLoss: vi.fn((cb: Listener) => {
       contextLoss = cb
     }),
     dispose: vi.fn()
-  }))
+  }) })
 }))
 
 vi.mock('../../utils/domUtils', () => ({
@@ -87,7 +87,7 @@ import { gatewayBridgeMock } from '../../test-utils/gatewayBridgeMock'
 import { logger } from '../../utils/logger'
 
 /** One unsubscribe mock per onClear subscription, in subscription order */
-const clearUnsubscribes: Array<ReturnType<typeof vi.fn>> = []
+const clearUnsubscribes: Array<Mock> = []
 let projectChanged: ((data: { newPath: string | null }) => void) | null = null
 
 function installApi(): void {

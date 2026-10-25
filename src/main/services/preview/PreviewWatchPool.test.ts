@@ -8,7 +8,7 @@
  * or a real filesystem. One test asserts the preview `awaitWriteFinish`
  * overrides (`stabilityThreshold: 50`) reach the factory.
  */
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, type Mock } from 'vitest'
 import type { FSWatcher, ChokidarOptions } from 'chokidar'
 import { createPreviewWatchPool, type WatchFactory } from './PreviewWatchPool'
 import { createPreviewWatchBudget } from './previewWatchBudget'
@@ -18,7 +18,7 @@ interface FakeWatcher {
   path: string
   handlers: { onChange: () => void; onUnlink: () => void; onError: (e: unknown) => void }
   overrides?: Partial<ChokidarOptions>
-  close: ReturnType<typeof vi.fn>
+  close: Mock
   closed: boolean
 }
 

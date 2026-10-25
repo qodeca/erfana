@@ -13,7 +13,7 @@
  * that premise is pinned by the real-chokidar test in
  * `watcher/singleFileWatch.rename.integration.test.ts` (finding M-7).
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
 import { FileWatcherService } from './FileWatcherService'
 import { WATCH_DEAD_OUTSIDE_PROJECT, WATCH_DEAD_SESSION_ENDED } from './watcher/atomicRearm'
 import { UNREADABLE_RECHECK_MS } from './watcher/pathPresence'
@@ -24,7 +24,7 @@ const DEBOUNCE_MS = 300
 interface FakeWatcher {
   path: string
   handlers: Record<string, (arg?: unknown) => void>
-  close: ReturnType<typeof vi.fn>
+  close: Mock
   on: (event: string, handler: (arg?: unknown) => void) => FakeWatcher
 }
 

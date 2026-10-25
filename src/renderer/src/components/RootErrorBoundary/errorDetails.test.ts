@@ -33,7 +33,7 @@ function stackWithLines(count: number): string {
 }
 
 describe('APP_VERSION', () => {
-  it('resolves the build-time define (mirrored in vitest.renderer.ts)', () => {
+  it('resolves the build-time define (mirrored in vitest.renderer.config.ts)', () => {
     expect(APP_VERSION).toBe('0.0.0-test')
   })
 })

@@ -6,7 +6,7 @@
  * Covers the `finalUpdate`-only forwarding of design §1.4, the exact
  * findInPage options shape, and the zero-count-before-stopFindInPage ordering.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 
 import {
   createPreviewFindController,
@@ -16,15 +16,15 @@ import {
 } from './PreviewFindController'
 
 interface WcMock extends PreviewFindContents {
-  findInPage: ReturnType<typeof vi.fn>
-  stopFindInPage: ReturnType<typeof vi.fn>
-  on: ReturnType<typeof vi.fn>
-  off: ReturnType<typeof vi.fn>
+  findInPage: Mock
+  stopFindInPage: Mock
+  on: Mock
+  off: Mock
 }
 
 function makeHarness(): {
   wc: WcMock
-  onCount: ReturnType<typeof vi.fn>
+  onCount: Mock
   emit: (result: FoundInPageResult) => void
 } {
   let listener: ((event: unknown, result: FoundInPageResult) => void) | undefined

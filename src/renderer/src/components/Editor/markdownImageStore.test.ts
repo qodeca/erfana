@@ -5,7 +5,7 @@
  * existing watcher signals (debounced, version-gated, held while hidden), and
  * its bounds (images per document, reads in flight).
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
 import type {
   MarkdownImageReadRequest,
   MarkdownImageReadResponse
@@ -45,7 +45,7 @@ class FakeDisk {
 let disk: FakeDisk
 let directoryListeners: Set<() => void>
 let ownListeners: Set<() => void>
-let decode: ReturnType<typeof vi.fn>
+let decode: Mock
 let budget: ImageByteBudget
 
 function makeStore(documentPath = '/p/docs/doc.md', platform: NodeJS.Platform = 'darwin'): MarkdownImageStore {

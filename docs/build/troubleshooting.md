@@ -317,7 +317,7 @@ Tests fail, preventing build
    npm run test:renderer
    ```
 2. Fix failing tests before building
-3. All tests must pass. The vitest workspace has three projects, and the `main` project covers more than `src/main`: at v0.22.0 it holds 792 test files – main 417 (`src/main` 358 · `src/shared` 35 · `scripts` 24) · renderer 360 · preload 15, counted 2026-10-25 from the vitest `include` globs. The last recorded case count (13,853 passing, 5 skipped on macOS) dates from v0.20.0. Run `npm run test:ci` for the live figure – see [Testing overview](../testing/README.md#key-test-areas)
+3. All tests must pass. vitest runs three projects, and the `main` project covers more than `src/main`: at v0.22.0 it holds 792 test files – main 417 (`src/main` 358 · `src/shared` 35 · `scripts` 24) · renderer 360 · preload 15, counted 2026-10-25 from the vitest `include` globs. The last recorded case count (13,853 passing, 5 skipped on macOS) dates from v0.20.0. Run `npm run test:ci` for the live figure – see [Testing overview](../testing/README.md#key-test-areas)
 
 ---
 

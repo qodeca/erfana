@@ -29,7 +29,7 @@ const mockResizeObserverCallback = vi.fn()
 
 vi.stubGlobal(
   'ResizeObserver',
-  vi.fn((callback: ResizeObserverCallback) => {
+  vi.fn(function (callback: ResizeObserverCallback) {
     mockResizeObserverCallback.mockImplementation(callback)
     return {
       observe: mockResizeObserverObserve,

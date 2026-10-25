@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -362,7 +362,7 @@ describe('registerConfinedHandle', () => {
   })
 
   describe('optional path arguments', () => {
-    const register = (handler: ReturnType<typeof vi.fn>) =>
+    const register = (handler: Mock) =>
       registerConfinedHandle(
         'test:optional',
         {
@@ -416,7 +416,7 @@ describe('registerConfinedHandle', () => {
       filePath: z.string(),
       generation: z.number().int().optional()
     })
-    const register = (handler: ReturnType<typeof vi.fn>, channel = 'test:object') =>
+    const register = (handler: Mock, channel = 'test:object') =>
       registerConfinedHandle(
         channel,
         {

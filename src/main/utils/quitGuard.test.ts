@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, type Mock } from 'vitest'
 import { createQuitGuard } from './quitGuard'
 
-const fakeEvent = (): { preventDefault: ReturnType<typeof vi.fn> } => ({ preventDefault: vi.fn() })
+const fakeEvent = (): { preventDefault: Mock } => ({ preventDefault: vi.fn() })
 
 describe('quitGuard', () => {
   it('prevents the first before-quit and asks the caller to start the shutdown', () => {

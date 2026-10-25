@@ -10,7 +10,7 @@
  * - Subscription management (subscribe/unsubscribe listeners)
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, afterAll, type Mock } from 'vitest'
 import { renderHook, act, cleanup } from '@testing-library/react'
 import { useDirectoryWatcher } from './useDirectoryWatcher'
 import { DIRECTORY_WATCHER } from '../components/ProjectTree/constants'
@@ -281,7 +281,7 @@ describe('useDirectoryWatcher hook', () => {
     })
 
     describe('structural flag (content-only batches skip the tree)', () => {
-      function mountWatcher(): { onRefresh: ReturnType<typeof vi.fn>; callback: (data: unknown) => void } {
+      function mountWatcher(): { onRefresh: Mock; callback: (data: unknown) => void } {
         const onRefresh = vi.fn()
         renderHook(() =>
           useDirectoryWatcher({

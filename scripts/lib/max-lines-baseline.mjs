@@ -8,7 +8,7 @@
 //
 // Coverage: eslint.config.mjs imports this module natively, so a test that runs
 // ESLint in-process loads a second copy outside vitest's transform, which v8
-// coverage maps onto the wrong source. vitest.main.ts therefore leaves this one
+// coverage maps onto the wrong source. vitest.main.config.ts therefore leaves this one
 // module out of coverage; scripts/check-max-lines.test.mjs tests it.
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
