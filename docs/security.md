@@ -483,7 +483,7 @@ npm run build:mac
 
 **Why electron-builder 26**:
 - ✅ Latest version with newest features and fixes
-- ✅ Full support for Electron 44.x (`^44.9.0` in `package.json`, 44.9.0 in the lockfile)
+- ✅ Full support for Electron 44.x (`^44.9.0` in `package.json`, 44.9.3 in the lockfile)
 - ✅ Applies fuses correctly with `afterPack` hook
 - ⚠️ Requires workaround for dependency scanning bug
 
