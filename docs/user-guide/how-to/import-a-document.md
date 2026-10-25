@@ -21,7 +21,7 @@ Select **Import** in the project tree, choose a file, then set OCR and page opti
 
 ## What happens next / If something goes wrong
 
-A plain-text file over 50 MB shows an **Import anyway** or **Skip** warning. Install a converter when the dialog says one is required.
+A plain-text file over 50 MB shows an **Import anyway** or **Skip** warning. PDF and image files need nothing extra. Word, PowerPoint, Excel and OpenDocument files need LibreOffice: if it is missing, the **LibreOffice required** message offers **Open import tools**, which shows how to install it. [Settings > Import tools](../reference/settings.md#import-tools) shows what works before you pick a file.
 
 ## Related
 

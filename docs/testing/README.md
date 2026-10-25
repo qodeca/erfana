@@ -24,7 +24,7 @@ Complete guide for testing Erfana. This covers both automated tests (Vitest/Play
 
 #### Key test areas
 
-Run `npm run test` for current totals. The workspace holds **563 test files** (under `src/`, `scripts/` and `tests/`, counted 2026-09-15). A full `npm run test:ci` reported **13,853 cases passing with 5 skipped** across 563 files on a macOS host at v0.20.0 (counted 2026-09-16, Node 24.20.0), and **13,729 passing with 123 skipped** across the same 563 files on a Windows 11 host on 2026-09-15 (Node 24.14.1, after #128–#130). Re-run `npm run test:ci` for the live figure, since the case count moves with every commit while the file count is checkable with a glob. **The two host figures are not comparable and neither is wrong** – the gap is the skip set below, which is what a Windows host declines to run.
+Run `npm run test` for current totals. The workspace holds **792 test files** at v0.22.0 (counted 2026-10-25 with `git ls-files` against the three vitest `include` globs): main 417 (`src/main` 358 · `src/shared` 35 · `scripts` 24), renderer 360, preload 15. The case counts below are older and were taken on the 563-file tree of September 2026: a full `npm run test:ci` reported **13,853 cases passing with 5 skipped** across 563 files on a macOS host at v0.20.0 (counted 2026-09-16, Node 24.20.0), and **13,729 passing with 123 skipped** across the same 563 files on a Windows 11 host on 2026-09-15 (Node 24.14.1, after #128–#130). Re-run `npm run test:ci` for the live figure, since the case count moves with every commit while the file count is checkable with a glob. **The two host figures are not comparable and neither is wrong** – the gap is the skip set below, which is what a Windows host declines to run.
 
 At v0.19.0, **108 cases were skipped on a Windows host** (the macOS skip set at v0.20.0 is 5), all of them in the `main` project: 77 in the POSIX-only `pathSecurity.test.ts`, 20 in `scripts/fuses.test.mjs` (the POSIX chmod and symlink cases), 5 in `projectConfinement.test.ts`, 5 across the file handlers, and 1 macOS-only `LiteParseConverter.test.ts` case. #124 then added more, and **#130 took most of them back out** after the first Windows run showed the suites passed there: `previewNavigation.integration.test.ts` runs in full on Windows again, while `previewFrames.integration.test.ts` and `BrowserLaunchService.integration.test.ts` each skip a single case rather than the whole file. What still gates on win32 is the inner `symlinks` describe in `previewRequestKind.integration.test.ts` and `it.skipIf` cases in `BrowserLaunchService.test.ts`, `previewFrameSources.test.ts` and `projectConfinement.test.ts`, all in `main`. That is the 174 → 123 drop measured on 2026-09-15. (`tarArchive.test.ts` gates its symlink case with an early `return` instead, so it reports as passing rather than skipped – which is why the coverage floors, not the test run, are what fail on Windows.)
 
@@ -71,9 +71,9 @@ For the version-by-version test-addition history, see [`docs/CHANGELOG.md`](../C
 
 **[e2e-testing.md](./e2e-testing.md)** – Comprehensive E2E testing guide
 
-- Playwright setup and configuration for Electron (three projects in `playwright.config.ts`: `electron` functional, `transcription` env-gated, `visual` regression)
+- Playwright setup and configuration for Electron (four projects in `playwright.config.ts`: `electron` functional, `transcription` env-gated, `bench` env-gated benchmarks, `visual` regression)
 - Testing patterns for third-party components (Monaco, xterm.js, Mermaid)
-- Complete selector catalog (259 testids) – see [e2e-selectors.md](./e2e-selectors.md)
+- Complete selector catalog (274 testids) – see [e2e-selectors.md](./e2e-selectors.md)
 - Test helper utilities documentation
 - Troubleshooting guide
 
@@ -86,7 +86,7 @@ npm run test:e2e:visual            # Visual regression tests (visual project) �
 npm run test:e2e:update-screenshots  # Update visual baselines
 ```
 
-**E2E test files** (all 44 specs in `e2e/`):
+**E2E test files** (a selection of the 66 specs in `e2e/`, counted 2026-10-25 – the full list is in [e2e-testing.md § Test files](./e2e-testing.md#test-files)):
 - `html-preview-corpus.e2e.ts` - HTML-preview corpus acceptance (#74): the fixture corpus renders, the native view is sized on open, and the process-isolation floor holds
 - `html-preview-links.e2e.ts` - in-page links and independent previews (sd-074b): a new tab per target and reuse on a second click, `javascript:` refused, a link out of the project refused, `#anchor` scrolls; plus the external-link case, where an `https:` link asks first and the cancelled outcome is read back from the main log
 - `html-preview-perf.e2e.ts` - the save-to-visible-change gate (sd-074b AC24), asserting the P95 against its budget

@@ -92,7 +92,7 @@ The project-scoped panel boundary is keyed by project path; see [user recovery](
 
 ### Terminal Not Available
 
-**Symptom:** Terminal panel shows "Terminal Not Available" message
+**Symptom:** Terminal panel shows the "Terminal not available" message (node-pty did not load). A "Terminal error" panel is a different case: node-pty loaded but the shell could not start, and its message says why.
 
 **Check:**
 ```typescript
@@ -161,7 +161,7 @@ const watcher = chokidar.watch(filePath, {
 3. Check whether the path is dropped: excluded (`files.exclude`), hidden (`tree.hiddenPatterns`, e.g. `.git`) or ignored (`watcher.ignoreList`: `node_modules`, build output, virtualenvs, …)
 
 **Solution:**
-If the file is in a dropped directory, create it elsewhere or change the list that drops it. One project path filter (`ProjectPathFilter`, `src/main/utils/projectPathFilter.ts`) decides this for the tree walk and both watcher backends: its `shouldDrop(rel)` tests the **project-relative** path against the exclude list, the hidden names and the ignore patterns (default ignore list: `DEFAULT_WATCHER_IGNORE_PATTERNS` in `src/shared/constants.ts`). The directory watcher asks it (`shouldDropAbs` / `shouldDropWatchRel` in `src/main/services/watcher/DirectoryWatcherCore.ts`) from chokidar's function-based `ignored` predicate, from the Windows native watcher's `shouldDrop` option and, as a backstop for every event, in `queueEvent` (`watcher/DirectoryWatcherEvents.ts`):
+If the file is in a dropped directory, create it elsewhere or change the list that drops it. One project path filter (`ProjectPathFilter`, `src/main/utils/projectPathFilter.ts`) decides this for the tree walk and both watcher backends: its `shouldDrop(rel)` tests the **project-relative** path against the exclude list, the hidden names and the ignore patterns (default ignore list: `DEFAULT_WATCHER_IGNORE_PATTERNS` in `src/shared/constants.ts`). The directory watcher asks it (`shouldDropAbs` / `shouldDropWatchRel` in `src/main/services/watcher/DirectoryWatcherCore.ts`) from chokidar's function-based `ignored` predicate (Linux, or `ERFANA_DIRECTORY_WATCHER=chokidar`), from the native watcher's `shouldDrop` option (macOS and Windows) and, as a backstop for every event, in `queueEvent` (`watcher/DirectoryWatcherEvents.ts`):
 ```typescript
 // src/main/services/watcher/directoryWatchBuilders.ts (createChokidarWatcher)
 chokidar.watch(dirPath, {

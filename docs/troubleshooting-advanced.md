@@ -145,7 +145,7 @@ Reachable without a terminal: the crash screen's **Open logs folder** button ope
 Check terminal where `npm run dev` is running.
 
 **Renderer Logs (dev):**
-Open DevTools in app (F12 or View → Toggle Developer Tools).
+Open DevTools in app with F12 (development builds only) or **View > Toggle Developer Tools** – see [Keyboard shortcuts § DevTools](./keyboard-shortcuts.md#devtools).
 
 ---
 
@@ -186,8 +186,8 @@ const watcher = chokidar.watch(filePath, {
 ### Reporting Issues
 
 When reporting bugs, include:
-1. **Erfana version:** `git describe --tags` or commit hash
-2. **Environment:** macOS version, Node version, Python version
+1. **Erfana version:** shown on the Welcome screen; for a source build, `git describe --tags` or the commit hash
+2. **Environment:** macOS or Windows version; for a source build also the Node and Python versions
 3. **Steps to reproduce:** Detailed steps
 4. **Expected vs actual behavior**
 5. **Logs:** `~/.erfana/logs/combined.log` (the relevant excerpt, not the whole file) — or, if a recovery screen appeared, press **Copy error details** on it and paste the report: it carries the version, timestamp, error name and message, the stack and the React component stack, capped at ~16 KB

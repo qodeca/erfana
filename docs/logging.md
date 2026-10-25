@@ -358,7 +358,7 @@ A very large project that kept changing made Erfana exit on Windows with nothing
 Field meanings:
 
 - `readId` – a number that goes up by one with every walk. It pairs a walk's `started` line with its `completed`, `failed` or `still running` line.
-- `pathDigest` – `stablePathDigest` of the resolved path: a 16-hex value, the same for every walk of one folder and different for another. None of the five `readDirectory` lines above carries a readable path. Two older lines still do, as before: the handler's own `file:readDirectory IPC completed` (info) logs `dirPath`, and `FileService: readDirectory error recovered` (warn, a sub-folder that could not be read) logs `path`.
+- `pathDigest` – `stablePathDigest` of the resolved path: a 16-hex value, the same for every walk of one folder and different for another. None of the five `readDirectory` lines above carries a readable path. Two older lines carry only the last folder name (`[redacted]/<name>`, through `redactPath`): the handler's own `file:readDirectory IPC completed` (info) logs `dirPath`, and `FileService: readDirectory error recovered` (warn, a sub-folder that could not be read or vanished during the walk) logs `path`, with any quoted path in its `error` text redacted.
 - `followUp` / `callers` – `followUp: true` marks the one queued walk (or refresh read) that serves every call made while the previous one ran; `callers` is how many calls it serves (1 for a walk that started at once).
 - `behindReadId` – the `readId` of the walk that call is waiting behind.
 - `applied` – `false` means the result was older than the tree already shown, or belonged to a project that is no longer open, and was dropped.
@@ -382,7 +382,7 @@ Reading notes:
 
 ### Large projects on Windows (#211)
 
-The `files.exclude` list, the project path filter and the Windows native directory watcher ([File watching § Watch backends](./file-watching/README.md#watch-backends-211)). Every line below carries counts, durations, codes and fixed reason strings only – never a path, an exclude entry's text or a Node error message (which quotes absolute paths).
+The `files.exclude` list, the project path filter and the native directory watcher ([File watching § Watch backends](./file-watching/README.md#watch-backends-211)). The native watcher was Windows-only in #211; since v0.22.0 macOS uses it too, so the `Native watcher: …` lines below can appear on both. Linux keeps chokidar. Every line below carries counts, durations, codes and fixed reason strings only – never a path, an exclude entry's text or a Node error message (which quotes absolute paths).
 
 **New lines** (`main.log`):
 
@@ -392,8 +392,8 @@ The `files.exclude` list, the project path filter and the Windows native directo
 | `Exclude patterns disabled: match budget exceeded` | warn | Once per project session, when 100 pattern tests have run out of budget and pattern entries switch off | `budgetExceeded`, `patternEntryCount` |
 | `Directory watcher backend selected` | info | Once, at the first directory watch | `backend` (`chokidar` / `native-recursive`) |
 | `Directory watcher override ignored: unknown value` | warn | `ERFANA_DIRECTORY_WATCHER` is set to anything but `chokidar` | `variable`, `accepted` (the value itself is not logged) |
-| `Native directory watcher ready` | info | Windows: the watcher's plan is complete | `recursiveWatches`, `splitFolders`, `walkHints`, `planCapped`, `elapsedMs` |
-| `Directory watcher resync` | info | Windows: lost events were answered by a catch-up re-read (or counted into a pause) | `reason` (`overflow`, `backlog`, `watch-error`, `reopen`), `paused`, `suppressedCount` – at most one line per 10 s |
+| `Native directory watcher ready` | info | macOS and Windows: the watcher's plan is complete | `recursiveWatches`, `splitFolders`, `walkHints`, `planCapped`, `elapsedMs` |
+| `Directory watcher resync` | info | macOS and Windows: lost events were answered by a catch-up re-read (or counted into a pause) | `reason` (`overflow`, `backlog`, `watch-error`, `reopen`), `paused`, `suppressedCount` – at most one line per 10 s |
 | `Directory watch failed to start, restart scheduled` | info | A watch could not be built and a restart was scheduled | `errorType` |
 | `Native watcher: handle cap reached, folder left unwatched` | warn | The 512-handle cap was hit | `maxHandles` |
 | `Native watcher: a watch failed to open` | warn | `fs.watch` refused a folder (other than as gone) | `code`, `recursive` |
@@ -407,9 +407,9 @@ Every `Native watcher: …` warning is rate-limited per kind to one line per 10 
 
 **New fields on existing lines:**
 
-- `FileService: readDirectory completed` – `excludePatternCount` (entries in the compiled list), `excludedEntryCount` (entries this walk skipped without reading), `walkHintCount` (hints a root walk stored for the Windows plan; 0 for any other walk), `matcherBudgetExceeded` (pattern tests in this walk that ran out of budget).
+- `FileService: readDirectory completed` – `excludePatternCount` (entries in the compiled list), `excludedEntryCount` (entries this walk skipped without reading), `walkHintCount` (hints a root walk stored for the native watcher's plan; 0 for any other walk), `matcherBudgetExceeded` (pattern tests in this walk that ran out of budget).
 - `Project switch: settings loaded` (debug) – `excludePatternCount`.
-- `DirectoryWatcher health` – `eventsFiltered` (events dropped as excluded, hidden, ignored or outside the project), `nativeOverflows` (Windows change-buffer overflows), `nativeResyncs` (catch-up re-reads the native backend asked for), `matcherBudgetExceeded`. The counters are cumulative. A growth in `nativeResyncs` since the previous health line now also counts as stress and logs the line at `warn`; a resync that happened before the previous line no longer does.
+- `DirectoryWatcher health` – `eventsFiltered` (events dropped as excluded, hidden, ignored or outside the project), `nativeOverflows` (native change-buffer overflows), `nativeResyncs` (catch-up re-reads the native backend asked for), `matcherBudgetExceeded`. The counters are cumulative. A growth in `nativeResyncs` since the previous health line now also counts as stress and logs the line at `warn`; a resync that happened before the previous line no longer does.
 
 Reading notes:
 

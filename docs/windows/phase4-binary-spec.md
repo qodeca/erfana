@@ -176,7 +176,7 @@ Review checklist: see [`docs/build/whisper-binaries.md#diff-review-checklist-eve
 
 ## CPU-unsupported exit-code contract (POSIX vs Win32)
 
-`src/main/services/LocalWhisperService.ts:835-838` branches the CPU-unsupported detection on `process.platform === 'win32'` and reads from `WIN32_CPU_UNSUPPORTED_EXIT_CODES` or `POSIX_CPU_UNSUPPORTED_EXIT_CODES` accordingly. The `POSIX_*` set is currently **macOS-only by accident-of-support**: `classifyPlatform()` in `whisper-assets.ts:170-203` rejects Linux outright with a `WHISPER_UNSUPPORTED_PLATFORM` reason, so the POSIX path never actually executes against a Linux SIGILL today.
+`src/main/services/LocalWhisperService.ts:849-852` branches the CPU-unsupported detection on `process.platform === 'win32'` and reads from `WIN32_CPU_UNSUPPORTED_EXIT_CODES` or `POSIX_CPU_UNSUPPORTED_EXIT_CODES` accordingly. The `POSIX_*` set is currently **macOS-only by accident-of-support**: `classifyPlatform()` in `whisper-assets.ts:178-211` rejects Linux outright with a `WHISPER_UNSUPPORTED_PLATFORM` reason, so the POSIX path never actually executes against a Linux SIGILL today.
 
 Any future Linux enablement must validate the `POSIX_CPU_UNSUPPORTED_EXIT_CODES` set against Linux SIGILL exit codes before unlocking the platform; the macOS values are not guaranteed to match. The branch is correct today; the contract is just implicit.
 
@@ -287,5 +287,5 @@ Full manifest:
 
 | Erfana app versions | Pinned whisper build | Date pinned | Notes |
 |---|---|---|---|
-| `0.9.4`–`0.21.0` (0.21.0 not tagged yet at pin time; last tag v0.20.1) | `whisper-build-v1.8.4-erfana1` | 2026-04-22 | First Windows + macOS release under Option A (#165) — upstream `9386f239` (v1.8.4) |
-| the release after 0.21.0 | `whisper-build-v1.8.4-erfana2` | 2026-10-24 | Static macOS `whisper-cli` (PR #363) – fixes local transcription failing to start on macOS; Windows rebuilt, same 4 DLLs. Same upstream `9386f239` (v1.8.4). `MIN_REVISION_INDEX` 1 → 2 |
+| `0.9.4`–`0.20.1` (0.21.0 was never released) | `whisper-build-v1.8.4-erfana1` | 2026-04-22 | First Windows + macOS release under Option A (#165) — upstream `9386f239` (v1.8.4) |
+| `0.22.0` (released 2026-10-25) onwards | `whisper-build-v1.8.4-erfana2` | 2026-10-24 | Static macOS `whisper-cli` (PR #363) – fixes local transcription failing to start on macOS; Windows rebuilt, same 4 DLLs. Same upstream `9386f239` (v1.8.4). `MIN_REVISION_INDEX` 1 → 2 |

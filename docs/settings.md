@@ -13,7 +13,7 @@ User controls, defaults and project options are in the [settings reference](./us
 
 ## Credential and local model storage
 
-**API key security**: Keys are encrypted using platform-native keychain (macOS Keychain, Linux libsecret, Windows DPAPI). The global settings JSON only stores a boolean `openaiApiKeyStored` flag, never the key itself. Plaintext fallback with warning if safeStorage unavailable.
+**API key security**: Keys are encrypted using platform-native keychain (macOS Keychain, Linux libsecret, Windows DPAPI). The global settings JSON only stores a boolean `openaiApiKeyStored` flag, never the key itself. There is no plaintext fallback: when `safeStorage` cannot encrypt (for example Linux without a keyring), `ApiKeyService.storeKey` throws `ApiKeyEncryptionUnavailableError`, nothing is written, and Settings shows the reason under the key field.
 
 **Local backend** (macOS universal + Windows x64 since Phase 4, #165, merged 2026-04-23 for 0.9.4): When backend is set to 'local', transcription runs entirely offline via whisper.cpp child process. The binary and model files are stored in the Electron `userData` directory. Binary + model downloads run through the Phase 4 trust chain — minisign-signed manifest (dual-pubkey), SHA-256 pin in `whisper-assets.ts`, pre-spawn TOCTOU re-hash, and monotonic `lastSeenRevision` downgrade block — progress is shown in the settings UI. Windows ARM64 shows a disabled "Local" option with ARM64-specific copy (upstream whisper.cpp has no ARM64 Windows binary). Downloads have a 10-minute timeout to prevent indefinite hangs. See [Whisper Trust Chain](./windows/whisper-trust-chain.md) for the full trust model.
 
@@ -27,7 +27,7 @@ User controls, defaults and project options are in the [settings reference](./us
 
 Settings persist to `~/.erfana/settings.json` via GlobalSettingsService. The file is read once, in `initialize()` at app start, and cached; every `setSetting` validates the whole cached object and writes it back in full, so a hand edit made while Erfana runs is overwritten by the next save. There is no file watcher on it.
 
-**Parse strictness.** A global file that fails `GlobalSettingsSchema` is treated as corrupt: it is copied to `settings.json.bak` and **every** setting is reset to its default. A project's `.erfana/settings.json` is read by `ProjectSettingsService` on every project open, and any failure there blocks the project from opening. Two blocks are therefore parsed leniently so that a mistake in them can do neither:
+**Parse strictness.** A global file that fails `GlobalSettingsSchema` is treated as corrupt: it is copied to `settings.json.bak` and **every** setting is reset to its default. A project's `.erfana/settings.json` is read by `ProjectSettingsService` on every project open, and any failure there blocks the project from opening. Three blocks are therefore parsed leniently so that a mistake in them can do neither:
 
 - `htmlPreview` in the project file – `z.unknown()`, parsed separately by `PreviewAllowlistStore` (see [Remote-host approval storage](#remote-host-approval-storage)).
 - `terminal` in the global file (lens review [23]) – `TerminalSettingsSchema`: an unknown `screenReaderMode` becomes `auto`, and a malformed section becomes `{ screenReaderMode: 'auto' }`.
@@ -40,6 +40,10 @@ Added in #211. `ProjectSettingsService` resolves the list on every project open:
 ## Terminal screen-reader mode (`terminal.screenReaderMode`)
 
 Added for lens review [23]. xterm.js draws output on a canvas, so a screen reader reads nothing unless xterm's `screenReaderMode` is on (an offscreen accessibility tree plus a live region). `useTerminalScreenReaderMode` (`src/renderer/src/hooks/`) resolves it: `on` and `off` win; `auto` follows `terminal:getScreenReaderSupport` and `terminal:screenReaderSupportChanged` (Electron's accessibility support, macOS and Windows only). `useXtermSession` passes the result to the `Terminal` constructor and sets `xterm.options.screenReaderMode` live, so a change in Settings or in the OS applies to running terminals without a restart. Chromium also reports some non-screen-reader tools that use the accessibility APIs, which is what `off` is for; on Linux, Auto stays off and `on` is the way in.
+
+## Import tools section (#250)
+
+`sections/ImportToolsSection.tsx` lists PDF and images as built in and Office documents by LibreOffice state (`found`, `missing`, `unsafe`), with a per-platform install hint (Homebrew command with a copy button on macOS, a **Download LibreOffice** button that opens `DOCUMENT_IMPORT.LIBREOFFICE_DOWNLOAD_URL` through `shell:openExternal` on Windows, the package name elsewhere). Opening the section reads the cached result from startup detection; **Check again** calls `import:toolStatus` with a recheck, which `ImportToolStatusService` throttles to one probe per `DOCUMENT_IMPORT.TOOL_RECHECK_MIN_INTERVAL_MS` (3 s). The import refusal's **Open import tools** button calls `openSettings({ section: 'import-tools' })`, which scrolls to the section and focuses its heading. Detection itself is `DependencyDetector` (see [glossary](./glossary.md#services)); the "unsafe" wording comes from `untrustedToolMessage` in `src/shared/errors.ts`, the same text a refused conversion uses.
 
 ## Implementation
 

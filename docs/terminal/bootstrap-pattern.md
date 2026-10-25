@@ -52,7 +52,7 @@ When the main process sees `process.env.ERFANA_E2E_FAST_SHELL === '1'`, the POSI
 - `-NoProfile`: PowerShell does not load the profiles before the script; the script's last step dot-sources them itself (all users all hosts, all users this host, current user all hosts, current user this host – PowerShell's own order), each in its own `try`, so they still run after the cwd is set and after the screen clear, as before
 - `-NoExit`: the same process stays as the interactive session once the script ends (`PowerShellBootstrapBuilder.build` returns `['-NoLogo', '-NoProfile', '-NoExit', '-Command', script]`). Until #305 round 8 the script ended with `& '<shell>' -NoLogo`, so the pid node-pty reported was a bootstrap PowerShell and the interactive shell was its child; on quit both ended with the console, and a program the user had started in its own console was left with a parent the quit cleanup had never been told about. Now the reported pid is the shell that runs the user's commands
 - `-Command`: Execute the bootstrap script
-- `Set-Location -LiteralPath`: `-LiteralPath` disables wildcard expansion and variable interpolation. Single-quoting the path further disables `$`-expansion. cwd apostrophes are doubled (`'` → `''`).
+- `Set-Location -LiteralPath`: `-LiteralPath` disables wildcard expansion and variable interpolation. Single-quoting the path further disables `$`-expansion. Every single-quote character in the cwd is doubled (`'` → `''`) – PowerShell treats the typographic quotes `‘ ’ ‚ ‛` (U+2018, U+2019, U+201A, U+201B) as the same quote, so they are doubled too (`escapePowerShellSingleQuotes` in `src/shared/powershellQuote.ts`, v0.22.0). Before that, a folder such as `Bob’s Files` ended the quoted path early.
 - `Write-Output '<marker>'` with the marker also single-quoted: defensive — protects against marker format changes that might include shell-sensitive characters.
 
 ### cmd.exe
@@ -72,7 +72,7 @@ When the main process sees `process.env.ERFANA_E2E_FAST_SHELL === '1'`, the POSI
 
 ### Missing-marker safety net
 
-`TerminalService` arms a 10 s timer at spawn. If the marker has not been seen by then (broken bootstrap, bad cwd, shell quirk), it logs a warning with lengths and counts only, marks the marker as received and the initialization as complete, and flushes the buffered output to the renderer, so the user sees the shell's error instead of a blank screen. The detector clears the timer when the marker does arrive. After a timeout it keeps watching a short tail of the output: a marker that arrives late runs the normal clear handshake and updates the cwd from the reported line. and every cleanup path (kill, exit, window close) clears it too.
+`TerminalService` arms a 10 s timer at spawn. If the marker has not been seen by then (broken bootstrap, bad cwd, shell quirk), it logs a warning with lengths and counts only, marks the marker as received and the initialization as complete, and flushes the buffered output to the renderer, so the user sees the shell's error instead of a blank screen. The detector clears the timer when the marker does arrive. After a timeout it keeps watching a short tail of the output: a marker that arrives late runs the normal clear handshake and updates the cwd from the reported line. Every cleanup path (kill, exit, window close) clears the timer too.
 
 ## Initialization Phases
 
@@ -87,10 +87,12 @@ When the main process sees `process.env.ERFANA_E2E_FAST_SHELL === '1'`, the POSI
 - `INIT_CWD` — Initial working directory
 - `VITE_*` — Vite build tool variables
 - `FORCE_COLOR` — Color output control
+- `COLORTERM` – removed, then set explicitly to `truecolor`
+- `CLAUDECODE`, `CLAUDE_CODE_*` – Claude Code session markers. If Erfana itself was started from inside a Claude Code session, a `claude` launched in the terminal would otherwise believe it is a nested session and skip writing its transcript, which leaves the context status bar with nothing to read. `ANTHROPIC_*` variables are kept on purpose
 
 **Preserved Variables**: `PATH`, `HOME`, `USER`, `SHELL`, `LANG`, and other standard environment variables.
 
-**Implementation**: `TerminalService.ts` filters environment before passing to node-pty.
+**Implementation**: `TerminalService.cleanEnvironment()` filters the **merged** environment (`process.env` plus any caller-supplied `env`), so a caller cannot re-add a removed name. `TERM`, `COLORTERM`, `PS1`, `PROMPT` (not for cmd.exe) and `SHELL_SESSIONS_DISABLE` are then set on top. The renderer cannot supply an environment at all: `terminal:create` accepts `{ cwd?, cols, rows }` only.
 
 ### 2. cwd Validation (Windows) and Normalization
 
@@ -186,7 +188,7 @@ The xterm.js-side handshake (§ 5) is unaffected — xterm still clears its own 
 
 ## Strategy pattern: `WindowsBootstrapBuilder`
 
-Windows shell bootstrap is implemented via a strategy pattern in `src/main/services/WindowsTerminalBootstrap.ts` (~240 LOC) so that future shells (WSL) can be added by *writing a new class*, not by modifying a switch.
+Windows shell bootstrap is implemented via a strategy pattern in `src/main/services/WindowsTerminalBootstrap.ts` so that future shells (WSL) can be added by *writing a new class*, not by modifying a switch.
 
 **Interface**:
 ```typescript
@@ -196,13 +198,13 @@ export interface WindowsBootstrapBuilder {
   readonly kind: WindowsBootstrapKind
   readonly shellKind: ShellKind // 'posix' | 'cmd' | 'powershell' – quoting flavour (#164)
   canHandle(shell: string): boolean
-  build(args: { shell: string; cwd: string; marker: string }): string[]
+  build(args: { shell: string; cwd: string; marker: string }): string[] | string
 }
 ```
 
 - `kind` is a stable identifier (`'powershell'`, `'git-bash'`, `'cmd.exe'`, typed as the `WindowsBootstrapKind` union so a `switch` on it is exhaustively checked) used in logging (see `🔵 Windows shell kind: …` log line) and for diagnostics.
 - `shellKind` is the quoting flavour the spawned shell speaks (`ShellKind` from `src/shared/shellKind.ts`); it is recorded on the `TerminalInstance` and returned to the renderer in the `terminal:create` response so pasted paths can be quoted per terminal (#164).
-- `build()` returns the raw `shellArgs` passed to node-pty. `kind` and `shellKind` are surfaced separately via `buildWindowsBootstrap()`'s return value: `{ kind, shellKind, shellArgs }`.
+- `build()` returns the raw `shellArgs` passed to node-pty: an argv array for PowerShell and Git Bash, one ready-made command-line string for cmd.exe (see [cmd.exe](#cmdexe)). `kind` and `shellKind` are surfaced separately via `buildWindowsBootstrap()`'s return value: `{ kind, shellKind, shellArgs }`.
 
 **Default builders** (`DEFAULT_WINDOWS_BOOTSTRAP_BUILDERS`, **precedence order matters**):
 1. `PowerShellBootstrapBuilder` — matches `pwsh`, `pwsh-preview`, `powershell` (regex covers forward-slash Git Bash paths)
@@ -262,7 +264,7 @@ pwsh.exe -NoLogo -NoProfile -NoExit -Command "Set-Location -LiteralPath 'C:\path
 - `-NoProfile`: PowerShell skips its own profile loading; the script dot-sources the profiles at its end instead, so they run after the cwd is set
 - `-NoExit`: this process stays as the interactive session (one process, so the pid node-pty reports is the user's shell – #305)
 - `-Command`: run the script string
-- `Set-Location -LiteralPath`: disable glob/variable expansion; cwd apostrophes doubled (`'` → `''`)
+- `Set-Location -LiteralPath`: disable glob/variable expansion; every single-quote character in the cwd doubled, plain and typographic (`'` → `''`, `’` → `’’`)
 - `[Console]::Write([char]27 + '[2J' + ...)`: wipes ConPTY's screen buffer + scrollback before the interactive session takes over (see § 4)
 - the profile loader: dot-sources each existing profile in PowerShell's order; a failing one prints its error and the next still runs
 - cwd rejected if it contains `\r` / `\n`
@@ -292,7 +294,7 @@ Handles: `C:\tools\pwsh\pwsh.exe`, `/c/Program Files/PowerShell/7/pwsh.exe` (Git
 
 **Test coverage**:
 - `src/main/services/TerminalService.test.ts` — service integration tests (spawn dispatch, bootstrap script shape per platform, cwd validation, POSIX escape, `resolveWindowsShell` fallback chain).
-- `src/main/services/WindowsTerminalBootstrap.test.ts` — isolated unit tests for the builder strategy (60 tests): each builder's `canHandle` regex, dispatch-chain precedence, emitted-script shape (including the Windows-specific ConPTY clear step), single-quote escape rules, deny-list accept/reject cases (including the `C:\Program Files (x86)\…` regression), and `normalizeWindowsCwd` trailing-separator rules.
+- `src/main/services/WindowsTerminalBootstrap.test.ts` — isolated unit tests for the builder strategy: each builder's `canHandle` regex, dispatch-chain precedence, emitted-script shape (including the Windows-specific ConPTY clear step), single-quote escape rules, deny-list accept/reject cases (including the `C:\Program Files (x86)\…` regression), and `normalizeWindowsCwd` trailing-separator rules.
 
 **Key test scenarios**:
 - ECHO-ON realism: simulate cmd.exe emitting the echoed script line + cwd + marker, assert `terminal.cwd` parses as the actual cwd (catches the Phase-1 blocker regression)
@@ -311,7 +313,8 @@ Handles: `C:\tools\pwsh\pwsh.exe`, `/c/Program Files/PowerShell/7/pwsh.exe` (Git
 
 - `src/main/services/TerminalService.ts` – service, bootstrap dispatch, marker detection, three-flag gating, `resolveWindowsShell` fallback chain
 - `src/main/services/WindowsTerminalBootstrap.ts` — strategy interface + `PowerShellBootstrapBuilder` / `GitBashBootstrapBuilder` / `CmdExeBootstrapBuilder` + `validateWindowsCwd` / `normalizeWindowsCwd` helpers
-- `src/main/services/WindowsTerminalBootstrap.test.ts` — unit tests for the strategy layer (added during Phase-2 UAT hardening)
+- `src/main/services/WindowsTerminalBootstrap.test.ts` — unit tests for the strategy layer (added during Phase-2 UAT hardening); `WindowsTerminalBootstrap.profiles.test.ts` covers the PowerShell profile loader
+- `src/shared/powershellQuote.ts` – PowerShell single-quote escaping shared by the bootstrap and the renderer's path quoting
 - `src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts` — clear handler + `markClearComplete` confirmation (sent once `TerminalPanel.tsx` reports its data listener attached)
 - `src/main/ipc/terminal-handlers.ts` — clear event bypass channel
 - `src/preload/index.ts` — `onClear()` and `markClearComplete()` API

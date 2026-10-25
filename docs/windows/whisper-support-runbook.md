@@ -91,7 +91,7 @@ Windows: type %APPDATA%\erfana\whisper\.last-seen-revision
 | Sentinel value > current release revision, NO legitimate reason | **Potential attack.** Don't reset. Investigate: did someone ship a rogue Erfana build that pinned a higher revision? Check `MIN_REVISION_INDEX` across shipped versions. |
 | Sentinel value equals `MIN_REVISION_INDEX`, user still sees the error | Misdiagnosis — the code is `≥` not `>`. Check the actual error message (which reports the floor). Likely a different failure. |
 
-**Rolling back past the erfana2 pin** (a known instance of scenario 2): once a release that pins `whisper-build-v1.8.4-erfana2` has installed its engine, `.last-seen-revision` holds `2`. An older Erfana (0.21.0 or earlier) pins `erfana1` (revision 1), so its local transcription fails with this error.
+**Rolling back past the erfana2 pin** (a known instance of scenario 2): once a release that pins `whisper-build-v1.8.4-erfana2` has installed its engine, `.last-seen-revision` holds `2`. An older Erfana (v0.20.1 or earlier; 0.21.0 was never released) pins `erfana1` (revision 1), so its local transcription fails with this error.
 
 - **macOS**: upgrade Erfana again. Do **not** delete the sentinel – the older app would then install `erfana1`, whose `whisper-cli` cannot start on a user's Mac (its dylibs are not in the download), so the user trades this error for `WHISPER_PROCESS_FAILED`.
 - **Windows**: deleting the sentinel is fine if the rollback has to stay – the `erfana1` Windows build works, and the next upgrade raises the floor again.

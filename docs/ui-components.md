@@ -38,6 +38,12 @@ Lightweight toast notifications in bottom-left corner.
 **API**: `showGlobalToast()` via event bus, rendered by `ToastProvider`
 **Types**: info, success, warning, error
 
+**Dwell and stacking** (v0.22.0, `toastDwell.ts`, `toastStack.ts`):
+- An error toast, or any toast with an action button, stays until it is closed. A warning stays at least 8 s (`WARNING_MIN_DWELL_MS`), even when the caller asked for less. Info and success keep the caller's duration
+- The countdown pauses while the pointer is over a toast or keyboard focus is inside it. Escape on a focused toast closes it and returns focus to where it was
+- The same type, title and message raised again while shown adds a count ("×3") to the toast on screen instead of a copy
+- At most five toasts that stay until closed (`MAX_STICKY_TOASTS`) are shown; a sixth drops the oldest, never the one that holds keyboard focus
+
 ## Control Panels
 
 Collapsible panels with chevron toggle (VS Code pattern).
@@ -87,7 +93,7 @@ Hierarchical file tree with filtering, visual indicators, context menu operation
 Integrated terminal with xterm.js + node-pty.
 
 **Access**: Terminal icon (right sidebar) or Cmd/Ctrl+J
-**Restart**: `RotateCw` icon in the header (`title="Restart terminal"`) kills and restarts the session – there is no X in the terminal header
+**Restart**: `RotateCw` icon in the header (`title="Restart terminal"`) kills and restarts the session – there is no X in the terminal header. It asks first (focus on Cancel) when Claude Code is running in the terminal, when the terminal is still producing output after you typed in it, or – on macOS and Linux – when any program other than the shell is running (`terminal:getActivity`); an idle terminal restarts straight away (`TerminalPanel/restartGuard.ts`)
 
 **Header controls** (left to right, all rendered only once the terminal is ready):
 
@@ -111,7 +117,9 @@ The three capture buttons appear only on platforms where screenshot capture is s
 - High contrast theme (white on black)
 - Cross-platform screenshot capture (screen / window / area) and webcam photo capture, inserted as a path into the terminal
 - Maximize over the editor (Cmd/Ctrl+Shift+M)
-- Per-terminal Claude Code context status bar (`ClaudeStatusBar`)
+- Per-terminal Claude Code context status bar (`ClaudeStatusBar`) – Claude Code only; other CLI agents run in the terminal without it
+- Screen-reader mode (xterm's `screenReaderMode`): **Settings > Terminal > Screen reader mode** – Auto (on while macOS or Windows reports a screen reader, through `terminal:getScreenReaderSupport`), On or Off; changes apply to open terminals at once (`useTerminalScreenReaderMode`)
+- Right-click menu from the keyboard: Shift+F10 or the Menu key
 - Preview and editor context menus send a selection to the terminal via prompt templates (there is no "Send selection to terminal" item)
 
 **Theme**: Uses design tokens - `var(--color-black)` bg, white fg, `var(--color-cursor)` cursor
@@ -119,7 +127,7 @@ The three capture buttons appear only on platforms where screenshot capture is s
 **Tech**: xterm.js v6.0.0, node-pty v1.0.0, WebglAddon, FitAddon, WebLinksAddon
 
 **Modular architecture** (started v0.6.5, **not finished**):
-- Extraction is partial. `TerminalPanel.tsx` currently consumes only `useScreenshotCapture`, plus the extracted `TerminalStatusContent.tsx` and `ClaudeStatusBar.tsx` components; the rest of the panel – including its header toolbar – is still inlined in `TerminalPanel.tsx`.
+- Extraction is partial. `TerminalPanel.tsx` consumes the extracted session hooks `useXtermSession` (start-up, the single `teardownTerminal`, the start-up guard) and `useTerminalFileDrop`, plus `useScreenshotCapture`, `restartGuard.ts`, `outputAck.ts` (flow-control acks) and the `TerminalStatusContent.tsx` and `ClaudeStatusBar.tsx` components; its header toolbar is still inlined in `TerminalPanel.tsx`.
 - `useTerminalDragDrop`, `useTerminalResize`, `useTerminalPortal` and `TerminalToolbar.tsx` exist and are re-exported from `TerminalPanel/index.ts`, but nothing outside their own tests imports them yet.
 - `TerminalPanel/index.ts` still re-exports the component from its old location with a `// Will be moved here in Phase 6` comment, so the module boundary is not yet real.
 - `TerminalStatusContent.tsx` – Status state display (checking, unavailable, error, ready). In use.
@@ -157,9 +165,10 @@ Reusable menu for Project Panel file/folder operations and tab actions.
 
 **Features**:
 - Portal rendering (#portal-root)
-- Keyboard navigation
+- Keyboard (v0.22.0, #90): Shift+F10 or the Menu key opens the menu of the focused file, tab, editor, terminal or text field, and focus moves into it. ↑ / ↓, Home and End move between items (a disabled item is still reachable), Enter or Space chooses one, typing a letter jumps to it, and Escape or Tab closes the menu and puts focus back where it was. Escape on an open menu never reaches the terminal underneath
 - Separator support
-- Disabled state (grayed out, non-clickable) - v0.4.2
+- Disabled state (grayed out, non-clickable) - v0.4.2. A disabled item never shows danger styling, so a disabled Delete is grey, not red
+- Shortcut hints are exposed as `aria-keyshortcuts` (`⌘C` → `Meta+C`)
 
 **Interface**:
 ```typescript
@@ -345,8 +354,10 @@ Prompts user before quitting when there are unsaved changes or active terminal s
 
 ### Dialog options
 
-- **Discard and quit**: Close app without saving
+- **Quit**: Close app without saving (a danger prompt, so it opens with focus on Cancel; Enter presses the focused button)
 - **Cancel**: Stay in app
+
+Escape closes only the dialog on top, so dismissing the quit prompt during a transcription or document import does not also cancel the job (#229).
 
 ### Terminal activity detection
 
@@ -432,7 +443,7 @@ The message paragraph branches on **capability, not taste**: promising that "res
 
 Offering Restart on a crash screen is only safe because **start-up never auto-opens the last project** – the "Load last project on mount - DISABLED" effect in [`useProjectManagement.ts`](../src/renderer/src/hooks/useProjectManagement.ts), which shows the welcome screen with recent projects instead. Were auto-restore re-enabled, restarting after a crash *caused by* a project would reopen that project and crash again, in a loop.
 
-Rather than rest on that coupling alone, the Restart handler clears `lastProjectPath` best-effort before `relaunchApp()`. `closeProjectBestEffort()` races `window.api.file.closeProject()` against a `CLOSE_PROJECT_TIMEOUT_MS` (1500 ms) timer – comfortably inside the 3 s `RESTART_STALLED_MS` window, so even the worst case still reaches the relaunch before the screen offers manual-quit guidance. Three outcomes, one behaviour: the call **settles** (happy path), **rejects** (swallowed), or **never settles** – the realistic case when the main process is the unwell part – and the wait is abandoned at the timeout. The relaunch proceeds in all three; the timer is cleared on every branch so it cannot outlive the screen. Both halves are load bearing – if auto-restore is ever re-enabled, this handler is the second line of defence, not the first.
+Rather than rest on that coupling alone, the Restart handler clears `lastProjectPath` best-effort before `relaunchApp()`. `closeProjectBestEffort()` races `fileGateway.closeProject()` (a `'user'` close, which clears the last path main-side) against a `CLOSE_PROJECT_TIMEOUT_MS` (1500 ms) timer – comfortably inside the 3 s `RESTART_STALLED_MS` window, so even the worst case still reaches the relaunch before the screen offers manual-quit guidance. Three outcomes, one behaviour: the call **settles** (happy path), **rejects** (swallowed), or **never settles** – the realistic case when the main process is the unwell part – and the wait is abandoned at the timeout. The relaunch proceeds in all three; the timer is cleared on every branch so it cannot outlive the screen. Both halves are load bearing – if auto-restore is ever re-enabled, this handler is the second line of defence, not the first.
 
 The invariant is pinned by `src/renderer/src/hooks/useProjectManagement.noAutoLoad.test.ts`. **Do not delete that test to "fix" a future auto-restore feature** – changing the behaviour means revisiting this screen first.
 

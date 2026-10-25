@@ -39,7 +39,7 @@ Erfana is an agent-native Markdown workspace – an Electron app that runs a ter
   - [Troubleshooting](./terminal/troubleshooting.md) - Known issues and solutions
 - [Project Panel](./project-panel.md) - File explorer and project management
 - [Drag-Drop](./drag-drop/README.md) - VS Code-style file reorganization, external file drop, keyboard shortcuts
-- [File Watching](./file-watching/README.md) - Auto-refresh and file monitoring
+- [File Watching](./file-watching/README.md) - Auto-refresh and file monitoring: the native project watcher on macOS and Windows, chokidar on Linux and for single files, content-only saves that skip the tree re-read
   - [Patterns & Testing](./file-watching/patterns-and-testing.md) - Implementation patterns and test scenarios
   - [Technical Details](./file-watching/technical-details.md) - Performance, security, edge cases
 - [Prompt Templates](./prompts/README.md) - context-menu templates that send a selection to the CLI agent in the terminal (v0.3.4)
@@ -48,7 +48,7 @@ Erfana is an agent-native Markdown workspace – an Electron app that runs a ter
   - [AutoExecute Testing](./prompts/autoexecute-testing.md) - Test coverage and mocking strategy
   - [AutoExecute Reference](./prompts/autoexecute-reference.md) - Implementation files and error handling
 - [Logging](./logging.md) - Logging layer, log levels, file rotation, settings
-- [Settings](./settings.md) - Editor, git, logging, and transcription configuration
+- [Settings](./settings.md) - Settings overlay implementation notes: storage and parse rules, API-key and model storage, the `files.exclude` list, terminal screen-reader mode. The user-facing list of settings is the [settings reference](./user-guide/reference/settings.md)
 
 ### UI/UX
 - **[Design system](../design/index.html)** - the cards that decide colours, type, spacing, surfaces, focus, motion, layering and each component (MANDATORY for UI changes; open it in a browser)
@@ -59,7 +59,7 @@ Erfana is an agent-native Markdown workspace – an Electron app that runs a ter
 
 ### Development
 - [Development Tasks](./development-tasks.md) - Build, test, and deployment
-- [Continuous Integration](./ci.md) - GitHub Actions workflows (`checks.yml` active on every push; `e2e.yml` **disabled** since 2026-04-25 — local-only verification until macos-latest stability is fixed; `release.yml` and `whisper-binaries*.yml` for release flow), retry patterns, visual-on-CI gap
+- [Continuous Integration](./ci.md) - GitHub Actions workflows (`checks.yml` on every push, carrying six of the seven required checks – the seventh, `Secret scan`, is `secret-scan.yml`; the macOS `e2e.yml` **disabled** since 2026-04-25, with the advisory `E2E (Linux, xvfb)` job in `e2e-linux.yml` as the only e2e run on pull requests; `release.yml` and `whisper-binaries*.yml` for release flow), retry patterns, visual-on-CI gap
 - [Build](./build/README.md) - electron-builder, ASAR, fuses, troubleshooting
 - [Release signing keys](./release-pubkey.txt) - Published minisign public keys (primary + standby rotation) for verifying release artifacts
 - [Release handoffs](./handoffs/) - Point-in-time release-verification handoffs - a checklist handed to the next session, and the report handed back; each file is dated and anchored on a commit, and is not maintained after that release ships
@@ -74,7 +74,21 @@ Erfana is an agent-native Markdown workspace – an Electron app that runs a ter
   - [Phase 4 binary spec](./windows/phase4-binary-spec.md) - Pinned SHAs for `whisper-build-v1.8.4-erfana2` (and the retired `erfana1`)
   - [Build Setup (Windows)](./build/windows.md) - Node 24, Python 3.12, VS 2022, Developer Mode, long paths
   - [Whisper-binaries CI runbook](./build/whisper-binaries.md) - Ops procedure for self-hosted whisper.cpp rebuilds + cert-revocation + monthly canary + **app-side pin-bump checklist** + **minisign gotchas** + **rejected approaches**
-- [Large Project Performance Plan](./large-project-performance-plan.md) - EMFILE mitigation, worker threads, diagnostics, single-flight tree reads (#208), the Windows watcher and exclude list (#211); content-only saves skip the tree re-read, [measured](./performance/watcher-structural-refresh.md)
+- [Large Project Performance Plan](./large-project-performance-plan.md) - EMFILE mitigation, worker threads, diagnostics, single-flight tree reads (#208), the Windows watcher and exclude list (#211), and the v0.22.0 work: a virtualized project tree, a lazy and parallel tree walk, and content-only saves that skip the tree re-read
+- Performance measurements (`performance/`) - how each number was measured, with the raw data and scripts beside each page
+  - [Content-only saves no longer re-read the tree](./performance/watcher-structural-refresh.md) - finding [29], v0.22.0
+  - [Terminal output batching and flow control](./performance/terminal-output-batching.md) - finding [30], v0.22.0
+  - [Typing in a large Markdown file: the deferred preview](./performance/2026-10-21-deferred-preview.md) - finding [31], v0.22.0
+  - [Deferred Markdown preview: remembered link checks](./performance/deferred-markdown-preview.md) - finding [31], v0.22.0
+  - [Opening a large project: the lazy tree walk](./performance/2026-10-22-lazy-tree-walk.md) - finding [32], v0.22.0
+  - [Manual Windows run on a 222k-entry project](./performance/211-large-project-windows-run.md) - #211, W17 (no-exclusion arm)
+- Spikes (`spikes/`) - time-boxed findings that a decision rests on
+  - [ASAR packaging with integrity enforcement](./spikes/2026-10-22-asar-integrity.md) - the v0.22.0 `app.asar` integrity check
+  - [How `fs.watch` behaves on Windows](./spikes/211-windows-fs-watch.md) - #211, W0
+  - [What the #138 capture design assumes](./spikes/138-capture-spike.md) - user-guide screenshots
+  - [Posting review verdicts without a model Bash call](./spikes/172-verdict-posting.md) - Xezar pipeline, #172
+  - [Leader liveness and a 30-minute silence alert](./spikes/179-leader-liveness.md) - Xezar pipeline, #179
+- [Leader-silence alert runbook](./runbooks/leader-watch.md) - the macOS notification when the Xezar project leader goes quiet (#179)
 - [Testing](./testing/README.md) - Testing strategies and coverage
   - [E2E Testing](./testing/e2e-testing.md) - Playwright/Electron E2E guide
   - [E2E Selectors](./testing/e2e-selectors.md) - `data-testid` catalog (`testids.ts` is the source of truth)
@@ -141,7 +155,8 @@ Not to be confused with **[`design/`](../design/index.html)** at the repo root, 
 
 ## Changelog
 
-- [CHANGELOG](./CHANGELOG.md) – Per-version release notes (v0.9.0 onward; v0.8.x and v0.3–v0.5 in `docs/archive/`; v0.6.x–v0.7.x have no entries)
+- [CHANGELOG](./CHANGELOG.md) – Per-version release notes (v0.9.0 onward; v0.8.x and v0.3–v0.5 in `docs/archive/`; v0.6.x–v0.7.x have no entries). Latest release: v0.22.0 (2026-10-25), which also ships the never-released 0.21.0 changes
+- [Changelog fragments](../changelog.d/README.md) – where a pull request records its change instead of editing the changelog; folded into the changelog at release
 - [Release notes](./release-notes/README.md) – Per-version release-notes files used as GitHub release bodies (v0.9.5 onward)
 - [Release incidents](./release-incidents/index.md) – Running log of `release.yml` failures with matched signatures and fixes
 

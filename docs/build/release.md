@@ -139,7 +139,7 @@ sequenceDiagram
 
 **Notarization note:** this project uses the **user-auth mode of notarytool** (Apple ID + app-specific password + Team ID). The `.p8` App Store Connect API key path is also supported by electron-builder 26 but not used here because the app-specific password was already provisioned before the release pipeline was built. Only the **altool CLI** was deprecated by Apple; notarytool itself accepts both auth modes.
 
-**Azure auth note:** this project uses **certificate-based auth** against the app registration, not OIDC federation. That choice was forced: before 26.9.1, electron-builder's `WindowsSignAzureManager.initialize()` hard-rejected `AZURE_FEDERATED_TOKEN_FILE` – its pre-flight validator only accepted `AZURE_CLIENT_SECRET`, `AZURE_CLIENT_CERTIFICATE_PATH`, or `AZURE_USERNAME`+`AZURE_PASSWORD`. 26.9.1 removed that validator ([electron-builder#9687](https://github.com/electron-userland/electron-builder/pull/9687)), so the pinned 26.15.3 no longer blocks OIDC; which credentials work is now up to the `TrustedSigning` PowerShell module that electron-builder installs. Certificate auth is the security-equivalent of OIDC here: no shared secret in transit (only the public cert lives on the app registration); the private key is a rotatable GitHub Secret. Moving to OIDC is now possible in principle but untested – prove a federated-token sign on a Windows runner before switching.
+**Azure auth note:** this project uses **certificate-based auth** against the app registration, not OIDC federation. That choice was forced: before 26.9.1, electron-builder's `WindowsSignAzureManager.initialize()` hard-rejected `AZURE_FEDERATED_TOKEN_FILE` – its pre-flight validator only accepted `AZURE_CLIENT_SECRET`, `AZURE_CLIENT_CERTIFICATE_PATH`, or `AZURE_USERNAME`+`AZURE_PASSWORD`. 26.9.1 removed that validator ([electron-builder#9687](https://github.com/electron-userland/electron-builder/pull/9687)), so the pinned 26.16.1 no longer blocks OIDC; which credentials work is now up to the `TrustedSigning` PowerShell module that electron-builder installs. Certificate auth is the security-equivalent of OIDC here: no shared secret in transit (only the public cert lives on the app registration); the private key is a rotatable GitHub Secret. Moving to OIDC is now possible in principle but untested – prove a federated-token sign on a Windows runner before switching.
 
 **`AZ_CLIENT_SECRET` is explicitly excluded.** This is the legacy Azure CLI 1.x env var name; `checks.yml` has a guard that fails the build if any workflow references it or `altool`. The modern `AZURE_CLIENT_SECRET` (used by `@azure/identity`) is permitted as a fallback auth path but unused here.
 
@@ -218,13 +218,13 @@ The release asset set is pinned in four places with no automated cross-check bet
 | `.github/workflows/build_win.yml` | signtool-verify + upload globs | `*-setup.exe` in both the verify loop and `gh release upload` |
 | [`.claude/skills/releasing-erfana/SKILL.md`](../../.claude/skills/releasing-erfana/SKILL.md) § Constants | expected asset count | 2 binaries + `SHA256SUMS` + `SHA256SUMS.minisig`, i.e. `EXPECTED_ASSETS=4`. Note this is **not** an equality assertion anywhere: §0.4 uses it as a floor (`[ "$ASSET_COUNT" -ge "$EXPECTED_ASSETS" ]`) to decide a draft is `draft-ready`, and `phase-4-verify.md` carries no count check at all — §4.6 only prints the expected set for the operator |
 
-**Verified in agreement on 2026-10-01.** The published `v0.20.1` release carries exactly four assets — `erfana-0.20.1-arm64.dmg`, `erfana-0.20.1-setup.exe`, `SHA256SUMS`, `SHA256SUMS.minisig` — matching all four definitions above. Adding or removing a build target is therefore a four-file change plus a release-notes/verification-doc sweep, never a one-line `electron-builder.yml` edit.
+**Verified in agreement on 2026-10-25.** The published `v0.22.0` release carries exactly four assets — `erfana-0.22.0-arm64.dmg`, `erfana-0.22.0-setup.exe`, `SHA256SUMS`, `SHA256SUMS.minisig` (read with `gh release view v0.22.0 --json assets`) — matching all four definitions above. Adding or removing a build target is therefore a four-file change plus a release-notes/verification-doc sweep, never a one-line `electron-builder.yml` edit.
 
 ## Hardened-runtime entitlements (known gap)
 
 The main app plist (`build/entitlements.mac.plist`) contains the strictly-required keys: `cs.allow-jit`, `cs.allow-unsigned-executable-memory` (V8 requirement), `device.camera`, `device.audio-input`. The CI guard fails the build if `cs.disable-library-validation` or `cs.allow-dyld-environment-variables` ever leak into either plist — it is Guard 2, the step named `Guard - no forbidden entitlements` in the `release-guards` job of [`.github/workflows/checks.yml`](../../.github/workflows/checks.yml) (cited by step name, not line number, so it survives edits above it; verified 2026-08-23).
 
-The inherit plist (`build/entitlements.mac.inherit.plist`) grants `cs.allow-jit` and `cs.allow-unsigned-executable-memory` to **all helper processes** (Renderer + GPU + Plugin), not just Renderer. This is an upstream-imposed over-grant: electron-builder 26.15.3's `mac.entitlementsInherit` field is a **single plist applied uniformly** to every helper bundle – there is no built-in per-helper-type configuration. The Renderer helper structurally requires both keys for V8 JIT to function; granting them to GPU and Plugin helpers is the unavoidable side-effect.
+The inherit plist (`build/entitlements.mac.inherit.plist`) grants `cs.allow-jit` and `cs.allow-unsigned-executable-memory` to **all helper processes** (Renderer + GPU + Plugin), not just Renderer. This is an upstream-imposed over-grant: electron-builder 26.16.1's `mac.entitlementsInherit` field is a **single plist applied uniformly** to every helper bundle – there is no built-in per-helper-type configuration. The Renderer helper structurally requires both keys for V8 JIT to function; granting them to GPU and Plugin helpers is the unavoidable side-effect.
 
 **Trigger to revisit**: electron-builder ships per-helper-type entitlement support (`mac.binaries[].entitlements` or equivalent), or we adopt a custom `signFn` callback that signs each helper bundle with a tighter plist. Until then, the over-grant is documented and the CI guard prevents it from getting worse.
 
@@ -244,7 +244,7 @@ An end user downloading from the release page should run the following to confir
 
 ### 1. Integrity + aggregate signature (all platforms)
 
-Substitute the version you downloaded for `{version}` throughout — the worked example below uses **v0.20.1**, the current public release (2026-10-01). Run the whole block from the directory that holds the downloaded `.dmg` / `.exe`; `SHA256SUMS` lists **both** binaries by bare filename, and two things follow from that:
+Substitute the version you downloaded for `{version}` throughout — the worked example below uses **v0.22.0**, the current public release (2026-10-25). Run the whole block from the directory that holds the downloaded `.dmg` / `.exe`; `SHA256SUMS` lists **both** binaries by bare filename, and two things follow from that:
 
 - Most people download **one** platform, so a bare `sha256sum -c SHA256SUMS` reports `FAILED open or read` for the other one and exits 1 on a perfectly good download. The recipe therefore passes `--ignore-missing`, verified working with GNU `sha256sum` (coreutils), macOS's `/sbin/sha256sum`, and Perl `shasum -a 256` (6.x).
 - `--ignore-missing` also means "verified nothing" is a possible outcome — that is what running from the wrong directory looks like. GNU `sha256sum` and `shasum` exit 1 with `no file was verified`, but macOS's `/sbin/sha256sum` exits **0** silently, so the block below additionally requires at least one `OK` line.
@@ -257,7 +257,7 @@ for `return 1`.
 
 ```bash
 #!/usr/bin/env bash
-VERSION=0.20.1   # the v{version} you downloaded, without the leading "v"
+VERSION=0.22.0   # the v{version} you downloaded, without the leading "v"
 
 curl -LO "https://github.com/qodeca/erfana/releases/download/v${VERSION}/SHA256SUMS"
 curl -LO "https://github.com/qodeca/erfana/releases/download/v${VERSION}/SHA256SUMS.minisig"
@@ -367,7 +367,7 @@ $signtool = Join-Path $sdkBin.FullName "x64\signtool.exe"
 if (-not (Test-Path $signtool)) { throw "signtool.exe not found under $sdkRoot" }
 
 # Both signatures must verify independently.
-& $signtool verify /pa /all /tw C:\Path\To\erfana-0.20.1-setup.exe
+& $signtool verify /pa /all /tw C:\Path\To\erfana-0.22.0-setup.exe
 ```
 
 First-time Windows installs will see a SmartScreen warning on a newly provisioned Azure Artifact Signing identity. Reputation accrues organically regardless of EV/OV status — several successful installs will silence the warning. This is expected, not a defect.
@@ -386,6 +386,56 @@ First-time Windows installs will see a SmartScreen warning on a newly provisione
 | Azure Artifact Signing outage | Hold the release. No unsigned fallback. |
 | Apple notarization outage (multi-hour Apple server issue) | `gh run watch` 90-min timeout surfaces it. Operator chooses wait or abort. |
 | Phase 4.2 download (operator-side): transient TCP timeout from GitHub/Fastly CDN mid-stream (`read tcp ...185.199.x.x:443: read: operation timed out`) | Use `curl -C -` per-file resume against `.assets[].apiUrl` (`-H "Accept: application/octet-stream"`, `-H "Authorization: Bearer $(gh auth token)"`, parallel) instead of `gh release download --clobber` from scratch — `gh` re-downloads completed files; curl resumes from the existing byte position. Tag is **not** burned: gates 4.3–4.5 haven't run, no signed bytes were touched. See [`docs/release-incidents/v0.9.6-cdn-recovery.md`](../release-incidents/v0.9.6-cdn-recovery.md). |
+
+## Lessons from v0.22.0
+
+v0.22.0 (2026-10-25) was the first release since v0.20.1 – v0.21.0 was prepared but never tagged – and it carried large build changes: Electron 44, electron-builder 26.16.1 and the integrity-checked `app.asar`. Four things went wrong or nearly did. Each one is cheap to avoid next time.
+
+### 1. Dry-run `release.yml` on `main` before you tag
+
+A tag is burned the moment a signed build fails (see [Failure recovery](#failure-recovery)), so prove the signed build first with a dry-run from `main`:
+
+```bash
+gh workflow run release.yml --ref main -f dry-run=true
+gh run list --workflow release.yml --limit 1   # note the run id, then approve the signing gate
+```
+
+A dry-run still stops at the [approval gate](#approval-gate-production-signing) and still signs and notarizes, but it skips the release-notes check, the green-`checks.yml` and lockfile-digest checks, the draft and every upload; the build legs keep their output as `mac-dry-run` / `win-dry-run` workflow artifacts instead.
+
+On v0.22.0 the first dry-run (run `40172951976`) failed in **Build Windows**. After Azure signed `Erfana.exe`, the `afterSign` hook (`scripts/resign.js`) read the embedded asar integrity back with `resedit`, which refuses a signed binary by default:
+
+```
+Parsing signed executable binary is not allowed by default.
+```
+
+The asar check had never run on a signed Windows build, because only the release pipeline signs. PR #407 made `readEmbeddedAsarIntegrity` (`scripts/fuses.js`) open the `.exe` with `{ ignoreCert: true }` – it only reads a resource, so the signature is untouched – and the next dry-run (run `40176922524`) and the tag run (`40177624416`) were green. Without the dry-run, the tag `v0.22.0` would have been burned. Background: [asar.md § Limits](./asar.md#limits).
+
+**Rule:** after any change to `electron-builder.yml`, `scripts/fuses.js`, `scripts/resign.js`, the signing setup or the Electron / electron-builder version, run a dry-run on `main` and wait for it to go green before pushing the tag.
+
+### 2. Draft release notes with an explicit `git cliff` range
+
+`git cliff --unreleased` drafts the commits since the newest tag that matches `tag_pattern` in `cliff.toml`. That pattern (`v[0-9]+\.[0-9]+\.[0-9]+`) is not anchored, so the whisper tag `whisper-build-v1.8.4-erfana2` matches it too. For v0.22.0 the whisper tag was newer than `v0.20.1`, so `--unreleased` covered only the 44 commits after it instead of the 593 since the last app release. Name the range yourself and leave whisper tags out:
+
+```bash
+git cliff --tag vX.Y.Z --ignore-tags "whisper-build.*" <last-app-tag>..HEAD
+# v0.22.0 example:
+git cliff --tag v0.22.0 --ignore-tags "whisper-build.*" v0.20.1..HEAD
+```
+
+`<last-app-tag>` is the previous `v*.*.*` tag that was actually released (for v0.22.0 that was `v0.20.1`, because v0.21.0 was never tagged). See also [whisper-binaries.md](./whisper-binaries.md).
+
+### 3. Bump the lockfile version by hand
+
+The version bump touches two fields in `package-lock.json` – the top-level `"version"` and `packages[""].version` – besides `package.json`. Do **not** regenerate them with `npm install --package-lock-only`: under npm 11 that drops `encoding@0.1.13` (an optional peer of `node-fetch`) from the lock, and `npm ci` then fails every CI job with `Missing: encoding@0.1.13 from lock file` (see [ci.md § Troubleshooting](../ci.md#troubleshooting)). Edit the two version fields directly, then confirm the lock diff is exactly those two lines:
+
+```bash
+git diff --stat package-lock.json   # expect: 1 file changed, 2 insertions(+), 2 deletions(-)
+npm ci                              # must succeed on the bumped lock
+```
+
+### 4. `develop` lands pull requests through a merge queue
+
+Release-prep pull requests into `develop` do not land with a one-shot `gh pr merge --delete-branch`: `develop` requires a merge queue, so a PR lands by being **added to the queue**, and GitHub merges it only after the seven required checks pass on the queue's temporary branch. Enqueue it with `gh pr merge <n>` (no strategy flag needed – the queue sets it; gh adds the PR to the queue, or turns on auto-merge if its own checks are still running) or **Merge when ready** in the UI, then delete the feature branch once the queue has merged it. Do not reach for `--admin`, which bypasses the queue. How the queue works: [ci.md § Merge queue](../ci.md#merge-queue-develop). Direct pushes to `develop` (the develop-first step under [Branch protection](#branch-protection-phase-i--done-2026-04-25)) are not affected.
 
 ## Incident response
 

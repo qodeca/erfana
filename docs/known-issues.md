@@ -8,32 +8,49 @@ Current issues and their workarounds. For historical resolved issues, see [archi
 
 ## Accessibility
 
-Nine defects found by an audit of the renderer on 2026-08-31, all **shipping
-today**. They are grouped here because they share a cause: a role or an ARIA
-attribute was declared without the behaviour it promises, which is worse than
-declaring nothing — a screen reader changes its own behaviour on the strength of
-that promise and then gets nothing back.
+An audit of the renderer on 2026-08-31 found nine defects. They share a cause: a
+role or an ARIA attribute was declared without the behaviour it promises, which is
+worse than declaring nothing – a screen reader changes its own behaviour on the
+strength of that promise and then gets nothing back. The design system decides the
+correct pattern for each; see [`design/README.md`](../design/README.md) for which
+card governs which defect.
 
-The design system decides the correct pattern for each; the app has not caught up.
-See [`design/README.md`](../design/README.md) for which card governs which defect.
+**Fixed in v0.22.0:** the project tree works with the keyboard and announces each
+row's own name ([#88](https://github.com/qodeca/erfana/issues/88),
+[#89](https://github.com/qodeca/erfana/issues/89)); every right-click menu opens with
+Shift+F10 or the Menu key and is keyboard-operable
+([#90](https://github.com/qodeca/erfana/issues/90)); every dialog keeps Tab inside
+itself ([#91](https://github.com/qodeca/erfana/issues/91)); tab close buttons show the 2px
+focus ring (part of [#93](https://github.com/qodeca/erfana/issues/93));
+"Reduce motion" stops every animation and small controls have 24 x 24 targets
+([#96](https://github.com/qodeca/erfana/issues/96)). Details are in the
+[changelog](./CHANGELOG.md#0220). Some of these issues may still be open on the tracker
+until they are closed after the release.
+
+Still shipping in v0.22.0:
 
 | Issue | What is broken | Workaround |
 |---|---|---|
-| [#88](https://github.com/qodeca/erfana/issues/88) | The file tree cannot be used with a keyboard at all — nothing in it is focusable, and no arrow key does anything. It declares `role="tree"`, so a screen reader hands it the arrow keys and loses its own. | Use the file picker dialog (⌘O / Ctrl+O), which does implement keyboard navigation correctly. |
-| [#89](https://github.com/qodeca/erfana/issues/89) | An expanded folder's announced name includes every visible file inside it. | None. |
-| [#90](https://github.com/qodeca/erfana/issues/90) | The right-click menu is mouse-only. Only Escape is bound; there is no keyboard way to open it. | Use the keyboard shortcuts shown in the menu directly where they exist. |
-| [#91](https://github.com/qodeca/erfana/issues/91) | 10 of 13 dialogs tell assistive technology the background is inert, and then let Tab walk into it. | Use Escape to close, rather than tabbing to a Cancel button. |
-| [#92](https://github.com/qodeca/erfana/issues/92) | The app declares no language, so a screen reader may read the interface with the wrong voice. | Set the reader's default language manually. |
-| [#93](https://github.com/qodeca/erfana/issues/93) | Three places give a keyboard user no visible focus: the editor panel, the welcome panel, and tab close buttons. | None. |
+| [#92](https://github.com/qodeca/erfana/issues/92) | The app declares no language, so a screen reader may read the interface with the wrong voice. The issue was folded into [#230](https://github.com/qodeca/erfana/issues/230) and closed, but `src/renderer/index.html` still has no `lang` attribute (checked 2026-10-25). | Set the reader's default language manually. |
+| [#93](https://github.com/qodeca/erfana/issues/93) | Tab close buttons now show focus, but the welcome panel is still a Tab stop with no visible focus: its `.panel-content` area sets `outline: none` (`AppDockLayout.css`, checked 2026-10-25). The issue was folded into [#230](https://github.com/qodeca/erfana/issues/230) and closed. The editor panel was not re-checked. | None. |
 | [#94](https://github.com/qodeca/erfana/issues/94) | The rename field and the prompt textarea are announced as unlabelled boxes, and no validation error is linked to its field. | None. |
 | [#95](https://github.com/qodeca/erfana/issues/95) | Folder git state is shown by colour alone, and the `M3 U2 D1` counts change without being announced. | The per-file badges carry a letter; read those instead of the folder dot. |
-| [#96](https://github.com/qodeca/erfana/issues/96) | "Reduce motion" is ignored by 12 stylesheets, including a full-screen camera flash. Four controls are smaller than the 24 x 24 minimum. | None for the motion issue. |
 
 ---
 
 ## Windows-specific issues
 
 Phases 0–2 of Windows enablement shipped in **v0.9.3** (2026-04-22); Phase 4 (local Whisper trust chain + Windows x64 binary) shipped in **v0.9.4** (merge `110f1b9` – pre-migration; no longer resolvable, that history was rewritten at the 2026-06 migration; 2026-04-23); Phase 3 (screenshots) shipped in **v0.12.0**. The following gaps remain user-visible until Phases 5 and 6 ship. See [`docs/windows/implementation-plan.md`](./windows/implementation-plan.md) for the canonical roadmap.
+
+### Terminal: Windows has two narrower safeguards
+
+**Issue**: Two v0.22.0 terminal safeguards rely on knowing which program runs in the terminal, which Erfana cannot tell on Windows. **Restart terminal** asks first while Claude Code runs or the terminal is still producing output after you typed in it, but a silent program that has printed nothing for a while is ended without a question (on macOS any running program triggers the prompt). And when a program floods the terminal, output is batched on Windows but the program is never held back while the window catches up.
+
+**Workaround**: Stop the program in the terminal yourself (Ctrl+C) before restarting it.
+
+**Tracking**: Platform limitation; see the [changelog](./CHANGELOG.md#0220).
+
+---
 
 ### SmartScreen warning on first launch
 
@@ -147,7 +164,7 @@ Phases 0–2 of Windows enablement shipped in **v0.9.3** (2026-04-22); Phase 4 (
 
 ### Directory watcher latency on Windows
 
-**Issue**: End-to-end file-creation notification latency (terminal `touch` → Project Tree shows the new file) is 1500–2500 ms on Windows versus 200–600 ms on macOS/Linux. The difference is not an Erfana bug — it's the cost of the underlying OS primitives. These figures were measured with the chokidar backend, before [#211](https://github.com/qodeca/erfana/issues/211) moved Windows to a native `fs.watch` watcher; they have not been re-measured since, but the e2e budget below still holds with the native backend.
+**Issue**: End-to-end file-creation notification latency (terminal `touch` → Project Tree shows the new file) is 1500–2500 ms on Windows versus 200–600 ms on macOS/Linux. The difference is not an Erfana bug — it's the cost of the underlying OS primitives. These figures were measured with the chokidar backend, before [#211](https://github.com/qodeca/erfana/issues/211) moved Windows to a native `fs.watch` watcher (macOS followed in v0.22.0); they have not been re-measured since, but the e2e budget below still holds with the native backend.
 
 Pipeline contributors on Windows:
 - **`ReadDirectoryChangesW`** (under chokidar before #211, under Node's `fs.watch` since) — 100–500 ms callback latency (vs. <5 ms for POSIX inotify). Since #211 each surviving event also waits for one `lstat` in a queue of at most two at a time.
@@ -335,7 +352,7 @@ See [E2E troubleshooting § Terminal commands not executing](./testing/e2e-troub
 
 **Fixed – black window on 100k+ files ([#60](https://github.com/qodeca/erfana/issues/60))**: opening a very large project (reported at 174k nodes on an external volume) used to blank the window outright. The project tree's `flattenTree` built its flat array with `flattened.push(...flattenTree(child))`; spread-into-push is `Function.prototype.apply`, whose argument count is bounded by the engine stack (~10^5 on V8), so the first directory whose *flattened subtree* crossed that bound threw `RangeError: Maximum call stack size exceeded`, React 18 unmounted the entire root, and nothing was left to paint. `flattenTree` is now an explicit-stack loop that pushes exactly one node per iteration – output-identical (pre-order DFS, forward sibling order, `depth` per level, `index` reset per parent) and covered by a 200k-node reproduction. Throws that happen *while Erfana is drawing the interface* now surface a recovery screen with Restart / Copy error details / Open logs folder instead of a black window – or, for the project tree specifically, a "Project tree unavailable" panel with the rest of the app still running. Errors outside drawing (background work, event handlers, rejected promises) are written to the log without interrupting the UI – see [UI Components § Error containment](./ui-components.md#error-containment).
 
-**Remaining – performance, not crashes**: a 100k+-file project still opens slowly. Per the #60 diagnosis the cost is dominated by the directory scan (~2.0 s for 169k files) and the main → renderer IPC clone (~1.2 s); the tree is neither memoized nor virtualized, directories load eagerly, and an open cannot be cancelled. Those limits are owned by **#149** (React memoization) and **#150** (lazy loading + virtualization) – see the [large-project performance plan](./large-project-performance-plan.md). On macOS the chokidar directory watcher can still use many FDs on a very large repo. On Windows, since [#211](https://github.com/qodeca/erfana/issues/211), the directory watcher holds at most 512 handles per project instead of one per folder, and it starts only after the first tree read.
+**Improved in v0.22.0 – performance**: the project tree now draws only the rows on screen, build and cache folders the watcher ignores (`dist`, `build`, `.venv`, `.next`, `coverage`, …) still show but are read only when expanded, the other folders are read several at a time, and past 50,000 entries (`MAX_WALK_ENTRIES` in `FileService.ts`) the remaining folders are read on expand; a save no longer re-reads the tree. On a 120,000-file test project the tree was ready about 3 times sooner (figures in the [changelog](./CHANGELOG.md#0220)). An open still cannot be cancelled. macOS and Windows both use the native directory watcher, which holds at most 512 handles per project instead of one per folder and starts only after the first tree read; Linux keeps chokidar. Remaining work is tracked in the [large-project performance plan](./large-project-performance-plan.md).
 
 **Workaround**: leave large folders you never need in Erfana out with the `files.exclude` list ([#211](https://github.com/qodeca/erfana/issues/211)). An excluded folder is not shown, not read when the tree loads, and not watched – unlike `watcher.ignoreList`, which only stops watching and still reads and shows the folder. In the project's `.erfana/settings.json` (or `~/.erfana/settings.json` for every project):
 ```json
@@ -347,14 +364,14 @@ Then close the project and open it again (after editing the global file, restart
 
 ### Excluded folders (`files.exclude`): known limits
 
-**Issue**: [#211](https://github.com/qodeca/erfana/issues/211) added the exclude list and a new Windows directory watcher. These limits are known and accepted:
+**Issue**: [#211](https://github.com/qodeca/erfana/issues/211) added the exclude list and a new Windows directory watcher, which macOS also uses since v0.22.0. These limits are known and accepted:
 
-1. **(Windows) A nested folder that becomes excluded, hidden or ignored after the project opened stays inside Windows' watch until the project is reopened.** Typical cases are a new `packages/a/node_modules` from `npm install`, or a new `src/tmp` matching a pattern such as `**/tmp`. A new folder of that kind at the top level of the project is left out at once. Excluded or ignored folders beyond the watcher's limits (64 remembered nested folders, 512 handles) are in the same position. Their changes are still ignored one by one, but a heavy burst there can overflow Windows' change buffer; Erfana then cannot tell where the lost changes were and re-reads the whole tree – about once per burst (a second after it ends, or every 5 s while it lasts). Everything excluded by a path entry, and every such folder that already existed when the project opened, is unaffected.
+1. **(macOS and Windows) A nested folder that becomes excluded, hidden or ignored after the project opened stays inside the native watch until the project is reopened.** Typical cases are a new `packages/a/node_modules` from `npm install`, or a new `src/tmp` matching a pattern such as `**/tmp`. A new folder of that kind at the top level of the project is left out at once. Excluded or ignored folders beyond the watcher's limits (64 remembered nested folders, 512 handles) are in the same position. Their changes are still ignored one by one, but a heavy burst there can overflow the system's change buffer; Erfana then cannot tell where the lost changes were and re-reads the whole tree – about once per burst (a second after it ends, or every 5 s while it lasts). Everything excluded by a path entry, and every such folder that already existed when the project opened, is unaffected.
 2. **The exclude list does not change git status.** It hides folders from the tree and the watcher, not from git; an excluded folder that git still tracks, or sees as untracked, keeps costing git time and still counts in the git status bar.
-3. **(Windows) "One watcher for the whole project" is one watcher per project that holds a small, bounded set of Windows handles** (typically tens, at most 512), not a single handle, so that excluded folders can be left out entirely.
+3. **(macOS and Windows) "One watcher for the whole project" is one watcher per project that holds a small, bounded set of system handles** (typically tens, at most 512), not a single handle, so that excluded folders can be left out entirely.
 4. **`.erfana` cannot be excluded**, so the settings that hide things stay findable in the tree.
 5. **An overly costly pattern fails open.** A pattern whose match exceeds the per-path work budget does not hide that path, and after 100 such overruns in one project session every pattern entry is switched off until the project is reopened (path entries keep working; one warning in the log). Real lists do not come near it; it exists because a cloned repository's settings are untrusted.
-6. **(Windows) A folder that keeps failing to be watched is left unwatched until the next restart or project open** – after 3 re-opens in 60 s, or when Windows reports it as gone while it is in fact still there. The tree still shows it correctly after the next re-read; only live updates from inside it pause. A new folder created while the watcher already holds its 512 handles is left unwatched the same way, until the project is closed and opened again.
+6. **(macOS and Windows) A folder that keeps failing to be watched is left unwatched until the next restart or project open** – after 3 re-opens in 60 s, or when the system reports it as gone while it is in fact still there. The tree still shows it correctly after the next re-read; only live updates from inside it pause. A new folder created while the watcher already holds its 512 handles is left unwatched the same way, until the project is closed and opened again.
 7. **Changes made while the first tree is loading can show late.** The directory watcher now starts only after the project's first tree read. A change made during that read in a folder the read has already passed, or before the watcher has opened that folder's watch, shows up with the next change or a manual refresh (Cmd/Ctrl+Alt+R).
 8. **Changes to the list apply the next time the project is opened after being closed.** The global file is read when Erfana starts. Nothing in the tree marks that something was excluded.
 

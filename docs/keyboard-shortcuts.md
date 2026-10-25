@@ -67,7 +67,8 @@ Every context menu is the shared `ContextMenu` (`components/ContextMenu/ContextM
 
 | Shortcut | Action |
 |----------|--------|
-| platform default for `toggleDevTools` | Toggle DevTools – Electron's `toggleDevTools` role in the View menu (`src/main/menu.ts`); Erfana binds no `F12` |
+| platform default for `toggleDevTools` | Toggle DevTools – Electron's `toggleDevTools` role in the View menu (`src/main/menu.ts`) |
+| `F12` (development builds only) | Toggle DevTools (undocked) – `optimizer.watchWindowShortcuts` from `@electron-toolkit/utils`, attached to every window in `src/main/index.ts`. In a packaged build the same helper binds no `F12` and blocks `Cmd/Ctrl+R` |
 | platform default for `reload` / `forceReload` | Reload – Electron's `reload` and `forceReload` roles |
 
 There is no `Cmd/Ctrl+Shift+I` DevTools binding and no `Cmd/Ctrl+Shift+C` inspect-element binding in `src/`. `Cmd/Ctrl+Shift+I` is the Project Panel's external-file import shortcut (see [project tree shortcuts](./user-guide/reference/keyboard-shortcuts.md#project-tree)).

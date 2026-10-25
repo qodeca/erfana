@@ -4,6 +4,10 @@ Erfana self-hosts its own builds of [ggml-org/whisper.cpp](https://github.com/gg
 
 See `docs/windows/phase4-binary-spec.md` for the currently pinned upstream SHA and per-platform SHA-256s.
 
+**Current pin:** `whisper-build-v1.8.4-erfana2` (`RELEASE_TAG` in `src/main/services/whisper-assets.ts`), first shipped in Erfana v0.22.0. It is the static macOS rebuild described in [macOS build is static](#macos-build-is-static); `erfana1` could not start on users' Macs and is no longer accepted.
+
+**The whisper tag also confuses changelog tooling.** A `whisper-build-*` tag is a git tag like any other, so `git cliff --unreleased` treats the newest one as the last release and drafts only the commits after it. Draft app release notes with an explicit range instead – see [release.md § Lessons from v0.22.0](./release.md#lessons-from-v0220).
+
 ## Release stream
 
 Two **separate** release streams in the same GitHub repo:
@@ -110,6 +114,8 @@ Verify anytime via `gh api repos/qodeca/erfana/rulesets/17762301`.
 - `erfana_revision` — integer, monotonic. Increment on rebuild (e.g. cert rotated; compiler pinned differently).
 - `skip_notarization` — debug only; the publish job refuses to create the release if this is true.
 
+The workflow reads the same secret names as `release.yml` (`MAC_CERT_P12_BASE64`, `MAC_CERT_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`, `MINISIGN_SECRET_KEY_BASE64`, `MINISIGN_KEY_PASSWORD`). Before v0.22.0 it asked for names that did not exist in `production-signing`, so a dispatch could not sign; if a run fails at a signing step with an empty secret, compare the names in the workflow with the environment first.
+
 Three of the workflow's four jobs — `build-macos`, `build-windows` and `publish-release` — declare `environment: production-signing`; only `validate-inputs` runs ungated. The approval prompt therefore appears within seconds of dispatch, as soon as input validation passes, and the run sits idle at the two build jobs until a reviewer approves. It does **not** build for ~25 minutes and then stop at publish. Approval is what attaches the signing / notarization / manifest secrets.
 
 Typical end-to-end time once approved: ~25–30 minutes (macOS build ~15 min + Windows build ~8 min + notary queue ~5–10 min).
@@ -122,6 +128,10 @@ The macOS tarball ships `whisper-cli` with no libraries beside it, so `build-mac
 - **"Smoke test (transcribe JFK sample)"** runs a copy of `staging/` from `$RUNNER_TEMP/whisper-smoke`, with `build/` moved aside, so a library missing from the tarball fails the run.
 
 Why: `whisper-build-v1.8.4-erfana1` was a shared build. Its `whisper-cli` loads `@rpath/libwhisper.1.dylib` and five `libggml*` dylibs that are not in the tarball, so on a user's Mac it stops at launch and Erfana reports `WHISPER_PROCESS_FAILED`. The CI smoke test still passed, because it ran on the runner, where the binary's absolute `LC_RPATH` entries pointed into `build/`.
+
+## Windows build picks its own Visual Studio
+
+`build-windows` runs `cmake -A x64` with **no `-G` generator**, so CMake picks the newest Visual Studio installed on `windows-latest`. A generator pinned to Visual Studio 2022 with `-G` broke when the runner image moved to a newer Visual Studio. `-A x64` works only with a Visual Studio generator, so a non-VS fallback fails loudly, and the multi-config output stays in `build\bin\Release`. Do not add `-G` back.
 
 ## Diff-review checklist (every upstream bump)
 
@@ -275,7 +285,7 @@ If any red flag — treat as a security review, don't auto-merge. This is the re
 
 ### Why minisign (not cosign / Sigstore)
 
-See [ADR 0002](../adrs/0002-minisign-over-cosign-sigstore.md) for the full decision and alternatives. Short version: minisign gives us offline verification (no Rekor dependency), tiny verifier surface (`verifyManifest.ts` is 209 lines), and no CA chain.
+See [ADR 0002](../adrs/0002-minisign-over-cosign-sigstore.md) for the full decision and alternatives. Short version: minisign gives us offline verification (no Rekor dependency), tiny verifier surface (`verifyManifest.ts` is about 260 lines), and no CA chain.
 
 ### Dual-pubkey architecture (primary + rotation)
 
@@ -306,7 +316,7 @@ What `src/main/utils/secureDownloader.ts` enforces for every whisper download (b
 
 ## Rejected approaches (don't re-propose without reading this section)
 
-1. **PowerShell `Compress-Archive` for Windows zips**. Produces stream-format zips that Node's `extract-zip` (via `yauzl`) rejects on long or non-ASCII paths. Use `7z a -tzip -mx=9 ...` as currently. A cleanup PR removing 7z as "redundant since Windows has native zip" would break every Erfana Windows install silently — the round-trip extract-zip check in the workflow catches it at CI time, but only if the check isn't removed too. **Leave 7z + extract-zip round-trip test in place.**
+1. **PowerShell `Compress-Archive` for Windows zips**. Produces stream-format zips that `yauzl` rejects on long or non-ASCII paths. Since v0.22.0 the Erfana client unpacks the zip with `yauzl` 3.4.0 directly (`src/main/utils/zipArchive.ts`, which also refuses symbolic-link and other non-regular entries); the workflow's round-trip step still checks the zip with `extract-zip@2.0.1`, a thin wrapper over `yauzl`, so it remains a close proxy rather than the exact client code. Use `7z a -tzip -mx=9 ...` as currently. A cleanup PR removing 7z as "redundant since Windows has native zip" would break every Erfana Windows install silently — the round-trip extract-zip check in the workflow catches it at CI time, but only if the check isn't removed too. **Leave 7z + extract-zip round-trip test in place.**
 2. **Live-log grep for leaked secrets from inside the runner job.** Infeasible — the runner doesn't have read access to its own rendered log (logs stream out to GitHub storage). The current impl scans `$GITHUB_STEP_SUMMARY` + `manifest.json` for credential patterns as a belt-and-suspenders check; the primary defense is GitHub's built-in `::add-mask::` redaction.
 3. **"Latest" Xcode on `macos-14` runner.** The runner image ships a specific Xcode version; `latest` is a moving target that can break notarization or cmake detection. `macos-14` currently ships 16.2 as latest (16.3 is NOT available as of 2026-04-22). Bump carefully when the runner image updates — check the `runner-images` repo release notes first.
 4. **Pin to ggml-org releases (Option B).** Never worked for macOS — no CLI binary published. See [ADR 0001](../adrs/0001-self-host-whisper-binaries.md) for the full rejection.

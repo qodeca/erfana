@@ -1,6 +1,6 @@
 # Build Troubleshooting
 
-**Last updated**: September 2026 (v0.20.0)
+**Last updated**: October 2026 (v0.22.0)
 
 This document provides solutions to common build errors.
 
@@ -162,6 +162,30 @@ Rebuild. Never modify `app.asar` after packing; anything that must change goes i
 
 ---
 
+## Windows `afterSign` cannot read the signed exe
+
+### Error Message
+
+```
+⨯ Parsing signed executable binary is not allowed by default.  failedTask=build stackTrace=Error: Parsing signed executable binary is not allowed by default.
+    at NtExecutable.from (...\node_modules\pe-library\dist\NtExecutable.js:66:23)
+    at readEmbeddedAsarIntegrity (...\scripts\fuses.js:1731:38)
+    at afterPack.assertEmbeddedIntegrityMatches (...\scripts\fuses.js:1821:21)
+    at verifySignedWindowsBundle (...\scripts\resign.js:64:27)
+```
+
+(From the failed v0.22.0 dry-run, run `40172951976`; line numbers are from before the fix.)
+
+### Cause
+
+After Azure signs `Erfana.exe`, `afterSign` reads the asar integrity resource back with `resedit`, which refuses a signed binary unless it is opened with `{ ignoreCert: true }`. Only a signed build reaches this step, so a local unsigned build never shows it. It broke the first v0.22.0 release dry-run and was fixed in PR #407.
+
+### Solution
+
+Keep `{ ignoreCert: true }` on the `resedit.NtExecutable.from` call in `readEmbeddedAsarIntegrity` – the read leaves the signature intact. `scripts/fuses.test.mjs` pins the option and parses a Microsoft-signed `OpenConsole.exe` with the real `resedit`. See [asar.md § Limits](./asar.md#limits) and [release.md § Lessons from v0.22.0](./release.md#lessons-from-v0220).
+
+---
+
 ## Missing Build Artifacts
 
 ### Symptoms
@@ -293,7 +317,7 @@ Tests fail, preventing build
    npm run test:renderer
    ```
 2. Fix failing tests before building
-3. All tests must pass – `npm run test:ci` reported **563 test files, 13,853 cases passing with 5 skipped** on a macOS host on 2026-09-16 (v0.20.0). The vitest workspace has three projects, and the `main` project covers more than `src/main`: main 288 files (`src/main` 262 · `src/shared` 22 · `scripts` 4) · renderer 268 · preload 7, counted 2026-09-16 at v0.20.0. Run `npm run test:ci` for the live figure – see [Testing overview](../testing/README.md#key-test-areas)
+3. All tests must pass. The vitest workspace has three projects, and the `main` project covers more than `src/main`: at v0.22.0 it holds 792 test files – main 417 (`src/main` 358 · `src/shared` 35 · `scripts` 24) · renderer 360 · preload 15, counted 2026-10-25 from the vitest `include` globs. The last recorded case count (13,853 passing, 5 skipped on macOS) dates from v0.20.0. Run `npm run test:ci` for the live figure – see [Testing overview](../testing/README.md#key-test-areas)
 
 ---
 

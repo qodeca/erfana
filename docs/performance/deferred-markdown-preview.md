@@ -6,6 +6,7 @@ SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 # Deferred Markdown preview: remembered link checks (finding [31])
 
 - **Finding:** [31] "Preview re-parses per keystroke with uncancelled exists IPC". The deferred, memoised render, the stable link key, the stale-result guard and the equal-map check landed in PR #290 ([2026-10-21 measurement](2026-10-21-deferred-preview.md)). This change adds the last part of the fix: `file.exists` answers are remembered, forgotten when the file structure changes or after 30 s, and re-checked at most a few times during a burst of changes – and not at all by hidden tabs.
+- **Shipped:** in v0.22.0 (2026-10-25) – see the [changelog](../CHANGELOG.md#0220).
 - **Date:** 2026-10-22. **Host:** Apple M5 Max, macOS 26.6.2, Node 24, vitest + jsdom (development React build), 1-minute load average about 5.5. Three runs per version; every run gave identical counts, times varied by under 10 %.
 
 ## The answer

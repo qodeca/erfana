@@ -31,7 +31,7 @@ By default, Claude Code asks before an edit. These capture screenshots used an i
 
 ## What happens next / If something goes wrong
 
-Use **Restart terminal** if a shell is stuck. For a terminal availability message, use [troubleshooting](../reference/troubleshooting.md).
+Use **Restart terminal** if a shell is stuck. If Claude Code or another program is still running, Erfana asks before it ends it. For a terminal availability message, use [troubleshooting](../reference/troubleshooting.md).
 
 ## Related
 

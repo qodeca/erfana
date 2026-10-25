@@ -28,7 +28,7 @@ Project panel displays hierarchical file tree with filtering, visual indicators,
 ### Responsibilities
 
 **ProjectPanel**: Header, control panel visibility, filter mode state & persistence, panel-scoped error containment
-**ProjectTree**: Tree rendering, expansion/collapse, context menu, file opening, recursive filtering
+**ProjectTree**: Tree rendering (virtualised), expansion/collapse, keyboard navigation, context menu, file opening, filtering, reading lazy folders on expand
 
 ### Error Containment (#60)
 
@@ -80,10 +80,15 @@ See: [IPC Patterns](./ipc-patterns.md) for filter persistence channels
 
 ## Unsaved Changes Prompt
 
-When switching projects (Open/Close), detects dirty editor tabs and shows confirmation dialog.
+Opening another project (from the picker or the recent list) or closing the project first **saves** every edited tab, then asks only about what could not be saved (`prepareProjectTransition` in `ProjectTree/switchHelpers.ts`, v0.22.0):
 
-**Options**: Discard (proceed, clear tabs) | Cancel (abort)
-**Timing**: Appears before OS folder dialog to avoid half-switched states
+1. The UI is locked ("Saving open tabs…") and every tab's autosave is held, so nothing can be typed or saved into the project being left
+2. Every dirty tab is saved; a tab whose file changed on disk (the conflict bar is showing) is left alone
+3. Only if some tab is still unsaved – a conflict, a failed or timed-out write – does a prompt appear: "1 tab could not be saved. Discard and switch project?"
+
+**Options**: Switch Anyway / Close Anyway (leave those tabs unsaved, with no late write) | Cancel (keep the project; autosave runs again)
+**Busy terminal**: with nothing unsaved but recent terminal activity, the prompt reads "Terminal shows recent activity. Stop it and switch project?"
+**Main side**: opens and closes run one at a time in `ProjectService`, so a quick double-click on two recent projects ends with the second one open
 
 ## File Filtering
 
@@ -97,29 +102,15 @@ When switching projects (Open/Close), detects dirty editor tabs and shows confir
 
 **Goal**: Show only .md files and folders containing them
 
-**Implementation**: Depth-first traversal with memoization
+**Implementation**: `filterMarkdownTree(nodes, loaded, status, base)` in `ProjectTree/markdownFilter.ts`, a depth-first walk over the merged tree (the base tree plus lazy folders read so far). A file is kept when `isMarkdownFileName()` says so; a folder is kept when anything below it is kept. Lazy folders are judged by what is known of them:
 
-```typescript
-const filterTree = useMemo(() => {
-  if (filterMode === 'all') return fileTree
+- read on expand – like any folder;
+- read failed – kept, so its "Could not read this folder" line stays in view;
+- never read, `capped` (left unread by a walk bound) – kept, because it may hold Markdown;
+- never read, `ignored` (build and cache output) – hidden;
+- never read, `linked` (its files show under the folder the link leads to) – hidden.
 
-  const shouldInclude = (entry: FileEntry): boolean => {
-    if (entry.type === 'file') return isMarkdownFile(entry.name)
-    return entry.children?.some(shouldInclude) ?? false
-  }
-
-  const filterEntries = (entries: FileEntry[]): FileEntry[] =>
-    entries.filter(shouldInclude).map(entry =>
-      entry.type === 'folder' && entry.children
-        ? { ...entry, children: filterEntries(entry.children) }
-        : entry
-    )
-
-  return filterEntries(fileTree)
-}, [fileTree, filterMode])
-```
-
-**Helper**: `isMarkdownFile()` checks `.md` and `.markdown` only. Note there are three copies – a local one in `ProjectTree.tsx` (used by this filter), the exported one in `src/renderer/src/utils/fileUtils.ts`, and another in `components/Panels/markdownEditorPanel.logic.ts`; all accept the same two extensions, so `.mdx`, `.mdown` and `.mkd` files are hidden in Markdown mode.
+**Helper**: `isMarkdownFileName()` checks `.md` and `.markdown` only, any case. There are two more copies with the same rule – `isMarkdownFile()` in `src/renderer/src/utils/fileUtils.ts` and in `components/Panels/markdownEditorPanel.logic.ts` – so `.mdx`, `.mdown` and `.mkd` files are hidden in Markdown mode.
 
 ### Behavior
 
@@ -132,20 +123,20 @@ const filterTree = useMemo(() => {
 
 VS Code-style git status badges on files and folders.
 
-**File Badges**: Letter badges showing status
-- **M** (Amber `#d97706`) - Modified
-- **U** (Lime `#84cc16`) - Untracked
-- **D** (Coral `#f87171`) - Deleted
-- **A** (Violet `#a78bfa`) - Staged/Added
-- **R** (Indigo `#818cf8`) - Renamed
-- **!** (Magenta `#e879f9`) - Conflicted
+**File Badges**: Letter badges showing status. Colours are design tokens (`design-tokens.css`): the badge background is the `-light` variant, for example `var(--color-git-modified-light)`, and the base token maps to a brand colour
+- **M** (amber, `--color-git-modified`) - Modified
+- **U** (lime, `--color-git-untracked`) - Untracked
+- **D** (coral, `--color-git-deleted`) - Deleted
+- **A** (violet, `--color-git-staged`) - Staged/Added
+- **R** (indigo, `--color-git-renamed`) - Renamed
+- **!** (magenta, `--color-git-conflicted`) - Conflicted
 
 **Folder Dots**: Colored dots showing child status (propagates from files)
 
 **Status Bar**: Footer showing branch name + colored status counts
 
 **Architecture**:
-- `GitStatusService.ts` - runs git status in a worker thread (`workers/git-status.worker.ts`): native `git status` first, isomorphic-git `statusMatrix()` only when no git binary is found
+- `GitStatusService.ts` - runs git status in a worker thread (`workers/git-status.worker.ts`): native `git status` first, isomorphic-git `statusMatrix()` only when no git binary is found. Native git runs hardened (`src/main/utils/hardenedGit.ts`): from a neutral folder, with a short list of environment variables, and with hooks, fsmonitor and filter drivers turned off; a partial clone, or a config that cannot be inspected, uses isomorphic-git instead
 - `useGitStatus.ts` - Hook with 250 ms debounce, 500 ms cooldown (`GIT_STATUS` in `ProjectTree/constants.ts`)
 - `useGitStore.ts` - Zustand store for git state
 - `GitStatusBadge.tsx` - File/folder badge component
@@ -299,10 +290,10 @@ Prevents double-refresh during internal CRUD operations.
 
 **Pattern** – all of it lives in `withWatcherPause()` (`ProjectTree/withWatcherPause.ts`), which callers wrap their operation in:
 1. Sets `isInternalOperationRef.current = true` and `setLoading(true)`
-2. Pause: `window.api.directoryWatch.pause(projectPath)`
+2. Pause: `directoryWatchGateway.pause(projectPath)`
 3. Runs the operation (create, rename, delete, paste, import)
 4. Resets `isInternalOperationRef.current = false` before resuming
-5. Resume: `window.api.directoryWatch.resume(projectPath)`
+5. Resume: `directoryWatchGateway.resume(projectPath)`
 6. `setLoading(false)` in a `finally` block, even on error
 
 **Race Prevention**: Debounced events during pause are ignored
@@ -314,30 +305,31 @@ const createdFilePath = await withWatcherPause(
   isInternalOperationRef,
   setLoading,
   async () => {
-    const path = await window.api.file.createFile(targetPath, fileName)
-    await refreshFileTree()
-    return path
+    const filePath = await api.file.createFile({ dirPath: targetPath!, name: fileName })
+    await refreshProjectTree()
+    return filePath
   }
 )
 ```
 
 ### Tree State Preservation
 
-**Expansion State**: Maintained via `expandedFolders` Set
+**Expansion State**: `expandedFolders` (a `Set` of paths) is component state in `ProjectTree.tsx`. A refresh replaces only the base tree, so the set survives it and external changes (git, npm, an agent writing files) don't collapse folders. It is reset only when the project changes (`seedExpansion(newPath)`, root expanded). Lazy folders that were read are read again when next shown expanded, and keep their old children on screen until the new ones arrive (`useLazyFolderChildren`).
 
-**Logic**:
-```typescript
-const handleDirectoryChanged = async () => {
-  if (isInternalOperation.current) return
-  const previouslyExpanded = new Set(expandedFolders)
-  await refreshFileTree()
-  setExpandedFolders(previouslyExpanded)
-}
-```
-
-**Benefits**: External changes (git, npm, IDE) don't collapse folders
+**Skip rule**: `useDirectoryWatcher` ignores a change while `isInternalOperationRef` is set, except a `catchUp` refresh, which reports changes dropped during a pause. A batch with `structural: false` (content edits only) refreshes git badges but not the tree.
 
 See: [File Watching](./file-watching/README.md#directorywatcherservice-directory-watching)
+
+## Large trees
+
+Since v0.22.0 the tree stays fast on projects with tens of thousands of files:
+
+- **Virtualised rows.** `buildVisibleRows` (`ProjectTree/visibleRows.ts`) flattens the expanded part of the tree into one list, and `@tanstack/react-virtual` draws only the rows on screen. A click or a git refresh redraws only the rows that changed. While dragging, the rows inside the target folder are tinted (`FolderDropHighlight.tsx`); a drop on a sibling or on the item's own folder does nothing, and auto-scroll follows the pointer. A cut item is dimmed until it is pasted
+- **Lazy folders.** The main-process walk leaves folders on the watcher's ignore list (`dist`, `build`, `.venv`, `.next`, `coverage`, …) unread, and past 50,000 entries leaves the rest unread too; such rows arrive with `lazy` set and no children. Expanding one runs one shallow `file:readDirectory` of that folder (`useLazyFolderChildren`), and the result is kept in `useLazyFolderStore` so every consumer of the project's files sees it (`useMergedProjectFiles`)
+- **Placeholder line.** While a lazy folder is read, a "Loading…" line sits under it (`TreePlaceholderRow.tsx`); "Could not read this folder" if the read fails. The line takes no focus and no drag, and a drop on it lands in the folder
+- **Incomplete tree.** When some folders are unread, a file name clicked in the terminal is also searched for on disk (`file:findByName`, bounded in time and size), and the file chooser says its list may be incomplete
+
+Measurement: [lazy tree walk](./performance/2026-10-22-lazy-tree-walk.md).
 
 ## File Opening
 
@@ -356,11 +348,23 @@ See: [UI Components](./ui-components.md#panel-communication)
 
 ## Keyboard Navigation
 
-**Cmd/Ctrl+Alt+R**: Refresh tree and git status
+Since v0.22.0 (#87, #88, #89) the tree is **one Tab stop** (roving `tabindex`), and the keys follow the WAI-ARIA tree pattern. The contract is data in `ProjectTree/treeKeyboard.ts` (`resolveTreeKey`, `findTypeAheadMatch`), decided by the design card `design/system/components/row/`:
 
-Arrow-key, Enter and Space navigation of the tree is not implemented – the tree declares `role="tree"` but has no keyboard handler; tracked in [#88](https://github.com/qodeca/erfana/issues/88).
+| Key | Action |
+|-----|--------|
+| ↑ / ↓ | Previous / next row |
+| Home / End | First / last row |
+| → | Closed folder: open it. Open folder: move to its first child |
+| ← | Open folder: close it. Otherwise: move to the parent |
+| Enter | What a click does: open a file; on a folder, toggle it and make it the paste target |
+| Letters | Type-ahead: jump to the next row whose name starts with what was typed |
+| Shift+F10 / Menu key | Open the row's context menu under the row |
+| Cmd/Ctrl+Alt+R | Refresh tree and git status |
+| Cmd+C / X / V (macOS), Ctrl+C / X / V (elsewhere) | Copy, cut, paste – only while the tree has focus, only with the platform's own modifier and no Shift or Alt (`treeClipboardScope.ts`) |
+
+Keys with Ctrl, Alt or Cmd held are left to app shortcuts. Placeholder lines ("Loading…") are stepped over. Each row states `aria-level`, `aria-posinset` and `aria-setsize`, because a virtualised tree does not have every row in the DOM for a screen reader to count. When the focused row disappears (deleted, renamed, filtered out), focus moves to the row with the same path, else its nearest ancestor, else the first row (`useTreeFocusRecovery.ts`); after New File, Rename or Delete from the menu, focus returns to the tree.
+
 **Right-Click**: Context menu
-**Accessibility**: ARIA labels, roles, focus indicators
 
 ## Development Patterns
 
