@@ -16,7 +16,7 @@
  * resolved threads never reach here – main counts open threads only, so a
  * count of 0 draws nothing.
  */
-import { PIN_BOX_PX, PIN_MAX_STEPS, PIN_PATH, PIN_STEP_PX, PIN_TIP, PIN_TIP_OFFSET_PX } from './constants'
+import { PIN_BODY_MIDDLE_Y, PIN_BOX_PX, PIN_MAX_STEPS, PIN_PATH, PIN_STEP_PX, PIN_TIP, PIN_TIP_OFFSET_PX } from './constants'
 import { clipToViewport, overlaps, type Box, type Viewport } from './geometry'
 
 const SVG_NS = 'http://www.w3.org/2000/svg'
@@ -127,7 +127,7 @@ function glyph(doc: Document, content: PinContent): Element {
     svg.append(svgChild(doc, 'rect', { x: '6', y: '10', width: '8', height: '2', class: 'erf-hpc-pin__line' }))
     return svg
   }
-  const text = svgChild(doc, 'text', { x: '12', y: '13', class: 'erf-hpc-pin__count' })
+  const text = svgChild(doc, 'text', { x: '12', y: String(PIN_BODY_MIDDLE_Y), class: 'erf-hpc-pin__count' })
   text.textContent = content
   svg.append(text)
   return svg

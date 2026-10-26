@@ -11,11 +11,12 @@ import type { CommentDraftOpened, CommentPick } from '../../../../shared/ipc/pre
 import { commentedPage, damagedBlock, insertBefore } from './__test-helpers__/commentedPages'
 import { makeProject, type TempProject } from './__test-helpers__/commentWriterHarness'
 import { FakeFrame, frameFile, serveLoad, stubFrameFiles, tokenOfTag } from './__test-helpers__/commentServiceHarness'
-import { createCommentDraftOpener, placeOf, type DraftOpenerDeps } from './commentDraftOpener'
+import { createCommentDraftOpener, pinPickOf, placeOf, type DraftOpenerDeps } from './commentDraftOpener'
 import type { CommentDraft } from './commentDraftBuilder'
 import { createInProcessCommentFileJobs } from './commentFileJobs'
 import { CommentFrames } from './commentFrames'
 import { CommentKeyStore } from './commentKeyStore'
+import type { PinGroup } from './commentPins'
 import { ElementTokenTable } from './ElementTokenTable'
 
 const VIEW = { w: 800, h: 600, dpr: 1, x: 0, y: 0 }
@@ -111,6 +112,37 @@ describe('commentDraftOpener', () => {
     expect(s.emitted[1]).toMatchObject({ kind: 'icon', threadKeys: [expect.stringMatching(/^t/)], blockKeys: [] })
   })
 
+  it('§10.4 a pin offers "New comment": a draft on the pin\'s element, bound to this view, with its target and the unsaved flag', async () => {
+    const s = await setup(commentedPage().text, true)
+    const [openKey, pin] = [...s.record.pins].find(([, group]) => group.threadIds.length > 0)!
+    await s.opener.icon(s.top, s.record, openKey, pick({ kind: 'icon', key: openKey }))
+    const opened = s.emitted[0]
+    if (opened.kind !== 'icon' || opened.draftToken === undefined) throw new Error('the pin carried no draft')
+    expect(opened).toMatchObject({ draftToken: expect.stringMatching(/^[0-9a-f]{32}$/), unsavedSource: true, target: { line: expect.any(Number) } })
+    expect(s.keys.claimDraft(opened.draftToken, { ...BINDING, session: 2 }).ok).toBe(false)
+    const claim = s.keys.claimDraft(opened.draftToken, BINDING)
+    if (!claim.ok) throw new Error('the draft was not this view\'s')
+    // The block goes before the pin's own element, as a menu on that element would put it.
+    const entry = s.tokens.lookup(s.record.loadId!, pin.token)!
+    expect(claim.value).toMatchObject({ realPath: s.path, offset: entry.startOffset, frame: false })
+    expect(claim.value.anchor.tag).toBe(entry.tagName)
+  })
+
+  it('a pin on a JS-built element offers its draft on that element; the page\'s own description is never used', () => {
+    const view = { w: 1, h: 1, dpr: 1, x: 0, y: 0 }
+    const iconPick = pick({ kind: 'icon', key: 'p1', view, runtime: { path: 'div:nth-of-type(1)', tag: 'div' } })
+    const group: PinGroup = { id: 'g', token: 'aaaaaaaaaaaa', threadIds: ['c-1'], attention: 0, count: 1, status: 'open' }
+    expect(pinPickOf(group, iconPick)).toEqual({ kind: 'icon', via: 'pointer', view })
+    expect(pinPickOf({ ...group, runtime: { path: 'span:nth-of-type(2)', tag: 'span' } }, iconPick)).toEqual({
+      kind: 'icon',
+      via: 'pointer',
+      view,
+      runtime: { path: 'span:nth-of-type(2)', tag: 'span' }
+    })
+    // A stored runtime element no pick could name gets no "New comment" rather than one on its ancestor.
+    expect(pinPickOf({ ...group, runtime: { path: 'span', tag: 'x<y' } }, iconPick)).toBeUndefined()
+  })
+
   it('a pin whose file changed lists no block keys; an unknown pin opens nothing', async () => {
     const html = insertBefore(commentedPage().text, '<p id="para"', damagedBlock('c-9'))
     const s = await setup(html)
@@ -118,6 +150,9 @@ describe('commentDraftOpener', () => {
     const pinKey = [...s.record.pins].find(([, pin]) => pin.attention > 0)![0]
     await s.opener.icon(s.top, s.record, pinKey, pick({ kind: 'icon', key: pinKey }))
     expect(s.emitted[0]).toMatchObject({ blockKeys: [] })
+    // Nor a draft: the element is no longer where the page was served from.
+    expect(s.emitted[0]).not.toHaveProperty('draftToken')
+    expect(s.keys.size.drafts).toBe(0)
     await s.opener.icon(s.top, s.record, 'p-none', pick({ kind: 'icon', key: 'p-none' }))
     expect(s.emitted).toHaveLength(1)
   })

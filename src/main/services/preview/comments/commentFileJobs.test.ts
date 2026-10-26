@@ -9,11 +9,13 @@
  */
 import { describe, expect, it } from 'vitest'
 import { analyzeCommentDocument, encodeText } from '../../../../shared/htmlComments'
+import { PREVIEW_LIMITS } from '../../../../shared/preview-limits'
 import { FIXED_NOW, VIEW } from '../../../../shared/htmlComments/__fixtures__/commentTestData'
 import { buttonBlock } from './__test-helpers__/commentParseBench'
 import { byId, draftFor, PAGE } from './__test-helpers__/commentWriterHarness'
 import { createInProcessCommentFileJobs, runCommentFileJob, type CommentFileJob } from './commentFileJobs'
 import { CommentDocCache, documentOf, freshDocumentOf, readOnlyRefusal, sha256HexOf, writableRefusal } from './commentJobDocs'
+import { storedQuoteOf } from './commentListCore'
 import { assembleSplice, isSpliceWithin } from './commentWriteCore'
 
 const BYTES = encodeText(PAGE)
@@ -23,6 +25,25 @@ const ACT = { author: { name: 'Ada', role: 'human' as const }, nowMs: FIXED_NOW.
 function addJob(bytes: Uint8Array): CommentFileJob {
   return { kind: 'write', request: { op: 'add', draft: draftFor(bytes, byId('buy')), view: VIEW, text: 'Hello' }, act: ACT }
 }
+
+describe('storedQuoteOf', () => {
+  const anchor = (exact: string) => ({ tag: 'p', path: '', quote: { exact, prefix: '', suffix: '' } })
+
+  it('is cut to the quote cap on whole characters and whole escapes', () => {
+    const plain = storedQuoteOf(anchor('x'.repeat(PREVIEW_LIMITS.COMMENT_QUOTE_MAX_CHARS)))
+    expect(plain).toHaveLength(PREVIEW_LIMITS.COMMENT_QUOTE_MAX_CHARS)
+    // 198 characters, then an escape that would not fit whole: it is left out, not cut.
+    expect(storedQuoteOf(anchor(`${'x'.repeat(198)}${String.fromCodePoint(0x200b)}`))).toBe('x'.repeat(198))
+    // A character past U+FFFF is two units: one unit short of room, it is left out whole.
+    expect(storedQuoteOf(anchor(`${'x'.repeat(199)}${String.fromCodePoint(0x1f600)}`))).toBe('x'.repeat(199))
+  })
+
+  it('shows line breaks and controls as escapes, and has nothing to show for an anchor without a quote', () => {
+    expect(storedQuoteOf(anchor('a\nb\u0007'))).toBe('a\\u000ab\\u0007')
+    expect(storedQuoteOf({ tag: 'p', path: '' })).toBeUndefined()
+    expect(storedQuoteOf(anchor(String.fromCodePoint(0x1f600)))).toBe(String.fromCodePoint(0x1f600))
+  })
+})
 
 describe('CommentDocCache', () => {
   it('keeps the most recently used documents within its entry and byte budgets', () => {

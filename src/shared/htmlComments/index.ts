@@ -64,6 +64,7 @@ export {
   renderReadable,
   renderReadableLines,
   serializeBlock,
+  visibleInline,
   type BlockLayout,
   type CommentAnchor,
   type CommentAuthor,

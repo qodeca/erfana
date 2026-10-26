@@ -9,8 +9,9 @@
  * while the top frame paints the selected outline twice over; then the fresh
  * still is captured and the renderer told – the menu's point, the file it
  * would be saved into, and a single-use draft token, or why there is none. For
- * a pin: the threads standing on it, as keys. The draft itself – real path,
- * offset, hash, anchor – never leaves main.
+ * a pin: the threads and blocks standing on it, as keys, and a draft token
+ * for the window's "New comment" on the same element. The draft itself – real
+ * path, offset, hash, anchor – never leaves main.
  *
  * The file a pick is about is the frame's file WHEN THE PICK ARRIVED. A frame
  * that commits another document while the draft is built would otherwise get
@@ -19,14 +20,15 @@
  * gone or the frame's record left it (`isCurrent`).
  */
 import type { ErrorCode } from '../../../../shared/errors'
-import type { CommentDraftOpened, CommentPick } from '../../../../shared/ipc/preview-comment-schema'
+import { CommentPickRuntimeSchema, type CommentDraftOpened, type CommentPick } from '../../../../shared/ipc/preview-comment-schema'
 import type { PreviewBounds } from '../../../../shared/ipc/preview-types'
 import { loadCommentBytes } from './commentFileAccess'
 import type { CommentFileJobRunner } from './commentFileJobs'
 import type { CommentBinding, CommentKeyStore } from './commentKeyStore'
 import type { CommentFrameLike, FrameRecord } from './commentFrames'
-import { buildDraft, type CommentDraft } from './commentDraftBuilder'
+import { buildDraft, type BuiltDraft, type CommentDraft } from './commentDraftBuilder'
 import { menuPoint } from './commentMenuPoint'
+import type { PinGroup } from './commentPins'
 import { captureFreshStill, waitForPaint, type FreshStillDeps, type PickFramePlace } from './commentStillCapture'
 import type { FrameOffset } from './commentScripts'
 import { samePathKey } from './commentUnsavedSources'
@@ -77,6 +79,19 @@ export function placeOf(frame: CommentFrameLike, main: CommentFrameLike | undefi
   while (ancestor.parent !== null && ancestor.parent.parent !== null) ancestor = ancestor.parent
   const childIndex = main.frames.findIndex(child => child.frameTreeNodeId === ancestor.frameTreeNodeId)
   return { childIndex, nested: frame.parent.parent !== null }
+}
+
+/**
+ * The pick a pin's "New comment" is built from: the icon pick's view, and the
+ * element the pin stands on as the file names it – never a runtime element
+ * the page describes. `undefined` when that element is not one a pick could
+ * name (a stored runtime tag or path the pick schema refuses).
+ */
+export function pinPickOf(pin: PinGroup, pick: CommentPick): CommentPick | undefined {
+  const base: CommentPick = { kind: pick.kind, via: pick.via, view: pick.view }
+  if (pin.runtime === undefined) return base
+  const runtime = CommentPickRuntimeSchema.safeParse({ path: pin.runtime.path, tag: pin.runtime.tag })
+  return runtime.success ? { ...base, runtime: runtime.data } : undefined
 }
 
 /** Build one view's opener. */
@@ -169,6 +184,25 @@ export function createCommentDraftOpener(deps: DraftOpenerDeps): CommentDraftOpe
     return found.kind === 'failed' ? [] : found.blocks
   }
 
+  /**
+   * A draft on the pin's element, for the window's "New comment": built from
+   * disk as a menu's is, on the JS-built element when the pin stands on one.
+   */
+  async function pinDraftOf(frame: CommentFrameLike, file: FrameFile, entry: ElementTokenEntry | undefined, pin: PinGroup, pick: CommentPick): Promise<BuiltDraft> {
+    const onPin = pinPickOf(pin, pick)
+    if (entry === undefined || onPin === undefined) return { ok: false }
+    return buildDraft({
+      realRoot: deps.realRoot,
+      file,
+      entry,
+      pick: onPin,
+      frame: frame.parent !== null,
+      pageRealPath: deps.currentPage(),
+      jobs: deps.jobs,
+      platform: deps.platform
+    })
+  }
+
   async function icon(frame: CommentFrameLike, record: FrameRecord, pinKey: string, pick: CommentPick): Promise<void> {
     const pin = record.pins.get(pinKey)
     const file = record.file
@@ -176,7 +210,11 @@ export function createCommentDraftOpener(deps: DraftOpenerDeps): CommentDraftOpe
     const { realPath } = file
     const entry = record.loadId === undefined ? undefined : deps.tokens.lookup(record.loadId, pin.token)
     const painted = paintAndCapture(placeOf(frame, deps.mainFrame()), pick)
-    const blocks = pin.attention > 0 ? await pinBlocksOf(file, entry) : []
+    const [blocks, built, unsavedSource] = await Promise.all([
+      pin.attention > 0 ? pinBlocksOf(file, entry) : [],
+      pinDraftOf(frame, file, entry, pin, pick),
+      deps.hasUnsavedSource(realPath)
+    ])
     const offset = await painted
     if (!stillCurrent(record, file)) return
     deps.emit({
@@ -185,7 +223,8 @@ export function createCommentDraftOpener(deps: DraftOpenerDeps): CommentDraftOpe
       point: pointOf(pick, offset),
       ...display(file, frame),
       threadKeys: pin.threadIds.map(threadId => deps.keys.keyFor(deps.binding, { kind: 'thread', realPath, threadId })),
-      blockKeys: blocks.map(({ rawHash, start }) => deps.keys.keyFor(deps.binding, { kind: 'block', realPath, rawHash, start }))
+      blockKeys: blocks.map(({ rawHash, start }) => deps.keys.keyFor(deps.binding, { kind: 'block', realPath, rawHash, start })),
+      ...(built.ok ? { draftToken: deps.keys.mintDraft(deps.binding, built.draft), target: built.target, unsavedSource } : {})
     })
   }
 

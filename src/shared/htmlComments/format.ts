@@ -323,9 +323,18 @@ export function escapeJsonForComment(json: string): string {
 
 /** Escape a value shown inside one readable line (an author, a tag summary). */
 export function escapeReadableInline(text: string): string {
-  return breakDashes(
-    text.replace(READABLE_ESCAPED, unicodeEscape).replace(INLINE_BREAKS, unicodeEscape)
-  )
+  return breakDashes(visibleInline(text))
+}
+
+/**
+ * A value from a file, made safe to show on one line with nothing hidden: the
+ * characters the readable part escapes – controls, lone surrogates, bidi
+ * marks, overrides and isolates, every other invisible character – and line
+ * breaks become a visible `\uXXXX`. Unlike {@link escapeReadableInline} it
+ * leaves dashes alone: it is for the screen, not for the file.
+ */
+export function visibleInline(text: string): string {
+  return text.replace(READABLE_ESCAPED, unicodeEscape).replace(INLINE_BREAKS, unicodeEscape)
 }
 
 /**

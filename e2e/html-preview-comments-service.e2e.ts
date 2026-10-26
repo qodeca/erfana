@@ -21,6 +21,9 @@
  * - **SEC-09.** A page cannot `pushState` to another path (Chromium throws),
  *   and after a same-document step a click still opens a draft on the file
  *   the load named.
+ * - **New comment from a pin (§10.4).** A click on a pin opens its threads with
+ *   a draft on the same element; saving through it adds a second thread there,
+ *   and the list carries each thread's stored quote ("It was attached to:").
  * - **SEC-23 (residual S6).** A page that fetches its own URL reads its own
  *   blocks, authors included: documented, expected to pass.
  *
@@ -195,6 +198,36 @@ async function pathSpellings(projectRoot: string): Promise<string[]> {
   return [...spellings]
 }
 
+/**
+ * A trusted click on the bubble of the pin of `#elementId` (§10.5: the tail tip
+ * 4 px outside the element's top-right corner, the 24 px box above it, clamped
+ * to the viewport); `false` when the element is missing.
+ */
+async function clickPinOf(app: ElectronApplication, preview: HtmlPreviewPage, elementId: string): Promise<boolean> {
+  const raw = await preview.eval(
+    `(() => {
+      const el = document.getElementById(${JSON.stringify(elementId)})
+      if (!el) return 'null'
+      const r = el.getBoundingClientRect()
+      const clamp = (v, max) => Math.min(Math.max(v, 0), max)
+      const left = clamp(r.right + 4 - 2, document.documentElement.clientWidth - 24)
+      const top = clamp(r.top - 4 - 22, document.documentElement.clientHeight - 24)
+      return JSON.stringify({ x: Math.round(left + 12), y: Math.round(top + 10) })
+    })()`,
+    HtmlPreviewPage.target(PAGE)
+  )
+  const point = JSON.parse(raw ?? 'null') as { x: number; y: number } | null
+  if (point === null) return false
+  return app.evaluate(({ webContents }, { x, y }) => {
+    const wc = webContents.getAllWebContents().find(contents => contents.getURL().startsWith('erfana-preview://'))
+    if (!wc) return false
+    wc.sendInputEvent({ type: 'mouseMove', x, y })
+    wc.sendInputEvent({ type: 'mouseDown', x, y, button: 'left', clickCount: 1 })
+    wc.sendInputEvent({ type: 'mouseUp', x, y, button: 'left', clickCount: 1 })
+    return true
+  }, point)
+}
+
 /** The thread with `threadKey` in main's list of the page's file. */
 async function threadOf(page: Page, panelId: string, threadKey: string): Promise<{ fileKey: string; thread: CommentThreadView }> {
   const list = await listComments(page, panelId)
@@ -357,6 +390,39 @@ test.describe('HTML Preview comments – service and IPC (P5 exit)', () => {
     expect(await clickAt(app, 'low', target), '#low not found').toBe(true)
     const draft = await waitForDraftOpened(page, 1)
     expect(draft).toMatchObject({ panelId, kind: 'open', displayPath: PAGE, target: { tag: 'p', elementId: 'low' } })
+  })
+
+  test('§10.4 a pin offers "New comment": its draft saves a second thread on the element, and the list carries the stored quote', async ({
+    windowWithTestProject,
+    appWithTestProject
+  }) => {
+    const app = appWithTestProject
+    const page = windowWithTestProject
+    const preview = new HtmlPreviewPage(page, app)
+    await setGlobalSetting(page, 'comments', AUTHOR)
+    const panelId = await openService(preview, app)
+    await recordDraftsOpened(page)
+    const target = HtmlPreviewPage.target(PAGE)
+    // Pins are drawn outside comment mode too; the open thread on #cta has one.
+    await expect
+      .poll(() => accentPixelsNear(app, 'cta', target), { timeout: PREVIEW_BUDGET_MS, message: 'no pin drawn at #cta' })
+      .toBeGreaterThanOrEqual(40)
+
+    expect(await clickPinOf(app, preview, 'cta'), '#cta not found').toBe(true)
+    const opened = await waitForDraftOpened(page, 1)
+    if (opened.kind !== 'icon' || opened.draftToken === undefined) throw new Error(`the pin carried no draft: ${JSON.stringify(opened)}`)
+    expect(opened).toMatchObject({ panelId, threadKeys: [expect.stringMatching(/^t/)], unsavedSource: false, target: { tag: 'button', elementId: 'cta' } })
+
+    const saved = await saveComment(page, { panelId, op: 'add', draftToken: opened.draftToken, text: NOTE })
+    expect(saved).toMatchObject({ ok: true, threadKey: expect.stringMatching(/^t/) })
+    await waitForCommentLoad(app, PAGE, 'page', BLOCKS + 1)
+    const list = await listComments(page, panelId)
+    if (!list.ok) throw new Error(`list refused: ${list.code}`)
+    const onCta = list.files.find(file => file.displayPath === PAGE)?.threads.filter(thread => thread.elementId === 'cta') ?? []
+    expect(onCta.map(thread => [thread.messages[0].text === NOTE, thread.quote]).sort()).toEqual([
+      [false, 'Buy now'],
+      [true, 'Buy now']
+    ])
   })
 
   test('SEC-23 residual S6: a page that fetches its own URL reads its own blocks', async ({

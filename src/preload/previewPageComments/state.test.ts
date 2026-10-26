@@ -46,7 +46,12 @@ describe('DEFAULT_THEME', () => {
     font: '--font-mono',
     size: '--text-sm',
     ring: '--border-width-thick',
-    pinTarget: '--btn-height-sm'
+    pinTarget: '--btn-height-sm',
+    hairline: '--border-width',
+    space1: '--space-1',
+    space2: '--space-2',
+    space4: '--space-4',
+    leading: '--leading-snug'
   }
 
   it.each(Object.entries(mapping))('%s mirrors %s', (key, cssName) => {

@@ -597,24 +597,24 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.PREVIEW_NAV_UNAVAILABLE]: 'This preview is not ready. Try again in a moment.',
   [ErrorCode.PREVIEW_NAV_SKIPPED]: 'This tab was still loading another page.',
 
-  // HTML Preview comments (§10.10); the comment window adds the file name
+  // HTML Preview comments, as §10.10 words them; `{file}` is the file's name, filled by the comment window
   [ErrorCode.COMMENT_TARGET_MOVED]: 'This element changed in the file since you picked it. Close and pick it again – your text will be restored.',
-  [ErrorCode.COMMENT_BLOCK_CHANGED]: 'This comment changed on disk. Reopen it and try again.',
+  [ErrorCode.COMMENT_BLOCK_CHANGED]: 'This block changed on disk. Reopen it and try again.',
   [ErrorCode.COMMENT_ENCODING_UNSUPPORTED]: 'Erfana can only add comments to UTF-8 files.',
-  [ErrorCode.COMMENT_FILE_CONFLICTED]: 'This file has unresolved git conflicts. Resolve them first.',
+  [ErrorCode.COMMENT_FILE_CONFLICTED]: '{file} has unresolved git conflicts. Resolve them first.',
   [ErrorCode.COMMENT_DRAFT_EXPIRED]: 'This comment window was open too long. Pick the element again – your text is kept.',
   [ErrorCode.COMMENT_KEY_INVALID]: 'This comment is no longer open here. Reopen it and try again.',
   [ErrorCode.COMMENT_IDENTITY_REQUIRED]: 'Enter a name to add comments.',
   [ErrorCode.COMMENT_LIMIT]: 'This would go over a comment size limit, so nothing was saved.',
   [ErrorCode.COMMENT_FILE_TOO_LARGE]: 'Erfana adds comments only to files up to 4 MB.',
-  [ErrorCode.COMMENT_WRITE_REFUSED_LINK]: "This file is a link to another file, so Erfana won't write to it.",
-  [ErrorCode.COMMENT_WRITE_UNSUPPORTED_FS]: "Erfana can't write comments to a file on this drive.",
-  [ErrorCode.COMMENT_UNSAVED_SOURCE]: 'This file has unsaved changes in another tab. Save them first.',
-  [ErrorCode.COMMENT_FILE_GONE]: 'This file no longer exists. Copy your text before closing.',
+  [ErrorCode.COMMENT_WRITE_REFUSED_LINK]: "{file} is a link to another file, so Erfana won't write to it.",
+  [ErrorCode.COMMENT_WRITE_UNSUPPORTED_FS]: "Erfana can't write to {file} on this drive.",
+  [ErrorCode.COMMENT_UNSAVED_SOURCE]: "{file} has unsaved changes in another tab. Save them first so your edits and this comment don't overwrite each other.",
+  [ErrorCode.COMMENT_FILE_GONE]: '{file} no longer exists. Copy your text before closing.',
   [ErrorCode.COMMENT_PATH_REFUSED]: "Erfana doesn't write comments to this file.",
-  [ErrorCode.COMMENT_FILE_READ_ONLY]: "Couldn't save: the file is read-only. Your text is still here.",
+  [ErrorCode.COMMENT_FILE_READ_ONLY]: "Couldn't save: {file} is read-only. Your text is still here.",
   [ErrorCode.COMMENT_WRITE_FAILED]: "Couldn't save the comment. Your text is still here – try again.",
-  [ErrorCode.COMMENT_SAVE_PENDING]: 'Still saving this comment. It appears here once the file is written – no need to save again.',
+  [ErrorCode.COMMENT_SAVE_PENDING]: 'Still saving to {file}. Your comment appears here once it is written – no need to save again.',
 
   // Generic errors
   [ErrorCode.UNKNOWN_ERROR]: 'An unexpected error occurred'

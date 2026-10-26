@@ -24,7 +24,7 @@
 import { z } from 'zod'
 import { ErrorCode } from '../errors'
 import { PREVIEW_LIMITS } from '../preview-limits'
-import { ELEMENT_TOKEN_PATTERN, MESSAGE_ID_PATTERN, utf8Length } from '../htmlComments'
+import { ELEMENT_TOKEN_PATTERN, MESSAGE_ID_PATTERN, utf8Length, visibleInline } from '../htmlComments'
 import { TAG_MAX_CHARS } from '../htmlComments/format'
 import { PanelIdSchema } from './preview-schema'
 
@@ -284,6 +284,17 @@ export const CommentThreadViewSchema = z
     attached: z.boolean(),
     /** Found, but not rendered right now ("Not visible now", decision 30). */
     notVisible: z.boolean(),
+    /**
+     * The element's text as the block stored it – "It was attached to:" (§10.10).
+     * One line with nothing hidden: invisible and bidi characters arrive as a
+     * visible `\uXXXX` (`visibleInline`), never raw.
+     */
+    quote: z
+      .string()
+      .min(1)
+      .max(PREVIEW_LIMITS.COMMENT_QUOTE_MAX_CHARS)
+      .refine(text => visibleInline(text) === text)
+      .optional(),
     /** A JS-built target: its tag and path below the in-file element, and its snapshot's size. */
     runtime: z
       .object({
@@ -419,7 +430,14 @@ export const CommentDraftOpenedSchema = z.discriminatedUnion('kind', [
       point: CommentPointSchema,
       ...DisplaySchema,
       threadKeys: z.array(KeySchema).max(PREVIEW_LIMITS.COMMENT_MAX_BLOCKS_PER_FILE),
-      blockKeys: z.array(KeySchema).max(PREVIEW_LIMITS.COMMENT_MAX_BLOCKS_PER_FILE)
+      blockKeys: z.array(KeySchema).max(PREVIEW_LIMITS.COMMENT_MAX_BLOCKS_PER_FILE),
+      /**
+       * "New comment" on the pin's element: a draft minted as a menu's is, with
+       * what the window shows for it. Absent when the element cannot take one now.
+       */
+      draftToken: z.string().regex(COMMENT_DRAFT_TOKEN_PATTERN).optional(),
+      target: CommentDraftTargetViewSchema.optional(),
+      unsavedSource: z.boolean().optional()
     })
     .strict()
 ])

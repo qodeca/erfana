@@ -89,6 +89,27 @@ describe('buildCommentList', () => {
     expect(thread.messages[0].by).not.toHaveProperty('email')
   })
 
+  it('§10.10 lists the stored quote for "It was attached to:" – the JS-built element\'s first, bidi characters shown, never raw', async () => {
+    const rlo = String.fromCodePoint(0x202e)
+    const inFile = makeComment({ id: fixedId('c-', 5), anchor: { tag: 'button', path: '', quote: { exact: `Buy ${rlo}now`, prefix: '', suffix: '' } } })
+    const runtime = makeComment({
+      id: fixedId('c-', 6),
+      anchor: {
+        tag: 'button',
+        path: '',
+        quote: { exact: 'Buy now', prefix: '', suffix: '' },
+        runtime: { path: 'span:nth-of-type(1)', tag: 'span', quote: { exact: 'Inner text', prefix: '', suffix: '' }, snapshotSource: 'page' }
+      }
+    })
+    const bare = makeComment({ id: fixedId('c-', 7), anchor: { tag: 'button', path: '' } })
+    let text = BASE_PAGE
+    for (const data of [inFile, runtime, bare]) text = addTo(text, 'button', data).text
+    const path = await project.write('index.html', text)
+    const [file] = await list([{ path }])
+    expect(file.threads.map(thread => thread.quote).sort()).toEqual(['Buy \\u202enow', 'Inner text', undefined])
+    expect(file.threads.every(thread => !thread.quote?.includes(rlo))).toBe(true)
+  })
+
   it('cuts a long damaged block\'s raw text and flags it', async () => {
     const huge = `<!-- erfana:comment v1 id=c-0000000000000009\n@data {"v":1, ${'x'.repeat(COMMENT_RAW_PREVIEW_MAX_CHARS)}\n-->`
     const path = await project.write('index.html', insertBefore(commentedPage().text, '<p id="para"', huge))

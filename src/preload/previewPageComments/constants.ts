@@ -86,6 +86,11 @@ export const BLOCK_HEADER = /^\s*erfana:comment\s+v\d+\b/
 
 /** The speech-bubble pin's outline, exactly (decision 33, §10.5, J-014). */
 export const PIN_PATH = 'M2 2H22V17H7L2 22Z'
+/**
+ * Where the count and the `!` are centred in the bubble: halfway down its body,
+ * which runs from y 2 to y 17 in {@link PIN_PATH} (the tail hangs below it).
+ */
+export const PIN_BODY_MIDDLE_Y = 9.5
 /** The pin's box: a 24 × 24 hit target (WCAG 2.5.8) whose tail tip is at (2, 22). */
 export const PIN_BOX_PX = 24
 /** Where the tail tip sits inside the pin's box. */

@@ -106,11 +106,14 @@
 <div class="gallery" id="pins"></div>
 
 <div class="ds-note">
-  <strong>A defect this card found on its first render.</strong> The number and the <code>!</code> sit low: they
-  touch the bubble's bottom edge. <code>pins.ts</code> centres the text at <code>y="13"</code> with
-  <code>dominant-baseline: middle</code>, but the bubble's body runs from 2 to 17 in the view box, so its middle is
-  9.5. The pins above are drawn the way the code draws them, on purpose. The fix belongs in <code>pins.ts</code>
-  (centre near <code>y="10"</code>) and then here – <strong>open for P6</strong>.
+  <strong>A defect this card found on its first render, fixed.</strong> The number and the <code>!</code> sat low,
+  touching the bubble's bottom edge: <code>pins.ts</code> centred the text at <code>y="13"</code> with
+  <code>dominant-baseline: middle</code>, but the bubble's body runs from 2 to 17 in the view box. It now centres
+  them on the body's middle, <code>y="9.5"</code> (<code>PIN_BODY_MIDDLE_Y</code>), and the card draws them the same way.
+  <br><br>
+  <strong>Damaged and selected.</strong> A selected damaged pin keeps its warning fill under the selected accent
+  stroke, so its <code>!</code> stays ink – the selected accent on the warning fill would be about 1.05:1.
+  Hover recolours an open pin only, never a selected or damaged one.
 </div>
 
 <h2>Comment mode</h2>
@@ -152,8 +155,9 @@
 
 <h2>Exceptions</h2>
 <p style="max-width: 72ch; color: var(--color-text-tertiary)">
-  Where the overlay departs from the system, with the reason. Each needs a <code>deviates:</code> marker at the
-  site in <code>overlayStyles.ts</code>.
+  Where the overlay departs from the system, with the reason. Each has a <code>deviates:</code> marker at its
+  site in <code>overlayStyles.ts</code> – the stylesheet as a whole, the pin focus rule and the forced-colours
+  block – and the same marker in the card's mirror, <code>overlay.css</code>.
 </p>
 <table>
   <thead><tr><th>Where</th><th>The system</th><th>The overlay, and why</th></tr></thead>
@@ -166,14 +170,16 @@
         tokens through one table, pinned by a test (R-012).</td>
     </tr>
     <tr>
-      <td>Values written outside the theme</td>
+      <td>Literals with no theme field</td>
       <td>Every value from the theme.</td>
-      <td><code>overlayStyles.ts</code> also writes a 1px ink line, 4px label padding, 2px 8px tab padding, the
-        12% / 24% fills and <code>line-height: 1.4</code> straight into the string. The first three equal
-        <code>--border-width</code>, <code>--space-2</code> and <code>--space-1 --space-4</code>; the line
-        height has no equal token (<code>--leading-snug</code> is 1.375). The R-012 test covers the ten theme
-        fields only, so these can drift from the tokens unseen – <strong>open question for P6</strong>: add them
-        to the theme, or pin them in the same test.</td>
+      <td>The hairline, the spaces and the line height now come through the theme
+        (<code>hairline</code>, <code>space1</code>, <code>space2</code>, <code>space4</code>, <code>leading</code>);
+        the line height moved from a typed 1.4 to <code>--leading-snug</code>, 1.375. Still written as literals,
+        each with no token of its own: the 12% selected and 24% flash fill mixes; the pin's SVG stroke widths 1.5
+        and 2 (selected), in view-box units; the label's <code>1ch</code> gap before the size; the count's weight
+        700 (the value of <code>--font-bold</code>, which the theme does not carry); the geometry percentages
+        (<code>50%</code> centring and clip, <code>100%</code> SVG size); and the 1px box of the visually-hidden
+        live region, a technique rather than a design value. The R-012 test lists exactly these.</td>
     </tr>
     <tr>
       <td>Pin focus</td>
@@ -186,7 +192,9 @@
       <td>Forced colours</td>
       <td>System colours where the theme is replaced.</td>
       <td>Matches: outline, frame and flash take <code>Highlight</code>; label, tab and pin take
-        <code>Highlight</code> / <code>HighlightText</code>. Listed so nobody “fixes” the literals in that block.</td>
+        <code>Highlight</code> / <code>HighlightText</code>. A selected pin inverts – <code>Canvas</code> body,
+        <code>Highlight</code> stroke, line and count – so it still differs from an open one, and hover does not
+        recolour a pin there. Listed so nobody “fixes” the literals in that block.</td>
     </tr>
   </tbody>
 </table>
@@ -205,7 +213,12 @@ const MAP = [
   ['font', '--font-mono', 'Label, tab and pin number'],
   ['size', '--text-sm', 'Label, tab and pin number'],
   ['ring', '--border-width-thick', 'Ring, frame and flash width'],
-  ['pinTarget', '--btn-height-sm', 'The pin hit box']
+  ['pinTarget', '--btn-height-sm', 'The pin hit box'],
+  ['hairline', '--border-width', 'The ink lines of the ring, the label border'],
+  ['space1', '--space-1', 'Tab block padding, pin focus offset'],
+  ['space2', '--space-2', 'Label inline padding, pin focus halo'],
+  ['space4', '--space-4', 'Tab inline padding'],
+  ['leading', '--leading-snug', 'Line height of the label and the tab']
 ];
 function resolved(token) {
   const probe = document.createElement('span');
@@ -292,6 +305,8 @@ pinScene('<strong>selected</strong> – window open or drawer row active: invert
   { count: 2, name: '2 comments on button.cta. Open.', selected: true });
 pinScene('<strong>focus</strong> – accent ring 2px out, ink halo between', { count: 2, name: '2 comments on button.cta. Open.', focus: true });
 pinScene('<strong>damaged</strong> – warning fill, ink !', { count: 1, damaged: true, name: 'Damaged comment on button.cta. Open.' });
+pinScene('<strong>damaged, selected</strong> – warning fill, accent stroke, the ! stays ink',
+  { count: 1, damaged: true, selected: true, name: 'Damaged comment on button.cta. Open.' });
 pinScene('<strong>on a dark page</strong> – the ink stroke still separates it', { count: 2, name: '2 comments on button.cta. Open.' }, { dark: true });
 scene(pins, '<strong>overlap</strong> – the ancestor keeps the corner, the child steps left 22px',
   '<div class="card" id="outer" style="max-width:240px;margin-top:20px"><b id="inner" style="display:block;text-align:right">Pro plan</b> 12 € a month</div>',

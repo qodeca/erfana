@@ -100,6 +100,26 @@ describe('PreviewCommentService', () => {
     expect(f.service.reveal(resolved.threadKey)).toEqual({ ok: false, code: ErrorCode.COMMENT_TARGET_MOVED })
   })
 
+  it('§10.4 a pin\'s "New comment": the icon event carries a draft, and a save through it adds a thread on the same element', async () => {
+    f = await commentServiceFixture(commentedPage().text)
+    await f.loadPage()
+    await f.service.setMode(true, true)
+    const pins = f.top.lastState()!.icons as Array<{ key: string }>
+    await f.pick(f.top, { kind: 'icon', via: 'pointer', key: pins[0].key, screen: { x: 30, y: 40 }, view: VIEW })
+    const opened = f.emit.draftOpened.mock.calls[0][1]
+    expect(opened).toMatchObject({ kind: 'icon', draftToken: expect.stringMatching(/^[0-9a-f]{32}$/), unsavedSource: false, target: { line: expect.any(Number) } })
+
+    const saved = await f.service.save({ panelId: 'html-preview-index', op: 'add', draftToken: opened.draftToken as string, text: TEXT })
+    if (!saved.ok || saved.threadKey === null) throw new Error(`save refused: ${JSON.stringify(saved)}`)
+    const list = await f.service.list()
+    if (!list.ok) throw new Error('list')
+    const threads = list.files[0].threads
+    const added = threads.find(thread => thread.threadKey === saved.threadKey)!
+    const onPin = threads.find(thread => thread.threadKey === (opened.threadKeys as string[])[0])!
+    expect(added.messages[0].text).toBe(TEXT)
+    expect({ tag: added.tag, elementId: added.elementId }).toEqual({ tag: onPin.tag, elementId: onPin.elementId })
+  })
+
   it('M-058 a save with no watcher reload reloads the view once after 300 ms', async () => {
     f = await commentServiceFixture(BASE_PAGE)
     const load = await f.loadPage()

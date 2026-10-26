@@ -11,7 +11,8 @@
  * sees and adds what only main knows – the file's paths and whether a thread
  * is rendered now (`commentListBuilder.ts`).
  */
-import type { CommentAuthor, CommentDocument, ParsedBlock } from '../../../../shared/htmlComments'
+import { visibleInline, type CommentAnchor, type CommentAuthor, type CommentDocument, type ParsedBlock } from '../../../../shared/htmlComments'
+import { PREVIEW_LIMITS } from '../../../../shared/preview-limits'
 import {
   COMMENT_RAW_PREVIEW_MAX_CHARS,
   type CommentFileView,
@@ -72,9 +73,28 @@ function authorView(author: CommentAuthor): { name: string; email?: string } {
   return author.email === undefined ? { name: author.name } : { name: author.name, email: author.email }
 }
 
+/**
+ * The stored text of the element a thread is on, for "It was attached to:":
+ * the JS-built element's own quote when it has one, else the in-file
+ * element's. Shown with nothing hidden (`visibleInline`) and cut, whole
+ * characters and escapes only, to the quote cap.
+ */
+export function storedQuoteOf(anchor: CommentAnchor): string | undefined {
+  const exact = anchor.runtime?.quote?.exact ?? anchor.quote?.exact
+  if (exact === undefined) return undefined
+  let shown = ''
+  for (const char of exact) {
+    const visible = visibleInline(char)
+    if (shown.length + visible.length > PREVIEW_LIMITS.COMMENT_QUOTE_MAX_CHARS) break
+    shown += visible
+  }
+  return shown === '' ? undefined : shown
+}
+
 function threadOf(block: Extract<ParsedBlock, { kind: 'ok' }>, line: number): ListedThread {
   const { data } = block
   const runtime = data.anchor.runtime
+  const quote = storedQuoteOf(data.anchor)
   return {
     threadId: data.id,
     rawHash: block.rawHash,
@@ -85,6 +105,7 @@ function threadOf(block: Extract<ParsedBlock, { kind: 'ok' }>, line: number): Li
     ...(data.anchor.id === undefined ? {} : { elementId: data.anchor.id }),
     classes: [...(data.anchor.cls ?? [])],
     attached: block.target.state === 'attached',
+    ...(quote === undefined ? {} : { quote }),
     ...(runtime === undefined
       ? {}
       : {

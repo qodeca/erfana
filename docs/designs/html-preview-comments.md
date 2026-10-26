@@ -344,14 +344,17 @@ Entirely in the frame: `pointermove` → `elementFromPoint` → outline + label 
 
 ### 7.7 Pin, edit, reply, resolve, delete
 - A pin click (any mode) sends `commentPick {kind: 'icon', key}`; main maps the key to thread ids and emits `draftOpened {threadIds}`.
+  *Rev 3 note (P5):* the icon event also carries `blockKeys` and, when the pin's element can take a comment now, a `draftToken` with its `target` and `unsavedSource` – the window's **New comment** on the same element. The draft is built from disk as a menu's is, on the element the pin stands on (its stored runtime path, never one the page describes), and minted like any draft: single use, 10 minutes, bound to window + panel + session (§19 "Rev 3 notes").
 - The renderer fetches thread content through `preview:commentList`. Text and emails never enter the page.
 - Ops: `reply | editMessage | deleteMessage | setStatus | deleteThread`. Deleting the first message deletes the thread. Anyone may do anything (decision 31). Each op is a §7.6 replace or delete.
 
 ### 7.8 Unsaved editor guard (decision 13)
 Before enabling Save: `findEditorTabsShowing(api, projectPath)` with the **project-space** path main returned; if any id is in `dirtyPanelIds`, show the "Save your edits first" banner with **Go to tab** and **Save {file}** (`editorSaveRegistry.save`). If the tab is in the "changed on disk" conflict state, the banner offers **Go to tab** only (no Save – saving would overwrite the outside edit), following `previewTabMove.ts:205-206`. During the write: `editorSaveRegistry.holdAutosave(id)` + `editorSaveRegistry.whenSaveSettled(id)` (new public method), released afterwards; the clean editor reloads via `useFileWatcher` with no conflict banner. Limitation: a tab in another window is not seen; the disk re-hash still prevents a stale overwrite. The same guard applies to a frame's own file.
+*Rev 3 note (P5, L2):* main accepts a reported dirty path only when it is fully qualified, lexically inside the open project and free of a Win32 device prefix (`\\?\`, `\\.\`, `\??\`); anything else is dropped before main resolves it. A UNC path is resolved only when the project itself is on that share. Dropping is safe: comments never write outside the project.
 
 ### 7.9 Identity
 `GlobalSettingsSchema.comments = { authorName?, authorEmail?, identityNoticeSeen }`, lenient `.catch` (pattern `global-settings-schema.ts:80-84`). App-level `~/.erfana/settings.json` only – never project `.erfana/` (a cloned repo must not preset identity). The identity step shows on the first comment whenever `identityNoticeSeen` is false – also when the name was already set in Settings (then the fields are pre-filled and the notice is the point). Prompt copy in §10.7. No migration is needed: the new section is lenient and absent in older settings files.
+*Rev 3 note (P5, L6):* one identity rule for every place that checks one, `src/shared/htmlComments/identity.ts`: a name or email may not carry a control, format (bidi marks, overrides, isolates, zero-width), surrogate, private-use, unassigned, line/paragraph-separator or default-ignorable code point. The writer refuses such an author; reading the settings file treats such a value as unset (lenient); a **write** through `setSetting` is checked strictly and refused with `GLOBAL_SETTINGS_VALIDATION_FAILED` and a message naming the field.
 
 ### 7.10 Drawer "Show on page"
 `preview:commentCommand {panelId, command: 'reveal', threadId}` → main sends `commentState {reveal: key}` to the owning frame → `scrollIntoView({block: 'center'})` + flash. Frame-in-parent scrolling is spike S3.
@@ -384,6 +387,8 @@ Before enabling Save: `findEditorTabsShowing(api, projectPath)` with the **proje
 **Events** (`PreviewCommentEvents`): `preview:commentDraftOpened`, `preview:commentsChanged {panelId, counts}`, `preview:commentAnchorStatus {panelId, notVisible: threadId[]}`.
 
 **New `ErrorCode`s**: `COMMENT_TARGET_MOVED`, `COMMENT_BLOCK_CHANGED`, `COMMENT_ENCODING_UNSUPPORTED`, `COMMENT_FILE_CONFLICTED`, `COMMENT_DRAFT_EXPIRED`, `COMMENT_KEY_INVALID`, `COMMENT_IDENTITY_REQUIRED`, `COMMENT_LIMIT`, `COMMENT_FILE_TOO_LARGE`, `COMMENT_WRITE_REFUSED_LINK`, `COMMENT_WRITE_UNSUPPORTED_FS`, `COMMENT_UNSAVED_SOURCE`, `COMMENT_FILE_GONE`. (`NOT_SESSION_OWNER` is a confinement-layer code, `shared/ipc/confinement.ts:23`, not an `ErrorCode`; key binding uses `COMMENT_KEY_INVALID`.)
+
+*Rev 3 note (P5):* also `COMMENT_PATH_REFUSED`, `COMMENT_FILE_READ_ONLY`, `COMMENT_WRITE_FAILED` and **`COMMENT_SAVE_PENDING`**: a save that outlasts its 15 s answer limit is answered `COMMENT_SAVE_PENDING` – still being written, not failed; the draft stays held so no second write starts, and if the write lands later main reloads the view and sends `preview:commentsChanged` even with unchanged counts, so the window re-lists (wording in §10.10). Payload additions: a `ThreadView` may carry `quote` – the stored element text for "It was attached to:", at most 200 characters, one line, invisible and bidi characters as visible `\uXXXX` (`visibleInline`, refused raw by the schema); the `icon` draft event may carry `draftToken`, `target` and `unsavedSource` (§7.7). Every `ErrorCode` fallback sentence in `errors.ts` is §10.10's, `{file}` included, pinned by `errors.comments.test.ts`.
 
 **Drawer mapping of block kinds**: `newer` (v2+) blocks go under "Needs attention" with the tag "Newer format – read-only"; a resolved thread whose element is not found stays under "Resolved" with the "Element not found" tag. "Show on page" on a not-visible row scrolls to the in-file ancestor and says "This element isn't on screen right now"; on an orphaned or damaged row it is replaced by "Open in source" (jumps to the block's line).
 
@@ -529,6 +534,8 @@ Self-drawn inline SVG in the shadow root, sharp corners (viewBox path `M2 2H22V1
 | Damaged | `--color-warning` fill, ink `!` |
 | All resolved, not visible now, not found, pins hidden | Not drawn |
 
+*Rev 3 note (P5):* the number and `!` are centred on the body's middle, `y="9.5"`, not on the 24-unit box; hover recolours an open pin only (never a selected or damaged one, and not in forced colours); a selected damaged pin keeps its warning fill and an ink `!` (accent on it is about 1.05:1); in forced colours a selected pin inverts – `Canvas` body, `Highlight` stroke and content.
+
 Only open threads are counted. Clicking opens the window in any mode; the click never reaches the page. Overlapping pins move left along the top edge in 22 px steps (the ancestor keeps the corner). Drawn only for elements passing `checkVisibility({opacityProperty, visibilityProperty})` and in the viewport. Scales with page zoom. Never animated. `role="button"`, `tabindex="-1"`.
 
 ### 10.6 Comment drawer
@@ -579,7 +586,7 @@ Form card errors (`aria-invalid`, `aria-describedby`, icon + text). Settings get
 | Tier | Names |
 |---|---|
 | New component tokens (`design-tokens.css`) | `--comments-window-width` 360px, `--comments-window-max-width` 480px, `--comments-drawer-width` 320px |
-| Resolved into the page (`commentState.theme`) | `accent` ← `--color-accent-primary`, `accentHover` ← `--color-brand-violet-hover`, `ink` ← `--color-brand-black`, `paper` ← `--color-brand-white`, `muted` ← `--color-text-primary`, `warning` ← `--color-warning`, `font` ← `--font-mono`, `size` ← `--text-sm`, `ring` ← `--border-width-thick`, `pinTarget` ← `--btn-height-sm`. A unit test checks the mapping against `design-tokens.css` (lint cannot see CSS inside a TS string). |
+| Resolved into the page (`commentState.theme`) | `accent` ← `--color-accent-primary`, `accentHover` ← `--color-brand-violet-hover`, `ink` ← `--color-brand-black`, `paper` ← `--color-brand-white`, `muted` ← `--color-text-primary`, `warning` ← `--color-warning`, `font` ← `--font-mono`, `size` ← `--text-sm`, `ring` ← `--border-width-thick`, `pinTarget` ← `--btn-height-sm`; *rev 3 (P5):* `hairline` ← `--border-width`, `space1` ← `--space-1`, `space2` ← `--space-2`, `space4` ← `--space-4`, `leading` ← `--leading-snug` (the line height was a typed 1.4). A unit test checks the mapping against `design-tokens.css` (lint cannot see CSS inside a TS string). |
 | Chrome | Existing `--space-*`, `--text-*`, `--color-bg-elevated`, `--color-border-subtle`, `--shadow-dialog`, `--color-text-tertiary` |
 
 Contrast numbers quoted in design-system cards go into `docs/design-system/claims.json`, never typed.
@@ -601,6 +608,7 @@ Contrast numbers quoted in design-system cards go into `docs/design-system/claim
 | Buttons | "Cancel" · "Save" (tooltip "Save (Ctrl+Enter)") · "Saving…" · "Reply" · "Resolve" · "Re-open" · "New comment" · "Edit" · "Delete…" · "Save changes" · "Close" · "Open" · "Show on page" · "Try again" |
 | Meta | "{name} · {time}" · "· edited" · "Resolved by {name} · {time}" · "{n} replies" · "Draft restored" |
 | Save errors | "Write a comment first." · "Comments can be up to 4,000 characters. This one is {n}." · "Couldn't save: {file} is read-only. Your text is still here." · "This element changed in the file since you picked it. Close and pick it again – your text will be restored." · "{file} no longer exists. Copy your text before closing." · "Couldn't save the comment. Your text is still here – try again." · "Erfana can only add comments to UTF-8 files." · "{file} has unresolved git conflicts. Resolve them first." · "{file} is a link to another file, so Erfana won't write to it." |
+| Save pending (rev 3, P5) | "Still saving to {file}. Your comment appears here once it is written – no need to save again." |
 | Saved | "Comment saved to {file}." |
 | Unsaved source | "Save your edits first" / "{file} has unsaved changes in another tab. Save them first so your edits and this comment don't overwrite each other." · "Go to tab" · "Save {file}" · "Saved. You can add your comment now." |
 | Delete | "Delete this comment? It is removed from {file}. Git history keeps earlier versions." → "Delete comment" · "Delete this thread and its {n} replies?" → "Delete thread" |
@@ -756,7 +764,7 @@ IDs: `HPC-U` unit, `HPC-P` property, `HPC-G` golden, `HPC-M` main, `HPC-I` IPC, 
 - SEC-06 1,000 picks/s → ≤ 5 accepted, one drop log line.
 - SEC-07 `commentSave` from the preview webContents, a sub-frame or a forged origin refused before parsing.
 - SEC-08 reused, expired, other-window or pre-project-switch draft tokens refused.
-- SEC-09 frame `pushState`s to another path → comment still targets its navigated file, or is refused.
+- SEC-09 frame `pushState`s to another path → comment still targets its navigated file, or is refused. *Rev 3 note (P5):* in real Chromium a `pushState` to another path throws `SecurityError`; after a same-document step (query, hash) a click still opens a draft on the file the load named (service e2e).
 - SEC-10 symlink (in/out), hard link, ADS name, `node_modules`, dot-folder, `.html`→`.sh`, `srcdoc`/remote frame → refused, every byte unchanged; a gitignored page the preview serves stays commentable (decision 35, M-055).
 - SEC-11 file changed or swapped just before rename → refused or re-located; never a stale write.
 - SEC-12 text and snapshot fuzz (`-->`, `--!>`, `<!--`, `--->`, `<!-->`, `</script>`, backslash escape, NUL, lone surrogates) round-trips; parse5 sees no new elements.
@@ -767,7 +775,7 @@ IDs: `HPC-U` unit, `HPC-P` property, `HPC-G` golden, `HPC-M` main, `HPC-I` IPC, 
 - SEC-17 damaged and conflicted blocks never rewritten by a nearby edit.
 - SEC-18 bidi/control characters in author or email refused on write; rendered isolated and flagged on read.
 - SEC-19 React XSS: `<img src=x onerror=…>` in text renders as text; the `commentState` payload has no text field.
-- SEC-20 log scan after add/edit/delete with marker strings: no author, email, text or absolute path in `~/.erfana/logs`.
+- SEC-20 log scan after add/edit/delete with marker strings: no author, email, text or absolute path in `~/.erfana/logs`. *Rev 3 note (P5):* every line of every log file (main, renderer, combined, rotated), every spelling of the project path (as given, resolved, `/`-separated, JSON-escaped, `file:` URL), and no comment line carries the path-derived panel id; nine non-comment lines name the project path on purpose and are allow-listed by their fixed text (carried to P8, §19).
 - SEC-21 overlay host removed or restyled by the page → re-attached; `host.shadowRoot === null` from the main world.
 - SEC-22 policy freeze: `nodeIntegrationInSubFrames: true`, every other key unchanged; a frame's preload registers no link or CSP listener.
 - SEC-23 (e2e) a page `fetch(location.href)` reads its own blocks – documents residual S6 (expected to pass).
@@ -988,6 +996,24 @@ Evidence: [docs/spikes/html-preview-comments.md](../spikes/html-preview-comments
 | R3-12 | **Parse in a worker** (S9): main-thread parse is 92 ms at 1 MB and 382 ms at 4 MB (budget 50/200). One persistent `worker_threads` worker (pattern `src/main/services/GitStatusWorkerAdapter.ts`), warmed when the first HTML preview opens, does the shared parse, instrumentation, block parse, and the Save / list re-parses. The §5.8 budget becomes **main-thread time** ≤ 10 ms at 1 MB and ≤ 30 ms at 4 MB (measured 7–28 ms); token tables cross as plain arrays. | §4.2 (new `services/preview/comments/commentParseWorker.ts` + adapter), §5.8, F-002 | M-068 worker crash → restart once, then "comments unavailable"; F-002 measures main-thread time |
 | R3-13 | **Token cap** (S9): 100,000 tokens per document (the 4 MB test file had 64,187 elements). Over the cap: the file is served raw and comments are unavailable with the reason "page too large". | §5.8, §4.2 token table | M-069 over-cap → raw + reason |
 | R3-14 | Small corrections: `process.isMainFrame` **is** available (either check works; keep `window === window.top`); `scrollIntoView` in a frame already scrolls the parent – no reveal step (§7.10, S3 closed); the `#hash` anchor jump may show for one frame before the scroll restore (§7.5); `frameFileMap` ignores non-`erfana-preview:` URLs – a refused frame reports the refused address and emits no `did-frame-navigate`. | §4.2, §7.5, §7.10, §15 | – |
+
+### Rev 3 notes – P5 service and IPC, after the security review
+
+Each note amends the cited sections; the rows above stand where a note does not say otherwise.
+
+| Note | Change | Amends | Tests |
+|---|---|---|---|
+| R3-12 jobs | **Every comment file job runs in the worker.** Besides instrumentation, the worker runs four jobs on bytes main read: `draft` (a pick's anchor, placement and excerpt), `pin-blocks` (the damaged and newer blocks on a pin's element), `list` (one file's threads, damaged and newer blocks) and `write` (plan, splice and the verifying re-parse of a save). Main reads with the confined no-follow read, builds the new file from **its own** bytes and the worker's splice (a splice outside them is refused), and writes; it never parses. A list reads at most **64 files**, one at a time. The worker's document cache is keyed by the **content hash** (8 MB, 16 documents), not `(realPath, file hash)`: the worker never sees a path. | §4.2, §7.5, §7.6, R3-12 | `commentFileJobs.test.ts`, `commentFileJobs.perf.test.ts` |
+| R3-12 gate | **Main-thread time per call**: a list and a pick ≤ 10 ms at 1 MB and ≤ 30 ms at 4 MB; a save ≤ 30 ms at **both** sizes – its main share is file-system work that does not shrink with the file (two confinements, the lock, the read, a temp file, fsync, a byte compare, a rename). Gated on the **fastest of seven runs**, not the median (F-002 keeps its median): busy time counts every moment the thread waits for a core, so contention only adds to it – the whole suite under coverage tripled the list's median – while a regression (parsing on main costs 92 ms at 1 MB) raises every run. Measured on the emulated x64 Windows box, fastest run inside the full coverage suite: list 3.3 / 6.3 ms, pick 2.3 / 4.0 ms, save 7.8 / 9.4 ms (1 / 4 MB). A list of eight framed 3.9 MB files must stall the event loop ≤ 60 ms (28–39 ms measured; 1,570 ms before). | §5.8, F-002 | `commentFileJobs.perf.test.ts` |
+| Save pending (L3) | A save past its 15 s limit answers `COMMENT_SAVE_PENDING`; a late landing reloads the view and re-sends the counts. | §7.5, §8, §10.10 | `commentSaveFlow.test.ts`, `PreviewCommentService.test.ts` |
+| Limits (L5) | On top of the per-frame limits, per view: 64 hellos and 128 anchor reports a second. The key store never evicts a draft whose save is in flight, keeps at most 64 drafts, and keeps keys by list generation – 8,192 soft (older generations go first), 65,536 hard. | §8, §9.1 S3/S7 | `commentPickHandler.test.ts`, `commentKeyStore.test.ts` |
+| Identity (L6) | One rule in `src/shared/htmlComments/identity.ts` for the writer and the settings (§7.9 note). | §7.9, S18 | `global-settings-schema.test.ts`, `GlobalSettingsService.test.ts`, `CommentWriter.test.ts` |
+| Share paths (L2) | Reported dirty paths: fully qualified, inside the project, no device prefix; UNC only on the project's own share (§7.8 note). | §7.8 | `commentUnsavedSources.test.ts` |
+| SEC-20 wider | The log scan covers every line of every log file and every spelling of the project path (§12.2 note). | §12.2 | `html-preview-comments-service.e2e.ts` |
+| SEC-09 | Proven in real Chromium (§12.2 note). | §12.2 | `html-preview-comments-service.e2e.ts` |
+| Window data | `ThreadView.quote` for "It was attached to:"; the icon event's draft for "New comment" (§7.7, §8 notes). | §7.7, §8, §10.4 | `preview-comment-schema.test.ts`, `commentListBuilder.test.ts`, `commentDraftOpener.test.ts`, `PreviewCommentService.test.ts` |
+| Overlay | Pin text centred at `y="9.5"`, hover, damaged-selected and forced-colour rules (§10.5 note); theme carries the hairline, spaces and line height (§10.9). | §10.5, §10.9 | `overlayStyles.test.ts`, `pins.test.ts`, `state.test.ts` |
+| Carried to P8 | Nine existing non-comment log lines name the project folder by its absolute path – the git polling and git watcher start lines, the directory watcher's start, ready and "Directory changed" lines, and the renderer's project switch, git-status (two) and "Opened new panel" lines. SEC-20 allow-lists them by text; P8 decides whether they become digests. Not changed in P5. | §9.1 S21, P8 | – |
 
 **Open after P0, carried to the handoff**: S4 on Linux (X11/Wayland) and macOS, mixed-DPI; S1/S6 re-confirmed on macOS. Owner review list: R3-11.
 

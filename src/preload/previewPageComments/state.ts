@@ -18,7 +18,7 @@ import {
   TOKEN_PATTERN
 } from './constants'
 
-/** The overlay's colours and sizes, resolved from Erfana's design tokens (§10.9). */
+/** The overlay's colours, sizes, spaces and line height, resolved from Erfana's design tokens (§10.9). */
 export interface OverlayTheme {
   readonly accent: string
   readonly accentHover: string
@@ -30,6 +30,11 @@ export interface OverlayTheme {
   readonly size: string
   readonly ring: string
   readonly pinTarget: string
+  readonly hairline: string
+  readonly space1: string
+  readonly space2: string
+  readonly space4: string
+  readonly leading: string
 }
 
 /**
@@ -48,7 +53,12 @@ export const DEFAULT_THEME: OverlayTheme = Object.freeze({
   font: "'Cascadia Mono', 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace", // --font-mono
   size: '11px', // --text-sm
   ring: '2px', // --border-width-thick
-  pinTarget: '24px' // --btn-height-sm
+  pinTarget: '24px', // --btn-height-sm
+  hairline: '1px', // --border-width
+  space1: '2px', // --space-1
+  space2: '4px', // --space-2
+  space4: '8px', // --space-4
+  leading: '1.375' // --leading-snug
 })
 
 /** A JS-built pin target below its tokened ancestor. */
@@ -103,6 +113,8 @@ export const IDLE_STATE: CommentState = Object.freeze({
 const COLOUR = /^(#[0-9a-fA-F]{3,8}|rgba?\(\s*[0-9.]+%?(\s*[,\s/]\s*[0-9.]+%?){2,3}\s*\))$/
 const FONT = /^[\w\s,'"-]{1,200}$/
 const LENGTH = /^\d{1,3}(\.\d{1,3})?px$/
+/** A unitless line height. */
+const RATIO = /^\d(\.\d{1,3})?$/
 const TAG = /^[A-Za-z][A-Za-z0-9:-]*$/
 const LARGEST_SCROLL = 10_000_000
 const MAX_CHILD_FRAMES = 1_000
@@ -117,7 +129,12 @@ const THEME_RULES: Readonly<Record<keyof OverlayTheme, RegExp>> = {
   font: FONT,
   size: LENGTH,
   ring: LENGTH,
-  pinTarget: LENGTH
+  pinTarget: LENGTH,
+  hairline: LENGTH,
+  space1: LENGTH,
+  space2: LENGTH,
+  space4: LENGTH,
+  leading: RATIO
 }
 
 type Bag = Readonly<Record<string, unknown>>

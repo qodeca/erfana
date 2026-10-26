@@ -21,22 +21,30 @@
  *   size        -> var(--text-sm)
  *   ring        -> var(--border-width-thick)
  *   pinTarget   -> var(--btn-height-sm)
+ *   hairline    -> var(--border-width)
+ *   space1      -> var(--space-1)
+ *   space2      -> var(--space-2)
+ *   space4      -> var(--space-4)
+ *   leading     -> var(--leading-snug)
  *
- * Two departures from the shipping string, both forced by the card:
- *  - `position: fixed` becomes `position: absolute`, because a card draws many
- *    pages and each overlay is placed inside its own `.page-area`.
- *  - The literals overlayStyles.ts writes OUTSIDE the theme (1px ink line, 4px
- *    label padding, 2px 8px tab padding) are written as the token of the same
- *    value. `line-height: 1.4` has no equal token and stays literal; see the
- *    overlay card's Exceptions.
+ * One departure from the shipping string, forced by the card: `position: fixed`
+ * becomes `position: absolute`, because a card draws many pages and each
+ * overlay is placed inside its own `.page-area`. The literals left in both
+ * (fill mixes, SVG stroke widths, the label's 1ch gap, the count's weight,
+ * geometry percentages) have no token in the theme; each is a row of the
+ * overlay card's Exceptions, and the `deviates:` markers below match the ones
+ * in overlayStyles.ts.
  *
  * No `var()` may ever reach the page. If you change a rule here, change
  * overlayStyles.ts in the same commit, or this card stops describing the page.
  */
 
+/* deviates: docs/design-system/product/html-comments/overlay.html — the shipping rules interpolate literals
+   from commentState.theme, never var(); this mirror writes each back as its token (Exceptions, "Every colour
+   and size") */
 .erf-hpc-root, .erf-hpc-root * { box-sizing: border-box; border-radius: 0; margin: 0; padding: 0; }
 .erf-hpc-root { position: absolute; inset: 0; pointer-events: none; overflow: hidden;
-                font-family: var(--font-mono); font-size: var(--text-sm); line-height: 1.4;
+                font-family: var(--font-mono); font-size: var(--text-sm); line-height: var(--leading-snug);
                 color: var(--color-brand-white); }
 
 /* Two-tone ring: the accent alone fails 3:1 on a white page, the ink line alone
@@ -64,13 +72,23 @@
 .erf-hpc-pin__line { fill: var(--color-brand-black); }
 .erf-hpc-pin__count { fill: var(--color-brand-black); font-family: var(--font-mono); font-size: var(--text-sm);
                       font-weight: var(--font-bold); text-anchor: middle; dominant-baseline: middle; }
-.erf-hpc-pin:hover .erf-hpc-pin__body,
-.erf-hpc-pin--hover .erf-hpc-pin__body { fill: var(--color-brand-violet-hover); }
+/* Hover recolours an open pin only: never a selected or damaged one, and not in
+   forced colours, where the system colours stand. */
+@media (forced-colors: none) {
+  .erf-hpc-pin:not(.erf-hpc-pin--selected):not(.erf-hpc-pin--damaged):hover .erf-hpc-pin__body,
+  .erf-hpc-pin--hover:not(.erf-hpc-pin--selected):not(.erf-hpc-pin--damaged) .erf-hpc-pin__body {
+    fill: var(--color-brand-violet-hover);
+  }
+}
 .erf-hpc-pin--selected .erf-hpc-pin__body { fill: var(--color-brand-black); stroke: var(--color-accent-primary);
                                             stroke-width: 2; }
 .erf-hpc-pin--selected .erf-hpc-pin__line,
 .erf-hpc-pin--selected .erf-hpc-pin__count { fill: var(--color-accent-primary); }
 .erf-hpc-pin--damaged .erf-hpc-pin__body { fill: var(--color-warning); }
+/* Damaged and selected keeps the warning fill, so its ! stays ink: accent on it is about 1.05:1. */
+.erf-hpc-pin--damaged.erf-hpc-pin--selected .erf-hpc-pin__count { fill: var(--color-brand-black); }
+/* deviates: docs/design-system/product/html-comments/overlay.html — pin focus: the passed-in accent with an
+   ink halo; pins are focusable but outside the Tab order (Exceptions, "Pin focus") */
 .erf-hpc-pin:focus-visible,
 .erf-hpc-pin--focus { outline: var(--border-width-thick) solid var(--color-accent-primary);
                       outline-offset: var(--space-1);
@@ -88,11 +106,16 @@
 .erf-hpc-tab--bottom { top: auto; bottom: 0; }
 .erf-hpc-hidden { display: none; }
 
+/* deviates: docs/design-system/product/html-comments/overlay.html — forced colours: system colours replace
+   the theme; a selected pin inverts so it still differs from an open one (Exceptions, "Forced colours") */
 @media (forced-colors: active) {
   .erf-hpc-outline, .erf-hpc-flash, .erf-hpc-frame { border-color: Highlight; outline-color: CanvasText; }
   .erf-hpc-label, .erf-hpc-tab { background: Highlight; color: HighlightText; border-color: HighlightText; }
   .erf-hpc-label__tag, .erf-hpc-label__size { color: HighlightText; }
-  .erf-hpc-pin__body { fill: Highlight; stroke: HighlightText; }
-  .erf-hpc-pin__line, .erf-hpc-pin__count { fill: HighlightText; }
+  .erf-hpc-pin .erf-hpc-pin__body { fill: Highlight; stroke: HighlightText; }
+  .erf-hpc-pin .erf-hpc-pin__line, .erf-hpc-pin .erf-hpc-pin__count { fill: HighlightText; }
+  .erf-hpc-pin.erf-hpc-pin--selected .erf-hpc-pin__body { fill: Canvas; stroke: Highlight; }
+  .erf-hpc-pin.erf-hpc-pin--selected .erf-hpc-pin__line,
+  .erf-hpc-pin.erf-hpc-pin--selected .erf-hpc-pin__count { fill: Highlight; }
 }
 @media print { .erf-hpc-root { display: none; } }

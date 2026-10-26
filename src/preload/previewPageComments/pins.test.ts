@@ -129,6 +129,8 @@ describe('drawPin (J-014)', () => {
   it('shows the count, the damaged state and the selected state', () => {
     const many = drawPin(document, undefined, pinOf(12), { label: 'div#a', selected: true })
     expect(many.querySelector('text')?.textContent).toBe('9+')
+    // Centred on the bubble's body (y 2 to 17), not on the whole box with its tail.
+    expect(many.querySelector('text')?.getAttribute('y')).toBe('9.5')
     expect(many.className).toBe('erf-hpc-pin erf-hpc-pin--selected')
     expect(pinName(pinOf(12), 'div#a')).toBe('12 comments on div#a. Open.')
     expect(pinTooltip(pinOf(3))).toBe('3 comments – click to open')

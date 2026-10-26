@@ -192,6 +192,22 @@ describe('I-004 event and answer schemas', () => {
     expect(CommentListResultSchema.safeParse({ ok: false, code: 'NOT_A_CODE' }).success).toBe(false)
   })
 
+  it('a thread\'s stored quote: one bounded line, its invisible and bidi characters escaped, never raw', () => {
+    const withQuote = (quote: string) => ({ ...fileView(), threads: [{ ...fileView().threads[0], quote }] })
+    expect(CommentFileViewSchema.safeParse(withQuote('Buy now \\u202e')).success).toBe(true)
+    expect(CommentFileViewSchema.safeParse(withQuote('x'.repeat(PREVIEW_LIMITS.COMMENT_QUOTE_MAX_CHARS))).success).toBe(true)
+    for (const refused of [
+      '',
+      'x'.repeat(PREVIEW_LIMITS.COMMENT_QUOTE_MAX_CHARS + 1),
+      `Buy ${String.fromCodePoint(0x202e)}now`,
+      `zero${String.fromCodePoint(0x200b)}width`,
+      'two\nlines',
+      `bell${String.fromCodePoint(0x07)}`
+    ]) {
+      expect(CommentFileViewSchema.safeParse(withQuote(refused)).success, JSON.stringify(refused)).toBe(false)
+    }
+  })
+
   it('draft-opened, both shapes, and nothing a page could name', () => {
     const base = { panelId: PANEL, point: { x: 10, y: 20 }, displayPath: 'index.html', filePath: '/p/index.html', frame: false, fileKey: 'f1' }
     expect(
@@ -204,8 +220,14 @@ describe('I-004 event and answer schemas', () => {
       }).success
     ).toBe(true)
     expect(CommentDraftOpenedSchema.safeParse({ ...base, kind: 'open', unsavedSource: false, code: ErrorCode.COMMENT_TARGET_MOVED }).success).toBe(true)
-    expect(CommentDraftOpenedSchema.safeParse({ ...base, kind: 'icon', threadKeys: [KEY], blockKeys: [] }).success).toBe(true)
-    expect(CommentDraftOpenedSchema.safeParse({ ...base, kind: 'icon', threadKeys: [KEY], blockKeys: [], draftToken: DRAFT }).success).toBe(false)
+    const icon = { ...base, kind: 'icon', threadKeys: [KEY], blockKeys: [] }
+    expect(CommentDraftOpenedSchema.safeParse(icon).success).toBe(true)
+    // "New comment" from a pin: a draft as a menu carries one, with its target and the unsaved flag.
+    const target = { tag: 'button', classes: [], line: 7, excerpt: '<button id="buy">' }
+    expect(CommentDraftOpenedSchema.safeParse({ ...icon, draftToken: DRAFT, target, unsavedSource: true }).success).toBe(true)
+    expect(CommentDraftOpenedSchema.safeParse({ ...icon, draftToken: DRAFT.toUpperCase() }).success).toBe(false)
+    expect(CommentDraftOpenedSchema.safeParse({ ...icon, draftToken: 'a'.repeat(31) }).success).toBe(false)
+    expect(CommentDraftOpenedSchema.safeParse({ ...icon, code: ErrorCode.COMMENT_TARGET_MOVED }).success).toBe(false)
     expect(CommentDraftOpenedSchema.safeParse({ ...base, kind: 'menu', unsavedSource: false, realPath: '/real' }).success).toBe(false)
   })
 
