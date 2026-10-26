@@ -125,8 +125,8 @@ describe('PreviewToolbarTools', () => {
     )
 
     const css = readFileSync(resolve(__dirname, 'PreviewNavControls.css'), 'utf8')
-    const minimal = /@container \(width < 293px\) \{([\s\S]*?)\n\}/.exec(css)?.[1]
-    expect(minimal, 'the width < 293px block is missing').toBeDefined()
+    const minimal = /@container \(width < 446px\) \{([\s\S]*?)\n\}/.exec(css)?.[1]
+    expect(minimal, 'the width < 446px block is missing').toBeDefined()
     for (const name of names) {
       expect(name).toBeTruthy()
       expect(minimal).toContain(`.erf-band__tool[aria-label='${name}']`)

@@ -239,6 +239,12 @@ async function threadOf(page: Page, panelId: string, threadKey: string): Promise
 }
 
 test.describe('HTML Preview comments – service and IPC (P5 exit)', () => {
+  // The worker's home outlives the app: put the identity back to unset, so a
+  // later spec in this worker still sees the first-comment identity step (E-001).
+  test.afterEach(async ({ windowWithTestProject }) => {
+    await setGlobalSetting(windowWithTestProject, 'comments', { identityNoticeSeen: false })
+  })
+
   test('M-040 M-058 save → one reload → the reader put back, the mode kept and the new pin drawn', async ({
     windowWithTestProject,
     appWithTestProject,

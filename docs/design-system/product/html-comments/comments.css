@@ -531,7 +531,8 @@
   padding: 0 var(--space-4);
   background: transparent;
   border: var(--border-width) solid var(--color-border-subtle);
-  border-block-end: var(--border-width-thick) solid transparent;
+  /* Every segment has its 2px bottom edge – quiet until selected, then lime. */
+  border-block-end: var(--border-width-thick) solid var(--color-border-subtle);
   border-radius: var(--border-radius);
   color: var(--color-text-primary);
   font-family: var(--font-sans);
@@ -650,8 +651,8 @@
 }
 
 /* The minimal tier: Show comment icons leaves the row – it stays reachable from
-   the drawer's checkbox. The threshold is nav.css's current minimal one and must
-   be re-measured with the new tools; the toolbar card prints the numbers. */
-@container (width < 293px) {
+   the drawer's checkbox. The threshold is nav.css's minimal one, re-measured with
+   the comment tools (446px, was 293px); the toolbar card prints the numbers. */
+@container (width < 446px) {
   .erf-band .erf-band__tool[aria-label='Show comment icons'] { display: none; }
 }

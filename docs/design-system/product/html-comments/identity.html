@@ -63,6 +63,22 @@
 </div>
 <div class="gallery" id="settings"></div>
 
+<h2>Exceptions</h2>
+<table>
+  <thead><tr><th>Where</th><th>The system</th><th>Here, and why</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>Info banner</td>
+      <td>The Feedback card has warning, error and success tones – no info tone.</td>
+      <td>The privacy notice under Settings › Comments, "Not visible now" and the read-only reason are neither
+        a problem nor a success, so the banner borrows the accent: <code>--color-brand-violet-muted</code> fill,
+        <code>--color-accent-primary</code> edge and icon. No new token: if the Feedback card gains an info tone,
+        <code>.erf-comment-banner--info</code> moves to it. Marked <code>deviates:</code> at the rule in
+        <code>CommentWindow.css</code>.</td>
+    </tr>
+  </tbody>
+</table>
+
 <script>
 const H = window.HPC;
 const I = H.icon;

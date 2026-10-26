@@ -98,6 +98,23 @@
 }
 
 /*
+ * The comments drawer is open (HTML Preview comments, §10.6): the page area
+ * becomes a row and the placeholder a flex item beside the drawer, so the
+ * bounds loop measures a narrower placeholder and the native page shrinks –
+ * the drawer is a flow sibling, never drawn over the page.
+ */
+.html-preview-page-area--drawer {
+  display: flex;
+}
+
+.html-preview-page-area--drawer > .html-preview-placeholder {
+  position: relative;
+  inset: auto;
+  flex: 1 1 auto;
+  min-inline-size: 0;
+}
+
+/*
  * THE PAGE'S FOCUS RING IS DRAWN OUTSIDE THE PLACEHOLDER — the only place it can
  * be seen at all.
  *

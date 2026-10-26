@@ -1,7 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { create } from 'zustand'
-import type { GlobalSettings, LoggingLevel, TerminalScreenReaderMode } from '../../../shared/ipc/global-settings-schema'
+import type {
+  CommentIdentitySettings,
+  GlobalSettings,
+  LoggingLevel,
+  TerminalScreenReaderMode
+} from '../../../shared/ipc/global-settings-schema'
 import type { TranscriptionBackend, WhisperModel } from '../../../shared/ipc/transcription-schema'
 import { globalSettingsGateway } from '../services/settingsGateway'
 
@@ -31,6 +36,14 @@ interface GlobalSettingsState {
   updateWhisperModel: (model: WhisperModel) => Promise<void>
   updateHtmlPreviewEnabled: (enabled: boolean) => Promise<void>
   updateTerminalScreenReaderMode: (mode: TerminalScreenReaderMode) => Promise<void>
+  /** HTML Preview comments on/off (`htmlPreview.comments.enabled`). */
+  updateHtmlPreviewCommentsEnabled: (enabled: boolean) => Promise<void>
+  /**
+   * The reviewer's identity for HTML Preview comments (app-level only).
+   * Resolves `true` when it was stored, `false` when the write was refused
+   * and rolled back.
+   */
+  updateCommentIdentity: (identity: CommentIdentitySettings) => Promise<boolean>
   resetSettings: () => Promise<void>
   clearCorruptionFlag: () => void
 
@@ -102,6 +115,23 @@ export const useGlobalSettingsStore = create<GlobalSettingsState>((set, get) => 
   // Read live by every terminal panel (useTerminalScreenReaderMode), no restart needed
   updateTerminalScreenReaderMode: async (mode: TerminalScreenReaderMode) => {
     await get()._updateSection('terminal', (current) => ({ ...current, screenReaderMode: mode }))
+  },
+
+  updateHtmlPreviewCommentsEnabled: async (enabled: boolean) => {
+    await get()._updateSection('htmlPreview', (current) => ({ ...current, comments: { enabled } }))
+  },
+
+  updateCommentIdentity: async (identity: CommentIdentitySettings) => {
+    await get()._updateSection('comments', () => identity)
+    // `_updateSection` rolls back on a refused write. Compared by value: the
+    // settings-changed echo may already have replaced the object.
+    const stored = get().settings?.comments
+    return (
+      stored !== undefined &&
+      stored.authorName === identity.authorName &&
+      stored.authorEmail === identity.authorEmail &&
+      stored.identityNoticeSeen === identity.identityNoticeSeen
+    )
   },
 
   resetSettings: async () => {

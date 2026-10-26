@@ -25,7 +25,7 @@ window.ERFANA_CLAIMS = {
     "card": "system/foundations/colors.html"
   },
   "aria-invalid-uses": {
-    "value": 0,
+    "value": 2,
     "label": "places the renderer marks a field invalid to assistive tech",
     "card": "system/components/form/index.html"
   },
@@ -95,7 +95,7 @@ window.ERFANA_CLAIMS = {
     "card": "system/components/feedback/index.html"
   },
   "context-menu-dependants": {
-    "value": 18,
+    "value": 20,
     "label": "files that import a context menu component",
     "card": "system/components/menu/index.html"
   },

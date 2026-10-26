@@ -808,6 +808,15 @@ export default [
       'no-restricted-syntax': ['error', ...RENDERER_GATEWAY_SELECTORS]
     }
   },
+  // HTML Preview comments render page and file text, so raw HTML is banned there
+  // (docs/designs/html-preview-comments.md SEC-25). A separate rule from
+  // `no-restricted-syntax`, so it adds to the blocks above instead of replacing them.
+  {
+    files: ['src/renderer/src/components/Panels/HtmlPreviewPanel/comments/**/*.{ts,tsx}'],
+    rules: {
+      'react/no-danger': 'error'
+    }
+  },
   // The max-lines ratchet (see MAX_LINES_BASELINE above). Last, so nothing
   // after them can reset the rule; each baseline block replaces the base limit
   // for its one file, because a later block's rule options win.

@@ -416,6 +416,12 @@
   --input-height-md: 36px;
   --input-height-lg: 44px;
 
+  /* HTML Preview comments (docs/designs/html-preview-comments.md §10.9):
+     the comment window's inline size and its cap, and the drawer's width */
+  --comments-window-width: 360px;
+  --comments-window-max-width: 480px;
+  --comments-drawer-width: 320px;
+
   /* ============================================
    * INTERACTIVE STATES
    * Opacity values for state overlays

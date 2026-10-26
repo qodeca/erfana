@@ -33,6 +33,17 @@ import {
   ArrowUp,
   ArrowLeft,
   MousePointerClick,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  CircleX,
+  Ellipsis,
+  Info,
+  MessageSquare,
+  MessageSquareOff,
+  MessageSquarePlus,
+  MessagesSquare,
+  X,
   LucideProps
 } from 'lucide-react'
 
@@ -73,6 +84,20 @@ export type IconName =
   | 'arrow-up'
   | 'arrow-left'
   | 'mouse-pointer-click'
+  // HTML Preview comments (docs/design-system/system/components/icon/index.html,
+  // "Proposed for HTML preview comments"): the toolbar tools and the comment
+  // window's chrome.
+  | 'check'
+  | 'chevron-down'
+  | 'chevron-up'
+  | 'circle-x'
+  | 'ellipsis'
+  | 'info'
+  | 'message-square'
+  | 'message-square-off'
+  | 'message-square-plus'
+  | 'messages-square'
+  | 'x'
 
 /**
  * Icon registry mapping names to Lucide components
@@ -94,7 +119,18 @@ const ICON_REGISTRY: Record<IconName, ComponentType<LucideProps>> = {
   'arrow-down': ArrowDown,
   'arrow-up': ArrowUp,
   'arrow-left': ArrowLeft,
-  'mouse-pointer-click': MousePointerClick
+  'mouse-pointer-click': MousePointerClick,
+  'check': Check,
+  'chevron-down': ChevronDown,
+  'chevron-up': ChevronUp,
+  'circle-x': CircleX,
+  'ellipsis': Ellipsis,
+  'info': Info,
+  'message-square': MessageSquare,
+  'message-square-off': MessageSquareOff,
+  'message-square-plus': MessageSquarePlus,
+  'messages-square': MessagesSquare,
+  'x': X
 }
 
 /**

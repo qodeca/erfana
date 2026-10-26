@@ -1,0 +1,26 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/**
+ * Settings › Comments (docs/design-system/product/html-comments/identity.html,
+ * proposed). The shipping `.settings-row` layout with the Form card's fields
+ * from the comment window's stylesheet. Descriptions are tertiary: secondary
+ * measures under 4.5:1 for small text on the Settings surface.
+ */
+
+.erf-comment-settings__desc {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  color: var(--color-text-tertiary);
+}
+
+.erf-comment-settings__fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  padding: var(--space-6) 0;
+}
+
+.erf-comment-settings__fields .erf-comment-field + .erf-comment-field {
+  margin-block-start: 0;
+}
