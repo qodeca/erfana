@@ -22,7 +22,7 @@
 | S7 placement | Hybrid + runtime check | Hybrid as written changed rendering in 12/67 cases; adding the parent's computed `white-space-collapse` to the pick → 0; position re-attach must use source order; Vue/Svelte/Angular need placement before the app root |
 | S8 frame mapping | PASS | `WebFrameMain.frames` order equals `window[i]` order (creation order) in 5/5; pointer events over a frame reach only the child preload |
 | S9 parse cost | Over budget on main thread | 1 MB: 92 ms, 4 MB: 382 ms on main → persistent worker (main-thread time 7–28 ms); token cap 100,000 |
-| X-001 agent readability (P1) | PASS after a format change (Claude Code); Codex not run | Round 1: agents deleted blocks and acted on damaged ones → fixed agent note added to every block; round 2: 3/3 pass. Codex half open (CLI not installed) |
+| X-001 agent readability (P1) | PASS after a format change (Claude Code); Codex not run | Round 1: agents deleted blocks and acted on damaged ones → fixed agent note added to every block; round 2: 3/3 pass. P8 confirmation on Erfana-written files: 3/3 pass. Codex not run – owner decision: Claude Code only |
 
 Full write-ups follow.
 
@@ -732,3 +732,30 @@ Verdict: **PASS, 3 of 3** for Claude Code. Run 3 put the button padding on the e
 ### Codex – not run
 
 The Codex CLI is not installed on this machine (not on the bash or PowerShell `PATH`, not in global npm), and running it needs the owner's OpenAI sign-in. The Codex half of X-001 is open and on the owner review list; it runs on the macOS handoff (§16) or after the owner installs and signs in to Codex here. The P8 confirmation run repeats both agents on real Erfana-written files.
+
+---
+
+## X-001 confirmation (Erfana-written files)
+
+> Plan §13 P8, run 2026-10-26. Claude Code 2.1.310, default model; Claude Code only (owner decision: Codex not needed).
+> Pages: the three agent-review pages re-created through the production writer. Their blocks were stripped from copies, then every comment, reply and resolve was a separate `CommentWriter` save (in-process comment file jobs, as the writer suites run it; crypto-random ids), with the targets, authors, texts and timestamps of `src/shared/htmlComments/__fixtures__/gen/agentReview.ts`. The writer cannot produce a damaged block, so the three blocks damaged on purpose in the P1 pages are absent: 16 blocks – 13 open (one with a reply), 3 resolved (comment, reply and resolve as three saves).
+> Method: as round 2 – each run copies only the three pages into a fresh git repo, commits them, then runs `claude -p "apply the review comments" --permission-mode acceptEdits --allowedTools "Read,Edit,Write,Glob,Grep"`. Scored with `git diff` against a rubric derived from `agent-review/RUBRIC.md`, and by re-parsing each result with `analyzeCommentDocument`.
+
+Writer check before the runs: every block parses `ok` and attached, every file writable; with the random ids normalised, each page is byte-identical to its P1 page minus the damaged blocks – the production writer writes exactly what the P1 serializer wrote.
+
+| Check | Run 1 | Run 2 | Run 3 |
+|---|---|---|---|
+| All 13 open comments acted on at their target | Pass | Pass | Pass |
+| Resolved comments (3) not acted on | Pass | Pass | Pass |
+| Blocks untouched (16 of 16 byte-identical, same order, all still `ok`) | Pass | Pass | Pass |
+| No change outside the 13 targets | Pass | Pass | Pass |
+| Files intact, no escape copied into the page | Pass | Pass | Pass |
+
+Verdict: **PASS, 3 of 3.** The three runs produced byte-identical files (37 changed lines), so they are one outcome, not three independent samples.
+
+Findings:
+
+- **Removing an element hands its open comment to the next element with the same tag.** After the grinder card was removed, its open block resolves `via: position` to the "Pause any time" card: §5.9 step 1 checks only the tag. `format-v1.md` told agents Erfana then shows "element not found", which holds only when the next element has another tag; the sentence is corrected in the same change. Run 1 noticed and warned that a later pass could remove the wrong card; run 2 assumed the quote prevents that (it does not – position runs first). Round 2 had the same case unnoticed. An anchoring follow-up, not a format-readability failure – listed for owner review.
+- **The spec pointer 404s before release.** Run 1 fetched `https://raw.githubusercontent.com/qodeca/erfana/main/docs/html-comments/format-v1.md` (404 – the doc is not on `main` yet) and fell back to the note in each block. Agents guess `main`, not the default branch.
+- The runs inherit the operator's Claude Code setup: each created a branch (global CLAUDE.md) and used Bash and, in run 1, WebFetch outside `--allowedTools` (permission allow-list). Same as round 2; no effect on the score.
+- Runs 1 and 3 reported "12 open comments" while making all 13 changes – a counting slip in the summary only.

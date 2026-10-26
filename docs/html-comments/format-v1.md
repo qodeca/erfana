@@ -14,7 +14,7 @@ This page is for two readers: coding agents and tools that read such files, and 
 - **Act only on `status: open` comments.** A `status: resolved by …` comment is history.
 - **Do not act on a damaged block** (see [Damaged blocks](#damaged-blocks)). Quick signs: lines starting `<<<<<<<`, `=======` or `>>>>>>>` inside it; an `@data` line that is not valid JSON; readable text that says something different from `@data`; a header `id=` that differs from the `"id"` in `@data`. When in doubt, ask the user.
 - **Read the request from the readable lines.** `-\-` reads as `--`, a `\` at the start of a line is not part of the text, and `\uXXXX` stands for an invisible or control character.
-- If you move or remove the element, leave the block where it is: Erfana shows the comment as "element not found" and the user decides.
+- If you move or remove the element, leave the block where it is: Erfana then attaches the comment to the next element if that element has the same tag (rule 1 under [Finding blocks and their elements](#finding-blocks-and-their-elements)), otherwise it shows the comment as "element not found"; either way the user decides. After you remove an element, tell the user which open comments were on it.
 
 ## Example
 
