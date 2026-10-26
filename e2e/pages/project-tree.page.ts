@@ -290,6 +290,13 @@ export class ProjectTreePage {
    * in the DOM once their parent folder is expanded. aria-expanded lives on the
    * row (the treeitem), which is also what a click toggles.
    */
+  /** Collapse an expanded folder and expand it again, so the tree re-reads its children. */
+  async reexpandFolder(relPath: string): Promise<void> {
+    await this.folderRow(relPath).click()
+    await expect(this.folderTreeItem(relPath)).toHaveAttribute('aria-expanded', 'false')
+    await this.expandTo([relPath])
+  }
+
   async expandTo(ancestorRelPaths: string[]): Promise<void> {
     for (const relPath of ancestorRelPaths) {
       const treeItem = this.folderTreeItem(relPath)

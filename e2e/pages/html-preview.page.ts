@@ -77,6 +77,15 @@ export class HtmlPreviewPage {
     if (segments.length > 1) {
       // Every ancestor folder, outermost first (`a`, `a/b`, …).
       await tree.expandTo(segments.slice(0, -1).map((_, i) => segments.slice(0, i + 1).join('/')))
+      // A file a test wrote a moment ago reaches the tree through the directory
+      // watcher, which on Windows can lag (known-flakes.md, directory-watcher row)
+      // or miss the event. Collapsing and re-expanding the parent re-reads it.
+      const row = tree.fileRow(relPath)
+      if (!(await row.isVisible().catch(() => false))) {
+        await row
+          .waitFor({ state: 'visible', timeout: 10_000 })
+          .catch(() => tree.reexpandFolder(segments.slice(0, -1).join('/')))
+      }
     }
     await tree.fileRow(relPath).click()
     // Actual page readiness (title sentinel, script effects) is asserted by each
