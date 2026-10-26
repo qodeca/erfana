@@ -13,16 +13,23 @@
  *
  * P3 exposes the served loads: for every live preview view, each instrumented
  * document with its blocks and the token each block resolved to, and the
- * reason comments are unavailable for a file. Later phases add the overlay
- * state (mode, hover, pins) to the same object.
+ * reason comments are unavailable for a file. P5 adds each view's comment
+ * service state (`panels()`, `state(panelId)`): mode, reloads and the last
+ * scroll restore, drafts and keys held, frames that said hello – counts and
+ * outcomes only, never a path, a name or comment text.
  */
 import { app } from 'electron'
 import type { CommentLoadView } from './ElementTokenTable'
+import type { CommentE2ePanelState } from './commentServiceTypes'
 
-/** What one preview view contributes to the hook. */
+/**
+ * What one preview view contributes to the hook: its served loads
+ * (instrumentation, P3) and/or its comment panel state (the service, P5).
+ */
 export interface CommentE2eSource {
-  views(): CommentLoadView[]
-  unavailable(): ReadonlyArray<{ readonly realPath: string; readonly reason: string }>
+  views?(): CommentLoadView[]
+  unavailable?(): ReadonlyArray<{ readonly realPath: string; readonly reason: string }>
+  panel?(): CommentE2ePanelState
 }
 
 /** The object an e2e spec reads. */
@@ -31,6 +38,10 @@ export interface CommentE2eHook {
   loads(): CommentLoadView[]
   /** Every file comments are unavailable for, with its reason. */
   unavailable(): Array<{ realPath: string; reason: string }>
+  /** Every live view's comment state (mode, reloads, restore, drafts, frames). */
+  panels(): CommentE2ePanelState[]
+  /** One panel's comment state; `undefined` when no live view has that panel. */
+  state(panelId: string): CommentE2ePanelState | undefined
 }
 
 /** The `globalThis` key the hook lives under. */
@@ -44,9 +55,13 @@ export function commentE2eHookEnabled(): boolean {
 }
 
 function install(): void {
+  const panels = (): CommentE2ePanelState[] =>
+    [...sources].flatMap(source => (source.panel === undefined ? [] : [source.panel()]))
   const hook: CommentE2eHook = {
-    loads: () => [...sources].flatMap(source => source.views()),
-    unavailable: () => [...sources].flatMap(source => [...source.unavailable()])
+    loads: () => [...sources].flatMap(source => source.views?.() ?? []),
+    unavailable: () => [...sources].flatMap(source => [...(source.unavailable?.() ?? [])]),
+    panels,
+    state: panelId => panels().find(panel => panel.panelId === panelId)
   }
   ;(globalThis as Record<string, unknown>)[COMMENT_E2E_HOOK_KEY] = hook
 }

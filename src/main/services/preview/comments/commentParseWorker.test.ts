@@ -3,11 +3,16 @@
 /**
  * The comment parse worker shell and its message contract
  * (docs/designs/html-preview-comments.md §19 R3-12). The shell answers only
- * well-formed requests, only when started in its role, transfers the result's
- * buffers, and answers a throw with `error` and no text.
+ * well-formed requests – an instrument request or a comment file job – only
+ * when started in its role, transfers the result's buffers, and answers a
+ * throw with `error` and no text.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { encodeText } from '../../../../shared/htmlComments'
+import { fixedId } from '../../../../shared/htmlComments/__fixtures__/commentTestData'
+import { buttonBlock } from './__test-helpers__/commentParseBench'
+import { PAGE as WRITER_PAGE, draftFor, byId } from './__test-helpers__/commentWriterHarness'
+import { CommentDocCache } from './commentJobDocs'
 import * as core from './commentParseCore'
 import {
   COMMENT_PARSE_WORKER_ROLE,
@@ -18,6 +23,7 @@ import {
 import {
   answerParseRequest,
   isCommentParseWorker,
+  jobTransferablesOf,
   startCommentParseWorker,
   type CommentParsePort
 } from './commentParseWorker'
@@ -95,6 +101,42 @@ describe('commentParseWorker', () => {
     expect(port.replies).toEqual([])
   })
 
+  it('answers a job with its result, from one document cache across requests', () => {
+    const port = makePort()
+    const cache = new CommentDocCache()
+    const page = encodeText(WRITER_PAGE.replace('    <button', `    ${buttonBlock(1)}<button`))
+    answerParseRequest(port, { type: 'job', id: 4, bytes: page, job: { kind: 'list' } }, cache)
+    answerParseRequest(port, { type: 'job', id: 5, bytes: page, job: { kind: 'list' } }, cache)
+
+    expect(port.replies.map(reply => reply.message)).toMatchObject([
+      { type: 'job', id: 4, result: { kind: 'list', ok: true, summary: { threads: [{ threadId: fixedId('c-', 1) }] } } },
+      { type: 'job', id: 5, result: { kind: 'list', ok: true } }
+    ])
+    expect(port.replies.every(reply => isParseReply(reply.message))).toBe(true)
+    expect(port.replies[0].transfer).toEqual([])
+    expect(cache.size).toBe(1)
+  })
+
+  it('transfers the block bytes of a write answer', () => {
+    const port = makePort()
+    const bytes = encodeText(WRITER_PAGE)
+    const job = {
+      kind: 'write' as const,
+      request: { op: 'add' as const, draft: draftFor(bytes, byId('buy')), view: { w: 800, h: 600, dpr: 1, x: 0, y: 0 }, text: 'Hi' },
+      act: { author: { name: 'Ada', role: 'human' as const }, nowMs: Date.UTC(2026, 9, 25) }
+    }
+    answerParseRequest(port, { type: 'job', id: 6, bytes, job }, new CommentDocCache())
+
+    const { message, transfer } = port.replies[0]
+    if (message.type !== 'job' || message.result.kind !== 'write' || !message.result.ok) throw new Error('expected a write')
+    expect(transfer).toEqual([message.result.insert.buffer])
+
+    // Block bytes that are a view into a larger buffer stay put; the message copies them.
+    const shared = new Uint8Array(16)
+    expect(jobTransferablesOf({ ...message.result, insert: shared.subarray(4, 8) })).toEqual([])
+    expect(jobTransferablesOf({ kind: 'write', ok: false, refusal: 'conflict-markers' })).toEqual([])
+  })
+
   it('starts listening on its port', () => {
     const port = makePort()
     startCommentParseWorker(port)
@@ -118,6 +160,20 @@ describe('commentParseProtocol', () => {
     expect(
       isParseRequest({ type: 'instrument', id: Number.MAX_SAFE_INTEGER + 2, bytes: PAGE })
     ).toBe(false)
+    for (const kind of ['draft', 'pin-blocks', 'list', 'write']) {
+      expect(isParseRequest({ type: 'job', id: 1, bytes: PAGE, job: { kind } })).toBe(true)
+    }
+    for (const job of [undefined, null, 'list', { kind: 'other' }, {}]) {
+      expect(isParseRequest({ type: 'job', id: 1, bytes: PAGE, job })).toBe(false)
+    }
+    expect(isParseRequest({ type: 'job', id: 1, job: { kind: 'list' } })).toBe(false)
+  })
+
+  it('isParseReply accepts a job answer of a known kind only', () => {
+    expect(isParseReply({ type: 'job', id: 1, result: { kind: 'list', ok: false, refusal: 'encoding' } })).toBe(true)
+    for (const result of [undefined, null, 'list', { kind: 'other' }]) {
+      expect(isParseReply({ type: 'job', id: 1, result })).toBe(false)
+    }
   })
 
   it('isParseReply checks the table is internally consistent', () => {

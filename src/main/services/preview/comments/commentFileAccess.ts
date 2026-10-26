@@ -33,27 +33,22 @@
  * Gitignore is NOT a rule here (decision 35): a page the preview serves –
  * gitignored pages shown in frames included – is commentable.
  *
- * Steps 2–5 – what the file is: a regular file with one link, read with
- * `O_NOFOLLOW` + a dev/ino compare, at most 4 MB; decoded only when the
- * decode is byte-identical (UTF-8 ± BOM); parsed once. The comment state says
- * whether it may be written (a complete conflict hunk, an unterminated block
- * and too many blocks make it read-only); {@link writableRefusal} turns that
- * into a refusal for the writer.
+ * Steps 2–3 – what the file is: a regular file with one link, read with
+ * `O_NOFOLLOW` + a dev/ino compare, at most 4 MB. Main stops at the bytes:
+ * the lossless decode and the parse – about 380 ms at 4 MB (spike S9) – run
+ * in the comment parse worker (`commentFileJobs.ts`, §19 R3-12), whose
+ * `writableRefusal` (`commentJobDocs.ts`) says whether the parsed state may be
+ * written (a complete conflict hunk, an unterminated block and too many
+ * blocks make it read-only).
  */
 import type { BigIntStats } from 'node:fs'
 import { lstat, realpath } from 'node:fs/promises'
 import { basename, isAbsolute, normalize, relative, resolve } from 'node:path'
 import { PREVIEW_LIMITS } from '../../../../shared/preview-limits'
 import {
-  parseCommentFile,
-  type CommentDocument,
-  type FileCommentState
-} from '../../../../shared/htmlComments'
-import {
   errnoOf,
   fileIdOf,
   readFileNoFollow,
-  sha256Hex,
   type FileId
 } from '../../../utils/atomicWriteBytesStrict'
 import { isInsideRoot } from '../../../utils/pathCompare'
@@ -73,23 +68,20 @@ export interface CommentFileTarget {
   readonly filePath: string
 }
 
-/** A file read for comments: its real path, its exact bytes, their hash and the shared parse. */
-export interface LoadedCommentFile {
+/** A file read for comments: its real path and its exact bytes, not yet decoded. */
+export interface LoadedCommentBytes {
   /** The confined real path – the path that is written. */
   readonly realPath: string
   /** The file the bytes were read from; the write requires it to still be in place. */
   readonly id: FileId
   readonly bytes: Buffer
-  /** SHA-256 (hex) of {@link bytes}; drafts and the write's compare-and-swap use it. */
-  readonly hash: string
-  readonly doc: CommentDocument
 }
 
 export type ConfineResult =
   | { readonly ok: true; readonly realPath: string; readonly id: FileId }
   | Refused
 
-export type LoadResult = { readonly ok: true; readonly file: LoadedCommentFile } | Refused
+export type LoadResult = ({ readonly ok: true } & LoadedCommentBytes) | Refused
 
 /** Options for the loader; the platform is injectable so the Windows rules run on every host. */
 export interface CommentFileAccessOptions {
@@ -182,42 +174,23 @@ export async function confineCommentFile(
 }
 
 /**
- * Steps 2–4 on an already confined real path: a regular file with one link,
- * read without following a link, at most 4 MB, decoded losslessly and parsed.
+ * Steps 2–3 on an already confined real path: a regular file with one link,
+ * read without following a link, at most 4 MB.
  */
-export async function readConfinedCommentFile(realPath: string): Promise<LoadResult> {
+export async function readConfinedCommentBytes(realPath: string): Promise<LoadResult> {
   const read = await readFileNoFollow(realPath, PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES)
   if (!read.ok) {
     const reason: CommentRefusal = read.reason === 'gone' ? 'missing' : read.reason
     return refused(reason, read.errno)
   }
-  const parsed = parseCommentFile(read.bytes)
-  if (!parsed.ok) return refused(readOnlyRefusal(parsed.state))
-  return {
-    ok: true,
-    file: { realPath, id: read.id, bytes: read.bytes, hash: sha256Hex(read.bytes), doc: parsed.doc }
-  }
+  return { ok: true, realPath, id: read.id, bytes: read.bytes }
 }
 
-/** Steps 1–4: confine, then read and parse. Never writes. */
-export async function loadCommentFile(
+/** Steps 1–3: confine, then read the bytes. Never writes, never parses. */
+export async function loadCommentBytes(
   target: CommentFileTarget,
   options: CommentFileAccessOptions = {}
 ): Promise<LoadResult> {
   const confined = await confineCommentFile(target, options)
-  return confined.ok ? readConfinedCommentFile(confined.realPath) : confined
-}
-
-/**
- * Why a read-only comment state may not be written. Every read-only reason of
- * the parse (`conflict-markers`, `unterminated-block`, `too-many-blocks`,
- * `too-large`, `encoding`) is a refusal of the same name.
- */
-function readOnlyRefusal(state: FileCommentState): CommentRefusal {
-  return state.readOnlyReason ?? 'read-only'
-}
-
-/** Step 5: why a parsed file may not be written, or `null` when it may. */
-export function writableRefusal(state: FileCommentState): CommentRefusal | null {
-  return state.writable ? null : readOnlyRefusal(state)
+  return confined.ok ? readConfinedCommentBytes(confined.realPath) : confined
 }

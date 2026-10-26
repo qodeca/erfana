@@ -23,10 +23,12 @@
  * | `COMMENT_TARGET_MOVED` | the picked element is no longer in the file, or not uniquely |
  * | `COMMENT_BLOCK_CHANGED` | the block changed, turned damaged or is gone since the window read it |
  * | `COMMENT_WRITE_UNSUPPORTED_FS` | the drive cannot rename or fsync (network and FUSE mounts) |
- * | `COMMENT_WRITE_FAILED` | anything else, including a file that kept changing during the save, a held file, and a splice that failed its verification (fail closed) |
+ * | `COMMENT_WRITE_FAILED` | anything else, including a file that kept changing during the save, a held file, a splice that failed its verification (fail closed), and a parse the comment parse worker could not run (`busy`, `parse-failed`) |
  *
  * `COMMENT_DRAFT_EXPIRED` and `COMMENT_KEY_INVALID` belong to the draft and
- * key layer (P5), which runs before a write is attempted.
+ * key layer (P5), which runs before a write is attempted. `COMMENT_SAVE_PENDING`
+ * is no refusal: the save outlasted its answer and is still being written
+ * (`commentSaveFlow.ts`).
  */
 import { ErrorCode } from '../../../../shared/errors'
 
@@ -80,6 +82,7 @@ export type CommentRefusal =
   | 'changed'
   | 'unsupported-fs'
   | 'busy'
+  | 'parse-failed'
   | 'io'
 
 const CODES: Readonly<Record<CommentRefusal, CommentErrorCode>> = {
@@ -109,6 +112,7 @@ const CODES: Readonly<Record<CommentRefusal, CommentErrorCode>> = {
   changed: ErrorCode.COMMENT_WRITE_FAILED,
   'unsupported-fs': ErrorCode.COMMENT_WRITE_UNSUPPORTED_FS,
   busy: ErrorCode.COMMENT_WRITE_FAILED,
+  'parse-failed': ErrorCode.COMMENT_WRITE_FAILED,
   io: ErrorCode.COMMENT_WRITE_FAILED
 }
 
@@ -127,4 +131,12 @@ export interface Refused {
 /** Build a {@link Refused}; `errno` is kept only when present. */
 export function refused(reason: CommentRefusal, errno?: string): Refused {
   return errno === undefined ? { ok: false, reason } : { ok: false, reason, errno }
+}
+
+/**
+ * A parse the comment parse worker did not answer, as a refusal: a full queue
+ * is `busy`; a timeout, a crash, a bad answer or no worker is `parse-failed`.
+ */
+export function jobFailureRefusal(failure: 'busy' | 'timeout' | 'crashed' | 'error' | 'unavailable'): Refused {
+  return refused(failure === 'busy' ? 'busy' : 'parse-failed')
 }

@@ -147,7 +147,7 @@ export class CommentController {
     this.tokens.closeWindow()
     this.watch.reattach()
     this.cursor.reassert()
-    this.anchors.markUnavailable()
+    this.anchors.markUnavailable('document-replaced')
     this.scheduler.soon()
   }
 
@@ -162,8 +162,8 @@ export class CommentController {
     if (next === null) return
     const previous = this.state
     this.state = next
-    if (this.view !== null && JSON.stringify(next.theme) !== JSON.stringify(previous.theme)) {
-      this.host.setCss(overlayCss(next.theme))
+    if (this.view !== null && (JSON.stringify(next.theme) !== JSON.stringify(previous.theme) || next.hidden !== previous.hidden)) {
+      this.host.setCss(overlayCss(next.theme, next.hidden))
     }
     if (next.mode !== previous.mode) this.modeChanged(next.mode)
     this.watch.set(next.mode || next.icons.length > 0)
@@ -414,7 +414,7 @@ export class CommentController {
     this.view = null
     this.pins = []
     this.shields = []
-    this.anchors.markUnavailable()
+    this.anchors.markUnavailable('overlay-removed')
   }
 
   private commentsOn(element: Element): number {
@@ -468,7 +468,7 @@ export class CommentController {
     const root = this.host.ensure()
     if (root === null) return
     if (this.view === null) {
-      this.host.setCss(overlayCss(this.state.theme))
+      this.host.setCss(overlayCss(this.state.theme, this.state.hidden))
       this.view = new OverlayView(doc, root, pxOf(this.state.theme.size) * 1.4 + 2)
     }
     this.view.render(

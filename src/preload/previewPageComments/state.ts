@@ -87,6 +87,8 @@ export interface CommentState {
   readonly childFrames?: readonly ChildFrameState[]
   /** Move the keyboard picker to the `<iframe>` of this child (Alt+↑ out of it). */
   readonly focusFrame?: string
+  /** Draw nothing while main prints the page to PDF (§4.2 `PreviewExportController`, M-064). */
+  readonly hidden?: true
 }
 
 /** The state before main has said anything: no mode, no pins. */
@@ -195,8 +197,9 @@ function parseRestore(raw: unknown): { x: number; y: number } | undefined {
 export function parseCommentState(raw: unknown): CommentState | null {
   if (!isBag(raw) || typeof raw.mode !== 'boolean') return null
   const theme = parseTheme(raw.theme)
+  const hidden = raw.hidden === true ? { hidden: true as const } : {}
   if (raw.commentable !== true) {
-    return { mode: raw.mode, commentable: false, showIcons: false, icons: [], theme }
+    return { mode: raw.mode, commentable: false, showIcons: false, icons: [], theme, ...hidden }
   }
   const restore = parseRestore(raw.restore)
   const childFrames = parseChildFrames(raw.childFrames)
@@ -209,7 +212,8 @@ export function parseCommentState(raw: unknown): CommentState | null {
     ...(isKey(raw.reveal) ? { reveal: raw.reveal } : {}),
     ...(restore ? { restore } : {}),
     ...(childFrames ? { childFrames } : {}),
-    ...(isKey(raw.focusFrame) ? { focusFrame: raw.focusFrame } : {})
+    ...(isKey(raw.focusFrame) ? { focusFrame: raw.focusFrame } : {}),
+    ...hidden
   }
 }
 

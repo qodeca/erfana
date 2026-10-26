@@ -15,6 +15,8 @@ import { describe, expect, it } from 'vitest'
 import { PREVIEW_COMMENTS_ARGUMENT } from '../../main/services/preview/previewSessionPolicy'
 import { PREVIEW_LIMITS } from '../../shared/preview-limits'
 import { PreviewCommentPageChannels } from '../../shared/ipc/preview-comment-channels'
+import { CommentPickSchema } from '../../shared/ipc/preview-comment-schema'
+import { TAG_MAX_CHARS as SHARED_TAG_MAX_CHARS } from '../../shared/htmlComments/format'
 import {
   BLOCK_HEADER as SHARED_BLOCK_HEADER,
   ELEMENT_TOKEN_ATTRIBUTE,
@@ -30,6 +32,9 @@ import {
   COMMENT_STATE_CHANNEL,
   MAX_TOKENS_PER_DOCUMENT,
   PICKS_PER_SECOND,
+  PICK_BOX_MAX_PX,
+  PICK_TAG_PATTERN,
+  TAG_MAX_CHARS,
   QUOTE_CONTEXT_CHARS,
   QUOTE_MAX_CHARS,
   RUNTIME_PATH_MAX_CHARS,
@@ -77,6 +82,24 @@ describe('previewPageComments constants match main', () => {
       VIEW_HASH_MAX_CHARS: PREVIEW_LIMITS.COMMENT_VIEW_HASH_MAX_CHARS,
       QUOTE_CONTEXT_CHARS: SHARED_QUOTE_CONTEXT_CHARS
     })
+  })
+
+  it('describes a pick within what main’s pick schema accepts (R3-13 L5, R3-6)', () => {
+    expect(TAG_MAX_CHARS).toBe(SHARED_TAG_MAX_CHARS)
+    const pick = (extra: Record<string, unknown>): boolean =>
+      CommentPickSchema.safeParse({ kind: 'menu', via: 'pointer', token: 'abcdefghijkl', view: { w: 1, h: 1, dpr: 1, x: 0, y: 0 }, ...extra }).success
+    for (const tag of ['a', 'x-copy', 'foreignObject', 'svg:a', 'h1', 'x'.repeat(TAG_MAX_CHARS)]) {
+      expect(PICK_TAG_PATTERN.test(tag), tag).toBe(true)
+      expect(pick({ tag }), tag).toBe(true)
+    }
+    for (const tag of ['x-é', '1a', '-a', 'a b', '']) {
+      expect(PICK_TAG_PATTERN.test(tag), tag).toBe(false)
+      expect(pick({ tag }), tag).toBe(false)
+    }
+    expect(pick({ tag: 'x'.repeat(TAG_MAX_CHARS + 1) })).toBe(false)
+    const edge = PICK_BOX_MAX_PX
+    expect(pick({ box: { x: -edge, y: edge, w: edge, h: 0 } })).toBe(true)
+    expect(pick({ box: { x: -edge - 1, y: 0, w: 0, h: 0 } })).toBe(false)
   })
 
   it('recognises an erfana block header exactly as the parser does', () => {

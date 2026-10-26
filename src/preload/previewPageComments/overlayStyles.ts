@@ -14,8 +14,11 @@
  */
 import type { OverlayTheme } from './state'
 
-/** The CSS text of the overlay for `theme`. */
-export function overlayCss(t: OverlayTheme): string {
+/** While main prints the page (M-064): nothing of the overlay is drawn, whatever the media. */
+const HIDDEN_CSS = '.erf-hpc-root { display: none !important; }'
+
+/** The CSS text of the overlay for `theme`; `hidden` draws none of it. */
+export function overlayCss(t: OverlayTheme, hidden = false): string {
   return `
 .erf-hpc-root, .erf-hpc-root * { box-sizing: border-box; border-radius: 0; margin: 0; padding: 0; }
 .erf-hpc-root { position: fixed; inset: 0; pointer-events: none; font-family: ${t.font}; font-size: ${t.size}; line-height: 1.4; color: ${t.paper}; }
@@ -49,7 +52,7 @@ export function overlayCss(t: OverlayTheme): string {
   .erf-hpc-pin__line, .erf-hpc-pin__count { fill: HighlightText; }
 }
 @media print { .erf-hpc-root { display: none; } }
-`
+${hidden ? HIDDEN_CSS : ''}`
 }
 
 /** The page-wide cursor rule for comment mode (§10.1 "Cursor: system crosshair"). */

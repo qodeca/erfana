@@ -16,10 +16,11 @@
  *   before the parser reaches it reads its own token in `connectedCallback`
  *   (the documented exposure) and copies it onto a child. Seen twice, the
  *   token is void: a pick on that element names its tokened ancestor instead.
- * - **A pin for a pre-seeded block (J-005).** With main's state played by the
- *   test's stub, the overlay draws a pin at the commented element – checked in
- *   the view's pixels, because the overlay lives in a closed shadow root
- *   (SEC-21: `shadowRoot === null` from the page) – and reports it visible.
+ * - **A pin for a pre-seeded block (J-005).** Main sends the page its pins on
+ *   hello (P5), so the overlay draws a pin at the commented element – checked
+ *   in the view's pixels, because the overlay lives in a closed shadow root
+ *   (SEC-21: `shadowRoot === null` from the page). The stub then takes the
+ *   pins away and shows the one pin again, and the page reports it visible.
  * - **A page CSP does not reach the preload (SEC-24).** A page that sets
  *   `script-src 'none'; style-src 'none'` is still stripped, pinned and
  *   pickable.
@@ -32,9 +33,11 @@
  *   pick, the page's handler never runs) while main hears the overlay is
  *   unavailable for that load.
  *
- * Main's comment handlers arrive in P5; until then the stub
- * (`html-preview.comments.ts`) records the picks and anchor reports and sends
- * the state. Local gate only: e2e is disabled in CI. Condition-based waits only.
+ * Since P5 main answers the page's channels itself; the stub
+ * (`html-preview.comments.ts`) records the picks and anchor reports next to
+ * main and sends its own state, which lasts until main's next one (main's
+ * mode stays off here, so it takes no pick). Local gate only: e2e is disabled
+ * in CI. Condition-based waits only.
  */
 
 import type { ElectronApplication } from '@playwright/test'
@@ -153,11 +156,22 @@ function tokenOn(load: CommentLoadView, elementId: string): string {
   return token
 }
 
-/** Show one pin on `elementId` through the stub, and wait until it is drawn and reported. */
+/**
+ * The pin of the pre-seeded block on `elementId`: main draws it on the page's
+ * hello; then the stub takes every pin away, shows that one pin again, and
+ * waits until it is drawn and reported visible.
+ */
 async function expectPinDrawn(app: ElectronApplication, relPath: string, load: CommentLoadView, elementId: string): Promise<void> {
   const target = HtmlPreviewPage.target(relPath)
+  await expect
+    .poll(() => accentPixelsNear(app, elementId, target), {
+      timeout: PREVIEW_BUDGET_MS,
+      message: `main never drew the pin at #${elementId}`
+    })
+    .toBeGreaterThanOrEqual(40)
   expect(await armCommentStub(app, target)).toBe(true)
-  // Nothing of the pin's colour is there before main says so.
+  // Without pins, nothing of the pin's colour is there.
+  expect(await sendCommentState(app, { mode: false, commentable: true, icons: [] }, target)).toBe(true)
   await expect.poll(() => accentPixelsNear(app, elementId, target), { timeout: PREVIEW_BUDGET_MS }).toBe(0)
 
   const key = 'k-pin'

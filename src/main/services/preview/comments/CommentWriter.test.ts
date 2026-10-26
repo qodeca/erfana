@@ -34,6 +34,7 @@ import {
   snapshot,
   type TempProject
 } from './__test-helpers__/commentWriterHarness'
+import { createInProcessCommentFileJobs, type CommentFileJob, type CommentFileJobRunner, type CommentJobOutcome } from './commentFileJobs'
 import { commentFileLock } from './commentFileLock'
 import { CommentWriter, type CommentWriteResult } from './CommentWriter'
 
@@ -248,7 +249,7 @@ describe('CommentWriter.add', () => {
 
   it('runs with the production defaults: the real clock, the crypto id source and the app logger', async () => {
     await project.write('index.html', PAGE)
-    const writer = new CommentWriter({ identity: () => ({ name: 'Ada Lovelace' }) })
+    const writer = new CommentWriter({ identity: () => ({ name: 'Ada Lovelace' }), jobs: createInProcessCommentFileJobs() })
     const startedAt = Date.now()
 
     const result = await addOn(writer, 'index.html', 'buy')
@@ -256,6 +257,46 @@ describe('CommentWriter.add', () => {
     const at = Date.parse(okBlock(await project.read('index.html'), threadIdOf(result)).data.msgs[0].at)
     expect(at).toBeGreaterThanOrEqual(Math.floor(startedAt / 1000) * 1000)
     expect(at).toBeLessThanOrEqual(Date.now())
+  })
+
+  it('R3-12 by default the parse runs in the comment parse worker: with no worker bundle the save is refused and nothing is written', async () => {
+    const path = await project.write('index.html', PAGE)
+    const before = await snapshot(path)
+    const writer = new CommentWriter({ identity: () => ({ name: 'Ada Lovelace' }) })
+
+    const result = await addOn(writer, 'index.html', 'buy')
+
+    expect(result).toEqual({ ok: false, code: ErrorCode.COMMENT_WRITE_FAILED, reason: 'parse-failed' })
+    expect(await snapshot(path)).toEqual(before)
+  })
+
+  it('R3-12 a parse the worker could not run refuses the save – busy, or parse-failed – and writes nothing', async () => {
+    const path = await project.write('index.html', PAGE)
+    const before = await snapshot(path)
+    for (const [failure, reason] of [['busy', 'busy'], ['timeout', 'parse-failed'], ['crashed', 'parse-failed']] as const) {
+      const jobs = { runJob: vi.fn(async () => ({ kind: 'failed' as const, failure })) }
+      const { writer } = makeWriter({ jobs: jobs as unknown as CommentFileJobRunner })
+
+      expect(await addOn(writer, 'index.html', 'buy')).toEqual({ ok: false, code: ErrorCode.COMMENT_WRITE_FAILED, reason })
+    }
+    expect(await snapshot(path)).toEqual(before)
+  })
+
+  it('R3-12 main rebuilds the file from its own bytes: an answer naming a range outside them writes nothing', async () => {
+    const path = await project.write('index.html', PAGE)
+    const before = await snapshot(path)
+    const real = createInProcessCommentFileJobs()
+    const jobs: CommentFileJobRunner = {
+      runJob: async (bytes, job) => {
+        const answer = await real.runJob(bytes, job)
+        const result: CommentJobOutcome<CommentFileJob> = answer
+        return (result.kind === 'write' && result.ok ? { ...result, byteEnd: bytes.length + 1 } : answer) as typeof answer
+      }
+    }
+    const { writer } = makeWriter({ jobs })
+
+    expect(await addOn(writer, 'index.html', 'buy')).toEqual({ ok: false, code: ErrorCode.COMMENT_WRITE_FAILED, reason: 'verify-failed' })
+    expect(await snapshot(path)).toEqual(before)
   })
 
   it('M-013 one save is one write, and its result carries the hash of the bytes now on disk for the echo filter', async () => {

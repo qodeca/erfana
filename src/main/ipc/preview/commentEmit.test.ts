@@ -1,0 +1,87 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+/**
+ * HTML Preview comments' events go only to the window that owns the view, and
+ * only after their schema (docs/designs/html-preview-comments.md §8; SEC-07,
+ * SEC-20).
+ */
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { PreviewCommentEvents } from '../../../shared/ipc/preview-comment-channels'
+import { logger } from '../../services/LoggingService'
+import { createPreviewCommentEmitters, issueCodesOf } from './commentEmit'
+import type { PreviewEmitTarget } from './emit'
+
+vi.mock('../../services/LoggingService', () => ({
+  logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn() }
+}))
+
+const PANEL = 'html-preview-/p/index.html'
+
+function target(windowId: number | undefined, destroyed = false) {
+  const send = vi.fn()
+  const value: PreviewEmitTarget = { isDestroyed: () => destroyed, send, ...(windowId === undefined ? {} : { windowId }) }
+  return { value, send }
+}
+
+beforeEach(() => {
+  vi.clearAllMocks()
+})
+
+describe('createPreviewCommentEmitters', () => {
+  it('SEC-07 sends each event to the owning window only – never to another, an unknown or a destroyed target', () => {
+    const own = target(1)
+    const other = target(2)
+    const anonymous = target(undefined)
+    const gone = target(1, true)
+    const emit = createPreviewCommentEmitters({ resolveTargets: () => [own.value, other.value, anonymous.value, gone.value] })
+
+    emit.commentsChanged(1, { panelId: PANEL, counts: { open: 1, resolved: 0, attention: 0 } })
+    emit.anchorStatus(1, { panelId: PANEL, notVisible: [] })
+    emit.modeChanged(1, { panelId: PANEL, on: true, reason: 'shortcut' })
+    emit.draftOpened(1, {
+      panelId: PANEL,
+      kind: 'icon',
+      point: { x: 1, y: 2 },
+      displayPath: 'index.html',
+      filePath: '/p/index.html',
+      frame: false,
+      fileKey: 'f1',
+      threadKeys: ['t1'],
+      blockKeys: []
+    })
+
+    expect(own.send.mock.calls.map(([channel]) => channel)).toEqual([
+      PreviewCommentEvents.COMMENTS_CHANGED,
+      PreviewCommentEvents.ANCHOR_STATUS,
+      PreviewCommentEvents.MODE_CHANGED,
+      PreviewCommentEvents.DRAFT_OPENED
+    ])
+    for (const silent of [other, anonymous, gone]) expect(silent.send).not.toHaveBeenCalled()
+  })
+
+  it('SEC-20 an event that fails its schema is not sent, and the log carries issue codes only', () => {
+    const own = target(1)
+    const emit = createPreviewCommentEmitters({ resolveTargets: () => [own.value] })
+    emit.modeChanged(1, { panelId: PANEL, on: true, reason: 'secret reason text' as never })
+    expect(own.send).not.toHaveBeenCalled()
+    const logged = JSON.stringify(vi.mocked(logger.warn).mock.calls)
+    expect(logged).toContain('invalid_value')
+    expect(logged).not.toContain('secret reason text')
+  })
+
+  it('a target that throws on send does not stop the rest', () => {
+    const throwing = target(1)
+    throwing.send.mockImplementation(() => {
+      throw new Error('Object has been destroyed')
+    })
+    const second = target(1)
+    const emit = createPreviewCommentEmitters({ resolveTargets: () => [throwing.value, second.value] })
+    expect(() => emit.anchorStatus(1, { panelId: PANEL, notVisible: [] })).not.toThrow()
+    expect(second.send).toHaveBeenCalledTimes(1)
+  })
+
+  it('issueCodesOf keeps distinct codes, at most eight', () => {
+    const issues = Array.from({ length: 20 }, (_, i) => ({ code: `c${i % 10}` }))
+    expect(issueCodesOf({ issues })).toEqual(['c0', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7'])
+  })
+})

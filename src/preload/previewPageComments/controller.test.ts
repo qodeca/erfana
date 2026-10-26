@@ -185,7 +185,7 @@ describe('visibility reports (J-006)', () => {
       h.host()?.remove()
       await microtasks()
     }
-    expect(reports().at(-1)).toEqual({ visible: ['one'], hidden: [], overlay: 'unavailable' })
+    expect(reports().at(-1)).toEqual({ visible: ['one'], hidden: [], overlay: 'unavailable', reason: 'overlay-removed' })
     h.controller.renderNow()
     expect(h.host()).toBeNull()
   })

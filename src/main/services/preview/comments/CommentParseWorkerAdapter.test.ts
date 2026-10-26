@@ -10,6 +10,8 @@
 import { EventEmitter } from 'node:events'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { encodeText } from '../../../../shared/htmlComments'
+import { runCommentFileJob } from './commentFileJobs'
+import { CommentDocCache } from './commentJobDocs'
 import { instrumentDocument } from './commentParseCore'
 import type { CommentParseRequest } from './commentParseProtocol'
 import {
@@ -39,6 +41,10 @@ class FakeWorker extends EventEmitter implements CommentParseWorkerLike {
   /** Answer request `id` the way the real worker would. */
   answer(id: number): void {
     const request = this.sent.find(entry => entry.message.id === id)!.message
+    if (request.type === 'job') {
+      this.emit('message', { type: 'job', id, result: runCommentFileJob(request.bytes, request.job, { cache: new CommentDocCache() }) })
+      return
+    }
     this.emit('message', { type: 'result', id, outcome: instrumentDocument(request.bytes) })
   }
   terminate(): Promise<number> {
@@ -75,6 +81,44 @@ function makeClient(
 
 afterEach(() => {
   vi.useRealTimers()
+})
+
+describe('CommentParseClient jobs', () => {
+  it('runs a comment file job in the worker on a copy of the bytes, and answers with its result', async () => {
+    const { client, workers } = makeClient()
+    const pooled = Buffer.from(PAGE)
+
+    const result = await client.runJob(pooled, { kind: 'list' })
+
+    expect(result).toMatchObject({ kind: 'list', ok: true, summary: { writable: true, threads: [] } })
+    const { message, transfer } = workers[0].sent[0]
+    expect(message).toMatchObject({ type: 'job', job: { kind: 'list' } })
+    expect(message.bytes.buffer).not.toBe(pooled.buffer)
+    expect(transfer).toEqual([message.bytes.buffer])
+  })
+
+  it('an answer of another kind, an instrument answer or an error is an error; a full queue is busy', async () => {
+    const { client, workers } = makeClient({ auto: false, maxPending: 3 })
+    const wrongKind = client.runJob(PAGE, { kind: 'list' })
+    const wrongType = client.runJob(PAGE, { kind: 'list' })
+    const thrown = client.runJob(PAGE, { kind: 'list' })
+    expect(await client.runJob(PAGE, { kind: 'list' })).toEqual({ kind: 'failed', failure: 'busy' })
+    const [first, second, third] = workers[0].sent.map(entry => entry.message.id)
+    workers[0].emit('message', { type: 'job', id: first, result: { kind: 'pin-blocks', blocks: [] } })
+    workers[0].emit('message', { type: 'result', id: second, outcome: instrumentDocument(PAGE) })
+    workers[0].emit('message', { type: 'error', id: third })
+
+    expect(await wrongKind).toEqual({ kind: 'failed', failure: 'error' })
+    expect(await wrongType).toEqual({ kind: 'failed', failure: 'error' })
+    expect(await thrown).toEqual({ kind: 'failed', failure: 'error' })
+  })
+
+  it('an instrument request answered with a job result is an error', async () => {
+    const { client, workers } = makeClient({ auto: false })
+    const pending = client.instrument(PAGE)
+    workers[0].emit('message', { type: 'job', id: workers[0].sent[0].message.id, result: { kind: 'list', ok: false, refusal: 'encoding' } })
+    expect(await pending).toEqual({ kind: 'failed', failure: 'error' })
+  })
 })
 
 describe('CommentParseClient', () => {

@@ -11,9 +11,10 @@
  * {@link ANCHOR_KEYS_MAX} keys. Main turns "hidden" into "Not visible now";
  * a key whose element is not in the file at all is main's call (orphaned).
  *
- * When the overlay gave up (the page kept removing it, §9.1 S25), the report
- * says so with `overlay: 'unavailable'`, and main shows "Comments are
- * unavailable for this page: the page keeps removing Erfana's overlay".
+ * When the overlay gave up (the page kept removing it, or rewrote itself with
+ * `document.open()`, §9.1 S25), the report says so with `overlay:
+ * 'unavailable'` and the `reason`, and main shows "Comments are unavailable
+ * for this page" with that reason.
  */
 import { ANCHOR_CHECK_MIN_MS, ANCHOR_KEYS_MAX, COMMENT_ANCHORS_CHANNEL } from './constants'
 
@@ -23,11 +24,16 @@ export interface AnchorEntry {
   readonly visible: boolean
 }
 
+/** Why the overlay gave up for this document (main's "Comments unavailable" reason). */
+export type OverlayLoss = 'document-replaced' | 'overlay-removed'
+
 /** The `commentAnchors` payload. */
 export interface AnchorsPayload {
   readonly visible: readonly string[]
   readonly hidden: readonly string[]
   readonly overlay?: 'unavailable'
+  /** Set with `overlay`: the page rewrote itself, or kept removing the overlay. */
+  readonly reason?: OverlayLoss
 }
 
 /** The reporter's dependencies. */
@@ -45,7 +51,7 @@ export class AnchorReporter {
   private pending: AnchorsPayload | null = null
   private timer: ReturnType<typeof setTimeout> | null = null
   private entries: readonly AnchorEntry[] = []
-  private lost = false
+  private lost: OverlayLoss | null = null
 
   constructor(private readonly deps: AnchorReporterDeps) {}
 
@@ -55,7 +61,7 @@ export class AnchorReporter {
     const payload: AnchorsPayload = {
       visible: entries.filter(e => e.visible).map(e => e.key).slice(0, ANCHOR_KEYS_MAX),
       hidden: entries.filter(e => !e.visible).map(e => e.key).slice(0, ANCHOR_KEYS_MAX),
-      ...(this.lost ? { overlay: 'unavailable' as const } : {})
+      ...(this.lost === null ? {} : { overlay: 'unavailable' as const, reason: this.lost })
     }
     if (JSON.stringify(payload) === this.lastText) {
       this.pending = null
@@ -70,10 +76,10 @@ export class AnchorReporter {
     this.timer ??= setTimeout(() => this.flush(), wait)
   }
 
-  /** The overlay is gone for this document: say so once, with the last split. */
-  markUnavailable(): void {
-    if (this.lost) return
-    this.lost = true
+  /** The overlay is gone for this document: say so once, with the last split. The first reason stays. */
+  markUnavailable(reason: OverlayLoss): void {
+    if (this.lost !== null) return
+    this.lost = reason
     this.lastSentAt = Number.NEGATIVE_INFINITY
     this.update(this.entries)
   }

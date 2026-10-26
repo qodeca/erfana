@@ -763,7 +763,7 @@ IDs: `HPC-U` unit, `HPC-P` property, `HPC-G` golden, `HPC-M` main, `HPC-I` IPC, 
 - SEC-13 insertion refused inside `script`, `style`, `textarea`, `title`, `template`, `noscript`, `iframe`, attributes, before the BOM.
 - SEC-14 byte identity on CRLF, LF, mixed, BOM, no-BOM; non-UTF-8 refused.
 - SEC-15 hostile `@data` (`__proto__`, depth 10,000, 10 MB, 100k replies) → damaged, `({}).polluted === undefined`, bounded time.
-- SEC-16 ReDoS corpus (long `-` runs, nested `<!--`, 4 MB of blocks) parses in < 200 ms; > 500 blocks capped.
+- SEC-16 ReDoS corpus (long `-` runs, nested `<!--`, 4 MB of blocks) parses in < 200 ms; > 500 blocks capped. P5 note: on the emulated Windows host a plain 4 MB parse takes about 316 ms (220 ms in parse5; 1.37 s under coverage), so the time gate passes when the corpus parses in < 200 ms **or** within 4× a non-hostile page of the same size. A backtracking regex is thousands of times slower, so the gate still catches ReDoS. SEC-15's bounded-time check uses the same rule.
 - SEC-17 damaged and conflicted blocks never rewritten by a nearby edit.
 - SEC-18 bidi/control characters in author or email refused on write; rendered isolated and flagged on read.
 - SEC-19 React XSS: `<img src=x onerror=…>` in text renders as text; the `commentState` payload has no text field.

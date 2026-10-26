@@ -103,6 +103,14 @@ describe('parseCommentState', () => {
     })
   })
 
+  it('M-064 carries the print hide to every frame, and only a literal true hides', () => {
+    expect(parseCommentState({ mode: true, commentable: true, hidden: true })?.hidden).toBe(true)
+    expect(parseCommentState({ mode: true, hidden: true })).toMatchObject({ commentable: false, hidden: true })
+    for (const hidden of [false, 'true', 1, undefined]) {
+      expect(parseCommentState({ mode: true, commentable: true, hidden })).not.toHaveProperty('hidden')
+    }
+  })
+
   it('defaults showIcons on and drops every malformed icon', () => {
     const state = parseCommentState({
       mode: false,

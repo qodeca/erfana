@@ -11,20 +11,26 @@
  * freeze every window (spike S9).
  *
  * The shell only moves messages; the work is `instrumentDocument`
- * (`commentParseCore.ts`). Requests are handled one at a time, in order. A
- * throw answers `error` with no text (nothing from the page reaches a log).
- * The result's large buffers are transferred, not copied.
+ * (`commentParseCore.ts`) for a served page, and `runCommentFileJob`
+ * (`commentFileJobs.ts`) for the parse a pick, a pin, a list or a write needs
+ * – with one document cache for the worker's life (`commentJobDocs.ts`).
+ * Requests are handled one at a time, in order. A throw answers `error` with
+ * no text (nothing from the page reaches a log). The result's large buffers
+ * are transferred, not copied.
  *
  * It starts listening only when its `workerData` names its role, so the module
  * can be imported anywhere – a test runner's own worker thread included –
  * without answering messages that are not addressed to it.
  */
 import { parentPort, workerData } from 'node:worker_threads'
+import { runCommentFileJob, type CommentFileJobResult } from './commentFileJobs'
+import { CommentDocCache } from './commentJobDocs'
 import { instrumentDocument, type InstrumentOutcome } from './commentParseCore'
 import {
   COMMENT_PARSE_WORKER_ROLE,
   isParseRequest,
-  type CommentParseReply
+  type CommentParseReply,
+  type CommentParseRequest
 } from './commentParseProtocol'
 
 /** The slice of a `MessagePort` the shell uses. */
@@ -39,17 +45,44 @@ function transferablesOf(outcome: InstrumentOutcome): ArrayBuffer[] {
   return [outcome.html.buffer, outcome.offsets.buffer, outcome.tagCodes.buffer] as ArrayBuffer[]
 }
 
-/** Answer one request on `port`; anything that is not a request is ignored. Never throws. */
-export function answerParseRequest(port: CommentParsePort, message: unknown): void {
+/**
+ * A job answer's buffer that can move without a copy: the write's block bytes,
+ * when they own theirs. A view into a larger buffer (a pooled `Buffer`, say)
+ * is copied instead – moving it would take the rest of that buffer with it.
+ */
+export function jobTransferablesOf(result: CommentFileJobResult): ArrayBuffer[] {
+  if (result.kind !== 'write' || !result.ok) return []
+  const { insert } = result
+  return insert.byteOffset === 0 && insert.byteLength === insert.buffer.byteLength ? [insert.buffer as ArrayBuffer] : []
+}
+
+/** The documents this worker parsed for jobs, by content hash. */
+const jobDocuments = new CommentDocCache()
+
+/** The reply to one request, with what it transfers. Throws when the work does. */
+function replyTo(request: CommentParseRequest, cache: CommentDocCache): [CommentParseReply, ArrayBuffer[]] {
+  if (request.type === 'job') {
+    const result = runCommentFileJob(request.bytes, request.job, { cache })
+    return [{ type: 'job', id: request.id, result }, jobTransferablesOf(result)]
+  }
+  const outcome = instrumentDocument(request.bytes)
+  return [{ type: 'result', id: request.id, outcome }, transferablesOf(outcome)]
+}
+
+/**
+ * Answer one request on `port`; anything that is not a request is ignored.
+ * Never throws. `cache` is the worker's document cache; a suite passes its own.
+ */
+export function answerParseRequest(port: CommentParsePort, message: unknown, cache: CommentDocCache = jobDocuments): void {
   if (!isParseRequest(message)) return
-  let outcome: InstrumentOutcome
+  let reply: [CommentParseReply, ArrayBuffer[]]
   try {
-    outcome = instrumentDocument(message.bytes)
+    reply = replyTo(message, cache)
   } catch {
     port.postMessage({ type: 'error', id: message.id })
     return
   }
-  port.postMessage({ type: 'result', id: message.id, outcome }, transferablesOf(outcome))
+  port.postMessage(...reply)
 }
 
 /** Start answering requests on `port`. */

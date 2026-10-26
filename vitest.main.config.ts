@@ -193,6 +193,80 @@ export default defineConfig({
         'src/main/services/preview/comments/commentInstrumentation.ts': { lines: 98, functions: 98, branches: 91, statements: 98 },
         // measured 100/100/100/100
         'src/main/services/preview/comments/commentE2eHook.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // HTML Preview comments – service and IPC (P5; design § 8, § 12.5: at
+        // least 92/92/88/92, the payload schema at least 98). These modules take
+        // the page's picks and the renderer's requests: frame → file
+        // confinement, main-minted keys bound to one view, the sender's own
+        // window, the schema on every request and answer, and what reaches the
+        // logs. Pinned 2 points under the value measured when this entry landed
+        // (2026-10-26, Windows, on the preview and IPC suites alone), never under
+        // the design minimum – PreviewCommentService and commentDraftBuilder
+        // branches sit on that minimum, 88.
+        // measured 100/100/100/100
+        'src/shared/ipc/preview-comment-schema.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/shared/ipc/preview-comment-channels.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/ipc/preview/comment-handlers.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/ipc/preview/commentEmit.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/preview/previewLiveComments.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 97.16/94.64/88.88/96.17
+        'src/main/services/preview/comments/PreviewCommentService.ts': { lines: 95, functions: 92, branches: 88, statements: 94 },
+        // measured 100/100/88.57/95
+        'src/main/services/preview/comments/commentDraftBuilder.ts': { lines: 98, functions: 98, branches: 88, statements: 93 },
+        // measured 100/100/94.11/98
+        'src/main/services/preview/comments/commentDraftOpener.ts': { lines: 98, functions: 98, branches: 92, statements: 96 },
+        // measured 100/100/92/100
+        'src/main/services/preview/comments/commentFrameBroadcaster.ts': { lines: 98, functions: 98, branches: 90, statements: 98 },
+        // measured 100/100/97.22/100
+        'src/main/services/preview/comments/commentFrames.ts': { lines: 98, functions: 98, branches: 95, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/preview/comments/commentKeyStore.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/93.75/100
+        'src/main/services/preview/comments/commentListBuilder.ts': { lines: 98, functions: 98, branches: 91, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/preview/comments/commentMenuPoint.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/preview/comments/commentOverlayTheme.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/96.66/100
+        'src/main/services/preview/comments/commentPanelStatus.ts': { lines: 98, functions: 98, branches: 94, statements: 98 },
+        // measured 100/100/94.44/99
+        'src/main/services/preview/comments/commentPickHandler.ts': { lines: 98, functions: 98, branches: 92, statements: 97 },
+        // measured 100/100/100/100
+        'src/main/services/preview/comments/commentPins.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/91.66/98.87
+        'src/main/services/preview/comments/commentReloadCoordinator.ts': { lines: 98, functions: 98, branches: 89, statements: 96 },
+        // measured 100/100/95.45/100
+        'src/main/services/preview/comments/commentSaveFlow.ts': { lines: 98, functions: 98, branches: 93, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/preview/comments/commentScripts.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/preview/comments/commentServiceEvents.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/preview/comments/commentServiceTypes.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/95.23/96.07
+        'src/main/services/preview/comments/commentStillCapture.ts': { lines: 98, functions: 98, branches: 93, statements: 94 },
+        // measured 100/100/100/100
+        'src/main/services/preview/comments/commentUnsavedSources.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/preview/comments/frameFileMap.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // The file jobs the parse worker runs for a pick, a pin, the list and a
+        // write (§19 R3-12), and the identity rule the writer and the settings
+        // share – same pinning (2026-10-26, Windows, on the comment suites alone).
+        // measured 100/100/100/100
+        'src/main/services/preview/comments/commentFileJobs.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/preview/comments/commentJobDocs.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/90.27/95.38
+        'src/main/services/preview/comments/commentDraftCore.ts': { lines: 98, functions: 98, branches: 88, statements: 93 },
+        // measured 100/100/92.85/100
+        'src/main/services/preview/comments/commentListCore.ts': { lines: 98, functions: 98, branches: 90, statements: 98 },
+        // measured 100/100/98.24/98.71
+        'src/main/services/preview/comments/commentWriteCore.ts': { lines: 98, functions: 98, branches: 96, statements: 96 },
+        // measured 100/100/100/100
+        'src/shared/htmlComments/identity.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100
         'src/main/services/preview/PreviewRequestKindLedger.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 93.9/100/94.73/93.9

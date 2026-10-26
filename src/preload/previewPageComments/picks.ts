@@ -15,7 +15,15 @@
  * window; main applies its own limit too, because a compromised renderer
  * would not run this one (§9.1 S7).
  */
-import { PICKS_PER_SECOND, PICK_TAG_MAX_CHARS, RUNTIME_PATH_MAX_CHARS, VIEW_HASH_MAX_CHARS } from './constants'
+import {
+  PICKS_PER_SECOND,
+  PICK_BOX_MAX_PX,
+  PICK_TAG_MAX_CHARS,
+  PICK_TAG_PATTERN,
+  RUNTIME_PATH_MAX_CHARS,
+  TAG_MAX_CHARS,
+  VIEW_HASH_MAX_CHARS
+} from './constants'
 import { pathBelow, quoteOf, snapshotOf, whiteSpaceOf, type PickQuote } from './domPath'
 import type { Point } from './geometry'
 import type { TokenRegistry } from './tokens'
@@ -44,10 +52,26 @@ export interface PickRuntime {
   readonly truncated?: true
 }
 
+/** The picked element's border box, frame CSS pixels: where main checks the fresh still's ring. */
+export interface PickBox {
+  readonly x: number
+  readonly y: number
+  readonly w: number
+  readonly h: number
+}
+
 /** What a pick says about its element. */
 export interface PickTarget {
   /** The token of the element, or of its nearest tokened ancestor. */
   readonly token?: string
+  /**
+   * That tokened element's `localName`; main refuses a pick whose tag is not
+   * the one it recorded for the token (§19 R3-13 L5). Left out for a name main
+   * would not accept, and the pick is then refused there.
+   */
+  readonly tag?: string
+  /** The picked element's border box. */
+  readonly box?: PickBox
   readonly runtime?: PickRuntime
   /** White space of the anchor's parent (R3-8). */
   readonly ws?: 'collapse' | 'preserve'
@@ -117,6 +141,22 @@ export function screenOf(event: MouseEvent): Point {
   return { x: whole(event.screenX), y: whole(event.screenY) }
 }
 
+/** A coordinate main accepts: whole, finite and within ±{@link PICK_BOX_MAX_PX}. */
+function bounded(value: number): number {
+  return Math.max(-PICK_BOX_MAX_PX, Math.min(PICK_BOX_MAX_PX, whole(value)))
+}
+
+/** `element`'s border box, rounded and bounded. */
+export function boxOfElement(element: Element): PickBox {
+  const rect = element.getBoundingClientRect()
+  return { x: bounded(rect.left), y: bounded(rect.top), w: Math.max(0, bounded(rect.width)), h: Math.max(0, bounded(rect.height)) }
+}
+
+/** Whether main accepts `tag` as a tag name in a pick of at most `max` characters. */
+function isPickTag(tag: string, max: number): boolean {
+  return tag.length <= max && PICK_TAG_PATTERN.test(tag)
+}
+
 /** A keyboard pick's point: `element`'s top-left + 4 px (§7.3 step 4). */
 export function elementPoint(element: Element): Point {
   const rect = element.getBoundingClientRect()
@@ -134,11 +174,17 @@ export function describeTarget(registry: TokenRegistry, element: Element): PickT
   const tokened = registry.nearestTokened(element)
   if (tokened === undefined) return {}
   const ws = whiteSpaceOf(tokened.element)
-  const base = { token: tokened.token, ws }
+  const own = tokened.element.localName
+  const base = {
+    token: tokened.token,
+    ...(isPickTag(own, TAG_MAX_CHARS) ? { tag: own } : {}),
+    ws,
+    box: boxOfElement(element)
+  }
   if (tokened.element === element) return base
   const path = pathBelow(tokened.element, element) as string
   const tag = element.localName
-  if (path.length > RUNTIME_PATH_MAX_CHARS || tag.length > PICK_TAG_MAX_CHARS) return base
+  if (path.length > RUNTIME_PATH_MAX_CHARS || !isPickTag(tag, PICK_TAG_MAX_CHARS)) return base
   const quote = quoteOf(tokened.element, element)
   const { snapshot, truncated } = snapshotOf(element)
   return {

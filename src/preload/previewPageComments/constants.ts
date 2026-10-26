@@ -53,6 +53,12 @@ export const QUOTE_CONTEXT_CHARS = 32
 export const VIEW_HASH_MAX_CHARS = 512
 /** Characters of a tag name (`TAG_MAX_CHARS` in `format.ts` is larger; §8 caps the pick at 32). */
 export const PICK_TAG_MAX_CHARS = 32
+/** Characters of the tokened element's own tag name in a pick (`TAG_MAX_CHARS` in `format.ts`). */
+export const TAG_MAX_CHARS = 128
+/** A tag name main accepts in a pick (`preview-comment-schema.ts`); any other is left out. */
+export const PICK_TAG_PATTERN = /^[A-Za-z][\w.:-]*$/
+/** Largest CSS-pixel coordinate a pick's box carries (`preview-comment-schema.ts`). */
+export const PICK_BOX_MAX_PX = 10_000_000
 /** Keys in each list of one anchors report (§8). */
 export const ANCHOR_KEYS_MAX = 500
 /** Characters of a pin key (§8). */

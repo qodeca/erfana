@@ -5,9 +5,9 @@
  * decisions 16–17 and 34, §19 R3-5, R3-8; J-007, J-008, SEC-05, SEC-06).
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { PICKS_PER_SECOND, SNAPSHOT_MAX_BYTES, TOKEN_ATTRIBUTE } from './constants'
+import { PICKS_PER_SECOND, PICK_BOX_MAX_PX, SNAPSHOT_MAX_BYTES, TOKEN_ATTRIBUTE } from './constants'
 import { pathBelow, quoteOf, resolvePath, snapshotOf, whiteSpaceOf } from './domPath'
-import { describeTarget, elementPoint, PickLimiter, screenOf, viewOf } from './picks'
+import { boxOfElement, describeTarget, elementPoint, PickLimiter, screenOf, viewOf } from './picks'
 import { TokenRegistry } from './tokens'
 import { microtasks, token } from './__test-helpers__/harness'
 
@@ -31,11 +31,13 @@ afterEach(() => {
 })
 
 const byId = (id: string): Element => document.getElementById(id) as Element
+/** jsdom lays nothing out: every box is empty. */
+const NO_BOX = { x: 0, y: 0, w: 0, h: 0 }
 
 describe('describeTarget (J-007)', () => {
   it('sends only the token for an element that is in the file', async () => {
     await page(`<button id="cta" ${TOKEN_ATTRIBUTE}="${token(1)}">Buy</button>`)
-    expect(describeTarget(registry, byId('cta'))).toEqual({ token: token(1), ws: 'preserve' })
+    expect(describeTarget(registry, byId('cta'))).toEqual({ token: token(1), tag: 'button', ws: 'preserve', box: NO_BOX })
   })
 
   it('J-007 describes a JS-built element below its nearest tokened ancestor', async () => {
@@ -45,7 +47,9 @@ describe('describeTarget (J-007)', () => {
     const target = describeTarget(registry, byId('built'))
     expect(target).toEqual({
       token: token(2),
+      tag: 'ul',
       ws: 'preserve',
+      box: NO_BOX,
       runtime: {
         path: 'li:nth-of-type(3)',
         tag: 'li',
@@ -80,10 +84,15 @@ describe('describeTarget (J-007)', () => {
       cur.append(next)
       cur = next
     }
-    expect(describeTarget(registry, cur)).toEqual({ token: token(3), ws: 'preserve' })
+    const ancestorOnly = { token: token(3), tag: 'div', ws: 'preserve', box: NO_BOX }
+    expect(describeTarget(registry, cur)).toEqual(ancestorOnly)
     const long = document.createElement(`x-${'y'.repeat(40)}`)
     byId('root').append(long)
-    expect(describeTarget(registry, long)).toEqual({ token: token(3), ws: 'preserve' })
+    expect(describeTarget(registry, long)).toEqual(ancestorOnly)
+    // A name main's schema would refuse is not described either.
+    const odd = document.createElementNS('http://www.w3.org/1999/xhtml', 'x-é')
+    byId('root').append(odd)
+    expect(describeTarget(registry, odd)).toEqual(ancestorOnly)
   })
 
   it('J-007 strips nested erfana blocks and token attributes from the snapshot, keeping other comments', () => {
@@ -167,6 +176,31 @@ describe('paths and white space', () => {
   })
 })
 
+describe('the tag and box main checks (R3-13 L5, R3-6)', () => {
+  it('L5 names the tokened element itself, not the JS-built one below it', async () => {
+    await page(`<section id="s" ${TOKEN_ATTRIBUTE}="${token(5)}"><p id="p">x</p></section>`)
+    const built = document.createElement('span')
+    byId('s').append(built)
+    expect(describeTarget(registry, built)).toMatchObject({ token: token(5), tag: 'section', runtime: { tag: 'span' } })
+  })
+
+  it('L5 leaves out an own tag main would refuse, so main refuses the pick', async () => {
+    await page(`<x-é id="odd" ${TOKEN_ATTRIBUTE}="${token(6)}"></x-é>`)
+    expect(byId('odd').localName).toBe('x-é')
+    expect(describeTarget(registry, byId('odd'))).toEqual({ token: token(6), ws: 'preserve', box: NO_BOX })
+  })
+
+  it('R3-6 sends the picked element’s border box, rounded and bounded', async () => {
+    await page(`<div id="d" ${TOKEN_ATTRIBUTE}="${token(7)}"></div>`)
+    const el = byId('d')
+    el.getBoundingClientRect = () =>
+      ({ left: 10.4, top: -5.6, width: 3e7, height: Number.NaN }) as DOMRect
+    expect(boxOfElement(el)).toEqual({ x: 10, y: -6, w: PICK_BOX_MAX_PX, h: 0 })
+    el.getBoundingClientRect = () => ({ left: -3e7, top: 0, width: -4, height: 2 }) as DOMRect
+    expect(boxOfElement(el)).toEqual({ x: -PICK_BOX_MAX_PX, y: 0, w: 0, h: 2 })
+  })
+})
+
 describe('the pick payload (J-008, SEC-05)', () => {
   it('J-008 leaves the isolated world as enums, a token and finite numbers only', async () => {
     await page(`<button id="cta" ${TOKEN_ATTRIBUTE}="${token(1)}">Buy</button>`)
@@ -180,7 +214,7 @@ describe('the pick payload (J-008, SEC-05)', () => {
     // A structured clone keeps nothing but plain data: no element, no function.
     const cloned = structuredClone(payload)
     expect(cloned).toEqual(payload)
-    expect(Object.keys(payload).sort()).toEqual(['kind', 'screen', 'token', 'via', 'view', 'ws'])
+    expect(Object.keys(payload).sort()).toEqual(['box', 'kind', 'screen', 'tag', 'token', 'via', 'view', 'ws'])
     expect(payload.screen).toEqual({ x: 11, y: 0 })
     for (const value of Object.values(payload.view)) expect(Number.isFinite(value)).toBe(true)
   })
@@ -191,7 +225,7 @@ describe('the pick payload (J-008, SEC-05)', () => {
     const target = describeTarget(registry, byId('d').firstElementChild as Element)
     const text = JSON.stringify(target)
     expect(text).not.toMatch(/offset|realPath|file:|erfana-preview:/)
-    expect(Object.keys(target).sort()).toEqual(['runtime', 'token', 'ws'])
+    expect(Object.keys(target).sort()).toEqual(['box', 'runtime', 'tag', 'token', 'ws'])
     expect(Object.keys(target.runtime ?? {}).sort()).toEqual(['path', 'snapshot', 'tag'])
   })
 

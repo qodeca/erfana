@@ -11,8 +11,13 @@
  * One worker with a serial queue, not a pool: a pool of four halved warm
  * latency but cost 1.2 s cold (S9).
  *
- * `instrument` never rejects. Every failure is a `failed` result and the
- * caller serves the raw bytes:
+ * The same worker runs the comment file jobs (`runJob`, `commentFileJobs.ts`):
+ * the parse a pick, a pin, a list or a write needs, so none of them parses a
+ * page on the main thread either. They share the queue and its limits with
+ * the instrumentation of served pages.
+ *
+ * `instrument` and `runJob` never reject. Every failure is a `failed` result
+ * – for `instrument` the caller serves the raw bytes:
  * - `busy` – the queue is full (count or bytes), so a page with many large
  *   frames cannot park unbounded copies in main memory;
  * - `timeout` – no answer in time; the worker is terminated;
@@ -34,6 +39,7 @@ import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { Worker } from 'node:worker_threads'
 import { logger } from '../../LoggingService'
+import type { CommentFileJob, CommentFileJobRunner, CommentJobFailure, CommentJobOutcome } from './commentFileJobs'
 import type { InstrumentOutcome } from './commentParseCore'
 import {
   COMMENT_PARSE_WORKER_ROLE,
@@ -43,7 +49,7 @@ import {
 } from './commentParseProtocol'
 
 /** Why the worker produced no outcome for a document. */
-export type CommentParseFailure = 'busy' | 'timeout' | 'crashed' | 'error' | 'unavailable'
+export type CommentParseFailure = CommentJobFailure
 
 /** What {@link CommentParseClient.instrument} resolves to. */
 export type CommentParseResult =
@@ -89,13 +95,31 @@ const WARM_UP_BYTES = new TextEncoder().encode(
   '<!doctype html><title>w</title><p id=a class=b>w</p>'
 )
 
+/** What a waiting request is answered with: the reply it accepts, else `failed`. */
+type Settled = CommentParseReply | { readonly kind: 'failed'; readonly failure: CommentParseFailure }
+
 interface PendingRequest {
-  readonly resolve: (result: CommentParseResult) => void
+  readonly resolve: (settled: Settled) => void
   readonly timer: ReturnType<typeof setTimeout>
   readonly bytes: number
 }
 
-const failed = (failure: CommentParseFailure): CommentParseResult => ({ kind: 'failed', failure })
+const failed = (failure: CommentParseFailure): { readonly kind: 'failed'; readonly failure: CommentParseFailure } => ({
+  kind: 'failed',
+  failure
+})
+
+/** The instrument outcome a reply carries, or `error` for any other reply. */
+function instrumentOutcomeOf(settled: Settled): CommentParseResult {
+  if ('kind' in settled) return settled
+  return settled.type === 'result' ? settled.outcome : failed('error')
+}
+
+/** The job answer a reply carries, when it answers a job of `kind`; else `error`. */
+function jobOutcomeOf<J extends CommentFileJob>(settled: Settled, kind: J['kind']): CommentJobOutcome<J> {
+  if ('kind' in settled) return settled
+  return settled.type === 'job' && settled.result.kind === kind ? (settled.result as CommentJobOutcome<J>) : failed('error')
+}
 
 /** The production worker: the built bundle, or `null` when it is missing. */
 function defaultCreateWorker(): CommentParseWorkerLike | null {
@@ -107,8 +131,8 @@ function defaultCreateWorker(): CommentParseWorkerLike | null {
   })
 }
 
-/** The process-wide comment parse client. */
-export class CommentParseClient {
+/** The process-wide comment parse client; also the production {@link CommentFileJobRunner}. */
+export class CommentParseClient implements CommentFileJobRunner {
   private readonly createWorker: () => CommentParseWorkerLike | null
   private readonly timeoutMs: number
   private readonly maxStarts: number
@@ -141,7 +165,17 @@ export class CommentParseClient {
   }
 
   /** Instrument one document in the worker. Never rejects. */
-  instrument(bytes: Uint8Array): Promise<CommentParseResult> {
+  async instrument(bytes: Uint8Array): Promise<CommentParseResult> {
+    return instrumentOutcomeOf(await this.request(bytes, (id, copy) => ({ type: 'instrument', id, bytes: copy })))
+  }
+
+  /** Run one comment file job on `bytes` in the worker. Never rejects. */
+  async runJob<J extends CommentFileJob>(bytes: Uint8Array, job: J): Promise<CommentJobOutcome<J>> {
+    return jobOutcomeOf<J>(await this.request(bytes, (id, copy) => ({ type: 'job', id, bytes: copy, job })), job.kind)
+  }
+
+  /** Queue one request for the worker; resolves with its reply, or why there is none. */
+  private request(bytes: Uint8Array, message: (id: number, copy: Uint8Array) => CommentParseRequest): Promise<Settled> {
     if (
       this.pending.size >= this.maxPending ||
       this.pendingBytes + bytes.length > this.maxPendingBytes
@@ -153,12 +187,12 @@ export class CommentParseClient {
     // A copy the worker may own: the read buffer can be a view into a larger one.
     const copy = new Uint8Array(bytes)
     const id = this.nextId++
-    return new Promise<CommentParseResult>(resolve => {
+    return new Promise<Settled>(resolve => {
       const timer = setTimeout(() => this.onTimeout(worker, id), this.timeoutMs)
       this.pending.set(id, { resolve, timer, bytes: copy.length })
       this.pendingBytes += copy.length
       try {
-        worker.postMessage({ type: 'instrument', id, bytes: copy }, [copy.buffer])
+        worker.postMessage(message(id, copy), [copy.buffer])
       } catch {
         this.settle(id, failed('crashed'))
         this.retire(worker, 'post-failed')
@@ -221,7 +255,7 @@ export class CommentParseClient {
       return
     }
     const reply: CommentParseReply = message
-    this.settle(reply.id, reply.type === 'result' ? reply.outcome : failed('error'))
+    this.settle(reply.id, reply.type === 'error' ? failed('error') : reply)
   }
 
   private onTimeout(worker: CommentParseWorkerLike, id: number): void {
@@ -240,7 +274,7 @@ export class CommentParseClient {
     void worker.terminate().catch(() => undefined)
   }
 
-  private settle(id: number, result: CommentParseResult): void {
+  private settle(id: number, result: Settled): void {
     const entry = this.pending.get(id)
     if (entry === undefined) return
     this.pending.delete(id)

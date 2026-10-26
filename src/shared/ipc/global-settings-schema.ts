@@ -7,6 +7,7 @@
  * @see Issue #50 - global settings service
  */
 import { z } from 'zod'
+import { hasRefusedIdentityChar } from '../htmlComments/identity'
 import { TranscriptionSettingsSchema } from './transcription-schema'
 import { FilesSettingsSchema } from './files-exclude-schema'
 import type { IpcAck } from './schema'
@@ -105,6 +106,56 @@ export const TerminalSettingsSchema = z
 export type TerminalSettings = z.infer<typeof TerminalSettingsSchema>
 
 /**
+ * The reviewer's identity for HTML Preview comments (docs/designs/
+ * html-preview-comments.md §7.9, decision 3): written into the HTML file next
+ * to each comment. App-level only – never a project's `.erfana/`, so a cloned
+ * repository cannot preset who you are (§9.1 S20). Main reads it at Save; the
+ * renderer never sends an author (§7.5 step 2).
+ *
+ * Lenient like `terminal` when READ: a missing or malformed value resolves to
+ * "not set" instead of tripping the corruption reset. A name or email over its
+ * cap, one that is not a string, or one carrying a control or invisible
+ * character (`REFUSED_IN_IDENTITY`, the writer's own rule) reads as unset.
+ *
+ * Strict when WRITTEN: a Settings write of `comments` must pass
+ * {@link CommentIdentityWriteSchema} (`GLOBAL_SETTINGS_WRITE_SCHEMAS`), so a
+ * refused value is an error the form can show, never a silent "unset".
+ */
+const AuthorNameSchema = z
+  .string()
+  .max(100, 'The name is longer than 100 characters.')
+  .refine(name => !hasRefusedIdentityChar(name), 'The name contains a control or invisible character.')
+const AuthorEmailSchema = z
+  .string()
+  .max(254, 'The email is longer than 254 characters.')
+  .refine(email => !hasRefusedIdentityChar(email), 'The email contains a control or invisible character.')
+
+export const CommentIdentitySettingsSchema = z
+  .object({
+    authorName: AuthorNameSchema.optional().catch(undefined),
+    authorEmail: AuthorEmailSchema.optional().catch(undefined),
+    /** The one-time privacy notice was shown (§3 "Privacy notice", §10.7). */
+    identityNoticeSeen: z.boolean().catch(false)
+  })
+  .catch(() => ({ identityNoticeSeen: false }))
+export type CommentIdentitySettings = z.infer<typeof CommentIdentitySettingsSchema>
+
+/** What a Settings write of `comments` must be: the read schema's rules, as errors. */
+export const CommentIdentityWriteSchema = z.object({
+  authorName: AuthorNameSchema.optional(),
+  authorEmail: AuthorEmailSchema.optional(),
+  identityNoticeSeen: z.boolean()
+})
+
+/**
+ * Settings whose WRITE is checked strictly before the lenient read schema
+ * applies: a value these refuse is a validation error, not silently dropped.
+ */
+export const GLOBAL_SETTINGS_WRITE_SCHEMAS: Readonly<Partial<Record<string, z.ZodType>>> = {
+  comments: CommentIdentityWriteSchema
+}
+
+/**
  * Root schema for ~/.erfana/settings.json
  */
 export const GlobalSettingsSchema = z.object({
@@ -131,7 +182,9 @@ export const GlobalSettingsSchema = z.object({
    */
   files: FilesSettingsSchema,
   /** Terminal configuration (lens review [23]) */
-  terminal: TerminalSettingsSchema
+  terminal: TerminalSettingsSchema,
+  /** HTML Preview comments: the reviewer's identity (lenient, see the schema) */
+  comments: CommentIdentitySettingsSchema
 })
 export type GlobalSettings = z.infer<typeof GlobalSettingsSchema>
 

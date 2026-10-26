@@ -29,6 +29,7 @@ import type {
   PreviewWebContentsHandle
 } from './PreviewSessionFactory'
 import type { PreviewFileWatcherHandle } from './previewViewLifecycle'
+import type { PreviewCommentShared } from './comments/commentServiceTypes'
 
 /**
  * Whether a page may run as a preview: `PreviewEligibilityService.check`, with
@@ -122,6 +123,12 @@ export interface PreviewLiveViewDeps {
    * tab (issue #124, part 3 §3.2 row 6). Absent, every link opens a new tab.
    */
   readonly checkEligibility?: PreviewEligibilityCheck
+  /**
+   * HTML Preview comments' shared collaborators (html-preview-comments.md
+   * §4.2). A view whose session was built with comments on gets its own
+   * comment service from them; absent, no view has comments.
+   */
+  readonly comments?: PreviewCommentShared
 }
 
 /** What the manager hands to a new live view. */

@@ -2,7 +2,9 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Reading a file for comments (docs/designs/html-preview-comments.md §7.6
- * steps 1–5; M-014) and the refusal → ErrorCode table (§8).
+ * steps 1–5; M-014) and the refusal → ErrorCode table (§8). Main reads the
+ * bytes; the parse is the comment file jobs' (`commentJobDocs.ts`), checked
+ * here on the bytes the loader returned.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { readdir, stat, symlink } from 'node:fs/promises'
@@ -11,8 +13,9 @@ import { serializeBlock } from '../../../../shared/htmlComments'
 import { fixedId, makeComment } from '../../../../shared/htmlComments/__fixtures__/commentTestData'
 import { fileIdOf, sha256Hex } from '../../../utils/atomicWriteBytesStrict'
 import { PAGE, makeProject, snapshot, type TempProject } from './__test-helpers__/commentWriterHarness'
-import { confineCommentFile, loadCommentFile, writableRefusal } from './commentFileAccess'
-import { refusalCode, refused, type CommentRefusal } from './commentRefusals'
+import { confineCommentFile, loadCommentBytes } from './commentFileAccess'
+import { freshDocumentOf, writableRefusal } from './commentJobDocs'
+import { jobFailureRefusal, refusalCode, refused, type CommentRefusal } from './commentRefusals'
 
 let project: TempProject
 
@@ -33,7 +36,7 @@ function block(n: number, tag = 'button'): string {
   return result.block
 }
 
-describe('loadCommentFile', () => {
+describe('loadCommentBytes', () => {
   it('M-014 loading a file with attached, orphaned and damaged blocks never writes: bytes, mtime and folder unchanged', async () => {
     const page = PAGE.replace(
       '    <button',
@@ -42,13 +45,16 @@ describe('loadCommentFile', () => {
     const path = await project.write('index.html', page)
     const before = await snapshot(path)
 
-    const loaded = await loadCommentFile(project.target('index.html'))
+    const loaded = await loadCommentBytes(project.target('index.html'))
 
     if (!loaded.ok) throw new Error(`load: ${loaded.reason}`)
-    const { blocks } = loaded.file.doc.state
+    const document = freshDocumentOf(loaded.bytes)
+    if (!document.ok) throw new Error(`parse: ${document.refusal}`)
+    const { blocks } = document.doc.state
     expect(blocks.map(b => (b.kind === 'ok' ? b.target.state : b.kind))).toEqual(['attached', 'orphaned', 'damaged'])
-    expect(loaded.file).toMatchObject({ realPath: path, hash: sha256Hex(before.bytes) })
-    expect(loaded.file.bytes.equals(before.bytes)).toBe(true)
+    expect(loaded.realPath).toBe(path)
+    expect(document.hash).toBe(sha256Hex(before.bytes))
+    expect(loaded.bytes.equals(before.bytes)).toBe(true)
     expect(await snapshot(path)).toEqual(before)
     expect(await readdir(project.root)).toEqual(['index.html'])
   })
@@ -57,20 +63,22 @@ describe('loadCommentFile', () => {
     const conflicted = PAGE.replace('<main>', '<main>\n<<<<<<< HEAD\na\n=======\nb\n>>>>>>> x')
     await project.write('index.html', conflicted)
 
-    const loaded = await loadCommentFile(project.target('index.html'))
+    const loaded = await loadCommentBytes(project.target('index.html'))
 
     if (!loaded.ok) throw new Error(`load: ${loaded.reason}`)
-    expect(writableRefusal(loaded.file.doc.state)).toBe('conflict-markers')
+    const document = freshDocumentOf(loaded.bytes)
+    expect(document.ok && writableRefusal(document.doc.state)).toBe('conflict-markers')
   })
 
   it('refuses what it cannot read losslessly or at all', async () => {
     await project.write('utf16.html', Buffer.from([0xff, 0xfe, 0x3c, 0x00]))
     await project.write('big.html', Buffer.alloc(4 * 1024 * 1024 + 1, 0x61))
 
-    expect(await loadCommentFile(project.target('utf16.html'))).toEqual(refused('encoding'))
-    expect(await loadCommentFile(project.target('big.html'))).toEqual(refused('too-large'))
-    expect(await loadCommentFile(project.target('gone.html'))).toEqual(refused('missing'))
-    expect(await loadCommentFile(project.target('notes.txt'))).toEqual(refused('not-html'))
+    const utf16 = await loadCommentBytes(project.target('utf16.html'))
+    expect(utf16.ok && freshDocumentOf(utf16.bytes)).toMatchObject({ ok: false, refusal: 'encoding' })
+    expect(await loadCommentBytes(project.target('big.html'))).toEqual(refused('too-large'))
+    expect(await loadCommentBytes(project.target('gone.html'))).toEqual(refused('missing'))
+    expect(await loadCommentBytes(project.target('notes.txt'))).toEqual(refused('not-html'))
   })
 
   it('returns the dev/ino of the file it confined and read – the lock key and the write precondition', async () => {
@@ -78,10 +86,10 @@ describe('loadCommentFile', () => {
     const id = fileIdOf(await stat(path, { bigint: true }))
 
     const confined = await confineCommentFile(project.target('index.html'))
-    const loaded = await loadCommentFile(project.target('index.html'))
+    const loaded = await loadCommentBytes(project.target('index.html'))
 
     expect(confined).toEqual({ ok: true, realPath: path, id })
-    expect(loaded.ok && loaded.file.id).toEqual(id)
+    expect(loaded.ok && loaded.id).toEqual(id)
   })
 
   it('F1 resolves the root itself: a root given through a link still confines to the real files', async () => {
@@ -124,7 +132,7 @@ describe('refusalCode', () => {
     'missing', 'link', 'too-large', 'encoding', 'conflict-markers', 'unterminated-block',
     'too-many-blocks', 'read-only', 'not-owner', 'unsaved-source', 'identity', 'target-moved',
     'block-changed', 'limit', 'meta-charset', 'invalid', 'verify-failed', 'changed',
-    'unsupported-fs', 'busy', 'io'
+    'unsupported-fs', 'busy', 'parse-failed', 'io'
   ]
 
   it('maps every refusal to a COMMENT_* ErrorCode', () => {
@@ -146,6 +154,14 @@ describe('refusalCode', () => {
     ['changed', ErrorCode.COMMENT_WRITE_FAILED]
   ])('%s → %s', (reason, code) => {
     expect(refusalCode(reason)).toBe(code)
+  })
+
+  it('a parse the worker did not answer: a full queue is busy, anything else parse-failed – both a failed write', () => {
+    expect(jobFailureRefusal('busy')).toEqual(refused('busy'))
+    for (const failure of ['timeout', 'crashed', 'error', 'unavailable'] as const) {
+      expect(jobFailureRefusal(failure)).toEqual(refused('parse-failed'))
+    }
+    expect(refusalCode('parse-failed')).toBe(ErrorCode.COMMENT_WRITE_FAILED)
   })
 
   it('keeps an errno code only when there is one', () => {

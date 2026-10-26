@@ -121,6 +121,24 @@ describe('atomicWriteBytesStrict', () => {
     expect(await readdir(dir)).toEqual(['page.html'])
   })
 
+  it('M-061 with the bytes read given, compares them byte for byte: unchanged writes, changed is refused', async () => {
+    const file = await original('page.html', Buffer.from('what I read'))
+
+    const refusedWrite = await atomicWriteBytesStrict(file.path, Buffer.from('mine'), {
+      ...expecting(file),
+      expectedBytes: Buffer.from('what I reaD')
+    })
+    expect(refusedWrite).toEqual({ ok: false, reason: 'changed' })
+    expect(await readFile(file.path, 'utf8')).toBe('what I read')
+
+    const written = await atomicWriteBytesStrict(file.path, Buffer.from('mine'), {
+      ...expecting(file),
+      expectedBytes: Buffer.from('what I read')
+    })
+    expect(written).toEqual({ ok: true, path: file.path })
+    expect(await readFile(file.path, 'utf8')).toBe('mine')
+  })
+
   it('M-061 refuses another file under the same name holding the same bytes (changed): the dev/ino must match too', async () => {
     const file = await original('page.html', Buffer.from('same bytes'))
     // An editor's own atomic save: a new file renamed over the old one

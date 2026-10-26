@@ -102,7 +102,8 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
       onForwardedShortcut: deps.onForwardedShortcut,
       platform: deps.platform,
       openExternal: deps.openExternal,
-      checkEligibility: deps.checkEligibility
+      checkEligibility: deps.checkEligibility,
+      comments: deps.comments
     }
     this.openDiscard = createPreviewOpenDiscard({ registry: deps.registry })
     this.resizeHolds = createResizeHoldRegistry({

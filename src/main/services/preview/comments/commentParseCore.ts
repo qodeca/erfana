@@ -156,9 +156,10 @@ export function tokenIndexAt(offsets: ArrayLike<number>, offset: number): number
 /**
  * The eligible element a block sits on by POSITION – the next start tag in
  * source order after the block, skipping whitespace and other blocks (§5.9
- * step 1, R3-10). Used for blocks without readable anchors (damaged, newer).
+ * step 1, R3-10). Used for blocks without readable anchors (damaged, newer);
+ * exported for the pin of a damaged block (`commentDraftOpener.ts`).
  */
-function positionTarget(
+export function positionTarget(
   index: HtmlIndex,
   after: number,
   blockEnds: ReadonlyMap<number, number>

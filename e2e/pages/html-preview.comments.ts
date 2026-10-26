@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * HTML Preview comments – e2e reads (docs/designs/html-preview-comments.md
- * §12.4, §13 P3 and P4 exits).
+ * §12.4, §13 P3, P4 and P5 exits).
  *
  * Comment state is read main-side through the e2e hook the app installs on
  * `globalThis.__erfanaE2eComments` (`commentE2eHook.ts`; unpackaged build with
@@ -10,23 +10,40 @@
  * markup. The page's own DOM is read with the bounded preview reads
  * (`html-preview.native.ts`, `html-preview.frames.ts`).
  *
- * **The comment stub (P4).** Until main's comment handlers exist (P5), the
- * test plays main's side of the preload's channels: `armCommentStub()`
- * records what the page's frames send on `preview-page:commentPick` and
- * `preview-page:commentAnchors` (on `webContents.ipc`, as main will), and
- * `sendCommentState()` sends one frame a `preview-page:commentState`.
+ * **The comment stub (P4).** The test can play main's side of the preload's
+ * channels: `armCommentStub()` records what the page's frames send on
+ * `preview-page:commentPick` and `preview-page:commentAnchors` (on
+ * `webContents.ipc`, next to main's own listeners), and `sendCommentState()`
+ * sends one frame a `preview-page:commentState`. Since P5 main answers the
+ * same channels itself: it sends every frame its state on hello (the pins
+ * included), so a stub state lasts until main's next one.
  * `clickAt()` is a trusted click at an element's centre, frame-aware, and
  * `accentPixelsNear()` reads the view's pixels where an element's pin is
  * drawn – the overlay lives in a closed shadow root, so pixels are the only
  * outside view of it.
  *
+ * **The real service (P5).** `commentPanels()` / `commentPanelState()` read
+ * each view's comment state from the hook (mode, reloads, the last scroll
+ * restore, drafts, frames); `setCommentMode()`, `listComments()` and
+ * `saveComment()` drive the renderer's real `window.api.previewComments`
+ * bridge, and `recordDraftsOpened()` records its draft-opened events.
+ *
  * Nothing here waits: callers poll. Condition-based waits only.
  */
 
 import { expect } from '@playwright/test'
-import type { ElectronApplication } from '@playwright/test'
+import type { ElectronApplication, Page } from '@playwright/test'
 
 import type { CommentLoadView } from '../../src/main/services/preview/comments/ElementTokenTable'
+import type { CommentE2ePanelState } from '../../src/main/services/preview/comments/commentServiceTypes'
+import type {
+  CommentDraftOpened,
+  CommentListResult,
+  CommentSaveRequest,
+  CommentSaveResult,
+  CommentSetModeResult,
+  PreviewCommentsBridge
+} from '../../src/shared/ipc/preview-comment-schema'
 import {
   EXEC_ACTION_CAP_MS,
   EXEC_READ_CAP_MS,
@@ -38,7 +55,7 @@ import { evalInFrame } from './html-preview.frames'
 import { evalInPreview, type PreviewTarget } from './html-preview.native'
 import { PREVIEW_BUDGET_MS } from './html-preview.page'
 
-export type { CommentLoadView }
+export type { CommentE2ePanelState, CommentLoadView }
 
 /** The attribute the served copy marks every eligible element with. */
 export const ELEMENT_TOKEN_ATTR = 'data-erfana-el'
@@ -276,23 +293,24 @@ export async function accentPixelsNear(
       }
     })
     if (!wc) return null
-    const corner = await exec<{ right: number; top: number } | null>(
+    const corner = await exec<{ right: number; top: number; viewportWidth: number } | null>(
       wc,
       `(() => {
         const el = document.getElementById(${JSON.stringify(id)})
         if (!el) return null
         const r = el.getBoundingClientRect()
-        return { right: r.right, top: r.top }
+        return { right: r.right, top: r.top, viewportWidth: innerWidth }
       })()`,
       capMs,
       `accentPixelsNear: #${id}`
     )
     if (corner === null) return null
-    // CSS px → the capture's DIP.
-    const zoom = wc.getZoomFactor()
     const image = await wc.capturePage()
     if (image.isEmpty()) return null
     const size = image.getSize()
+    // CSS px → the capture's pixels: the capture is at the display's scale
+    // factor times the page zoom (1.25 on a 125 % display), so measure it.
+    const zoom = corner.viewportWidth > 0 ? size.width / corner.viewportWidth : wc.getZoomFactor()
     // The pin's 24 px box sits right of the corner and above it (clamped to
     // the viewport): a 64 × 48 CSS px window holds it with margin.
     const left = Math.max(0, Math.floor((corner.right - 30) * zoom))
@@ -404,4 +422,187 @@ export async function pickAt(
     )
     .toBeGreaterThan(before)
   return picks[picks.length - 1]
+}
+
+// ---------------------------------------------------------------------------
+// The real service (P5): main's comment state and the renderer's bridge
+// ---------------------------------------------------------------------------
+
+/** Every live view's comment state (the service, P5); `[]` before the hook exists. */
+export async function commentPanels(app: ElectronApplication): Promise<CommentE2ePanelState[]> {
+  return app.evaluate(() => {
+    const hook = (globalThis as { __erfanaE2eComments?: { panels(): CommentE2ePanelState[] } })
+      .__erfanaE2eComments
+    return hook ? hook.panels() : []
+  })
+}
+
+/** One panel's comment state; `undefined` when no live view has that panel. */
+export async function commentPanelState(
+  app: ElectronApplication,
+  panelId: string
+): Promise<CommentE2ePanelState | undefined> {
+  return app.evaluate((_electron, id) => {
+    const hook = (globalThis as { __erfanaE2eComments?: { state(panelId: string): CommentE2ePanelState | undefined } })
+      .__erfanaE2eComments
+    return hook?.state(id)
+  }, panelId)
+}
+
+/**
+ * Wait for the one live view with comments, once its page has said hello
+ * (a commentable frame), and return its state – `panelId` included.
+ */
+export async function waitForCommentPanel(app: ElectronApplication): Promise<CommentE2ePanelState> {
+  let found: CommentE2ePanelState | undefined
+  await expect
+    .poll(
+      async () => {
+        const panels = await commentPanels(app)
+        found = panels.length === 1 ? panels[0] : undefined
+        return found?.commentableFrames ?? 0
+      },
+      { timeout: PREVIEW_BUDGET_MS, message: 'no single preview with a commentable page' }
+    )
+    .toBeGreaterThan(0)
+  return found as CommentE2ePanelState
+}
+
+type BridgeWindow = { api: { previewComments: PreviewCommentsBridge } }
+
+/** Turn comment mode on or off through the renderer's real bridge. */
+export async function setCommentMode(
+  page: Page,
+  panelId: string,
+  on: boolean,
+  showIcons = true
+): Promise<CommentSetModeResult> {
+  return page.evaluate(
+    request => (window as unknown as BridgeWindow).api.previewComments.setMode(request),
+    { panelId, on, showIcons }
+  )
+}
+
+/** Main's file list for the panel (`preview:commentList`), through the renderer's real bridge. */
+export async function listComments(page: Page, panelId: string): Promise<CommentListResult> {
+  return page.evaluate(id => (window as unknown as BridgeWindow).api.previewComments.list(id), panelId)
+}
+
+/** Save through the renderer's real bridge (`preview:commentSave`). */
+export async function saveComment(page: Page, request: CommentSaveRequest): Promise<CommentSaveResult> {
+  return page.evaluate(r => (window as unknown as BridgeWindow).api.previewComments.save(r), request)
+}
+
+type DraftRecorder = { __erfanaE2eDrafts?: CommentDraftOpened[] }
+
+/** Start recording the window's `preview:commentDraftOpened` events. Idempotent. */
+export async function recordDraftsOpened(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const w = window as unknown as BridgeWindow & DraftRecorder
+    if (w.__erfanaE2eDrafts !== undefined) return
+    const drafts: CommentDraftOpened[] = []
+    w.__erfanaE2eDrafts = drafts
+    w.api.previewComments.onDraftOpened(payload => {
+      drafts.push(payload)
+    })
+  })
+}
+
+/** Every draft-opened event recorded since {@link recordDraftsOpened}. */
+export async function draftsOpened(page: Page): Promise<CommentDraftOpened[]> {
+  return page.evaluate(() => (window as unknown as DraftRecorder).__erfanaE2eDrafts ?? [])
+}
+
+/** Wait for draft-opened event number `count` (1-based) and return it. */
+export async function waitForDraftOpened(page: Page, count: number): Promise<CommentDraftOpened> {
+  let drafts: CommentDraftOpened[] = []
+  await expect
+    .poll(
+      async () => {
+        drafts = await draftsOpened(page)
+        return drafts.length
+      },
+      { timeout: PREVIEW_BUDGET_MS, message: `draft-opened event ${count} never came` }
+    )
+    .toBeGreaterThanOrEqual(count)
+  return drafts[count - 1]
+}
+
+// ---------------------------------------------------------------------------
+// The renderer UI (P6): driving the page the way a reviewer does
+// ---------------------------------------------------------------------------
+
+/**
+ * Hover `elementId`, then a trusted right-click at its centre (`sendInputEvent`
+ * – a mouse move, then the right button pressed and released), in the page or
+ * in the frame `frameUrlIncludes` names. Blink raises the `contextmenu` event
+ * from that press on every platform (on release on Windows), which is what the
+ * comment overlay picks on. `false` when the element or the frame is missing.
+ */
+export async function rightClickAt(app: ElectronApplication, elementId: string, target: StubTarget = {}): Promise<boolean> {
+  await installBoundedExec(app)
+  return app.evaluate(async ({ webContents }, { id, urlIncludes, frameUrl, iframeId, capMs }) => {
+    const exec = (globalThis as unknown as BoundedExecGlobal).__erfanaE2eExec
+    const wc = webContents.getAllWebContents().find((c) => {
+      try {
+        const url = c.getURL()
+        return url.startsWith('erfana-preview://') && (urlIncludes === undefined || url.includes(urlIncludes))
+      } catch {
+        return false
+      }
+    })
+    if (!wc) return false
+    const pointOf = (elementIdToFind: string, contentOrigin: boolean): string => `(() => {
+      const el = document.getElementById(${JSON.stringify(elementIdToFind)})
+      if (!el) return null
+      const r = el.getBoundingClientRect()
+      return ${contentOrigin ? '{ x: r.left + el.clientLeft, y: r.top + el.clientTop }' : '{ x: r.left + r.width / 2, y: r.top + r.height / 2 }'}
+    })()`
+    let offset = { x: 0, y: 0 }
+    let scope: Parameters<typeof exec>[0] = wc
+    if (frameUrl !== undefined && iframeId !== undefined) {
+      const topId = wc.mainFrame.frameTreeNodeId
+      const frame = wc.mainFrame.framesInSubtree.find((f) => f.frameTreeNodeId !== topId && f.url.includes(frameUrl))
+      const at = await exec<{ x: number; y: number } | null>(wc, pointOf(iframeId, true), capMs, `rightClickAt: #${iframeId}`)
+      if (!frame || at === null) return false
+      offset = at
+      scope = frame
+    }
+    const point = await exec<{ x: number; y: number } | null>(scope, pointOf(id, false), capMs, `rightClickAt: #${id}`)
+    if (point === null) return false
+    const x = Math.round(offset.x + point.x)
+    const y = Math.round(offset.y + point.y)
+    wc.sendInputEvent({ type: 'mouseMove', x, y })
+    wc.sendInputEvent({ type: 'mouseDown', x, y, button: 'right', clickCount: 1 })
+    wc.sendInputEvent({ type: 'mouseUp', x, y, button: 'right', clickCount: 1 })
+    return true
+  }, { id: elementId, urlIncludes: target.urlIncludes, frameUrl: target.frameUrlIncludes, iframeId: target.iframeId, capMs: EXEC_ACTION_CAP_MS })
+}
+
+/**
+ * Split `after` against `before`, line by line, into the one run of whole
+ * lines a write inserted: the lines both share in front of it, the inserted
+ * lines, and the lines both share after it (each part joined with `\n`).
+ * `null` when `after` is not `before` with exactly one run of lines inserted
+ * (anything removed or changed elsewhere). Whole lines, because a block is
+ * written on lines of its own – a character diff would slide the split into
+ * the indentation and the `<` the block and the element share.
+ */
+export function insertedStretch(
+  before: string,
+  after: string
+): { head: string; inserted: string; tail: string } | null {
+  const was = before.split(/\r?\n/)
+  const now = after.split(/\r?\n/)
+  if (now.length <= was.length) return null
+  let start = 0
+  while (start < was.length && was[start] === now[start]) start += 1
+  let end = 0
+  while (end < was.length - start && was[was.length - 1 - end] === now[now.length - 1 - end]) end += 1
+  if (start + end !== was.length) return null
+  return {
+    head: was.slice(0, start).join('\n'),
+    inserted: now.slice(start, now.length - end).join('\n'),
+    tail: was.slice(was.length - end).join('\n')
+  }
 }

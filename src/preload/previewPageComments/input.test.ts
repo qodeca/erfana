@@ -96,7 +96,9 @@ describe('the guards', () => {
         kind: 'open',
         via: 'pointer',
         token: token(2),
+        tag: 'button',
         ws: 'preserve',
+        box: { x: 100, y: 100, w: 80, h: 30 },
         screen: { x: 520, y: 310 },
         view: expect.objectContaining({ w: window.innerWidth, h: window.innerHeight })
       }
@@ -426,7 +428,7 @@ describe('document.open (M1)', () => {
       expect(added.mock.calls.every(([, , options]) => (options as AddEventListenerOptions).capture === true)).toBe(true)
       expect(addedDoc.mock.calls.map(([type]) => type)).toEqual(['pointerout'])
       expect(document.adoptedStyleSheets).toEqual([cursor])
-      expect(h.sent(COMMENT_ANCHORS_CHANNEL).at(-1)).toEqual({ visible: [], hidden: [], overlay: 'unavailable' })
+      expect(h.sent(COMMENT_ANCHORS_CHANNEL).at(-1)).toEqual({ visible: [], hidden: [], overlay: 'unavailable', reason: 'document-replaced' })
       // The overlay came back on the new root, and comment mode still picks.
       expect(h.host()?.parentNode).toBe(newRoot)
       mount('<button id="written">Written</button>', { written: { left: 10, top: 10, width: 50, height: 20 } }, h.doubles)

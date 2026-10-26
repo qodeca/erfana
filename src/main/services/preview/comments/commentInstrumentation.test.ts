@@ -290,7 +290,7 @@ describe('createPreviewCommentServing', () => {
     await s.bodyFor(request())
     await s.bodyFor(request({ realPath: 'gone', noteType: undefined }))
     const source = registerE2e.mock.calls[0][0]
-    expect(source.views()).toHaveLength(1)
-    expect(source.unavailable()).toEqual([{ realPath: 'gone', reason: 'request-unknown' }])
+    expect(source.views?.()).toHaveLength(1)
+    expect(source.unavailable?.()).toEqual([{ realPath: 'gone', reason: 'request-unknown' }])
   })
 })

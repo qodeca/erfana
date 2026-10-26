@@ -3,7 +3,8 @@
 /**
  * Shared set-up for the CommentWriter suites: a real temp project (realpath'd,
  * so a Windows 8.3 temp folder or macOS `/var` → `/private/var` never shows),
- * a writer with a fixed clock, a seeded id source and a captured log, and a
+ * a writer with a fixed clock, a seeded id source, the comment file jobs run
+ * in process (the suites have no worker bundle) and a captured log, and a
  * draft built the way the pick handler (P5) builds one – from a fresh parse of
  * the file's bytes.
  */
@@ -26,6 +27,7 @@ import {
   seededRandom
 } from '../../../../../shared/htmlComments/__fixtures__/commentTestData'
 import { sha256Hex } from '../../../../utils/atomicWriteBytesStrict'
+import { createInProcessCommentFileJobs } from '../commentFileJobs'
 import {
   CommentWriter,
   type CommentDraftTarget,
@@ -99,7 +101,7 @@ export function makeWriter(overrides: Partial<CommentWriterDeps> = {}): WriterHa
   const writer = new CommentWriter({
     identity: () => ADA_IDENTITY,
     now: () => FIXED_NOW,
-    random: seededRandom(7),
+    jobs: createInProcessCommentFileJobs({ random: seededRandom(7) }),
     log,
     ...overrides
   })

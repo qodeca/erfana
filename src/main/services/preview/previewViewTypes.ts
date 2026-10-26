@@ -35,6 +35,7 @@ import type {
 import type { PreviewFileWatcherHandle } from './previewViewLifecycle'
 import type { PreviewWindowLike } from './PreviewLiveView'
 import type { PreviewEligibilityCheck } from './previewLiveTypes'
+import type { PreviewCommentShared } from './comments/commentServiceTypes'
 
 /** A `preview:open` request (mirrors `PreviewOpenRequestSchema`, §4.2). */
 export interface PreviewOpenRequest {
@@ -173,4 +174,6 @@ export interface PreviewViewDeps {
    * typed as plain objects stay valid; absent, no page is shown in place.
    */
   readonly checkEligibility?: PreviewEligibilityCheck
+  /** HTML Preview comments' shared collaborators, handed to every live view. */
+  readonly comments?: PreviewCommentShared
 }

@@ -75,14 +75,14 @@ describe('AnchorReporter', () => {
     expect(report.hidden).toHaveLength(Math.floor((ANCHOR_KEYS_MAX + 5) / 2))
   })
 
-  it('says the overlay is unavailable once, at once, with the last split', () => {
+  it('says the overlay is unavailable once, at once, with the last split and the first reason', () => {
     reporter.update([{ key: 'a', visible: true }])
     wait(10)
-    reporter.markUnavailable()
-    reporter.markUnavailable()
+    reporter.markUnavailable('document-replaced')
+    reporter.markUnavailable('overlay-removed')
     expect(reports()).toEqual([
       { visible: ['a'], hidden: [] },
-      { visible: ['a'], hidden: [], overlay: 'unavailable' }
+      { visible: ['a'], hidden: [], overlay: 'unavailable', reason: 'document-replaced' }
     ])
   })
 

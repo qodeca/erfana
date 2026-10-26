@@ -77,6 +77,9 @@ export interface PreviewNativeImage {
   getSize(): { width: number; height: number }
   resize(options: { width?: number; height?: number; quality?: 'good' | 'better' | 'best' }): PreviewNativeImage
   toDataURL(): string
+  /** Optional so older fakes stay valid; the fresh capture's pixel check reads through them. */
+  crop?(rect: { x: number; y: number; width: number; height: number }): PreviewNativeImage
+  toBitmap?(): Buffer
 }
 
 /**
@@ -143,6 +146,26 @@ export interface IPreviewStillFrameCache {
    * valid; {@link PreviewStillFrameCache} always has it.
    */
   markStale?(panelId: string): void
+  /**
+   * Capture NOW for a popup about to cover the view (HTML Preview comments,
+   * html-preview-comments.md §3, §19 R3-6). Optional like `markStale`.
+   */
+  captureFresh?(
+    wc: PreviewCaptureContents,
+    panelId: string,
+    size: { width: number; height: number },
+    opts?: PreviewFreshCaptureOptions
+  ): Promise<boolean>
+}
+
+/** Options of {@link PreviewStillFrameCache.captureFresh}. */
+export interface PreviewFreshCaptureOptions {
+  /** The view's CSS size when the capture started; stored as `cssWidth` / `cssHeight`. */
+  cssSize?: { width: number; height: number }
+  /** Whether a capture shows what it must; a refused one is retried once, and the retry kept. */
+  accept?: (image: PreviewNativeImage) => boolean
+  /** Runs before that retry – wait for another paint. */
+  beforeRetry?: () => Promise<void>
 }
 
 /** Options of {@link IPreviewStillFrameCache.captureIfStale}. */
@@ -282,14 +305,72 @@ export class PreviewStillFrameCache implements IPreviewStillFrameCache {
       return
     }
 
+    // Input the page got while this capture ran may be missing from it.
+    this.store(panelId, image, opts.cssSize, run.inputDuring)
+  }
+
+  /**
+   * Capture `wc` into `panelId`'s slot NOW: a popup is about to cover the view
+   * and must sit over a picture of what the reader just picked, its outline
+   * painted (HTML Preview comments, §3 "Stale still image under popups",
+   * R3-6). Unlike {@link captureIfStale} it supersedes a capture in flight,
+   * whose idle picture would miss the outline, and what it stores is not
+   * stale: the input that asked for it came before it. `accept` checks a
+   * capture; a refused or empty one is retried once after `beforeRetry`, and
+   * the retry is kept when it has pixels. Never throws; resolves whether a
+   * frame was stored.
+   */
+  async captureFresh(
+    wc: PreviewCaptureContents,
+    panelId: string,
+    size: { width: number; height: number },
+    opts: PreviewFreshCaptureOptions = {}
+  ): Promise<boolean> {
+    if (size.width < PREVIEW.MIN_STILL_FRAME_PX || size.height < PREVIEW.MIN_STILL_FRAME_PX) {
+      return false
+    }
+    const overtaken = this.inFlight.get(panelId)
+    if (overtaken !== undefined) overtaken.superseded = true
+    const run: PreviewCaptureRun = { superseded: false, inputDuring: false }
+    this.inFlight.set(panelId, run)
+    let image: PreviewNativeImage | null = null
+    try {
+      image = await this.firstCapture(wc, size)
+      if (image === null || image.isEmpty() || (opts.accept !== undefined && !opts.accept(image))) {
+        await opts.beforeRetry?.()
+        const retry = run.superseded ? null : await this.captureOnce(wc, size).catch(() => null)
+        if (retry !== null && !retry.isEmpty()) image = retry
+      }
+    } catch (error) {
+      logger.warn('Preview still frame: fresh capture failed', {
+        panelId: stablePathDigest(panelId),
+        ...errorFieldsOf(error)
+      })
+      return false
+    } finally {
+      if (this.inFlight.get(panelId) === run) {
+        this.inFlight.delete(panelId)
+      }
+    }
+    if (run.superseded || image === null || image.isEmpty()) {
+      return false
+    }
+    return this.store(panelId, image, opts.cssSize, false)
+  }
+
+  /** Downscale, encode and keep `image` as `panelId`'s frame; `false` when it is over budget. */
+  private store(
+    panelId: string,
+    image: PreviewNativeImage,
+    cssSize: { width: number; height: number } | undefined,
+    stale: boolean
+  ): boolean {
     const downscaled = this.downscale(image)
     const dataUrl = downscaled.toDataURL()
-
     // Over the data-URL budget ⇒ NO frame (never a partial/blank one).
     if (dataUrl.length > this.maxDataUrlChars) {
-      return
+      return false
     }
-
     const { width, height } = downscaled.getSize()
     // The #124 fields are added only when there is something to say, so a frame
     // without them is exactly the frame it always was.
@@ -298,12 +379,10 @@ export class PreviewStillFrameCache implements IPreviewStillFrameCache {
       width,
       height,
       capturedAt: this.now(),
-      ...(opts.cssSize !== undefined
-        ? { cssWidth: opts.cssSize.width, cssHeight: opts.cssSize.height }
-        : {}),
-      // Input the page got while this capture ran may be missing from it.
-      ...(run.inputDuring ? { stale: true } : {})
+      ...(cssSize !== undefined ? { cssWidth: cssSize.width, cssHeight: cssSize.height } : {}),
+      ...(stale ? { stale: true } : {})
     })
+    return true
   }
 
   markStale(panelId: string): void {

@@ -15,16 +15,22 @@
  *  3. RE-READS the file from disk – never a copy read earlier – and refuses a
  *     symlink, a hard link, a non-UTF-8 file, a file over 4 MB or one the
  *     parse marks read-only (a conflict hunk, an unterminated block);
- *  4. re-locates its target in that fresh parse: for an add, the draft's
- *     element (its offset while the file is unchanged, else the draft's
- *     backup anchors, which must match exactly one element); for an edit or
- *     delete, the block by id whose bytes still hash to what the window read
- *     – a damaged or newer block is never rewritten (decision 12);
+ *  4. re-locates its target in a fresh parse of those bytes: for an add, the
+ *     draft's element (its offset while the file is unchanged, else the
+ *     draft's backup anchors, which must match exactly one element); for an
+ *     edit or delete, the block by id whose bytes still hash to what the
+ *     window read – a damaged or newer block is never rewritten (decision 12);
  *  5. plans ONE splice on the decoded text, applies it to the original bytes,
  *     and verifies before writing: every byte outside the block identical, the
  *     new bytes decode losslessly to the spliced text, exactly one block more,
  *     the same or one fewer, the same elements, and the written block reads
- *     back with the intended data. Any failure: nothing is written;
+ *     back with the intended data. Any failure: nothing is written.
+ *     Step 3's decode and parse, and steps 4 and 5, run in the comment parse
+ *     worker as the `write` job (`commentWriteCore.ts`, §19 R3-12) – the file
+ *     and the spliced file are both parsed there, never on the main thread.
+ *     Main gets back the splice as a byte range and the block's bytes, and
+ *     rebuilds the file from its OWN copy of the bytes read, so every byte
+ *     outside the block is the byte it read whatever the worker answered;
  *  6. writes with `atomicWriteBytesStrict`, which refuses when the path no
  *     longer names the file read in 3 (dev/ino), the file no longer holds the
  *     bytes read, or its folder no longer resolves where it did. Then the
@@ -41,77 +47,43 @@
 import { dirname } from 'node:path'
 import { PREVIEW_LIMITS } from '../../../../shared/preview-limits'
 import { stablePathDigest } from '../../../../shared/stablePathDigest'
-import {
-  addReply,
-  applySplice,
-  buildDraftAnchor,
-  codePointLength,
-  createThread,
-  decodeLossless,
-  deleteMessage,
-  editMessage,
-  findAnchorTarget,
-  planDelete,
-  planInsert,
-  planReplace,
-  setStatus,
-  spliceBytes,
-  verifyCommentSplice,
-  verifySpliceBytes,
-  type CommentAnchor,
-  type CommentAuthor,
-  type CommentData,
-  type CommentDocument,
-  type CommentView,
-  type IndexedElement,
-  type PlanFailure,
-  type PlanResult,
-  type RandomBytes,
-  type SplicePlan,
-  type ThreadContext
-} from '../../../../shared/htmlComments'
-import {
-  atomicWriteBytesStrict,
-  errnoOf,
-  fileIdKey,
-  sha256Hex
-} from '../../../utils/atomicWriteBytesStrict'
+import { codePointLength, type CommentAuthor, type CommentView } from '../../../../shared/htmlComments'
+import { hasRefusedIdentityChar } from '../../../../shared/htmlComments/identity'
+import { atomicWriteBytesStrict, errnoOf, fileIdKey } from '../../../utils/atomicWriteBytesStrict'
 import { logger } from '../../LoggingService'
+import { sharedCommentParseClient } from './CommentParseWorkerAdapter'
 import {
   confineCommentFile,
-  loadCommentFile,
-  writableRefusal,
+  loadCommentBytes,
   type CommentFileTarget,
-  type ConfineResult,
-  type LoadedCommentFile
+  type ConfineResult
 } from './commentFileAccess'
+import type { CommentFileJobRunner } from './commentFileJobs'
 import { commentFileLock } from './commentFileLock'
 import {
+  jobFailureRefusal,
   refusalCode,
   refused,
   type CommentErrorCode,
   type CommentRefusal,
   type Refused
 } from './commentRefusals'
+import {
+  assembleSplice,
+  isSpliceWithin,
+  type CommentDraftTarget,
+  type ThreadChange,
+  type WriteAct,
+  type WritePlanRequest
+} from './commentWriteCore'
 
 export type { CommentFileTarget } from './commentFileAccess'
+export type { CommentDraftTarget, ThreadChange } from './commentWriteCore'
 
 /** The reviewer as Erfana's own settings hold them (decision 3). */
 export interface CommentIdentity {
   readonly name: string
   readonly email?: string
-}
-
-/** What a draft recorded about its element when the pick was made (P5). */
-export interface CommentDraftTarget {
-  /** UTF-16 offset of the element's start tag in the decoded text the draft was made from. */
-  readonly offset: number
-  /** SHA-256 (hex) of the file bytes the draft was made from (`LoadedCommentFile.hash`). */
-  readonly fileHash: string
-  /** The draft's anchor (`buildDraftAnchor`): its backups re-locate the element, its `runtime` part is kept. */
-  readonly anchor: CommentAnchor
-  /** The pick's computed `white-space-collapse` of the element's parent (R3-8); missing → mid-line. */
-  readonly ws?: string
 }
 
 /** Add a new thread before a picked element. */
@@ -121,14 +93,6 @@ export interface AddCommentRequest {
   readonly view: CommentView
   readonly text: string
 }
-
-/** One change to an existing thread (§7.7). Deleting the first message deletes the thread. */
-export type ThreadChange =
-  | { readonly op: 'reply'; readonly text: string }
-  | { readonly op: 'editMessage'; readonly messageId: string; readonly text: string }
-  | { readonly op: 'deleteMessage'; readonly messageId: string }
-  | { readonly op: 'setStatus'; readonly status: CommentData['status'] }
-  | { readonly op: 'deleteThread' }
 
 /** Change the thread `threadId`, whose block hashed to `rawHash` when the window read it. */
 export interface ThreadChangeRequest {
@@ -171,23 +135,16 @@ export interface CommentWriterDeps {
   /** True when an editor tab holds unsaved changes for this real path (decision 13). */
   readonly hasUnsavedSource?: (realPath: string) => boolean | Promise<boolean>
   readonly now?: () => Date
-  /** Random source for new thread and message ids; defaults to `crypto.getRandomValues`. */
-  readonly random?: RandomBytes
+  /**
+   * Where the parse, the plan and the verification run: the process-wide
+   * comment parse worker by default. A suite passes the in-process runner
+   * (`createInProcessCommentFileJobs`), with a seeded id source.
+   */
+  readonly jobs?: CommentFileJobRunner
   /** `process.platform`; a test sets `win32` on any host for the Windows path rules. */
   readonly platform?: NodeJS.Platform
   readonly log?: CommentWriterLog
 }
-
-/** Who acts and when, for one save. `author` is set whenever the job writes one. */
-interface Act {
-  readonly author: CommentAuthor | undefined
-  readonly now: Date
-  readonly random: RandomBytes | undefined
-}
-
-type Planned =
-  | { readonly ok: true; readonly plan: SplicePlan; readonly threadId: string | null }
-  | Refused
 
 type Attempt = Extract<CommentWriteResult, { ok: true }> | Refused
 
@@ -196,34 +153,14 @@ interface WriteJob {
   readonly file: CommentFileTarget
   /** The operation writes the acting author (add, reply, status), so an identity is required. */
   readonly needsAuthor: boolean
-  readonly plan: (file: LoadedCommentFile, act: Act) => Planned
-}
-
-/** Planner refusals as save refusals. */
-const PLAN_REFUSALS: Readonly<Record<PlanFailure, CommentRefusal>> = {
-  'read-only': 'read-only',
-  'not-eligible': 'target-moved',
-  'not-found': 'block-changed',
-  'not-editable': 'block-changed',
-  stale: 'block-changed',
-  'meta-charset': 'meta-charset',
-  limit: 'limit',
-  invalid: 'invalid'
+  readonly request: WritePlanRequest
 }
 
 /**
- * Code points refused in an author name or email (§5.4), by Unicode property
- * rather than by a hand list, so every invisible character is caught: controls
- * (Cc), format characters (Cf – bidi marks, embeddings, overrides and
- * isolates, zero-width characters, the BOM, the tag characters U+E0000–E007F),
- * lone surrogates (Cs), private-use (Co) and unassigned (Cn) code points, the
- * line and paragraph separators, and every default-ignorable code point
- * (U+2060 word joiner, variation selectors, Hangul fillers).
+ * The settings identity as a v1 author, or `undefined` when it is missing or
+ * unusable: empty, over its cap, or carrying a control or invisible character
+ * (`identity.ts` – the settings refuse to store such a value too).
  */
-const REFUSED_IN_IDENTITY =
-  /[\p{Cc}\p{Cf}\p{Cs}\p{Co}\p{Cn}\p{Zl}\p{Zp}\p{Default_Ignorable_Code_Point}]/u
-
-/** The settings identity as a v1 author, or `undefined` when it is missing or unusable. */
 async function resolveAuthor(identity: CommentWriterDeps['identity']): Promise<CommentAuthor | undefined> {
   const raw = await identity()
   const name = raw?.name.trim() ?? ''
@@ -231,94 +168,11 @@ async function resolveAuthor(identity: CommentWriterDeps['identity']): Promise<C
   const nameOk =
     name !== '' &&
     codePointLength(name) <= PREVIEW_LIMITS.COMMENT_AUTHOR_NAME_MAX_CHARS &&
-    !REFUSED_IN_IDENTITY.test(name)
+    !hasRefusedIdentityChar(name)
   const emailOk =
-    email.length <= PREVIEW_LIMITS.COMMENT_AUTHOR_EMAIL_MAX_CHARS && !REFUSED_IN_IDENTITY.test(email)
+    email.length <= PREVIEW_LIMITS.COMMENT_AUTHOR_EMAIL_MAX_CHARS && !hasRefusedIdentityChar(email)
   if (!nameOk || !emailOk) return undefined
   return email ? { name, email, role: 'human' } : { name, role: 'human' }
-}
-
-/** The thread context of a job that writes the author; `run` refuses such a job without one. */
-function contextOf(act: Act): ThreadContext {
-  return { author: act.author!, now: act.now, random: act.random }
-}
-
-function fromPlan(result: PlanResult, threadId: string | null): Planned {
-  return result.ok ? { ok: true, plan: result.plan, threadId } : refused(PLAN_REFUSALS[result.reason])
-}
-
-/** The element the draft's backup anchors name in a changed file, when exactly one matches. */
-function relocate(doc: CommentDocument, anchor: CommentAnchor): IndexedElement | undefined {
-  const found = findAnchorTarget(doc.index, anchor)
-  return found.state === 'attached' ? doc.index.elementAt(found.startOffset) : undefined
-}
-
-function planAdd(request: AddCommentRequest, file: LoadedCommentFile, act: Act): Planned {
-  const { doc } = file
-  const { draft } = request
-  const el =
-    file.hash === draft.fileHash ? doc.index.elementAt(draft.offset) : relocate(doc, draft.anchor)
-  if (!el || el.tag !== draft.anchor.tag) return refused('target-moved')
-  // The stored anchor is rebuilt from the bytes being written; only `runtime` comes from the draft
-  const anchor = buildDraftAnchor(doc.index, el, draft.anchor.runtime)
-  const data = createThread({ anchor, view: request.view, text: request.text, context: contextOf(act) })
-  return fromPlan(planInsert(doc, { targetStart: el.start, data, ws: draft.ws }), data.id)
-}
-
-/** The thread after `change`: `null` removes the block, `undefined` means the message is gone. */
-function changedData(data: CommentData, change: ThreadChange, act: Act): CommentData | null | undefined {
-  switch (change.op) {
-    case 'reply':
-      return addReply(data, change.text, contextOf(act))
-    case 'editMessage':
-      return editMessage(data, change.messageId, change.text, act.now)
-    case 'deleteMessage':
-      return deleteMessage(data, change.messageId)
-    case 'setStatus':
-      return setStatus(data, change.status, contextOf(act))
-    case 'deleteThread':
-      return null
-  }
-}
-
-function planThreadChange(request: ThreadChangeRequest, file: LoadedCommentFile, act: Act): Planned {
-  const { doc } = file
-  const { threadId, rawHash } = request
-  const block = doc.state.blocks.find(b => b.kind === 'ok' && b.data.id === threadId)
-  if (block?.kind !== 'ok' || block.rawHash !== rawHash) return refused('block-changed')
-  const next = changedData(block.data, request.change, act)
-  if (next === undefined) return refused('block-changed')
-  if (next === null) return fromPlan(planDelete(doc, { block: { id: threadId }, rawHash }), null)
-  return fromPlan(planReplace(doc, { id: threadId, rawHash, data: next }), threadId)
-}
-
-function planDeleteDamaged(request: DeleteDamagedBlockRequest, file: LoadedCommentFile): Planned {
-  const damaged = file.doc.state.blocks.filter(
-    b => b.kind === 'damaged' && b.rawHash === request.rawHash
-  )
-  const block =
-    damaged.length === 1 ? damaged[0] : damaged.find(b => b.nodeRange[0] === request.start)
-  if (!block) return refused('block-changed')
-  const start = block.nodeRange[0]
-  return fromPlan(planDelete(file.doc, { block: { start }, rawHash: request.rawHash }), null)
-}
-
-/** §7.6 steps 7–8: the spliced bytes, when every check passes; otherwise nothing is written. */
-function spliceVerified(
-  file: LoadedCommentFile,
-  plan: SplicePlan
-): { readonly ok: true; readonly bytes: Uint8Array } | Refused {
-  const { bytes, doc } = file
-  const out = spliceBytes(bytes, doc.text, plan)
-  if (out.length > PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES) return refused('limit')
-  const text = applySplice(doc.text, plan)
-  const decoded = decodeLossless(out)
-  const sound =
-    verifySpliceBytes(bytes, out, doc.text, plan) &&
-    decoded.ok &&
-    decoded.text === text &&
-    verifyCommentSplice(doc, text, plan).ok
-  return sound ? { ok: true, bytes: out } : refused('verify-failed')
 }
 
 /** Writes comment blocks into HTML files – see the module comment for every step. */
@@ -327,12 +181,14 @@ export class CommentWriter {
   private readonly platform: NodeJS.Platform
   private readonly log: CommentWriterLog
   private readonly now: () => Date
+  private readonly jobs: CommentFileJobRunner
 
   constructor(deps: CommentWriterDeps) {
     this.deps = deps
     this.platform = deps.platform ?? process.platform
     this.log = deps.log ?? logger
     this.now = deps.now ?? (() => new Date())
+    this.jobs = deps.jobs ?? sharedCommentParseClient()
   }
 
   /** Add a new thread before the draft's element. Requires an identity. */
@@ -341,7 +197,7 @@ export class CommentWriter {
       op: 'add',
       file: request.file,
       needsAuthor: true,
-      plan: (file, act) => planAdd(request, file, act)
+      request: { op: 'add', draft: request.draft, view: request.view, text: request.text }
     })
   }
 
@@ -352,7 +208,7 @@ export class CommentWriter {
       op,
       file: request.file,
       needsAuthor: op === 'reply' || op === 'setStatus',
-      plan: (file, act) => planThreadChange(request, file, act)
+      request: { op: 'thread', threadId: request.threadId, rawHash: request.rawHash, change: request.change }
     })
   }
 
@@ -362,7 +218,7 @@ export class CommentWriter {
       op: 'deleteBlock',
       file: request.file,
       needsAuthor: false,
-      plan: file => planDeleteDamaged(request, file)
+      request: { op: 'deleteBlock', rawHash: request.rawHash, ...(request.start === undefined ? {} : { start: request.start }) }
     })
   }
 
@@ -395,35 +251,32 @@ export class CommentWriter {
     if (await this.deps.hasUnsavedSource?.(realPath)) return refused('unsaved-source')
     const author = job.needsAuthor ? await resolveAuthor(this.deps.identity) : undefined
     if (job.needsAuthor && !author) return refused('identity')
-    const act: Act = { author, now: this.now(), random: this.deps.random }
+    const act: WriteAct = { ...(author === undefined ? {} : { author }), nowMs: this.now().getTime() }
     const first = await this.attempt(job, realPath, act)
     return !first.ok && first.reason === 'changed' ? this.attempt(job, realPath, act) : first
   }
 
-  private async attempt(job: WriteJob, realPath: string, act: Act): Promise<Attempt> {
+  private async attempt(job: WriteJob, realPath: string, act: WriteAct): Promise<Attempt> {
     // Confined again under the lock: the path must still resolve to the locked real path
-    const loaded = await loadCommentFile(job.file, { platform: this.platform })
+    const loaded = await loadCommentBytes(job.file, { platform: this.platform })
     if (!loaded.ok) return loaded
-    if (loaded.file.realPath !== realPath) return refused('changed')
-    const blocked = writableRefusal(loaded.file.doc.state)
-    if (blocked) return refused(blocked)
-    const planned = job.plan(loaded.file, act)
-    if (!planned.ok) return planned
-    const spliced = spliceVerified(loaded.file, planned.plan)
-    if (!spliced.ok) return spliced
-    const written = await atomicWriteBytesStrict(realPath, spliced.bytes, {
-      expectedHash: loaded.file.hash,
-      expectedId: loaded.file.id,
+    if (loaded.realPath !== realPath) return refused('changed')
+    const planned = await this.jobs.runJob(loaded.bytes, { kind: 'write', request: job.request, act })
+    if (planned.kind === 'failed') return jobFailureRefusal(planned.failure)
+    if (!planned.ok) return refused(planned.refusal)
+    if (!isSpliceWithin(planned, loaded.bytes.length)) return refused('verify-failed')
+    // Rebuilt from main's own copy: outside the block, the bytes written are the bytes read.
+    const out = assembleSplice(loaded.bytes, planned)
+    if (out.length > PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES) return refused('limit')
+    const written = await atomicWriteBytesStrict(realPath, out, {
+      expectedHash: planned.inputHash,
+      expectedBytes: loaded.bytes,
+      expectedId: loaded.id,
       expectedDir: dirname(realPath),
       maxBytes: PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES
     })
     if (!written.ok) return refused(written.reason === 'gone' ? 'missing' : written.reason, written.errno)
-    return {
-      ok: true,
-      realPath: written.path,
-      fileHash: sha256Hex(spliced.bytes),
-      threadId: planned.threadId
-    }
+    return { ok: true, realPath: written.path, fileHash: planned.outputHash, threadId: planned.threadId }
   }
 
   private succeed(job: WriteJob, done: Extract<CommentWriteResult, { ok: true }>): CommentWriteResult {

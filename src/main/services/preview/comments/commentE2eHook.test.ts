@@ -15,6 +15,7 @@ import {
   type CommentE2eSource
 } from './commentE2eHook'
 import type { CommentLoadView } from './ElementTokenTable'
+import type { CommentE2ePanelState } from './commentServiceTypes'
 
 const hook = (): CommentE2eHook | undefined =>
   (globalThis as Record<string, unknown>)[COMMENT_E2E_HOOK_KEY] as CommentE2eHook | undefined
@@ -88,5 +89,34 @@ describe('commentE2eHook', () => {
     ).toEqual(['/b.html', '/c.html'])
     second()
     expect(hook()!.loads()).toEqual([])
+  })
+
+  it('reports each comment service\'s panel state, and finds one panel by its id', () => {
+    const panel = (panelId: string): CommentE2ePanelState => ({
+      panelId,
+      windowId: 1,
+      mode: false,
+      showIcons: true,
+      hidden: false,
+      reloads: 0,
+      echoes: 0,
+      drafts: 0,
+      keys: 0,
+      frames: 1,
+      commentableFrames: 1
+    })
+    // A service has a panel and no loads; instrumentation has loads and no panel.
+    const service = registerCommentE2eSource({ panel: () => panel('preview-a') }, () => true)
+    registerCommentE2eSource(source(['/a.html']), () => true)
+    registerCommentE2eSource({ panel: () => panel('preview-b') }, () => true)
+
+    expect(hook()!.panels().map(state => state.panelId)).toEqual(['preview-a', 'preview-b'])
+    expect(hook()!.state('preview-b')).toMatchObject({ panelId: 'preview-b', frames: 1 })
+    expect(hook()!.state('preview-z')).toBeUndefined()
+    expect(hook()!.loads().map(v => v.realPath)).toEqual(['/a.html'])
+    expect(hook()!.unavailable()).toEqual([])
+
+    service()
+    expect(hook()!.state('preview-a')).toBeUndefined()
   })
 })

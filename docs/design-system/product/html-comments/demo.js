@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/* global document, window */
 /*
  * Shared behaviour for the HTML preview comments cards. Card chrome, not app
  * code: each function implements a rule a card states, so the card can be
@@ -72,7 +73,7 @@
 
   /* ---------- bidi and zero-width controls drawn as visible tokens (S18, R-017) ---------- */
 
-  const BIDI = /[​-‏‪-‮⁦-⁩﻿]/g;
+  const BIDI = /[\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g;
   function visibleBidi(text) {
     return esc(text).replace(BIDI, (ch) => {
       const code = ch.codePointAt(0).toString(16).toUpperCase().padStart(4, '0');

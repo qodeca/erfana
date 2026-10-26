@@ -33,7 +33,7 @@ import type { PreviewWebContentsHandle } from './PreviewSessionFactory'
 import { PREVIEW_PAGE_LINK_CHANNEL, PREVIEW_PAGE_LINK_NOTE_CHANNEL } from './previewLinkBridge'
 import { PREVIEW_PAGE_CSP_VIOLATION_CHANNEL } from './previewCspViolationBridge'
 import { classifyConsoleMessage } from './previewConsoleClassify'
-import { attachInputForwarding } from './previewInputForward'
+import { attachInputForwarding, type CommentKeyState } from './previewInputForward'
 
 /** The disposable single-file watcher the service uses for the page's HTML (`previewEntryWatch.ts`). */
 export interface PreviewFileWatcherHandle {
@@ -116,6 +116,8 @@ const CONSOLE_LEVEL_TO_NUMBER: Readonly<Record<string, number>> = {
 export interface PreviewLifecycleParams {
   readonly webContents: PreviewWebContentsHandle
   readonly platform?: NodeJS.Platform
+  /** The view's comments, for the toggle and Esc (`previewInputForward.ts`); absent: neither. */
+  readonly comments?: CommentKeyState
 }
 
 /** A `will-navigate`-style event carrying `preventDefault`. */
@@ -231,7 +233,8 @@ export function wirePreviewLifecycle(
   const detachInput = attachInputForwarding(
     wc as never,
     hooks.onForwardedShortcut,
-    params.platform
+    params.platform,
+    params.comments
   )
 
   return {

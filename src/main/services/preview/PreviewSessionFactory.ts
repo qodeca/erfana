@@ -64,6 +64,7 @@ import { assertSealed, purge as purgePreviewSession } from './PreviewStorageSeal
 import {
   buildPreviewSessionContexts,
   type PreviewSessionCommentDeps,
+  type PreviewSessionContexts,
   type PreviewSessionPageScopes
 } from './previewSessionFilterContext'
 
@@ -189,6 +190,8 @@ export interface PreviewSession {
   readonly realRoot: string
   /** Detach the protocol handler, the request filter and the session hardening. */
   readonly teardown: () => void
+  /** The view's comment serving, when the view was built with comments on (html-preview-comments.md §4.2). */
+  readonly comments?: PreviewSessionContexts['comments']
 }
 
 export interface IPreviewSessionFactory {
@@ -386,16 +389,10 @@ export class PreviewSessionFactory implements IPreviewSessionFactory {
       comments: this.deps.comments
     })
 
-    // Steps 3–9 all run AFTER the token is live, and every one of them can
-    // throw: `createView` allocates a WebContentsView, `hardenSession` touches
-    // the new webContents, and both attach steps install session-level wiring.
-    //
-    // An earlier revision guarded step 9 only, under a comment claiming "no
-    // half-wired view leaks". That was true of the seal tripwire and of nothing
-    // else: a throw in `attachFilter` left the token resolvable and the protocol
-    // handler attached, so it kept serving confined file reads for the life of
-    // the process (lens review F9). The cleanup list is now built incrementally,
-    // so a failure at ANY step unwinds exactly what was built before it.
+    // Steps 3–9 run AFTER the token is live, and each can throw. A throw in
+    // `attachFilter` once left the token resolvable and the handler serving
+    // confined reads for the life of the process (lens review F9), so the cleanup
+    // list is built incrementally: a failure at ANY step unwinds what came before.
     const unwind: Array<() => void> = [() => registry.revoke(token)]
     const rollback = (): void => {
       // Last built, first undone. Each step is independently guarded: one
@@ -429,6 +426,8 @@ export class PreviewSessionFactory implements IPreviewSessionFactory {
       unwind.push(() => {
         void release()
       })
+      // Read as the web prefs are built, so the frame preload and the service agree.
+      const commentsOn = commentsFlagOf(this.deps.comments)
       const webPreferences = this.deps.buildWebPreferences(session)
       const view = this.deps.createView(webPreferences)
       unwind.push(() => {
@@ -466,7 +465,8 @@ export class PreviewSessionFactory implements IPreviewSessionFactory {
         realRoot: entry.realRoot,
         partition,
         teardown,
-        release
+        release,
+        ...(commentsOn && contexts.comments !== undefined ? { comments: contexts.comments } : {})
       }
     } catch (error) {
       rollback()

@@ -17,6 +17,11 @@
  * outside the frozen list is ever forwarded (design §1.9): Cmd+R, Cmd+P and
  * plain typing all stay with the page.
  *
+ * HTML Preview comments add one row of their own, `PREVIEW_COMMENT_TOGGLE`,
+ * taken only while comments are on for the view – and, while comment mode is
+ * on, leave Esc with the page, whose preload leaves the mode
+ * (html-preview-comments.md §3, §7.1, §10.1; M-052).
+ *
  * @see docs/designs/sd-074-html-preview.md §1.9, §0 (Enumerated keystrokes)
  * @see docs/designs/design-issue-124-part3.md §3.7
  */
@@ -61,6 +66,28 @@ export const PREVIEW_FORWARDED_SHORTCUTS = Object.freeze([
   { key: 'back', accel: false, nav: true },
   { key: 'forward', accel: false, nav: true }
 ] as const satisfies readonly ForwardedShortcut[])
+
+/**
+ * The comment-mode toggle: Ctrl+Alt+M, Cmd+Option+M on macOS. Its own frozen
+ * row, outside the list above, because it is taken only while comments are on
+ * for the view – off, the chord stays with the page. Matched on the TYPED key,
+ * never the physical one: AltGr is Ctrl+Alt on Windows, and AltGr+M types µ on
+ * a German layout, which must go on typing µ. On macOS Option+M itself types µ,
+ * and with Cmd down that is still this chord (AltGr does not exist there).
+ */
+export const PREVIEW_COMMENT_TOGGLE = Object.freeze({
+  key: 'comment-mode',
+  typed: 'm',
+  darwinTyped: Object.freeze(['m', 'µ'])
+} as const)
+
+/** What the forwarder asks about the view's comments, per key press. */
+export interface CommentKeyState {
+  /** Comments are on for the view: the toggle is the view's to take. */
+  readonly enabled: () => boolean
+  /** Comment mode is on: Esc stays with the page, whose preload leaves the mode. */
+  readonly modeOn: () => boolean
+}
 
 /**
  * The slice of Electron's `Input` this module reads. Declared locally so the
@@ -112,10 +139,15 @@ export interface InputForwardTarget {
  */
 export function matchForwardedShortcut(
   input: ForwardableInput,
-  platform: NodeJS.Platform = process.platform
+  platform: NodeJS.Platform = process.platform,
+  comments?: CommentKeyState
 ): string | null {
   if (input.type !== 'keyDown') {
     return null
+  }
+
+  if (comments !== undefined && comments.enabled() && matchCommentToggle(input, platform)) {
+    return PREVIEW_COMMENT_TOGGLE.key
   }
 
   const accelDown = platform === 'darwin' ? input.meta : input.control
@@ -123,11 +155,30 @@ export function matchForwardedShortcut(
 
   for (const shortcut of PREVIEW_FORWARDED_SHORTCUTS) {
     if (matchesShortcut(shortcut, input, accelDown, navAction)) {
-      return shortcut.key
+      // In comment mode the page's preload takes Esc: it leaves the mode first.
+      return shortcut.key === 'Escape' && comments?.modeOn() === true ? null : shortcut.key
     }
   }
 
   return null
+}
+
+/**
+ * Whether a key press is the comment-mode toggle: the typed `m` (µ too on
+ * macOS) with exactly Ctrl+Alt, or Cmd+Option on macOS – Shift never.
+ */
+export function matchCommentToggle(
+  input: ForwardableInput,
+  platform: NodeJS.Platform = process.platform
+): boolean {
+  if (input.type !== 'keyDown' || input.shift) {
+    return false
+  }
+  const typed = input.key.toLowerCase()
+  if (platform === 'darwin') {
+    return input.meta && input.alt && !input.control && PREVIEW_COMMENT_TOGGLE.darwinTyped.some((key) => key === typed)
+  }
+  return input.control && input.alt && !input.meta && typed === PREVIEW_COMMENT_TOGGLE.typed
 }
 
 /** One row of the frozen list against one key press. */
@@ -157,10 +208,11 @@ function matchesShortcut(
 export function attachInputForwarding(
   target: InputForwardTarget,
   onShortcut: (key: string) => void,
-  platform: NodeJS.Platform = process.platform
+  platform: NodeJS.Platform = process.platform,
+  comments?: CommentKeyState
 ): () => void {
   const listener = (event: InputForwardEvent, input: ForwardableInput): void => {
-    const key = matchForwardedShortcut(input, platform)
+    const key = matchForwardedShortcut(input, platform, comments)
     if (key !== null) {
       event.preventDefault()
       onShortcut(key)

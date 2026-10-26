@@ -97,6 +97,13 @@ export interface FileId {
 export interface StrictWriteOptions {
   /** SHA-256 (hex, {@link sha256Hex}) of the bytes the caller read; the target must still hold them. */
   readonly expectedHash: string
+  /**
+   * The bytes the caller read themselves, whose hash is `expectedHash`. When
+   * given, the re-read is compared with them byte for byte instead of being
+   * hashed – the stricter check, and a 4 MB SHA-256 is about 7 ms of the main
+   * thread on the slowest box measured.
+   */
+  readonly expectedBytes?: Uint8Array
   /** The file the caller read ({@link readFileNoFollow}); the target must still be that very file. */
   readonly expectedId: FileId
   /**
@@ -121,7 +128,7 @@ export type NoFollowRead =
 /** `O_NOFOLLOW` is POSIX only; on Windows it is `undefined`, so fall back to `0` (no-op). */
 const O_NOFOLLOW = fsConstants.O_NOFOLLOW ?? 0
 const READ_FLAGS = fsConstants.O_RDONLY | O_NOFOLLOW
-/** Chunk size of the bounded read. */
+/** Chunk size of the bounded read once the size the file reported has been read. */
 const READ_CHUNK_BYTES = 64 * 1024
 
 /** The file system cannot do rename/fsync (network and FUSE mounts) – as `atomicWriteText`. */
@@ -172,20 +179,30 @@ function sameFile(a: FileId, b: FileId): boolean {
   return a.dev === b.dev && a.ino === b.ino
 }
 
-/** Read at most `maxBytes`; `undefined` when the file holds more (its size is never trusted). */
-async function readBounded(handle: FileHandle, maxBytes: number): Promise<Buffer | undefined> {
+/**
+ * Read at most `maxBytes`; `undefined` when the file holds more. The size the
+ * file reported only sizes the FIRST read – one byte over it, so a file read
+ * whole ends on the next, empty read – and is never trusted: reads go on to
+ * the end of the file whatever it said. A file that kept its size is read in
+ * one call into one buffer, with no copy: each chunk costs the main thread a
+ * thread-pool round trip, about 0.2 ms on the slowest box measured, 64 of
+ * them for 4 MB.
+ */
+async function readBounded(handle: FileHandle, maxBytes: number, sizeHint = 0): Promise<Buffer | undefined> {
   const chunks: Buffer[] = []
   let total = 0
+  let want = Math.min(Math.max(sizeHint + 1, READ_CHUNK_BYTES), maxBytes + 1)
   for (;;) {
-    const want = Math.min(READ_CHUNK_BYTES, maxBytes + 1 - total)
-    const chunk = Buffer.allocUnsafe(want)
+    // Zero-filled: a short read leaves no stale memory behind the bytes returned.
+    const chunk = Buffer.alloc(want)
     const { bytesRead } = await handle.read(chunk, 0, want, total)
     if (bytesRead === 0) break
     chunks.push(chunk.subarray(0, bytesRead))
     total += bytesRead
     if (total > maxBytes) return undefined
+    want = Math.min(READ_CHUNK_BYTES, maxBytes + 1 - total)
   }
-  return Buffer.concat(chunks, total)
+  return chunks.length === 1 ? chunks[0] : Buffer.concat(chunks, total)
 }
 
 /** The failure for an open that threw. */
@@ -228,7 +245,7 @@ export async function readFileNoFollow(filePath: string, maxBytes: number): Prom
     const opened = await handle.stat({ bigint: true })
     const failure = identityFailure(opened, await lstat(filePath, { bigint: true }))
     if (failure) return { ok: false, reason: failure }
-    const bytes = await readBounded(handle, maxBytes)
+    const bytes = await readBounded(handle, maxBytes, Number(opened.size))
     return bytes ? { ok: true, bytes, id: fileIdOf(opened) } : { ok: false, reason: 'too-large' }
   } catch (error) {
     const errno = errnoOf(error)
@@ -322,9 +339,12 @@ async function verifyUnchanged(
     const reason = current.reason === 'too-large' ? 'changed' : current.reason
     return { ok: false, reason, ...(current.errno ? { errno: current.errno } : {}) }
   }
-  const same =
-    sameFile(current.id, options.expectedId) && sha256Hex(current.bytes) === options.expectedHash
-  return same ? null : { ok: false, reason: 'changed' }
+  const { expectedBytes } = options
+  const sameBytes =
+    expectedBytes === undefined
+      ? sha256Hex(current.bytes) === options.expectedHash
+      : current.bytes.equals(expectedBytes)
+  return sameFile(current.id, options.expectedId) && sameBytes ? null : { ok: false, reason: 'changed' }
 }
 
 /** Step 4's folder check: `changed` when the target's folder no longer resolves to `expectedDir`. */
