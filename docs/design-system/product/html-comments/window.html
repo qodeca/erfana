@@ -1,0 +1,538 @@
+<!-- @card group="HTML preview" name="Comment window" subtitle="New comment, threads, edit, delete, damaged, read-only, not found, not visible, saving and every save error" status="proposed" reviewed="2026-10-26" -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Erfana — comment window</title>
+<link rel="stylesheet" href="../../tokens.css">
+<link rel="stylesheet" href="../../ds.css">
+<script src="../../claims.js"></script>
+<link rel="stylesheet" href="../../system/components/menu/menu.css">
+<link rel="stylesheet" href="./demo.css">
+<link rel="stylesheet" href="./overlay.css">
+<link rel="stylesheet" href="./comments.css">
+<script src="./demo.js"></script>
+<style>
+  .live { block-size: 520px; inline-size: 760px; }
+  .live .erf-comment-window { position: absolute; inset-block-start: var(--space-8); inset-inline-end: var(--space-8); }
+  .sheet-demo { block-size: 420px; inline-size: 360px; }
+  .gallery .erf-comment-window { max-block-size: none; }
+  .times td:first-child { font-family: var(--font-mono); font-size: var(--text-sm); }
+</style>
+</head>
+<body>
+
+<h1>Comment window</h1>
+<p class="ds-lede">
+  Where a reviewer types. It is <strong>Erfana's own window</strong>, drawn over a still image of the page – the
+  page cannot see it, style it, or type into it (decision 4). Every state below is the real CSS.
+</p>
+
+<div class="ds-note">
+  <strong>The shape.</strong> A dialog through the dialog stack: <code>role="dialog"</code>,
+  <code>aria-modal="true"</code> and a real focus trap. 360px wide (at least 320, at most 480 or the page area
+  less 16px), at most 560px tall; the title and the action row stay put, the body scrolls. Placed right of the
+  element, else left, else below, else above; under 400px of page width it becomes a sheet across the page
+  area's foot. <code>--color-bg-elevated</code>, a 1px <code>--color-border-subtle</code> edge,
+  <code>--shadow-dialog</code>, square corners.
+  <br><br>
+  <strong>Built from what exists:</strong> the buttons are the Buttons card's Dialog.css variants, the banners
+  the Feedback card's one banner, the field and its error the decided Form controls card, the per-message menu
+  the decided Menu card. Proposed, as the plan files it (§10.11); the focus rules in the table below are
+  contracts and are the first candidates for promotion.
+</div>
+
+<div class="ds-note">
+  <strong>Small text is tertiary, never secondary.</strong> The context line, the meta lines, the hint and the
+  counter are all <code>--text-sm</code>. <code>--color-text-tertiary</code> on the window measures
+  <strong><span data-claim="hpc-window-meta"></span>:1</strong>; <code>--color-text-secondary</code>, which
+  much of the app uses for hints, is <strong><span data-claim="hpc-window-secondary"></span>:1</strong> here –
+  under the 4.5:1 small text needs. The field's edge is <code>--color-border-input</code>,
+  <strong><span data-claim="hpc-window-input-border"></span>:1</strong>, and the focus ring
+  <strong><span data-claim="hpc-window-focus"></span>:1</strong>, both clear of 3:1.
+</div>
+
+<h2>Live – a real dialog</h2>
+
+<div class="ds-note">
+  <strong>Try it with the keyboard.</strong> Press <em>Open the window</em>: focus lands in the text field. Tab
+  cycles inside the window only. <kbd>Ctrl</kbd>+<kbd>Enter</kbd> (<kbd>Cmd</kbd>+<kbd>Enter</kbd> on macOS)
+  saves the focused field; Save on an empty field says why instead of doing nothing; past 4,000 characters the
+  field is marked invalid. <kbd>Esc</kbd> closes and keeps your text – open it again and it says
+  “Draft restored”. After Save, focus goes back to the opener and the live region says so.
+</div>
+
+<button class="erf-comment-btn erf-comment-btn--secondary" type="button" id="opener">Open the window</button>
+<div class="panel live" style="margin-top: var(--space-8)"><div class="panel__body"><div class="page-area" id="liveArea">
+  <div class="page">
+    <h4>Pricing</h4>
+    <p>Start free, then pay for what you use. Every plan includes the editor and the terminal.</p>
+    <button class="cta" id="buy" type="button" tabindex="-1">Buy now</button>
+  </div>
+  <span class="still-tag">still image of the page while the window is open</span>
+</div></div></div>
+<div class="announce-view" id="liveRegion" aria-live="polite"></div>
+
+<h2>Focus, exactly</h2>
+<table>
+  <thead><tr><th>When</th><th>Focus goes to</th><th>Why</th></tr></thead>
+  <tbody>
+    <tr><td>A new comment opens</td><td>The text field</td><td>There is only one thing to do.</td></tr>
+    <tr><td>A thread opens</td><td>The window title (<code>tabindex="-1"</code>)</td><td>So a screen reader starts at the top and reads the thread in order, rather than landing in the reply box below text it never heard.</td></tr>
+    <tr><td>A delete confirmation opens</td><td>Cancel</td><td>The destructive button is never the default; Return twice cannot delete.</td></tr>
+    <tr><td>The window closes</td><td>The opener: the drawer row, or <strong>native focus to the page</strong> with the picker on the same element</td><td>The Menu card's rule – focus comes back to what opened it. From the page the opener is page content, so Erfana hands focus back to the native view (Focus card Exceptions).</td></tr>
+  </tbody>
+</table>
+
+<h2>New comment</h2>
+<div class="gallery" id="g-new"></div>
+
+<h2>Saving, and when saving cannot happen</h2>
+<div class="ds-note">
+  <strong>Every error keeps the text.</strong> A save is a re-read of the file, a splice and a verified atomic
+  write, so it can fail for reasons the reviewer did not cause. The field stays as it was, a banner above the
+  actions says what happened and what to do, and the assertive live region reads it once. A field problem
+  (empty, too long) sits directly under the field instead, as the Form card requires.
+</div>
+<div class="gallery" id="g-save"></div>
+
+<h3 style="color: var(--color-text-bright)">Every save error</h3>
+<p style="max-width: 76ch; color: var(--color-text-tertiary)">
+  The strings are the plan's §10.10 where it gives one, with the file name filled in. Where §10.10 has none, the
+  card uses the fallback in <code>src/shared/errors.ts</code> and says so – those rows are the ones to check.
+</p>
+<table>
+  <thead><tr><th>Code</th><th>What the window says</th><th>Source</th><th>Shown as</th></tr></thead>
+  <tbody id="errors"></tbody>
+</table>
+
+<h2>A thread</h2>
+<div class="ds-note">
+  Threads in file order; replies one level deep; a resolved thread folds to one line. The author's name is
+  shown; the email sits in a tooltip and the message's accessible description, and is shown in full only when
+  two authors share a name. Times are absolute and local and never count up (“Today, 14:32”). Anyone may edit or
+  delete any message (decision 31), so every message has the same <em>…</em> menu: Edit, Delete….
+  <strong>The UI never implies an author is verified</strong> – there is no badge, no avatar, nothing that
+  reads as identity (threat S19).
+</div>
+<div class="gallery" id="g-thread"></div>
+
+<h2>Plain text, and what it refuses to hide</h2>
+<div class="ds-note">
+  The body is plain text: <code>white-space: pre-wrap</code>, <code>overflow-wrap: anywhere</code>,
+  <code>dir="auto"</code> on every message, so a right-to-left comment runs right-to-left inside a left-to-right
+  window. A bidi or zero-width control character is drawn as a visible token, so it cannot silently reorder the
+  text around it (threat S18, R-017). Escapes Erfana adds to keep <code>--&gt;</code> out of the file are never
+  shown.
+</div>
+<div class="gallery" id="g-text"></div>
+
+<h2>When the comment cannot be used normally</h2>
+<div class="gallery" id="g-odd"></div>
+
+<h2>Narrow pages</h2>
+<div class="ds-note">
+  Under 400px of page width there is no room beside the element, so the window becomes a sheet across the foot
+  of the page area – same content, same focus rules, full width.
+</div>
+<div class="panel sheet-demo"><div class="panel__body"><div class="page-area" id="sheetArea">
+  <div class="page"><h4>Pricing</h4><p>Start free, then pay for what you use.</p>
+    <button class="cta" type="button" tabindex="-1">Buy now</button></div>
+</div></div></div>
+
+<h2>Time, as it is printed</h2>
+<p style="max-width: 76ch; color: var(--color-text-tertiary)">
+  Absolute local time through <code>Intl.DateTimeFormat</code>, in a <code>&lt;time datetime&gt;</code>. Computed
+  below against a fixed clock (R-016 injects one the same way), so the rows do not change with the day you
+  open the card.
+</p>
+<table class="times">
+  <thead><tr><th>Written</th><th>Shown</th></tr></thead>
+  <tbody id="times"></tbody>
+</table>
+
+<h2>Exceptions</h2>
+<table>
+  <thead><tr><th>Where</th><th>The system</th><th>The window, and why</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>Window size</td>
+      <td>Sizes from tokens.</td>
+      <td>320px minimum and 560px maximum height are literals, and 360 / 480 are read as
+        <code>var(--comments-window-width, 360px)</code> / <code>var(--comments-window-max-width, 480px)</code>
+        until P6 adds them to <code>design-tokens.css</code> (plan §10.9). The fallback means nothing changes
+        the day the token lands.</td>
+    </tr>
+    <tr>
+      <td>Close</td>
+      <td>Escape returns focus to the opener.</td>
+      <td>When the opener is the page, focus returns natively to the page view with the picker on the same
+        element – Erfana cannot focus a DOM node inside it. Recorded in the Focus card.</td>
+    </tr>
+  </tbody>
+</table>
+
+<script>
+const H = window.HPC;
+const I = H.icon;
+let uid = 0;
+
+/* ---------- builders ---------- */
+function win(o) {
+  const id = `w${uid += 1}`;
+  const role = o.live ? 'role="dialog" aria-modal="true"' : `role="group" aria-label="Example: ${H.esc(o.example || o.title)}"`;
+  return `<div class="erf-comment-window${o.sheet ? ' erf-comment-window--sheet' : ''}" ${role} aria-labelledby="${id}-t">
+    <div class="erf-comment-window__head">
+      <div class="erf-comment-window__heading">
+        <h2 class="erf-comment-window__title" id="${id}-t" tabindex="-1">${o.title}</h2>
+        ${o.context ? `<p class="erf-comment-window__context">${o.context}</p>` : ''}
+        ${o.context2 ? `<p class="erf-comment-note">${o.context2}</p>` : ''}
+      </div>
+      <button class="erf-comment-icon-btn" type="button" aria-label="Close" data-close>${I('x')}</button>
+    </div>
+    <div class="erf-comment-window__body">${o.body}</div>
+    ${o.foot ? `<div class="erf-comment-window__foot">${o.foot}</div>` : ''}
+  </div>`;
+}
+const ctx = (label, file, line) => `<bdi dir="ltr">${label}</bdi> · ${file}, line ${line}`;
+const btn = (label, kind, extra = '') => `<button class="erf-comment-btn erf-comment-btn--${kind}" type="button" ${extra}><span>${label}</span></button>`;
+const action = (label, extra = '') => `<button class="erf-comment-action" type="button" ${extra}>${label}</button>`;
+const banner = (kind, iconName, text, title, actions) => `<div class="erf-comment-banner erf-comment-banner--${kind}">
+  <span class="erf-comment-banner__icon" aria-hidden="true">${I(iconName)}</span>
+  <div class="erf-comment-banner__body">${title ? `<p class="erf-comment-banner__title">${title}</p>` : ''}
+    <p class="erf-comment-banner__text">${text}</p>
+    ${actions ? `<div class="erf-comment-banner__actions">${actions}</div>` : ''}</div></div>`;
+
+function field(o = {}) {
+  const id = `f${uid += 1}`;
+  const n = o.count ?? (o.value ? o.value.length : 0);
+  const near = n >= 3600 && n <= 4000;
+  const over = n > 4000;
+  const err = o.error || (over ? `Comments can be up to 4,000 characters. This one is ${n.toLocaleString('en-US')}.` : '');
+  const counterGlyph = over ? I('circle-x', 12) + ' ' : near ? I('triangle-alert', 12) + ' ' : '';
+  return `<div class="erf-comment-field">
+    <label class="erf-comment-field__label" for="${id}">${o.label || 'Comment'}</label>
+    <textarea class="erf-comment-textarea${o.reply ? ' erf-comment-textarea--reply' : ''}" id="${id}"
+      placeholder="${o.placeholder ?? 'What should change here?'}" aria-describedby="${err ? `${id}-e ` : ''}${id}-h ${id}-c"
+      ${err ? 'aria-invalid="true"' : ''} ${o.readonly ? 'readonly' : ''}>${H.esc(o.value || '')}</textarea>
+    ${err ? `<p class="erf-comment-error" id="${id}-e"><span aria-hidden="true">${I('circle-x', 14)}</span><span>${err}</span></p>` : ''}
+    <div class="erf-comment-field__foot">
+      <p class="erf-comment-field__hint" id="${id}-h">${o.hint || 'Plain text. Saved inside index.html.'}</p>
+      <span class="erf-comment-counter${over ? ' erf-comment-counter--over' : near ? ' erf-comment-counter--near' : ''}" id="${id}-c">${counterGlyph}${n} / 4000</span>
+    </div>
+    ${o.restored ? '<p class="erf-comment-note">Draft restored</p>' : ''}
+  </div>`;
+}
+const identity = '<p class="erf-comment-identity">Commenting as <bdi>Marcin Obel</bdi> <button class="erf-comment-link" type="button">Change</button></p>';
+const newFoot = (saving, disabled) => btn('Cancel', 'secondary') +
+  (saving ? btn('Saving…', 'primary', 'aria-disabled="true"')
+          : btn('Save', 'primary', `title="Save (Ctrl+Enter)" aria-keyshortcuts="Control+Enter"${disabled ? ' aria-disabled="true"' : ''}`));
+
+function message(o) {
+  const id = `m${uid += 1}`;
+  const email = o.email ? `<span class="erf-comment-sr" id="${id}-d">${H.esc(o.email)}</span>` : '';
+  return `<article class="erf-comment-message" aria-labelledby="${id}-a"${o.email ? ` aria-describedby="${id}-d"` : ''}>
+    <div class="erf-comment-message__meta">
+      <span class="erf-comment-message__meta-text" id="${id}-a"><bdi class="erf-comment-message__author"${o.email ? ` title="${H.esc(o.email)}"` : ''}>${H.esc(o.name)}</bdi>${o.showEmail ? ` <span>(${H.esc(o.email)})</span>` : ''} · <time datetime="${o.iso}">${o.time}</time>${o.edited ? ' · edited' : ''}</span>
+      ${o.noMenu ? '' : `<button class="erf-comment-icon-btn" type="button" aria-haspopup="menu" aria-expanded="${o.menuOpen ? 'true' : 'false'}" aria-label="Actions for the comment by ${H.esc(o.name)}, ${o.time}">${I('ellipsis')}</button>`}
+    </div>
+    ${o.editing ? o.editing : `<p class="erf-comment-message__text" dir="auto">${o.html || H.esc(o.text)}</p>`}
+    ${o.after || ''}${email}
+  </article>`;
+}
+const confirmBox = (text, label) => `<div class="erf-comment-confirm" role="group" aria-label="Confirm delete">
+  <p class="erf-comment-confirm__text">${text}</p>
+  <div class="erf-comment-confirm__actions">${btn('Cancel', 'secondary', 'data-autofocus')}${btn(label, 'danger')}</div></div>`;
+const resolvedLine = (open) => `<div class="erf-comment-resolved">
+  <span class="erf-comment-resolved__text"><span class="erf-comment-resolved__icon" aria-hidden="true">${I('check', 14)}</span>
+  <span>Resolved by <bdi>Anna K.</bdi> · <time datetime="2026-10-25T16:05">25 Oct, 16:05</time></span></span>
+  ${action('Re-open')}
+  <button class="erf-comment-icon-btn" type="button" aria-expanded="${open ? 'true' : 'false'}" aria-label="Show the resolved thread">${I(open ? 'chevron-up' : 'chevron-down')}</button>
+  ${open ? `<div class="erf-comment-resolved__body">${message({ name: 'Anna K.', email: 'anna@studio.example', iso: '2026-10-24T11:20', time: '24 Oct, 11:20', text: 'The footer logo is blurry on retina screens.' })}</div>` : ''}
+</div>`;
+const replyBox = (resolve = true) => `<div class="erf-comment-thread__reply">${field({ label: 'Reply', placeholder: '', reply: true, hint: 'Plain text. Saved inside index.html.' })}
+  <div class="erf-comment-thread__actions">${resolve ? action('Resolve') : ''}${btn('Reply', 'primary', 'title="Reply (Ctrl+Enter)"')}</div></div>`;
+
+const THREAD_A = (o = {}) => `<section class="erf-comment-thread" aria-label="Thread started by Marcin Obel">
+  ${message({ name: 'Marcin Obel', email: 'marcin@qodeca.example', iso: '2026-10-26T14:32', time: 'Today, 14:32',
+              text: 'Make this say "Start free trial".', menuOpen: o.menuOpen, editing: o.editing,
+              after: o.confirm || '' })}
+  <div class="erf-comment-replies">
+    ${message({ name: 'Anna K.', email: 'anna@studio.example', iso: '2026-10-25T09:10', time: 'Yesterday, 09:10', edited: true,
+                text: 'Agreed – and move it above the fold.' })}
+  </div>
+  ${o.noReply ? '' : replyBox()}
+</section>`;
+
+function add(host, caption, html, after) {
+  const fig = document.createElement('figure');
+  fig.className = 'state';
+  fig.innerHTML = `<figcaption>${caption}</figcaption>${html}`;
+  document.getElementById(host).appendChild(fig);
+  if (after) after(fig);
+}
+
+/* ---------- new comment ---------- */
+add('g-new', '<strong>an element in the file</strong> – context line, hint, counter, identity',
+  win({ title: 'New comment', context: ctx('button.cta', 'index.html', 42), body: field() + identity, foot: newFoot(false, true) }));
+add('g-new', '<strong>an element a script built</strong> – saved before its in-file ancestor',
+  win({ title: 'New comment', context: ctx('div.toast', 'index.html', 61),
+        context2: 'Added by a script – saved before &lt;section id="pricing"&gt;.', body: field() + identity, foot: newFoot(false, true) }));
+add('g-new', '<strong>inside a same-project frame</strong> – saved in the frame’s own file',
+  win({ title: 'New comment', context: ctx('td.price', 'pricing-table.html', 18), context2: 'Saved in pricing-table.html.',
+        body: field({ hint: 'Plain text. Saved inside pricing-table.html.' }) + identity, foot: newFoot(false, true) }));
+add('g-new', '<strong>from 3,600 characters</strong> – the counter gains a glyph and the warning colour',
+  win({ title: 'New comment', context: ctx('button.cta', 'index.html', 42), body: field({ count: 3712, value: 'Long review text…' }) + identity, foot: newFoot() }));
+add('g-new', '<strong>over 4,000</strong> – invalid, with the reason under the field; Save says why',
+  win({ title: 'New comment', context: ctx('button.cta', 'index.html', 42), body: field({ count: 4212, value: 'Long review text…' }) + identity, foot: newFoot(false, true) }));
+add('g-new', '<strong>Save on an empty field</strong> – Save is aria-disabled and says why when pressed',
+  win({ title: 'New comment', context: ctx('button.cta', 'index.html', 42), body: field({ error: 'Write a comment first.' }) + identity, foot: newFoot(false, true) }));
+add('g-new', '<strong>Draft restored</strong> – reopened after Esc; the text was kept per element',
+  win({ title: 'New comment', context: ctx('button.cta', 'index.html', 42), body: field({ value: 'Make the button text bigger', restored: true }) + identity, foot: newFoot() }));
+
+/* ---------- saving ---------- */
+const typed = 'Make the button text bigger';
+add('g-save', '<strong>Saving…</strong> – aria-disabled, focus stays on it, the text is kept',
+  win({ title: 'New comment', context: ctx('button.cta', 'index.html', 42), body: field({ value: typed }) + identity, foot: newFoot(true) }));
+add('g-save', '<strong>unsaved source</strong> – the file has unsaved edits in another tab',
+  win({ title: 'New comment', context: ctx('button.cta', 'index.html', 42),
+        body: banner('warning', 'triangle-alert', 'index.html has unsaved changes in another tab. Save them first so your edits and this comment don\'t overwrite each other.',
+              'Save your edits first', action('Go to tab') + action('Save index.html')) + field({ value: typed }) + identity,
+        foot: newFoot(false, true) }));
+add('g-save', '<strong>unsaved source, changed on disk</strong> – Go to tab only: saving would overwrite the outside edit',
+  win({ title: 'New comment', context: ctx('button.cta', 'index.html', 42),
+        body: banner('warning', 'triangle-alert', 'index.html has unsaved changes in another tab. Save them first so your edits and this comment don\'t overwrite each other.',
+              'Save your edits first', action('Go to tab')) + field({ value: typed }) + identity,
+        foot: newFoot(false, true) }));
+add('g-save', '<strong>the other tab saved</strong> – the banner clears itself and says so',
+  win({ title: 'New comment', context: ctx('button.cta', 'index.html', 42),
+        body: banner('success', 'check', 'Saved. You can add your comment now.') + field({ value: typed }) + identity, foot: newFoot() }));
+add('g-save', '<strong>the write failed</strong> – text kept, Save stays',
+  win({ title: 'New comment', context: ctx('button.cta', 'index.html', 42),
+        body: field({ value: typed }) + identity + '<div style="margin-top: var(--space-8)"></div>' +
+              banner('error', 'circle-x', 'Couldn\'t save the comment. Your text is still here – try again.'), foot: newFoot() }));
+add('g-save', '<strong>the element moved</strong> – close and pick again; the text comes back',
+  win({ title: 'New comment', context: ctx('button.cta', 'index.html', 42),
+        body: field({ value: typed }) + identity + '<div style="margin-top: var(--space-8)"></div>' +
+              banner('error', 'circle-x', 'This element changed in the file since you picked it. Close and pick it again – your text will be restored.'),
+        foot: btn('Close', 'secondary') }));
+add('g-save', '<strong>the window was open too long</strong> – Pick again, text kept',
+  win({ title: 'New comment', context: ctx('button.cta', 'index.html', 42),
+        body: field({ value: typed }) + identity + '<div style="margin-top: var(--space-8)"></div>' +
+              banner('error', 'circle-x', 'This comment window was open too long. Pick the element again – your text is kept.', '', action('Pick again')),
+        foot: btn('Cancel', 'secondary') }));
+add('g-save', '<strong>the file is gone</strong> – nothing to save into; copy the text out',
+  win({ title: 'New comment', context: ctx('button.cta', 'index.html', 42),
+        body: field({ value: typed }) + '<div style="margin-top: var(--space-8)"></div>' +
+              banner('error', 'circle-x', 'index.html no longer exists. Copy your text before closing.'),
+        foot: btn('Close', 'secondary') }));
+
+/* ---------- the error table ---------- */
+const PLAN = '§10.10';
+const ERR = 'errors.ts';
+const ERRORS = [
+  ['(field) empty', 'Write a comment first.', PLAN, 'under the field'],
+  ['(field) too long', 'Comments can be up to 4,000 characters. This one is {n}.', PLAN, 'under the field'],
+  ['COMMENT_FILE_READ_ONLY', 'Couldn\'t save: {file} is read-only. Your text is still here.', PLAN, 'error banner'],
+  ['COMMENT_TARGET_MOVED', 'This element changed in the file since you picked it. Close and pick it again – your text will be restored.', PLAN, 'error banner, Close'],
+  ['COMMENT_FILE_GONE', '{file} no longer exists. Copy your text before closing.', PLAN, 'error banner, Close'],
+  ['COMMENT_WRITE_FAILED', 'Couldn\'t save the comment. Your text is still here – try again.', PLAN, 'error banner, Save stays'],
+  ['COMMENT_ENCODING_UNSUPPORTED', 'Erfana can only add comments to UTF-8 files.', PLAN, 'error banner'],
+  ['COMMENT_FILE_CONFLICTED', '{file} has unresolved git conflicts. Resolve them first.', PLAN, 'error banner'],
+  ['COMMENT_WRITE_REFUSED_LINK', '{file} is a link to another file, so Erfana won\'t write to it.', PLAN, 'error banner'],
+  ['COMMENT_WRITE_UNSUPPORTED_FS', 'Erfana can\'t write to {file} on this drive.', PLAN, 'error banner'],
+  ['COMMENT_DRAFT_EXPIRED', 'This comment window was open too long. Pick the element again – your text is kept.', PLAN, 'error banner, Pick again'],
+  ['COMMENT_BLOCK_CHANGED', 'This block changed on disk. Reopen it and try again.', `${PLAN} (damaged row) – ${ERR} says “This comment changed on disk.”`, 'error banner'],
+  ['COMMENT_UNSAVED_SOURCE', 'Save your edits first / {file} has unsaved changes in another tab. …', PLAN, 'warning banner, Go to tab, Save {file}'],
+  ['COMMENT_IDENTITY_REQUIRED', 'Enter a name to add comments.', ERR, 'the identity step opens'],
+  ['COMMENT_LIMIT', 'This would go over a comment size limit, so nothing was saved.', ERR, 'error banner'],
+  ['COMMENT_FILE_TOO_LARGE', 'Erfana adds comments only to files up to 4 MB.', ERR, 'error banner'],
+  ['COMMENT_KEY_INVALID', 'This comment is no longer open here. Reopen it and try again.', ERR, 'error banner, Close'],
+  ['COMMENT_PATH_REFUSED', 'Erfana doesn\'t write comments to this file.', ERR, 'error banner']
+];
+const tbody = document.getElementById('errors');
+for (const [code, text, source, shown] of ERRORS) {
+  const tr = document.createElement('tr');
+  tr.innerHTML = `<td><code></code></td><td></td><td></td><td></td>`;
+  tr.children[0].firstChild.textContent = code;
+  tr.children[1].textContent = text;
+  tr.children[2].innerHTML = source === PLAN ? `<span class="copy-source">${PLAN}</span>` : `<span class="not-in-plan">${H.esc(source)}</span>`;
+  tr.children[3].textContent = shown;
+  tbody.appendChild(tr);
+}
+
+/* ---------- threads ---------- */
+add('g-thread', '<strong>a thread</strong> – reply, resolve, a folded resolved thread, New comment',
+  win({ title: 'Comments on button.cta', context: ctx('button.cta', 'index.html', 42),
+        body: THREAD_A() + resolvedLine(false), foot: btn('New comment', 'secondary') }));
+add('g-thread', '<strong>the … menu</strong> – Edit, Delete… (decided Menu card)',
+  win({ title: 'Comment on button.cta', context: ctx('button.cta', 'index.html', 42),
+        body: THREAD_A({ menuOpen: true, noReply: true }), foot: btn('New comment', 'secondary') }),
+  (fig) => {
+    const anchor = fig.querySelector('[aria-expanded="true"]');
+    const host = fig.querySelector('.erf-comment-window');
+    host.style.position = 'relative';
+    const a = host.getBoundingClientRect();
+    const b = anchor.getBoundingClientRect();
+    const menu = document.createElement('div');
+    menu.className = 'erf-menu';
+    menu.setAttribute('role', 'menu');
+    menu.setAttribute('aria-label', 'Comment actions');
+    menu.style.cssText = `position:absolute; left:${b.right - a.left - 180}px; top:${b.bottom - a.top + 2}px`;
+    menu.innerHTML = `<div class="erf-menu-item erf-menu-item--active" role="menuitem"><span class="erf-menu-label">Edit</span></div>
+      <div class="erf-menu-item erf-menu-item--danger" role="menuitem"><span class="erf-menu-label">Delete…</span></div>`;
+    host.appendChild(menu);
+  });
+add('g-thread', '<strong>edit in place</strong> – the message becomes its field',
+  win({ title: 'Comment on button.cta', context: ctx('button.cta', 'index.html', 42),
+        body: THREAD_A({ noReply: true, editing: field({ label: 'Edit comment', value: 'Make this say "Start free trial".', placeholder: '' }) +
+          `<div class="erf-comment-thread__actions">${btn('Cancel', 'secondary')}${btn('Save changes', 'primary')}</div>` }),
+        foot: btn('New comment', 'secondary') }));
+add('g-thread', '<strong>delete a comment</strong> – inline, destructive on the right, focus on Cancel',
+  win({ title: 'Comment on button.cta', context: ctx('button.cta', 'index.html', 42),
+        body: `<section class="erf-comment-thread">${message({ name: 'Anna K.', email: 'anna@studio.example', iso: '2026-10-25T09:10', time: 'Yesterday, 09:10',
+          text: 'Agreed – and move it above the fold.', after: confirmBox('Delete this comment? It is removed from index.html. Git history keeps earlier versions.', 'Delete comment') })}</section>`,
+        foot: btn('New comment', 'secondary') }));
+add('g-thread', '<strong>delete a thread</strong> – deleting the first message deletes its replies',
+  win({ title: 'Comment on button.cta', context: ctx('button.cta', 'index.html', 42),
+        body: THREAD_A({ noReply: true, confirm: confirmBox('Delete this thread and its 1 replies?', 'Delete thread') }),
+        foot: btn('New comment', 'secondary') }));
+add('g-thread', '<strong>a resolved thread, unfolded</strong>',
+  win({ title: 'Comment on footer img.logo', context: ctx('img.logo', 'index.html', 120), body: resolvedLine(true), foot: btn('New comment', 'secondary') }));
+add('g-thread', '<strong>two authors share a name</strong> – the email is shown in full',
+  win({ title: 'Comment on h1', context: ctx('h1', 'index.html', 12), body: `<section class="erf-comment-thread">
+    ${message({ name: 'Anna K.', email: 'anna@studio.example', showEmail: true, iso: '2026-10-25T09:10', time: 'Yesterday, 09:10', text: 'Shorter headline?' })}
+    <div class="erf-comment-replies">${message({ name: 'Anna K.', email: 'anna.k@client.example', showEmail: true, iso: '2026-10-26T08:02', time: 'Today, 08:02', text: 'Fine by me.' })}</div></section>`,
+        foot: btn('New comment', 'secondary') }));
+
+/* ---------- text ---------- */
+add('g-text', '<strong>a bidi control in the text</strong> – drawn as a visible token',
+  win({ title: 'Comment on a.download', context: ctx('a.download', 'index.html', 77), body: `<section class="erf-comment-thread">
+    ${message({ name: 'Marcin Obel', iso: '2026-10-26T10:00', time: 'Today, 10:00', html: H.visibleBidi('Rename the file to invoice‮fdp.exe before release') })}</section>`,
+        foot: btn('New comment', 'secondary') }));
+add('g-text', '<strong>right-to-left text</strong> – dir="auto" per message; long words break, never widen',
+  win({ title: 'Comment on p.lead', context: ctx('p.lead', 'index.html', 30), body: `<section class="erf-comment-thread">
+    ${message({ name: 'Yael', iso: '2026-10-26T11:40', time: 'Today, 11:40', text: 'הכותרת הזאת ארוכה מדי למסך של טלפון.' })}
+    <div class="erf-comment-replies">${message({ name: 'Marcin Obel', iso: '2026-10-26T11:52', time: 'Today, 11:52', text: 'See https://example.com/a/very/long/path/that/must/wrap/instead/of/widening/the/window' })}</div></section>`,
+        foot: btn('New comment', 'secondary') }));
+
+/* ---------- odd states ---------- */
+const RAW = '<!-- erfana:comment v1\nMarcin Obel · 2026-10-20 14:02\nMove the CTA above the fold.\n@data {"v":1,"id":"c_7f3k","thread":[{"author":{"name":"Marcin Obel"},"text":"Move the CTA above the fold.",\n-->';
+const RAW_CONFLICT = '<!-- erfana:comment v1\n<<<<<<< HEAD\nMarcin Obel · Move the CTA above the fold.\n=======\nAnna K. · Keep the CTA where it is.\n>>>>>>> review/anna\n@data {"v":1,"id":"c_7f3k", …}\n-->';
+const rawBox = (text) => `<span class="erf-comment-raw-label" id="raw${uid}">Raw text (read-only)</span>
+  <pre class="erf-comment-raw" tabindex="0" aria-labelledby="raw${uid}">${H.esc(text)}</pre>`;
+add('g-odd', '<strong>damaged</strong> – read-only, never overwritten; copy, open in source, or delete exactly it',
+  win({ title: 'Damaged comment', context: 'index.html, line 57',
+        body: banner('warning', 'triangle-alert', 'Erfana can\'t read this comment block, so it won\'t change it. Fix it in the source, or delete it.') + rawBox(RAW),
+        foot: `<span class="erf-comment-window__foot-start">${action('Copy raw text')}</span>${action('Open in source')}${action('Delete block…')}` }));
+add('g-odd', '<strong>damaged by a merge</strong> – conflict wording; the file is read-only, so no Delete',
+  win({ title: 'Damaged comment', context: 'index.html, line 57',
+        body: banner('warning', 'triangle-alert', 'This block contains git conflict markers. Resolve the conflict in the source.') + rawBox(RAW_CONFLICT),
+        foot: `<span class="erf-comment-window__foot-start">${action('Copy raw text')}</span>${action('Open in source')}` }));
+add('g-odd', '<strong>delete a damaged block</strong> – removes exactly the text shown',
+  win({ title: 'Damaged comment', context: 'index.html, line 57',
+        body: rawBox(RAW) + confirmBox('Delete this damaged block? Erfana removes exactly the text shown above from index.html.', 'Delete block') }));
+add('g-odd', '<strong>the block changed meanwhile</strong> – nothing deleted',
+  win({ title: 'Damaged comment', context: 'index.html, line 57',
+        body: banner('error', 'circle-x', 'This block changed on disk. Reopen it and try again.') + rawBox(RAW), foot: btn('Close', 'secondary') }));
+add('g-odd', '<strong>read-only file</strong> – the reason up front (same §10.10 sentence), no reply, edit or delete',
+  win({ title: 'Comment on button.cta', context: ctx('button.cta', 'legacy.html', 42),
+        body: banner('info', 'info', 'Erfana can only add comments to UTF-8 files.') +
+          `<section class="erf-comment-thread">${message({ name: 'Anna K.', iso: '2026-10-25T09:10', time: 'Yesterday, 09:10', text: 'Typo in the price.', noMenu: true })}</section>`,
+        foot: btn('Close', 'secondary') }));
+add('g-odd', '<strong>not found</strong> – the element is gone from the file; the stored quote, struck through',
+  win({ title: 'Comment on section#pricing', context: 'index.html, line 88',
+        body: banner('warning', 'triangle-alert', `Erfana can't find this element any more. The comment stays in index.html, line 88.<br><span>It was attached to:</span><s class="erf-comment-quote">Choose the plan that fits your team</s>`) +
+          `<section class="erf-comment-thread">${message({ name: 'Marcin Obel', iso: '2026-10-20T14:02', time: '20 Oct, 14:02', text: 'Rename to "Plans".', noMenu: true })}</section>`,
+        foot: `<span class="erf-comment-window__foot-start">${action('Open in source')}</span>${action('Delete…')}` }));
+add('g-odd', '<strong>not visible now</strong> – a hidden slide or tab; still fully usable',
+  win({ title: 'Comment on li.slide-4', context: ctx('li.slide-4', 'deck.html', 140),
+        body: banner('info', 'info', 'This element isn\'t on screen right now – it may be on another slide or tab. Its icon comes back when it does.') + THREAD_A(),
+        foot: btn('New comment', 'secondary') }));
+
+/* ---------- the sheet ---------- */
+document.getElementById('sheetArea').insertAdjacentHTML('beforeend',
+  win({ title: 'New comment', context: ctx('button.cta', 'index.html', 42), body: field() + identity, foot: newFoot(false, true), sheet: true, example: 'New comment as a sheet' }));
+
+/* ---------- times ---------- */
+const NOW = new Date(2026, 9, 26, 15, 0);
+const TIMES = [new Date(2026, 9, 26, 14, 32), new Date(2026, 9, 25, 9, 10), new Date(2026, 9, 3, 18, 5), new Date(2025, 11, 30, 8, 0)];
+for (const t of TIMES) {
+  const tr = document.createElement('tr');
+  tr.innerHTML = '<td></td><td></td>';
+  tr.children[0].textContent = t.toISOString().slice(0, 16).replace('T', ' ') + ' (UTC)';
+  tr.children[1].innerHTML = `<time datetime="${t.toISOString()}">${H.esc(H.formatCommentTime(t, NOW, 'en-GB'))}</time>`;
+  document.getElementById('times').appendChild(tr);
+}
+
+/* ---------- the live window ---------- */
+const area = document.getElementById('liveArea');
+const opener = document.getElementById('opener');
+const live = document.getElementById('liveRegion');
+let draft = '';
+let release = null;
+
+function openLive() {
+  const restored = draft.length > 0;
+  area.insertAdjacentHTML('beforeend', win({ live: true, title: 'New comment', context: ctx('button.cta', 'index.html', 42),
+    body: field({ value: draft, restored }) + identity, foot: newFoot(false, draft.trim() === '') }));
+  const w = area.querySelector('.erf-comment-window');
+  H.drawOutline(area, H.boxIn(area, area.querySelector('#buy')), H.labelOf(area.querySelector('#buy')), true);
+  const ta = w.querySelector('textarea');
+  const save = w.querySelectorAll('.erf-comment-btn--primary')[0];
+  const cancel = w.querySelector('.erf-comment-btn--secondary');
+  const fieldBox = w.querySelector('.erf-comment-field');
+  const update = () => {
+    draft = ta.value;
+    const n = ta.value.length;
+    const c = fieldBox.querySelector('.erf-comment-counter');
+    c.className = 'erf-comment-counter' + (n > 4000 ? ' erf-comment-counter--over' : n >= 3600 ? ' erf-comment-counter--near' : '');
+    c.innerHTML = (n > 4000 ? H.icon('circle-x', 12) + ' ' : n >= 3600 ? H.icon('triangle-alert', 12) + ' ' : '') + `${n} / 4000`;
+    if (ta.value.trim() === '' || n > 4000) save.setAttribute('aria-disabled', 'true'); else save.removeAttribute('aria-disabled');
+    setError(n > 4000 ? `Comments can be up to 4,000 characters. This one is ${n.toLocaleString('en-US')}.` : '');
+  };
+  const setError = (text) => {
+    let e = fieldBox.querySelector('.erf-comment-error');
+    if (!text) { if (e) e.remove(); ta.removeAttribute('aria-invalid'); return; }
+    if (!e) {
+      e = document.createElement('p'); e.className = 'erf-comment-error'; e.id = `${ta.id}-e`;
+      ta.insertAdjacentElement('afterend', e);
+    }
+    e.innerHTML = `<span aria-hidden="true">${H.icon('circle-x', 14)}</span><span>${H.esc(text)}</span>`;
+    ta.setAttribute('aria-invalid', 'true');
+    ta.setAttribute('aria-describedby', `${ta.id}-e ${ta.id}-h ${ta.id}-c`);
+  };
+  const doSave = () => {
+    if (save.getAttribute('aria-disabled') === 'true') {
+      if (ta.value.trim() === '') setError('Write a comment first.');
+      ta.focus();
+      return;
+    }
+    save.setAttribute('aria-disabled', 'true');
+    save.firstElementChild.textContent = 'Saving…';
+    setTimeout(() => { draft = ''; close(); H.announce(live, 'Comment saved to index.html.'); }, 700);
+  };
+  ta.addEventListener('input', update);
+  ta.addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); doSave(); } });
+  save.addEventListener('click', doSave);
+  cancel.addEventListener('click', () => close());
+  w.querySelector('[data-close]').addEventListener('click', () => close());
+  release = H.trapFocus(w, () => close());
+  ta.focus();
+  ta.setSelectionRange(ta.value.length, ta.value.length);
+}
+function close() {
+  if (release) release();
+  release = null;
+  const w = area.querySelector('.erf-comment-window');
+  if (w) w.remove();
+  H.clearOutline(area);
+  opener.focus();
+}
+opener.addEventListener('click', () => { if (!area.querySelector('.erf-comment-window')) openLive(); });
+</script>
+</body>
+</html>

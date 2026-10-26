@@ -1,0 +1,98 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/**
+ * The in-page comment overlay – a MIRROR, not a source.
+ *
+ * The shipping overlay is a CSS string in src/preload/previewPageComments/
+ * overlayStyles.ts, adopted by a closed shadow root inside the previewed page.
+ * The page cannot see Erfana's tokens, so main resolves them into
+ * `commentState.theme` (src/main/services/preview/comments/commentOverlayTheme.ts)
+ * and the preload interpolates literals. This file is the same rule set with each
+ * theme field written back as the token it is resolved from, so the card renders
+ * the mapping instead of describing it:
+ *
+ *   accent      -> var(--color-accent-primary)
+ *   accentHover -> var(--color-brand-violet-hover)
+ *   ink         -> var(--color-brand-black)
+ *   paper       -> var(--color-brand-white)
+ *   muted       -> var(--color-text-primary)
+ *   warning     -> var(--color-warning)
+ *   font        -> var(--font-mono)
+ *   size        -> var(--text-sm)
+ *   ring        -> var(--border-width-thick)
+ *   pinTarget   -> var(--btn-height-sm)
+ *
+ * Two departures from the shipping string, both forced by the card:
+ *  - `position: fixed` becomes `position: absolute`, because a card draws many
+ *    pages and each overlay is placed inside its own `.page-area`.
+ *  - The literals overlayStyles.ts writes OUTSIDE the theme (1px ink line, 4px
+ *    label padding, 2px 8px tab padding) are written as the token of the same
+ *    value. `line-height: 1.4` has no equal token and stays literal; see the
+ *    overlay card's Exceptions.
+ *
+ * No `var()` may ever reach the page. If you change a rule here, change
+ * overlayStyles.ts in the same commit, or this card stops describing the page.
+ */
+
+.erf-hpc-root, .erf-hpc-root * { box-sizing: border-box; border-radius: 0; margin: 0; padding: 0; }
+.erf-hpc-root { position: absolute; inset: 0; pointer-events: none; overflow: hidden;
+                font-family: var(--font-mono); font-size: var(--text-sm); line-height: 1.4;
+                color: var(--color-brand-white); }
+
+/* Two-tone ring: the accent alone fails 3:1 on a white page, the ink line alone
+   fails on a black one. Together one of the two edges always clears it. */
+.erf-hpc-outline { position: absolute; pointer-events: none;
+                   border: var(--border-width-thick) solid var(--color-accent-primary);
+                   outline: var(--border-width) solid var(--color-brand-black);
+                   box-shadow: inset 0 0 0 var(--border-width) var(--color-brand-black); }
+.erf-hpc-outline--selected { background: color-mix(in srgb, var(--color-accent-primary) 12%, transparent); }
+.erf-hpc-flash { position: absolute; pointer-events: none;
+                 border: var(--border-width-thick) solid var(--color-accent-primary);
+                 background: color-mix(in srgb, var(--color-accent-primary) 24%, transparent); }
+
+.erf-hpc-label { position: absolute; pointer-events: none; padding: 0 var(--space-2); white-space: nowrap;
+                 direction: ltr; unicode-bidi: isolate; background: var(--color-brand-black);
+                 color: var(--color-brand-white); border: var(--border-width) solid var(--color-accent-primary); }
+.erf-hpc-label__tag { color: var(--color-accent-primary); }
+.erf-hpc-label__size { color: var(--color-text-primary); margin-left: 1ch; }
+
+.erf-hpc-pin { position: absolute; pointer-events: auto; cursor: pointer; display: block;
+               width: var(--btn-height-sm); height: var(--btn-height-sm); }
+.erf-hpc-pin svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.erf-hpc-pin__body { fill: var(--color-accent-primary); stroke: var(--color-brand-black);
+                     stroke-width: 1.5; stroke-linejoin: miter; }
+.erf-hpc-pin__line { fill: var(--color-brand-black); }
+.erf-hpc-pin__count { fill: var(--color-brand-black); font-family: var(--font-mono); font-size: var(--text-sm);
+                      font-weight: var(--font-bold); text-anchor: middle; dominant-baseline: middle; }
+.erf-hpc-pin:hover .erf-hpc-pin__body,
+.erf-hpc-pin--hover .erf-hpc-pin__body { fill: var(--color-brand-violet-hover); }
+.erf-hpc-pin--selected .erf-hpc-pin__body { fill: var(--color-brand-black); stroke: var(--color-accent-primary);
+                                            stroke-width: 2; }
+.erf-hpc-pin--selected .erf-hpc-pin__line,
+.erf-hpc-pin--selected .erf-hpc-pin__count { fill: var(--color-accent-primary); }
+.erf-hpc-pin--damaged .erf-hpc-pin__body { fill: var(--color-warning); }
+.erf-hpc-pin:focus-visible,
+.erf-hpc-pin--focus { outline: var(--border-width-thick) solid var(--color-accent-primary);
+                      outline-offset: var(--space-1);
+                      box-shadow: 0 0 0 var(--space-2) var(--color-brand-black); }
+
+/* A transparent shield over a frame that is not commentable inside (§19 R3-3). */
+.erf-hpc-shield { position: absolute; pointer-events: auto; background: transparent; cursor: crosshair; }
+
+/* Comment mode: a 2px frame inside the page edge, and the tab. */
+.erf-hpc-frame { position: absolute; inset: 0; pointer-events: none;
+                 border: var(--border-width-thick) solid var(--color-accent-primary); }
+.erf-hpc-tab { position: absolute; top: 0; left: 50%; transform: translateX(-50%); pointer-events: none;
+               padding: var(--space-1) var(--space-4); white-space: nowrap;
+               background: var(--color-accent-primary); color: var(--color-brand-black); }
+.erf-hpc-tab--bottom { top: auto; bottom: 0; }
+.erf-hpc-hidden { display: none; }
+
+@media (forced-colors: active) {
+  .erf-hpc-outline, .erf-hpc-flash, .erf-hpc-frame { border-color: Highlight; outline-color: CanvasText; }
+  .erf-hpc-label, .erf-hpc-tab { background: Highlight; color: HighlightText; border-color: HighlightText; }
+  .erf-hpc-label__tag, .erf-hpc-label__size { color: HighlightText; }
+  .erf-hpc-pin__body { fill: Highlight; stroke: HighlightText; }
+  .erf-hpc-pin__line, .erf-hpc-pin__count { fill: HighlightText; }
+}
+@media print { .erf-hpc-root { display: none; } }

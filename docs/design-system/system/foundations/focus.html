@@ -200,6 +200,27 @@
         this card words its inset case for lists. The band's chip keeps the outward ring: it fits inside the
         bar's padding. See <code>PreviewChromeBand.css</code>.</td>
     </tr>
+    <tr>
+      <td>HTML-preview comment overlay (outline and pin ring, inside the page)</td>
+      <td>The ring is <code>var(--color-border-focus)</code> at <code>--border-width-thick</code>.</td>
+      <td>Literal colours passed in by main as <code>commentState.theme</code> – the accent ring with an ink line or
+        halo beside it – because the overlay is drawn in the previewed page, where a <code>var()</code> would read
+        the page's own properties. See <code>overlayStyles.ts</code> and the proposed
+        <a href="../../product/html-comments/overlay.html">Comment overlay</a> card.</td>
+    </tr>
+    <tr>
+      <td>Comment pins</td>
+      <td>Every control is reachable with Tab.</td>
+      <td>Focusable (<code>role="button"</code>) but <code>tabindex="-1"</code>. A page can carry hundreds, and every
+        thread is reachable from the comments drawer, which is the guaranteed keyboard route (plan §10.8).</td>
+    </tr>
+    <tr>
+      <td>Closing the comment window or menu opened from the page</td>
+      <td>Escape returns focus to whatever opened it.</td>
+      <td>The opener is page content, so focus returns <em>natively</em> to the page view, with the picker on the same
+        element – Erfana cannot focus a node inside the native view. Planned for P6; see the proposed
+        <a href="../../product/html-comments/window.html">Comment window</a> card.</td>
+    </tr>
   </tbody>
 </table>
 

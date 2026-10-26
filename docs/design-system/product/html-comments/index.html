@@ -1,0 +1,417 @@
+<!-- @card group="HTML preview" name="Commenting on a page" subtitle="The whole journey – pins, comment mode, right-click, the first comment, save, reopen – on a live fake page" status="proposed" reviewed="2026-10-26" -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Erfana — commenting on a page</title>
+<link rel="stylesheet" href="../../tokens.css">
+<link rel="stylesheet" href="../../ds.css">
+<link rel="stylesheet" href="../../system/components/menu/menu.css">
+<link rel="stylesheet" href="../../system/components/permission-band/band.css">
+<link rel="stylesheet" href="../../system/components/permission-band/nav.css">
+<link rel="stylesheet" href="./demo.css">
+<link rel="stylesheet" href="./overlay.css">
+<link rel="stylesheet" href="./comments.css">
+<script src="./demo.js"></script>
+<style>
+  .journey { block-size: 400px; }
+  .live-panel { inline-size: 900px; block-size: 560px; }
+  .page-area:focus-visible { outline: var(--border-width-thick) solid var(--color-border-focus); outline-offset: calc(var(--space-1) * -1); }
+  .cards { columns: 2 320px; column-gap: var(--space-16); max-inline-size: 1100px; }
+  .cards a { color: var(--color-link); }
+  .cards li { margin-block-end: var(--space-4); break-inside: avoid; color: var(--color-text-tertiary); }
+</style>
+</head>
+<body>
+
+<h1>Commenting on a page</h1>
+<p class="ds-lede">
+  A reviewer turns on comment mode, right-clicks an element, writes, saves. Erfana writes the comment into the
+  HTML file just before that element, reloads the page where it was, and shows a speech-bubble pin. Coding agents
+  read the comments straight from the file. <strong>This card walks the whole journey; the five cards below hold
+  every state.</strong>
+</p>
+
+<ul class="cards">
+  <li><a href="overlay.html">Comment overlay in the page</a> – outline, label, pin, mode frame and tab, and the token mapping the page receives.</li>
+  <li><a href="window.html">Comment window</a> – new comment, thread, edit, delete, damaged, read-only, not found, not visible, saving, every error.</li>
+  <li><a href="drawer.html">Comments drawer</a> – Open / Resolved / Needs attention, empty, loading, error, narrow.</li>
+  <li><a href="identity.html">Who is commenting</a> – the one-time privacy notice, the identity step, Settings › Comments.</li>
+  <li><a href="toolbar.html">Comment tools in the toolbar</a> – the three tools, the unavailable reasons, the re-measured tiers.</li>
+</ul>
+
+<div class="ds-note">
+  <strong>The line this design draws.</strong> Hover outlines and pins are drawn <em>inside</em> the page, in a
+  closed shadow root, and carry no comment text and no emails – only counts. The menu, the comment window and
+  everything you type are <strong>Erfana's own chrome</strong>, drawn while the page is frozen to a still image
+  (decision 4). A page can fake an outline; it cannot see, style or type into the window where the words are.
+  <br><br>
+  <strong>Status.</strong> Proposed, as the plan files the set (§10.11). What the plan locks is not re-opened by
+  any of these cards: Erfana draws the menu and the window over a still; the pin is a speech bubble at the
+  element's top-right, one numbered pin for several threads, hidden when all are resolved; pins are always
+  visible and can be hidden per tab; anyone may edit or delete any comment; name required, email optional,
+  privacy notice once.
+</div>
+
+<h2>Try it – the live page</h2>
+<div class="ds-note">
+  <strong>Mouse:</strong> turn on Comment mode, hover, <em>right-click</em> an element and choose Add comment – or
+  left-click to open the window directly. Right-click the refused frame to see the disabled item.
+  <strong>Keyboard:</strong> focus the page and press <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>M</kbd>; <kbd>Tab</kbd>
+  / <kbd>Shift</kbd>+<kbd>Tab</kbd> pick the next or previous element, <kbd>Alt</kbd>+<kbd>↑</kbd>/<kbd>↓</kbd>
+  go to the parent or back down, <kbd>Enter</kbd> opens the window, <kbd>Shift</kbd>+<kbd>F10</kbd> the menu,
+  <kbd>Esc</kbd> closes whatever is open, then leaves the mode. Saving adds a pin with a one-time highlight;
+  clicking a pin reopens the thread in any mode.
+</div>
+<div class="panel live-panel"><div id="liveBand"></div><div class="panel__body">
+  <div class="page-area" id="area" tabindex="0" aria-label="Previewed page (stand-in for the native view)"><div class="page">
+    <h4 id="title">Pricing</h4>
+    <p id="lead">Start free, then pay for what you use. Every plan includes the editor and the terminal.</p>
+    <button class="cta" id="buy" type="button" tabindex="-1">Start free trial</button>
+    <button class="cta cta--ghost" id="talk" type="button" tabindex="-1">Talk to sales</button>
+    <div class="card" id="pro" style="margin-top: 14px"><b id="proName">Pro</b> – 12 € a month, up to 10 seats.</div>
+    <div class="frame" id="frame">iframe – https://example.com (refused)</div>
+  </div></div>
+</div></div>
+<div class="announce-view" id="region" aria-live="polite"></div>
+
+<h2>Step by step</h2>
+<div id="flow"></div>
+
+<h2>What it deliberately does not do</h2>
+<table>
+  <thead><tr><th>Not this</th><th>Why</th></tr></thead>
+  <tbody>
+    <tr><td>A “Send to agent” button</td><td>Agents read the file; the comment is already where they look (decision 9).</td></tr>
+    <tr><td>Other menu items</td><td>The menu holds exactly “Add comment” in v1 (decision 14). Outside comment mode the page keeps its own right-click.</td></tr>
+    <tr><td>Rich text</td><td>Plain text is what an agent reads unambiguously and what a diff shows honestly.</td></tr>
+    <tr><td>Animate anything</td><td>The window and drawer open instantly; pins never move; the “flash” is a static highlight. Nothing to turn off under reduced motion, and nothing racing the native page.</td></tr>
+    <tr><td>Show a verified author</td><td>Names are typed, not proven. No badge, no avatar; git history is the audit trail.</td></tr>
+  </tbody>
+</table>
+
+<script>
+const H = window.HPC;
+const I = H.icon;
+const mac = /Mac/.test(navigator.platform);
+const KEY = mac ? 'Cmd+Option+M' : 'Ctrl+Alt+M';
+
+/* ---------- small builders (the window card has the full set) ---------- */
+function bandHtml(s) {
+  const name = s.open ? `Comments, ${s.open} open` : 'Comments, none yet';
+  return `<div class="erf-band"><div class="erf-band__bar" role="toolbar" aria-label="Preview">
+    <button class="erf-band__tool" type="button" aria-label="Back" aria-disabled="true" title="Back – no earlier page in this tab">${I('back')}</button>
+    <button class="erf-band__tool erf-band__tool--toggle" type="button" aria-label="Open links in this tab" aria-pressed="false">${I('links')}</button>
+    <button class="erf-band__tool" type="button" aria-label="Find" title="Find (Cmd/Ctrl+F)">${I('find')}</button>
+    <button class="erf-band__tool erf-band__tool--toggle erf-band__tool--comment erf-band__tool--comment-first" type="button" aria-label="Comment mode"
+      aria-pressed="${s.mode}" title="${s.mode ? `Comment mode (${KEY}) – on: click an element to comment, Esc to leave` : `Comment mode (${KEY}) – off`}" data-mode>${I('message-square-plus')}</button>
+    <button class="erf-band__tool erf-band__tool--toggle erf-band__tool--comment erf-band__tool--count" type="button" aria-label="${name}" title="${name}"
+      aria-expanded="${Boolean(s.drawer)}" data-list>${I('messages-square')}${s.open ? `<span>${s.open}</span>` : ''}</button>
+    <button class="erf-band__tool erf-band__tool--toggle erf-band__tool--comment" type="button" aria-label="Show comment icons" aria-pressed="${s.pins !== false}"
+      title="${s.pins !== false ? 'Show comment icons – on' : 'Show comment icons – off: icons hidden on this page'}" data-pins>${I(s.pins !== false ? 'message-square' : 'message-square-off')}</button>
+    <span class="erf-band__spacer"></span>
+    <button class="erf-band__chip" type="button" aria-expanded="false" aria-label="0 blocked · 0 allowed. Remote hosts in this preview. Press Escape in the previewed page to return here."><span>0 blocked<span class="erf-band__chip-allowed"> · 0 allowed</span></span><span class="erf-band__chip-caret" aria-hidden="true">▸</span></button>
+    <span class="erf-band__separator" aria-hidden="true"></span>
+    <button class="erf-band__tool" type="button" aria-label="Open in default browser">${I('browser')}</button>
+    <button class="erf-band__tool" type="button" aria-label="Export to PDF">${I('pdf')}</button>
+  </div><div class="erf-band__announce" aria-live="polite"></div></div>`;
+}
+const btn = (label, kind, extra = '') => `<button class="erf-comment-btn erf-comment-btn--${kind}" type="button" ${extra}><span>${label}</span></button>`;
+function windowHtml(o) {
+  return `<div class="erf-comment-window" ${o.live ? 'role="dialog" aria-modal="true"' : 'role="group"'} aria-labelledby="${o.id}-t">
+    <div class="erf-comment-window__head"><div class="erf-comment-window__heading">
+      <h2 class="erf-comment-window__title" id="${o.id}-t" tabindex="-1">${o.title}</h2>
+      <p class="erf-comment-window__context">${o.context}</p></div>
+      <button class="erf-comment-icon-btn" type="button" aria-label="Close" data-close>${I('x')}</button></div>
+    <div class="erf-comment-window__body">${o.body}</div>
+    <div class="erf-comment-window__foot">${o.foot}</div></div>`;
+}
+const fieldHtml = (id, value = '', file = 'index.html') => `<div class="erf-comment-field">
+  <label class="erf-comment-field__label" for="${id}">Comment</label>
+  <textarea class="erf-comment-textarea" id="${id}" placeholder="What should change here?" aria-describedby="${id}-h ${id}-c">${H.esc(value)}</textarea>
+  <div class="erf-comment-field__foot"><p class="erf-comment-field__hint" id="${id}-h">Plain text. Saved inside ${file}.</p>
+  <span class="erf-comment-counter" id="${id}-c">${value.length} / 4000</span></div></div>
+  <p class="erf-comment-identity">Commenting as <bdi>Marcin Obel</bdi> <button class="erf-comment-link" type="button">Change</button></p>`;
+const threadHtml = (threads) => threads.map((t) => `<section class="erf-comment-thread">
+  <article class="erf-comment-message"><div class="erf-comment-message__meta"><span class="erf-comment-message__meta-text">
+    <bdi class="erf-comment-message__author">${H.esc(t.who)}</bdi> · <time>${t.time}</time></span>
+    <button class="erf-comment-icon-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Actions for the comment by ${H.esc(t.who)}, ${t.time}">${I('ellipsis')}</button></div>
+    <p class="erf-comment-message__text" dir="auto">${H.esc(t.text)}</p></article>
+  <div class="erf-comment-thread__reply"><div class="erf-comment-field"><label class="erf-comment-field__label" for="r${t.id}">Reply</label>
+    <textarea class="erf-comment-textarea erf-comment-textarea--reply" id="r${t.id}"></textarea></div>
+    <div class="erf-comment-thread__actions"><button class="erf-comment-action" type="button">Resolve</button>${btn('Reply', 'primary')}</div></div>
+</section>`).join('');
+
+/* The window goes right of the element, else left, else below, else above; under 400px it is a sheet. */
+function placeWindow(area, box, w) {
+  const W = area.clientWidth;
+  const Hh = area.clientHeight;
+  const m = 8;
+  if (W < 400) { w.classList.add('erf-comment-window--sheet'); return; }
+  w.style.position = 'absolute';
+  const ww = w.offsetWidth;
+  const wh = Math.min(w.offsetHeight, Hh - 2 * m);
+  const top = Math.max(m, Math.min(box.top, Hh - wh - m));
+  const tries = [
+    { left: box.left + box.width + m, top, ok: box.left + box.width + m + ww <= W - m },
+    { left: box.left - m - ww, top, ok: box.left - m - ww >= m },
+    { left: Math.max(m, Math.min(box.left, W - ww - m)), top: box.top + box.height + m, ok: box.top + box.height + m + wh <= Hh - m },
+    { left: Math.max(m, Math.min(box.left, W - ww - m)), top: box.top - m - wh, ok: box.top - m - wh >= m }
+  ];
+  const at = tries.find((t) => t.ok) || { left: Math.max(m, W - ww - m), top: m };
+  w.style.left = `${at.left}px`;
+  w.style.top = `${at.top}px`;
+}
+
+/* ---------- the live page ---------- */
+const area = document.getElementById('area');
+const bandHost = document.getElementById('liveBand');
+const region = document.getElementById('region');
+const S = { mode: false, pins: true, open: 1, drawer: false };
+const COMMENTS = { pro: [{ id: 'p1', who: 'Anna K.', time: 'Yesterday, 09:10', text: 'Add the seat limit to the headline.' }] };
+let picked = null;
+let popupOpen = false;
+let release = null;
+let draftFor = {};
+
+const pickables = () => [...area.querySelectorAll('.page h4, .page p, .page button, .page .card, .page .card b, .page .frame')];
+const labelFor = (el) => (el.id === 'frame' ? { tag: 'iframe', rest: ' · refused frame', size: '' } : H.labelOf(el));
+const shortLabel = (el) => { const l = labelFor(el); return l.tag + (el.id === 'frame' ? '' : l.rest); };
+
+function renderBand() {
+  bandHost.innerHTML = bandHtml(S);
+  bandHost.querySelector('[data-mode]').addEventListener('click', (e) => setMode(!S.mode, e.detail === 0));
+  bandHost.querySelector('[data-pins]').addEventListener('click', () => { S.pins = !S.pins; renderBand(); renderPins(); bandHost.querySelector('[data-pins]').focus(); });
+}
+function renderPins(flashKey) {
+  const list = S.pins ? Object.entries(COMMENTS).filter(([, t]) => t.length).map(([key, t]) => {
+    const el = area.querySelector(`#${key}`);
+    return { key, box: H.boxIn(area, el), count: t.length, name: `${t.length} ${t.length === 1 ? 'comment' : 'comments'} on ${shortLabel(el)}. Open.` };
+  }) : [];
+  const els = H.drawPins(area, list);
+  els.forEach((p, i) => p.addEventListener('click', (e) => { e.stopPropagation(); openThread(area.querySelector(`#${list[i].key}`)); }));
+  if (flashKey) {
+    const box = H.boxIn(area, area.querySelector(`#${flashKey}`));
+    const f = document.createElement('div');
+    f.className = 'erf-hpc-flash';
+    Object.assign(f.style, { left: `${box.left}px`, top: `${box.top}px`, width: `${box.width}px`, height: `${box.height}px` });
+    area.querySelector('.erf-hpc-root').appendChild(f);
+    setTimeout(() => f.remove(), 1500);
+  }
+}
+function setMode(on, byKeyboard) {
+  S.mode = on;
+  renderBand();
+  H.drawMode(area, on, false);
+  area.style.cursor = on ? 'crosshair' : '';
+  if (!on) { picked = null; H.clearOutline(area); }
+  H.announce(region, on ? 'Comment mode on. Click an element, or press Tab to pick one. Esc to leave.' : 'Comment mode off.');
+  if (on && byKeyboard) { area.focus(); pick(area.querySelector('#lead')); }
+  else bandHost.querySelector('[data-mode]').focus();
+}
+function pick(el, quiet) {
+  picked = el;
+  H.drawOutline(area, H.boxIn(area, el), labelFor(el), popupOpen);
+  if (!quiet) H.announce(region, `${shortLabel(el)}${COMMENTS[el.id] ? `, ${COMMENTS[el.id].length} comments` : ''}.`);
+}
+
+area.addEventListener('pointermove', (e) => {
+  if (!S.mode || popupOpen) return;
+  const a = area.getBoundingClientRect();
+  H.drawMode(area, true, e.clientY - a.top < 48);
+  const hit = document.elementFromPoint(e.clientX, e.clientY);
+  const el = hit && hit.closest && pickables().includes(hit) ? hit : null;
+  if (el) pick(el, true);
+});
+area.addEventListener('click', (e) => {
+  if (!S.mode || popupOpen) return;
+  e.preventDefault();
+  const el = pickables().includes(e.target) ? e.target : null;
+  if (!el) return;
+  if (el.id === 'frame') { H.announce(region, 'Can\'t comment here.'); return; }
+  pick(el, true);
+  openNew(el);
+});
+area.addEventListener('contextmenu', (e) => {
+  if (!S.mode) return;          // outside comment mode the page owns its right-click
+  e.preventDefault();
+  if (popupOpen) return;
+  const el = pickables().includes(e.target) ? e.target : picked;
+  if (!el) return;
+  pick(el, true);
+  const a = area.getBoundingClientRect();
+  openMenuFor(el, e.clientX - a.left, e.clientY - a.top);
+});
+area.addEventListener('keydown', (e) => {
+  if (popupOpen) return;
+  const mods = mac ? e.metaKey && e.altKey : e.ctrlKey && e.altKey;
+  if (mods && e.key.toLowerCase() === 'm') { e.preventDefault(); setMode(!S.mode, true); return; }
+  if (!S.mode) return;
+  const all = pickables();
+  const at = Math.max(0, all.indexOf(picked));
+  if (e.key === 'Escape') { e.preventDefault(); setMode(false); area.focus(); return; }
+  if (e.key === 'Tab') { e.preventDefault(); pick(all[(at + (e.shiftKey ? -1 : 1) + all.length) % all.length]); return; }
+  if (e.altKey && e.key === 'ArrowUp') {
+    e.preventDefault();
+    const parent = picked && picked.parentElement && !picked.parentElement.classList.contains('page') ? picked.parentElement : null;
+    if (parent) pick(parent); else H.announce(region, 'Top of page – no parent to select.');
+    return;
+  }
+  if (e.altKey && e.key === 'ArrowDown') {
+    e.preventDefault();
+    const child = picked && [...picked.children].find((c) => all.includes(c));
+    if (child) pick(child); else H.announce(region, 'No child elements.');
+    return;
+  }
+  if (!picked) return;
+  if (e.key === 'Enter') { e.preventDefault(); if (picked.id !== 'frame') openNew(picked); return; }
+  if ((e.shiftKey && e.key === 'F10') || e.key === 'ContextMenu') {
+    e.preventDefault();
+    const b = H.boxIn(area, picked);
+    openMenuFor(picked, b.left + 4, b.top + 4);
+  }
+});
+document.addEventListener('keydown', (e) => {
+  if (popupOpen || document.activeElement === area) return;
+  const mods = mac ? e.metaKey && e.altKey : e.ctrlKey && e.altKey;
+  if (mods && e.key.toLowerCase() === 'm' && bandHost.contains(document.activeElement)) { e.preventDefault(); setMode(!S.mode, true); }
+});
+
+function openMenuFor(el, x, y) {
+  popupOpen = true;
+  pick(el, true);
+  const can = el.id !== 'frame';
+  H.openMenu(area, x, y, [can ? { label: 'Add comment', icon: 'message-square-plus' } : { label: 'Can\'t comment here', icon: 'message-square-plus', disabled: true }],
+    'Element', () => { popupOpen = false; openNew(el); },
+    (returnFocus) => { if (popupOpen) { popupOpen = false; pick(el, true); } if (returnFocus) area.focus(); });
+}
+
+function mount(html, el, focusSel) {
+  popupOpen = true;
+  pick(el, true);
+  area.insertAdjacentHTML('beforeend', `<span class="still-tag" id="still">still image of the page</span>${html}`);
+  const w = area.querySelector('.erf-comment-window');
+  placeWindow(area, H.boxIn(area, el), w);
+  release = H.trapFocus(w, () => closeWindow(el));
+  w.querySelectorAll('[data-close], [data-cancel]').forEach((b) => b.addEventListener('click', () => closeWindow(el)));
+  (w.querySelector(focusSel) || w.querySelector('h2')).focus();
+  return w;
+}
+function closeWindow(el) {
+  const w = area.querySelector('.erf-comment-window');
+  if (w) { const ta = w.querySelector('#nc'); if (ta) draftFor[el.id] = ta.value; w.remove(); }
+  area.querySelector('#still')?.remove();
+  if (release) release();
+  release = null;
+  popupOpen = false;
+  // Native focus back to the page, with the picker on the same element.
+  area.focus();
+  if (S.mode) pick(el, true); else H.clearOutline(area);
+}
+function openNew(el) {
+  const draft = draftFor[el.id] || '';
+  const w = mount(windowHtml({ live: true, id: 'nw', title: 'New comment', context: `<bdi dir="ltr">${H.esc(shortLabel(el))}</bdi> · index.html, line 42`,
+    body: fieldHtml('nc', draft) + (draft ? '<p class="erf-comment-note">Draft restored</p>' : ''),
+    foot: btn('Cancel', 'secondary', 'data-cancel') + btn('Save', 'primary', `title="Save (${mac ? 'Cmd' : 'Ctrl'}+Enter)"${draft.trim() ? '' : ' aria-disabled="true"'} data-save`) }), el, '#nc');
+  const ta = w.querySelector('#nc');
+  const save = w.querySelector('[data-save]');
+  ta.addEventListener('input', () => {
+    w.querySelector('#nc-c').textContent = `${ta.value.length} / 4000`;
+    if (ta.value.trim()) save.removeAttribute('aria-disabled'); else save.setAttribute('aria-disabled', 'true');
+  });
+  const doSave = () => {
+    if (save.getAttribute('aria-disabled') === 'true') return;
+    save.setAttribute('aria-disabled', 'true');
+    save.firstElementChild.textContent = 'Saving…';
+    setTimeout(() => {
+      (COMMENTS[el.id] = COMMENTS[el.id] || []).push({ id: `x${Date.now()}`, who: 'Marcin Obel', time: 'Today, 15:04', text: ta.value.trim() });
+      ta.value = '';
+      draftFor[el.id] = '';
+      closeWindow(el);
+      S.open = Object.values(COMMENTS).reduce((n, t) => n + t.length, 0);
+      renderBand();
+      renderPins(el.id);
+      H.announce(region, 'Comment saved to index.html.');
+    }, 600);
+  };
+  save.addEventListener('click', doSave);
+  ta.addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); doSave(); } });
+}
+function openThread(el) {
+  const t = COMMENTS[el.id];
+  mount(windowHtml({ live: true, id: 'tw', title: `${t.length > 1 ? 'Comments' : 'Comment'} on ${H.esc(shortLabel(el))}`,
+    context: `<bdi dir="ltr">${H.esc(shortLabel(el))}</bdi> · index.html, line 42`, body: threadHtml(t),
+    foot: btn('New comment', 'secondary') }), el, 'h2');
+}
+renderBand();
+renderPins();
+new ResizeObserver(() => renderPins()).observe(area);
+
+/* ---------- the step-by-step flow ---------- */
+const PAGE = `<div class="page"><h4>Pricing</h4><p id="lead">Start free, then pay for what you use. Every plan includes the editor and the terminal.</p>
+  <button class="cta" id="buy" type="button" tabindex="-1">Start free trial</button>
+  <div class="card" id="pro" style="margin-top: 14px"><b>Pro</b> – 12 € a month, up to 10 seats.</div></div>`;
+const STEPS = [
+  { title: 'Pins are always there', s: { mode: false, open: 1 },
+    text: ['A page that already has comments shows a pin on each commented element, <strong>also outside comment mode</strong> (decision 20). The page works normally: clicks reach it, except a click on a pin, which opens the thread.',
+           'Pins can be hidden for this tab with the toolbar tool; that is not saved, and the next tab starts with pins on.'],
+    draw: (a) => H.drawPins(a, [{ box: H.boxIn(a, a.querySelector('#pro')), count: 1, name: '1 comment on div.card. Open.' }]) },
+  { title: 'Turn on comment mode', s: { mode: true, open: 1 },
+    text: ['The toggle is pressed, a frame runs inside the page edge, and the tab says <strong>“Comment mode – Esc to leave”</strong>. Hovering outlines the element under the pointer and names it.',
+           'Clicks no longer reach the page; scrolling still works.'],
+    draw: (a) => { H.drawMode(a, true); H.drawPins(a, [{ box: H.boxIn(a, a.querySelector('#pro')), count: 1, name: '1 comment on div.card. Open.' }]);
+      H.drawOutline(a, H.boxIn(a, a.querySelector('#buy')), H.labelOf(a.querySelector('#buy'))); } },
+  { title: 'Right-click: one item', s: { mode: true, open: 1 },
+    text: ['The page freezes to a still with the picked element outlined and filled. Erfana draws the menu at the pointer: <strong>Add comment</strong>, the only item in v1. On something that cannot take a comment the same item reads <strong>“Can\'t comment here”</strong>, disabled but reachable.',
+           'The menu is the decided Menu card: focus on the item, arrows, Escape and Tab close it and return focus to the page.'],
+    draw: (a) => { H.drawMode(a, true); H.drawOutline(a, H.boxIn(a, a.querySelector('#buy')), H.labelOf(a.querySelector('#buy')), true);
+      const b = H.boxIn(a, a.querySelector('#buy'));
+      a.insertAdjacentHTML('beforeend', `<div class="erf-menu" role="menu" aria-label="Element" style="position:absolute; left:${b.left + 60}px; top:${b.top + 22}px">
+        <div class="erf-menu-item erf-menu-item--active" role="menuitem"><span class="erf-menu-icon" aria-hidden="true">${I('message-square-plus')}</span><span class="erf-menu-label">Add comment</span></div></div>
+        <div class="erf-menu" role="menu" aria-label="Element" style="position:absolute; right:16px; bottom:16px">
+        <div class="erf-menu-item" role="menuitem" aria-disabled="true"><span class="erf-menu-icon" aria-hidden="true">${I('message-square-plus')}</span><span class="erf-menu-label">Can't comment here</span></div></div>
+        <span class="still-tag">still image</span>`); } },
+  { title: 'The first time: who you are', s: { mode: true, open: 1 },
+    text: ['On the very first comment the window opens on <strong>“Before your first comment”</strong> – the privacy notice and the name and email fields – inside the same window, so nothing is lost. It shows once, to everyone. See the identity card.'],
+    draw: (a) => { H.drawMode(a, true); H.drawOutline(a, H.boxIn(a, a.querySelector('#buy')), H.labelOf(a.querySelector('#buy')), true);
+      a.insertAdjacentHTML('beforeend', windowHtml({ id: 's4', title: 'Before your first comment', context: '<bdi dir="ltr">button.cta</bdi> · index.html, line 42',
+        body: '<p class="erf-comment-notice">Erfana writes your name – and your email, if you add one – into the HTML file next to each comment. Anyone who can open the file can read them: in Erfana, in the page source, and in git history once the file is committed and pushed. Scripts in pages previewed in this project can read them too. Deleting a comment later does not remove it from git history.</p>',
+        foot: btn('Cancel', 'secondary') + btn('Continue', 'primary') }) + '<span class="still-tag">still image</span>');
+      placeWindow(a, H.boxIn(a, a.querySelector('#buy')), a.querySelector('.erf-comment-window')); } },
+  { title: 'Write it', s: { mode: true, open: 1 },
+    text: ['The window sits beside the element – right, else left, else below, else above. The context line names the element and where it lives in the file; the hint says the text is saved <em>inside</em> it. <kbd>Ctrl</kbd>+<kbd>Enter</kbd> saves.'],
+    draw: (a) => { H.drawMode(a, true); H.drawOutline(a, H.boxIn(a, a.querySelector('#buy')), H.labelOf(a.querySelector('#buy')), true);
+      a.insertAdjacentHTML('beforeend', windowHtml({ id: 's5', title: 'New comment', context: '<bdi dir="ltr">button.cta</bdi> · index.html, line 42',
+        body: fieldHtml('s5f', 'Make this say "Start free trial – no card".'), foot: btn('Cancel', 'secondary') + btn('Save', 'primary') }) + '<span class="still-tag">still image</span>');
+      placeWindow(a, H.boxIn(a, a.querySelector('#buy')), a.querySelector('.erf-comment-window')); } },
+  { title: 'Saved', s: { mode: true, open: 2 },
+    text: ['Erfana writes the block, the page reloads with its scroll and <code>#hash</code> restored, and the new pin appears <strong>within a second</strong> with a one-time highlight. A screen reader hears <strong>“Comment saved to index.html.”</strong>',
+           'Comment mode survives the reload – you can carry on.'],
+    draw: (a) => { H.drawMode(a, true); H.drawPins(a, [{ box: H.boxIn(a, a.querySelector('#buy')), count: 1, name: '1 comment on button.cta. Open.' },
+      { box: H.boxIn(a, a.querySelector('#pro')), count: 1, name: '1 comment on div.card. Open.' }]);
+      const b = H.boxIn(a, a.querySelector('#buy')); a.querySelector('.erf-hpc-root').insertAdjacentHTML('beforeend',
+        `<div class="erf-hpc-flash" style="left:${b.left}px; top:${b.top}px; width:${b.width}px; height:${b.height}px"></div>`); } },
+  { title: 'Reopen from the pin', s: { mode: false, open: 2 },
+    text: ['A pin opens its thread in any mode. Reply, resolve, edit or delete – anyone may change any comment (decision 31). Resolving hides the pin; the thread stays in the drawer under Resolved.'],
+    draw: (a) => { H.drawPins(a, [{ box: H.boxIn(a, a.querySelector('#buy')), count: 1, name: '1 comment on button.cta. Open.', selected: true },
+      { box: H.boxIn(a, a.querySelector('#pro')), count: 1, name: '1 comment on div.card. Open.' }]);
+      a.insertAdjacentHTML('beforeend', windowHtml({ id: 's7', title: 'Comment on button.cta', context: '<bdi dir="ltr">button.cta</bdi> · index.html, line 42',
+        body: threadHtml([{ id: 's7t', who: 'Marcin Obel', time: 'Today, 15:04', text: 'Make this say "Start free trial – no card".' }]), foot: btn('New comment', 'secondary') }) + '<span class="still-tag">still image</span>');
+      placeWindow(a, H.boxIn(a, a.querySelector('#buy')), a.querySelector('.erf-comment-window')); } }
+];
+const flow = document.getElementById('flow');
+STEPS.forEach((step, i) => {
+  const el = document.createElement('div');
+  el.className = 'step';
+  el.innerHTML = `<div class="panel journey">${bandHtml(step.s)}<div class="panel__body"><div class="page-area">${PAGE}</div></div></div>
+    <div><p class="step__no">STEP ${String(i + 1).padStart(2, '0')}</p><h3 class="step__title">${step.title}</h3>
+    ${step.text.map((t) => `<p class="step__text">${t}</p>`).join('')}</div>`;
+  flow.appendChild(el);
+  requestAnimationFrame(() => step.draw(el.querySelector('.page-area')));
+});
+</script>
+</body>
+</html>

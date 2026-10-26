@@ -128,6 +128,14 @@
       <td>Same treatment as the hint, at a smaller size. The bypass covers colour, type size and
         offsets – no tokens reach the window; corners are still 0, like the rest of the app.</td>
     </tr>
+    <tr>
+      <td>HTML-preview comment overlay (<code>overlayStyles.ts</code>, in the previewed page)</td>
+      <td>Every colour is a token.</td>
+      <td>Literal values, resolved from the tokens by main and sent in <code>commentState.theme</code>
+        (<code>commentOverlayTheme.ts</code>, pinned to <code>design-tokens.css</code> by a test). The overlay is
+        drawn inside the page, where a <code>var()</code> would read the page's own properties. The mapping is
+        drawn in the proposed <a href="../../product/html-comments/overlay.html">Comment overlay</a> card.</td>
+    </tr>
   </tbody>
 </table>
 

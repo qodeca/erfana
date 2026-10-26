@@ -164,6 +164,15 @@
       <td><code>aria-haspopup="menu"</code> only. ARIA does not allow <code>aria-expanded</code> on a
         <code>textbox</code>.</td>
     </tr>
+    <tr>
+      <td>HTML-preview comment menu (“Add comment”)</td>
+      <td>The opener carries <code>aria-haspopup</code> and <code>aria-expanded</code>.</td>
+      <td>Neither. The opener is an element of the previewed page, inside a native view Erfana does not own, and
+        the in-page picker announces the element instead. The menu itself keeps this card's whole contract, opens
+        with <kbd>Shift</kbd>+<kbd>F10</kbd> and the <kbd>Menu</kbd> key, and on close returns focus natively to
+        the page. Planned for P6; see the proposed
+        <a href="../../../product/html-comments/index.html">Commenting on a page</a> card.</td>
+    </tr>
   </tbody>
 </table>
 
