@@ -33,6 +33,7 @@
     "docs:screenshots": "node scripts/capture/run.mjs",
     "docs:brand": "node scripts/capture/brand.mjs",
     "design": "node scripts/design-sync.mjs",
+    "fixtures:html-comments": "esbuild src/shared/htmlComments/__fixtures__/gen/genFixtures.ts --bundle --platform=node --sourcemap --log-level=warning --outfile=temp/fixtures-html-comments.cjs && node --enable-source-maps temp/fixtures-html-comments.cjs",
     "start": "electron-vite preview",
     "dev": "electron-vite dev",
     "build": "npm run typecheck && electron-vite build",
