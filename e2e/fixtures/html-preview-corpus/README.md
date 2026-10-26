@@ -111,3 +111,5 @@ Pages for HTML Preview comments ([design](../../../docs/designs/html-preview-com
 |---|---|
 | `agent-review/landing.html`, `slides.html`, `signup-form.html` | The agent check (X-001): pages with open, resolved and deliberately damaged `erfana:comment v1` blocks, written by the P1 serializer. `slides.html` builds its deck from a script, so two comments target script-built elements |
 | `agent-review/RUBRIC.md` | The expected result per comment, and how to score a run. Never copy it into the run repo |
+
+Regenerate the agent-review pages with `npm run fixtures:html-comments` ([how](../../../src/shared/htmlComments/__fixtures__/README.md)); `RUBRIC.md` stays hand-written from the line numbers it prints.
