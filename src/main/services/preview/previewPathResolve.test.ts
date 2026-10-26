@@ -11,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vite
  * implementation, so realpath/symlink/write behaviour is genuine.
  */
 const closeSpies: Array<Mock> = []
-let lstatOverride: ((path: string) => Promise<{ dev: number; ino: number }>) | null = null
+let lstatOverride: ((path: string) => Promise<{ dev: bigint; ino: bigint }>) | null = null
 
 vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs/promises')>()
@@ -247,7 +247,7 @@ describe('resolveConfined', () => {
 
   it('returns 403 path-escape on a dev/ino mismatch and closes the descriptor', async () => {
     await writeFile(join(realRoot, 'index.html'), '<h1>hi</h1>')
-    lstatOverride = async () => ({ dev: 0xdead, ino: 0xbeef })
+    lstatOverride = async () => ({ dev: 0xdeadn, ino: 0xbeefn })
     const result = await resolveConfined(realRoot, ['index.html'])
     expect(result).toEqual({ ok: false, status: 403, reason: 'path-escape' })
     expect(closeSpies).toHaveLength(1)

@@ -22,7 +22,10 @@ import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import type { ChokidarOptions } from 'chokidar'
 import { PREVIEW } from '../../../shared/constants'
-import type { GlobalSettings } from '../../../shared/ipc/global-settings-schema'
+import {
+  isHtmlPreviewCommentsEnabled,
+  type GlobalSettings
+} from '../../../shared/ipc/global-settings-schema'
 import { createPreviewRootRegistry } from '../../services/preview/PreviewRootRegistry'
 import { createPreviewAllowlistStore } from '../../services/preview/PreviewAllowlistStore'
 import { createPreviewSessionFactory } from '../../services/preview/PreviewSessionFactory'
@@ -170,7 +173,10 @@ export function buildPreviewGraph(deps: BuildPreviewGraphDeps): PreviewGraph {
   const sessionFactory = createPreviewSessionFactory({
     registry,
     allowlistStore,
-    previewPagePreloadPath: resolvePreviewPagePreload()
+    previewPagePreloadPath: resolvePreviewPagePreload(),
+    // HTML Preview comments: the flag is read per request, so turning it off
+    // serves the next page raw (docs/designs/html-preview-comments.md §3).
+    comments: { isEnabled: () => isHtmlPreviewCommentsEnabled(getSettings()) }
   })
   const stillFrameCache = createPreviewStillFrameCache()
   const exportController = createPreviewExportController()

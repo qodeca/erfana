@@ -1,0 +1,253 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+/**
+ * Comment instrumentation for one preview view's protocol handler
+ * (docs/designs/html-preview-comments.md §3 "Raw vs instrumented bytes",
+ * §4.2 "PreviewProtocolHandler", §6, §19 R3-1, R3-12, R3-13; tests M-030,
+ * M-031, M-060).
+ *
+ * After the handler has confined and read a file, `bodyFor` decides what to
+ * serve. The served copy gets a `data-erfana-el` token on every eligible
+ * start tag only when ALL of these hold (M-060), else the raw bytes go out:
+ * 1. the feature flag `htmlPreview.comments.enabled` is on;
+ * 2. the request is a GET of an `.html`/`.htm` file;
+ * 3. it is a document load: no `user-agent` header (the request class, R3-1)
+ *    AND the ledger note says page (`mainFrame`) or frame (`subFrame`);
+ * 4. comments are expected: comment mode is on for the view, or the bytes
+ *    contain `erfana:comment`;
+ * 5. the file is at most 4 MB, decodes losslessly as UTF-8, does not already
+ *    contain `data-erfana-el`, and has at most 100,000 eligible elements;
+ * 6. the parse worker answered.
+ *
+ * When comments were expected (4) but a later check fails, the raw bytes go
+ * out and the file gets an "unavailable" reason – kept for the comment list
+ * and logged, rate-capped, as a code and a path digest only (§18). A missed
+ * ledger note is one of those reasons, never a security question: tokens are
+ * not authoritative (§6, S24).
+ *
+ * The parse runs in the persistent worker (R3-12); every instrumented load is
+ * registered in the view's {@link ElementTokenTable} with its blocks resolved
+ * to tokens from the bytes actually served. Nothing here throws into the
+ * handler: any failure serves the raw bytes.
+ */
+import { BLOCK_MARKER } from '../../../../shared/htmlComments'
+import { createDropReporter, type DropReporter } from '../../../../shared/dropReporter'
+import { PREVIEW_LIMITS } from '../../../../shared/preview-limits'
+import { stablePathDigest } from '../../../../shared/stablePathDigest'
+import { logger } from '../../LoggingService'
+import { redactedLogError } from '../../../utils/redactUserInput'
+import type { PreviewRequestClass } from '../PreviewRequestKindLedger'
+import type { InstrumentRefusal } from './commentParseCore'
+import {
+  sharedCommentParseClient,
+  type CommentParseClient,
+  type CommentParseFailure
+} from './CommentParseWorkerAdapter'
+import { registerCommentE2eSource, type CommentE2eSource } from './commentE2eHook'
+import { ElementTokenTable, type CommentLoadScope } from './ElementTokenTable'
+
+/** Why comments are unavailable for a file the view served raw although they were expected. */
+export type CommentUnavailableReason =
+  | InstrumentRefusal
+  /** A header-less request with no document note: the request kind is unknown (S24). */
+  | 'request-unknown'
+  /** The parse worker gave no answer (busy, timed out, crashed, missing). */
+  | 'parse-failed'
+
+/** What the protocol handler knows about a confined, read request. */
+export interface CommentServeRequest {
+  readonly body: Buffer
+  /** Lower-case extension with its dot (`resolveConfined`). */
+  readonly ext: string
+  /** The confined real path the body was read from. */
+  readonly realPath: string
+  readonly method: string
+  /** The webRequest resource type the ledger handed back, if any. */
+  readonly noteType: string | undefined
+  readonly requestClass: PreviewRequestClass
+}
+
+/** What to serve, before any parsing (M-060). */
+export type CommentServeDecision =
+  | { readonly action: 'raw'; readonly reason?: CommentUnavailableReason }
+  | { readonly action: 'instrument'; readonly scope: CommentLoadScope }
+
+/** The per-view state the decision reads. */
+export interface CommentServeState {
+  readonly enabled: boolean
+  readonly commentMode: boolean
+}
+
+/** The document extensions comments are written into (§7.6 step 1). */
+const COMMENTABLE_EXTENSIONS: ReadonlySet<string> = new Set(['.html', '.htm'])
+/** Files remembered with an unavailable reason; the oldest is forgotten past this. */
+const MAX_UNAVAILABLE_FILES = 64
+
+const RAW: CommentServeDecision = { action: 'raw' }
+
+/** The load scope a ledger note names, or `undefined` for a request that is not a document load. */
+function scopeOf(noteType: string | undefined): CommentLoadScope | undefined {
+  if (noteType === 'mainFrame') return 'page'
+  if (noteType === 'subFrame') return 'frame'
+  return undefined
+}
+
+/** Decide, without parsing, whether a confined response may be instrumented (M-060). */
+export function decideCommentServing(
+  request: CommentServeRequest,
+  state: CommentServeState
+): CommentServeDecision {
+  if (!state.enabled || request.method !== 'GET') return RAW
+  if (!COMMENTABLE_EXTENSIONS.has(request.ext) || request.requestClass !== 'navigation') return RAW
+  const expected = state.commentMode || request.body.includes(BLOCK_MARKER)
+  if (!expected) return RAW
+  if (request.noteType === undefined) return { action: 'raw', reason: 'request-unknown' }
+  const scope = scopeOf(request.noteType)
+  // An `<object>`/`<embed>` document: header-less, but never a commentable frame.
+  if (scope === undefined) return RAW
+  if (request.body.length > PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES) {
+    return { action: 'raw', reason: 'too-large' }
+  }
+  return { action: 'instrument', scope }
+}
+
+/** One view's comment instrumentation, hung on its protocol handler. */
+export interface PreviewCommentServing {
+  /** The body to serve for a confined, read request. Never rejects. */
+  bodyFor(request: CommentServeRequest): Promise<Buffer>
+  /** The view's per-load token tables. */
+  readonly tokens: ElementTokenTable
+  /** Comment mode for the view (P5 drives it); on, a file without blocks is instrumented too. */
+  setCommentMode(on: boolean): void
+  /** Why comments are unavailable for `realPath`, if they are. */
+  unavailableReason(realPath: string): CommentUnavailableReason | undefined
+  /** The view is gone: drop its tables and stop instrumenting. */
+  dispose(): void
+}
+
+/** What a view's comment serving is built from; production uses the defaults. */
+export interface PreviewCommentServingDeps {
+  /** The feature flag, read per request. */
+  readonly isEnabled: () => boolean
+  readonly client?: Pick<CommentParseClient, 'instrument' | 'warm'>
+  readonly now?: () => number
+  readonly registerE2e?: (source: CommentE2eSource) => () => void
+}
+
+function unavailableLog(now: () => number): DropReporter {
+  return createDropReporter({
+    source: 'main',
+    now,
+    // The reporter digests its `panelId` field; here it carries the file path.
+    emit: ({ context }) =>
+      logger.warn('Preview comments unavailable for a page', {
+        reason: context.reason,
+        file: context.panelId,
+        ...(context.suppressed === undefined ? {} : { suppressed: context.suppressed })
+      })
+  })
+}
+
+/** Build one view's comment serving. */
+export function createPreviewCommentServing(
+  deps: PreviewCommentServingDeps
+): PreviewCommentServing {
+  const client = deps.client ?? sharedCommentParseClient()
+  const now = deps.now ?? (() => performance.now())
+  // A settings read that throws counts as off: the safe side is today's preview.
+  const isEnabled = (): boolean => {
+    try {
+      return deps.isEnabled()
+    } catch {
+      return false
+    }
+  }
+  const tokens = new ElementTokenTable()
+  const unavailable = new Map<string, CommentUnavailableReason>()
+  const log = unavailableLog(now)
+  let commentMode = false
+  let disposed = false
+
+  const markUnavailable = (
+    realPath: string,
+    reason: CommentUnavailableReason,
+    detail?: CommentParseFailure
+  ): void => {
+    unavailable.delete(realPath)
+    unavailable.set(realPath, reason)
+    if (unavailable.size > MAX_UNAVAILABLE_FILES) {
+      unavailable.delete(unavailable.keys().next().value as string)
+    }
+    const code = detail === undefined ? reason : `${reason}:${detail}`
+    log.report({ reason: code, level: 'warn', panelId: realPath })
+  }
+
+  const instrument = async (
+    request: CommentServeRequest,
+    scope: CommentLoadScope
+  ): Promise<Buffer> => {
+    const started = now()
+    const result = await client.instrument(request.body)
+    if (result.kind === 'failed') {
+      markUnavailable(request.realPath, 'parse-failed', result.failure)
+      return request.body
+    }
+    if (result.kind === 'unavailable') {
+      markUnavailable(request.realPath, result.reason)
+      return request.body
+    }
+    if (disposed) return request.body
+    tokens.register({
+      realPath: request.realPath,
+      scope,
+      fileHash: result.fileHash,
+      tokens: result.tokens,
+      offsets: result.offsets,
+      tagCodes: result.tagCodes,
+      tagNames: result.tagNames,
+      blocks: result.blocks
+    })
+    unavailable.delete(request.realPath)
+    logger.debug('Preview comments: page instrumented', {
+      file: stablePathDigest(request.realPath),
+      tokens: result.offsets.length,
+      ms: Math.round(now() - started)
+    })
+    const { html } = result
+    return Buffer.from(html.buffer, html.byteOffset, html.byteLength)
+  }
+
+  const unregisterE2e = (deps.registerE2e ?? registerCommentE2eSource)({
+    views: () => tokens.views(),
+    unavailable: () => [...unavailable].map(([realPath, reason]) => ({ realPath, reason }))
+  })
+  if (isEnabled()) client.warm()
+
+  return {
+    tokens,
+    async bodyFor(request) {
+      try {
+        if (disposed) return request.body
+        const decision = decideCommentServing(request, { enabled: isEnabled(), commentMode })
+        if (decision.action === 'raw') {
+          if (decision.reason !== undefined) markUnavailable(request.realPath, decision.reason)
+          return request.body
+        }
+        return await instrument(request, decision.scope)
+      } catch (error) {
+        logger.error('Preview comments: instrumentation failed', redactedLogError(error))
+        return request.body
+      }
+    },
+    setCommentMode(on) {
+      commentMode = on
+    },
+    unavailableReason: realPath => unavailable.get(realPath),
+    dispose() {
+      disposed = true
+      tokens.clear()
+      unavailable.clear()
+      unregisterE2e()
+    }
+  }
+}

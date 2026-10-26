@@ -58,9 +58,29 @@ export type GitStatusSettings = z.infer<typeof GitStatusSettingsSchema>
  */
 export const HtmlPreviewSettingsSchema = z.object({
   /** Master switch for the HTML preview feature. */
-  enabled: z.boolean().default(true)
+  enabled: z.boolean().default(true),
+  /**
+   * HTML Preview comments (docs/designs/html-preview-comments.md §3 "Feature
+   * flag", §18). Absent means on – read it through
+   * {@link isHtmlPreviewCommentsEnabled}. Lenient, like `files`: a malformed
+   * block resolves to on instead of tripping the corruption reset that would
+   * replace every other setting.
+   */
+  comments: z
+    .object({ enabled: z.boolean().catch(true) })
+    .catch(() => ({ enabled: true }))
+    .optional()
 })
 export type HtmlPreviewSettings = z.infer<typeof HtmlPreviewSettingsSchema>
+
+/**
+ * Whether HTML Preview comments are on (`htmlPreview.comments.enabled`,
+ * default on). Off restores today's preview exactly: raw serving, no comment
+ * UI and the frozen session policy (design §3, §18).
+ */
+export function isHtmlPreviewCommentsEnabled(settings: Pick<GlobalSettings, 'htmlPreview'>): boolean {
+  return settings.htmlPreview.comments?.enabled !== false
+}
 
 /**
  * Terminal screen-reader mode (lens review [23]).

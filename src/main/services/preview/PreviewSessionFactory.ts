@@ -62,6 +62,7 @@ import {
 import { assertSealed, purge as purgePreviewSession } from './PreviewStorageSeal'
 import {
   buildPreviewSessionContexts,
+  type PreviewSessionCommentDeps,
   type PreviewSessionPageScopes
 } from './previewSessionFilterContext'
 
@@ -235,18 +236,21 @@ export interface PreviewSessionFactoryDeps {
   readonly attachFilter?: (session: PreviewSessionLike, ctx: PreviewFilterContext) => () => void
   /** Assert the session is in-memory; defaults to the item-22 `assertSealed`. */
   readonly assertSealed?: (session: PreviewSessionLike) => void
+  /** HTML Preview comments (html-preview-comments.md §4.2); absent, pages are served raw. */
+  readonly comments?: PreviewSessionCommentDeps
 }
 
 export class PreviewSessionFactory implements IPreviewSessionFactory {
   private readonly deps: Required<
-    Omit<PreviewSessionFactoryDeps, 'registry' | 'allowlistStore'>
+    Omit<PreviewSessionFactoryDeps, 'registry' | 'allowlistStore' | 'comments'>
   > &
-    Pick<PreviewSessionFactoryDeps, 'registry' | 'allowlistStore'>
+    Pick<PreviewSessionFactoryDeps, 'registry' | 'allowlistStore' | 'comments'>
 
   constructor(deps: PreviewSessionFactoryDeps) {
     this.deps = {
       registry: deps.registry,
       allowlistStore: deps.allowlistStore,
+      comments: deps.comments,
       createSession: deps.createSession ?? defaultCreateSession,
       createView: deps.createView ?? defaultCreateView,
       previewPagePreloadPath: deps.previewPagePreloadPath ?? null,
@@ -377,7 +381,8 @@ export class PreviewSessionFactory implements IPreviewSessionFactory {
       resolve: (t) => registry.resolve(t) ?? null,
       getAllowedHosts: () => allowlistStore.getOrigins(),
       pageScopes: ctx.pageScopes,
-      onBlocked: ctx.onBlocked
+      onBlocked: ctx.onBlocked,
+      comments: this.deps.comments
     })
 
     // Steps 3–9 all run AFTER the token is live, and every one of them can

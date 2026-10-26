@@ -36,6 +36,13 @@
  * CSP; the handler catches it, records a `csp-missing` failure entry and
  * returns 500 rather than shipping a page with no sandbox (design §1.1, §2.6).
  *
+ * HTML Preview comments (docs/designs/html-preview-comments.md §4.2, §6): when
+ * the session carries a comment context, step 12 asks it for the body. It
+ * serves an instrumented COPY of a page – an element token on every eligible
+ * start tag – only for a document load of an `.html` file that comments are
+ * expected for, and the raw bytes otherwise (`comments/commentInstrumentation.ts`).
+ * The file on disk is never written, and the CSP is the same either way.
+ *
  * Trust model: the request URL is untrusted DATA. It is parsed, decoded,
  * confined and served — never executed, and NO requested path, decoded segment,
  * filename, query string or request header ever reaches a response header value
@@ -50,8 +57,10 @@ import { logger } from '../LoggingService'
 import { redactedLogError } from '../../utils/redactUserInput'
 import type { PreviewFailureInput, PreviewFailureType } from '../../../shared/ipc/preview-types'
 import type { PreviewFrameRefusalType } from './previewFrameRefusals'
+import type { PreviewCommentServing } from './comments/commentInstrumentation'
 import { resolveConfined, type PreviewResolveResult } from './previewPathResolve'
 import {
+  requestClassOf,
   requestKind,
   type PreviewRequestKind,
   type PreviewRequestKindLedger
@@ -112,6 +121,11 @@ export interface PreviewProtocolContext {
   recordFrameRefusal(type: PreviewFrameRefusalType, address: string): void
   /** The session's request-kind notes, left by the request filter (S1). */
   readonly ledger: Pick<PreviewRequestKindLedger, 'take'>
+  /**
+   * HTML Preview comments for this session: picks the body of a served
+   * document and is disposed with the handler. Absent: every body is raw.
+   */
+  readonly comments?: Pick<PreviewCommentServing, 'bodyFor' | 'dispose'>
 }
 
 /** Build a bodyless error response for a non-2xx status (no CSP, no leak). */
@@ -273,8 +287,12 @@ async function handleRequestInner(
 ): Promise<GlobalResponse> {
   // The request's kind, from the note the request filter left (S1). Taken
   // first and exactly once, whatever the outcome below, so the ledger's queue
-  // for this URL stays in step with the requests that reach the handler.
-  const kind = requestKind(ctx.ledger.take(request.url))
+  // for this URL stays in step with the requests that reach the handler. Only
+  // a note of the request's own class matches: a document load carries no
+  // `user-agent` header, a fetch or subresource always does (S1e).
+  const requestClass = requestClassOf(request.headers as Headers | undefined)
+  const noteType = ctx.ledger.take(request.url, requestClass)
+  const kind = requestKind(noteType)
 
   // Step 1: parse the URL. A URL the platform cannot parse is a 404.
   let url: URL
@@ -368,11 +386,25 @@ async function handleRequestInner(
     return errorResponse(500)
   }
 
-  // Step 12: serve the confined bytes with the header set built above. A Node
-  // `Buffer` is a valid `BodyInit` at runtime (undici accepts a `Uint8Array`),
-  // but its `Buffer<ArrayBufferLike>` static type does not satisfy the DOM lib's
-  // `BufferSource<ArrayBuffer>` union member, so the value is cast to `BodyInit`.
-  return new Response(resolved.body as unknown as BodyInit, { status: 200, headers })
+  // Step 12: serve the confined bytes with the header set built above – or,
+  // for a page that comments are expected for, its instrumented copy (the
+  // comment context never throws; any failure there serves the raw bytes). A
+  // Node `Buffer` is a valid `BodyInit` at runtime (undici accepts a
+  // `Uint8Array`), but its `Buffer<ArrayBufferLike>` static type does not
+  // satisfy the DOM lib's `BufferSource<ArrayBuffer>` union member, so the
+  // value is cast to `BodyInit`.
+  const body =
+    ctx.comments === undefined
+      ? resolved.body
+      : await ctx.comments.bodyFor({
+          body: resolved.body,
+          ext: resolved.ext,
+          realPath: resolved.realPath,
+          method: request.method,
+          noteType,
+          requestClass
+        })
+  return new Response(body as unknown as BodyInit, { status: 200, headers })
 }
 
 /**
@@ -391,5 +423,7 @@ export function attach(session: Session, ctx: PreviewProtocolContext): () => voi
   )
   return () => {
     session.protocol.unhandle(PREVIEW_SCHEME)
+    // The session's token tables live exactly as long as its handler.
+    ctx.comments?.dispose()
   }
 }

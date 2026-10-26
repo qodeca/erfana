@@ -174,6 +174,8 @@ export default defineConfig({
         input: {
           index: resolve('src/main/index.ts'),
           'git-status.worker': resolve('src/main/services/workers/git-status.worker.ts'),
+          // HTML Preview comments: the persistent parse worker (design §19 R3-12).
+          'comment-parse.worker': resolve('src/main/services/preview/comments/commentParseWorker.ts'),
           // DOCX conversion runs in a killable utilityProcess child (#1 lens-review).
           'docx/docx-convert.process': resolve('src/main/services/docx/docx-convert.process.ts')
         }

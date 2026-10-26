@@ -21,10 +21,22 @@
  * entry per address, whichever layer saw the frame.
  */
 import type { PreviewFailureInput } from '../../../shared/ipc/preview-types'
+import {
+  createPreviewCommentServing,
+  type PreviewCommentServing,
+  type PreviewCommentServingDeps
+} from './comments/commentInstrumentation'
 import type { PreviewFrameRefusalType } from './previewFrameRefusals'
 import type { PreviewProtocolContext, PreviewRootEntryLike } from './PreviewProtocolHandler'
 import type { PreviewFilterContext } from './PreviewRequestFilter'
 import { createPreviewRequestKindLedger } from './PreviewRequestKindLedger'
+
+/**
+ * What a session's HTML Preview comments are built from
+ * (docs/designs/html-preview-comments.md §4.2): the feature flag, plus test
+ * seams. Absent, the session serves every body raw.
+ */
+export type PreviewSessionCommentDeps = PreviewCommentServingDeps
 
 /**
  * What a session reads from its view's page scopes (issue #124, WI-29). The page
@@ -59,12 +71,20 @@ export interface PreviewSessionContextParams {
   readonly pageScopes: () => PreviewSessionPageScopes
   /** Sink for a network-layer refusal – the permission band's source. */
   readonly onBlocked: PreviewFilterContext['onBlocked']
+  /** HTML Preview comments; absent, every body is served raw. */
+  readonly comments?: PreviewSessionCommentDeps
 }
 
 /** The two contexts, sharing one request-kind ledger. */
 export interface PreviewSessionContexts {
   readonly protocol: PreviewProtocolContext
   readonly filter: PreviewFilterContext
+  /**
+   * The session's comment state – its token tables and comment mode – when
+   * comments are wired; the protocol context carries the same object and
+   * disposes it with the handler.
+   */
+  readonly comments?: PreviewCommentServing
 }
 
 /** Build the handler's and the filter's contexts for one session. */
@@ -78,6 +98,10 @@ export function buildPreviewSessionContexts(
   const recordFrameRefusal = (type: PreviewFrameRefusalType, address: string): void => {
     pageScopes().committed().frameRefusals.record(type, address)
   }
+  // Per session like the ledger: a recycled partition never inherits the
+  // previous view's token tables.
+  const comments =
+    params.comments === undefined ? undefined : createPreviewCommentServing(params.comments)
 
   return {
     protocol: {
@@ -85,8 +109,10 @@ export function buildPreviewSessionContexts(
       recordFailure: (input) => pageScopes().committed().recordFailure(input),
       recordDocumentFailure: (input) => pageScopes().forMainDocument().recordFailure(input),
       recordFrameRefusal,
-      ledger
+      ledger,
+      ...(comments === undefined ? {} : { comments })
     },
+    ...(comments === undefined ? {} : { comments }),
     filter: {
       getAllowedHosts: params.getAllowedHosts,
       ownToken: params.token,

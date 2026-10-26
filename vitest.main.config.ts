@@ -151,6 +151,48 @@ export default defineConfig({
         'src/shared/htmlComments/frameworkMarkers.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100
         'src/shared/htmlComments/thread.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // HTML Preview comments – the writer (design § 7.6, § 12.5: at least
+        // 92/92/88/92). The only page-driven write into the user's files: path
+        // confinement, link refusal, the re-read/re-hash compare-and-swap and the
+        // strict no-fallback write. Pinned 2 points under the value measured when
+        // this entry landed (2026-10-26, Windows; the only branch it missed, the
+        // POSIX `ELOOP` refusal, runs on Linux instead of the Windows-only
+        // followed-symlink check).
+        // measured 100/100/98.63/99.07
+        'src/main/utils/atomicWriteBytesStrict.ts': { lines: 98, functions: 98, branches: 96, statements: 97 },
+        // measured 100/100/100/100
+        'src/main/services/preview/comments/CommentWriter.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/preview/comments/commentFileAccess.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/preview/comments/commentFileLock.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/preview/comments/commentRefusals.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // HTML Preview comments – instrumentation (design § 4.2, § 6, § 12.5: at
+        // least 92/92/88/92). These modules decide which served document gets
+        // element tokens and which element a token names, and the confinement
+        // core returns the real path the comments key on – including the exact
+        // realpath containment of security review F1. Pinned about 2 points
+        // under the value measured when this entry landed (2026-10-26, Windows,
+        // on the preview and comments suites alone; the full run covers more).
+        // measured 98.61/100/97.29/98.78
+        'src/main/services/preview/comments/commentParseCore.ts': { lines: 96, functions: 98, branches: 95, statements: 96 },
+        // measured 100/100/100/100
+        'src/main/services/preview/comments/commentParseProtocol.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/preview/comments/commentParseWorker.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/95.23/95.91/97.19
+        'src/main/services/preview/comments/CommentParseWorkerAdapter.ts': { lines: 98, functions: 93, branches: 93, statements: 95 },
+        // measured 100/100/94.44/100
+        'src/main/services/preview/comments/ElementTokenTable.ts': { lines: 98, functions: 98, branches: 92, statements: 98 },
+        // measured 100/100/93.75/100
+        'src/main/services/preview/comments/commentInstrumentation.ts': { lines: 98, functions: 98, branches: 91, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/preview/comments/commentE2eHook.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/main/services/preview/PreviewRequestKindLedger.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 93.9/100/94.73/93.9
+        'src/main/services/preview/previewPathResolve.ts': { lines: 91, functions: 98, branches: 92, statements: 91 },
       },
       exclude: [
         'node_modules/**',

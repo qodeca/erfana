@@ -6,7 +6,8 @@
  *
  * Implements design §2.4's request→response confinement EXACTLY:
  *   realpath the parent → build the parent-based relative path → escape check →
- *   exclusion check → `O_NOFOLLOW` open → stat isFile → lstat dev/ino compare →
+ *   exclusion check → `O_NOFOLLOW` open → stat isFile → lstat dev/ino compare
+ *   (as bigints, so a 64-bit Windows file ID keeps every bit) →
  *   step 8h re-resolve + re-run the exclusion rules against the FULLY RESOLVED
  *   path → bounded `readExactly` (413 on overflow; the file size is NEVER
  *   trusted). Every path from the open onward runs inside `try/finally` so a
@@ -21,12 +22,21 @@
  * `fs.realpath.native()`"), so it canonicalises Windows 8.3 short names. Do NOT
  * "fix" this to `.native` — it is already correct, and the residual short-name
  * bypass lives in the UNRESOLVED basename at step 8b, which step 8h closes.
+ *
+ * NOTE on case: the DECIDING containment check (step 8h, in both
+ * `confinePath` and `resolveConfined`) is an exact prefix compare of two
+ * realpaths ({@link realPathWithin}), never `path.relative`. On win32
+ * `path.relative` compares with JavaScript's `toLowerCase`, which folds
+ * characters NTFS keeps apart – U+212A KELVIN SIGN lowercases to `k` – so a
+ * sibling folder `…\proj<U+212A>` would count as inside the root `…\projk`
+ * (security review F1). The parent-based `relative` checks at steps 8b–8d
+ * stay as early rejects only.
  */
 
 import { constants as fsConstants } from 'node:fs'
 import { open, realpath, lstat } from 'node:fs/promises'
 import type { FileHandle } from 'node:fs/promises'
-import { basename, dirname, extname, isAbsolute, join, relative } from 'node:path'
+import { basename, dirname, extname, isAbsolute, join, relative, sep } from 'node:path'
 import { PREVIEW } from '../../../shared/constants'
 import type { PreviewFailureType } from '../../../shared/ipc/preview-types'
 import { hasDotSegment, hasShortNameAlias, isInExcludedDirectory } from './previewExclusion'
@@ -41,9 +51,14 @@ export type ConfineVerdict =
   | { ok: true; realTarget: string; rel: string }
   | { ok: false; reason: 'escape' | 'excluded' | 'missing' }
 
-/** Result of resolving an `erfana-preview://` request to a served body (§2.4). */
+/**
+ * Result of resolving an `erfana-preview://` request to a served body (§2.4).
+ * `realPath` is the confined, fully resolved path the body was read from (the
+ * step 8h `realpath`) – the key HTML Preview comments use for the file
+ * (docs/designs/html-preview-comments.md §4.2).
+ */
 export type PreviewResolveResult =
-  | { ok: true; body: Buffer; ext: string }
+  | { ok: true; body: Buffer; ext: string; realPath: string }
   | { ok: false; status: 400 | 403 | 404 | 413 | 500; reason: PreviewFailureType }
 
 /**
@@ -82,6 +97,25 @@ export function isSafeSegment(
 }
 
 /**
+ * The path of `realPath` below `realRoot`, or `undefined` when it is not
+ * strictly inside it. Exact and case-sensitive: both arguments MUST be
+ * `fsPromises.realpath` results, so a path inside the root starts with the
+ * root's exact spelling (realpath canonicalises the case of every component).
+ * `separator` is threaded through so the win32 branch is testable on any host.
+ */
+export function realPathWithin(
+  realRoot: string,
+  realPath: string,
+  separator: string = sep
+): string | undefined {
+  const prefix = realRoot.endsWith(separator) ? realRoot : realRoot + separator
+  if (realPath.length <= prefix.length || !realPath.startsWith(prefix)) {
+    return undefined
+  }
+  return realPath.slice(prefix.length)
+}
+
+/**
  * Realpath-confine a candidate absolute path to `realRoot` (design §2.4
  * steps 8a–8d + 8h, without opening a handle). Used by the watch coordinator to
  * drop out-of-root candidates before acquiring a watch, and as the shared
@@ -117,7 +151,8 @@ export async function confinePath(
     return { ok: false, reason: 'missing' }
   }
 
-  // 8b–8c: parent-based relative path + escape check. The basename is left
+  // 8b–8c: parent-based relative path + escape check – an early reject only
+  // (`relative` folds case on win32; 8h decides). The basename is left
   // UNRESOLVED here deliberately (the short-name bypass lives in it), so the
   // full re-resolve below is what actually closes the hole.
   const parentRel = relative(realRoot, join(parentReal, basename(candidate)))
@@ -132,15 +167,16 @@ export async function confinePath(
 
   // 8h: re-resolve the FULL path and re-run every rule against the resolved
   // relative path — closes the Windows 8.3 short-name and symlinked-name
-  // bypasses that survive the parent-only check above.
+  // bypasses that survive the parent-only check above. The containment test
+  // is the exact one (see the NOTE on case in the header).
   let realTarget: string
   try {
     realTarget = await realpath(candidate)
   } catch {
     return { ok: false, reason: 'missing' }
   }
-  const rel = relative(realRoot, realTarget)
-  if (rel === '' || rel.startsWith('..') || isAbsolute(rel)) {
+  const rel = realPathWithin(realRoot, realTarget)
+  if (rel === undefined) {
     return { ok: false, reason: 'escape' }
   }
   if (hasDotSegment(rel) || (!allowBuildDirs && isInExcludedDirectory(rel))) {
@@ -219,7 +255,8 @@ export async function resolveConfined(
     return { ok: false, status: 404, reason: 'missing-local-file' }
   }
 
-  // Step 8b–8c: parent-based relative path + escape check.
+  // Step 8b–8c: parent-based relative path + escape check – an early reject
+  // only (`relative` folds case on win32; step 8h decides).
   const parentRel = relative(realRoot, join(parentReal, basename(candidate)))
   if (parentRel === '' || parentRel.startsWith('..') || isAbsolute(parentRel)) {
     return { ok: false, status: 403, reason: 'path-escape' }
@@ -242,23 +279,26 @@ export async function resolveConfined(
     }
 
     // Step 8f: must be a regular file.
-    const st = await handle.stat()
+    const st = await handle.stat({ bigint: true })
     if (!st.isFile()) {
       return { ok: false, status: 404, reason: 'missing-local-file' }
     }
 
     // Step 8g: the opened inode must match the name's inode — pins the identity
-    // of the OPENED handle against a swap between resolve and open.
-    const lst = await lstat(candidate)
+    // of the OPENED handle against a swap between resolve and open. Compared as
+    // bigints: a Windows file ID is 64-bit, and as a Number two IDs that differ
+    // only past 2^53 would compare equal.
+    const lst = await lstat(candidate, { bigint: true })
     if (lst.dev !== st.dev || lst.ino !== st.ino) {
       return { ok: false, status: 403, reason: 'path-escape' }
     }
 
     // Step 8h: re-resolve the full path and re-run the exclusion rules against
     // the resolved relative path (closes the short-name / symlinked-name bypass).
+    // The containment test is the exact one (see the NOTE on case in the header).
     const realTarget = await realpath(candidate)
-    const relReal = relative(realRoot, realTarget)
-    if (relReal === '' || relReal.startsWith('..') || isAbsolute(relReal)) {
+    const relReal = realPathWithin(realRoot, realTarget)
+    if (relReal === undefined) {
       return { ok: false, status: 403, reason: 'path-escape' }
     }
     if (isInExcludedDirectory(relReal) || hasDotSegment(relReal)) {
@@ -271,7 +311,12 @@ export async function resolveConfined(
       return { ok: false, status: 413, reason: 'asset-too-large' }
     }
 
-    return { ok: true, body: read.buffer, ext: extname(candidate).toLowerCase() }
+    return {
+      ok: true,
+      body: read.buffer,
+      ext: extname(candidate).toLowerCase(),
+      realPath: realTarget
+    }
   } finally {
     await handle?.close()
   }

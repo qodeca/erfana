@@ -19,8 +19,28 @@
  * dropped first, and a note is forgotten `REQUEST_KIND_LEDGER_TTL_MS` after it
  * was made, so a request the filter let through but that never reached the
  * handler does not linger. A URL with no note has kind `''`: no badge, and the
- * bytes are still served. The kind only ever picks a diagnostic; it never
- * changes what is served or how it is confined.
+ * bytes are still served.
+ *
+ * Request classes (HTML Preview comments, spike S1e; design §19 R3-1). A page
+ * that fetches its own URL while it is reloaded used to poison the queue: the
+ * fetches the reload aborted were noted but never reached the handler, so the
+ * next document load took a stale `xhr` note (28–29 of 30 reloads wrong). Two
+ * rules fix it, 30 of 30:
+ * - a note carries the webRequest id, and `forget(id)` drops it when that
+ *   request fails (`onErrorOccurred`) before it reaches the handler;
+ * - `take(url, requestClass)` only hands back a note of the request's own
+ *   class. Document and frame loads (and `<object>`/`<embed>` documents) reach
+ *   `protocol.handle` WITHOUT a `user-agent` header; every fetch and
+ *   subresource – script, style, image, font, media, XHR – carries one, and a
+ *   page cannot remove it (S1e, re-checked on Electron 44.9 for every type
+ *   listed). This is undocumented Electron behaviour: an Electron upgrade must
+ *   re-check it (the comments e2e exit test fails if it changes).
+ *
+ * The kind picks a diagnostic, and whether comment instrumentation is
+ * attempted (only for a document-class note taken by a header-less request).
+ * It never changes how a request is confined, and security never depends on
+ * it: a token served to a `fetch` is harmless, and a missed note only makes
+ * comments unavailable for that page (design §6, threat S24).
  *
  * Trust model: the URL is page-controlled data. It is only compared, never
  * parsed, run or reflected. Its fragment is dropped – the network layer and the
@@ -39,15 +59,45 @@ export type PreviewRequestKind = 'document' | 'iframe' | 'script' | 'style' | ''
  */
 export const REQUEST_KIND_KEY_MAX_CHARS = 2048
 
+/**
+ * What a request is, as `protocol.handle` can tell: a `navigation` loads a
+ * document into a frame and carries no `user-agent` header; a `subresource`
+ * (fetch, script, style, image, font, media) always carries one (S1e).
+ */
+export type PreviewRequestClass = 'navigation' | 'subresource'
+
+/** webRequest resource types that load a document, and so arrive without `user-agent`. */
+const NAVIGATION_RESOURCE_TYPES: ReadonlySet<string> = new Set(['mainFrame', 'subFrame', 'object'])
+
+/**
+ * The class of a request the handler received, from its headers alone. A
+ * request without a headers object is not one Chromium built; it is treated
+ * as a subresource, the class that is never instrumented.
+ */
+export function requestClassOf(headers: Pick<Headers, 'has'> | undefined): PreviewRequestClass {
+  return headers === undefined || headers.has('user-agent') ? 'subresource' : 'navigation'
+}
+
+/** The class of request a webRequest resource type belongs to. */
+export function resourceTypeClass(resourceType: string): PreviewRequestClass {
+  return NAVIGATION_RESOURCE_TYPES.has(resourceType) ? 'navigation' : 'subresource'
+}
+
 /** One session's notes, written by the request filter and read by the handler. */
 export interface PreviewRequestKindLedger {
-  /** The filter let `url` through; `resourceType` is webRequest's value. */
-  note(url: string, resourceType: string): void
   /**
-   * The handler received `url`: the oldest live note for it, removed from the
-   * ledger, or `undefined` when there is none.
+   * The filter let `url` through; `resourceType` is webRequest's value and
+   * `requestId` its `details.id`, which {@link forget} drops the note by.
    */
-  take(url: string): string | undefined
+  note(url: string, resourceType: string, requestId?: number): void
+  /**
+   * The handler received `url`: the oldest live note for it of `requestClass`,
+   * removed from the ledger, or `undefined` when there is none. Without a
+   * class, the oldest note of any class (a reader that cannot see the request).
+   */
+  take(url: string, requestClass?: PreviewRequestClass): string | undefined
+  /** Request `requestId` failed before reaching the handler (`onErrorOccurred`): drop its note. */
+  forget(requestId: number): void
 }
 
 /** Test seams; production uses the defaults. */
@@ -59,6 +109,8 @@ export interface PreviewRequestKindLedgerDeps {
 interface KindNote {
   readonly key: string
   readonly resourceType: string
+  readonly requestClass: PreviewRequestClass
+  readonly requestId: number | undefined
   readonly notedAt: number
 }
 
@@ -116,21 +168,36 @@ export function createPreviewRequestKindLedger(
   }
 
   return {
-    note(url, resourceType) {
+    note(url, resourceType, requestId) {
       forgetExpired()
       if (notes.length >= PREVIEW_LIMITS.REQUEST_KIND_LEDGER_MAX) {
         notes.shift()
       }
-      notes.push({ key: ledgerKey(url), resourceType, notedAt: now() })
+      notes.push({
+        key: ledgerKey(url),
+        resourceType,
+        requestClass: resourceTypeClass(resourceType),
+        requestId,
+        notedAt: now()
+      })
     },
-    take(url) {
+    take(url, requestClass) {
       forgetExpired()
       const key = ledgerKey(url)
-      const index = notes.findIndex((entry) => entry.key === key)
+      const index = notes.findIndex(
+        (entry) =>
+          entry.key === key && (requestClass === undefined || entry.requestClass === requestClass)
+      )
       if (index === -1) {
         return undefined
       }
       return notes.splice(index, 1)[0].resourceType
+    },
+    forget(requestId) {
+      const index = notes.findIndex((entry) => entry.requestId === requestId)
+      if (index !== -1) {
+        notes.splice(index, 1)
+      }
     }
   }
 }
