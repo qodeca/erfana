@@ -50,6 +50,15 @@ describe('M-052 the comment-mode toggle', () => {
     expect(matchCommentToggle({ ...CTRL_ALT_M, code: 'Semicolon' }, 'win32')).toBe(true)
   })
 
+  it('M-052 Cmd+Option+M on macOS matches whatever non-ASCII character Option types on the M key', () => {
+    // Polish layout: Option+M types Ķ (U+0136), seen on a real Mac.
+    expect(matchCommentToggle({ ...CMD_OPT_M, key: String.fromCharCode(0x136) }, 'darwin')).toBe(true)
+    // A layout whose M position types another ASCII letter keeps its chord.
+    expect(matchCommentToggle({ ...CMD_OPT_M, key: ',' }, 'darwin')).toBe(false)
+    // A non-ASCII character on another physical key is not the toggle.
+    expect(matchCommentToggle({ ...CMD_OPT_M, code: 'KeyN' }, 'darwin')).toBe(false)
+  })
+
   it('M-052 any other modifier set is not the toggle', () => {
     for (const input of [
       { ...CTRL_ALT_M, shift: true },

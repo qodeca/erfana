@@ -15,30 +15,8 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSyn
 import { tmpdir } from 'node:os'
 import { join, win32 } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { KELVIN, KELVIN_SIBLING_IS_DISTINCT } from './__test-helpers__/kelvinSibling'
 import { confinePath, realPathWithin, resolveConfined } from './previewPathResolve'
-
-const KELVIN = String.fromCharCode(0x212a)
-
-let base: string
-let realRoot: string
-let sibling: string
-
-beforeEach(() => {
-  base = realpathSync.native(mkdtempSync(join(tmpdir(), 'preview-casefold-')))
-  realRoot = join(base, 'projk')
-  sibling = join(base, `proj${KELVIN}`)
-  mkdirSync(realRoot)
-  mkdirSync(sibling)
-  writeFileSync(join(realRoot, 'index.html'), '<p>inside</p>')
-  writeFileSync(join(sibling, 'secret.html'), '<p>outside</p>')
-  // A junction needs no privilege on Windows; elsewhere the type is ignored.
-  symlinkSync(sibling, join(realRoot, 'link'), 'junction')
-  realRoot = realpathSync.native(realRoot)
-})
-
-afterEach(() => {
-  rmSync(base, { recursive: true, force: true })
-})
 
 describe('realPathWithin – exact containment', () => {
   const root = win32.join('C:/', 'work', 'projk')
@@ -70,7 +48,29 @@ describe('realPathWithin – exact containment', () => {
   })
 })
 
-describe('preview confinement – U+212A sibling folder (F1)', () => {
+// Needs both folders on disk: a case-insensitive APFS volume folds them into one.
+describe.skipIf(!KELVIN_SIBLING_IS_DISTINCT)('preview confinement – U+212A sibling folder (F1)', () => {
+  let base: string
+  let realRoot: string
+  let sibling: string
+
+  beforeEach(() => {
+    base = realpathSync.native(mkdtempSync(join(tmpdir(), 'preview-casefold-')))
+    realRoot = join(base, 'projk')
+    sibling = join(base, `proj${KELVIN}`)
+    mkdirSync(realRoot)
+    mkdirSync(sibling)
+    writeFileSync(join(realRoot, 'index.html'), '<p>inside</p>')
+    writeFileSync(join(sibling, 'secret.html'), '<p>outside</p>')
+    // A junction needs no privilege on Windows; elsewhere the type is ignored.
+    symlinkSync(sibling, join(realRoot, 'link'), 'junction')
+    realRoot = realpathSync.native(realRoot)
+  })
+
+  afterEach(() => {
+    rmSync(base, { recursive: true, force: true })
+  })
+
   it('resolveConfined refuses a file reached through a junction to the Kelvin-sign sibling', async () => {
     expect(await resolveConfined(realRoot, ['link', 'secret.html'])).toEqual({
       ok: false,

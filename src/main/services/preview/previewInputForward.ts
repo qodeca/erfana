@@ -72,13 +72,17 @@ export const PREVIEW_FORWARDED_SHORTCUTS = Object.freeze([
  * row, outside the list above, because it is taken only while comments are on
  * for the view – off, the chord stays with the page. Matched on the TYPED key,
  * never the physical one: AltGr is Ctrl+Alt on Windows, and AltGr+M types µ on
- * a German layout, which must go on typing µ. On macOS Option+M itself types µ,
- * and with Cmd down that is still this chord (AltGr does not exist there).
+ * a German layout, which must go on typing µ. On macOS Option changes the
+ * typed character with the layout (µ on ABC, Ķ on Polish), and with Cmd down
+ * that is still this chord (AltGr does not exist there), so the physical KeyM
+ * stands in – only when the typed key is not printable ASCII, so a layout
+ * whose M position types another letter keeps its chord (the renderer's
+ * `usePreviewComments` rule, L14).
  */
 export const PREVIEW_COMMENT_TOGGLE = Object.freeze({
   key: 'comment-mode',
   typed: 'm',
-  darwinTyped: Object.freeze(['m', 'µ'])
+  darwinCode: 'KeyM'
 } as const)
 
 /** What the forwarder asks about the view's comments, per key press. */
@@ -164,8 +168,9 @@ export function matchForwardedShortcut(
 }
 
 /**
- * Whether a key press is the comment-mode toggle: the typed `m` (µ too on
- * macOS) with exactly Ctrl+Alt, or Cmd+Option on macOS – Shift never.
+ * Whether a key press is the comment-mode toggle: the typed `m` (on macOS
+ * also the M key typing a non-ASCII character) with exactly Ctrl+Alt, or
+ * Cmd+Option on macOS – Shift never.
  */
 export function matchCommentToggle(
   input: ForwardableInput,
@@ -176,7 +181,11 @@ export function matchCommentToggle(
   }
   const typed = input.key.toLowerCase()
   if (platform === 'darwin') {
-    return input.meta && input.alt && !input.control && PREVIEW_COMMENT_TOGGLE.darwinTyped.some((key) => key === typed)
+    const typedAscii = input.key.length === 1 && input.key >= ' ' && input.key <= '~'
+    const isM =
+      typed === PREVIEW_COMMENT_TOGGLE.typed ||
+      (input.code === PREVIEW_COMMENT_TOGGLE.darwinCode && !typedAscii)
+    return input.meta && input.alt && !input.control && isM
   }
   return input.control && input.alt && !input.meta && typed === PREVIEW_COMMENT_TOGGLE.typed
 }

@@ -20,6 +20,7 @@ import { tmpdir } from 'node:os'
 import { join, relative, win32 } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ErrorCode } from '../../../shared/errors'
+import { KELVIN, KELVIN_SIBLING_IS_DISTINCT } from './__test-helpers__/kelvinSibling'
 
 const hooks = vi.hoisted(() => ({
   /** Runs after the real `lstat` of a path, before the gate sees the result. */
@@ -41,7 +42,6 @@ vi.mock('node:fs/promises', async importOriginal => {
 import { resolveErfanaDir } from './erfanaDirGate'
 import { realPathWithin } from './previewPathResolve'
 
-const KELVIN = String.fromCharCode(0x212a)
 const ESCAPE = {
   code: ErrorCode.SYMLINK_ATTACK,
   message: 'Resolved .erfana directory escapes the project root'
@@ -95,18 +95,22 @@ describe('realPathWithin – the .erfana rule', () => {
 })
 
 describe('resolveErfanaDir – U+212A sibling folder (F1)', () => {
-  it('refuses a .erfana swapped, after the symlink check, for a junction into the Kelvin-sign sibling', async () => {
-    swapAfterSymlinkCheck(siblingErfana)
+  // Needs both folders on disk: a case-insensitive APFS volume folds them into one.
+  it.skipIf(!KELVIN_SIBLING_IS_DISTINCT)(
+    'refuses a .erfana swapped, after the symlink check, for a junction into the Kelvin-sign sibling',
+    async () => {
+      swapAfterSymlinkCheck(siblingErfana)
 
-    await expect(resolveErfanaDir(realRoot)).rejects.toMatchObject(ESCAPE)
-    expect(hooks.afterLstat).toBeUndefined()
-    // What the old `relative` rule saw on this file system: on win32 the
-    // sibling folded into the root's own `.erfana` and was accepted.
-    const seen = relative(realRoot, realpathSync.native(join(realRoot, '.erfana')))
-    expect(seen).toBe(
-      process.platform === 'win32' ? '.erfana' : join('..', `proj${KELVIN}`, '.erfana')
-    )
-  })
+      await expect(resolveErfanaDir(realRoot)).rejects.toMatchObject(ESCAPE)
+      expect(hooks.afterLstat).toBeUndefined()
+      // What the old `relative` rule saw on this file system: on win32 the
+      // sibling folded into the root's own `.erfana` and was accepted.
+      const seen = relative(realRoot, realpathSync.native(join(realRoot, '.erfana')))
+      expect(seen).toBe(
+        process.platform === 'win32' ? '.erfana' : join('..', `proj${KELVIN}`, '.erfana')
+      )
+    }
+  )
 
   it('refuses a .erfana swapped the same way for a junction to an unrelated folder', async () => {
     swapAfterSymlinkCheck(outsideDir)

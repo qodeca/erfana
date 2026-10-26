@@ -68,6 +68,9 @@ function setup(patch: Partial<CommentWindowProps> = {}) {
 }
 
 const field = () => screen.getByTestId('comment-new-field') as HTMLTextAreaElement
+// The window's own first focus lands on a 10-20 ms timer; act only after it.
+const nameFocused = () =>
+  waitFor(() => expect(screen.getByTestId('comment-identity-name')).toHaveFocus())
 const saveButton = () => screen.getByTestId('comment-save')
 
 describe('CommentWindow – new comment', () => {
@@ -448,6 +451,7 @@ describe('CommentWindow – new comment', () => {
     it('requires a name and validates the email', async () => {
       const user = userEvent.setup()
       const { props } = setup({ identity: null })
+      await nameFocused()
       await user.click(screen.getByTestId('comment-identity-continue'))
       expect(screen.getByText(IDENTITY_COPY.nameRequired)).toBeVisible()
       expect(screen.getByTestId('comment-identity-name')).toHaveFocus()
@@ -462,6 +466,7 @@ describe('CommentWindow – new comment', () => {
     it('stores the trimmed identity, then moves on to the comment field', async () => {
       const user = userEvent.setup()
       const { props, rerender } = setup({ identity: null })
+      await nameFocused()
       await user.type(screen.getByTestId('comment-identity-name'), '  Ada  ')
       await user.click(screen.getByTestId('comment-identity-continue'))
       expect(props.onSaveIdentity).toHaveBeenCalledWith({ name: 'Ada', email: '' })
@@ -543,6 +548,7 @@ describe('CommentWindow – new comment', () => {
     it('edits the name without leaving the window', async () => {
       const user = userEvent.setup()
       const { props } = setup()
+      await waitFor(() => expect(field()).toHaveFocus())
       await user.click(screen.getByRole('button', { name: COPY.change }))
       const name = screen.getByTestId('comment-identity-edit-name')
       expect(name).toHaveFocus()

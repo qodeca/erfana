@@ -816,6 +816,7 @@ describe('CommentWindow – threads', () => {
     it('L12 an empty reply puts focus back in the field with its error', async () => {
       const user = userEvent.setup()
       setup()
+      await titleFocused()
       await user.click(screen.getByTestId('comment-reply'))
       const field = screen.getByTestId('comment-reply-field')
       expect(field).toHaveFocus()

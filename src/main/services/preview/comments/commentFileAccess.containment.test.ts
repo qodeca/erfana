@@ -20,12 +20,10 @@ vi.mock('../previewPathResolve', async importOriginal => {
 
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
+import { KELVIN, KELVIN_SIBLING_IS_DISTINCT } from '../__test-helpers__/kelvinSibling'
 import { PAGE, makeProject, snapshot, type TempProject } from './__test-helpers__/commentWriterHarness'
 import { confineCommentFile } from './commentFileAccess'
 import { refused } from './commentRefusals'
-
-/** U+212A KELVIN SIGN, which `toLowerCase` folds to `k`. */
-const KELVIN = String.fromCharCode(0x212a)
 
 let parent: TempProject
 
@@ -39,10 +37,13 @@ afterEach(async () => {
 })
 
 describe('confineCommentFile – the exact containment check (F1)', () => {
-  it.each([
-    ['a sibling whose name only case-folds to the root', `proj${KELVIN}`],
-    ['a sibling whose name starts with the root', 'projk-other']
-  ])('refuses %s even when confinePath lets it through', async (_name, siblingName) => {
+  // The Kelvin row needs both folders on disk: a case-insensitive APFS volume
+  // folds them into one.
+  it.for<[string, string, boolean]>([
+    ['a sibling whose name only case-folds to the root', `proj${KELVIN}`, !KELVIN_SIBLING_IS_DISTINCT],
+    ['a sibling whose name starts with the root', 'projk-other', false]
+  ])('refuses %s even when confinePath lets it through', async ([, siblingName, skip], ctx) => {
+    if (skip) ctx.skip()
     await mkdir(parent.path('projk'))
     await mkdir(parent.path(siblingName))
     const outsidePage = await parent.write(join(siblingName, 'page.html'), PAGE)
