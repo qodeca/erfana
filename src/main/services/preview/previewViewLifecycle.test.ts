@@ -16,7 +16,7 @@ import {
 } from './previewViewLifecycle'
 import type { PreviewWebContentsHandle } from './PreviewSessionFactory'
 import { PREVIEW_PAGE_CSP_VIOLATION_CHANNEL } from './previewCspViolationBridge'
-import { PREVIEW_PAGE_LINK_NOTE_CHANNEL } from './previewLinkBridge'
+import { PREVIEW_PAGE_LINK_CHANNEL, PREVIEW_PAGE_LINK_NOTE_CHANNEL } from './previewLinkBridge'
 
 /** A WebContents test double that records listeners keyed by event name. */
 /** The object the fake uses as its top-level frame identity. */
@@ -195,6 +195,34 @@ describe('wirePreviewLifecycle link-note wiring', () => {
 
     emitIpc(PREVIEW_PAGE_LINK_NOTE_CHANNEL, { senderFrame: MAIN_FRAME }, NOTE)
     expect(hooks.onLinkNote).not.toHaveBeenCalled()
+  })
+})
+
+describe('wirePreviewLifecycle sender-frame gate (SEC-27)', () => {
+  // With HTML Preview comments every frame runs the preview preload, so a
+  // message whose sender frame is unknown must not count as the page's. It
+  // used to (`undefined` was read as the main frame), which was safe only
+  // while frames had no preload (docs/adrs/0005-sub-frame-preload-one-receive-channel.md).
+  const CASES = [
+    { channel: PREVIEW_PAGE_LINK_CHANNEL, hook: 'onLinkActivated' },
+    { channel: PREVIEW_PAGE_LINK_NOTE_CHANNEL, hook: 'onLinkNote' },
+    { channel: PREVIEW_PAGE_CSP_VIOLATION_CHANNEL, hook: 'onCspViolation' }
+  ] as const
+
+  it.each(CASES)('SEC-27 refuses $channel without a known sender frame, and takes it from the main frame', ({ channel, hook }) => {
+    const { wc, emitIpc } = makeWebContents()
+    const hooks: PreviewLifecycleHooks = { ...makeHooks(), onLinkActivated: vi.fn() }
+    wirePreviewLifecycle(makeParams(wc), hooks)
+    const payload = { probe: channel }
+
+    for (const event of [{}, { senderFrame: undefined }, { senderFrame: null }, null, undefined]) {
+      emitIpc(channel, event, payload)
+    }
+    expect(hooks[hook]).not.toHaveBeenCalled()
+
+    emitIpc(channel, { senderFrame: MAIN_FRAME }, payload)
+    expect(hooks[hook]).toHaveBeenCalledTimes(1)
+    expect(hooks[hook]).toHaveBeenCalledWith(payload)
   })
 })
 

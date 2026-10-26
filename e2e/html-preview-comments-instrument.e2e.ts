@@ -9,8 +9,14 @@
  * seeded into a temp project and opened in the real preview. The protocol
  * handler serves a copy with an element token on every eligible element and
  * registers the load; the e2e hook (`globalThis.__erfanaE2eComments`) names,
- * for each block, the token of the element it is on. Each token must mark that
- * element in the live document, and the file on disk must not change.
+ * for each block, the token of the element it is on, and the file on disk must
+ * not change.
+ *
+ * Since P4 the preload strips every token at document start, so the live DOM
+ * carries none (`[]`). That each block's token names its element is checked
+ * the way the product will use it: in comment mode (driven by the test's stub
+ * of main, `html-preview.comments.ts`), a trusted click on the element sends a
+ * pick carrying exactly that token.
  *
  * It is also the real-app check of the request-class rule the ledger relies on
  * (`PreviewRequestKindLedger.ts`): a document load reaches `protocol.handle`
@@ -32,10 +38,12 @@ import {
   DOM_TOKENS_EXPR,
   commentLoads,
   commentUnavailable,
-  idOfTokenExpr,
+  enterStubCommentMode,
   namesFile,
-  newestLoad,
-  type CommentLoadView
+  pickAt,
+  waitForCommentLoad,
+  type CommentLoadView,
+  type StubTarget
 } from './pages/html-preview.comments'
 import {
   BASE_PAGE,
@@ -103,36 +111,39 @@ async function openTitled(preview: HtmlPreviewPage, relPath: string, title: stri
   )
 }
 
-/** Wait for the newest `scope` load of `relPath` whose three blocks all resolved to a token. */
-async function waitForLoad(
+/** The newest `scope` load of `relPath` whose three blocks all resolved to a token. */
+function waitForLoad(
   app: ElectronApplication,
   relPath: string,
   scope: CommentLoadView['scope'],
-  isNew: (load: CommentLoadView) => boolean = () => true
+  isNew?: (load: CommentLoadView) => boolean
 ): Promise<CommentLoadView> {
-  let found: CommentLoadView | undefined
-  await expect
-    .poll(
-      async () => {
-        found = newestLoad(await commentLoads(app), relPath, scope)
-        return found !== undefined && isNew(found) && found.blocks.every(b => b.token !== undefined)
-          ? found.blocks.length
-          : -1
-      },
-      { timeout: PREVIEW_BUDGET_MS, message: `no instrumented ${scope} load of ${relPath}` }
-    )
-    .toBe(COMMENTED.targets.size)
-  return found!
+  return waitForCommentLoad(app, relPath, scope, COMMENTED.targets.size, isNew)
 }
 
-/** Block id → `id` of the element its token marks, read by `readIdOf` in the live document. */
-async function elementsOfBlocks(
-  load: CommentLoadView,
-  readIdOf: (token: string) => Promise<unknown>
+/** Block id → the block's token, as the load registered it. */
+function blockTokens(load: CommentLoadView): Map<string, string | undefined> {
+  return new Map(load.blocks.map(block => [block.id as string, block.token]))
+}
+
+/**
+ * Block id → the token a comment-mode click on the block's element sends,
+ * and whether every pick came from the expected frame.
+ */
+async function tokensByPick(
+  app: ElectronApplication,
+  target: StubTarget,
+  fromFrame: (pick: { fromMain: boolean; frameUrl: string }) => boolean
 ): Promise<Map<string, unknown>> {
-  const found = new Map<string, unknown>()
-  for (const block of load.blocks) found.set(block.id!, await readIdOf(block.token!))
-  return found
+  await enterStubCommentMode(app, target)
+  const picked = new Map<string, unknown>()
+  for (const [blockId, elementId] of COMMENTED.targets) {
+    const pick = await pickAt(app, elementId, target)
+    expect(fromFrame(pick), `the pick for #${elementId} came from another frame`).toBe(true)
+    expect(pick.payload).toMatchObject({ kind: 'open', via: 'pointer' })
+    picked.set(blockId, pick.payload.token)
+  }
+  return picked
 }
 
 /** The file's bytes, to prove instrumentation never writes. */
@@ -141,7 +152,7 @@ function bytesOf(projectPath: string, relPath: string): Buffer {
 }
 
 test.describe('HTML Preview comments – instrumentation (P3 exit)', () => {
-  test("every pre-seeded block's token marks the element the block is on", async ({
+  test("every pre-seeded block's token names the element the block is on", async ({
     windowWithTestProject,
     appWithTestProject,
     testProject
@@ -156,15 +167,13 @@ test.describe('HTML Preview comments – instrumentation (P3 exit)', () => {
       [expect.any(String), 'ok', 'open'],
       [expect.any(String), 'ok', 'open']
     ])
+    expect(load.tokenCount).toBeGreaterThan(COMMENTED.targets.size)
 
+    // The preload took every token out of the live document (P4)…
     const target = HtmlPreviewPage.target(PAGE)
-    const ids = await elementsOfBlocks(load, token => preview.eval(idOfTokenExpr(token), target))
-    expect(ids).toEqual(new Map(COMMENTED.targets))
-
-    // The live document carries exactly the load's tokens, each once.
-    const domTokens = JSON.parse((await preview.eval(DOM_TOKENS_EXPR, target)) ?? '[]') as string[]
-    expect(domTokens).toHaveLength(load.tokenCount)
-    expect(new Set(domTokens).size).toBe(load.tokenCount)
+    expect(await preview.eval(DOM_TOKENS_EXPR, target)).toBe('[]')
+    // …and a click on each block's element names that block's token.
+    expect(await tokensByPick(appWithTestProject, target, pick => pick.fromMain)).toEqual(blockTokens(load))
     expect(await commentUnavailable(appWithTestProject)).toEqual([])
 
     // Serving an instrumented copy never touches the file (M-030).
@@ -193,19 +202,23 @@ test.describe('HTML Preview comments – instrumentation (P3 exit)', () => {
 
     const load = await waitForLoad(appWithTestProject, PAGE, 'frame')
     const target = HtmlPreviewPage.target(FRAMED)
-    let ids = new Map<string, unknown>()
-    await expect
-      .poll(
-        async () => {
-          ids = await elementsOfBlocks(load, token =>
-            evalInFrame(appWithTestProject, 'page.html', idOfTokenExpr(token), target)
-          )
-          return [...ids.values()].every(id => id !== null)
-        },
-        { timeout: PREVIEW_BUDGET_MS, message: 'the framed page never answered' }
-      )
-      .toBe(true)
-    expect(ids).toEqual(new Map(COMMENTED.targets))
+    // The frame runs the preload too (ADR 0005): its tokens are stripped…
+    await preview.withReadError(
+      expect
+        .poll(() => evalInFrame(appWithTestProject, 'page.html', DOM_TOKENS_EXPR, target), {
+          timeout: PREVIEW_BUDGET_MS,
+          message: 'the framed page never answered'
+        })
+        .toBe('[]')
+    )
+    // …and its picks come from the frame, with the frame load's tokens.
+    const frame: StubTarget = { ...target, frameUrlIncludes: 'page.html', iframeId: 'child' }
+    const picked = await tokensByPick(
+      appWithTestProject,
+      frame,
+      pick => !pick.fromMain && pick.frameUrl.endsWith('/page.html')
+    )
+    expect(picked).toEqual(blockTokens(load))
 
     // The host page has no blocks: it is served raw, and only the frame's load exists.
     expect(await preview.eval(DOM_TOKENS_EXPR, target)).toBe('[]')
@@ -249,9 +262,7 @@ test.describe('HTML Preview comments – instrumentation (P3 exit)', () => {
     )
     expect(latest.loadId).not.toBe(first.loadId)
     const target = HtmlPreviewPage.target(RELOADED)
-    expect(
-      await elementsOfBlocks(latest, token => preview.eval(idOfTokenExpr(token), target))
-    ).toEqual(new Map(COMMENTED.targets))
+    expect(await tokensByPick(appWithTestProject, target, pick => pick.fromMain)).toEqual(blockTokens(latest))
     expect(await commentUnavailable(appWithTestProject)).toEqual([])
   })
 })

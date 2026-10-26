@@ -56,6 +56,7 @@ import { attach as attachProtocolHandler } from './PreviewProtocolHandler'
 import { attach as attachRequestFilter } from './PreviewRequestFilter'
 import {
   buildPreviewWebPreferences,
+  commentsFlagOf,
   hardenPreviewSession,
   nextPartitionName
 } from './previewSessionPolicy'
@@ -257,10 +258,10 @@ export class PreviewSessionFactory implements IPreviewSessionFactory {
       buildWebPreferences:
         deps.buildWebPreferences ??
         ((session) =>
-          buildPreviewWebPreferences(
-            session as unknown as Session,
-            deps.previewPagePreloadPath ?? null
-          )),
+          buildPreviewWebPreferences(session as unknown as Session, deps.previewPagePreloadPath ?? null, {
+            // Read per view: a view keeps its policy for life (html-preview-comments.md §3).
+            comments: commentsFlagOf(deps.comments)
+          })),
       nextPartitionName: deps.nextPartitionName ?? nextPartitionName,
       purge: deps.purge ?? ((session) => purgePreviewSession(session as unknown as Session)),
       hardenSession:

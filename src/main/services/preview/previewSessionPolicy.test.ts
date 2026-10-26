@@ -3,7 +3,9 @@
 import type { Session, WebContents } from 'electron'
 import { describe, expect, it, vi } from 'vitest'
 import {
+  PREVIEW_COMMENTS_ARGUMENT,
   PREVIEW_WEB_PREFERENCES,
+  PREVIEW_WEB_PREFERENCES_WITH_COMMENTS,
   buildPreviewWebPreferences,
   hardenPreviewSession,
   nextPartitionName
@@ -128,6 +130,49 @@ describe('buildPreviewWebPreferences', () => {
 
   it('freezes the literal so it cannot be mutated at runtime', () => {
     expect(Object.isFrozen(PREVIEW_WEB_PREFERENCES)).toBe(true)
+  })
+})
+
+describe('buildPreviewWebPreferences with HTML Preview comments (SEC-22)', () => {
+  // ADR 0005: the comment overlay needs the preload in every frame. Under
+  // `sandbox: true`, `nodeIntegrationInSubFrames` gives frames no Node – it
+  // only runs the sandboxed, isolated preload there. The renderer argument is
+  // the preload's only signal to install the overlay (the kill switch). Those
+  // are the TWO keys the flag may change.
+  it('SEC-22 differs from the frozen literal in nodeIntegrationInSubFrames and the comments argument only', () => {
+    const { nodeIntegrationInSubFrames, additionalArguments, ...rest } = PREVIEW_WEB_PREFERENCES_WITH_COMMENTS
+    const { nodeIntegrationInSubFrames: off, ...pinned } = PREVIEW_WEB_PREFERENCES
+    expect(nodeIntegrationInSubFrames).toBe(true)
+    expect(additionalArguments).toStrictEqual(['--erfana-hpc'])
+    expect(PREVIEW_COMMENTS_ARGUMENT).toBe('--erfana-hpc')
+    expect(Object.isFrozen(additionalArguments)).toBe(true)
+    expect(off).toBe(false)
+    expect(Object.prototype.hasOwnProperty.call(PREVIEW_WEB_PREFERENCES, 'additionalArguments')).toBe(false)
+    expect(rest).toStrictEqual(pinned)
+    expect(rest.sandbox).toBe(true)
+    expect(rest.contextIsolation).toBe(true)
+    expect(rest.nodeIntegration).toBe(false)
+    expect(Object.isFrozen(PREVIEW_WEB_PREFERENCES_WITH_COMMENTS)).toBe(true)
+    expect(Object.prototype.hasOwnProperty.call(PREVIEW_WEB_PREFERENCES_WITH_COMMENTS, 'preload')).toBe(false)
+  })
+
+  it('SEC-22 builds the comments variant only when the flag is on', () => {
+    const session = { marker: true } as unknown as Session
+    const on = buildPreviewWebPreferences(session, '/out/preload/previewPage.js', { comments: true })
+    const { session: _on, preload, ...onRest } = on
+    void _on
+    expect(preload).toBe('/out/preload/previewPage.js')
+    expect(onRest).toStrictEqual(PREVIEW_WEB_PREFERENCES_WITH_COMMENTS)
+    // Electron gets its own array, never the frozen literal's.
+    expect(onRest.additionalArguments).not.toBe(PREVIEW_WEB_PREFERENCES_WITH_COMMENTS.additionalArguments)
+
+    for (const options of [undefined, {}, { comments: false }]) {
+      const { session: _off, ...offRest } = buildPreviewWebPreferences(session, null, options)
+      void _off
+      expect(offRest).toStrictEqual(PREVIEW_WEB_PREFERENCES)
+      // Flag off: no renderer argument, so the preload installs no overlay.
+      expect(Object.prototype.hasOwnProperty.call(offRest, 'additionalArguments')).toBe(false)
+    }
   })
 })
 

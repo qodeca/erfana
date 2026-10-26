@@ -32,7 +32,40 @@ export default defineConfig({
       // margin is small: one untested bridge function costs about half a point
       // of `functions`, so a new bridge method needs a preload test. Never
       // lower one to make a change pass.
-      thresholds: { lines: 97, functions: 97, branches: 97, statements: 98 },
+      thresholds: {
+        lines: 97,
+        functions: 97,
+        branches: 97,
+        statements: 98,
+        // HTML Preview comments overlay (P4): it runs inside the sealed page
+        // and every frame of it, and decides what a pick may say and when a
+        // page event is swallowed – a coverage gap here is an untested
+        // security path (docs/adrs/0005-sub-frame-preload-one-receive-channel.md).
+        // Measured 2026-10-26: 100 on every axis, except domPath.ts branches
+        // 98.14 (a `??` fallback for an element's `textContent`, never null);
+        // re-measured after the security-review fixes (documentWatch.ts and
+        // iconResolver.ts added): unchanged.
+        // Same rule as above: the measured value rounded down, minus one point.
+        'src/preload/previewPageComments/anchors.ts': { lines: 99, functions: 99, branches: 99, statements: 99 },
+        'src/preload/previewPageComments/controller.ts': { lines: 99, functions: 99, branches: 99, statements: 99 },
+        'src/preload/previewPageComments/documentWatch.ts': { lines: 99, functions: 99, branches: 99, statements: 99 },
+        'src/preload/previewPageComments/domPath.ts': { lines: 99, functions: 99, branches: 97, statements: 99 },
+        'src/preload/previewPageComments/frames.ts': { lines: 99, functions: 99, branches: 99, statements: 99 },
+        'src/preload/previewPageComments/geometry.ts': { lines: 99, functions: 99, branches: 99, statements: 99 },
+        'src/preload/previewPageComments/iconResolver.ts': { lines: 99, functions: 99, branches: 99, statements: 99 },
+        'src/preload/previewPageComments/index.ts': { lines: 99, functions: 99, branches: 99, statements: 99 },
+        'src/preload/previewPageComments/input.ts': { lines: 99, functions: 99, branches: 99, statements: 99 },
+        'src/preload/previewPageComments/label.ts': { lines: 99, functions: 99, branches: 99, statements: 99 },
+        'src/preload/previewPageComments/overlayHost.ts': { lines: 99, functions: 99, branches: 99, statements: 99 },
+        'src/preload/previewPageComments/overlayStyles.ts': { lines: 99, functions: 99, branches: 99, statements: 99 },
+        'src/preload/previewPageComments/overlayView.ts': { lines: 99, functions: 99, branches: 99, statements: 99 },
+        'src/preload/previewPageComments/picker.ts': { lines: 99, functions: 99, branches: 99, statements: 99 },
+        'src/preload/previewPageComments/picks.ts': { lines: 99, functions: 99, branches: 99, statements: 99 },
+        'src/preload/previewPageComments/pins.ts': { lines: 99, functions: 99, branches: 99, statements: 99 },
+        'src/preload/previewPageComments/scheduling.ts': { lines: 99, functions: 99, branches: 99, statements: 99 },
+        'src/preload/previewPageComments/state.ts': { lines: 99, functions: 99, branches: 99, statements: 99 },
+        'src/preload/previewPageComments/tokens.ts': { lines: 99, functions: 99, branches: 99, statements: 99 },
+      },
       exclude: [
         'node_modules/**',
         'out/**',
