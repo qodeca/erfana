@@ -1,4 +1,4 @@
-<!-- @card group="HTML preview" name="Comments drawer" subtitle="Every comment in the page – Open, Resolved, Needs attention – and the keyboard route to all of them" status="proposed" reviewed="2026-10-26" -->
+<!-- @card group="HTML preview" name="Comments drawer" subtitle="Every comment in the page – Open, Resolved, Needs attention – and the keyboard route to all of them" status="decided" reviewed="2026-10-26" -->
 <!-- SPDX-License-Identifier: GPL-3.0-only -->
 <!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
 <!DOCTYPE html>
@@ -163,6 +163,7 @@ function drawer(o) {
       <div class="erf-comment-filter" role="radiogroup" aria-labelledby="${o.id || 'd'}-show"><span class="erf-comment-filter__label" id="${o.id || 'd'}-show">Show</span>${filter}</div>
       <label class="erf-comment-drawer__check"><input class="erf-comment-check" type="checkbox" checked> Show comment icons</label>
     </div>
+    ${o.unread ? `<div class="erf-comment-drawer__note"><div class="erf-comment-banner erf-comment-banner--info"><span class="erf-comment-banner__icon">${I('info', 16)}</span><div class="erf-comment-banner__body"><p class="erf-comment-banner__text">Comments from ${o.unread} files in this page aren't listed: one list reads at most 64 files and 64 MB. Open a frame's file in its own tab to see its comments.</p></div></div></div>` : ''}
     <div class="erf-comment-drawer__scroll">${list}</div>
   </aside>`;
 }
@@ -252,6 +253,7 @@ state('<strong>empty: Open</strong>', drawer({ filter: 'open', empty: true, id: 
 state('<strong>empty: Resolved</strong>', drawer({ filter: 'resolved', empty: true, id: 's4' }));
 state('<strong>empty: Needs attention</strong>', drawer({ filter: 'attention', empty: true, id: 's5' }));
 state('<strong>read error</strong> – with Try again', drawer({ filter: 'open', state: 'error', id: 's6' }));
+state('<strong>files left out</strong> – a list reads at most 64 files and 64 MB; the note stays above the scroll', drawer({ filter: 'open', unread: 2, id: 's9' }));
 state('<strong>Resolved</strong> – a resolved thread whose element is gone stays here, tagged', drawer({ filter: 'resolved', id: 's7', active: 1 }));
 state('<strong>Needs attention</strong> – not found, damaged, newer format; Enter = Open in source', drawer({ filter: 'attention', id: 's8' }));
 
