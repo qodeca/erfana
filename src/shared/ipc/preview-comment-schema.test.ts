@@ -35,6 +35,8 @@ import {
   CommentUnsavedSourcesRequestSchema,
   COMMENT_ANCHOR_KEYS_MAX,
   COMMENT_KEY_MAX_CHARS,
+  COMMENT_PICKER_LABEL_MAX_CHARS,
+  COMMENT_STEP_LABEL_MAX_CHARS,
   COMMENT_UNSAVED_SOURCES_MAX
 } from './preview-comment-schema'
 
@@ -175,6 +177,22 @@ describe('I-003 page signals: enums and bounded finite numbers only', () => {
     expect(CommentPickSchema.safeParse({ kind: 'menu', via: 'pointer', view: VIEW, filePath: '/etc/passwd' }).success).toBe(false)
   })
 
+  it('E-022 a keyboard-picker step says what it reached, and only a step says anything', () => {
+    const step = (patch: Record<string, unknown>) => CommentPickSchema.safeParse({ kind: 'step', via: 'keyboard', view: VIEW, ...patch }).success
+    expect(step({ say: 'showing', label: 'p#team-copy' })).toBe(true)
+    expect(step({ say: 'top' })).toBe(true)
+    expect(step({ say: 'no-child' })).toBe(true)
+    expect(step({ say: 'showing', label: 'x'.repeat(COMMENT_STEP_LABEL_MAX_CHARS) })).toBe(true)
+    expect(step({})).toBe(false)
+    expect(step({ say: 'showing' })).toBe(false)
+    expect(step({ say: 'top', label: 'x' })).toBe(false)
+    expect(step({ say: 'showing', label: '' })).toBe(false)
+    expect(step({ say: 'showing', label: 'x'.repeat(COMMENT_STEP_LABEL_MAX_CHARS + 1) })).toBe(false)
+    expect(step({ say: 'Showing anything a page likes.' })).toBe(false)
+    expect(pick({ say: 'top' })).toBe(false)
+    expect(pick({ label: 'p' })).toBe(false)
+  })
+
   it('caps an anchors report', () => {
     const keys = Array.from({ length: COMMENT_ANCHOR_KEYS_MAX + 1 }, (_, i) => `p${i}`)
     expect(CommentAnchorsSchema.safeParse({ visible: keys, hidden: [] }).success).toBe(false)
@@ -237,6 +255,17 @@ describe('I-004 event and answer schemas', () => {
     expect(CommentAnchorStatusSchema.safeParse({ panelId: PANEL, notVisible: [KEY] }).success).toBe(true)
     expect(CommentModeChangedSchema.safeParse({ panelId: PANEL, on: false, reason: 'escape' }).success).toBe(true)
     expect(CommentModeChangedSchema.safeParse({ panelId: PANEL, on: false, reason: 'page' }).success).toBe(false)
+    const picker = (patch: Record<string, unknown>) => CommentModeChangedSchema.safeParse({ panelId: PANEL, on: true, reason: 'picker', ...patch }).success
+    expect(picker({ say: 'no-child' })).toBe(true)
+    expect(picker({ say: 'showing', label: 'p#a\\u202eb' })).toBe(true)
+    expect(picker({ say: 'showing', label: 'x'.repeat(COMMENT_PICKER_LABEL_MAX_CHARS) })).toBe(true)
+    expect(picker({})).toBe(false)
+    expect(picker({ say: 'Showing anything.' })).toBe(false)
+    expect(picker({ say: 'showing' })).toBe(false)
+    expect(picker({ say: 'top', label: 'x' })).toBe(false)
+    expect(picker({ say: 'showing', label: `p#a${String.fromCodePoint(0x202e)}b` })).toBe(false)
+    expect(picker({ say: 'showing', label: 'x'.repeat(COMMENT_PICKER_LABEL_MAX_CHARS + 1) })).toBe(false)
+    expect(CommentModeChangedSchema.safeParse({ panelId: PANEL, on: true, reason: 'shortcut', say: 'top' }).success).toBe(false)
     expect(CommentSetModeResultSchema.safeParse({ ok: true, on: true, showIcons: true }).success).toBe(true)
     expect(CommentAckSchema.safeParse({ ok: true }).success).toBe(true)
     expect(CommentAckSchema.safeParse({ ok: true, extra: 1 }).success).toBe(false)

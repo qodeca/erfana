@@ -13,10 +13,9 @@
  * order differ, the case J-017 is about.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { COMMENT_HELLO_CHANNEL, HELLO_REPEAT_MAX, HELLO_REPEAT_MIN_MS, TOKEN_ATTRIBUTE } from './constants'
-import { ANNOUNCE } from './controller'
+import { COMMENT_HELLO_CHANNEL, COMMENT_PICK_CHANNEL, HELLO_REPEAT_MAX, HELLO_REPEAT_MIN_MS, TOKEN_ATTRIBUTE } from './constants'
 import { EMPTY_FRAME_MAP, iframeOfKey, iframeSuffix, isShielded, mapChildFrames, shieldsOf } from './frames'
-import { byId, createHarness, microtasks, mount, token, userMouse, type Harness } from './__test-helpers__/harness'
+import { byId, createHarness, drawnText, lastStep, microtasks, mount, token, userMouse, type Harness } from './__test-helpers__/harness'
 import { installBrowserDoubles } from './__test-helpers__/browserDoubles'
 
 const LENGTH = Object.getOwnPropertyDescriptor(window, 'length') as PropertyDescriptor
@@ -279,9 +278,9 @@ describe('frames in the controller (J-017)', () => {
     exposeFrames([byId('mine') as HTMLIFrameElement, byId('theirs') as HTMLIFrameElement])
     h.state({ mode: true, childFrames })
     h.state({ mode: true, childFrames, focusFrame: 'k-mine' })
-    expect(h.root()?.querySelector('[role="status"]')?.textContent).toBe(ANNOUNCE.showing('iframe#mine · frame mine.html'))
+    expect(lastStep(h, COMMENT_PICK_CHANNEL)).toBe('showing iframe#mine · frame mine.html')
     // A key main no longer knows moves nothing.
     h.state({ mode: true, childFrames, focusFrame: 'k-gone' })
-    expect(h.root()?.querySelector('.erf-hpc-label')?.textContent).toBe('iframe#mine · frame mine.html400×200')
+    expect(drawnText(h.root()?.querySelector('.erf-hpc-label'))).toBe('iframe#mine · frame mine.html400×200')
   })
 })

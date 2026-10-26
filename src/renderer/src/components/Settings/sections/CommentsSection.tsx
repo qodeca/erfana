@@ -44,6 +44,7 @@ import { CommentBanner, CommentInput } from '../../Panels/HtmlPreviewPanel/comme
 import { useLiveText } from '../../Panels/HtmlPreviewPanel/comments/commentLive'
 import '../../Panels/HtmlPreviewPanel/comments/CommentWindow.css'
 import './CommentsSection.css'
+import { TEST_IDS } from '../../../constants/testids'
 
 /** The first issue's message, or `null` when the value parses. */
 function issueOf(
@@ -119,7 +120,7 @@ export function CommentsSection(): React.JSX.Element {
     <section
       className="settings-section erf-comment-settings"
       aria-labelledby={titleId}
-      data-testid="settings-section-comments"
+      data-testid={TEST_IDS.COMMENT_SETTINGS_SECTION}
     >
       <h2 className="settings-section-title" id={titleId}>
         {SETTINGS_COPY.title}
@@ -140,7 +141,7 @@ export function CommentsSection(): React.JSX.Element {
           checked={enabled}
           disabled={!settings}
           aria-describedby={`${flagId}-d`}
-          data-testid="settings-toggle-html-comments"
+          data-testid={TEST_IDS.COMMENT_SETTINGS_TOGGLE}
           onChange={event => void updateEnabled(event.target.checked)}
         />
       </div>
@@ -157,7 +158,7 @@ export function CommentsSection(): React.JSX.Element {
           error={nameError}
           autoComplete="name"
           disabled={!enabled}
-          testId="settings-comment-name"
+          testId={TEST_IDS.COMMENT_SETTINGS_NAME}
         />
         {name.trim() === '' && <p className="erf-comment-note">{SETTINGS_COPY.nameEmpty}</p>}
         <CommentInput
@@ -173,13 +174,13 @@ export function CommentsSection(): React.JSX.Element {
           type="email"
           autoComplete="email"
           disabled={!enabled}
-          testId="settings-comment-email"
+          testId={TEST_IDS.COMMENT_SETTINGS_EMAIL}
         />
       </div>
-      <CommentBanner kind="info" after testId="settings-comment-notice">
+      <CommentBanner kind="info" after testId={TEST_IDS.COMMENT_SETTINGS_NOTICE}>
         {SETTINGS_COPY.notice}
       </CommentBanner>
-      <p className="erf-comment-sr" aria-live="assertive" data-testid="settings-comment-alert">
+      <p className="erf-comment-sr" aria-live="assertive" data-testid={TEST_IDS.COMMENT_SETTINGS_ALERT}>
         {alertText}
       </p>
     </section>

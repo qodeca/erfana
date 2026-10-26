@@ -11,13 +11,19 @@
  * - in the top frame in comment mode, the 2 px mode frame and the
  *   "Comment mode – Esc to leave" tab, which moves to the bottom edge while
  *   the pointer is near the top;
- * - the reveal flash (a static highlight, so reduced motion needs nothing);
- * - an always-mounted polite live region and an assertive one.
+ * - the reveal flash (a static highlight, so reduced motion needs nothing).
  *
- * DOM is built with `createElement` and `textContent` only – nothing the page
+ * No text node in it (E-022, §10.2): Find in page counts text in a shadow
+ * root, closed or not, so every word the overlay shows – the label, the mode
+ * tab, a pin's number – is CSS generated content read from a `data-text`
+ * attribute (`TEXT_ATTRIBUTE`), which Find does not search. Nor does it hold
+ * a live region: what the keyboard picker reaches is said by the comment
+ * window's live region, through main (`StepSender`).
+ *
+ * DOM is built with `createElement` and attributes only – nothing the page
  * wrote is ever parsed as markup here – and positioned through `el.style`.
  */
-import { drawPin, type PinPlacement } from './pins'
+import { drawPin, showText, type PinPlacement } from './pins'
 import type { Box, Viewport } from './geometry'
 import type { LabelParts } from './label'
 
@@ -76,8 +82,6 @@ export class OverlayView {
   private readonly labelRest: HTMLSpanElement
   private readonly labelSize: HTMLSpanElement
   private readonly pinLayer: HTMLDivElement
-  private readonly polite: HTMLDivElement
-  private readonly assertive: HTMLDivElement
   private readonly pinElements = new Map<string, HTMLElement>()
 
   constructor(
@@ -88,7 +92,7 @@ export class OverlayView {
     const container = part(doc, 'erf-hpc-root')
     this.frame = part(doc, 'erf-hpc-frame erf-hpc-hidden')
     this.tab = part(doc, 'erf-hpc-tab erf-hpc-hidden')
-    this.tab.textContent = MODE_TAB_TEXT
+    showText(this.tab, MODE_TAB_TEXT)
     this.tab.setAttribute('aria-hidden', 'true')
     this.shields = part(doc, 'erf-hpc-shields')
     this.flash = part(doc, 'erf-hpc-flash erf-hpc-hidden')
@@ -102,23 +106,7 @@ export class OverlayView {
     this.labelSize.className = 'erf-hpc-label__size'
     this.label.append(this.labelTag, this.labelRest, this.labelSize)
     this.pinLayer = part(doc, 'erf-hpc-pins')
-    this.polite = part(doc, 'erf-hpc-sr')
-    this.polite.setAttribute('role', 'status')
-    this.polite.setAttribute('aria-live', 'polite')
-    this.assertive = part(doc, 'erf-hpc-sr')
-    this.assertive.setAttribute('role', 'alert')
-    this.assertive.setAttribute('aria-live', 'assertive')
-    container.append(
-      this.frame,
-      this.tab,
-      this.shields,
-      this.flash,
-      this.outline,
-      this.label,
-      this.pinLayer,
-      this.polite,
-      this.assertive
-    )
+    container.append(this.frame, this.tab, this.shields, this.flash, this.outline, this.label, this.pinLayer)
     root.replaceChildren(container)
   }
 
@@ -132,16 +120,6 @@ export class OverlayView {
     if (model.flash !== null) place(this.flash, model.flash)
     this.renderOutline(model.outline, viewport)
     this.renderPins(model)
-  }
-
-  /** Say `text` through the polite live region. */
-  announce(text: string): void {
-    this.polite.textContent = text
-  }
-
-  /** Say `text` through the assertive live region. */
-  alert(text: string): void {
-    this.assertive.textContent = text
   }
 
   private renderShields(boxes: readonly Box[]): void {
@@ -158,9 +136,9 @@ export class OverlayView {
     if (outline === null) return
     place(this.outline, outline.box)
     this.outline.classList.toggle('erf-hpc-outline--selected', outline.selected)
-    this.labelTag.textContent = outline.label.tag
-    this.labelRest.textContent = outline.label.rest
-    this.labelSize.textContent = outline.label.size
+    showText(this.labelTag, outline.label.tag)
+    showText(this.labelRest, outline.label.rest)
+    showText(this.labelSize, outline.label.size)
     this.placeLabel(outline.box, viewport)
   }
 

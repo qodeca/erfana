@@ -44,6 +44,7 @@ import { drawerRows, type DrawerFilter, type DrawerRow } from './commentRows'
 import { ActionButton, VisibleText } from './CommentParts'
 import './CommentWindow.css'
 import './CommentDrawer.css'
+import { TEST_IDS } from '../../../../constants/testids'
 
 /** A list longer than this is windowed (§10.6 "Rows virtualised above ~200 items"). */
 export const VIRTUALISE_ABOVE = 200
@@ -56,6 +57,13 @@ export const DRAWER_ROW_ESTIMATE_PX = 76
 
 /** Rows mounted beyond each edge of the viewport, so a fast scroll shows no gap. */
 const OVERSCAN_ROWS = 8
+
+/** Each filter option's test id. */
+const FILTER_TEST_IDS: Readonly<Record<DrawerFilter, string>> = {
+  open: TEST_IDS.COMMENT_FILTER_OPEN,
+  resolved: TEST_IDS.COMMENT_FILTER_RESOLVED,
+  attention: TEST_IDS.COMMENT_FILTER_ATTENTION
+}
 
 const FILTERS: ReadonlyArray<{ key: DrawerFilter; label: string; empty: string }> = [
   { key: 'open', label: 'Open', empty: DRAWER_COPY.emptyOpen },
@@ -227,7 +235,7 @@ export function CommentDrawer(props: CommentDrawerProps): React.JSX.Element {
     )
   } else if (list.status === 'error') {
     body = (
-      <div className="erf-comment-drawer__status" data-testid="comment-drawer-error">
+      <div className="erf-comment-drawer__status" data-testid={TEST_IDS.COMMENT_DRAWER_ERROR}>
         <span className="erf-comment-drawer__status-line">
           {renderIcon('circle-x', { size: 14, 'aria-hidden': true })}
           <span>{readErrorText(props.pageFile)}</span>
@@ -264,7 +272,7 @@ export function CommentDrawer(props: CommentDrawerProps): React.JSX.Element {
         style={windowed ? { blockSize: virtualizer.getTotalSize() } : undefined}
         aria-label={`${FILTERS.find(f => f.key === filter)?.label} comments`}
         onKeyDown={onListKeyDown}
-        data-testid="comment-drawer-list"
+        data-testid={TEST_IDS.COMMENT_DRAWER_LIST}
       >
         {windowed
           ? virtualizer.getVirtualItems().map(item =>
@@ -286,7 +294,7 @@ export function CommentDrawer(props: CommentDrawerProps): React.JSX.Element {
       className={`erf-comment-drawer${props.full ? ' erf-comment-drawer--full' : ''}`}
       aria-labelledby={`${props.id}-title`}
       data-focus-return
-      data-testid="comment-drawer"
+      data-testid={TEST_IDS.COMMENT_DRAWER}
       onKeyDown={event => {
         // Full width, the drawer covers the page like a sheet: Esc closes it.
         if (props.full && event.key === 'Escape' && !event.defaultPrevented) {
@@ -305,7 +313,7 @@ export function CommentDrawer(props: CommentDrawerProps): React.JSX.Element {
           className="erf-comment-icon-btn"
           aria-label={DRAWER_COPY.close}
           onClick={props.onClose}
-          data-testid="comment-drawer-close"
+          data-testid={TEST_IDS.COMMENT_DRAWER_CLOSE}
         >
           {renderIcon('x', { size: 16, 'aria-hidden': true })}
         </button>
@@ -331,7 +339,7 @@ export function CommentDrawer(props: CommentDrawerProps): React.JSX.Element {
               className="erf-comment-filter__option"
               aria-checked={filter === key}
               tabIndex={filter === key ? 0 : -1}
-              data-testid={`comment-filter-${key}`}
+              data-testid={FILTER_TEST_IDS[key]}
               onClick={() => chooseFilter(key)}
             >
               {`${label} `}
@@ -345,7 +353,7 @@ export function CommentDrawer(props: CommentDrawerProps): React.JSX.Element {
             type="checkbox"
             checked={props.showIcons}
             onChange={event => props.onShowIconsChange(event.target.checked)}
-            data-testid="comment-drawer-show-icons"
+            data-testid={TEST_IDS.COMMENT_DRAWER_SHOW_ICONS}
           />
           {DRAWER_COPY.showIcons}
         </label>
@@ -419,7 +427,7 @@ function DrawerRowView({
       data-index={place ? index : undefined}
       aria-setsize={place?.setSize}
       aria-posinset={place ? index + 1 : undefined}
-      data-testid="comment-drawer-row"
+      data-testid={TEST_IDS.COMMENT_DRAWER_ROW}
     >
       <button
         type="button"
@@ -430,7 +438,7 @@ function DrawerRowView({
         aria-describedby={describedBy}
         title={mainLabel}
         data-row-main
-        data-testid="comment-drawer-row-main"
+        data-testid={TEST_IDS.COMMENT_DRAWER_ROW_MAIN}
         onClick={onMain}
       />
       <div className="erf-comment-row__line">
@@ -450,7 +458,7 @@ function DrawerRowView({
             <span
               key={tag.text}
               className={`erf-comment-tag${tag.attention ? ' erf-comment-tag--attention' : ''}`}
-              data-testid="comment-drawer-tag"
+              data-testid={TEST_IDS.COMMENT_DRAWER_TAG}
             >
               {tag.attention && renderIcon('alert-triangle', { size: 12, 'aria-hidden': true })}
               {tag.text}
@@ -476,7 +484,7 @@ function DrawerRowView({
         className="erf-comment-action erf-comment-row__open"
         tabIndex={active ? 0 : -1}
         aria-label={`Open comments on ${visibleString(row.label)}`}
-        data-testid="comment-drawer-row-open"
+        data-testid={TEST_IDS.COMMENT_DRAWER_ROW_OPEN}
         onClick={onOpen}
       >
         {COPY.open}

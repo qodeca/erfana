@@ -17,6 +17,7 @@ import {
   HELLOS_PER_VIEW_PER_SECOND,
   MAIN_CONTROL_PICKS_PER_SECOND,
   MAIN_PICKS_PER_SECOND,
+  MAIN_STEPS_PER_SECOND,
   SlidingBudget,
   type PageSignalSinks
 } from './commentPickHandler'
@@ -31,7 +32,7 @@ const FRAME = '/p/frame.html'
 const VIEW = { w: 800, h: 600, dpr: 1, x: 0, y: 0 }
 
 function sinks(): { [K in keyof PageSignalSinks]: ReturnType<typeof vi.fn> } {
-  return { hello: vi.fn(), exit: vi.fn(), parent: vi.fn(), icon: vi.fn(), element: vi.fn(), anchors: vi.fn() }
+  return { hello: vi.fn(), exit: vi.fn(), parent: vi.fn(), step: vi.fn(), icon: vi.fn(), element: vi.fn(), anchors: vi.fn() }
 }
 
 /** A page with a commentable child frame, both bound to their own loads. */
@@ -275,6 +276,37 @@ describe('commentPickHandler pins, control picks and budgets', () => {
     })
     expect(() => h.handler.hello(eventFrom(h.top), {})).not.toThrow()
     expect(logger.error).toHaveBeenCalledWith('Preview comments: a page signal failed', undefined, { error: 'TypeError' })
+  })
+
+  it('E-022 a keyboard-picker step reaches its sink in comment mode only, on its own budget', async () => {
+    const h = await setup()
+    const step = { kind: 'step', via: 'keyboard', say: 'showing', label: 'p#team-copy', view: VIEW }
+    h.handler.pick(eventFrom(h.child), step)
+    expect(h.out.step).toHaveBeenCalledWith(expect.objectContaining({ kind: 'step', say: 'showing', label: 'p#team-copy' }))
+    // Steps do not spend the picks' budget, nor picks the steps'.
+    for (let i = 0; i < MAIN_STEPS_PER_SECOND + 3; i += 1) h.handler.pick(eventFrom(h.top), { ...step, say: 'top', label: undefined })
+    expect(h.out.step).toHaveBeenCalledTimes(MAIN_STEPS_PER_SECOND)
+    h.handler.pick(eventFrom(h.top), menuPick(tokenOfTag(h.page.doc, 'button'), 'button'))
+    expect(h.out.element).toHaveBeenCalledTimes(1)
+    h.advance(1_000)
+    h.setMode(false)
+    h.handler.pick(eventFrom(h.top), step)
+    expect(h.out.step).toHaveBeenCalledTimes(MAIN_STEPS_PER_SECOND)
+  })
+
+  it('E-022 a step that says nothing, or a pick that says something, is rejected', async () => {
+    const h = await setup()
+    for (const bad of [
+      { kind: 'step', via: 'keyboard', view: VIEW },
+      { kind: 'step', via: 'keyboard', say: 'showing', view: VIEW },
+      { kind: 'step', via: 'keyboard', say: 'top', label: 'x', view: VIEW },
+      { kind: 'step', via: 'keyboard', say: 'showing', label: 'x'.repeat(65), view: VIEW },
+      { ...menuPick(tokenOfTag(h.page.doc, 'button'), 'button'), say: 'top' }
+    ]) {
+      h.handler.pick(eventFrom(h.top), bad)
+    }
+    expect(h.out.step).not.toHaveBeenCalled()
+    expect(h.out.element).not.toHaveBeenCalled()
   })
 
   it('SlidingBudget admits `perSecond` takes in any one-second window', () => {

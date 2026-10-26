@@ -82,15 +82,20 @@
 <div class="ds-note">
   The band never wraps and never changes height; it steps down by container query (decided Permission band
   card). <strong>Three more tools make every tier wider</strong>, so the thresholds in <code>nav.css</code> –
-  read below by probing the shipping stylesheet, not typed – no longer match what each row needs. At the
-  minimal tier <strong>Show comment icons leaves the row</strong>; it stays reachable from the drawer's
-  checkbox. Comment mode and the list stay: Comment mode has a shortcut but is the feature's front door, and the
-  list is the keyboard route to every thread.
+  read below by probing the shipping stylesheet, not typed – no longer match what each row needs.
+  <strong>The comment tools give way before Find.</strong> A new <em>narrow</em> tier sits between compact and
+  minimal: there <strong>Show comment icons leaves the row</strong> – it stays reachable from the drawer's
+  checkbox – and Export to PDF with it (Cmd/Ctrl+S still exports), while <strong>Find stays</strong>. The
+  narrow row fits the editor area's 400px minimum, so Find is on the row at every width the editor can have;
+  it leaves only in the minimal tier, below that. Comment mode and the list stay in every tier: Comment mode
+  has a shortcut but is the feature's front door, and the list is the keyboard route to every thread (it has
+  no shortcut; Find has Cmd/Ctrl+F).
   <div class="readout" id="tierNeeds"></div>
 </div>
 <div class="widths">
   <div class="width-demo" data-width="640"></div>
   <div class="width-demo" data-width="460"></div>
+  <div class="width-demo" data-width="400"></div>
   <div class="width-demo" data-width="340"></div>
   <div class="width-demo" data-width="260"></div>
   <label>Any width – drag it through the tiers <input type="range" id="free" min="160" max="760" value="420"></label>
@@ -113,10 +118,11 @@
         the band's own 2px inside it (<code>erf-band__tool--comment</code>).</td>
     </tr>
     <tr>
-      <td>Minimal tier</td>
-      <td>Find and Export to PDF leave the row.</td>
-      <td>Show comment icons leaves too; the drawer's checkbox does the same job. Matched by accessible name, as
-        the band already matches Find.</td>
+      <td>Narrow tier (new)</td>
+      <td>Three tiers: full, compact, minimal – Find and Export to PDF leave together in minimal.</td>
+      <td>A fourth tier between compact and minimal: Show comment icons and Export to PDF leave, Find stays, so
+        the comment tools give way before Find and Find is on the row at the editor area's 400px minimum. Find
+        leaves in minimal only. Matched by accessible name, as the band already matches Find.</td>
     </tr>
   </tbody>
 </table>
@@ -241,8 +247,10 @@ function rowNeeds(bar) {
   return Math.ceil(total);
 }
 function tierOf(b) {
-  if (getComputedStyle(b.querySelector(".erf-band__tool[aria-label='Find']")).display === 'none') return 'minimal';
-  return getComputedStyle(b.querySelector('.erf-band__chip-allowed')).display === 'none' ? 'compact' : 'full';
+  const hidden = (sel) => getComputedStyle(b.querySelector(sel)).display === 'none';
+  if (hidden(".erf-band__tool[aria-label='Find']")) return 'minimal';
+  if (hidden(".erf-band__tool[aria-label='Show comment icons']")) return 'narrow';
+  return hidden('.erf-band__chip-allowed') ? 'compact' : 'full';
 }
 /* Where nav.css switches tier, found by probing a band at every width – so the card
    reports the shipping thresholds without anyone typing them. */
@@ -279,8 +287,8 @@ function measure() {
   }
   const t = (tier) => (needs[tier] === undefined ? '– (drag the slider)' : `${needs[tier]}px`);
   document.getElementById('tierNeeds').innerHTML =
-    `nav.css today: compact below <b>${thresholds.compact}px</b>, minimal below <b>${thresholds.minimal}px</b>. ` +
-    `With the comment tools: full row needs <b>${t('full')}</b>, compact row needs <b>${t('compact')}</b>, minimal row needs <b>${t('minimal')}</b>. ` +
+    `nav.css today: compact below <b>${thresholds.compact}px</b>, narrow below <b>${thresholds.narrow}px</b>, minimal below <b>${thresholds.minimal}px</b>. ` +
+    `With the comment tools: full row needs <b>${t('full')}</b>, compact row needs <b>${t('compact')}</b>, narrow row needs <b>${t('narrow')}</b>, minimal row needs <b>${t('minimal')}</b>. ` +
     'Each threshold should become the need of the tier above it.';
 }
 document.getElementById('free').addEventListener('input', (e) => { document.getElementById('freeDemo').dataset.width = e.target.value; measure(); });

@@ -44,7 +44,7 @@ import type { CommentToolbarToolsProps } from './CommentToolbarTools'
 import { pinDraftToken, type CommentWindowRequest, type ElementDraft } from './commentWindowTypes'
 import type { DrawerRow } from './commentRows'
 import type { PreviewCommentsLayerProps } from './PreviewCommentsLayer'
-import { useLiveText } from './commentLive'
+import { pickerAnnouncement, useLiveText } from './commentLive'
 
 /** Under this panel width the drawer takes the whole width (§10.6). */
 export const DRAWER_FULL_BELOW_PX = 640
@@ -186,10 +186,27 @@ export function usePreviewComments({
     })
     const offAnchors = commentGateway.onAnchorStatus(payload => {
       if (payload.panelId !== panelId) return
-      store.getState().patch(panelId, { notVisible: payload.notVisible })
+      // Newer than the flags a list keeps from its read: a list read while the
+      // element was hidden must not keep "Not visible now" once it shows (E-005).
+      const hidden = new Set(payload.notVisible)
+      const list = store.getState().panels.get(panelId)?.list
+      const files = list?.files.map(file => ({
+        ...file,
+        threads: file.threads.map(t => ({ ...t, notVisible: hidden.has(t.threadKey) }))
+      }))
+      store.getState().patch(panelId, {
+        notVisible: payload.notVisible,
+        ...(list !== undefined && files !== undefined ? { list: { ...list, files } } : {})
+      })
     })
     const offMode = commentGateway.onModeChanged(payload => {
       if (payload.panelId !== panelId) return
+      // The page's keyboard picker moved: the page holds no live region (E-022), so it is said here.
+      if (payload.reason === 'picker') {
+        const say = pickerAnnouncement(payload)
+        if (say !== undefined) announce(say)
+        return
+      }
       store.getState().patch(panelId, { mode: payload.on })
       announce(payload.on ? ANNOUNCE.modeOn : ANNOUNCE.modeOff)
     })

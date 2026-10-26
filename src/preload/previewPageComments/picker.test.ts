@@ -6,8 +6,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { COMMENT_PICK_CHANNEL, TOKEN_ATTRIBUTE } from './constants'
-import { ANNOUNCE } from './controller'
-import { byId, createHarness, dispatchTrusted, microtasks, mount, token, userKey, userMouse, userMove, type Harness } from './__test-helpers__/harness'
+import { byId, createHarness, dispatchTrusted, drawnText, lastStep, microtasks, mount, token, userKey, userMouse, userMove, type Harness } from './__test-helpers__/harness'
 
 const T = TOKEN_ATTRIBUTE
 const PAGE = [
@@ -45,9 +44,11 @@ afterEach(() => {
   h.dispose()
 })
 
-const label = (): string | null | undefined => h.root()?.querySelector('.erf-hpc-label')?.textContent
-const spoken = (): string | null | undefined => h.root()?.querySelector('[role="status"]')?.textContent
-const picks = (): Array<Record<string, unknown>> => h.sent(COMMENT_PICK_CHANNEL) as Array<Record<string, unknown>>
+const label = (): string | undefined => drawnText(h.root()?.querySelector('.erf-hpc-label'))
+/** What the window's live region is told to say, through main – the page holds no screen-reader text. */
+const spoken = (): string | undefined => lastStep(h, COMMENT_PICK_CHANNEL)
+const picks = (): Array<Record<string, unknown>> =>
+  (h.sent(COMMENT_PICK_CHANNEL) as Array<Record<string, unknown>>).filter(p => p.kind !== 'step')
 
 describe('hover label (J-001)', () => {
   it('J-001 outlines the element under the pointer and labels it with its size', () => {
@@ -94,27 +95,27 @@ describe('Alt+↑ / Alt+↓ (J-002)', () => {
   it('J-002 Alt+↑ goes to the parent, Alt+↓ back down the remembered path', () => {
     userMove(10, 100) // li#two
     userKey({ key: 'ArrowUp', code: 'ArrowUp', altKey: true })
-    expect(spoken()).toBe(ANNOUNCE.showing('ul#list'))
+    expect(spoken()).toBe('showing ul#list')
     userKey({ key: 'ArrowUp', code: 'ArrowUp', altKey: true })
-    expect(spoken()).toBe(ANNOUNCE.showing('main#main'))
+    expect(spoken()).toBe('showing main#main')
     userKey({ key: 'ArrowDown', code: 'ArrowDown', altKey: true })
-    expect(spoken()).toBe(ANNOUNCE.showing('ul#list'))
+    expect(spoken()).toBe('showing ul#list')
     userKey({ key: 'ArrowDown', code: 'ArrowDown', altKey: true })
-    expect(spoken()).toBe(ANNOUNCE.showing('li#two'))
+    expect(spoken()).toBe('showing li#two')
     // Off the remembered path: the first child.
     userKey({ key: 'ArrowUp', code: 'ArrowUp', altKey: true })
     userKey({ key: 'ArrowUp', code: 'ArrowUp', altKey: true })
     userKey({ key: 'Tab' })
-    expect(spoken()).toBe(ANNOUNCE.showing('footer#foot'))
+    expect(spoken()).toBe('showing footer#foot')
   })
 
   it('J-002 stops at a leaf (“No child elements”) and at <body> (“Top of page”)', () => {
     userMove(10, 305)
     userKey({ key: 'ArrowDown', code: 'ArrowDown', altKey: true })
-    expect(spoken()).toBe(ANNOUNCE.noChild)
+    expect(spoken()).toBe('no-child')
     userMove(10, 60)
     for (let i = 0; i < 4; i += 1) userKey({ key: 'ArrowUp', code: 'ArrowUp', altKey: true })
-    expect(spoken()).toBe(ANNOUNCE.top)
+    expect(spoken()).toBe('top')
     expect(picks()).toEqual([])
   })
 
@@ -137,14 +138,14 @@ describe('keyboard picker (J-010)', () => {
     // No pointer yet: the element at the centre of the 1024 × 768 test viewport.
     vi.spyOn(document, 'elementFromPoint').mockImplementationOnce(() => byId('title'))
     userKey({ key: 'Tab' })
-    expect(spoken()).toBe(ANNOUNCE.showing('ul#list'))
+    expect(spoken()).toBe('showing ul#list')
     userKey({ key: 'Tab' })
     // <script> is skipped.
-    expect(spoken()).toBe(ANNOUNCE.showing('p#last'))
+    expect(spoken()).toBe('showing p#last')
     userKey({ key: 'Tab' })
-    expect(spoken()).toBe(ANNOUNCE.showing('footer#foot'))
+    expect(spoken()).toBe('showing footer#foot')
     userKey({ key: 'Tab', shiftKey: true })
-    expect(spoken()).toBe(ANNOUNCE.showing('main#main'))
+    expect(spoken()).toBe('showing main#main')
     // Each move scrolls the element into view.
     expect(h.doubles.scrolledIntoView.at(-1)).toEqual({
       element: byId('main'),
@@ -155,10 +156,10 @@ describe('keyboard picker (J-010)', () => {
   it('J-010 Tab at the end of a level climbs to the parent’s next sibling, and stops at the last one', () => {
     userMove(10, 100) // li#two, the last item
     userKey({ key: 'Tab' })
-    expect(spoken()).toBe(ANNOUNCE.showing('p#last'))
+    expect(spoken()).toBe('showing p#last')
     userMove(10, 530)
     userKey({ key: 'Tab' })
-    expect(spoken()).toBe(ANNOUNCE.showing('p#last'))
+    expect(spoken()).toBe('showing p#last')
   })
 
   it('J-010 Enter opens, Shift+F10 and the Menu key open the menu – keyboard picks at the element + 4 px', () => {
@@ -212,20 +213,20 @@ describe('picker edges', () => {
   it('Alt+↓ with no remembered path goes to the first child that can be shown', () => {
     vi.spyOn(document, 'elementFromPoint').mockImplementationOnce(() => byId('title'))
     userKey({ key: 'Tab' })
-    expect(spoken()).toBe(ANNOUNCE.showing('ul#list'))
+    expect(spoken()).toBe('showing ul#list')
     userKey({ key: 'ArrowDown', code: 'ArrowDown', altKey: true })
-    expect(spoken()).toBe(ANNOUNCE.showing('li#one'))
+    expect(spoken()).toBe('showing li#one')
     // A hidden first child is passed over (the pointer starts a fresh path).
     h.doubles.setVisible(byId('title'), false)
     userMove(10, 200) // main itself
     userKey({ key: 'ArrowDown', code: 'ArrowDown', altKey: true })
-    expect(spoken()).toBe(ANNOUNCE.showing('ul#list'))
+    expect(spoken()).toBe('showing ul#list')
   })
 
   it('Shift+Tab passes over what cannot be shown, too', () => {
     userMove(10, 305) // p#last
     userKey({ key: 'Tab', shiftKey: true })
-    expect(spoken()).toBe(ANNOUNCE.showing('ul#list'))
+    expect(spoken()).toBe('showing ul#list')
   })
 
   it('keeps the keyboard’s element when the pointer leaves the frame, and drops a hovered one', () => {
@@ -254,7 +255,7 @@ describe('picker edges', () => {
     at.mockReturnValueOnce(null).mockReturnValueOnce(null).mockReturnValueOnce(byId('title'))
     userMove(10, 60)
     userKey({ key: 'Tab' })
-    expect(spoken()).toBe(ANNOUNCE.showing('ul#list'))
+    expect(spoken()).toBe('showing ul#list')
   })
 
   it('works in a document without a <body>', () => {
@@ -263,7 +264,7 @@ describe('picker edges', () => {
     try {
       userKey({ key: 'Tab' }, document.documentElement)
       userKey({ key: 'ArrowUp', code: 'ArrowUp', altKey: true }, document.documentElement)
-      expect(spoken()).toBe(ANNOUNCE.top)
+      expect(spoken()).toBe('top')
     } finally {
       delete (document as unknown as Record<string, unknown>).body
     }

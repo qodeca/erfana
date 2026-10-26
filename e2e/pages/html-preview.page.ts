@@ -75,7 +75,8 @@ export class HtmlPreviewPage {
     const tree = new ProjectTreePage(this.page)
     const segments = relPath.split('/')
     if (segments.length > 1) {
-      await tree.expandTo([segments[0]])
+      // Every ancestor folder, outermost first (`a`, `a/b`, …).
+      await tree.expandTo(segments.slice(0, -1).map((_, i) => segments.slice(0, i + 1).join('/')))
     }
     await tree.fileRow(relPath).click()
     // Actual page readiness (title sentinel, script effects) is asserted by each

@@ -37,6 +37,7 @@ import { replyDraftKey } from './commentLive'
 import { CommentMessageView } from './CommentMessage'
 import { validateCommentText } from './commentSchemas'
 import { ActionButton, CommentField, DialogButton, VisibleText } from './CommentParts'
+import { TEST_IDS } from '../../../../constants/testids'
 
 /** A write the thread asks the window to make; resolves whether it was saved. */
 export type RunCommentOp = (request: CommentSaveRequest) => Promise<boolean>
@@ -134,10 +135,10 @@ function ReplyBox({ ctx, thread }: CommentThreadProps): React.JSX.Element {
         error={error}
         compact
         textareaRef={fieldRef}
-        testId="comment-reply-field"
+        testId={TEST_IDS.COMMENT_REPLY_FIELD}
       />
       <div className="erf-comment-thread__actions">
-        <ActionButton onClick={() => void resolve()} testId="comment-resolve">
+        <ActionButton onClick={() => void resolve()} testId={TEST_IDS.COMMENT_RESOLVE}>
           {COPY.resolve}
         </ActionButton>
         <DialogButton
@@ -146,7 +147,7 @@ function ReplyBox({ ctx, thread }: CommentThreadProps): React.JSX.Element {
           title={`${COPY.reply} (${saveShortcutLabel()})`}
           keyShortcut={saveShortcutAria()}
           onClick={() => void reply()}
-          testId="comment-reply"
+          testId={TEST_IDS.COMMENT_REPLY}
         >
           {busy ? COPY.saving : COPY.reply}
         </DialogButton>
@@ -168,7 +169,7 @@ export function CommentThread({ ctx, thread }: CommentThreadProps): React.JSX.El
     <section
       className="erf-comment-thread"
       aria-label={`Thread started by ${visibleString(first.by.name)}`}
-      data-testid="comment-thread"
+      data-testid={TEST_IDS.COMMENT_THREAD}
     >
       <CommentMessageView ctx={ctx} thread={thread} message={first} first />
       {replies.length > 0 && (
@@ -210,7 +211,7 @@ export function ResolvedThread({ ctx, thread }: CommentThreadProps): React.JSX.E
   const by = thread.resolved?.by.name
   const at = thread.resolved ? formatCommentTime(thread.resolved.at, ctx.now, ctx.locale) : null
   return (
-    <div className="erf-comment-resolved" data-testid="comment-resolved-thread">
+    <div className="erf-comment-resolved" data-testid={TEST_IDS.COMMENT_RESOLVED_THREAD}>
       <span className="erf-comment-resolved__text">
         <span className="erf-comment-resolved__icon">
           {renderIcon('check', { size: 14, 'aria-hidden': true })}
@@ -248,7 +249,7 @@ export function ResolvedThread({ ctx, thread }: CommentThreadProps): React.JSX.E
                 if (!ok) setFocusAfter(null)
               })
           }}
-          testId="comment-reopen"
+          testId={TEST_IDS.COMMENT_REOPEN}
         >
           {COPY.reopen}
         </ActionButton>

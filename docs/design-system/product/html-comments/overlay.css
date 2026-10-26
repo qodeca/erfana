@@ -70,8 +70,12 @@
 .erf-hpc-pin__body { fill: var(--color-accent-primary); stroke: var(--color-brand-black);
                      stroke-width: 1.5; stroke-linejoin: miter; }
 .erf-hpc-pin__line { fill: var(--color-brand-black); }
-.erf-hpc-pin__count { fill: var(--color-brand-black); font-family: var(--font-mono); font-size: var(--text-sm);
-                      font-weight: var(--font-bold); text-anchor: middle; dominant-baseline: middle; }
+/* The count is HTML in a foreignObject over the bubble body, and its text is
+   generated content, so Find in page never counts it (E-022). */
+.erf-hpc-pin__count { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%;
+                      color: var(--color-brand-black); font-family: var(--font-mono); font-size: var(--text-sm);
+                      font-weight: var(--font-bold); }
+.erf-hpc-text::before { content: attr(data-text); }
 /* Hover recolours an open pin only: never a selected or damaged one, and not in
    forced colours, where the system colours stand. */
 @media (forced-colors: none) {
@@ -83,10 +87,10 @@
 .erf-hpc-pin--selected .erf-hpc-pin__body { fill: var(--color-brand-black); stroke: var(--color-accent-primary);
                                             stroke-width: 2; }
 .erf-hpc-pin--selected .erf-hpc-pin__line,
-.erf-hpc-pin--selected .erf-hpc-pin__count { fill: var(--color-accent-primary); }
+.erf-hpc-pin--selected .erf-hpc-pin__count { color: var(--color-accent-primary); }
 .erf-hpc-pin--damaged .erf-hpc-pin__body { fill: var(--color-warning); }
 /* Damaged and selected keeps the warning fill, so its ! stays ink: accent on it is about 1.05:1. */
-.erf-hpc-pin--damaged.erf-hpc-pin--selected .erf-hpc-pin__count { fill: var(--color-brand-black); }
+.erf-hpc-pin--damaged.erf-hpc-pin--selected .erf-hpc-pin__count { color: var(--color-brand-black); }
 /* deviates: docs/design-system/product/html-comments/overlay.html — pin focus: the passed-in accent with an
    ink halo; pins are focusable but outside the Tab order (Exceptions, "Pin focus") */
 .erf-hpc-pin:focus-visible,
@@ -113,9 +117,9 @@
   .erf-hpc-label, .erf-hpc-tab { background: Highlight; color: HighlightText; border-color: HighlightText; }
   .erf-hpc-label__tag, .erf-hpc-label__size { color: HighlightText; }
   .erf-hpc-pin .erf-hpc-pin__body { fill: Highlight; stroke: HighlightText; }
-  .erf-hpc-pin .erf-hpc-pin__line, .erf-hpc-pin .erf-hpc-pin__count { fill: HighlightText; }
+  .erf-hpc-pin .erf-hpc-pin__line, .erf-hpc-pin .erf-hpc-pin__count { fill: HighlightText; color: HighlightText; }
   .erf-hpc-pin.erf-hpc-pin--selected .erf-hpc-pin__body { fill: Canvas; stroke: Highlight; }
   .erf-hpc-pin.erf-hpc-pin--selected .erf-hpc-pin__line,
-  .erf-hpc-pin.erf-hpc-pin--selected .erf-hpc-pin__count { fill: Highlight; }
+  .erf-hpc-pin.erf-hpc-pin--selected .erf-hpc-pin__count { fill: Highlight; color: Highlight; }
 }
 @media print { .erf-hpc-root { display: none; } }

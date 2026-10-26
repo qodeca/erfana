@@ -54,6 +54,7 @@ import { stablePathDigest } from '../../../shared/stablePathDigest'
 import { logger } from '../LoggingService'
 import { TimeoutError, withTimeout } from '../../utils/withTimeout'
 import type { PreviewBounds, PreviewStillFrame } from '../../../shared/ipc/preview-types'
+import { StillFrameOrder, type PreviewInvalidateOptions } from './previewStillFrameOrder'
 
 /**
  * An error as a log line carries it: its name, plus `code` when it has one.
@@ -135,9 +136,12 @@ export interface IPreviewStillFrameCache {
   get(panelId: string): PreviewStillFrame | undefined
   /**
    * Drop `panelId`'s frame, and the result of any capture of it still running
-   * (called on file change, a new page, panel close).
+   * (called on file change, a new page, panel close). With `keepSinceLoad`,
+   * only what was captured before the last {@link markLoaded} goes.
    */
-  invalidate(panelId: string): void
+  invalidate(panelId: string, opts?: PreviewInvalidateOptions): void
+  /** A load of `panelId`'s page finished (`did-finish-load`). Optional like `markStale`. */
+  markLoaded?(panelId: string): void
   /**
    * Real input reached `panelId`'s page (issue #124, RU3): its cached frame no
    * longer shows what the page does, and a capture running now may miss it.
@@ -157,6 +161,8 @@ export interface IPreviewStillFrameCache {
     opts?: PreviewFreshCaptureOptions
   ): Promise<boolean>
 }
+
+export type { PreviewInvalidateOptions } from './previewStillFrameOrder'
 
 /** Options of {@link PreviewStillFrameCache.captureFresh}. */
 export interface PreviewFreshCaptureOptions {
@@ -182,12 +188,16 @@ interface PreviewCaptureRun {
   superseded: boolean
   /** Real input reached the page meanwhile: the picture may miss it. */
   inputDuring: boolean
+  /** When it started, in this cache's capture order. */
+  readonly order: number
 }
 
 export class PreviewStillFrameCache implements IPreviewStillFrameCache {
   private readonly frames = new Map<string, PreviewStillFrame>()
   /** Each panel's capture THIS cache started, not yet settled and not overtaken. */
   private readonly inFlight = new Map<string, PreviewCaptureRun>()
+  /** Capture starts and load marks in one order (E-011). */
+  private readonly order = new StillFrameOrder()
   private readonly now: () => number
   private readonly maxEdgePx: number
   private readonly maxDataUrlChars: number
@@ -219,7 +229,7 @@ export class PreviewStillFrameCache implements IPreviewStillFrameCache {
     }
 
     let image: PreviewNativeImage | null
-    const run: PreviewCaptureRun = { superseded: false, inputDuring: false }
+    const run: PreviewCaptureRun = { superseded: false, inputDuring: false, order: this.order.next() }
     this.inFlight.set(panelId, run)
     try {
       image = await this.firstCapture(wc, size)
@@ -306,7 +316,7 @@ export class PreviewStillFrameCache implements IPreviewStillFrameCache {
     }
 
     // Input the page got while this capture ran may be missing from it.
-    this.store(panelId, image, opts.cssSize, run.inputDuring)
+    this.store(panelId, image, { cssSize: opts.cssSize, stale: run.inputDuring, order: run.order })
   }
 
   /**
@@ -331,7 +341,7 @@ export class PreviewStillFrameCache implements IPreviewStillFrameCache {
     }
     const overtaken = this.inFlight.get(panelId)
     if (overtaken !== undefined) overtaken.superseded = true
-    const run: PreviewCaptureRun = { superseded: false, inputDuring: false }
+    const run: PreviewCaptureRun = { superseded: false, inputDuring: false, order: this.order.next() }
     this.inFlight.set(panelId, run)
     let image: PreviewNativeImage | null = null
     try {
@@ -355,15 +365,14 @@ export class PreviewStillFrameCache implements IPreviewStillFrameCache {
     if (run.superseded || image === null || image.isEmpty()) {
       return false
     }
-    return this.store(panelId, image, opts.cssSize, false)
+    return this.store(panelId, image, { cssSize: opts.cssSize, stale: false, order: run.order })
   }
 
   /** Downscale, encode and keep `image` as `panelId`'s frame; `false` when it is over budget. */
   private store(
     panelId: string,
     image: PreviewNativeImage,
-    cssSize: { width: number; height: number } | undefined,
-    stale: boolean
+    { cssSize, stale, order }: { cssSize?: { width: number; height: number }; stale: boolean; order: number }
   ): boolean {
     const downscaled = this.downscale(image)
     const dataUrl = downscaled.toDataURL()
@@ -382,7 +391,12 @@ export class PreviewStillFrameCache implements IPreviewStillFrameCache {
       ...(cssSize !== undefined ? { cssWidth: cssSize.width, cssHeight: cssSize.height } : {}),
       ...(stale ? { stale: true } : {})
     })
+    this.order.stored(panelId, order)
     return true
+  }
+
+  markLoaded(panelId: string): void {
+    this.order.loaded(panelId)
   }
 
   markStale(panelId: string): void {
@@ -405,12 +419,14 @@ export class PreviewStillFrameCache implements IPreviewStillFrameCache {
     return opts.shouldKeep === undefined || opts.shouldKeep()
   }
 
-  invalidate(panelId: string): void {
-    this.frames.delete(panelId)
+  invalidate(panelId: string, opts: PreviewInvalidateOptions = {}): void {
+    // `keepSinceLoad`: what started after the load shows the loaded document (E-011).
+    const gone = this.order.invalidate(panelId, opts.keepSinceLoad === true)
+    if (gone.frame) this.frames.delete(panelId)
     // A capture still running shows what was just declared gone: it stores
     // nothing, and the next capture need not wait for it.
     const run = this.inFlight.get(panelId)
-    if (run !== undefined) {
+    if (run !== undefined && gone.run(run.order)) {
       run.superseded = true
       this.inFlight.delete(panelId)
     }

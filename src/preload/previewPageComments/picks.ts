@@ -17,6 +17,8 @@
  */
 import {
   PICKS_PER_SECOND,
+  STEPS_PER_SECOND,
+  STEP_LABEL_MAX_CHARS,
   PICK_BOX_MAX_PX,
   PICK_TAG_MAX_CHARS,
   PICK_TAG_PATTERN,
@@ -28,8 +30,13 @@ import { pathBelow, quoteOf, snapshotOf, whiteSpaceOf, type PickQuote } from './
 import type { Point } from './geometry'
 import type { TokenRegistry } from './tokens'
 
-/** What a pick asks for. `parent` = Alt+↑ out of a frame's `<body>`; `exit` = Esc. */
-export type PickKind = 'menu' | 'open' | 'icon' | 'parent' | 'exit'
+/**
+ * What a pick asks for. `parent` = Alt+↑ out of a frame's `<body>`; `exit` =
+ * Esc; `step` = the keyboard picker moved, for the window's live region.
+ */
+export type PickKind = 'menu' | 'open' | 'icon' | 'parent' | 'exit' | 'step'
+/** What a `step` reached: an element (with its label), the top of the page, or no child. */
+export type StepSay = 'showing' | 'top' | 'no-child'
 /** How the user picked. */
 export type PickVia = 'pointer' | 'keyboard'
 
@@ -86,6 +93,9 @@ export interface PickPayload extends PickTarget {
   readonly screen?: Point
   /** A keyboard pick: the element's top-left + 4 px, frame CSS pixels. */
   readonly point?: Point
+  /** A `step`: what the picker reached, and for an element the overlay's label. */
+  readonly say?: StepSay
+  readonly label?: string
   readonly view: PickView
 }
 
@@ -114,6 +124,66 @@ export class PickLimiter {
     }
     this.droppedCount += 1
     return false
+  }
+}
+
+/** `text` cut to at most `max` UTF-16 units, never inside a surrogate pair. */
+function cutUnits(text: string, max: number): string {
+  let out = ''
+  for (const char of text) {
+    if (out.length + char.length > max) break
+    out += char
+  }
+  return out
+}
+
+/**
+ * Keyboard-picker steps (§10.2, §10.8; test E-022). The page holds no
+ * screen-reader text – Find in page would count it – so each step goes to
+ * main, which has the comment window's live region say it. At most
+ * {@link STEPS_PER_SECOND} leave a frame; the newest one held back is sent
+ * once the window has room, so the place the picker stopped at is always said.
+ */
+export class StepSender {
+  private readonly limiter: PickLimiter
+  private held: PickPayload | null = null
+  private timer: ReturnType<typeof setTimeout> | null = null
+
+  constructor(
+    now: () => number,
+    private readonly send: (payload: PickPayload) => void
+  ) {
+    this.limiter = new PickLimiter(now, STEPS_PER_SECOND)
+  }
+
+  /** Say that the picker reached `say` (an element named `label`), seen from `view`. */
+  say(say: StepSay, label: string | undefined, view: PickView): void {
+    const cut = label === undefined ? '' : cutUnits(label, STEP_LABEL_MAX_CHARS)
+    // A `showing` step with nothing to name is not worth a message.
+    if (say === 'showing' && cut === '') return
+    this.offer({ kind: 'step', via: 'keyboard', say, ...(say === 'showing' ? { label: cut } : {}), view })
+  }
+
+  /** Drop a held step (teardown). */
+  dispose(): void {
+    if (this.timer !== null) clearTimeout(this.timer)
+    this.timer = null
+    this.held = null
+  }
+
+  private offer(payload: PickPayload): void {
+    if (this.limiter.tryTake()) {
+      this.held = null
+      this.send(payload)
+      return
+    }
+    this.held = payload
+    this.timer ??= setTimeout(() => {
+      this.timer = null
+      const held = this.held
+      this.held = null
+      if (held !== null) this.offer(held)
+    }, 1_000 / STEPS_PER_SECOND)
   }
 }
 

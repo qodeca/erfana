@@ -4,6 +4,8 @@
  * The three comment tools in the preview toolbar
  * (docs/designs/html-preview-comments.md §10.1, §10.10; R-010, R-021).
  */
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
@@ -145,6 +147,35 @@ describe('CommentToolbarTools', () => {
       const { props } = setup({ unavailable: 'encoding', drawerOpen: true })
       await user.click(listButton())
       expect(props.onToggleDrawer).toHaveBeenCalled()
+    })
+  })
+
+  describe('narrow toolbar tiers (PreviewNavControls.css)', () => {
+    const css = readFileSync(resolve(__dirname, '../components/PreviewNavControls.css'), 'utf8')
+    const blocks = [...css.matchAll(/@container \(width < (\d+)px\) \{([\s\S]*?)\n\}/g)].map(m => ({
+      width: Number(m[1]),
+      body: m[2]
+    }))
+
+    it('Show comment icons gives way first – in the narrow tier, before Find', () => {
+      setup()
+      const icons = iconsButton().getAttribute('aria-label')
+      const narrow = blocks.find(b => b.body.includes(`aria-label='${icons}'`))
+      const find = blocks.find(b => b.body.includes("aria-label='Find'"))
+      expect(narrow, 'Show comment icons is never hidden').toBeDefined()
+      expect(find, 'Find has no tier').toBeDefined()
+      // A wider threshold leaves the row first.
+      expect(narrow?.width).toBeGreaterThan(find?.width ?? Infinity)
+      // Find stays at the editor area's minimum width (400px).
+      expect(find?.width).toBeLessThanOrEqual(400)
+    })
+
+    it('Comment mode and the list stay in every tier', () => {
+      setup()
+      for (const name of [modeButton(), listButton()].map(b => b.getAttribute('aria-label'))) {
+        for (const block of blocks) expect(block.body).not.toContain(`aria-label='${name}'`)
+      }
+      expect(css).not.toMatch(/erf-band__tool--count\s*\{[^}]*display:\s*none/)
     })
   })
 })

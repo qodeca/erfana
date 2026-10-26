@@ -70,7 +70,14 @@ function baseOf(input: ListInput, { file, frame }: ListedFile) {
   }
 }
 
-/** The worker's summary with main's keys, paths and "not visible now" flags. */
+/** One file's view, with each thread's id in order – its "not visible now" flag is set last. */
+interface ListedView {
+  readonly view: CommentFileView
+  readonly realPath: string
+  readonly threadIds: readonly string[]
+}
+
+/** The worker's summary with main's keys and paths; every "not visible now" flag still `false`. */
 function fileView(input: ListInput, listed: ListedFile, summary: ListSummary): CommentFileView {
   const { realPath } = listed.file
   const blockKey = (rawHash: string, start: number): string =>
@@ -82,7 +89,7 @@ function fileView(input: ListInput, listed: ListedFile, summary: ListSummary): C
     threads: summary.threads.map(({ threadId, ...thread }) => ({
       ...thread,
       threadKey: input.keys.keyFor(input.binding, { kind: 'thread', realPath, threadId }),
-      notVisible: input.notVisible(realPath, threadId)
+      notVisible: false
     })),
     damaged: summary.damaged.map(({ start, ...block }) => ({ ...block, blockKey: blockKey(block.rawHash, start) })),
     newer: summary.newer.map(({ start, rawHash, ...block }) => ({ ...block, blockKey: blockKey(rawHash, start) }))
@@ -97,24 +104,41 @@ function refusedView(input: ListInput, listed: ListedFile, refusal: CommentRefus
 }
 
 /** One file's view, or `undefined` when it is not listed (a path comments never touch). */
-async function viewOf(input: ListInput, listed: ListedFile): Promise<CommentFileView | undefined> {
-  const loaded = await loadCommentBytes({ realRoot: input.realRoot, filePath: listed.file.realPath }, { platform: input.platform })
-  if (!loaded.ok) return refusedView(input, listed, loaded.reason)
+async function viewOf(input: ListInput, listed: ListedFile): Promise<ListedView | undefined> {
+  const { realPath } = listed.file
+  const loaded = await loadCommentBytes({ realRoot: input.realRoot, filePath: realPath }, { platform: input.platform })
+  if (!loaded.ok) {
+    const refused = refusedView(input, listed, loaded.reason)
+    return refused === undefined ? undefined : { view: refused, realPath, threadIds: [] }
+  }
   const listedFile = await input.jobs.runJob(loaded.bytes, { kind: 'list' })
   if (listedFile.kind === 'failed') {
     logger.warn('Preview comments: a file could not be parsed for the comment list', {
       failure: listedFile.failure,
-      file: stablePathDigest(listed.file.realPath)
+      file: stablePathDigest(realPath)
     })
     return undefined
   }
   const view = listedFile.ok ? fileView(input, listed, listedFile.summary) : refusedView(input, listed, listedFile.refusal)
   // Composed here, so a miss is a bug: the file drops out of the list rather than the whole list failing.
   if (view !== undefined && !CommentFileViewSchema.safeParse(view).success) {
-    logger.warn('Preview comments: a file was left out of the comment list', { file: stablePathDigest(listed.file.realPath) })
+    logger.warn('Preview comments: a file was left out of the comment list', { file: stablePathDigest(realPath) })
     return undefined
   }
-  return view
+  if (view === undefined) return undefined
+  const threadIds = listedFile.ok ? listedFile.summary.threads.map(thread => thread.threadId) : []
+  return { view, realPath, threadIds }
+}
+
+/**
+ * Each thread's "not visible now" flag, read once, after the last file: the
+ * renderer takes the newer of this answer and main's anchor-status events, so
+ * the flags must be no older than the answer itself (a flag read before a
+ * later file's await could be overtaken by an event the renderer then sees
+ * first – E-005).
+ */
+function withNotVisible(input: ListInput, { view, realPath, threadIds }: ListedView): CommentFileView {
+  return { ...view, threads: view.threads.map((thread, i) => ({ ...thread, notVisible: input.notVisible(realPath, threadIds[i]) })) }
 }
 
 /**
@@ -125,7 +149,7 @@ export async function buildCommentList(input: ListInput): Promise<CommentFileVie
   if (input.files.length > COMMENT_LIST_MAX_FILES) {
     logger.warn('Preview comments: the comment list was cut short', { files: input.files.length, listed: COMMENT_LIST_MAX_FILES })
   }
-  const views: CommentFileView[] = []
+  const views: ListedView[] = []
   // One after the other: one file's bytes in flight at a time, and the worker's queue left to page loads.
   for (const listed of input.files.slice(0, COMMENT_LIST_MAX_FILES)) {
     const view = await viewOf(input, listed).catch(() => {
@@ -134,5 +158,5 @@ export async function buildCommentList(input: ListInput): Promise<CommentFileVie
     })
     if (view !== undefined) views.push(view)
   }
-  return views
+  return views.map(view => withNotVisible(input, view))
 }

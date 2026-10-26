@@ -230,6 +230,20 @@ describe('usePreviewComments', () => {
     expect(fake.bridge.list).not.toHaveBeenCalled()
   })
 
+  it('E-022 says where the page’s keyboard picker is, without touching the mode', async () => {
+    render(<Harness onValue={onValue} />)
+    act(() => fake.emitMode({ panelId: PANEL, on: true, reason: 'escape' }))
+    await waitFor(() => expect(latest.layer.polite).toBe(ANNOUNCE.modeOn))
+    act(() => fake.emitMode({ panelId: PANEL, on: false, reason: 'picker', say: 'showing', label: 'p#team-copy' }))
+    await waitFor(() => expect(latest.layer.polite).toBe('Showing p#team-copy.'))
+    // A picker event is not a mode change, whatever its `on` says.
+    expect(latest.toolbar.mode).toBe(true)
+    act(() => fake.emitMode({ panelId: PANEL, on: true, reason: 'picker', say: 'top' }))
+    await waitFor(() => expect(latest.layer.polite).toBe('Top of page – no parent to select.'))
+    act(() => fake.emitMode({ panelId: PANEL, on: true, reason: 'picker', say: 'no-child' }))
+    await waitFor(() => expect(latest.layer.polite).toBe('No child elements.'))
+  })
+
   describe('R-010 / R-023 mode', () => {
     it('toggles through main and announces it; a keyboard toggle hands focus to the page', async () => {
       render(<Harness onValue={onValue} />)
@@ -347,6 +361,27 @@ describe('usePreviewComments', () => {
       await waitFor(() => expect(fake.bridge.list).toHaveBeenCalledTimes(3))
       act(() => latest.drawer?.onClose())
       expect(latest.drawer).toBeNull()
+    })
+
+    it('E-005 an anchor status after the list wins over the flag the list was read with', async () => {
+      fake.bridge.list.mockResolvedValue({
+        ok: true,
+        files: [fileView({ threads: [thread(1, { notVisible: true })] })]
+      })
+      render(<Harness onValue={onValue} />)
+      act(() => latest.toolbar.onToggleDrawer())
+      await waitFor(() => expect(latest.drawer?.list.status).toBe('ready'))
+      const tags = (): string[] => {
+        const drawer = latest.drawer!
+        const [row] = drawerRows(drawer.list.files, new Set(drawer.notVisible)).open
+        return row.tags.map(tag => tag.text)
+      }
+      expect(tags()).toContain(DRAWER_COPY.notVisible)
+      // The element is rendered again: main reports nothing hidden.
+      act(() => fake.emitAnchors({ panelId: PANEL, notVisible: [] }))
+      expect(tags()).not.toContain(DRAWER_COPY.notVisible)
+      act(() => fake.emitAnchors({ panelId: PANEL, notVisible: ['t1'] }))
+      expect(tags()).toContain(DRAWER_COPY.notVisible)
     })
 
     it('re-reads on a page change while open', async () => {

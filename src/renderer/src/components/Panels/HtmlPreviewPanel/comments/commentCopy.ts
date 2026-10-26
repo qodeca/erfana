@@ -421,5 +421,9 @@ export const ANNOUNCE = {
   // not in §10.10
   resolved: 'Comment resolved.',
   reopened: 'Comment re-opened.',
-  deleted: (file: string): string => `Comment deleted from ${file}.`
+  deleted: (file: string): string => `Comment deleted from ${file}.`,
+  // keyboard picker (§10.8): spoken by the panel, never drawn in the page
+  pickerTop: 'Top of page – no parent to select.',
+  pickerNoChild: 'No child elements.',
+  pickerShowing: (label: string): string => `Showing ${label}.`
 } as const

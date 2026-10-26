@@ -190,6 +190,23 @@ describe('PreviewCommentService', () => {
     expect(await f.service.list()).toMatchObject({ ok: true, unavailable: 'disabled' })
   })
 
+  it('E-022 the page\'s keyboard picker is said through the window\'s live region, and the mode stays as it is', async () => {
+    f = await commentServiceFixture(BASE_PAGE)
+    await f.loadPage()
+    f.service.toggleMode()
+    f.emit.modeChanged.mockClear()
+    await f.pick(f.top, { kind: 'step', via: 'keyboard', say: 'showing', label: 'button#buy', view: VIEW })
+    expect(f.emit.modeChanged).toHaveBeenLastCalledWith(1, { panelId: 'html-preview-index', on: true, reason: 'picker', say: 'showing', label: 'button#buy' })
+    await f.pick(f.top, { kind: 'step', via: 'keyboard', say: 'top', view: VIEW })
+    expect(f.emit.modeChanged).toHaveBeenLastCalledWith(1, { panelId: 'html-preview-index', on: true, reason: 'picker', say: 'top' })
+    expect(f.service.isModeOn()).toBe(true)
+    // With the mode off, a step from the page is dropped: nothing is said.
+    f.service.toggleMode()
+    f.emit.modeChanged.mockClear()
+    await f.pick(f.top, { kind: 'step', via: 'keyboard', say: 'no-child', view: VIEW })
+    expect(f.emit.modeChanged).not.toHaveBeenCalled()
+  })
+
   it('comment mode on over a page served without tokens reloads once, keeping the place', async () => {
     f = await commentServiceFixture(BASE_PAGE)
     // The page was served raw: committed and greeted, but no load registered.

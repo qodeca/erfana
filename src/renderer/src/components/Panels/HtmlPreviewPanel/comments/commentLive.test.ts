@@ -10,6 +10,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   CommentStepsContext,
   editDraftKey,
+  pickerAnnouncement,
   replyDraftKey,
   useCommentAlert,
   useInnerStep,
@@ -100,6 +101,14 @@ describe('commentLive', () => {
       result.current('Couldn\'t save.')
       expect(alert).toHaveBeenCalledWith('Couldn\'t save.')
     })
+  })
+
+  it('E-022 words where the keyboard picker moved (§10.10 "Announce"), and nothing for another event', () => {
+    expect(pickerAnnouncement({ say: 'showing', label: 'p#team-copy' })).toBe('Showing p#team-copy.')
+    expect(pickerAnnouncement({ say: 'top' })).toBe('Top of page – no parent to select.')
+    expect(pickerAnnouncement({ say: 'no-child' })).toBe('No child elements.')
+    expect(pickerAnnouncement({})).toBeUndefined()
+    expect(pickerAnnouncement({ say: 'showing' })).toBeUndefined()
   })
 
   it('keys drafts per tab, file, thread and message', () => {

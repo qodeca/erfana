@@ -60,7 +60,7 @@ export interface PreviewLivePipelineDeps {
   /** The page, for the CSS-swap script. */
   readonly contents: Pick<PreviewWebContentsHandle, 'executeJavaScriptInIsolatedWorld'>
   readonly emit: Pick<PreviewEmitters, 'loadStateChanged'>
-  readonly stillFrameCache: Pick<IPreviewStillFrameCache, 'invalidate'>
+  readonly stillFrameCache: Pick<IPreviewStillFrameCache, 'invalidate' | 'markLoaded'>
   readonly now: () => number
   /** Reads the page and each frame document; the bounded reader below when absent. */
   readonly readEntryHtml?: (filePath: string) => Promise<string>
@@ -312,8 +312,11 @@ export function createPreviewLivePipeline(deps: PreviewLivePipelineDeps): Previe
     // Drop the old picture only when a new one will follow: `captureWhileVisible`
     // below captures only while the view is drawn, so invalidating behind a
     // hidden tab left it with nothing to show until it was looked at again.
+    // Only what was captured before the load finished is old: a still taken
+    // for a comment popup since then shows this document, and dropping it
+    // left the popup over no picture (E-011).
     if (deps.isWanted()) {
-      deps.stillFrameCache.invalidate(deps.panelId)
+      deps.stillFrameCache.invalidate(deps.panelId, { keepSinceLoad: true })
     }
     deps.emit.loadStateChanged(deps.panelId, 'ready', result.dropped.length)
     // The page has painted and the watch set is established: the one moment we
@@ -326,6 +329,8 @@ export function createPreviewLivePipeline(deps: PreviewLivePipelineDeps): Previe
     if (deps.isTornDown()) {
       return
     }
+    // The load finished now, whenever its run gets to `ready`.
+    deps.stillFrameCache.markLoaded?.(deps.panelId)
     if (paused) {
       waiting.run = true
       return

@@ -37,20 +37,11 @@ import { OverlayHost } from './overlayHost'
 import { overlayCss } from './overlayStyles'
 import { OverlayView, type OutlineModel } from './overlayView'
 import { firstChildOf, parentOf, pickableExcept, stepOf, type PickablePredicate } from './picker'
-import { describeTarget, elementPoint, PickLimiter, screenOf, viewOf, type PickKind, type PickPayload } from './picks'
+import { describeTarget, elementPoint, PickLimiter, screenOf, StepSender, viewOf, type PickKind, type PickPayload } from './picks'
 import { placePins, type PinPlacement } from './pins'
 import { CursorSheet, PageWatch, RenderScheduler, ScrollRestore } from './scheduling'
 import { IDLE_STATE, parseCommentState, pxOf, type CommentState } from './state'
 import { TokenRegistry } from './tokens'
-
-/** Microcopy the live region speaks (§10.10 "Announce"). */
-export const ANNOUNCE = Object.freeze({
-  modeOn: 'Comment mode on. Click an element, or press Tab to pick one. Esc to leave.',
-  modeOff: 'Comment mode off.',
-  top: 'Top of page – no parent to select.',
-  noChild: 'No child elements.',
-  showing: (label: string) => `Showing ${label}.`
-})
 
 /** What the controller needs from its frame. */
 export interface ControllerDeps {
@@ -58,7 +49,7 @@ export interface ControllerDeps {
   readonly doc: Document
   readonly send: (channel: string, payload: unknown) => void
   readonly now: () => number
-  /** `window === window.top`: only the top frame draws the mode indicator and speaks mode changes. */
+  /** `window === window.top`: only the top frame draws the mode indicator. */
   readonly isTop: boolean
 }
 
@@ -77,6 +68,8 @@ export class CommentController {
   private readonly anchors: AnchorReporter
   /** Element and pin picks share one budget; Esc and Alt+↑-out-of-a-frame each have their own. */
   private readonly limiters: Readonly<Record<'pick' | 'exit' | 'parent', PickLimiter>>
+  /** Where the keyboard picker is, for the comment window's live region – never text in the page (§10.2). */
+  private readonly steps: StepSender
   private readonly scheduler: RenderScheduler
   private readonly watch: PageWatch
   private readonly cursor: CursorSheet
@@ -110,6 +103,7 @@ export class CommentController {
       exit: new PickLimiter(now, CONTROL_PICKS_PER_SECOND),
       parent: new PickLimiter(now, CONTROL_PICKS_PER_SECOND)
     }
+    this.steps = new StepSender(now, payload => deps.send(COMMENT_PICK_CHANNEL, payload))
     this.scheduler = new RenderScheduler(deps.win, () => this.render())
     this.watch = new PageWatch(deps, target => this.host.isHost(target), () => this.scheduler.soon())
     this.cursor = new CursorSheet(doc)
@@ -276,6 +270,7 @@ export class CommentController {
     this.watch.set(false)
     this.scheduler.cancel()
     this.anchors.dispose()
+    this.steps.dispose()
     this.restorer.cancel()
     this.cursor.set(false)
     if (this.flashTimer !== null) clearTimeout(this.flashTimer)
@@ -318,8 +313,8 @@ export class CommentController {
     this.downPath = path
     element.scrollIntoView({ block: 'nearest', inline: 'nearest' })
     this.renderNow()
-    const box = boxOf(element)
-    this.announce(ANNOUNCE.showing(labelText(labelOf(element, box, this.suffixOf(element), this.commentsOn(element)))))
+    const label = labelText(labelOf(element, boxOf(element), this.suffixOf(element), this.commentsOn(element)))
+    this.steps.say('showing', label, viewOf(this.deps.win))
   }
 
   private stepUp(current: Element): void {
@@ -327,7 +322,7 @@ export class CommentController {
     if (parent === null) {
       // Out of a frame's <body>: main hands the picker to the parent's <iframe>.
       if (!this.deps.isTop) this.sendPick({ kind: 'parent', via: 'keyboard', view: viewOf(this.deps.win) })
-      else this.announce(ANNOUNCE.top)
+      else this.steps.say('top', undefined, viewOf(this.deps.win))
       return
     }
     const path = [...this.downPath, current]
@@ -344,7 +339,7 @@ export class CommentController {
       return
     }
     const child = firstChildOf(current, this.pickable)
-    if (child === null) this.announce(ANNOUNCE.noChild)
+    if (child === null) this.steps.say('no-child', undefined, viewOf(this.deps.win))
     else this.moveTo(child)
   }
 
@@ -384,16 +379,11 @@ export class CommentController {
 
   private modeChanged(on: boolean): void {
     this.cursor.set(on)
+    // The window says the mode change (`commentModeChanged`); the page says nothing.
     if (!on) {
       this.select(null, false)
       this.pointer = null
     }
-    if (this.deps.isTop && (on || this.view !== null)) this.announce(on ? ANNOUNCE.modeOn : ANNOUNCE.modeOff)
-  }
-
-  private announce(text: string): void {
-    if (this.view === null) this.render(true)
-    this.view?.announce(text)
   }
 
   private reveal(key: string): void {
@@ -445,8 +435,8 @@ export class CommentController {
     this.deps.send(COMMENT_HELLO_CHANNEL, {})
   }
 
-  /** One render pass; `force` builds the overlay even with nothing to draw (the live region). */
-  private render(force = false): void {
+  /** One render pass. */
+  private render(): void {
     const { win, doc } = this.deps
     if (doc.documentElement === null) return
     const viewport = viewportOf(win)
@@ -463,7 +453,7 @@ export class CommentController {
     this.shields = this.state.mode ? shieldsOf(doc, this.frameMap, viewport) : []
     this.watch.observeSizes(pinned.map(r => r.element as Element))
     const flash = this.flash !== null && this.flash.until > this.deps.now() ? this.flash.element : null
-    const needed = force || this.state.mode || this.pins.length > 0 || flash !== null
+    const needed = this.state.mode || this.pins.length > 0 || flash !== null
     if (!needed && this.view === null) return
     const root = this.host.ensure()
     if (root === null) return

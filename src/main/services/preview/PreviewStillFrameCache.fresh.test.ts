@@ -75,6 +75,40 @@ describe('PreviewStillFrameCache.captureFresh', () => {
     expect(cache.get(PANEL)?.dataUrl).toBe('newer')
   })
 
+  it('E-011 the load\'s ready step keeps a fresh still captured after the load finished', async () => {
+    const cache = new PreviewStillFrameCache()
+    // The load finished; the reader right-clicked before its `ready` step ran.
+    cache.markLoaded(PANEL)
+    expect(await cache.captureFresh(contents(image('fresh')), PANEL, SIZE)).toBe(true)
+    // `ready` drops only what predates the load – before the fix, this emptied the slot.
+    cache.invalidate(PANEL, { keepSinceLoad: true })
+    expect(cache.get(PANEL)?.dataUrl).toBe('fresh')
+    // A full invalidate (a file change, a new page) still drops it.
+    cache.invalidate(PANEL)
+    expect(cache.get(PANEL)).toBeUndefined()
+  })
+
+  it('E-011 drops a picture from before the load, and lets a fresh capture in flight since the load finish', async () => {
+    const cache = new PreviewStillFrameCache()
+    await cache.captureFresh(contents(image('old document')), PANEL, SIZE)
+    cache.markLoaded(PANEL)
+    let release: (img: PreviewNativeImage) => void = () => {}
+    const slow: PreviewCaptureContents = { capturePage: () => new Promise(resolve => (release = resolve)) }
+    const running = cache.captureFresh(slow, PANEL, SIZE)
+    cache.invalidate(PANEL, { keepSinceLoad: true })
+    expect(cache.get(PANEL)).toBeUndefined()
+    release(image('loaded document'))
+    expect(await running).toBe(true)
+    expect(cache.get(PANEL)?.dataUrl).toBe('loaded document')
+  })
+
+  it('keepSinceLoad with no load mark drops everything, as a plain invalidate does', async () => {
+    const cache = new PreviewStillFrameCache()
+    await cache.captureFresh(contents(image('a')), PANEL, SIZE)
+    cache.invalidate(PANEL, { keepSinceLoad: true })
+    expect(cache.get(PANEL)).toBeUndefined()
+  })
+
   it('a capture over the data-URL budget stores nothing', async () => {
     const cache = new PreviewStillFrameCache({ maxDataUrlChars: 4 })
     expect(await cache.captureFresh(contents(image('data:too-long')), PANEL, SIZE)).toBe(false)

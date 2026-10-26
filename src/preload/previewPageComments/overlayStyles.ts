@@ -10,11 +10,12 @@
  * be visible to the page. Every colour, size, space and the line height come
  * from the resolved theme (`state.ts`), never `var()` – the page cannot see
  * Erfana's tokens. The few literals left (fill mixes, SVG stroke widths, the
- * label's `1ch` gap, the count's weight, geometry percentages and the
- * visually-hidden box) have no token of their own; each is a row of the
- * overlay card's Exceptions. Corners are square (`border-radius: 0`), forced
- * colours map to system colours, and the overlay never prints, so pins cannot
- * land in a PDF.
+ * label's `1ch` gap, the count's weight and geometry percentages) have no
+ * token of their own; each is a row of the overlay card's Exceptions. Corners
+ * are square (`border-radius: 0`), forced colours map to system colours, and
+ * the overlay never prints, so pins cannot land in a PDF. Every word it shows
+ * is generated content from a `data-text` attribute (`.erf-hpc-text`), which
+ * Find in page does not count (E-022).
  *
  * The design-system card `docs/design-system/product/html-comments/overlay.css`
  * mirrors these rules with each theme field written back as its token: change
@@ -45,9 +46,9 @@ const FORCED_COLOURS_CSS = `@media (forced-colors: active) {
   .erf-hpc-label, .erf-hpc-tab { background: Highlight; color: HighlightText; border-color: HighlightText; }
   .erf-hpc-label__tag, .erf-hpc-label__size { color: HighlightText; }
   .erf-hpc-pin .erf-hpc-pin__body { fill: Highlight; stroke: HighlightText; }
-  .erf-hpc-pin .erf-hpc-pin__line, .erf-hpc-pin .erf-hpc-pin__count { fill: HighlightText; }
+  .erf-hpc-pin .erf-hpc-pin__line, .erf-hpc-pin .erf-hpc-pin__count { fill: HighlightText; color: HighlightText; }
   .erf-hpc-pin.erf-hpc-pin--selected .erf-hpc-pin__body { fill: Canvas; stroke: Highlight; }
-  .erf-hpc-pin.erf-hpc-pin--selected .erf-hpc-pin__line, .erf-hpc-pin.erf-hpc-pin--selected .erf-hpc-pin__count { fill: Highlight; }
+  .erf-hpc-pin.erf-hpc-pin--selected .erf-hpc-pin__line, .erf-hpc-pin.erf-hpc-pin--selected .erf-hpc-pin__count { fill: Highlight; color: Highlight; }
 }`
 
 /*
@@ -79,21 +80,22 @@ export function overlayCss(t: OverlayTheme, hidden = false): string {
 .erf-hpc-pin svg { display: block; width: 100%; height: 100%; overflow: visible; }
 .erf-hpc-pin__body { fill: ${t.accent}; stroke: ${t.ink}; stroke-width: 1.5; stroke-linejoin: miter; }
 .erf-hpc-pin__line { fill: ${t.ink}; }
-.erf-hpc-pin__count { fill: ${t.ink}; font-family: ${t.font}; font-size: ${t.size}; font-weight: 700; text-anchor: middle; dominant-baseline: middle; }
+.erf-hpc-pin__count { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; color: ${t.ink}; font-family: ${t.font}; font-size: ${t.size}; font-weight: 700; }
 @media (forced-colors: none) {
   .erf-hpc-pin:not(.erf-hpc-pin--selected):not(.erf-hpc-pin--damaged):hover .erf-hpc-pin__body { fill: ${t.accentHover}; }
 }
 .erf-hpc-pin--selected .erf-hpc-pin__body { fill: ${t.ink}; stroke: ${t.accent}; stroke-width: 2; }
-.erf-hpc-pin--selected .erf-hpc-pin__line, .erf-hpc-pin--selected .erf-hpc-pin__count { fill: ${t.accent}; }
+.erf-hpc-pin--selected .erf-hpc-pin__line { fill: ${t.accent}; }
+.erf-hpc-pin--selected .erf-hpc-pin__count { color: ${t.accent}; }
 .erf-hpc-pin--damaged .erf-hpc-pin__body { fill: ${t.warning}; }
-.erf-hpc-pin--damaged.erf-hpc-pin--selected .erf-hpc-pin__count { fill: ${t.ink}; }
+.erf-hpc-pin--damaged.erf-hpc-pin--selected .erf-hpc-pin__count { color: ${t.ink}; }
 ${pinFocusCss(t)}
 .erf-hpc-shield { position: fixed; pointer-events: auto; background: transparent; cursor: crosshair; }
 .erf-hpc-frame { position: fixed; inset: 0; pointer-events: none; border: ${t.ring} solid ${t.accent}; }
 .erf-hpc-tab { position: fixed; top: 0; left: 50%; transform: translateX(-50%); pointer-events: none; padding: ${t.space1} ${t.space4}; white-space: nowrap; background: ${t.accent}; color: ${t.ink}; }
 .erf-hpc-tab--bottom { top: auto; bottom: 0; }
 .erf-hpc-hidden { display: none; }
-.erf-hpc-sr { position: fixed; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.erf-hpc-text::before { content: attr(data-text); }
 ${FORCED_COLOURS_CSS}
 @media print { .erf-hpc-root { display: none; } }
 ${hidden ? HIDDEN_CSS : ''}`

@@ -14,7 +14,7 @@ import { BASE_PAGE, commentedPage, damagedBlock, insertBefore, newerBlock } from
 import { makeProject, type TempProject } from './__test-helpers__/commentWriterHarness'
 import { frameFile } from './__test-helpers__/commentServiceHarness'
 import { CommentKeyStore, type CommentBinding } from './commentKeyStore'
-import { createInProcessCommentFileJobs } from './commentFileJobs'
+import { createInProcessCommentFileJobs, type CommentFileJob } from './commentFileJobs'
 import { buildCommentList, COMMENT_LIST_MAX_FILES } from './commentListBuilder'
 
 vi.mock('../../LoggingService', () => ({
@@ -64,6 +64,58 @@ describe('buildCommentList', () => {
     expect(file.threads.filter(thread => thread.notVisible)).toHaveLength(1)
     expect(file.damaged).toEqual([expect.objectContaining({ reason: 'bad-json', raw: expect.stringContaining('erfana:comment'), blockKey: expect.stringMatching(/^b/) })])
     expect(file.newer).toEqual([expect.objectContaining({ version: 2, blockKey: expect.stringMatching(/^b/) })])
+  })
+
+  it('E-005 reads every "not visible now" flag after the last file, so no flag is older than the answer', async () => {
+    const first = await project.write('index.html', commentedPage().text)
+    const second = await project.write('other.html', commentedPage().text)
+    const jobs = createInProcessCommentFileJobs()
+    let hidden = true
+    const reads: Array<{ realPath: string; hidden: boolean }> = []
+    let jobsRun = 0
+    const views = await buildCommentList({
+      binding: BINDING,
+      keys: new CommentKeyStore<unknown>(),
+      realRoot: project.root,
+      files: [first, second].map(path => ({ file: frameFile(path, { projectPath: path, displayPath: path }), frame: false })),
+      notVisible: realPath => {
+        reads.push({ realPath, hidden })
+        return hidden
+      },
+      jobs: {
+        runJob<J extends CommentFileJob>(bytes: Uint8Array, job: J) {
+          jobsRun += 1
+          // An anchor report lands while the second file is read: the element is rendered again.
+          if (jobsRun === 2) hidden = false
+          return jobs.runJob(bytes, job)
+        }
+      }
+    })
+    expect(views.flatMap(view => view.threads.map(thread => thread.notVisible))).not.toContain(true)
+    expect(reads.length).toBeGreaterThan(0)
+    expect(reads.every(read => !read.hidden)).toBe(true)
+  })
+
+  it('leaves out a file the worker refuses for a reason the list does not show', async () => {
+    const shown = await project.write('index.html', commentedPage().text)
+    const refused = await project.write('other.html', commentedPage().text)
+    const jobs = createInProcessCommentFileJobs()
+    let jobsRun = 0
+    const views = await buildCommentList({
+      binding: BINDING,
+      keys: new CommentKeyStore<unknown>(),
+      realRoot: project.root,
+      files: [shown, refused].map(path => ({ file: frameFile(path, { projectPath: path, displayPath: path }), frame: false })),
+      notVisible: () => false,
+      jobs: {
+        async runJob<J extends CommentFileJob>(bytes: Uint8Array, job: J) {
+          jobsRun += 1
+          if (jobsRun === 2) return { kind: 'list', ok: false, refusal: 'too-many-blocks' } as Awaited<ReturnType<typeof jobs.runJob<J>>>
+          return jobs.runJob(bytes, job)
+        }
+      }
+    })
+    expect(views.map(view => view.displayPath)).toEqual([shown])
   })
 
   it("lists a JS-built target with its snapshot size, an edited message, and a read-only file's threads", async () => {

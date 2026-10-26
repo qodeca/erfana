@@ -650,9 +650,10 @@
   .erf-band .erf-band__tool--toggle[aria-expanded='true'] { border-block-end-color: Highlight; }
 }
 
-/* The minimal tier: Show comment icons leaves the row – it stays reachable from
-   the drawer's checkbox. The threshold is nav.css's minimal one, re-measured with
-   the comment tools (446px, was 293px); the toolbar card prints the numbers. */
+/* The narrow tier: Show comment icons leaves the row before Find does – it stays
+   reachable from the drawer's checkbox. nav.css (synced from the shipping
+   PreviewNavControls.css) carries the same rule; this copy keeps the card's own
+   demos right on its own. The toolbar card prints the measured numbers. */
 @container (width < 446px) {
   .erf-band .erf-band__tool[aria-label='Show comment icons'] { display: none; }
 }

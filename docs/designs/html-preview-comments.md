@@ -464,7 +464,7 @@ Rewrite `:699` ("no file-write path" → "no write path from the page; one user-
 - Above the element's top-left; flips below at the viewport top; clamped sideways.
 - Alt+↑ parent (stops at `<body>`, announces "Top of page"); Alt+↓ back down the path, else first child; the level holds while the pointer stays inside that box. Instant, no tween.
 - Same-project frame: its own elements; Alt+↑ from the frame's `<body>` moves to the `<iframe>` element in the parent (spike S8). Refused, `srcdoc` and about:blank frames: the `<iframe>` element itself, label `iframe · refused frame` / `iframe · inline frame`.
-- PDF export: the overlay is hidden while printing, so pins never land in the PDF. Find in page: overlay text lives in a closed shadow root and is excluded from find counts (test R-021 / E-022).
+- PDF export: the overlay is hidden while printing, so pins never land in the PDF. Find in page: overlay text lives in a closed shadow root and is excluded from find counts (test R-021 / E-022). *Rev 3 note (P7):* a closed shadow root does **not** hide text from Find in page – Chromium searches it. Every word the overlay draws (the label, the mode tab, a pin's number) is CSS generated content (`::before { content: attr(data-text) }`), which Find never counts, and the page holds no live region (§10.8).
 - Tiny (< 8 px): ring pushed out 2 px. Huge: clipped to the viewport, label sticks to the visible top-left. Fixed/sticky and scrolling: `getBoundingClientRect` per animation frame, drawn in the **top layer** (Popover API), snapped to device pixels.
 - Isolation: one host element, closed shadow root, `all: initial`, inline `!important` positioning, re-attached by `MutationObserver`. Values arrive resolved in `commentState.theme`, never as `var()`. `forced-colors` → `Highlight` / `HighlightText`. Styles via constructable stylesheets (spike S5).
 
@@ -534,7 +534,7 @@ Self-drawn inline SVG in the shadow root, sharp corners (viewBox path `M2 2H22V1
 | Damaged | `--color-warning` fill, ink `!` |
 | All resolved, not visible now, not found, pins hidden | Not drawn |
 
-*Rev 3 note (P5):* the number and `!` are centred on the body's middle, `y="9.5"`, not on the 24-unit box; hover recolours an open pin only (never a selected or damaged one, and not in forced colours); a selected damaged pin keeps its warning fill and an ink `!` (accent on it is about 1.05:1); in forced colours a selected pin inverts – `Canvas` body, `Highlight` stroke and content.
+*Rev 3 note (P5):* the number and `!` are centred on the body's middle, `y="9.5"`, not on the 24-unit box (*P7:* they are now an HTML span in a `foreignObject` over the body, x 2, y 2, 20×15, drawn as generated content so Find in page cannot count them – §10.2); hover recolours an open pin only (never a selected or damaged one, and not in forced colours); a selected damaged pin keeps its warning fill and an ink `!` (accent on it is about 1.05:1); in forced colours a selected pin inverts – `Canvas` body, `Highlight` stroke and content.
 
 Only open threads are counted. Clicking opens the window in any mode; the click never reaches the page. Overlapping pins move left along the top edge in 22 px steps (the ancestor keeps the corner). Drawn only for elements passing `checkVisibility({opacityProperty, visibilityProperty})` and in the viewport. Scales with page zoom. Never animated. `role="button"`, `tabindex="-1"`.
 
@@ -577,7 +577,7 @@ Form card errors (`aria-invalid`, `aria-describedby`, icon + text). Settings get
 ### 10.8 Accessibility
 
 - Keyboard-only path: shortcut or toggle → picker starts on the hovered element, else the element at the viewport centre → Tab / Shift+Tab next/previous at the same level (then the parent's next sibling), Alt+↑/↓ level, each move scrolls into view → Enter opens the window, Shift+F10 the menu. Arrow keys keep scrolling.
-- Always-mounted polite live region in the shadow root ("button, Buy now, 2 comments."); mode and save results also go to `.erf-band__announce`; an assertive region for errors. Verify with NVDA, VoiceOver and Orca.
+- Always-mounted polite live region in the shadow root ("button, Buy now, 2 comments."); mode and save results also go to `.erf-band__announce`; an assertive region for errors. Verify with NVDA, VoiceOver and Orca. *Rev 3 note (P7):* the page holds **no** live region – Find in page counts its text (E-022). The keyboard picker sends each move to main as a `step` pick (what it reached, and the element's label), main passes it on as `commentModeChanged` with reason `picker`, and the comment chrome's polite region (`useLiveText`) says the §10.10 "Announce" sentence. Mode on and off are said there too.
 - The drawer is the guaranteed keyboard route to every thread.
 - Reduced motion: no transitions; flash = static highlight for 1.5 s; instant scrolling; nothing loops.
 
@@ -1015,6 +1015,18 @@ Each note amends the cited sections; the rows above stand where a note does not 
 | Window data | `ThreadView.quote` for "It was attached to:"; the icon event's draft for "New comment" (§7.7, §8 notes). | §7.7, §8, §10.4 | `preview-comment-schema.test.ts`, `commentListBuilder.test.ts`, `commentDraftOpener.test.ts`, `PreviewCommentService.test.ts` |
 | Overlay | Pin text centred at `y="9.5"`, hover, damaged-selected and forced-colour rules (§10.5 note); theme carries the hairline, spaces and line height (§10.9). | §10.5, §10.9 | `overlayStyles.test.ts`, `pins.test.ts`, `state.test.ts` |
 | Carried to P8 | Nine existing non-comment log lines name the project folder by its absolute path – the git polling and git watcher start lines, the directory watcher's start, ready and "Directory changed" lines, and the renderer's project switch, git-status (two) and "Opened new panel" lines. SEC-20 allow-lists them by text; P8 decides whether they become digests. Not changed in P5. | §9.1 S21, P8 | – |
+
+### Rev 3 notes – P7 bug round
+
+Found by the P7 end-to-end specs; each note amends the cited sections.
+
+| Note | Cause and change | Amends | Tests |
+|---|---|---|---|
+| E-022 Find | Find in page counted the overlay's words: Chromium searches closed shadow roots. Every overlay word is now CSS generated content (`data-text` + `::before`), the pin's number included, and the page's polite and assertive live regions are gone. The keyboard picker's sentences travel as a `step` pick (at most 10 a second from a frame, 12 a second per view in main, dropped when the mode is off; label at most 64 characters) and `commentModeChanged` reason `picker` (`say`: `showing` / `top` / `no-child`, `label` escaped with `visibleInline`, at most 384 characters); the renderer words them. | §8, §10.2, §10.5, §10.8 | `overlayView.test.ts`, `overlayStyles.test.ts`, `pins.test.ts`, `picks.test.ts`, `picker.test.ts`, `commentPickHandler.test.ts`, `commentPickerStep.test.ts`, `PreviewCommentService.test.ts`, `preview-comment-schema.test.ts`, `usePreviewComments.test.tsx`; E-022 |
+| E-011 still | The load's `ready` step (the post-load pipeline, asynchronous and rate-limited) for the comment-mode reload could run after the reader's right-click: it threw away the fresh still, and the capture that replaced it landed after the menu had hidden the view, where nothing showed it. The still-frame cache now orders capture starts and load marks: `ready` drops only what was captured before the load finished, and a capture that lands after a hide is shown. | R3-6, §3 stale still | `PreviewStillFrameCache.fresh.test.ts`, `previewLivePipeline.test.ts`, `previewStillFrameFreshness.test.ts`; E-011 |
+| E-005 not visible | A list read while a pin's element was hidden kept "Not visible now" after the page reported it visible again: the drawer combined the list's per-thread flag with the anchor status, and nothing re-read the list. The list reads every flag after its last file, and each anchor status rewrites the stored list's flags – the newest report wins. | decision 30, §10.6 | `commentListBuilder.test.ts`, `usePreviewComments.test.tsx`; E-005 |
+| SEC-20 list | Between a reload's commit and the new document's hello a frame has no file, so a list read then was empty ("thread not listed"). The list falls back to the frame-to-file map, which knows the file from the commit. | §7.6 | `commentPanelStatus.test.ts`; SEC-20 |
+| F-003 | Not reproduced. On the emulated x64 Windows box, with the machine idle and again under a 10-core CPU load, right-click → menu P95 was 39–46 ms on both the pre-fix build and this one (instrumented main path, pick → draft sent: 25–60 ms; the 200-pin hover in comment mode: frame-gap P95 9.0 ms, as with the mode off). The 772–956 ms and 185 ms gap records were not explained by main's draft path. The SEC-06 limit (5 picks a second per frame) drops a sixth right-click within one second; a timing loop must pace itself to it. | F-003 | – |
 
 **Open after P0, carried to the handoff**: S4 on Linux (X11/Wayland) and macOS, mixed-DPI; S1/S6 re-confirmed on macOS. Owner review list: R3-11.
 

@@ -50,7 +50,7 @@
       inner += '<rect class="erf-hpc-pin__line" x="6" y="6" width="12" height="2"></rect>' +
                '<rect class="erf-hpc-pin__line" x="6" y="10" width="8" height="2"></rect>';
     } else {
-      inner += `<text class="erf-hpc-pin__count" x="12" y="9.5">${esc(content)}</text>`;
+      inner += `<foreignObject x="2" y="2" width="20" height="15"><span xmlns="http://www.w3.org/1999/xhtml" class="erf-hpc-pin__count erf-hpc-text" data-text="${esc(content)}"></span></foreignObject>`;
     }
     return `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">${inner}</svg>`;
   }

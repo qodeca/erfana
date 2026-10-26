@@ -108,8 +108,9 @@
 <div class="ds-note">
   <strong>A defect this card found on its first render, fixed.</strong> The number and the <code>!</code> sat low,
   touching the bubble's bottom edge: <code>pins.ts</code> centred the text at <code>y="13"</code> with
-  <code>dominant-baseline: middle</code>, but the bubble's body runs from 2 to 17 in the view box. It now centres
-  them on the body's middle, <code>y="9.5"</code> (<code>PIN_BODY_MIDDLE_Y</code>), and the card draws them the same way.
+  <code>dominant-baseline: middle</code>, but the bubble's body runs from 2 to 17 in the view box. They are now HTML
+  text in a <code>foreignObject</code> over the body (<code>PIN_BODY</code>), centred by flex, and the text is CSS generated
+  content so Find in page never counts it (E-022); the card draws them the same way.
   <br><br>
   <strong>Damaged and selected.</strong> A selected damaged pin keeps its warning fill under the selected accent
   stroke, so its <code>!</code> stays ink – the selected accent on the warning fill would be about 1.05:1.
@@ -178,8 +179,7 @@
         each with no token of its own: the 12% selected and 24% flash fill mixes; the pin's SVG stroke widths 1.5
         and 2 (selected), in view-box units; the label's <code>1ch</code> gap before the size; the count's weight
         700 (the value of <code>--font-bold</code>, which the theme does not carry); the geometry percentages
-        (<code>50%</code> centring and clip, <code>100%</code> SVG size); and the 1px box of the visually-hidden
-        live region, a technique rather than a design value. The R-012 test lists exactly these.</td>
+        (<code>50%</code> centring and clip, <code>100%</code> SVG size);. The page has no live region any more: the panel speaks the picker's sentences (E-022). The R-012 test lists exactly these.</td>
     </tr>
     <tr>
       <td>Pin focus</td>

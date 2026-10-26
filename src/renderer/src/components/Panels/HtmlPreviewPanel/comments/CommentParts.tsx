@@ -16,6 +16,7 @@
 import { useId, type ReactNode } from 'react'
 import { renderIcon } from '../../../../utils/iconRegistry'
 import { splitVisibleControls, counterState, COMMENT_MAX_CHARS } from './commentFormat'
+import { TEST_IDS } from '../../../../constants/testids'
 
 /** Props for {@link VisibleText}. */
 export interface VisibleTextProps {
@@ -46,7 +47,7 @@ export function VisibleText({ text }: VisibleTextProps): React.JSX.Element {
             key={index}
             className="erf-comment-bidi"
             title={`Invisible control character ${segment.code}`}
-            data-testid="comment-control-token"
+            data-testid={TEST_IDS.COMMENT_CONTROL_TOKEN}
           >
             {`⟨${segment.code}⟩`}
           </span>

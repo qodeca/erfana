@@ -403,6 +403,31 @@ describe('the still picture end to end: its stale flag and CSS size', () => {
     )
   })
 
+  it('E-011 a capture that lands after the hide is published, so the hidden view is not left with no still', async () => {
+    const still = makeStill()
+    let land: (image: PreviewNativeImage) => void = () => {}
+    still.capturePage.mockImplementationOnce(() => new Promise(resolve => (land = resolve)))
+    still.bounds.apply(RECT, 1, false)
+    // A load's `ready` step dropped the old picture and started this capture…
+    still.visibility.captureWhileVisible()
+    // …and a popup hid the view before it landed: nothing to publish yet.
+    still.visibility.set(false)
+    expect(still.emit.stillFrameChanged).not.toHaveBeenCalled()
+
+    land(makeImage())
+    await still.visibility.whenCaptureSettled()
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(still.emit.stillFrameChanged).toHaveBeenCalledWith(PANEL, expect.objectContaining({ dataUrl: 'data:image/png;base64,AAAA' }))
+  })
+
+  it('a capture that lands while the view is still drawn publishes nothing', async () => {
+    const still = makeStill()
+    await still.capture()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(still.emit.stillFrameChanged).not.toHaveBeenCalled()
+  })
+
   it('a pointer crossing the page keeps the picture fresh', async () => {
     const still = makeStill()
     await still.capture()

@@ -52,8 +52,8 @@ export interface CommentPanelStatus {
   notVisibleThreadKeys(): string[]
   /** Whether the thread `threadId` of `realPath` is not rendered now. */
   isNotVisible(realPath: string, threadId: string): boolean
-  /** The files the drawer lists, the page's first. */
-  listedFiles(): ListedFile[]
+  /** The files the drawer lists, the page's first – a frame mid-reload by the file its commit named. */
+  listedFiles(): Promise<ListedFile[]>
   /** Why comments are unavailable for the tab, if they are. */
   unavailable(): CommentUnavailableReason | undefined
   /** The tab's counts and availability, as `preview:commentsChanged` carries them. */
@@ -108,15 +108,19 @@ export function createCommentPanelStatus(deps: CommentPanelStatusDeps): CommentP
         )
     },
 
-    listedFiles() {
+    async listedFiles() {
       const seen = new Set<string>()
       const out: ListedFile[] = []
-      for (const frame of deps.frames.liveFrames()) {
-        const file = deps.frames.get(frame.frameTreeNodeId)?.file
-        if (file === undefined || !file.commentable || seen.has(key(file.realPath))) continue
+      const frames = deps.frames.liveFrames()
+      // A reload clears a frame's file at the commit and sets it again at the
+      // new document's hello; a list read in between still lists the file (SEC-20).
+      const files = await Promise.all(frames.map(frame => deps.frames.fileOf(frame.frameTreeNodeId)))
+      frames.forEach((frame, i) => {
+        const file = files[i]
+        if (file === undefined || !file.commentable || seen.has(key(file.realPath))) return
         seen.add(key(file.realPath))
         out.push({ file, frame: frame.parent !== null })
-      }
+      })
       return out
     },
 

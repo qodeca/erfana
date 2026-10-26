@@ -31,6 +31,7 @@ import type {
   CommentAnchors,
   CommentListResult,
   CommentModeChanged,
+  CommentPick,
   CommentSaveRequest,
   CommentSaveResult,
   CommentSetModeResult
@@ -45,6 +46,7 @@ import { CommentFrames, type CommentFrameLike, type FrameRecord } from './commen
 import { createCommentFrameBroadcaster, type CommentFrameBroadcaster } from './commentFrameBroadcaster'
 import { CommentKeyStore, type CommentBinding } from './commentKeyStore'
 import { createCommentPickHandler, type CommentPickHandler, type PageSignalEvent } from './commentPickHandler'
+import { pickerStepOf } from './commentPickerStep'
 import { createCommentDraftOpener, type CommentDraftOpener, type DraftOpenerGeometry } from './commentDraftOpener'
 import type { CommentDraft } from './commentDraftBuilder'
 import { buildCommentList } from './commentListBuilder'
@@ -162,6 +164,7 @@ export class PreviewCommentService implements CommentServiceApi {
         hello: frame => this.guard(this.onHello(frame)),
         exit: () => this.changeMode(false, 'escape'),
         parent: frame => this.onParent(frame),
+        step: pick => this.onStep(pick),
         icon: (frame, record, key, pick) => this.guard(this.opener.icon(frame, record, key, pick)),
         element: (frame, record, entry, pick) => this.guard(this.opener.element(frame, record, entry, pick)),
         anchors: (_frame, record, anchors) => this.onAnchors(record, anchors)
@@ -218,7 +221,7 @@ export class PreviewCommentService implements CommentServiceApi {
       binding: this.binding,
       keys: this.keys,
       realRoot: this.deps.realRoot,
-      files: this.status.listedFiles(),
+      files: await this.status.listedFiles(),
       notVisible: (realPath, threadId) => this.status.isNotVisible(realPath, threadId),
       jobs: this.jobs,
       platform: this.deps.platform
@@ -432,6 +435,13 @@ export class PreviewCommentService implements CommentServiceApi {
   private onParent(frame: CommentFrameLike): void {
     if (frame.parent === null) return
     this.broadcaster.send(frame.parent, { focusFrame: this.frames.record(frame.frameTreeNodeId).key })
+  }
+
+  /** The keyboard picker moved: the window's live region says where (the page holds no screen-reader text). */
+  private onStep(pick: CommentPick): void {
+    // The pick schema puts `say` on every step, and `label` on a `showing` one.
+    const step = pickerStepOf(pick.say!, pick.label)
+    this.deps.shared.emit.modeChanged(this.windowId, { panelId: this.panelId, on: this.mode, reason: 'picker', ...step })
   }
 
   private onAnchors(record: FrameRecord, anchors: CommentAnchors): void {

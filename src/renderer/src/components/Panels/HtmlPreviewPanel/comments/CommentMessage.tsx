@@ -33,6 +33,7 @@ import { editDraftKey, useInnerStep } from './commentLive'
 import { validateCommentText } from './commentSchemas'
 import { CommentField, DialogButton, VisibleText } from './CommentParts'
 import type { ThreadContext } from './CommentThread'
+import { TEST_IDS } from '../../../../constants/testids'
 
 type Message = CommentThreadView['messages'][number]
 
@@ -142,7 +143,7 @@ export function CommentMessageView({
       className="erf-comment-message"
       aria-labelledby={`${id}-a`}
       aria-describedby={email !== undefined ? `${id}-d` : undefined}
-      data-testid="comment-message"
+      data-testid={TEST_IDS.COMMENT_MESSAGE}
     >
       <div className="erf-comment-message__meta">
         <span className="erf-comment-message__meta-text" id={`${id}-a`}>
@@ -173,7 +174,7 @@ export function CommentMessageView({
             aria-haspopup="menu"
             aria-expanded={menu !== null}
             aria-label={`Actions for the comment by ${visibleString(message.by.name)}, ${time}`}
-            data-testid="comment-message-actions"
+            data-testid={TEST_IDS.COMMENT_MESSAGE_ACTIONS}
             onClick={() => {
               const box = menuButton.current?.getBoundingClientRect()
               setMenu({ x: (box?.right ?? 0) - 180, y: box?.bottom ?? 0 })
@@ -198,12 +199,12 @@ export function CommentMessageView({
             error={error}
             compact
             textareaRef={editRef}
-            testId="comment-edit-field"
+            testId={TEST_IDS.COMMENT_EDIT_FIELD}
           />
           <div className="erf-comment-thread__actions">
             <DialogButton
               variant="secondary"
-              testId="comment-edit-cancel"
+              testId={TEST_IDS.COMMENT_EDIT_CANCEL}
               onClick={() => {
                 commentDrafts.clear(draftKey)
                 backToView()
@@ -215,14 +216,14 @@ export function CommentMessageView({
               variant="primary"
               busy={busy}
               onClick={() => void saveEdit()}
-              testId="comment-edit-save"
+              testId={TEST_IDS.COMMENT_EDIT_SAVE}
             >
               {busy ? COPY.saving : COPY.saveChanges}
             </DialogButton>
           </div>
         </>
       ) : (
-        <p className="erf-comment-message__text" dir="auto" data-testid="comment-message-text">
+        <p className="erf-comment-message__text" dir="auto" data-testid={TEST_IDS.COMMENT_MESSAGE_TEXT}>
           <VisibleText text={message.text} />
         </p>
       )}
@@ -234,7 +235,7 @@ export function CommentMessageView({
               variant="secondary"
               buttonRef={cancelRef}
               onClick={backToView}
-              testId="comment-delete-cancel"
+              testId={TEST_IDS.COMMENT_DELETE_CANCEL}
             >
               {COPY.cancel}
             </DialogButton>
@@ -242,7 +243,7 @@ export function CommentMessageView({
               variant="danger"
               busy={busy}
               onClick={() => void confirmDelete()}
-              testId="comment-delete-confirm"
+              testId={TEST_IDS.COMMENT_DELETE_CONFIRM}
             >
               {first && replies > 0 ? COPY.deleteThread : COPY.deleteComment}
             </DialogButton>

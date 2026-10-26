@@ -5,7 +5,7 @@
  * decisions 20 and 33; J-005, J-014).
  */
 import { afterEach, describe, expect, it } from 'vitest'
-import { PIN_MAX_STEPS, PIN_PATH, PIN_STEP_PX } from './constants'
+import { PIN_BODY_MIDDLE_Y, PIN_MAX_STEPS, PIN_PATH, PIN_STEP_PX } from './constants'
 import { drawPin, pinContent, pinName, pinTooltip, placePins, type PinInput } from './pins'
 
 const VIEWPORT = { width: 800, height: 600 }
@@ -128,15 +128,25 @@ describe('drawPin (J-014)', () => {
 
   it('shows the count, the damaged state and the selected state', () => {
     const many = drawPin(document, undefined, pinOf(12), { label: 'div#a', selected: true })
-    expect(many.querySelector('text')?.textContent).toBe('9+')
-    // Centred on the bubble's body (y 2 to 17), not on the whole box with its tail.
-    expect(many.querySelector('text')?.getAttribute('y')).toBe('9.5')
+    const count = many.querySelector('.erf-hpc-pin__count')
+    expect(count?.getAttribute('data-text')).toBe('9+')
+    expect(count?.classList.contains('erf-hpc-text')).toBe(true)
+    expect(count?.namespaceURI).toBe('http://www.w3.org/1999/xhtml')
+    // Generated content, never a text node: Find in page would count it (E-022).
+    expect(many.textContent).toBe('')
+    // A box over the bubble's body (y 2 to 17), so the number sits on its middle, not the whole box's.
+    const box = count?.parentElement
+    expect(box?.localName).toBe('foreignObject')
+    const [y, height] = ['y', 'height'].map(name => Number(box?.getAttribute(name)))
+    expect([y, height]).toEqual([2, 15])
+    expect(y + height / 2).toBe(PIN_BODY_MIDDLE_Y)
+    expect(PIN_BODY_MIDDLE_Y).toBe(9.5)
     expect(many.className).toBe('erf-hpc-pin erf-hpc-pin--selected')
     expect(pinName(pinOf(12), 'div#a')).toBe('12 comments on div#a. Open.')
     expect(pinTooltip(pinOf(3))).toBe('3 comments – click to open')
 
     const damaged = drawPin(document, undefined, pinOf(0, 'damaged'), { label: 'div#a', selected: false })
-    expect(damaged.querySelector('text')?.textContent).toBe('!')
+    expect(damaged.querySelector('.erf-hpc-pin__count')?.getAttribute('data-text')).toBe('!')
     expect(damaged.className).toBe('erf-hpc-pin erf-hpc-pin--damaged')
     expect(damaged.getAttribute('aria-label')).toBe('Damaged comment on div#a. Open.')
     expect(damaged.title).toBe('Damaged comment – click to open')

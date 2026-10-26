@@ -16,10 +16,24 @@
  * resolved threads never reach here – main counts open threads only, so a
  * count of 0 draws nothing.
  */
-import { PIN_BODY_MIDDLE_Y, PIN_BOX_PX, PIN_MAX_STEPS, PIN_PATH, PIN_STEP_PX, PIN_TIP, PIN_TIP_OFFSET_PX } from './constants'
+import { PIN_BODY, PIN_BOX_PX, PIN_MAX_STEPS, PIN_PATH, PIN_STEP_PX, PIN_TIP, PIN_TIP_OFFSET_PX } from './constants'
 import { clipToViewport, overlaps, type Box, type Viewport } from './geometry'
 
 const SVG_NS = 'http://www.w3.org/2000/svg'
+const HTML_NS = 'http://www.w3.org/1999/xhtml'
+
+/** The attribute the overlay's words are drawn from (`.erf-hpc-text::before`). */
+export const TEXT_ATTRIBUTE = 'data-text'
+
+/**
+ * Show `text` in `el` as CSS generated content, never as a text node: Find in
+ * page counts text in a shadow root, closed or not, and generated content it
+ * does not search (E-022). Unchanged text is not written again.
+ */
+export function showText(el: Element, text: string): void {
+  el.classList.add('erf-hpc-text')
+  if (el.getAttribute(TEXT_ATTRIBUTE) !== text) el.setAttribute(TEXT_ATTRIBUTE, text)
+}
 
 /** What a pin shows: two "text lines" for one thread, a number, `9+`, or `!` (damaged). */
 export type PinContent = 'lines' | '!' | '9+' | `${number}`
@@ -118,7 +132,12 @@ function svgChild(doc: Document, tag: string, attributes: Record<string, string>
   return node
 }
 
-/** The pin's glyph: the bubble plus its content, in a 24-unit view box. */
+/**
+ * The pin's glyph: the bubble plus its content, in a 24-unit view box. A
+ * number or `!` is not SVG text (Find in page would count it): it is a box
+ * over the bubble's body (`PIN_BODY`, so its middle is `PIN_BODY_MIDDLE_Y`)
+ * showing generated content.
+ */
 function glyph(doc: Document, content: PinContent): Element {
   const svg = svgChild(doc, 'svg', { viewBox: '0 0 24 24', 'aria-hidden': 'true', focusable: 'false' })
   svg.append(svgChild(doc, 'path', { d: PIN_PATH, class: 'erf-hpc-pin__body' }))
@@ -127,9 +146,13 @@ function glyph(doc: Document, content: PinContent): Element {
     svg.append(svgChild(doc, 'rect', { x: '6', y: '10', width: '8', height: '2', class: 'erf-hpc-pin__line' }))
     return svg
   }
-  const text = svgChild(doc, 'text', { x: '12', y: String(PIN_BODY_MIDDLE_Y), class: 'erf-hpc-pin__count' })
-  text.textContent = content
-  svg.append(text)
+  const { x, y, width, height } = PIN_BODY
+  const box = svgChild(doc, 'foreignObject', { x: String(x), y: String(y), width: String(width), height: String(height) })
+  const count = doc.createElementNS(HTML_NS, 'span')
+  count.setAttribute('class', 'erf-hpc-pin__count')
+  showText(count, content)
+  box.append(count)
+  svg.append(box)
   return svg
 }
 

@@ -67,6 +67,7 @@ import { IdentityStep } from './IdentityStep'
 import { NewCommentView } from './NewCommentView'
 import { ThreadsView, selectThreads } from './ThreadsView'
 import './CommentWindow.css'
+import { TEST_IDS } from '../../../../constants/testids'
 
 /** Props for {@link CommentWindow}. */
 export interface CommentWindowProps {
@@ -269,12 +270,12 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
         ref={windowRef}
         className={`erf-comment-window${placement?.kind === 'sheet' ? ' erf-comment-window--sheet' : ''}`}
         style={style}
-        data-testid="comment-window"
+        data-testid={TEST_IDS.COMMENT_WINDOW}
         data-view={view}
       >
         <CommentStepsContext.Provider value={stepsValue}>
         {/* Always mounted, empty until a failure: see the module comment. */}
-        <p className="erf-comment-sr" aria-live="assertive" data-testid="comment-window-alert">
+        <p className="erf-comment-sr" aria-live="assertive" data-testid={TEST_IDS.COMMENT_WINDOW_ALERT}>
           {alertText}
         </p>
         <div className="erf-comment-window__head">
@@ -284,7 +285,7 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
               id={titleId}
               tabIndex={-1}
               ref={titleRef}
-              data-testid="comment-window-title"
+              data-testid={TEST_IDS.COMMENT_WINDOW_TITLE}
             >
               {view === 'identity' ? IDENTITY_COPY.title : <VisibleText text={heading.title} />}
             </h2>
@@ -305,7 +306,7 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
             className="erf-comment-icon-btn"
             aria-label={COPY.close}
             onClick={() => props.onClose()}
-            data-testid="comment-window-close"
+            data-testid={TEST_IDS.COMMENT_WINDOW_CLOSE}
           >
             {renderIcon('x', { size: 16, 'aria-hidden': true })}
           </button>
@@ -368,11 +369,11 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
         {view === 'threads' && selection === null && list.status === 'error' && (
           <div className="erf-comment-window__body">
             {/* M7: a list that failed is said, with the way on – never an endless "Reading". */}
-            <p className="erf-comment-note" data-testid="comment-window-read-error">
+            <p className="erf-comment-note" data-testid={TEST_IDS.COMMENT_WINDOW_READ_ERROR}>
               {readErrorText(request.file?.displayPath ?? COPY.thisFile)}
             </p>
             <div className="erf-comment-thread__actions">
-              <ActionButton onClick={props.onRefresh} testId="comment-window-retry">
+              <ActionButton onClick={props.onRefresh} testId={TEST_IDS.COMMENT_WINDOW_RETRY}>
                 {COPY.tryAgain}
               </ActionButton>
             </div>

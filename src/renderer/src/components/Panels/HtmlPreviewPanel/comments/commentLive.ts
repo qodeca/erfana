@@ -17,7 +17,22 @@
  * @module HtmlPreviewPanel/comments/commentLive
  */
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
+import type { CommentModeChanged } from '../../../../../../shared/ipc/preview-comment-schema'
 import { useLatestRef } from '../../../../hooks/useLatestRef'
+import { ANNOUNCE } from './commentCopy'
+
+/**
+ * §10.10 "Announce" – where the page's keyboard picker moved (§10.8, E-022).
+ * The page holds no live region (Find in page would count its text), so main
+ * passes each step on and the window's polite region says it.
+ *
+ * @returns The sentence, or `undefined` for an event that is not a picker step.
+ */
+export function pickerAnnouncement(event: Pick<CommentModeChanged, 'say' | 'label'>): string | undefined {
+  if (event.say === 'top') return ANNOUNCE.pickerTop
+  if (event.say === 'no-child') return ANNOUNCE.pickerNoChild
+  return event.say === 'showing' && event.label !== undefined ? ANNOUNCE.pickerShowing(event.label) : undefined
+}
 
 /**
  * Text for an always-mounted live region, set clear-then-text.

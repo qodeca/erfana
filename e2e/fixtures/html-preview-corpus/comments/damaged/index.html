@@ -1,0 +1,36 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>-HPC-DAMAGED-</title>
+  <style>
+    body { font: 16px/1.5 sans-serif; margin: 40px; background: #fff; color: #111; }
+    p, h1 { width: 420px; }
+  </style>
+</head>
+<body>
+  <!-- erfana:comment v1 id=c-aaaaaaaaaaaaaaaa
+  status: open
+  target: <h1 id="title">
+  comment by Ada Lovelace at 2026-10-25T14:03:00Z:
+    The data line of this block was cut off.
+  @data {"v":1,"id":"c-aaaaaaaaaaaaaaaa","status":"open",
+  -->
+  <h1 id="title">Damaged comments</h1>
+  <!-- erfana:comment v1 id=c-bbbbbbbbbbbbbbbb
+  status: open
+  target: <p id="schema">
+  comment by Ada Lovelace at 2026-10-25T14:03:00Z:
+    The data line parses, but its status is not one v1 knows.
+  @data {"v":1,"id":"c-bbbbbbbbbbbbbbbb","status":"maybe","msgs":[]}
+  -->
+  <p id="schema">A paragraph under a block with a schema error.</p>
+  <!-- erfana:comment v2 id=c-cccccccccccccccc
+  something a later Erfana wrote
+  -->
+  <p id="newer">A paragraph under a block of a newer format.</p>
+  <p id="plain">A paragraph with no comment.</p>
+</body>
+</html>

@@ -18,6 +18,7 @@ import {
   byId,
   createHarness,
   dispatchTrusted,
+  drawnText,
   microtasks,
   mount,
   token,
@@ -66,7 +67,9 @@ function pageListeners(): { seen: string[]; remove: () => void } {
   }
 }
 
-const picks = (): Array<Record<string, unknown>> => h.sent(COMMENT_PICK_CHANNEL) as Array<Record<string, unknown>>
+/** Picks, without the keyboard picker's `step`s (what the window's live region says). */
+const picks = (): Array<Record<string, unknown>> =>
+  (h.sent(COMMENT_PICK_CHANNEL) as Array<Record<string, unknown>>).filter(p => p.kind !== 'step')
 
 describe('the guards', () => {
   it('J-004 in comment mode every click-family event is stopped in capture; contextmenu keeps its default', () => {
@@ -210,7 +213,7 @@ describe('pins and shields', () => {
     // The shield is hovered as the iframe, labelled as an inline frame.
     userMove(10, 460, h.host() as HTMLElement)
     h.controller.renderNow()
-    expect(h.root()?.querySelector('.erf-hpc-label')?.textContent).toBe('iframe#frame · inline frame300×100')
+    expect(drawnText(h.root()?.querySelector('.erf-hpc-label'))).toBe('iframe#frame · inline frame300×100')
   })
 })
 
@@ -449,7 +452,7 @@ describe('hover (J-009)', () => {
     h.state({ mode: true })
     userMove(120, 110)
     h.controller.renderNow()
-    expect(h.root()?.querySelector('.erf-hpc-label')?.textContent).toContain('button#cta.btn')
+    expect(drawnText(h.root()?.querySelector('.erf-hpc-label'))).toContain('button#cta.btn')
     byId('cta').remove()
     expect(() => h.controller.renderNow()).not.toThrow()
     expect(h.root()?.querySelector('.erf-hpc-outline')?.classList.contains('erf-hpc-hidden')).toBe(true)

@@ -4,10 +4,10 @@
  * What a pick says (docs/designs/html-preview-comments.md §5.3, §6, §8,
  * decisions 16–17 and 34, §19 R3-5, R3-8; J-007, J-008, SEC-05, SEC-06).
  */
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { PICKS_PER_SECOND, PICK_BOX_MAX_PX, SNAPSHOT_MAX_BYTES, TOKEN_ATTRIBUTE } from './constants'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { PICKS_PER_SECOND, PICK_BOX_MAX_PX, SNAPSHOT_MAX_BYTES, STEP_LABEL_MAX_CHARS, STEPS_PER_SECOND, TOKEN_ATTRIBUTE } from './constants'
 import { pathBelow, quoteOf, resolvePath, snapshotOf, whiteSpaceOf } from './domPath'
-import { boxOfElement, describeTarget, elementPoint, PickLimiter, screenOf, viewOf } from './picks'
+import { boxOfElement, describeTarget, elementPoint, PickLimiter, type PickPayload, screenOf, StepSender, viewOf } from './picks'
 import { TokenRegistry } from './tokens'
 import { microtasks, token } from './__test-helpers__/harness'
 
@@ -277,5 +277,74 @@ describe('PickLimiter (SEC-06)', () => {
     expect(limiter.tryTake()).toBe(false)
     now = 1_000
     expect(limiter.tryTake()).toBe(true)
+  })
+})
+
+describe('StepSender (E-022)', () => {
+  const VIEW = { w: 800, h: 600, dpr: 1, x: 0, y: 0 }
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  function sender(): { steps: StepSender; sent: PickPayload[] } {
+    const sent: PickPayload[] = []
+    return { steps: new StepSender(() => Date.now(), payload => sent.push(payload)), sent }
+  }
+
+  it('sends what the picker reached as a keyboard step, the label cut on a code point', () => {
+    const { steps, sent } = sender()
+    steps.say('showing', 'p#team-copy', VIEW)
+    steps.say('top', undefined, VIEW)
+    steps.say('no-child', 'ignored', VIEW)
+    expect(sent).toEqual([
+      { kind: 'step', via: 'keyboard', say: 'showing', label: 'p#team-copy', view: VIEW },
+      { kind: 'step', via: 'keyboard', say: 'top', view: VIEW },
+      { kind: 'step', via: 'keyboard', say: 'no-child', view: VIEW }
+    ])
+    const emoji = String.fromCodePoint(0x1f600)
+    steps.say('showing', `${'x'.repeat(STEP_LABEL_MAX_CHARS - 1)}${emoji}`, VIEW)
+    expect(sent.at(-1)?.label).toBe('x'.repeat(STEP_LABEL_MAX_CHARS - 1))
+  })
+
+  it('says nothing for a showing step with no label', () => {
+    const { steps, sent } = sender()
+    steps.say('showing', '', VIEW)
+    steps.say('showing', undefined, VIEW)
+    expect(sent).toEqual([])
+  })
+
+  it(`sends at most ${STEPS_PER_SECOND} a second, then the newest held step once there is room`, async () => {
+    const { steps, sent } = sender()
+    for (let i = 0; i < STEPS_PER_SECOND + 5; i += 1) steps.say('showing', `div#n${i}`, VIEW)
+    expect(sent).toHaveLength(STEPS_PER_SECOND)
+    await vi.advanceTimersByTimeAsync(1_000)
+    expect(sent).toHaveLength(STEPS_PER_SECOND + 1)
+    expect(sent.at(-1)?.label).toBe(`div#n${STEPS_PER_SECOND + 4}`)
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect(sent).toHaveLength(STEPS_PER_SECOND + 1)
+  })
+
+  it('a newer step that finds room is sent at once, and the held one is dropped', async () => {
+    const { steps, sent } = sender()
+    for (let i = 0; i < STEPS_PER_SECOND; i += 1) steps.say('top', undefined, VIEW)
+    await vi.advanceTimersByTimeAsync(950)
+    steps.say('showing', 'div#held', VIEW)
+    expect(sent).toHaveLength(STEPS_PER_SECOND)
+    // The window frees before the retry: the newest step goes now, the held one never.
+    await vi.advanceTimersByTimeAsync(50)
+    steps.say('showing', 'div#newest', VIEW)
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect(sent.slice(STEPS_PER_SECOND).map(step => step.label)).toEqual(['div#newest'])
+  })
+
+  it('drops a held step on dispose', async () => {
+    const { steps, sent } = sender()
+    for (let i = 0; i < STEPS_PER_SECOND + 1; i += 1) steps.say('top', undefined, VIEW)
+    steps.dispose()
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect(sent).toHaveLength(STEPS_PER_SECOND)
   })
 })

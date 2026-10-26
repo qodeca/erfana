@@ -54,6 +54,7 @@ import {
 import { IdentityEditor } from './IdentityStep'
 import { useCommentAlert, useInnerStep } from './commentLive'
 import { draftKeyOf, type CommentWindowRequest } from './commentWindowTypes'
+import { TEST_IDS } from '../../../../constants/testids'
 
 /** Props for {@link NewCommentView}. */
 export interface NewCommentViewProps {
@@ -189,11 +190,11 @@ export function NewCommentView({
     <CommentBanner
       kind="warning"
       title={COPY.unsavedTitle}
-      testId="comment-unsaved-banner"
+      testId={TEST_IDS.COMMENT_UNSAVED_BANNER}
       actions={
         <>
           <ActionButton
-            testId="comment-unsaved-go-to-tab"
+            testId={TEST_IDS.COMMENT_UNSAVED_GO_TO_TAB}
             onClick={() => {
               // Close first (the text is in the drafts): a modal left open
               // would sit over the editor and trap focus away from it.
@@ -204,7 +205,7 @@ export function NewCommentView({
             {COPY.goToTab}
           </ActionButton>
           {guard.state !== 'conflict' && (
-            <ActionButton onClick={() => void guard.save()} testId="comment-unsaved-save">
+            <ActionButton onClick={() => void guard.save()} testId={TEST_IDS.COMMENT_UNSAVED_SAVE}>
               {`Save ${file}`}
             </ActionButton>
           )}
@@ -214,7 +215,7 @@ export function NewCommentView({
       {guard.state === 'conflict' ? unsavedConflictText(file) : unsavedSourceText(file)}
     </CommentBanner>
   ) : clearedText !== null ? (
-    <CommentBanner kind="success" testId="comment-unsaved-cleared">
+    <CommentBanner kind="success" testId={TEST_IDS.COMMENT_UNSAVED_CLEARED}>
       {clearedText}
     </CommentBanner>
   ) : null
@@ -237,7 +238,7 @@ export function NewCommentView({
           placeholder={COPY.placeholder}
           restored={restored}
           textareaRef={textareaRef}
-          testId="comment-new-field"
+          testId={TEST_IDS.COMMENT_NEW_FIELD}
         />
         {changingIdentity ? (
           <IdentityEditor
@@ -254,7 +255,7 @@ export function NewCommentView({
             }}
           />
         ) : (
-          <p className="erf-comment-identity" data-testid="comment-identity-line">
+          <p className="erf-comment-identity" data-testid={TEST_IDS.COMMENT_IDENTITY_LINE}>
             {`${IDENTITY_COPY.commentingAs} `}
             <bdi>
               <VisibleText text={authorName} />
@@ -263,7 +264,7 @@ export function NewCommentView({
               ref={changeRef}
               type="button"
               className="erf-comment-link"
-              data-testid="comment-identity-change"
+              data-testid={TEST_IDS.COMMENT_IDENTITY_CHANGE}
               onClick={() => setChangingIdentity(true)}
             >
               {COPY.change}
@@ -274,7 +275,7 @@ export function NewCommentView({
           <CommentBanner
             kind={failure.action === 'pending' ? 'info' : 'error'}
             after
-            testId="comment-save-error"
+            testId={TEST_IDS.COMMENT_SAVE_ERROR}
             actions={
               failure.action === 'pick-again' ? (
                 <ActionButton onClick={onPickAgain}>{COPY.pickAgain}</ActionButton>
@@ -287,12 +288,12 @@ export function NewCommentView({
       </div>
       <div className="erf-comment-window__foot">
         {closedOff && (failure?.action === 'close' || failure?.action === 'pending') ? (
-          <DialogButton variant="secondary" onClick={onCancel} testId="comment-close">
+          <DialogButton variant="secondary" onClick={onCancel} testId={TEST_IDS.COMMENT_CLOSE}>
             {COPY.close}
           </DialogButton>
         ) : (
           <>
-            <DialogButton variant="secondary" onClick={onCancel} testId="comment-cancel">
+            <DialogButton variant="secondary" onClick={onCancel} testId={TEST_IDS.COMMENT_CANCEL}>
               {COPY.cancel}
             </DialogButton>
             {!closedOff && (
@@ -302,7 +303,7 @@ export function NewCommentView({
                 title={`${COPY.save} (${saveShortcutLabel()})`}
                 keyShortcut={saveShortcutAria()}
                 onClick={() => void save()}
-                testId="comment-save"
+                testId={TEST_IDS.COMMENT_SAVE}
               >
                 {saving ? COPY.saving : COPY.save}
               </DialogButton>

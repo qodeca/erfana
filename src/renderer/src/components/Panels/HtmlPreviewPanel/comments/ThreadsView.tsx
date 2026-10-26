@@ -43,6 +43,7 @@ import {
   type ThreadContext
 } from './CommentThread'
 import { useInnerStep } from './commentLive'
+import { TEST_IDS } from '../../../../constants/testids'
 
 type DamagedBlock = CommentFileView['damaged'][number]
 type NewerBlock = CommentFileView['newer'][number]
@@ -98,7 +99,7 @@ function QuoteOf({ thread }: { readonly thread: CommentThreadView }): React.JSX.
   return (
     <>
       <span className="erf-comment-quote-label">{COPY.attachedTo}</span>
-      <s className="erf-comment-quote" dir="auto" data-testid="comment-not-found-quote">
+      <s className="erf-comment-quote" dir="auto" data-testid={TEST_IDS.COMMENT_NOT_FOUND_QUOTE}>
         <VisibleText text={quote} />
       </s>
     </>
@@ -153,7 +154,7 @@ function DamagedBlockView({
     <section
       className="erf-comment-thread"
       aria-label={`Damaged comment, line ${block.line}`}
-      data-testid="comment-damaged"
+      data-testid={TEST_IDS.COMMENT_DAMAGED}
     >
       <CommentBanner kind="warning">
         {conflict ? COPY.conflictText : COPY.damagedText}
@@ -166,7 +167,7 @@ function DamagedBlockView({
         className="erf-comment-raw"
         tabIndex={0}
         aria-labelledby={labelId}
-        data-testid="comment-damaged-raw"
+        data-testid={TEST_IDS.COMMENT_DAMAGED_RAW}
       >
         {block.raw}
       </pre>
@@ -184,7 +185,7 @@ function DamagedBlockView({
             <DialogButton
               variant="danger"
               busy={busy}
-              testId="comment-delete-block-confirm"
+              testId={TEST_IDS.COMMENT_DELETE_BLOCK_CONFIRM}
               onClick={() => {
                 if (busy) return
                 setBusy(true)
@@ -214,7 +215,7 @@ function DamagedBlockView({
             <ActionButton
               buttonRef={deleteRef}
               onClick={() => setConfirm(true)}
-              testId="comment-delete-block"
+              testId={TEST_IDS.COMMENT_DELETE_BLOCK}
             >
               {COPY.deleteBlockAction}
             </ActionButton>
@@ -299,25 +300,25 @@ export function ThreadsView({
         {failure !== null && (
           <CommentBanner
             kind={failure.action === 'pending' ? 'info' : 'error'}
-            testId="comment-save-error"
+            testId={TEST_IDS.COMMENT_SAVE_ERROR}
           >
             {failure.text}
           </CommentBanner>
         )}
         {!file.writable && (
-          <CommentBanner kind="info" testId="comment-read-only">
+          <CommentBanner kind="info" testId={TEST_IDS.COMMENT_READ_ONLY}>
             {readOnlyReasonText(file.readOnlyReason, fileName)}
           </CommentBanner>
         )}
         {anyNotVisible && (
-          <CommentBanner kind="info" testId="comment-not-visible">
+          <CommentBanner kind="info" testId={TEST_IDS.COMMENT_NOT_VISIBLE}>
             {COPY.notVisibleText}
           </CommentBanner>
         )}
         {threads.map(thread => (
           <div key={thread.threadKey}>
             {!thread.attached && (
-              <CommentBanner kind="warning" testId="comment-not-found">
+              <CommentBanner kind="warning" testId={TEST_IDS.COMMENT_NOT_FOUND}>
                 {notFoundText(fileName, thread.line)}
                 <QuoteOf thread={thread} />
               </CommentBanner>
@@ -345,7 +346,7 @@ export function ThreadsView({
             key={block.blockKey}
             className="erf-comment-thread"
             aria-label={COPY.newerTag}
-            data-testid="comment-newer"
+            data-testid={TEST_IDS.COMMENT_NEWER}
           >
             <CommentBanner kind="info" title={COPY.newerTag}>
               {COPY.newerText}
@@ -360,16 +361,16 @@ export function ThreadsView({
       </div>
       <div className="erf-comment-window__foot">
         <span className="erf-comment-window__foot-start">
-          <ActionButton onClick={() => onOpenInSource(firstLine)} testId="comment-open-in-source">
+          <ActionButton onClick={() => onOpenInSource(firstLine)} testId={TEST_IDS.COMMENT_OPEN_IN_SOURCE}>
             {COPY.openInSource}
           </ActionButton>
         </span>
         {onNewComment !== undefined && (
-          <DialogButton variant="secondary" onClick={onNewComment} testId="comment-new-on-element">
+          <DialogButton variant="secondary" onClick={onNewComment} testId={TEST_IDS.COMMENT_NEW_ON_ELEMENT}>
             {COPY.newComment}
           </DialogButton>
         )}
-        <DialogButton variant="secondary" onClick={onClose} testId="comment-close">
+        <DialogButton variant="secondary" onClick={onClose} testId={TEST_IDS.COMMENT_CLOSE}>
           {COPY.close}
         </DialogButton>
       </div>

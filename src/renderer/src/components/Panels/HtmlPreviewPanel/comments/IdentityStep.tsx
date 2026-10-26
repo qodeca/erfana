@@ -23,6 +23,7 @@ import { useEffect, useRef, useState } from 'react'
 import { IDENTITY_COPY, COPY } from './commentCopy'
 import { validateIdentity, type IdentityFormData, type IdentityFormErrors } from './commentSchemas'
 import { CommentInput, DialogButton } from './CommentParts'
+import { TEST_IDS } from '../../../../constants/testids'
 
 /** Props shared by both identity forms. */
 interface IdentityFormProps {
@@ -105,7 +106,7 @@ export function IdentityStep(props: IdentityStepProps): React.JSX.Element {
           autoComplete="name"
           required
           inputRef={form.nameRef}
-          testId="comment-identity-name"
+          testId={TEST_IDS.COMMENT_IDENTITY_NAME}
         />
         <CommentInput
           label={IDENTITY_COPY.emailLabel}
@@ -116,24 +117,24 @@ export function IdentityStep(props: IdentityStepProps): React.JSX.Element {
           type="email"
           autoComplete="email"
           inputRef={form.emailRef}
-          testId="comment-identity-email"
+          testId={TEST_IDS.COMMENT_IDENTITY_EMAIL}
         />
         {/* Always mounted, empty until there is news (Feedback card,
             "telling a screen reader"): a role="alert" box that appears with
             its text is announced unreliably. */}
-        <p className="erf-comment-error" aria-live="assertive" data-testid="comment-identity-error">
+        <p className="erf-comment-error" aria-live="assertive" data-testid={TEST_IDS.COMMENT_IDENTITY_ERROR}>
           {form.failed && <span>Couldn&apos;t save your name. Try again.</span>}
         </p>
       </div>
       <div className="erf-comment-window__foot">
-        <DialogButton variant="secondary" onClick={props.onCancel} testId="comment-identity-cancel">
+        <DialogButton variant="secondary" onClick={props.onCancel} testId={TEST_IDS.COMMENT_IDENTITY_CANCEL}>
           {COPY.cancel}
         </DialogButton>
         <DialogButton
           variant="primary"
           busy={form.busy}
           onClick={() => void form.submit()}
-          testId="comment-identity-continue"
+          testId={TEST_IDS.COMMENT_IDENTITY_CONTINUE}
         >
           {IDENTITY_COPY.continue}
         </DialogButton>
@@ -165,7 +166,7 @@ export function IdentityEditor(props: IdentityFormProps): React.JSX.Element {
         autoComplete="name"
         required
         inputRef={form.nameRef}
-        testId="comment-identity-edit-name"
+        testId={TEST_IDS.COMMENT_IDENTITY_EDIT_NAME}
       />
       <CommentInput
         label={IDENTITY_COPY.emailLabel}
@@ -176,7 +177,7 @@ export function IdentityEditor(props: IdentityFormProps): React.JSX.Element {
         type="email"
         autoComplete="email"
         inputRef={form.emailRef}
-        testId="comment-identity-edit-email"
+        testId={TEST_IDS.COMMENT_IDENTITY_EDIT_EMAIL}
       />
       <div className="erf-comment-thread__actions">
         <DialogButton variant="secondary" onClick={props.onCancel}>

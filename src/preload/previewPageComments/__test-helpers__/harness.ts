@@ -85,6 +85,26 @@ export function createHarness(options: HarnessOptions = {}): Harness {
   }
 }
 
+/**
+ * The words an overlay element shows: its own and its descendants' generated
+ * `data-text`, in document order – the overlay holds no text node (E-022).
+ */
+export function drawnText(el: Element | null | undefined): string | undefined {
+  if (el === null || el === undefined) return undefined
+  return [el, ...el.querySelectorAll('[data-text]')].map(node => node.getAttribute('data-text') ?? '').join('')
+}
+
+/**
+ * The keyboard picker's last `step` pick, as `"showing <label>"`, `"top"` or
+ * `"no-child"` – what the comment window's live region says through main.
+ */
+export function lastStep(h: Pick<Harness, 'sent'>, channel: string): string | undefined {
+  const steps = (h.sent(channel) as Array<{ kind: string; say?: string; label?: string }>).filter(p => p.kind === 'step')
+  const step = steps.at(-1)
+  if (step === undefined) return undefined
+  return step.say === 'showing' ? `showing ${step.label}` : step.say
+}
+
 /** Let queued microtasks (MutationObserver deliveries) run. */
 export async function microtasks(): Promise<void> {
   for (let i = 0; i < 4; i += 1) await Promise.resolve()

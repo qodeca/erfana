@@ -32,6 +32,7 @@ import {
   modeTooltip,
   unavailableTooltip
 } from './commentCopy'
+import { TEST_IDS } from '../../../../constants/testids'
 
 /** Reasons that leave nothing readable: list and pins go `aria-disabled` too. */
 const UNREADABLE: ReadonlySet<CommentUnavailableReason> = new Set([
@@ -109,7 +110,7 @@ export function CommentToolbarTools({
         aria-keyshortcuts={commentModeAriaShortcut()}
         aria-disabled={modeBlocked ? 'true' : undefined}
         title={modeTitle}
-        data-testid="preview-band-comment-mode"
+        data-testid={TEST_IDS.COMMENT_TOOL_MODE}
         onClick={event => {
           // aria-disabled stops nothing by itself; turning OFF stays possible.
           if (modeBlocked && !mode) return
@@ -127,7 +128,7 @@ export function CommentToolbarTools({
         aria-controls={drawerOpen ? drawerId : undefined}
         aria-disabled={readBlocked ? 'true' : undefined}
         title={readBlocked && unavailable !== null ? unavailableTooltip(unavailable) : listName}
-        data-testid="preview-band-comments"
+        data-testid={TEST_IDS.COMMENT_TOOL_LIST}
         onClick={() => {
           if (readBlocked && !drawerOpen) return
           onToggleDrawer()
@@ -144,7 +145,7 @@ export function CommentToolbarTools({
         aria-pressed={showIcons}
         aria-disabled={readBlocked ? 'true' : undefined}
         title={showIcons ? TOOL_COPY.pinsOn : TOOL_COPY.pinsOff}
-        data-testid="preview-band-comment-icons"
+        data-testid={TEST_IDS.COMMENT_TOOL_ICONS}
         onClick={() => {
           if (!readBlocked) onToggleIcons()
         }}

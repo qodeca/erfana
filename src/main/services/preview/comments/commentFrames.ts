@@ -169,6 +169,15 @@ export class CommentFrames {
     return record
   }
 
+  /**
+   * The file frame `ftn` shows: what its document's hello recorded, or –
+   * between a commit and that hello, while a page reloads – the file the
+   * commit named (`frameFileMap`), so a list read then still has the file.
+   */
+  async fileOf(ftn: number): Promise<FrameFile | undefined> {
+    return this.records.get(ftn)?.file ?? (await this.deps.files.fileOf(ftn))
+  }
+
   /** The bound load's view, while the token table still holds it. */
   viewOf(record: FrameRecord): CommentLoadView | undefined {
     return record.loadId === undefined ? undefined : this.deps.tokens.view(record.loadId)

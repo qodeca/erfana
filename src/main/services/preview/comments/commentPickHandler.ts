@@ -45,6 +45,8 @@ import type { ElementTokenEntry, ElementTokenTable } from './ElementTokenTable'
 export const MAIN_PICKS_PER_SECOND = 5
 /** `exit` and `parent` picks per second, each kind on its own budget. */
 export const MAIN_CONTROL_PICKS_PER_SECOND = 3
+/** Keyboard-picker `step`s per second: what the window's live region says (the preload sends at most ten). */
+export const MAIN_STEPS_PER_SECOND = 12
 /** Hellos one frame may send per second (the preload repeats at most once a second). */
 export const HELLOS_PER_FRAME_PER_SECOND = 5
 /** Anchor reports one frame may send per second (the preload sends at most four). */
@@ -83,6 +85,8 @@ export interface PageSignalSinks {
   exit(): void
   /** Alt+↑ out of a frame's `<body>`. */
   parent(frame: CommentFrameLike): void
+  /** The keyboard picker moved, in comment mode: the window's live region says it. */
+  step(pick: CommentPick): void
   icon(frame: CommentFrameLike, record: FrameRecord, pinKey: string, pick: CommentPick): void
   /** `entry` absent: the element has no tokened ancestor ("Can't comment here"). */
   element(frame: CommentFrameLike, record: FrameRecord, entry: ElementTokenEntry | undefined, pick: CommentPick): void
@@ -130,6 +134,7 @@ export function createCommentPickHandler(deps: PickHandlerDeps): CommentPickHand
   const drops = dropLog(deps.now)
   const picks = new SlidingBudget(MAIN_PICKS_PER_SECOND)
   const control = { exit: new SlidingBudget(MAIN_CONTROL_PICKS_PER_SECOND), parent: new SlidingBudget(MAIN_CONTROL_PICKS_PER_SECOND) }
+  const steps = new SlidingBudget(MAIN_STEPS_PER_SECOND)
   const perFrame = new Map<string, SlidingBudget>()
   const perView = { hello: new SlidingBudget(HELLOS_PER_VIEW_PER_SECOND), anchors: new SlidingBudget(ANCHORS_PER_VIEW_PER_SECOND) }
 
@@ -173,6 +178,12 @@ export function createCommentPickHandler(deps: PickHandlerDeps): CommentPickHand
   }
 
   function route(frame: CommentFrameLike, pick: CommentPick): void {
+    if (pick.kind === 'step') {
+      if (!steps.take(deps.now())) return drop('rate-limited')
+      if (!deps.mode()) return drop('mode-off')
+      deps.sinks.step(pick)
+      return
+    }
     if (pick.kind === 'exit' || pick.kind === 'parent') {
       if (!control[pick.kind].take(deps.now())) return drop('rate-limited')
       if (pick.kind === 'exit') {

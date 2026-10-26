@@ -47,7 +47,8 @@ function makeHarness(overrides: Partial<PreviewLivePipelineDeps> = {}) {
   const state = { tornDown: false, wanted: true, now: 0 }
   const fakes = {
     loadStateChanged: vi.fn(),
-    invalidate: vi.fn<(panelId: string) => void>(),
+    invalidate: vi.fn<(panelId: string, opts?: { keepSinceLoad?: boolean }) => void>(),
+    markLoaded: vi.fn<(panelId: string) => void>(),
     executeJavaScriptInIsolatedWorld: vi.fn<
       (worldId: number, scripts: { code: string }[]) => Promise<unknown>
     >(() => Promise.resolve(true)),
@@ -63,7 +64,7 @@ function makeHarness(overrides: Partial<PreviewLivePipelineDeps> = {}) {
     panelId: 'panel-A',
     contents: { executeJavaScriptInIsolatedWorld: fakes.executeJavaScriptInIsolatedWorld },
     emit: { loadStateChanged: fakes.loadStateChanged },
-    stillFrameCache: { invalidate: fakes.invalidate },
+    stillFrameCache: { invalidate: fakes.invalidate, markLoaded: fakes.markLoaded },
     now: () => state.now,
     readEntryHtml: fakes.readEntryHtml,
     currentPage: () => PAGE,
@@ -87,9 +88,22 @@ describe('createPreviewLivePipeline — one run', () => {
 
     expect(h.readEntryHtml).toHaveBeenCalledWith(PAGE)
     expect(h.setWatchSet).toHaveBeenCalledWith([STYLE])
-    expect(h.invalidate).toHaveBeenCalledWith('panel-A')
+    // Only pictures from before the load go: a comment popup's fresh still stays (E-011).
+    expect(h.invalidate).toHaveBeenCalledWith('panel-A', { keepSinceLoad: true })
     expect(h.loadStateChanged).toHaveBeenCalledWith('panel-A', 'ready', 0)
     expect(h.captureWhileVisible).toHaveBeenCalledTimes(1)
+  })
+
+  it('E-011 marks the load finished at did-finish-load, before the run reaches ready', async () => {
+    const read = deferred<string>()
+    const h = makeHarness()
+    h.readEntryHtml.mockReturnValueOnce(read.promise)
+    h.pipeline.schedule()
+    expect(h.markLoaded).toHaveBeenCalledWith('panel-A')
+    expect(h.invalidate).not.toHaveBeenCalled()
+    read.resolve(ONE_LINK)
+    await flush()
+    expect(h.markLoaded.mock.invocationCallOrder[0]).toBeLessThan(h.invalidate.mock.invocationCallOrder[0])
   })
 
   it('keeps the old picture behind a hidden tab, because no new one would follow', async () => {

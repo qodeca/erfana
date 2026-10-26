@@ -10,14 +10,14 @@ import {
   ANCHOR_CHECK_MIN_MS,
   COMMENT_ANCHORS_CHANNEL,
   COMMENT_HELLO_CHANNEL,
+  COMMENT_PICK_CHANNEL,
   RENDER_FALLBACK_MS,
   REVEAL_FLASH_MS,
   TOKEN_ATTRIBUTE
 } from './constants'
-import { ANNOUNCE } from './controller'
 import { MODE_TAB_TEXT } from './overlayView'
 import { DEFAULT_THEME } from './state'
-import { byId, createHarness, microtasks, mount, token, userMove, type Harness } from './__test-helpers__/harness'
+import { byId, createHarness, drawnText, microtasks, mount, token, userMove, type Harness } from './__test-helpers__/harness'
 
 const T = TOKEN_ATTRIBUTE
 const PAGE = [
@@ -192,19 +192,19 @@ describe('visibility reports (J-006)', () => {
 })
 
 describe('mode, reveal, restore', () => {
-  it('turns the mode on with the frame, the tab and an announcement, and off again', () => {
+  it('turns the mode on with the frame and the tab, and off again – saying nothing in the page', () => {
     h.state({ mode: true })
     const root = h.root() as ShadowRoot
-    expect(root.querySelector('.erf-hpc-tab')?.textContent).toBe(MODE_TAB_TEXT)
+    expect(drawnText(root.querySelector('.erf-hpc-tab'))).toBe(MODE_TAB_TEXT)
     expect(root.querySelector('.erf-hpc-frame')?.classList.contains('erf-hpc-hidden')).toBe(false)
-    expect(root.querySelector('[role="status"]')?.textContent).toBe(ANNOUNCE.modeOn)
+    // The comment window says the mode change (`commentModeChanged`); the page has no live region (E-022).
+    expect(root.querySelector('[aria-live]')).toBeNull()
     expect(document.adoptedStyleSheets).toHaveLength(1)
     // The tab moves to the bottom while the pointer is near the top.
     userMove(400, 20)
     h.controller.renderNow()
     expect(root.querySelector('.erf-hpc-tab')?.classList.contains('erf-hpc-tab--bottom')).toBe(true)
     h.state({ mode: false })
-    expect(root.querySelector('[role="status"]')?.textContent).toBe(ANNOUNCE.modeOff)
     expect(root.querySelector('.erf-hpc-frame')?.classList.contains('erf-hpc-hidden')).toBe(true)
     expect(document.adoptedStyleSheets).toHaveLength(0)
   })
@@ -214,7 +214,7 @@ describe('mode, reveal, restore', () => {
     h = createHarness({ isTop: false })
     h.state({ mode: true })
     expect(h.root()?.querySelector('.erf-hpc-frame')?.classList.contains('erf-hpc-hidden')).toBe(true)
-    expect(h.root()?.querySelector('[role="status"]')?.textContent).toBe('')
+    expect(h.sent(COMMENT_PICK_CHANNEL)).toEqual([])
     await microtasks()
   })
 

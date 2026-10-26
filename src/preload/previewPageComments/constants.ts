@@ -41,6 +41,10 @@ export const PICKS_PER_SECOND = 5
  * second, each kind on its own budget – so a burst of clicks never drops Esc.
  */
 export const CONTROL_PICKS_PER_SECOND = 3
+/** Keyboard-picker `step`s one frame sends per second; the newest one held back follows when there is room. */
+export const STEPS_PER_SECOND = 10
+/** Characters (UTF-16 units) of a `step`'s label (`COMMENT_STEP_LABEL_MAX_CHARS`). */
+export const STEP_LABEL_MAX_CHARS = 64
 /** UTF-8 bytes of a JS-built element's snapshot (`PREVIEW_LIMITS.COMMENT_SNAPSHOT_MAX_BYTES`). */
 export const SNAPSHOT_MAX_BYTES = 256 * 1024
 /** Characters of a runtime path (`PREVIEW_LIMITS.COMMENT_RUNTIME_PATH_MAX_CHARS`). */
@@ -86,11 +90,13 @@ export const BLOCK_HEADER = /^\s*erfana:comment\s+v\d+\b/
 
 /** The speech-bubble pin's outline, exactly (decision 33, §10.5, J-014). */
 export const PIN_PATH = 'M2 2H22V17H7L2 22Z'
+/** The bubble's body in {@link PIN_PATH}, without its tail: 2 to 22 across, 2 to 17 down. */
+export const PIN_BODY = { x: 2, y: 2, width: 20, height: 15 } as const
 /**
- * Where the count and the `!` are centred in the bubble: halfway down its body,
- * which runs from y 2 to y 17 in {@link PIN_PATH} (the tail hangs below it).
+ * Where the count and the `!` are centred in the bubble: halfway down its body
+ * (the tail hangs below it).
  */
-export const PIN_BODY_MIDDLE_Y = 9.5
+export const PIN_BODY_MIDDLE_Y = PIN_BODY.y + PIN_BODY.height / 2
 /** The pin's box: a 24 × 24 hit target (WCAG 2.5.8) whose tail tip is at (2, 22). */
 export const PIN_BOX_PX = 24
 /** Where the tail tip sits inside the pin's box. */

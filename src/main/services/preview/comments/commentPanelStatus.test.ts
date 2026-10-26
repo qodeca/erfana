@@ -63,10 +63,18 @@ async function setup(options: { enabled?: boolean; reasons?: Record<string, stri
 describe('commentPanelStatus', () => {
   it('lists the page first, then each other commentable frame file once', async () => {
     const s = await setup()
-    expect(s.status.listedFiles().map(({ file, frame }) => [file.realPath, frame])).toEqual([
+    expect((await s.status.listedFiles()).map(({ file, frame }) => [file.realPath, frame])).toEqual([
       [PAGE, false],
       [OTHER, true]
     ])
+  })
+
+  it('still lists a page between its reload commit and the new document\'s hello (SEC-20 race)', async () => {
+    const s = await setup()
+    // The save's reload committed: the record's file is cleared until the new document says hello.
+    s.frames.navigated(s.top.frameTreeNodeId, 'u', true)
+    expect(s.frames.get(s.top.frameTreeNodeId)?.file).toBeUndefined()
+    expect((await s.status.listedFiles()).map(({ file, frame }) => [file.realPath, frame])).toEqual([[PAGE, false]])
   })
 
   it('counts each file on screen once and reports no reason while comments work', async () => {

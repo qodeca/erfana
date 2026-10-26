@@ -1,0 +1,37 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>-HPC-STATIC-</title>
+  <style>
+    body { font: 16px/1.5 sans-serif; margin: 40px; background: #fff; color: #111; }
+    header, section, footer { max-width: 560px; }
+    .swatch { display: inline-block; width: 120px; height: 24px; background: #123456; }
+    .plan { padding: 12px; margin: 24px 0; border: 1px solid #ccc; }
+    button { font-size: 16px; padding: 8px 16px; }
+  </style>
+</head>
+<body>
+  <header id="top">
+    <h1 id="heading">Pricing</h1>
+    <p id="intro">Three plans, billed monthly.</p>
+  </header>
+  <section id="plans">
+    <div class="plan" id="starter">
+      <h2 id="starter-name">Starter</h2>
+      <p id="starter-copy">For one person. Every plan includes <em id="unlimited">unlimited</em> previews.</p>
+      <button id="buy" class="cta" onclick="window.__clicks = (window.__clicks || 0) + 1">Buy now</button>
+    </div>
+    <div class="plan" id="team">
+      <h2 id="team-name">Team</h2>
+      <p id="team-copy">For five people, with shared review.</p>
+    </div>
+  </section>
+  <footer id="foot">
+    <span class="swatch" id="swatch"></span>
+    <p id="vat">Prices exclude VAT.</p>
+  </footer>
+</body>
+</html>

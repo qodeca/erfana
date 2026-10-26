@@ -111,5 +111,14 @@ Pages for HTML Preview comments ([design](../../../docs/designs/html-preview-com
 |---|---|
 | `agent-review/landing.html`, `slides.html`, `signup-form.html` | The agent check (X-001): pages with open, resolved and deliberately damaged `erfana:comment v1` blocks, written by the P1 serializer. `slides.html` builds its deck from a script, so two comments target script-built elements |
 | `agent-review/RUBRIC.md` | The expected result per comment, and how to score a run. Never copy it into the run repo |
+| `static-design/index.html` | A plain marketing page with stable ids (`heading`, `intro`, `buy` with a click counter, `team-copy`, a `#123456` swatch, `vat`): the reviewer journeys, the still frame, the PDF and Find checks (E-001 – E-004, E-007, E-009, E-011, E-022, F-003) |
+| `slide-deck/index.html`, `deck.js` | Five script-built slides with hash routing; slide 3 holds `s3-p1` … `s3-p20` and a scroller. Comment mode must not move the deck (E-005, F-001) |
+| `iframe-host/` | Same-project child and grandchild frames, a frame under a git-ignored folder, and `srcdoc`, `about:blank` and remote frames that only pick the `<iframe>` (E-006) |
+| `raw-text/index.html` | `pre`, inline, CSS `white-space: pre` and SVG text targets whose rectangles and `innerText` must not change when commented (E-019) |
+| `vue-hydrated/index.html` | A hydrated-app shape (`data-v-app`, `<!--[-->` markers): the block goes before the app root and hydration still matches (E-025) |
+| `damaged/index.html`, `conflict.html`, `unterminated.html` | Bad JSON, a schema error and a `v2` block (read-only, deletable); a merge-conflict page and an unterminated comment (read-only, no delete) (E-010) |
+| `hostile/index.html`, `csp-none.html` | A page that overrides prototypes, hides everything with CSS, draws a fake pin, deletes nodes and forges events; and a CSP `'none'` page (E-015) |
+
+The specs also generate pages at test time and never commit them (`e2e/fixtures/html-preview-comments-pages.ts`): a page with 200 comments (E-013, F-003) and 0.5 / 1 / ~4 MB pages with raw controls (F-002).
 
 Regenerate the agent-review pages with `npm run fixtures:html-comments` ([how](../../../src/shared/htmlComments/__fixtures__/README.md)); `RUBRIC.md` stays hand-written from the line numbers it prints.

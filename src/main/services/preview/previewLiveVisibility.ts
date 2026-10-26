@@ -304,6 +304,14 @@ export function createPreviewLiveVisibility(
      */
     const previous = pendingCapture
     pendingCapture = Promise.allSettled([previous, capture]).then(() => undefined)
+
+    // The view was hidden while this capture ran. The hide published what was
+    // cached then – nothing, when a load's `ready` had just dropped the old
+    // picture – so publish what the capture left, or the hidden view shows no
+    // still at all until its next hide (E-011).
+    void capture.then(() => {
+      if (!isDrawn() && !deps.isDefunct() && !deps.window.isDestroyed()) publishCachedFrame()
+    })
   }
 
   /**

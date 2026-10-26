@@ -54,6 +54,12 @@ const RuntimeTagSchema = TagNameSchema.max(PICK_RUNTIME_TAG_MAX_CHARS)
 /** A `pathBelow` path: `tag:nth-of-type(n)` segments joined by ` > `, or `''`. */
 const RUNTIME_PATH = /^(?:[A-Za-z][\w.:-]*:nth-of-type\(\d{1,6}\)(?: > [A-Za-z][\w.:-]*:nth-of-type\(\d{1,6}\))*)?$/
 const quotePart = z.string().max(PREVIEW_LIMITS.COMMENT_QUOTE_MAX_CHARS)
+/** Characters of a `step` pick's label (the overlay's is at most 40), and of it escaped for the window (`\uXXXX` each). */
+export const COMMENT_STEP_LABEL_MAX_CHARS = 64
+export const COMMENT_PICKER_LABEL_MAX_CHARS = COMMENT_STEP_LABEL_MAX_CHARS * 6
+/** What the keyboard picker reached (§10.10 "Announce"): an element, the top of the page, or a leaf. */
+const PickerSaySchema = z.enum(['showing', 'top', 'no-child'])
+const PickerLabelSchema = z.string().min(1).max(COMMENT_PICKER_LABEL_MAX_CHARS).refine(text => visibleInline(text) === text)
 
 /** A point in CSS pixels (a pick's `screen` or `point`, a menu point). */
 export const CommentPointSchema = z.object({ x: coordinate, y: coordinate }).strict()
@@ -102,7 +108,8 @@ export type CommentPickRuntime = z.infer<typeof CommentPickRuntimeSchema>
 /** `preview-page:commentPick` (§8, §19 R3-5, R3-8). */
 export const CommentPickSchema = z
   .object({
-    kind: z.enum(['menu', 'open', 'icon', 'parent', 'exit']),
+    /** `step`: the keyboard picker moved – nothing is picked; the window's live region says it (§10.8). */
+    kind: z.enum(['menu', 'open', 'icon', 'parent', 'exit', 'step']),
     via: z.enum(['pointer', 'keyboard']),
     /** The element's token, or its nearest tokened ancestor's. */
     token: z.string().regex(ELEMENT_TOKEN_PATTERN).optional(),
@@ -118,13 +125,16 @@ export const CommentPickSchema = z
     box: CommentBoxSchema.optional(),
     ws: z.enum(['collapse', 'preserve']).optional(),
     runtime: CommentPickRuntimeSchema.optional(),
+    /** A `step`: what the picker reached; `showing` names the overlay's label (page text: ids and classes). */
+    say: PickerSaySchema.optional(),
+    label: z.string().min(1).max(COMMENT_STEP_LABEL_MAX_CHARS).optional(),
     view: CommentPickViewSchema
   })
   .strict()
   .refine(pick => pick.kind !== 'icon' || pick.key !== undefined, { message: 'a pin pick names its key' })
-  .refine(pick => pick.runtime === undefined || pick.token !== undefined, {
-    message: 'a runtime element is described below a tokened ancestor'
-  })
+  .refine(pick => (pick.kind === 'step') === (pick.say !== undefined), { message: 'only a step says, and it says something' })
+  .refine(pick => (pick.say === 'showing') === (pick.label !== undefined), { message: 'a showing step names its label' })
+  .refine(pick => pick.runtime === undefined || pick.token !== undefined, { message: 'a runtime element is described below a tokened ancestor' })
 export type CommentPick = z.infer<typeof CommentPickSchema>
 
 /** Why a frame's overlay gave up (the preload's `anchors.ts`). */
@@ -465,10 +475,15 @@ export const CommentAnchorStatusSchema = z
   .strict()
 export type CommentAnchorStatus = z.infer<typeof CommentAnchorStatusSchema>
 
-/** `preview:commentModeChanged` – main changed the mode: Esc in the page (its exit pick), or the shortcut. */
+/**
+ * `preview:commentModeChanged` – Esc in the page (its exit pick) or the shortcut changed the mode; `picker`: it did not –
+ * the keyboard picker moved to `say` (`label`: nothing hidden), for the window's live region to word (§10.2, §10.8).
+ */
 export const CommentModeChangedSchema = z
-  .object({ panelId: PanelIdSchema, on: z.boolean(), reason: z.enum(['escape', 'shortcut']) })
+  .object({ panelId: PanelIdSchema, on: z.boolean(), reason: z.enum(['escape', 'shortcut', 'picker']), say: PickerSaySchema.optional(), label: PickerLabelSchema.optional() })
   .strict()
+  .refine(event => (event.reason === 'picker') === (event.say !== undefined), { message: 'only a picker event says' })
+  .refine(event => (event.say === 'showing') === (event.label !== undefined), { message: 'a showing step names its label' })
 export type CommentModeChanged = z.infer<typeof CommentModeChangedSchema>
 
 /** The `window.api.previewComments` contract (`src/preload/previewCommentsBridge.ts`). */
