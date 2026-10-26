@@ -1,0 +1,205 @@
+{
+  "writable": true,
+  "blocks": [
+    {
+      "kind": "ok",
+      "range": [
+        259,
+        1160
+      ],
+      "nodeRange": [
+        259,
+        1160
+      ],
+      "rawHash": "d1b3d9b29e9d1273978a6d1c41998c34722e58403b94d51935aebbb5cd715860",
+      "target": {
+        "state": "attached",
+        "startOffset": 1169,
+        "via": "position",
+        "tag": "h1"
+      },
+      "data": {
+        "v": 1,
+        "id": "c-aaaaaaaaaaaaaadf",
+        "status": "open",
+        "anchor": {
+          "tag": "h1",
+          "path": "",
+          "id": "title"
+        },
+        "view": {
+          "w": 1280,
+          "h": 800,
+          "dpr": 2,
+          "x": 0,
+          "y": 120
+        },
+        "msgs": [
+          {
+            "id": "m-aaaaaaaaaaaaaadf",
+            "by": {
+              "name": "Ada Lovelace",
+              "email": "ada@example.com",
+              "role": "human"
+            },
+            "at": "2026-10-25T14:03:00Z",
+            "text": "Shorter headline, please."
+          }
+        ]
+      }
+    },
+    {
+      "kind": "ok",
+      "range": [
+        1224,
+        2081
+      ],
+      "nodeRange": [
+        1224,
+        2081
+      ],
+      "rawHash": "a15fcf14d12cc39effdaecfda428b05afd0513500d09b50f7b6f72ae62fa165d",
+      "target": {
+        "state": "attached",
+        "startOffset": 2081,
+        "via": "position",
+        "tag": "em"
+      },
+      "data": {
+        "v": 1,
+        "id": "c-aaaaaaaaaaaaaadg",
+        "status": "open",
+        "anchor": {
+          "tag": "em",
+          "path": ""
+        },
+        "view": {
+          "w": 1280,
+          "h": 800,
+          "dpr": 2,
+          "x": 0,
+          "y": 120
+        },
+        "msgs": [
+          {
+            "id": "m-aaaaaaaaaaaaaadg",
+            "by": {
+              "name": "Ada Lovelace",
+              "email": "ada@example.com",
+              "role": "human"
+            },
+            "at": "2026-10-25T14:03:00Z",
+            "text": "Say 9 EUR here."
+          }
+        ]
+      }
+    },
+    {
+      "kind": "ok",
+      "range": [
+        2120,
+        3025
+      ],
+      "nodeRange": [
+        2120,
+        3025
+      ],
+      "rawHash": "c8f9e70e4e3fb3c844e39bd4cf4a69656f716347fd0eb63fbe11a050a0836975",
+      "target": {
+        "state": "attached",
+        "startOffset": 4123,
+        "via": "position",
+        "tag": "button"
+      },
+      "data": {
+        "v": 1,
+        "id": "c-aaaaaaaaaaaaaadh",
+        "status": "open",
+        "anchor": {
+          "tag": "button",
+          "path": "",
+          "cls": [
+            "cta"
+          ]
+        },
+        "view": {
+          "w": 1280,
+          "h": 800,
+          "dpr": 2,
+          "x": 0,
+          "y": 120
+        },
+        "msgs": [
+          {
+            "id": "m-aaaaaaaaaaaaaadh",
+            "by": {
+              "name": "Ada Lovelace",
+              "email": "ada@example.com",
+              "role": "human"
+            },
+            "at": "2026-10-25T14:03:00Z",
+            "text": "Make this button blue."
+          }
+        ]
+      }
+    },
+    {
+      "kind": "ok",
+      "range": [
+        3034,
+        4114
+      ],
+      "nodeRange": [
+        3034,
+        4114
+      ],
+      "rawHash": "4318e9c660d929fea21eade405a52d77efab5888a5a5c2720196b817cf692fe0",
+      "target": {
+        "state": "attached",
+        "startOffset": 4123,
+        "via": "position",
+        "tag": "button"
+      },
+      "data": {
+        "v": 1,
+        "id": "c-aaaaaaaaaaaaaadi",
+        "status": "open",
+        "anchor": {
+          "tag": "button",
+          "path": "",
+          "cls": [
+            "cta"
+          ]
+        },
+        "view": {
+          "w": 1280,
+          "h": 800,
+          "dpr": 2,
+          "x": 0,
+          "y": 120
+        },
+        "msgs": [
+          {
+            "id": "m-aaaaaaaaaaaaaadi",
+            "by": {
+              "name": "Ada Lovelace",
+              "email": "ada@example.com",
+              "role": "human"
+            },
+            "at": "2026-10-25T14:03:00Z",
+            "text": "And bigger."
+          },
+          {
+            "id": "m-aaaaaaaaaaaaaa7j",
+            "by": {
+              "name": "Grace Hopper",
+              "role": "human"
+            },
+            "at": "2026-10-26T09:12:00Z",
+            "text": "Agreed."
+          }
+        ]
+      }
+    }
+  ]
+}

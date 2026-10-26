@@ -31,6 +31,7 @@ Erfana is an agent-native Markdown workspace – an Electron app that runs a ter
   - [Export](./editor/export.md) - PDF and DOCX export pipeline
   - [Mermaid Viewer](./editor/mermaid-viewer.md) - Full-screen diagram viewer with zoom and pan
 - [HTML Preview](./html-preview/README.md) - Live `.html` preview running real CSS + JS in a sealed process, with a per-project host allowlist, auto-refresh, find-in-page and PDF export (issue #74), plus same-project frames, same-tab links with Back and Forward, Open in default browser, and keyboard entry into the page (issue #124). Threat model in [Security § HTML preview](./security.md#html-preview)
+- [HTML comments – format v1](./html-comments/format-v1.md) - Draft public spec of the `erfana:comment v1` block that HTML Preview comments store in the `.html` file: grammar, `@data` schema, escaping, placement, damaged blocks and rules for coding agents
 - [Image Viewer](./ui-components.md#image-viewer-panel) - Image preview panel with zoom, pan, and fullscreen
 - [Terminal](./terminal/README.md) - xterm.js terminal integration
   - [Bootstrap Pattern](./terminal/bootstrap-pattern.md) - Clean initialization without artifacts

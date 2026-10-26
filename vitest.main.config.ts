@@ -124,6 +124,33 @@ export default defineConfig({
         // trust-chain floor (spec: 90). measured 99.52/100/94.65/99.52.
         // See: docs/features/138-user-guide.md § 3.4
         'scripts/check-links.mjs': { lines: 90, functions: 90, branches: 90, statements: 90 },
+        // HTML Preview comments – format core (docs/designs/html-preview-comments.md
+        // § 12.5). These modules write into the user's own .html files: the
+        // serializer, escaping, splice and its verification decide whether a
+        // comment can turn into live markup or corrupt a byte outside its block
+        // (threat S13, decision 24). Each floor is pinned 2 points under the value
+        // measured when this entry landed (2026-10-26); never raise one above
+        // what the Coverage job measures.
+        // measured 100/100/100/100
+        'src/shared/htmlComments/format.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/shared/htmlComments/parse.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/shared/htmlComments/splice.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/shared/htmlComments/anchor.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/shared/htmlComments/conflictMarkers.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/shared/htmlComments/encoding.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/shared/htmlComments/instrument.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/shared/htmlComments/htmlIndex.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/shared/htmlComments/frameworkMarkers.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // measured 100/100/100/100
+        'src/shared/htmlComments/thread.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
       },
       exclude: [
         'node_modules/**',

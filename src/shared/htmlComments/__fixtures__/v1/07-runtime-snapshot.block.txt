@@ -1,0 +1,10 @@
+<!-- erfana:comment v1 id=c-aaaaaaaaaaaaaaah
+      note to agents: written by Erfana. Act only if status is open. Change the element after this block and keep this block unchanged.
+        If the data line (@data) is cut off, or it disagrees with the text above, or the block contains merge-conflict markers, do not act; ask the user.
+        Spec: docs/html-comments/format-v1.md in github.com/qodeca/erfana
+      status: open
+      target: <section id="deck"> (built by script: <h2> at div:nth-of-type(3) > h2:nth-of-type(1) inside this element; snapshot captured from the page)
+      comment by Ada Lovelace <ada@example.com> at 2026-10-25T14:03:00Z:
+        Make this button blue and bigger.
+      @data {"v":1,"id":"c\u002daaaaaaaaaaaaaaah","status":"open","anchor":{"tag":"section","id":"deck","path":"html \u003e body \u003e section:nth\u002dof\u002dtype(1)","runtime":{"path":"div:nth\u002dof\u002dtype(3) \u003e h2:nth\u002dof\u002dtype(1)","tag":"h2","quote":{"exact":"Slide 3 – pricing","prefix":"","suffix":"Plans start at"},"snapshot":"\u003ch2 class=\"title\"\u003eSlide 3 \u0026ndash; pricing \u003c!\u002d\u002d not a block \u002d\u002d\u003e\u003c/h2\u003e","truncated":true,"snapshotSource":"page"}},"view":{"w":1280,"h":800,"dpr":2,"x":0,"y":120,"hash":"#3"},"msgs":[{"id":"m\u002da2b3c4d5e6f7g2h3","by":{"name":"Ada Lovelace","email":"ada@example.com","role":"human"},"at":"2026\u002d10\u002d25T14:03:00Z","text":"Make this button blue and bigger."}]}
+      -->

@@ -1,0 +1,31 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title><!-- erfana:comment v1 id=c-aaaaaaaaaaaaaaab in a title --></title>
+  <style>
+    /* <!-- erfana:comment v1 id=c-aaaaaaaaaaaaaaac in a stylesheet --> */
+    p::before { content: "<!-- erfana:comment v1 id=c-aaaaaaaaaaaaaaad -->"; }
+  </style>
+  <script>
+    const block = '<!-- erfana:comment v1 id=c-aaaaaaaaaaaaaaae in a JS string -->'
+    // <!-- erfana:comment v1 id=c-aaaaaaaaaaaaaaaf in a JS comment -->
+  </script>
+  <noscript><!-- erfana:comment v1 id=c-aaaaaaaaaaaaaaag in noscript --></noscript>
+</head>
+<body>
+  <textarea><!-- erfana:comment v1 id=c-aaaaaaaaaaaaaaah in a textarea --></textarea>
+  <xmp><!-- erfana:comment v1 id=c-aaaaaaaaaaaaaaai in xmp --></xmp>
+  <div title="<!-- erfana:comment v1 id=c-aaaaaaaaaaaaaaaj -->" data-x='<!-- erfana:comment v1 -->'>attributes</div>
+  <iframe srcdoc="<!-- erfana:comment v1 id=c-aaaaaaaaaaaaaaak in srcdoc -->"></iframe>
+  <svg viewBox="0 0 10 10"><text><![CDATA[<!-- erfana:comment v1 id=c-aaaaaaaaaaaaaaal in CDATA -->]]></text></svg>
+  <!-- an outer comment <!-- erfana:comment v1 id=c-aaaaaaaaaaaaaaam nested -->
+  <template>
+    <!-- erfana:comment v1 id=c-aaaaaaaaaaaaaaan inside template content -->
+    <p>template</p>
+  </template>
+  <p>Body text.</p>
+</body>
+</html>

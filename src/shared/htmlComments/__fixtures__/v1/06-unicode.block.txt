@@ -1,0 +1,14 @@
+<!-- erfana:comment v1 id=c-aaaaaaaaaaaaaaag
+note to agents: written by Erfana. Act only if status is open. Change the element after this block and keep this block unchanged.
+  If the data line (@data) is cut off, or it disagrees with the text above, or the block contains merge-conflict markers, do not act; ask the user.
+  Spec: docs/html-comments/format-v1.md in github.com/qodeca/erfana
+status: open
+target: <button class="cta">
+comment by Zoë 张伟 at 2026-10-25T14:03:00Z:
+  Thumbs 👍🏽 family 👩‍👩‍👧
+  Combining é and CJK 漢字, Arabic مرحبا
+  Bidi \u202eevil\u202c \u2066isolate\u2069 zero\u200bwidth BOM\ufeff
+  Controls NUL\u0000 BEL\u0007 DEL\u007f C1\u0085
+  Separators\u2028inside, lone \ud83d and \ude00
+@data {"v":1,"id":"c\u002daaaaaaaaaaaaaaag","status":"open","anchor":{"tag":"button","cls":["cta"],"path":"html \u003e body \u003e main:nth\u002dof\u002dtype(1) \u003e button:nth\u002dof\u002dtype(1)","quote":{"exact":"Buy now","prefix":"Pricing","suffix":""}},"view":{"w":1280,"h":800,"dpr":2,"x":0,"y":120},"msgs":[{"id":"m\u002da2b3c4d5e6f7g2h3","by":{"name":"Zoë 张伟","role":"human"},"at":"2026\u002d10\u002d25T14:03:00Z","text":"Thumbs 👍🏽 family 👩‍👩‍👧\nCombining é and CJK 漢字, Arabic مرحبا\nBidi \u202eevil\u202c \u2066isolate\u2069 zero\u200bwidth BOM\ufeff\nControls NUL\u0000 BEL\u0007 DEL\u007f C1\u0085\nSeparators\u2028inside, lone \ud83d and \ude00"}]}
+-->

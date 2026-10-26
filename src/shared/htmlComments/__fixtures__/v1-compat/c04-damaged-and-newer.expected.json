@@ -1,0 +1,219 @@
+{
+  "writable": true,
+  "blocks": [
+    {
+      "kind": "ok",
+      "range": [
+        254,
+        1138
+      ],
+      "nodeRange": [
+        254,
+        1133
+      ],
+      "rawHash": "42f5c9c0a5107c6a0449af523f00b2d1b31f9861a33db800f9aa64b47fa68c86",
+      "target": {
+        "state": "attached",
+        "startOffset": 1138,
+        "via": "position",
+        "tag": "li"
+      },
+      "data": {
+        "v": 1,
+        "id": "c-aaaaaaaaaaaaaadl",
+        "status": "open",
+        "anchor": {
+          "tag": "li",
+          "path": "",
+          "id": "i1"
+        },
+        "view": {
+          "w": 1280,
+          "h": 800,
+          "dpr": 2,
+          "x": 0,
+          "y": 120
+        },
+        "msgs": [
+          {
+            "id": "m-aaaaaaaaaaaaaadl",
+            "by": {
+              "name": "Ada Lovelace",
+              "email": "ada@example.com",
+              "role": "human"
+            },
+            "at": "2026-10-25T14:03:00Z",
+            "text": "This one is fine."
+          }
+        ]
+      }
+    },
+    {
+      "kind": "damaged",
+      "range": [
+        1162,
+        1702
+      ],
+      "nodeRange": [
+        1162,
+        1697
+      ],
+      "rawHash": "7f4bdadb6b4fee5c95e56f3ab4266e3f6fd03a41fa1c5b41be8055306a209f74",
+      "reason": "no-data",
+      "headerId": "c-aaaaaaaaaaaaaadm"
+    },
+    {
+      "kind": "damaged",
+      "range": [
+        1731,
+        2324
+      ],
+      "nodeRange": [
+        1731,
+        2319
+      ],
+      "rawHash": "81e032f1b8fcc86efa1ce414bb45c90bfed9c262a26a2435d6287c0f06db2e91",
+      "reason": "bad-json",
+      "headerId": "c-aaaaaaaaaaaaaadn"
+    },
+    {
+      "kind": "damaged",
+      "range": [
+        2354,
+        3228
+      ],
+      "nodeRange": [
+        2354,
+        3223
+      ],
+      "rawHash": "f3dd8442ed8235f0796ba5f045f21c47e2666fcb60256dc5e20e686eba27889f",
+      "reason": "schema",
+      "headerId": "c-aaaaaaaaaaaaaado"
+    },
+    {
+      "kind": "damaged",
+      "range": [
+        3256,
+        4141
+      ],
+      "nodeRange": [
+        3256,
+        4136
+      ],
+      "rawHash": "55cfae071db4e5798d7a66afe94c8ba034e39ba931290a1dfbcf0a3436a0f38d",
+      "reason": "limits",
+      "headerId": "c-aaaaaaaaaaaaaadp"
+    },
+    {
+      "kind": "damaged",
+      "range": [
+        4169,
+        5032
+      ],
+      "nodeRange": [
+        4169,
+        5027
+      ],
+      "rawHash": "d93c1cba1eea019b726c4dbe012b5e8e63b843d14356509e1e1679c919ff7469",
+      "reason": "readable-mismatch",
+      "headerId": "c-aaaaaaaaaaaaaadq"
+    },
+    {
+      "kind": "damaged",
+      "range": [
+        5071,
+        5955
+      ],
+      "nodeRange": [
+        5071,
+        5950
+      ],
+      "rawHash": "d9a3abd5aae71f9e93d349490cc99188b34480135aaa62ef57bfc45dec0b8ce5",
+      "reason": "conflict-marker",
+      "headerId": "c-aaaaaaaaaaaaaadr"
+    },
+    {
+      "kind": "damaged",
+      "range": [
+        5992,
+        6872
+      ],
+      "nodeRange": [
+        5992,
+        6867
+      ],
+      "rawHash": "27fce7718e79fd23b9ab7d571a88c71dd3c00523bd8c3cedb0176318ae0207cd",
+      "reason": "duplicate-id",
+      "headerId": "c-aaaaaaaaaaaaaads"
+    },
+    {
+      "kind": "damaged",
+      "range": [
+        6910,
+        7790
+      ],
+      "nodeRange": [
+        6910,
+        7785
+      ],
+      "rawHash": "27fce7718e79fd23b9ab7d571a88c71dd3c00523bd8c3cedb0176318ae0207cd",
+      "reason": "duplicate-id",
+      "headerId": "c-aaaaaaaaaaaaaads"
+    },
+    {
+      "kind": "damaged",
+      "range": [
+        7828,
+        8696
+      ],
+      "nodeRange": [
+        7828,
+        8691
+      ],
+      "rawHash": "e9e5f8abcc34b2d7a56b3808c106d469d6e3f3f91fc14b823ea6635ea1e7ef48",
+      "reason": "id-mismatch",
+      "headerId": "c-aaaaaaaaaaaaaa7h"
+    },
+    {
+      "kind": "damaged",
+      "range": [
+        8730,
+        9604
+      ],
+      "nodeRange": [
+        8730,
+        9599
+      ],
+      "rawHash": "fa4353de19ef947d5d2d696ad114681c5de232263b1844555306810eaa842d8e",
+      "reason": "bad-json",
+      "headerId": "c-aaaaaaaaaaaaaadu"
+    },
+    {
+      "kind": "newer",
+      "range": [
+        9640,
+        9746
+      ],
+      "nodeRange": [
+        9640,
+        9741
+      ],
+      "rawHash": "486fa7f7eb4b1465abbc53d778e23eeb2ba20fa37e6516c76da3977b84685243",
+      "version": 2
+    },
+    {
+      "kind": "damaged",
+      "range": [
+        9795,
+        10663
+      ],
+      "nodeRange": [
+        9795,
+        10658
+      ],
+      "rawHash": "ba1d0b2e9b45213a2f4894bd98f83fcc8484a8a5510076bc9026a641a5ff1b8c",
+      "reason": "in-template",
+      "headerId": "c-aaaaaaaaaaaaaadv"
+    }
+  ]
+}

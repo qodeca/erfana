@@ -102,3 +102,12 @@ link has a stable `id`.
 `PREVIEW.MAX_ASSET_BYTES` – eligible, but refused with 413 when it loads, so a move lands on a
 failed page without racing a delete – and `extra/page-N.html`, one per
 `PREVIEW.MAX_LIVE_VIEWS`, enough previews to put a tab to sleep.
+
+## `comments/`
+
+Pages for HTML Preview comments ([design](../../../docs/designs/html-preview-comments.md), [format](../../../docs/html-comments/format-v1.md)). Byte-exact (`-text` in `.gitattributes`).
+
+| Path | Case |
+|---|---|
+| `agent-review/landing.html`, `slides.html`, `signup-form.html` | The agent check (X-001): pages with open, resolved and deliberately damaged `erfana:comment v1` blocks, written by the P1 serializer. `slides.html` builds its deck from a script, so two comments target script-built elements |
+| `agent-review/RUBRIC.md` | The expected result per comment, and how to score a run. Never copy it into the run repo |

@@ -63,5 +63,40 @@ export const PREVIEW_LIMITS = {
    */
   NAV_MAX_ANCHOR_CHARS: 1_024,
   /** Idle time after the last real input before the still picture is refreshed (ms). */
-  STILL_FRAME_IDLE_REFRESH_MS: 500
+  STILL_FRAME_IDLE_REFRESH_MS: 500,
+
+  // HTML preview comments (docs/designs/html-preview-comments.md §5.8, §19 R3-13).
+  // The byte limits are measured on the serialised block – readable text plus
+  // `@data`, after escaping – so a block Erfana writes always reads back `ok`.
+
+  /** Characters (code points) in one comment or reply. */
+  COMMENT_MESSAGE_MAX_CHARS: 4_000,
+  /** Replies in one thread, after its first comment. */
+  COMMENT_MAX_REPLIES: 200,
+  /** Comment blocks in one file; past this the file is read-only for comments. */
+  COMMENT_MAX_BLOCKS_PER_FILE: 500,
+  /** UTF-8 bytes in one serialised block; checked before `JSON.parse` on read and before writing. */
+  COMMENT_BLOCK_MAX_BYTES: 2 * 1024 * 1024,
+  /** UTF-8 bytes of a JS-built element's `outerHTML` snapshot; longer ones are cut and flagged `truncated`. */
+  COMMENT_SNAPSHOT_MAX_BYTES: 256 * 1024,
+  /** Nesting depth of the `@data` JSON (the root object is depth 1). */
+  COMMENT_JSON_MAX_DEPTH: 6,
+  /** Characters (code points) in an author name. */
+  COMMENT_AUTHOR_NAME_MAX_CHARS: 100,
+  /** Characters in an author email. */
+  COMMENT_AUTHOR_EMAIL_MAX_CHARS: 254,
+  /** Characters in each part of a text quote (`exact`, `prefix`, `suffix`). */
+  COMMENT_QUOTE_MAX_CHARS: 200,
+  /** Classes kept in an anchor. */
+  COMMENT_MAX_CLASSES: 8,
+  /** Characters in a JS-built element's path below its in-file ancestor. */
+  COMMENT_RUNTIME_PATH_MAX_CHARS: 1_024,
+  /** Characters in the `#hash` stored with a comment's view. */
+  COMMENT_VIEW_HASH_MAX_CHARS: 512,
+  /** Page pick signals one view admits per second. */
+  COMMENT_PICKS_PER_SECOND: 5,
+  /** `data-erfana-el` tokens in one served document; past this it is served raw ("page too large"). */
+  COMMENT_MAX_TOKENS_PER_DOCUMENT: 100_000,
+  /** Largest commentable file; equals `PREVIEW.MAX_ENTRY_HTML_BYTES` in `constants.ts`. */
+  COMMENT_FILE_MAX_BYTES: 4 * 1024 * 1024
 } as const

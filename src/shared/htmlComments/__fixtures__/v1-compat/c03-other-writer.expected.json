@@ -1,0 +1,101 @@
+{
+  "writable": true,
+  "blocks": [
+    {
+      "kind": "ok",
+      "range": [
+        252,
+        915
+      ],
+      "nodeRange": [
+        252,
+        910
+      ],
+      "rawHash": "8a9ee019b4366f6bad91fab7fca553d2f628e92d7a92e6d2dff17fdc69e4d06e",
+      "target": {
+        "state": "attached",
+        "startOffset": 915,
+        "via": "position",
+        "tag": "h1"
+      },
+      "data": {
+        "msgs": [
+          {
+            "text": "Shorter headline, please.",
+            "at": "2026-10-25T14:03:00Z",
+            "by": {
+              "role": "human",
+              "email": "ada@example.com",
+              "name": "Ada Lovelace"
+            },
+            "id": "m-aaaaaaaaaaaaaadj"
+          }
+        ],
+        "view": {
+          "w": 1280,
+          "h": 800,
+          "dpr": 2,
+          "x": 0,
+          "y": 120
+        },
+        "anchor": {
+          "path": "",
+          "tag": "h1",
+          "id": "title"
+        },
+        "status": "open",
+        "id": "c-aaaaaaaaaaaaaadj",
+        "v": 1,
+        "x-other-writer": {
+          "version": "0.1",
+          "note": "kept on edit"
+        }
+      }
+    },
+    {
+      "kind": "ok",
+      "range": [
+        955,
+        1531
+      ],
+      "nodeRange": [
+        955,
+        1531
+      ],
+      "rawHash": "af27523bfb175ca9fd67d09b317e5507f873c9ba5d5c17c464bc6a1a88eabb05",
+      "target": {
+        "state": "attached",
+        "startOffset": 1531,
+        "via": "position",
+        "tag": "em"
+      },
+      "data": {
+        "v": 1,
+        "id": "c-aaaaaaaaaaaaaadk",
+        "status": "open",
+        "anchor": {
+          "tag": "em",
+          "path": ""
+        },
+        "view": {
+          "w": 1280,
+          "h": 800,
+          "dpr": 2,
+          "x": 0,
+          "y": 120
+        },
+        "msgs": [
+          {
+            "id": "m-aaaaaaaaaaaaaadk",
+            "by": {
+              "name": "Grace Hopper",
+              "role": "human"
+            },
+            "at": "2026-10-25T14:03:00Z",
+            "text": "Say 9 EUR here."
+          }
+        ]
+      }
+    }
+  ]
+}

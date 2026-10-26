@@ -1,0 +1,20 @@
+{
+  "writable": false,
+  "readOnlyReason": "conflict-markers",
+  "blocks": [
+    {
+      "kind": "damaged",
+      "range": [
+        245,
+        1247
+      ],
+      "nodeRange": [
+        245,
+        1242
+      ],
+      "rawHash": "3941f33bc120b401c27506258d7091435a035ca239215c79b447bafca28e8d26",
+      "reason": "conflict-marker",
+      "headerId": "c-aaaaaaaaaaaaaady"
+    }
+  ]
+}

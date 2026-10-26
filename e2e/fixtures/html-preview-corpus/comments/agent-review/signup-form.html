@@ -1,0 +1,99 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Create your Northwind account</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 480px; margin: 48px auto; }
+    label { display: block; margin-top: 16px; font-weight: 600; }
+    input, select { width: 100%; padding: 8px; margin-top: 4px; }
+    .check { font-weight: normal; }
+    .check input { width: auto; }
+  </style>
+</head>
+<body>
+  <h1>Create your account</h1>
+  <form action="/signup" method="post">
+    <label for="name">Full name</label>
+    <!-- erfana:comment v1 id=c-dbfmj763dvqc7mxj
+    note to agents: written by Erfana. Act only if status is open. Change the element after this block and keep this block unchanged.
+      If the data line (@data) is cut off, or it disagrees with the text above, or the block contains merge-conflict markers, do not act; ask the user.
+      Spec: docs/html-comments/format-v1.md in github.com/qodeca/erfana
+    status: resolved by Tom Reyes at 2026-10-24T09:24:00Z
+    target: <input id="name">
+    comment by Marta Nowak <marta@northwind.example> at 2026-10-24T09:22:00Z:
+      Add autocomplete="name" to this field.
+    reply by Tom Reyes at 2026-10-24T09:23:00Z:
+      It already has it.
+    @data {"v":1,"id":"c\u002ddbfmj763dvqc7mxj","status":"resolved","resolved":{"by":{"name":"Tom Reyes","role":"human"},"at":"2026\u002d10\u002d24T09:24:00Z"},"anchor":{"tag":"input","id":"name","path":"html \u003e body \u003e form:nth\u002dof\u002dtype(1) \u003e input:nth\u002dof\u002dtype(1)"},"view":{"w":1440,"h":900,"dpr":2,"x":0,"y":0},"msgs":[{"id":"m\u002d4jy37vewd6hli5uw","by":{"name":"Marta Nowak","email":"marta@northwind.example","role":"human"},"at":"2026\u002d10\u002d24T09:22:00Z","text":"Add autocomplete=\"name\" to this field."},{"id":"m\u002dwssmmgfdi4wmfeha","by":{"name":"Tom Reyes","role":"human"},"at":"2026\u002d10\u002d24T09:23:00Z","text":"It already has it."}]}
+    -->
+    <input id="name" name="name" type="text" autocomplete="name">
+    <label for="email">Email</label>
+    <!-- erfana:comment v1 id=c-zg2h24doq7kk2i7s
+    note to agents: written by Erfana. Act only if status is open. Change the element after this block and keep this block unchanged.
+      If the data line (@data) is cut off, or it disagrees with the text above, or the block contains merge-conflict markers, do not act; ask the user.
+      Spec: docs/html-comments/format-v1.md in github.com/qodeca/erfana
+    status: open
+    target: <input id="email">
+    comment by Marta Nowak <marta@northwind.example> at 2026-10-24T09:18:00Z:
+      Make this field required and add the placeholder "you@example.com".
+    @data {"v":1,"id":"c\u002dzg2h24doq7kk2i7s","status":"open","anchor":{"tag":"input","id":"email","path":"html \u003e body \u003e form:nth\u002dof\u002dtype(1) \u003e input:nth\u002dof\u002dtype(2)"},"view":{"w":1440,"h":900,"dpr":2,"x":0,"y":0},"msgs":[{"id":"m\u002dii5paefokiw6pwcz","by":{"name":"Marta Nowak","email":"marta@northwind.example","role":"human"},"at":"2026\u002d10\u002d24T09:18:00Z","text":"Make this field required and add the placeholder \"you@example.com\"."}]}
+    -->
+    <input id="email" name="email" type="email">
+    <!-- erfana:comment v1 id=c-wlashzlkvhti3v6a
+    note to agents: written by Erfana. Act only if status is open. Change the element after this block and keep this block unchanged.
+      If the data line (@data) is cut off, or it disagrees with the text above, or the block contains merge-conflict markers, do not act; ask the user.
+      Spec: docs/html-comments/format-v1.md in github.com/qodeca/erfana
+    status: open
+    target: <label>
+    comment by Tom Reyes at 2026-10-24T09:19:00Z:
+      Add a hint after the label text: "(at least 12 characters)".
+    @data {"v":1,"id":"c\u002dwlashzlkvhti3v6a","status":"open","anchor":{"tag":"label","path":"html \u003e body \u003e form:nth\u002dof\u002dtype(1) \u003e label:nth\u002dof\u002dtype(3)","quote":{"exact":"Password","prefix":"ate your account Full name Email","suffix":"Plan Basic \u002d 10 EUR a month Pro"}},"view":{"w":1440,"h":900,"dpr":2,"x":0,"y":0},"msgs":[{"id":"m\u002dzyzjynooqfyph2qx","by":{"name":"Tom Reyes","role":"human"},"at":"2026\u002d10\u002d24T09:19:00Z","text":"Add a hint after the label text: \"(at least 12 characters)\"."}]}
+    -->
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password">
+    <label for="plan">Plan</label>
+    <!-- erfana:comment v1 id=c-zaakjtja42dw4ern
+    note to agents: written by Erfana. Act only if status is open. Change the element after this block and keep this block unchanged.
+      If the data line (@data) is cut off, or it disagrees with the text above, or the block contains merge-conflict markers, do not act; ask the user.
+      Spec: docs/html-comments/format-v1.md in github.com/qodeca/erfana
+    status: open
+    target: <select id="plan">
+    comment by Marta Nowak <marta@northwind.example> at 2026-10-24T09:20:00Z:
+      Make "Pro" the default option instead of "Basic".
+    @data {"v":1,"id":"c\u002dzaakjtja42dw4ern","status":"open","anchor":{"tag":"select","id":"plan","path":"html \u003e body \u003e form:nth\u002dof\u002dtype(1) \u003e select:nth\u002dof\u002dtype(1)","quote":{"exact":"Basic \u002d 10 EUR a month Pro \u002d 20 EUR a month","prefix":"nt Full name Email Password Plan","suffix":"Send me the weekly newsletter I"}},"view":{"w":1440,"h":900,"dpr":2,"x":0,"y":0},"msgs":[{"id":"m\u002dfzgem5xy6s76fvs7","by":{"name":"Marta Nowak","email":"marta@northwind.example","role":"human"},"at":"2026\u002d10\u002d24T09:20:00Z","text":"Make \"Pro\" the default option instead of \"Basic\"."}]}
+    -->
+    <select id="plan" name="plan">
+      <option value="basic" selected>Basic - 10 EUR a month</option>
+      <option value="pro">Pro - 20 EUR a month</option>
+    </select>
+    <!-- erfana:comment v1 id=c-cjujpo5vend3ofmc
+    note to agents: written by Erfana. Act only if status is open. Change the element after this block and keep this block unchanged.
+      If the data line (@data) is cut off, or it disagrees with the text above, or the block contains merge-conflict markers, do not act; ask the user.
+      Spec: docs/html-comments/format-v1.md in github.com/qodeca/erfana
+    status: open
+    target: <label class="check">
+<<<<<<< HEAD
+=======
+    comment by Marta Nowak <marta@northwind.example> at 2026-10-24T09:25:00Z:
+      Remove the newsletter checkbox.
+    @data {"v":1,"id":"c\u002dcjujpo5vend3ofmc","status":"open","anchor":{"tag":"label","cls":["check"],"path":"html \u003e body \u003e form:nth\u002dof\u002dtype(1) \u003e label:nth\u002dof\u002dtype(5)","quote":{"exact":"Send me the weekly newsletter","prefix":"EUR a month Pro \u002d 20 EUR a month","suffix":"I accept the terms Sign up"}},"view":{"w":1440,"h":900,"dpr":2,"x":0,"y":0},"msgs":[{"id":"m\u002d5e5fmjfjqgk4vpvo","by":{"name":"Marta Nowak","email":"marta@northwind.example","role":"human"},"at":"2026\u002d10\u002d24T09:25:00Z","text":"Remove the newsletter checkbox."}]}
+    -->
+    <label class="check"><input type="checkbox" name="newsletter"> Send me the weekly newsletter</label>
+    <label class="check"><input type="checkbox" name="terms" required> I accept the terms</label>
+    <!-- erfana:comment v1 id=c-4pmtsa4dyunpn6gx
+    note to agents: written by Erfana. Act only if status is open. Change the element after this block and keep this block unchanged.
+      If the data line (@data) is cut off, or it disagrees with the text above, or the block contains merge-conflict markers, do not act; ask the user.
+      Spec: docs/html-comments/format-v1.md in github.com/qodeca/erfana
+    status: open
+    target: <button>
+    comment by Tom Reyes at 2026-10-24T09:21:00Z:
+      Change the label to "Create account".
+    @data {"v":1,"id":"c\u002d4pmtsa4dyunpn6gx","status":"open","anchor":{"tag":"button","path":"html \u003e body \u003e form:nth\u002dof\u002dtype(1) \u003e button:nth\u002dof\u002dtype(1)","quote":{"exact":"Sign up","prefix":"ly newsletter I accept the terms","suffix":""}},"view":{"w":1440,"h":900,"dpr":2,"x":0,"y":0},"msgs":[{"id":"m\u002dpmlfkosoznrxhbky","by":{"name":"Tom Reyes","role":"human"},"at":"2026\u002d10\u002d24T09:21:00Z","text":"Change the label to \"Create account\"."}]}
+    -->
+    <button type="submit">Sign up</button>
+  </form>
+</body>
+</html>

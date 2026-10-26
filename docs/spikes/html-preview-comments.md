@@ -22,6 +22,7 @@
 | S7 placement | Hybrid + runtime check | Hybrid as written changed rendering in 12/67 cases; adding the parent's computed `white-space-collapse` to the pick → 0; position re-attach must use source order; Vue/Svelte/Angular need placement before the app root |
 | S8 frame mapping | PASS | `WebFrameMain.frames` order equals `window[i]` order (creation order) in 5/5; pointer events over a frame reach only the child preload |
 | S9 parse cost | Over budget on main thread | 1 MB: 92 ms, 4 MB: 382 ms on main → persistent worker (main-thread time 7–28 ms); token cap 100,000 |
+| X-001 agent readability (P1) | PASS after a format change (Claude Code); Codex not run | Round 1: agents deleted blocks and acted on damaged ones → fixed agent note added to every block; round 2: 3/3 pass. Codex half open (CLI not installed) |
 
 Full write-ups follow.
 
@@ -678,3 +679,56 @@ Each set ran in a fresh process: 1 cold run, 2 warm-ups, then 10 measured runs. 
 | `report-s9.cjs`, `s9-tables.md` | S9 tables |
 
 Reproduce from the repo root with `node <scratch>/<script> <scratch>` – except `render-probe.cjs`, which runs as `npx electron <scratch>/render-probe.cjs <scratch>`. Build order: `build-corpus` → `make-variants` → `render-probe` → `gitdiff` → `report-s7`, and `bench-gen` → `bench` / `bench-worker` / `bench-extra` → `report-s9`.
+
+---
+
+## X-001 agent readability – P1 run (2026-10-26)
+
+> Design: §16 HPC-X-001 (decision 27). Pages: `e2e/fixtures/html-preview-corpus/comments/agent-review/` (`landing.html`, `slides.html`, `signup-form.html`), written by the P1 serializer, with three blocks damaged on purpose. Answer key: `RUBRIC.md` in the same folder (never copied into the run repo).
+> Method: each run copies only the three pages into a fresh git repo, commits them, then runs `claude -p "apply the review comments" --permission-mode acceptEdits --allowedTools "Read,Edit,Write,Glob,Grep"`. Scored with `git diff` against the rubric. Claude Code 2.1.310, default model.
+
+### Round 1 – format as first drafted
+
+| Check | Run 1 | Run 2 | Run 3 |
+|---|---|---|---|
+| All 13 open comments acted on at their target | Pass | Pass | Pass |
+| Resolved comments (3) not acted on | Pass | Pass | Pass |
+| Damaged blocks (3) not acted on | Pass | Fail – 2 of 3 acted on | Fail – 2 of 3 acted on |
+| Blocks untouched | Pass | Fail – 15 blocks deleted | Fail – 15 blocks deleted |
+| Files intact, no escape misread | Pass | Pass | Pass |
+
+Findings:
+
+- **Agents delete the block after acting on it.** Nothing in the block said to keep it.
+- **Agents act on a damaged block when its readable text looks clear.** The `readable-mismatch` blockquote and the `bad-json` Prev button were applied in runs 2 and 3. The conflict-marker block was left alone in every run.
+- No misreading of `@data` or of the escapes in any run.
+
+### Format change applied before P2
+
+Every block now carries a fixed agent note as its second line (constant `AGENT_NOTE_LINES` in `src/shared/htmlComments/format.ts`):
+
+```text
+note to agents: written by Erfana. Act only if status is open. Change the element after this block and keep this block unchanged.
+  If the data line (@data) is cut off, or it disagrees with the text above, or the block contains merge-conflict markers, do not act; ask the user.
+  Spec: docs/html-comments/format-v1.md in github.com/qodeca/erfana
+```
+
+- Readers skip the note. A block reads the same with the note present, absent, reworded, cut short or re-indented (U-022…U-025, P-001/P-002, compat page c09).
+- The note never contains `@data` followed by a space. A first wording did, and a tool that searched for that text truncated the note instead of the real data line (U-023 guards this).
+- Goldens, `v1.lock.json`, compat pages, the agent-review pages and `RUBRIC.md` were regenerated; `docs/html-comments/format-v1.md` documents the note.
+
+### Round 2 – with the agent note
+
+| Check | Run 1 | Run 2 | Run 3 |
+|---|---|---|---|
+| All 13 open comments acted on at their target | Pass | Pass | Pass |
+| Resolved comments (3) not acted on | Pass | Pass | Pass |
+| Damaged blocks (3) not acted on – agent asked the user instead | Pass | Pass | Pass |
+| Blocks untouched (0 block lines changed, moved or removed) | Pass | Pass | Pass |
+| Files intact, no escape misread | Pass | Pass | Pass |
+
+Verdict: **PASS, 3 of 3** for Claude Code. Run 3 put the button padding on the element (`style="padding: 15px 27px;"`) instead of the `.btn-primary` rule; that still meets the comment.
+
+### Codex – not run
+
+The Codex CLI is not installed on this machine (not on the bash or PowerShell `PATH`, not in global npm), and running it needs the owner's OpenAI sign-in. The Codex half of X-001 is open and on the owner review list; it runs on the macOS handoff (§16) or after the owner installs and signs in to Codex here. The P8 confirmation run repeats both agents on real Erfana-written files.

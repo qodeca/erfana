@@ -1,0 +1,281 @@
+{
+  "writable": true,
+  "blocks": [
+    {
+      "kind": "ok",
+      "range": [
+        245,
+        1127
+      ],
+      "nodeRange": [
+        245,
+        1122
+      ],
+      "rawHash": "19dbec447d9c2ff46f813d6c61ca60a486314ae6a887f8aa9aeb917075ba9679",
+      "target": {
+        "state": "attached",
+        "startOffset": 1127,
+        "via": "position",
+        "tag": "tr"
+      },
+      "data": {
+        "v": 1,
+        "id": "c-aaaaaaaaaaaaaadz",
+        "status": "open",
+        "anchor": {
+          "tag": "tr",
+          "path": ""
+        },
+        "view": {
+          "w": 1280,
+          "h": 800,
+          "dpr": 2,
+          "x": 0,
+          "y": 120
+        },
+        "msgs": [
+          {
+            "id": "m-aaaaaaaaaaaaaadz",
+            "by": {
+              "name": "Ada Lovelace",
+              "email": "ada@example.com",
+              "role": "human"
+            },
+            "at": "2026-10-25T14:03:00Z",
+            "text": "First row, implied tbody."
+          }
+        ]
+      }
+    },
+    {
+      "kind": "ok",
+      "range": [
+        1205,
+        2079
+      ],
+      "nodeRange": [
+        1205,
+        2074
+      ],
+      "rawHash": "584d0396ec559fee98aebbed4d78731d0df7a1575bbf133481fc4e499e690945",
+      "target": {
+        "state": "attached",
+        "startOffset": 2079,
+        "via": "position",
+        "tag": "li"
+      },
+      "data": {
+        "v": 1,
+        "id": "c-aaaaaaaaaaaaaad2",
+        "status": "open",
+        "anchor": {
+          "tag": "li",
+          "path": ""
+        },
+        "view": {
+          "w": 1280,
+          "h": 800,
+          "dpr": 2,
+          "x": 0,
+          "y": 120
+        },
+        "msgs": [
+          {
+            "id": "m-aaaaaaaaaaaaaad2",
+            "by": {
+              "name": "Ada Lovelace",
+              "email": "ada@example.com",
+              "role": "human"
+            },
+            "at": "2026-10-25T14:03:00Z",
+            "text": "After an unclosed li."
+          }
+        ]
+      }
+    },
+    {
+      "kind": "ok",
+      "range": [
+        2111,
+        2961
+      ],
+      "nodeRange": [
+        2111,
+        2958
+      ],
+      "rawHash": "e199f99e96cd3f041af49238a0d046495333efc8cc8e4495da1e65ac97f45fef",
+      "target": {
+        "state": "attached",
+        "startOffset": 2961,
+        "via": "position",
+        "tag": "p"
+      },
+      "data": {
+        "v": 1,
+        "id": "c-aaaaaaaaaaaaaad3",
+        "status": "open",
+        "anchor": {
+          "tag": "p",
+          "path": ""
+        },
+        "view": {
+          "w": 1280,
+          "h": 800,
+          "dpr": 2,
+          "x": 0,
+          "y": 120
+        },
+        "msgs": [
+          {
+            "id": "m-aaaaaaaaaaaaaad3",
+            "by": {
+              "name": "Ada Lovelace",
+              "email": "ada@example.com",
+              "role": "human"
+            },
+            "at": "2026-10-25T14:03:00Z",
+            "text": "After an unclosed p."
+          }
+        ]
+      }
+    },
+    {
+      "kind": "ok",
+      "range": [
+        2989,
+        3851
+      ],
+      "nodeRange": [
+        2989,
+        3846
+      ],
+      "rawHash": "5ebb3a6d64c042e43eef5962c62ff6b18395576048955c2af2fd5521e13eef55",
+      "target": {
+        "state": "attached",
+        "startOffset": 5567,
+        "via": "position",
+        "tag": "h2"
+      },
+      "data": {
+        "v": 1,
+        "id": "c-aaaaaaaaaaaaaad4",
+        "status": "open",
+        "anchor": {
+          "tag": "h2",
+          "path": ""
+        },
+        "view": {
+          "w": 1280,
+          "h": 800,
+          "dpr": 2,
+          "x": 0,
+          "y": 120
+        },
+        "msgs": [
+          {
+            "id": "m-aaaaaaaaaaaaaad4",
+            "by": {
+              "name": "Ada Lovelace",
+              "email": "ada@example.com",
+              "role": "human"
+            },
+            "at": "2026-10-25T14:03:00Z",
+            "text": "First of three."
+          }
+        ]
+      }
+    },
+    {
+      "kind": "ok",
+      "range": [
+        3851,
+        4710
+      ],
+      "nodeRange": [
+        3851,
+        4710
+      ],
+      "rawHash": "2f1064d8e3fd8754e0cfd935e7ca097551e5e7907a7cf5ea476155013627d2ba",
+      "target": {
+        "state": "attached",
+        "startOffset": 5567,
+        "via": "position",
+        "tag": "h2"
+      },
+      "data": {
+        "v": 1,
+        "id": "c-aaaaaaaaaaaaaad5",
+        "status": "open",
+        "anchor": {
+          "tag": "h2",
+          "path": ""
+        },
+        "view": {
+          "w": 1280,
+          "h": 800,
+          "dpr": 2,
+          "x": 0,
+          "y": 120
+        },
+        "msgs": [
+          {
+            "id": "m-aaaaaaaaaaaaaad5",
+            "by": {
+              "name": "Ada Lovelace",
+              "email": "ada@example.com",
+              "role": "human"
+            },
+            "at": "2026-10-25T14:03:00Z",
+            "text": "Second of three."
+          }
+        ]
+      }
+    },
+    {
+      "kind": "ok",
+      "range": [
+        4710,
+        5567
+      ],
+      "nodeRange": [
+        4710,
+        5567
+      ],
+      "rawHash": "4dfda1e416321bf7faac86682467cb9c1e4d5ec0c7227031d95e21cf10bdda37",
+      "target": {
+        "state": "attached",
+        "startOffset": 5567,
+        "via": "position",
+        "tag": "h2"
+      },
+      "data": {
+        "v": 1,
+        "id": "c-aaaaaaaaaaaaaad6",
+        "status": "open",
+        "anchor": {
+          "tag": "h2",
+          "path": ""
+        },
+        "view": {
+          "w": 1280,
+          "h": 800,
+          "dpr": 2,
+          "x": 0,
+          "y": 120
+        },
+        "msgs": [
+          {
+            "id": "m-aaaaaaaaaaaaaad6",
+            "by": {
+              "name": "Ada Lovelace",
+              "email": "ada@example.com",
+              "role": "human"
+            },
+            "at": "2026-10-25T14:03:00Z",
+            "text": "Third of three."
+          }
+        ]
+      }
+    }
+  ]
+}

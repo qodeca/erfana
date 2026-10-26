@@ -44,3 +44,9 @@ src/preload/__snapshots__/surface.test.ts.snap text eol=lf
 *.tar.gz binary
 *.tgz binary
 *.traineddata binary
+
+# HTML Preview comment fixtures are byte-exact goldens: LF, CRLF and CR-only
+# files on purpose, pinned by SHA-256 in v1.lock.json (G-003) and replayed by
+# the agent-review check (X-001). Line-ending conversion would change them.
+src/shared/htmlComments/__fixtures__/** -text
+e2e/fixtures/html-preview-corpus/comments/** -text
