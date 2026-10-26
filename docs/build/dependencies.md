@@ -136,6 +136,24 @@ These are **CVE pins**, forced onto transitive consumers. 4.18.1 is a real publi
 
 ---
 
+## Electron upgrade checklist
+
+Some features lean on Electron and Chromium behaviour that is documented only in part. After any Electron major or minor bump, re-check these before release. HTML Preview comments ([design](../designs/html-preview-comments.md) R17, [spike results](../spikes/html-preview-comments.md)) add the following:
+
+| Re-check | Why it can break | Where it is pinned |
+|---|---|---|
+| **Sub-frame preload injection** – with `sandbox: true` and `nodeIntegrationInSubFrames: true` the preload still runs in every frame, including opaque-origin `erfana-preview:` frames, and `window === window.top` still tells the main frame from a frame | The overlay, token capture and click swallowing all live in the preload; no preload means no pins and an unguarded page | `src/preload/previewPage.frame.test.ts`, `previewSessionPolicy.test.ts` (policy freeze, both variants), `e2e/html-preview-comments-instrument.e2e.ts` |
+| **`--erfana-hpc` renderer argument** – `additionalArguments` still reaches a sandboxed sub-frame preload in `process.argv` | It is the kill switch: if frames stop seeing it, the overlay is silently off there; if the main frame ignores it, the flag-off variant is wrong | `previewSessionPolicy.test.ts`, `e2e/html-preview-comments-preload.e2e.ts` |
+| **Token strip timing** – the preload still strips element tokens before the first inline, `defer` and module script, and a token is valid on its first sighting before the preload's `DOMContentLoaded` | The one-sighting rule and the known residuals (custom elements, `attributeOldValue`) were measured on one Electron | `e2e/html-preview-comments-preload.e2e.ts`, SEC-26 and SEC-30 |
+| **Document loads carry no `user-agent` header** (fetches and subresources do) and `webRequest.onErrorOccurred` still drops a failed request's note | The request-kind ledger uses this undocumented class signal to decide whether a load is instrumented | `PreviewRequestKindLedger.test.ts`, `PreviewRequestKindLedger.classes.test.ts`, M-065 and M-066 |
+| **Closed shadow root overlay** – constructable stylesheets and `el.style` apply under a page CSP, the host's popover stays in the top layer, `beforetoggle` and `toggle` are still guarded, `checkVisibility()` options still work | The overlay is drawn only this way; a change shows as missing or unclickable pins | `e2e/html-preview-comments-preload.e2e.ts` (SEC-28, SEC-31), `overlayStyles.test.ts` |
+| **`webContents.sendInputEvent`** with `globalX` / `globalY` – a pointer event still reaches the right frame and carries the expected `screenX` / `screenY` | The menu point is computed from the trusted event's screen position; the e2e helpers drive the native view the same way | M-067 (`commentMenuPoint.ts` point math) and the `html-preview-comments*` e2e specs |
+| **`white-space-collapse` in computed style** – the preload still reads the parent's value as `collapse` or `preserve` | It decides own-lines or mid-line block placement; a missing or renamed value falls back to mid-line, which is safe but changes `git diff` | `picker.test.ts`, U-042 and U-043, E-019 |
+| **`forced-colors`** – the overlay's pins and outline still use system colours under `forced-colors: active` | The overlay carries its own forced-colour rules | `overlayStyles.test.ts`, `pins.test.ts` |
+| **Frame order** – `WebFrameMain.frames` order and `window[i]` still match, and `WebFrameMain.send` reaches a single frame | The parent maps child frames to `<iframe>` elements this way | J-017, `frameFileMap.test.ts` |
+
+Run `npm run test:e2e -- e2e/html-preview-comments*.e2e.ts` on every platform you ship, not only the one you upgraded on.
+
 ## Verification
 
 To confirm the exclusions took effect after a macOS build:

@@ -1,6 +1,6 @@
 # Erfana HTML comments – format v1
 
-**Status: draft** (written with phase P1 of [HTML Preview comments](../designs/html-preview-comments.md); final in P8). The format itself is frozen: every file Erfana writes must stay readable by every later version, so v1 only ever gains optional fields.
+**Status: final for v1** (written with phase P1 of [HTML Preview comments](../designs/html-preview-comments.md), finalised in P8). The format is frozen: every file Erfana writes must stay readable by every later version, so v1 only ever gains optional fields. The serializer is `src/shared/htmlComments/format.ts`; its output is pinned by golden tests, and the examples below are parsed by them.
 
 Erfana's HTML Preview lets a reviewer click an element in a running page and leave a comment on it. The comment is stored **inside the `.html` file**, as an ordinary HTML comment placed right before the element. Browsers do not show it, it travels with the file through git, and a coding agent reading the file sees the request next to the markup it is about.
 
@@ -99,8 +99,8 @@ block      = "<!--" SP "erfana:comment" SP "v1" SP "id=" cid EOL
 note       = ind "note to agents: " ntext EOL *( ind "  " ntext EOL )   ; fixed text, see below
 message    = ind ( "comment" | "reply" ) " by " who " at " ts ":" EOL
              1*( ind "  " rtext EOL )
-runtime-note = " (built by script: " rtag " at " rpath " inside this element; snapshot captured from the page)"
-             | " (comment is about " rtag " at " rpath " inside this element)"
+runtime-note = " (built by script: <" rtag ">" [ " at " rpath ] " inside this element; snapshot captured from the page)"
+             | " (comment is about <" rtag ">" [ " at " rpath ] " inside this element)"
 who        = name [ " <" email ">" ]
 ts         = YYYY "-" MM "-" DD "T" hh ":" mm ":" ss "Z"     ; UTC, whole seconds
 cid        = "c-" 16base32 ; message ids are "m-" 16base32; a-z and 2-7, random
@@ -151,8 +151,8 @@ Unknown fields are kept through every edit, so a later version can add fields wi
 
 Nothing inside a block may end the HTML comment or hide text from a reader.
 
-- **`@data`**: `JSON.stringify`, then, **inside JSON strings only**, `<` `>` `-` `&` become `\u003c` `\u003e` `\u002d` `\u0026`, and so do C1 controls, U+2028/U+2029, bidi embeddings, overrides and isolates, the zero-width space, LRM/RLM, the Arabic letter mark and the BOM. `JSON.parse` reverses all of it. Outside strings JSON never puts two `-` next to each other, so negative numbers keep their plain `-`. For example `{"text":"a --> b <!-- c & d"}` is written as `{"text":"a \u002d\u002d\u003e b \u003c!\u002d\u002d c \u0026 d"}`.
-- **Readable text**: every `--` is written `-\-`. A line whose first non-blank text is `@`, `\`, `<<<<<<<`, `=======`, `>>>>>>>` or `|||||||` gets a leading `\`. Control characters, invisible characters and lone surrogates are shown as `\uXXXX`; in names, e-mails and tag summaries tabs and line breaks are too.
+- **`@data`**: `JSON.stringify`, then, **inside JSON strings only**, `<` `>` `-` `&` become `\u003c` `\u003e` `\u002d` `\u0026`, and so do C1 controls and every invisible character: format characters (bidi embeddings, overrides and isolates, the zero-width space, LRM/RLM, the Arabic letter mark, the BOM, the tag characters), private-use characters, U+2028/U+2029 and the other default-ignorable code points (word joiner, variation selectors, Hangul fillers). Four joiners stay raw because ordinary text needs them: ZWNJ, ZWJ, VS15 and VS16. `JSON.parse` reverses all of it. Outside strings JSON never puts two `-` next to each other, so negative numbers keep their plain `-`. For example `{"text":"a --> b <!-- c & d"}` is written as `{"text":"a \u002d\u002d\u003e b \u003c!\u002d\u002d c \u0026 d"}`.
+- **Readable text**: every `--` is written `-\-`. A line whose first non-blank text is `@`, `\`, `<<<<<<<`, `=======`, `>>>>>>>` or `|||||||` gets a leading `\`. C0 and C1 control characters (a tab is kept in message text), lone surrogates and the invisible characters listed above (except the four joiners) are shown as `\uXXXX`, one escape per UTF-16 unit; in names, e-mails and tag summaries tabs and line breaks are too. Unassigned code points are left as they are, so a newer Unicode version never changes how an old block renders.
 - The result never holds `--`, so it cannot hold `-->`, `--!>` or `<!--`.
 
 ## Placement
@@ -211,7 +211,9 @@ Erfana shows a file's comments but writes none when: the file is not UTF-8 (UTF-
 | `@data` nesting | 6 levels |
 | Author name / e-mail | 100 / 254 characters |
 | Quote text | 200 characters each for `exact`, `prefix` and `suffix` |
-| Classes kept per anchor | 8 |
+| Classes kept per anchor | 8 (each up to 100 characters, no whitespace) |
+| Anchor `id` / tag name | 200 / 128 characters |
+| `view` | `w`, `h` whole numbers 0 – 1,000,000; `dpr` above 0 and up to 16; `x`, `y` within ±1,000,000 |
 | Runtime path / view `#hash` | 1,024 / 512 characters |
 | File size | 4 MB |
 

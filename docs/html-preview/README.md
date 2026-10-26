@@ -153,6 +153,44 @@ A page can also be opened outside Erfana, in your own web browser – for browse
 
 **This page runs unsealed.** In a real browser the page has no sandbox, no host allowlist and open network access. It is started only from Erfana's own interface – a previewed page cannot trigger it – and this is recorded as an accepted risk in [Security § HTML preview](../security.md#html-preview).
 
+## Comments
+
+You can leave comments on the elements of a previewed page. A comment is saved **inside the `.html` file**, as an ordinary HTML comment right before the element. Browsers do not show it, it travels with the file through git, and a coding agent that reads the file sees your request next to the markup it is about. The file format is described in [HTML comments format v1](../html-comments/format-v1.md).
+
+**Comment mode.** Turn it on with the **Comment mode** button in the preview's toolbar, or press **Ctrl+Alt+M** (macOS: **Cmd+Option+M**). While it is on, the page is frozen for clicking: hovering outlines an element and shows its label, and a click picks it instead of running the page's own click handlers. Wheel scrolling still works. **Esc** leaves the mode.
+
+- **Click** an element to open the comment window. **Right-click** opens a small menu with **Add comment**.
+- **Keyboard**: Tab and Shift+Tab move the outline to the next or previous element, Alt+Up Arrow selects the parent (and, from the top of a frame, the frame element), Alt+Down Arrow the first child, Enter opens the comment window and Shift+F10 or the Menu key opens the menu.
+- **The comment window** takes the text (up to 4,000 characters) and saves with **Save** or Ctrl+Enter (Cmd+Enter on macOS). It also shows the thread of an element that already has comments, where you can reply, edit, resolve, re-open or delete. Your text is kept if a save fails.
+
+**Pins.** An element with comments shows a small speech-bubble pin in the page. Click it to open its thread. The **Show comment icons** button hides or shows the pins for this tab only; the choice is not saved. Pins are left out of a PDF export.
+
+**The drawer.** The **Comments** button in the toolbar (its name says how many are open, for example "Comments, 3 open, 1 needs attention") opens a drawer that lists every comment in the page and in its same-project frames, filtered by **Open**, **Resolved** and **Needs attention**. **Show on page** scrolls to the element and flashes it. A comment whose element is hidden right now is tagged **Not visible now**; one whose element is gone is tagged **Element not found** and stays in the file. A very long list shows only the rows near the screen.
+
+**Identity.** The first time you comment, Erfana asks for your name (and an optional email) and tells you who can read them: anyone who can open the file, in the page source and in git history once pushed. A script in a page you preview can read them too. Both are stored in Erfana's own settings (`~/.erfana/settings.json`), never in the project, and you can change them in **Settings > Comments**. Changing your name affects new comments only. Erfana does not check who a name belongs to.
+
+**Where comments are stored.** In the `.html` file itself. Deleting a comment removes its block, and git history keeps earlier versions. If the same file is open in an editor tab with unsaved changes, Erfana asks you to save those first ("Save your edits first"), so the two writes cannot overwrite each other. Erfana writes the file in one step and only if it is still exactly the file it read; if it changed in the meantime, the save is refused and your text stays in the window.
+
+**When comments are unavailable.** The toolbar tooltip says why. The usual reasons:
+
+| Reason | What happens |
+|---|---|
+| The file is over **4 MB** | The page still previews, but it shows no comments and takes none |
+| The file is not UTF-8 | Existing comments are shown read-only; no new ones |
+| The file holds an unresolved git conflict | Read-only until you resolve it |
+| The file is a link to another file, or has other hard links | Erfana will not write to it |
+| The page has too many elements | Comments are unavailable for that page |
+| The page keeps removing Erfana's overlay | Comments are unavailable for that page |
+| An `<iframe srcdoc>` or a remote frame | You cannot comment inside it; you can comment on the `<iframe>` element itself |
+
+A comment block that has been damaged (for example by a hand edit) or was written by a newer Erfana is shown read-only. You can open it in the source or delete a damaged block.
+
+**Framework pages.** Pages that a framework hydrates from server-rendered markup (Vue, Svelte, Angular) do not tolerate an extra comment inside the markup they hydrate. For those pages Erfana places the block **before the app's root container** and remembers the element you clicked by its path inside it. The comment still pins to the right element. **Limitation:** a page script that walks `childNodes` can see comment blocks anywhere in the document, because that is what they are. React pages are not affected.
+
+**Other limits.** A page `<dialog>` or popover opened later sits above Erfana's pins; while a page modal is open the pins cannot be clicked. A page can read the comments in its own file, names and emails included; see [Security § HTML Preview comments](../security.md#html-preview-comments). An editor tab in another Erfana window is not seen by the unsaved-changes guard.
+
+**The off-switch.** **Settings > Comments > Comments in HTML preview** (`htmlPreview.comments.enabled`, on by default). With it off, previews behave exactly as before: no comment mode, no pins, no instrumented page. Turning it off never touches comment blocks already in your files.
+
 ## Failure reporting
 
 Failures – script errors, missing local files, network timeouts, blocked hosts, blocked links, unsupported asset types, refused frames (see [Frames](#frames)) – accumulate quietly into a badge that carries a count. Opening the badge lists the individual failures with enough detail to identify the cause. Blocked addresses additionally appear in the permission band described above. Nothing interrupts the page; the badge is the single place failures gather.
