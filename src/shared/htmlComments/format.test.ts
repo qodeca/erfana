@@ -316,6 +316,33 @@ describe('escaping', () => {
     expect(block).toContain(uEsc(0xd83d))
   })
 
+  it('U-007 tag characters, joiners, fillers, selectors and private use never reach the file raw; ZWNJ, ZWJ, VS15 and VS16 stay as typed', () => {
+    // Security review F5: tag characters (U+E0000–E007F) can carry text no reader sees
+    const hidden = [
+      0xe0072, 0xe006d, 0xe0001, 0xe007f, 0x2060, 0x2064, 0x2065, 0xad, 0x180e, 0x3164, 0x115f,
+      0x34f, 0xfe00, 0xe0100, 0xe000, 0xf0000, 0xfff9
+    ].map(ch)
+    const kept = [0x200c, 0x200d, 0xfe0e, 0xfe0f].map(ch)
+    const text = `a${hidden.join('b')}c ${kept.join('d')} e`
+
+    const block = serialize(withText(text))
+
+    expect(okData(block).msgs[0].text).toBe(text)
+    for (const raw of hidden) expect(block).not.toContain(raw)
+    for (const raw of kept) expect(escapeReadableLine(raw)).toBe(raw)
+    // A character past U+FFFF is shown as both of its code units
+    expect(escapeReadableLine(`x${ch(0xe0072)}`)).toBe(`x${uEsc(0xdb40)}${uEsc(0xdc72)}`)
+    expect(escapeReadableInline(ch(0xe0072))).toBe(`${uEsc(0xdb40)}${uEsc(0xdc72)}`)
+  })
+
+  it('U-007 an unassigned code point is shown as typed, so the readable text never changes with the Unicode version', () => {
+    // U+FDD0 is a noncharacter: unassigned (Cn) for good, and not default-ignorable
+    const unassigned = ch(0xfdd0)
+
+    expect(escapeReadableLine(`x${unassigned}`)).toBe(`x${unassigned}`)
+    expect(okData(serialize(withText(unassigned))).msgs[0].text).toBe(unassigned)
+  })
+
   it('U-009 line breaks inside text use the block line break in readable text; @data keeps them exactly', () => {
     const text = 'one\r\ntwo\rthree\nfour'
     const block = serialize(withText(text), { indent: '  ', eol: '\r\n' })

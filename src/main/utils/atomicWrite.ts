@@ -8,9 +8,11 @@
  *
  * @see ProjectLockService.ts - uses atomic writes for lock files
  * @see Spec #010 - Multi-instance support specification
+ * @see atomicWriteBytesStrict.ts - the strict, no-fallback variant for HTML
+ *   Preview comment writes, built from the helpers exported here
  */
 import { writeFile, rename, unlink, lstat, open, access, constants } from 'node:fs/promises'
-import { realpath as realpathCallback } from 'node:fs'
+import { realpath as realpathCallback, type Stats } from 'node:fs'
 import { dirname, join, basename } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { logger } from '../services/LoggingService'
@@ -32,7 +34,7 @@ export function isAtomicTempName(path: string): boolean {
 /** Mode a new file gets – the same as `fs.writeFile` (umask applies). */
 const DEFAULT_NEW_FILE_MODE = 0o666
 /** Permission bits kept from the original file (setuid etc. are not copied). */
-const PERMISSION_BITS = 0o777
+export const PERMISSION_BITS = 0o777
 /** Owner-write bit of a mode. */
 const OWNER_WRITE_BIT = 0o200
 
@@ -166,6 +168,51 @@ async function fallBackInPlace(filePath: string, data: string, step: string, err
 }
 
 /**
+ * Why replacing the existing file `filePath` (whose `lstat` is `info`) by a
+ * rename would be wrong, or `null` when a rename is fine:
+ *  - `link`: a symlink, or a file with other hard links – a rename would replace
+ *    the link itself, or detach this name from the other names;
+ *  - `not-owner`: another user's file (POSIX) – a rename would change its owner;
+ *  - `read-only`: read-only for its owner, or not writable – the save must keep
+ *    failing, where a rename would silently replace it (the folder is writable).
+ * Checked in that order.
+ */
+export async function renameBlocker(
+  filePath: string,
+  info: Stats
+): Promise<'link' | 'not-owner' | 'read-only' | null> {
+  if (info.isSymbolicLink() || info.nlink > 1) return 'link'
+  if (process.platform !== 'win32' && typeof process.getuid === 'function' && info.uid !== process.getuid()) {
+    return 'not-owner'
+  }
+  if ((info.mode & OWNER_WRITE_BIT) === 0) return 'read-only'
+  try {
+    await access(filePath, constants.W_OK)
+  } catch {
+    return 'read-only'
+  }
+  return null
+}
+
+/**
+ * `filePath` with its last segment spelled as on disk. On a case-insensitive
+ * disk `Notes.md` can name the file `notes.md`: a save must rename onto the
+ * on-disk spelling, or the file would be renamed by its own save. The path is
+ * returned as given when it cannot be resolved.
+ */
+export async function onDiskSpelling(filePath: string): Promise<string> {
+  try {
+    const real = await realpathNative(filePath)
+    if (basename(real).toLowerCase() === basename(filePath).toLowerCase()) {
+      return join(dirname(filePath), basename(real))
+    }
+  } catch {
+    // keep the path as given
+  }
+  return filePath
+}
+
+/**
  * What a save of `filePath` does: write in place (`null`), or replace the
  * returned on-disk path by rename, keeping the returned mode (`undefined`
  * mode = a new file).
@@ -180,31 +227,8 @@ async function planAtomicTarget(
     if (errorCode(error) === 'ENOENT') return { target: filePath, mode: undefined }
     throw error
   }
-  if (info.isSymbolicLink() || info.nlink > 1) return null
-  // Not ours (a file of another user in a shared folder): a rename would change its owner
-  if (process.platform !== 'win32' && typeof process.getuid === 'function' && info.uid !== process.getuid()) {
-    return null
-  }
-  // Read-only files keep refusing to save: an in-place write fails with EACCES,
-  // where a rename would silently replace the file (the folder is writable).
-  if ((info.mode & OWNER_WRITE_BIT) === 0) return null
-  try {
-    await access(filePath, constants.W_OK)
-  } catch {
-    return null
-  }
-  // On a case-insensitive disk `Notes.md` can name the file `notes.md`: rename onto
-  // the on-disk spelling, or the file would be renamed by its own save.
-  let target = filePath
-  try {
-    const real = await realpathNative(filePath)
-    if (basename(real).toLowerCase() === basename(filePath).toLowerCase()) {
-      target = join(dirname(filePath), basename(real))
-    }
-  } catch {
-    // keep the path as given
-  }
-  return { target, mode: info.mode & PERMISSION_BITS }
+  if ((await renameBlocker(filePath, info)) !== null) return null
+  return { target: await onDiskSpelling(filePath), mode: info.mode & PERMISSION_BITS }
 }
 
 /**
@@ -275,7 +299,13 @@ export async function atomicWriteText(filePath: string, data: string): Promise<v
   }
 }
 
-async function renameWithRetry(from: string, to: string): Promise<void> {
+/**
+ * `rename(from, to)`, retried after 10, 30 and 100 ms while it fails with
+ * EPERM, EBUSY or EACCES – on Windows, antivirus or the search indexer can
+ * hold the target for a moment (Node issue #29481). Any other error, or the
+ * last retry's, is thrown.
+ */
+export async function renameWithRetry(from: string, to: string): Promise<void> {
   for (let attempt = 0; attempt <= RENAME_BACKOFFS_MS.length; attempt++) {
     try {
       await rename(from, to)

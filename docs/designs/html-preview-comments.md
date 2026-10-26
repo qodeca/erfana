@@ -231,6 +231,7 @@ Author = { "name" ≤100, "email"? ≤254, "role":"human" }    ; "agent" reserve
 - **`@data`**: `JSON.stringify`, then `<` → `\u003c`, `>` → `\u003e`, `-` → `\u002d`, `&` → `\u0026`, U+2028/2029 and bidi/control characters → `\uXXXX`. `--`, `-->`, `--!>`, `<!--` and a trailing `<!-` become impossible; `JSON.parse` reverses everything. The reviver drops `__proto__`, `constructor`, `prototype`; depth ≤ 6.
 - **Readable text** (display only, never parsed for data): `--` → `-\-` (repeatedly); a line starting with `@`, `<<<<<<<`, `=======`, `>>>>>>>` or `\` gets a leading `\`; bidi and control characters shown as `\uXXXX`. The spec states "`-\-` reads as `--`".
 - **Author name / email**: bidi and control characters are refused on write.
+- **Character sets (P2 security review, F5)**: "bidi and control characters" means the Unicode property set `\p{Cc} \p{Cf} \p{Cs} \p{Co} \p{Cn} \p{Zl} \p{Zp} \p{Default_Ignorable_Code_Point}`. Author name and email refuse the whole set. The readable-text escaper escapes the same set except unassigned code points (`\p{Cn}`, so an engine upgrade never turns old text into a mismatch) and four joiners kept raw: ZWNJ, ZWJ, VS15, VS16. Code points above U+FFFF are escaped as both surrogate halves.
 
 ### 5.5 Finding blocks
 
@@ -754,7 +755,7 @@ IDs: `HPC-U` unit, `HPC-P` property, `HPC-G` golden, `HPC-M` main, `HPC-I` IPC, 
 - SEC-07 `commentSave` from the preview webContents, a sub-frame or a forged origin refused before parsing.
 - SEC-08 reused, expired, other-window or pre-project-switch draft tokens refused.
 - SEC-09 frame `pushState`s to another path → comment still targets its navigated file, or is refused.
-- SEC-10 symlink (in/out), hard link, ADS name, gitignored, `node_modules`, dot-folder, `.html`→`.sh`, `srcdoc`/remote frame → refused, every byte unchanged.
+- SEC-10 symlink (in/out), hard link, ADS name, `node_modules`, dot-folder, `.html`→`.sh`, `srcdoc`/remote frame → refused, every byte unchanged; a gitignored page the preview serves stays commentable (decision 35, M-055).
 - SEC-11 file changed or swapped just before rename → refused or re-located; never a stale write.
 - SEC-12 text and snapshot fuzz (`-->`, `--!>`, `<!--`, `--->`, `<!-->`, `</script>`, backslash escape, NUL, lone surrogates) round-trips; parse5 sees no new elements.
 - SEC-13 insertion refused inside `script`, `style`, `textarea`, `title`, `template`, `noscript`, `iframe`, attributes, before the BOM.

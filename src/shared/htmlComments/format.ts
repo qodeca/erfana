@@ -257,41 +257,45 @@ function unitRange(from: number, to: number): string {
 }
 
 /**
- * Characters invisible to a reader, or able to reorder what they see: the
- * Arabic letter mark, zero-width space, LRM and RLM, the line and paragraph
- * separators, the bidi embeddings, overrides and isolates, and the BOM. Built
- * from numbers, so this source file holds no invisible character itself.
+ * The joiners ordinary text needs, kept raw although they are format or
+ * default-ignorable characters: ZWNJ and ZWJ (Persian and Indic shaping, emoji
+ * sequences) and the text and emoji presentation selectors VS15 and VS16.
  */
-const INVISIBLE_CLASS = [
-  unitEscape(0x061c),
-  unitEscape(0x200b),
-  unitRange(0x200e, 0x200f),
-  unitRange(0x2028, 0x202e),
-  unitRange(0x2066, 0x2069),
-  unitEscape(0xfeff)
-].join('')
-const HIGH_SURROGATE = `[${unitRange(0xd800, 0xdbff)}]`
-const LOW_SURROGATE = `[${unitRange(0xdc00, 0xdfff)}]`
+const TEXT_JOINERS = `[${unitRange(0x200c, 0x200d)}${unitRange(0xfe0e, 0xfe0f)}]`
+
+/**
+ * Characters invisible to a reader, or able to reorder or hide what they see,
+ * by Unicode property (a `u`-flag pattern): format characters (Cf – the
+ * Arabic letter mark, zero-width space, LRM and RLM, the bidi embeddings,
+ * overrides and isolates, the BOM, the tag characters U+E0000–E007F), private
+ * use (Co), the line and paragraph separators, and every default-ignorable
+ * code point (the word joiner, variation selectors, Hangul fillers) – minus
+ * {@link TEXT_JOINERS}. Unassigned code points are deliberately NOT in it:
+ * which ones are unassigned changes with the Unicode version, and a newer
+ * Erfana must render the readable text of a block exactly as an older one
+ * did, or the block would read as `readable-mismatch`. Written as escapes and
+ * numbers, so this source file holds no invisible character itself.
+ */
+const INVISIBLE = `(?!${TEXT_JOINERS})[\\p{Cf}\\p{Co}\\p{Zl}\\p{Zp}\\p{Default_Ignorable_Code_Point}]`
 
 /**
  * Characters escaped inside `@data` strings. `JSON.stringify` already escapes
  * C0 controls and lone surrogates; these are the rest that could end the
  * comment (`<`, `>`, `-`), confuse an HTML-aware reader (`&`), break a
- * JavaScript reader (U+2028/2029) or hide text from a human (C1, bidi,
- * zero-width, BOM).
+ * JavaScript reader (U+2028/2029) or hide text from a human (C1 and the
+ * invisible characters above).
  */
-const JSON_ESCAPED = new RegExp(`[<>&\\-${unitRange(0x7f, 0x9f)}${INVISIBLE_CLASS}]`, 'g')
+const JSON_ESCAPED = new RegExp(`[<>&\\-${unitRange(0x7f, 0x9f)}]|${INVISIBLE}`, 'gu')
 
 /**
  * Characters the readable text shows as `\uXXXX`: C0 and C1 controls (tab
- * kept), the invisible characters above, and lone surrogates (which UTF-8
- * cannot store).
+ * kept), lone surrogates (which UTF-8 cannot store; under the `u` flag `Cs`
+ * matches only an unpaired one) and the invisible characters above.
  */
 const READABLE_ESCAPED = new RegExp(
   `[${unitRange(0x00, 0x08)}${unitEscape(0x0b)}${unitEscape(0x0c)}${unitRange(0x0e, 0x1f)}` +
-    `${unitRange(0x7f, 0x9f)}${INVISIBLE_CLASS}]` +
-    `|${HIGH_SURROGATE}(?!${LOW_SURROGATE})|(?<!${HIGH_SURROGATE})${LOW_SURROGATE}`,
-  'g'
+    `${unitRange(0x7f, 0x9f)}\\p{Cs}]|${INVISIBLE}`,
+  'gu'
 )
 
 /** Inline contexts (names, tag summaries) also escape tab and line breaks. */
@@ -300,8 +304,11 @@ const INLINE_BREAKS = /[\t\n\r]/g
 /** A readable line whose first non-blank characters would look like data or a merge marker. */
 const LEAD_NEEDS_ESCAPE = /^(?:@|\\|<{7}|={7}|>{7}|\|{7})/
 
+/** `\uXXXX` for every UTF-16 code unit of `ch` – two for a character past U+FFFF, such as a tag character. */
 function unicodeEscape(ch: string): string {
-  return unitEscape(ch.charCodeAt(0))
+  let escaped = ''
+  for (let i = 0; i < ch.length; i++) escaped += unitEscape(ch.charCodeAt(i))
+  return escaped
 }
 
 /** `--` → `-\-`, repeatedly, so no two dashes ever touch. */
