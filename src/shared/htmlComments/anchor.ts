@@ -15,12 +15,14 @@
  * cheapest first: a unique `id` + tag, the unique CSS path, a unique text
  * quote (exact text, then the text around it). Two equal candidates leave the
  * block ORPHANED – a guess is worse than "element not found" – and nothing
- * here ever moves or deletes a block (decision 21).
+ * here ever moves or deletes a block (decision 21). The `id` and quote tiers
+ * answer from tables built once per parse (`anchorLookup.ts`), so many
+ * orphaned blocks cost about as much as one.
  *
  * Quote text is the element's readable text (no `script`, `style`,
  * `noscript`, template content) with whitespace runs collapsed to one space,
  * trimmed and NFC-normalised, so reformatting and NFD file names typed on
- * macOS do not break a match (U-088).
+ * macOS do not break a match (U-088; `quoteText.ts`).
  */
 import {
   defaultTreeAdapter,
@@ -29,6 +31,7 @@ import {
   type DefaultTreeAdapterMap
 } from 'parse5'
 import { PREVIEW_LIMITS } from '../preview-limits'
+import { anchorLookupOf } from './anchorLookup'
 import { utf8Length } from './encoding'
 import {
   ANCHOR_CLASS_MAX_CHARS,
@@ -39,18 +42,13 @@ import {
   type TextQuote
 } from './format'
 import type { HtmlIndex, IndexedElement, Parse5Element } from './htmlIndex'
+import { exactOf, prefixOf, suffixOf } from './quoteText'
+
+export { QUOTE_CONTEXT_CHARS } from './quoteText'
 
 type ChildNode = DefaultTreeAdapterMap['childNode']
 type ParentNode = DefaultTreeAdapterMap['parentNode']
 
-/** Characters of context kept on each side of a quote. */
-export const QUOTE_CONTEXT_CHARS = 32
-/** Raw characters scanned on each side of an element for its context. */
-const CONTEXT_WINDOW = 512
-/** Extra characters collected before NFC, which may compose a few away. */
-const NFC_SLACK = 8
-
-const WHITESPACE = /\s/
 const HTML_WHITESPACE: ReadonlySet<string> = new Set([' ', '\t', '\n', '\f', '\r'])
 const NTH_SEGMENT = /^(.+):nth-of-type\((\d+)\)$/
 /** The anchored header test of §5.5, applied to a short head of the comment text. */
@@ -70,84 +68,9 @@ export function isBlockHeader(commentData: string): boolean {
   return BLOCK_HEADER.test(commentData.slice(0, HEADER_PROBE_CHARS))
 }
 
-function isHighSurrogate(unit: number): boolean {
-  return unit >= 0xd800 && unit <= 0xdbff
-}
-
-function isLowSurrogate(unit: number): boolean {
-  return unit >= 0xdc00 && unit <= 0xdfff
-}
-
 /** Whitespace collapsed to single spaces, trimmed, NFC. */
 export function normalizeQuoteText(text: string): string {
   return text.replace(/\s+/g, ' ').trim().normalize('NFC')
-}
-
-/** At most `max` characters from the start, never splitting a surrogate pair. */
-function cutHead(text: string, max: number): string {
-  if (text.length <= max) return text
-  const end = isHighSurrogate(text.charCodeAt(max - 1)) ? max - 1 : max
-  return text.slice(0, end).trimEnd()
-}
-
-/** At most `max` characters from the end, never splitting a surrogate pair. */
-function cutTail(text: string, max: number): string {
-  if (text.length <= max) return text
-  const start = text.length - max
-  return text.slice(isLowSurrogate(text.charCodeAt(start)) ? start + 1 : start).trimStart()
-}
-
-/** Normalised text of `text[from, to)`, read forwards, at most `max` characters. */
-function headText(text: string, from: number, to: number, max: number): string {
-  let out = ''
-  let gap = false
-  for (let i = from; i < to && out.length < max + NFC_SLACK; i += 1) {
-    const ch = text[i]
-    if (WHITESPACE.test(ch)) {
-      gap = out.length > 0
-      continue
-    }
-    if (gap) out += ' '
-    gap = false
-    out += ch
-  }
-  return cutHead(out.normalize('NFC'), max)
-}
-
-/** Normalised text of `text[from, to)`, read backwards, at most `max` characters. */
-function tailText(text: string, from: number, to: number, max: number): string {
-  let out = ''
-  let gap = false
-  for (let i = to - 1; i >= from && out.length < max + NFC_SLACK; i -= 1) {
-    const ch = text[i]
-    if (WHITESPACE.test(ch)) {
-      gap = out.length > 0
-      continue
-    }
-    if (gap) out = ` ${out}`
-    gap = false
-    out = ch + out
-  }
-  return cutTail(out.normalize('NFC'), max)
-}
-
-function exactOf(index: HtmlIndex, el: IndexedElement): string {
-  return headText(
-    index.visibleText,
-    el.textStart,
-    el.textEnd,
-    PREVIEW_LIMITS.COMMENT_QUOTE_MAX_CHARS
-  )
-}
-
-function prefixOf(index: HtmlIndex, el: IndexedElement): string {
-  const from = Math.max(0, el.textStart - CONTEXT_WINDOW)
-  return tailText(index.visibleText, from, el.textStart, QUOTE_CONTEXT_CHARS)
-}
-
-function suffixOf(index: HtmlIndex, el: IndexedElement): string {
-  const to = Math.min(index.visibleText.length, el.textEnd + CONTEXT_WINDOW)
-  return headText(index.visibleText, el.textEnd, to, QUOTE_CONTEXT_CHARS)
 }
 
 /** The element's text quote, or `undefined` when it has no text. */
@@ -178,37 +101,21 @@ function attached(el: IndexedElement, via: TargetVia): TargetResolution {
   return { state: 'attached', startOffset: el.start, via }
 }
 
-function unique<T>(items: readonly T[]): T | undefined {
-  return items.length === 1 ? items[0] : undefined
-}
-
-function byQuote(index: HtmlIndex, anchor: CommentAnchor): IndexedElement | undefined {
-  const quote = anchor.quote
-  if (!quote) return undefined
-  const sameTag = index.elements.filter(el => el.tag === anchor.tag)
-  const exact = sameTag.filter(el => exactOf(index, el) === quote.exact)
-  if (exact.length === 1) return exact[0]
-  if (!quote.prefix && !quote.suffix) return undefined
-  const pool = exact.length > 1 ? exact : sameTag
-  return unique(
-    pool.filter(el => prefixOf(index, el) === quote.prefix && suffixOf(index, el) === quote.suffix)
-  )
-}
-
 /**
  * Find an anchor's element without the position rule – for a block whose
  * position no longer matches, or for a draft re-anchored at Save (§7.6).
  */
 export function findAnchorTarget(index: HtmlIndex, anchor: CommentAnchor): TargetResolution {
+  const lookup = anchorLookupOf(index)
   if (anchor.id) {
-    const el = unique(index.elementsWithId(anchor.id).filter(cand => cand.tag === anchor.tag))
+    const el = lookup.byId(anchor.tag, anchor.id)
     if (el) return attached(el, 'id')
   }
   if (anchor.path) {
     const el = index.elementAtPath(anchor.path)
     if (el && el.tag === anchor.tag) return attached(el, 'path')
   }
-  const el = byQuote(index, anchor)
+  const el = anchor.quote && lookup.byQuote(anchor.tag, anchor.quote)
   return el ? attached(el, 'quote') : { state: 'orphaned' }
 }
 

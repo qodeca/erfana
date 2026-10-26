@@ -283,6 +283,8 @@ interface FileCommentState {
 4. Unique text-quote match (exact, then prefix/suffix; whitespace collapsed, NFC).
 5. Otherwise **orphaned**. A block is never moved or deleted automatically (decision 21). Two equal candidates → orphaned, never a guess.
 
+Work budget (added after P3): steps 2–4 use lookup tables built once per parse (`anchorLookup.ts`), and all quote reads in one parse share a budget of 40 million characters (a dense 4 MB page needs 12–19 million). Past the budget, the remaining blocks that still need step 4 are orphaned, with no error. This keeps a hostile page from stalling the parse worker (450 orphaned blocks on 4 MB: 6.9 s → about 0.3 s).
+
 ## 6. Element → source mapping
 
 | Option | Verdict |

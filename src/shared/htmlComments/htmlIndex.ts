@@ -61,6 +61,12 @@ const TAG_NAME_END = /[\t\n\f\r />]/
 /** ASCII whitespace, which splits a `class` attribute. */
 const ASCII_WHITESPACE = /[\t\n\f\r ]+/
 
+/** Joins the segments of a CSS path ({@link HtmlIndex.pathOf}); a tag name never holds a space. */
+const PATH_SEPARATOR = ' > '
+const NTH_OF_TYPE = ':nth-of-type('
+/** A position as {@link HtmlIndex.segmentOf} writes it: no sign, no leading zero. */
+const NTH_DIGITS = /^[1-9]\d*$/
+
 /** One element that may receive a comment block before its start tag. */
 export interface IndexedElement {
   readonly node: Parse5Element
@@ -142,7 +148,8 @@ export class HtmlIndex {
   private readonly byNode: ReadonlyMap<Parse5Element, IndexedElement>
   private readonly nthOfType: WeakMap<Parse5Element, number>
   private idMap: Map<string, IndexedElement[]> | undefined
-  private pathMap: Map<string, IndexedElement> | undefined
+  /** Per parent visited by {@link HtmlIndex.elementAtPath}: its element children by tag, in order. */
+  private readonly childrenByTag = new Map<ParentNode, Map<string, Parse5Element[]>>()
 
   constructor(
     readonly text: string,
@@ -188,12 +195,58 @@ export class HtmlIndex {
     return this.idMap.get(id) ?? []
   }
 
-  /** The eligible element at an absolute CSS path from {@link HtmlIndex.pathOf}. */
+  /**
+   * The eligible element at an absolute CSS path from {@link HtmlIndex.pathOf}.
+   *
+   * The path is walked down from the document one segment at a time, each
+   * parent's children grouped by tag once, so a lookup costs about its own
+   * length, not the page's: a map of every element's path cost about 190 ms
+   * at 4 MB, and time and memory in the square of the depth on a deeply
+   * nested page. Two elements can share a path only through a bare singleton
+   * segment (an SVG `<html>` repeated under one parent) – the one case where a
+   * step visits more than one element; the last eligible one in tree order
+   * answers, as such a map would.
+   */
   elementAtPath(path: string): IndexedElement | undefined {
-    if (!this.pathMap) {
-      this.pathMap = new Map(this.elements.map(el => [this.pathOf(el.node), el]))
+    let level: readonly ParentNode[] = [this.document]
+    for (const segment of path.split(PATH_SEPARATOR)) {
+      level = level.flatMap(parent => this.childrenAt(parent, segment))
+      if (level.length === 0) return undefined
     }
-    return this.pathMap.get(path)
+    for (let i = level.length - 1; i >= 0; i -= 1) {
+      const el = this.byNode.get(level[i] as Parse5Element)
+      if (el) return el
+    }
+    return undefined
+  }
+
+  /** The element children of `parent` whose {@link HtmlIndex.segmentOf} is `segment`, in order. */
+  private childrenAt(parent: ParentNode, segment: string): readonly Parse5Element[] {
+    const byTag = this.childTable(parent)
+    if (SINGLETON_TAGS.has(segment)) return byTag.get(segment) ?? []
+    const open = segment.lastIndexOf(NTH_OF_TYPE)
+    if (open <= 0 || !segment.endsWith(')')) return []
+    const tag = segment.slice(0, open)
+    const digits = segment.slice(open + NTH_OF_TYPE.length, -1)
+    // A singleton is always written bare, so `body:nth-of-type(1)` names nothing.
+    if (!NTH_DIGITS.test(digits) || SINGLETON_TAGS.has(tag)) return []
+    const child = byTag.get(tag)?.[Number(digits) - 1]
+    return child ? [child] : []
+  }
+
+  private childTable(parent: ParentNode): Map<string, Parse5Element[]> {
+    let table = this.childrenByTag.get(parent)
+    if (!table) {
+      table = new Map()
+      for (const child of parent.childNodes) {
+        if (!isElement(child)) continue
+        const list = table.get(child.tagName)
+        if (list) list.push(child)
+        else table.set(child.tagName, [child])
+      }
+      this.childrenByTag.set(parent, table)
+    }
+    return table
   }
 
   /** 1-based position among the parent's element children with the same tag. */

@@ -6,7 +6,7 @@
  */
 import { defaultTreeAdapter, html as htmlSpec } from 'parse5'
 import { describe, expect, it } from 'vitest'
-import { BOM, elementOf } from './__fixtures__/commentTestData'
+import { BOM, LINE_SEP, elementOf } from './__fixtures__/commentTestData'
 import { attributeOf, indexHtml } from './htmlIndex'
 
 /** About 1.6 s alone; room for a loaded CI runner and coverage instrumentation. */
@@ -109,6 +109,59 @@ describe('text and paths', () => {
     expect(index.elementAtPath('html > body > nav:nth-of-type(1)')).toBeUndefined()
     expect(index.nthOf(elementOf(index, 'li', 1).node)).toBe(2)
     expect(index.segmentOf(elementOf(index, 'main').node)).toBe('main:nth-of-type(1)')
+  })
+
+  it('walks a path down to every element of a page, and only a path pathOf writes', () => {
+    const index = indexHtml(
+      '<body><main><p>a</p><section><p>b</p><p>c</p></section><table><tr><td>x</td></tr></table></main></body>'
+    )
+    for (const el of index.elements) expect(index.elementAtPath(index.pathOf(el.node))).toBe(el)
+    const td = elementOf(index, 'td')
+    expect(index.pathOf(td.node)).toBe(
+      'html > body > main:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1)'
+    )
+    const second = 'html > body > main:nth-of-type(1) > section:nth-of-type(1) > p:nth-of-type(2)'
+    expect(index.elementAtPath(second)).toBe(elementOf(index, 'p', 2))
+    for (const path of [
+      '',
+      'html',
+      'body',
+      'html > body > main',
+      'html > body:nth-of-type(1)',
+      'html > body > main:nth-of-type(01)',
+      'html > body > main:nth-of-type(0)',
+      'html > body > main:nth-of-type(+1)',
+      'html > body > main:nth-of-type(1',
+      'html > body > main:nth-of-type()',
+      'html > body > :nth-of-type(1)',
+      'html > body > main:nth-of-type(2)',
+      'html > body > main:nth-of-type(1) > ',
+      'html > body > main:nth-of-type(1) > table:nth-of-type(1) > tbody:nth-of-type(1)'
+    ]) {
+      expect(index.elementAtPath(path), path).toBeUndefined()
+    }
+  })
+
+  it('finds tags whose names hold the path syntax or a line separator', () => {
+    const index = indexHtml(
+      `<main><x:nth-of-type(2) id="odd"></x:nth-of-type(2)><a${LINE_SEP}b id="ls"></a${LINE_SEP}b></main>`
+    )
+    for (const id of ['odd', 'ls']) {
+      const el = index.elementsWithId(id)[0]
+      expect(index.elementAtPath(index.pathOf(el.node))).toBe(el)
+    }
+    expect(index.pathOf(index.elementsWithId('odd')[0].node)).toBe(
+      'html > body > main:nth-of-type(1) > x:nth-of-type(2):nth-of-type(1)'
+    )
+  })
+
+  it('answers the last element in tree order when two share a path (repeated SVG <html>)', () => {
+    const index = indexHtml(
+      '<svg><html><g id="one"></g></html><html><g id="two"></g></html></svg>'
+    )
+    const [one, two] = ['one', 'two'].map(id => index.elementsWithId(id)[0])
+    expect(index.pathOf(one.node)).toBe(index.pathOf(two.node))
+    expect(index.elementAtPath(index.pathOf(one.node))).toBe(two)
   })
 
   it('treats an element it never saw as the first of its type', () => {
