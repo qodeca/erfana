@@ -79,9 +79,9 @@ export class HtmlPreviewPage {
       await tree.expandTo(segments.slice(0, -1).map((_, i) => segments.slice(0, i + 1).join('/')))
       // A file a test wrote a moment ago reaches the tree through the directory
       // watcher, which on Windows can lag (known-flakes.md, directory-watcher row)
-      // or miss the event. Re-expanding alone serves the cached listing, so the
-      // retry presses the tree's Refresh (a disk re-read), re-opens the
-      // ancestors and repeats until the row shows.
+      // or miss the event (the watch-start gap is now closed by a catch-up
+      // refresh). As a last resort the retry presses the tree's Refresh (a
+      // disk re-read), re-opens the ancestors and repeats until the row shows.
       const row = tree.fileRow(relPath)
       if (!(await row.isVisible().catch(() => false))) {
         const appeared = await row

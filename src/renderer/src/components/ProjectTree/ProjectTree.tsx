@@ -186,10 +186,10 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
 
   // The tree as rendered and operated on: the base tree with the children of
   // the lazy folders (ignored, or past the walk's cap) read on expand
-  // Only lazy folders in view are read: below the root row, through the filter shown
+  // Only lazy folders in view are read: below the root row, through the filter shown; an opened folder is checked against the disk
   const lazyView = useMemo(
-    () => ({ rootPath: projectPath, filter: filterMode === 'markdown' ? filterMarkdownTree : undefined }),
-    [projectPath, filterMode]
+    () => ({ rootPath: projectPath, filter: filterMode === 'markdown' ? filterMarkdownTree : undefined, onFolderStale: refreshFiles }),
+    [projectPath, filterMode, refreshFiles]
   )
   const {
     tree: files,

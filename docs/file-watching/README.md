@@ -314,7 +314,10 @@ Recommended:
 
 `useProjectManagement` keeps a `firstReadPending` state, and `initialLoadComplete` – what `useDirectoryWatcher` waits for – is now `projectPath !== null && !firstReadPending`. The `project:changed` listener sets it in the same synchronous block as `setProjectPath`, so the render that remounts the tree never starts a watcher early. It is cleared when that first read settles, **success or failure** (a failed first read can still self-heal through the watcher), when a superseding reload settles, on close, and on main's no-op re-open. Before #211 the flag was `true` from mount, so chokidar's initial scan (or the new backend's plan) competed with the first tree read. Git status still starts at once. Neither the tree read nor git status ever waits for the watcher's `ready`.
 
-One consequence, pre-existing in another form: a change made during the first read in a folder the walk has already passed, or before the watcher's plan has opened that folder's watch, shows up only with the next change or a manual refresh.
+**Closing the start gap.** A change made during the first read in a folder the walk has already passed, or before the watcher's plan has opened that folder's watch, is in no tree read and in no event: the watch that would report it did not exist yet. Until 2026-10-27 such a file showed only with the next change or a manual Refresh – collapsing and re-opening its folder served the same listing (design #211 risk R4, seen as the `html-preview-comments` E-004 e2e failure, see the [flake register](../windows/known-flakes.md)). Two fixes close it:
+
+- **A catch-up refresh at `ready`.** When the backend reports `ready` – every watch of the plan is open – `DirectoryWatcherEvents.handleWatchReady` sends one `directory-watch:changed` with `catchUp: true`, so the tree is read once more with the watch in place; while paused it records one unknown drop instead, like a resync. A restart's new watcher ends there too. A `ready` from a watcher that was replaced, or from an earlier session, is ignored. The cost is one extra tree read per watch start.
+- **Opening a folder checks it against the disk.** When the user opens one folder (click, key or drag hover), `useExpandReconcile` lists that folder once more – one shallow `file:readDirectory`, one level – and refreshes the whole tree only when the names or kinds on disk differ from what the tree shows. Not for the root row, a lazy folder (read on expand anyway) or several folders opened at once. So collapsing and re-opening a folder is a cheap recovery for any change a watcher missed, not only this one.
 
 ### Use Cases
 
@@ -327,6 +330,8 @@ One consequence, pre-existing in another form: a change made during the first re
 | Internal CRUD (create/delete/rename) | Watcher paused, no double refresh |
 | Another program (e.g. an agent in the terminal) adds or removes items while an internal CRUD runs | One catch-up refresh at resume; none when nothing outside changed or the operation's own refresh already showed it (#210) |
 | Expand folders, make external changes | Folders remain expanded after refresh |
+| A file is created right after the project opens, before the watcher is ready | One catch-up refresh when the watch is ready shows it |
+| Collapse a folder and open it again | Its listing is checked against the disk; a difference refreshes the tree |
 | Very large project keeps changing while the tree is being read | Changes are picked up by one follow-up read after the running one; reads never overlap and the tree never shows an older state (#208) |
 | Something keeps writing inside an excluded, hidden or ignored folder | Nothing reaches the renderer: no tree re-read, no git refresh (#211) |
 | A burst overflows a Windows change buffer | One debounced catch-up re-read about 1 s after the burst ends, at most every 5 s while it lasts (#211) |
@@ -362,12 +367,13 @@ One consequence, pre-existing in another form: a change made during the first re
 - **Service**: `src/main/services/DirectoryWatcherService.ts` – the public lifecycle (`watchDirectory`, `stopAll`, `setPathFilter`, `reportsRemovalsAbove`). Since v0.22.0 it is split into layers, each a class the next one extends (lens review finding [65]); the public API, IPC channels and log lines did not change:
   - `watcher/DirectoryWatcherCore.ts` – shared state, the path rules (`shouldDropRel`) and how a notice reaches the watching windows
   - `watcher/DirectoryWatcherRecovery.ts` – error classification, EMFILE teardown, restarts with back-off (`handleWatcherError`, `scheduleRestart`)
-  - `watcher/DirectoryWatcherEvents.ts` – the event pipeline and the pause API (`queueEvent`, `handleResync`, `pauseWatch`, `resumeWatch`)
+  - `watcher/DirectoryWatcherEvents.ts` – the event pipeline and the pause API (`queueEvent`, `handleResync`, `handleWatchReady`, `pauseWatch`, `resumeWatch`)
   - helpers: `watcher/directoryWatchBuilders.ts` (builds the chokidar or native backend), `watcher/directoryWatchTypes.ts` (shapes and batch rules such as `isStructuralBatch`), `watcher/DirectoryWatchListeners.ts` (removal and coverage listeners, #252)
 - **IPC Handlers**: `src/main/ipc/directory-watcher-handlers.ts`
 - **Renderer Hook**: `src/renderer/src/hooks/useDirectoryWatcher.ts` (lifecycle, event handling, AC-010 guard)
 - **Pure Logic**: `src/renderer/src/hooks/useDirectoryWatcher.logic.ts` (state guards, message creation)
 - **Pause Utility**: `src/renderer/src/components/ProjectTree/withWatcherPause.ts` (pause/resume wrapper)
+- **Folder check on open**: `src/renderer/src/components/ProjectTree/useExpandReconcile.ts` (one shallow read of the folder the user opens; a difference refreshes the tree), called from `useLazyFolderChildren`
 - **Pause episode (#210)**: `src/main/services/watcher/PauseEpisode.ts` (drop counting, own-change filter, read coverage; `recordUnknownDrop()` for a resync during a pause, #211); hooks in `src/main/ipc/file-handlers.ts`
 - **Path filter and exclude list (#211)**: `src/main/utils/projectPathFilter.ts` (`ProjectPathFilter`, `toRootRelative`, split paths and walk hints), `src/main/utils/excludeMatcher.ts` (the `files.exclude` matcher), `src/shared/ipc/files-exclude-schema.ts` (lenient schema); merged by `ProjectSettingsService`, applied by `ProjectService`
 - **Backends (#211)**: `src/main/services/watcher/directoryWatchBackend.ts` (selector and `DirectoryWatchHandle` seam), `NativeRecursiveWatcher.ts` (Windows plan, lost events, self-events), `NativeEventClassifier.ts` (the `lstat` queue)

@@ -19,7 +19,12 @@ import type { KnownEntriesRead, KnownEntryKind } from './KnownEntries'
 import { PauseEpisode, type InternalChange } from './PauseEpisode'
 import type { DirectoryWatchHandle, DirectoryWatchResyncReason } from './directoryWatchBackend'
 import { DirectoryWatcherRecovery } from './DirectoryWatcherRecovery'
-import { entryKindOf, isStructuralRawBatch, type DirectoryChangeEvent } from './directoryWatchTypes'
+import {
+  entryKindOf,
+  isStructuralRawBatch,
+  type DirectoryChangeEvent,
+  type WatchedDirectory
+} from './directoryWatchTypes'
 
 export abstract class DirectoryWatcherEvents extends DirectoryWatcherRecovery {
   /**
@@ -35,7 +40,34 @@ export abstract class DirectoryWatcherEvents extends DirectoryWatcherRecovery {
     this.metrics.recordNativeResync()
     const paused = watched.pauseController.isPaused()
     this.resyncLogger.log('info', 'Directory watcher resync', { reason, paused })
-    if (paused) {
+    this.catchUpOnUnknownChanges(dirPath, watched)
+  }
+
+  /**
+   * The backend's watch is in place (design #211, risk R4). From here on every
+   * change arrives as an event, but one made after the tree on screen was read
+   * and before this watch opened reached nobody: the watcher starts only after
+   * the first tree read (D12), and on Windows a folder's own watch opens later
+   * still, while the native watcher plans. Such a file never showed until the
+   * user pressed Refresh – re-expanding its folder serves the same listing. One
+   * catch-up refresh, sent now, closes the gap; while paused it counts as one
+   * unknown drop, like a resync. A restart's new watcher ends here too.
+   */
+  protected handleWatchReady(dirPath: string, watcher: DirectoryWatchHandle): void {
+    if (this.isDisposing) return
+    const watched = this.watchedDirectories.get(dirPath)
+    // A watcher replaced meanwhile (a restart), or one of an earlier session
+    if (!watched || watched.watcher !== watcher || watched.version !== this.switchVersion) return
+    this.catchUpOnUnknownChanges(dirPath, watched)
+  }
+
+  /**
+   * Changes may have been missed and nobody can say where: one catch-up
+   * refresh, or – while paused – one unknown drop, so resume catches up unless
+   * a later completed read by the pausing window covers it (#210).
+   */
+  private catchUpOnUnknownChanges(dirPath: string, watched: WatchedDirectory): void {
+    if (watched.pauseController.isPaused()) {
       watched.pauseEpisode?.recordUnknownDrop()
       return
     }
@@ -100,10 +132,11 @@ export abstract class DirectoryWatcherEvents extends DirectoryWatcherRecovery {
       this.handleWatcherError(dirPath, errorMessage)
     })
 
-    // Handle watcher ready
+    // Handle watcher ready – then catch up on what changed before the watch opened
     watcher.on('ready', () => {
       this.safeLog(`✅ Directory watcher ready for: ${dirPath}`)
       this.metrics.setActiveWatchers(this.watchedDirectories.size)
+      this.handleWatchReady(dirPath, watcher)
     })
   }
 

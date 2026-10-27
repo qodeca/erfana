@@ -791,6 +791,118 @@ describe('DirectoryWatcherService native backend (#211, W13)', () => {
     })
   })
 
+  // A change made after the first tree read and before the watch opened is in
+  // no event (design #211 risk R4; the real-file-system proof is
+  // DirectoryWatcherService.startGap.win32.test.ts)
+  describe('ready closes the watch-start gap', () => {
+    const catchUp = expect.objectContaining({ dirPath: ROOT, eventCount: 0, structural: true, catchUp: true })
+
+    it('sends one catch-up refresh when the watch is ready, and nothing before', async () => {
+      await svc.watchDirectory(ROOT, webContents)
+      expect(harness.sends).toHaveLength(0)
+
+      latestNative().emit('ready')
+
+      expect(harness.sends).toEqual([{ channel: 'directory-watch:changed', payload: catchUp }])
+    })
+
+    it('counts ready while paused as one unknown drop and catches up at resume', async () => {
+      const recordUnknownDrop = vi.spyOn(PauseEpisode.prototype, 'recordUnknownDrop')
+      await svc.watchDirectory(ROOT, webContents)
+
+      svc.pauseWatch(ROOT, OWNER)
+      latestNative().emit('ready')
+
+      expect(recordUnknownDrop).toHaveBeenCalledTimes(1)
+      expect(harness.sends).toHaveLength(0)
+
+      svc.resumeWatch(ROOT)
+
+      expect(sent('directory-watch:changed')).toEqual([catchUp])
+    })
+
+    it('sends no catch-up at resume when a read by the pausing window began after ready and completed', async () => {
+      await svc.watchDirectory(ROOT, webContents)
+
+      svc.pauseWatch(ROOT, OWNER)
+      latestNative().emit('ready')
+      svc.beginTreeRead(ROOT, OWNER)()
+      svc.resumeWatch(ROOT)
+
+      expect(harness.sends).toHaveLength(0)
+    })
+
+    it('ignores the ready of a watcher a restart replaced, and catches up on the new one', async () => {
+      await svc.watchDirectory(ROOT, webContents)
+      const first = latestNative()
+      first.emit('error', codeError('EMFILE'))
+      await vi.advanceTimersByTimeAsync(RESTART_DELAYS_MS[0])
+      const second = latestNative()
+      expect(second).not.toBe(first)
+      // The restart's own catch-up
+      expect(sent('directory-watch:changed')).toEqual([catchUp])
+
+      first.emit('ready')
+      expect(sent('directory-watch:changed')).toHaveLength(1)
+
+      second.emit('ready')
+      expect(sent('directory-watch:changed')).toEqual([catchUp, catchUp])
+    })
+
+    it('ignores a ready from an earlier session – after stopAll, or once the project changed', async () => {
+      await svc.watchDirectory(ROOT, webContents)
+      const stopped = latestNative()
+      await svc.stopAll()
+      stopped.emit('ready')
+
+      await svc.watchDirectory(ROOT, webContents)
+      svc.setProjectPath(ROOT)
+      latestNative().emit('ready')
+
+      expect(harness.sends).toHaveLength(0)
+    })
+
+    it('ignores a ready that lands while the service is disposing', async () => {
+      await svc.watchDirectory(ROOT, webContents)
+      const native = latestNative()
+      let releaseClose: () => void = () => {}
+      native.close.mockImplementation(() => new Promise<void>(resolve => (releaseClose = resolve)))
+
+      const disposing = svc.dispose()
+      native.emit('ready')
+      releaseClose()
+      await disposing
+
+      expect(harness.sends).toHaveLength(0)
+    })
+
+    it('catches up at ready on the chokidar backend too', async () => {
+      const handlers = new Map<string, () => void>()
+      harness.chokidarWatch.mockImplementation(() => {
+        const watcher = {
+          on: vi.fn((event: string, listener: () => void) => {
+            handlers.set(event, listener)
+            return watcher
+          }),
+          close: vi.fn(async () => {})
+        }
+        return watcher
+      })
+      const chokidarSvc = new DirectoryWatcherService({ backend: 'chokidar' })
+      try {
+        chokidarSvc.setProjectPath(ROOT)
+        await chokidarSvc.watchDirectory(ROOT, webContents)
+        expect(harness.sends).toHaveLength(0)
+
+        handlers.get('ready')?.()
+
+        expect(harness.sends).toEqual([{ channel: 'directory-watch:changed', payload: catchUp }])
+      } finally {
+        await chokidarSvc.dispose()
+      }
+    })
+  })
+
   describe('restarts (D15, D16)', () => {
     it('sends project-deleted once the ENOENT restarts run out, after the map entry is gone', async () => {
       await svc.watchDirectory(ROOT, webContents)
