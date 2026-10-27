@@ -6,10 +6,18 @@
  *
  * Given the entry HTML of a previewed page, this collects the set of LOCAL,
  * relative subresource links so the watch coordinator can watch each one and
- * hot-swap / reload the page when the file on disk changes. It parses the HTML
- * once with parse5 rather than scanning with regexes — a tag regex desynchs
- * from a real parser (a `>` inside a quoted attribute, a decoy attribute), the
- * same reason `docx/docxImageStrip.ts` uses parse5.
+ * hot-swap / reload the page when the file on disk changes. It reads the HTML
+ * once with parse5's spec tokenizer rather than with regexes — a tag regex
+ * desynchs from a real parser (a `>` inside a quoted attribute, a decoy
+ * attribute), the same reason `docx/docxImageStrip.ts` uses parse5.
+ *
+ * Bounded (issue #124, security audit). This runs on the main thread at every
+ * preview load, on up to `PREVIEW.MAX_ENTRY_HTML_BYTES` of a page the user did
+ * not necessarily write, so its work is linear in the page: the scan builds no
+ * tree and caps the attributes it keeps per tag (`htmlElementScan.ts`), and
+ * `url()` is found by a linear scanner (`cssUrlTargets.ts`). A bound the scan
+ * reaches is passed to the optional `onLimit` – the links found are still
+ * returned, and nothing is thrown.
  *
  * What is collected:
  *   - `<link href>`   (stylesheets, icons, preloads, …)
@@ -45,13 +53,14 @@
  * Files are DATA, never instructions: attribute and CSS text are parsed and
  * classified, never evaluated.
  */
-import { parse, type DefaultTreeAdapterMap } from 'parse5'
+import { cssUrlTargets } from './cssUrlTargets'
+import { scanHtmlElements, type HtmlScanLimit, type ScannedElement } from './htmlElementScan'
 import { parseSrcset } from './previewSrcset'
 
-type ChildNode = DefaultTreeAdapterMap['childNode']
-type ParentNode = DefaultTreeAdapterMap['parentNode']
-type Element = DefaultTreeAdapterMap['element']
-type TextNode = DefaultTreeAdapterMap['textNode']
+export type { HtmlScanLimit } from './htmlElementScan'
+
+/** Told each bound a scan reached (`HtmlScanLimit`), once per scan. */
+export type OnScanLimit = (limit: HtmlScanLimit) => void
 
 /** What the frames of one HTML document show (see `extractFrameSources`). */
 export interface ExtractedFrameSources {
@@ -61,27 +70,13 @@ export interface ExtractedFrameSources {
   readonly srcdocHtml: string[]
 }
 
-/**
- * Matches a CSS `url(...)` reference, capturing the inner target for the three
- * quoting forms: single-quoted, double-quoted, and unquoted.
- */
-const CSS_URL_RE = /url\(\s*(?:'([^']*)'|"([^"]*)"|([^'")]*))\s*\)/gi
-
 /** An explicit URL scheme such as `http:`, `data:`, `blob:`, `javascript:`. */
 const SCHEME_RE = /^[a-z][a-z0-9+.-]*:/i
 
 /** Every backslash, which a frame's `src` reads as `/` (Chromium, standard URLs). */
 const BACKSLASH_RE = /\\/g
 
-function isElement(node: ChildNode): node is Element {
-  return 'tagName' in node
-}
-
-function isTextNode(node: ChildNode): node is TextNode {
-  return node.nodeName === '#text'
-}
-
-function getAttr(el: Element, name: string): string | undefined {
+function getAttr(el: ScannedElement, name: string): string | undefined {
   return el.attrs.find((a) => a.name === name)?.value
 }
 
@@ -109,34 +104,27 @@ function toRelativeLink(raw: string): string | null {
  * The raw link a frame loads, with `\` read as `/`; `undefined` for a `srcdoc`
  * frame, which loads no file whatever its `src` says.
  */
-function frameSrc(el: Element): string | undefined {
+function frameSrc(el: ScannedElement): string | undefined {
   if (getAttr(el, 'srcdoc') !== undefined) return undefined
   return getAttr(el, 'src')?.replace(BACKSLASH_RE, '/')
 }
 
 /**
- * Call `onElement` for every element of the document, in document order.
+ * Call `onElement` for every element of the document, in document order, then
+ * tell `onLimit` each bound the scan reached.
  *
- * An explicit stack rather than recursion: a page nested some thousands of
- * levels deep would otherwise overflow the call stack (issue #124, QG-11a Q12).
- * Children are pushed last-first, so they pop – and are visited – in document
- * order, before the siblings that follow their parent.
+ * No tree and no recursion: a page nested some thousands of levels deep costs
+ * no stack (issue #124, QG-11a Q12), and no tree-building step can multiply the
+ * work (the #124 security audit; see `htmlElementScan.ts`).
  */
-function forEachElement(html: string, onElement: (el: Element) => void): void {
-  const pending: ChildNode[] = []
-  const pushChildren = (parent: ParentNode): void => {
-    for (let index = parent.childNodes.length - 1; index >= 0; index -= 1) {
-      pending.push(parent.childNodes[index])
-    }
-  }
-  pushChildren(parse(html))
-  for (let node = pending.pop(); node !== undefined; node = pending.pop()) {
-    if (!isElement(node)) continue
-    onElement(node)
-    // Elements are also parent nodes in parse5; their children come next.
-    if ('childNodes' in node) {
-      pushChildren(node)
-    }
+function forEachElement(
+  html: string,
+  onElement: (el: ScannedElement) => void,
+  onLimit: OnScanLimit | undefined
+): void {
+  const limits = scanHtmlElements(html, onElement)
+  if (onLimit !== undefined) {
+    for (const limit of limits) onLimit(limit)
   }
 }
 
@@ -145,9 +133,10 @@ function forEachElement(html: string, onElement: (el: Element) => void): void {
  * page's entry HTML.
  *
  * @param html - the entry HTML document
+ * @param onLimit - told each bound the scan reached; the links found are returned all the same
  * @returns relative links (query/fragment stripped), in first-seen order
  */
-export function extractStaticLinks(html: string): string[] {
+export function extractStaticLinks(html: string, onLimit?: OnScanLimit): string[] {
   const links = new Set<string>()
 
   const addLink = (raw: string | undefined): void => {
@@ -157,9 +146,7 @@ export function extractStaticLinks(html: string): string[] {
   }
 
   const addCssUrls = (css: string): void => {
-    for (const match of css.matchAll(CSS_URL_RE)) {
-      addLink(match[1] ?? match[2] ?? match[3] ?? '')
-    }
+    for (const target of cssUrlTargets(css)) addLink(target)
   }
 
   forEachElement(html, (node) => {
@@ -182,9 +169,7 @@ export function extractStaticLinks(html: string): string[] {
         addLink(frameSrc(node))
         break
       case 'style':
-        for (const child of node.childNodes) {
-          if (isTextNode(child)) addCssUrls(child.value)
-        }
+        for (const css of node.texts) addCssUrls(css)
         break
     }
 
@@ -193,7 +178,7 @@ export function extractStaticLinks(html: string): string[] {
     if (styleAttr !== undefined && styleAttr !== '') {
       addCssUrls(styleAttr)
     }
-  })
+  }, onLimit)
 
   return [...links]
 }
@@ -205,8 +190,9 @@ export function extractStaticLinks(html: string): string[] {
  * file and is dropped, as in `extractStaticLinks`.
  *
  * @param html - an HTML document, or a `srcdoc` frame's markup
+ * @param onLimit - told each bound the scan reached; the frames found are returned all the same
  */
-export function extractFrameSources(html: string): ExtractedFrameSources {
+export function extractFrameSources(html: string, onLimit?: OnScanLimit): ExtractedFrameSources {
   const src = new Set<string>()
   const srcdocHtml: string[] = []
 
@@ -221,7 +207,7 @@ export function extractFrameSources(html: string): ExtractedFrameSources {
     const raw = frameSrc(node)
     const link = raw === undefined ? null : toRelativeLink(raw)
     if (link !== null) src.add(link)
-  })
+  }, onLimit)
 
   return { src: [...src], srcdocHtml }
 }

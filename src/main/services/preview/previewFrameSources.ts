@@ -31,7 +31,10 @@
  * it. Without a root no frame document is read.
  *
  * Never rejects. A document the link extractor throws on ends the walk with the
- * candidates found before it; that alone is logged, by error name, never a path.
+ * candidates found before it, logged by error name, never a path. Each scan is
+ * bounded (issue #124 audit; `htmlElementScan.ts`): a bound one reaches keeps
+ * the links found and the walk going, and the bounds reached are logged once
+ * per walk, by name.
  *
  * `watchedFrameAssets` then names the watched files a frame uses, spelled as
  * the coordinator reports their changes, for `classifyReload`.
@@ -48,7 +51,7 @@ import { PREVIEW } from '../../../shared/constants'
 import { PREVIEW_LIMITS } from '../../../shared/preview-limits'
 import { logger } from '../LoggingService'
 import type { ConfineFn, WatchSetResult } from './PreviewWatchCoordinator'
-import { extractFrameSources, extractStaticLinks } from './linkExtract'
+import { extractFrameSources, extractStaticLinks, type HtmlScanLimit } from './linkExtract'
 import { confinePath } from './previewPathResolve'
 
 /** The pages a frame can show whose links are followed. */
@@ -120,6 +123,10 @@ interface FrameWalk {
   readonly frameAssets: Set<string>
   /** Frame files already queued, so a file framed twice is read once. */
   readonly queued: Set<string>
+  /** The bounds the walk's scans reached. */
+  readonly limits: Set<HtmlScanLimit>
+  /** Adds a bound to `limits`; each scan of the walk reports through it. */
+  readonly noteLimit: (limit: HtmlScanLimit) => void
 }
 
 /**
@@ -133,6 +140,7 @@ export async function collectPreviewFrameSources(
 ): Promise<PreviewFrameSources> {
   const budget = input.budget ?? PREVIEW.MAX_WATCHED_FILES
   const path = input.pathApi ?? NATIVE_PATH
+  const limits = new Set<HtmlScanLimit>()
   const walk: FrameWalk = {
     path,
     maxDepth: input.maxDepth ?? PREVIEW_LIMITS.MAX_FRAME_DEPTH,
@@ -143,7 +151,11 @@ export async function collectPreviewFrameSources(
     frameAssets: new Set(),
     // The page itself is not queued: a frame that shows the page is read once
     // more as a frame document, so a stylesheet the two share counts as a frame's.
-    queued: new Set()
+    queued: new Set(),
+    limits,
+    noteLimit: (limit) => {
+      limits.add(limit)
+    }
   }
 
   let framesScanned = 0
@@ -204,7 +216,7 @@ function scanDocument(
   depth: number
 ): PendingDocument[] {
   const inFrame = depth > 0
-  for (const link of extractStaticLinks(html)) {
+  for (const link of extractStaticLinks(html, walk.noteLimit)) {
     const target = walk.path.resolve(baseDir, link)
     walk.candidates.add(target)
     if (inFrame) {
@@ -217,7 +229,7 @@ function scanDocument(
 
   // `src` frames first, then `srcdoc` frames: the order within one level only
   // decides which of them the budget still reaches.
-  const frames = extractFrameSources(html)
+  const frames = extractFrameSources(html, walk.noteLimit)
   const children: PendingDocument[] = []
   for (const src of frames.src) {
     const filePath = walk.path.resolve(baseDir, src)
@@ -273,6 +285,12 @@ async function confinedTarget(walk: FrameWalk, filePath: string): Promise<string
 }
 
 function finish(walk: FrameWalk): PreviewFrameSources {
+  if (walk.limits.size > 0) {
+    // By bound name only: which page, or which file, is not logged.
+    logger.warn('Preview auto-refresh: a page was scanned only up to a limit', {
+      limits: [...walk.limits]
+    })
+  }
   return { candidates: [...walk.candidates], frameAssets: walk.frameAssets }
 }
 

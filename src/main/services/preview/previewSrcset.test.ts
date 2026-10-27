@@ -67,4 +67,18 @@ describe('parseSrcset', () => {
     // No whitespace around the comma: it is part of a single URL token.
     expect(parseSrcset('a.png,b.png 2x')).toEqual(['a.png,b.png'])
   })
+
+  it('keeps inner commas and strips only the trailing run', () => {
+    expect(parseSrcset('a,,b,,, c.png')).toEqual(['a,,b', 'c.png'])
+  })
+
+  it('strips trailing commas in linear time (issue #124 audit)', () => {
+    // `/,+$/` read an inner run of commas again from each of them: 80,000 took
+    // 2.9 s, so the 200,000 here would take some 18 s.
+    const inner = ','.repeat(200_000)
+    const start = performance.now()
+    const urls = parseSrcset(`x${inner}y,`)
+    expect(performance.now() - start).toBeLessThan(3_000)
+    expect(urls).toEqual([`x${inner}y`])
+  })
 })
