@@ -5,7 +5,8 @@
 // Responsibilities:
 //   1. Remove any previous `coverage/` output.
 //   2. Run vitest with coverage for each workspace project (main, preload, renderer),
-//      scoped with `--project <name>` to match the CI Coverage job.
+//      scoped with `--project <name>` to match the CI Coverage job. The main pass
+//      also runs `main-perf`, the timing-budget suites, after the rest.
 //   3. Exit non-zero if any pass failed, naming every project that missed a floor.
 //
 // It leaves the electron-vite `out/` build alone. The bash original moved it to

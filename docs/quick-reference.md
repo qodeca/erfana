@@ -22,8 +22,8 @@ npm run lint             # eslint (JS/TS) + shebang check + 500-line file limit
 npm run lint:css         # stylelint: src/ CSS + the docs/design-system/ cards' inline styles
 npm run design           # Rebuild docs/design-system/ (index, token copy, claims)
 npm run design -- --check # Fail if a generated file under docs/design-system/ is stale
-npm run test             # All tests (vitest projects: main + renderer + preload)
-npm run test:main        # vitest.main.config.ts config: src/main + src/shared + scripts
+npm run test             # All tests (vitest projects: main + main-perf + renderer + preload)
+npm run test:main        # vitest.main.config.ts config: src/main + src/shared + scripts (main-perf last)
 npm run test:renderer    # vitest.renderer.config.ts config: src/renderer/src only (jsdom)
 npm run test:preload     # vitest.preload.config.ts config: preload tests
 npm run test:cov         # Coverage report (all 3 projects)

@@ -37,3 +37,11 @@
   was read, refuses links, keeps the Windows mark of the web, and never logs comment text, names or
   paths. The preview preload now runs in frames and has one receive channel when comments are on
   (ADR 0005). See `docs/security.md` § HTML Preview comments.
+
+### Internal
+
+- **Timing-budget tests run alone.** The `*.perf.test.*` suites now run in their own vitest
+  project, `main-perf`, one file at a time and after every other test file – in `test:ci`,
+  `test:main`, `test:cov` and the Coverage job – because other files running beside them pushed
+  their event-loop stalls past budget. Their budgets are unchanged, and their coverage still counts
+  in the main report. See `docs/ci.md` § Quality checks.

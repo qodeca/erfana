@@ -13,10 +13,11 @@ import { existsSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 
-import { projects, coverageArgs } from './lib/test-cov-projects.mjs'
+import { projects, coverageArgs, projectScope } from './lib/test-cov-projects.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const pkg = JSON.parse(readFileSync(join(here, '..', 'package.json'), 'utf8'))
+const checksWorkflow = readFileSync(join(here, '..', '.github', 'workflows', 'checks.yml'), 'utf8')
 
 const projectNames = ['main', 'preload', 'renderer']
 
@@ -49,9 +50,23 @@ describe('test-cov project scoping (issue #133)', () => {
     expect(existsSync(join(here, '..', 'node_modules', 'vitest', 'vitest.mjs'))).toBe(true)
   })
 
-  it('scopes the per-area npm scripts with the same --project flag', () => {
-    for (const name of projectNames) {
-      expect(pkg.scripts[`test:${name}`]).toContain(`--project ${name}`)
+  it('runs main-perf, the timing-budget suites, in the main pass and no other', () => {
+    // Owner decision 2026-10-27, "run speed tests alone": main-perf runs after
+    // main, one file at a time, and its coverage merges into coverage/main.
+    expect(projects.map((project) => project.vitestProjects)).toEqual([['main', 'main-perf'], ['preload'], ['renderer']])
+  })
+
+  it('scopes the per-area npm scripts with the same --project flags', () => {
+    for (const project of projects) {
+      expect(pkg.scripts[`test:${project.name}`]).toContain(projectScope(project).join(' '))
+    }
+  })
+
+  it('scopes the CI Coverage steps exactly as this runner does', () => {
+    // The Coverage job runs the three passes itself rather than through this
+    // runner, so a pass that changes here must change there too.
+    for (const project of projects) {
+      expect(checksWorkflow).toContain(`run: npx ${coverageArgs(project).join(' ')}`)
     }
   })
 })

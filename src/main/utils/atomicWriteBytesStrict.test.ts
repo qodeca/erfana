@@ -15,6 +15,7 @@ import {
   lstat,
   mkdir,
   mkdtemp,
+  open,
   readFile,
   readdir,
   readlink,
@@ -267,6 +268,37 @@ describe('atomicWriteBytesStrict', () => {
   })
 })
 
+/** Windows' own `whoami`; Git for Windows puts a coreutils `whoami` without `/priv` first on PATH. */
+const WHOAMI = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'whoami.exe')
+const BYPASS_PRIVILEGES = ['SeBackupPrivilege', 'SeRestorePrivilege']
+
+/**
+ * Why a deny-write ACE on `path` cannot stop this process, or `undefined` when nothing explains it.
+ *
+ * libuv opens every file with `FILE_FLAG_BACKUP_SEMANTICS`, and Windows then skips the file's
+ * access check for a process whose token has SeBackupPrivilege and SeRestorePrivilege enabled.
+ * An elevated administrator holds both, disabled; the MSYS2 runtime (a Cygwin fork) behind Git for
+ * Windows bash enables them at startup, and every child inherits them. That is the GitHub `Windows checks` job:
+ * `npm run test:main` under `shell: bash`, as the elevated `runneradmin`. No ACL can deny such a
+ * process a write, so the case cannot be staged there. A write-open that got past the deny for any
+ * other reason returns `undefined`, and the test then fails as it should. Registered in
+ * docs/windows/known-flakes.md, row `atomicWriteBytesStrict.test.ts`.
+ */
+async function aclBypassNote(path: string): Promise<string | undefined> {
+  try {
+    await (await open(path, 'r+')).close()
+  } catch (error) {
+    if (errnoOf(error) === 'EPERM' || errnoOf(error) === 'EACCES') return undefined
+    throw error
+  }
+  const held = execFileSync(WHOAMI, ['/priv'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+    .split(/\r?\n/)
+    .filter(line => BYPASS_PRIVILEGES.some(name => line.includes(name)))
+    .map(line => line.replace(/\s+/g, ' ').trim())
+  if (!BYPASS_PRIVILEGES.every(name => held.some(line => line.includes(name)))) return undefined
+  return `a write-open got past the deny ACE: this process overrides file ACLs (${held.join('; ')})`
+}
+
 describe.runIf(isWindows)('atomicWriteBytesStrict on Windows', () => {
   let made: string
   let dir: string
@@ -287,11 +319,17 @@ describe.runIf(isWindows)('atomicWriteBytesStrict on Windows', () => {
     return { path, hash: sha256Hex(Buffer.from(bytes)), id: await idOf(path) }
   }
 
-  it('M-007 refuses a file whose ACL denies writing, though its read-only attribute is clear', async () => {
+  it('M-007 refuses a file whose ACL denies writing, though its read-only attribute is clear', async ({ skip }) => {
     const file = await original('old')
     // Deny writing the data, not reading it: the read checks still pass, and a plain rename would replace it
     execFileSync('icacls', [file.path, '/deny', `${user}:(WD,AD)`], { stdio: 'pipe' })
     try {
+      const bypass = await aclBypassNote(file.path)
+      if (bypass !== undefined) {
+        // The reporter shows a skip note only for a failed file; stderr always reaches the log
+        console.warn(`M-007 deny-write ACL case skipped: ${bypass}`)
+        skip(bypass)
+      }
       const result = await atomicWriteBytesStrict(file.path, Buffer.from('new'), expecting(file))
 
       expect(result).toEqual({ ok: false, reason: 'read-only', errno: 'EPERM' })

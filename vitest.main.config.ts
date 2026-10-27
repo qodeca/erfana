@@ -1,19 +1,24 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+//
+// The config for the main-process tests alone: `npm run test:main`, the main
+// pass of `npm run test:cov` and the CI Coverage job start here with
+// `--config vitest.main.config.ts --project main --project main-perf`. It runs
+// the two main-process projects (vitest.main.projects.ts): `main`, then
+// `main-perf`, the timing-budget suites, one at a time once `main` is done.
+//
+// It also holds main's coverage floors. vitest reads `coverage` only from the
+// config a run starts with, and collects it from every project of that run, so
+// one run of both projects writes one merged report to coverage/main.
 import { defineConfig } from 'vitest/config'
-import path from 'node:path'
+import { mainProjects } from './vitest.main.projects'
 import { maxWorkers } from './vitest.workers'
 
 export default defineConfig({
   test: {
-    name: 'main',
-    // Worker cap (issue #171); only read when this file is the root `--config`.
+    // Worker cap (issue #171), as in every config a run can start from.
     maxWorkers,
-    environment: 'node',
-    include: ['src/main/**/*.test.{ts,tsx}', 'src/shared/**/*.test.{ts,tsx}', 'scripts/**/*.test.{js,mjs,ts}'],
-    exclude: ['node_modules', 'dist', 'out', 'e2e', 'tests/fixtures'],
-    globals: true,
-    setupFiles: ['tests/setup/setupTests.main.ts'],
+    projects: mainProjects,
     reporters: 'default',
     // Coverage MUST live under `test.coverage` — a top-level `coverage` key is
     // ignored by vitest, which is where the per-file floors below sat inert until
@@ -314,12 +319,6 @@ export default defineConfig({
         // is tested in scripts/check-max-lines.test.mjs.
         'scripts/lib/max-lines-baseline.mjs'
       ],
-    },
-  },
-  resolve: {
-    alias: {
-      '@main': path.resolve(__dirname, 'src/main'),
-      '@shared': path.resolve(__dirname, 'src/shared'),
     },
   },
 })

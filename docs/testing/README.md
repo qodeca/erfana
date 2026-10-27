@@ -7,7 +7,7 @@ Complete guide for testing Erfana. This covers both automated tests (Vitest/Play
 ## 📚 Documentation Index
 
 ### Automated Tests (Unit/Integration)
-- Runner: Vitest workspace (`main`, `preload`, `renderer`)
+- Runner: Vitest projects (`main`, `main-perf`, `preload`, `renderer`). `main-perf` holds the main process's timing-budget suites (`*.perf.test.*`), which run last and one at a time – see [ci.md § Quality checks](../ci.md#quality-checks-checksyml), "Timing-budget suites run alone"
 - Commands:
   - `npm run test` — run all projects once
   - `npm run test:renderer` — renderer tests

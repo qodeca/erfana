@@ -23,7 +23,7 @@
     "test": "vitest --run",
     "test:watch": "vitest --watch",
     "test:ci": "vitest --run --reporter=dot",
-    "test:main": "vitest --run --config vitest.main.config.ts --project main",
+    "test:main": "vitest --run --config vitest.main.config.ts --project main --project main-perf",
     "test:preload": "vitest --run --config vitest.preload.config.ts --project preload",
     "test:renderer": "vitest --run --config vitest.renderer.config.ts --project renderer",
     "test:cov": "node scripts/test-cov.mjs",

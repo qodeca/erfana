@@ -84,7 +84,10 @@ jobs:
   test:
     name: Unit tests
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # 20, not 10: the main-process timing-budget suites (`*.perf.test.*`) run
+    # last and one file at a time, after every other file (owner decision
+    # 2026-10-27), so their minutes add to the run instead of overlapping it.
+    timeout-minutes: 20
     if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
     steps:
       # actions/checkout v7.0.1 — MUST run before the local composite action
@@ -145,9 +148,10 @@ jobs:
   coverage:
     name: Coverage
     runs-on: ubuntu-latest
-    # 15, not 10: the job runs three coverage passes (main, preload, renderer);
-    # the renderer suite is the largest in the repo.
-    timeout-minutes: 15
+    # 25, not 10: the job runs three coverage passes (main, preload, renderer);
+    # the renderer suite is the largest in the repo, and the main pass ends with
+    # the timing-budget suites run one file at a time (owner decision 2026-10-27).
+    timeout-minutes: 25
     if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
     # Enforces the coverage FLOORS declared in all three vitest configs. Main
     # (vitest.main.config.ts, test.coverage.thresholds) carries the per-file floors for
@@ -167,7 +171,11 @@ jobs:
     # run over all three projects pulls renderer/preload tests in too and can
     # emit a second 0%-baseline fuses.js row; `--project main` keeps the
     # instrumented set (and therefore the threshold match) unambiguous and
-    # deterministic. Do NOT drop `--project main`.
+    # deterministic. Do NOT drop `--project main`. `--project main-perf` goes
+    # with it: the main-process timing-budget suites (`*.perf.test.*`), which
+    # vitest.main.config.ts runs after `main`, one file at a time, into the
+    # same report (owner decision 2026-10-27). scripts/test-cov.test.mjs holds
+    # these three steps to the arguments `npm run test:cov` uses.
     steps:
       # actions/checkout v7.0.1 — MUST run before the local composite action
       # below so the action.yml file can be loaded from the workspace.
@@ -181,8 +189,9 @@ jobs:
       - name: Main-project coverage (enforces the scripts/fuses.js + whisper floors)
         # Fails the job when any per-file floor in vitest.main.config.ts is breached
         # (vitest exits non-zero on a threshold miss). --coverage activates the
-        # thresholds; --config supplies them; --project main scopes the run.
-        run: npx vitest --run --config vitest.main.config.ts --project main --coverage
+        # thresholds; --config supplies them; --project main scopes the run and
+        # --project main-perf adds the timing-budget suites, run last and alone.
+        run: npx vitest --run --config vitest.main.config.ts --project main --project main-perf --coverage
       - name: Preload-project coverage (enforces the vitest.preload.config.ts floors)
         # Global floors for src/preload (previewBridge.ts + index.ts), added in
         # #124 QG-8. Scoped with --project preload like the main step, so the
@@ -233,7 +242,7 @@ jobs:
   windows-checks:
     name: Windows checks
     runs-on: windows-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
     # Advisory Windows gate (typecheck + main-process tests only). Excluded
     # from branch-protection required checks until proven stable, mirroring
