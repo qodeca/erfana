@@ -561,6 +561,7 @@ describe('CommentWindow – new comment', () => {
       let answer: (ok: boolean) => void = () => {}
       const onSaveIdentity = vi.fn(() => new Promise<boolean>(resolve => (answer = resolve)))
       setup({ identity: null, onSaveIdentity })
+      await nameFocused()
       await user.type(screen.getByTestId('comment-identity-name'), 'Ada')
       await user.click(screen.getByTestId('comment-identity-continue'))
       expect(screen.getByTestId('comment-identity-continue')).toHaveAttribute(
@@ -579,6 +580,7 @@ describe('CommentWindow – new comment', () => {
       const region = screen.getByTestId('comment-identity-error')
       expect(region).toHaveAttribute('aria-live', 'assertive')
       expect(region).toBeEmptyDOMElement()
+      await nameFocused()
       await user.type(screen.getByTestId('comment-identity-name'), 'Ada')
       await user.click(screen.getByTestId('comment-identity-continue'))
       await waitFor(() => expect(region).toHaveTextContent("Couldn't save your name. Try again."))
