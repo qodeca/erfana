@@ -8,7 +8,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { link, mkdir, readdir, stat, symlink } from 'node:fs/promises'
-import { basename, join, sep } from 'node:path'
+import { basename, dirname, join, sep } from 'node:path'
 import { ErrorCode } from '../../../../shared/errors'
 import { fileIdKey, fileIdOf } from '../../../utils/atomicWriteBytesStrict'
 import {
@@ -143,11 +143,17 @@ describe('M-009 confinement', () => {
       await mkdir(sibling)
       const page = await outside.write(join(`proj${KELVIN}`, 'page.html'), PAGE)
       const before = await snapshot(page)
-      const { writer } = makeWriter({ platform: 'win32' })
+      const job = { file: { realRoot: root, filePath: page }, draft: DRAFT, view: VIEW, text: 'x' }
 
-      const result = await writer.add({ file: { realRoot: root, filePath: page }, draft: DRAFT, view: VIEW, text: 'x' })
-
-      expect(result).toEqual(refusedPath('outside-project'))
+      // Windows and macOS rules fold case as JavaScript does, so on every host `proj` + KELVIN passes
+      // their lexical root check for `projk`, and its part below the root is `page.html` (§19 Rev 4:
+      // cut under the same rule, never by the host's `path.relative`). The disk keeps the two folders
+      // apart, so the realpath steps (rule 4) refuse it as outside the project. Exact rules (Linux)
+      // refuse it at the lexical check. Rule 4's exact compare alone, on every host:
+      // commentFileAccess.containment.test.ts.
+      for (const platform of ['win32', 'darwin', 'linux'] as const) {
+        expect(await makeWriter({ platform }).writer.add(job), platform).toEqual(refusedPath('outside-project'))
+      }
       expect(await snapshot(page)).toEqual(before)
       expect(await readdir(sibling)).toEqual(['page.html'])
     }
@@ -160,12 +166,42 @@ describe('M-009 confinement', () => {
   })
 
   it('M-009 the lexical root check compares exactly on Linux and ignores case on Windows and macOS', async () => {
-    await project.write('index.html', PAGE)
-    const variant = project.path('index.html').replace(basename(project.root), basename(project.root).toUpperCase())
+    const variantRoot = join(dirname(project.root), basename(project.root).toUpperCase())
+    await project.write('linux.html', PAGE)
 
-    expect(await addAt(variant, { platform: 'linux' })).toEqual(refusedPath('outside-project'))
-    // Past the lexical check on macOS rules; the disk then decides (written, or missing on a case-sensitive one)
-    expect(await addAt(variant, { platform: 'darwin' })).not.toEqual(refusedPath('outside-project'))
+    expect(await addAt(join(variantRoot, 'linux.html'), { platform: 'linux' })).toEqual(refusedPath('outside-project'))
+    // Windows and macOS rules pass it lexically and leave the verdict to the realpath step: on a
+    // case-insensitive disk the root's own folder, written under its on-disk spelling; on a
+    // case-sensitive one a folder that does not exist. Never excluded (§19 Rev 4) and never outside.
+    // The same rows on a simulated case-insensitive disk, every host: commentFileAccess.caseVariant.test.ts
+    for (const platform of ['darwin', 'win32'] as const) {
+      // One file per rule set: each writer starts its id source afresh, so a second save on one
+      // file would repeat the first thread id
+      const name = `${platform}.html`
+      await project.write(name, PAGE)
+
+      const result = await addAt(join(variantRoot, name), { platform })
+
+      if (CASE_INSENSITIVE) {
+        expect(result, platform).toMatchObject({ ok: true, realPath: project.path(name) })
+      } else {
+        expect(result, platform).toEqual({ ok: false, code: ErrorCode.COMMENT_FILE_GONE, reason: 'missing' })
+      }
+      expect(blocksOf(await project.read(name)), platform).toHaveLength(CASE_INSENSITIVE ? 1 : 0)
+    }
+    expect((await readdir(project.root)).sort()).toEqual(['darwin.html', 'linux.html', 'win32.html'])
+    expect((await project.read('linux.html')).toString('utf8')).toBe(PAGE)
+  })
+
+  it('§19 Rev 4 a path naming the project root in another letter case is written under the on-disk spelling (real case-insensitive disk, host rules)', async ctx => {
+    ctx.skip(!CASE_INSENSITIVE, 'the temp folder is on a case-sensitive disk: a case variant of the root is another, missing folder')
+    await project.write('index.html', PAGE)
+
+    const result = await addAt(join(dirname(project.root), basename(project.root).toUpperCase(), 'index.html'))
+
+    expect(result).toMatchObject({ ok: true, realPath: project.path('index.html') })
+    expect(await readdir(project.root)).toEqual(['index.html'])
+    expect(blocksOf(await project.read('index.html'))).toHaveLength(1)
   })
 
   it('M-009 a case variant of a project file: written under the on-disk spelling (Windows, macOS), a missing file on a case-sensitive disk', async () => {

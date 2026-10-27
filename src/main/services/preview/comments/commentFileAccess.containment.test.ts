@@ -38,11 +38,14 @@ afterEach(async () => {
 
 describe('confineCommentFile – the exact containment check (F1)', () => {
   // The Kelvin row needs both folders on disk: a case-insensitive APFS volume
-  // folds them into one.
-  it.for<[string, string, boolean]>([
-    ['a sibling whose name only case-folds to the root', `proj${KELVIN}`, !KELVIN_SIBLING_IS_DISTINCT],
-    ['a sibling whose name starts with the root', 'projk-other', false]
-  ])('refuses %s even when confinePath lets it through', async ([, siblingName, skip], ctx) => {
+  // folds them into one. Both case-folding rule sets (Windows, macOS) run on
+  // every host.
+  it.for<[string, NodeJS.Platform, string, boolean]>([
+    ['a sibling whose name only case-folds to the root', 'win32', `proj${KELVIN}`, !KELVIN_SIBLING_IS_DISTINCT],
+    ['a sibling whose name only case-folds to the root', 'darwin', `proj${KELVIN}`, !KELVIN_SIBLING_IS_DISTINCT],
+    ['a sibling whose name starts with the root', 'win32', 'projk-other', false],
+    ['a sibling whose name starts with the root', 'darwin', 'projk-other', false]
+  ])('refuses %s even when confinePath lets it through (%s rules)', async ([, platform, siblingName, skip], ctx) => {
     if (skip) ctx.skip()
     await mkdir(parent.path('projk'))
     await mkdir(parent.path(siblingName))
@@ -52,7 +55,7 @@ describe('confineCommentFile – the exact containment check (F1)', () => {
 
     const result = await confineCommentFile(
       { realRoot: parent.path('projk'), filePath: parent.path('projk', 'page.html') },
-      { platform: 'win32' }
+      { platform }
     )
 
     expect(result).toEqual(refused('outside-project'))

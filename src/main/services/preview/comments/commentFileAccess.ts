@@ -10,7 +10,13 @@
  * path is never touched):
  *  1. a fully qualified absolute path (a Windows path rooted without a drive,
  *     `\proj\a.html`, would resolve against the current drive), lexically
- *     inside the project root – an early reject only, see 4;
+ *     inside the project root – an early reject only, see 4. The part below
+ *     the root, which rules 2–3 classify, is cut at the root's end under the
+ *     same case rule (`pathBelowRoot`), never by `path.relative`, which
+ *     compares by the host's rule: on macOS a path naming the root in another
+ *     letter case passed this check and then came back from `relative` as
+ *     `../proj/…`, refused as excluded (§19 Rev 4 "case-only path
+ *     differences on macOS");
  *  2. a `.html`/`.htm` name; on Windows no NTFS alternate-stream name
  *     (`index.html:x.html`, `index.html::$DATA`) and no 8.3 short-name
  *     segment below the root;
@@ -44,7 +50,7 @@
  */
 import type { BigIntStats } from 'node:fs'
 import { lstat, realpath } from 'node:fs/promises'
-import { basename, isAbsolute, normalize, relative, resolve } from 'node:path'
+import { basename, isAbsolute, normalize, resolve } from 'node:path'
 import { PREVIEW_LIMITS } from '../../../../shared/preview-limits'
 import {
   errnoOf,
@@ -52,7 +58,7 @@ import {
   readFileNoFollow,
   type FileId
 } from '../../../utils/atomicWriteBytesStrict'
-import { isInsideRoot } from '../../../utils/pathCompare'
+import { hostPathFlavour, pathBelowRoot, type PathFlavour } from '../../../utils/pathCompare'
 import { namesAlternateDataStream } from '../../browserLaunch/BrowserLaunchService'
 import { hasDotSegment, hasShortNameAlias, isInExcludedDirectory } from '../previewExclusion'
 import { confinePath, realPathWithin } from '../previewPathResolve'
@@ -129,11 +135,12 @@ function isFullyQualified(filePath: string): boolean {
 function lexicalRefusal(target: CommentFileTarget, platform: NodeJS.Platform): CommentRefusal | null {
   const { realRoot, filePath } = target
   if (!isFullyQualified(filePath)) return 'not-absolute'
-  const resolved = resolve(filePath)
-  if (!isInsideRoot(resolved, realRoot, isCaseSensitive(platform))) return 'outside-project'
+  // The host's path syntax with the platform's case rules – production passes its own platform
+  const flavour: PathFlavour = { path: hostPathFlavour.path, platform }
+  const rel = pathBelowRoot(resolve(filePath), realRoot, isCaseSensitive(platform), flavour)
+  if (rel === undefined) return 'outside-project'
   const byName = nameRefusal(filePath, platform)
   if (byName) return byName
-  const rel = relative(realRoot, resolved)
   if (hasShortNameAlias(rel, platform)) return 'short-name'
   if (hasDotSegment(rel) || isInExcludedDirectory(rel)) return 'excluded'
   return null
