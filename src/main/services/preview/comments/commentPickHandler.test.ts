@@ -232,6 +232,17 @@ describe('commentPickHandler pins, control picks and budgets', () => {
     expect(h.out.element).toHaveBeenCalledTimes(MAIN_PICKS_PER_SECOND + 1)
   })
 
+  it('exit and parent each have their own budget: spending one leaves the other whole', async () => {
+    const h = await setup()
+    for (let i = 0; i < 10; i++) h.handler.pick(eventFrom(h.child), { kind: 'parent', via: 'keyboard', view: VIEW })
+    expect(h.out.parent).toHaveBeenCalledTimes(MAIN_CONTROL_PICKS_PER_SECOND)
+    for (let i = 0; i < 10; i++) h.handler.pick(eventFrom(h.top), { kind: 'exit', via: 'keyboard', view: VIEW })
+    expect(h.out.exit).toHaveBeenCalledTimes(MAIN_CONTROL_PICKS_PER_SECOND)
+    h.advance(1_000)
+    h.handler.pick(eventFrom(h.child), { kind: 'parent', via: 'keyboard', view: VIEW })
+    expect(h.out.parent).toHaveBeenCalledTimes(MAIN_CONTROL_PICKS_PER_SECOND + 1)
+  })
+
   it('hellos and anchor reports are budgeted per frame', async () => {
     const h = await setup()
     for (let i = 0; i < 20; i++) {
