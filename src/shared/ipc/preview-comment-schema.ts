@@ -9,9 +9,8 @@
  * is bounded (zod 4's `z.number()` already refuses `NaN` and `±Infinity`).
  *
  * - **Page signals** (`preview-page:comment*`) come from an untrusted page,
- *   through its preload. They carry enums, a token, a pin key, numbers and –
- *   for a JS-built element – a path, a tag, a quote and a snapshot. Never a
- *   file path or an offset: main decides the file from its own frame record.
+ *   through its preload: `preview-comment-page-schema.ts`, re-exported here
+ *   with the bounded primitives every payload is built from.
  * - **Renderer requests** come from Erfana's own window, after
  *   `isTrustedPreviewSender`. They name a panel and main-minted opaque keys
  *   (draft tokens, `fileKey`, `threadKey`, `blockKey`) bound to that window,
@@ -24,18 +23,37 @@
 import { z } from 'zod'
 import { ErrorCode } from '../errors'
 import { PREVIEW_LIMITS } from '../preview-limits'
-import { ELEMENT_TOKEN_PATTERN, MESSAGE_ID_PATTERN, utf8Length, visibleInline } from '../htmlComments'
+import { MESSAGE_ID_PATTERN, visibleInline } from '../htmlComments'
 import { TAG_MAX_CHARS } from '../htmlComments/format'
+import {
+  CommentKeySchema as KeySchema,
+  CommentPickerSaySchema as PickerSaySchema,
+  CommentPointSchema,
+  CommentRuntimeTagSchema as RuntimeTagSchema,
+  CommentTagNameSchema as TagNameSchema
+} from './preview-comment-page-schema'
 import { PanelIdSchema } from './preview-schema'
 
-/** Characters in a main-minted key: pin, frame, file, thread and block keys. */
-export const COMMENT_KEY_MAX_CHARS = 40
+export {
+  COMMENT_ANCHOR_KEYS_MAX,
+  COMMENT_KEY_MAX_CHARS,
+  CommentAnchorsSchema,
+  CommentBoxSchema,
+  CommentHelloSchema,
+  CommentOverlayLossSchema,
+  CommentPickRuntimeSchema,
+  CommentPickSchema,
+  CommentPickViewSchema,
+  CommentPointSchema,
+  PICK_RUNTIME_TAG_MAX_CHARS
+} from './preview-comment-page-schema'
+export type { CommentAnchors, CommentBox, CommentOverlayLoss, CommentPick } from './preview-comment-page-schema'
+export type { CommentPickRuntime, CommentPickView, CommentPoint } from './preview-comment-page-schema'
+
 /** A draft token: 128 random bits as lower-case hex. */
 export const COMMENT_DRAFT_TOKEN_PATTERN = /^[0-9a-f]{32}$/
-/** Characters of a tag name in a pick (§8 caps the JS-built element's tag at 32). */
-export const PICK_RUNTIME_TAG_MAX_CHARS = 32
-/** Keys in each list of one anchors report (§8). */
-export const COMMENT_ANCHOR_KEYS_MAX = 500
+/** A draft's element key: an opaque 128-bit digest main mints from the file and the element's place in it. */
+export const COMMENT_DRAFT_KEY_PATTERN = /^[0-9a-f]{32}$/
 /** Files one window may report as holding unsaved editor changes. */
 export const COMMENT_UNSAVED_SOURCES_MAX = 500
 /** Characters of one such path. */
@@ -43,126 +61,15 @@ export const COMMENT_PATH_MAX_CHARS = 4_096
 /** Characters of a damaged block's raw text sent to the renderer; longer is cut and flagged. */
 export const COMMENT_RAW_PREVIEW_MAX_CHARS = 65_536
 
-const MAX_VIEW_PX = 1_000_000
-const MAX_RECT_PX = 10_000_000
-
-const KeySchema = z.string().min(1).max(COMMENT_KEY_MAX_CHARS).regex(/^[\w-]+$/)
-const coordinate = z.number().min(-MAX_RECT_PX).max(MAX_RECT_PX)
-const extent = z.number().min(0).max(MAX_RECT_PX)
-const TagNameSchema = z.string().min(1).max(TAG_MAX_CHARS).regex(/^[A-Za-z][\w.:-]*$/)
-const RuntimeTagSchema = TagNameSchema.max(PICK_RUNTIME_TAG_MAX_CHARS)
-/** A `pathBelow` path: `tag:nth-of-type(n)` segments joined by ` > `, or `''`. */
-const RUNTIME_PATH = /^(?:[A-Za-z][\w.:-]*:nth-of-type\(\d{1,6}\)(?: > [A-Za-z][\w.:-]*:nth-of-type\(\d{1,6}\))*)?$/
-const quotePart = z.string().max(PREVIEW_LIMITS.COMMENT_QUOTE_MAX_CHARS)
-/** Characters of a `step` pick's label (the overlay's is at most 40), and of it escaped for the window (`\uXXXX` each). */
-export const COMMENT_STEP_LABEL_MAX_CHARS = 64
-export const COMMENT_PICKER_LABEL_MAX_CHARS = COMMENT_STEP_LABEL_MAX_CHARS * 6
-/** What the keyboard picker reached (§10.10 "Announce"): an element, the top of the page, or a leaf. */
-const PickerSaySchema = z.enum(['showing', 'top', 'no-child'])
-const PickerLabelSchema = z.string().min(1).max(COMMENT_PICKER_LABEL_MAX_CHARS).refine(text => visibleInline(text) === text)
-
-/** A point in CSS pixels (a pick's `screen` or `point`, a menu point). */
-export const CommentPointSchema = z.object({ x: coordinate, y: coordinate }).strict()
-export type CommentPoint = z.infer<typeof CommentPointSchema>
-
-/** A border box in a frame's CSS pixels. */
-export const CommentBoxSchema = z.object({ x: coordinate, y: coordinate, w: extent, h: extent }).strict()
-export type CommentBox = z.infer<typeof CommentBoxSchema>
-
-// ---------------------------------------------------------------------------
-// Page → main (`preview-page:commentHello`, `…Pick`, `…Anchors`)
-// ---------------------------------------------------------------------------
-
-/** `preview-page:commentHello`: carries nothing. */
-export const CommentHelloSchema = z.object({}).strict()
-
-/** The frame's viewport and scroll at pick time (§5.3 `view`). */
-export const CommentPickViewSchema = z
-  .object({
-    w: z.number().int().min(0).max(MAX_VIEW_PX),
-    h: z.number().int().min(0).max(MAX_VIEW_PX),
-    dpr: z.number().positive().max(16),
-    x: z.number().min(-MAX_VIEW_PX).max(MAX_VIEW_PX),
-    y: z.number().min(-MAX_VIEW_PX).max(MAX_VIEW_PX),
-    hash: z.string().min(2).max(PREVIEW_LIMITS.COMMENT_VIEW_HASH_MAX_CHARS).startsWith('#').optional()
-  })
-  .strict()
-export type CommentPickView = z.infer<typeof CommentPickViewSchema>
-
-/** A JS-built element below its tokened ancestor (§5.3 `runtime`). */
-export const CommentPickRuntimeSchema = z
-  .object({
-    path: z.string().max(PREVIEW_LIMITS.COMMENT_RUNTIME_PATH_MAX_CHARS).regex(RUNTIME_PATH),
-    tag: RuntimeTagSchema,
-    quote: z.object({ exact: quotePart.min(1), prefix: quotePart, suffix: quotePart }).strict().optional(),
-    snapshot: z
-      .string()
-      .max(PREVIEW_LIMITS.COMMENT_SNAPSHOT_MAX_BYTES)
-      .refine(s => utf8Length(s) <= PREVIEW_LIMITS.COMMENT_SNAPSHOT_MAX_BYTES)
-      .optional(),
-    truncated: z.literal(true).optional()
-  })
-  .strict()
-export type CommentPickRuntime = z.infer<typeof CommentPickRuntimeSchema>
-
-/** `preview-page:commentPick` (§8, §19 R3-5, R3-8). */
-export const CommentPickSchema = z
-  .object({
-    /** `step`: the keyboard picker moved – nothing is picked; the window's live region says it (§10.8). */
-    kind: z.enum(['menu', 'open', 'icon', 'parent', 'exit', 'step']),
-    via: z.enum(['pointer', 'keyboard']),
-    /** The element's token, or its nearest tokened ancestor's. */
-    token: z.string().regex(ELEMENT_TOKEN_PATTERN).optional(),
-    /** The tokened element's `localName`; must equal the tag main recorded for the token. */
-    tag: TagNameSchema.optional(),
-    /** A pin's key (`icon`). */
-    key: KeySchema.optional(),
-    /** A pointer pick: the trusted event's `screenX/Y`. */
-    screen: CommentPointSchema.optional(),
-    /** A keyboard pick: the element's top-left + 4 px, frame CSS pixels. */
-    point: CommentPointSchema.optional(),
-    /** The selected element's border box, frame CSS pixels: where the fresh still's ring is checked. */
-    box: CommentBoxSchema.optional(),
-    ws: z.enum(['collapse', 'preserve']).optional(),
-    runtime: CommentPickRuntimeSchema.optional(),
-    /** A `step`: what the picker reached; `showing` names the overlay's label (page text: ids and classes). */
-    say: PickerSaySchema.optional(),
-    label: z.string().min(1).max(COMMENT_STEP_LABEL_MAX_CHARS).optional(),
-    view: CommentPickViewSchema
-  })
-  .strict()
-  .refine(pick => pick.kind !== 'icon' || pick.key !== undefined, { message: 'a pin pick names its key' })
-  .refine(pick => (pick.kind === 'step') === (pick.say !== undefined), { message: 'only a step says, and it says something' })
-  .refine(pick => (pick.say === 'showing') === (pick.label !== undefined), { message: 'a showing step names its label' })
-  .refine(pick => pick.runtime === undefined || pick.token !== undefined, { message: 'a runtime element is described below a tokened ancestor' })
-export type CommentPick = z.infer<typeof CommentPickSchema>
-
-/** Why a frame's overlay gave up (the preload's `anchors.ts`). */
-export const CommentOverlayLossSchema = z.enum(['document-replaced', 'overlay-removed'])
-export type CommentOverlayLoss = z.infer<typeof CommentOverlayLossSchema>
-
-/** `preview-page:commentAnchors`: which pins' elements are rendered now; overlay loss. */
-export const CommentAnchorsSchema = z
-  .object({
-    visible: z.array(KeySchema).max(COMMENT_ANCHOR_KEYS_MAX),
-    hidden: z.array(KeySchema).max(COMMENT_ANCHOR_KEYS_MAX),
-    overlay: z.literal('unavailable').optional(),
-    reason: CommentOverlayLossSchema.optional()
-  })
-  .strict()
-export type CommentAnchors = z.infer<typeof CommentAnchorsSchema>
-
 // ---------------------------------------------------------------------------
 // Renderer → main
 // ---------------------------------------------------------------------------
 
 /**
- * Why comments are unavailable for the page on screen (§10.10 "Unavailable"):
- * the feature flag is off for this tab, the page or a frame is over 4 MB, not
- * UTF-8, over the element cap, or could not be prepared (an unknown request
- * kind, a parse that failed, a source that already carries the token
- * attribute), or the page fights the overlay (removes it, or rewrites itself
- * with `document.open()`).
+ * Why comments are unavailable for the page on screen (§10.10 "Unavailable"): the feature flag is off for this
+ * tab, the page or a frame is over `COMMENT_FILE_MAX_BYTES`, not UTF-8, over the element cap, or could not be
+ * prepared (an unknown request kind, a parse that failed, a source that already carries the token attribute),
+ * or the page fights the overlay (removes it, or rewrites itself with `document.open()`).
  */
 export const CommentUnavailableReasonSchema = z.enum([
   'disabled',
@@ -375,7 +282,9 @@ export const CommentListResultSchema = z.union([
     .object({
       ok: z.literal(true),
       files: z.array(CommentFileViewSchema).max(64),
-      unavailable: CommentUnavailableReasonSchema.optional()
+      unavailable: CommentUnavailableReasonSchema.optional(),
+      /** Files the list left out: past its file count or its byte budget (`commentListBuilder.ts`). */
+      unread: z.number().int().min(1).optional()
     })
     .strict(),
   RefusedSchema
@@ -415,42 +324,59 @@ export const CommentDraftTargetViewSchema = z
   })
   .strict()
 
-/** `preview:commentDraftOpened` (§7.3, §7.4, §7.7). */
-export const CommentDraftOpenedSchema = z.discriminatedUnion('kind', [
-  z
-    .object({
-      panelId: PanelIdSchema,
-      kind: z.enum(['menu', 'open']),
-      /** Host-window CSS pixels, already clamped to the panel. */
-      point: CommentPointSchema,
-      ...DisplaySchema,
-      /** Absent: the menu shows a disabled "Can't comment here". */
-      draftToken: z.string().regex(COMMENT_DRAFT_TOKEN_PATTERN).optional(),
-      /** Why not, when there is no draft. */
-      code: z.enum(ErrorCode).optional(),
-      target: CommentDraftTargetViewSchema.optional(),
-      /** An editor tab holds unsaved changes for this file (decision 13): Save is blocked. */
-      unsavedSource: z.boolean()
-    })
-    .strict(),
-  z
-    .object({
-      panelId: PanelIdSchema,
-      kind: z.literal('icon'),
-      point: CommentPointSchema,
-      ...DisplaySchema,
-      threadKeys: z.array(KeySchema).max(PREVIEW_LIMITS.COMMENT_MAX_BLOCKS_PER_FILE),
-      blockKeys: z.array(KeySchema).max(PREVIEW_LIMITS.COMMENT_MAX_BLOCKS_PER_FILE),
-      /**
-       * "New comment" on the pin's element: a draft minted as a menu's is, with
-       * what the window shows for it. Absent when the element cannot take one now.
-       */
-      draftToken: z.string().regex(COMMENT_DRAFT_TOKEN_PATTERN).optional(),
-      target: CommentDraftTargetViewSchema.optional(),
-      unsavedSource: z.boolean().optional()
-    })
-    .strict()
-])
+/**
+ * A draft, as the renderer holds it: the single-use token, the element key the
+ * window keeps typed text under for the session (§10.4 "Draft restored"), and
+ * what the window shows for the element. All three or none.
+ */
+const DraftSchema = {
+  draftToken: z.string().regex(COMMENT_DRAFT_TOKEN_PATTERN).optional(),
+  draftKey: z.string().regex(COMMENT_DRAFT_KEY_PATTERN).optional(),
+  target: CommentDraftTargetViewSchema.optional()
+}
+
+/**
+ * `preview:commentDraftOpened` (§7.3, §7.4, §7.7). No reason rides along when
+ * there is no draft – the menu's only refusal is "Can't comment here" – and no
+ * unsaved-source flag: the window's own guard follows the editor tab live
+ * (§19 "Draft event fields").
+ */
+export const CommentDraftOpenedSchema = z
+  .discriminatedUnion('kind', [
+    z
+      .object({
+        panelId: PanelIdSchema,
+        kind: z.enum(['menu', 'open']),
+        /** Host-window CSS pixels, already clamped to the panel. */
+        point: CommentPointSchema,
+        ...DisplaySchema,
+        /** Absent: the menu shows a disabled "Can't comment here". */
+        ...DraftSchema
+      })
+      .strict(),
+    z
+      .object({
+        panelId: PanelIdSchema,
+        kind: z.literal('icon'),
+        point: CommentPointSchema,
+        ...DisplaySchema,
+        threadKeys: z.array(KeySchema).max(PREVIEW_LIMITS.COMMENT_MAX_BLOCKS_PER_FILE),
+        blockKeys: z.array(KeySchema).max(PREVIEW_LIMITS.COMMENT_MAX_BLOCKS_PER_FILE),
+        /**
+         * "New comment" on the pin's element: a draft minted as a menu's is, with
+         * what the window shows for it. Absent when the element cannot take one now.
+         */
+        ...DraftSchema
+      })
+      .strict()
+  ])
+  .refine(
+    event => {
+      const none = event.draftToken === undefined
+      return (event.draftKey === undefined) === none && (event.target === undefined) === none
+    },
+    { message: 'a draft comes with its key and its target' }
+  )
 export type CommentDraftOpened = z.infer<typeof CommentDraftOpenedSchema>
 
 /** `preview:commentsChanged` – the toolbar badge and the unavailable state (§10.1, §10.10). */
@@ -476,15 +402,83 @@ export const CommentAnchorStatusSchema = z
 export type CommentAnchorStatus = z.infer<typeof CommentAnchorStatusSchema>
 
 /**
+ * Where the keyboard picker stopped, as MAIN's token table has it – the tag main parsed and the line of its start
+ * tag; `added`: the element reached lies below it (a script built it). Never page text (security review S-L-A); a
+ * parsed tag no tag name can spell is left out.
+ */
+export const CommentPickerElementSchema = z
+  .object({ tag: TagNameSchema.optional(), line: z.number().int().min(1), added: z.literal(true).optional() })
+  .strict()
+export type CommentPickerElement = z.infer<typeof CommentPickerElementSchema>
+
+/**
  * `preview:commentModeChanged` – Esc in the page (its exit pick) or the shortcut changed the mode; `picker`: it did not –
- * the keyboard picker moved to `say` (`label`: nothing hidden), for the window's live region to word (§10.2, §10.8).
+ * the keyboard picker moved to `say` (`element`: main's own facts), for the window's live region to word (§10.2, §10.8).
  */
 export const CommentModeChangedSchema = z
-  .object({ panelId: PanelIdSchema, on: z.boolean(), reason: z.enum(['escape', 'shortcut', 'picker']), say: PickerSaySchema.optional(), label: PickerLabelSchema.optional() })
+  .object({
+    panelId: PanelIdSchema,
+    on: z.boolean(),
+    reason: z.enum(['escape', 'shortcut', 'picker']),
+    say: PickerSaySchema.optional(),
+    element: CommentPickerElementSchema.optional()
+  })
   .strict()
   .refine(event => (event.reason === 'picker') === (event.say !== undefined), { message: 'only a picker event says' })
-  .refine(event => (event.say === 'showing') === (event.label !== undefined), { message: 'a showing step names its label' })
+  .refine(event => (event.say === 'showing') === (event.element !== undefined), { message: 'a showing step names its element' })
 export type CommentModeChanged = z.infer<typeof CommentModeChangedSchema>
+
+/** Every `preview:commentSave` operation. */
+export const CommentSaveOpSchema = z.enum([
+  'add',
+  'reply',
+  'editMessage',
+  'deleteMessage',
+  'setStatus',
+  'deleteThread',
+  'deleteBlock'
+])
+export type CommentSaveOp = z.infer<typeof CommentSaveOpSchema>
+
+/**
+ * The key a save is named by: the draft token of an `add`, the block key of a
+ * `deleteBlock`, the thread key of every other operation – and only that one.
+ */
+function namedByItsOwnKey(event: {
+  readonly op: CommentSaveOp
+  readonly draftToken?: string
+  readonly threadKey?: string
+  readonly blockKey?: string
+}): boolean {
+  const named = { draftToken: event.draftToken !== undefined, threadKey: event.threadKey !== undefined, blockKey: event.blockKey !== undefined }
+  if (event.op === 'add') return named.draftToken && !named.threadKey && !named.blockKey
+  if (event.op === 'deleteBlock') return named.blockKey && !named.draftToken && !named.threadKey
+  return named.threadKey && !named.draftToken && !named.blockKey
+}
+
+/**
+ * `preview:commentSaveSettled` (§8, §19 "Save pending settles") – a save that
+ * was answered `COMMENT_SAVE_PENDING` settled after all: it wrote (`ok`), or
+ * it was refused or failed (`code`, never `COMMENT_SAVE_PENDING` again). The
+ * write is named by the request's own key, so the window that sent it – or a
+ * later one on the same thread – can tell it apart. Sent only for a save that
+ * outlasted its answer: every other save's answer already said how it ended.
+ */
+export const CommentSaveSettledSchema = z
+  .object({
+    panelId: PanelIdSchema,
+    op: CommentSaveOpSchema,
+    draftToken: z.string().regex(COMMENT_DRAFT_TOKEN_PATTERN).optional(),
+    threadKey: KeySchema.optional(),
+    blockKey: KeySchema.optional(),
+    ok: z.boolean(),
+    code: z.enum(ErrorCode).optional()
+  })
+  .strict()
+  .refine(event => event.ok === (event.code === undefined), { message: 'a failed write names its code, a landed one none' })
+  .refine(event => event.code !== ErrorCode.COMMENT_SAVE_PENDING, { message: 'a settled write is no longer pending' })
+  .refine(namedByItsOwnKey, { message: 'a write is named by its own key' })
+export type CommentSaveSettled = z.infer<typeof CommentSaveSettledSchema>
 
 /** The `window.api.previewComments` contract (`src/preload/previewCommentsBridge.ts`). */
 export interface PreviewCommentsBridge {
@@ -497,4 +491,5 @@ export interface PreviewCommentsBridge {
   onCommentsChanged(callback: (payload: CommentsChanged) => void): () => void
   onAnchorStatus(callback: (payload: CommentAnchorStatus) => void): () => void
   onModeChanged(callback: (payload: CommentModeChanged) => void): () => void
+  onSaveSettled(callback: (payload: CommentSaveSettled) => void): () => void
 }

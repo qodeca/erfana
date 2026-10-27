@@ -5,7 +5,7 @@
  * (docs/designs/html-preview-comments.md §10.4, §10.7; R-003, R-007, R-008,
  * R-013, R-017, R-019, R-022, R-024).
  */
-import { act, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ErrorCode } from '../../../../../../shared/errors'
@@ -32,10 +32,16 @@ vi.mock('../../../../hooks/useCommentDirtyGuard', () => ({
   useCommentDirtyGuard: () => guard.current
 }))
 
-import { newRequest } from './__test-helpers__/commentTestKit'
+import {
+  DRAFT_TOKEN,
+  installCommentsBridge,
+  newRequest,
+  type FakeCommentsBridge
+} from './__test-helpers__/commentTestKit'
 import { COPY, IDENTITY_COPY, unsavedConflictText } from './commentCopy'
 import { CommentWindow, type CommentWindowProps } from './CommentWindow'
 import { draftKeyOf } from './commentWindowTypes'
+import { resetCommentPendingWrites } from './commentPendingWrites'
 
 const IDENTITY: CommentIdentitySettings = {
   authorName: 'Ada Lovelace',
@@ -92,6 +98,7 @@ describe('CommentWindow – new comment', () => {
   afterEach(() => {
     portalRoot.remove()
     commentDrafts.reset()
+    resetCommentPendingWrites()
   })
 
   describe('R-013 dialog role, focus and context line', () => {
@@ -307,6 +314,75 @@ describe('CommentWindow – new comment', () => {
       expect(field().value).toBe('Slow disk')
     })
 
+    describe('H1 a pending save settles', () => {
+      const PENDING = { ok: false as const, code: ErrorCode.COMMENT_SAVE_PENDING }
+      let fake: FakeCommentsBridge
+      beforeEach(() => {
+        fake = installCommentsBridge()
+      })
+      afterEach(() => fake.uninstall())
+
+      /** Types `text`, saves, and waits for the "Still saving" banner. */
+      async function savePending(text: string): Promise<{ release: ReturnType<typeof vi.fn> }> {
+        const release = vi.fn()
+        guard.current = { ...guard.current, holdForWrite: vi.fn(() => release) }
+        setup({ onSave: vi.fn(async () => PENDING) })
+        const user = userEvent.setup()
+        await user.type(field(), text)
+        await user.click(saveButton())
+        expect(await screen.findByTestId('comment-save-error')).toHaveClass('erf-comment-banner--info')
+        return { release }
+      }
+
+      it('the field is read-only and the autosave hold stays past the answer – until main says the write landed', async () => {
+        const { release } = await savePending('Slow disk')
+        expect(field()).toHaveAttribute('readonly')
+        expect(release).not.toHaveBeenCalled()
+        act(() => fake.emitSettled({ panelId: 'preview-index', op: 'add', draftToken: DRAFT_TOKEN, ok: true }))
+        expect(release).toHaveBeenCalledTimes(1)
+        // The draft is spent; the panel announces the write and closes this window.
+        expect(commentDrafts.get(draftKeyOf(newRequest()))).toBe('')
+      })
+
+      it('refused after all: the error banner replaces "Still saving", Save is back and the text stays', async () => {
+        const { release } = await savePending('Keep me')
+        act(() =>
+          fake.emitSettled({
+            panelId: 'preview-index',
+            op: 'add',
+            draftToken: DRAFT_TOKEN,
+            ok: false,
+            code: ErrorCode.COMMENT_WRITE_FAILED
+          })
+        )
+        const banner = screen.getByTestId('comment-save-error')
+        expect(banner).toHaveClass('erf-comment-banner--error')
+        expect(banner).toHaveTextContent("Couldn't save the comment.")
+        expect(release).toHaveBeenCalledTimes(1)
+        expect(field().value).toBe('Keep me')
+        expect(field()).not.toHaveAttribute('readonly')
+        expect(saveButton()).not.toHaveAttribute('aria-disabled')
+        await waitFor(() =>
+          expect(screen.getByTestId('comment-window-alert')).toHaveTextContent("Couldn't save the comment.")
+        )
+      })
+
+      it('a window reopened on the same element while the write is pending offers no second Save; a landed write empties it', async () => {
+        await savePending('Once only')
+        cleanup()
+        // Pick again on the same element: a new draft token, the same element key.
+        const again = newRequest({ draftToken: 'f'.repeat(32) })
+        setup({ request: again })
+        expect(screen.getByTestId('comment-save-error')).toHaveClass('erf-comment-banner--info')
+        expect(screen.queryByTestId('comment-save')).toBeNull()
+        expect(field().value).toBe('Once only')
+        expect(field()).toHaveAttribute('readonly')
+        act(() => fake.emitSettled({ panelId: 'preview-index', op: 'add', draftToken: DRAFT_TOKEN, ok: true }))
+        expect(field().value).toBe('')
+        expect(saveButton()).toHaveAttribute('aria-disabled', 'true')
+      })
+    })
+
     it('H1 speaks the unsaved-source refusal too', async () => {
       const user = userEvent.setup()
       setup({
@@ -330,8 +406,11 @@ describe('CommentWindow – new comment', () => {
       })
       await user.type(field(), 'Precious')
       await user.click(saveButton())
+      // The banner; the window's assertive region says the same sentence a frame later.
       expect(
-        await screen.findByText('index.html no longer exists. Copy your text before closing.')
+        await screen.findByText('index.html no longer exists. Copy your text before closing.', {
+          selector: '.erf-comment-banner__text'
+        })
       ).toBeVisible()
       expect(field().value).toBe('Precious')
       expect(screen.queryByTestId('comment-save')).toBeNull()
@@ -597,6 +676,19 @@ describe('CommentWindow – new comment', () => {
       })
       expect(screen.getByTestId('comment-control-token')).toHaveTextContent('⟨U+202E⟩')
       expect(field()).toHaveAttribute('dir', 'auto')
+    })
+
+    it('S-L-B a file name with controls shows them as tokens: context line, frame note, hint, banner and its Save button', () => {
+      const rlo = String.fromCodePoint(0x202e)
+      guard.current = { ...guard.current, state: 'dirty' }
+      const request = newRequest()
+      setup({ request: { ...request, file: { ...request.file, frame: true, displayPath: `lmth.${rlo}child.html` } } })
+      const window1 = screen.getByTestId('comment-window')
+      expect(window1.textContent).not.toContain(rlo)
+      const notes = [...window1.querySelectorAll('.erf-comment-note')].map(note => note.textContent)
+      expect(notes).toContain('Saved in lmth.⟨U+202E⟩child.html.')
+      expect(screen.getByTestId('comment-unsaved-save')).toHaveTextContent('Save lmth.⟨U+202E⟩child.html')
+      expect(screen.getByTestId('comment-unsaved-banner').textContent).toContain('lmth.⟨U+202E⟩child.html')
     })
   })
 })

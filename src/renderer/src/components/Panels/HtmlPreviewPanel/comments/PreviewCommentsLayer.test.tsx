@@ -7,7 +7,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ErrorCode } from '../../../../../../shared/errors'
 import { INITIAL_PANEL_COMMENT_STATE } from '../../../../stores/usePreviewCommentStore'
 import { useOverlayOccluderStore } from '../../../../stores/useOverlayOccluderStore'
 import { menuDraft, newRequest, threadsRequest } from './__test-helpers__/commentTestKit'
@@ -93,11 +92,7 @@ describe('PreviewCommentsLayer', () => {
     it('shows a disabled "Can\'t comment here" when there is no draft', async () => {
       const user = userEvent.setup()
       const { props } = setup({
-        menu: menuDraft({
-          draftToken: undefined,
-          target: undefined,
-          code: ErrorCode.COMMENT_PATH_REFUSED
-        })
+        menu: menuDraft({ draftToken: undefined, draftKey: undefined, target: undefined })
       })
       const item = screen.getByRole('menuitem', { name: COPY.cantCommentHere })
       expect(item).toHaveAttribute('aria-disabled', 'true')

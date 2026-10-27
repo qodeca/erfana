@@ -27,6 +27,9 @@ export type { PreviewMoveAnnouncer, PreviewFrameScheduler } from './usePreviewMo
 export { usePreviewPageEntry } from './usePreviewPageEntry'
 export type { PreviewPageEntry, UsePreviewPageEntryOptions } from './usePreviewPageEntry'
 
+export { usePreviewGroupKeys } from './usePreviewGroupKeys'
+export type { PreviewKeyEventLike, UsePreviewGroupKeysOptions } from './usePreviewGroupKeys'
+
 export { usePreviewPanelActions } from './usePreviewPanelActions'
 export type {
   PreviewPanelActions,

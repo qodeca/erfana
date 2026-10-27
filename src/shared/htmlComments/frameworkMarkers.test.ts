@@ -120,4 +120,9 @@ describe('detectFrameworkRegions', () => {
     expect(detectFrameworkRegions(index)).toEqual({ frameworks: ['vue'], roots: [] })
     expect(frameworkPlacementFor(index, elementOf(index, 'p'))).toEqual({ kind: 'plain' })
   })
+
+  it('walks an element with 300,000 children without overflowing the stack (a flat 25 MB list, §19 Rev 4)', () => {
+    const index = indexHtml(page(`<div data-v-ssr>${'<br>'.repeat(300_000)}</div>`))
+    expect(detectFrameworkRegions(index)).toEqual({ frameworks: ['vue'], roots: [elementOf(index, 'div').node] })
+  })
 })

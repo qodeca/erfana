@@ -100,7 +100,9 @@ export function detectFrameworkRegions(index: HtmlIndex): FrameworkRegions {
       found.add(kind)
       addRoot(node)
     }
-    pending.push(...node.childNodes)
+    // One push per child: spreading a long child list as arguments overflows
+    // the call stack (a flat 25 MB list has hundreds of thousands of items).
+    for (const child of node.childNodes) pending.push(child)
   }
   if (fragments) found.add(svelteFragment || found.has('svelte') ? 'svelte' : 'vue')
   return {

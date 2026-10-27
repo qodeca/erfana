@@ -125,6 +125,8 @@ The preview watches the page plus every local file it links, and re-subscribes w
 
 **At most 16 files are watched per preview.** The page's own links come first, then the frames' files by depth. A file past that budget is left out and counted, so a framed page with many files can report a non-zero "not watched" count – expected, not a fault. Saving an unwatched file does not refresh the preview.
 
+**Finding the linked files has a fixed cost.** Erfana reads each page's markup once, start to end, without building the page, so a hostile page cannot stall Erfana (#124). A tag keeps its first 1,024 attributes, and a page is read up to its first 4 MiB; a link past either bound is not watched, and Erfana's log records which bound was reached. Markup a browser repairs while building the page – content inside `<select>` or `<frameset>`, a repeated `<body>` – can add a watched file or change which 16 come first.
+
 For the acceptance corpus, save-to-visible-change stays under 300 ms.
 
 ## Colours, zoom, and the preview toolbar
@@ -175,11 +177,11 @@ You can leave comments on the elements of a previewed page. A comment is saved *
 
 | Reason | What happens |
 |---|---|
-| The file is over **4 MB** | The page still previews, but it shows no comments and takes none |
+| The file is over **25 MB** | The preview does not show a file that large, so there is nothing to comment on. A file that grows past 25 MB while it is open keeps its comments read-only |
 | The file is not UTF-8 | Existing comments are shown read-only; no new ones |
 | The file holds an unresolved git conflict | Read-only until you resolve it |
 | The file is a link to another file, or has other hard links | Erfana will not write to it |
-| The page has too many elements | Comments are unavailable for that page |
+| The page has too many elements (over 640,000) | Comments are unavailable for that page |
 | The page keeps removing Erfana's overlay | Comments are unavailable for that page |
 | An `<iframe srcdoc>` or a remote frame | You cannot comment inside it; you can comment on the `<iframe>` element itself |
 

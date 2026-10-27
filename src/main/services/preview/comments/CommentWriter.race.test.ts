@@ -10,9 +10,18 @@
  * policy). The mocks pass through to the real implementations; a test arms
  * one hook to act at an exact step – when the temp file is created, which is
  * after the writer read and spliced the file and before it re-hashes and
- * renames.
+ * renames. The comment file limit is lowered to {@link TEST_FILE_LIMIT}, so a
+ * file at the limit is built and parsed without 25 MB of parse (§19 Rev 4).
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+
+/** The comment file limit in this suite. */
+const TEST_FILE_LIMIT = vi.hoisted(() => 512 * 1024)
+
+vi.mock('../../../../shared/preview-limits', async importOriginal => {
+  const actual = await importOriginal<typeof import('../../../../shared/preview-limits')>()
+  return { ...actual, PREVIEW_LIMITS: { ...actual.PREVIEW_LIMITS, COMMENT_FILE_MAX_BYTES: TEST_FILE_LIMIT } }
+})
 
 const hooks = vi.hoisted(() => ({
   rename: vi.fn(),
@@ -294,8 +303,9 @@ describe('file-system failures and fail-closed verification', () => {
     expect(await snapshot(project.path('index.html'))).toEqual(before)
   })
 
-  it('a block that would push the file past 4 MB is refused before writing (COMMENT_LIMIT)', async () => {
-    const nearlyFull = PAGE.replace('</body>', `<!-- ${'x'.repeat(4 * 1024 * 1024 - PAGE.length - 20)} -->\n</body>`)
+  it('a block that would push the file past the file limit is refused before writing (COMMENT_LIMIT)', async () => {
+    const nearlyFull = PAGE.replace('</body>', `<!-- ${'x'.repeat(TEST_FILE_LIMIT - PAGE.length - 20)} -->\n</body>`)
+    expect(Buffer.byteLength(nearlyFull)).toBeLessThanOrEqual(TEST_FILE_LIMIT)
     await project.write('index.html', nearlyFull)
 
     const result = await makeWriter().writer.add({

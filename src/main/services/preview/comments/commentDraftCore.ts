@@ -6,8 +6,12 @@
  * §7.3 step 3, decisions 16–17, 34, §19 R3-8, R3-11, R3-12; tests M-033,
  * M-054, M-055).
  *
- * Runs in the comment parse worker as the `draft` and `pin-blocks` jobs
- * (`commentFileJobs.ts`), so a 4 MB page never parses on the main thread.
+ * Runs in the comment parse worker as the `draft` and `pin` jobs
+ * (`commentFileJobs.ts`), so no page – up to 25 MB – parses on the main thread.
+ * A pin click is ONE job on one read: the blocks standing on the pin's element
+ * and the draft for its "New comment" come from the same parse (§19 "One pin
+ * job") – a 25 MB page does not fit the worker's document cache, so two jobs
+ * would parse it twice.
  * Pure: no Electron, no file system, no worker API. Main reads the bytes and
  * keeps everything that names a path (`commentDraftBuilder.ts`,
  * `commentDraftOpener.ts`).
@@ -89,16 +93,27 @@ export type DraftJobResult =
     }
   | { readonly kind: 'draft'; readonly ok: false; readonly refusal?: CommentRefusal }
 
-/** The damaged and newer blocks standing on a pin's element. */
-export interface PinBlocksJob {
-  readonly kind: 'pin-blocks'
-  readonly entry: Omit<DraftEntry, 'tagName'>
+/** A damaged or newer block by its hash and start offset – main turns it into a key. */
+export interface PinBlock {
+  readonly rawHash: string
+  readonly start: number
 }
 
-/** Each block by its hash and start offset – main turns them into keys. Empty when the file changed. */
-export interface PinBlocksJobResult {
-  readonly kind: 'pin-blocks'
-  readonly blocks: ReadonlyArray<{ readonly rawHash: string; readonly start: number }>
+/** A pin click: the blocks standing on the pin's element, and a draft on it, from one parse. */
+export interface PinJob {
+  readonly kind: 'pin'
+  readonly entry: DraftEntry
+  /** Look for the element's damaged and newer blocks (the pin counts some). */
+  readonly blocks: boolean
+  /** The pick "New comment" is built from; absent: no draft (the element is not one a pick could name). */
+  readonly pick?: DraftPickPart
+}
+
+/** The pin's blocks – empty when the file changed – and the draft's parse half when one was asked for. */
+export interface PinJobResult {
+  readonly kind: 'pin'
+  readonly blocks: readonly PinBlock[]
+  readonly draft?: DraftJobResult
 }
 
 const MOVED: DraftJobResult = { kind: 'draft', ok: false, refusal: 'target-moved' }
@@ -199,13 +214,19 @@ export function runDraftJob(document: JobDocument, job: DraftJob): DraftJobResul
   }
 }
 
-/** The `pin-blocks` job: damaged and newer blocks whose position names the pin's element. */
-export function runPinBlocksJob(document: JobDocument, job: PinBlocksJob): PinBlocksJobResult {
-  if (!document.ok || document.hash !== job.entry.fileHash) return { kind: 'pin-blocks', blocks: [] }
+/** Damaged and newer blocks whose position names the element at `entry`; none when the file changed. */
+function pinBlocksOf(document: JobDocument, entry: DraftEntry): PinBlock[] {
+  if (!document.ok || document.hash !== entry.fileHash) return []
   const { index, state } = document.doc
   const ends = new Map(state.blocks.map(block => [block.nodeRange[0], block.nodeRange[1]]))
-  const blocks = state.blocks
-    .filter(block => block.kind !== 'ok' && positionTarget(index, block.nodeRange[1], ends) === job.entry.startOffset)
+  return state.blocks
+    .filter(block => block.kind !== 'ok' && positionTarget(index, block.nodeRange[1], ends) === entry.startOffset)
     .map(block => ({ rawHash: block.rawHash, start: block.nodeRange[0] }))
-  return { kind: 'pin-blocks', blocks }
+}
+
+/** The `pin` job: the pin's blocks and the draft on its element, from one parse. */
+export function runPinJob(document: JobDocument, job: PinJob): PinJobResult {
+  const blocks = job.blocks ? pinBlocksOf(document, job.entry) : []
+  if (job.pick === undefined) return { kind: 'pin', blocks }
+  return { kind: 'pin', blocks, draft: runDraftJob(document, { kind: 'draft', entry: job.entry, pick: job.pick }) }
 }

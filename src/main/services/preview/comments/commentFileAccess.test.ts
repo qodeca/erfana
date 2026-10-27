@@ -10,6 +10,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { readdir, stat, symlink } from 'node:fs/promises'
 import { ErrorCode } from '../../../../shared/errors'
 import { serializeBlock } from '../../../../shared/htmlComments'
+import { PREVIEW_LIMITS } from '../../../../shared/preview-limits'
 import { fixedId, makeComment } from '../../../../shared/htmlComments/__fixtures__/commentTestData'
 import { fileIdOf, sha256Hex } from '../../../utils/atomicWriteBytesStrict'
 import { PAGE, makeProject, snapshot, type TempProject } from './__test-helpers__/commentWriterHarness'
@@ -72,13 +73,35 @@ describe('loadCommentBytes', () => {
 
   it('refuses what it cannot read losslessly or at all', async () => {
     await project.write('utf16.html', Buffer.from([0xff, 0xfe, 0x3c, 0x00]))
-    await project.write('big.html', Buffer.alloc(4 * 1024 * 1024 + 1, 0x61))
+    await project.write('big.html', Buffer.alloc(PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES + 1, 0x61))
 
     const utf16 = await loadCommentBytes(project.target('utf16.html'))
     expect(utf16.ok && freshDocumentOf(utf16.bytes)).toMatchObject({ ok: false, refusal: 'encoding' })
     expect(await loadCommentBytes(project.target('big.html'))).toEqual(refused('too-large'))
     expect(await loadCommentBytes(project.target('gone.html'))).toEqual(refused('missing'))
     expect(await loadCommentBytes(project.target('notes.txt'))).toEqual(refused('not-html'))
+  })
+
+  it('§19 Rev 4 reads a file of exactly 25 MB whole; one byte more is too-large', async () => {
+    const limit = PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES
+    expect(limit).toBe(25 * 1024 * 1024)
+    await project.write('at-limit.html', Buffer.alloc(limit, 0x61))
+    await project.write('over.html', Buffer.alloc(limit + 1, 0x61))
+
+    const atLimit = await loadCommentBytes(project.target('at-limit.html'))
+    expect(atLimit.ok && atLimit.bytes.length).toBe(limit)
+    expect(await loadCommentBytes(project.target('over.html'))).toEqual(refused('too-large'))
+  })
+
+  it('§19 Rev 4 a lower maxBytes (the comment list budget) refuses a longer file; a higher one never lifts the limit', async () => {
+    await project.write('index.html', PAGE)
+    const size = Buffer.byteLength(PAGE)
+    expect(await loadCommentBytes(project.target('index.html'), { maxBytes: size - 1 })).toEqual(refused('too-large'))
+    const exact = await loadCommentBytes(project.target('index.html'), { maxBytes: size })
+    expect(exact.ok && exact.bytes.length).toBe(size)
+    await project.write('over.html', Buffer.alloc(PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES + 1, 0x61))
+    const lifted = await loadCommentBytes(project.target('over.html'), { maxBytes: 2 * PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES })
+    expect(lifted).toEqual(refused('too-large'))
   })
 
   it('returns the dev/ino of the file it confined and read – the lock key and the write precondition', async () => {

@@ -12,6 +12,7 @@ vi.mock('../../../../utils/platform', () => ({
 
 import {
   ANNOUNCE,
+  FILE_LIMIT_TEXT,
   UNAVAILABLE_REASON_TEXT,
   commentModeAriaShortcut,
   commentModeShortcutLabel,
@@ -25,7 +26,8 @@ import {
   saveShortcutAria,
   saveShortcutLabel,
   threadsTitle,
-  unavailableTooltip
+  unavailableTooltip,
+  unreadFilesText
 } from './commentCopy'
 
 describe('commentCopy', () => {
@@ -134,6 +136,19 @@ describe('commentCopy', () => {
     undefined
   ])('states the read-only reason %s', reason => {
     expect(readOnlyReasonText(reason, 'a.html').length).toBeGreaterThan(10)
+  })
+
+  it('§19 Rev 4 states the file limits the code enforces, in the drawer and in the save error alike', () => {
+    expect(FILE_LIMIT_TEXT).toBe('Erfana adds comments only to files of up to 25 MB and 640,000 elements.')
+    expect(readOnlyReasonText('too-large', 'a.html')).toBe(`${FILE_LIMIT_TEXT} a.html is larger, so its comments are read-only.`)
+    expect(ERROR_MESSAGES[ErrorCode.COMMENT_FILE_TOO_LARGE]).toBe(FILE_LIMIT_TEXT)
+  })
+
+  it('§19 Rev 4 says how many files a list left out, with a real singular', () => {
+    expect(unreadFilesText(1)).toBe(
+      "Comments from 1 file in this page aren't listed: one list reads at most 64 files and 64 MB. Open a frame's file in its own tab to see its comments."
+    )
+    expect(unreadFilesText(3)).toContain('Comments from 3 files in this page')
   })
 
   it('titles a thread window by count', () => {

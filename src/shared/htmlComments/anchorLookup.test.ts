@@ -17,7 +17,7 @@ import type { CommentAnchor, TextQuote } from './format'
 import { indexHtml, type HtmlIndex, type IndexedElement } from './htmlIndex'
 import { exactOf, prefixOf, suffixOf } from './quoteText'
 
-// --- the reference: the per-block scan the tables replaced ---
+// --- the reference: the per-block scan the tables replaced, with the §19 Rev 4 refusals ---
 
 function only<T>(items: readonly T[]): T | undefined {
   return items.length === 1 ? items[0] : undefined
@@ -38,6 +38,26 @@ function scanQuote(index: HtmlIndex, tag: string, quote: TextQuote): IndexedElem
   )
 }
 
+/** §19 Rev 4: the element carries an `id`, and it is not the stored one. */
+function otherId(el: IndexedElement, anchor: CommentAnchor): boolean {
+  return Boolean(anchor.id && el.id && el.id !== anchor.id)
+}
+
+/**
+ * §19 Rev 4: the element's text is not the quote (exact, or the text on both
+ * sides) but shares a start with the stored suffix – it slid into the place
+ * of a removed target.
+ */
+function slidIn(index: HtmlIndex, el: IndexedElement, quote: TextQuote | undefined): boolean {
+  if (!quote) return false
+  const exact = exactOf(index, el)
+  if (exact === quote.exact) return false
+  const sameContext = prefixOf(index, el) === quote.prefix && suffixOf(index, el) === quote.suffix
+  if ((quote.prefix || quote.suffix) && sameContext) return false
+  const { suffix } = quote
+  return exact !== '' && suffix !== '' && (exact.startsWith(suffix) || suffix.startsWith(exact))
+}
+
 function scanTarget(index: HtmlIndex, anchor: CommentAnchor): TargetResolution {
   if (anchor.id) {
     const el = only(index.elements.filter(c => c.id === anchor.id && c.tag === anchor.tag))
@@ -46,10 +66,13 @@ function scanTarget(index: HtmlIndex, anchor: CommentAnchor): TargetResolution {
   if (anchor.path) {
     const paths = new Map(index.elements.map(el => [index.pathOf(el.node), el]))
     const el = paths.get(anchor.path)
-    if (el && el.tag === anchor.tag) return attachedAt(el, 'path')
+    const sameId = Boolean(anchor.id && el?.id === anchor.id)
+    const refused =
+      el !== undefined && (otherId(el, anchor) || (!sameId && slidIn(index, el, anchor.quote)))
+    if (el && el.tag === anchor.tag && !refused) return attachedAt(el, 'path')
   }
   const el = anchor.quote && scanQuote(index, anchor.tag, anchor.quote)
-  return el ? attachedAt(el, 'quote') : { state: 'orphaned' }
+  return el && !otherId(el, anchor) ? attachedAt(el, 'quote') : { state: 'orphaned' }
 }
 
 // --- anchors that hit, miss and collide, built from the document's own elements ---
@@ -193,7 +216,9 @@ describe('the quote budget', () => {
 
   it('answers nothing once a table cannot be finished, and never throws', () => {
     const lookup = new AnchorLookup(index, 3)
-    expect(lookup.byQuote('p', { exact: 'first paragraph', prefix: '', suffix: '' })).toBeUndefined()
+    expect(
+      lookup.byQuote('p', { exact: 'first paragraph', prefix: '', suffix: '' })
+    ).toBeUndefined()
     expect(lookup.budgetSpent).toBe(true)
     // Nothing new is read after it ran out, however short the text.
     expect(lookup.byQuote('b', { exact: 'bold words', prefix: '', suffix: '' })).toBeUndefined()

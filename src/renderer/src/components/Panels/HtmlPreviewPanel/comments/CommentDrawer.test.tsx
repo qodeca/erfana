@@ -12,7 +12,7 @@ import type { CommentFileView } from '../../../../../../shared/ipc/preview-comme
 import type { CommentListState } from '../../../../stores/usePreviewCommentStore'
 import { damaged, fileView, message, thread } from './__test-helpers__/commentTestKit'
 import { resolveFocusReturnTarget } from '../../../Dialog/BaseDialog'
-import { COPY, DRAWER_COPY } from './commentCopy'
+import { COPY, DRAWER_COPY, unreadFilesText } from './commentCopy'
 import {
   CommentDrawer,
   DRAWER_ROW_ESTIMATE_PX,
@@ -211,6 +211,19 @@ describe('CommentDrawer', () => {
     it('has a full-width mode for narrow panels', () => {
       setup({ full: true })
       expect(screen.getByTestId('comment-drawer')).toHaveClass('erf-comment-drawer--full')
+    })
+
+    it('§19 Rev 4 says above the list how many files it left out, and nothing when it left none out', () => {
+      const { unmount } = setup({ list: { ...ready([fileView({ threads: [thread(1)] })]), unread: 2 } })
+      const note = screen.getByTestId('comment-drawer-unread')
+      expect(note).toHaveTextContent(unreadFilesText(2))
+      expect(note).toHaveTextContent('2 files')
+      // Above the scrolling list, so it stays in view.
+      expect(screen.getByTestId('comment-drawer').querySelector('.erf-comment-drawer__scroll')?.contains(note)).toBe(false)
+      expect(rows()).toHaveLength(1)
+      unmount()
+      setup()
+      expect(screen.queryByTestId('comment-drawer-unread')).toBeNull()
     })
   })
 
@@ -413,6 +426,14 @@ describe('CommentDrawer', () => {
         .getAllByTestId('comment-drawer-row-main')
         .map(main => main.getAttribute('aria-labelledby'))
       expect(new Set(ids).size).toBe(ids.length)
+    })
+
+    it('S-L-B the file heading shows a control in the file name as a token', () => {
+      const rlo = String.fromCodePoint(0x202e)
+      setup({ list: ready([fileView({ displayPath: `lmth.${rlo}index.html`, threads: [thread(1)] })]) })
+      const heading = document.querySelector('.erf-comment-drawer__file')!
+      expect(heading.textContent).toBe('lmth.⟨U+202E⟩index.html')
+      expect(within(heading as HTMLElement).getByTestId('comment-control-token')).toBeVisible()
     })
 
     it('M9 a label with a control shows a token, in the text and in Open\'s name', () => {

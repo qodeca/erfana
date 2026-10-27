@@ -13,7 +13,7 @@
  * | `COMMENT_PATH_REFUSED` | not a file comments may be written to: not absolute, outside the project, a never-served path (`node_modules`, `dist`, `out`, `coverage`, `.git`, dot-folders), not `.html`/`.htm`, an NTFS stream name, an 8.3 short name |
  * | `COMMENT_FILE_GONE` | the file, or a folder on its path, no longer exists |
  * | `COMMENT_WRITE_REFUSED_LINK` | the file is a symlink or has other hard links |
- * | `COMMENT_FILE_TOO_LARGE` | over 4 MB |
+ * | `COMMENT_FILE_TOO_LARGE` | over `COMMENT_FILE_MAX_BYTES` (25 MB, every page the preview serves – §19 Rev 4) |
  * | `COMMENT_ENCODING_UNSUPPORTED` | not UTF-8 (± BOM) with a byte-identical round trip |
  * | `COMMENT_FILE_CONFLICTED` | a complete git conflict hunk in the file |
  * | `COMMENT_FILE_READ_ONLY` | read-only on disk, another user's file, an unwritable folder, or an unterminated block (read-only for comments) |
@@ -137,6 +137,6 @@ export function refused(reason: CommentRefusal, errno?: string): Refused {
  * A parse the comment parse worker did not answer, as a refusal: a full queue
  * is `busy`; a timeout, a crash, a bad answer or no worker is `parse-failed`.
  */
-export function jobFailureRefusal(failure: 'busy' | 'timeout' | 'crashed' | 'error' | 'unavailable'): Refused {
+export function jobFailureRefusal(failure: 'busy' | 'timeout' | 'crashed' | 'error' | 'unavailable' | 'poisoned'): Refused {
   return refused(failure === 'busy' ? 'busy' : 'parse-failed')
 }

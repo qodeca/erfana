@@ -22,7 +22,6 @@ const SENTENCES = new Set([...MICROCOPY.matchAll(/"([^"]+)"/g)].map(match => mat
 const NOT_IN_MICROCOPY = new Set<ErrorCode>([
   ErrorCode.COMMENT_KEY_INVALID,
   ErrorCode.COMMENT_LIMIT,
-  ErrorCode.COMMENT_FILE_TOO_LARGE,
   ErrorCode.COMMENT_PATH_REFUSED
 ])
 

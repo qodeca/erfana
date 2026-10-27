@@ -7,7 +7,8 @@
 import { defaultTreeAdapter, html as htmlSpec } from 'parse5'
 import { describe, expect, it } from 'vitest'
 import { BOM, LINE_SEP, elementOf } from './__fixtures__/commentTestData'
-import { attributeOf, indexHtml } from './htmlIndex'
+import { attributeOf, hasMoreStartTagsThan, indexHtml } from './htmlIndex'
+import { UNBOUNDED_PARSE } from './parseBounds'
 
 /** About 1.6 s alone; room for a loaded CI runner and coverage instrumentation. */
 const DEEP_PAGE_TIMEOUT_MS = 30_000
@@ -183,12 +184,36 @@ describe('text and paths', () => {
     'walks a very deep page without overflowing the stack',
     () => {
       // Deeper than plain recursion reaches on Node 24 (about 10,400 frames).
-      // Kept near that: parse5's scope checks make deep nesting quadratic.
+      // Kept near that: parse5's scope checks make deep nesting quadratic –
+      // which is why the default bounds refuse this page (S-M, parseBounds.test.ts),
+      // and why this test of the walk lifts them.
       const depth = 12_000
-      const index = indexHtml(`${'<div>'.repeat(depth)}deep${'</div>'.repeat(depth)}`)
+      const index = indexHtml(`${'<div>'.repeat(depth)}deep${'</div>'.repeat(depth)}`, UNBOUNDED_PARSE)
       expect(index.elements).toHaveLength(depth)
       expect(index.visibleText).toBe('deep')
     },
     DEEP_PAGE_TIMEOUT_MS
   )
+})
+
+describe('hasMoreStartTagsThan (§19 Rev 4)', () => {
+  const bytes = (text: string): Uint8Array => new TextEncoder().encode(text)
+
+  it('counts a `<` followed by an ASCII letter of either case, up to the limit', () => {
+    const page = bytes('<p>a</p><DIV>b</DIV><x-y></x-y>')
+    expect(hasMoreStartTagsThan(page, 3)).toBe(false)
+    expect(hasMoreStartTagsThan(page, 2)).toBe(true)
+  })
+
+  it('ignores end tags, comments, doctypes, a `<` before a digit or a blank, and a `<` at the very end', () => {
+    expect(hasMoreStartTagsThan(bytes('<!doctype html><!-- c --></p><1 < 2 <'), 0)).toBe(false)
+    expect(hasMoreStartTagsThan(bytes('['), 0)).toBe(false)
+    expect(hasMoreStartTagsThan(new Uint8Array(0), 0)).toBe(false)
+  })
+
+  it('never counts fewer than the elements the index finds: every eligible element owns a start tag', () => {
+    const text = '<main><p id="a">x<b>y</b></p><table><tr><td>1</td></tr></table><template><i>t</i></template></main>'
+    const elements = indexHtml(text).elements.length
+    expect(hasMoreStartTagsThan(bytes(text), elements - 1)).toBe(true)
+  })
 })

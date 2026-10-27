@@ -31,7 +31,6 @@ import type {
   CommentAnchors,
   CommentListResult,
   CommentModeChanged,
-  CommentPick,
   CommentSaveRequest,
   CommentSaveResult,
   CommentSetModeResult
@@ -46,14 +45,14 @@ import { CommentFrames, type CommentFrameLike, type FrameRecord } from './commen
 import { createCommentFrameBroadcaster, type CommentFrameBroadcaster } from './commentFrameBroadcaster'
 import { CommentKeyStore, type CommentBinding } from './commentKeyStore'
 import { createCommentPickHandler, type CommentPickHandler, type PageSignalEvent } from './commentPickHandler'
-import { pickerStepOf } from './commentPickerStep'
+import { pickerStepOf, type PickerStepInput } from './commentPickerStep'
 import { createCommentDraftOpener, type CommentDraftOpener, type DraftOpenerGeometry } from './commentDraftOpener'
 import type { CommentDraft } from './commentDraftBuilder'
 import { buildCommentList } from './commentListBuilder'
 import { accentRgb } from './commentOverlayTheme'
 import { createCommentPanelStatus, type CommentPanelStatus } from './commentPanelStatus'
 import { createCommentReloadCoordinator, type CommentReloadCoordinator } from './commentReloadCoordinator'
-import { createCommentSaveFlow } from './commentSaveFlow'
+import { createCommentSaveFlow, type LateSettle } from './commentSaveFlow'
 import { attachCommentServiceEvents, type CommentEventContents, type FrameFromIds } from './commentServiceEvents'
 import { waitForPaint, type FreshStillDeps } from './commentStillCapture'
 import type { CommentE2ePanelState, CommentServiceApi, PreviewCommentShared } from './commentServiceTypes'
@@ -164,7 +163,7 @@ export class PreviewCommentService implements CommentServiceApi {
         hello: frame => this.guard(this.onHello(frame)),
         exit: () => this.changeMode(false, 'escape'),
         parent: frame => this.onParent(frame),
-        step: pick => this.onStep(pick),
+        step: step => this.onStep(step),
         icon: (frame, record, key, pick) => this.guard(this.opener.icon(frame, record, key, pick)),
         element: (frame, record, entry, pick) => this.guard(this.opener.element(frame, record, entry, pick)),
         anchors: (_frame, record, anchors) => this.onAnchors(record, anchors)
@@ -217,7 +216,7 @@ export class PreviewCommentService implements CommentServiceApi {
   async list(): Promise<CommentListResult> {
     const unavailable = this.status.unavailable()
     this.keys.beginGeneration()
-    const files = await buildCommentList({
+    const { files, unread } = await buildCommentList({
       binding: this.binding,
       keys: this.keys,
       realRoot: this.deps.realRoot,
@@ -226,7 +225,7 @@ export class PreviewCommentService implements CommentServiceApi {
       jobs: this.jobs,
       platform: this.deps.platform
     })
-    return { ok: true, files, ...(unavailable === undefined ? {} : { unavailable }) }
+    return { ok: true, files, ...(unread > 0 ? { unread } : {}), ...(unavailable === undefined ? {} : { unavailable }) }
   }
 
   /** "Show on page" (`preview:commentCommand`): scroll the thread's pin into view in its frame. */
@@ -346,7 +345,6 @@ export class PreviewCommentService implements CommentServiceApi {
       },
       accent: accentRgb(),
       currentPage: deps.currentPage,
-      hasUnsavedSource: realPath => deps.shared.unsaved.has(deps.windowId, realPath),
       emit: payload => deps.shared.emit.draftOpened(deps.windowId, payload),
       jobs: this.jobs,
       isCurrent: record => !this.disposed && this.frames.get(record.ftn) === record,
@@ -370,7 +368,7 @@ export class PreviewCommentService implements CommentServiceApi {
       captureScroll: () => this.coordinator.captureScroll(),
       currentPage: deps.currentPage,
       landed: write => this.coordinator.arm(write),
-      lateLanded: () => this.publishChanged(true),
+      lateSettled: settled => this.onLateSettled(settled),
       platform: deps.platform
     })
   }
@@ -437,11 +435,9 @@ export class PreviewCommentService implements CommentServiceApi {
     this.broadcaster.send(frame.parent, { focusFrame: this.frames.record(frame.frameTreeNodeId).key })
   }
 
-  /** The keyboard picker moved: the window's live region says where (the page holds no screen-reader text). */
-  private onStep(pick: CommentPick): void {
-    // The pick schema puts `say` on every step, and `label` on a `showing` one.
-    const step = pickerStepOf(pick.say!, pick.label)
-    this.deps.shared.emit.modeChanged(this.windowId, { panelId: this.panelId, on: this.mode, reason: 'picker', ...step })
+  /** The keyboard picker moved: the window's live region says where, in main's words (S-L-A). */
+  private onStep(step: PickerStepInput): void {
+    this.deps.shared.emit.modeChanged(this.windowId, { panelId: this.panelId, on: this.mode, reason: 'picker', ...pickerStepOf(step) })
   }
 
   private onAnchors(record: FrameRecord, anchors: CommentAnchors): void {
@@ -454,6 +450,17 @@ export class PreviewCommentService implements CommentServiceApi {
       this.deps.shared.emit.anchorStatus(this.windowId, { panelId: this.panelId, notVisible })
     }
     this.publishChanged()
+  }
+
+  /**
+   * A save that outlasted its answer settled. A landed one re-sends the
+   * counts even unchanged, so the window re-lists. The window is told how it
+   * ended even once the view is gone – a suspended tab is still on screen,
+   * and its comment window holds the editor's autosave until it hears.
+   */
+  private onLateSettled(settled: LateSettle): void {
+    if (settled.ok) this.publishChanged(true)
+    this.deps.shared.emit.saveSettled(this.windowId, { panelId: this.panelId, ...settled })
   }
 
   /**

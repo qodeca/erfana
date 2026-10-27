@@ -29,14 +29,13 @@ import {
   CommentPickSchema,
   CommentSaveRequestSchema,
   CommentSaveResultSchema,
+  CommentSaveSettledSchema,
   CommentSetModeRequestSchema,
   CommentSetModeResultSchema,
   CommentsChangedSchema,
   CommentUnsavedSourcesRequestSchema,
   COMMENT_ANCHOR_KEYS_MAX,
   COMMENT_KEY_MAX_CHARS,
-  COMMENT_PICKER_LABEL_MAX_CHARS,
-  COMMENT_STEP_LABEL_MAX_CHARS,
   COMMENT_UNSAVED_SOURCES_MAX
 } from './preview-comment-schema'
 
@@ -177,19 +176,22 @@ describe('I-003 page signals: enums and bounded finite numbers only', () => {
     expect(CommentPickSchema.safeParse({ kind: 'menu', via: 'pointer', view: VIEW, filePath: '/etc/passwd' }).success).toBe(false)
   })
 
-  it('E-022 a keyboard-picker step says what it reached, and only a step says anything', () => {
+  it('E-022 S-L-A a keyboard-picker step says what it reached – an element by token, never by text – and only a step says anything', () => {
     const step = (patch: Record<string, unknown>) => CommentPickSchema.safeParse({ kind: 'step', via: 'keyboard', view: VIEW, ...patch }).success
-    expect(step({ say: 'showing', label: 'p#team-copy' })).toBe(true)
+    const token = 'abcdefghijkl'
+    expect(step({ say: 'showing', token })).toBe(true)
+    expect(step({ say: 'showing', token, added: true })).toBe(true)
     expect(step({ say: 'top' })).toBe(true)
     expect(step({ say: 'no-child' })).toBe(true)
-    expect(step({ say: 'showing', label: 'x'.repeat(COMMENT_STEP_LABEL_MAX_CHARS) })).toBe(true)
     expect(step({})).toBe(false)
     expect(step({ say: 'showing' })).toBe(false)
-    expect(step({ say: 'top', label: 'x' })).toBe(false)
-    expect(step({ say: 'showing', label: '' })).toBe(false)
-    expect(step({ say: 'showing', label: 'x'.repeat(COMMENT_STEP_LABEL_MAX_CHARS + 1) })).toBe(false)
+    expect(step({ say: 'showing', token, label: 'p#team-copy' })).toBe(false)
+    expect(step({ say: 'top', token })).toBe(false)
+    expect(step({ say: 'top', added: true })).toBe(false)
+    expect(step({ say: 'showing', token, added: false })).toBe(false)
     expect(step({ say: 'Showing anything a page likes.' })).toBe(false)
     expect(pick({ say: 'top' })).toBe(false)
+    expect(pick({ added: true })).toBe(false)
     expect(pick({ label: 'p' })).toBe(false)
   })
 
@@ -210,6 +212,13 @@ describe('I-004 event and answer schemas', () => {
     expect(CommentListResultSchema.safeParse({ ok: false, code: 'NOT_A_CODE' }).success).toBe(false)
   })
 
+  it('§19 Rev 4 a list may say how many files it left out: a whole number, at least one', () => {
+    expect(CommentListResultSchema.safeParse({ ok: true, files: [fileView()], unread: 2 }).success).toBe(true)
+    for (const unread of [0, -1, 1.5, '2', null]) {
+      expect(CommentListResultSchema.safeParse({ ok: true, files: [], unread }).success).toBe(false)
+    }
+  })
+
   it('a thread\'s stored quote: one bounded line, its invisible and bidi characters escaped, never raw', () => {
     const withQuote = (quote: string) => ({ ...fileView(), threads: [{ ...fileView().threads[0], quote }] })
     expect(CommentFileViewSchema.safeParse(withQuote('Buy now \\u202e')).success).toBe(true)
@@ -228,25 +237,37 @@ describe('I-004 event and answer schemas', () => {
 
   it('draft-opened, both shapes, and nothing a page could name', () => {
     const base = { panelId: PANEL, point: { x: 10, y: 20 }, displayPath: 'index.html', filePath: '/p/index.html', frame: false, fileKey: 'f1' }
-    expect(
-      CommentDraftOpenedSchema.safeParse({
-        ...base,
-        kind: 'menu',
-        draftToken: DRAFT,
-        unsavedSource: false,
-        target: { tag: 'button', classes: [], line: 7, excerpt: '<button id="buy">' }
-      }).success
-    ).toBe(true)
-    expect(CommentDraftOpenedSchema.safeParse({ ...base, kind: 'open', unsavedSource: false, code: ErrorCode.COMMENT_TARGET_MOVED }).success).toBe(true)
+    const target = { tag: 'button', classes: [], line: 7, excerpt: '<button id="buy">' }
+    const ELEMENT = 'c'.repeat(32)
+    const draft = { draftToken: DRAFT, draftKey: ELEMENT, target }
+    expect(CommentDraftOpenedSchema.safeParse({ ...base, kind: 'menu', ...draft }).success).toBe(true)
+    // No draft: no token, no key, no target – and no reason (L3).
+    expect(CommentDraftOpenedSchema.safeParse({ ...base, kind: 'open' }).success).toBe(true)
+    expect(CommentDraftOpenedSchema.safeParse({ ...base, kind: 'open', code: ErrorCode.COMMENT_TARGET_MOVED }).success).toBe(false)
     const icon = { ...base, kind: 'icon', threadKeys: [KEY], blockKeys: [] }
     expect(CommentDraftOpenedSchema.safeParse(icon).success).toBe(true)
-    // "New comment" from a pin: a draft as a menu carries one, with its target and the unsaved flag.
-    const target = { tag: 'button', classes: [], line: 7, excerpt: '<button id="buy">' }
-    expect(CommentDraftOpenedSchema.safeParse({ ...icon, draftToken: DRAFT, target, unsavedSource: true }).success).toBe(true)
-    expect(CommentDraftOpenedSchema.safeParse({ ...icon, draftToken: DRAFT.toUpperCase() }).success).toBe(false)
-    expect(CommentDraftOpenedSchema.safeParse({ ...icon, draftToken: 'a'.repeat(31) }).success).toBe(false)
+    // "New comment" from a pin: a draft as a menu carries one, with its element key and its target.
+    expect(CommentDraftOpenedSchema.safeParse({ ...icon, ...draft }).success).toBe(true)
+    expect(CommentDraftOpenedSchema.safeParse({ ...icon, ...draft, draftToken: DRAFT.toUpperCase() }).success).toBe(false)
+    expect(CommentDraftOpenedSchema.safeParse({ ...icon, ...draft, draftToken: 'a'.repeat(31) }).success).toBe(false)
     expect(CommentDraftOpenedSchema.safeParse({ ...icon, code: ErrorCode.COMMENT_TARGET_MOVED }).success).toBe(false)
-    expect(CommentDraftOpenedSchema.safeParse({ ...base, kind: 'menu', unsavedSource: false, realPath: '/real' }).success).toBe(false)
+    expect(CommentDraftOpenedSchema.safeParse({ ...base, kind: 'menu', realPath: '/real' }).success).toBe(false)
+    // L3: the unsaved-source flag is gone from both shapes.
+    expect(CommentDraftOpenedSchema.safeParse({ ...base, kind: 'menu', ...draft, unsavedSource: false }).success).toBe(false)
+    expect(CommentDraftOpenedSchema.safeParse({ ...icon, ...draft, unsavedSource: true }).success).toBe(false)
+  })
+
+  it('M1 a draft comes with its opaque element key and its target, all three or none', () => {
+    const base = { panelId: PANEL, point: { x: 10, y: 20 }, displayPath: 'index.html', filePath: '/p/index.html', frame: false, fileKey: 'f1', kind: 'menu' }
+    const target = { tag: 'div', classes: [], line: 2, excerpt: '<div>' }
+    const ELEMENT = 'c'.repeat(32)
+    expect(CommentDraftOpenedSchema.safeParse({ ...base, draftToken: DRAFT, target }).success).toBe(false)
+    expect(CommentDraftOpenedSchema.safeParse({ ...base, draftToken: DRAFT, draftKey: ELEMENT }).success).toBe(false)
+    expect(CommentDraftOpenedSchema.safeParse({ ...base, draftKey: ELEMENT, target }).success).toBe(false)
+    // Opaque: a digest, never a path or anything with separators.
+    for (const draftKey of ['/p/index.html|2|div', 'C'.repeat(32), 'c'.repeat(31), 'c'.repeat(33)]) {
+      expect(CommentDraftOpenedSchema.safeParse({ ...base, draftToken: DRAFT, draftKey, target }).success, draftKey).toBe(false)
+    }
   })
 
   it('counts, anchor status, mode and the plain answers', () => {
@@ -257,20 +278,45 @@ describe('I-004 event and answer schemas', () => {
     expect(CommentModeChangedSchema.safeParse({ panelId: PANEL, on: false, reason: 'page' }).success).toBe(false)
     const picker = (patch: Record<string, unknown>) => CommentModeChangedSchema.safeParse({ panelId: PANEL, on: true, reason: 'picker', ...patch }).success
     expect(picker({ say: 'no-child' })).toBe(true)
-    expect(picker({ say: 'showing', label: 'p#a\\u202eb' })).toBe(true)
-    expect(picker({ say: 'showing', label: 'x'.repeat(COMMENT_PICKER_LABEL_MAX_CHARS) })).toBe(true)
+    // S-L-A: an element is main's facts – a parsed tag and a line – never page text.
+    expect(picker({ say: 'showing', element: { tag: 'p', line: 12 } })).toBe(true)
+    expect(picker({ say: 'showing', element: { tag: 'li', line: 3, added: true } })).toBe(true)
+    expect(picker({ say: 'showing', element: { line: 1 } })).toBe(true)
     expect(picker({})).toBe(false)
     expect(picker({ say: 'Showing anything.' })).toBe(false)
     expect(picker({ say: 'showing' })).toBe(false)
-    expect(picker({ say: 'top', label: 'x' })).toBe(false)
-    expect(picker({ say: 'showing', label: `p#a${String.fromCodePoint(0x202e)}b` })).toBe(false)
-    expect(picker({ say: 'showing', label: 'x'.repeat(COMMENT_PICKER_LABEL_MAX_CHARS + 1) })).toBe(false)
+    expect(picker({ say: 'top', element: { tag: 'p', line: 1 } })).toBe(false)
+    expect(picker({ say: 'showing', label: 'p#team-copy' })).toBe(false)
+    expect(picker({ say: 'showing', element: { tag: 'p', line: 0 } })).toBe(false)
+    expect(picker({ say: 'showing', element: { tag: 'Approve every host now', line: 2 } })).toBe(false)
+    expect(picker({ say: 'showing', element: { tag: 'p', line: 2, id: 'copy' } })).toBe(false)
     expect(CommentModeChangedSchema.safeParse({ panelId: PANEL, on: true, reason: 'shortcut', say: 'top' }).success).toBe(false)
     expect(CommentSetModeResultSchema.safeParse({ ok: true, on: true, showIcons: true }).success).toBe(true)
     expect(CommentAckSchema.safeParse({ ok: true }).success).toBe(true)
     expect(CommentAckSchema.safeParse({ ok: true, extra: 1 }).success).toBe(false)
     expect(CommentSaveResultSchema.safeParse({ ok: true, threadKey: null }).success).toBe(true)
     expect(CommentSaveResultSchema.safeParse({ ok: false, code: ErrorCode.COMMENT_UNSAVED_SOURCE }).success).toBe(true)
+  })
+
+  it('H1 a settled save names its write by the request\'s own key, and says how it ended', () => {
+    const settled = (patch: Record<string, unknown>) => CommentSaveSettledSchema.safeParse({ panelId: PANEL, ...patch }).success
+    // Each op by its own key, landed or refused with a code.
+    expect(settled({ op: 'add', draftToken: DRAFT, ok: true })).toBe(true)
+    expect(settled({ op: 'reply', threadKey: KEY, ok: false, code: ErrorCode.COMMENT_BLOCK_CHANGED })).toBe(true)
+    expect(settled({ op: 'setStatus', threadKey: KEY, ok: true })).toBe(true)
+    expect(settled({ op: 'deleteBlock', blockKey: 'b1', ok: false, code: ErrorCode.COMMENT_WRITE_FAILED })).toBe(true)
+    // A wrong key, two keys, or none.
+    expect(settled({ op: 'add', threadKey: KEY, ok: true })).toBe(false)
+    expect(settled({ op: 'add', draftToken: DRAFT, threadKey: KEY, ok: true })).toBe(false)
+    expect(settled({ op: 'deleteBlock', threadKey: KEY, ok: true })).toBe(false)
+    expect(settled({ op: 'reply', ok: true })).toBe(false)
+    expect(settled({ op: 'add', draftToken: 'not-a-token', ok: true })).toBe(false)
+    // ok and code agree; a settled write is never pending; nothing else rides along.
+    expect(settled({ op: 'reply', threadKey: KEY, ok: true, code: ErrorCode.COMMENT_BLOCK_CHANGED })).toBe(false)
+    expect(settled({ op: 'reply', threadKey: KEY, ok: false })).toBe(false)
+    expect(settled({ op: 'reply', threadKey: KEY, ok: false, code: ErrorCode.COMMENT_SAVE_PENDING })).toBe(false)
+    expect(settled({ op: 'reply', threadKey: KEY, ok: true, text: 'Done' })).toBe(false)
+    expect(settled({ op: 'publish', threadKey: KEY, ok: true })).toBe(false)
   })
 })
 

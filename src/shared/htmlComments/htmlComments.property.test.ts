@@ -14,7 +14,7 @@ import fc from 'fast-check'
 import { parseFragment } from 'parse5'
 import { describe, expect, it } from 'vitest'
 import { PREVIEW_LIMITS } from '../preview-limits'
-import { buildAnchor } from './anchor'
+import { buildAnchor, resolveBlockTarget } from './anchor'
 import {
   PROPERTY_TIMEOUT_MS,
   commentDataArb,
@@ -30,9 +30,10 @@ import {
   renderAgentNote,
   serializeBlock,
   type BlockLayout,
+  type CommentAnchor,
   type CommentData
 } from './format'
-import { indexHtml } from './htmlIndex'
+import { indexHtml, type HtmlIndex, type IndexedElement } from './htmlIndex'
 import {
   analyzeCommentDocument,
   parseCommentBlocks,
@@ -446,6 +447,100 @@ describe('document properties', () => {
           }
         }),
         fcParams()
+      )
+    },
+    PROPERTY_TIMEOUT_MS
+  )
+})
+
+// ---------------------------------------------------------------------------
+// Re-attachment
+// ---------------------------------------------------------------------------
+
+/**
+ * A block right before the element `at`, its anchor taken part by part from
+ * the element the comment was made on (`own`), from `at`, or bent: an `id`
+ * that `at` does not carry, a quote whose text is gone.
+ */
+const placedAnchorArb = fc.record({
+  at: fc.nat(),
+  of: fc.nat(),
+  tag: fc.constantFrom('own', 'at'),
+  id: fc.constantFrom('own', 'at', 'changed', 'none'),
+  path: fc.constantFrom('own', 'at', 'none'),
+  quote: fc.constantFrom('own', 'at', 'gone', 'none')
+})
+
+type PlacedAnchor = typeof placedAnchorArb extends fc.Arbitrary<infer T> ? T : never
+
+function anchorBefore(index: HtmlIndex, at: IndexedElement, recipe: PlacedAnchor): CommentAnchor {
+  const own = buildAnchor(index, index.elements[recipe.of % index.elements.length])
+  const next = buildAnchor(index, at)
+  const part = <T>(choice: string, mine: T, theirs: T): T | undefined =>
+    choice === 'own' ? mine : choice === 'at' ? theirs : undefined
+  const id =
+    recipe.id === 'changed' ? `${next.id ?? 'x'}-changed` : part(recipe.id, own.id, next.id)
+  const quote =
+    recipe.quote === 'gone'
+      ? own.quote && { ...own.quote, exact: 'gone' }
+      : part(recipe.quote, own.quote, next.quote)
+  return {
+    tag: recipe.tag === 'own' ? own.tag : next.tag,
+    path: part(recipe.path, own.path, next.path) ?? '',
+    ...(id ? { id } : {}),
+    ...(quote ? { quote } : {})
+  }
+}
+
+describe('re-attachment properties', () => {
+  it(
+    'P-008 a block never attaches to an element that carries another id than the stored one, and stays on the element after it whose id agrees',
+    () => {
+      fc.assert(
+        fc.property(
+          documentArb,
+          fc.array(placedAnchorArb, { minLength: 1, maxLength: 8 }),
+          ({ text }, recipes) => {
+            const index = indexHtml(text)
+            if (index.elements.length === 0) return
+            for (const recipe of recipes) {
+              const at = index.elements[recipe.at % index.elements.length]
+              const anchor = anchorBefore(index, at, recipe)
+              const target = resolveBlockTarget(index, {
+                after: at.start,
+                anchor,
+                blockEnds: new Map()
+              })
+              if (target.state === 'attached' && anchor.id) {
+                const found = index.elementAt(target.startOffset)?.id
+                expect(
+                  !found || found === anchor.id,
+                  `${target.via}: ${found} for ${anchor.id}`
+                ).toBe(true)
+              }
+              if (anchor.id && at.id === anchor.id && at.tag === anchor.tag) {
+                expect(target).toEqual({
+                  state: 'attached',
+                  startOffset: at.start,
+                  via: 'position'
+                })
+              }
+            }
+          }
+        ),
+        // X-001 with ids: the element after the block is another card, and every backup names it too.
+        fcParams({
+          examples: [
+            [
+              {
+                text: '<main><article id="pause">Pause any time</article></main>',
+                eol: '\n',
+                bom: false
+              },
+              [{ at: 1, of: 1, tag: 'at', id: 'changed', path: 'at', quote: 'at' }]
+            ]
+          ]
+        })
       )
     },
     PROPERTY_TIMEOUT_MS

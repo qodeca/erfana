@@ -278,7 +278,8 @@ describe('frames in the controller (J-017)', () => {
     exposeFrames([byId('mine') as HTMLIFrameElement, byId('theirs') as HTMLIFrameElement])
     h.state({ mode: true, childFrames })
     h.state({ mode: true, childFrames, focusFrame: 'k-mine' })
-    expect(lastStep(h, COMMENT_PICK_CHANNEL)).toBe('showing iframe#mine · frame mine.html')
+    // The step names the <iframe> by token; main says its tag and line (S-L-A). The overlay still draws the label.
+    expect(lastStep(h, COMMENT_PICK_CHANNEL)).toBe('showing iframe#mine')
     // A key main no longer knows moves nothing.
     h.state({ mode: true, childFrames, focusFrame: 'k-gone' })
     expect(drawnText(h.root()?.querySelector('.erf-hpc-label'))).toBe('iframe#mine · frame mine.html400×200')

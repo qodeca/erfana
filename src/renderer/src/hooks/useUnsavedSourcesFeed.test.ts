@@ -6,14 +6,20 @@
  */
 import { act, renderHook } from '@testing-library/react'
 import type { DockviewApi } from 'dockview'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ErrorCode } from '../../../shared/errors'
 import { COMMENT_UNSAVED_SOURCES_MAX } from '../../../shared/ipc/preview-comment-schema'
 import {
   installCommentsBridge,
   type FakeCommentsBridge
 } from '../components/Panels/HtmlPreviewPanel/comments/__test-helpers__/commentTestKit'
 import { useProjectStore } from '../stores/useProjectStore'
-import { unsavedHtmlSources, useUnsavedSourcesFeed } from './useUnsavedSourcesFeed'
+import {
+  UNSAVED_SOURCES_ATTEMPTS,
+  UNSAVED_SOURCES_RETRY_MS,
+  unsavedHtmlSources,
+  useUnsavedSourcesFeed
+} from './useUnsavedSourcesFeed'
 
 const panelsBy = (entries: Record<string, unknown>) =>
   ({ getPanel: (id: string) => (id in entries ? { params: entries[id] } : undefined) }) as Pick<
@@ -66,6 +72,7 @@ describe('useUnsavedSourcesFeed', () => {
   afterEach(() => {
     fake.uninstall()
     useProjectStore.setState({ dockviewApi: null, dirtyPanelIds: new Set() })
+    vi.useRealTimers()
   })
 
   it('sends the list on mount and on every change, never the same list twice', () => {
@@ -79,6 +86,51 @@ describe('useUnsavedSourcesFeed', () => {
     act(() => useProjectStore.setState({ dirtyPanelIds: new Set() }))
     expect(fake.bridge.setUnsavedSources).toHaveBeenLastCalledWith([])
     expect(fake.bridge.setUnsavedSources).toHaveBeenCalledTimes(3)
+  })
+
+  describe('L4 a list main did not take is not "sent"', () => {
+    const REFUSED = { ok: false as const, code: ErrorCode.UNKNOWN_ERROR }
+    beforeEach(() => {
+      vi.useFakeTimers()
+    })
+    const wait = (ms: number) => act(async () => vi.advanceTimersByTimeAsync(ms))
+
+    it('goes again a moment later, gives up after the last try, and goes again on the next change', async () => {
+      fake.bridge.setUnsavedSources.mockResolvedValue(REFUSED)
+      renderHook(() => useUnsavedSourcesFeed())
+      for (let tries = 1; tries < UNSAVED_SOURCES_ATTEMPTS; tries += 1) {
+        await wait(UNSAVED_SOURCES_RETRY_MS)
+      }
+      expect(fake.bridge.setUnsavedSources).toHaveBeenCalledTimes(UNSAVED_SOURCES_ATTEMPTS)
+      await wait(UNSAVED_SOURCES_RETRY_MS * 5)
+      expect(fake.bridge.setUnsavedSources).toHaveBeenCalledTimes(UNSAVED_SOURCES_ATTEMPTS)
+      // A change that leaves the same list still sends it: main never had it.
+      fake.bridge.setUnsavedSources.mockResolvedValue({ ok: true })
+      await act(async () => useProjectStore.setState({ dirtyPanelIds: new Set(['e2']) }))
+      expect(fake.bridge.setUnsavedSources).toHaveBeenCalledTimes(UNSAVED_SOURCES_ATTEMPTS + 1)
+      expect(fake.bridge.setUnsavedSources).toHaveBeenLastCalledWith([])
+      // Taken now: the same list is not sent again.
+      await act(async () => useProjectStore.setState({ dirtyPanelIds: new Set() }))
+      await wait(UNSAVED_SOURCES_RETRY_MS * 5)
+      expect(fake.bridge.setUnsavedSources).toHaveBeenCalledTimes(UNSAVED_SOURCES_ATTEMPTS + 1)
+    })
+
+    it('a newer list supersedes the retries of an older one', async () => {
+      fake.bridge.setUnsavedSources.mockResolvedValueOnce(REFUSED)
+      renderHook(() => useUnsavedSourcesFeed())
+      await act(async () => useProjectStore.setState({ dirtyPanelIds: new Set(['e1']) }))
+      await wait(UNSAVED_SOURCES_RETRY_MS * 5)
+      expect(fake.bridge.setUnsavedSources.mock.calls).toEqual([[[]], [['/p/index.html']]])
+    })
+
+    it('an unmounted feed sends nothing more', async () => {
+      fake.bridge.setUnsavedSources.mockResolvedValue(REFUSED)
+      const { unmount } = renderHook(() => useUnsavedSourcesFeed())
+      await act(async () => {})
+      unmount()
+      await wait(UNSAVED_SOURCES_RETRY_MS * 5)
+      expect(fake.bridge.setUnsavedSources).toHaveBeenCalledTimes(1)
+    })
   })
 
   it('sends nothing without the comments bridge', () => {

@@ -17,6 +17,7 @@ import {
   CommentAnchorStatusSchema,
   CommentDraftOpenedSchema,
   CommentModeChangedSchema,
+  CommentSaveSettledSchema,
   CommentsChangedSchema
 } from '../../../shared/ipc/preview-comment-schema'
 import type { PreviewCommentEmitters } from '../../services/preview/comments/commentServiceTypes'
@@ -63,6 +64,8 @@ export function createPreviewCommentEmitters(deps: PreviewCommentEmitterDeps): P
     anchorStatus: (windowId, payload) =>
       send(PreviewCommentEvents.ANCHOR_STATUS, CommentAnchorStatusSchema, windowId, payload),
     modeChanged: (windowId, payload) =>
-      send(PreviewCommentEvents.MODE_CHANGED, CommentModeChangedSchema, windowId, payload)
+      send(PreviewCommentEvents.MODE_CHANGED, CommentModeChangedSchema, windowId, payload),
+    saveSettled: (windowId, payload) =>
+      send(PreviewCommentEvents.SAVE_SETTLED, CommentSaveSettledSchema, windowId, payload)
   }
 }

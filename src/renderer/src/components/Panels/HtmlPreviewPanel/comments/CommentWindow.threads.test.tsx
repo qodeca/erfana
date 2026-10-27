@@ -20,15 +20,20 @@ import { commentDrafts, type CommentListState } from '../../../../stores/usePrev
 import {
   damaged,
   fileView,
+  installCommentsBridge,
   message,
   thread,
-  threadsRequest
+  threadsRequest,
+  type FakeCommentsBridge
 } from './__test-helpers__/commentTestKit'
 import { COPY } from './commentCopy'
-import { CommentWindow, newCommentFrom, type CommentWindowProps } from './CommentWindow'
+import { CommentWindow, type CommentWindowProps } from './CommentWindow'
+import { newCommentFrom } from './commentWindowHeading'
 import { selectThreads } from './ThreadsView'
+import { resetCommentPendingWrites } from './commentPendingWrites'
 
-const ready = (files: CommentFileView[]): CommentListState => ({ status: 'ready', files })
+/** A list read after the window opened (its request's `listAfter` is 0) unless `generation` says otherwise. */
+const ready = (files: CommentFileView[], generation = 1): CommentListState => ({ status: 'ready', files, generation })
 
 // BaseDialog moves focus to the title a moment after opening: typing before
 // that lands would lose keystrokes to the title on a loaded machine.
@@ -74,6 +79,7 @@ describe('CommentWindow – threads', () => {
   afterEach(() => {
     portalRoot.remove()
     commentDrafts.reset()
+    resetCommentPendingWrites()
   })
 
   describe('R-013 focus and title', () => {
@@ -113,6 +119,31 @@ describe('CommentWindow – threads', () => {
     it('closes itself when the file is no longer in the list', () => {
       const { props } = setup({ list: ready([fileView({ fileKey: 'other' })]) })
       expect(props.onClose).toHaveBeenCalled()
+    })
+
+    it('M2 never closes itself on the list it opened with – a pin\'s new thread is not in it yet', () => {
+      // A pin click opened the window over list 3, before the pin's thread was listed; list 4 is being read.
+      const request = threadsRequest({ listAfter: 3 })
+      const { props, rerender } = setup({ request, list: ready([fileView({ threads: [] })], 3) })
+      expect(props.onClose).not.toHaveBeenCalled()
+      expect(screen.getByRole('status')).toHaveTextContent('Reading comments…')
+      // Nor while the newer list is still being read (`beginList` keeps the old one, still 'ready').
+      rerender(<CommentWindow {...props} list={ready([fileView({ fileKey: 'other' })], 3)} />)
+      expect(props.onClose).not.toHaveBeenCalled()
+      // The list read after the click has the thread.
+      rerender(<CommentWindow {...props} list={ready([fileView({ threads: [thread(1)] })], 4)} />)
+      expect(screen.getAllByTestId('comment-thread')).toHaveLength(1)
+      expect(props.onClose).not.toHaveBeenCalled()
+      // A later list without it: the thread is gone, and so is the window.
+      rerender(<CommentWindow {...props} list={ready([fileView({ threads: [] })], 5)} />)
+      expect(props.onClose).toHaveBeenCalledTimes(1)
+    })
+
+    it('M2 a list that failed after the window opened says so instead of "Reading"', () => {
+      const failed: CommentListState = { status: 'error', files: [fileView({ threads: [] })], code: 'COMMENT_WRITE_FAILED', generation: 4 }
+      const { props } = setup({ request: threadsRequest({ listAfter: 3 }), list: failed })
+      expect(props.onClose).not.toHaveBeenCalled()
+      expect(screen.getByTestId('comment-window-read-error')).toBeVisible()
     })
   })
 
@@ -197,6 +228,84 @@ describe('CommentWindow – threads', () => {
       expect(banner).toHaveClass('erf-comment-banner--info')
       expect(banner).toHaveTextContent('Still saving to index.html.')
       expect(screen.getByTestId('comment-reply-field')).toHaveValue('Later')
+    })
+
+    describe('H1 a pending reply settles', () => {
+      let fake: FakeCommentsBridge
+      beforeEach(() => {
+        fake = installCommentsBridge()
+      })
+      afterEach(() => fake.uninstall())
+
+      /** Replies `text` and waits for "Still saving". */
+      async function replyPending(text: string) {
+        const user = userEvent.setup()
+        const view = setup({
+          onSave: vi.fn(async () => ({ ok: false as const, code: ErrorCode.COMMENT_SAVE_PENDING }))
+        })
+        await titleFocused()
+        await user.type(screen.getByTestId('comment-reply-field'), text)
+        await user.click(screen.getByTestId('comment-reply'))
+        await screen.findByTestId('comment-save-error')
+        return { user, ...view }
+      }
+
+      it('Reply stays "Saving…" and sends nothing more until main says the reply landed; then the field empties', async () => {
+        const { user, props } = await replyPending('Later')
+        const replyButton = screen.getByTestId('comment-reply')
+        expect(replyButton).toHaveAttribute('aria-disabled', 'true')
+        expect(replyButton).toHaveTextContent(COPY.saving)
+        expect(screen.getByTestId('comment-reply-field')).toHaveAttribute('readonly')
+        await user.click(replyButton)
+        expect(props.onSave).toHaveBeenCalledTimes(1)
+        act(() => fake.emitSettled({ panelId: 'preview-index', op: 'reply', threadKey: 't1', ok: true }))
+        expect(screen.getByTestId('comment-reply-field')).toHaveValue('')
+        expect(screen.getByTestId('comment-reply-field')).not.toHaveAttribute('readonly')
+        expect(screen.queryByTestId('comment-save-error')).toBeNull()
+        expect(screen.getByTestId('comment-reply')).toHaveTextContent(COPY.reply)
+      })
+
+      it('refused after all: the refusal replaces "Still saving", Reply is back, the text stays and the list is re-read', async () => {
+        const { props } = await replyPending('Keep me')
+        act(() =>
+          fake.emitSettled({
+            panelId: 'preview-index',
+            op: 'reply',
+            threadKey: 't1',
+            ok: false,
+            code: ErrorCode.COMMENT_BLOCK_CHANGED
+          })
+        )
+        expect(screen.getByTestId('comment-save-error')).toHaveClass('erf-comment-banner--error')
+        expect(screen.getByTestId('comment-reply-field')).toHaveValue('Keep me')
+        expect(screen.getByTestId('comment-reply')).not.toHaveAttribute('aria-disabled')
+        expect(props.onRefresh).toHaveBeenCalled()
+      })
+
+      it('an edit on the thread is not sent while the reply is still being written: the window says why', async () => {
+        const { user, props } = await replyPending('Later')
+        await user.click(screen.getByTestId('comment-message-actions'))
+        await user.click(screen.getByRole('menuitem', { name: COPY.edit }))
+        await user.type(screen.getByTestId('comment-edit-field'), '!')
+        await user.click(screen.getByTestId('comment-edit-save'))
+        expect(props.onSave).toHaveBeenCalledTimes(1)
+        expect(screen.getByTestId('comment-save-error')).toHaveClass('erf-comment-banner--info')
+        expect(screen.getByTestId('comment-edit-field')).toHaveValue('Message 1!')
+      })
+
+      it('Resolve sends nothing either while the reply is still being written', async () => {
+        const { user, props } = await replyPending('Later')
+        await user.click(screen.getByTestId('comment-resolve'))
+        expect(props.onSave).toHaveBeenCalledTimes(1)
+        expect(screen.getByTestId('comment-save-error')).toHaveClass('erf-comment-banner--info')
+      })
+
+      it('another thread\'s settle changes nothing here', async () => {
+        await replyPending('Later')
+        act(() => fake.emitSettled({ panelId: 'preview-index', op: 'reply', threadKey: 't2', ok: true }))
+        expect(screen.getByTestId('comment-reply')).toHaveAttribute('aria-disabled', 'true')
+        expect(screen.getByTestId('comment-save-error')).toHaveClass('erf-comment-banner--info')
+      })
     })
 
     it('replies with Ctrl+Enter and keeps the text when the write is refused', async () => {
@@ -569,7 +678,8 @@ describe('CommentWindow – threads', () => {
       line: 12,
       excerpt: 'Buy now'
     }
-    const pinRequest = threadsRequest({ draftToken: TOKEN, file: FILE, target: TARGET })
+    const KEY = 'e'.repeat(32)
+    const pinRequest = threadsRequest({ draftToken: TOKEN, draftKey: KEY, file: FILE, target: TARGET })
 
     it('offers New comment and hands over a new-comment request on the same element', async () => {
       const user = userEvent.setup()
@@ -580,6 +690,7 @@ describe('CommentWindow – threads', () => {
         kind: 'new',
         panelId: 'preview-index',
         draftToken: TOKEN,
+        draftKey: KEY,
         // Main's own description of the element, not one rebuilt from the thread.
         target: TARGET,
         file: FILE,
@@ -604,15 +715,18 @@ describe('CommentWindow – threads', () => {
       const files = [fileView({ threads: [thread(1)] })]
       const selection = selectThreads(files, 'f1', ['t1'], [])
       expect(newCommentFrom(pinRequest, null)).toBeNull()
-      expect(newCommentFrom(threadsRequest({ draftToken: TOKEN, file: FILE }), selection)).toBeNull()
-      expect(newCommentFrom(threadsRequest({ draftToken: TOKEN, target: TARGET }), selection)).toBeNull()
-      expect(newCommentFrom(threadsRequest({ file: FILE, target: TARGET }), selection)).toBeNull()
+      expect(newCommentFrom(threadsRequest({ draftToken: TOKEN, draftKey: KEY, file: FILE }), selection)).toBeNull()
+      expect(newCommentFrom(threadsRequest({ draftToken: TOKEN, draftKey: KEY, target: TARGET }), selection)).toBeNull()
+      expect(newCommentFrom(threadsRequest({ draftKey: KEY, file: FILE, target: TARGET }), selection)).toBeNull()
+      // M1: no element key, no session draft to keep the text under – no New comment.
+      expect(newCommentFrom(threadsRequest({ draftToken: TOKEN, file: FILE, target: TARGET }), selection)).toBeNull()
     })
 
     it('carries a script-built element as main described it', () => {
       const files = [fileView({ threads: [thread(1)] })]
       const request = threadsRequest({
         draftToken: TOKEN,
+        draftKey: KEY,
         file: FILE,
         target: { ...TARGET, runtime: { tag: 'li' } }
       })
@@ -803,6 +917,18 @@ describe('CommentWindow – threads', () => {
       expect(screen.getByTestId('comment-reopen')).not.toHaveFocus()
     })
 
+    it('M4 a refused Re-open asks for no focus move later', async () => {
+      const user = userEvent.setup()
+      const { props, rerender } = setup({
+        list: resolvedList,
+        onSave: vi.fn(async () => ({ ok: false as const, code: ErrorCode.COMMENT_FILE_READ_ONLY }))
+      })
+      await user.click(screen.getByTestId('comment-reopen'))
+      await screen.findByTestId('comment-save-error')
+      rerender(<CommentWindow {...props} list={ready([fileView({ threads: [thread(1)] })])} />)
+      expect(screen.getByTestId('comment-reply-field')).not.toHaveFocus()
+    })
+
     it('M6 typed reply text survives the window closing and comes back', async () => {
       const user = userEvent.setup()
       const { unmount } = setup()
@@ -901,6 +1027,43 @@ describe('CommentWindow – threads', () => {
       expect(screen.getAllByTestId('comment-control-token')).toHaveLength(2)
       expect(screen.getByTestId('comment-message-text')).toHaveAttribute('dir', 'auto')
       expect(screen.getByTestId('comment-message-text')).toHaveTextContent('pay⟨U+202E⟩gnp.exe')
+    })
+
+    it('S-L-B a file name with controls shows them as tokens in every sentence that names it', async () => {
+      const rlo = String.fromCodePoint(0x202e)
+      const user = userEvent.setup()
+      const name = `lmth.${rlo}index.html`
+      const { unmount } = setup({
+        list: ready([
+          fileView({ displayPath: name, writable: false, readOnlyReason: 'encoding', threads: [thread(1, { attached: false })] })
+        ])
+      })
+      const window1 = screen.getByTestId('comment-window')
+      expect(window1.textContent).not.toContain(rlo)
+      expect(window1.textContent).toContain('lmth.⟨U+202E⟩index.html')
+      unmount()
+
+      setup({
+        request: threadsRequest({ threadKeys: [], blockKeys: ['b1'] }),
+        list: ready([fileView({ displayPath: name, damaged: [damaged(1)] })])
+      })
+      await user.click(screen.getByTestId('comment-delete-block'))
+      const confirm = screen.getByRole('group', { name: 'Confirm delete' })
+      expect(confirm.textContent).not.toContain(rlo)
+      expect(within(confirm).getByTestId('comment-control-token')).toHaveTextContent('⟨U+202E⟩')
+      expect(screen.getByTestId('comment-window').textContent).not.toContain(rlo)
+    })
+
+    it('S-L-B a list that failed names the file with its controls as tokens', () => {
+      const rlo = String.fromCodePoint(0x202e)
+      const failed: CommentListState = { status: 'error', files: [], code: 'COMMENT_WRITE_FAILED', generation: 4 }
+      setup({
+        request: threadsRequest({ listAfter: 3, file: { displayPath: `a${rlo}b.html`, filePath: '/project/ab.html', frame: false, fileKey: 'f1' } }),
+        list: failed
+      })
+      const error = screen.getByTestId('comment-window-read-error')
+      expect(error.textContent).not.toContain(rlo)
+      expect(within(error).getByTestId('comment-control-token')).toHaveTextContent('⟨U+202E⟩')
     })
   })
 })

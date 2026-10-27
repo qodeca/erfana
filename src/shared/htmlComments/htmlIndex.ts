@@ -28,6 +28,7 @@
  */
 import { parse, type DefaultTreeAdapterMap } from 'parse5'
 import { BOM_CHAR } from './encoding'
+import { boundedTreeAdapter, parseLimitsFor, type HtmlParseLimits } from './parseBounds'
 
 type ChildNode = DefaultTreeAdapterMap['childNode']
 type ParentNode = DefaultTreeAdapterMap['parentNode']
@@ -290,14 +291,48 @@ function tagNameEnd(text: string, start: number): number {
   return i
 }
 
+const LESS_THAN = 0x3c
+/** OR-ed into an ASCII letter, this bit makes it lower case. */
+const ASCII_LOWER_BIT = 0x20
+const LOWER_A = 0x61
+const LOWER_Z = 0x7a
+
+/**
+ * Whether `bytes` hold more than `limit` start tags – a `<` followed by an
+ * ASCII letter – counted without parsing (design §19 Rev 4). Every eligible
+ * element owns a start tag, so this bounds what {@link indexHtml} would index
+ * before a parse builds a tree: parse5 holds about 30 bytes of tree per byte
+ * of page, and the element count, more than the file size, decides whether a
+ * parse fits the parse worker's heap. An upper bound only: a `<` and a letter
+ * inside a script, a comment or an attribute value counts too. Both bytes are
+ * ASCII, which never occurs inside a UTF-8 multi-byte sequence.
+ */
+export function hasMoreStartTagsThan(bytes: Uint8Array, limit: number): boolean {
+  let count = 0
+  for (let at = bytes.indexOf(LESS_THAN); at !== -1; at = bytes.indexOf(LESS_THAN, at + 1)) {
+    // Past the end, `undefined | 0x20` is 0x20: not a letter.
+    const next = bytes[at + 1] | ASCII_LOWER_BIT
+    if (next >= LOWER_A && next <= LOWER_Z && ++count > limit) return true
+  }
+  return false
+}
+
 /**
  * Parse `text` once and build the {@link HtmlIndex}.
  *
+ * The parse is bounded (`parseBounds.ts`, security review S-M): past
+ * `limits` – elements the parser creates, or its work – it throws
+ * `HtmlParseLimitError`, which the callers turn into "page too large".
+ *
  * @param text - The decoded file, BOM included when the file has one.
+ * @param limits - What the parse may use; by default the limits for the page's length.
  */
-export function indexHtml(text: string): HtmlIndex {
+export function indexHtml(text: string, limits: HtmlParseLimits = parseLimitsFor(text.length)): HtmlIndex {
   const bomLength = text.startsWith(BOM_CHAR) ? 1 : 0
-  const document = parse(bomLength ? text.slice(1) : text, { sourceCodeLocationInfo: true })
+  const document = parse(bomLength ? text.slice(1) : text, {
+    sourceCodeLocationInfo: true,
+    treeAdapter: boundedTreeAdapter(limits)
+  })
   const elements: IndexedElement[] = []
   const comments: IndexedComment[] = []
   const tagSequence: string[] = []

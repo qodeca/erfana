@@ -14,6 +14,11 @@
  * All text is untrusted and drawn through {@link VisibleText} (SEC-19); in an
  * attribute value (`title`, `aria-label`) through `visibleString`.
  *
+ * While a write on the thread is still being written (`COMMENT_SAVE_PENDING`,
+ * `commentPendingWrites`) the reply field is read-only and Reply says
+ * "Saving…": a second reply of the same text cannot be sent. A pending reply
+ * that lands empties the field; one that is refused leaves the text.
+ *
  * Typed reply and edit text lives in `commentDrafts` (keyed per thread and per
  * message), so Esc, an outside click or a closed window never loses it. Esc
  * backs out of an open edit or delete confirmation first (`useInnerStep`).
@@ -34,6 +39,7 @@ import { commentDrafts } from '../../../../stores/usePreviewCommentStore'
 import { COPY, fieldHint, saveShortcutAria, saveShortcutLabel } from './commentCopy'
 import { formatCommentTime, visibleString } from './commentFormat'
 import { replyDraftKey } from './commentLive'
+import { onCommentWriteSettled, useCommentWritePending } from './commentPendingWrites'
 import { CommentMessageView } from './CommentMessage'
 import { validateCommentText } from './commentSchemas'
 import { ActionButton, CommentField, DialogButton, VisibleText } from './CommentParts'
@@ -82,8 +88,20 @@ function ReplyBox({ ctx, thread }: CommentThreadProps): React.JSX.Element {
   const [text, setText] = useState(() => commentDrafts.get(key))
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  // A write on this thread still being written: no second one (H1).
+  const pending = useCommentWritePending(ctx.panelId, thread.threadKey)
   const fieldRef = useRef<HTMLTextAreaElement>(null)
   const { focusAfter, setFocusAfter } = ctx
+  // A reply answered "still saving" landed: its text is spent (the draft is cleared already).
+  useEffect(
+    () =>
+      onCommentWriteSettled(({ event, request }) => {
+        if (event.ok && request.op === 'reply' && request.panelId === ctx.panelId && request.threadKey === thread.threadKey) {
+          setText('')
+        }
+      }),
+    [ctx.panelId, thread.threadKey]
+  )
   // Re-opened from the resolved line: the reply field replaces Re-open.
   useEffect(() => {
     if (focusAfter?.threadKey !== thread.threadKey || focusAfter.target !== 'reply') return
@@ -98,7 +116,7 @@ function ReplyBox({ ctx, thread }: CommentThreadProps): React.JSX.Element {
   }
 
   const reply = async (): Promise<void> => {
-    if (busy) return
+    if (busy || pending) return
     const result = validateCommentText(text)
     if (!result.ok) {
       setError(result.error)
@@ -115,6 +133,7 @@ function ReplyBox({ ctx, thread }: CommentThreadProps): React.JSX.Element {
   }
 
   const resolve = async (): Promise<void> => {
+    if (pending) return
     setFocusAfter({ threadKey: thread.threadKey, target: 'reopen' })
     const ok = await ctx.run({ ...target, op: 'setStatus', status: 'resolved' })
     if (!ok) setFocusAfter(null)
@@ -134,6 +153,7 @@ function ReplyBox({ ctx, thread }: CommentThreadProps): React.JSX.Element {
         hint={fieldHint(ctx.file)}
         error={error}
         compact
+        readOnly={pending && !busy}
         textareaRef={fieldRef}
         testId={TEST_IDS.COMMENT_REPLY_FIELD}
       />
@@ -143,13 +163,13 @@ function ReplyBox({ ctx, thread }: CommentThreadProps): React.JSX.Element {
         </ActionButton>
         <DialogButton
           variant="primary"
-          busy={busy}
+          busy={busy || pending}
           title={`${COPY.reply} (${saveShortcutLabel()})`}
           keyShortcut={saveShortcutAria()}
           onClick={() => void reply()}
           testId={TEST_IDS.COMMENT_REPLY}
         >
-          {busy ? COPY.saving : COPY.reply}
+          {busy || pending ? COPY.saving : COPY.reply}
         </DialogButton>
       </div>
     </div>

@@ -16,6 +16,7 @@ import type {
   CommentModeChanged,
   CommentSaveRequest,
   CommentSaveResult,
+  CommentSaveSettled,
   CommentSetModeResult,
   CommentsChanged
 } from '../../../../shared/ipc/preview-comment-schema'
@@ -29,6 +30,8 @@ export interface PreviewCommentEmitters {
   commentsChanged(windowId: number, payload: CommentsChanged): void
   anchorStatus(windowId: number, payload: CommentAnchorStatus): void
   modeChanged(windowId: number, payload: CommentModeChanged): void
+  /** A save answered `COMMENT_SAVE_PENDING` settled after all. */
+  saveSettled(windowId: number, payload: CommentSaveSettled): void
 }
 
 /** One panel's state as the e2e hook reports it (`commentE2eHook.ts`). */

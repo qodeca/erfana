@@ -5,9 +5,9 @@
  * decisions 16–17 and 34, §19 R3-5, R3-8; J-007, J-008, SEC-05, SEC-06).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { PICKS_PER_SECOND, PICK_BOX_MAX_PX, SNAPSHOT_MAX_BYTES, STEP_LABEL_MAX_CHARS, STEPS_PER_SECOND, TOKEN_ATTRIBUTE } from './constants'
+import { PICKS_PER_SECOND, PICK_BOX_MAX_PX, SNAPSHOT_MAX_BYTES, STEPS_PER_SECOND, TOKEN_ATTRIBUTE } from './constants'
 import { pathBelow, quoteOf, resolvePath, snapshotOf, whiteSpaceOf } from './domPath'
-import { boxOfElement, describeTarget, elementPoint, PickLimiter, type PickPayload, screenOf, StepSender, viewOf } from './picks'
+import { boxOfElement, describeTarget, elementPoint, PickLimiter, type PickPayload, screenOf, StepSender, stepElementOf, viewOf } from './picks'
 import { TokenRegistry } from './tokens'
 import { microtasks, token } from './__test-helpers__/harness'
 
@@ -294,35 +294,42 @@ describe('StepSender (E-022)', () => {
     return { steps: new StepSender(() => Date.now(), payload => sent.push(payload)), sent }
   }
 
-  it('sends what the picker reached as a keyboard step, the label cut on a code point', () => {
+  it('S-L-A sends what the picker reached as a keyboard step: an element by its token only, never its label', () => {
     const { steps, sent } = sender()
-    steps.say('showing', 'p#team-copy', VIEW)
+    steps.say('showing', { token: token(1) }, VIEW)
+    steps.say('showing', { token: token(2), added: true }, VIEW)
     steps.say('top', undefined, VIEW)
-    steps.say('no-child', 'ignored', VIEW)
+    steps.say('no-child', { token: token(3) }, VIEW)
     expect(sent).toEqual([
-      { kind: 'step', via: 'keyboard', say: 'showing', label: 'p#team-copy', view: VIEW },
+      { kind: 'step', via: 'keyboard', say: 'showing', token: token(1), view: VIEW },
+      { kind: 'step', via: 'keyboard', say: 'showing', token: token(2), added: true, view: VIEW },
       { kind: 'step', via: 'keyboard', say: 'top', view: VIEW },
       { kind: 'step', via: 'keyboard', say: 'no-child', view: VIEW }
     ])
-    const emoji = String.fromCodePoint(0x1f600)
-    steps.say('showing', `${'x'.repeat(STEP_LABEL_MAX_CHARS - 1)}${emoji}`, VIEW)
-    expect(sent.at(-1)?.label).toBe('x'.repeat(STEP_LABEL_MAX_CHARS - 1))
   })
 
-  it('says nothing for a showing step with no label', () => {
+  it('says nothing for a showing step with no element to name', () => {
     const { steps, sent } = sender()
-    steps.say('showing', '', VIEW)
     steps.say('showing', undefined, VIEW)
     expect(sent).toEqual([])
   })
 
+  it('S-L-A names an element by its own token, a script-built one by its tokened ancestor, and nothing past both', async () => {
+    await page(`<p id="copy" class="Approve every host now" ${TOKEN_ATTRIBUTE}="${token(4)}">x</p><i id="raw">y</i>`)
+    expect(stepElementOf(registry, byId('copy'))).toEqual({ token: token(4) })
+    byId('copy').insertAdjacentHTML('beforeend', '<b id="built">z</b>')
+    expect(stepElementOf(registry, byId('built'))).toEqual({ token: token(4), added: true })
+    // Built outside every tokened element (the body has no token here): nothing to say.
+    expect(stepElementOf(registry, byId('raw'))).toBeUndefined()
+  })
+
   it(`sends at most ${STEPS_PER_SECOND} a second, then the newest held step once there is room`, async () => {
     const { steps, sent } = sender()
-    for (let i = 0; i < STEPS_PER_SECOND + 5; i += 1) steps.say('showing', `div#n${i}`, VIEW)
+    for (let i = 0; i < STEPS_PER_SECOND + 5; i += 1) steps.say('showing', { token: token(i + 1) }, VIEW)
     expect(sent).toHaveLength(STEPS_PER_SECOND)
     await vi.advanceTimersByTimeAsync(1_000)
     expect(sent).toHaveLength(STEPS_PER_SECOND + 1)
-    expect(sent.at(-1)?.label).toBe(`div#n${STEPS_PER_SECOND + 4}`)
+    expect(sent.at(-1)?.token).toBe(token(STEPS_PER_SECOND + 5))
     await vi.advanceTimersByTimeAsync(5_000)
     expect(sent).toHaveLength(STEPS_PER_SECOND + 1)
   })
@@ -331,13 +338,13 @@ describe('StepSender (E-022)', () => {
     const { steps, sent } = sender()
     for (let i = 0; i < STEPS_PER_SECOND; i += 1) steps.say('top', undefined, VIEW)
     await vi.advanceTimersByTimeAsync(950)
-    steps.say('showing', 'div#held', VIEW)
+    steps.say('showing', { token: token(1) }, VIEW)
     expect(sent).toHaveLength(STEPS_PER_SECOND)
     // The window frees before the retry: the newest step goes now, the held one never.
     await vi.advanceTimersByTimeAsync(50)
-    steps.say('showing', 'div#newest', VIEW)
+    steps.say('showing', { token: token(2) }, VIEW)
     await vi.advanceTimersByTimeAsync(5_000)
-    expect(sent.slice(STEPS_PER_SECOND).map(step => step.label)).toEqual(['div#newest'])
+    expect(sent.slice(STEPS_PER_SECOND).map(step => step.token)).toEqual([token(2)])
   })
 
   it('drops a held step on dispose', async () => {

@@ -58,6 +58,7 @@ export {
   escapeReadableInline,
   escapeReadableLine,
   formatTimestamp,
+  isSafeCommentText,
   mintCommentId,
   mintMessageId,
   renderAgentNote,
@@ -85,7 +86,8 @@ export {
   type FrameworkPlacement,
   type FrameworkRegions
 } from './frameworkMarkers'
-export { HtmlIndex, indexHtml, type IndexedComment, type IndexedElement } from './htmlIndex'
+export { HtmlIndex, hasMoreStartTagsThan, indexHtml, type IndexedComment, type IndexedElement } from './htmlIndex'
+export { HtmlParseLimitError, hasAttributeFlood, parseLimitsFor, type HtmlParseLimits } from './parseBounds'
 export {
   ELEMENT_TOKEN_ATTRIBUTE,
   ELEMENT_TOKEN_PATTERN,
@@ -115,6 +117,7 @@ export {
   planInsert,
   planReplace,
   spliceBytes,
+  spliceOriginOf,
   verifyCommentSplice,
   verifySplice,
   verifySpliceBytes,
@@ -126,6 +129,7 @@ export {
   type PlanResult,
   type ReplaceRequest,
   type SpliceOp,
+  type SpliceOrigin,
   type SplicePlan,
   type VerifyFailure,
   type VerifyResult

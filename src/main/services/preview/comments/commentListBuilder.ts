@@ -9,9 +9,11 @@
  * bytes; the parse and the summary run in the comment parse worker as the
  * `list` job (`commentListCore.ts`, §19 R3-12), whose document cache spares
  * an unchanged file a second parse. Files are read one after the other, so a
- * list holds one file's bytes at a time, and at most
+ * list holds one file's bytes at a time. At most
  * {@link COMMENT_LIST_MAX_FILES} are listed – the cut is made before any file
- * is read.
+ * is read – and at most {@link COMMENT_LIST_MAX_BYTES} are read in all; every
+ * file left out by either limit is counted, so the drawer can say the list is
+ * partial (`unread`).
  *
  * Each file, thread and damaged or newer block is named by a main-minted key
  * bound to the window, panel and view session (`commentKeyStore.ts`); the
@@ -20,6 +22,7 @@
  * page (§4.1 B5).
  */
 import { CommentFileViewSchema, type CommentFileView } from '../../../../shared/ipc/preview-comment-schema'
+import { PREVIEW_LIMITS } from '../../../../shared/preview-limits'
 import { stablePathDigest } from '../../../../shared/stablePathDigest'
 import { logger } from '../../LoggingService'
 import { loadCommentBytes } from './commentFileAccess'
@@ -31,6 +34,23 @@ import type { FrameFile } from './frameFileMap'
 
 /** Files one list reads at most: the page and every frame of two pages' worth (`MAX_FRAMES_PER_PAGE` is 50). */
 export const COMMENT_LIST_MAX_FILES = 64
+
+/**
+ * Bytes one list reads at most, every file together (design §19 Rev 4). Files
+ * are read one at a time, so this does not bound memory – one file's bytes
+ * do – but the time a list keeps the parse worker and the disk busy: 64 MB of
+ * dense markup is about 14 s of parsing on the slowest box measured, where 64
+ * files of 25 MB would be over five minutes. The page, at most 25 MB, always
+ * fits; a frame's file that no longer fits is not read, and is counted.
+ */
+export const COMMENT_LIST_MAX_BYTES = PREVIEW_LIMITS.COMMENT_LIST_MAX_BYTES
+
+/** A list: each file read, and how many files were left out. */
+export interface CommentList {
+  readonly files: CommentFileView[]
+  /** Files not read: past {@link COMMENT_LIST_MAX_FILES} or {@link COMMENT_LIST_MAX_BYTES}. */
+  readonly unread: number
+}
 
 /** One file to list: the page's, or a frame's. */
 export interface ListedFile {
@@ -49,6 +69,8 @@ export interface ListInput {
   /** Where the parse runs: the comment parse worker in the app. */
   readonly jobs: CommentFileJobRunner
   readonly platform?: NodeJS.Platform
+  /** Bytes the list may read; {@link COMMENT_LIST_MAX_BYTES} unless a suite passes a small one. */
+  readonly maxBytes?: number
 }
 
 type ReadOnlyView = NonNullable<CommentFileView['readOnlyReason']>
@@ -103,15 +125,42 @@ function refusedView(input: ListInput, listed: ListedFile, refusal: CommentRefus
   return { ...baseOf(input, listed), writable: false, readOnlyReason: reason, threads: [], damaged: [], newer: [] }
 }
 
-/** One file's view, or `undefined` when it is not listed (a path comments never touch). */
-async function viewOf(input: ListInput, listed: ListedFile): Promise<ListedView | undefined> {
+/** What reading one file came to: its view, if it is listed, and the bytes it took from the budget. */
+interface FileRead {
+  readonly listed?: ListedView
+  readonly bytes: number
+  /** Left out: it did not fit in what was left of the budget. */
+  readonly unread?: true
+}
+
+const NOT_LISTED: FileRead = { bytes: 0 }
+
+/**
+ * One file read within `budget` bytes. Past the budget, `too-large` cannot
+ * tell a file over the budget from one over `COMMENT_FILE_MAX_BYTES`; both
+ * count as unread, which shows no comments either way.
+ */
+async function readWithin(input: ListInput, listed: ListedFile, budget: number): Promise<FileRead> {
   const { realPath } = listed.file
-  const loaded = await loadCommentBytes({ realRoot: input.realRoot, filePath: realPath }, { platform: input.platform })
+  const target = { realRoot: input.realRoot, filePath: realPath }
+  const loaded = await loadCommentBytes(target, { platform: input.platform, maxBytes: budget })
+  if (!loaded.ok && loaded.reason === 'too-large' && budget < PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES) {
+    return { bytes: 0, unread: true }
+  }
   if (!loaded.ok) {
     const refused = refusedView(input, listed, loaded.reason)
-    return refused === undefined ? undefined : { view: refused, realPath, threadIds: [] }
+    return refused === undefined ? NOT_LISTED : { listed: { view: refused, realPath, threadIds: [] }, bytes: 0 }
   }
-  const listedFile = await input.jobs.runJob(loaded.bytes, { kind: 'list' })
+  // Counted before the job: the bytes may be lent to the worker, which leaves this buffer empty.
+  const bytes = loaded.bytes.length
+  const view = await viewOf(input, listed, loaded.bytes)
+  return view === undefined ? { bytes } : { listed: view, bytes }
+}
+
+/** One read file's view, or `undefined` when it is not listed (a parse that failed). */
+async function viewOf(input: ListInput, listed: ListedFile, fileBytes: Buffer): Promise<ListedView | undefined> {
+  const { realPath } = listed.file
+  const listedFile = await input.jobs.runJob(fileBytes, { kind: 'list' })
   if (listedFile.kind === 'failed') {
     logger.warn('Preview comments: a file could not be parsed for the comment list', {
       failure: listedFile.failure,
@@ -143,20 +192,30 @@ function withNotVisible(input: ListInput, { view, realPath, threadIds }: ListedV
 
 /**
  * Every listed file's comments, in the order given, at most
- * {@link COMMENT_LIST_MAX_FILES} of them. Never throws for one file's failure.
+ * {@link COMMENT_LIST_MAX_FILES} files and {@link COMMENT_LIST_MAX_BYTES}
+ * bytes of them, with the count of files left out. Never throws for one
+ * file's failure.
  */
-export async function buildCommentList(input: ListInput): Promise<CommentFileView[]> {
-  if (input.files.length > COMMENT_LIST_MAX_FILES) {
+export async function buildCommentList(input: ListInput): Promise<CommentList> {
+  const cut = Math.max(0, input.files.length - COMMENT_LIST_MAX_FILES)
+  if (cut > 0) {
     logger.warn('Preview comments: the comment list was cut short', { files: input.files.length, listed: COMMENT_LIST_MAX_FILES })
   }
   const views: ListedView[] = []
+  let budget = input.maxBytes ?? COMMENT_LIST_MAX_BYTES
+  let overBudget = 0
   // One after the other: one file's bytes in flight at a time, and the worker's queue left to page loads.
   for (const listed of input.files.slice(0, COMMENT_LIST_MAX_FILES)) {
-    const view = await viewOf(input, listed).catch(() => {
+    const read = await readWithin(input, listed, budget).catch(() => {
       logger.warn('Preview comments: a file could not be listed', { file: stablePathDigest(listed.file.realPath) })
-      return undefined
+      return NOT_LISTED
     })
-    if (view !== undefined) views.push(view)
+    budget -= read.bytes
+    if (read.unread) overBudget += 1
+    if (read.listed !== undefined) views.push(read.listed)
   }
-  return views.map(view => withNotVisible(input, view))
+  if (overBudget > 0) {
+    logger.warn('Preview comments: the comment list reached its byte budget', { unread: overBudget })
+  }
+  return { files: views.map(view => withNotVisible(input, view)), unread: cut + overBudget }
 }

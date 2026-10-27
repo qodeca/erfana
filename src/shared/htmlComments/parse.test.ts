@@ -305,6 +305,17 @@ describe('file state', () => {
       state: { readOnlyReason: 'too-large' }
     })
   })
+
+  it('§19 Rev 4 parseCommentFile decodes a file of exactly 25 MB, and refuses one with more start tags than the element cap unparsed', () => {
+    const atLimit = parseCommentFile(new Uint8Array(PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES).fill(0xff))
+    expect(atLimit).toMatchObject({ ok: false, reason: 'invalid-utf8' })
+    const tags = encodeText('<i>'.repeat(PREVIEW_LIMITS.COMMENT_MAX_TOKENS_PER_DOCUMENT + 1))
+    expect(parseCommentFile(tags)).toEqual({
+      ok: false,
+      reason: 'too-large',
+      state: { blocks: [], writable: false, readOnlyReason: 'too-large' }
+    })
+  })
 })
 
 describe('JSON pre-scan', () => {

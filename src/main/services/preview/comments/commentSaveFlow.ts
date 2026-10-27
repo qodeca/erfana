@@ -14,16 +14,18 @@
  * past it the save answers `COMMENT_SAVE_PENDING` – still being written, not
  * failed, so the window does not invite a second save of the same text. The
  * write itself keeps its per-file lock until it settles, and the draft stays
- * in flight until then, so a retry cannot write twice. When such a late write
- * lands it is handled as one that answered in time – the reload and the
- * reader's place – and the window is told the comments changed
- * (`lateLanded`). A draft is consumed only by a write; a refusal leaves it for
- * the next try, with the window's text kept (M-056, M-057). A landed write is
- * handed to the reload coordinator, which restores the reader's place after
- * the reload.
+ * in flight until then, so a retry cannot write twice. However such a late
+ * write ends, the window is told (`lateSettled`, sent on as
+ * `preview:commentSaveSettled`): one that lands is handled as one that
+ * answered in time – the reload and the reader's place – and reported `ok`;
+ * one that is refused, or throws, is reported with its code, so the window can
+ * turn "Still saving…" into the refusal and offer Save again. A draft is
+ * consumed only by a write; a refusal leaves it for the next try, with the
+ * window's text kept (M-056, M-057). A landed write is handed to the reload
+ * coordinator, which restores the reader's place after the reload.
  */
 import { ErrorCode } from '../../../../shared/errors'
-import type { CommentSaveRequest, CommentSaveResult } from '../../../../shared/ipc/preview-comment-schema'
+import type { CommentSaveRequest, CommentSaveResult, CommentSaveSettled } from '../../../../shared/ipc/preview-comment-schema'
 import { TimeoutError, withTimeout } from '../../../utils/withTimeout'
 import { logger } from '../../LoggingService'
 import type { CommentWriter, CommentWriteResult, ThreadChange } from './CommentWriter'
@@ -35,6 +37,12 @@ import { samePathKey } from './commentUnsavedSources'
 
 /** Longest a save waits for the writer before it answers `COMMENT_SAVE_PENDING`. */
 export const SAVE_TIMEOUT_MS = 15_000
+
+/** How a save that outlasted its answer ended, named by the request's own key (no panel: the service adds it). */
+export type LateSettle = Omit<CommentSaveSettled, 'panelId'>
+
+/** The request's own key: the draft token of an add, the block key of a block delete, else the thread key. */
+type SaveRef = Pick<LateSettle, 'op' | 'draftToken' | 'threadKey' | 'blockKey'>
 
 /** What the flow is built from. */
 export interface SaveFlowDeps {
@@ -48,8 +56,8 @@ export interface SaveFlowDeps {
   readonly currentPage: () => string
   /** A write landed. */
   readonly landed: (write: ArmedWrite) => void
-  /** A write that outlasted its answer landed after all: tell the window its comments changed. */
-  readonly lateLanded?: () => void
+  /** A write that outlasted its answer settled after all – landed or not: tell the window how. */
+  readonly lateSettled?: (settled: LateSettle) => void
   readonly timeoutMs?: number
   readonly platform?: NodeJS.Platform
 }
@@ -82,28 +90,44 @@ export function createCommentSaveFlow(deps: SaveFlowDeps): (request: CommentSave
   const same = (a: string, b: string): boolean => samePathKey(a, deps.platform) === samePathKey(b, deps.platform)
 
   /**
+   * A write that outlasted its answer settled: hand a landed one to `land`,
+   * then tell the window how it ended – whatever that was.
+   */
+  function settleLate(write: Promise<CommentWriteResult>, land: (result: Written) => void, ref: SaveRef): void {
+    void write.then(
+      result => {
+        if (result.ok) {
+          logger.info('Preview comments: a save that outlasted its time limit landed')
+          land(result)
+          deps.lateSettled?.({ ...ref, ok: true })
+          return
+        }
+        logger.info('Preview comments: a save that outlasted its time limit was refused', { code: result.code })
+        deps.lateSettled?.({ ...ref, ok: false, code: result.code })
+      },
+      () => {
+        logger.warn('Preview comments: a save that outlasted its time limit failed')
+        deps.lateSettled?.({ ...ref, ok: false, code: ErrorCode.COMMENT_WRITE_FAILED })
+      }
+    )
+  }
+
+  /**
    * Wait for `write`. At the time limit answer `pending` – still being
-   * written – and, should it land later, hand it to `land` then. A write that
-   * threw is `failed`.
+   * written – and report how it ends later (`settleLate`). A write that threw
+   * is `failed`.
    */
   async function bounded(
     write: Promise<CommentWriteResult>,
-    land: (result: Written) => void
+    land: (result: Written) => void,
+    ref: SaveRef
   ): Promise<CommentWriteResult | 'pending' | 'failed'> {
     try {
       return await withTimeout(write, timeoutMs, 'Preview comments: save')
     } catch (error) {
       if (!(error instanceof TimeoutError)) return 'failed'
       logger.warn('Preview comments: a save outlasted its time limit', { ms: timeoutMs })
-      void write.then(
-        result => {
-          if (!result.ok) return
-          logger.info('Preview comments: a save that outlasted its time limit landed')
-          land(result)
-          deps.lateLanded?.()
-        },
-        () => undefined
-      )
+      settleLate(write, land, ref)
       return 'pending'
     }
   }
@@ -111,9 +135,10 @@ export function createCommentSaveFlow(deps: SaveFlowDeps): (request: CommentSave
   /** The answer for a write that is still running, refused or landed; `land` runs for a landed one. */
   async function answer(
     write: Promise<CommentWriteResult>,
-    land: (result: Written) => void
+    land: (result: Written) => void,
+    ref: SaveRef
   ): Promise<{ readonly ok: true; readonly result: Written } | Refused> {
-    const result = await bounded(write, land)
+    const result = await bounded(write, land, ref)
     if (result === 'pending') return refused(ErrorCode.COMMENT_SAVE_PENDING)
     if (result === 'failed') return refused(ErrorCode.COMMENT_WRITE_FAILED)
     if (!result.ok) return refused(result.code)
@@ -137,14 +162,17 @@ export function createCommentSaveFlow(deps: SaveFlowDeps): (request: CommentSave
       result => deps.keys.settleDraft(request.draftToken, result.ok),
       () => deps.keys.settleDraft(request.draftToken, false)
     )
-    const done = await answer(write, result =>
-      deps.landed({
-        realPath: result.realPath,
-        fileHash: result.fileHash,
-        ...(scroll === undefined ? {} : { scroll }),
-        ...(draft.pageRealPath === undefined ? {} : { page: draft.pageRealPath }),
-        ...(draft.frame ? { frameRestore: { realPath: draft.realPath, x: draft.view.x, y: draft.view.y } } : {})
-      })
+    const done = await answer(
+      write,
+      result =>
+        deps.landed({
+          realPath: result.realPath,
+          fileHash: result.fileHash,
+          ...(scroll === undefined ? {} : { scroll }),
+          ...(draft.pageRealPath === undefined ? {} : { page: draft.pageRealPath }),
+          ...(draft.frame ? { frameRestore: { realPath: draft.realPath, x: draft.view.x, y: draft.view.y } } : {})
+        }),
+      { op: 'add', draftToken: request.draftToken }
     )
     if (!done.ok) return done
     const threadId = done.result.threadId as string
@@ -161,7 +189,7 @@ export function createCommentSaveFlow(deps: SaveFlowDeps): (request: CommentSave
       if (!block.ok || !same(block.value.realPath, realPath) || block.value.rawHash !== request.rawHash) return INVALID
       const scroll = await deps.captureScroll()
       write = deps.writer.deleteDamagedBlock({ file: { realRoot: deps.realRoot, filePath: realPath }, rawHash: request.rawHash, start: block.value.start })
-      return finish(write, scroll, null)
+      return finish(write, scroll, null, { op: 'deleteBlock', blockKey: request.blockKey })
     }
     const thread = deps.keys.resolve(deps.binding, request.threadKey, 'thread')
     if (!thread.ok || !same(thread.value.realPath, realPath)) return INVALID
@@ -172,16 +200,20 @@ export function createCommentSaveFlow(deps: SaveFlowDeps): (request: CommentSave
       rawHash: request.rawHash,
       change: changeOf(request)
     })
-    return finish(write, scroll, request.threadKey)
+    return finish(write, scroll, request.threadKey, { op: request.op, threadKey: request.threadKey })
   }
 
   async function finish(
     write: Promise<CommentWriteResult>,
     scroll: TopScroll | undefined,
-    threadKey: string | null
+    threadKey: string | null,
+    ref: SaveRef
   ): Promise<CommentSaveResult> {
-    const done = await answer(write, result =>
-      deps.landed({ realPath: result.realPath, fileHash: result.fileHash, ...(scroll === undefined ? {} : { scroll, page: deps.currentPage() }) })
+    const done = await answer(
+      write,
+      result =>
+        deps.landed({ realPath: result.realPath, fileHash: result.fileHash, ...(scroll === undefined ? {} : { scroll, page: deps.currentPage() }) }),
+      ref
     )
     if (!done.ok) return done
     return { ok: true, threadKey: done.result.threadId === null ? null : threadKey }

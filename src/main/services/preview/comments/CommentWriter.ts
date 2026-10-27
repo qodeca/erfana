@@ -13,8 +13,9 @@
  *     and reads the author from Erfana's own settings when the operation
  *     writes one – a request never carries an author (§7.5 step 2);
  *  3. RE-READS the file from disk – never a copy read earlier – and refuses a
- *     symlink, a hard link, a non-UTF-8 file, a file over 4 MB or one the
- *     parse marks read-only (a conflict hunk, an unterminated block);
+ *     symlink, a hard link, a non-UTF-8 file, a file over
+ *     `COMMENT_FILE_MAX_BYTES` (25 MB) or one the parse marks read-only (a
+ *     conflict hunk, an unterminated block);
  *  4. re-locates its target in a fresh parse of those bytes: for an add, the
  *     draft's element (its offset while the file is unchanged, else the
  *     draft's backup anchors, which must match exactly one element); for an
@@ -29,8 +30,11 @@
  *     worker as the `write` job (`commentWriteCore.ts`, §19 R3-12) – the file
  *     and the spliced file are both parsed there, never on the main thread.
  *     Main gets back the splice as a byte range and the block's bytes, and
- *     rebuilds the file from its OWN copy of the bytes read, so every byte
- *     outside the block is the byte it read whatever the worker answered;
+ *     rebuilds the file from the bytes read, so every byte outside the block
+ *     is the byte it read whatever the worker answered. The bytes are lent
+ *     to the worker, not copied (§19 Rev 4), and come back as the answer's
+ *     `raw`; step 6 compares them byte for byte with the file on disk, so
+ *     bytes the worker changed could only refuse the write, never land;
  *  6. writes with `atomicWriteBytesStrict`, which refuses when the path no
  *     longer names the file read in 3 (dev/ino), the file no longer holds the
  *     bytes read, or its folder no longer resolves where it did. Then the
@@ -70,6 +74,7 @@ import {
 } from './commentRefusals'
 import {
   assembleSplice,
+  isSafeInsert,
   isSpliceWithin,
   type CommentDraftTarget,
   type ThreadChange,
@@ -264,13 +269,18 @@ export class CommentWriter {
     const planned = await this.jobs.runJob(loaded.bytes, { kind: 'write', request: job.request, act })
     if (planned.kind === 'failed') return jobFailureRefusal(planned.failure)
     if (!planned.ok) return refused(planned.refusal)
-    if (!isSpliceWithin(planned, loaded.bytes.length)) return refused('verify-failed')
-    // Rebuilt from main's own copy: outside the block, the bytes written are the bytes read.
-    const out = assembleSplice(loaded.bytes, planned)
+    // The bytes read: handed back when they were lent, main's own view when they were copied.
+    const read = planned.raw ?? loaded.bytes
+    // Main's own checks of the worker's answer: a range inside the bytes read, and an
+    // insert that is one comment and nothing more (S-L-C).
+    if (!isSpliceWithin(planned, read.length) || !isSafeInsert(planned.insert)) return refused('verify-failed')
+    // Rebuilt from the bytes read – and the strict write below re-reads the file and
+    // requires these very bytes on disk: outside the block, the bytes written are the bytes read.
+    const out = assembleSplice(read, planned)
     if (out.length > PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES) return refused('limit')
     const written = await atomicWriteBytesStrict(realPath, out, {
       expectedHash: planned.inputHash,
-      expectedBytes: loaded.bytes,
+      expectedBytes: read,
       expectedId: loaded.id,
       expectedDir: dirname(realPath),
       maxBytes: PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES

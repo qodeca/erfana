@@ -8,6 +8,7 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { COMMENT_RAW_PREVIEW_MAX_CHARS } from '../../../../shared/ipc/preview-comment-schema'
+import { PREVIEW_LIMITS } from '../../../../shared/preview-limits'
 import { logger } from '../../LoggingService'
 import { addTo, fixedId, makeComment } from '../../../../shared/htmlComments/__fixtures__/commentTestData'
 import { BASE_PAGE, commentedPage, damagedBlock, insertBefore, newerBlock } from './__test-helpers__/commentedPages'
@@ -15,7 +16,7 @@ import { makeProject, type TempProject } from './__test-helpers__/commentWriterH
 import { frameFile } from './__test-helpers__/commentServiceHarness'
 import { CommentKeyStore, type CommentBinding } from './commentKeyStore'
 import { createInProcessCommentFileJobs, type CommentFileJob } from './commentFileJobs'
-import { buildCommentList, COMMENT_LIST_MAX_FILES } from './commentListBuilder'
+import { buildCommentList, COMMENT_LIST_MAX_BYTES, COMMENT_LIST_MAX_FILES } from './commentListBuilder'
 
 vi.mock('../../LoggingService', () => ({
   logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn() }
@@ -34,15 +35,27 @@ afterEach(async () => {
   await project.dispose()
 })
 
-function list(paths: Array<{ path: string; frame?: boolean }>, keys: Pick<CommentKeyStore<unknown>, 'keyFor'> = new CommentKeyStore<unknown>()) {
+function listOf(
+  paths: Array<{ path: string; frame?: boolean }>,
+  keys: Pick<CommentKeyStore<unknown>, 'keyFor'> = new CommentKeyStore<unknown>(),
+  maxBytes?: number
+) {
   return buildCommentList({
     binding: BINDING,
     keys,
     realRoot: project.root,
     files: paths.map(({ path, frame }) => ({ file: frameFile(path, { projectPath: path, displayPath: path.slice(project.root.length + 1).replace(/\\/g, '/') }), frame: frame ?? false })),
     notVisible: (_realPath, threadId) => threadId === fixedId('c-', 2),
-    jobs: createInProcessCommentFileJobs()
+    jobs: createInProcessCommentFileJobs(),
+    ...(maxBytes === undefined ? {} : { maxBytes })
   })
+}
+
+/** The files of a list that left nothing out. */
+async function list(paths: Array<{ path: string; frame?: boolean }>, keys?: Pick<CommentKeyStore<unknown>, 'keyFor'>) {
+  const { files, unread } = await listOf(paths, keys)
+  expect(unread).toBe(0)
+  return files
 }
 
 describe('buildCommentList', () => {
@@ -73,7 +86,7 @@ describe('buildCommentList', () => {
     let hidden = true
     const reads: Array<{ realPath: string; hidden: boolean }> = []
     let jobsRun = 0
-    const views = await buildCommentList({
+    const { files: views } = await buildCommentList({
       binding: BINDING,
       keys: new CommentKeyStore<unknown>(),
       realRoot: project.root,
@@ -101,7 +114,7 @@ describe('buildCommentList', () => {
     const refused = await project.write('other.html', commentedPage().text)
     const jobs = createInProcessCommentFileJobs()
     let jobsRun = 0
-    const views = await buildCommentList({
+    const { files: views } = await buildCommentList({
       binding: BINDING,
       keys: new CommentKeyStore<unknown>(),
       realRoot: project.root,
@@ -212,11 +225,39 @@ describe('buildCommentList', () => {
             frame: true
           }
     )
-    const views = await buildCommentList({ binding: BINDING, keys: new CommentKeyStore<unknown>(), realRoot: project.root, files, notVisible: () => false, jobs: counted })
+    const { files: views, unread } = await buildCommentList({ binding: BINDING, keys: new CommentKeyStore<unknown>(), realRoot: project.root, files, notVisible: () => false, jobs: counted })
     expect(views).toHaveLength(COMMENT_LIST_MAX_FILES)
+    // The files past the cut are counted, so the drawer can say the list is partial.
+    expect(unread).toBe(5)
+    // The drawer's note names both limits in words (`unreadFilesText`, commentCopy.ts).
+    expect([COMMENT_LIST_MAX_FILES, COMMENT_LIST_MAX_BYTES]).toEqual([64, 64 * 1024 * 1024])
     expect(pastCapTouched).toBe(false)
     expect(most).toBe(1)
     expect(JSON.stringify(vi.mocked(logger.warn).mock.calls)).toContain('cut short')
+  })
+
+  it('§19 Rev 4 reads at most its byte budget: a file past what is left is not read but counted, and a smaller one after it still is', async () => {
+    const page = commentedPage().text
+    const size = Buffer.byteLength(page)
+    const [a, b, c] = await Promise.all(['a.html', 'b.html', 'c.html'].map(name => project.write(name, page)))
+    const small = await project.write('small.html', '<!doctype html><p>small</p>')
+    const { files, unread } = await listOf([{ path: a }, { path: b, frame: true }, { path: c, frame: true }, { path: small, frame: true }], undefined, 2 * size + 100)
+    expect(files.map(file => file.displayPath)).toEqual(['a.html', 'b.html', 'small.html'])
+    expect(unread).toBe(1)
+    const logged = JSON.stringify(vi.mocked(logger.warn).mock.calls)
+    expect(logged).toContain('byte budget')
+    expect(logged).not.toContain('c.html')
+  })
+
+  it(`§19 Rev 4 within the budget, a file over ${PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES} bytes is listed read-only as too-large, not counted as unread`, async () => {
+    const page = await project.write('index.html', commentedPage().text)
+    const big = await project.write('big.html', Buffer.alloc(PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES + 1, 0x20))
+    const { files, unread } = await listOf([{ path: page }, { path: big, frame: true }])
+    expect(files.map(file => [file.displayPath, file.writable, file.readOnlyReason ?? null])).toEqual([
+      ['index.html', true, null],
+      ['big.html', false, 'too-large']
+    ])
+    expect(unread).toBe(0)
   })
 
   it('R3-12 a file the worker could not parse drops out alone, logged by digest', async () => {
@@ -225,7 +266,7 @@ describe('buildCommentList', () => {
     const jobs = createInProcessCommentFileJobs()
     let calls = 0
     const flaky = { runJob: async (bytes: Uint8Array, job: Parameters<typeof jobs.runJob>[1]) => (calls++ === 0 ? { kind: 'failed' as const, failure: 'busy' as const } : jobs.runJob(bytes, job)) } as typeof jobs
-    const views = await buildCommentList({
+    const { files: views } = await buildCommentList({
       binding: BINDING,
       keys: new CommentKeyStore<unknown>(),
       realRoot: project.root,
@@ -243,7 +284,7 @@ describe('buildCommentList', () => {
     const path = await project.write('index.html', commentedPage().text)
     const other = await project.write('other.html', commentedPage().text)
     const bad = { keyFor: () => 'not a key!' }
-    expect(await list([{ path }], bad)).toEqual([])
+    expect(await listOf([{ path }], bad)).toEqual({ files: [], unread: 0 })
     let calls = 0
     const throwing = {
       keyFor: (_binding: CommentBinding, target: { realPath: string }) => {

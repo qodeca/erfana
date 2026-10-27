@@ -24,6 +24,11 @@
  * a draft runs backup-tier lookups whose budget is shared per parse
  * (`commentJobDocs.ts`). The verified result is a fresh parse of the new
  * bytes, so it goes INTO the cache – the list after the write finds it.
+ *
+ * Only the plan and the file's {@link SpliceOrigin} outlive the planning
+ * step, so the first parse tree can be collected before the verifying
+ * re-parse: at 25 MB one tree is most of a gigabyte, and holding both would
+ * double the worker's peak (§19 Rev 4).
  */
 import { PREVIEW_LIMITS } from '../../../../shared/preview-limits'
 import {
@@ -36,10 +41,12 @@ import {
   editMessage,
   encodeText,
   findAnchorTarget,
+  isSafeCommentText,
   planDelete,
   planInsert,
   planReplace,
   setStatus,
+  spliceOriginOf,
   utf8Length,
   verifyCommentSplice,
   verifySpliceBytes,
@@ -52,10 +59,11 @@ import {
   type PlanFailure,
   type PlanResult,
   type RandomBytes,
+  type SpliceOrigin,
   type SplicePlan,
   type ThreadContext
 } from '../../../../shared/htmlComments'
-import { sha256HexOf, writableRefusal, type CommentDocCache, type JobDocument } from './commentJobDocs'
+import { freshDocumentOf, sha256HexOf, writableRefusal, type CommentDocCache } from './commentJobDocs'
 import type { CommentRefusal } from './commentRefusals'
 
 /** What a draft recorded about its element when the pick was made (P5). */
@@ -162,6 +170,29 @@ export function isSpliceWithin(splice: ByteSplice, length: number): boolean {
   )
 }
 
+/** The own-lines tail after a new block (§5.2): one line break, then the target's indent. */
+const OWN_LINES_TAIL = /(?:\r\n|\r|\n)[ \t]*$/
+
+/**
+ * Main's own check of the bytes a worker answer would put in the file
+ * (security review S-L-C): nothing (a delete), or ONE comment that cannot end
+ * early or open another (`isSafeCommentText`), optionally followed by the
+ * own-lines tail. The worker serialized and verified the block, but it parses
+ * hostile pages; checked here, a worker that answered wrong still cannot make
+ * main write text that leaves the comment. Strict UTF-8, BOM kept: anything
+ * else is not what the serializer writes.
+ */
+export function isSafeInsert(insert: Uint8Array): boolean {
+  if (insert.length === 0) return true
+  let text: string
+  try {
+    text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(insert)
+  } catch {
+    return false
+  }
+  return isSafeCommentText(text.replace(OWN_LINES_TAIL, ''))
+}
+
 function contextOf(act: WriteAct, random: RandomBytes | undefined): ThreadContext {
   // `CommentWriter` refuses an edit that writes an author before it gets here without one.
   return { author: act.author!, now: new Date(act.nowMs), random }
@@ -233,33 +264,49 @@ function planOf(job: WriteJob, doc: CommentDocument, hash: string, random: Rando
   }
 }
 
+/** A plan made on the bytes read, with what verifying it needs – and no parse tree. */
+type ReadyPlan =
+  | (Extract<Planned, { ok: true }> & { readonly origin: SpliceOrigin; readonly hash: string })
+  | { readonly ok: false; readonly refusal: CommentRefusal }
+
+/**
+ * §7.6 steps 3–6 on a fresh parse of `bytes`. Only the plan and the file's
+ * {@link SpliceOrigin} are returned, so the parse tree is unreachable once
+ * this returns (module comment).
+ */
+function planOnFreshParse(bytes: Uint8Array, job: WriteJob, random: RandomBytes | undefined): ReadyPlan {
+  const document = freshDocumentOf(bytes)
+  if (!document.ok) return refuse(document.refusal)
+  const blocked = writableRefusal(document.doc.state)
+  if (blocked) return refuse(blocked)
+  const planned = planOf(job, document.doc, document.hash, random)
+  return planned.ok ? { ...planned, origin: spliceOriginOf(document.doc), hash: document.hash } : planned
+}
+
 /** §7.6 steps 7–8: the splice as bytes and the new file's parse, when every check passes. */
 function spliceVerified(
   bytes: Uint8Array,
-  doc: CommentDocument,
+  origin: SpliceOrigin,
   plan: SplicePlan
 ): { readonly ok: true; readonly splice: ByteSplice; readonly out: Uint8Array; readonly doc: CommentDocument } | { readonly ok: false; readonly refusal: CommentRefusal } {
-  const byteStart = utf8Length(doc.text, 0, plan.start)
-  const splice: ByteSplice = { byteStart, byteEnd: byteStart + utf8Length(doc.text, plan.start, plan.end), insert: encodeText(plan.insert) }
+  const byteStart = utf8Length(origin.text, 0, plan.start)
+  const splice: ByteSplice = { byteStart, byteEnd: byteStart + utf8Length(origin.text, plan.start, plan.end), insert: encodeText(plan.insert) }
   const out = assembleSplice(bytes, splice)
   if (out.length > PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES) return refuse('limit')
-  const text = applySplice(doc.text, plan)
+  const text = applySplice(origin.text, plan)
   const decoded = decodeLossless(out)
-  if (!verifySpliceBytes(bytes, out, doc.text, plan) || !decoded.ok || decoded.text !== text) return refuse('verify-failed')
-  const verified = verifyCommentSplice(doc, text, plan)
+  if (!verifySpliceBytes(bytes, out, origin.text, plan) || !decoded.ok || decoded.text !== text) return refuse('verify-failed')
+  const verified = verifyCommentSplice(origin, text, plan)
   return verified.ok ? { ok: true, splice, out, doc: verified.doc } : refuse('verify-failed')
 }
 
-/** The `write` job. `cache` receives the verified new file's parse. */
-export function runWriteJob(document: JobDocument, bytes: Uint8Array, job: WriteJob, env: { readonly cache?: CommentDocCache; readonly random?: RandomBytes }): WriteJobResult {
-  if (!document.ok) return { kind: 'write', ok: false, refusal: document.refusal }
-  const blocked = writableRefusal(document.doc.state)
-  if (blocked) return { kind: 'write', ok: false, refusal: blocked }
-  const planned = planOf(job, document.doc, document.hash, env.random)
-  if (!planned.ok) return { kind: 'write', ok: false, refusal: planned.refusal }
-  const spliced = spliceVerified(bytes, document.doc, planned.plan)
+/** The `write` job on the bytes main read. `cache` receives the verified new file's parse. */
+export function runWriteJob(bytes: Uint8Array, job: WriteJob, env: { readonly cache?: CommentDocCache; readonly random?: RandomBytes }): WriteJobResult {
+  const ready = planOnFreshParse(bytes, job, env.random)
+  if (!ready.ok) return { kind: 'write', ok: false, refusal: ready.refusal }
+  const spliced = spliceVerified(bytes, ready.origin, ready.plan)
   if (!spliced.ok) return { kind: 'write', ok: false, refusal: spliced.refusal }
   const outputHash = sha256HexOf(spliced.out)
   env.cache?.set(outputHash, spliced.doc, spliced.out.length)
-  return { kind: 'write', ok: true, ...spliced.splice, inputHash: document.hash, outputHash, threadId: planned.threadId }
+  return { kind: 'write', ok: true, ...spliced.splice, inputHash: ready.hash, outputHash, threadId: ready.threadId }
 }

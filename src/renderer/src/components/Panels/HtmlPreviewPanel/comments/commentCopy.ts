@@ -18,9 +18,28 @@
  * @module HtmlPreviewPanel/comments/commentCopy
  */
 import { ERROR_MESSAGES, ErrorCode } from '../../../../../../shared/errors'
-import type { CommentUnavailableReason } from '../../../../../../shared/ipc/preview-comment-schema'
+import type {
+  CommentPickerElement,
+  CommentSaveRequest,
+  CommentUnavailableReason
+} from '../../../../../../shared/ipc/preview-comment-schema'
+import { PREVIEW_LIMITS } from '../../../../../../shared/preview-limits'
 import { isMacOS } from '../../../../utils/platform'
 import { plural } from './commentFormat'
+
+/** A byte limit as the reader reads it: `25 MB`. */
+function megabytes(bytes: number): string {
+  return `${Math.round(bytes / (1024 * 1024))} MB`
+}
+
+/**
+ * §10.10 "File limits (rev 4)": the two limits a commentable file stays within –
+ * main counts the elements as start tags, before any parse. Equal to
+ * `COMMENT_FILE_TOO_LARGE`'s fallback sentence in `errors.ts`.
+ */
+export const FILE_LIMIT_TEXT =
+  `Erfana adds comments only to files of up to ${megabytes(PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES)} ` +
+  `and ${PREVIEW_LIMITS.COMMENT_MAX_TOKENS_PER_DOCUMENT.toLocaleString('en-US')} elements.`
 
 /** The comment-mode shortcut as §10.10 prints it, per platform. */
 export function commentModeShortcutLabel(): string {
@@ -84,8 +103,8 @@ export function readOnlyReasonText(reason: string | undefined, file: string): st
     case 'conflict-markers':
       return `${file} has unresolved git conflicts. Resolve them first.`
     case 'too-large':
-      // not in §10.10
-      return `Erfana adds comments only to files up to 4 MB. ${file} is larger, so its comments are read-only.`
+      // §10.10 "File limits (rev 4)"
+      return `${FILE_LIMIT_TEXT} ${file} is larger, so its comments are read-only.`
     case 'too-many-blocks':
       // not in §10.10
       return `${file} holds more comment blocks than Erfana edits, so its comments are read-only.`
@@ -373,6 +392,20 @@ export function readErrorText(file: string): string {
   return `Couldn't read comments from ${file}.`
 }
 
+/**
+ * §10.10 "List left files out (rev 4)": main left files out of the list – past its 64
+ * files or its byte budget – so the drawer says the list is not complete.
+ *
+ * @param count - Files main did not read.
+ * @returns e.g. "Comments from 2 files in this page aren't listed: …".
+ */
+export function unreadFilesText(count: number): string {
+  return (
+    `Comments from ${plural(count, 'file', 'files')} in this page aren't listed: one list reads at most ` +
+    `64 files and ${megabytes(PREVIEW_LIMITS.COMMENT_LIST_MAX_BYTES)}. Open a frame's file in its own tab to see its comments.`
+  )
+}
+
 /** "In frame: {file}" */
 export function inFrameTag(file: string): string {
   return `In frame: ${file}`
@@ -422,8 +455,29 @@ export const ANNOUNCE = {
   resolved: 'Comment resolved.',
   reopened: 'Comment re-opened.',
   deleted: (file: string): string => `Comment deleted from ${file}.`,
-  // keyboard picker (§10.8): spoken by the panel, never drawn in the page
+  // keyboard picker (§10.8): spoken by the panel, never drawn in the page. The
+  // element is named by what MAIN parsed – its tag and line – never by its ids
+  // or classes, which are the page's words (security review S-L-A).
   pickerTop: 'Top of page – no parent to select.',
   pickerNoChild: 'No child elements.',
-  pickerShowing: (label: string): string => `Showing ${label}.`
+  pickerShowing: ({ tag, line, added }: CommentPickerElement): string =>
+    added
+      ? `Showing an element added by a script, inside ${tag ?? 'an element'} on line ${line}.`
+      : `Showing ${tag ?? 'an element'}, line ${line}.`
 } as const
+
+/**
+ * What the panel says once a write landed, by its operation – answered in
+ * time, or settled after "still saving".
+ *
+ * @param save - The write.
+ * @param file - The file as the reader knows it.
+ * @returns The polite announcement.
+ */
+export function writtenAnnouncement(save: CommentSaveRequest, file: string): string {
+  if (save.op === 'setStatus') return save.status === 'resolved' ? ANNOUNCE.resolved : ANNOUNCE.reopened
+  if (save.op === 'deleteMessage' || save.op === 'deleteThread' || save.op === 'deleteBlock') {
+    return ANNOUNCE.deleted(file)
+  }
+  return savedAnnouncement(file)
+}

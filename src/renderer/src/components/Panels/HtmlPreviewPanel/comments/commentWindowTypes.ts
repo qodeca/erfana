@@ -7,6 +7,7 @@
  * @module HtmlPreviewPanel/comments/commentWindowTypes
  */
 import {
+  COMMENT_DRAFT_KEY_PATTERN,
   COMMENT_DRAFT_TOKEN_PATTERN,
   type CommentDraftOpened
 } from '../../../../../../shared/ipc/preview-comment-schema'
@@ -35,6 +36,8 @@ export type CommentWindowRequest =
       readonly kind: 'new'
       readonly panelId: string
       readonly draftToken: string
+      /** Main's opaque key for the element: the typed text is kept under it for the session. */
+      readonly draftKey: string
       readonly target: DraftTarget
       readonly file: WindowFile
       readonly point: { readonly x: number; readonly y: number }
@@ -49,10 +52,17 @@ export type CommentWindowRequest =
       readonly point: { readonly x: number; readonly y: number }
       readonly opener: WindowOpener
       /**
+       * The generation of the list stored when the window opened: it closes
+       * itself on an empty selection only in a newer list (M2).
+       */
+      readonly listAfter: number
+      /**
        * A pin's draft on its element, when main sent one: the thread view's
        * "New comment" adds a thread there. Absent from a drawer row.
        */
       readonly draftToken?: string
+      /** Main's element key for that draft (with `draftToken`). */
+      readonly draftKey?: string
       /** The pin's file, as main described it (with `draftToken`). */
       readonly file?: WindowFile
       /** The element the pin's draft is on, as main described it (with `draftToken`). */
@@ -60,35 +70,33 @@ export type CommentWindowRequest =
     }
 
 /**
- * The draft token a pin event carries, if a well-formed one is there
- * (docs/designs/html-preview-comments.md §10.4 "[New comment]").
+ * The draft a pin event carries – its token and element key – if well-formed
+ * ones are there (docs/designs/html-preview-comments.md §10.4 "[New comment]").
  *
  * Main's events are not schema-parsed again in the renderer; a malformed
  * token would only be refused at save, after the reader typed a comment, so
  * it is dropped here and "New comment" is simply not offered.
  *
  * @param draft - A pin's draft event.
- * @returns The token, or `undefined`.
+ * @returns The token and key, or `undefined`.
  */
-export function pinDraftToken(draft: PinDraft): string | undefined {
-  const token = draft.draftToken
-  return token !== undefined && COMMENT_DRAFT_TOKEN_PATTERN.test(token) ? token : undefined
+export function pinDraftOf(draft: PinDraft): { readonly draftToken: string; readonly draftKey: string } | undefined {
+  const { draftToken, draftKey } = draft
+  if (draftToken === undefined || !COMMENT_DRAFT_TOKEN_PATTERN.test(draftToken)) return undefined
+  if (draftKey === undefined || !COMMENT_DRAFT_KEY_PATTERN.test(draftKey)) return undefined
+  return { draftToken, draftKey }
 }
 
 /**
  * The session key a typed draft is kept under: one per element per tab.
+ * Main mints the element part (`draftKey`, an opaque digest of the file and
+ * the element's place in it), so two elements never share a draft – two
+ * id-less `div`s on one line included – and the same element picked again
+ * gets its text back.
  *
  * @param request - A new-comment request.
  * @returns A stable key for `commentDrafts`.
  */
 export function draftKeyOf(request: Extract<CommentWindowRequest, { kind: 'new' }>): string {
-  const { target, file, panelId } = request
-  return [
-    panelId,
-    file.fileKey,
-    target.line,
-    target.tag,
-    target.elementId ?? '',
-    target.runtime?.tag ?? ''
-  ].join('|')
+  return ['new', request.panelId, request.draftKey].join('|')
 }

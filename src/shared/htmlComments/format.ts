@@ -351,19 +351,29 @@ export function escapeReadableLine(line: string): string {
 }
 
 /**
- * Throws when `block` could end its comment early or open a new one. It is a
- * last line of defence behind the escaping above, so it should never fire.
+ * Whether `block` is exactly one HTML comment that cannot end early or open a
+ * new one: `<!--`, then text with no `--` that does not start with `>` or `->`
+ * and does not end with `-`, then `-->`.
  */
-export function assertSafeCommentText(block: string): void {
+export function isSafeCommentText(block: string): boolean {
   const inner = block.slice(4, -3)
-  const safe =
+  return (
+    block.length >= 7 &&
     block.startsWith('<!--') &&
     block.endsWith('-->') &&
     !inner.includes('--') &&
     !inner.startsWith('>') &&
     !inner.startsWith('->') &&
     !inner.endsWith('-')
-  if (!safe) throw new Error('htmlComments: serialized block could end its HTML comment early')
+  )
+}
+
+/**
+ * Throws when `block` could end its comment early or open a new one. It is a
+ * last line of defence behind the escaping above, so it should never fire.
+ */
+export function assertSafeCommentText(block: string): void {
+  if (!isSafeCommentText(block)) throw new Error('htmlComments: serialized block could end its HTML comment early')
 }
 
 // ---------------------------------------------------------------------------

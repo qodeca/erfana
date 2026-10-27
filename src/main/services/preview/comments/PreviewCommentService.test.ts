@@ -14,6 +14,7 @@ import { BASE_PAGE, commentedPage } from './__test-helpers__/commentedPages'
 import { commentServiceFixture, SCROLL, type CommentServiceFixture } from './__test-helpers__/commentServiceFixture'
 import { FakeFrame, flush, serveLoad, tokenOfTag } from './__test-helpers__/commentServiceHarness'
 import type { CommentWriteResult } from './CommentWriter'
+import * as listBuilder from './commentListBuilder'
 import { SAVE_TIMEOUT_MS } from './commentSaveFlow'
 import { READ_SCROLL_SCRIPT } from './commentScripts'
 
@@ -46,7 +47,7 @@ describe('PreviewCommentService', () => {
     expect(f.captureFresh).toHaveBeenCalledTimes(1)
     const opened = f.emit.draftOpened.mock.calls[0]
     expect(opened[0]).toBe(1)
-    expect(opened[1]).toMatchObject({ panelId: 'html-preview-index', kind: 'menu', displayPath: 'index.html', frame: false, unsavedSource: false, target: { tag: 'button', elementId: 'cta' } })
+    expect(opened[1]).toMatchObject({ panelId: 'html-preview-index', kind: 'menu', displayPath: 'index.html', frame: false, draftKey: expect.stringMatching(/^[0-9a-f]{32}$/), target: { tag: 'button', elementId: 'cta' } })
     const draftToken = opened[1].draftToken as string
 
     const saved = await f.service.save({ panelId: 'html-preview-index', op: 'add', draftToken, text: TEXT })
@@ -80,6 +81,8 @@ describe('PreviewCommentService', () => {
     const list = await f.service.list()
     if (!list.ok) throw new Error('list')
     expect(list.files).toHaveLength(1)
+    // Nothing was left out, so the answer says nothing about it.
+    expect(list).not.toHaveProperty('unread')
     const [file] = list.files
     expect(file).toMatchObject({ displayPath: 'index.html', frame: false, writable: true })
     expect(file.threads.map(thread => thread.status).sort()).toEqual(['open', 'open', 'resolved'])
@@ -100,6 +103,14 @@ describe('PreviewCommentService', () => {
     expect(f.service.reveal(resolved.threadKey)).toEqual({ ok: false, code: ErrorCode.COMMENT_TARGET_MOVED })
   })
 
+  it('§19 Rev 4 the list answer counts the files the list left out', async () => {
+    f = await commentServiceFixture(commentedPage().text)
+    await f.loadPage()
+    const built = vi.spyOn(listBuilder, 'buildCommentList').mockResolvedValueOnce({ files: [], unread: 2 })
+    expect(await f.service.list()).toEqual({ ok: true, files: [], unread: 2 })
+    built.mockRestore()
+  })
+
   it('§10.4 a pin\'s "New comment": the icon event carries a draft, and a save through it adds a thread on the same element', async () => {
     f = await commentServiceFixture(commentedPage().text)
     await f.loadPage()
@@ -107,7 +118,7 @@ describe('PreviewCommentService', () => {
     const pins = f.top.lastState()!.icons as Array<{ key: string }>
     await f.pick(f.top, { kind: 'icon', via: 'pointer', key: pins[0].key, screen: { x: 30, y: 40 }, view: VIEW })
     const opened = f.emit.draftOpened.mock.calls[0][1]
-    expect(opened).toMatchObject({ kind: 'icon', draftToken: expect.stringMatching(/^[0-9a-f]{32}$/), unsavedSource: false, target: { line: expect.any(Number) } })
+    expect(opened).toMatchObject({ kind: 'icon', draftToken: expect.stringMatching(/^[0-9a-f]{32}$/), draftKey: expect.stringMatching(/^[0-9a-f]{32}$/), target: { line: expect.any(Number) } })
 
     const saved = await f.service.save({ panelId: 'html-preview-index', op: 'add', draftToken: opened.draftToken as string, text: TEXT })
     if (!saved.ok || saved.threadKey === null) throw new Error(`save refused: ${JSON.stringify(saved)}`)
@@ -132,7 +143,7 @@ describe('PreviewCommentService', () => {
   })
 
   /** A save whose write outlasts the time limit: answered SAVE_PENDING, its write still open. */
-  async function pendingSave(): Promise<{ fixture: CommentServiceFixture; finish: (result: CommentWriteResult) => void }> {
+  async function pendingSave(): Promise<{ fixture: CommentServiceFixture; finish: (result: CommentWriteResult) => void; draftToken: string }> {
     let finish: (result: CommentWriteResult) => void = () => {}
     const add = vi.fn(() => new Promise<CommentWriteResult>(resolve => (finish = resolve)))
     const fixture = await commentServiceFixture(BASE_PAGE, { createWriter: () => ({ add, changeThread: vi.fn(), deleteDamagedBlock: vi.fn() }) })
@@ -151,24 +162,40 @@ describe('PreviewCommentService', () => {
       vi.useRealTimers()
     }
     fixture.emit.commentsChanged.mockClear()
-    return { fixture, finish }
+    return { fixture, finish, draftToken }
   }
 
   const LATE = (pagePath: string) => ({ ok: true, realPath: pagePath, fileHash: 'h-late', threadId: 'c-late' }) as unknown as CommentWriteResult
 
-  it('L3 a late landing re-sends the tab\'s counts even unchanged, so the window re-lists', async () => {
-    const { fixture, finish } = await pendingSave()
+  it('L3 H1 a late landing re-sends the tab\'s counts even unchanged, so the window re-lists, and says it landed', async () => {
+    const { fixture, finish, draftToken } = await pendingSave()
     finish(LATE(fixture.pagePath))
     await flush()
     expect(fixture.emit.commentsChanged).toHaveBeenCalledTimes(1)
+    expect(fixture.emit.saveSettled).toHaveBeenCalledExactlyOnceWith(1, { panelId: 'html-preview-index', op: 'add', draftToken, ok: true })
   })
 
-  it('L3 a late landing after the view is gone tells nothing', async () => {
-    const { fixture, finish } = await pendingSave()
+  it('H1 a late refusal tells the owning window its code, and re-sends no counts', async () => {
+    const { fixture, finish, draftToken } = await pendingSave()
+    finish({ ok: false, code: ErrorCode.COMMENT_TARGET_MOVED, reason: 'target-moved' } as unknown as CommentWriteResult)
+    await flush()
+    expect(fixture.emit.commentsChanged).not.toHaveBeenCalled()
+    expect(fixture.emit.saveSettled).toHaveBeenCalledExactlyOnceWith(1, {
+      panelId: 'html-preview-index',
+      op: 'add',
+      draftToken,
+      ok: false,
+      code: ErrorCode.COMMENT_TARGET_MOVED
+    })
+  })
+
+  it('L3 H1 a late landing after the view is gone re-sends no counts, but still says how the save ended', async () => {
+    const { fixture, finish, draftToken } = await pendingSave()
     fixture.service.dispose()
     finish(LATE(fixture.pagePath))
     await flush()
     expect(fixture.emit.commentsChanged).not.toHaveBeenCalled()
+    expect(fixture.emit.saveSettled).toHaveBeenCalledExactlyOnceWith(1, { panelId: 'html-preview-index', op: 'add', draftToken, ok: true })
   })
 
   it('the shortcut and the page\'s Esc change the mode and tell the renderer why; the flag off refuses it', async () => {
@@ -190,13 +217,14 @@ describe('PreviewCommentService', () => {
     expect(await f.service.list()).toMatchObject({ ok: true, unavailable: 'disabled' })
   })
 
-  it('E-022 the page\'s keyboard picker is said through the window\'s live region, and the mode stays as it is', async () => {
+  it('E-022 S-L-A the page\'s keyboard picker is said through the window\'s live region in main\'s words, and the mode stays as it is', async () => {
     f = await commentServiceFixture(BASE_PAGE)
-    await f.loadPage()
+    const load = await f.loadPage()
     f.service.toggleMode()
     f.emit.modeChanged.mockClear()
-    await f.pick(f.top, { kind: 'step', via: 'keyboard', say: 'showing', label: 'button#buy', view: VIEW })
-    expect(f.emit.modeChanged).toHaveBeenLastCalledWith(1, { panelId: 'html-preview-index', on: true, reason: 'picker', say: 'showing', label: 'button#buy' })
+    await f.pick(f.top, { kind: 'step', via: 'keyboard', say: 'showing', token: tokenOfTag(load.doc, 'button'), view: VIEW })
+    // BASE_PAGE's `<button id="cta" class="btn">` is on line 8: its tag and line, not its id or class.
+    expect(f.emit.modeChanged).toHaveBeenLastCalledWith(1, { panelId: 'html-preview-index', on: true, reason: 'picker', say: 'showing', element: { tag: 'button', line: 8 } })
     await f.pick(f.top, { kind: 'step', via: 'keyboard', say: 'top', view: VIEW })
     expect(f.emit.modeChanged).toHaveBeenLastCalledWith(1, { panelId: 'html-preview-index', on: true, reason: 'picker', say: 'top' })
     expect(f.service.isModeOn()).toBe(true)
@@ -372,9 +400,13 @@ describe('PreviewCommentService', () => {
     const load = await f.loadPage()
     await f.service.setMode(true, true)
     vi.mocked(logger.error).mockClear()
-    vi.spyOn(f.unsaved, 'has').mockImplementationOnce(async () => Promise.reject(new RangeError(f!.pagePath)))
+    f.emit.draftOpened.mockImplementationOnce(() => {
+      throw new RangeError(f!.pagePath)
+    })
     await f.pick(f.top, menuOn(tokenOfTag(load.doc, 'button'), 'button'))
-    vi.spyOn(f.unsaved, 'has').mockImplementationOnce(async () => Promise.reject('no error object'))
+    f.emit.draftOpened.mockImplementationOnce(() => {
+      throw 'no error object'
+    })
     await f.pick(f.top, menuOn(tokenOfTag(load.doc, 'button'), 'button'))
     const logged = vi.mocked(logger.error).mock.calls
     expect(logged.map(call => call[0])).toEqual(['Preview comments: a page signal failed', 'Preview comments: a page signal failed'])

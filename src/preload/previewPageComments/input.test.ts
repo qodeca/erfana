@@ -263,7 +263,7 @@ describe('keys', () => {
       GUARDED_EVENTS.length + TOUCH_EVENTS.length + TOGGLE_EVENTS.length +
       3 /* user input */ + 4 /* keydown, keyup, pointermove, DOMContentLoaded */
     expect(removed).toHaveBeenCalledTimes(onWindow)
-    expect(removedDoc.mock.calls.map(([type]) => type)).toEqual(['pointerout'])
+    expect(removedDoc.mock.calls.map(([type]) => type)).toEqual(['pointerout', 'visibilitychange'])
     removed.mockRestore()
     removedDoc.mockRestore()
     h = createHarness()
@@ -429,7 +429,7 @@ describe('document.open (M1)', () => {
       const expected = [...GUARDED_EVENTS, ...TOUCH_EVENTS, ...TOGGLE_EVENTS, 'keydown', 'keyup', 'pointermove', 'DOMContentLoaded', 'scroll']
       for (const type of expected) expect(types, type).toContain(type)
       expect(added.mock.calls.every(([, , options]) => (options as AddEventListenerOptions).capture === true)).toBe(true)
-      expect(addedDoc.mock.calls.map(([type]) => type)).toEqual(['pointerout'])
+      expect(addedDoc.mock.calls.map(([type]) => type)).toEqual(['pointerout', 'visibilitychange'])
       expect(document.adoptedStyleSheets).toEqual([cursor])
       expect(h.sent(COMMENT_ANCHORS_CHANNEL).at(-1)).toEqual({ visible: [], hidden: [], overlay: 'unavailable', reason: 'document-replaced' })
       // The overlay came back on the new root, and comment mode still picks.

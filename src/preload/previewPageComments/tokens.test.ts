@@ -98,7 +98,7 @@ describe('TokenRegistry – capture and strip', () => {
     // Only the capped registry watches: the shared one would strip first.
     registry.stop()
     const capped = new TokenRegistry(document, true)
-    // Reach the cap without building 100,000 nodes: fill the private map.
+    // Reach the cap without building that many nodes: fill the private map.
     const internals = capped as unknown as { byToken: Map<string, WeakRef<Element>> }
     for (let i = 0; i < MAX_TOKENS_PER_DOCUMENT; i += 1) internals.byToken.set(`k${i}`, new WeakRef(document.body))
     capped.start()

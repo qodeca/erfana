@@ -658,7 +658,7 @@ describe('limits', () => {
     expect(CommentDataSchema.safeParse(twice).success).toBe(false)
   })
 
-  it('keeps the file-size limit equal to the preview entry limit', () => {
-    expect(PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES).toBe(PREVIEW.MAX_ENTRY_HTML_BYTES)
+  it('keeps the file-size limit equal to the largest file the preview serves (§19 Rev 4)', () => {
+    expect(PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES).toBe(PREVIEW.MAX_ASSET_BYTES)
   })
 })

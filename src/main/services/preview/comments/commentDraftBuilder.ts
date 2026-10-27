@@ -15,15 +15,18 @@
  *
  * Main reads the bytes; the parse and everything worked out from it – the
  * placement, the anchor, the excerpt – run in the comment parse worker as the
- * `draft` job (`commentDraftCore.ts`, §19 R3-12). The draft that results,
- * paths included, stays on main.
+ * `draft` job (`commentDraftCore.ts`, §19 R3-12), or, for a pin click, as the
+ * `pin` job that also finds the blocks on the pin's element in the same parse.
+ * The draft that results, paths included, stays on main; the renderer gets
+ * only its token and an opaque element key ({@link draftKeyOf}).
  */
+import { createHash } from 'node:crypto'
 import { ErrorCode } from '../../../../shared/errors'
 import type { CommentAnchor, CommentView } from '../../../../shared/htmlComments'
 import type { CommentPick } from '../../../../shared/ipc/preview-comment-schema'
 import { stablePathDigest } from '../../../../shared/stablePathDigest'
 import { logger } from '../../LoggingService'
-import type { DraftPickPart, DraftTargetView } from './commentDraftCore'
+import type { DraftJobResult, DraftPickPart, DraftTargetView, PinBlock } from './commentDraftCore'
 import { loadCommentBytes } from './commentFileAccess'
 import type { CommentFileJobRunner } from './commentFileJobs'
 import { jobFailureRefusal, refusalCode } from './commentRefusals'
@@ -79,22 +82,95 @@ function pickPartOf(pick: CommentPick): DraftPickPart {
   }
 }
 
+/**
+ * The element key a draft's typed text is kept under in the renderer (the
+ * session drafts, §10.4 "Draft restored"): an opaque digest of the file and
+ * the element's place in it – the in-file element's CSS path (its offset when
+ * the path was too long to store), and the JS-built element below it. Two
+ * elements never share one, two id-less `div`s on one line included; the same
+ * element picked again gets the same one while its place in the file holds –
+ * also after an edit elsewhere in the file, so "pick it again – your text will
+ * be restored" (§10.10) keeps its word. Never a path: a SHA-256, cut to 128 bits.
+ *
+ * @example
+ * ```ts
+ * draftKeyOf(draft) // '3f1c…' – 32 hex characters
+ * ```
+ */
+export function draftKeyOf(draft: Pick<CommentDraft, 'realPath' | 'offset' | 'anchor'>): string {
+  const { anchor } = draft
+  const place = anchor.path === '' ? `offset:${draft.offset}` : `path:${anchor.path}`
+  const identity = JSON.stringify([draft.realPath, place, anchor.runtime?.path ?? null, anchor.runtime?.tag ?? null])
+  return createHash('sha256').update(identity).digest('hex').slice(0, 32)
+}
+
+/** The file's bytes, read again and confined, or why a draft cannot be built from them. */
+async function loadFor(input: Pick<DraftInput, 'realRoot' | 'file' | 'platform'>) {
+  const loaded = await loadCommentBytes({ realRoot: input.realRoot, filePath: input.file.realPath }, { platform: input.platform })
+  if (!loaded.ok) return { ok: false, refused: { ok: false, code: refusalCode(loaded.reason) } } as const
+  if (samePathKey(loaded.realPath, input.platform) !== samePathKey(input.file.realPath, input.platform)) {
+    return { ok: false, refused: MOVED } as const
+  }
+  return { ok: true, bytes: loaded.bytes } as const
+}
+
+/** A failed job, logged by its failure and the file's digest. */
+function jobFailed(failure: Parameters<typeof jobFailureRefusal>[0], realPath: string): BuiltDraft {
+  logger.warn('Preview comments: a draft could not be prepared', { failure, file: stablePathDigest(realPath) })
+  return { ok: false, code: refusalCode(jobFailureRefusal(failure).reason) }
+}
+
+/** The worker's entry for a token: where it was served, as what, in which bytes. */
+function entryOf(entry: ElementTokenEntry) {
+  return { startOffset: entry.startOffset, tagName: entry.tagName, fileHash: entry.fileHash }
+}
+
 /** Read the file again and build the draft for a pick's token. Never throws. */
 export async function buildDraft(input: DraftInput): Promise<BuiltDraft> {
-  const { entry, pick, file } = input
-  const loaded = await loadCommentBytes({ realRoot: input.realRoot, filePath: file.realPath }, { platform: input.platform })
-  if (!loaded.ok) return { ok: false, code: refusalCode(loaded.reason) }
-  if (samePathKey(loaded.realPath, input.platform) !== samePathKey(file.realPath, input.platform)) return MOVED
-  const built = await input.jobs.runJob(loaded.bytes, {
-    kind: 'draft',
-    entry: { startOffset: entry.startOffset, tagName: entry.tagName, fileHash: entry.fileHash },
-    pick: pickPartOf(pick)
+  const loaded = await loadFor(input)
+  if (!loaded.ok) return loaded.refused
+  const built = await input.jobs.runJob(loaded.bytes, { kind: 'draft', entry: entryOf(input.entry), pick: pickPartOf(input.pick) })
+  if (built.kind === 'failed') return jobFailed(built.failure, input.file.realPath)
+  return draftFrom(input, input.pick, built)
+}
+
+/** What a pin click is built from: a draft's input, the pick only when "New comment" can be offered. */
+export interface PinInput extends Omit<DraftInput, 'pick'> {
+  /** The pick "New comment" is built from; absent: no draft. */
+  readonly pick?: CommentPick
+  /** Look for the damaged and newer blocks standing on the element. */
+  readonly blocks: boolean
+}
+
+/** A pin click's draft and blocks. */
+export interface BuiltPin {
+  readonly draft: BuiltDraft
+  readonly blocks: readonly PinBlock[]
+}
+
+/**
+ * Read the file once and, in ONE worker job, find the blocks standing on the
+ * pin's element and build the draft for its "New comment" (M4). Never throws.
+ */
+export async function buildPin(input: PinInput): Promise<BuiltPin> {
+  if (input.pick === undefined && !input.blocks) return { draft: { ok: false }, blocks: [] }
+  const loaded = await loadFor(input)
+  if (!loaded.ok) return { draft: loaded.refused, blocks: [] }
+  const found = await input.jobs.runJob(loaded.bytes, {
+    kind: 'pin',
+    entry: entryOf(input.entry),
+    blocks: input.blocks,
+    ...(input.pick === undefined ? {} : { pick: pickPartOf(input.pick) })
   })
-  if (built.kind === 'failed') {
-    logger.warn('Preview comments: a draft could not be prepared', { failure: built.failure, file: stablePathDigest(file.realPath) })
-    return { ok: false, code: refusalCode(jobFailureRefusal(built.failure).reason) }
-  }
+  if (found.kind === 'failed') return { draft: jobFailed(found.failure, input.file.realPath), blocks: [] }
+  const draft = input.pick === undefined || found.draft === undefined ? { ok: false as const } : draftFrom(input, input.pick, found.draft)
+  return { draft, blocks: found.blocks }
+}
+
+/** The draft from the worker's half of it. */
+function draftFrom(input: Omit<DraftInput, 'pick' | 'jobs'>, pick: CommentPick, built: DraftJobResult): BuiltDraft {
   if (!built.ok) return built.refusal === undefined ? { ok: false } : { ok: false, code: refusalCode(built.refusal) }
+  const { file } = input
   const draft: CommentDraft = {
     realRoot: input.realRoot,
     realPath: file.realPath,

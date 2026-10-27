@@ -112,10 +112,25 @@ describe('runCommentFileJob', () => {
 
   it('a pin on a file that changed since it was served, or cannot be read, has no blocks', () => {
     const cache = new CommentDocCache()
-    const entry = { startOffset: PAGE.indexOf('<button'), fileHash: 'not-this-file' }
-    expect(runCommentFileJob(BYTES, { kind: 'pin-blocks', entry }, { cache })).toEqual({ kind: 'pin-blocks', blocks: [] })
+    const entry = { startOffset: PAGE.indexOf('<button'), tagName: 'button', fileHash: 'not-this-file' }
+    expect(runCommentFileJob(BYTES, { kind: 'pin', entry, blocks: true }, { cache })).toEqual({ kind: 'pin', blocks: [] })
     const unreadable = Uint8Array.from([0xff, 0xfe])
-    expect(runCommentFileJob(unreadable, { kind: 'pin-blocks', entry: { ...entry, fileHash: sha256HexOf(unreadable) } }, { cache })).toEqual({ kind: 'pin-blocks', blocks: [] })
+    expect(runCommentFileJob(unreadable, { kind: 'pin', entry: { ...entry, fileHash: sha256HexOf(unreadable) }, blocks: true }, { cache })).toEqual({ kind: 'pin', blocks: [] })
+  })
+
+  it('M4 a pin job answers the blocks on the element and its draft from one parse', () => {
+    const damaged = PAGE.replace('    <button', '    <!-- erfana:comment v1 c-damaged {not json -->\n    <button')
+    const bytes = encodeText(damaged)
+    const entry = { startOffset: damaged.indexOf('<button'), tagName: 'button', fileHash: sha256HexOf(bytes) }
+    const cache = new CommentDocCache()
+    const both = runCommentFileJob(bytes, { kind: 'pin', entry, blocks: true, pick: {} }, { cache })
+    if (both.kind !== 'pin') throw new Error('expected a pin answer')
+    expect(both.draft).toMatchObject({ kind: 'draft', ok: true, offset: entry.startOffset, fileHash: entry.fileHash })
+    expect(both.blocks).toHaveLength(1)
+    expect(both.blocks[0].start).toBe(damaged.indexOf('<!-- erfana:comment'))
+    // Without a pick there is no draft; without blocks asked, none are looked for.
+    expect(runCommentFileJob(bytes, { kind: 'pin', entry, blocks: true }, { cache })).toEqual({ kind: 'pin', blocks: both.blocks })
+    expect(runCommentFileJob(bytes, { kind: 'pin', entry, blocks: false, pick: {} }, { cache })).toMatchObject({ kind: 'pin', blocks: [], draft: { ok: true } })
   })
 
   it('a write on a file that cannot be read for comments is refused with the parse reason', () => {

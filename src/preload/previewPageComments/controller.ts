@@ -36,8 +36,9 @@ import { labelOf, labelText, type LabelSuffix } from './label'
 import { OverlayHost } from './overlayHost'
 import { overlayCss } from './overlayStyles'
 import { OverlayView, type OutlineModel } from './overlayView'
+import { PickHold } from './pickHold'
 import { firstChildOf, parentOf, pickableExcept, stepOf, type PickablePredicate } from './picker'
-import { describeTarget, elementPoint, PickLimiter, screenOf, StepSender, viewOf, type PickKind, type PickPayload } from './picks'
+import { describeTarget, elementPoint, PickLimiter, screenOf, StepSender, stepElementOf, viewOf, type PickKind, type PickPayload } from './picks'
 import { placePins, type PinPlacement } from './pins'
 import { CursorSheet, PageWatch, RenderScheduler, ScrollRestore } from './scheduling'
 import { IDLE_STATE, parseCommentState, pxOf, type CommentState } from './state'
@@ -81,6 +82,8 @@ export class CommentController {
   private frameMap: FrameMap = EMPTY_FRAME_MAP
   private current: Element | null = null
   private levelHold = false
+  /** Keeps the picked element while main's menu or window hides the page. */
+  private readonly pickHold = new PickHold(() => this.deps.doc.visibilityState === 'hidden')
   private downPath: Element[] = []
   private selected: Element | null = null
   private pointer: Point | null = null
@@ -187,6 +190,7 @@ export class CommentController {
   /** A trusted pointer move. */
   pointerAt(point: Point): void {
     this.pointer = point
+    this.pickHold.pointerMoved()
     if (this.state.mode) {
       const raw = this.hitElement(point)
       if (raw !== null && !(this.levelHold && this.current?.contains(raw) === true)) {
@@ -196,11 +200,16 @@ export class CommentController {
     this.scheduler.soon()
   }
 
-  /** The pointer left the frame (or entered a child frame). */
+  /** The pointer left the frame (or entered a child frame) – or the view hid under it ({@link PickHold}). */
   pointerLeft(): void {
     this.pointer = null
-    if (!this.levelHold) this.current = null
+    if (!this.pickHold.pointerLeft() && !this.levelHold) this.current = null
     this.scheduler.soon()
+  }
+
+  /** A trusted `visibilitychange`: the view hidden behind a still frame, or shown again. */
+  visibilityChanged(): void {
+    this.pickHold.visibilityChanged()
   }
 
   /** Any trusted wheel, key or press: the user takes over the scroll. */
@@ -303,6 +312,7 @@ export class CommentController {
   private select(element: Element | null, hold: boolean): void {
     this.current = element
     this.levelHold = hold
+    this.pickHold.release()
     this.downPath = []
     this.selected = null
   }
@@ -313,8 +323,7 @@ export class CommentController {
     this.downPath = path
     element.scrollIntoView({ block: 'nearest', inline: 'nearest' })
     this.renderNow()
-    const label = labelText(labelOf(element, boxOf(element), this.suffixOf(element), this.commentsOn(element)))
-    this.steps.say('showing', label, viewOf(this.deps.win))
+    this.steps.say('showing', stepElementOf(this.tokens, element), viewOf(this.deps.win))
   }
 
   private stepUp(current: Element): void {
@@ -374,7 +383,10 @@ export class CommentController {
   private sendPick(payload: PickPayload): void {
     const { kind } = payload
     const limiter = kind === 'exit' || kind === 'parent' ? this.limiters[kind] : this.limiters.pick
-    if (limiter.tryTake()) this.deps.send(COMMENT_PICK_CHANNEL, payload)
+    if (!limiter.tryTake()) return
+    this.deps.send(COMMENT_PICK_CHANNEL, payload)
+    // A menu, open or icon pick: main's menu or window hides the page, and the picker holds its element meanwhile.
+    if (limiter === this.limiters.pick && this.state.mode) this.pickHold.picked()
   }
 
   private modeChanged(on: boolean): void {

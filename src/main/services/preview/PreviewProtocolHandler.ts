@@ -279,6 +279,26 @@ async function handleRequest(
   }
 }
 
+/**
+ * Steps 6–9 again, for a document whose bytes were lent to the comment parse
+ * worker and lost with it (a timeout or a crash – `bodyFor` answers
+ * `undefined`): the same confined read under the same limiter, served raw.
+ * `undefined` when the file cannot be read now.
+ */
+async function rereadRaw(
+  realRoot: string,
+  segments: readonly string[],
+  limiter: ConcurrencyLimiter
+): Promise<Buffer | undefined> {
+  if (!(await limiter.acquire())) return undefined
+  try {
+    const again = await resolveConfined(realRoot, segments)
+    return again.ok ? again.body : undefined
+  } finally {
+    limiter.release()
+  }
+}
+
 /** The request→response algorithm of design §2.4. */
 async function handleRequestInner(
   request: GlobalRequest,
@@ -388,7 +408,8 @@ async function handleRequestInner(
 
   // Step 12: serve the confined bytes with the header set built above – or,
   // for a page that comments are expected for, its instrumented copy (the
-  // comment context never throws; any failure there serves the raw bytes). A
+  // comment context never throws; any failure there serves the raw bytes,
+  // read again when the parse worker they were lent to lost them). A
   // Node `Buffer` is a valid `BodyInit` at runtime (undici accepts a
   // `Uint8Array`), but its `Buffer<ArrayBufferLike>` static type does not
   // satisfy the DOM lib's `BufferSource<ArrayBuffer>` union member, so the
@@ -396,14 +417,15 @@ async function handleRequestInner(
   const body =
     ctx.comments === undefined
       ? resolved.body
-      : await ctx.comments.bodyFor({
+      : ((await ctx.comments.bodyFor({
           body: resolved.body,
           ext: resolved.ext,
           realPath: resolved.realPath,
           method: request.method,
           noteType,
           requestClass
-        })
+        })) ?? (await rereadRaw(entry.realRoot, segments, limiter)))
+  if (body === undefined) return errorResponse(503)
   return new Response(body as unknown as BodyInit, { status: 200, headers })
 }
 

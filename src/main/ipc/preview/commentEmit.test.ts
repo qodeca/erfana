@@ -6,6 +6,7 @@
  * SEC-20).
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { ErrorCode } from '../../../shared/errors'
 import { PreviewCommentEvents } from '../../../shared/ipc/preview-comment-channels'
 import { logger } from '../../services/LoggingService'
 import { createPreviewCommentEmitters, issueCodesOf } from './commentEmit'
@@ -38,6 +39,7 @@ describe('createPreviewCommentEmitters', () => {
     emit.commentsChanged(1, { panelId: PANEL, counts: { open: 1, resolved: 0, attention: 0 } })
     emit.anchorStatus(1, { panelId: PANEL, notVisible: [] })
     emit.modeChanged(1, { panelId: PANEL, on: true, reason: 'shortcut' })
+    emit.saveSettled(1, { panelId: PANEL, op: 'reply', threadKey: 't1', ok: false, code: ErrorCode.COMMENT_BLOCK_CHANGED })
     emit.draftOpened(1, {
       panelId: PANEL,
       kind: 'icon',
@@ -54,6 +56,7 @@ describe('createPreviewCommentEmitters', () => {
       PreviewCommentEvents.COMMENTS_CHANGED,
       PreviewCommentEvents.ANCHOR_STATUS,
       PreviewCommentEvents.MODE_CHANGED,
+      PreviewCommentEvents.SAVE_SETTLED,
       PreviewCommentEvents.DRAFT_OPENED
     ])
     for (const silent of [other, anonymous, gone]) expect(silent.send).not.toHaveBeenCalled()
@@ -67,6 +70,15 @@ describe('createPreviewCommentEmitters', () => {
     const logged = JSON.stringify(vi.mocked(logger.warn).mock.calls)
     expect(logged).toContain('invalid_value')
     expect(logged).not.toContain('secret reason text')
+  })
+
+  it('H1 a settle that names no key, or a key of another op, or stays pending is not sent', () => {
+    const own = target(1)
+    const emit = createPreviewCommentEmitters({ resolveTargets: () => [own.value] })
+    emit.saveSettled(1, { panelId: PANEL, op: 'reply', ok: true })
+    emit.saveSettled(1, { panelId: PANEL, op: 'add', threadKey: 't1', ok: true })
+    emit.saveSettled(1, { panelId: PANEL, op: 'reply', threadKey: 't1', ok: false, code: ErrorCode.COMMENT_SAVE_PENDING })
+    expect(own.send).not.toHaveBeenCalled()
   })
 
   it('a target that throws on send does not stop the rest', () => {

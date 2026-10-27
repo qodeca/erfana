@@ -59,6 +59,8 @@ export default defineConfig({
         'src/preload/previewPageComments/overlayHost.ts': { lines: 99, functions: 99, branches: 99, statements: 99 },
         'src/preload/previewPageComments/overlayStyles.ts': { lines: 99, functions: 99, branches: 99, statements: 99 },
         'src/preload/previewPageComments/overlayView.ts': { lines: 99, functions: 99, branches: 99, statements: 99 },
+        // Added with the module (the macOS leave-on-hide fix), measured at 100 on every axis.
+        'src/preload/previewPageComments/pickHold.ts': { lines: 99, functions: 99, branches: 99, statements: 99 },
         'src/preload/previewPageComments/picker.ts': { lines: 99, functions: 99, branches: 99, statements: 99 },
         'src/preload/previewPageComments/picks.ts': { lines: 99, functions: 99, branches: 99, statements: 99 },
         'src/preload/previewPageComments/pins.ts': { lines: 99, functions: 99, branches: 99, statements: 99 },

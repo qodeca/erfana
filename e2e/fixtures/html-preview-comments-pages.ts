@@ -35,13 +35,19 @@ export function manyCommentsPage(count: number, title = '-HPC-MANY-'): string {
 }
 
 /**
- * A page of about `bytes` UTF-8 bytes: paragraphs of ordinary text (about 130
- * bytes an element, well under the 100,000-token cap at 4 MB) and one comment
- * block, so the preview instruments it on every load. Without the block
- * (`withBlock: false`) the same page is served raw – the control.
+ * A page of about `bytes` UTF-8 bytes: paragraphs of ordinary text (about 110
+ * bytes an element – about 240,000 elements at 25 MB, under the 640,000-token
+ * cap) and one comment block on the `<h1>`, so the preview instruments it on
+ * every load. Without the block (`withBlock: false`) the same page is served
+ * raw – the control.
+ *
+ * The block is planned on the page cut after its first row: the `<h1>`'s
+ * anchor (its quote's suffix reaches into that row) and its place depend on
+ * nothing further, so the bytes are the ones a plan on the whole page gives,
+ * without parsing 25 MB in the runner.
  */
 export function sizedPage(bytes: number, title: string, withBlock = true): string {
-  const head = [
+  const plainHead = [
     '<!doctype html>',
     '<html lang="en">',
     `<head><meta charset="utf-8"><title>${title}</title></head>`,
@@ -51,13 +57,19 @@ export function sizedPage(bytes: number, title: string, withBlock = true): strin
   ].join('\n')
   const tail = '</body>\n</html>\n'
   const rows: string[] = []
-  let size = Buffer.byteLength(head) + Buffer.byteLength(tail)
+  let size = Buffer.byteLength(plainHead) + Buffer.byteLength(tail)
   for (let i = 0; size < bytes; i += 1) {
     const row = `  <p id="r${i}">Row ${i}: a paragraph of ordinary review text, long enough to look like a real page.</p>\n`
     rows.push(row)
     size += Buffer.byteLength(row)
   }
-  const page = head + rows.join('') + tail
-  if (!withBlock) return page
+  if (!withBlock) return plainHead + rows.join('') + tail
+  const cutTail = (rows[0] ?? '') + tail
+  const head = withTitleBlock(plainHead + cutTail).slice(0, -cutTail.length)
+  return head + rows.join('') + tail
+}
+
+/** `page` with one open block on its `<h1>`, the way Erfana writes one. */
+function withTitleBlock(page: string): string {
   return addTo(page, 'h1', commentOn(page, 'h1', 0, { id: fixedId('c-', 7) }), { ws: 'collapse' }).text
 }

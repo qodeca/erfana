@@ -12,38 +12,45 @@ import { encodeText } from '../../../../shared/htmlComments'
 import { fixedId } from '../../../../shared/htmlComments/__fixtures__/commentTestData'
 import { buttonBlock } from './__test-helpers__/commentParseBench'
 import { PAGE as WRITER_PAGE, draftFor, byId } from './__test-helpers__/commentWriterHarness'
-import { CommentDocCache } from './commentJobDocs'
+import { CommentDocCache, sha256HexOf } from './commentJobDocs'
 import * as core from './commentParseCore'
 import {
   COMMENT_PARSE_WORKER_ROLE,
+  MAX_POISONED_HASHES,
+  isParseBegin,
   isParseReply,
   isParseRequest,
+  type CommentParseBegin,
   type CommentParseReply
 } from './commentParseProtocol'
 import {
   answerParseRequest,
   isCommentParseWorker,
   jobTransferablesOf,
+  rawTransferablesOf,
   startCommentParseWorker,
   type CommentParsePort
 } from './commentParseWorker'
 
 const PAGE = encodeText('<!doctype html><p id="a">x</p><!-- erfana:comment v2 id=c-x\n-->')
 
-/** A port that records every reply. */
+/** A port that records every reply, and apart from them every `begin` (S-M). */
 function makePort(): CommentParsePort & {
   replies: Array<{ message: CommentParseReply; transfer?: ArrayBuffer[] }>
+  begins: CommentParseBegin[]
   listener?: (message: unknown) => void
 } {
   const port = {
     replies: [] as Array<{ message: CommentParseReply; transfer?: ArrayBuffer[] }>,
+    begins: [] as CommentParseBegin[],
     listener: undefined as ((message: unknown) => void) | undefined,
     on(_event: 'message', listener: (message: unknown) => void) {
       port.listener = listener
       return port
     },
-    postMessage(message: CommentParseReply, transfer?: ArrayBuffer[]) {
-      port.replies.push({ message, transfer })
+    postMessage(message: CommentParseReply | CommentParseBegin, transfer?: ArrayBuffer[]) {
+      if (message.type === 'begin') port.begins.push(message)
+      else port.replies.push({ message, transfer })
     }
   }
   return port
@@ -64,25 +71,35 @@ describe('commentParseWorker', () => {
     expect(isParseReply(message)).toBe(true)
     const outcome = (message as Extract<CommentParseReply, { type: 'result' }>).outcome
     if (outcome.kind !== 'ok') throw new Error('expected ok')
-    expect(transfer).toEqual([outcome.html.buffer, outcome.offsets.buffer, outcome.tagCodes.buffer])
+    // §19 Rev 4: the request's own bytes go back too – main may have lent them.
+    expect(message.raw).toBe(PAGE)
+    expect(transfer).toEqual([outcome.html.buffer, outcome.offsets.buffer, outcome.lines.buffer, outcome.tagCodes.buffer, PAGE.buffer])
   })
 
-  it('transfers nothing with a refusal', () => {
+  it('transfers only the bytes it was sent back with a refusal', () => {
     const port = makePort()
-    answerParseRequest(port, { type: 'instrument', id: 1, bytes: Uint8Array.from([0xff, 0xfe]) })
+    const bytes = Uint8Array.from([0xff, 0xfe])
+    answerParseRequest(port, { type: 'instrument', id: 1, bytes })
     expect(port.replies[0]).toEqual({
-      message: { type: 'result', id: 1, outcome: { kind: 'unavailable', reason: 'encoding' } },
-      transfer: []
+      message: { type: 'result', id: 1, outcome: { kind: 'unavailable', reason: 'encoding' }, raw: bytes },
+      transfer: [bytes.buffer]
     })
   })
 
-  it('answers a throw with error and no text', () => {
+  it('answers a throw with error and no text – and the bytes it was sent', () => {
     vi.spyOn(core, 'instrumentDocument').mockImplementation(() => {
       throw new Error('secret page text')
     })
     const port = makePort()
     answerParseRequest(port, { type: 'instrument', id: 3, bytes: PAGE })
-    expect(port.replies).toEqual([{ message: { type: 'error', id: 3 }, transfer: undefined }])
+    expect(port.replies).toEqual([{ message: { type: 'error', id: 3, raw: PAGE }, transfer: [PAGE.buffer] }])
+  })
+
+  it('§19 Rev 4 moves the bytes back when they own their buffer, and copies a view into a larger one', () => {
+    const own = new Uint8Array(8)
+    expect(rawTransferablesOf(own)).toEqual([own.buffer])
+    expect(rawTransferablesOf(own.subarray(2, 6))).toEqual([])
+    expect(rawTransferablesOf(own.subarray(0, 4))).toEqual([])
   })
 
   it('ignores anything that is not a well-formed request', () => {
@@ -113,7 +130,8 @@ describe('commentParseWorker', () => {
       { type: 'job', id: 5, result: { kind: 'list', ok: true } }
     ])
     expect(port.replies.every(reply => isParseReply(reply.message))).toBe(true)
-    expect(port.replies[0].transfer).toEqual([])
+    expect(port.replies[0].transfer).toEqual([page.buffer])
+    expect(port.replies[0].message.raw).toBe(page)
     expect(cache.size).toBe(1)
   })
 
@@ -129,7 +147,7 @@ describe('commentParseWorker', () => {
 
     const { message, transfer } = port.replies[0]
     if (message.type !== 'job' || message.result.kind !== 'write' || !message.result.ok) throw new Error('expected a write')
-    expect(transfer).toEqual([message.result.insert.buffer])
+    expect(transfer).toEqual([message.result.insert.buffer, bytes.buffer])
 
     // Block bytes that are a view into a larger buffer stay put; the message copies them.
     const shared = new Uint8Array(16)
@@ -142,6 +160,40 @@ describe('commentParseWorker', () => {
     startCommentParseWorker(port)
     port.listener!({ type: 'instrument', id: 2, bytes: PAGE })
     expect(port.replies[0].message).toMatchObject({ type: 'result', id: 2 })
+  })
+
+  it('S-M names the content before any work, and answers "poisoned" for a content that stopped a worker – without parsing it', () => {
+    const port = makePort()
+    const instrument = vi.spyOn(core, 'instrumentDocument')
+    const hash = sha256HexOf(PAGE)
+    answerParseRequest(port, { type: 'instrument', id: 3, bytes: PAGE })
+    expect(port.begins).toEqual([{ type: 'begin', id: 3, hash }])
+    expect(isParseBegin(port.begins[0])).toBe(true)
+    expect(instrument).toHaveBeenCalledTimes(1)
+
+    const again = new Uint8Array(PAGE)
+    answerParseRequest(port, { type: 'instrument', id: 4, bytes: again, poisoned: ['0'.repeat(64), hash] })
+    expect(port.begins.at(-1)).toEqual({ type: 'begin', id: 4, hash })
+    expect(port.replies.at(-1)).toEqual({ message: { type: 'poisoned', id: 4, raw: again }, transfer: [again.buffer] })
+    expect(isParseReply(port.replies.at(-1)!.message)).toBe(true)
+    expect(instrument).toHaveBeenCalledTimes(1)
+    // A job of the same bytes is not parsed either.
+    answerParseRequest(port, { type: 'job', id: 5, bytes: new Uint8Array(PAGE), job: { kind: 'list' }, poisoned: [hash] }, new CommentDocCache())
+    expect(port.replies.at(-1)!.message).toMatchObject({ type: 'poisoned', id: 5 })
+  })
+
+  it('S-M a poison list is a short list of content hashes, and a begin names one', () => {
+    const request = { type: 'instrument', id: 1, bytes: PAGE }
+    expect(isParseRequest({ ...request, poisoned: [] })).toBe(true)
+    expect(isParseRequest({ ...request, poisoned: ['a'.repeat(64)] })).toBe(true)
+    expect(isParseRequest({ ...request, poisoned: 'a'.repeat(64) })).toBe(false)
+    expect(isParseRequest({ ...request, poisoned: ['A'.repeat(64)] })).toBe(false)
+    expect(isParseRequest({ ...request, poisoned: Array(MAX_POISONED_HASHES + 1).fill('a'.repeat(64)) })).toBe(false)
+    expect(isParseBegin({ type: 'begin', id: 1, hash: 'a'.repeat(64) })).toBe(true)
+    expect(isParseBegin({ type: 'begin', id: 1, hash: 'x' })).toBe(false)
+    expect(isParseBegin({ type: 'begin', id: 'one', hash: 'a'.repeat(64) })).toBe(false)
+    // A begin is not a reply: it settles nothing.
+    expect(isParseReply({ type: 'begin', id: 1, hash: 'a'.repeat(64) })).toBe(false)
   })
 
   it('starts only in its own role, with a port', () => {
@@ -160,7 +212,7 @@ describe('commentParseProtocol', () => {
     expect(
       isParseRequest({ type: 'instrument', id: Number.MAX_SAFE_INTEGER + 2, bytes: PAGE })
     ).toBe(false)
-    for (const kind of ['draft', 'pin-blocks', 'list', 'write']) {
+    for (const kind of ['draft', 'pin', 'list', 'write']) {
       expect(isParseRequest({ type: 'job', id: 1, bytes: PAGE, job: { kind } })).toBe(true)
     }
     for (const job of [undefined, null, 'list', { kind: 'other' }, {}]) {
@@ -173,6 +225,20 @@ describe('commentParseProtocol', () => {
     expect(isParseReply({ type: 'job', id: 1, result: { kind: 'list', ok: false, refusal: 'encoding' } })).toBe(true)
     for (const result of [undefined, null, 'list', { kind: 'other' }]) {
       expect(isParseReply({ type: 'job', id: 1, result })).toBe(false)
+    }
+  })
+
+  it('§19 Rev 4 isParseReply accepts handed-back bytes only as a Uint8Array, on every reply type', () => {
+    const raw = new Uint8Array(4)
+    const job = { kind: 'list', ok: false, refusal: 'encoding' }
+    const refusal = { kind: 'unavailable', reason: 'encoding' }
+    expect(isParseReply({ type: 'error', id: 1, raw })).toBe(true)
+    expect(isParseReply({ type: 'job', id: 1, result: job, raw })).toBe(true)
+    expect(isParseReply({ type: 'result', id: 1, outcome: refusal, raw })).toBe(true)
+    for (const bad of [[1, 2], 'bytes', null, raw.buffer]) {
+      expect(isParseReply({ type: 'error', id: 1, raw: bad })).toBe(false)
+      expect(isParseReply({ type: 'job', id: 1, result: job, raw: bad })).toBe(false)
+      expect(isParseReply({ type: 'result', id: 1, outcome: refusal, raw: bad })).toBe(false)
     }
   })
 
@@ -196,6 +262,8 @@ describe('commentParseProtocol', () => {
       { type: 'result', id: 1, outcome: { ...ok, tokens: ok.tokens.slice(1) } },
       { type: 'result', id: 1, outcome: { ...ok, offsets: Array.from(ok.offsets) } },
       { type: 'result', id: 1, outcome: { ...ok, tagCodes: new Uint32Array(0) } },
+      { type: 'result', id: 1, outcome: { ...ok, lines: new Uint32Array(0) } },
+      { type: 'result', id: 1, outcome: { ...ok, lines: Array.from(ok.lines) } },
       { type: 'result', id: 1, outcome: { ...ok, html: 'text' } },
       { type: 'result', id: 1, outcome: { ...ok, fileHash: 1 } },
       { type: 'result', id: 1, outcome: { ...ok, tagNames: 'p' } },

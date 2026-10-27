@@ -14,7 +14,9 @@
  * - **E-011** with the menu or the window open the native page is hidden and
  *   a fresh still frame stands in, with the selected outline painted in it.
  * - **E-012** an outside edit removes the element: "Element not found", and
- *   the block stays in the file (decision 21).
+ *   the block stays in the file (decision 21) – also when the next element
+ *   has the same tag, the X-001 case (§19 Rev 4: a position match must be
+ *   corroborated).
  * - **E-013** 200 comments on one page: the drawer lists them all, pins are
  *   drawn, and "Show on page" on the last row brings its element into view.
  * - **E-015** a hostile page (`comments/hostile/`: forged events, prototype
@@ -54,6 +56,7 @@ import {
   commentPanelState,
   draftsOpened,
   namesFile,
+  newestLoad,
   recordDraftsOpened,
   waitForCommentLoad
 } from './pages/html-preview.comments'
@@ -73,7 +76,8 @@ import {
   waitForBox,
   type ElementPlace
 } from './pages/html-preview.comments-ui'
-import { commentedPage } from '../src/main/services/preview/comments/__test-helpers__/commentedPages'
+import { commentedPage, commentOn } from '../src/main/services/preview/comments/__test-helpers__/commentedPages'
+import { addTo, fixedId } from '../src/shared/htmlComments/__fixtures__/commentTestData'
 import { manyCommentsPage } from './fixtures/html-preview-comments-pages'
 
 const CORPUS = path.join(__dirname, 'fixtures', 'html-preview-corpus', 'comments')
@@ -97,6 +101,50 @@ const REVIEW_TITLE = '-HPC-P3-'
 const MANY_COUNT = 200
 const MANY_TEXT = manyCommentsPage(MANY_COUNT)
 
+const CARDS = 'comments/cards.html'
+const CARDS_TITLE = '-HPC-CARDS-'
+/** The first card, which the outside edit of E-012 (X-001 case) removes. */
+const FIRST_CARD = [
+  '<article class="card">',
+  '      <h2>Roasted to order</h2>',
+  '      <p>We roast only what we sell that week.</p>',
+  '    </article>'
+].join('\n')
+
+/**
+ * Three sibling cards without ids, as on the X-001 page, each with one open
+ * comment from the real serializer; `ids` are the comments in card order.
+ */
+function cardsPage(): { readonly text: string; readonly ids: readonly string[] } {
+  let text = [
+    '<!doctype html>',
+    '<html lang="en">',
+    `<head><meta charset="utf-8"><title>${CARDS_TITLE}</title></head>`,
+    '<body>',
+    '  <section class="features">',
+    `    ${FIRST_CARD}`,
+    '    <article class="card">',
+    '      <h2>Grinder rental</h2>',
+    '      <p>Borrow a burr grinder for 5 EUR a month.</p>',
+    '    </article>',
+    '    <article class="card">',
+    '      <h2>Pause any time</h2>',
+    '      <p>Skip a week or cancel from your account page.</p>',
+    '    </article>',
+    '  </section>',
+    '</body>',
+    '</html>',
+    ''
+  ].join('\n')
+  const ids = [0, 1, 2].map(n => fixedId('c-', 400 + n))
+  ids.forEach((id, n) => {
+    text = addTo(text, 'article', commentOn(text, 'article', n, { id }), { n, ws: 'collapse' }).text
+  })
+  return { text, ids }
+}
+
+const CARDS_PAGE = cardsPage()
+
 /** A page that frames the commented page (E-023). */
 const FRAMED_TEXT = [
   '<!doctype html>',
@@ -119,6 +167,7 @@ test.use({
     [RAW]: corpus('raw-text/index.html'),
     [REVIEW]: REVIEWED.text,
     [MANY]: MANY_TEXT,
+    [CARDS]: CARDS_PAGE.text,
     [FRAMED]: FRAMED_TEXT,
     [NOTES]: [
       '# Notes',
@@ -365,6 +414,50 @@ test.describe('HTML Preview comments – safety and edges (P7)', () => {
     const after = await fsp.readFile(file, 'utf-8')
     expect(after).toContain(`id=${ctaBlock}`)
     expect(after).toContain('<span id="gone">Sold out</span>')
+  })
+
+  test('E-012 the removed card has a same-tag card right after it: "Element not found", never the next card (X-001)', async ({
+    windowWithTestProject,
+    appWithTestProject,
+    testProject
+  }) => {
+    const app = appWithTestProject
+    const page = windowWithTestProject
+    const preview = new HtmlPreviewPage(page, app)
+    const chrome = new CommentChrome(page, preview, 'cards.html')
+    const file = path.join(testProject.path, CARDS)
+    const [onFirst, ...onOthers] = CARDS_PAGE.ids
+
+    await openCommentPage(preview, app, CARDS, CARDS_TITLE)
+    const before = await waitForCommentLoad(app, CARDS, 'page', CARDS_PAGE.ids.length)
+    // The outside edit: the first card is gone, its block stays, and the second card now follows that block.
+    const text = await fsp.readFile(file, 'utf-8')
+    expect(text).toContain(FIRST_CARD)
+    await fsp.writeFile(file, text.replace(FIRST_CARD, ''), 'utf-8')
+    // Main: the first comment names no element; the other two keep theirs.
+    await expect
+      .poll(
+        async () => {
+          const load = newestLoad(await commentLoads(app), CARDS, 'page')
+          if (!load || load.loadId === before.loadId) return null
+          return load.blocks.map(block => [block.id, block.token !== undefined])
+        },
+        { timeout: PREVIEW_BUDGET_MS, message: 'no load of the edited cards page' }
+      )
+      .toEqual([[onFirst, false], ...onOthers.map(id => [id, true])])
+
+    await chrome.openDrawer()
+    await chrome.filter('attention').click()
+    const notFound = chrome.drawerRows().filter({ has: page.getByTestId('comment-drawer-tag').filter({ hasText: 'Element not found' }) })
+    await expect(notFound).toHaveCount(1, { timeout: PREVIEW_BUDGET_MS })
+    await notFound.getByTestId('comment-drawer-row-open').click()
+    const win = chrome.window()
+    await expect(win.getByTestId('comment-not-found')).toContainText("Erfana can't find this element any more", { timeout: PREVIEW_BUDGET_MS })
+    await expect(win.getByTestId('comment-not-found-quote')).toHaveText('Roasted to order We roast only what we sell that week.')
+    // Decision 21: nothing was moved or deleted.
+    const after = await fsp.readFile(file, 'utf-8')
+    for (const id of CARDS_PAGE.ids) expect(after).toContain(`id=${id}`)
+    expect(after).not.toContain('<h2>Roasted to order</h2>')
   })
 
   test('E-013 200 comments: the drawer lists every one, pins are drawn, and Show on page brings the last into view', async ({

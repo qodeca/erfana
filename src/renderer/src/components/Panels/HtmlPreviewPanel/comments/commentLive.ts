@@ -28,10 +28,10 @@ import { ANNOUNCE } from './commentCopy'
  *
  * @returns The sentence, or `undefined` for an event that is not a picker step.
  */
-export function pickerAnnouncement(event: Pick<CommentModeChanged, 'say' | 'label'>): string | undefined {
+export function pickerAnnouncement(event: Pick<CommentModeChanged, 'say' | 'element'>): string | undefined {
   if (event.say === 'top') return ANNOUNCE.pickerTop
   if (event.say === 'no-child') return ANNOUNCE.pickerNoChild
-  return event.say === 'showing' && event.label !== undefined ? ANNOUNCE.pickerShowing(event.label) : undefined
+  return event.say === 'showing' && event.element !== undefined ? ANNOUNCE.pickerShowing(event.element) : undefined
 }
 
 /**

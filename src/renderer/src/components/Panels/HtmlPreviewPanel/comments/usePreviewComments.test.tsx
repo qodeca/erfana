@@ -15,13 +15,14 @@ import { usePreviewCommentStore } from '../../../../stores/usePreviewCommentStor
 
 const mocks = vi.hoisted(() => ({
   writeText: vi.fn(async () => true),
-  openFileInPanel: vi.fn()
+  openFileInPanel: vi.fn(),
+  mac: false
 }))
 vi.mock('../../../../services/textClipboard', () => ({
   textClipboard: { writeText: mocks.writeText }
 }))
 vi.mock('../../../../utils/openFileInPanel', () => ({ openFileInPanel: mocks.openFileInPanel }))
-vi.mock('../../../../utils/platform', () => ({ isMacOS: () => false, isWindows: () => true }))
+vi.mock('../../../../utils/platform', () => ({ isMacOS: () => mocks.mac, isWindows: () => !mocks.mac }))
 
 import {
   damaged,
@@ -35,6 +36,7 @@ import {
 import { ANNOUNCE, COPY, DRAWER_COPY } from './commentCopy'
 import { drawerRows } from './commentRows'
 import { usePreviewComments, type PreviewComments } from './usePreviewComments'
+import { resetCommentPendingWrites } from './commentPendingWrites'
 
 const PANEL = 'preview-index'
 
@@ -106,6 +108,7 @@ describe('usePreviewComments', () => {
     await new Promise(resolve => requestAnimationFrame(resolve))
     fake.uninstall()
     usePreviewCommentStore.getState().reset()
+    resetCommentPendingWrites()
     useGlobalSettingsStore.setState({ settings: null })
     vi.clearAllMocks()
   })
@@ -167,9 +170,10 @@ describe('usePreviewComments', () => {
   })
 
   it.each([
-    ['carries a valid pin draft token into the threads request', 'c'.repeat(32), 'c'.repeat(32)],
-    ['drops a malformed one', 'not-a-token', undefined]
-  ])('%s, and New comment switches to the new view', (_label, sent, kept) => {
+    ['carries a valid pin draft token and its element key into the threads request', 'c'.repeat(32), 'd'.repeat(32), true],
+    ['drops a malformed token', 'not-a-token', 'd'.repeat(32), false],
+    ['M1 drops a draft whose element key is malformed', 'c'.repeat(32), '/project/index.html|3|p', false]
+  ])('%s, and New comment switches to the new view', (_label, sent, sentKey, kept) => {
     render(<Harness onValue={onValue} />)
     act(() =>
       fake.emitDraft({
@@ -183,12 +187,15 @@ describe('usePreviewComments', () => {
         threadKeys: ['t1'],
         blockKeys: [],
         draftToken: sent,
+        draftKey: sentKey,
         target: { tag: 'p', classes: [], line: 3, excerpt: '<p id="x">' }
       } as never)
     )
+    const opened = latest.layer.request as { draftToken?: string; draftKey?: string }
+    expect(opened.draftToken).toBe(kept ? sent : undefined)
+    expect(opened.draftKey).toBe(kept ? sentKey : undefined)
     expect(latest.layer.request).toMatchObject({
       kind: 'threads',
-      draftToken: kept,
       file: { fileKey: 'f1' },
       // A: main's own description of the element rides along for New comment.
       target: { tag: 'p', line: 3 }
@@ -234,8 +241,8 @@ describe('usePreviewComments', () => {
     render(<Harness onValue={onValue} />)
     act(() => fake.emitMode({ panelId: PANEL, on: true, reason: 'escape' }))
     await waitFor(() => expect(latest.layer.polite).toBe(ANNOUNCE.modeOn))
-    act(() => fake.emitMode({ panelId: PANEL, on: false, reason: 'picker', say: 'showing', label: 'p#team-copy' }))
-    await waitFor(() => expect(latest.layer.polite).toBe('Showing p#team-copy.'))
+    act(() => fake.emitMode({ panelId: PANEL, on: false, reason: 'picker', say: 'showing', element: { tag: 'p', line: 12 } }))
+    await waitFor(() => expect(latest.layer.polite).toBe('Showing p, line 12.'))
     // A picker event is not a mode change, whatever its `on` says.
     expect(latest.toolbar.mode).toBe(true)
     act(() => fake.emitMode({ panelId: PANEL, on: true, reason: 'picker', say: 'top' }))
@@ -320,19 +327,31 @@ describe('usePreviewComments', () => {
       expect(fake.bridge.setMode).toHaveBeenCalledTimes(1)
     })
 
-    it('L14 the physical M stands in only for a non-ASCII typed key (µ), never for AZERTY ","', async () => {
+    it('M3 Windows: AltGr+M keeps typing µ, AZERTY "," is not M, and only Ctrl+Alt exactly toggles', () => {
       const { getByTestId } = render(<Harness onValue={onValue} />)
+      // AltGr is Ctrl+Alt on Windows: the physical M typing µ (German layout) is the page's, not the shortcut.
+      fireEvent.keyDown(getByTestId('root'), { key: 'µ', code: 'KeyM', ctrlKey: true, altKey: true })
       // AZERTY: the KeyM position types ",", which is not the M shortcut.
       fireEvent.keyDown(getByTestId('root'), { key: ',', code: 'KeyM', ctrlKey: true, altKey: true })
+      // Cmd+Option is the macOS chord; an extra modifier is another chord.
+      fireEvent.keyDown(getByTestId('root'), { key: 'm', code: 'KeyM', metaKey: true, altKey: true })
+      fireEvent.keyDown(getByTestId('root'), { key: 'm', code: 'KeyM', ctrlKey: true, altKey: true, metaKey: true })
       expect(fake.bridge.setMode).not.toHaveBeenCalled()
-      // AltGr / Option turn M into µ: the physical key decides.
-      fireEvent.keyDown(getByTestId('root'), {
-        key: 'µ',
-        code: 'KeyM',
-        ctrlKey: true,
-        altKey: true
-      })
-      await waitFor(() => expect(fake.bridge.setMode).toHaveBeenCalledTimes(1))
+    })
+
+    it('M3 macOS: Cmd+Option on the M key toggles whatever non-ASCII character it types, never AZERTY ","', async () => {
+      mocks.mac = true
+      try {
+        const { getByTestId } = render(<Harness onValue={onValue} />)
+        fireEvent.keyDown(getByTestId('root'), { key: ',', code: 'KeyM', metaKey: true, altKey: true })
+        fireEvent.keyDown(getByTestId('root'), { key: 'm', code: 'KeyM', ctrlKey: true, altKey: true })
+        expect(fake.bridge.setMode).not.toHaveBeenCalled()
+        // Option turns M into µ (ABC) or Ķ (Polish): the physical key decides.
+        fireEvent.keyDown(getByTestId('root'), { key: 'µ', code: 'KeyM', metaKey: true, altKey: true })
+        await waitFor(() => expect(fake.bridge.setMode).toHaveBeenCalledTimes(1))
+      } finally {
+        mocks.mac = false
+      }
     })
 
     it('ignores the shortcut while the page is not ready or a window is open', () => {

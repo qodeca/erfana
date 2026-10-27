@@ -29,6 +29,7 @@ import type {
   CommentModeChanged,
   CommentSaveRequest,
   CommentSaveResult,
+  CommentSaveSettled,
   CommentSetModeRequest,
   CommentSetModeResult,
   CommentsChanged
@@ -94,5 +95,7 @@ export const commentGateway = {
   onAnchorStatus: (callback: (payload: CommentAnchorStatus) => void): (() => void) =>
     listen(cb => previewCommentsGateway.onAnchorStatus(cb), callback),
   onModeChanged: (callback: (payload: CommentModeChanged) => void): (() => void) =>
-    listen(cb => previewCommentsGateway.onModeChanged(cb), callback)
+    listen(cb => previewCommentsGateway.onModeChanged(cb), callback),
+  onSaveSettled: (callback: (payload: CommentSaveSettled) => void): (() => void) =>
+    listen(cb => previewCommentsGateway.onSaveSettled(cb), callback)
 }

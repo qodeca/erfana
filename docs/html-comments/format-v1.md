@@ -14,7 +14,7 @@ This page is for two readers: coding agents and tools that read such files, and 
 - **Act only on `status: open` comments.** A `status: resolved by …` comment is history.
 - **Do not act on a damaged block** (see [Damaged blocks](#damaged-blocks)). Quick signs: lines starting `<<<<<<<`, `=======` or `>>>>>>>` inside it; an `@data` line that is not valid JSON; readable text that says something different from `@data`; a header `id=` that differs from the `"id"` in `@data`. When in doubt, ask the user.
 - **Read the request from the readable lines.** `-\-` reads as `--`, a `\` at the start of a line is not part of the text, and `\uXXXX` stands for an invisible or control character.
-- If you move or remove the element, leave the block where it is: Erfana then attaches the comment to the next element if that element has the same tag (rule 1 under [Finding blocks and their elements](#finding-blocks-and-their-elements)), otherwise it shows the comment as "element not found"; either way the user decides. After you remove an element, tell the user which open comments were on it.
+- If you move or remove the element, leave the block where it is. Erfana finds a moved element again by its `id`, path or text; for a removed element it normally shows the comment as "element not found". It does not hand the comment to the next element just because that element has the same tag (rule 1 under [Finding blocks and their elements](#finding-blocks-and-their-elements)). Either way the user decides. After you remove an element, tell the user which open comments were on it.
 
 ## Example
 
@@ -168,11 +168,11 @@ Nothing inside a block may end the HTML comment or hide text from a reader.
 
 - A block is an **HTML comment node** whose text starts, after optional whitespace, with `erfana:comment v<number>`. Use a real HTML parser: the same characters inside `<script>`, `<style>`, `<textarea>` or an attribute value are text, not a block.
 - Erfana finds a block's element in this order, and stops at the first rule that gives exactly one answer:
-  1. **Position**: the next start tag in the source after the block, skipping whitespace and other erfana blocks, has the stored tag.
+  1. **Position**: the next start tag in the source after the block, skipping whitespace and other erfana blocks, has the stored tag, **and** that element agrees with the anchor: it has the stored `id`; or, when the anchor or the element has no `id`, its text matches the stored quote (exact text, or the text before and after it) or it is at the stored `path`. An anchor with no `id`, `path` or quote needs the tag only. The element never counts when it has a different `id`, or when its text begins the stored `suffix` – then it is the element that came after a removed target and moved into its place (and into its `path`).
   2. A unique element with the stored `id` and tag.
-  3. A unique element at the stored `path`.
-  4. A unique element whose text matches the stored quote (exact text, then the text around it).
-- Otherwise the block is **orphaned** ("element not found"). Two equal candidates also orphan it – a guess is worse than no answer. Erfana never moves or deletes a block on its own.
+  3. A unique element at the stored `path` – unless it has a different `id` or moved into a removed target's place, as in rule 1.
+  4. A unique element whose text matches the stored quote (exact text, then the text around it) – unless it has a different `id`.
+- Otherwise the block is **orphaned** ("element not found"). Two equal candidates also orphan it – a guess is worse than no answer. A block never attaches to an element with a different `id` from the stored one. Erfana never moves or deletes a block on its own.
 
 ## Newer versions, damaged blocks and read-only files
 
@@ -197,7 +197,7 @@ A damaged block is shown with a warning and its text as written. Erfana does not
 
 ### Read-only files
 
-Erfana shows a file's comments but writes none when: the file is not UTF-8 (UTF-8 with or without a BOM is fine; a `<meta charset>` naming another encoding counts as not UTF-8); it holds a complete git conflict (`<<<<<<<` … `=======` … `>>>>>>>`); a block is unterminated; it has more than 500 blocks (at exactly 500, threads can still be edited, but no new one is added); or it is larger than 4 MB (then blocks are not read either).
+Erfana shows a file's comments but writes none when: the file is not UTF-8 (UTF-8 with or without a BOM is fine; a `<meta charset>` naming another encoding counts as not UTF-8); it holds a complete git conflict (`<<<<<<<` … `=======` … `>>>>>>>`); a block is unterminated; it has more than 500 blocks (at exactly 500, threads can still be edited, but no new one is added); or it is larger than 25 MB or has more than 640,000 elements (then blocks are not read either).
 
 ## Limits
 
@@ -215,7 +215,8 @@ Erfana shows a file's comments but writes none when: the file is not UTF-8 (UTF-
 | Anchor `id` / tag name | 200 / 128 characters |
 | `view` | `w`, `h` whole numbers 0 – 1,000,000; `dpr` above 0 and up to 16; `x`, `y` within ±1,000,000 |
 | Runtime path / view `#hash` | 1,024 / 512 characters |
-| File size | 4 MB |
+| File size | 25 MB |
+| Elements per file | 640,000, counted as start tags (`<` followed by a letter) before the file is parsed |
 
 ## Writing blocks from another tool
 

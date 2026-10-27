@@ -264,6 +264,7 @@ exports[`preload surface > window.api.previewComments exposes the expected membe
   "onCommentsChanged",
   "onDraftOpened",
   "onModeChanged",
+  "onSaveSettled",
   "reveal",
   "save",
   "setMode",

@@ -34,6 +34,15 @@
  * panel's regions sit outside the `aria-modal` subtree, where a screen reader
  * does not look while the dialog is open (H1).
  *
+ * A thread view closes itself when the threads it names are gone – but only
+ * on a list read after the one it opened with (`listAfter`): the list shown
+ * at a pin click predates the pin's own thread, and an empty selection in it
+ * means "not read yet", not "deleted".
+ *
+ * A thread write answered "still saving" (`COMMENT_SAVE_PENDING`) is tracked
+ * in `commentPendingWrites` until main says how it ended; meanwhile no second
+ * write on that thread is sent, and the banner says why.
+ *
  * @module HtmlPreviewPanel/comments/CommentWindow
  */
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
@@ -47,21 +56,19 @@ import { ErrorCode } from '../../../../../../shared/errors'
 import { BaseDialog } from '../../../Dialog/BaseDialog'
 import { readZIndexToken } from '../../../../utils/overlayStack'
 import type { CommentListState } from '../../../../stores/usePreviewCommentStore'
+import { COPY, IDENTITY_COPY, readErrorText, saveFailureCopy, type SaveFailureCopy } from './commentCopy'
+import { visibleString } from './commentFormat'
+import { CommentStepsContext, replyDraftKey, useLiveText, type CommentSteps } from './commentLive'
 import {
-  COPY,
-  IDENTITY_COPY,
-  frameFileText,
-  readErrorText,
-  saveFailureCopy,
-  scriptBuiltText,
-  threadsTitle,
-  type SaveFailureCopy
-} from './commentCopy'
-import { ancestorTag, elementLabel } from './commentFormat'
-import { CommentStepsContext, useLiveText, type CommentSteps } from './commentLive'
+  isCommentWritePending,
+  onCommentWriteSettled,
+  trackCommentWrite,
+  writeKeyOf
+} from './commentPendingWrites'
 import { ActionButton, VisibleText } from './CommentParts'
 import { placeCommentWindow, type Box, type WindowPlacement } from './commentPlacement'
 import type { IdentityFormData } from './commentSchemas'
+import { headingOf, newCommentFrom } from './commentWindowHeading'
 import type { CommentWindowRequest } from './commentWindowTypes'
 import { IdentityStep } from './IdentityStep'
 import { NewCommentView } from './NewCommentView'
@@ -99,13 +106,6 @@ export interface CommentWindowProps {
   readonly onPickAgain: () => void
   readonly onOpenInSource: (filePath: string, line: number) => void
   readonly onCopyRaw: (text: string) => void
-}
-
-/** The window's heading for each view. */
-interface Heading {
-  readonly title: string
-  readonly context: string | null
-  readonly note: string | null
 }
 
 /**
@@ -159,6 +159,14 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
   const selectionEmpty =
     selection !== null &&
     selection.threads.length + selection.damaged.length + selection.newer.length === 0
+  // A list newer than the one the window opened with (M2).
+  const fresh =
+    request.kind === 'threads' && list.status === 'ready' && (list.generation ?? 0) > request.listAfter
+  // Nothing to show yet: the file is not in the list, or its threads are not – in a list that predates the window.
+  const waiting = selection === null || (selectionEmpty && !fresh)
+  // Before any memoized callback: the compiler takes these calls as possible changes to `selection`.
+  const heading = headingOf(request, selection)
+  const newComment = props.onNewComment ? newCommentFrom(request, selection) : null
 
   // A thread deleted from here, or a file gone: nothing left to show.
   const { onClose } = props
@@ -168,9 +176,9 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
     else onClose()
   }, [onClose])
   useEffect(() => {
-    if (request.kind !== 'threads' || list.status !== 'ready') return
+    if (!fresh) return
     if (selection === null || selectionEmpty) onClose()
-  }, [request.kind, list.status, selection, selectionEmpty, onClose])
+  }, [fresh, selection, selectionEmpty, onClose])
 
   // Focus moves into the field when the identity step hands over.
   const previousView = useRef(view)
@@ -211,32 +219,57 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
     return () => window.removeEventListener('resize', place)
   }, [place])
 
+  const { onRefresh } = props
+  // Shown in banners and alerts through `visibleString`: bidi and invisible characters as tokens (S-L-B).
+  const displayPath = selection?.file.displayPath ?? ''
+  /** A write that did not land – refused, or still being written: say so. */
+  const refused = useCallback(
+    (code: string) => {
+      const copy = saveFailureCopy(code, visibleString(displayPath))
+      setFailure(copy)
+      alert(copy.text)
+      // The list is stale: read it again so the next try uses fresh hashes.
+      if (code === ErrorCode.COMMENT_BLOCK_CHANGED || code === ErrorCode.COMMENT_KEY_INVALID) onRefresh()
+    },
+    [displayPath, alert, onRefresh]
+  )
+
   const run = useCallback(
     async (save: CommentSaveRequest): Promise<boolean> => {
+      // Still being written: a second write on the thread would only collide with it.
+      if (isCommentWritePending(save.panelId, writeKeyOf(save), true)) {
+        refused(ErrorCode.COMMENT_SAVE_PENDING)
+        return false
+      }
       setFailure(null)
+      const file = visibleString(displayPath)
+      const draftKey = save.op === 'reply' ? replyDraftKey(save.panelId, save.fileKey, save.threadKey) : undefined
+      const write = trackCommentWrite(save, { file, ...(draftKey === undefined ? {} : { draftKey }) })
       const result = await props.onSave(save)
-      const file = selection?.file.displayPath ?? ''
+      write.answered(result)
       if (result.ok) {
         props.onWritten(save, file)
         return true
       }
-      const copy = saveFailureCopy(result.code, file)
-      setFailure(copy)
-      alert(copy.text)
-      // The list is stale: read it again so the next try uses fresh hashes.
-      if (
-        result.code === ErrorCode.COMMENT_BLOCK_CHANGED ||
-        result.code === ErrorCode.COMMENT_KEY_INVALID
-      ) {
-        props.onRefresh()
-      }
+      refused(result.code)
       return false
     },
-    [props, selection, alert]
+    [props, displayPath, refused]
   )
 
-  const heading = headingOf(request, selection)
-  const newComment = props.onNewComment ? newCommentFrom(request, selection) : null
+  // A write answered "still saving" settled: landed clears the banner (the
+  // panel announces it and main re-lists); refused says why.
+  const shownKeys = request.kind === 'threads' ? [...request.threadKeys, ...request.blockKeys].join('\n') : ''
+  useEffect(() => {
+    if (shownKeys === '') return undefined
+    const keys = new Set(shownKeys.split('\n'))
+    return onCommentWriteSettled(({ event, request: save }) => {
+      if (save.panelId !== request.panelId || !keys.has(writeKeyOf(save))) return
+      if (event.ok) setFailure(current => (current?.action === 'pending' ? null : current))
+      else refused(event.code ?? ErrorCode.COMMENT_WRITE_FAILED)
+    })
+  }, [shownKeys, request.panelId, refused])
+
   const style: React.CSSProperties =
     placement === null
       ? { visibility: 'hidden', left: 0, top: 0 }
@@ -298,7 +331,9 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
               </p>
             )}
             {heading.note !== null && view !== 'identity' && (
-              <p className="erf-comment-note">{heading.note}</p>
+              <p className="erf-comment-note">
+                <VisibleText text={heading.note} />
+              </p>
             )}
           </div>
           <button
@@ -351,7 +386,7 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
             onPickAgain={props.onPickAgain}
           />
         )}
-        {view === 'threads' && selection !== null && (
+        {view === 'threads' && selection !== null && !waiting && (
           <ThreadsView
             selection={selection}
             panelId={request.panelId}
@@ -366,11 +401,11 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
             onNewComment={newComment !== null ? () => props.onNewComment?.(newComment) : undefined}
           />
         )}
-        {view === 'threads' && selection === null && list.status === 'error' && (
+        {view === 'threads' && waiting && list.status === 'error' && (
           <div className="erf-comment-window__body">
             {/* M7: a list that failed is said, with the way on – never an endless "Reading". */}
             <p className="erf-comment-note" data-testid={TEST_IDS.COMMENT_WINDOW_READ_ERROR}>
-              {readErrorText(request.file?.displayPath ?? COPY.thisFile)}
+              <VisibleText text={readErrorText(request.file?.displayPath ?? COPY.thisFile)} />
             </p>
             <div className="erf-comment-thread__actions">
               <ActionButton onClick={props.onRefresh} testId={TEST_IDS.COMMENT_WINDOW_RETRY}>
@@ -379,7 +414,7 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
             </div>
           </div>
         )}
-        {view === 'threads' && selection === null && list.status !== 'error' && (
+        {view === 'threads' && waiting && list.status !== 'error' && (
           <div className="erf-comment-window__body">
             <p className="erf-comment-note" role="status">
               Reading comments…
@@ -390,69 +425,4 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
       </div>
     </BaseDialog>
   )
-}
-
-/**
- * The new-comment request "New comment" in a pin's thread view opens: a new
- * thread on the element the pin stands for, with the draft and the target
- * main sent with the pin – the target is main's description of the element
- * as it is in the file now, so the context line names it exactly as a
- * right-click would. `null` when there is no such draft (a drawer row, or
- * main sent none) or the file is read-only.
- *
- * @param request - The window's request.
- * @param selection - What the list holds for it.
- * @returns The request, or `null`.
- */
-export function newCommentFrom(
-  request: CommentWindowRequest,
-  selection: ReturnType<typeof selectThreads>
-): Extract<CommentWindowRequest, { kind: 'new' }> | null {
-  if (request.kind !== 'threads') return null
-  const { draftToken, file, target } = request
-  if (draftToken === undefined || file === undefined || target === undefined) return null
-  if (selection === null || !selection.file.writable) return null
-  return {
-    kind: 'new',
-    panelId: request.panelId,
-    draftToken,
-    target,
-    file,
-    point: request.point,
-    opener: request.opener
-  }
-}
-
-/** The title, context line and note for a request (§10.10 "Window titles", "Context line"). */
-function headingOf(
-  request: CommentWindowRequest,
-  selection: ReturnType<typeof selectThreads>
-): Heading {
-  if (request.kind === 'new') {
-    const { target, file } = request
-    const label = target.runtime ? target.runtime.tag : elementLabel(target)
-    const note = target.runtime
-      ? scriptBuiltText(ancestorTag(target))
-      : file.frame
-        ? frameFileText(file.displayPath)
-        : null
-    return {
-      title: COPY.newComment,
-      context: `${label} · ${file.displayPath}, line ${target.line}`,
-      note
-    }
-  }
-  if (selection === null) return { title: 'Comments', context: null, note: null }
-  const file = selection.file.displayPath
-  const first = selection.threads[0]
-  if (first === undefined) {
-    const line = selection.damaged[0]?.line ?? selection.newer[0]?.line ?? 1
-    return { title: COPY.damagedComment, context: `${file}, line ${line}`, note: null }
-  }
-  const label = first.runtime ? first.runtime.tag : elementLabel(first)
-  return {
-    title: threadsTitle(label, selection.threads.length),
-    context: `${label} · ${file}, line ${first.line}`,
-    note: selection.file.frame ? frameFileText(file) : null
-  }
 }

@@ -18,6 +18,7 @@ import {
   makeComment,
   makeReply,
   RLO,
+  seededRandom,
   unit
 } from '../../../../shared/htmlComments/__fixtures__/commentTestData'
 import { stablePathDigest } from '../../../../shared/stablePathDigest'
@@ -103,6 +104,29 @@ describe('CommentWriter.add', () => {
     // Only the block was inserted, on its own lines: the target line is unchanged
     expect(withoutBlock(after, threadIdOf(result))).toBe(PAGE)
     expect(after.toString('utf8')).toContain('-->\n    <button id="buy" class="cta">Buy now</button>\n')
+  })
+
+  it('§19 Rev 4 bytes lent to the worker: the splice goes into the bytes it handed back, and the write is the same', async () => {
+    await project.write('index.html', PAGE)
+    await project.write('copy.html', PAGE)
+    const inner = createInProcessCommentFileJobs({ random: seededRandom(7) })
+    let lentView: Uint8Array | undefined
+    const lending: CommentFileJobRunner = {
+      async runJob(bytes, job) {
+        lentView = bytes
+        // The transfer empties the writer's own view; the worker hands the same memory back.
+        const raw = structuredClone(bytes, { transfer: [bytes.buffer as ArrayBuffer] })
+        return { ...(await inner.runJob(raw, job)), raw }
+      }
+    }
+
+    const lent = await addOn(makeWriter({ jobs: lending }).writer, 'index.html', 'buy')
+    const copied = await addOn(makeWriter().writer, 'copy.html', 'buy')
+
+    expect(lent.ok).toBe(true)
+    expect(lentView?.length).toBe(0)
+    expect((await project.read('index.html')).equals(await project.read('copy.html'))).toBe(true)
+    expect(lent.ok && copied.ok && lent.fileHash === copied.fileHash).toBe(true)
   })
 
   it('M-002 the file changed meanwhile and the element is still found: written at its new offset, the outside edit kept', async () => {
@@ -299,6 +323,24 @@ describe('CommentWriter.add', () => {
     expect(await snapshot(path)).toEqual(before)
   })
 
+  it('S-L-C main checks the bytes it inserts: an answer whose block could leave its comment writes nothing', async () => {
+    const path = await project.write('index.html', PAGE)
+    const before = await snapshot(path)
+    const real = createInProcessCommentFileJobs()
+    for (const hostile of ['<!-- a --><script>x()</script><!-- b -->', '<!-- note -- more -->', '<!-->', '\uFEFF<!-- note -->']) {
+      const jobs: CommentFileJobRunner = {
+        runJob: async (bytes, job) => {
+          const answer = await real.runJob(bytes, job)
+          const result: CommentJobOutcome<CommentFileJob> = answer
+          return (result.kind === 'write' && result.ok ? { ...result, insert: new TextEncoder().encode(hostile) } : answer) as typeof answer
+        }
+      }
+      const { writer } = makeWriter({ jobs })
+      expect(await addOn(writer, 'index.html', 'buy'), hostile).toEqual({ ok: false, code: ErrorCode.COMMENT_WRITE_FAILED, reason: 'verify-failed' })
+    }
+    expect(await snapshot(path)).toEqual(before)
+  })
+
   it('M-013 one save is one write, and its result carries the hash of the bytes now on disk for the echo filter', async () => {
     await project.write('index.html', PAGE)
 
@@ -311,7 +353,7 @@ describe('CommentWriter.add', () => {
 })
 
 describe('CommentWriter limits (M-015)', () => {
-  it('M-015 a file over 4 MB is refused with COMMENT_FILE_TOO_LARGE', async () => {
+  it('M-015 a file over the 25 MB file limit is refused with COMMENT_FILE_TOO_LARGE', async () => {
     const big = PAGE.replace('</body>', `<!-- ${'x'.repeat(PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES)} -->\n</body>`)
     await project.write('index.html', big)
     const before = await snapshot(project.path('index.html'))
@@ -319,7 +361,7 @@ describe('CommentWriter limits (M-015)', () => {
     const result = await addOn(makeWriter().writer, 'index.html', 'buy', 'x', Buffer.from(PAGE))
 
     expect(result).toEqual({ ok: false, code: ErrorCode.COMMENT_FILE_TOO_LARGE, reason: 'too-large' })
-    // Buffer.equals, not toEqual: a deep compare of 4 MB element by element takes seconds
+    // Buffer.equals, not toEqual: a deep compare of 25 MB element by element takes seconds
     const after = await snapshot(project.path('index.html'))
     expect(after.bytes.equals(before.bytes)).toBe(true)
     expect(after.mtimeMs).toBe(before.mtimeMs)

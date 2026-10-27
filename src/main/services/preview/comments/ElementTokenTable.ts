@@ -35,14 +35,22 @@
  * re-reads and re-locates from disk at Save.
  */
 import { ELEMENT_TOKEN_PATTERN } from '../../../../shared/htmlComments'
+import { PREVIEW_LIMITS } from '../../../../shared/preview-limits'
 import { NO_TARGET, TOKEN_CHARS, type CommentLoadBlock } from './commentParseCore'
 
 /** Loads kept per page and per frame: the current one and the one before it. */
 export const TOKEN_TABLE_GENERATIONS = 2
 /** Two full generations of a page at the frame cap (`MAX_FRAMES_PER_PAGE` is 50). */
 export const MAX_LOADS = 102
-/** About 8 MB of tables per view; a 4 MB element-dense page has 64,187 tokens (S9). */
-export const MAX_TOKENS = 400_000
+/**
+ * Twice the per-document cap (§19 Rev 4): the largest page served with tokens
+ * still fits beside its frames, or beside its own previous load – frames load
+ * after the page, so a smaller budget would evict the page's tokens first. A
+ * token costs about 20 bytes (12 characters, an offset, a tag code), so at
+ * most about 26 MB of tables per view. A 4 MB element-dense page has 64,187
+ * tokens (S9), a dense 25 MB page about 456,000.
+ */
+export const MAX_TOKENS = 2 * PREVIEW_LIMITS.COMMENT_MAX_TOKENS_PER_DOCUMENT
 
 /** Which frame of the view a load was served to, as far as the request kind tells. */
 export type CommentLoadScope = 'page' | 'frame'
@@ -55,6 +63,8 @@ export interface CommentLoadInput {
   readonly fileHash: string
   readonly tokens: string
   readonly offsets: Int32Array
+  /** 1-based line of each token's start tag. */
+  readonly lines: Uint32Array
   readonly tagCodes: Uint32Array
   readonly tagNames: readonly string[]
   readonly blocks: readonly CommentLoadBlock[]
@@ -67,6 +77,8 @@ export interface ElementTokenEntry {
   readonly fileHash: string
   /** UTF-16 offset of the start tag's `<` in the decoded file as served. */
   readonly startOffset: number
+  /** 1-based line of the start tag in the file as served. */
+  readonly line: number
   readonly tagName: string
 }
 
@@ -155,12 +167,13 @@ export class ElementTokenTable {
     if (record === undefined) return undefined
     const index = alignedTokenIndex(record.input.tokens, token)
     if (index < 0) return undefined
-    const { realPath, fileHash, offsets, tagCodes, tagNames } = record.input
+    const { realPath, fileHash, offsets, lines, tagCodes, tagNames } = record.input
     return {
       realPath,
       loadId,
       fileHash,
       startOffset: offsets[index],
+      line: lines[index] ?? 1,
       tagName: tagNames[tagCodes[index]] ?? ''
     }
   }

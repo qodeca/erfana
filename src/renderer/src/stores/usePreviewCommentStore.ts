@@ -48,6 +48,10 @@ export interface CommentListState {
   readonly files: readonly CommentFileView[]
   /** Main's error code when `status` is `'error'`. */
   readonly code?: string
+  /** Files main left out of a ready list: past its file count or byte budget. */
+  readonly unread?: number
+  /** The generation of the request whose answer this is; absent before the first. */
+  readonly generation?: number
 }
 
 /** One tab's comment state. */
@@ -160,8 +164,8 @@ export const usePreviewCommentStore = create<PreviewCommentStore>((set, get) => 
     const current = entryOf(get().panels, panelId)
     if (generation !== current.listGeneration) return false
     const list: CommentListState = result.ok
-      ? { status: 'ready', files: result.files }
-      : { status: 'error', files: current.list.files, code: result.code }
+      ? { status: 'ready', files: result.files, generation, ...(result.unread === undefined ? {} : { unread: result.unread }) }
+      : { status: 'error', files: current.list.files, code: result.code, generation }
     const unavailable = result.ok
       ? (result.unavailable ?? current.unavailable)
       : current.unavailable

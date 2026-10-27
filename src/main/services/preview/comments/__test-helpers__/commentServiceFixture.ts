@@ -74,7 +74,8 @@ export async function commentServiceFixture(pageHtml: string, overrides: Partial
     draftOpened: vi.fn(),
     commentsChanged: vi.fn(),
     anchorStatus: vi.fn(),
-    modeChanged: vi.fn()
+    modeChanged: vi.fn(),
+    saveSettled: vi.fn()
   }
   let enabled = true
   let now = 1_000
@@ -120,15 +121,34 @@ export async function commentServiceFixture(pageHtml: string, overrides: Partial
     framesById.set(frame.frameTreeNodeId, frame)
     view.events.get('did-frame-navigate')?.({}, `erfana-preview://${TOKEN}/${rel}`, 200, 'OK', frame.parent === null, 7, frame.frameTreeNodeId)
   }
+  // The async work of every page signal (the service's `guard`), so `hello` and `pick` wait for
+  // exactly that work: a fixed number of turns is too few for its file reads in a loaded full run.
+  const signals = new Set<Promise<void>>()
+  const guarded = service as unknown as { guard(work: Promise<void>): void }
+  const guard = guarded.guard.bind(service)
+  guarded.guard = work => {
+    signals.add(work)
+    void work.finally(() => signals.delete(work)).catch(() => undefined)
+    guard(work)
+  }
+  /** Wait until no page signal's work is left, and the turns after it. */
+  const settle = async (): Promise<void> => {
+    while (signals.size > 0) {
+      await Promise.allSettled([...signals])
+      await flush()
+    }
+  }
   /** `frame` says hello, and its state goes out. */
   const hello = async (frame: FakeFrame): Promise<void> => {
     view.ipc.get(PreviewCommentPageChannels.HELLO)?.(eventFrom(frame), {})
     await flush()
     await flush()
+    await settle()
   }
   const pick = async (frame: FakeFrame, payload: unknown): Promise<void> => {
     view.ipc.get(PreviewCommentPageChannels.PICK)?.(eventFrom(frame), payload)
     for (let i = 0; i < 6; i++) await flush()
+    await settle()
   }
   const anchors = (frame: FakeFrame, payload: unknown): void => {
     view.ipc.get(PreviewCommentPageChannels.ANCHORS)?.(eventFrom(frame), payload)

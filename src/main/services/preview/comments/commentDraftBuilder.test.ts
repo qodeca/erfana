@@ -5,6 +5,7 @@
  * html-preview-comments.md §7.3 step 3, decisions 16–17, 35, §19 R3-11;
  * M-033, M-054, M-055, M-056).
  */
+import { symlinkSync } from 'node:fs'
 import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -12,9 +13,10 @@ import { ErrorCode } from '../../../../shared/errors'
 import { logger } from '../../LoggingService'
 import type { CommentPick } from '../../../../shared/ipc/preview-comment-schema'
 import { makeProject, PAGE, type TempProject } from './__test-helpers__/commentWriterHarness'
+import { damagedBlock, insertBefore } from './__test-helpers__/commentedPages'
 import { frameFile, serveLoad, tokenOfTag } from './__test-helpers__/commentServiceHarness'
-import { buildDraft, cutText, EXCERPT_MAX_CHARS, lineAt } from './commentDraftBuilder'
-import { createInProcessCommentFileJobs } from './commentFileJobs'
+import { buildDraft, buildPin, cutText, EXCERPT_MAX_CHARS, lineAt } from './commentDraftBuilder'
+import { createInProcessCommentFileJobs, type CommentFileJobRunner } from './commentFileJobs'
 import { ElementTokenTable } from './ElementTokenTable'
 
 vi.mock('../../LoggingService', () => ({
@@ -147,11 +149,95 @@ describe('buildDraft', () => {
     expect(logged).not.toContain('index.html')
   })
 
+  it('a file whose real path is no longer the one its frame committed opens no draft: TARGET_MOVED', async () => {
+    await mkdir(project.path('site'))
+    const real = await project.write(join('site', 'index.html'), PAGE)
+    // A junction needs no admin rights on Windows; elsewhere 'junction' is ignored and a folder link is made.
+    symlinkSync(project.path('site'), project.path('alias'), 'junction')
+    const tokens = new ElementTokenTable()
+    const { loadId, doc } = serveLoad(tokens, PAGE, real)
+    const token = tokenOfTag(doc, 'button')
+    const built = await buildDraft({
+      realRoot: project.root,
+      file: frameFile(project.path(join('alias', 'index.html'))),
+      entry: tokens.lookup(loadId, token)!,
+      pick: { kind: 'menu', via: 'pointer', token, tag: 'button', view: VIEW } as CommentPick,
+      frame: false,
+      jobs: createInProcessCommentFileJobs()
+    })
+    expect(built).toEqual({ ok: false, code: ErrorCode.COMMENT_TARGET_MOVED })
+  })
+
   it('a runtime path over its cap opens no draft and names no error', async () => {
     const built = await draftFor('index.html', PAGE, 'p', {
       runtime: { path: Array.from({ length: 200 }, () => 'span:nth-of-type(1)').join(' > '), tag: 'span' }
     })
     expect(built).toEqual({ ok: false })
+  })
+})
+
+describe('buildPin (M4)', () => {
+  /** `PAGE` with a damaged block standing on the button. */
+  const PINNED = insertBefore(PAGE, '<button', `${damagedBlock('d1')}\n    `)
+
+  /** Serve `html`, then build the pin on the first `tag`, counting the jobs it runs. */
+  async function pinFor(html: string, tag: string, options: { pick: boolean; blocks: boolean; jobs?: CommentFileJobRunner; change?: (path: string) => Promise<void> }) {
+    const path = await project.write('index.html', html)
+    const tokens = new ElementTokenTable()
+    const { loadId, doc } = serveLoad(tokens, html, path)
+    const token = tokenOfTag(doc, tag)
+    await options.change?.(path)
+    const inProcess = options.jobs ?? createInProcessCommentFileJobs()
+    const runJob = vi.fn(inProcess.runJob.bind(inProcess))
+    const built = await buildPin({
+      realRoot: project.root,
+      file: frameFile(path),
+      entry: tokens.lookup(loadId, token)!,
+      ...(options.pick ? { pick: { kind: 'icon', via: 'pointer', token, tag, view: VIEW } as CommentPick } : {}),
+      blocks: options.blocks,
+      frame: false,
+      jobs: { runJob } as CommentFileJobRunner
+    })
+    return { built, runJob }
+  }
+
+  it('finds the blocks on the element and builds its New comment draft in ONE job', async () => {
+    const { built, runJob } = await pinFor(PINNED, 'button', { pick: true, blocks: true })
+    expect(runJob).toHaveBeenCalledTimes(1)
+    expect(runJob.mock.calls[0][1]).toMatchObject({ kind: 'pin', blocks: true })
+    expect(built.blocks).toEqual([expect.objectContaining({ start: PINNED.indexOf('<!-- erfana:comment') })])
+    if (!built.draft.ok) throw new Error('draft')
+    expect(built.draft.target).toMatchObject({ tag: 'button', elementId: 'buy' })
+  })
+
+  it('blocks only: no pick, no draft', async () => {
+    const { built, runJob } = await pinFor(PINNED, 'button', { pick: false, blocks: true })
+    expect(runJob.mock.calls[0][1]).not.toHaveProperty('pick')
+    expect(built).toEqual({ draft: { ok: false }, blocks: [expect.objectContaining({ start: PINNED.indexOf('<!-- erfana:comment') })] })
+  })
+
+  it('neither asked for: answers at once, without reading the file', async () => {
+    const { built, runJob } = await pinFor(PAGE, 'button', { pick: false, blocks: false, change: path => rm(path) })
+    expect(runJob).not.toHaveBeenCalled()
+    expect(built).toEqual({ draft: { ok: false }, blocks: [] })
+  })
+
+  it('a file gone, or a job that failed, gives no blocks and says why', async () => {
+    const gone = await pinFor(PAGE, 'button', { pick: true, blocks: true, change: path => rm(path) })
+    expect(gone.runJob).not.toHaveBeenCalled()
+    expect(gone.built).toEqual({ draft: { ok: false, code: ErrorCode.COMMENT_FILE_GONE }, blocks: [] })
+
+    const failed = await pinFor(PINNED, 'button', { pick: true, blocks: true, jobs: { runJob: async () => ({ kind: 'failed', failure: 'poisoned' }) } })
+    expect(failed.built).toEqual({ draft: { ok: false, code: ErrorCode.COMMENT_WRITE_FAILED }, blocks: [] })
+  })
+
+  it('a file changed since it was served: the draft for New comment says TARGET_MOVED', async () => {
+    const { built } = await pinFor(PINNED, 'button', {
+      pick: true,
+      blocks: true,
+      change: path => writeFile(path, PINNED.replace('Buy now', 'Buy later'))
+    })
+    expect(built.draft).toEqual({ ok: false, code: ErrorCode.COMMENT_TARGET_MOVED })
   })
 })
 

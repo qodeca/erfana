@@ -115,7 +115,11 @@ describe('decideCommentServing – M-060 gates', () => {
     })
   })
 
-  it('M-060 over 4 MB → raw with the reason too-large', () => {
+  it('M-060 §19 Rev 4 up to 25 MB → instrumented; one byte more → raw with the reason too-large', () => {
+    const atLimit = Buffer.alloc(PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES, 0x20)
+    atLimit.write('<!-- erfana:comment v1 -->', 0)
+    expect(PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES).toBe(25 * 1024 * 1024)
+    expect(decideCommentServing(request({ body: atLimit }), on)).toEqual({ action: 'instrument', scope: 'page' })
     const big = Buffer.alloc(PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES + 1, 0x20)
     big.write('<!-- erfana:comment v1 -->', 0)
     expect(decideCommentServing(request({ body: big }), on)).toEqual({
@@ -153,8 +157,8 @@ describe('createPreviewCommentServing', () => {
     const before = Buffer.from(COMMENTED)
     const body = await s.bodyFor(request())
 
-    expect(body.toString('utf8')).toMatch(HAS_TOKEN)
-    expect(body.toString('utf8').replace(TOKEN_ATTRIBUTE, '')).toBe(COMMENTED.toString('utf8'))
+    expect(body?.toString('utf8')).toMatch(HAS_TOKEN)
+    expect(body?.toString('utf8').replace(TOKEN_ATTRIBUTE, '')).toBe(COMMENTED.toString('utf8'))
     expect(COMMENTED.equals(before)).toBe(true)
   })
 
@@ -184,7 +188,7 @@ describe('createPreviewCommentServing', () => {
   it('comment mode instruments a page without blocks', async () => {
     const { serving: s } = serving()
     s.setCommentMode(true)
-    expect((await s.bodyFor(request({ body: PLAIN }))).toString('utf8')).toMatch(HAS_TOKEN)
+    expect((await s.bodyFor(request({ body: PLAIN })))?.toString('utf8')).toMatch(HAS_TOKEN)
     s.setCommentMode(false)
     expect(await s.bodyFor(request({ body: PLAIN }))).toBe(PLAIN)
   })
@@ -283,6 +287,44 @@ describe('createPreviewCommentServing', () => {
     finish(instrumentDocument(COMMENTED))
     expect(await pending).toBe(COMMENTED)
     expect(s.tokens.size).toBe(0)
+  })
+
+  describe('§19 Rev 4 bytes lent to the worker', () => {
+    /** A body with an ArrayBuffer of its own, as the handler's exact-size read gives. */
+    const ownBuffer = (): Buffer => Buffer.from(new Uint8Array(COMMENTED).buffer)
+    /** A client that takes the bytes as a transfer does: the caller's view is left empty. */
+    function lendingClient(answer: (raw: Uint8Array) => CommentParseResult) {
+      const client = inProcessClient()
+      client.instrument.mockImplementation(async (bytes: Uint8Array) =>
+        answer(structuredClone(bytes, { transfer: [bytes.buffer as ArrayBuffer] }))
+      )
+      return client
+    }
+
+    it('serves the bytes the worker handed back after a refusal', async () => {
+      const body = ownBuffer()
+      const { serving: s } = serving({ client: lendingClient(raw => ({ kind: 'unavailable', reason: 'collision', raw })) })
+      const served = await s.bodyFor(request({ body }))
+      expect(body.length).toBe(0)
+      expect(served?.equals(COMMENTED)).toBe(true)
+      expect(s.unavailableReason(REAL_PATH)).toBe('collision')
+    })
+
+    it('answers undefined – read the file again – when the lent bytes were lost with the worker', async () => {
+      const { serving: s } = serving({ client: lendingClient(() => ({ kind: 'failed', failure: 'crashed' })) })
+      expect(await s.bodyFor(request({ body: ownBuffer() }))).toBeUndefined()
+      expect(s.unavailableReason(REAL_PATH)).toBe('parse-failed')
+    })
+
+    it('answers undefined after a throw that took the lent bytes', async () => {
+      const { serving: s } = serving({
+        client: lendingClient(() => {
+          throw new Error('lost')
+        })
+      })
+      expect(await s.bodyFor(request({ body: ownBuffer() }))).toBeUndefined()
+      expect(logger.error).toHaveBeenCalledTimes(1)
+    })
   })
 
   it('gives the e2e hook the view’s loads and unavailable files', async () => {

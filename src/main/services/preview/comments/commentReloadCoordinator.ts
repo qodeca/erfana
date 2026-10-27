@@ -25,9 +25,10 @@
  * comment mode turned on over a page that was served without tokens
  * reloads it once, so it can be commented, and the reader keeps their place.
  */
+import { webcrypto } from 'node:crypto'
 import { PREVIEW_LIMITS } from '../../../../shared/preview-limits'
 import { withTimeout } from '../../../utils/withTimeout'
-import { readFileNoFollow, sha256Hex } from '../../../utils/atomicWriteBytesStrict'
+import { readFileNoFollow } from '../../../utils/atomicWriteBytesStrict'
 import { logger } from '../../LoggingService'
 import {
   COMMENT_SCRIPT_TIMEOUT_MS,
@@ -74,8 +75,8 @@ export interface ReloadCoordinatorDeps {
   readonly reload: () => void
   /**
    * SHA-256 of a file's bytes now; `undefined` when unreadable. Defaults to
-   * the writer's own bounded no-follow read: at most 4 MB, never through a
-   * link, a regular file with one link only.
+   * the writer's own bounded no-follow read: at most `COMMENT_FILE_MAX_BYTES`
+   * (25 MB), never through a link, a regular file with one link only.
    */
   readonly hashOf?: (path: string) => Promise<string | undefined>
   readonly now: () => number
@@ -118,10 +119,16 @@ interface Armed extends ArmedWrite {
   frameRestoreLeft: boolean
 }
 
-/** The echo filter's read: what the writer reads, so a file it would not write never counts as its echo. */
+/**
+ * The echo filter's read: what the writer reads, so a file it would not write
+ * never counts as its echo. Hashed with WebCrypto, which digests on the thread
+ * pool: a 25 MB SHA-256 holds the main thread about 50 ms on the slowest box
+ * measured, the asynchronous digest about 10 ms (§19 Rev 4).
+ */
 export async function defaultHashOf(path: string): Promise<string | undefined> {
   const read = await readFileNoFollow(path, PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES)
-  return read.ok ? sha256Hex(read.bytes) : undefined
+  if (!read.ok) return undefined
+  return Buffer.from(await webcrypto.subtle.digest('SHA-256', read.bytes)).toString('hex')
 }
 
 /** Build one view's coordinator. */

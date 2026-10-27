@@ -275,6 +275,19 @@ describe('atomicWriteBytesStrict failure paths', () => {
     expect(await readFileNoFollow(target, 1024)).toEqual({ ok: false, reason: 'gone', errno: 'ENOENT' })
   })
 
+  it('readFileNoFollow never trusts a size that admits: a file reporting 1 byte but holding more than maxBytes is too-large', async () => {
+    // A file that grew between the stat and the read looks exactly like this
+    hooks.open.mockImplementation(async (...args: Parameters<FsPromises['open']>) => {
+      const handle = await actual.open(...args)
+      const stat = handle.stat.bind(handle)
+      ;(handle as unknown as Record<string, unknown>).stat = async () =>
+        Object.assign(await stat({ bigint: true }), { size: 1n })
+      return handle
+    })
+
+    expect(await readFileNoFollow(target, 4)).toEqual({ ok: false, reason: 'too-large' })
+  })
+
   it('readFileNoFollow: a handle that fails to close after a good read does not fail the read', async () => {
     hooks.open.mockImplementation(async (...args: Parameters<FsPromises['open']>) => {
       const handle = await actual.open(...args)

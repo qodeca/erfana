@@ -5,13 +5,18 @@
  * unsaved editor changes for (docs/designs/html-preview-comments.md
  * decision 13, §7.8; `preview:commentSetUnsavedSources`).
  *
- * Main refuses a comment write into any of them with `COMMENT_UNSAVED_SOURCE`
- * and marks a new draft `unsavedSource: true`. The renderer is the only side
- * that knows about unsaved buffers, so it reports them: every change of
- * `useProjectStore.dirtyPanelIds` maps the dirty editor tabs to their
- * `params.filePath` (absolute, project space – never parsed from the panel
- * id), keeps the `.html` / `.htm` ones, and sends the list when it differs
- * from the last one sent.
+ * Main refuses a comment write into any of them with `COMMENT_UNSAVED_SOURCE`.
+ * The renderer is the only side that knows about unsaved buffers, so it
+ * reports them: every change of `useProjectStore.dirtyPanelIds` maps the dirty
+ * editor tabs to their `params.filePath` (absolute, project space – never
+ * parsed from the panel id), keeps the `.html` / `.htm` ones, and sends the
+ * list when it differs from the one main has.
+ *
+ * A list main did not take (the invoke failed, or main refused it) does not
+ * count as sent (review finding L4): it goes again
+ * {@link UNSAVED_SOURCES_RETRY_MS} later, {@link UNSAVED_SOURCES_ATTEMPTS}
+ * tries in all, and after that on the next change of the dirty tabs – even one
+ * that leaves the same list. A newer list supersedes an older one's retries.
  *
  * Mount ONCE per window (`EditorAreaSplitPanel`): the list is the window's,
  * and a second mount would race the first with the same request.
@@ -52,6 +57,11 @@ export function unsavedHtmlSources(
   return [...paths].sort().slice(0, COMMENT_UNSAVED_SOURCES_MAX)
 }
 
+/** A list main did not take is sent again after this long… */
+export const UNSAVED_SOURCES_RETRY_MS = 1_000
+/** …this many tries in all, before it waits for the next change. */
+export const UNSAVED_SOURCES_ATTEMPTS = 3
+
 /**
  * Keeps main's unsaved-sources list in step with this window's dirty tabs.
  *
@@ -66,17 +76,39 @@ export function unsavedHtmlSources(
 export function useUnsavedSourcesFeed(): void {
   const dockviewApi = useProjectStore(s => s.dockviewApi)
   const dirtyIds = useProjectStore(s => s.dirtyPanelIds)
-  // The last list sent, joined – `null` before the first send, so an empty
-  // list is still sent once when there was something before (a reload of the
-  // renderer leaves main with the old list).
-  const lastSent = useRef<string | null>(null)
+  // The list main has or is being sent, joined. `null` before the first send,
+  // so an empty list is still sent once when there was something before (a
+  // reload of the renderer leaves main with the old list) – and again once a
+  // list is given up on, so the next change sends whatever it holds.
+  const current = useRef<string | null>(null)
+  const retry = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const alive = useRef(true)
+  useEffect(() => {
+    alive.current = true
+    return () => {
+      alive.current = false
+      clearTimeout(retry.current)
+    }
+  }, [])
 
   useEffect(() => {
     if (!commentGateway.available()) return
     const paths = unsavedHtmlSources(dockviewApi, dirtyIds)
     const key = paths.join('\n')
-    if (key === lastSent.current) return
-    lastSent.current = key
-    void commentGateway.setUnsavedSources(paths)
+    if (key === current.current) return
+    current.current = key
+    clearTimeout(retry.current)
+    const send = (attempt: number): void => {
+      // The gateway never rejects: a failed invoke answers `{ ok: false }`.
+      void commentGateway.setUnsavedSources(paths).then(ack => {
+        if (ack.ok || !alive.current || current.current !== key) return
+        if (attempt >= UNSAVED_SOURCES_ATTEMPTS) {
+          current.current = null
+          return
+        }
+        retry.current = setTimeout(() => send(attempt + 1), UNSAVED_SOURCES_RETRY_MS)
+      })
+    }
+    send(1)
   }, [dockviewApi, dirtyIds])
 }

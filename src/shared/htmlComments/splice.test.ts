@@ -33,6 +33,7 @@ import {
   planInsert,
   planReplace,
   spliceBytes,
+  spliceOriginOf,
   verifyCommentSplice,
   verifySplice,
   verifySpliceBytes,
@@ -428,6 +429,45 @@ describe('plan refusals', () => {
       reason: 'limit'
     })
   })
+
+  it('L2 an edit that grows a block never pushes a <meta charset> past byte 1,024; one that does not grow it may', () => {
+    const id = fixedId('c-', 40)
+    const page = (pad: number): string =>
+      `<!doctype html><p id="x">hi</p><!--${'.'.repeat(pad)}--><meta charset="utf-8"><p>after</p>`
+    const withBlock = (pad: number): Buffer =>
+      add(Buffer.from(page(pad)), 'p', makeComment({ id, anchor: { tag: 'p', path: '' } })).bytes
+    const metaEnd = (bytes: Buffer): number => bytes.indexOf('>', bytes.indexOf('<meta')) + 1
+    // The block in place, and the <meta charset> ending 4 bytes inside the prescan.
+    const bytes = withBlock(1_020 - metaEnd(withBlock(0)))
+    expect(metaEnd(bytes)).toBe(1_020)
+    const doc = analyzeCommentDocument(bytes.toString('utf8'))
+    const block = okBlock(doc, id)
+    const context = { author: ADA, now: LATER, random: seededRandom(5) }
+    expect(
+      planReplace(doc, { id, rawHash: block.rawHash, data: addReply(block.data, 'A reply', context) })
+    ).toEqual({ ok: false, reason: 'meta-charset' })
+    expect(
+      planReplace(doc, { id, rawHash: block.rawHash, data: setStatus(block.data, 'resolved', context) })
+    ).toEqual({ ok: false, reason: 'meta-charset' })
+    // An edit to shorter text moves the <meta> towards the start: allowed.
+    const shorter = editMessage(block.data, block.data.msgs[0].id, 'x', LATER)!
+    expect(planReplace(doc, { id, rawHash: block.rawHash, data: shorter }).ok).toBe(true)
+    // A <meta charset> before the block never moves: the same reply is written.
+    const before = add(
+      Buffer.from('<!doctype html><meta charset="utf-8"><p id="x">hi</p>'),
+      'p',
+      makeComment({ id, anchor: { tag: 'p', path: '' } })
+    ).bytes
+    const roomyDoc = analyzeCommentDocument(before.toString('utf8'))
+    const roomyBlock = okBlock(roomyDoc, id)
+    expect(
+      planReplace(roomyDoc, {
+        id,
+        rawHash: roomyBlock.rawHash,
+        data: addReply(roomyBlock.data, 'A reply', context)
+      })
+    ).toMatchObject({ ok: true })
+  })
 })
 
 describe('verification', () => {
@@ -496,5 +536,28 @@ describe('verification', () => {
       ok: false,
       reason: 'block-data'
     })
+  })
+
+  it('§19 Rev 4 a SpliceOrigin – the document without its tree, so the writer can free it – verifies as the document does', () => {
+    const origin = spliceOriginOf(doc)
+    expect(origin).toEqual({
+      text: PAGE,
+      blockCount: doc.state.blocks.length,
+      commentCount: doc.index.comments.length,
+      tagSequence: doc.index.tagSequence
+    })
+    const element: SplicePlan = { ...plan, insert: plan.insert + '<i></i>' }
+    const extraComment: SplicePlan = { ...plan, insert: plan.insert + '<!-- note -->' }
+    const cases: ReadonlyArray<readonly [string, SplicePlan]> = [
+      [good, plan],
+      [good + 'x', plan],
+      [applySplice(PAGE, element), element],
+      [applySplice(PAGE, extraComment), extraComment]
+    ]
+    for (const [text, splice] of cases) {
+      const viaOrigin = verifyCommentSplice(origin, text, splice)
+      const viaDoc = verifyCommentSplice(doc, text, splice)
+      expect(viaOrigin.ok ? 'ok' : viaOrigin).toEqual(viaDoc.ok ? 'ok' : viaDoc)
+    }
   })
 })

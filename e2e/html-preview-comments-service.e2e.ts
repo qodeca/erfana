@@ -140,7 +140,7 @@ async function scrollToLow(preview: HtmlPreviewPage): Promise<number> {
 async function addOnLow(app: ElectronApplication, page: Page, panelId: string, draftNumber: number): Promise<string> {
   expect(await clickAt(app, 'low', HtmlPreviewPage.target(PAGE)), '#low not found').toBe(true)
   const draft = await waitForDraftOpened(page, draftNumber)
-  expect(draft).toMatchObject({ panelId, kind: 'open', displayPath: PAGE, unsavedSource: false, target: { tag: 'p', elementId: 'low' } })
+  expect(draft).toMatchObject({ panelId, kind: 'open', displayPath: PAGE, draftKey: expect.stringMatching(/^[0-9a-f]{32}$/), target: { tag: 'p', elementId: 'low' } })
   if (draft.kind === 'icon' || draft.draftToken === undefined) throw new Error(`no draft token: ${JSON.stringify(draft)}`)
   const saved = await saveComment(page, { panelId, op: 'add', draftToken: draft.draftToken, text: NOTE })
   expect(saved).toMatchObject({ ok: true, threadKey: expect.stringMatching(/^t/) })
@@ -417,7 +417,7 @@ test.describe('HTML Preview comments – service and IPC (P5 exit)', () => {
     expect(await clickPinOf(app, preview, 'cta'), '#cta not found').toBe(true)
     const opened = await waitForDraftOpened(page, 1)
     if (opened.kind !== 'icon' || opened.draftToken === undefined) throw new Error(`the pin carried no draft: ${JSON.stringify(opened)}`)
-    expect(opened).toMatchObject({ panelId, threadKeys: [expect.stringMatching(/^t/)], unsavedSource: false, target: { tag: 'button', elementId: 'cta' } })
+    expect(opened).toMatchObject({ panelId, threadKeys: [expect.stringMatching(/^t/)], draftKey: expect.stringMatching(/^[0-9a-f]{32}$/), target: { tag: 'button', elementId: 'cta' } })
 
     const saved = await saveComment(page, { panelId, op: 'add', draftToken: opened.draftToken, text: NOTE })
     expect(saved).toMatchObject({ ok: true, threadKey: expect.stringMatching(/^t/) })

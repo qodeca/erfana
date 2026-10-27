@@ -123,6 +123,12 @@ export interface CommentFieldProps {
   readonly compact?: boolean
   /** "Draft restored" under the field. */
   readonly restored?: boolean
+  /**
+   * Read-only while the text is still being written (`COMMENT_SAVE_PENDING`):
+   * still focusable and selectable, so it can be copied, but not changed under
+   * the write.
+   */
+  readonly readOnly?: boolean
   readonly textareaRef?: React.Ref<HTMLTextAreaElement>
   readonly testId?: string
 }
@@ -145,6 +151,7 @@ export function CommentField({
   placeholder,
   compact = false,
   restored = false,
+  readOnly = false,
   textareaRef,
   testId
 }: CommentFieldProps): React.JSX.Element {
@@ -163,6 +170,7 @@ export function CommentField({
         className={`erf-comment-textarea${compact ? ' erf-comment-textarea--reply' : ''}`}
         value={value}
         placeholder={placeholder}
+        readOnly={readOnly}
         dir="auto"
         aria-invalid={error ? 'true' : undefined}
         aria-describedby={describedBy}

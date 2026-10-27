@@ -38,10 +38,10 @@ import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useSta
 import { defaultRangeExtractor, useVirtualizer, type Range } from '@tanstack/react-virtual'
 import { renderIcon } from '../../../../utils/iconRegistry'
 import type { CommentListState } from '../../../../stores/usePreviewCommentStore'
-import { COPY, DRAWER_COPY, readErrorText } from './commentCopy'
+import { COPY, DRAWER_COPY, readErrorText, unreadFilesText } from './commentCopy'
 import { formatCommentTime, plural, visibleString } from './commentFormat'
 import { drawerRows, type DrawerFilter, type DrawerRow } from './commentRows'
-import { ActionButton, VisibleText } from './CommentParts'
+import { ActionButton, CommentBanner, VisibleText } from './CommentParts'
 import './CommentWindow.css'
 import './CommentDrawer.css'
 import { TEST_IDS } from '../../../../constants/testids'
@@ -358,9 +358,15 @@ export function CommentDrawer(props: CommentDrawerProps): React.JSX.Element {
           {DRAWER_COPY.showIcons}
         </label>
       </div>
+      {list.status === 'ready' && list.unread !== undefined && (
+        <div className="erf-comment-drawer__note">
+          <CommentBanner kind="info" testId={TEST_IDS.COMMENT_DRAWER_UNREAD}>{unreadFilesText(list.unread)}</CommentBanner>
+        </div>
+      )}
       <div className="erf-comment-drawer__scroll" ref={scrollRef}>
         {list.status === 'ready' && visible.length > 0 && (
-          <p className="erf-comment-drawer__file">{rows[filter][0].displayPath}</p>
+          // A file name is the page author's: bidi and invisible characters drawn as tokens (S-L-B).
+          <p className="erf-comment-drawer__file"><VisibleText text={rows[filter][0].displayPath} /></p>
         )}
         {body}
       </div>

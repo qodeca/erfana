@@ -310,14 +310,14 @@ describe('SEC-15 hostile @data', () => {
   )
 
   it(
-    'SEC-15 10 MB of @data leaves the file read-only unparsed; a block past 2 MB is damaged before JSON.parse',
+    'SEC-15 @data past the 25 MB file limit leaves the file read-only unparsed; a block past 2 MB is damaged before JSON.parse',
     () => {
       const parseSpy = vi.spyOn(JSON, 'parse')
-      const tenMb = pageWith(rawBlock(`{"v":1,"pad":"${'x'.repeat(10 * MB)}"}`))
+      const pastLimit = pageWith(rawBlock(`{"v":1,"pad":"${'x'.repeat(PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES)}"}`))
       const tooLarge = { blocks: [], writable: false, readOnlyReason: 'too-large' }
-      expect(parseCommentBlocks(tenMb)).toEqual(tooLarge)
-      expect(parseCommentFile(encodeText(tenMb))).toMatchObject({ ok: false, reason: 'too-large', state: tooLarge })
-      expectBoundedParse(tenMb)
+      expect(parseCommentBlocks(pastLimit)).toEqual(tooLarge)
+      expect(parseCommentFile(encodeText(pastLimit))).toMatchObject({ ok: false, reason: 'too-large', state: tooLarge })
+      expectBoundedParse(pastLimit)
       // Within the file limit, the block limit holds on its own.
       const threeMb = pageWith(rawBlock(`{"v":1,"pad":"${'x'.repeat(3 * MB)}"}`))
       expect(parseCommentBlocks(threeMb).blocks[0]).toMatchObject({ kind: 'damaged', reason: 'limits' })
@@ -342,8 +342,9 @@ describe('SEC-15 hostile @data', () => {
       const many = pageWith(rawBlock(JSON.stringify({ ...data, msgs: Array.from({ length: fit }, (_, n) => reply(n)) })))
       expect(parseCommentBlocks(many).blocks[0]).toMatchObject({ kind: 'damaged', reason: 'schema' })
       expectBoundedParse(many)
-      // All 100,000 real replies are past the file limit: read-only, unparsed.
-      const real = pageWith(rawBlock(JSON.stringify({ ...data, msgs: Array.from({ length: REPLIES }, (_, n) => reply(n)) })))
+      // As many real replies as push the file past its limit (25 MB, §19 Rev 4): read-only, unparsed.
+      const pastLimit = Math.max(REPLIES, Math.ceil(PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES / JSON.stringify(reply(0)).length))
+      const real = pageWith(rawBlock(JSON.stringify({ ...data, msgs: Array.from({ length: pastLimit }, (_, n) => reply(n)) })))
       expect(parseCommentBlocks(real)).toMatchObject({ blocks: [], readOnlyReason: 'too-large' })
       expectBoundedParse(real)
       expectNoPollution()
@@ -355,15 +356,19 @@ describe('SEC-15 hostile @data', () => {
 /** Header and id of the SEC-16 blocks. */
 const HEADER = `erfana:comment v1 id=${makeComment().id}`
 
-/** As many real blocks as fit in just under the 4 MB file limit – far more than the cap. */
+/**
+ * As many real blocks as fit in just under 4 MB – far more than the cap. Kept
+ * at the old 4 MB file limit when the limit rose to 25 MB (§19 Rev 4): the cap
+ * holds the same at any size, and the timed gate parses the file five times.
+ */
 function fourMbOfBlocks(): string {
   const item = (n: number): string => `${blockOf(makeComment({ id: fixedId('c-', n) }))}<i>x</i>\n`
   // Every fixed id has the same length, so every item does too.
-  const count = Math.floor((PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES - 64) / item(0).length)
+  const count = Math.floor((4 * MB - 64) / item(0).length)
   return `<main>${Array.from({ length: count }, (_, n) => item(n)).join('')}</main>`
 }
 
-/** Inputs shaped to make a scanner backtrack, each under the 4 MB file limit. */
+/** Inputs shaped to make a scanner backtrack, each under the file limit. */
 const REDOS_CORPUS: ReadonlyArray<readonly [string, () => string]> = [
   ['a 1 MB run of dashes in a comment', () => `<p>a</p><!--${'-'.repeat(MB)}--><p>b</p>`],
   ['a header followed by a 1 MB dash run', () => `<p>a</p><!-- ${HEADER}\n${'-'.repeat(MB)}\n--><p>b</p>`],

@@ -31,8 +31,8 @@ export const COMMENT_ANCHORS_CHANNEL = 'preview-page:commentAnchors'
 export const TOKEN_ATTRIBUTE = 'data-erfana-el'
 /** A served element token: 12 lower-case base32 characters (`instrument.ts`). */
 export const TOKEN_PATTERN = /^[a-z2-7]{12}$/
-/** Tokens one document may register (`PREVIEW_LIMITS.COMMENT_MAX_TOKENS_PER_DOCUMENT`). */
-export const MAX_TOKENS_PER_DOCUMENT = 100_000
+/** Tokens one document may register (`PREVIEW_LIMITS.COMMENT_MAX_TOKENS_PER_DOCUMENT`, design §19 Rev 4). */
+export const MAX_TOKENS_PER_DOCUMENT = 640_000
 
 /** Picks one frame admits per second (`PREVIEW_LIMITS.COMMENT_PICKS_PER_SECOND`). */
 export const PICKS_PER_SECOND = 5
@@ -43,8 +43,6 @@ export const PICKS_PER_SECOND = 5
 export const CONTROL_PICKS_PER_SECOND = 3
 /** Keyboard-picker `step`s one frame sends per second; the newest one held back follows when there is room. */
 export const STEPS_PER_SECOND = 10
-/** Characters (UTF-16 units) of a `step`'s label (`COMMENT_STEP_LABEL_MAX_CHARS`). */
-export const STEP_LABEL_MAX_CHARS = 64
 /** UTF-8 bytes of a JS-built element's snapshot (`PREVIEW_LIMITS.COMMENT_SNAPSHOT_MAX_BYTES`). */
 export const SNAPSHOT_MAX_BYTES = 256 * 1024
 /** Characters of a runtime path (`PREVIEW_LIMITS.COMMENT_RUNTIME_PATH_MAX_CHARS`). */

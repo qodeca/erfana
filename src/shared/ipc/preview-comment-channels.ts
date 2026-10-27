@@ -64,7 +64,9 @@ export const PreviewCommentEvents = {
   /** Which threads' elements are not rendered right now ("Not visible now"). */
   ANCHOR_STATUS: 'preview:commentAnchorStatus',
   /** Main turned comment mode on or off: Esc in the page (its exit pick), or the shortcut. */
-  MODE_CHANGED: 'preview:commentModeChanged'
+  MODE_CHANGED: 'preview:commentModeChanged',
+  /** A save answered `COMMENT_SAVE_PENDING` settled after all: written, or refused with its code. */
+  SAVE_SETTLED: 'preview:commentSaveSettled'
 } as const
 
 export type PreviewCommentChannel =

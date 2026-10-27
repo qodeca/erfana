@@ -37,7 +37,8 @@ import {
   renderReadableLines,
   type CommentData
 } from './format'
-import { indexHtml, type HtmlIndex, type IndexedComment } from './htmlIndex'
+import { hasMoreStartTagsThan, indexHtml, type HtmlIndex, type IndexedComment } from './htmlIndex'
+import { HtmlParseLimitError, hasAttributeFlood } from './parseBounds'
 
 /** Why a block is damaged (§5.7). */
 export type DamageReason =
@@ -351,13 +352,27 @@ const TOO_LARGE: FileCommentState = { blocks: [], writable: false, readOnlyReaso
  * the reason `too-large` and lists no blocks.
  */
 export function parseCommentBlocks(text: string): FileCommentState {
-  return isTooLarge(text) ? TOO_LARGE : parseIndexedBlocks(indexHtml(text))
+  return analyzeCommentDocument(text).state
 }
 
-/** Parse once and keep the parse: the input of `planInsert` / `planReplace` / `planDelete`. */
+/** The index of `text`, or `undefined` when the parse went past its bounds (`parseBounds.ts`, S-M). */
+function boundedIndex(text: string): HtmlIndex | undefined {
+  try {
+    return indexHtml(text)
+  } catch (error) {
+    if (error instanceof HtmlParseLimitError) return undefined
+    throw error
+  }
+}
+
+/**
+ * Parse once and keep the parse: the input of `planInsert` / `planReplace` /
+ * `planDelete`. A page past the parse bounds is `too-large`, like one past the
+ * size limit: read-only, no blocks.
+ */
 export function analyzeCommentDocument(text: string): CommentDocument {
-  if (isTooLarge(text)) return { text, index: indexHtml(''), state: TOO_LARGE }
-  const index = indexHtml(text)
+  const index = isTooLarge(text) ? undefined : boundedIndex(text)
+  if (index === undefined) return { text, index: indexHtml(''), state: TOO_LARGE }
   return { text, index, state: parseIndexedBlocks(index) }
 }
 
@@ -373,9 +388,19 @@ export type CommentFileResult =
 /**
  * Decode a file's bytes losslessly and analyse it. Anything but UTF-8 is
  * read-only with the reason `encoding` (§3); the bytes are never touched.
+ * A file over `COMMENT_FILE_MAX_BYTES`, with more start tags than
+ * `COMMENT_MAX_TOKENS_PER_DOCUMENT`, or with an attribute flood
+ * (`hasAttributeFlood`) is `too-large` and never parsed: either would build a
+ * tree past what the parse worker's heap is sized for, or take it minutes
+ * (§19 Rev 4, S-M). One that goes past the parse's own bounds while parsing
+ * is `too-large` too.
  */
 export function parseCommentFile(bytes: Uint8Array): CommentFileResult {
-  if (bytes.length > PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES) {
+  if (
+    bytes.length > PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES ||
+    hasMoreStartTagsThan(bytes, PREVIEW_LIMITS.COMMENT_MAX_TOKENS_PER_DOCUMENT) ||
+    hasAttributeFlood(bytes)
+  ) {
     return { ok: false, reason: 'too-large', state: TOO_LARGE }
   }
   const decoded = decodeLossless(bytes)
@@ -386,5 +411,6 @@ export function parseCommentFile(bytes: Uint8Array): CommentFileResult {
       state: { blocks: [], writable: false, readOnlyReason: 'encoding' }
     }
   }
-  return { ok: true, doc: analyzeCommentDocument(decoded.text) }
+  const doc = analyzeCommentDocument(decoded.text)
+  return doc.state === TOO_LARGE ? { ok: false, reason: 'too-large', state: TOO_LARGE } : { ok: true, doc }
 }

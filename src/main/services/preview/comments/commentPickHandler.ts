@@ -26,7 +26,10 @@
  *   recorded it at the frame's last navigation (SEC-09), and the tag the page
  *   says the tokened element has is the tag main recorded for the token
  *   (R3-13 L5) – a token moved onto another element is refused;
- * - for a pin pick: the key is one of the frame's pins.
+ * - for a pin pick: the key is one of the frame's pins;
+ * - for a keyboard-picker step that reached an element: comment mode is on,
+ *   and the token passes the element pick's frame and file checks, so the
+ *   tag and line the window says are main's own (security review S-L-A).
  */
 import { createDropReporter, type DropReporter } from '../../../../shared/dropReporter'
 import {
@@ -39,6 +42,7 @@ import {
 import { logger } from '../../LoggingService'
 import { samePathKey } from './commentUnsavedSources'
 import type { CommentFrameLike, CommentFrames, FrameRecord } from './commentFrames'
+import type { PickerStepInput } from './commentPickerStep'
 import type { ElementTokenEntry, ElementTokenTable } from './ElementTokenTable'
 
 /** Element and pin picks the whole view admits per second (`PREVIEW_LIMITS.COMMENT_PICKS_PER_SECOND`). */
@@ -86,7 +90,7 @@ export interface PageSignalSinks {
   /** Alt+↑ out of a frame's `<body>`. */
   parent(frame: CommentFrameLike): void
   /** The keyboard picker moved, in comment mode: the window's live region says it. */
-  step(pick: CommentPick): void
+  step(step: PickerStepInput): void
   icon(frame: CommentFrameLike, record: FrameRecord, pinKey: string, pick: CommentPick): void
   /** `entry` absent: the element has no tokened ancestor ("Can't comment here"). */
   element(frame: CommentFrameLike, record: FrameRecord, entry: ElementTokenEntry | undefined, pick: CommentPick): void
@@ -163,25 +167,46 @@ export function createCommentPickHandler(deps: PickHandlerDeps): CommentPickHand
     return budget.take(deps.now())
   }
 
+  /** What `token` names in the load bound to `record`'s frame, of that frame's own file (SEC-26, SEC-09) – or why not. */
+  function entryOf(record: FrameRecord, token: string): ElementTokenEntry | 'unknown-token' | 'wrong-file' {
+    const entry = record.loadId === undefined ? undefined : deps.tokens.lookup(record.loadId, token)
+    if (entry === undefined) return 'unknown-token'
+    if (record.file === undefined || samePathKey(entry.realPath, deps.platform) !== samePathKey(record.file.realPath, deps.platform)) {
+      return 'wrong-file'
+    }
+    return entry
+  }
+
   function elementPick(frame: CommentFrameLike, record: FrameRecord, pick: CommentPick): void {
     if (pick.token === undefined) {
       deps.sinks.element(frame, record, undefined, pick)
       return
     }
-    const entry = record.loadId === undefined ? undefined : deps.tokens.lookup(record.loadId, pick.token)
-    if (entry === undefined) return drop('unknown-token')
-    if (record.file === undefined || samePathKey(entry.realPath, deps.platform) !== samePathKey(record.file.realPath, deps.platform)) {
-      return drop('wrong-file')
-    }
+    const entry = entryOf(record, pick.token)
+    if (typeof entry === 'string') return drop(entry)
     if (!sameTag(pick.tag, entry.tagName)) return drop('tag-mismatch')
     deps.sinks.element(frame, record, entry, pick)
+  }
+
+  /** A picker step: an element is said only as main recorded it for the frame's own load (S-L-A). */
+  function stepPick(frame: CommentFrameLike, pick: CommentPick): void {
+    if (pick.say !== 'showing') {
+      deps.sinks.step({ say: pick.say as 'top' | 'no-child' })
+      return
+    }
+    const record = deps.frames.get(frame.frameTreeNodeId)
+    if (record === undefined || !deps.frames.isCommentable(record)) return drop('not-commentable')
+    // The schema puts a token on every `showing` step.
+    const entry = entryOf(record, pick.token as string)
+    if (typeof entry === 'string') return drop(entry)
+    deps.sinks.step({ say: 'showing', entry, ...(pick.added ? { added: true as const } : {}) })
   }
 
   function route(frame: CommentFrameLike, pick: CommentPick): void {
     if (pick.kind === 'step') {
       if (!steps.take(deps.now())) return drop('rate-limited')
       if (!deps.mode()) return drop('mode-off')
-      deps.sinks.step(pick)
+      stepPick(frame, pick)
       return
     }
     if (pick.kind === 'exit' || pick.kind === 'parent') {

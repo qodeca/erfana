@@ -95,8 +95,30 @@ export const PREVIEW_LIMITS = {
   COMMENT_VIEW_HASH_MAX_CHARS: 512,
   /** Page pick signals one view admits per second. */
   COMMENT_PICKS_PER_SECOND: 5,
-  /** `data-erfana-el` tokens in one served document; past this it is served raw ("page too large"). */
-  COMMENT_MAX_TOKENS_PER_DOCUMENT: 100_000,
-  /** Largest commentable file; equals `PREVIEW.MAX_ENTRY_HTML_BYTES` in `constants.ts`. */
-  COMMENT_FILE_MAX_BYTES: 4 * 1024 * 1024
+  /**
+   * `data-erfana-el` tokens in one served document; past this it is served raw
+   * ("page too large"). Sized for real pages at `COMMENT_FILE_MAX_BYTES`
+   * (design §19 Rev 4): the densest measured – generated API docs, about 51
+   * bytes per element – hold about 518,000 elements at 25 MB.
+   */
+  COMMENT_MAX_TOKENS_PER_DOCUMENT: 640_000,
+  /**
+   * Attributes one start tag may have before the page is "page too large"
+   * (`parseBounds.ts`, security review S-M): the tokenizer compares each
+   * attribute with the tag's earlier ones, so one tag of 40,000 takes 6.5 s.
+   * Real tags have tens.
+   */
+  COMMENT_MAX_ATTRIBUTES_PER_TAG: 1_024,
+  /**
+   * Largest commentable file: every page the preview serves (owner decision,
+   * design §19 Rev 4). Equals `PREVIEW.MAX_ASSET_BYTES` in `constants.ts`,
+   * which this module cannot import; `format.test.ts` pins the two together.
+   */
+  COMMENT_FILE_MAX_BYTES: 25 * 1024 * 1024,
+  /**
+   * Bytes one comment list reads, every file together; a frame's file past it
+   * is left out and counted (`commentListBuilder.ts`, design §19 Rev 4). At
+   * least `COMMENT_FILE_MAX_BYTES`, so the page itself always fits.
+   */
+  COMMENT_LIST_MAX_BYTES: 64 * 1024 * 1024
 } as const

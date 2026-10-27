@@ -606,7 +606,7 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.COMMENT_KEY_INVALID]: 'This comment is no longer open here. Reopen it and try again.',
   [ErrorCode.COMMENT_IDENTITY_REQUIRED]: 'Enter a name to add comments.',
   [ErrorCode.COMMENT_LIMIT]: 'This would go over a comment size limit, so nothing was saved.',
-  [ErrorCode.COMMENT_FILE_TOO_LARGE]: 'Erfana adds comments only to files up to 4 MB.',
+  [ErrorCode.COMMENT_FILE_TOO_LARGE]: 'Erfana adds comments only to files of up to 25 MB and 640,000 elements.',
   [ErrorCode.COMMENT_WRITE_REFUSED_LINK]: "{file} is a link to another file, so Erfana won't write to it.",
   [ErrorCode.COMMENT_WRITE_UNSUPPORTED_FS]: "Erfana can't write to {file} on this drive.",
   [ErrorCode.COMMENT_UNSAVED_SOURCE]: "{file} has unsaved changes in another tab. Save them first so your edits and this comment don't overwrite each other.",

@@ -86,6 +86,31 @@ describe('usePreviewCommentStore', () => {
       get().finishList(P, g, { ok: true, files: [], unavailable: 'encoding' })
       expect(entry().unavailable).toBe('encoding')
     })
+
+    it('§19 Rev 4 keeps the count of files a ready list left out, and only for that answer', () => {
+      const g1 = get().beginList(P)
+      get().finishList(P, g1, { ok: true, files: [fileView()], unread: 2 })
+      expect(entry().list).toMatchObject({ status: 'ready', unread: 2 })
+      const g2 = get().beginList(P)
+      get().finishList(P, g2, { ok: true, files: [fileView()] })
+      expect(entry().list).not.toHaveProperty('unread')
+      const g3 = get().beginList(P)
+      get().finishList(P, g3, { ok: false, code: ErrorCode.UNKNOWN_ERROR })
+      expect(entry().list).not.toHaveProperty('unread')
+    })
+
+    it('M2 a stored list names the request it answers, so a window can tell it from the list it opened over', () => {
+      expect(entry().list).not.toHaveProperty('generation')
+      const g1 = get().beginList(P)
+      get().finishList(P, g1, { ok: true, files: [fileView()] })
+      expect(entry().list).toMatchObject({ status: 'ready', generation: g1 })
+      // While the next one is read, the stored list still names the old request.
+      const g2 = get().beginList(P)
+      expect(entry().list).toMatchObject({ status: 'ready', generation: g1 })
+      get().finishList(P, g2, { ok: false, code: ErrorCode.UNKNOWN_ERROR })
+      expect(entry().list).toMatchObject({ status: 'error', generation: g2 })
+      expect(g2).toBeGreaterThan(g1)
+    })
   })
 
   it('R-023 keeps the mode across a page change of the same tab', () => {

@@ -16,9 +16,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { performance } from 'node:perf_hooks'
 import { Worker } from 'node:worker_threads'
-import { encodeText, serializeBlock } from '../../../../../shared/htmlComments'
-import { fixedId, makeComment } from '../../../../../shared/htmlComments/__fixtures__/commentTestData'
-import { CommentParseClient } from '../CommentParseWorkerAdapter'
+import { encodeText, serializeBlock, type CommentAnchor } from '../../../../../shared/htmlComments'
+import { BUTTON_ANCHOR, fixedId, makeComment } from '../../../../../shared/htmlComments/__fixtures__/commentTestData'
+import { CommentParseClient, WORKER_HEAP_MB } from '../CommentParseWorkerAdapter'
 import { COMMENT_PARSE_WORKER_ROLE } from '../commentParseProtocol'
 
 export const MB = 1024 * 1024
@@ -74,7 +74,12 @@ export async function startBenchWorker(prefix: string): Promise<BenchWorker> {
     logLevel: 'warning'
   })
   const client = new CommentParseClient({
-    createWorker: () => new Worker(workerFile, { workerData: { role: COMMENT_PARSE_WORKER_ROLE } })
+    // The app's own heap ceiling, so a 25 MB run proves it holds (§19 Rev 4).
+    createWorker: () =>
+      new Worker(workerFile, {
+        workerData: { role: COMMENT_PARSE_WORKER_ROLE },
+        resourceLimits: { maxOldGenerationSizeMb: WORKER_HEAP_MB }
+      })
   })
   return {
     client,
@@ -88,10 +93,12 @@ export async function startBenchWorker(prefix: string): Promise<BenchWorker> {
 /**
  * A real block (the P1 serializer) with its own id, anchored to a `<button>`.
  * It is placed right before one, so it attaches by position – as every block
- * Erfana writes does until the page around it changes.
+ * Erfana writes does until the page around it changes. `anchor` is the
+ * fixture's "Buy now" button unless the page's button says otherwise: a
+ * position match counts only when the element corroborates the anchor (§5.9).
  */
-export function buttonBlock(n: number): string {
-  const result = serializeBlock(makeComment({ id: fixedId('c-', n) }), { indent: '  ', eol: '\n' })
+export function buttonBlock(n: number, anchor: CommentAnchor = BUTTON_ANCHOR): string {
+  const result = serializeBlock(makeComment({ id: fixedId('c-', n), anchor }), { indent: '  ', eol: '\n' })
   if (!result.ok) throw new Error(`serializeBlock: ${result.reason}`)
   return result.block
 }
@@ -107,6 +114,14 @@ const LOREM =
   'person who answers within a working day, and returns are accepted for thirty days after the ' +
   'roast date, no receipt needed. Gift cards never expire and can be split across orders.'
 
+/** The anchor of {@link benchPage}'s buttons: their text, "Go", corroborates the position. */
+const BENCH_BUTTON_ANCHOR: CommentAnchor = {
+  tag: 'button',
+  cls: ['btn'],
+  path: '',
+  quote: { exact: 'Go', prefix: '', suffix: '' }
+}
+
 /** How {@link benchPage} places comment blocks. */
 export interface BenchPageOptions {
   /** A block before the button of every `blockEvery`-th section; 4 by default. */
@@ -118,9 +133,10 @@ export interface BenchPageOptions {
 /**
  * A dense, deterministic page of about `bytes` UTF-8 bytes: nested wrappers,
  * cards, tables, inline SVG, scripts, styles and body text, and a real
- * comment block every few sections – the shape of the S9 inputs (about 60–66
+ * comment block every few sections – the shape of the S9 inputs (about 57–66
  * bytes per eligible element, the dense end of real pages; a 4 MB page has
- * about 65,000 elements, under the 100,000 token cap).
+ * about 72,000 elements and a 25 MB page about 456,000, under the 640,000
+ * token cap).
  */
 export function benchPage(bytes: number, options: BenchPageOptions = {}): Uint8Array {
   const blockEvery = options.blockEvery ?? 4
@@ -138,7 +154,7 @@ export function benchPage(bytes: number, options: BenchPageOptions = {}): Uint8A
       `with <em>emphasis</em> and <b>bold</b>.</p>\n` +
       `  <svg viewBox="0 0 24 24" width="16"><path d="M0 0h24v24H0z"/><circle cx="12" cy="12" r="4"/></svg>\n` +
       `  <table><tr><td>a</td><td>b</td><td>c</td></tr><tr><td>1</td><td>2</td><td>3</td></tr></table>\n` +
-      `  <ul><li>one</li><li>two</li><li>three</li></ul>${withBlock ? buttonBlock(n) : ''}` +
+      `  <ul><li>one</li><li>two</li><li>three</li></ul>${withBlock ? buttonBlock(n, BENCH_BUTTON_ANCHOR) : ''}` +
       `<button class="btn">Go</button>\n` +
       `  <p class="long">${LOREM}</p></article>\n` +
       (n % 9 === 0 ? `  <script>window.n${n} = "<p>not a tag</p>"</script>\n` : '') +

@@ -15,6 +15,7 @@ import type {
   CommentDraftOpened,
   CommentFileView,
   CommentModeChanged,
+  CommentSaveSettled,
   CommentsChanged,
   CommentThreadView,
   PreviewCommentsBridge
@@ -100,6 +101,8 @@ export function damaged(
 
 /** A 32-hex draft token. */
 export const DRAFT_TOKEN = hex(0xabc, 32)
+/** A 32-hex element key, as main mints it for a draft. */
+export const DRAFT_KEY = hex(0xe1e, 32)
 
 /** A `menu` draft event for a plain button. */
 export function menuDraft(
@@ -114,6 +117,7 @@ export function menuDraft(
     frame: false,
     fileKey: 'f1',
     draftToken: DRAFT_TOKEN,
+    draftKey: DRAFT_KEY,
     target: {
       tag: 'button',
       elementId: 'buy',
@@ -121,7 +125,6 @@ export function menuDraft(
       line: 12,
       excerpt: '<button id="buy" class="cta primary">'
     },
-    unsavedSource: false,
     ...patch
   } satisfies CommentDraftOpened
 }
@@ -135,6 +138,7 @@ export function newRequest(
     kind: 'new',
     panelId: draft.panelId,
     draftToken: draft.draftToken,
+    draftKey: draft.draftKey,
     target: draft.target,
     file: draft,
     point: draft.point,
@@ -155,6 +159,7 @@ export function threadsRequest(
     blockKeys: [],
     point: { x: 200, y: 150 },
     opener: 'page',
+    listAfter: 0,
     ...patch
   }
 }
@@ -166,6 +171,7 @@ export interface FakeCommentsBridge {
   emitChanged: (payload: CommentsChanged) => void
   emitAnchors: (payload: CommentAnchorStatus) => void
   emitMode: (payload: CommentModeChanged) => void
+  emitSettled: (payload: CommentSaveSettled) => void
   /** Removes the bridge (and every other `window.api` domain this put there). */
   uninstall: () => void
 }
@@ -181,7 +187,8 @@ export function installCommentsBridge(): FakeCommentsBridge {
     draft: new Set<(p: CommentDraftOpened) => void>(),
     changed: new Set<(p: CommentsChanged) => void>(),
     anchors: new Set<(p: CommentAnchorStatus) => void>(),
-    mode: new Set<(p: CommentModeChanged) => void>()
+    mode: new Set<(p: CommentModeChanged) => void>(),
+    settled: new Set<(p: CommentSaveSettled) => void>()
   }
   const subscribe =
     <T>(set: Set<(p: T) => void>) =>
@@ -202,7 +209,8 @@ export function installCommentsBridge(): FakeCommentsBridge {
     onDraftOpened: vi.fn(subscribe(listeners.draft)),
     onCommentsChanged: vi.fn(subscribe(listeners.changed)),
     onAnchorStatus: vi.fn(subscribe(listeners.anchors)),
-    onModeChanged: vi.fn(subscribe(listeners.mode))
+    onModeChanged: vi.fn(subscribe(listeners.mode)),
+    onSaveSettled: vi.fn(subscribe(listeners.settled))
   }
   const holder = window as unknown as { api?: Record<string, unknown> }
   const before = holder.api
@@ -213,6 +221,7 @@ export function installCommentsBridge(): FakeCommentsBridge {
     emitChanged: p => listeners.changed.forEach(l => l(p)),
     emitAnchors: p => listeners.anchors.forEach(l => l(p)),
     emitMode: p => listeners.mode.forEach(l => l(p)),
+    emitSettled: p => [...listeners.settled].forEach(l => l(p)),
     uninstall: () => {
       holder.api = before
     }

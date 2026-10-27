@@ -39,7 +39,6 @@ import {
   type Eol,
   type SerializeFailure
 } from './format'
-import type { HtmlIndex } from './htmlIndex'
 import {
   analyzeCommentDocument,
   type CommentDocument,
@@ -146,14 +145,23 @@ export function lineLayoutAt(text: string, offset: number, bomLength = 0): LineL
   }
 }
 
-/** True when inserting `insert` at `offset` pushes a `<meta charset>` past byte 1,024. */
-function pushesMetaCharset(text: string, offset: number, insert: string): boolean {
-  const insertBytes = utf8Length(insert)
+/**
+ * True when putting `insert` in place of `text[start:end]` pushes a
+ * `<meta charset>` that now ends inside the browser's 1,024-byte prescan past
+ * it. An insert is the empty range; an edit grows a block in place (a reply,
+ * a resolve), so it can push one just as far (review finding L2). A change that
+ * does not grow the file moves nothing later, and a match inside the replaced
+ * range is the old block's own text, not a tag.
+ */
+function pushesMetaCharset(text: string, range: readonly [number, number], insert: string): boolean {
+  const [start, end] = range
+  const growth = utf8Length(insert) - utf8Length(text, start, end)
+  if (growth <= 0) return false
   for (const match of text.slice(0, CHARSET_PRESCAN_BYTES).matchAll(META_CHARSET_TAG)) {
-    if (match.index < offset) continue
+    if (match.index < end) continue
     const close = text.indexOf('>', match.index)
     const endByte = utf8Length(text, 0, close < 0 ? text.length : close + 1)
-    if (endByte <= CHARSET_PRESCAN_BYTES && endByte + insertBytes > CHARSET_PRESCAN_BYTES) {
+    if (endByte <= CHARSET_PRESCAN_BYTES && endByte + growth > CHARSET_PRESCAN_BYTES) {
       return true
     }
   }
@@ -174,7 +182,7 @@ export function planInsert(doc: CommentDocument, request: InsertRequest): PlanRe
   if (!serialized.ok) return fail(serialized.reason)
   const insert =
     placement === 'own-lines' ? serialized.block + layout.eol + layout.indent : serialized.block
-  if (pushesMetaCharset(text, el.start, insert)) return fail('meta-charset')
+  if (pushesMetaCharset(text, [el.start, el.start], insert)) return fail('meta-charset')
   return {
     ok: true,
     plan: { op: 'insert', start: el.start, end: el.start, insert, placement, data: request.data }
@@ -215,6 +223,7 @@ export function planReplace(doc: CommentDocument, request: ReplaceRequest): Plan
   if (request.data.id !== request.id) return fail('invalid')
   const serialized = serializeBlock(request.data, blockLayout(doc.text, block))
   if (!serialized.ok) return fail(serialized.reason)
+  if (pushesMetaCharset(doc.text, block.nodeRange, serialized.block)) return fail('meta-charset')
   const [start, end] = block.nodeRange
   return {
     ok: true,
@@ -315,11 +324,32 @@ export type VerifyResult =
 
 const BLOCK_DELTA: Readonly<Record<SpliceOp, number>> = { insert: 1, replace: 0, delete: -1 }
 
-function sameTags(a: HtmlIndex, b: HtmlIndex): boolean {
-  return (
-    a.tagSequence.length === b.tagSequence.length &&
-    a.tagSequence.every((tag, i) => tag === b.tagSequence[i])
-  )
+/**
+ * What {@link verifyCommentSplice} needs of the document a splice was planned
+ * on. It holds no parse tree, so a caller can let that tree go before the new
+ * text is parsed: a dense 25 MB page's tree is most of a gigabyte, and two of
+ * them alive at once would double the parse worker's peak (§19 Rev 4).
+ */
+export interface SpliceOrigin {
+  readonly text: string
+  readonly blockCount: number
+  readonly commentCount: number
+  /** The tag of every element in tree order ({@link CommentDocument.index}'s `tagSequence`). */
+  readonly tagSequence: readonly string[]
+}
+
+/** The {@link SpliceOrigin} of a parsed document. */
+export function spliceOriginOf(doc: CommentDocument): SpliceOrigin {
+  return {
+    text: doc.text,
+    blockCount: doc.state.blocks.length,
+    commentCount: doc.index.comments.length,
+    tagSequence: doc.index.tagSequence
+  }
+}
+
+function sameTags(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((tag, i) => tag === b[i])
 }
 
 /**
@@ -329,22 +359,26 @@ function sameTags(a: HtmlIndex, b: HtmlIndex): boolean {
  * has exactly the same elements in the same order – so no text escaped a
  * comment (threat S13); and a written block reads back `ok` with the intended
  * data. Any failure: fail closed.
+ *
+ * @param old - The document the plan was made on, or its {@link SpliceOrigin}
+ *   when the caller has already let its parse tree go.
  */
 export function verifyCommentSplice(
-  oldDoc: CommentDocument,
+  old: CommentDocument | SpliceOrigin,
   newText: string,
   plan: SplicePlan
 ): VerifyResult {
-  if (!verifySplice(oldDoc.text, newText, plan)) return { ok: false, reason: 'bytes' }
+  const origin = 'tagSequence' in old ? old : spliceOriginOf(old)
+  if (!verifySplice(origin.text, newText, plan)) return { ok: false, reason: 'bytes' }
   const doc = analyzeCommentDocument(newText)
   const delta = BLOCK_DELTA[plan.op]
-  if (doc.state.blocks.length - oldDoc.state.blocks.length !== delta) {
+  if (doc.state.blocks.length - origin.blockCount !== delta) {
     return { ok: false, reason: 'block-count' }
   }
-  if (doc.index.comments.length - oldDoc.index.comments.length !== delta) {
+  if (doc.index.comments.length - origin.commentCount !== delta) {
     return { ok: false, reason: 'comment-count' }
   }
-  if (!sameTags(oldDoc.index, doc.index)) return { ok: false, reason: 'elements' }
+  if (!sameTags(origin.tagSequence, doc.index.tagSequence)) return { ok: false, reason: 'elements' }
   if (plan.data) {
     const written = doc.state.blocks.find(block => block.nodeRange[0] === plan.start)
     if (written?.kind !== 'ok' || JSON.stringify(written.data) !== JSON.stringify(plan.data)) {

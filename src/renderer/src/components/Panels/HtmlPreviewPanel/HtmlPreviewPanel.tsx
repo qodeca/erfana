@@ -52,10 +52,12 @@ import { PreviewBanner, PreviewFallback, PreviewFindTool, PreviewNavControls } f
 import {
   usePreviewBounds,
   usePreviewEvents,
+  usePreviewGroupKeys,
   usePreviewLifecycle,
   usePreviewNavigation,
   usePreviewPageEntry,
-  usePreviewPanelActions
+  usePreviewPanelActions,
+  type PreviewKeyEventLike
 } from './hooks'
 import { previewPlaceholderLabel, selectFallback, selectPanelView } from './htmlPreview.logic'
 import './HtmlPreviewPanel.css'
@@ -270,13 +272,22 @@ export function HtmlPreviewPanel(props: IDockviewPanelProps<HtmlPreviewPanelPara
     panelRootRef,
     containerApi
   })
+  // The panel's key chain, comments first: the mode toggle claims its chord
+  // before navigation reads the same event. Shared by both key routes below.
+  const onPanelKey = (event: PreviewKeyEventLike): void => {
+    comments.onRootKeyDown(event)
+    if (!event.defaultPrevented) navigation.onRootKeyDown(event)
+  }
   // Keys from a portalled overlay (the comment window, a menu) bubble through
   // React to this root; only keys typed in the panel's own DOM are its.
   const onRootKeyDown = (event: React.KeyboardEvent<HTMLDivElement>): void => {
     if (!(event.target instanceof Node) || !event.currentTarget.contains(event.target)) return
-    comments.onRootKeyDown(event)
-    if (!event.defaultPrevented) navigation.onRootKeyDown(event)
+    onPanelKey(event)
   }
+  // A tab switch leaves focus on dockview's group element, outside this root
+  // (the panel renders in the overlay layer), so neither the root nor main's
+  // page forwarder hears a key there. The active panel takes it from the group.
+  usePreviewGroupKeys({ api, rootRef: panelRootRef, onKey: onPanelKey })
 
   // ========================================
   // Find provider (X15b: memoised on panelId)

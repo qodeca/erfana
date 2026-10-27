@@ -43,7 +43,7 @@ function flow(result: Promise<CommentWriteResult> | (() => Promise<CommentWriteR
   const next = typeof result === 'function' ? result : () => result
   const writer = { add: vi.fn(next), changeThread: vi.fn(next), deleteDamagedBlock: vi.fn(next) }
   const landed = vi.fn()
-  const lateLanded = vi.fn()
+  const lateSettled = vi.fn()
   const captureScroll = vi.fn(async () => SCROLL)
   const save = createCommentSaveFlow({
     binding: BINDING,
@@ -53,10 +53,10 @@ function flow(result: Promise<CommentWriteResult> | (() => Promise<CommentWriteR
     captureScroll,
     currentPage: () => PAGE,
     landed,
-    lateLanded,
+    lateSettled,
     ...(timeoutMs === undefined ? {} : { timeoutMs })
   })
-  return { keys, writer, landed, lateLanded, captureScroll, save }
+  return { keys, writer, landed, lateSettled, captureScroll, save }
 }
 
 describe('commentSaveFlow add', () => {
@@ -110,22 +110,23 @@ describe('commentSaveFlow add', () => {
     await new Promise(resolve => setTimeout(resolve, 0))
     expect(f.keys.size.drafts).toBe(0)
     expect(f.landed).toHaveBeenCalledWith({ realPath: PAGE, fileHash: 'h1', scroll: SCROLL, page: PAGE })
-    expect(f.lateLanded).toHaveBeenCalledTimes(1)
+    expect(f.lateSettled).toHaveBeenCalledExactlyOnceWith({ op: 'add', draftToken: token, ok: true })
   })
 
-  it('L3 a late write that is refused after all lands nothing and tells nothing', async () => {
+  it('H1 a late write that is refused after all lands nothing and tells the window its code, named by the thread', async () => {
     let finish: (result: CommentWriteResult) => void = () => {}
     const k = flow(() => new Promise(resolve => (finish = resolve)), 20)
     const fileKey = k.keys.keyFor(BINDING, { kind: 'file', realPath: PAGE })
     const threadKey = k.keys.keyFor(BINDING, { kind: 'thread', realPath: PAGE, threadId: 'c-1' })
     expect(await k.save({ panelId: 'panel', fileKey, threadKey, rawHash: HASH, op: 'reply', text: 'x' })).toEqual({ ok: false, code: ErrorCode.COMMENT_SAVE_PENDING })
+    expect(k.lateSettled).not.toHaveBeenCalled()
     finish({ ok: false, code: ErrorCode.COMMENT_BLOCK_CHANGED } as unknown as CommentWriteResult)
     await new Promise(resolve => setTimeout(resolve, 0))
     expect(k.landed).not.toHaveBeenCalled()
-    expect(k.lateLanded).not.toHaveBeenCalled()
+    expect(k.lateSettled).toHaveBeenCalledExactlyOnceWith({ op: 'reply', threadKey, ok: false, code: ErrorCode.COMMENT_BLOCK_CHANGED })
   })
 
-  it('L3 a late write that throws lands nothing, tells nothing, and hands the draft back', async () => {
+  it('H1 a late write that throws lands nothing, tells the window it failed, and hands the draft back', async () => {
     let fail: (error: Error) => void = () => {}
     const f = flow(() => new Promise((_resolve, reject) => (fail = reject)), 20)
     const token = f.keys.mintDraft(BINDING, draft())
@@ -133,8 +134,25 @@ describe('commentSaveFlow add', () => {
     fail(new Error('EIO'))
     await new Promise(resolve => setTimeout(resolve, 0))
     expect(f.landed).not.toHaveBeenCalled()
-    expect(f.lateLanded).not.toHaveBeenCalled()
+    expect(f.lateSettled).toHaveBeenCalledExactlyOnceWith({ op: 'add', draftToken: token, ok: false, code: ErrorCode.COMMENT_WRITE_FAILED })
     expect(f.keys.claimDraft(token, BINDING).ok).toBe(true)
+  })
+
+  it('H1 a late block delete is named by its block key, and a save answered in time tells nothing more', async () => {
+    let finish: (result: CommentWriteResult) => void = () => {}
+    const k = flow(() => new Promise(resolve => (finish = resolve)), 20)
+    const fileKey = k.keys.keyFor(BINDING, { kind: 'file', realPath: PAGE })
+    const blockKey = k.keys.keyFor(BINDING, { kind: 'block', realPath: PAGE, rawHash: HASH, start: 42 })
+    expect(await k.save({ panelId: 'panel', op: 'deleteBlock', fileKey, blockKey, rawHash: HASH })).toEqual({ ok: false, code: ErrorCode.COMMENT_SAVE_PENDING })
+    finish(wrote(null))
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(k.lateSettled).toHaveBeenCalledExactlyOnceWith({ op: 'deleteBlock', blockKey, ok: true })
+
+    const quick = flow()
+    const token = quick.keys.mintDraft(BINDING, draft())
+    await quick.save({ panelId: 'panel', op: 'add', draftToken: token, text: 'Hi' })
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(quick.lateSettled).not.toHaveBeenCalled()
   })
 
   it('a write that rejects hands the draft back', async () => {

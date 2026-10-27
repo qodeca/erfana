@@ -34,8 +34,9 @@
  * gitignored pages shown in frames included – is commentable.
  *
  * Steps 2–3 – what the file is: a regular file with one link, read with
- * `O_NOFOLLOW` + a dev/ino compare, at most 4 MB. Main stops at the bytes:
- * the lossless decode and the parse – about 380 ms at 4 MB (spike S9) – run
+ * `O_NOFOLLOW` + a dev/ino compare, at most `COMMENT_FILE_MAX_BYTES` (25 MB,
+ * §19 Rev 4). Main stops at the bytes: the lossless decode and the parse –
+ * about 380 ms at 4 MB and 5 s at 25 MB on the slowest box measured – run
  * in the comment parse worker (`commentFileJobs.ts`, §19 R3-12), whose
  * `writableRefusal` (`commentJobDocs.ts`) says whether the parsed state may be
  * written (a complete conflict hunk, an unterminated block and too many
@@ -86,6 +87,12 @@ export type LoadResult = ({ readonly ok: true } & LoadedCommentBytes) | Refused
 /** Options for the loader; the platform is injectable so the Windows rules run on every host. */
 export interface CommentFileAccessOptions {
   readonly platform?: NodeJS.Platform
+  /**
+   * Read at most this many bytes, when it is below `COMMENT_FILE_MAX_BYTES`:
+   * the comment list's remaining budget (`commentListBuilder.ts`). A longer
+   * file is refused as `too-large`.
+   */
+  readonly maxBytes?: number
 }
 
 /** `.html` or `.htm` at the very end of the name, any case. */
@@ -175,10 +182,14 @@ export async function confineCommentFile(
 
 /**
  * Steps 2–3 on an already confined real path: a regular file with one link,
- * read without following a link, at most 4 MB.
+ * read without following a link, at most `COMMENT_FILE_MAX_BYTES` – or
+ * `maxBytes`, when that is lower.
  */
-export async function readConfinedCommentBytes(realPath: string): Promise<LoadResult> {
-  const read = await readFileNoFollow(realPath, PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES)
+export async function readConfinedCommentBytes(
+  realPath: string,
+  maxBytes: number = PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES
+): Promise<LoadResult> {
+  const read = await readFileNoFollow(realPath, Math.min(maxBytes, PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES))
   if (!read.ok) {
     const reason: CommentRefusal = read.reason === 'gone' ? 'missing' : read.reason
     return refused(reason, read.errno)
@@ -192,5 +203,5 @@ export async function loadCommentBytes(
   options: CommentFileAccessOptions = {}
 ): Promise<LoadResult> {
   const confined = await confineCommentFile(target, options)
-  return confined.ok ? readConfinedCommentBytes(confined.realPath) : confined
+  return confined.ok ? readConfinedCommentBytes(confined.realPath, options.maxBytes) : confined
 }

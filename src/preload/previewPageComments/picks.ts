@@ -18,7 +18,6 @@
 import {
   PICKS_PER_SECOND,
   STEPS_PER_SECOND,
-  STEP_LABEL_MAX_CHARS,
   PICK_BOX_MAX_PX,
   PICK_TAG_MAX_CHARS,
   PICK_TAG_PATTERN,
@@ -93,10 +92,28 @@ export interface PickPayload extends PickTarget {
   readonly screen?: Point
   /** A keyboard pick: the element's top-left + 4 px, frame CSS pixels. */
   readonly point?: Point
-  /** A `step`: what the picker reached, and for an element the overlay's label. */
+  /** A `step`: what the picker reached; an element is named by `token` only (S-L-A). */
   readonly say?: StepSay
-  readonly label?: string
+  /** A `showing` step: the element reached lies below the tokened one. */
+  readonly added?: true
   readonly view: PickView
+}
+
+/** The element a `showing` step names: its own token, or its nearest tokened ancestor's and `added`. */
+export interface StepElement {
+  readonly token: string
+  readonly added?: true
+}
+
+/**
+ * What a `showing` step sends about `element`: a token main looks up, never
+ * text from the page – main says the tag and line it recorded for the token
+ * (security review S-L-A). `undefined` when no ancestor carries a token.
+ */
+export function stepElementOf(registry: TokenRegistry, element: Element): StepElement | undefined {
+  const tokened = registry.nearestTokened(element)
+  if (tokened === undefined) return undefined
+  return tokened.element === element ? { token: tokened.token } : { token: tokened.token, added: true }
 }
 
 /** At most {@link PICKS_PER_SECOND} picks in any one-second window. */
@@ -127,16 +144,6 @@ export class PickLimiter {
   }
 }
 
-/** `text` cut to at most `max` UTF-16 units, never inside a surrogate pair. */
-function cutUnits(text: string, max: number): string {
-  let out = ''
-  for (const char of text) {
-    if (out.length + char.length > max) break
-    out += char
-  }
-  return out
-}
-
 /**
  * Keyboard-picker steps (§10.2, §10.8; test E-022). The page holds no
  * screen-reader text – Find in page would count it – so each step goes to
@@ -156,12 +163,15 @@ export class StepSender {
     this.limiter = new PickLimiter(now, STEPS_PER_SECOND)
   }
 
-  /** Say that the picker reached `say` (an element named `label`), seen from `view`. */
-  say(say: StepSay, label: string | undefined, view: PickView): void {
-    const cut = label === undefined ? '' : cutUnits(label, STEP_LABEL_MAX_CHARS)
-    // A `showing` step with nothing to name is not worth a message.
-    if (say === 'showing' && cut === '') return
-    this.offer({ kind: 'step', via: 'keyboard', say, ...(say === 'showing' ? { label: cut } : {}), view })
+  /** Say that the picker reached `say` (for `showing`, the element `element` names), seen from `view`. */
+  say(say: StepSay, element: StepElement | undefined, view: PickView): void {
+    if (say !== 'showing') {
+      this.offer({ kind: 'step', via: 'keyboard', say, view })
+      return
+    }
+    // An element main cannot look up is not worth a message.
+    if (element === undefined) return
+    this.offer({ kind: 'step', via: 'keyboard', say, ...element, view })
   }
 
   /** Drop a held step (teardown). */

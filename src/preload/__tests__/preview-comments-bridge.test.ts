@@ -38,6 +38,7 @@ describeBridge('previewComments bridge', previewCommentsBridge, {
     { method: 'onDraftOpened', channel: 'preview:commentDraftOpened' },
     { method: 'onCommentsChanged', channel: 'preview:commentsChanged' },
     { method: 'onAnchorStatus', channel: 'preview:commentAnchorStatus' },
-    { method: 'onModeChanged', channel: 'preview:commentModeChanged' }
+    { method: 'onModeChanged', channel: 'preview:commentModeChanged' },
+    { method: 'onSaveSettled', channel: 'preview:commentSaveSettled' }
   ]
 })

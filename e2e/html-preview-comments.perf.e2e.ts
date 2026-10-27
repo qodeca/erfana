@@ -5,14 +5,17 @@
  * comments.md §12.2 F-001 – F-003, §5.8, §19 R3-6, R3-12).
  *
  * Each test RECORDS its numbers – as a `HPC-PERF {…}` line on stdout and as a
- * test annotation – and asserts only that every sample was taken:
+ * test annotation – and asserts that every sample was taken. Only F-001 is
+ * also gated, and only where §12.2 says:
  *
  * - **F-001** save → pin visible on the `slide-deck/` fixture, 20 samples,
- *   P95. The < 1,000 ms gate is on macOS and Linux at the handoff (§16); on
- *   the emulated x64 Windows host it is record only (docs/windows/known-
- *   flakes.md, the perf rows). Timed from the Save click to the first capture
- *   that shows the new pin's body, so a sample includes one capture's latency.
- * - **F-002** the cost of a load on main for 0.5, 1 and ~4 MB pages and a page
+ *   P95. Gated < 1,000 ms on macOS and Linux (§12.2, §16); on the emulated
+ *   x64 Windows host it is record only (docs/windows/known-flakes.md, the
+ *   perf rows). Timed from the Save click to the first capture that shows the
+ *   new pin's body, so a sample includes one capture's latency.
+ * - **F-002** the cost of a load on main for 0.5, 1, ~4 and ~25 MB pages (25 MB
+ *   is the comment file limit, §19 Rev 4; three reloads of it per kind, five of
+ *   the others) and a page
  *   with 10 same-project frames: the event-loop busy time (`performance.
  *   eventLoopUtilization`) and the longest stall (a 1 ms main-side probe)
  *   between a reload and its instrumented load(s) being registered. An upper
@@ -60,14 +63,32 @@ const DECK = 'comments/slide-deck/index.html'
 const STATIC = 'comments/static-design/index.html'
 const MANY = 'comments/many.html'
 const MB = 1024 * 1024
+/** Timed reloads per page and kind (instrumented, raw). */
+const RUNS = 5
+/** Longest a timed reload of a page up to 4 MB may take: a guard, not a wait for state. */
+const RELOAD_GUARD_MS = 20_000
+/**
+ * The 25 MB page (about 240,000 paragraphs) on the emulated Windows box: a
+ * reload took 45–60 s served raw and 74–103 s instrumented, and the page's
+ * renderer is too busy to answer a read for most of it. So it gets three runs
+ * per kind, a 300 s reload guard and 300 s to show its title the first time.
+ */
+const LARGEST = { runs: 3, guardMs: 300_000, openMs: 300_000 }
+const SMALL = { runs: RUNS, guardMs: RELOAD_GUARD_MS, openMs: PREVIEW_BUDGET_MS }
 const SIZES = [
-  { label: '0.5 MB', rel: 'comments/size-05.html', bytes: MB / 2 },
-  { label: '1 MB', rel: 'comments/size-1.html', bytes: MB },
-  // Just under the 4 MB file limit (`PREVIEW.MAX_ENTRY_HTML_BYTES`), so the page is still instrumented.
-  { label: '4 MB', rel: 'comments/size-4.html', bytes: 4 * MB - 64 * 1024 }
+  { label: '0.5 MB', rel: 'comments/size-05.html', bytes: MB / 2, ...SMALL },
+  { label: '1 MB', rel: 'comments/size-1.html', bytes: MB, ...SMALL },
+  // Just under the comment file limit before §19 Rev 4 (4 MB): the size the R3-12 gates were set at.
+  { label: '4 MB', rel: 'comments/size-4.html', bytes: 4 * MB - 64 * 1024, ...SMALL },
+  // Just under the comment file limit (25 MB, `PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES`), so the page is still instrumented.
+  { label: '25 MB', rel: 'comments/size-25.html', bytes: 25 * MB - 64 * 1024, ...LARGEST }
 ] as const
 const FRAMES = 10
 const FRAME_HOST = 'comments/frames-10.html'
+/** F-001's P95 budget, save → pin visible (§12.2). */
+const F001_BUDGET_MS = 1_000
+/** §12.2: F-001 is gated on macOS and Linux; the emulated Windows box records it only. */
+const F001_GATED = process.platform !== 'win32'
 
 const files: Record<string, string> = {
   [DECK]: corpus('slide-deck/index.html'),
@@ -133,8 +154,8 @@ interface ReloadCost {
  * loop could not run; Node's event-loop utilisation reads 0 inside Electron's
  * main loop, so it cannot be used.
  */
-async function timedReload(app: ElectronApplication, needle: string): Promise<ReloadCost> {
-  const cost = await app.evaluate(async ({ webContents }, n) => {
+async function timedReload(app: ElectronApplication, needle: string, guardMs = RELOAD_GUARD_MS): Promise<ReloadCost> {
+  const cost = await app.evaluate(async ({ webContents }, { n, guardMs: guard }) => {
     const wc = webContents.getAllWebContents().find(c => c.getURL().startsWith('erfana-preview://') && c.getURL().includes(n))
     if (!wc) return null
     const started = performance.now()
@@ -150,9 +171,9 @@ async function timedReload(app: ElectronApplication, needle: string): Promise<Re
     try {
       await new Promise<void>((resolve, reject) => {
         // A guard against a reload that never finishes, not a wait for state.
-        const guard = setTimeout(() => reject(new Error('the reload never finished')), 20_000)
+        const timer = setTimeout(() => reject(new Error('the reload never finished')), guard)
         wc.once('did-finish-load', () => {
-          clearTimeout(guard)
+          clearTimeout(timer)
           resolve()
         })
         wc.reload()
@@ -161,9 +182,30 @@ async function timedReload(app: ElectronApplication, needle: string): Promise<Re
       clearInterval(probe)
     }
     return { wallMs: Math.round(performance.now() - started), maxStallMs: Math.round(max * 10) / 10, overFloorMs: Math.round(over * 10) / 10 }
-  }, needle)
+  }, { n: needle, guardMs })
   if (cost === null) throw new Error(`no preview for ${needle}`)
   return cost
+}
+
+/**
+ * Open a sized page and wait for its title. Up to 4 MB through
+ * `openCommentPage`; a page with a longer `openMs` gets the same title wait
+ * with that budget.
+ */
+async function openSized(preview: HtmlPreviewPage, app: ElectronApplication, rel: string, title: string, openMs: number): Promise<void> {
+  if (openMs <= PREVIEW_BUDGET_MS) {
+    await openCommentPage(preview, app, rel, title)
+    return
+  }
+  await preview.open(rel)
+  await preview.withReadError(
+    expect
+      .poll(async () => (await preview.snapshot(HtmlPreviewPage.target(rel)))?.docTitle, {
+        timeout: openMs,
+        message: `${rel} never showed its ${title} title`
+      })
+      .toBe(title)
+  )
 }
 
 test.describe('HTML Preview comments – performance records (P7)', () => {
@@ -215,25 +257,28 @@ test.describe('HTML Preview comments – performance records (P7)', () => {
       await waitForCommentLoad(app, DECK, 'page', i)
     }
     expect(samples).toHaveLength(20)
+    const p95 = percentile(samples, 0.95)
+    // Recorded first, so a P95 over budget still leaves its numbers behind.
     record(testInfo, 'F-001', {
       samples,
       p50: median(samples),
-      p95: percentile(samples, 0.95),
+      p95,
       max: Math.max(...samples),
-      budgetMs: 1000,
-      gated: false
+      budgetMs: F001_BUDGET_MS,
+      gated: F001_GATED
     })
+    if (F001_GATED) expect(p95, 'F-001 P95').toBeLessThan(F001_BUDGET_MS)
   })
 
-  test('F-002 shared parse + instrumentation per load: 0.5 / 1 / 4 MB pages and a 10-frame page, main-thread cost recorded', async ({
+  test('F-002 shared parse + instrumentation per load: 0.5 / 1 / 4 / 25 MB pages and a 10-frame page, main-thread cost recorded', async ({
     windowWithTestProject,
     appWithTestProject
   }, testInfo) => {
-    test.setTimeout(300_000)
+    // The 25 MB page takes a minute or more per load on the emulated Windows box (LARGEST); the others under 3 s.
+    test.setTimeout(1_800_000)
     const app = appWithTestProject
     const page = windowWithTestProject
     const preview = new HtmlPreviewPage(page, app)
-    const RUNS = 5
     const results: Record<string, unknown>[] = []
     const summary = (runs: readonly ReloadCost[]): Record<string, number> => ({
       wallMsMedian: median(runs.map(r => r.wallMs)),
@@ -242,20 +287,20 @@ test.describe('HTML Preview comments – performance records (P7)', () => {
     })
 
     for (const size of SIZES) {
-      const row: Record<string, unknown> = { page: size.label, bytes: Buffer.byteLength(files[size.rel]) }
+      const row: Record<string, unknown> = { page: size.label, bytes: Buffer.byteLength(files[size.rel]), runsPerKind: size.runs }
       // The instrumented page, then the same page without a block (served raw) as the control.
       for (const [kind, rel, title] of [
         ['instrumented', size.rel, `-HPC-SIZE-${size.label}-`],
         ['raw', rawOf(size.rel), `-HPC-RAW-${size.label}-`]
       ] as const) {
         const target = HtmlPreviewPage.target(rel)
-        await openCommentPage(preview, app, rel, title)
+        await openSized(preview, app, rel, title, size.openMs)
         if (kind === 'instrumented') await waitForCommentLoad(app, rel, 'page', 1)
         const newest = async (): Promise<string | undefined> => newestLoad(await commentLoads(app), rel, 'page')?.loadId
         const runs: ReloadCost[] = []
-        for (let run = 0; run < RUNS; run += 1) {
+        for (let run = 0; run < size.runs; run += 1) {
           const was = await newest()
-          runs.push(await timedReload(app, target.urlIncludes as string))
+          runs.push(await timedReload(app, target.urlIncludes as string, size.guardMs))
           // Every instrumented reload registered a new load; the raw page never one.
           if (kind === 'instrumented') await expect.poll(newest, { timeout: PREVIEW_BUDGET_MS }).not.toBe(was)
           else expect(await newest()).toBeUndefined()

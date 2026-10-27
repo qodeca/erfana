@@ -40,7 +40,8 @@
  * resolve, re-open), E-003 (edit, then delete: the bytes come back), E-004
  * (the whole cycle on a CRLF + BOM file, generated here as bytes), E-007
  * (clicks swallowed, Alt+↑/↓, Esc), E-014 (the pins toggle), E-016 (the
- * keyboard-only path), E-021 (Settings changes the author of new comments
+ * keyboard-only path), E-016b (the shortcut with focus on dockview's group
+ * element, as a tab switch leaves it – `usePreviewGroupKeys`), E-021 (Settings changes the author of new comments
  * only) and E-024 (`git diff` after add, edit and delete on a line-start
  * target). Helpers: `pages/html-preview.comments-ui.ts`.
  *
@@ -74,6 +75,7 @@ import {
   waitForOverlay
 } from './pages/html-preview.comments-ui'
 import { HtmlPreviewPage, PREVIEW_BUDGET_MS } from './pages/html-preview.page'
+import { bringAppToFront, focusState } from './pages/html-preview.focus'
 import { dismissAllToasts, previewTabs } from './pages/html-preview.navigation'
 import { KeyboardHelper } from './pages/keyboard.helper'
 import { MonacoPage } from './pages/monaco.page'
@@ -707,22 +709,23 @@ test.describe('HTML Preview comments – the reviewer journeys (P7)', () => {
     await page.keyboard.press('Escape')
     await expect(win).toHaveCount(0)
 
-    /** Enter on the picked element, and the window's context line names it. */
-    const enterNames = async (label: string): Promise<void> => {
-      expect(await pressInPage(app, 'Enter', [], STATIC_TARGET)).toBe(true)
-      await expect(win).toHaveAttribute('data-view', 'new', { timeout: PREVIEW_BUDGET_MS })
-      await expect(win).toContainText(`${label} · ${STATIC}, line `)
-      await page.keyboard.press('Escape')
-      await expect(win).toHaveCount(0)
-    }
-    // The picker starts on the hovered element…
+    // The picker starts on the hovered element. Hover it now, with the window
+    // gone and the view shown again: where the pointer last was – or a real
+    // cursor resting on the page – must not set the start.
     await clickElement(app, 'unlimited', 'none', STATIC_TARGET)
-    await enterNames('em#unlimited')
-    // …Alt+↑ is its parent, Alt+↓ back down the same path.
+    // Alt+↑ is its parent, Alt+↓ back down the same path: each step is said in
+    // the panel's polite region (the page holds no screen-reader text, E-022), by
+    // the tag and line main parsed – never the page's ids or classes (S-L-A).
     expect(await pressInPage(app, 'Up', ['alt'], STATIC_TARGET)).toBe(true)
-    await enterNames('p#starter-copy')
+    await expect(chrome.announce()).toHaveText('Showing p, line 24.', { timeout: PREVIEW_BUDGET_MS })
     expect(await pressInPage(app, 'Down', ['alt'], STATIC_TARGET)).toBe(true)
-    await enterNames('em#unlimited')
+    await expect(chrome.announce()).toHaveText('Showing em, line 24.', { timeout: PREVIEW_BUDGET_MS })
+    // Enter opens the window on the element the picker stopped at.
+    expect(await pressInPage(app, 'Enter', [], STATIC_TARGET)).toBe(true)
+    await expect(win).toHaveAttribute('data-view', 'new', { timeout: PREVIEW_BUDGET_MS })
+    await expect(win).toContainText(`em#unlimited · ${STATIC}, line `)
+    await page.keyboard.press('Escape')
+    await expect(win).toHaveCount(0)
     // Still no click reached the page.
     expect(await preview.eval('String(window.__clicks ?? 0)', STATIC_TARGET)).toBe('0')
 
@@ -786,12 +789,19 @@ test.describe('HTML Preview comments – the reviewer journeys (P7)', () => {
     await expect.poll(async () => (await commentPanelState(app, panelId))?.commentableFrames ?? 0, { timeout: PREVIEW_BUDGET_MS }).toBeGreaterThan(0)
     await waitForOverlay(preview, app, STATIC_TARGET)
 
-    // Tab moves the picker (it starts at the viewport's centre), Enter opens the window.
+    // The picker starts under the pointer (else at the viewport's centre), and a
+    // keyboard user's pointer is still somewhere: park it on a known element, so
+    // a pointer left over the page's white margin cannot set the start.
+    await clickElement(app, 'starter-name', 'none', STATIC_TARGET)
+    // Tab moves the picker along the level, each step said in the polite region; Enter opens the window.
     expect(await pressInPage(app, 'Tab', [], STATIC_TARGET)).toBe(true)
+    await expect(chrome.announce()).toHaveText('Showing p, line 24.', { timeout: PREVIEW_BUDGET_MS })
     expect(await pressInPage(app, 'Tab', [], STATIC_TARGET)).toBe(true)
+    await expect(chrome.announce()).toHaveText('Showing button, line 25.', { timeout: PREVIEW_BUDGET_MS })
     expect(await pressInPage(app, 'Enter', [], STATIC_TARGET)).toBe(true)
     const win = chrome.window()
     await expect(win).toHaveAttribute('data-view', 'new', { timeout: PREVIEW_BUDGET_MS })
+    await expect(win).toContainText(`button#buy.cta · ${STATIC}, line `)
     const field = page.getByTestId('comment-new-field')
     await expect(field).toBeFocused()
     await page.keyboard.type(TYPED)
@@ -799,6 +809,49 @@ test.describe('HTML Preview comments – the reviewer journeys (P7)', () => {
     await expect(win).toHaveCount(0, { timeout: PREVIEW_BUDGET_MS })
     await expect(chrome.announce()).toHaveText(`Comment saved to ${STATIC}.`, { timeout: PREVIEW_BUDGET_MS })
     expect(insertedText(before, await diskBytes(file)).text).toContain(TYPED)
+  })
+
+  test('E-016b the shortcut works with focus on the dockview group, where a tab switch leaves it – not in the page', async ({
+    windowWithTestProject,
+    appWithTestProject
+  }) => {
+    const app = appWithTestProject
+    const page = windowWithTestProject
+    const preview = new HtmlPreviewPage(page, app)
+    const chrome = new CommentChrome(page, preview, 'e001.html')
+    const target = HtmlPreviewPage.target(PAGE)
+    // Opened from the tree; nothing clicks into the page or the panel chrome.
+    const panelId = await openCommentPage(preview, app, PAGE, TITLE)
+    await expect(chrome.modeButton()).not.toHaveAttribute('aria-disabled', 'true', { timeout: PREVIEW_BUDGET_MS })
+    await expect(chrome.modeButton()).toHaveAttribute('aria-pressed', 'false')
+
+    // Where `group.focus()` leaves focus on a tab switch: dockview's group
+    // element, outside the panel root (the preview renders in the overlay layer).
+    const group = page.locator('.dv-groupview.dv-active-group', { has: preview.tab('e001.html') })
+    // The preview may hold native focus after the open (it does on Windows). A
+    // DOM focus cannot take the keyboard back from a native view, so hand native
+    // focus to the host's own contents first – what a click on the host does.
+    await bringAppToFront(app)
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.webContents.focus())
+    await expect
+      .poll(async () => (await focusState(app, target))?.host, { timeout: PREVIEW_BUDGET_MS })
+      .toBe(true)
+    await group.focus()
+    await expect(group).toBeFocused()
+    // Main's forwarder hears keys only while the page has focus; it must not here,
+    // or this test would pass through the forwarder instead of the group route.
+    const focus = await focusState(app, target)
+    expect(focus).not.toBeNull()
+    expect(focus?.preview).toBe(false)
+
+    await page.keyboard.press(process.platform === 'darwin' ? 'Meta+Alt+m' : 'Control+Alt+m')
+    await expect(chrome.modeButton()).toHaveAttribute('aria-pressed', 'true', { timeout: PREVIEW_BUDGET_MS })
+    await expect
+      .poll(async () => (await commentPanelState(app, panelId))?.mode, {
+        timeout: PREVIEW_BUDGET_MS,
+        message: 'main never turned comment mode on'
+      })
+      .toBe(true)
   })
 
   test('E-021 the Settings "Comments" section changes the author of new comments only', async ({

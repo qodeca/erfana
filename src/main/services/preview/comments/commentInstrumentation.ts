@@ -15,8 +15,10 @@
  *    AND the ledger note says page (`mainFrame`) or frame (`subFrame`);
  * 4. comments are expected: comment mode is on for the view, or the bytes
  *    contain `erfana:comment`;
- * 5. the file is at most 4 MB, decodes losslessly as UTF-8, does not already
- *    contain `data-erfana-el`, and has at most 100,000 eligible elements;
+ * 5. the file is at most `COMMENT_FILE_MAX_BYTES` (25 MB, every page the
+ *    preview serves), has at most `COMMENT_MAX_TOKENS_PER_DOCUMENT` start
+ *    tags (counted before the parse), decodes losslessly as UTF-8, and does
+ *    not already contain `data-erfana-el`;
  * 6. the parse worker answered.
  *
  * When comments were expected (4) but a later check fails, the raw bytes go
@@ -28,7 +30,10 @@
  * The parse runs in the persistent worker (R3-12); every instrumented load is
  * registered in the view's {@link ElementTokenTable} with its blocks resolved
  * to tokens from the bytes actually served. Nothing here throws into the
- * handler: any failure serves the raw bytes.
+ * handler: any failure serves the raw bytes. The bytes are LENT to the worker
+ * (§19 Rev 4): the raw body served after a failure is the one the worker
+ * handed back, and when the worker died holding it (a timeout, a crash)
+ * `bodyFor` answers `undefined` – the handler reads the file again.
  */
 import { BLOCK_MARKER } from '../../../../shared/htmlComments'
 import { createDropReporter, type DropReporter } from '../../../../shared/dropReporter'
@@ -113,8 +118,12 @@ export function decideCommentServing(
 
 /** One view's comment instrumentation, hung on its protocol handler. */
 export interface PreviewCommentServing {
-  /** The body to serve for a confined, read request. Never rejects. */
-  bodyFor(request: CommentServeRequest): Promise<Buffer>
+  /**
+   * The body to serve for a confined, read request. Never rejects.
+   * `undefined`: the request's bytes were lent to the parse worker and lost
+   * with it – read the file again and serve it raw.
+   */
+  bodyFor(request: CommentServeRequest): Promise<Buffer | undefined>
   /** The view's per-load token tables. */
   readonly tokens: ElementTokenTable
   /** Comment mode for the view (P5 drives it); on, a file without blocks is instrumented too. */
@@ -132,6 +141,16 @@ export interface PreviewCommentServingDeps {
   readonly client?: Pick<CommentParseClient, 'instrument' | 'warm'>
   readonly now?: () => number
   readonly registerE2e?: (source: CommentE2eSource) => () => void
+}
+
+/**
+ * The raw body after the worker answered without an instrumented copy: the
+ * bytes it handed back, the request's own when they were never lent (their
+ * length is unchanged), or `undefined` when they were lent and lost.
+ */
+function rawBodyAfter(handedBack: Uint8Array | undefined, own: Buffer, length: number): Buffer | undefined {
+  if (handedBack !== undefined) return Buffer.from(handedBack.buffer, handedBack.byteOffset, handedBack.byteLength)
+  return own.length === length ? own : undefined
 }
 
 function unavailableLog(now: () => number): DropReporter {
@@ -185,24 +204,26 @@ export function createPreviewCommentServing(
   const instrument = async (
     request: CommentServeRequest,
     scope: CommentLoadScope
-  ): Promise<Buffer> => {
+  ): Promise<Buffer | undefined> => {
     const started = now()
+    const length = request.body.length
     const result = await client.instrument(request.body)
     if (result.kind === 'failed') {
       markUnavailable(request.realPath, 'parse-failed', result.failure)
-      return request.body
+      return rawBodyAfter(result.raw, request.body, length)
     }
     if (result.kind === 'unavailable') {
       markUnavailable(request.realPath, result.reason)
-      return request.body
+      return rawBodyAfter(result.raw, request.body, length)
     }
-    if (disposed) return request.body
+    if (disposed) return rawBodyAfter(result.raw, request.body, length)
     tokens.register({
       realPath: request.realPath,
       scope,
       fileHash: result.fileHash,
       tokens: result.tokens,
       offsets: result.offsets,
+      lines: result.lines,
       tagCodes: result.tagCodes,
       tagNames: result.tagNames,
       blocks: result.blocks
@@ -226,6 +247,7 @@ export function createPreviewCommentServing(
   return {
     tokens,
     async bodyFor(request) {
+      const length = request.body.length
       try {
         if (disposed) return request.body
         const decision = decideCommentServing(request, { enabled: isEnabled(), commentMode })
@@ -236,7 +258,8 @@ export function createPreviewCommentServing(
         return await instrument(request, decision.scope)
       } catch (error) {
         logger.error('Preview comments: instrumentation failed', redactedLogError(error))
-        return request.body
+        // A view that lost its length was lent, and its bytes went with the throw.
+        return rawBodyAfter(undefined, request.body, length)
       }
     },
     setCommentMode(on) {

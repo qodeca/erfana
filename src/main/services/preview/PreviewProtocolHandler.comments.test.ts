@@ -21,6 +21,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ELEMENT_TOKEN_ATTRIBUTE, indexHtml } from '../../../shared/htmlComments'
 import { commentedPage } from './comments/__test-helpers__/commentedPages'
 import { instrumentDocument } from './comments/commentParseCore'
+import type { CommentParseResult } from './comments/CommentParseWorkerAdapter'
 import { attach as attachHandler } from './PreviewProtocolHandler'
 import { attach as attachFilter } from './PreviewRequestFilter'
 import {
@@ -56,8 +57,12 @@ function pageScopes(): PreviewSessionPageScopes {
   return { committed: () => page, forMainDocument: () => page, recordViewFailure: vi.fn() }
 }
 
+type InstrumentClient = { instrument: (bytes: Uint8Array) => Promise<CommentParseResult>; warm: () => void }
+
 /** One preview session over `root`: filter, ledger, handler and comment context. */
-function openSession() {
+function openSession(
+  client: InstrumentClient = { instrument: async bytes => instrumentDocument(bytes), warm: () => {} }
+) {
   const contexts: PreviewSessionContexts = buildPreviewSessionContexts({
     token: TOKEN,
     resolve: host => (host === TOKEN ? { realRoot: root, csp: CSP } : null),
@@ -66,7 +71,7 @@ function openSession() {
     onBlocked: vi.fn(),
     comments: {
       isEnabled: () => enabled,
-      client: { instrument: async bytes => instrumentDocument(bytes), warm: () => {} },
+      client,
       registerE2e: () => () => {}
     }
   })
@@ -266,6 +271,35 @@ describe('the ledger fix (S1e, R3-1)', () => {
     const taken = harness.note('index.html', 'mainFrame')
     expect(await (await harness.serve('index.html')).text()).toMatch(HAS_TOKEN)
     expect(() => harness.fail(taken)).not.toThrow()
+  })
+})
+
+describe('§19 Rev 4 bytes lent to the parse worker', () => {
+  /** A worker that took the bytes as a transfer and died with them: the handler's view is empty. */
+  function losingClient(before: () => void = () => {}): InstrumentClient {
+    return {
+      instrument: async bytes => {
+        structuredClone(bytes.buffer, { transfer: [bytes.buffer as ArrayBuffer] })
+        before()
+        return { kind: 'failed', failure: 'crashed' }
+      },
+      warm: () => {}
+    }
+  }
+
+  it('reads the file again and serves it raw when the worker lost the bytes it was lent', async () => {
+    harness.close()
+    harness = openSession(losingClient())
+    const response = await harness.loadDocument('index.html')
+    expect(response.status).toBe(200)
+    expect(Buffer.from(await response.arrayBuffer()).equals(readFileSync(join(root, 'index.html')))).toBe(true)
+    expect(harness.comments.unavailableReason(realpathSync.native(join(root, 'index.html')))).toBe('parse-failed')
+  })
+
+  it('answers 503 when the file cannot be read again either', async () => {
+    harness.close()
+    harness = openSession(losingClient(() => rmSync(join(root, 'index.html'))))
+    expect((await harness.loadDocument('index.html')).status).toBe(503)
   })
 })
 

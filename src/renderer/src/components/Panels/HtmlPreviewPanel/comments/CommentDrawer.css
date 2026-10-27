@@ -113,6 +113,17 @@
   font-size: var(--text-base);
 }
 
+/* Main left files out of the list (design §19 Rev 4). Above the scroll, not in
+   it: the windowed list's offset is measured once per filter, and the note
+   stays in view however far the list scrolls. */
+.erf-comment-drawer__note {
+  flex: 0 0 auto;
+  padding: var(--space-6) var(--space-8) 0;
+}
+.erf-comment-drawer__note > .erf-comment-banner {
+  margin-block-end: 0;
+}
+
 .erf-comment-drawer__scroll {
   /* The windowed list measures its offset from here. */
   position: relative;

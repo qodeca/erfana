@@ -22,6 +22,12 @@
  * - Every refusal, and the unsaved banner clearing, is also spoken from the
  *   window's assertive region (`useCommentAlert`).
  * - Busy is `aria-disabled` "Saving…": focus stays where the user pressed.
+ * - **Still saving** (`COMMENT_SAVE_PENDING`): the info banner, the field
+ *   read-only and no Save while a write for this element is outstanding
+ *   (`commentPendingWrites`) – in this window or one closed earlier. Main says
+ *   how it ended: landed, the panel announces it and closes the window; refused,
+ *   the banner turns into the refusal and Save comes back, text kept. The
+ *   editor's autosave stays held until then, not just until the answer.
  *
  * @module HtmlPreviewPanel/comments/NewCommentView
  */
@@ -29,6 +35,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { CommentSaveResult } from '../../../../../../shared/ipc/preview-comment-schema'
 import { ErrorCode } from '../../../../../../shared/errors'
 import { commentDrafts } from '../../../../stores/usePreviewCommentStore'
+import { useLatestRef } from '../../../../hooks/useLatestRef'
 import { useCommentDirtyGuard } from '../../../../hooks/useCommentDirtyGuard'
 import {
   COPY,
@@ -42,7 +49,7 @@ import {
   unsavedSourceText,
   type SaveFailureCopy
 } from './commentCopy'
-import { counterState, countCharacters } from './commentFormat'
+import { counterState, countCharacters, visibleString } from './commentFormat'
 import { validateCommentText, type IdentityFormData } from './commentSchemas'
 import {
   ActionButton,
@@ -53,6 +60,7 @@ import {
 } from './CommentParts'
 import { IdentityEditor } from './IdentityStep'
 import { useCommentAlert, useInnerStep } from './commentLive'
+import { onCommentWriteSettled, trackCommentWrite, useCommentWritePending } from './commentPendingWrites'
 import { draftKeyOf, type CommentWindowRequest } from './commentWindowTypes'
 import { TEST_IDS } from '../../../../constants/testids'
 
@@ -95,7 +103,8 @@ export function NewCommentView({
   textareaRef
 }: NewCommentViewProps): React.JSX.Element {
   const key = draftKeyOf(request)
-  const file = request.file.displayPath
+  // Every sentence naming the file shows its bidi and invisible characters as tokens (S-L-B).
+  const file = visibleString(request.file.displayPath)
   const [text, setText] = useState(() => commentDrafts.get(key))
   const [restored] = useState(() => commentDrafts.get(key) !== '')
   const [fieldError, setFieldError] = useState<string | null>(null)
@@ -120,10 +129,12 @@ export function NewCommentView({
   const unsaved = guard.state !== 'clean' || (refusedUnsaved && !guard.justSaved)
   const count = countCharacters(text)
   const fieldBlocked = text.trim() === '' || counterState(count) === 'over'
-  // No second Save once the draft is spent – or still being written (pending).
-  const closedOff =
-    failure?.action === 'close' || failure?.action === 'pick-again' || failure?.action === 'pending'
-  const saveBlocked = saving || unsaved || fieldBlocked || closedOff
+  // A write for this element is still being written – this window's own, or
+  // one sent from a window closed meanwhile (same session draft): no second.
+  const pending = useCommentWritePending(request.panelId, key) && !saving
+  // No second Save once the draft is spent.
+  const closedOff = failure?.action === 'close' || failure?.action === 'pick-again'
+  const saveBlocked = saving || pending || unsaved || fieldBlocked || closedOff
   const clearedText =
     guard.cleared === 'saved' ? COPY.unsavedCleared : guard.cleared === 'clean' ? COPY.unsavedGone : null
 
@@ -145,8 +156,39 @@ export function NewCommentView({
     }
   }, [changingIdentity])
 
+  /** A refused save – answered, or settled after a pending answer: say why, keep the text. */
+  const refused = (code: string): void => {
+    const copy = saveFailureCopy(code, file)
+    if (copy.action === 'identity') {
+      onIdentityRequired()
+      return
+    }
+    if (copy.action === 'unsaved') {
+      setRefusedUnsaved(true)
+      alert(unsavedSourceText(file))
+      return
+    }
+    setFailure(copy)
+    alert(copy.text)
+  }
+  const refusedRef = useLatestRef(refused)
+
+  // A pending write for this element settled. Landed: the panel announces it
+  // and closes the window that sent it; an earlier window's text is spent.
+  // Refused: the refusal replaces "Still saving…", and Save is back.
+  const { draftToken } = request
+  useEffect(
+    () =>
+      onCommentWriteSettled(settled => {
+        if (settled.draftKey !== key || !mounted.current) return
+        if (!settled.event.ok) refusedRef.current(settled.event.code ?? ErrorCode.COMMENT_WRITE_FAILED)
+        else if (settled.request.op === 'add' && settled.request.draftToken !== draftToken) setText('')
+      }),
+    [key, draftToken, refusedRef]
+  )
+
   const save = async (): Promise<void> => {
-    if (saving || closedOff) return
+    if (saving || pending || closedOff) return
     const result = validateCommentText(text)
     if (!result.ok) {
       setFieldError(result.error)
@@ -157,33 +199,27 @@ export function NewCommentView({
     setSaving(true)
     setFailure(null)
     // Autosave held for the write, so a keystroke-triggered save of the same
-    // file cannot land between main's re-read and its rename (§7.8).
-    const release = guard.holdForWrite()
+    // file cannot land between main's re-read and its rename (§7.8) – until
+    // the write settles, which for a pending answer is after the answer.
+    const write = trackCommentWrite(
+      { panelId: request.panelId, op: 'add', draftToken, text: result.text },
+      { file, draftKey: key, release: guard.holdForWrite() }
+    )
     let answer: CommentSaveResult
     try {
       answer = await onSave(result.text)
-    } finally {
-      release()
+    } catch {
+      // The gateway never rejects; a caller that does still ends the write.
+      answer = { ok: false, code: ErrorCode.UNKNOWN_ERROR }
     }
+    write.answered(answer)
+    // Spent even if the window closed meanwhile (L1).
+    if (answer.ok) commentDrafts.clear(key)
     if (!mounted.current) return
     setSaving(false)
-    if (answer.ok) {
-      commentDrafts.clear(key)
-      onSaved()
-      return
-    }
-    const copy = saveFailureCopy(answer.code, file)
-    if (copy.action === 'identity') {
-      onIdentityRequired()
-      return
-    }
-    if (copy.action === 'unsaved' || answer.code === ErrorCode.COMMENT_UNSAVED_SOURCE) {
-      setRefusedUnsaved(true)
-      alert(unsavedSourceText(file))
-      return
-    }
-    setFailure(copy)
-    alert(copy.text)
+    if (answer.ok) onSaved()
+    else if (answer.code === ErrorCode.COMMENT_SAVE_PENDING) alert(saveFailureCopy(answer.code, file).text)
+    else refused(answer.code)
   }
 
   const unsavedBanner = unsaved ? (
@@ -237,6 +273,7 @@ export function NewCommentView({
           error={fieldError ?? (counterState(count) === 'over' ? tooLongText(count) : null)}
           placeholder={COPY.placeholder}
           restored={restored}
+          readOnly={pending}
           textareaRef={textareaRef}
           testId={TEST_IDS.COMMENT_NEW_FIELD}
         />
@@ -271,23 +308,29 @@ export function NewCommentView({
             </button>
           </p>
         )}
-        {failure !== null && (
-          <CommentBanner
-            kind={failure.action === 'pending' ? 'info' : 'error'}
-            after
-            testId={TEST_IDS.COMMENT_SAVE_ERROR}
-            actions={
-              failure.action === 'pick-again' ? (
-                <ActionButton onClick={onPickAgain}>{COPY.pickAgain}</ActionButton>
-              ) : undefined
-            }
-          >
-            {failure.text}
+        {pending ? (
+          <CommentBanner kind="info" after testId={TEST_IDS.COMMENT_SAVE_ERROR}>
+            {saveFailureCopy(ErrorCode.COMMENT_SAVE_PENDING, file).text}
           </CommentBanner>
+        ) : (
+          failure !== null && (
+            <CommentBanner
+              kind="error"
+              after
+              testId={TEST_IDS.COMMENT_SAVE_ERROR}
+              actions={
+                failure.action === 'pick-again' ? (
+                  <ActionButton onClick={onPickAgain}>{COPY.pickAgain}</ActionButton>
+                ) : undefined
+              }
+            >
+              {failure.text}
+            </CommentBanner>
+          )
         )}
       </div>
       <div className="erf-comment-window__foot">
-        {closedOff && (failure?.action === 'close' || failure?.action === 'pending') ? (
+        {pending || failure?.action === 'close' ? (
           <DialogButton variant="secondary" onClick={onCancel} testId={TEST_IDS.COMMENT_CLOSE}>
             {COPY.close}
           </DialogButton>

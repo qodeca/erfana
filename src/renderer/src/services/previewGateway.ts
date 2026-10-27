@@ -67,5 +67,6 @@ export const previewCommentsGateway: PreviewCommentsBridge = {
   onDraftOpened: (...args) => commentsBridge().onDraftOpened(...args),
   onCommentsChanged: (...args) => commentsBridge().onCommentsChanged(...args),
   onAnchorStatus: (...args) => commentsBridge().onAnchorStatus(...args),
-  onModeChanged: (...args) => commentsBridge().onModeChanged(...args)
+  onModeChanged: (...args) => commentsBridge().onModeChanged(...args),
+  onSaveSettled: (...args) => commentsBridge().onSaveSettled(...args)
 }

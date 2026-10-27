@@ -32,10 +32,12 @@ import {
   newerBlock,
   tokenOf
 } from './__test-helpers__/commentedPages'
+import { lineAt } from './commentDraftCore'
 import {
   NO_TARGET,
   TOKEN_CHARS,
   instrumentDocument,
+  linesAt,
   pooledRandom,
   tokenIndexAt
 } from './commentParseCore'
@@ -142,9 +144,40 @@ describe('instrumentDocument – the served copy', () => {
     })
   })
 
-  it('a file over the 4 MB comment limit is refused before it is decoded', () => {
+  it('§19 Rev 4 a file over the 25 MB comment limit is refused before it is decoded; one of exactly 25 MB is decoded', () => {
+    const atLimit = new Uint8Array(PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES).fill(0xff)
+    expect(instrumentDocument(atLimit)).toEqual({ kind: 'unavailable', reason: 'encoding' })
     const bytes = new Uint8Array(PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES + 1).fill(0x20)
     expect(instrumentDocument(bytes)).toEqual({ kind: 'unavailable', reason: 'too-large' })
+  })
+
+  it('§19 Rev 4 more start tags than the cap are refused before the decode and the parse, so no tree is built', () => {
+    const cap = PREVIEW_LIMITS.COMMENT_MAX_TOKENS_PER_DOCUMENT
+    // Invalid UTF-8 at the end: refused for its start tags, not for its encoding.
+    const over = encodeText(`${'<a>'.repeat(cap + 1)}`)
+    expect(instrumentDocument(Uint8Array.from([...over, 0xff]))).toEqual({ kind: 'unavailable', reason: 'too-many-elements' })
+    expect(instrumentDocument(encodeText('<p>a</p><p>b</p><p>c</p>'), { maxTokens: 3 }).kind).toBe('ok')
+  })
+
+  it('§19 Rev 4 the start-tag count is an upper bound: a `<` and a letter in a script counts too', () => {
+    const page = encodeText('<script>if (a<b) go()</script><p>x</p>')
+    expect(indexHtml('<script>if (a<b) go()</script><p>x</p>').elements).toHaveLength(1)
+    expect(instrumentDocument(page, { maxTokens: 2 })).toEqual({ kind: 'unavailable', reason: 'too-many-elements' })
+    expect(instrumentDocument(page, { maxTokens: 3 }).kind).toBe('ok')
+  })
+
+  it('S-M a page under the start-tag cap that makes the parser build or work far past its size is refused in bounded time', () => {
+    // 17 KB that re-opens 1,000 formatting elements in 2,000 paragraphs; 100,000 unclosed <div>; one tag past the attribute cap.
+    let reopened = '<!doctype html><body><p>'
+    for (let i = 0; i < 1_000; i += 1) reopened += `<b a=${i}>`
+    reopened += '<p>x'.repeat(2_000)
+    let flood = '<a'
+    for (let i = 0; i <= PREVIEW_LIMITS.COMMENT_MAX_ATTRIBUTES_PER_TAG; i += 1) flood += ` a${i}`
+    for (const page of [reopened, `<body>${'<div>'.repeat(100_000)}`, `${flood}>`]) {
+      const started = performance.now()
+      expect(instrumentDocument(encodeText(page))).toEqual({ kind: 'unavailable', reason: 'too-many-elements' })
+      expect(performance.now() - started).toBeLessThan(3_000)
+    }
   })
 
   it('hashes the ORIGINAL bytes, not the served copy', () => {
@@ -163,11 +196,14 @@ describe('instrumentDocument – the token table', () => {
 
     expect(doc.tokens.length).toBe(doc.offsets.length * TOKEN_CHARS)
     expect(doc.tagCodes.length).toBe(doc.offsets.length)
+    expect(doc.lines.length).toBe(doc.offsets.length)
     for (let i = 0; i < doc.offsets.length; i += 1) {
       const offset = doc.offsets[i]
       const tag = doc.tagNames[doc.tagCodes[i]]
       if (i > 0) expect(offset).toBeGreaterThan(doc.offsets[i - 1])
       expect(page[offset]).toBe('<')
+      // S-L-A: the line the picker announces is the menu's line for the element.
+      expect(doc.lines[i]).toBe(lineAt(page, offset))
       expect(original.elementAt(offset)?.tag).toBe(tag)
       // The same element in the served copy carries exactly this token.
       expect(servedElement(html, tokenOf(doc, i)).tag).toBe(tag)
@@ -259,6 +295,14 @@ describe('helpers', () => {
       NO_TARGET
     ])
     expect(tokenIndexAt(new Int32Array(0), 0)).toBe(NO_TARGET)
+  })
+
+  it('linesAt numbers ascending offsets in one pass, counting lines as the menu does', () => {
+    const text = 'a\nb\r\nc\rd\n\ne'
+    const offsets = [0, 2, 5, 7, 9, 10]
+    expect([...linesAt(text, offsets)]).toEqual(offsets.map(offset => lineAt(text, offset)))
+    expect([...linesAt(text, offsets)]).toEqual([1, 2, 3, 3, 4, 5])
+    expect(linesAt('', [])).toHaveLength(0)
   })
 
   it('pooledRandom hands out fresh bytes across pool refills and for oversized requests', () => {

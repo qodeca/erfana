@@ -7,6 +7,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import { encodeText } from '../../../../shared/htmlComments'
+import { PREVIEW_LIMITS } from '../../../../shared/preview-limits'
 import { commentedPage, expectInstrumented, tokenOf } from './__test-helpers__/commentedPages'
 import { NO_TARGET, instrumentDocument, type CommentLoadBlock } from './commentParseCore'
 import {
@@ -44,6 +45,7 @@ function load(
     fileHash: `hash-of-${realPath}`,
     tokens: tokens.join(''),
     offsets: Int32Array.from(tokens, (_, i) => i * 10),
+    lines: Uint32Array.from(tokens, (_, i) => i + 1),
     tagCodes: Uint32Array.from(tokens, (_, i) => i % 2),
     tagNames: ['div', 'p'],
     blocks: options.blocks ?? []
@@ -56,7 +58,7 @@ function nth(input: CommentLoadInput, i: number): string {
 }
 
 describe('ElementTokenTable lookups', () => {
-  it('names the element a token marks: path, load, hash, start offset and tag', () => {
+  it('names the element a token marks: path, load, hash, start offset, line and tag', () => {
     const table = new ElementTokenTable()
     const input = load(PAGE, 'page')
     const id = table.register(input)
@@ -66,6 +68,7 @@ describe('ElementTokenTable lookups', () => {
       loadId: id,
       fileHash: `hash-of-${PAGE}`,
       startOffset: 20,
+      line: 3,
       tagName: 'div'
     })
     expect(table.lookup(id, nth(input, 1))?.tagName).toBe('p')
@@ -205,6 +208,16 @@ describe('ElementTokenTable generations and eviction', () => {
     expect(table.view(ids[0])).toBeUndefined()
     expect(table.view(ids[1])?.tokenCount).toBe(big)
     expect(table.view(ids[2])?.tokenCount).toBe(big)
+  })
+
+  it('§19 Rev 4 keeps the largest page served with tokens while its frames load after it', () => {
+    const table = new ElementTokenTable()
+    const cap = PREVIEW_LIMITS.COMMENT_MAX_TOKENS_PER_DOCUMENT
+    expect(MAX_TOKENS).toBe(2 * cap)
+    const page = table.register(load(PAGE, 'page', { count: cap }))
+    const frames = [1, 2, 3].map(n => table.register(load(OTHER, 'frame', { count: Math.floor(cap / 3), prefix: `f${n}aaaa` })))
+    expect(table.view(page)?.tokenCount).toBe(cap)
+    expect(frames.every(id => table.view(id) !== undefined)).toBe(true)
   })
 
   it('never evicts the load it just registered, even past the token budget', () => {

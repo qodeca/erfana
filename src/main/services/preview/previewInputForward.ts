@@ -26,6 +26,7 @@
  * @see docs/designs/design-issue-124-part3.md §3.7
  */
 
+import { COMMENT_MODE_KEY, matchCommentModeKey } from '../../../shared/commentModeKey'
 import { matchPreviewNavKey, type PreviewNavAction } from '../../../shared/previewNavKeys'
 
 /** A forwarded key. `accel` true ⇒ requires Cmd (macOS) / Ctrl (else). */
@@ -70,19 +71,15 @@ export const PREVIEW_FORWARDED_SHORTCUTS = Object.freeze([
 /**
  * The comment-mode toggle: Ctrl+Alt+M, Cmd+Option+M on macOS. Its own frozen
  * row, outside the list above, because it is taken only while comments are on
- * for the view – off, the chord stays with the page. Matched on the TYPED key,
- * never the physical one: AltGr is Ctrl+Alt on Windows, and AltGr+M types µ on
- * a German layout, which must go on typing µ. On macOS Option changes the
- * typed character with the layout (µ on ABC, Ķ on Polish), and with Cmd down
- * that is still this chord (AltGr does not exist there), so the physical KeyM
- * stands in – only when the typed key is not printable ASCII, so a layout
- * whose M position types another letter keeps its chord (the renderer's
- * `usePreviewComments` rule, L14).
+ * for the view – off, the chord stays with the page. Which key press it is –
+ * the typed `m`, the physical KeyM on macOS only for a non-ASCII character –
+ * is the one rule in `src/shared/commentModeKey.ts`, which the panel's own
+ * chrome asks too (M3).
  */
 export const PREVIEW_COMMENT_TOGGLE = Object.freeze({
   key: 'comment-mode',
-  typed: 'm',
-  darwinCode: 'KeyM'
+  typed: COMMENT_MODE_KEY.typed,
+  darwinCode: COMMENT_MODE_KEY.macCode
 } as const)
 
 /** What the forwarder asks about the view's comments, per key press. */
@@ -168,26 +165,16 @@ export function matchForwardedShortcut(
 }
 
 /**
- * Whether a key press is the comment-mode toggle: the typed `m` (on macOS
- * also the M key typing a non-ASCII character) with exactly Ctrl+Alt, or
- * Cmd+Option on macOS – Shift never.
+ * Whether a key press is the comment-mode toggle – the shared rule
+ * (`matchCommentModeKey`): the typed `m` (on macOS also the M key typing a
+ * non-ASCII character) with exactly Ctrl+Alt, or Cmd+Option on macOS – Shift
+ * never.
  */
 export function matchCommentToggle(
   input: ForwardableInput,
   platform: NodeJS.Platform = process.platform
 ): boolean {
-  if (input.type !== 'keyDown' || input.shift) {
-    return false
-  }
-  const typed = input.key.toLowerCase()
-  if (platform === 'darwin') {
-    const typedAscii = input.key.length === 1 && input.key >= ' ' && input.key <= '~'
-    const isM =
-      typed === PREVIEW_COMMENT_TOGGLE.typed ||
-      (input.code === PREVIEW_COMMENT_TOGGLE.darwinCode && !typedAscii)
-    return input.meta && input.alt && !input.control && isM
-  }
-  return input.control && input.alt && !input.meta && typed === PREVIEW_COMMENT_TOGGLE.typed
+  return matchCommentModeKey(input, platform === 'darwin')
 }
 
 /** One row of the frozen list against one key press. */

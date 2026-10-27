@@ -292,3 +292,87 @@ describe('picker edges', () => {
     expect(label()).toBe('li#one800×40')
   })
 })
+
+describe('a pick’s menu or window holds the picker on its element (macOS: the view hides under the pointer)', () => {
+  /** A leave with no `relatedTarget`: the pointer left the page – or the view hid under it. */
+  const leave = (): void => dispatchTrusted(document, new MouseEvent('pointerout', { bubbles: true, relatedTarget: null }))
+  /** The view hidden behind its still frame, or shown again, as Chromium reports it to the page. */
+  const pageHidden = (hidden: boolean): void => {
+    if (hidden) Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' })
+    else delete (document as unknown as Record<string, unknown>).visibilityState
+    dispatchTrusted(document, new Event('visibilitychange'))
+  }
+  const outlineGone = (): boolean => h.root()?.querySelector('.erf-hpc-label')?.classList.contains('erf-hpc-hidden') === true
+  const altUp = (): void => void userKey({ key: 'ArrowUp', code: 'ArrowUp', altKey: true })
+
+  afterEach(() => {
+    delete (document as unknown as Record<string, unknown>).visibilityState
+  })
+
+  it.each([
+    ['Enter', () => void userKey({ key: 'Enter' })],
+    ['a click', () => void userMouse(byId('one'), 'click', { x: 10, y: 60, button: 0 })],
+    ['a right-click', () => void userMouse(byId('one'), 'contextmenu', { x: 10, y: 60, button: 2 })]
+  ])('hover → %s → window open → the leave on hide → window closed: Alt+↑ starts from the pick’s parent', (_, pick) => {
+    userMove(10, 60) // li#one
+    pick()
+    expect(picks()).toHaveLength(1)
+    pageHidden(true)
+    leave()
+    h.controller.renderNow()
+    expect(label()).toBe('li#one800×40')
+    pageHidden(false)
+    altUp()
+    expect(spoken()).toBe('showing ul#list')
+  })
+
+  it('holds it when the leave comes before the page is hidden, and through a move that lands while it is', () => {
+    userMove(10, 60)
+    userKey({ key: 'Enter' })
+    leave()
+    pageHidden(true)
+    userMove(10, 60)
+    leave()
+    pageHidden(false)
+    h.controller.renderNow()
+    expect(label()).toBe('li#one800×40')
+    altUp()
+    expect(spoken()).toBe('showing ul#list')
+  })
+
+  it('lets go at the first move on the shown page: a normal leave clears the outline again', () => {
+    userMove(10, 60)
+    userKey({ key: 'Enter' })
+    // The pointer was not over the view when it hid: no leave, only the hide.
+    pageHidden(true)
+    pageHidden(false)
+    userMove(12, 62) // still li#one
+    leave()
+    h.controller.renderNow()
+    expect(outlineGone()).toBe(true)
+  })
+
+  it('a leave while the page is hidden is not a leave, with no pick too (a dialog or another tab over the page)', () => {
+    userMove(10, 60)
+    pageHidden(true)
+    leave()
+    pageHidden(false)
+    h.controller.renderNow()
+    expect(label()).toBe('li#one800×40')
+    altUp()
+    expect(spoken()).toBe('showing ul#list')
+  })
+
+  it('a page’s own visibilitychange moves nothing', () => {
+    userMove(10, 60)
+    userKey({ key: 'Enter' })
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' })
+    document.dispatchEvent(new Event('visibilitychange'))
+    delete (document as unknown as Record<string, unknown>).visibilityState
+    // Had the forged hide counted, this move would end the hold and the leave clear the outline.
+    userMove(12, 62)
+    leave()
+    h.controller.renderNow()
+    expect(label()).toBe('li#one800×40')
+  })
+})

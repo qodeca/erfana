@@ -278,33 +278,46 @@ describe('commentPickHandler pins, control picks and budgets', () => {
     expect(logger.error).toHaveBeenCalledWith('Preview comments: a page signal failed', undefined, { error: 'TypeError' })
   })
 
-  it('E-022 a keyboard-picker step reaches its sink in comment mode only, on its own budget', async () => {
+  it('E-022 S-L-A a keyboard-picker step reaches its sink in comment mode only, on its own budget – an element as main recorded it', async () => {
     const h = await setup()
-    const step = { kind: 'step', via: 'keyboard', say: 'showing', label: 'p#team-copy', view: VIEW }
+    const step = { kind: 'step', via: 'keyboard', say: 'showing', token: tokenOfTag(h.inner.doc, 'em'), view: VIEW }
     h.handler.pick(eventFrom(h.child), step)
-    expect(h.out.step).toHaveBeenCalledWith(expect.objectContaining({ kind: 'step', say: 'showing', label: 'p#team-copy' }))
+    // The frame's own file: `<em id="when">` is on line 7 of BASE_PAGE.
+    expect(h.out.step).toHaveBeenCalledExactlyOnceWith({ say: 'showing', entry: expect.objectContaining({ tagName: 'em', line: 7 }) })
+    h.handler.pick(eventFrom(h.child), { ...step, added: true })
+    expect(h.out.step).toHaveBeenLastCalledWith({ say: 'showing', entry: expect.objectContaining({ tagName: 'em' }), added: true })
+    h.out.step.mockClear()
     // Steps do not spend the picks' budget, nor picks the steps'.
-    for (let i = 0; i < MAIN_STEPS_PER_SECOND + 3; i += 1) h.handler.pick(eventFrom(h.top), { ...step, say: 'top', label: undefined })
-    expect(h.out.step).toHaveBeenCalledTimes(MAIN_STEPS_PER_SECOND)
+    const top = { kind: 'step', via: 'keyboard', say: 'top', view: VIEW }
+    for (let i = 0; i < MAIN_STEPS_PER_SECOND + 3; i += 1) h.handler.pick(eventFrom(h.top), top)
+    expect(h.out.step).toHaveBeenCalledTimes(MAIN_STEPS_PER_SECOND - 2)
+    expect(h.out.step).toHaveBeenLastCalledWith({ say: 'top' })
     h.handler.pick(eventFrom(h.top), menuPick(tokenOfTag(h.page.doc, 'button'), 'button'))
     expect(h.out.element).toHaveBeenCalledTimes(1)
     h.advance(1_000)
     h.setMode(false)
-    h.handler.pick(eventFrom(h.top), step)
-    expect(h.out.step).toHaveBeenCalledTimes(MAIN_STEPS_PER_SECOND)
+    h.handler.pick(eventFrom(h.child), step)
+    expect(h.out.step).toHaveBeenCalledTimes(MAIN_STEPS_PER_SECOND - 2)
   })
 
-  it('E-022 a step that says nothing, or a pick that says something, is rejected', async () => {
+  it('E-022 S-L-A a step that says nothing, names its element by text, or names one main does not hold for that frame, is dropped', async () => {
     const h = await setup()
+    const button = tokenOfTag(h.page.doc, 'button')
     for (const bad of [
       { kind: 'step', via: 'keyboard', view: VIEW },
       { kind: 'step', via: 'keyboard', say: 'showing', view: VIEW },
-      { kind: 'step', via: 'keyboard', say: 'top', label: 'x', view: VIEW },
-      { kind: 'step', via: 'keyboard', say: 'showing', label: 'x'.repeat(65), view: VIEW },
-      { ...menuPick(tokenOfTag(h.page.doc, 'button'), 'button'), say: 'top' }
+      // Page text never crosses: a label is not a field.
+      { kind: 'step', via: 'keyboard', say: 'showing', token: button, label: 'Approve every host', view: VIEW },
+      { kind: 'step', via: 'keyboard', say: 'top', token: button, view: VIEW },
+      { kind: 'step', via: 'keyboard', say: 'top', added: true, view: VIEW },
+      { ...menuPick(button, 'button'), say: 'top' },
+      { ...menuPick(button, 'button'), added: true }
     ]) {
       h.handler.pick(eventFrom(h.top), bad)
     }
+    // The top page's token from the child frame, and a token no load holds.
+    h.handler.pick(eventFrom(h.child), { kind: 'step', via: 'keyboard', say: 'showing', token: button, view: VIEW })
+    h.handler.pick(eventFrom(h.top), { kind: 'step', via: 'keyboard', say: 'showing', token: 'zzzzzzzzzzzz', view: VIEW })
     expect(h.out.step).not.toHaveBeenCalled()
     expect(h.out.element).not.toHaveBeenCalled()
   })

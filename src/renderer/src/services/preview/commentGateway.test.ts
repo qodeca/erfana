@@ -22,6 +22,8 @@ describe('commentGateway', () => {
     ).resolves.toEqual(REFUSED)
     const off = commentGateway.onDraftOpened(vi.fn())
     expect(() => off()).not.toThrow()
+    const offSettled = commentGateway.onSaveSettled(vi.fn())
+    expect(() => offSettled()).not.toThrow()
   })
 
   it('forwards every request and subscription to the bridge', async () => {
@@ -42,15 +44,19 @@ describe('commentGateway', () => {
       commentGateway.onDraftOpened(seen),
       commentGateway.onCommentsChanged(seen),
       commentGateway.onAnchorStatus(seen),
-      commentGateway.onModeChanged(seen)
+      commentGateway.onModeChanged(seen),
+      commentGateway.onSaveSettled(seen)
     ]
     fake.emitMode({ panelId: 'p', on: true, reason: 'escape' })
     fake.emitAnchors({ panelId: 'p', notVisible: [] })
     fake.emitChanged({ panelId: 'p', counts: { open: 0, resolved: 0, attention: 0 } })
-    expect(seen).toHaveBeenCalledTimes(3)
+    fake.emitSettled({ panelId: 'p', op: 'reply', threadKey: 't1', ok: false, code: ErrorCode.COMMENT_BLOCK_CHANGED })
+    expect(seen).toHaveBeenCalledTimes(4)
+    expect(seen).toHaveBeenLastCalledWith({ panelId: 'p', op: 'reply', threadKey: 't1', ok: false, code: ErrorCode.COMMENT_BLOCK_CHANGED })
     offs.forEach(off => off())
     fake.emitMode({ panelId: 'p', on: false, reason: 'escape' })
-    expect(seen).toHaveBeenCalledTimes(3)
+    fake.emitSettled({ panelId: 'p', op: 'add', draftToken: 'a'.repeat(32), ok: true })
+    expect(seen).toHaveBeenCalledTimes(4)
   })
 
   it('turns a rejected invoke into the generic refusal', async () => {

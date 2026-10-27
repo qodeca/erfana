@@ -104,7 +104,12 @@ describe('commentLive', () => {
   })
 
   it('E-022 words where the keyboard picker moved (§10.10 "Announce"), and nothing for another event', () => {
-    expect(pickerAnnouncement({ say: 'showing', label: 'p#team-copy' })).toBe('Showing p#team-copy.')
+    // S-L-A: main's facts – the parsed tag and its line – never the page's ids or classes.
+    expect(pickerAnnouncement({ say: 'showing', element: { tag: 'p', line: 12 } })).toBe('Showing p, line 12.')
+    expect(pickerAnnouncement({ say: 'showing', element: { tag: 'ul', line: 3, added: true } })).toBe(
+      'Showing an element added by a script, inside ul on line 3.'
+    )
+    expect(pickerAnnouncement({ say: 'showing', element: { line: 5 } })).toBe('Showing an element, line 5.')
     expect(pickerAnnouncement({ say: 'top' })).toBe('Top of page – no parent to select.')
     expect(pickerAnnouncement({ say: 'no-child' })).toBe('No child elements.')
     expect(pickerAnnouncement({})).toBeUndefined()

@@ -20,8 +20,9 @@
  *
  * A hostile page can still make the quotes slow to read: the text of nested
  * elements overlaps, so a long whitespace run inside thousands of nested
- * elements is read once per element. All quote reads of one parse therefore
- * share {@link QUOTE_READ_BUDGET}. A table that cannot be finished within it
+ * elements is read once per element. All quote reads of one parse – the
+ * position check's reads of single elements included (step 1, §19 Rev 4) –
+ * therefore share {@link QUOTE_READ_BUDGET}. A table that cannot be finished within it
  * is never used, and nothing new is read after it runs out, so the blocks
  * that still need the quote tier stay orphaned – never an error, never a
  * guess from half a table. A real page stays far below it.
@@ -34,11 +35,20 @@ import { exactOf, prefixOf, suffixOf, type WorkMeter } from './quoteText'
  * Characters the quote reads of one parse may visit in total. Reading the
  * quote and context of EVERY element of a dense 4 MB page (about 80,000
  * elements) visits 12–19 million, compact or pretty-printed; reading this
- * many takes about 0.3 s on the slowest box measured.
+ * many takes about 0.3 s on the slowest box measured. Kept at 25 MB (§19
+ * Rev 4): a table is built per tag, and the largest one-tag table of a dense
+ * 25 MB page (about 456,000 elements) visits 10.3 million – every tag of it
+ * together 61 million – so lost comments on a few tags still fit.
  */
 export const QUOTE_READ_BUDGET = 40_000_000
 
 type Elements = readonly IndexedElement[]
+
+/** The text just before and just after one element, as a quote stores it. */
+export interface QuoteContext {
+  readonly prefix: string
+  readonly suffix: string
+}
 
 /** Elements of one tag by context, alone and with the exact quote in front. */
 interface ContextTable {
@@ -117,6 +127,23 @@ export class AnchorLookup {
     return unique(
       exact ? context.byExactAndContext.get(pairKey(quote.exact, key)) : context.byContext.get(key)
     )
+  }
+
+  /**
+   * One element's exact quote, read on the shared budget – the position
+   * check of step 1 (`anchorEvidence.ts`). `undefined` once the budget is
+   * spent: a cut read is never compared.
+   */
+  exactQuote(el: IndexedElement): string | undefined {
+    const exact = exactOf(this.index, el, this.meter)
+    return this.budgetSpent ? undefined : exact
+  }
+
+  /** One element's prefix and suffix, read on the shared budget; `undefined` once it is spent. */
+  quoteContext(el: IndexedElement): QuoteContext | undefined {
+    const prefix = prefixOf(this.index, el, this.meter)
+    const suffix = suffixOf(this.index, el, this.meter)
+    return this.budgetSpent ? undefined : { prefix, suffix }
   }
 
   /** Eligible elements with `tag`, in index order. */

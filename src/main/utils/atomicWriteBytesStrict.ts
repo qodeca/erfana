@@ -100,8 +100,8 @@ export interface StrictWriteOptions {
   /**
    * The bytes the caller read themselves, whose hash is `expectedHash`. When
    * given, the re-read is compared with them byte for byte instead of being
-   * hashed – the stricter check, and a 4 MB SHA-256 is about 7 ms of the main
-   * thread on the slowest box measured.
+   * hashed – the stricter check, and a SHA-256 costs the main thread about
+   * 7 ms per 4 MB on the slowest box measured (45 ms at 25 MB).
    */
   readonly expectedBytes?: Uint8Array
   /** The file the caller read ({@link readFileNoFollow}); the target must still be that very file. */
@@ -181,17 +181,18 @@ function sameFile(a: FileId, b: FileId): boolean {
 
 /**
  * Read at most `maxBytes`; `undefined` when the file holds more. The size the
- * file reported only sizes the FIRST read – one byte over it, so a file read
- * whole ends on the next, empty read – and is never trusted: reads go on to
- * the end of the file whatever it said. A file that kept its size is read in
- * one call into one buffer, with no copy: each chunk costs the main thread a
- * thread-pool round trip, about 0.2 ms on the slowest box measured, 64 of
- * them for 4 MB.
+ * file reported only sizes the FIRST read, and is never trusted: reads go on
+ * to the end of the file whatever it said, so a file read whole ends on the
+ * next, empty read. A file that kept its size is read in one call into one
+ * buffer of exactly its size, with no copy: each chunk costs the main thread
+ * a thread-pool round trip, about 0.2 ms on the slowest box measured, 400 of
+ * them for 25 MB – and a buffer that is exactly the bytes is one the comment
+ * parse worker can be lent instead of a copy (§19 Rev 4).
  */
 async function readBounded(handle: FileHandle, maxBytes: number, sizeHint = 0): Promise<Buffer | undefined> {
   const chunks: Buffer[] = []
   let total = 0
-  let want = Math.min(Math.max(sizeHint + 1, READ_CHUNK_BYTES), maxBytes + 1)
+  let want = Math.min(Math.max(sizeHint, READ_CHUNK_BYTES), maxBytes + 1)
   for (;;) {
     // Zero-filled: a short read leaves no stale memory behind the bytes returned.
     const chunk = Buffer.alloc(want)
@@ -230,9 +231,10 @@ function identityFailure(opened: BigIntStats, named: BigIntStats): NoFollowReadF
  * Read a regular file without following a link (design §7.6 step 3; pattern
  * `previewPathResolve.ts` steps 8e–8g): `O_NOFOLLOW` open, the opened inode
  * must be the name's (a swap between open and read is `changed`), a symlink
- * or a second hard link is `link`, and at most `maxBytes` are read. Returns
- * the bytes and the {@link FileId} they were read from. The descriptor is
- * closed on every path.
+ * or a second hard link is `link`, and at most `maxBytes` are read. A file
+ * that already reports more than `maxBytes` is `too-large` without a read –
+ * the size may refuse, never admit. Returns the bytes and the {@link FileId}
+ * they were read from. The descriptor is closed on every path.
  */
 export async function readFileNoFollow(filePath: string, maxBytes: number): Promise<NoFollowRead> {
   let handle: FileHandle
@@ -245,6 +247,7 @@ export async function readFileNoFollow(filePath: string, maxBytes: number): Prom
     const opened = await handle.stat({ bigint: true })
     const failure = identityFailure(opened, await lstat(filePath, { bigint: true }))
     if (failure) return { ok: false, reason: failure }
+    if (opened.size > BigInt(maxBytes)) return { ok: false, reason: 'too-large' }
     const bytes = await readBounded(handle, maxBytes, Number(opened.size))
     return bytes ? { ok: true, bytes, id: fileIdOf(opened) } : { ok: false, reason: 'too-large' }
   } catch (error) {

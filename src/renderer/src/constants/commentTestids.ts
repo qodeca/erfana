@@ -175,6 +175,8 @@ export const COMMENT_TEST_IDS = {
   COMMENT_DRAWER_TAG: 'comment-drawer-tag',
   /** List read error with Try again */
   COMMENT_DRAWER_ERROR: 'comment-drawer-error',
+  /** Note: main left files out of the list (its file count or byte budget) */
+  COMMENT_DRAWER_UNREAD: 'comment-drawer-unread',
 
   // Settings
   /** Settings › Comments section */

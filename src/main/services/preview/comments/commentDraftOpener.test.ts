@@ -2,12 +2,13 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Opening drafts and pins (docs/designs/html-preview-comments.md §7.3, §7.7;
- * M-033, M-056).
+ * M-033, M-056; review findings M1, M4, L3).
  */
 import { rm, writeFile } from 'node:fs/promises'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ErrorCode } from '../../../../shared/errors'
 import type { CommentDraftOpened, CommentPick } from '../../../../shared/ipc/preview-comment-schema'
+import { CommentDraftOpenedSchema } from '../../../../shared/ipc/preview-comment-schema'
+import type { InstrumentedDocument } from './commentParseCore'
 import { commentedPage, damagedBlock, insertBefore } from './__test-helpers__/commentedPages'
 import { makeProject, type TempProject } from './__test-helpers__/commentWriterHarness'
 import { FakeFrame, frameFile, serveLoad, stubFrameFiles, tokenOfTag } from './__test-helpers__/commentServiceHarness'
@@ -32,7 +33,7 @@ afterEach(async () => {
   await project.dispose()
 })
 
-async function setup(html: string, unsaved = false) {
+async function setup(html: string) {
   const path = await project.write('index.html', html)
   const tokens = new ElementTokenTable()
   const files = stubFrameFiles()
@@ -62,7 +63,6 @@ async function setup(html: string, unsaved = false) {
     geometry: { viewRect: () => ({ x: 0, y: 0, width: 800, height: 600 }), contentBounds: () => ({ x: 0, y: 0 }), hostZoom: () => 1, pageZoom: () => 1, cursor: () => ({ x: 7, y: 8 }) },
     accent: [0xa0, 0xa8, 0xff],
     currentPage: () => path,
-    hasUnsavedSource: async () => unsaved,
     emit: payload => emitted.push(payload),
     jobs: createInProcessCommentFileJobs(),
     isCurrent: record => frames.get(record.ftn) === record
@@ -73,14 +73,47 @@ async function setup(html: string, unsaved = false) {
 
 const pick = (overrides: Partial<CommentPick> = {}): CommentPick => ({ kind: 'menu', via: 'pointer', view: VIEW, ...overrides }) as CommentPick
 
+/** Every token of `tag` in the served document, in source order. */
+function tokensOfTag(doc: InstrumentedDocument, tag: string): string[] {
+  const code = doc.tagNames.indexOf(tag)
+  const out: string[] = []
+  doc.tagCodes.forEach((value, index) => {
+    if (value === code) out.push(doc.tokens.slice(index * 12, (index + 1) * 12))
+  })
+  return out
+}
+
+const DRAFT_KEY = /^[0-9a-f]{32}$/
+
 describe('commentDraftOpener', () => {
-  it('opens a draft with its token, the file\'s keys and the unsaved flag', async () => {
-    const s = await setup(commentedPage().text, true)
+  it('opens a draft with its token, its element key and the file\'s keys – and no unsaved flag (L3)', async () => {
+    const s = await setup(commentedPage().text)
     const token = tokenOfTag(s.load.doc, 'p')
     await s.opener.element(s.top, s.record, s.tokens.lookup(s.record.loadId!, token), pick({ token, tag: 'p', screen: { x: 20, y: 30 } }))
     expect(s.emitted).toHaveLength(1)
-    expect(s.emitted[0]).toMatchObject({ kind: 'menu', point: { x: 20, y: 30 }, displayPath: 'index.html', unsavedSource: true, target: { tag: 'p', elementId: 'para' } })
+    expect(s.emitted[0]).toMatchObject({ kind: 'menu', point: { x: 20, y: 30 }, displayPath: 'index.html', draftKey: expect.stringMatching(DRAFT_KEY), target: { tag: 'p', elementId: 'para' } })
+    expect(s.emitted[0]).not.toHaveProperty('unsavedSource')
+    expect(CommentDraftOpenedSchema.safeParse(s.emitted[0]).success).toBe(true)
     expect(s.keys.size.drafts).toBe(1)
+  })
+
+  it('M1 two id-less elements on one line get two element keys; the same element picked again gets its own back, and no path shows', async () => {
+    const html = '<!doctype html><html><body>\n<div>first</div><div>second</div>\n</body></html>'
+    const s = await setup(html)
+    const [first, second] = tokensOfTag(s.load.doc, 'div')
+    const open = (token: string) => s.opener.element(s.top, s.record, s.tokens.lookup(s.record.loadId!, token), pick({ token, tag: 'div' }))
+    await open(first)
+    await open(second)
+    await open(first)
+    const keys = s.emitted.map(event => event.draftKey)
+    expect(keys[0]).toMatch(DRAFT_KEY)
+    expect(keys[1]).toMatch(DRAFT_KEY)
+    expect(keys[0]).not.toBe(keys[1])
+    expect(keys[2]).toBe(keys[0])
+    // Both share line and tag – what the renderer keyed on before.
+    expect(s.emitted[0].target).toMatchObject({ tag: 'div', line: 2 })
+    expect(s.emitted[1].target).toMatchObject({ tag: 'div', line: 2 })
+    expect(JSON.stringify(s.emitted)).not.toContain(project.root)
   })
 
   it('an element with no tokened ancestor opens "can\'t comment here" – no token, no code', async () => {
@@ -91,12 +124,13 @@ describe('commentDraftOpener', () => {
     expect(s.emitted[0]).not.toHaveProperty('code')
   })
 
-  it('M-033 the file changed since the page loaded: the menu says why, and no draft is minted', async () => {
+  it('M-033 the file changed since the page loaded: no draft is minted, and the menu opens with none to offer', async () => {
     const s = await setup(commentedPage().text)
     await writeFile(s.path, `${commentedPage().text}\n<!-- edited -->`)
     const token = tokenOfTag(s.load.doc, 'p')
     await s.opener.element(s.top, s.record, s.tokens.lookup(s.record.loadId!, token), pick({ token, tag: 'p' }))
-    expect(s.emitted[0]).toMatchObject({ code: ErrorCode.COMMENT_TARGET_MOVED })
+    expect(s.emitted[0]).toMatchObject({ kind: 'menu', fileKey: expect.stringMatching(/^f/) })
+    for (const absent of ['draftToken', 'draftKey', 'target', 'code']) expect(s.emitted[0]).not.toHaveProperty(absent)
     expect(s.keys.size.drafts).toBe(0)
   })
 
@@ -112,13 +146,18 @@ describe('commentDraftOpener', () => {
     expect(s.emitted[1]).toMatchObject({ kind: 'icon', threadKeys: [expect.stringMatching(/^t/)], blockKeys: [] })
   })
 
-  it('§10.4 a pin offers "New comment": a draft on the pin\'s element, bound to this view, with its target and the unsaved flag', async () => {
-    const s = await setup(commentedPage().text, true)
+  it('§10.4 a pin offers "New comment": a draft on the pin\'s element, bound to this view, with its element key and target', async () => {
+    const s = await setup(commentedPage().text)
     const [openKey, pin] = [...s.record.pins].find(([, group]) => group.threadIds.length > 0)!
     await s.opener.icon(s.top, s.record, openKey, pick({ kind: 'icon', key: openKey }))
     const opened = s.emitted[0]
     if (opened.kind !== 'icon' || opened.draftToken === undefined) throw new Error('the pin carried no draft')
-    expect(opened).toMatchObject({ draftToken: expect.stringMatching(/^[0-9a-f]{32}$/), unsavedSource: true, target: { line: expect.any(Number) } })
+    expect(opened).toMatchObject({ draftToken: expect.stringMatching(/^[0-9a-f]{32}$/), draftKey: expect.stringMatching(DRAFT_KEY), target: { line: expect.any(Number) } })
+    expect(opened).not.toHaveProperty('unsavedSource')
+    // The same element through a menu: the same session draft.
+    const entry0 = s.tokens.lookup(s.record.loadId!, pin.token)!
+    await s.opener.element(s.top, s.record, entry0, pick({ token: pin.token, tag: entry0.tagName }))
+    expect(s.emitted[1].draftKey).toBe(opened.draftKey)
     expect(s.keys.claimDraft(opened.draftToken, { ...BINDING, session: 2 }).ok).toBe(false)
     const claim = s.keys.claimDraft(opened.draftToken, BINDING)
     if (!claim.ok) throw new Error('the draft was not this view\'s')
@@ -141,6 +180,25 @@ describe('commentDraftOpener', () => {
     })
     // A stored runtime element no pick could name gets no "New comment" rather than one on its ancestor.
     expect(pinPickOf({ ...group, runtime: { path: 'span', tag: 'x<y' } }, iconPick)).toBeUndefined()
+  })
+
+  it('M4 a pin with a damaged block reads its file once and runs ONE job for its blocks and its draft', async () => {
+    const html = insertBefore(commentedPage().text, '<p id="para"', damagedBlock('c-9'))
+    const s = await setup(html)
+    const runner = createInProcessCommentFileJobs()
+    const runJob = vi.fn(runner.runJob.bind(runner))
+    const counted = createCommentDraftOpener({ ...s.deps, jobs: { runJob } as typeof runner })
+    const pinKey = [...s.record.pins].find(([, pin]) => pin.attention > 0)![0]
+    await counted.icon(s.top, s.record, pinKey, pick({ kind: 'icon', key: pinKey }))
+    expect(runJob).toHaveBeenCalledTimes(1)
+    expect(runJob.mock.calls[0][1]).toMatchObject({ kind: 'pin', blocks: true, pick: {} })
+    expect(s.emitted[0]).toMatchObject({ kind: 'icon', blockKeys: [expect.stringMatching(/^b/)], draftToken: expect.any(String), draftKey: expect.stringMatching(DRAFT_KEY) })
+    // A pin with nothing needing attention asks for no blocks – still one job, for the draft.
+    runJob.mockClear()
+    const openKey = [...s.record.pins].find(([, pin]) => pin.attention === 0)![0]
+    await counted.icon(s.top, s.record, openKey, pick({ kind: 'icon', key: openKey }))
+    expect(runJob).toHaveBeenCalledTimes(1)
+    expect(runJob.mock.calls[0][1]).toMatchObject({ kind: 'pin', blocks: false })
   })
 
   it('a pin whose file changed lists no block keys; an unknown pin opens nothing', async () => {
@@ -219,7 +277,6 @@ describe('commentDraftOpener', () => {
       geometry: { viewRect: () => ({ x: 0, y: 0, width: 800, height: 600 }), contentBounds: () => ({ x: 0, y: 0 }), hostZoom: () => 1, pageZoom: () => 1, cursor: () => ({ x: 7, y: 8 }) },
       accent: [0xa0, 0xa8, 0xff],
       currentPage: () => pathA,
-      hasUnsavedSource: async () => false,
       emit: payload => emitted.push(payload),
       jobs: createInProcessCommentFileJobs(),
       isCurrent: current => frames.get(current.ftn) === current

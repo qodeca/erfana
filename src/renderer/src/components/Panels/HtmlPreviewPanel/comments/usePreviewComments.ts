@@ -35,16 +35,19 @@ import {
 import { useOccluder } from '../../../../hooks/useOccluder'
 import { useLatestRef } from '../../../../hooks/useLatestRef'
 import { isMacOS } from '../../../../utils/platform'
+import { commentModeKeyFromDomEvent, matchCommentModeKey } from '../../../../../../shared/commentModeKey'
 import { openFileInPanel } from '../../../../utils/openFileInPanel'
 import { getBasename } from '../../../../utils/fileUtils'
-import { ANNOUNCE, COPY, DRAWER_COPY, savedAnnouncement } from './commentCopy'
+import { ANNOUNCE, COPY, DRAWER_COPY, writtenAnnouncement } from './commentCopy'
 import type { Box } from './commentPlacement'
 import type { CommentDrawerProps } from './CommentDrawer'
 import type { CommentToolbarToolsProps } from './CommentToolbarTools'
-import { pinDraftToken, type CommentWindowRequest, type ElementDraft } from './commentWindowTypes'
+import { pinDraftOf, type CommentWindowRequest, type ElementDraft } from './commentWindowTypes'
+import { useCommentSettleNotices } from './useCommentSettleNotices'
 import type { DrawerRow } from './commentRows'
 import type { PreviewCommentsLayerProps } from './PreviewCommentsLayer'
 import { pickerAnnouncement, useLiveText } from './commentLive'
+import type { PreviewKeyEventLike } from '../hooks/usePreviewGroupKeys'
 
 /** Under this panel width the drawer takes the whole width (§10.6). */
 export const DRAWER_FULL_BELOW_PX = 640
@@ -71,8 +74,8 @@ export interface PreviewComments {
   /** The drawer's props while it is open, else `null`. */
   readonly drawer: CommentDrawerProps | null
   readonly layer: PreviewCommentsLayerProps
-  /** Ctrl+Alt+M / Cmd+Option+M with focus in the panel's own chrome. */
-  readonly onRootKeyDown: (event: React.KeyboardEvent<HTMLElement>) => void
+  /** Ctrl+Alt+M / Cmd+Option+M, focus in the chrome or on the group (native event too). */
+  readonly onRootKeyDown: (event: PreviewKeyEventLike) => void
 }
 
 /** Native focus back into the page, a frame after the overlay that held it is gone. */
@@ -125,6 +128,9 @@ export function usePreviewComments({
   // The state as of the last commit, for event handlers and async answers.
   const latestRef = useLatestRef(state)
 
+  // The generation of the list stored now: a thread window closes itself only on a newer one (M2).
+  const listAfter = useCallback(() => store.getState().panels.get(panelId)?.list.generation ?? 0, [panelId, store])
+
   const refreshList = useCallback(async () => {
     const generation = store.getState().beginList(panelId)
     const result = await commentGateway.list(panelId)
@@ -146,7 +152,8 @@ export function usePreviewComments({
           blockKeys: payload.blockKeys,
           point: payload.point,
           opener: 'page',
-          draftToken: pinDraftToken(payload),
+          listAfter: listAfter(),
+          ...pinDraftOf(payload),
           target: payload.target,
           file: {
             fileKey: payload.fileKey,
@@ -162,6 +169,7 @@ export function usePreviewComments({
       if (
         payload.kind === 'open' &&
         payload.draftToken !== undefined &&
+        payload.draftKey !== undefined &&
         payload.target !== undefined
       ) {
         setMenu(null)
@@ -169,6 +177,7 @@ export function usePreviewComments({
           kind: 'new',
           panelId,
           draftToken: payload.draftToken,
+          draftKey: payload.draftKey,
           target: payload.target,
           file: payload,
           point: payload.point,
@@ -216,7 +225,7 @@ export function usePreviewComments({
       offAnchors()
       offMode()
     }
-  }, [enabled, panelId, store, refreshList, announce, latestRef])
+  }, [enabled, panelId, store, refreshList, announce, latestRef, listAfter])
 
   // A move to another page: the menu and the window were about the old one
   // (any typed draft stays in memory). The mode and the toggle stay (R-023).
@@ -323,25 +332,15 @@ export function usePreviewComments({
 
   const onWritten = useCallback(
     (save: CommentSaveRequest, file: string) => {
-      const name = file || getBasename(filePath)
-      if (save.op === 'add') {
-        announce(savedAnnouncement(name))
-        closeWindow()
-      } else if (save.op === 'setStatus') {
-        announce(save.status === 'resolved' ? ANNOUNCE.resolved : ANNOUNCE.reopened)
-      } else if (
-        save.op === 'deleteMessage' ||
-        save.op === 'deleteThread' ||
-        save.op === 'deleteBlock'
-      ) {
-        announce(ANNOUNCE.deleted(name))
-      } else {
-        announce(savedAnnouncement(name))
-      }
+      announce(writtenAnnouncement(save, file || getBasename(filePath)))
+      if (save.op === 'add') closeWindow()
       void refreshList()
     },
     [announce, closeWindow, filePath, refreshList]
   )
+
+  // A write answered "still saving" settled: say how, even with its window closed (H1).
+  useCommentSettleNotices({ panelId, request, pageName: getBasename(filePath), announce, alert, closeWindow })
 
   const getArea = useCallback((): Box | null => {
     const box = pageAreaRef.current?.getBoundingClientRect()
@@ -349,17 +348,10 @@ export function usePreviewComments({
   }, [pageAreaRef])
 
   const onRootKeyDown = useCallback(
-    (event: React.KeyboardEvent<HTMLElement>) => {
+    (event: PreviewKeyEventLike) => {
       if (!enabled || !ready || menu !== null || request !== null) return
-      const mods = isMacOS() ? event.metaKey && event.altKey : event.ctrlKey && event.altKey
-      // The TYPED key, never the physical one: AltGr+M types µ on German layouts.
-      // macOS Option changes the typed character, so there `code` stands in.
-      // The physical key stands in only when the typed one is not printable
-      // ASCII (µ under Option or AltGr): on AZERTY a typed "," sits on KeyM
-      // and must not toggle the mode (L14).
-      const typedAscii = event.key.length === 1 && event.key >= ' ' && event.key <= '~'
-      const isM = event.key.toLowerCase() === 'm' || (event.code === 'KeyM' && !typedAscii)
-      if (!mods || !isM || event.shiftKey) return
+      // The one rule main forwards the page's key by (`shared/commentModeKey`, M3).
+      if (!matchCommentModeKey(commentModeKeyFromDomEvent(event), isMacOS())) return
       event.preventDefault()
       toggleMode(false)
     },
@@ -402,6 +394,7 @@ export function usePreviewComments({
               blockKeys: row.blockKey !== undefined ? [row.blockKey] : [],
               point: centreOf(getArea()),
               opener: 'drawer',
+              listAfter: listAfter(),
               // The file, so a failed list read can name it (M7).
               file: {
                 fileKey: row.fileKey,
@@ -431,12 +424,14 @@ export function usePreviewComments({
         if (!chosen) focusPageSoon(panelId)
       },
       onAddComment: (draft: ElementDraft) => {
-        if (draft.draftToken === undefined || draft.target === undefined) return
+        const { draftToken, draftKey, target } = draft
+        if (draftToken === undefined || draftKey === undefined || target === undefined) return
         setRequest({
           kind: 'new',
           panelId,
-          draftToken: draft.draftToken,
-          target: draft.target,
+          draftToken,
+          draftKey,
+          target,
           file: draft,
           point: draft.point,
           opener: 'page'

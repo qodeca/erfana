@@ -43,6 +43,8 @@ describe('commentParseWorker – entry', () => {
 
     port.listeners[0]({ type: 'instrument', id: 7, bytes: encodeText('<p id="a">x</p>') })
     expect(port.posted).toEqual([
+      // The content's name before any work (S-M), then the answer.
+      { type: 'begin', id: 7, hash: expect.stringMatching(/^[0-9a-f]{64}$/) },
       expect.objectContaining({
         type: 'result',
         id: 7,

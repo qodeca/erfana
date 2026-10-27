@@ -143,6 +143,9 @@ export default defineConfig({
         // (measured 100/100/100/100 on 2026-10-26, Windows).
         'src/shared/htmlComments/anchorLookup.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         'src/shared/htmlComments/quoteText.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
+        // The position-corroboration rule split out of anchor.ts (§19 Rev 4,
+        // measured 100/100/100/100 on 2026-10-26, Windows).
+        'src/shared/htmlComments/anchorEvidence.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100
         'src/shared/htmlComments/conflictMarkers.ts': { lines: 98, functions: 98, branches: 98, statements: 98 },
         // measured 100/100/100/100

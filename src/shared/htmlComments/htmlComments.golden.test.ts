@@ -2,9 +2,13 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Golden tests: the v1 format as shipped (docs/designs/html-preview-comments.md
- * §12, decision 22; G-001–G-005). The format is a one-way door – every file
+ * §12, decision 22; G-001–G-004). The format is a one-way door – every file
  * Erfana ever wrote must stay readable – so these fixtures are APPEND ONLY and
  * pinned by a SHA-256 manifest.
+ *
+ * G-005 (a v1 block inside Markdown stays hidden in the Markdown preview) runs
+ * in the renderer suite, where that pipeline lives:
+ * `src/renderer/src/components/Editor/MarkdownPreview.comments.test.tsx`.
  */
 import { createHash } from 'node:crypto'
 import { readdirSync, readFileSync } from 'node:fs'
@@ -139,8 +143,4 @@ describe('public spec', () => {
       }
     }
   })
-
-  it.todo(
-    'G-005 a v1 block inside a Markdown file stays hidden in the Markdown preview (lands with P6: the pipeline lives in the renderer)'
-  )
 })

@@ -95,14 +95,19 @@ export function drawnText(el: Element | null | undefined): string | undefined {
 }
 
 /**
- * The keyboard picker's last `step` pick, as `"showing <label>"`, `"top"` or
- * `"no-child"` – what the comment window's live region says through main.
+ * The keyboard picker's last `step` pick, as `"showing tag#id"` (plus
+ * `" added"` for a script-built element below its token), `"top"` or
+ * `"no-child"`. The step carries only a token (S-L-A); the test reads it back
+ * through the controller's own registry to name the element it reached.
  */
-export function lastStep(h: Pick<Harness, 'sent'>, channel: string): string | undefined {
-  const steps = (h.sent(channel) as Array<{ kind: string; say?: string; label?: string }>).filter(p => p.kind === 'step')
+export function lastStep(h: Pick<Harness, 'sent' | 'controller'>, channel: string): string | undefined {
+  const steps = (h.sent(channel) as Array<{ kind: string; say?: string; token?: string; added?: true }>).filter(p => p.kind === 'step')
   const step = steps.at(-1)
   if (step === undefined) return undefined
-  return step.say === 'showing' ? `showing ${step.label}` : step.say
+  if (step.say !== 'showing') return step.say
+  const element = step.token === undefined ? undefined : h.controller.tokens.elementOf(step.token)
+  if (element === undefined) return `showing unknown token ${step.token}`
+  return `showing ${element.localName}${element.id ? `#${element.id}` : ''}${step.added ? ' added' : ''}`
 }
 
 /** Let queued microtasks (MutationObserver deliveries) run. */

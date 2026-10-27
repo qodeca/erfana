@@ -86,7 +86,7 @@ export function labelOf(
   return { tag, rest, size: `${Math.round(box.width)}×${Math.round(box.height)}` }
 }
 
-/** The label as one line of text, for the live region ("Showing {label}."). */
+/** The label as one line of text (a pin's label). Never sent to main: the live region words main's facts (S-L-A). */
 export function labelText(parts: LabelParts): string {
   return `${parts.tag}${parts.rest}`
 }

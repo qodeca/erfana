@@ -550,6 +550,10 @@
 
 .erf-comment-drawer__check { display: flex; align-items: center; gap: var(--space-4); font-size: var(--text-base); }
 
+/* Files left out of the list: an info banner above the scroll, so it stays in view. */
+.erf-comment-drawer__note { flex: 0 0 auto; padding: var(--space-6) var(--space-8) 0; }
+.erf-comment-drawer__note > .erf-comment-banner { margin-block-end: 0; }
+
 .erf-comment-drawer__scroll { flex: 1 1 auto; min-block-size: 0; overflow-y: auto; }
 
 .erf-comment-drawer__file { margin: 0; padding: var(--space-6) var(--space-8) var(--space-2);

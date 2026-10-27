@@ -12,8 +12,10 @@
  * depends on the bytes alone, so two files with the same bytes share one
  * entry, a changed file misses, and the worker never learns a path. It is
  * bounded by entries and by the source bytes it holds – a 4 MB page holds
- * about 60 MB of tree while it is alive (spike S9), and the worker's heap
- * ceiling is 512 MB.
+ * about 60 MB of tree while it is alive (spike S9), a dense 25 MB page about
+ * 760 MB (§19 Rev 4), against the worker's heap ceiling (`WORKER_HEAP_MB`).
+ * A file over {@link DOC_CACHE_MAX_BYTES} is never cached, so every pick,
+ * pin and list of one parses it again.
  *
  * What may be cached: a document straight from `parseCommentFile`, whose
  * anchor lookup tables (`anchorLookup.ts`) have been used by the block parse

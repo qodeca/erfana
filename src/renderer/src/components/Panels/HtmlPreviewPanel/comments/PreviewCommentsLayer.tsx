@@ -69,7 +69,8 @@ export interface PreviewCommentsLayerProps {
  */
 export function PreviewCommentsLayer(props: PreviewCommentsLayerProps): React.JSX.Element {
   const { menu, request } = props
-  const canComment = menu !== null && menu.draftToken !== undefined && menu.target !== undefined
+  const canComment =
+    menu !== null && menu.draftToken !== undefined && menu.draftKey !== undefined && menu.target !== undefined
   // Set by the item's action, read by the close that ContextMenu runs right after it.
   const chosen = useRef(false)
   const closeMenu = (): void => {

@@ -354,7 +354,7 @@ describe('readFileNoFollow', () => {
     expect(read.ok && read.bytes.equals(big)).toBe(true)
   })
 
-  it('reports a file over maxBytes as too-large without trusting its size', async () => {
+  it('reports a file over maxBytes as too-large from its size (a size that admits is never trusted: see the failure suite)', async () => {
     await writeFile(join(dir, 'a.html'), 'abcde')
 
     expect(await readFileNoFollow(join(dir, 'a.html'), 4)).toEqual({ ok: false, reason: 'too-large' })

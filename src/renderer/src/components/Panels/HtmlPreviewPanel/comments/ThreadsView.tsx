@@ -34,6 +34,7 @@ import {
   readOnlyReasonText,
   type SaveFailureCopy
 } from './commentCopy'
+import { visibleString } from './commentFormat'
 import { ActionButton, CommentBanner, DialogButton, VisibleText } from './CommentParts'
 import {
   CommentThread,
@@ -173,7 +174,9 @@ function DamagedBlockView({
       </pre>
       {confirm ? (
         <div className="erf-comment-confirm" role="group" aria-label="Confirm delete">
-          <p className="erf-comment-confirm__text">{deleteBlockText(file.displayPath)}</p>
+          <p className="erf-comment-confirm__text">
+            <VisibleText text={deleteBlockText(file.displayPath)} />
+          </p>
           <div className="erf-comment-confirm__actions">
             <DialogButton
               variant="secondary"
@@ -263,7 +266,9 @@ export function ThreadsView({
   onNewComment
 }: ThreadsViewProps): React.JSX.Element {
   const { file, threads, damaged, newer } = selection
-  const fileName = file.displayPath
+  // A file name is the page author's: every sentence built from it shows its
+  // bidi and invisible characters as `⟨U+202E⟩` tokens (S-L-B).
+  const fileName = visibleString(file.displayPath)
   const sharedNames = useMemo(() => {
     const emailsByName = new Map<string, Set<string>>()
     for (const thread of threads) {

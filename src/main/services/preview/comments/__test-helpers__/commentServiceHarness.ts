@@ -84,6 +84,7 @@ export function serveLoad(
     fileHash: doc.fileHash,
     tokens: doc.tokens,
     offsets: doc.offsets,
+    lines: doc.lines,
     tagCodes: doc.tagCodes,
     tagNames: doc.tagNames,
     blocks: doc.blocks

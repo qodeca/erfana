@@ -6,16 +6,20 @@
  *
  * A block normally sits right before its element, so the first rule –
  * POSITION – is "the next start tag in the SOURCE TEXT after the block,
- * skipping whitespace and other erfana blocks, has the stored tag". Source
- * order, not DOM order: an implied `tbody` or an unclosed `<p>`/`<li>` puts the
- * comment node somewhere else in the tree than its element (spike S7, 7 of 9
- * cases), but never somewhere else in the text.
+ * skipping whitespace and other erfana blocks, has the stored tag, and the
+ * element corroborates the anchor" (§19 Rev 4: same `id`, matching text or
+ * same path, and nothing that contradicts – the decision table is in
+ * `anchorEvidence.ts`). Source order, not DOM order: an implied `tbody` or an
+ * unclosed `<p>`/`<li>` puts the comment node somewhere else in the tree than
+ * its element (spike S7, 7 of 9 cases), but never somewhere else in the text.
  *
  * When the file was edited around the block, the backups are tried in order,
  * cheapest first: a unique `id` + tag, the unique CSS path, a unique text
- * quote (exact text, then the text around it). Two equal candidates leave the
- * block ORPHANED – a guess is worse than "element not found" – and nothing
- * here ever moves or deletes a block (decision 21). The `id` and quote tiers
+ * quote (exact text, then the text around it). The path and quote backups
+ * refuse an element with another `id`, and the path backup the element that
+ * slid into a removed target's place. Two equal candidates leave the block
+ * ORPHANED – a guess is worse than "element not found" – and nothing here
+ * ever moves or deletes a block (decision 21). The `id` and quote tiers
  * answer from tables built once per parse (`anchorLookup.ts`), so many
  * orphaned blocks cost about as much as one.
  *
@@ -31,6 +35,7 @@ import {
   type DefaultTreeAdapterMap
 } from 'parse5'
 import { PREVIEW_LIMITS } from '../preview-limits'
+import { pathBackupRefuses, positionCorroborated, quoteBackupRefuses } from './anchorEvidence'
 import { anchorLookupOf } from './anchorLookup'
 import { utf8Length } from './encoding'
 import {
@@ -103,7 +108,8 @@ function attached(el: IndexedElement, via: TargetVia): TargetResolution {
 
 /**
  * Find an anchor's element without the position rule – for a block whose
- * position no longer matches, or for a draft re-anchored at Save (§7.6).
+ * position no longer matches or is not corroborated, or for a draft
+ * re-anchored at Save (§7.6).
  */
 export function findAnchorTarget(index: HtmlIndex, anchor: CommentAnchor): TargetResolution {
   const lookup = anchorLookupOf(index)
@@ -113,10 +119,12 @@ export function findAnchorTarget(index: HtmlIndex, anchor: CommentAnchor): Targe
   }
   if (anchor.path) {
     const el = index.elementAtPath(anchor.path)
-    if (el && el.tag === anchor.tag) return attached(el, 'path')
+    if (el && el.tag === anchor.tag && !pathBackupRefuses(lookup, el, anchor)) {
+      return attached(el, 'path')
+    }
   }
   const el = anchor.quote && lookup.byQuote(anchor.tag, anchor.quote)
-  return el ? attached(el, 'quote') : { state: 'orphaned' }
+  return el && !quoteBackupRefuses(el, anchor) ? attached(el, 'quote') : { state: 'orphaned' }
 }
 
 /** Input for {@link resolveBlockTarget}. */
@@ -128,9 +136,13 @@ export interface BlockTargetQuery {
   readonly blockEnds: ReadonlyMap<number, number>
 }
 
-/** Where a block's element is: position first, then the backups (§5.9). */
+/**
+ * Where a block's element is: a corroborated position first, then the
+ * backups (§5.9, §19 Rev 4).
+ */
 export function resolveBlockTarget(index: HtmlIndex, query: BlockTargetQuery): TargetResolution {
   const { text } = index
+  const { anchor } = query
   let pos = query.after
   for (;;) {
     while (pos < text.length && HTML_WHITESPACE.has(text[pos])) pos += 1
@@ -139,8 +151,13 @@ export function resolveBlockTarget(index: HtmlIndex, query: BlockTargetQuery): T
     pos = end
   }
   const next = index.elementAt(pos)
-  if (next && next.tag === query.anchor.tag) return attached(next, 'position')
-  return findAnchorTarget(index, query.anchor)
+  if (
+    next?.tag === anchor.tag &&
+    positionCorroborated(index, anchorLookupOf(index), next, anchor)
+  ) {
+    return attached(next, 'position')
+  }
+  return findAnchorTarget(index, anchor)
 }
 
 // ---------------------------------------------------------------------------

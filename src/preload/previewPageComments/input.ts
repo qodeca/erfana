@@ -106,6 +106,7 @@ interface Handlers {
   readonly keyUp: Handler
   readonly move: Handler
   readonly out: Handler
+  readonly visibility: Handler
   readonly userInput: Handler
   readonly ready: Handler
 }
@@ -156,6 +157,9 @@ function handlersOf(controller: CommentController): Handlers {
     out(event) {
       if (event.isTrusted && (event as PointerEvent).relatedTarget === null) controller.pointerLeft()
     },
+    visibility(event) {
+      if (event.isTrusted) controller.visibilityChanged()
+    },
     userInput(event) {
       if (event.isTrusted) controller.userInput()
     },
@@ -185,6 +189,8 @@ function registrationsOf(win: Window, doc: Document, on: Handlers): Registration
     ...onWindow(['keyup'], on.keyUp, CAPTURE),
     ...onWindow(['pointermove'], on.move, PASSIVE),
     { target: doc, type: 'pointerout', listener: on.out, options: PASSIVE },
+    // The view hidden behind a menu's or window's still frame (and shown again).
+    { target: doc, type: 'visibilitychange', listener: on.visibility, options: PASSIVE },
     // The first DOMContentLoaded listener of the document – the window, in
     // capture, before the document's own – so the token window closes before
     // any page listener runs (R3-2). Not `once`: a page's forged event would
