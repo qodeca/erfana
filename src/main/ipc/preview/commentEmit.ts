@@ -10,6 +10,13 @@
  * none. Every payload is re-validated against its strict schema first – main
  * composed it, so a miss is a wiring bug, logged with the schema's issue codes
  * only (never a value: a message could quote a comment).
+ *
+ * `draftOpened` first hands native keyboard focus to that window's own
+ * contents (`target.focusHost`, only while the window is the OS key window):
+ * the pick that opened the menu or window was a click or key inside the page,
+ * which still holds focus, and the renderer's DOM focus alone cannot take it
+ * back – the reader's typing and Cmd/Ctrl+Enter would land in the page (§19
+ * "Rev 4 – owner test: comment window focus and save key").
  */
 import type { ZodType } from 'zod'
 import { PreviewCommentEvents } from '../../../shared/ipc/preview-comment-channels'
@@ -37,7 +44,7 @@ export function issueCodesOf(error: { readonly issues: ReadonlyArray<{ readonly 
 
 /** Build the comment emitters. */
 export function createPreviewCommentEmitters(deps: PreviewCommentEmitterDeps): PreviewCommentEmitters {
-  function send(channel: string, schema: ZodType, windowId: number, payload: unknown): void {
+  function send(channel: string, schema: ZodType, windowId: number, payload: unknown, focusHost = false): void {
     const parsed = schema.safeParse(payload)
     if (!parsed.success) {
       logger.warn('Preview comments: an event failed its schema and was not sent', {
@@ -48,6 +55,15 @@ export function createPreviewCommentEmitters(deps: PreviewCommentEmitterDeps): P
     }
     for (const target of deps.resolveTargets()) {
       if (target.windowId !== windowId || target.isDestroyed()) continue
+      // Before the send: the renderer focuses the field as soon as the event
+      // lands. A focus that fails still lets the event through.
+      if (focusHost) {
+        try {
+          target.focusHost?.()
+        } catch {
+          // The window closed between the check and the focus.
+        }
+      }
       try {
         target.send(channel, parsed.data)
       } catch {
@@ -58,7 +74,7 @@ export function createPreviewCommentEmitters(deps: PreviewCommentEmitterDeps): P
 
   return {
     draftOpened: (windowId, payload) =>
-      send(PreviewCommentEvents.DRAFT_OPENED, CommentDraftOpenedSchema, windowId, payload),
+      send(PreviewCommentEvents.DRAFT_OPENED, CommentDraftOpenedSchema, windowId, payload, true),
     commentsChanged: (windowId, payload) =>
       send(PreviewCommentEvents.COMMENTS_CHANGED, CommentsChangedSchema, windowId, payload),
     anchorStatus: (windowId, payload) =>

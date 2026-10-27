@@ -5,7 +5,7 @@
  * (docs/designs/html-preview-comments.md §10.2; J-001).
  */
 import { afterEach, describe, expect, it } from 'vitest'
-import { clipToViewport, contains, outlineBox, overlaps, snap } from './geometry'
+import { clipToViewport, contains, outlineBox, overlaps, snap, viewportOf } from './geometry'
 import { frameFileOf, labelOf, labelText } from './label'
 
 const BOX = { left: 10, top: 20, width: 120.4, height: 39.6 }
@@ -105,5 +105,53 @@ describe('geometry', () => {
     expect(contains(box, { x: 10, y: 5 })).toBe(false)
     expect(overlaps(box, { left: 9, top: 9, width: 5, height: 5 })).toBe(true)
     expect(overlaps(box, { left: 10, top: 0, width: 5, height: 5 })).toBe(false)
+  })
+})
+
+describe('viewportOf – the visible viewport, scrollbars excluded (§19 Rev 4 "pins at the right edge")', () => {
+  type Size = { clientWidth: number; clientHeight: number } | null
+  /** A window as `viewportOf` reads it: inner size, compat mode, root and body sizes. */
+  function windowWith(options: { compatMode?: string; root?: Size; body?: Size }): Window {
+    return {
+      innerWidth: 1024,
+      innerHeight: 768,
+      document: {
+        compatMode: options.compatMode ?? 'CSS1Compat',
+        documentElement: options.root ?? null,
+        body: options.body ?? null
+      }
+    } as unknown as Window
+  }
+
+  it('leaves out classic scrollbars: the root element’s client size in standards mode', () => {
+    // 15 px vertical and horizontal scrollbars.
+    const win = windowWith({ root: { clientWidth: 1009, clientHeight: 753 }, body: { clientWidth: 993, clientHeight: 4000 } })
+    expect(viewportOf(win)).toEqual({ width: 1009, height: 753 })
+  })
+
+  it('reads the body in quirks mode, where the root is as tall as the document', () => {
+    const win = windowWith({
+      compatMode: 'BackCompat',
+      root: { clientWidth: 1009, clientHeight: 4000 },
+      body: { clientWidth: 1009, clientHeight: 768 }
+    })
+    expect(viewportOf(win)).toEqual({ width: 1009, height: 768 })
+  })
+
+  it('agrees with the inner size under overlay scrollbars, and never passes it', () => {
+    expect(viewportOf(windowWith({ root: { clientWidth: 1024, clientHeight: 768 } }))).toEqual({ width: 1024, height: 768 })
+    expect(viewportOf(windowWith({ root: { clientWidth: 1100, clientHeight: 800 } }))).toEqual({ width: 1024, height: 768 })
+  })
+
+  it('falls back to the inner size when the root reports nothing', () => {
+    // No root (the page removed <html>), no body in quirks mode, or no layout box (0).
+    expect(viewportOf(windowWith({}))).toEqual({ width: 1024, height: 768 })
+    expect(viewportOf(windowWith({ compatMode: 'BackCompat' }))).toEqual({ width: 1024, height: 768 })
+    expect(viewportOf(windowWith({ root: { clientWidth: 0, clientHeight: 0 } }))).toEqual({ width: 1024, height: 768 })
+  })
+
+  it('measures the window it is given – a frame’s preload, its own frame', () => {
+    const frame = { ...windowWith({ root: { clientWidth: 305, clientHeight: 200 } }), innerWidth: 320, innerHeight: 200 }
+    expect(viewportOf(frame as unknown as Window)).toEqual({ width: 305, height: 200 })
   })
 })

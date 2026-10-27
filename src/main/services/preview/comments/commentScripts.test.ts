@@ -7,16 +7,20 @@
  */
 import { runInNewContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
+import { PREVIEW_LIMITS } from '../../../../shared/preview-limits'
 import {
   parseFrameOffset,
+  parseOpenSections,
   parseTopScroll,
   READ_SCROLL_SCRIPT,
   restoreScrollScript,
   waitFramesScript
 } from './commentScripts'
 
+const { COMMENT_OPEN_SECTIONS_MAX: OPEN_SECTIONS_MAX, COMMENT_SECTIONS_SCANNED_MAX: SECTIONS_SCANNED_MAX } = PREVIEW_LIMITS
+
 /** A window that scrolls to what it is asked, up to `maxY`, and runs frames on demand. */
-function fakeWindow(maxY: number, frames: unknown[] = []) {
+function fakeWindow(maxY: number, frames: unknown[] = [], sections: ArrayLike<{ open?: unknown }> = []) {
   const queued: Array<() => void> = []
   let clock = 0
   const listeners = new Map<string, (event: { isTrusted: boolean }) => void>()
@@ -37,6 +41,7 @@ function fakeWindow(maxY: number, frames: unknown[] = []) {
     performance: { now: () => clock },
     requestAnimationFrame: (run: () => void) => queued.push(run),
     document: {
+      getElementsByTagName: (tag: string) => (tag === 'details' ? sections : []),
       querySelectorAll: () =>
         frames.map(contentWindow => ({
           contentWindow,
@@ -62,7 +67,52 @@ describe('commentScripts', () => {
     const { context, win } = fakeWindow(5000)
     win.scrollY = 300
     context.location.hash = '#a'
-    expect(runInNewContext(READ_SCROLL_SCRIPT, context)).toEqual({ x: 0, y: 300, hash: '#a' })
+    expect(runInNewContext(READ_SCROLL_SCRIPT, context)).toEqual({ x: 0, y: 300, hash: '#a', openSections: [] })
+  })
+
+  it('§19 Rev 4 READ_SCROLL_SCRIPT names the open <details> by their place, within its two bounds', () => {
+    // Only a literal `open === true` counts: an SVG element named details has no such property.
+    const some = fakeWindow(0, [], [{ open: true }, { open: false }, {}, { open: 'yes' }, { open: true }])
+    expect(runInNewContext(READ_SCROLL_SCRIPT, some.context)).toMatchObject({ openSections: [0, 4] })
+
+    const many = fakeWindow(0, [], Array.from({ length: OPEN_SECTIONS_MAX + 50 }, () => ({ open: true })))
+    expect((runInNewContext(READ_SCROLL_SCRIPT, many.context) as { openSections: number[] }).openSections).toEqual(
+      Array.from({ length: OPEN_SECTIONS_MAX }, (_, n) => n)
+    )
+
+    // A page of endless sections: the read stops at the scan bound, and never asks for `length`.
+    const read: number[] = []
+    const endless = new Proxy({} as ArrayLike<{ open?: unknown }>, {
+      get(_target, key) {
+        if (key === 'length') throw new Error('length read')
+        const place = Number(key)
+        read.push(place)
+        return { open: place >= SECTIONS_SCANNED_MAX - 3 }
+      }
+    })
+    const scanned = fakeWindow(0, [], endless)
+    expect(runInNewContext(READ_SCROLL_SCRIPT, scanned.context)).toMatchObject({
+      openSections: [SECTIONS_SCANNED_MAX - 3, SECTIONS_SCANNED_MAX - 2, SECTIONS_SCANNED_MAX - 1]
+    })
+    expect(Math.max(...read)).toBe(SECTIONS_SCANNED_MAX - 1)
+  })
+
+  it('§19 Rev 4 keeps the open sections only as a short list of places, and a bad list never costs the scroll', () => {
+    const scroll = { x: 0, y: 10, hash: '' }
+    expect(parseTopScroll({ ...scroll, openSections: [7, 2, 7] })).toEqual({ ...scroll, openSections: [2, 7] })
+    expect(parseOpenSections([SECTIONS_SCANNED_MAX - 1])).toEqual([SECTIONS_SCANNED_MAX - 1])
+    for (const bad of [
+      undefined,
+      [],
+      'all',
+      [1, -1],
+      [0.5],
+      ['1'],
+      [SECTIONS_SCANNED_MAX],
+      Array.from({ length: OPEN_SECTIONS_MAX + 1 }, (_, n) => n)
+    ]) {
+      expect(parseTopScroll({ ...scroll, openSections: bad }), JSON.stringify(bad)).toEqual(scroll)
+    }
   })
 
   it('M-041 the restore sets the hash and scrolls until the page is tall enough', async () => {

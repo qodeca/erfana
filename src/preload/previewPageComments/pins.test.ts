@@ -5,7 +5,8 @@
  * decisions 20 and 33; J-005, J-014).
  */
 import { afterEach, describe, expect, it } from 'vitest'
-import { PIN_BODY_MIDDLE_Y, PIN_MAX_STEPS, PIN_PATH, PIN_STEP_PX } from './constants'
+import { PIN_BODY_MIDDLE_Y, PIN_EDGE_INSET_PX, PIN_MAX_STEPS, PIN_PATH, PIN_STEP_PX } from './constants'
+import { overlaps } from './geometry'
 import { drawPin, pinContent, pinName, pinTooltip, placePins, type PinInput } from './pins'
 
 const VIEWPORT = { width: 800, height: 600 }
@@ -50,12 +51,14 @@ describe('placePins (J-005)', () => {
     expect(pins).toEqual([])
   })
 
-  it('clamps to the visible part of the element and to the viewport', () => {
+  it('clamps to the visible part of the element and to the viewport, 4 px inside its edges', () => {
     const [a] = elements('a')
     // A huge element whose top-right is off screen: the pin stays at the
-    // viewport's top-right corner, fully visible.
+    // viewport's top-right corner, fully visible, PIN_EDGE_INSET_PX in from
+    // the right and the top (§19 Rev 4 "pins at the right edge").
     const [pin] = placePins([input(a, { left: -50, top: -100, width: 2000, height: 3000 })], VIEWPORT)
-    expect(pin.box).toEqual({ left: 776, top: 0, width: 24, height: 24 })
+    expect(PIN_EDGE_INSET_PX).toBe(4)
+    expect(pin.box).toEqual({ left: 800 - 24 - 4, top: 4, width: 24, height: 24 })
   })
 
   it('moves an overlapping pin left in 22 px steps; the ancestor keeps the corner', () => {
@@ -71,11 +74,13 @@ describe('placePins (J-005)', () => {
     ])
   })
 
-  it('stops stepping at the left edge', () => {
+  it('stops stepping at the left inset', () => {
     const [a, b] = elements('a', 'b')
     const box = { left: 0, top: 200, width: 1, height: 50 }
     const pins = placePins([input(a, box), input(b, box)], VIEWPORT)
-    expect(pins.map(p => p.box.left)).toEqual([3, 3])
+    // The tip would put the box at 3: the left inset holds it at 4, and a step
+    // of 22 would cross the inset, so the second pin stays put.
+    expect(pins.map(p => p.box.left)).toEqual([4, 4])
   })
 
   it(`L9 keeps the collision search bounded: at most ${PIN_MAX_STEPS} steps, against its own row only`, () => {
@@ -104,6 +109,85 @@ describe('placePins (J-005)', () => {
     const box = { left: 100, top: 200, width: 50, height: 30 }
     const pins = placePins([input(a, box), input(a, box, { key: 'k-a2' })], VIEWPORT)
     expect(pins.map(p => p.box.left)).toEqual([152, 130])
+  })
+})
+
+describe('placePins at the edges of the visible viewport (§19 Rev 4 "pins at the right edge")', () => {
+  // An 800 × 600 window less 15 px classic scrollbars, as `viewportOf`
+  // measures it: the pin must stay left of the vertical one, above the other.
+  const VISIBLE = { width: 785, height: 585 }
+  const RIGHT_MOST = VISIBLE.width - 24 - PIN_EDGE_INSET_PX
+  type PinBox = PinInput['box']
+  const inside = (box: PinBox): boolean =>
+    box.left >= PIN_EDGE_INSET_PX &&
+    box.top >= PIN_EDGE_INSET_PX &&
+    box.left + box.width <= VISIBLE.width - PIN_EDGE_INSET_PX &&
+    box.top + box.height <= VISIBLE.height - PIN_EDGE_INSET_PX
+  /** The drawn bubble: the 20 px body inside the 24 px hit box, which collisions are judged on. */
+  const bubble = (box: PinBox): PinBox => ({ left: box.left + 2, top: box.top + 2, width: 20, height: 20 })
+
+  it('keeps a full-width element’s pin inside the visible width, clear of the scrollbar', () => {
+    const [doc] = elements('doc')
+    // The owner's div.doc: it spans the page, its right edge on the scrollbar's left edge.
+    const [pin] = placePins([input(doc, { left: 0, top: 120, width: 785, height: 900 })], VISIBLE)
+    expect(pin.box).toEqual({ left: RIGHT_MOST, top: 94, width: 24, height: 24 })
+    expect(inside(pin.box)).toBe(true)
+  })
+
+  it('clips an element that reaches under the scrollbar (width: 100vw) to the visible width first', () => {
+    const [doc] = elements('doc')
+    const [pin] = placePins([input(doc, { left: 0, top: 120, width: 800, height: 900 })], VISIBLE)
+    expect(pin.box.left).toBe(RIGHT_MOST)
+  })
+
+  it('leaves a narrow element in the middle where it was', () => {
+    const [a] = elements('a')
+    const box = { left: 300, top: 200, width: 120, height: 40 }
+    const [withScrollbar] = placePins([input(a, box)], VISIBLE)
+    const [without] = placePins([input(a, box)], VIEWPORT)
+    expect(withScrollbar.box).toEqual({ left: 422, top: 174, width: 24, height: 24 })
+    expect(without.box).toEqual(withScrollbar.box)
+  })
+
+  it('gives two stacked full-width elements separate pins', () => {
+    const [first, second] = elements('first', 'second')
+    // Rows apart: each keeps the clamped corner.
+    const apart = placePins(
+      [input(first, { left: 0, top: 100, width: 785, height: 60 }), input(second, { left: 0, top: 160, width: 785, height: 400 })],
+      VISIBLE
+    )
+    expect(apart.map(p => [p.box.left, p.box.top])).toEqual([
+      [RIGHT_MOST, 74],
+      [RIGHT_MOST, 134]
+    ])
+    // One row (a 10 px band above a section): both clamp to the same spot, so
+    // the second steps left of the first – the clamp never makes them overlap.
+    const close = placePins(
+      [input(first, { left: 0, top: 100, width: 785, height: 10 }), input(second, { left: 0, top: 110, width: 785, height: 400 })],
+      VISIBLE
+    )
+    expect(close.map(p => [p.box.left, p.box.top])).toEqual([
+      [RIGHT_MOST, 74],
+      [RIGHT_MOST - PIN_STEP_PX, 84]
+    ])
+    expect(overlaps(bubble(close[0].box), bubble(close[1].box))).toBe(false)
+    expect(close.every(p => inside(p.box))).toBe(true)
+  })
+
+  it('clamps at the left edge: an element scrolled off sideways keeps its pin 4 px in', () => {
+    const [a] = elements('a')
+    // Only its last pixel shows: the tip would put the box at 3.
+    const [pin] = placePins([input(a, { left: -299, top: 200, width: 300, height: 50 })], VISIBLE)
+    expect(pin.box).toEqual({ left: PIN_EDGE_INSET_PX, top: 174, width: 24, height: 24 })
+  })
+
+  it('keeps the bottom above a horizontal scrollbar, and draws nothing for an element only under it', () => {
+    const [a, b] = elements('a', 'b')
+    // Its visible part starts 1 px above the scrollbar: the box stops 4 px above it.
+    const [low] = placePins([input(a, { left: 100, top: 584, width: 50, height: 30 })], VISIBLE)
+    expect(low.box.top).toBe(VISIBLE.height - 24 - PIN_EDGE_INSET_PX)
+    // Behind the scrollbar strip only (585–600 of the 600 px window): not on screen, no pin.
+    expect(placePins([input(b, { left: 100, top: 586, width: 50, height: 10 })], VISIBLE)).toEqual([])
   })
 })
 

@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * One frame's comment overlay (docs/designs/html-preview-comments.md §6,
- * §7.1–§7.3, §7.5 step 6–7, §7.10, §10).
+ * §7.1–§7.3, §7.5 step 6–7, §7.10, §10; folded sections: §19 Rev 4).
  *
  * It holds the state main last sent, the document's tokens, the hover and
  * keyboard-picker position, and draws the overlay in one render pass per
@@ -30,6 +30,7 @@ import {
   type FrameMap,
   type Shield
 } from './frames'
+import { openAround, SectionRestore } from './foldedSections'
 import { boxOf, clipToViewport, contains, outlineBox, viewportOf, type Point, type Viewport } from './geometry'
 import { IconResolver } from './iconResolver'
 import { labelOf, labelText, type LabelSuffix } from './label'
@@ -75,6 +76,7 @@ export class CommentController {
   private readonly watch: PageWatch
   private readonly cursor: CursorSheet
   private readonly restorer: ScrollRestore
+  private readonly sections: SectionRestore
   private readonly pickable: PickablePredicate
   private readonly icons: IconResolver
   private state: CommentState = IDLE_STATE
@@ -111,6 +113,7 @@ export class CommentController {
     this.watch = new PageWatch(deps, target => this.host.isHost(target), () => this.scheduler.soon())
     this.cursor = new CursorSheet(doc)
     this.restorer = new ScrollRestore(deps.win, now)
+    this.sections = new SectionRestore(deps.win, doc, now)
     this.pickable = pickableExcept(element => this.host.isHost(element))
     this.icons = new IconResolver(this.tokens, () => this.watch.version)
   }
@@ -164,6 +167,7 @@ export class CommentController {
     }
     if (next.mode !== previous.mode) this.modeChanged(next.mode)
     this.watch.set(next.mode || next.icons.length > 0)
+    if (next.openSections !== undefined) this.sections.start(next.openSections)
     if (next.restore !== undefined) this.restorer.start(next.restore)
     this.render()
     if (next.reveal !== undefined) this.reveal(next.reveal)
@@ -215,6 +219,7 @@ export class CommentController {
   /** Any trusted wheel, key or press: the user takes over the scroll. */
   userInput(): void {
     this.restorer.cancel()
+    this.sections.cancel()
   }
 
   /** A trusted pointer event that reached the overlay host. */
@@ -281,6 +286,7 @@ export class CommentController {
     this.anchors.dispose()
     this.steps.dispose()
     this.restorer.cancel()
+    this.sections.cancel()
     this.cursor.set(false)
     if (this.flashTimer !== null) clearTimeout(this.flashTimer)
     this.host.dispose()
@@ -401,6 +407,7 @@ export class CommentController {
   private reveal(key: string): void {
     const element = this.icons.resolve(this.state.icons).find(r => r.icon.key === key)?.element
     if (element === undefined) return
+    openAround(element)
     element.scrollIntoView({ block: 'center' })
     this.flash = { element, until: this.deps.now() + REVEAL_FLASH_MS }
     if (this.flashTimer !== null) clearTimeout(this.flashTimer)

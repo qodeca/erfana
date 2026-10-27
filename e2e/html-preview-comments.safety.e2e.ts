@@ -3,8 +3,8 @@
 /**
  * HTML Preview comments – file safety, hostile pages and the edges of the
  * feature, through the real UI (docs/designs/html-preview-comments.md §12.2
- * E-009 – E-013, E-015, E-019, E-020, E-022, E-023; decisions 4, 8, 12, 14,
- * 21, 24, 32; §19 R3-6, R3-8).
+ * E-009 – E-013, E-015, E-019, E-020, E-022, E-023, E-027; decisions 4, 8,
+ * 12, 14, 21, 24, 28, 32; §19 R3-6, R3-8, Rev 4 "folded sections").
  *
  * - **E-009** an "agent" edits the file while the comment window is open: the
  *   block still lands before its element, and the agent's edit is kept.
@@ -19,6 +19,11 @@
  *   corroborated).
  * - **E-013** 200 comments on one page: the drawer lists them all, pins are
  *   drawn, and "Show on page" on the last row brings its element into view.
+ * - **E-027** the owner's folded-section case: a paragraph inside a
+ *   `<details>` the reader opened stays open through comment mode's reload
+ *   and the save's reload, with its pin drawn; folded again it is "Not
+ *   visible now", and the drawer row's Open unfolds it behind the window –
+ *   the pin back once the window closes.
  * - **E-015** a hostile page (`comments/hostile/`: forged events, prototype
  *   overrides, hide-all CSS, a fake pin, a node-deleting observer; and a CSP
  *   `'none'` page) never opens Erfana's window by itself, and its file's
@@ -100,6 +105,32 @@ const REVIEW_TITLE = '-HPC-P3-'
 
 const MANY_COUNT = 200
 const MANY_TEXT = manyCommentsPage(MANY_COUNT)
+
+const FOLDED = 'comments/folded.html'
+const FOLDED_TITLE = '-HPC-FOLDED-'
+/** The owner's case (§19 Rev 4): a paragraph inside a "Technical details" section, folded as served. */
+const FOLDED_TEXT = [
+  '<!doctype html>',
+  '<html lang="en">',
+  '<head>',
+  '  <meta charset="utf-8">',
+  `  <title>${FOLDED_TITLE}</title>`,
+  '  <style>body { font: 16px/1.5 sans-serif; margin: 40px; } p { padding: 12px; }</style>',
+  '</head>',
+  '<body>',
+  '  <h1 id="heading">Release notes</h1>',
+  '  <p id="intro">What changed in this release.</p>',
+  '  <details id="facts">',
+  '    <summary id="facts-summary">Technical details</summary>',
+  '    <p id="folded">The parser now reads the file in 64 KB chunks.</p>',
+  '  </details>',
+  '  <p id="thanks">Thanks to everyone who reported issues.</p>',
+  '</body>',
+  '</html>',
+  ''
+].join('\n')
+/** Whether the section is open, from the page itself (`none` mid-load). */
+const FACTS_OPEN = "(() => { const facts = document.getElementById('facts'); return facts ? String(facts.open) : 'none' })()"
 
 const CARDS = 'comments/cards.html'
 const CARDS_TITLE = '-HPC-CARDS-'
@@ -493,6 +524,65 @@ test.describe('HTML Preview comments – safety and edges (P7)', () => {
         { timeout: PREVIEW_BUDGET_MS, message: 'the last row\'s element never came into view' }
       )
       .toBe(true)
+  })
+
+  test('E-027 a comment inside a folded <details>: the section stays open through the reloads and the pin draws; folded again, the drawer row\'s Open unfolds it', async ({
+    windowWithTestProject,
+    appWithTestProject,
+    testProject
+  }) => {
+    const app = appWithTestProject
+    const page = windowWithTestProject
+    const preview = new HtmlPreviewPage(page, app)
+    const chrome = new CommentChrome(page, preview, 'folded.html')
+    const target = HtmlPreviewPage.target(FOLDED)
+    const file = path.join(testProject.path, FOLDED)
+    const factsOpen = (message: string, open: boolean): Promise<void> =>
+      expect
+        .poll(() => preview.eval(FACTS_OPEN, target), { timeout: PREVIEW_BUDGET_MS, message })
+        .toBe(String(open))
+    // Written here, so no other spec's project carries it.
+    await fsp.writeFile(file, FOLDED_TEXT, 'utf-8')
+    await setGlobalSetting(page, 'comments', reviewer(NAME))
+
+    const panelId = await openCommentPage(preview, app, FOLDED, FOLDED_TITLE)
+    await factsOpen('the section was not served folded', false)
+    // The reader unfolds "Technical details" with a real click on its summary (comment mode is off).
+    await clickElement(app, 'facts-summary', 'left', target)
+    await factsOpen('the summary click never unfolded the section', true)
+
+    // Comment mode reloads the page – it has no comments yet, so it was served raw – and keeps the section open.
+    await chrome.modeOn(app, panelId, target)
+    await factsOpen('comment mode\'s reload folded the section', true)
+
+    // Comment the paragraph inside it: one block before it, and after the save's reload it is open, with its pin.
+    const before = await diskBytes(file)
+    await clickElement(app, 'folded', 'left', target)
+    await expect(chrome.window()).toHaveAttribute('data-view', 'new', { timeout: PREVIEW_BUDGET_MS })
+    await chrome.saveNewComment('Folded-Rev4: say why 64 KB', FOLDED)
+    const inserted = singleBlockInsert(before, await diskBytes(file))
+    expect(inserted, 'not exactly one block inserted').not.toBeNull()
+    expect(before.subarray(inserted?.offset ?? 0).toString('utf-8').startsWith('<p id="folded">')).toBe(true)
+    await waitForCommentLoad(app, FOLDED, 'page', 1)
+    await factsOpen('the save\'s reload folded the section', true)
+    await expectPin(app, 'folded', true, target)
+
+    // Folded again – in comment mode a click on the summary is a pick, so the page folds it, as a script
+    // would: no pin, and the drawer says "Not visible now".
+    expect(await preview.eval("(document.getElementById('facts').open = false, 'folded')", target)).toBe('folded')
+    await expectPin(app, 'folded', false, target)
+    await chrome.openDrawer()
+    const row = chrome.drawerRows().first()
+    await expect(row.getByTestId('comment-drawer-tag')).toHaveText(['Not visible now'], { timeout: PREVIEW_BUDGET_MS })
+
+    // The row's Open: its thread in the window, and behind it the section unfolds; once closed, the pin is back.
+    await row.getByTestId('comment-drawer-row-open').click()
+    await expect(chrome.window()).toHaveAttribute('data-view', 'threads', { timeout: PREVIEW_BUDGET_MS })
+    await page.getByTestId('comment-close').click()
+    await expect(chrome.window()).toHaveCount(0, { timeout: PREVIEW_BUDGET_MS })
+    await factsOpen('the drawer\'s Open never unfolded the section', true)
+    await expect(row.getByTestId('comment-drawer-tag')).toHaveCount(0, { timeout: PREVIEW_BUDGET_MS })
+    await expectPin(app, 'folded', true, target)
   })
 
   test('E-015 a hostile page never opens Erfana\'s window by itself, and its file is never written', async ({

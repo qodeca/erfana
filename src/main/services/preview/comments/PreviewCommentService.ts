@@ -42,7 +42,7 @@ import { sharedCommentParseClient } from './CommentParseWorkerAdapter'
 import { CommentWriter, type CommentWriterDeps } from './CommentWriter'
 import { registerCommentE2eSource } from './commentE2eHook'
 import { CommentFrames, type CommentFrameLike, type FrameRecord } from './commentFrames'
-import { createCommentFrameBroadcaster, type CommentFrameBroadcaster } from './commentFrameBroadcaster'
+import { createCommentFrameBroadcaster, type CommentFrameBroadcaster, type CommentStateExtras } from './commentFrameBroadcaster'
 import { CommentKeyStore, type CommentBinding } from './commentKeyStore'
 import { createCommentPickHandler, type CommentPickHandler, type PageSignalEvent } from './commentPickHandler'
 import { pickerStepOf, type PickerStepInput } from './commentPickerStep'
@@ -420,14 +420,23 @@ export class PreviewCommentService implements CommentServiceApi {
 
   private async onHello(frame: CommentFrameLike): Promise<void> {
     const record = await this.frames.hello(frame)
-    const realPath = record.file?.realPath
-    const restore = frame.parent !== null && realPath !== undefined ? this.coordinator.frameRestoreFor(realPath) : undefined
-    this.broadcaster.send(frame, restore === undefined ? undefined : { restore })
+    this.broadcaster.send(frame, this.placeFor(frame, record.file?.realPath))
     // The parent's list of child frames now says whether this one is commentable.
     if (frame.parent !== null) this.broadcaster.send(frame.parent)
     // A load that started before the mode came on was served without tokens.
     if (this.mode && this.servedRaw(record)) this.reloadRaw()
     this.publishChanged()
+  }
+
+  /** What a hello gets back of the reader's place after a save: a frame its scroll, the top frame its open sections. */
+  private placeFor(frame: CommentFrameLike, realPath: string | undefined): CommentStateExtras | undefined {
+    if (realPath === undefined) return undefined
+    if (frame.parent !== null) {
+      const restore = this.coordinator.frameRestoreFor(realPath)
+      return restore === undefined ? undefined : { restore }
+    }
+    const openSections = this.coordinator.sectionsFor(realPath)
+    return openSections === undefined ? undefined : { openSections }
   }
 
   private onParent(frame: CommentFrameLike): void {

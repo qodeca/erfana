@@ -142,7 +142,7 @@ const threadHtml = (threads) => threads.map((t) => `<section class="erf-comment-
     <p class="erf-comment-message__text" dir="auto">${H.esc(t.text)}</p></article>
   <div class="erf-comment-thread__reply"><div class="erf-comment-field"><label class="erf-comment-field__label" for="r${t.id}">Reply</label>
     <textarea class="erf-comment-textarea erf-comment-textarea--reply" id="r${t.id}"></textarea></div>
-    <div class="erf-comment-thread__actions"><button class="erf-comment-action" type="button">Resolve</button>${btn('Reply', 'primary')}</div></div>
+    <div class="erf-comment-thread__actions">${btn('Resolve', 'secondary')}${btn('Reply', threads.filter((x) => !x.resolved).length === 1 ? 'primary' : 'secondary')}</div></div>
 </section>`).join('');
 
 /* The window goes right of the element, else left, else below, else above; under 400px it is a sheet. */

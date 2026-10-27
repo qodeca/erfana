@@ -55,6 +55,16 @@
   <strong><span data-claim="hpc-window-focus"></span>:1</strong>, both clear of 3:1.
 </div>
 
+<div class="ds-note">
+  <strong>One button size in the window.</strong> Every text button – the foot, a thread's Resolve and Reply, a
+  folded thread's Re-open, a banner's Go to tab or Pick again, a damaged block's Copy raw text – is the Buttons
+  card's Dialog.css button, so the window reads like every other Erfana dialog. Secondary unless it is the
+  view's one primary action: Save in a new comment, Continue in the identity step, Save changes in an edit, and
+  Reply only while the view holds a single open thread. The compact <code>.erf-comment-action</code> belongs to
+  the drawer, which is panel chrome sized with the toolbar. Only the 24px icon buttons (close, a message's
+  <em>…</em>, a resolved thread's chevron) differ, as icon buttons do in every dialog.
+</div>
+
 <h2>Live – a real dialog</h2>
 
 <div class="ds-note">
@@ -83,6 +93,8 @@
     <tr><td>A new comment opens</td><td>The text field</td><td>There is only one thing to do.</td></tr>
     <tr><td>A thread opens</td><td>The window title (<code>tabindex="-1"</code>)</td><td>So a screen reader starts at the top and reads the thread in order, rather than landing in the reply box below text it never heard.</td></tr>
     <tr><td>A delete confirmation opens</td><td>Cancel</td><td>The destructive button is never the default; Return twice cannot delete.</td></tr>
+    <tr><td>Open in source</td><td>The editor, on the comment's line – the window closes first</td><td>A dialog left open would float over the editor and its focus trap would pull the keyboard back out of it. Nothing typed is lost: reply and edit text stay in the session drafts and come back with the window.</td></tr>
+    <tr><td>Another tab is shown</td><td>Wherever the reader went – the window is not drawn</td><td>The window belongs to its preview tab. Drawn over another tab it would cover that tab's content, and its dialog occluder would freeze every other preview. It comes back, text restored, when its tab does.</td></tr>
     <tr><td>The window closes</td><td>The opener: the drawer row, or <strong>native focus to the page</strong> with the picker on the same element</td><td>The Menu card's rule – focus comes back to what opened it. From the page the opener is page content, so Erfana hands focus back to the native view (Focus card Exceptions).</td></tr>
   </tbody>
 </table>
@@ -199,7 +211,13 @@ function win(o) {
 }
 const ctx = (label, file, line) => `<bdi dir="ltr">${label}</bdi> · ${file}, line ${line}`;
 const btn = (label, kind, extra = '') => `<button class="erf-comment-btn erf-comment-btn--${kind}" type="button" ${extra}><span>${label}</span></button>`;
-const action = (label, extra = '') => `<button class="erf-comment-action" type="button" ${extra}>${label}</button>`;
+/* Every text button in the window is one size, the Dialog.css one: banner, thread and foot actions are its
+   secondary variant (§19 Rev 4 "open in source and button sizes"). `action` stays as a name for the call sites. */
+const action = (label, extra = '') => btn(label, 'secondary', extra);
+/* A thread's foot, as the window draws it: Open in source leading, the closing pair grouped so a narrow window
+   wraps the pair whole onto a second row. */
+const threadFoot = () => `<span class="erf-comment-window__foot-start">${btn('Open in source', 'secondary')}</span>` +
+  `<span class="erf-comment-window__foot-end">${btn('New comment', 'secondary')}${btn('Close', 'secondary')}</span>`;
 const banner = (kind, iconName, text, title, actions) => `<div class="erf-comment-banner erf-comment-banner--${kind}">
   <span class="erf-comment-banner__icon" aria-hidden="true">${I(iconName)}</span>
   <div class="erf-comment-banner__body">${title ? `<p class="erf-comment-banner__title">${title}</p>` : ''}
@@ -367,10 +385,10 @@ for (const [code, text, source, shown] of ERRORS) {
 /* ---------- threads ---------- */
 add('g-thread', '<strong>a thread</strong> – reply, resolve, a folded resolved thread, New comment',
   win({ title: 'Comments on button.cta', context: ctx('button.cta', 'index.html', 42),
-        body: THREAD_A() + resolvedLine(false), foot: btn('New comment', 'secondary') }));
+        body: THREAD_A() + resolvedLine(false), foot: threadFoot() }));
 add('g-thread', '<strong>the … menu</strong> – Edit, Delete… (decided Menu card)',
   win({ title: 'Comment on button.cta', context: ctx('button.cta', 'index.html', 42),
-        body: THREAD_A({ menuOpen: true, noReply: true }), foot: btn('New comment', 'secondary') }),
+        body: THREAD_A({ menuOpen: true, noReply: true }), foot: threadFoot() }),
   (fig) => {
     const anchor = fig.querySelector('[aria-expanded="true"]');
     const host = fig.querySelector('.erf-comment-window');
@@ -390,34 +408,34 @@ add('g-thread', '<strong>edit in place</strong> – the message becomes its fiel
   win({ title: 'Comment on button.cta', context: ctx('button.cta', 'index.html', 42),
         body: THREAD_A({ noReply: true, editing: field({ label: 'Edit comment', value: 'Make this say "Start free trial".', placeholder: '' }) +
           `<div class="erf-comment-thread__actions">${btn('Cancel', 'secondary')}${btn('Save changes', 'primary')}</div>` }),
-        foot: btn('New comment', 'secondary') }));
+        foot: threadFoot() }));
 add('g-thread', '<strong>delete a comment</strong> – inline, destructive on the right, focus on Cancel',
   win({ title: 'Comment on button.cta', context: ctx('button.cta', 'index.html', 42),
         body: `<section class="erf-comment-thread">${message({ name: 'Anna K.', email: 'anna@studio.example', iso: '2026-10-25T09:10', time: 'Yesterday, 09:10',
           text: 'Agreed – and move it above the fold.', after: confirmBox('Delete this comment? It is removed from index.html. Git history keeps earlier versions.', 'Delete comment') })}</section>`,
-        foot: btn('New comment', 'secondary') }));
+        foot: threadFoot() }));
 add('g-thread', '<strong>delete a thread</strong> – deleting the first message deletes its replies',
   win({ title: 'Comment on button.cta', context: ctx('button.cta', 'index.html', 42),
         body: THREAD_A({ noReply: true, confirm: confirmBox('Delete this thread and its 1 replies?', 'Delete thread') }),
-        foot: btn('New comment', 'secondary') }));
+        foot: threadFoot() }));
 add('g-thread', '<strong>a resolved thread, unfolded</strong>',
-  win({ title: 'Comment on footer img.logo', context: ctx('img.logo', 'index.html', 120), body: resolvedLine(true), foot: btn('New comment', 'secondary') }));
+  win({ title: 'Comment on footer img.logo', context: ctx('img.logo', 'index.html', 120), body: resolvedLine(true), foot: threadFoot() }));
 add('g-thread', '<strong>two authors share a name</strong> – the email is shown in full',
   win({ title: 'Comment on h1', context: ctx('h1', 'index.html', 12), body: `<section class="erf-comment-thread">
     ${message({ name: 'Anna K.', email: 'anna@studio.example', showEmail: true, iso: '2026-10-25T09:10', time: 'Yesterday, 09:10', text: 'Shorter headline?' })}
     <div class="erf-comment-replies">${message({ name: 'Anna K.', email: 'anna.k@client.example', showEmail: true, iso: '2026-10-26T08:02', time: 'Today, 08:02', text: 'Fine by me.' })}</div></section>`,
-        foot: btn('New comment', 'secondary') }));
+        foot: threadFoot() }));
 
 /* ---------- text ---------- */
 add('g-text', '<strong>a bidi control in the text</strong> – drawn as a visible token',
   win({ title: 'Comment on a.download', context: ctx('a.download', 'index.html', 77), body: `<section class="erf-comment-thread">
     ${message({ name: 'Marcin Obel', iso: '2026-10-26T10:00', time: 'Today, 10:00', html: H.visibleBidi('Rename the file to invoice‮fdp.exe before release') })}</section>`,
-        foot: btn('New comment', 'secondary') }));
+        foot: threadFoot() }));
 add('g-text', '<strong>right-to-left text</strong> – dir="auto" per message; long words break, never widen',
   win({ title: 'Comment on p.lead', context: ctx('p.lead', 'index.html', 30), body: `<section class="erf-comment-thread">
     ${message({ name: 'Yael', iso: '2026-10-26T11:40', time: 'Today, 11:40', text: 'הכותרת הזאת ארוכה מדי למסך של טלפון.' })}
     <div class="erf-comment-replies">${message({ name: 'Marcin Obel', iso: '2026-10-26T11:52', time: 'Today, 11:52', text: 'See https://example.com/a/very/long/path/that/must/wrap/instead/of/widening/the/window' })}</div></section>`,
-        foot: btn('New comment', 'secondary') }));
+        foot: threadFoot() }));
 
 /* ---------- odd states ---------- */
 const RAW = '<!-- erfana:comment v1\nMarcin Obel · 2026-10-20 14:02\nMove the CTA above the fold.\n@data {"v":1,"id":"c_7f3k","thread":[{"author":{"name":"Marcin Obel"},"text":"Move the CTA above the fold.",\n-->';
@@ -451,7 +469,7 @@ add('g-odd', '<strong>not found</strong> – the element is gone from the file; 
 add('g-odd', '<strong>not visible now</strong> – a hidden slide or tab; still fully usable',
   win({ title: 'Comment on li.slide-4', context: ctx('li.slide-4', 'deck.html', 140),
         body: banner('info', 'info', 'This element isn\'t on screen right now – it may be on another slide or tab. Its icon comes back when it does.') + THREAD_A(),
-        foot: btn('New comment', 'secondary') }));
+        foot: threadFoot() }));
 
 /* ---------- the sheet ---------- */
 document.getElementById('sheetArea').insertAdjacentHTML('beforeend',

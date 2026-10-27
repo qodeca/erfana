@@ -52,7 +52,6 @@ import {
 import { counterState, countCharacters, visibleString } from './commentFormat'
 import { validateCommentText, type IdentityFormData } from './commentSchemas'
 import {
-  ActionButton,
   CommentBanner,
   CommentField,
   DialogButton,
@@ -229,7 +228,8 @@ export function NewCommentView({
       testId={TEST_IDS.COMMENT_UNSAVED_BANNER}
       actions={
         <>
-          <ActionButton
+          <DialogButton
+            variant="secondary"
             testId={TEST_IDS.COMMENT_UNSAVED_GO_TO_TAB}
             onClick={() => {
               // Close first (the text is in the drafts): a modal left open
@@ -239,11 +239,15 @@ export function NewCommentView({
             }}
           >
             {COPY.goToTab}
-          </ActionButton>
+          </DialogButton>
           {guard.state !== 'conflict' && (
-            <ActionButton onClick={() => void guard.save()} testId={TEST_IDS.COMMENT_UNSAVED_SAVE}>
+            <DialogButton
+              variant="secondary"
+              onClick={() => void guard.save()}
+              testId={TEST_IDS.COMMENT_UNSAVED_SAVE}
+            >
               {`Save ${file}`}
-            </ActionButton>
+            </DialogButton>
           )}
         </>
       }
@@ -320,7 +324,9 @@ export function NewCommentView({
               testId={TEST_IDS.COMMENT_SAVE_ERROR}
               actions={
                 failure.action === 'pick-again' ? (
-                  <ActionButton onClick={onPickAgain}>{COPY.pickAgain}</ActionButton>
+                  <DialogButton variant="secondary" onClick={onPickAgain}>
+                    {COPY.pickAgain}
+                  </DialogButton>
                 ) : undefined
               }
             >

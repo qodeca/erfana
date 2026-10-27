@@ -65,7 +65,7 @@ import {
   trackCommentWrite,
   writeKeyOf
 } from './commentPendingWrites'
-import { ActionButton, VisibleText } from './CommentParts'
+import { DialogButton, VisibleText } from './CommentParts'
 import { placeCommentWindow, type Box, type WindowPlacement } from './commentPlacement'
 import type { IdentityFormData } from './commentSchemas'
 import { headingOf, newCommentFrom } from './commentWindowHeading'
@@ -408,9 +408,9 @@ export function CommentWindow(props: CommentWindowProps): React.JSX.Element {
               <VisibleText text={readErrorText(request.file?.displayPath ?? COPY.thisFile)} />
             </p>
             <div className="erf-comment-thread__actions">
-              <ActionButton onClick={props.onRefresh} testId={TEST_IDS.COMMENT_WINDOW_RETRY}>
+              <DialogButton variant="secondary" onClick={props.onRefresh} testId={TEST_IDS.COMMENT_WINDOW_RETRY}>
                 {COPY.tryAgain}
-              </ActionButton>
+              </DialogButton>
             </div>
           </div>
         )}

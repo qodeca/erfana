@@ -1066,4 +1066,84 @@ describe('CommentWindow – threads', () => {
       expect(within(error).getByTestId('comment-control-token')).toHaveTextContent('⟨U+202E⟩')
     })
   })
+
+  describe('§19 Rev 4 owner test: open in source and button sizes', () => {
+    /** Every text button in the window – the icon buttons (close, …, chevron) are a kind of their own. */
+    const textButtons = (): HTMLElement[] =>
+      within(screen.getByTestId('comment-window'))
+        .getAllByRole('button')
+        .filter(button => !button.classList.contains('erf-comment-icon-btn'))
+
+    it('a thread view draws every text button as a Dialog.css button, Reply the one primary', () => {
+      setup({
+        request: threadsRequest({ threadKeys: ['t1', 't2'] }),
+        list: ready([
+          fileView({
+            threads: [
+              thread(1),
+              thread(2, {
+                status: 'resolved',
+                resolved: { by: { name: 'Bo' }, at: new Date(2026, 9, 25, 8, 0).toISOString() }
+              })
+            ]
+          })
+        ])
+      })
+      const buttons = textButtons()
+      // Resolve, Reply, Re-open, Open in source, Close – one size, no compact action among them.
+      expect(buttons.map(b => b.textContent)).toEqual(
+        expect.arrayContaining([COPY.resolve, COPY.reply, COPY.reopen, COPY.openInSource, COPY.close])
+      )
+      for (const button of buttons) {
+        expect(button).toHaveClass('dialog-btn')
+        expect(button).not.toHaveClass('erf-comment-action')
+      }
+      const primaries = buttons.filter(b => b.classList.contains('dialog-btn-primary'))
+      expect(primaries.map(b => b.textContent)).toEqual([COPY.reply])
+    })
+
+    it('with several open threads no Reply is primary – one primary per view', () => {
+      setup({
+        request: threadsRequest({ threadKeys: ['t1', 't2'] }),
+        list: ready([fileView({ threads: [thread(1), thread(2)] })])
+      })
+      const replies = screen.getAllByTestId('comment-reply')
+      expect(replies).toHaveLength(2)
+      for (const reply of replies) expect(reply).toHaveClass('dialog-btn', 'dialog-btn-secondary')
+      expect(screen.getByTestId('comment-window').querySelector('.dialog-btn-primary')).toBeNull()
+    })
+
+    it('a damaged block\'s actions and the read error\'s Try again are Dialog.css secondaries', () => {
+      const { unmount } = setup({
+        request: threadsRequest({ threadKeys: [], blockKeys: ['b1'] }),
+        list: ready([fileView({ damaged: [damaged(1)] })])
+      })
+      for (const button of textButtons()) expect(button).toHaveClass('dialog-btn', 'dialog-btn-secondary')
+      unmount()
+      setup({ list: { status: 'error', files: [] } })
+      expect(screen.getByTestId('comment-window-retry')).toHaveClass('dialog-btn', 'dialog-btn-secondary')
+    })
+
+    it('the foot keeps Open in source leading and the closing actions in one group that wraps whole', () => {
+      setup()
+      expect(screen.getByTestId('comment-open-in-source').parentElement).toHaveClass(
+        'erf-comment-window__foot-start'
+      )
+      // New comment, when offered, joins Close in this group (see "offers New comment" above).
+      expect(screen.getByTestId('comment-close').parentElement).toHaveClass('erf-comment-window__foot-end')
+    })
+
+    it('a reply typed before Open in source is still there when the window opens again', async () => {
+      const user = userEvent.setup()
+      const first = setup()
+      await titleFocused()
+      await user.type(screen.getByTestId('comment-reply-field'), 'Half a thought')
+      await user.click(screen.getByTestId('comment-open-in-source'))
+      expect(first.props.onOpenInSource).toHaveBeenCalledWith('/project/index.html', 11)
+      // The panel closes the window for Open in source (usePreviewComments): nothing is asked, nothing lost.
+      first.unmount()
+      setup()
+      expect(screen.getByTestId('comment-reply-field')).toHaveValue('Half a thought')
+    })
+  })
 })

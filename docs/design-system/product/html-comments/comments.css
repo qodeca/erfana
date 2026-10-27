@@ -116,6 +116,15 @@
 
 .erf-comment-window__foot-start { margin-inline-end: auto; }
 
+/* The foot's closing pair ("New comment", "Close"): wraps whole, right-aligned. */
+.erf-comment-window__foot-end {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-4);
+  margin-inline-start: auto;
+}
+
 /* ---------- icon buttons: close and the per-message actions ---------- */
 
 .erf-comment-icon-btn {
@@ -173,7 +182,8 @@
 .erf-comment-btn[aria-disabled='true'] { cursor: default; }
 .erf-comment-btn[aria-disabled='true'] > span { opacity: var(--opacity-disabled); }
 
-/* A small action inside a banner or a folded row: the Feedback card's action. */
+/* A small action in the comments DRAWER only (a row's Open, the read error's Try again). Inside the window
+   every text button is .erf-comment-btn – one size per window (window card, "One button size"). */
 .erf-comment-action {
   flex: 0 0 auto;
   block-size: var(--btn-height-sm);

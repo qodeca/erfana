@@ -259,6 +259,57 @@ describe('PreviewCommentService', () => {
     expect(f.service.e2eState().lastRestore).toBe('restored')
   })
 
+  it('§19 Rev 4 the reload keeps the open sections: the top frame\'s first hello after it gets them back, once', async () => {
+    f = await commentServiceFixture(BASE_PAGE)
+    const sent = (): unknown[] =>
+      (f as CommentServiceFixture).top.send.mock.calls.flatMap(([, state]) => {
+        const sections = (state as Record<string, unknown>).openSections
+        return sections === undefined ? [] : [sections]
+      })
+    f.navigate(f.top, 'index.html')
+    await f.hello(f.top)
+    // The read before the reload (world 996) found two sections open; the fixture's stub is typed by its usual answers.
+    f.view.contents.executeJavaScriptInIsolatedWorld.mockResolvedValueOnce({ ...SCROLL, openSections: [4, 1] } as typeof SCROLL)
+    await f.service.setMode(true, true)
+    await flush()
+    expect(f.reload).toHaveBeenCalledTimes(1)
+    expect(sent()).toEqual([])
+
+    f.service.reloadStarting()
+    serveLoad(f.serving.tokens, BASE_PAGE, f.pagePath, 'page')
+    f.navigate(f.top, 'index.html')
+    f.service.pageLoadEnded({ reason: 'committed', load: { filePath: f.pagePath } })
+    await f.hello(f.top)
+    expect(sent()).toEqual([[1, 4]])
+    // Once: a repeated hello, and a later ordinary reload, reopen nothing.
+    await f.hello(f.top)
+    f.service.reloadStarting()
+    f.service.pageLoadEnded({ reason: 'committed', load: { filePath: f.pagePath } })
+    await f.hello(f.top)
+    expect(sent()).toEqual([[1, 4]])
+  })
+
+  it('§19 Rev 4 a save reload that serves the page raw still gives the top frame its sections back, as it keeps the scroll', async () => {
+    f = await commentServiceFixture(BASE_PAGE)
+    const load = await f.loadPage()
+    await f.service.setMode(true, true)
+    await f.pick(f.top, menuOn(tokenOfTag(load.doc, 'button'), 'button'))
+    const draftToken = f.emit.draftOpened.mock.calls[0][1].draftToken as string
+    // The save's read (world 996) finds one section open.
+    f.view.contents.executeJavaScriptInIsolatedWorld.mockResolvedValueOnce({ ...SCROLL, openSections: [2] } as typeof SCROLL)
+    expect(await f.service.save({ panelId: 'html-preview-index', op: 'add', draftToken, text: TEXT })).toMatchObject({ ok: true })
+
+    // Its reload is served without tokens, as after deleting a page's last comment with the mode off.
+    f.service.reloadStarting()
+    f.navigate(f.top, 'index.html')
+    f.service.pageLoadEnded({ reason: 'committed', load: { filePath: f.pagePath } })
+    await f.hello(f.top)
+    const withSections = f.top.send.mock.calls
+      .map(([, state]) => state as Record<string, unknown>)
+      .filter(state => state.openSections !== undefined)
+    expect(withSections).toEqual([expect.objectContaining({ commentable: false, openSections: [2] })])
+  })
+
   it('a page with a reason it cannot be instrumented never reloads for the mode, and says why', async () => {
     f = await commentServiceFixture(BASE_PAGE)
     f.serving.unavailableReason.mockReturnValue('too-many-elements')

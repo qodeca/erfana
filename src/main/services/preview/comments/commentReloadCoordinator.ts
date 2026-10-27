@@ -18,8 +18,13 @@
  * - when the reload commits the same page, its next `did-finish-load` restores
  *   the scroll and hash (M-040, M-041); when another page commits first – the
  *   reader went Back – the restore is dropped (M-042);
+ * - the `<details>` that were open come back with the top frame's first hello
+ *   after that commit (`commentState.openSections`, §19 Rev 4 "folded
+ *   sections"): the preload opens them before it draws or reports a pin, so a
+ *   comment inside one keeps its pin. Once only – a later load of the page,
+ *   an ordinary reload included, reopens nothing;
  * - a frame's own scroll comes back through `commentState.restore` at that
- *   frame's next hello (best effort, S3).
+ *   frame's next hello (best effort, S3). A frame's own sections are not kept.
  *
  * `reloadKeepingPlace()` is the same reload and restore without a write:
  * comment mode turned on over a page that was served without tokens
@@ -104,6 +109,11 @@ export interface CommentReloadCoordinator {
   didFinishLoad(): void
   /** A frame of `realPath` said hello: its own scroll to restore, once. */
   frameRestoreFor(realPath: string): { x: number; y: number } | undefined
+  /**
+   * The top frame of `realPath` said hello: the sections to open again, once,
+   * when this is the write's reload of the page the scroll was read on.
+   */
+  sectionsFor(realPath: string): readonly number[] | undefined
   /** A watcher change to `path`: `record` it, unless it is a write's own echo. */
   filterChange(path: string, record: () => void): void
   /** What the e2e hook reports. */
@@ -116,6 +126,10 @@ interface Armed extends ArmedWrite {
   reloadStartedAt?: number
   /** The reload committed the same page: restore at its `did-finish-load`. */
   restoreDue: boolean
+  /** A load committed since the write: any later commit is another load. */
+  committed: boolean
+  /** The reload committed the same page: its top frame's next hello reopens the sections. */
+  sectionsDue: boolean
   frameRestoreLeft: boolean
 }
 
@@ -189,6 +203,8 @@ export function createCommentReloadCoordinator(deps: ReloadCoordinatorDeps): Com
         ...(samePage ? {} : { scroll: undefined }),
         armedAt: deps.now(),
         restoreDue: false,
+        committed: false,
+        sectionsDue: false,
         frameRestoreLeft: write.frameRestore !== undefined
       }
       if (!samePage) lastRestore = 'dropped'
@@ -206,7 +222,17 @@ export function createCommentReloadCoordinator(deps: ReloadCoordinatorDeps): Com
       if (disposed) return
       cancelFallback()
       // No file was written: nothing to drop as an echo, and no fallback to arm.
-      armed = { realPath: '', fileHash: '', ...(scroll === undefined ? {} : { scroll }), page: deps.currentPage(), armedAt: deps.now(), restoreDue: false, frameRestoreLeft: false }
+      armed = {
+        realPath: '',
+        fileHash: '',
+        ...(scroll === undefined ? {} : { scroll }),
+        page: deps.currentPage(),
+        armedAt: deps.now(),
+        restoreDue: false,
+        committed: false,
+        sectionsDue: false,
+        frameRestoreLeft: false
+      }
       deps.reload()
     },
 
@@ -220,13 +246,17 @@ export function createCommentReloadCoordinator(deps: ReloadCoordinatorDeps): Com
 
     pageLoadEnded(end) {
       if (armed === undefined || end.reason !== 'committed') return
+      const first = !armed.committed
+      armed.committed = true
       if (armed.reloadStartedAt === undefined || key(end.load.filePath) !== key(armed.page ?? end.load.filePath)) {
         // Another page is on screen: nothing is restored onto it (M-042).
         if (armed.scroll !== undefined) lastRestore = 'dropped'
-        armed = { ...armed, scroll: undefined, restoreDue: false }
+        armed = { ...armed, scroll: undefined, restoreDue: false, sectionsDue: false }
         return
       }
       armed.restoreDue = armed.scroll !== undefined
+      // Only the write's own reload: a later commit of the page is an ordinary load.
+      armed.sectionsDue = first && armed.scroll?.openSections !== undefined
     },
 
     didFinishLoad() {
@@ -243,6 +273,13 @@ export function createCommentReloadCoordinator(deps: ReloadCoordinatorDeps): Com
       }
       write.frameRestoreLeft = false
       return { x: write.frameRestore.x, y: write.frameRestore.y }
+    },
+
+    sectionsFor(realPath) {
+      const write = armed
+      if (write === undefined || !write.sectionsDue) return undefined
+      write.sectionsDue = false
+      return key(realPath) === key(write.page ?? realPath) ? write.scroll?.openSections : undefined
     },
 
     filterChange(path, record) {

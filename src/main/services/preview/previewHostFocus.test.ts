@@ -15,6 +15,7 @@ import { PREVIEW_FORWARDED_SHORTCUTS } from './previewInputForward'
 import {
   PREVIEW_HOST_FOCUS_KEYS,
   focusHostContents,
+  focusHostWhileKey,
   forwardWithHostFocus,
   movesFocusToHost,
   type PreviewHostFocusWindow
@@ -111,5 +112,32 @@ describe('focusHostContents', () => {
   it('skips a contents that cannot focus', () => {
     const window: PreviewHostFocusWindow = { isDestroyed: () => false, webContents: {} }
     expect(focusHostContents(window)).toBe(false)
+  })
+})
+
+describe('focusHostWhileKey (§19 Rev 4 owner test: comment window focus)', () => {
+  function keyWindow(key: boolean, options: { windowGone?: boolean } = {}) {
+    const made = makeWindow(options)
+    const isFocused = vi.fn(() => key)
+    return { window: { ...made.window, isFocused }, focus: made.focus, isFocused }
+  }
+
+  it('focuses the host contents while the window is the OS key window', () => {
+    const { window, focus } = keyWindow(true)
+    expect(focusHostWhileKey(window)).toBe(true)
+    expect(focus).toHaveBeenCalledTimes(1)
+  })
+
+  it('never pulls a window that is not key to the front – the reader switched apps while the draft was built', () => {
+    const { window, focus } = keyWindow(false)
+    expect(focusHostWhileKey(window)).toBe(false)
+    expect(focus).not.toHaveBeenCalled()
+  })
+
+  it('skips a window that is gone without asking whether it is key', () => {
+    const { window, focus, isFocused } = keyWindow(true, { windowGone: true })
+    expect(focusHostWhileKey(window)).toBe(false)
+    expect(isFocused).not.toHaveBeenCalled()
+    expect(focus).not.toHaveBeenCalled()
   })
 })

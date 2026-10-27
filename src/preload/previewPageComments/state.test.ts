@@ -7,7 +7,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { MAX_ICONS } from './constants'
+import { MAX_ICONS, OPEN_SECTIONS_MAX, SECTIONS_SCANNED_MAX } from './constants'
 import { DEFAULT_THEME, IDLE_STATE, parseCommentState, pxOf, type OverlayTheme } from './state'
 import { token } from './__test-helpers__/harness'
 
@@ -162,6 +162,38 @@ describe('parseCommentState', () => {
     const many = Array.from({ length: 1_001 }, (_, n) => ({ key: `f${n}`, commentable: true }))
     expect(parseCommentState({ mode: false, commentable: true, childFrames: many })?.childFrames).toBeUndefined()
     expect(parseCommentState({ mode: false, commentable: true, childFrames: [null] })?.childFrames).toBeUndefined()
+  })
+
+  it('keeps the sections to reopen only as a short list of places – sorted, once each – also for a page served raw', () => {
+    const sections = (openSections: unknown): unknown =>
+      parseCommentState({ mode: false, commentable: true, openSections })?.openSections
+    expect(sections([4, 0, 4, 2])).toEqual([0, 2, 4])
+    expect(sections(Array.from({ length: OPEN_SECTIONS_MAX }, (_, n) => n))).toHaveLength(OPEN_SECTIONS_MAX)
+    expect(sections([SECTIONS_SCANNED_MAX - 1])).toEqual([SECTIONS_SCANNED_MAX - 1])
+    // One bad entry, or one too many, drops the whole list: nothing opens.
+    for (const bad of [
+      [],
+      'all',
+      { 0: 1 },
+      [1, -1],
+      [1.5],
+      ['1'],
+      [Number.NaN],
+      [SECTIONS_SCANNED_MAX],
+      Array.from({ length: OPEN_SECTIONS_MAX + 1 }, (_, n) => n)
+    ]) {
+      expect(sections(bad), JSON.stringify(bad)).toBeUndefined()
+    }
+    // A save reload that served the page raw (its last comment deleted, the mode off) keeps them, as it keeps the scroll.
+    expect(parseCommentState({ mode: false, openSections: [3, 0], reveal: 'k1' })).toEqual({
+      mode: false,
+      commentable: false,
+      showIcons: false,
+      icons: [],
+      theme: DEFAULT_THEME,
+      openSections: [0, 3]
+    })
+    expect(parseCommentState({ mode: false, openSections: [-1] })).not.toHaveProperty('openSections')
   })
 
   it('keeps a theme value only when it is a plain colour, font list or pixel length', () => {

@@ -93,7 +93,9 @@
 <div class="ds-note">
   A self-drawn square-cornered bubble, <code>M2 2H22V17H7L2 22Z</code> in a 24 × 24 hit box (WCAG 2.5.8). The
   tail tip sits on the element's top-right corner, 4px outward, so the bubble floats above the element rather
-  than covering it. <strong>Only open threads are counted.</strong> One open thread shows two ink "text lines";
+  than covering it. <strong>Near an edge it stays on the page:</strong> it is clamped to the page's visible
+  area – never under its scrollbar – and keeps 4px inside it, so an element as wide as the page has its pin
+  just inside the right edge. <strong>Only open threads are counted.</strong> One open thread shows two ink "text lines";
   2–9 the number in bold mono; ten or more <code>9+</code>. A state is never colour alone: hover changes the
   fill and the cursor and adds a tooltip, selected inverts the whole bubble, damaged swaps the content for
   <code>!</code>. Pins are never animated.
@@ -314,6 +316,14 @@ scene(pins, '<strong>overlap</strong> – the ancestor keeps the corner, the chi
     { box: H.boxIn(a, q('#outer')), count: 2, name: '2 comments on div.card. Open.' },
     { box: H.boxIn(a, q('#inner')), count: 1, name: '1 comment on b#inner. Open.' }
   ]));
+scene(pins, '<strong>at the page edge</strong> – an element as wide as the page: the pin stays 4px inside the visible area, left of the scrollbar',
+  '<div class="card" id="doc" style="max-width:none;margin:0 -22px;height:320px"><b>div.doc</b> – the whole page width</div>',
+  (a, q) => {
+    const page = a.querySelector('.page');
+    page.style.overflowY = 'scroll';
+    H.drawPins(a, [{ box: H.boxIn(a, q('#doc')), count: 1, name: '1 comment on div.doc. Open.' }],
+      { width: page.clientWidth, height: page.clientHeight });
+  });
 scene(pins, '<strong>not drawn</strong> – all resolved, not visible now, not found, or hidden for this tab',
   PIN_PAGE, () => {});
 

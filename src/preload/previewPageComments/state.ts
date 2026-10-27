@@ -2,7 +2,8 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * The comment state main sends a frame on `preview-page:commentState`
- * (docs/designs/html-preview-comments.md §8, §10.9, §19 R3-3, R3-4).
+ * (docs/designs/html-preview-comments.md §8, §10.9, §19 R3-3, R3-4, Rev 4
+ * "folded sections").
  *
  * Main is trusted, but the payload is still parsed field by field: anything
  * malformed is dropped rather than drawn, a colour or length that would not
@@ -12,9 +13,11 @@
  */
 import {
   MAX_ICONS,
+  OPEN_SECTIONS_MAX,
   PICK_TAG_MAX_CHARS,
   PIN_KEY_MAX_CHARS,
   RUNTIME_PATH_MAX_CHARS,
+  SECTIONS_SCANNED_MAX,
   TOKEN_PATTERN
 } from './constants'
 
@@ -92,6 +95,8 @@ export interface CommentState {
   readonly icons: readonly IconState[]
   readonly reveal?: string
   readonly restore?: { readonly x: number; readonly y: number }
+  /** After a save reload: the `<details>` to open again, by place among the page's `<details>` (§19 Rev 4). */
+  readonly openSections?: readonly number[]
   readonly theme: OverlayTheme
   /** Absent: main has not told this frame its children (every iframe is shielded). */
   readonly childFrames?: readonly ChildFrameState[]
@@ -210,13 +215,27 @@ function parseRestore(raw: unknown): { x: number; y: number } | undefined {
   return ok(x) && ok(y) ? { x, y } : undefined
 }
 
+/**
+ * At most {@link OPEN_SECTIONS_MAX} places, each a whole number below
+ * {@link SECTIONS_SCANNED_MAX}; ascending and once each. Any bad entry drops the
+ * whole list – main's read never sends one.
+ */
+function parseOpenSections(raw: unknown): number[] | undefined {
+  if (!Array.isArray(raw) || raw.length === 0 || raw.length > OPEN_SECTIONS_MAX) return undefined
+  if (!raw.every(place => Number.isInteger(place) && place >= 0 && place < SECTIONS_SCANNED_MAX)) return undefined
+  return [...new Set(raw as number[])].sort((a, b) => a - b)
+}
+
 /** Parse a `commentState` message; `null` when it is not one. */
 export function parseCommentState(raw: unknown): CommentState | null {
   if (!isBag(raw) || typeof raw.mode !== 'boolean') return null
   const theme = parseTheme(raw.theme)
   const hidden = raw.hidden === true ? { hidden: true as const } : {}
+  // A page served raw after a save reload still gets its open sections back, like its scroll.
+  const openSections = parseOpenSections(raw.openSections)
+  const sections = openSections ? { openSections } : {}
   if (raw.commentable !== true) {
-    return { mode: raw.mode, commentable: false, showIcons: false, icons: [], theme, ...hidden }
+    return { mode: raw.mode, commentable: false, showIcons: false, icons: [], theme, ...hidden, ...sections }
   }
   const restore = parseRestore(raw.restore)
   const childFrames = parseChildFrames(raw.childFrames)
@@ -228,6 +247,7 @@ export function parseCommentState(raw: unknown): CommentState | null {
     theme,
     ...(isKey(raw.reveal) ? { reveal: raw.reveal } : {}),
     ...(restore ? { restore } : {}),
+    ...sections,
     ...(childFrames ? { childFrames } : {}),
     ...(isKey(raw.focusFrame) ? { focusFrame: raw.focusFrame } : {}),
     ...hidden

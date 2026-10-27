@@ -8,7 +8,10 @@
  *
  * Adopted from the card's comments.css. Buttons are NOT restated: the window
  * is a dialog, so it uses Dialog.css's `.dialog-btn` variants (the Dialog
- * framework's mandatory rule); this file adds only the busy dim.
+ * framework's mandatory rule); this file adds only the busy dim. Every text
+ * button in the window is one of them – banner, thread and foot actions alike –
+ * so one window never shows two button sizes (design §19 Rev 4 "open in source
+ * and button sizes"). `.erf-comment-action` below is the drawer's.
  *
  * Small text is --color-text-tertiary, never --color-text-secondary, which
  * measures under 4.5:1 on --color-bg-elevated (the window card's claim).
@@ -146,6 +149,17 @@
   margin-inline-end: auto;
 }
 
+/* The foot's closing actions ("New comment", "Close") as one group: in a
+   narrow window the group wraps whole onto a second row, right-aligned, under
+   "Open in source", instead of leaving one button stranded. */
+.erf-comment-window__foot-end {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-4);
+  margin-inline-start: auto;
+}
+
 /* aria-disabled, never disabled: "Saving…" keeps focus where the user pressed.
    The dim goes on the label, never the button, so the focus ring keeps full
    strength – the Permission band card's rule. */
@@ -190,7 +204,8 @@
   color: var(--color-text-emphasis);
 }
 
-/* A small action inside a banner or a folded row: the Feedback card's action. */
+/* A small action in the comments drawer (its "Try again"): panel chrome, sized
+   with the toolbar. Never inside the comment window – see the file header. */
 .erf-comment-action {
   flex: 0 0 auto;
   block-size: var(--btn-height-sm);

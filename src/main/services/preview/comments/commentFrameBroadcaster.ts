@@ -9,13 +9,14 @@
  * mode, its pins, its child frames in `WebFrameMain.frames` order (R3-4), the
  * resolved theme. Every other frame – `srcdoc`, `about:blank`, an error page,
  * a file served raw – gets the mode alone, so clicks are swallowed everywhere
- * in comment mode (R3-3). Nothing in a state names a file, a thread or an
+ * in comment mode (R3-3); only a top frame served raw by a save's reload also
+ * gets its open sections back (§19 Rev 4 "folded sections"). Nothing in a state names a file, a thread or an
  * author: pins carry a key, a token, a count and a status (§4.1 B1').
  *
  * `hidden` rides on every state while the page prints to PDF (M-064); the
- * one-shot fields – `reveal`, `restore`, `focusFrame` – go only in the send
- * they were asked for. Sends are coalesced: everything one tick asks for is
- * one broadcast.
+ * one-shot fields – `reveal`, `restore`, `openSections`, `focusFrame` – go
+ * only in the send they were asked for. Sends are coalesced: everything one
+ * tick asks for is one broadcast.
  */
 import { PreviewCommentPageChannels } from '../../../../shared/ipc/preview-comment-channels'
 import { stablePathDigest } from '../../../../shared/stablePathDigest'
@@ -35,6 +36,8 @@ export interface CommentViewMode {
 export interface CommentStateExtras {
   readonly reveal?: string
   readonly restore?: { readonly x: number; readonly y: number }
+  /** The top frame after a save reload: the `<details>` to open again, by place (§19 Rev 4). */
+  readonly openSections?: readonly number[]
   readonly focusFrame?: string
 }
 
@@ -90,7 +93,10 @@ export function createCommentFrameBroadcaster(deps: CommentBroadcasterDeps): Com
     const { mode, showIcons, hidden } = deps.mode()
     const record = deps.frames.get(frame.frameTreeNodeId)
     const base = { mode, theme: COMMENT_OVERLAY_THEME, ...(hidden ? { hidden: true } : {}) }
-    if (record === undefined || !deps.frames.isCommentable(record)) return { ...base, commentable: false }
+    if (record === undefined || !deps.frames.isCommentable(record)) {
+      // A page served raw after a save – its last comment deleted with the mode off – keeps its sections too.
+      return { ...base, commentable: false, ...(extras.openSections === undefined ? {} : { openSections: extras.openSections }) }
+    }
     const childFrames = frame.frames.filter(isLiveFrame).map(child => {
       const childRecord = deps.frames.record(child.frameTreeNodeId)
       return { key: childRecord.key, commentable: deps.frames.isCommentable(childRecord) }

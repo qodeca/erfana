@@ -177,10 +177,16 @@ export function CommentField({
         data-testid={testId}
         onChange={event => onChange(event.target.value)}
         onKeyDown={event => {
-          if (event.key === 'Enter' && (event.ctrlKey || event.metaKey) && onSubmit) {
-            event.preventDefault()
-            onSubmit()
-          }
+          if (event.key !== 'Enter' || !(event.ctrlKey || event.metaKey) || !onSubmit) return
+          // Either modifier on every OS, as the Markdown preview's Ask / Modify /
+          // Prompt dialogs (`PromptDialog`) accept it; the hint names the
+          // platform's own (`saveShortcutLabel`).
+          event.preventDefault()
+          // A held key's auto-repeat, or Enter confirming an IME composition, is
+          // not a second press: one press is one save attempt (the view's own
+          // busy / pending guards cover presses after it).
+          if (event.repeat || event.nativeEvent.isComposing) return
+          onSubmit()
         }}
       />
       {error && (
@@ -294,7 +300,10 @@ export interface DialogButtonProps {
 
 /**
  * A Dialog.css button (`.dialog-btn` variants – the Dialog framework's
- * mandatory buttons). Busy or blocked is `aria-disabled`: Chromium blurs a
+ * mandatory buttons), and the ONLY text button inside the comment window:
+ * banner actions, thread actions and the foot all share its size, so one
+ * window never mixes two (§19 Rev 4 "open in source and button sizes").
+ * At most one primary per view. Busy or blocked is `aria-disabled`: Chromium blurs a
  * control the moment it gets `disabled`, which would drop a keyboard reader's
  * focus on `<body>` mid-save.
  *
@@ -337,7 +346,11 @@ export interface ActionButtonProps {
 }
 
 /**
- * A small action inside a banner, a folded row or a drawer row.
+ * A small action in the comments DRAWER (its read error's "Try again"). Never
+ * inside the comment window: the window is a dialog, so every text button
+ * there is a {@link DialogButton} – one size, Dialog.css's (§19 Rev 4 "open in
+ * source and button sizes"). The drawer is panel chrome, sized with the
+ * toolbar, so it keeps this compact action.
  *
  * @param props - {@link ActionButtonProps}
  * @returns The button.

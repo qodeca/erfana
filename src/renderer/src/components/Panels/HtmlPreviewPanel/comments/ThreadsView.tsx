@@ -35,7 +35,7 @@ import {
   type SaveFailureCopy
 } from './commentCopy'
 import { visibleString } from './commentFormat'
-import { ActionButton, CommentBanner, DialogButton, VisibleText } from './CommentParts'
+import { CommentBanner, DialogButton, VisibleText } from './CommentParts'
 import {
   CommentThread,
   ResolvedThread,
@@ -210,18 +210,21 @@ function DamagedBlockView({
         </div>
       ) : (
         <div className="erf-comment-thread__actions">
-          <ActionButton onClick={() => onCopy(block.raw)}>{COPY.copyRaw}</ActionButton>
-          <ActionButton onClick={() => onOpenInSource(block.line)}>
+          <DialogButton variant="secondary" onClick={() => onCopy(block.raw)}>
+            {COPY.copyRaw}
+          </DialogButton>
+          <DialogButton variant="secondary" onClick={() => onOpenInSource(block.line)}>
             {COPY.openInSource}
-          </ActionButton>
+          </DialogButton>
           {deletable && (
-            <ActionButton
+            <DialogButton
+              variant="secondary"
               buttonRef={deleteRef}
               onClick={() => setConfirm(true)}
               testId={TEST_IDS.COMMENT_DELETE_BLOCK}
             >
               {COPY.deleteBlockAction}
-            </ActionButton>
+            </DialogButton>
           )}
         </div>
       )}
@@ -290,6 +293,7 @@ export function ThreadsView({
     now,
     locale,
     sharedNames,
+    replyIsPrimary: threads.filter(t => t.status !== 'resolved').length === 1,
     run,
     focusAfter,
     setFocusAfter
@@ -357,27 +361,34 @@ export function ThreadsView({
               {COPY.newerText}
             </CommentBanner>
             <div className="erf-comment-thread__actions">
-              <ActionButton onClick={() => onOpenInSource(block.line)}>
+              <DialogButton variant="secondary" onClick={() => onOpenInSource(block.line)}>
                 {COPY.openInSource}
-              </ActionButton>
+              </DialogButton>
             </div>
           </section>
         ))}
       </div>
       <div className="erf-comment-window__foot">
         <span className="erf-comment-window__foot-start">
-          <ActionButton onClick={() => onOpenInSource(firstLine)} testId={TEST_IDS.COMMENT_OPEN_IN_SOURCE}>
+          <DialogButton
+            variant="secondary"
+            onClick={() => onOpenInSource(firstLine)}
+            testId={TEST_IDS.COMMENT_OPEN_IN_SOURCE}
+          >
             {COPY.openInSource}
-          </ActionButton>
-        </span>
-        {onNewComment !== undefined && (
-          <DialogButton variant="secondary" onClick={onNewComment} testId={TEST_IDS.COMMENT_NEW_ON_ELEMENT}>
-            {COPY.newComment}
           </DialogButton>
-        )}
-        <DialogButton variant="secondary" onClick={onClose} testId={TEST_IDS.COMMENT_CLOSE}>
-          {COPY.close}
-        </DialogButton>
+        </span>
+        {/* One group, so a narrow window wraps it whole onto a second row rather than strand Close alone. */}
+        <span className="erf-comment-window__foot-end">
+          {onNewComment !== undefined && (
+            <DialogButton variant="secondary" onClick={onNewComment} testId={TEST_IDS.COMMENT_NEW_ON_ELEMENT}>
+              {COPY.newComment}
+            </DialogButton>
+          )}
+          <DialogButton variant="secondary" onClick={onClose} testId={TEST_IDS.COMMENT_CLOSE}>
+            {COPY.close}
+          </DialogButton>
+        </span>
       </div>
     </>
   )

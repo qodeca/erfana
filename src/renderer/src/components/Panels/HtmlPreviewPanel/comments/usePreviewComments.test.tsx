@@ -12,6 +12,7 @@ import type { GlobalSettings } from '../../../../../../shared/ipc/global-setting
 import { useGlobalSettingsStore } from '../../../../stores/useGlobalSettingsStore'
 import { useOverlayOccluderStore } from '../../../../stores/useOverlayOccluderStore'
 import { usePreviewCommentStore } from '../../../../stores/usePreviewCommentStore'
+import { usePreviewCoveredStore } from '../../../../stores/usePreviewCoveredStore'
 
 const mocks = vi.hoisted(() => ({
   writeText: vi.fn(async () => true),
@@ -40,6 +41,30 @@ import { resetCommentPendingWrites } from './commentPendingWrites'
 
 const PANEL = 'preview-index'
 
+/** A pin click: main's `icon` draft for thread t1. */
+const pinDraft = () => ({
+  panelId: PANEL,
+  kind: 'icon' as const,
+  point: { x: 1, y: 2 },
+  displayPath: 'index.html',
+  filePath: '/project/index.html',
+  frame: false,
+  fileKey: 'f1',
+  threadKeys: ['t1'],
+  blockKeys: []
+})
+
+/** Deliver one resize to every live `MockResizeObserver` (the test setup's). */
+function resizeAll(): void {
+  const { instances } = globalThis.ResizeObserver as unknown as {
+    instances: Array<{ trigger: () => void }>
+  }
+  for (const observer of [...instances]) observer.trigger()
+}
+
+/** This tab's page is gated behind its full-width drawer. */
+const isCovered = (): boolean => usePreviewCoveredStore.getState().isCovered(PANEL)
+
 function settingsWith(patch: Partial<GlobalSettings> = {}): GlobalSettings {
   return {
     comments: { authorName: 'Ada', identityNoticeSeen: true },
@@ -52,6 +77,10 @@ interface HarnessProps {
   readonly filePath?: string
   readonly ready?: boolean
   readonly width?: number
+  /** 0 with `width` 0: the tab dockview hid (`display: none`). */
+  readonly height?: number
+  /** dockview shows this tab (`DOCKVIEW_PANEL_VISIBLE`). */
+  readonly visible?: boolean
   readonly onValue: (value: PreviewComments) => void
 }
 
@@ -59,6 +88,8 @@ function Harness({
   filePath = '/project/index.html',
   ready = true,
   width = 1000,
+  height = 600,
+  visible = true,
   onValue
 }: HarnessProps) {
   const pageAreaRef = useRef<HTMLDivElement>(null)
@@ -69,7 +100,8 @@ function Harness({
     ready,
     pageAreaRef,
     panelRootRef,
-    containerApi: undefined
+    containerApi: undefined,
+    visible
   })
   onValue(value)
   return (
@@ -77,7 +109,7 @@ function Harness({
       ref={node => {
         panelRootRef.current = node
         if (node)
-          node.getBoundingClientRect = () => ({ width, height: 600, left: 0, top: 0 }) as DOMRect
+          node.getBoundingClientRect = () => ({ width, height, left: 0, top: 0 }) as DOMRect
       }}
       onKeyDown={value.onRootKeyDown}
       data-testid="root"
@@ -100,6 +132,7 @@ describe('usePreviewComments', () => {
     ;(window as unknown as { api: Record<string, unknown> }).api.preview = { focusPage }
     useGlobalSettingsStore.setState({ settings: settingsWith() })
     useOverlayOccluderStore.getState().reset()
+    usePreviewCoveredStore.setState({ covered: new Set() })
   })
   afterEach(async () => {
     // Unmount before resetting the stores, so the reset is not a state update
@@ -411,17 +444,68 @@ describe('usePreviewComments', () => {
       await waitFor(() => expect(fake.bridge.list).toHaveBeenCalledTimes(2))
     })
 
-    it('goes full width and occludes the page in a narrow panel', () => {
+    it('goes full width in a narrow panel and hides its own page – through its panel gate', () => {
       render(<Harness onValue={onValue} width={500} />)
       act(() => latest.toolbar.onToggleDrawer())
       expect(latest.drawer?.full).toBe(true)
-      expect(useOverlayOccluderStore.getState().isOccluded()).toBe(true)
+      expect(isCovered()).toBe(true)
     })
 
-    it('stays a side panel without occluding in a wide one', () => {
+    it('stays a side panel without hiding anything in a wide one', () => {
       render(<Harness onValue={onValue} />)
       act(() => latest.toolbar.onToggleDrawer())
       expect(latest.drawer?.full).toBe(false)
+      expect(isCovered()).toBe(false)
+      expect(useOverlayOccluderStore.getState().isOccluded()).toBe(false)
+    })
+
+    it('lifts the gate when the sheet closes, when the panel widens, and on unmount', () => {
+      const { rerender, unmount } = render(<Harness onValue={onValue} width={500} />)
+      act(() => latest.toolbar.onToggleDrawer())
+      expect(isCovered()).toBe(true)
+      act(() => latest.drawer?.onClose())
+      expect(isCovered()).toBe(false)
+      act(() => latest.toolbar.onToggleDrawer())
+      expect(isCovered()).toBe(true)
+      rerender(<Harness onValue={onValue} width={900} />)
+      act(() => resizeAll())
+      expect(latest.drawer?.full).toBe(false)
+      expect(isCovered()).toBe(false)
+      rerender(<Harness onValue={onValue} width={500} />)
+      act(() => resizeAll())
+      expect(isCovered()).toBe(true)
+      unmount()
+      expect(isCovered()).toBe(false)
+    })
+
+    // Owner bug: with the drawer open on one preview tab, switching to another
+    // froze the other tab on its still frame. dockview hides an inactive tab
+    // with `display: none`, so the hidden root measures 0×0 – which read as
+    // "narrow" – and the full-width drawer's hide was the window's GLOBAL
+    // occluder, which hides every preview, the one on screen included.
+    it('a tab dockview hides keeps a side drawer a side drawer, and hides no other preview', () => {
+      const { rerender } = render(<Harness onValue={onValue} />)
+      act(() => latest.toolbar.onToggleDrawer())
+      expect(latest.drawer?.full).toBe(false)
+      rerender(<Harness onValue={onValue} width={0} height={0} />)
+      act(() => resizeAll())
+      expect(latest.drawer?.full).toBe(false)
+      expect(isCovered()).toBe(false)
+      expect(useOverlayOccluderStore.getState().isOccluded()).toBe(false)
+    })
+
+    it('a full-width drawer never hides the window\'s other previews – not even while its tab is hidden', () => {
+      const { rerender } = render(<Harness onValue={onValue} width={500} />)
+      act(() => latest.toolbar.onToggleDrawer())
+      expect(latest.drawer?.full).toBe(true)
+      expect(useOverlayOccluderStore.getState().isOccluded()).toBe(false)
+      rerender(<Harness onValue={onValue} width={0} height={0} />)
+      act(() => resizeAll())
+      // The last real width stands: the tab comes back as the sheet it left,
+      // its own page still gated, so it is never shown over the sheet.
+      expect(latest.drawer?.full).toBe(true)
+      expect(isCovered()).toBe(true)
+      expect(usePreviewCoveredStore.getState().covered).toEqual(new Set([PANEL]))
       expect(useOverlayOccluderStore.getState().isOccluded()).toBe(false)
     })
 
@@ -489,6 +573,20 @@ describe('usePreviewComments', () => {
         // M7: the file rides along, so a failed read can name it.
         file: { fileKey: 'f1', displayPath: 'index.html', frame: false }
       })
+      // A block row has no element to bring into view.
+      expect(fake.bridge.reveal).not.toHaveBeenCalled()
+    })
+
+    it('§19 Rev 4 Open on a thread also reveals its element behind the window – unfolding a closed <details> – and keeps the drawer', () => {
+      render(<Harness onValue={onValue} width={500} />)
+      act(() => latest.toolbar.onToggleDrawer())
+      const [row] = drawerRows([fileView({ threads: [thread(1, { notVisible: true })] })], new Set()).open
+      act(() => latest.drawer?.onOpen(row))
+      expect(fake.bridge.reveal).toHaveBeenCalledWith(PANEL, 't1')
+      expect(latest.layer.request).toMatchObject({ kind: 'threads', threadKeys: ['t1'], opener: 'drawer' })
+      // Unlike Show on page, the window takes over: the drawer stays, and nothing is announced.
+      expect(latest.drawer).not.toBeNull()
+      expect(latest.layer.polite).toBe('')
     })
 
     it('the drawer icons checkbox goes through main', async () => {
@@ -568,6 +666,60 @@ describe('usePreviewComments', () => {
       const [row] = drawerRows([fileView({ threads: [thread(1)] })], new Set()).open
       act(() => latest.drawer?.onOpen(row))
       act(() => latest.layer.onCloseWindow())
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+      expect(focusPage).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('§19 Rev 4 owner test: open in source', () => {
+    it('Open in source closes the window, opens the editor at the line, and leaves focus to it', async () => {
+      render(<Harness onValue={onValue} />)
+      act(() => fake.emitDraft(pinDraft()))
+      expect(latest.layer.request).not.toBeNull()
+      act(() => latest.layer.onOpenInSource('/project/index.html', 11))
+      expect(latest.layer.request).toBeNull()
+      expect(mocks.openFileInPanel).toHaveBeenCalledWith(undefined, '/project/index.html', {
+        kind: 'editor',
+        params: { initialLine: 11 }
+      })
+      // Not handed back to the page a frame later (H2): the editor has it.
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+      await new Promise(resolve => requestAnimationFrame(resolve))
+      expect(focusPage).not.toHaveBeenCalled()
+    })
+
+    it("the drawer's Open in source leaves the drawer open", () => {
+      render(<Harness onValue={onValue} />)
+      act(() => latest.toolbar.onToggleDrawer())
+      const [row] = drawerRows([fileView({ damaged: [damaged(1)] })], new Set()).attention
+      act(() => latest.drawer?.onOpenInSource(row))
+      expect(mocks.openFileInPanel).toHaveBeenCalled()
+      expect(latest.drawer).not.toBeNull()
+    })
+  })
+
+  describe('§19 Rev 4 owner test: the window belongs to its tab', () => {
+    it('is not drawn while another tab is shown, and comes back with its tab', () => {
+      const { rerender } = render(<Harness onValue={onValue} />)
+      act(() => fake.emitDraft(pinDraft()))
+      const shown = latest.layer.request
+      expect(shown).not.toBeNull()
+      rerender(<Harness onValue={onValue} visible={false} />)
+      expect(latest.layer.request).toBeNull()
+      rerender(<Harness onValue={onValue} visible />)
+      // The same request: kept while hidden, never re-minted.
+      expect(latest.layer.request).toBe(shown)
+    })
+
+    it('a hidden tab drops its element menu – it pointed at a page no longer on screen', async () => {
+      const { rerender } = render(<Harness onValue={onValue} />)
+      act(() => fake.emitDraft(menuDraft()))
+      expect(latest.layer.menu).not.toBeNull()
+      rerender(<Harness onValue={onValue} visible={false} />)
+      expect(latest.layer.menu).toBeNull()
+      rerender(<Harness onValue={onValue} visible />)
+      expect(latest.layer.menu).toBeNull()
+      // Dropped quietly: no native focus handed to a page that is not shown.
       await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
       expect(focusPage).not.toHaveBeenCalled()
     })

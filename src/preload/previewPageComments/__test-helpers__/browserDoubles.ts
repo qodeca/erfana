@@ -43,7 +43,7 @@ export interface TestBox {
 export interface BrowserDoubles {
   /** Give `element` a border box (and a client rect when it has an area). */
   setBox(element: Element, box: TestBox): void
-  /** What `checkVisibility` answers for `element` (default true). */
+  /** What `checkVisibility` answers for `element` (default true; false inside a closed `<details>`, as in Chromium). */
   setVisible(element: Element, visible: boolean): void
   /** Every closed shadow root attached since install, oldest first. */
   readonly shadowRoots: ShadowRoot[]
@@ -82,6 +82,19 @@ function toRect(box: TestBox): DOMRect {
   return { ...rect, toJSON: () => rect } as DOMRect
 }
 
+/**
+ * Whether a closed `<details>` hides `element`, as Chromium renders one: of a
+ * closed section only its first `<summary>` child is rendered.
+ */
+function foldedAway(element: Element): boolean {
+  let child: Element = element
+  for (let parent = element.parentElement; parent !== null; child = parent, parent = parent.parentElement) {
+    if (parent.localName !== 'details' || parent.hasAttribute('open')) continue
+    if ([...parent.children].find(c => c.localName === 'summary') !== child) return true
+  }
+  return false
+}
+
 /** Install every double. Call `restore()` in `afterEach`. */
 export function installBrowserDoubles(): BrowserDoubles {
   const saved: Saved[] = []
@@ -116,7 +129,7 @@ export function installBrowserDoubles(): BrowserDoubles {
   define(Element.prototype, 'checkVisibility', {
     value(this: Element, options: unknown) {
       visibilityOptions.unshift(options)
-      return !hidden.has(this)
+      return !hidden.has(this) && !foldedAway(this)
     }
   })
   define(Element.prototype, 'scrollIntoView', {

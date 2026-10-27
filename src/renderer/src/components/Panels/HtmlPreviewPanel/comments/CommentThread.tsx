@@ -42,7 +42,7 @@ import { replyDraftKey } from './commentLive'
 import { onCommentWriteSettled, useCommentWritePending } from './commentPendingWrites'
 import { CommentMessageView } from './CommentMessage'
 import { validateCommentText } from './commentSchemas'
-import { ActionButton, CommentField, DialogButton, VisibleText } from './CommentParts'
+import { CommentField, DialogButton, VisibleText } from './CommentParts'
 import { TEST_IDS } from '../../../../constants/testids'
 
 /** A write the thread asks the window to make; resolves whether it was saved. */
@@ -69,6 +69,12 @@ export interface ThreadContext {
   readonly locale?: string
   /** Names carried by more than one email in this window – those print the email. */
   readonly sharedNames: ReadonlySet<string>
+  /**
+   * The view holds exactly one open thread, so its Reply is the view's one
+   * primary action. With several, every Reply is secondary: a row of violet
+   * buttons ranks nothing (§19 Rev 4 "open in source and button sizes").
+   */
+  readonly replyIsPrimary: boolean
   readonly run: RunCommentOp
   /** The focus a status change asked for, until a control takes it. */
   readonly focusAfter: FocusAfter | null
@@ -158,11 +164,11 @@ function ReplyBox({ ctx, thread }: CommentThreadProps): React.JSX.Element {
         testId={TEST_IDS.COMMENT_REPLY_FIELD}
       />
       <div className="erf-comment-thread__actions">
-        <ActionButton onClick={() => void resolve()} testId={TEST_IDS.COMMENT_RESOLVE}>
+        <DialogButton variant="secondary" onClick={() => void resolve()} testId={TEST_IDS.COMMENT_RESOLVE}>
           {COPY.resolve}
-        </ActionButton>
+        </DialogButton>
         <DialogButton
-          variant="primary"
+          variant={ctx.replyIsPrimary ? 'primary' : 'secondary'}
           busy={busy || pending}
           title={`${COPY.reply} (${saveShortcutLabel()})`}
           keyShortcut={saveShortcutAria()}
@@ -252,7 +258,8 @@ export function ResolvedThread({ ctx, thread }: CommentThreadProps): React.JSX.E
         </span>
       </span>
       {!ctx.readOnly && (
-        <ActionButton
+        <DialogButton
+          variant="secondary"
           buttonRef={reopenRef}
           onClick={() => {
             setFocusAfter({ threadKey: thread.threadKey, target: 'reply' })
@@ -272,7 +279,7 @@ export function ResolvedThread({ ctx, thread }: CommentThreadProps): React.JSX.E
           testId={TEST_IDS.COMMENT_REOPEN}
         >
           {COPY.reopen}
-        </ActionButton>
+        </DialogButton>
       )}
       <button
         type="button"

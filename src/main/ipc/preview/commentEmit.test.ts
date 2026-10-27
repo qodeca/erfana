@@ -92,6 +92,70 @@ describe('createPreviewCommentEmitters', () => {
     expect(second.send).toHaveBeenCalledTimes(1)
   })
 
+  describe('§19 Rev 4 owner test – the host takes native focus before a draft opens', () => {
+    const DRAFT = {
+      panelId: PANEL,
+      kind: 'open' as const,
+      point: { x: 1, y: 2 },
+      displayPath: 'index.html',
+      filePath: '/p/index.html',
+      frame: false,
+      fileKey: 'f1'
+    }
+
+    function focusable(windowId: number, destroyed = false) {
+      const trail: string[] = []
+      const focusHost = vi.fn(() => {
+        trail.push('focus')
+        return true
+      })
+      const send = vi.fn((channel: string) => {
+        trail.push(channel)
+      })
+      const value: PreviewEmitTarget = { isDestroyed: () => destroyed, send, windowId, focusHost }
+      return { value, send, focusHost, trail }
+    }
+
+    it('focuses the owning window BEFORE it sends draftOpened – and no other window', () => {
+      const own = focusable(1)
+      const other = focusable(2)
+      const gone = focusable(1, true)
+      const emit = createPreviewCommentEmitters({ resolveTargets: () => [own.value, other.value, gone.value] })
+      emit.draftOpened(1, DRAFT)
+      expect(own.trail).toEqual(['focus', PreviewCommentEvents.DRAFT_OPENED])
+      expect(other.focusHost).not.toHaveBeenCalled()
+      expect(gone.focusHost).not.toHaveBeenCalled()
+    })
+
+    it('focuses for every draft kind – the menu and a pin thread open over the page too', () => {
+      const own = focusable(1)
+      const emit = createPreviewCommentEmitters({ resolveTargets: () => [own.value] })
+      emit.draftOpened(1, { ...DRAFT, kind: 'menu' })
+      emit.draftOpened(1, { ...DRAFT, kind: 'icon', threadKeys: ['t1'], blockKeys: [] })
+      expect(own.focusHost).toHaveBeenCalledTimes(2)
+    })
+
+    it('moves no focus for the other events, nor for a draft that fails its schema', () => {
+      const own = focusable(1)
+      const emit = createPreviewCommentEmitters({ resolveTargets: () => [own.value] })
+      emit.commentsChanged(1, { panelId: PANEL, counts: { open: 1, resolved: 0, attention: 0 } })
+      emit.anchorStatus(1, { panelId: PANEL, notVisible: [] })
+      emit.modeChanged(1, { panelId: PANEL, on: true, reason: 'shortcut' })
+      emit.draftOpened(1, { ...DRAFT, kind: 'bogus' as never })
+      expect(own.focusHost).not.toHaveBeenCalled()
+    })
+
+    it('a focus that throws still lets the draft through', () => {
+      const own = focusable(1)
+      own.focusHost.mockImplementation(() => {
+        throw new Error('Object has been destroyed')
+      })
+      const emit = createPreviewCommentEmitters({ resolveTargets: () => [own.value] })
+      expect(() => emit.draftOpened(1, DRAFT)).not.toThrow()
+      expect(own.send).toHaveBeenCalledWith(PreviewCommentEvents.DRAFT_OPENED, expect.objectContaining({ kind: 'open' }))
+    })
+  })
+
   it('issueCodesOf keeps distinct codes, at most eight', () => {
     const issues = Array.from({ length: 20 }, (_, i) => ({ code: `c${i % 10}` }))
     expect(issueCodesOf({ issues })).toEqual(['c0', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7'])

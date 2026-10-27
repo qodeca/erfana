@@ -18,7 +18,7 @@ export interface Box {
   readonly height: number
 }
 
-/** The frame's viewport size. */
+/** The frame's visible viewport size: scrollbars excluded ({@link viewportOf}). */
 export interface Viewport {
   readonly width: number
   readonly height: number
@@ -30,9 +30,30 @@ export interface Point {
   readonly y: number
 }
 
-/** The viewport of `win`. */
+/** `client` when the root reported a size, never past `inner`; else `inner`. */
+function visibleExtent(client: number | undefined, inner: number): number {
+  return client !== undefined && client > 0 ? Math.min(client, inner) : inner
+}
+
+/**
+ * The visible viewport of `win`: what `position: fixed` content can be seen
+ * in. Not `innerWidth` / `innerHeight` – those count a classic scrollbar, and
+ * the page's scrollbar paints over the overlay, so a pin clamped to them sat
+ * under it on a full-width element (§19 Rev 4 "pins at the right edge"). The
+ * scrolling root's `clientWidth` / `clientHeight` leave the scrollbars out:
+ * the root element's in standards mode, the body's in quirks mode (CSSOM
+ * View). Overlay scrollbars take no room, so there the two agree. A root that
+ * reports nothing (none, or no layout box: 0) falls back to the inner size.
+ * Each frame's preload measures its own window, so a frame's pins are
+ * clamped to that frame's own viewport.
+ */
 export function viewportOf(win: Window): Viewport {
-  return { width: win.innerWidth, height: win.innerHeight }
+  const doc = win.document
+  const root = doc.compatMode === 'BackCompat' ? doc.body : doc.documentElement
+  return {
+    width: visibleExtent(root?.clientWidth, win.innerWidth),
+    height: visibleExtent(root?.clientHeight, win.innerHeight)
+  }
 }
 
 /** `element`'s border box. */

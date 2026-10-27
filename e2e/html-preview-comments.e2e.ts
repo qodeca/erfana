@@ -42,8 +42,14 @@
  * (clicks swallowed, Alt+↑/↓, Esc), E-014 (the pins toggle), E-016 (the
  * keyboard-only path), E-016b (the shortcut with focus on dockview's group
  * element, as a tab switch leaves it – `usePreviewGroupKeys`), E-021 (Settings changes the author of new comments
- * only) and E-024 (`git diff` after add, edit and delete on a line-start
- * target). Helpers: `pages/html-preview.comments-ui.ts`.
+ * only), E-024 (`git diff` after add, edit and delete on a line-start
+ * target), E-026 (a tab switch away from an open drawer leaves the other
+ * preview live, with its own drawer and count) and E-028 (Open in source
+ * closes the window and shows the line; one button size; the window stays
+ * with its tab – §19 Rev 4 "open in source and button sizes"). E-029 (with
+ * the drawer open beside the page, a full-width element's pin is drawn and
+ * hit inside the page's visible width, not under its scrollbar – §19 Rev 4
+ * "pins at the right edge"). Helpers: `pages/html-preview.comments-ui.ts`.
  *
  * Every test that sets the identity puts the worker home's comment settings
  * back in `afterEach`, so E-001 always starts with the identity unset.
@@ -54,7 +60,7 @@
 import * as fs from 'fs'
 import * as fsp from 'fs/promises'
 import * as path from 'path'
-import type { ElectronApplication, Page } from '@playwright/test'
+import type { ElectronApplication, Locator, Page } from '@playwright/test'
 import { test, expect } from './fixtures/index'
 import { TEST_IDS } from '../src/renderer/src/constants/testids'
 import { byTestId } from './utils/locators'
@@ -64,15 +70,19 @@ import {
   clickElement,
   clickPin,
   diskBytes,
+  elementBox,
   expectPin,
   globalSetting,
   openCommentPage,
+  pinPoint,
   pressInPage,
   resetCommentSettings,
   reviewer,
   setGlobalSetting,
   singleBlockInsert,
-  waitForOverlay
+  viewShown,
+  waitForOverlay,
+  waitForViewShown
 } from './pages/html-preview.comments-ui'
 import { HtmlPreviewPage, PREVIEW_BUDGET_MS } from './pages/html-preview.page'
 import { bringAppToFront, focusState } from './pages/html-preview.focus'
@@ -82,7 +92,10 @@ import { MonacoPage } from './pages/monaco.page'
 import { ProjectTreePage } from './pages/project-tree.page'
 import { TabBarPage } from './pages/tab-bar.page'
 import { commentedPage } from '../src/main/services/preview/comments/__test-helpers__/commentedPages'
+import { PIN_BOX_PX, PIN_EDGE_INSET_PX } from '../src/preload/previewPageComments/constants'
+import { fullWidthCommentPage } from './fixtures/html-preview-comments-pages'
 import {
+  OVERLAY_HOST_EXPR,
   OVERLAY_HOSTS_EXPR,
   accentPixelsNear,
   commentPanels,
@@ -854,6 +867,63 @@ test.describe('HTML Preview comments – the reviewer journeys (P7)', () => {
       .toBe(true)
   })
 
+  test('E-016c a pick made with the page holding the keyboard opens the window with the keyboard in its field; Ctrl/Cmd+Enter saves', async ({
+    windowWithTestProject,
+    appWithTestProject,
+    testProject
+  }) => {
+    // §19 "Rev 4 – owner test: comment window focus and save key". Playwright's
+    // `page.keyboard` types into the host renderer whatever holds NATIVE focus,
+    // so E-016 could pass while a real reader's keys still went to the page.
+    // This test pins native focus itself, read main-side (`focusState`).
+    const app = appWithTestProject
+    const page = windowWithTestProject
+    const preview = new HtmlPreviewPage(page, app)
+    const chrome = new CommentChrome(page, preview, 'index.html')
+    const file = path.join(testProject.path, STATIC)
+    const TYPED = 'Typed-P7-Fc31 with no click'
+    await setGlobalSetting(page, 'comments', reviewer(NAME_A))
+    const before = await diskBytes(file)
+    const panelId = await openCommentPage(preview, app, STATIC, STATIC_TITLE)
+    await chrome.modeOn(app, panelId, STATIC_TARGET)
+
+    // The reader is in the page: it holds native focus, as after a real click
+    // (`sendInputEvent` alone moves no OS focus, so hand it over explicitly).
+    await bringAppToFront(app)
+    await app.evaluate(({ webContents }, urlIncludes) => {
+      webContents
+        .getAllWebContents()
+        .find(c => !c.isDestroyed() && c.getURL().startsWith('erfana-preview://') && c.getURL().includes(urlIncludes ?? ''))
+        ?.focus()
+    }, STATIC_TARGET.urlIncludes)
+    await expect
+      .poll(async () => await focusState(app, STATIC_TARGET), { timeout: PREVIEW_BUDGET_MS })
+      .toEqual({ preview: true, host: false })
+
+    await clickElement(app, 'team-copy', 'left', STATIC_TARGET)
+    const win = chrome.window()
+    await expect(win).toHaveAttribute('data-view', 'new', { timeout: PREVIEW_BUDGET_MS })
+    // Main handed the keyboard to the host before it opened the window …
+    await expect
+      .poll(async () => await focusState(app, STATIC_TARGET), {
+        timeout: PREVIEW_BUDGET_MS,
+        message: 'the page kept the keyboard after the comment window opened'
+      })
+      .toEqual({ preview: false, host: true })
+    // … and the window put it in the field: no click before typing.
+    const field = page.getByTestId('comment-new-field')
+    await expect(field).toBeFocused()
+    await page.keyboard.type(TYPED)
+    await expect(field).toHaveValue(TYPED)
+    await page.keyboard.press(process.platform === 'darwin' ? 'Meta+Enter' : 'Control+Enter')
+    await expect(win).toHaveCount(0, { timeout: PREVIEW_BUDGET_MS })
+    await expect(chrome.announce()).toHaveText(`Comment saved to ${STATIC}.`, { timeout: PREVIEW_BUDGET_MS })
+    await expectPin(app, 'team-copy', true, STATIC_TARGET)
+    const { text, tail } = insertedText(before, await diskBytes(file))
+    expect(text).toContain(TYPED)
+    expect(tail.startsWith('<p id="team-copy">')).toBe(true)
+  })
+
   test('E-021 the Settings "Comments" section changes the author of new comments only', async ({
     windowWithTestProject,
     appWithTestProject,
@@ -972,5 +1042,254 @@ test.describe('HTML Preview comments – the reviewer journeys (P7)', () => {
     await expect.poll(() => changedLines(repo, STATIC).length, { timeout: PREVIEW_BUDGET_MS }).toBeGreaterThan(0)
     expectOnlyBlockLines(changedLines(repo, STATIC), /^-/)
     expect(runGit(repo, 'diff', 'HEAD~2', '--stat', '--', STATIC)).toBe('')
+  })
+
+  test('E-026 a tab switch away from an open drawer leaves the other preview live – no still frame, clicks reach it – with its own drawer and count', async ({
+    windowWithTestProject,
+    appWithTestProject
+  }) => {
+    const app = appWithTestProject
+    const page = windowWithTestProject
+    const preview = new HtmlPreviewPage(page, app)
+    const other = new CommentChrome(page, preview, 'index.html')
+    const reviewed = new CommentChrome(page, preview, 'e002.html')
+    const reviewTarget = HtmlPreviewPage.target(REVIEW)
+    /** The dockview tab of `basename`, only while it is the active one. */
+    const activeTab = (basename: string): Locator =>
+      page.locator('.dv-tab.dv-active-tab', { has: preview.tab(basename) })
+
+    // Two preview tabs of one project: the static page (no comments), then
+    // the reviewed page (two open) – the owner's index.html and decisions.html.
+    await openCommentPage(preview, app, STATIC, STATIC_TITLE)
+    const reviewPanel = await openCommentPage(preview, app, REVIEW, REVIEW_TITLE)
+    await expect(activeTab('e002.html')).toHaveCount(1)
+    await expect(reviewed.listButton()).toHaveAccessibleName('Comments, 2 open', { timeout: PREVIEW_BUDGET_MS })
+
+    // The drawer open on the reviewed page, its two comments listed, and comment mode on.
+    await reviewed.openDrawer()
+    await expect(reviewed.drawerRows()).toHaveCount(2)
+    await reviewed.modeOn(app, reviewPanel, reviewTarget)
+
+    // Switch to the other preview tab.
+    await preview.tab('index.html').click()
+    await expect(activeTab('index.html')).toHaveCount(1)
+
+    // It is LIVE: the native view is shown, no still frame stands in for it,
+    // and the hidden tab's view is the one hidden.
+    await waitForViewShown(app, STATIC_TARGET)
+    await expect(preview.stillFrame('index.html')).toHaveCount(0)
+    await expect.poll(() => viewShown(app, reviewTarget), { timeout: PREVIEW_BUDGET_MS }).toBe(false)
+    expect(await preview.eval('document.title', STATIC_TARGET)).toBe(STATIC_TITLE)
+    // A click reaches the page's own handler: the tab is not in comment mode,
+    // and nothing over it swallows the input.
+    await clickElement(app, 'buy', 'left', STATIC_TARGET)
+    await expect
+      .poll(() => preview.eval('String(window.__clicks ?? 0)', STATIC_TARGET), { timeout: PREVIEW_BUDGET_MS })
+      .toBe('1')
+    await expect(other.window()).toHaveCount(0)
+    // It still renders frames after the click (a still picture never would).
+    await expect(preview.stillFrame('index.html')).toHaveCount(0)
+    expect(await viewShown(app, STATIC_TARGET)).toBe(true)
+
+    // Its chrome is its own: no drawer, no count, mode off …
+    await expect(other.drawer()).toHaveCount(0)
+    await expect(other.listButton()).toHaveAttribute('aria-expanded', 'false')
+    await expect(other.listButton()).toHaveAccessibleName('Comments, none yet')
+    await expect(other.modeButton()).toHaveAttribute('aria-pressed', 'false')
+    // … and the hidden tab kept its own: drawer open, mode on.
+    await expect(reviewed.listButton()).toHaveAttribute('aria-expanded', 'true')
+    await expect(reviewed.modeButton()).toHaveAttribute('aria-pressed', 'true')
+
+    // Back to the reviewed tab: its drawer and its two comments are still
+    // there, and the static page's view is the hidden one now. Its own view
+    // shows unless its drawer is a full-width sheet (a panel under 640 px),
+    // which covers the page by design.
+    await preview.tab('e002.html').click()
+    await expect(activeTab('e002.html')).toHaveCount(1)
+    await expect(reviewed.drawer()).toBeVisible()
+    await expect(reviewed.drawerRows()).toHaveCount(2)
+    await expect.poll(() => viewShown(app, STATIC_TARGET), { timeout: PREVIEW_BUDGET_MS }).toBe(false)
+    const sheet = await reviewed.drawer().evaluate(el => el.classList.contains('erf-comment-drawer--full'))
+    await expect.poll(() => viewShown(app, reviewTarget), { timeout: PREVIEW_BUDGET_MS }).toBe(!sheet)
+
+    // A wide panel (the terminal put away): the drawer is a side panel
+    // beside the live page. Hiding its tab must not turn it into a sheet – a
+    // tab dockview hides measures 0×0 – nor hide the tab switched to.
+    await byTestId(page, TEST_IDS.ACTIVITY_BAR_BTN_TERMINAL).click()
+    await expect(byTestId(page, TEST_IDS.TERMINAL_PANEL)).toBeHidden({ timeout: 10_000 })
+    await expect(reviewed.drawer(), 'the panel is still under 640 px with the terminal put away').not.toHaveClass(
+      /erf-comment-drawer--full/,
+      { timeout: PREVIEW_BUDGET_MS }
+    )
+    await waitForViewShown(app, reviewTarget)
+
+    await preview.tab('index.html').click()
+    await expect(activeTab('index.html')).toHaveCount(1)
+    await waitForViewShown(app, STATIC_TARGET)
+    await expect(preview.stillFrame('index.html')).toHaveCount(0)
+    await expect(reviewed.drawer()).not.toHaveClass(/erf-comment-drawer--full/)
+    await clickElement(app, 'buy', 'left', STATIC_TARGET)
+    await expect
+      .poll(() => preview.eval('String(window.__clicks ?? 0)', STATIC_TARGET), { timeout: PREVIEW_BUDGET_MS })
+      .toBe('2')
+  })
+  test('E-028 Open in source closes the comment window and shows the line; the window keeps one button size and never follows to another tab', async ({
+    windowWithTestProject,
+    appWithTestProject
+  }) => {
+    const app = appWithTestProject
+    const page = windowWithTestProject
+    const preview = new HtmlPreviewPage(page, app)
+    const chrome = new CommentChrome(page, preview, 'e002.html')
+    const tabs = new TabBarPage(page)
+    const target = HtmlPreviewPage.target(REVIEW)
+    const DRAFT = 'Draft-E028-Kp3v: half a thought'
+    await setGlobalSetting(page, 'comments', reviewer(NAME_A))
+
+    await openCommentPage(preview, app, REVIEW, REVIEW_TITLE)
+    await expectPin(app, 'cta', true, target)
+    await clickPin(app, 'cta', target)
+    const win = chrome.window()
+    await expect(win).toHaveAttribute('data-view', 'threads', { timeout: PREVIEW_BUDGET_MS })
+    await expect(win.getByTestId('comment-message')).toHaveCount(1, { timeout: PREVIEW_BUDGET_MS })
+
+    // One button size (owner test): every text button is a Dialog.css button – no compact action among them.
+    const textButtons = win.locator('button:not(.erf-comment-icon-btn)')
+    const count = await textButtons.count()
+    expect(count).toBeGreaterThan(2)
+    for (let i = 0; i < count; i += 1) {
+      await expect(textButtons.nth(i)).toHaveClass(/\bdialog-btn\b/)
+      await expect(textButtons.nth(i)).not.toHaveClass(/\berf-comment-action\b/)
+    }
+
+    // A reply typed, then Open in source: the window is gone and the editor shows the element's line.
+    await page.getByTestId('comment-reply-field').fill(DRAFT)
+    await page.getByTestId('comment-open-in-source').click()
+    await expect(win).toHaveCount(0)
+    await tabs.waitForTab('e002.html')
+    await tabs.expectActive('e002.html')
+    const monaco = new MonacoPage(page, new KeyboardHelper(page))
+    await monaco.waitForReady()
+    await expect.poll(() => monaco.visibleText(), { timeout: PREVIEW_BUDGET_MS }).toContain('id="cta"')
+
+    // Back on the preview, the same pin: the reply text came back with the window (session drafts).
+    await preview.tab('e002.html').click()
+    await clickPin(app, 'cta', target)
+    await expect(win).toHaveAttribute('data-view', 'threads', { timeout: PREVIEW_BUDGET_MS })
+    await expect(page.getByTestId('comment-reply-field')).toHaveValue(DRAFT)
+
+    // The window belongs to its tab: not drawn over the editor tab, back with its own.
+    // The window is modal (§10.4), so a pointer cannot reach the tab strip; a tab
+    // change without the pointer (an agent opening the file) is what can happen.
+    for (const type of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click']) {
+      await tabs.tab('e002.html').dispatchEvent(type, { button: 0, isPrimary: true })
+    }
+    await tabs.expectActive('e002.html')
+    await expect(win).toHaveCount(0)
+    await preview.tab('e002.html').click()
+    await expect(win).toHaveAttribute('data-view', 'threads', { timeout: PREVIEW_BUDGET_MS })
+    await page.getByTestId('comment-close').click()
+    await expect(win).toHaveCount(0)
+  })
+})
+
+/** The owner's page: one open comment on a `div.doc` that spans the page (E-029). */
+const EDGE = 'comments/full-width.html'
+const EDGE_TITLE = '-HPC-EDGE-'
+
+/** What {@link edgeHitsExpr} reports: where along one row the overlay host takes the hit. */
+interface EdgeHits {
+  visible: number
+  inner: number
+  first: number | null
+  last: number | null
+}
+
+/**
+ * A page expression (main world): along row `y`, from 80 px left of the
+ * visible edge to the window's edge (scrollbar included), the x of each point
+ * `elementFromPoint` answers with the overlay host – a hit inside its closed
+ * shadow root is retargeted to it, and only a pin takes pointer events there.
+ */
+function edgeHitsExpr(y: number): string {
+  return `(() => {
+    const root = document.documentElement
+    const host = ${OVERLAY_HOST_EXPR}
+    const hits = []
+    for (let x = Math.max(0, root.clientWidth - 80); host && x < innerWidth; x += 1) {
+      if (document.elementFromPoint(x, ${y}) === host) hits.push(x)
+    }
+    return JSON.stringify({ visible: root.clientWidth, inner: innerWidth, first: hits[0] ?? null, last: hits.at(-1) ?? null })
+  })()`
+}
+
+test.describe('HTML Preview comments – the pin at the page edge (§19 Rev 4 owner test)', () => {
+  test.use({ testProjectFiles: { [EDGE]: fullWidthCommentPage(EDGE_TITLE), 'notes.md': '# Notes\n' } })
+
+  test('E-029 with the drawer open beside the page, a full-width element’s pin is drawn and hit inside the page’s visible width – not under its scrollbar', async ({
+    windowWithTestProject,
+    appWithTestProject
+  }) => {
+    const app = appWithTestProject
+    const page = windowWithTestProject
+    const preview = new HtmlPreviewPage(page, app)
+    const chrome = new CommentChrome(page, preview, 'full-width.html')
+    const target = HtmlPreviewPage.target(EDGE)
+
+    await openCommentPage(preview, app, EDGE, EDGE_TITLE)
+    await expect(chrome.listButton()).toHaveAccessibleName('Comments, 1 open', { timeout: PREVIEW_BUDGET_MS })
+
+    // The owner's layout: the drawer as a side panel, the page view narrower
+    // beside it. With the terminal put away the panel is wide enough for one
+    // (under 640 px the drawer is a full-width sheet over the page – E-026).
+    await byTestId(page, TEST_IDS.ACTIVITY_BAR_BTN_TERMINAL).click()
+    await expect(byTestId(page, TEST_IDS.TERMINAL_PANEL)).toBeHidden({ timeout: 10_000 })
+    await chrome.openDrawer()
+    await expect(chrome.drawer()).not.toHaveClass(/erf-comment-drawer--full/, { timeout: PREVIEW_BUDGET_MS })
+    await waitForViewShown(app, target)
+
+    // The pin's row: the overlay host takes the hit along a whole 24 px box,
+    // and the box ends 4 px inside the visible width. Before the fix the box
+    // was clamped to innerWidth, so it ran under the scrollbar and only a
+    // sliver of it was left of the scrollbar's edge. Polled: the view settles
+    // its new width after the drawer opens.
+    let hits: EdgeHits | null = null
+    await expect
+      .poll(
+        async () => {
+          const box = await elementBox(app, 'doc', target)
+          if (box === null) return 'no #doc yet'
+          const raw = await preview.eval(edgeHitsExpr(pinPoint(box).y), target)
+          if (raw === null) return 'the page is mid-load'
+          const now = JSON.parse(raw) as EdgeHits
+          hits = now
+          if (now.first === null || now.last === null) return `no pin along its row (visible ${now.visible} of ${now.inner} px)`
+          const whole = now.last - now.first + 1 >= PIN_BOX_PX - 1
+          const inside = now.last < now.visible - PIN_EDGE_INSET_PX
+          return whole && inside ? 'inside' : `pin hit at x ${now.first}–${now.last}, visible width ${now.visible} of ${now.inner} px`
+        },
+        { timeout: PREVIEW_BUDGET_MS, message: 'the full-width element’s pin is not wholly inside the page’s visible width' }
+      )
+      .toBe('inside')
+    const seen = hits as EdgeHits | null
+    test.info().annotations.push({
+      type: 'scrollbar',
+      description: seen === null ? 'unread' : `${seen.inner - seen.visible} px (0 under overlay scrollbars)`
+    })
+
+    // #doc spans the page: its top-right corner is on the visible edge, where
+    // the pin's tail would have put it under the scrollbar.
+    const box = await elementBox(app, 'doc', target)
+    expect(box, '#doc vanished').not.toBeNull()
+    if (box === null) return
+    expect(box.right).toBeGreaterThanOrEqual(box.visibleWidth - 1)
+
+    // Painted where it is hit: the pin's fill covers its body in the view's capture.
+    await expectPin(app, 'doc', true, target)
+    // And a real click there opens its thread.
+    await clickPin(app, 'doc', target)
+    await expect(chrome.window()).toHaveAttribute('data-view', 'threads', { timeout: PREVIEW_BUDGET_MS })
+    await page.getByTestId('comment-close').click()
+    await expect(chrome.window()).toHaveCount(0)
   })
 })

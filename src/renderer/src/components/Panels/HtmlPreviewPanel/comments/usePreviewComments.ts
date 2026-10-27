@@ -32,7 +32,6 @@ import {
   usePanelCommentState,
   usePreviewCommentStore
 } from '../../../../stores/usePreviewCommentStore'
-import { useOccluder } from '../../../../hooks/useOccluder'
 import { useLatestRef } from '../../../../hooks/useLatestRef'
 import { isMacOS } from '../../../../utils/platform'
 import { commentModeKeyFromDomEvent, matchCommentModeKey } from '../../../../../../shared/commentModeKey'
@@ -44,13 +43,11 @@ import type { CommentDrawerProps } from './CommentDrawer'
 import type { CommentToolbarToolsProps } from './CommentToolbarTools'
 import { pinDraftOf, type CommentWindowRequest, type ElementDraft } from './commentWindowTypes'
 import { useCommentSettleNotices } from './useCommentSettleNotices'
+import { useDrawerSheet } from './useDrawerSheet'
 import type { DrawerRow } from './commentRows'
 import type { PreviewCommentsLayerProps } from './PreviewCommentsLayer'
 import { pickerAnnouncement, useLiveText } from './commentLive'
 import type { PreviewKeyEventLike } from '../hooks/usePreviewGroupKeys'
-
-/** Under this panel width the drawer takes the whole width (§10.6). */
-export const DRAWER_FULL_BELOW_PX = 640
 
 /** Options for {@link usePreviewComments}. */
 export interface UsePreviewCommentsOptions {
@@ -65,6 +62,8 @@ export interface UsePreviewCommentsOptions {
   readonly panelRootRef: React.RefObject<HTMLElement | null>
   /** The editor area, for "Open in source". */
   readonly containerApi: DockviewApi | undefined
+  /** dockview shows this tab (default `true`). A hidden tab stays mounted: its window must not float over another (§19 Rev 4). */
+  readonly visible?: boolean
 }
 
 /** What the panel renders. `enabled` false: nothing at all (the feature flag is off). */
@@ -105,7 +104,8 @@ export function usePreviewComments({
   ready,
   pageAreaRef,
   panelRootRef,
-  containerApi
+  containerApi,
+  visible = true
 }: UsePreviewCommentsOptions): PreviewComments {
   const settings = useGlobalSettingsStore(s => s.settings)
   const updateCommentIdentity = useGlobalSettingsStore(s => s.updateCommentIdentity)
@@ -123,7 +123,6 @@ export function usePreviewComments({
   // twice is still announced twice (H1).
   const [polite, announce] = useLiveText()
   const [assertive, alert] = useLiveText()
-  const [narrow, setNarrow] = useState(false)
   const listButtonRef = useRef<HTMLButtonElement>(null)
   // The state as of the last commit, for event handlers and async answers.
   const latestRef = useLatestRef(state)
@@ -239,20 +238,17 @@ export function usePreviewComments({
     if (latestRef.current.drawerOpen) void refreshList()
   }, [filePath, refreshList, latestRef])
 
-  // The drawer's full-width mode follows the panel's width.
-  useEffect(() => {
-    const root = panelRootRef.current
-    if (!root || typeof ResizeObserver === 'undefined') return undefined
-    const measure = (): void => setNarrow(root.getBoundingClientRect().width < DRAWER_FULL_BELOW_PX)
-    measure()
-    const observer = new ResizeObserver(measure)
-    observer.observe(root)
-    return () => observer.disconnect()
-  }, [panelRootRef, state.drawerOpen])
+  // Tab hidden (§19 Rev 4): the menu pointed at a page no longer shown, so it goes; the
+  // window's request is KEPT, only withheld from the layer, and returns with the tab.
+  const [shownVisible, setShownVisible] = useState(visible)
+  if (shownVisible !== visible) {
+    setShownVisible(visible)
+    if (!visible) setMenu(null)
+  }
 
-  // A full-width drawer covers the whole page area: the page has nowhere to
-  // show, so its native view must be hidden, not left painting over the list.
-  useOccluder('overlay', enabled && state.drawerOpen && narrow)
+  // The drawer's full-width mode follows the panel's width; as a sheet it hides
+  // THIS panel's page through its own gate, never the window's occluder.
+  const narrow = useDrawerSheet({ panelId, panelRootRef, drawerOpen: enabled && state.drawerOpen })
 
   const setMode = useCallback(
     async (on: boolean, showIcons: boolean) => {
@@ -386,6 +382,8 @@ export function usePreviewComments({
           onReveal: reveal,
           onOpenInSource: row => openInSource(row.filePath, row.line),
           onOpen: row => {
+            // Its element comes into view behind the window, out of any folded <details> (§19 Rev 4).
+            if (row.main === 'reveal' && row.threadKey !== undefined) void commentGateway.reveal(panelId, row.threadKey)
             setRequest({
               kind: 'threads',
               panelId,
@@ -412,7 +410,8 @@ export function usePreviewComments({
   const layer: PreviewCommentsLayerProps = useMemo(
     () => ({
       menu,
-      request,
+      // Withheld, not dropped, while the tab is hidden (see `shownVisible`).
+      request: visible ? request : null,
       list: state.list,
       identity,
       notVisible: state.notVisible,
@@ -452,7 +451,12 @@ export function usePreviewComments({
         closeWindow()
         if (!latestRef.current.mode) void setMode(true, latestRef.current.showIcons)
       },
-      onOpenInSource: openInSource,
+      onOpenInSource: (path: string, line: number) => {
+        // Close first, as "Go to tab" does: a modal left open would sit over the editor and
+        // trap its focus. Typed text stays in the session drafts; the editor takes focus.
+        closeWindow(false)
+        openInSource(path, line)
+      },
       onCopyRaw: (text: string) => {
         void textClipboard.writeText(text).then(ok => {
           if (ok) announce(COPY.rawCopied)
@@ -463,6 +467,7 @@ export function usePreviewComments({
     [
       menu,
       request,
+      visible,
       state.list,
       identity,
       state.notVisible,

@@ -185,6 +185,7 @@
   const OUTSET = 2;        // TINY_RING_OUTSET_PX
   const LABEL_GAP = 2;     // LABEL_GAP_PX (overlayView.ts)
   const TIP_OFFSET = 4;    // PIN_TIP_OFFSET_PX
+  const EDGE = 4;          // PIN_EDGE_INSET_PX
   const PIN = 24;          // PIN_BOX_PX
   const STEP = 22;         // PIN_STEP_PX
 
@@ -243,18 +244,23 @@
 
   /** Pins for [{ box, count, damaged, name, selected, cls }], placed in document order with the
       22px collision step along the top edge. Returns the pin elements. */
-  function drawPins(area, pins) {
+  /**
+   * Pins, placed as pins.ts places them. `view` is the visible area (pins.ts:
+   * the frame's viewport less its scrollbars); the whole area by default. A
+   * pin pushed to an edge keeps EDGE px inside it.
+   */
+  function drawPins(area, pins, view) {
     const r = root(area);
     r.querySelectorAll('.erf-hpc-pin').forEach((n) => n.remove());
-    const vw = area.clientWidth;
-    const vh = area.clientHeight;
+    const vw = view ? view.width : area.clientWidth;
+    const vh = view ? view.height : area.clientHeight;
     const placed = [];
     return pins.map((p) => {
-      const tipX = p.box.left + p.box.width + TIP_OFFSET;
-      const tipY = p.box.top - TIP_OFFSET;
-      let left = Math.min(Math.max(tipX - 2, 0), vw - PIN);
-      const top = Math.min(Math.max(tipY - 22, 0), vh - PIN);
-      for (let moves = 0; moves < 8 && left - STEP >= 0; moves += 1) {
+      const tipX = Math.min(p.box.left + p.box.width, vw) + TIP_OFFSET;
+      const tipY = Math.max(p.box.top, 0) - TIP_OFFSET;
+      let left = Math.min(Math.max(tipX - 2, EDGE), vw - PIN - EDGE);
+      const top = Math.min(Math.max(tipY - 22, EDGE), vh - PIN - EDGE);
+      for (let moves = 0; moves < 8 && left - STEP >= EDGE; moves += 1) {
         const clash = placed.some((o) => Math.abs(o.top - top) < PIN && Math.abs(o.left - left) < PIN - 4);
         if (!clash) break;
         left -= STEP;

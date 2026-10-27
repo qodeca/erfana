@@ -96,6 +96,17 @@ export const PREVIEW_LIMITS = {
   /** Page pick signals one view admits per second. */
   COMMENT_PICKS_PER_SECOND: 5,
   /**
+   * Open `<details>` one save remembers and reopens after its reload (design
+   * §19 Rev 4 "folded sections"); a section past it reloads folded.
+   */
+  COMMENT_OPEN_SECTIONS_MAX: 256,
+  /**
+   * `<details>` the save's read looks at, in document order: a section is
+   * named by its place among them, so a place is always below this. Bounds the
+   * read on a page that builds millions of them.
+   */
+  COMMENT_SECTIONS_SCANNED_MAX: 65_536,
+  /**
    * `data-erfana-el` tokens in one served document; past this it is served raw
    * ("page too large"). Sized for real pages at `COMMENT_FILE_MAX_BYTES`
    * (design §19 Rev 4): the densest measured – generated API docs, about 51

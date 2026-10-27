@@ -11,6 +11,7 @@ import {
   COMMENT_ANCHORS_CHANNEL,
   COMMENT_HELLO_CHANNEL,
   COMMENT_PICK_CHANNEL,
+  PIN_EDGE_INSET_PX,
   RENDER_FALLBACK_MS,
   REVEAL_FLASH_MS,
   TOKEN_ATTRIBUTE
@@ -303,6 +304,83 @@ describe('mode, reveal, restore', () => {
     window.dispatchEvent(new Event('resize'))
     await vi.advanceTimersByTimeAsync(20)
     expect(pins()[0].style.top).toBe('74px')
+  })
+})
+
+describe('a classic scrollbar (§19 Rev 4 "pins at the right edge")', () => {
+  const SCROLLBAR_PX = 15
+  let restoreLayout: (() => void) | null = null
+
+  /**
+   * jsdom has no layout, so its root reports a 0 client size and the overlay
+   * falls back to the inner size. Here the root reports the inner size less a
+   * 15 px vertical scrollbar, and the label measures `labelWidth`.
+   */
+  function withScrollbar(labelWidth = 0): number {
+    const root = document.documentElement
+    const visible = window.innerWidth - SCROLLBAR_PX
+    Object.defineProperty(root, 'clientWidth', { configurable: true, get: () => visible })
+    Object.defineProperty(root, 'clientHeight', { configurable: true, get: () => window.innerHeight })
+    const offsetWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetWidth')
+    Object.defineProperty(HTMLElement.prototype, 'offsetWidth', {
+      configurable: true,
+      get(this: HTMLElement) {
+        return this.classList.contains('erf-hpc-label') ? labelWidth : 0
+      }
+    })
+    restoreLayout = () => {
+      delete (root as unknown as Record<string, unknown>).clientWidth
+      delete (root as unknown as Record<string, unknown>).clientHeight
+      if (offsetWidth !== undefined) Object.defineProperty(HTMLElement.prototype, 'offsetWidth', offsetWidth)
+    }
+    return visible
+  }
+
+  afterEach(() => {
+    restoreLayout?.()
+    restoreLayout = null
+  })
+
+  const px = (value: string): number => Number.parseFloat(value)
+
+  it('draws a full-width element’s pin inside the visible width, not under the scrollbar', () => {
+    const visible = withScrollbar()
+    expect(visible).toBeLessThan(window.innerWidth)
+    // The owner's div.doc: the whole page width, one element reaching under the scrollbar.
+    h.doubles.setBox(byId('deck'), { left: 0, top: 120, width: visible, height: 2_000 })
+    h.doubles.setBox(byId('list'), { left: 0, top: 60, width: window.innerWidth, height: 20 })
+    h.state({ showIcons: true, icons: [icon('deck', 1), icon('list', 4)] })
+    const drawn = pins()
+    expect(drawn).toHaveLength(2)
+    for (const pin of drawn) {
+      expect(px(pin.style.left)).toBe(visible - 24 - PIN_EDGE_INSET_PX)
+      expect(px(pin.style.left) + px(pin.style.width)).toBeLessThanOrEqual(visible - PIN_EDGE_INSET_PX)
+    }
+  })
+
+  it('leaves a narrow element’s pin where it was', () => {
+    h.doubles.setBox(byId('s1'), { left: 300, top: 200, width: 120, height: 40 })
+    h.state({ showIcons: true, icons: [icon('s1', 2)] })
+    const without = [pins()[0].style.left, pins()[0].style.top]
+    withScrollbar()
+    h.controller.renderNow()
+    expect([pins()[0].style.left, pins()[0].style.top]).toEqual(without)
+    expect(without).toEqual(['422px', '174px'])
+  })
+
+  it('clips the outline and clamps the label to the visible width too', () => {
+    const visible = withScrollbar(120)
+    // An element at the right edge, reaching under the scrollbar.
+    h.doubles.setBox(byId('list'), { left: visible - 19, top: 320, width: 34, height: 60 })
+    h.state({ mode: true })
+    userMove(visible - 9, 350)
+    h.controller.renderNow()
+    const root = h.root() as ShadowRoot
+    const outline = root.querySelector('.erf-hpc-outline') as HTMLElement
+    const label = root.querySelector('.erf-hpc-label') as HTMLElement
+    expect(outline.classList.contains('erf-hpc-hidden')).toBe(false)
+    expect(px(outline.style.left) + px(outline.style.width)).toBe(visible)
+    expect(px(label.style.left)).toBe(visible - 120)
   })
 })
 

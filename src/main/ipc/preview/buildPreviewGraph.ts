@@ -60,6 +60,7 @@ import {
 } from '../../services/preview/comments/commentServiceTypes'
 import type { CommentIdentity } from '../../services/preview/comments/CommentWriter'
 import { createCommentUnsavedSources } from '../../services/preview/comments/commentUnsavedSources'
+import { focusHostWhileKey } from '../../services/preview/previewHostFocus'
 import { createPreviewEmitters, type PreviewEmitTarget } from './emit'
 import { createPreviewCommentEmitters } from './commentEmit'
 import { createExternalLinkConsent } from './externalLinkConsent'
@@ -120,7 +121,8 @@ export function defaultResolveEmitTargets(): readonly PreviewEmitTarget[] {
       return {
         isDestroyed: () => contents.isDestroyed(),
         send: (channel, payload) => contents.send(channel, payload),
-        windowId: win.id
+        windowId: win.id,
+        focusHost: () => focusHostWhileKey(win)
       }
     })
 }

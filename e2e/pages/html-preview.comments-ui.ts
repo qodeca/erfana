@@ -38,6 +38,12 @@ import {
   installBoundedExec,
   type BoundedExecGlobal
 } from '../utils/bounded-exec'
+import {
+  PIN_BOX_PX,
+  PIN_EDGE_INSET_PX,
+  PIN_TIP,
+  PIN_TIP_OFFSET_PX
+} from '../../src/preload/previewPageComments/constants'
 import { evalInFrame } from './html-preview.frames'
 import { evalInPreview } from './html-preview.native'
 import { HtmlPreviewPage, PREVIEW_BUDGET_MS, type PreviewTarget } from './html-preview.page'
@@ -289,8 +295,15 @@ export interface ElementBox {
   bottom: number
   width: number
   height: number
+  /** `innerWidth` / `innerHeight`: scrollbars included, as the view's capture is. */
   viewportWidth: number
   viewportHeight: number
+  /**
+   * The visible viewport, scrollbars excluded – what the overlay clamps a pin
+   * to (`viewportOf`, §19 Rev 4 "pins at the right edge").
+   */
+  visibleWidth: number
+  visibleHeight: number
 }
 
 /**
@@ -323,8 +336,20 @@ export async function elementBox(
       if (!r) return null
       return ${contentOrigin ? '{ x: r.left + el.clientLeft, y: r.top + el.clientTop }' : '{ left: r.left, top: r.top, width: r.width, height: r.height }'}
     })()`
+    // The visible size as the overlay's `viewportOf` reads it: the scrolling
+    // root's client size, never past the inner size, the inner size when 0.
+    const viewExpr = `(() => {
+      const root = document.compatMode === 'BackCompat' ? document.body : document.documentElement
+      const visible = (client, inner) => (client > 0 ? Math.min(client, inner) : inner)
+      return {
+        w: innerWidth,
+        h: innerHeight,
+        vw: visible(root ? root.clientWidth : 0, innerWidth),
+        vh: visible(root ? root.clientHeight : 0, innerHeight)
+      }
+    })()`
     try {
-      const view = await exec<{ w: number; h: number }>(wc, '({ w: innerWidth, h: innerHeight })', capMs, 'elementBox: viewport')
+      const view = await exec<{ w: number; h: number; vw: number; vh: number }>(wc, viewExpr, capMs, 'elementBox: viewport')
       let x = 0
       let y = 0
       let scope: Parameters<typeof exec>[0] = wc
@@ -347,7 +372,9 @@ export async function elementBox(
         width: r.width,
         height: r.height,
         viewportWidth: view.w,
-        viewportHeight: view.h
+        viewportHeight: view.h,
+        visibleWidth: view.vw,
+        visibleHeight: view.vh
       }
     } catch (err) {
       if (tolerable(err)) return null
@@ -463,14 +490,23 @@ export async function clickElement(
 
 /**
  * Where the pin of an element is drawn (§10.5): the bubble's 24 px box with
- * its tail 4 px outside the element's top-right corner, clamped to the
- * viewport the element is drawn in. The point is the middle of the body.
+ * its tail 4 px outside the element's top-right corner, clamped to the page's
+ * visible viewport – scrollbars excluded – 4 px inside its edges (§19 Rev 4
+ * "pins at the right edge"). Page only: a frame's pins sit in the frame's
+ * viewport. The box's top-left corner, in CSS px.
  */
-export function pinPoint(box: ElementBox, viewport: { width: number; height: number } = { width: box.viewportWidth, height: box.viewportHeight }): { x: number; y: number } {
-  const clamp = (v: number, max: number): number => Math.min(Math.max(v, 0), max)
-  const left = clamp(box.right + 4 - 2, viewport.width - 24)
-  const top = clamp(box.top - 4 - 22, viewport.height - 24)
-  return { x: Math.round(left + 12), y: Math.round(top + 10) }
+export function pinBoxOf(box: ElementBox): { left: number; top: number } {
+  const clamp = (v: number, max: number): number => Math.min(Math.max(v, PIN_EDGE_INSET_PX), max)
+  return {
+    left: clamp(box.right + PIN_TIP_OFFSET_PX - PIN_TIP.x, box.visibleWidth - PIN_BOX_PX - PIN_EDGE_INSET_PX),
+    top: clamp(box.top - PIN_TIP_OFFSET_PX - PIN_TIP.y, box.visibleHeight - PIN_BOX_PX - PIN_EDGE_INSET_PX)
+  }
+}
+
+/** The middle of the pin's body ({@link pinBoxOf}). */
+export function pinPoint(box: ElementBox): { x: number; y: number } {
+  const pin = pinBoxOf(box)
+  return { x: Math.round(pin.left + 12), y: Math.round(pin.top + 10) }
 }
 
 /** A page expression: resolves `'painted'` once the page has drawn two frames. */
@@ -528,14 +564,14 @@ export async function pressInPage(
 
 /**
  * The share of the pin's drawn body (the 20 × 15 CSS px bubble inside its
- * 24 px box, placed as §10.5 says – see {@link pinPoint}) that shows the pin's
+ * 24 px box, placed as §10.5 says – see {@link pinBoxOf}) that shows the pin's
  * fill colour in the view's capture, 0–1. Only the body is read: the selected
  * outline (on the element's edge) and the hover label (1 px accent border)
  * never fill more than a sliver of it, and a pin fills most of it. `null` when
  * the capture is empty (an undrawn view) – the caller polls.
  */
 export async function pinCoverage(app: ElectronApplication, box: ElementBox, target: PreviewTarget = {}): Promise<number | null> {
-  return app.evaluate(async ({ webContents }, { b, urlIncludes, rgb }) => {
+  return app.evaluate(async ({ webContents }, { b, pin, urlIncludes, rgb }) => {
     const wc = webContents.getAllWebContents().find((c) => {
       try {
         const url = c.getURL()
@@ -554,12 +590,10 @@ export async function pinCoverage(app: ElectronApplication, box: ElementBox, tar
     }
     if (image.isEmpty()) return null
     const size = image.getSize()
+    // The capture holds the whole view, scrollbars included: `innerWidth` scales it.
     const zoom = b.viewportWidth > 0 ? size.width / b.viewportWidth : 1
-    const clamp = (v: number, max: number): number => Math.min(Math.max(v, 0), max)
-    const boxLeft = clamp(b.right + 4 - 2, b.viewportWidth - 24)
-    const boxTop = clamp(b.top - 4 - 22, b.viewportHeight - 24)
-    const left = Math.round((boxLeft + 3) * zoom)
-    const top = Math.round((boxTop + 3) * zoom)
+    const left = Math.round((pin.left + 3) * zoom)
+    const top = Math.round((pin.top + 3) * zoom)
     const width = Math.min(size.width - left, Math.round(18 * zoom))
     const height = Math.min(size.height - top, Math.round(13 * zoom))
     if (width <= 0 || height <= 0) return 0
@@ -572,7 +606,7 @@ export async function pinCoverage(app: ElectronApplication, box: ElementBox, tar
       if (bgra || rgba) count += 1
     }
     return count / (width * height)
-  }, { b: box, urlIncludes: target.urlIncludes, rgb: [...PIN_ACCENT_RGB] })
+  }, { b: box, pin: pinBoxOf(box), urlIncludes: target.urlIncludes, rgb: [...PIN_ACCENT_RGB] })
 }
 
 /** A pin is drawn when its fill covers at least this share of its body (its ink "text lines" or number take the rest). */

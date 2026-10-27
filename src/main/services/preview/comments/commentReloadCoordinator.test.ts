@@ -234,6 +234,77 @@ describe('commentReloadCoordinator', () => {
     expect(h.coordinator.frameRestoreFor('/p/frame.html')).toBeUndefined()
   })
 
+  it('§19 Rev 4 the open sections go to the top frame\'s first hello after the write\'s reload commits the page – once', () => {
+    const h = harness()
+    const folded = { ...WRITE, scroll: { ...SCROLL, openSections: [0, 3] } }
+    h.coordinator.arm(folded)
+    // Before the reload commits, a hello is the old document's: nothing is due.
+    expect(h.coordinator.sectionsFor(PAGE)).toBeUndefined()
+    h.coordinator.reloadStarting()
+    h.coordinator.pageLoadEnded(committed(PAGE))
+    expect(h.coordinator.sectionsFor(PAGE)).toEqual([0, 3])
+    expect(h.coordinator.sectionsFor(PAGE)).toBeUndefined()
+    // An ordinary reload of the page later – an agent's edit – reopens nothing.
+    h.coordinator.reloadStarting()
+    h.coordinator.pageLoadEnded(committed(PAGE))
+    expect(h.coordinator.sectionsFor(PAGE)).toBeUndefined()
+
+    // A write that names no page (a frame's file): the hello's own file is the page.
+    const unnamed = harness()
+    unnamed.coordinator.arm({ realPath: PAGE, fileHash: 'h', scroll: { ...SCROLL, openSections: [1] } })
+    unnamed.coordinator.reloadStarting()
+    unnamed.coordinator.pageLoadEnded(committed(PAGE))
+    expect(unnamed.coordinator.sectionsFor(PAGE)).toEqual([1])
+  })
+
+  it('§19 Rev 4 no sections for another page, a load before the reload, a write with none open, or a missed hello', () => {
+    const folded = { ...WRITE, scroll: { ...SCROLL, openSections: [1] } }
+    // Back to another page: dropped with the scroll (M-042).
+    const back = harness()
+    back.coordinator.arm(folded)
+    back.coordinator.reloadStarting()
+    back.coordinator.pageLoadEnded(committed(OTHER))
+    expect(back.coordinator.sectionsFor(OTHER)).toBeUndefined()
+    // A top frame that names another file: the one hand-out is spent on nothing.
+    const stray = harness()
+    stray.coordinator.arm(folded)
+    stray.coordinator.reloadStarting()
+    stray.coordinator.pageLoadEnded(committed(PAGE))
+    expect(stray.coordinator.sectionsFor(OTHER)).toBeUndefined()
+    expect(stray.coordinator.sectionsFor(PAGE)).toBeUndefined()
+    // A load that committed before any reload started is not the write's reload.
+    const early = harness()
+    early.coordinator.arm(folded)
+    early.coordinator.pageLoadEnded(committed(PAGE))
+    early.coordinator.reloadStarting()
+    early.coordinator.pageLoadEnded(committed(PAGE))
+    expect(early.coordinator.sectionsFor(PAGE)).toBeUndefined()
+    // The read found nothing open.
+    const none = harness()
+    none.coordinator.arm(WRITE)
+    none.coordinator.reloadStarting()
+    none.coordinator.pageLoadEnded(committed(PAGE))
+    expect(none.coordinator.sectionsFor(PAGE)).toBeUndefined()
+    // The reload's hello never came: the next commit is another load.
+    const missed = harness()
+    missed.coordinator.arm(folded)
+    missed.coordinator.reloadStarting()
+    missed.coordinator.pageLoadEnded(committed(PAGE))
+    missed.coordinator.pageLoadEnded(committed(PAGE))
+    expect(missed.coordinator.sectionsFor(PAGE)).toBeUndefined()
+    // Nothing armed.
+    expect(harness().coordinator.sectionsFor(PAGE)).toBeUndefined()
+  })
+
+  it('§19 Rev 4 reloadKeepingPlace keeps the open sections too', async () => {
+    const h = harness()
+    h.execute.mockResolvedValueOnce({ ...SCROLL, openSections: [2] })
+    await h.coordinator.reloadKeepingPlace()
+    h.coordinator.reloadStarting()
+    h.coordinator.pageLoadEnded(committed(PAGE))
+    expect(h.coordinator.sectionsFor(PAGE)).toEqual([2])
+  })
+
   it('reads the top frame\'s scroll in world 996; a bad or failed read is no scroll', async () => {
     const h = harness()
     expect(await h.coordinator.captureScroll()).toEqual(SCROLL)

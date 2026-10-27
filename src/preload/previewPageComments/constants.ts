@@ -67,6 +67,10 @@ export const ANCHOR_KEYS_MAX = 500
 export const PIN_KEY_MAX_CHARS = 40
 /** Pins one state may carry (one per key; §8 caps the anchors lists at 500). */
 export const MAX_ICONS = ANCHOR_KEYS_MAX
+/** `<details>` one state may reopen (`PREVIEW_LIMITS.COMMENT_OPEN_SECTIONS_MAX`, §19 Rev 4). */
+export const OPEN_SECTIONS_MAX = 256
+/** A section's place is below this (`PREVIEW_LIMITS.COMMENT_SECTIONS_SCANNED_MAX`). */
+export const SECTIONS_SCANNED_MAX = 65_536
 
 /** Overlay repairs (re-attach, re-show, restyle) one page may force per second (§9.1 S25). */
 export const OVERLAY_REPAIRS_PER_SECOND = 3
@@ -101,6 +105,13 @@ export const PIN_BOX_PX = 24
 export const PIN_TIP = { x: 2, y: 22 } as const
 /** The tail tip's offset outward from the element's top-right corner (§10.5). */
 export const PIN_TIP_OFFSET_PX = 4
+/**
+ * How far a pin clamped to an edge of the frame's visible viewport stays
+ * inside it (§19 Rev 4 "pins at the right edge"): the tip's own 4 px offset
+ * (`--space-2`), so a pin pushed to an edge keeps clear of it – and of comment
+ * mode's 2 px frame along it.
+ */
+export const PIN_EDGE_INSET_PX = PIN_TIP_OFFSET_PX
 /** How far an overlapping pin moves left along the top edge (§10.5). */
 export const PIN_STEP_PX = 22
 /** Steps an overlapping pin may take before it stays put, overlapping (bounds the search). */

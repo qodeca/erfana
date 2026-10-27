@@ -7,11 +7,13 @@
  *
  * All of them run in isolated world {@link COMMENT_WORLD_ID} – 997 to 999 are
  * taken by the bounds ack, the backdrop read and the stylesheet swap – so a
- * page cannot patch what they call. They read and set scroll positions and wait
- * for frames; none of them reads the page's text or writes its DOM. Every
- * result is parsed here before main trusts it, and every caller time-boxes the
- * call: a hidden view may never run an animation frame.
+ * page cannot patch what they call. They read and set scroll positions, read
+ * which `<details>` are open and wait for frames; none of them reads the page's
+ * text or writes its DOM. Every result is parsed here before main trusts it,
+ * and every caller time-boxes the call: a hidden view may never run an
+ * animation frame.
  */
+import { PREVIEW_LIMITS } from '../../../../shared/preview-limits'
 
 /** The isolated world comments run in (§7.5 step 3). */
 export const COMMENT_WORLD_ID = 996
@@ -22,6 +24,7 @@ export const RESTORE_BUDGET_MS = 1_000
 
 const LARGEST_SCROLL = 10_000_000
 const HASH_MAX_CHARS = 512
+const { COMMENT_OPEN_SECTIONS_MAX: OPEN_SECTIONS_MAX, COMMENT_SECTIONS_SCANNED_MAX: SECTIONS_SCANNED_MAX } = PREVIEW_LIMITS
 
 /** The top frame's scroll and hash when a save starts (§7.5 step 3). */
 export interface TopScroll {
@@ -29,6 +32,12 @@ export interface TopScroll {
   readonly y: number
   /** `''` for none. */
   readonly hash: string
+  /**
+   * The open `<details>`, each by its place among the page's `<details>` in
+   * document order, ascending; absent when none is open (§19 Rev 4 "folded
+   * sections"). The top frame's preload reopens them after the reload.
+   */
+  readonly openSections?: readonly number[]
 }
 
 /** A point in the top frame's CSS pixels. */
@@ -37,8 +46,22 @@ export interface FrameOffset {
   readonly y: number
 }
 
-/** Read the top frame's scroll position and hash. */
-export const READ_SCROLL_SCRIPT = '({ x: window.scrollX, y: window.scrollY, hash: location.hash })'
+/**
+ * Read the top frame's scroll position, hash and open sections: the places of
+ * the open ones among the first {@link SECTIONS_SCANNED_MAX} `<details>`, at
+ * most {@link OPEN_SECTIONS_MAX}. Indexed, never `.length`: a live collection
+ * counts the whole document for its length, and the read has 400 ms.
+ */
+export const READ_SCROLL_SCRIPT = `(() => {
+  const all = document.getElementsByTagName('details')
+  const openSections = []
+  for (let i = 0; i < ${SECTIONS_SCANNED_MAX} && openSections.length < ${OPEN_SECTIONS_MAX}; i += 1) {
+    const section = all[i]
+    if (section === undefined) break
+    if (section.open === true) openSections.push(i)
+  }
+  return { x: window.scrollX, y: window.scrollY, hash: location.hash, openSections }
+})()`
 
 /**
  * Wait two animation frames – one is not enough for the selected outline to
@@ -102,16 +125,28 @@ function finite(value: unknown, max: number): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) && Math.abs(value) <= max ? value : undefined
 }
 
+/**
+ * A read's open sections: at most {@link OPEN_SECTIONS_MAX} places, each a
+ * whole number below {@link SECTIONS_SCANNED_MAX}, ascending and once each.
+ * Anything else is none – the scroll still counts.
+ */
+export function parseOpenSections(raw: unknown): readonly number[] | undefined {
+  if (!Array.isArray(raw) || raw.length === 0 || raw.length > OPEN_SECTIONS_MAX) return undefined
+  if (!raw.every(place => Number.isInteger(place) && place >= 0 && place < SECTIONS_SCANNED_MAX)) return undefined
+  return [...new Set(raw as number[])].sort((a, b) => a - b)
+}
+
 /** A {@link READ_SCROLL_SCRIPT} result, or `undefined` when it is not one. */
 export function parseTopScroll(raw: unknown): TopScroll | undefined {
   if (typeof raw !== 'object' || raw === null) return undefined
-  const { x, y, hash } = raw as Record<string, unknown>
+  const { x, y, hash, openSections } = raw as Record<string, unknown>
   const sx = finite(x, LARGEST_SCROLL)
   const sy = finite(y, LARGEST_SCROLL)
   if (sx === undefined || sy === undefined || typeof hash !== 'string' || hash.length > HASH_MAX_CHARS) {
     return undefined
   }
-  return { x: Math.max(0, sx), y: Math.max(0, sy), hash }
+  const sections = parseOpenSections(openSections)
+  return { x: Math.max(0, sx), y: Math.max(0, sy), hash, ...(sections === undefined ? {} : { openSections: sections }) }
 }
 
 /** A {@link waitFramesScript} result, or `undefined` when it is not one. */

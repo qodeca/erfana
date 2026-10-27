@@ -50,6 +50,8 @@ export default defineConfig({
         'src/preload/previewPageComments/controller.ts': { lines: 99, functions: 99, branches: 99, statements: 99 },
         'src/preload/previewPageComments/documentWatch.ts': { lines: 99, functions: 99, branches: 99, statements: 99 },
         'src/preload/previewPageComments/domPath.ts': { lines: 99, functions: 99, branches: 97, statements: 99 },
+        // Added with the module (§19 Rev 4 folded sections), measured at 100 on every axis.
+        'src/preload/previewPageComments/foldedSections.ts': { lines: 99, functions: 99, branches: 99, statements: 99 },
         'src/preload/previewPageComments/frames.ts': { lines: 99, functions: 99, branches: 99, statements: 99 },
         'src/preload/previewPageComments/geometry.ts': { lines: 99, functions: 99, branches: 99, statements: 99 },
         'src/preload/previewPageComments/iconResolver.ts': { lines: 99, functions: 99, branches: 99, statements: 99 },

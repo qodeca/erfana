@@ -155,7 +155,7 @@ Rules that follow from the diagram:
 | `components/Panels/HtmlPreviewPanel/comments/CommentModeToggle.tsx`, `CommentListToggle.tsx`, `ShowPinsToggle.tsx` | Toolbar tools in `PreviewToolbarTools` |
 | `…/comments/CommentContextMenu.tsx` | Shared `ContextMenu` (already `useOccluder('menu', true)`, `ContextMenu.tsx:153`); one item "Add comment" |
 | `…/comments/CommentWindow.tsx` + `.css` | Thread view + editor; portal, `useOccluder('overlay', open)`, `erf-comment-*` classes |
-| `…/comments/CommentDrawer.tsx` + `.css` | Side drawer, flow sibling of `.html-preview-page-area` (no occluder) |
+| `…/comments/CommentDrawer.tsx` + `.css` | Side drawer, flow sibling of `.html-preview-page-area` (no occluder). As a full-width sheet it hides its own page through a panel gate: `…/comments/useDrawerSheet.ts` → `stores/usePreviewCoveredStore.ts` (§19 Rev 4) |
 | `…/comments/IdentityStep.tsx` | First-run identity, shown as step 1 inside the comment window |
 | `components/Settings/…` (changed) | New "Comments" section in `SettingsOverlay` (name, optional email) |
 | `services/preview/commentGateway.ts` | The only reader of `window.api.previewComments` |
@@ -540,9 +540,13 @@ Self-drawn inline SVG in the shadow root, sharp corners (viewBox path `M2 2H22V1
 
 Only open threads are counted. Clicking opens the window in any mode; the click never reaches the page. Overlapping pins move left along the top edge in 22 px steps (the ancestor keeps the corner). Drawn only for elements passing `checkVisibility({opacityProperty, visibilityProperty})` and in the viewport. Scales with page zoom. Never animated. `role="button"`, `tabindex="-1"`.
 
+*Rev 4 note (owner test):* "the viewport" is the frame's **visible** viewport – scrollbars excluded – and a pin clamped to one of its edges keeps its box 4 px inside it, so a full-width element's pin is never drawn under the page's scrollbar (§19 "Rev 4 – owner test: pins at the right edge").
+
 ### 10.6 Comment drawer
 
 Flow sibling at the inline end of `.html-preview-page-area` (never absolute), 320 px (min 280), opens instantly. Under a 640 px panel it takes the full width and "Show on page" closes it first. Filter "Show": **Open (n) · Resolved (n) · Needs attention (n)** (radio group). File order; "Not visible now" is an inline tag.
+
+*Rev 4 note (owner bug):* as a full-width sheet the drawer hides **its own** page only – through the panel gate `covered`, never the window's occluder – and a tab dockview has hidden is not measured, so it keeps its last real width (§19 "Rev 4 – tab switch with the drawer open").
 
 ```
 Comments                                    [x]
@@ -832,6 +836,7 @@ IDs: `HPC-U` unit, `HPC-P` property, `HPC-G` golden, `HPC-M` main, `HPC-I` IPC, 
 | E-014 | P2 | Pins toggle |
 | E-015 | P2 | Hostile page: no window opened, mtime unchanged |
 | E-016 | P2 | Keyboard-only path: shortcut → Tab picker → Enter → type → Cmd/Ctrl+Enter |
+| E-016c | P1 | A left-click pick made while the page holds native focus: the new-comment window opens with native focus on the host and DOM focus in the field; typing needs no click, Cmd/Ctrl+Enter saves, the block is on disk (§19 Rev 4 "comment window focus and save key") |
 | E-017 | P2 | Same file in two previews: comment appears in both after reload |
 | E-018 | P2 | Focus in and out of the window and drawer |
 | E-019 | P2 | Element rectangles and `innerText` equal before/after adding comments (pre/inline fixture) |
@@ -840,6 +845,10 @@ IDs: `HPC-U` unit, `HPC-P` property, `HPC-G` golden, `HPC-M` main, `HPC-I` IPC, 
 | E-022 | P2 | PDF export of a commented page contains no pins; Find in page does not count overlay text |
 | E-023 | P1 | Feature flag off → no comment UI, page served raw, frames run without preload (today's behaviour) |
 | E-024 | P2 | `git diff` after add/edit/delete on a line-start target shows only added/removed block lines (target line unchanged) |
+| E-026 | P1 | Two preview tabs; the drawer open and comment mode on in one; switch to the other: it is live (view shown, no still frame, clicks reach the page) with its own drawer, count and mode; back again, the first tab's drawer is still open. Run with the drawer as a full-width sheet and again as a side panel (§19 Rev 4) |
+| E-027 | P1 | A paragraph inside a `<details>` the reader opened: the section stays open through comment mode's reload and the save's reload, and the pin is drawn; folded again it is "Not visible now", and the drawer row's Open unfolds it behind the window – the pin is back once the window closes (§19 Rev 4 "folded sections") |
+| E-028 | P1 | A pin's thread window: every text button is a Dialog.css button; a reply typed, then **Open in source** – the window is gone and the editor shows the element's line; back on the preview the pin's window restores the reply; with the window open, switching to the editor tab hides it and switching back shows it again (§19 Rev 4 "open in source and button sizes") |
+| E-029 | P1 | The drawer open as a side panel beside a page whose commented `div.doc` spans its width: along the pin's row the overlay takes the hit over a whole 24 px box ending 4 px inside the page's visible width (`clientWidth`, not under the scrollbar), the pin's fill shows there in the view's capture, and a click there opens its thread (§19 Rev 4 "pins at the right edge") |
 | F-001 | P1 | Save → pin visible on the `slide-deck/` fixture: 20 samples, P95 < 1,000 ms. **Gate on macOS and Linux**; on the emulated Windows box record only (`known-flakes.md:62-76`) |
 | F-002 | P1 | Shared parse + instrumentation per load: 0.5 / 1 / 4 MB files, a ~25 MB file (§19 Rev 4) and a 10-frame page within the §5.8 budget (recorded per OS) |
 | F-003 | P2 | Right-click → menu visible ≤ 150 ms including the still capture; 200 pins keep hover at 60 fps (no long task > 50 ms) |
@@ -1080,6 +1089,63 @@ Findings of the 2026-10-26 code review (H1, M1–M4, L1–L6) and security revie
 | File names drawn safely | (S-L-B) A file name comes from the project, so anyone who can name a file writes it. Every place the comments UI shows one – the drawer's file heading, the window's banners, read error and frame note, the delete confirmation – draws bidi controls and invisible characters as visible tokens (`VisibleText`, `visibleString`), as for comment text. | §10.4, §10.6 | `CommentDrawer.test.tsx`, `CommentWindow.test.tsx`, `CommentWindow.threads.test.tsx` |
 | Main checks the splice | (S-L-C) The worker parses hostile pages, so main checks its write answer itself: the bytes to insert must be nothing (a delete) or strict UTF-8 holding exactly one comment with no `--` inside, that does not start with `>` or `->` and does not end with `-`, followed at most by a line break and indentation (`isSafeInsert`). Anything else is refused (`verify-failed`) before the write. | §7.5, §9 | `commentWriteCore.test.ts`, `CommentWriter.test.ts` |
 
+### Rev 4 – tab switch with the drawer open (owner bug)
+
+Owner report (2026-10-27): with the drawer open on one preview tab, switching to another left that tab frozen – a still picture that took no input. Each note overrides the cited sections.
+
+| Note | Change | Amends | Tests |
+|---|---|---|---|
+| The sheet is a panel gate | The full-width drawer hid the page with the window's `overlay` occluder, which hides **every** preview. dockview keeps every opened tab mounted, so a drawer left open in a hidden tab kept the tab on screen hidden behind its still frame. The sheet now raises its own panel's gate (`covered`, `stores/usePreviewCoveredStore.ts`, written by `comments/useDrawerSheet.ts`); the overlay guard applies it to that panel only (reason `covered`, after the chrome gate and `collapsed`), and the panel counts it as hidden (still frame, no keyboard way into the page). The flag stays set while its tab is hidden, so coming back hides the page before the guard would show it – no flash of the page over the sheet. | §10.6, §4.2 | `usePreviewComments.test.tsx`, `OverlayGuardService.test.ts`, `usePreviewCoveredStore.test.ts`, `HtmlPreviewPanel.pageEntry.test.tsx`; E-026 |
+| A hidden tab is not narrow | dockview hides an inactive tab with `display: none`, so its root measures 0×0, which read as "under 640 px": a side drawer turned into a sheet the moment its tab was hidden, which is what raised the occluder even in a wide window. A 0×0 measure is now skipped and the last real width stands. | §10.6 | `usePreviewComments.test.tsx`; E-026 |
+
+### Rev 4 – owner test: folded sections
+
+Owner decision (2026-10-27, "Fix: reopen and reveal"): on a real page the owner opened a closed `<details>` ("Technical details"), commented a `<p>` inside it and saved. The save's reload folded the section again, so the comment showed "Not visible now" with no pin, and the drawer's **Open** did not unfold it. Only `<details>` is handled: an element hidden any other way (`display: none`, `hidden`, an inactive slide) keeps "Not visible now". Each note overrides the cited sections.
+
+| Note | Change | Amends | Tests |
+|---|---|---|---|
+| Kept open | The world-996 read before a write also records the top frame's open `<details>`, each by its **place** among the page's `<details>` in document order: the first 65,536 are looked at (`PREVIEW_LIMITS.COMMENT_SECTIONS_SCANNED_MAX`), by index – a live collection's `length` would count the whole document inside the read's 400 ms – and at most 256 are kept (`COMMENT_OPEN_SECTIONS_MAX`). A comment block is a comment node, so a save moves no place. The top frame's first hello after the write's reload commits the same page gets them back, once, as `commentState.openSections`; its preload opens them, outer before inner, before it scrolls, draws or reports, so the load's first anchors report already counts the pin visible. A place the page builds later is retried each animation frame within the 1 s restore budget; any user input stops that. | §7.5 steps 3, 6; §8 `commentState` (adds `openSections?: number[]`, ≤ 256) | `commentScripts.test.ts`, `commentReloadCoordinator.test.ts`, `PreviewCommentService.test.ts`, `state.test.ts`, `contract.test.ts`, `foldedSections.test.ts`; E-027 |
+| Scope | The scroll restore's: every comment write (add, reply, edit, resolve, delete) and comment mode's reload of a page served raw – also a write whose reload serves the page raw (its last comment deleted with the mode off): a state that is not commentable carries `openSections` too, and nothing else new. Never a navigation or an ordinary file-change reload: one hand-out per write, so a later reload of the page reopens nothing – unlike the scroll restore, which an armed write applies again at a later commit of the same page (unchanged here). A frame's own sections are not kept, as its scroll is best effort; a frame write reloads the whole view, so the top frame's are. Reopen only: a section open in the file that the reader had folded comes back open, as before. | §7.5 | `commentReloadCoordinator.test.ts` |
+| Reveal unfolds | A reveal opens every closed `<details>` around the element, outermost first, before `scrollIntoView` – not one whose first `<summary>` holds it, which shows while folded. The render after it reports the element visible, so "Not visible now" goes and the pin draws. A drawer row's **Open** now reveals its thread's element too (attached threads only), behind the window, so closing the window shows it; unlike "Show on page" it keeps the drawer and announces nothing. | §7.10, §10.6 | `foldedSections.test.ts`, `usePreviewComments.test.tsx`; E-027 |
+| Accordions | Opening a section of an exclusive accordion (`<details name>`) closes its open sibling, as a summary click would, so a reveal can fold the section the reader had open beside it. Accepted. | – | – |
+| Trust | The places are numbers from main's own read in an isolated world; main and the preload both parse them, and any bad entry drops the list (the scroll stays). Only main's state starts a restore or a reveal, on the one receive channel; nothing the page sends or dispatches does. The page sees a section open (its `toggle` fires), as it would see the reader open it. | §9.1 S4, S7 | `commentScripts.test.ts`, `state.test.ts`, `foldedSections.test.ts` |
+
+### Rev 4 – owner test: comment window focus and save key
+
+Owner report (2026-10-27, Windows): after a pick the new-comment window opened without the keyboard in its field, and Cmd/Ctrl+Enter did not save – "the same as in other cases", meaning the Markdown preview's Ask / Modify / Prompt dialogs (`PromptDialog`: focus on mount, Enter with Ctrl **or** Meta submits). Each note overrides the cited sections.
+
+| Note | Change | Amends | Tests |
+|---|---|---|---|
+| Root cause | The field already took DOM focus (`BaseDialog`'s `initialFocusRef`, 10 ms after open) and already saved on Cmd/Ctrl+Enter. But every pick is a click or key INSIDE the page, a separate `WebContentsView` that then holds native keyboard focus, and a DOM `focus()` in the host cannot take that back (Electron #18859, the issue #124 finding in `previewHostFocus.ts`). So the reader's keys – the text and the save chord – kept going to the page behind the still frame. The Markdown prompts never meet this: Markdown preview is host DOM. E-016 passed regardless, because Playwright's `page.keyboard` types into the host renderer whatever holds native focus. | §10.4 Focus | – |
+| Host focus before the draft | Main hands native focus to the owning window's own contents **before** it sends `preview:commentDraftOpened` – every kind (`open`, `menu`, `icon`): each opens Erfana's menu or window over the page – so the renderer's DOM focus lands in a contents that holds the keyboard (`commentEmit.ts` → `PreviewEmitTarget.focusHost` → `focusHostWhileKey`). No new channel and nothing trusted from the renderer: the draft event is main's own. Only while the window is the OS key window: a draft is built from disk (up to 25 MB) and `webContents.focus()` also raises the window, so a reader who switched apps meanwhile is not pulled back – the DOM focus is still set for their return. The first comment's identity step gets the same host focus and keeps "focus in Name". Close still hands focus back into the page (unchanged). | §10.4 Focus, §8 `commentDraftOpened` (side effect, payload unchanged) | `previewHostFocus.test.ts`, `commentEmit.test.ts`, `buildPreviewGraph.emitTargets.test.ts`; E-016c |
+| The save key | Unchanged keys, now pinned per platform: Enter with Ctrl or Meta saves the new comment, a reply and an edit on every OS (as `PromptDialog`), and the tooltip and `aria-keyshortcuts` name the platform's own – "Save (Cmd+Enter)" / `Meta+Enter` on macOS, "Save (Ctrl+Enter)" / `Control+Enter` elsewhere (§10.10). The chord with Save blocked (empty, too long, unsaved source tab) sends nothing, as Save does; while a save is pending a second chord sends nothing. New: a held key's auto-repeat and an Enter that confirms an IME composition are not presses. | §10.4, R-003 | `CommentWindow.keys.test.tsx` |
+
+### Rev 4 – owner test: open in source and button sizes
+
+Owner report (2026-10-27, Windows; `designs/decisions/decisions.html`, the window "Comment on span.label", line 172): after **Open in source** the comment window stayed open, floating over the Monaco editor; and the window mixed two button sizes – small outlined Resolve and Open in source beside large bold Reply, New comment and Close. Each note overrides the cited sections.
+
+| Note | Change | Amends | Tests |
+|---|---|---|---|
+| Open in source closes the window | The window closes first, then the editor opens at the line (the drawer's own Open in source is unchanged – the drawer stays). Same order and reason as "Go to tab": a dialog left open would sit over the editor, and its focus trap would pull the keyboard back out of it. Focus is not handed back to the page – the editor takes it. Nothing is asked and nothing is lost: closing a window always keeps typed text (§10.4), and reply and edit text already live in the session drafts (`replyDraftKey`, `editDraftKey`), so the reply is there when the pin is clicked again. `useCommentDirtyGuard` is not involved – it guards a save against an unsaved *source* tab, not the window's own text. | §10.4 | `usePreviewComments.test.tsx`, `CommentWindow.threads.test.tsx`; E-028 |
+| The window belongs to its tab | The design was silent. The window is a `BaseDialog` – portalled to the app window, `position: fixed` – and dockview keeps a hidden tab mounted, so the window of a tab the reader switched away from floated over the tab now shown, and its `dialog` occluder (global) froze every other preview on its still frame: the E-026 class of bug, for the window instead of the drawer. Now `usePreviewComments` takes the panel's dockview visibility (`visible`) and withholds the window from the layer while its tab is hidden: the request is **kept**, so the window comes back with its tab, text restored from the session drafts; an open inner step (an edit, a delete confirmation) does not survive the round trip, its text does. The element menu of a hidden tab is dropped (it pointed at a page no longer on screen), quietly – no native focus to a page that is not shown. | §10.4, §10.3 | `usePreviewComments.test.tsx`; E-028 |
+| One button size | Every text button in the window is the Dialog.css button (`.dialog-btn` + variant: `--space-5` / `--space-12` padding, `--text-md`, `--font-semibold`) – the Dialog framework's mandatory button, as in `PromptDialog` (Ask / Modify / Prompt). Resolve, Re-open, Open in source, Copy raw text, Delete block…, Try again, and the banner actions Go to tab, Save {file} and Pick again move from the compact `.erf-comment-action` (24 px, `--text-sm`, regular) to the secondary variant. `.erf-comment-action` stays for the drawer, which is panel chrome sized with the toolbar. The 24 px icon buttons (close, a message's …, a resolved thread's chevron) are unchanged, as in every dialog. | §10.4, §10.11 Buttons; window card | `CommentWindow.threads.test.tsx`; E-028 |
+| One primary per view | Save (new comment), Continue (identity), Save changes (an edit) and the danger button of a delete confirmation, as before. Reply is primary only while the view holds exactly one open thread; with several, every Reply is secondary – a row of violet buttons ranks nothing. Accepted: while an edit is open in a single-thread view, its Save changes and the thread's Reply are both primary; the edit is an inner step that holds focus. | §10.4 | `CommentWindow.threads.test.tsx` |
+| The foot wraps as a pair | At the larger size a thread view's foot (Open in source, New comment, Close) can pass the 360 px window. New comment and Close are one group (`.erf-comment-window__foot-end`), so a narrow window wraps the pair whole, right-aligned, under Open in source, rather than stranding Close alone. | §10.4 | `CommentWindow.threads.test.tsx` |
+
+### Rev 4 – owner test: pins at the right edge
+
+Owner report (2026-10-27, Windows): the drawer open as a side panel, so the page view was narrower; a comment on `div.doc`, an element spanning the page's full width. Its pin showed only as a thin sliver of blue beside the page's vertical scrollbar – read as "the comment icon is hidden behind the comments panel on the right". Each note overrides the cited sections.
+
+| Note | Change | Amends | Tests |
+|---|---|---|---|
+| Root cause | The drawer never covered the pin; the page's own scrollbar did. The overlay clamped pins to the frame's `innerWidth` / `innerHeight`, which **count** a classic scrollbar. A full-width element's top-right corner sits on the scrollbar's left edge, so its pin – tail tip 4 px outside that corner, box clamped to at most `innerWidth − 24` – ran under the scrollbar: with a 15–17 px scrollbar, 7–9 px of the 24 px box showed. | §10.5 | – |
+| The visible viewport | Every overlay measure uses the frame's **visible** viewport (`viewportOf`): the scrolling root's `clientWidth` / `clientHeight` – the root element in standards mode, the body in quirks mode (CSSOM View) – never past the inner size, and the inner size when the root reports 0 (no root, no layout box). Overlay scrollbars (macOS) take no room, so nothing changes there. Not `visualViewport`: `getBoundingClientRect` and `position: fixed` both work in the layout viewport. Each frame's preload measures its own window, so a frame's pins clamp to that frame's own viewport. | §10.5, §10.2 | `label.test.ts` (`viewportOf`) |
+| 4 px inside | A pin clamped to an edge keeps its box `PIN_EDGE_INSET_PX` inside the visible viewport on every side: 4 px, the tip's own offset (`--space-2`), clear of the edge and of comment mode's 2 px frame along it. A pin that fits stays where it was – the inset applies only where the clamp does. Collision stepping runs after the clamp, so two full-width elements in one row step apart as any two pins do, and stepping stops at the left inset. | §10.5 | `pins.test.ts`, `controller.test.ts` |
+| Vertically | Same rule, new bounds. §10.5 already clamps to "the visible part of the element and the viewport", so an element scrolled partly off keeps its pin at the viewport's top – now 4 px down – and one fully off has none. The bottom bound leaves out a horizontal scrollbar; an element showing only behind it has no pin. | §10.5 | `pins.test.ts` |
+| Outline, label, shields, flash | The same visible viewport: a huge element's outline is clipped at the scrollbar's edge, so its right ring shows; the label is clamped sideways inside it (§10.2); click shields and the reveal flash stop there too. The mode frame and tab were already inside – `position: fixed; inset: 0` leaves scrollbars out. | §10.2 | `controller.test.ts` |
+| Not changed | A pick's `view` (`w`, `h`) stays `innerWidth` / `innerHeight`: it records the reader's window, not where the overlay draws. | §8 | – |
+| E2e oracle | `pinBoxOf` (`e2e/pages/html-preview.comments-ui.ts`) places a pin by this rule from the page's own visible size, read as `viewportOf` reads it; `pinPoint`, `clickPin` and `pinCoverage` use it. The capture's scale stays `innerWidth`-based, since the capture holds the scrollbar too. | §12.4 | E-029 |
+
 **Open after P0, carried to the handoff**: S4 on Linux (X11/Wayland) and macOS, mixed-DPI; S1/S6 re-confirmed on macOS. Owner review list: R3-11.
 
 ### Traceability (decision → tests)
@@ -1089,11 +1155,11 @@ Findings of the 2026-10-26 code review (H1, M1–M4, L1–L6) and security revie
 | 1 | X-001, G-001 |
 | 2 | U-002, U-018, M-018, R-004, E-002 |
 | 3 | R-008, R-014, R-019, M-017, E-001, E-021, SEC-18 |
-| 4 | R-001, R-002, J-001, E-011 |
+| 4 | R-001, R-002, J-001, E-011, E-028 |
 | 5 | U-085, M-040–042, J-007, E-005 |
 | 6 | U-032–042, P-004, SEC-13, E-001, E-024 |
 | 7 | R-008 |
-| 8 | R-009, R-020, E-002, E-005, E-010, E-012, E-013 |
+| 8 | R-009, R-020, E-002, E-005, E-010, E-012, E-013, E-026, E-027 |
 | 9 | R-011 |
 | 10 | U-016, U-017 |
 | 11 | U-005–009, P-001, P-002, SEC-12 |
@@ -1102,15 +1168,15 @@ Findings of the 2026-10-26 code review (H1, M1–M4, L1–L6) and security revie
 | 14 | R-001, R-011, E-020 |
 | 15 | M-009, M-010, M-050, M-059, E-006, SEC-09 |
 | 16–17 | U-085, U-086, J-007, M-054, SEC-12 |
-| 19 | J-002–004, J-010, J-012, R-018, E-001, E-001b, E-007, E-016, M-052 |
-| 20 | J-005, J-013, R-010, E-002, E-014 |
+| 19 | J-002–004, J-010, J-012, R-018, E-001, E-001b, E-007, E-016, E-016c, M-052 |
+| 20 | J-005, J-013, R-010, E-002, E-014, E-029 |
 | 21 | M-014, U-084 |
 | 22 | U-004, U-016, U-060, G-002–004 |
 | 23 | X-002 |
 | 24 | U-050–061, U-020/021, P-003, P-005, P-007, E-001, E-003, E-004, E-024, SEC-14 |
 | 26 | Assumption (like 18/25/29); G-002 keeps reading only Erfana-shaped blocks |
 | 27 | X-001 (P1 and P8) |
-| 28 | F-001 (slide-deck), M-040, M-058, J-016, E-005 |
+| 28 | F-001 (slide-deck), M-040, M-058, J-016, E-005, E-027 |
 | 30 | U-087, J-006, E-005 |
 | 31 | M-018, R-004 |
 | 32 | U-070–074, E-010 |

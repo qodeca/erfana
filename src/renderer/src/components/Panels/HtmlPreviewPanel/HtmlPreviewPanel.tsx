@@ -43,6 +43,7 @@ import { usePreviewStore } from '../../../stores/usePreviewStore'
 import { usePreviewTabStore, type PreviewLinkMode } from '../../../stores/usePreviewTabStore'
 import { useSearchStore } from '../../../stores/useSearchStore'
 import { useOverlayOccluderStore } from '../../../stores/useOverlayOccluderStore'
+import { usePreviewCoveredStore } from '../../../stores/usePreviewCoveredStore'
 import { DOCKVIEW_PANEL_VISIBLE, useDockviewValue } from '../../../hooks/useDockviewValue'
 import { SearchBar } from '../../Search/SearchBar'
 import { PreviewChromeBand } from './components/PreviewChromeBand'
@@ -214,7 +215,11 @@ export function HtmlPreviewPanel(props: IDockviewPanelProps<HtmlPreviewPanelPara
     panelRef: panelRootRef
   })
 
-  const isViewHidden = isViewHiddenBase || gate !== null || resizeHeld
+  // This panel's comments drawer as a full-width sheet: a gate term of its own
+  // (never the window's occluder), so only this page counts as hidden.
+  const covered = usePreviewCoveredStore((s) => s.covered.has(panelId))
+
+  const isViewHidden = isViewHiddenBase || gate !== null || resizeHeld || covered
 
   // The hook owns every push, including the one on becoming visible: a tab
   // switch changes no size, so the `ResizeObserver` alone would not re-emit.
@@ -270,7 +275,9 @@ export function HtmlPreviewPanel(props: IDockviewPanelProps<HtmlPreviewPanelPara
     ready: loadState === 'ready',
     pageAreaRef,
     panelRootRef,
-    containerApi
+    containerApi,
+    // The window belongs to this tab: it is not drawn while another tab is shown.
+    visible: isVisible
   })
   // The panel's key chain, comments first: the mode toggle claims its chord
   // before navigation reads the same event. Shared by both key routes below.
