@@ -113,7 +113,10 @@ describe('commentDraftOpener', () => {
     // Both share line and tag – what the renderer keyed on before.
     expect(s.emitted[0].target).toMatchObject({ tag: 'div', line: 2 })
     expect(s.emitted[1].target).toMatchObject({ tag: 'div', line: 2 })
-    expect(JSON.stringify(s.emitted)).not.toContain(project.root)
+    // `filePath` is the schema's project path; no other field carries it. The
+    // root is JSON-escaped first, so its backslashes match on Windows too.
+    const root = JSON.stringify(project.root).slice(1, -1)
+    for (const event of s.emitted) expect(JSON.stringify({ ...event, filePath: undefined })).not.toContain(root)
   })
 
   it('an element with no tokened ancestor opens "can\'t comment here" – no token, no code', async () => {
