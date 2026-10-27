@@ -33,6 +33,7 @@ import type {
 } from './PreviewSessionFactory'
 import type { PreviewFileWatcherHandle } from './previewViewLifecycle'
 import type { PreviewWindowLike } from './PreviewLiveView'
+import { inProcessLinkScanner } from './__test-helpers__/inProcessLinkScanner'
 import { PREVIEW_PAGE_CSP_VIOLATION_CHANNEL } from './previewCspViolationBridge'
 import { PreviewViewService, type PreviewOpenRequest, type PreviewViewDeps } from './PreviewViewService'
 
@@ -383,6 +384,7 @@ function makeHarness(
     getZoomFactor: () => options.zoom ?? 1,
     now: options.now ?? (() => 0),
     readEntryHtml,
+    linkScanner: inProcessLinkScanner,
     platform: 'darwin'
   }
 
@@ -1112,9 +1114,10 @@ describe('PreviewViewService — post-load pipeline', () => {
     // the same `resolve(dirname(entry), href)` the view uses rather than a POSIX
     // literal: on win32 `resolve` anchors a rooted POSIX fixture to the current
     // drive, so the produced path is `C:\proj\style.css`.
-    expect(h.setWatchSet).toHaveBeenCalledWith([
-      resolve(dirname(REQUEST_A.filePath), 'style.css')
-    ])
+    expect(h.setWatchSet).toHaveBeenCalledWith(
+      [resolve(dirname(REQUEST_A.filePath), 'style.css')],
+      { changedSince: expect.any(Number) }
+    )
     expect(h.loadStateChanged).toHaveBeenCalledWith('panel-A', 'ready', 0)
   })
 })

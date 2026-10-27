@@ -30,6 +30,8 @@ import type {
 } from './PreviewSessionFactory'
 import type { PreviewFileWatcherHandle } from './previewViewLifecycle'
 import type { PreviewCommentShared } from './comments/commentServiceTypes'
+import type { PreviewLinkScanner } from './PreviewLinkScanWorkerAdapter'
+import type { HtmlSource } from './previewLinkScanProtocol'
 
 /**
  * Whether a page may run as a preview: `PreviewEligibilityService.check`, with
@@ -108,7 +110,9 @@ export interface PreviewLiveViewDeps {
    */
   readonly getZoomFactor: (window: Pick<PreviewWindowLike, 'webContents'>) => number
   readonly now: () => number
-  readonly readEntryHtml?: (filePath: string) => Promise<string>
+  readonly readEntryHtml?: (filePath: string) => Promise<HtmlSource>
+  /** Scans each page for its links off the main thread; the shared link scan worker by default. */
+  readonly linkScanner?: PreviewLinkScanner
   readonly onForwardedShortcut?: (panelId: string, key: string) => void
   readonly platform?: NodeJS.Platform
   /**

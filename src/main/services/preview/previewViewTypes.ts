@@ -36,6 +36,8 @@ import type { PreviewFileWatcherHandle } from './previewViewLifecycle'
 import type { PreviewWindowLike } from './PreviewLiveView'
 import type { PreviewEligibilityCheck } from './previewLiveTypes'
 import type { PreviewCommentShared } from './comments/commentServiceTypes'
+import type { PreviewLinkScanner } from './PreviewLinkScanWorkerAdapter'
+import type { HtmlSource } from './previewLinkScanProtocol'
 
 /** A `preview:open` request (mirrors `PreviewOpenRequestSchema`, §4.2). */
 export interface PreviewOpenRequest {
@@ -157,8 +159,10 @@ export interface PreviewViewDeps {
   /** The zoom to size a view with, read from its host window (issue #124, C3). */
   readonly getZoomFactor: (window: Pick<PreviewWindowLike, 'webContents'>) => number
   readonly now: () => number
-  /** Read the entry HTML for the post-load pipeline; defaults to `fs.readFile`. */
-  readonly readEntryHtml?: (filePath: string) => Promise<string>
+  /** Read the entry HTML for the post-load pipeline; defaults to a bounded read of its bytes. */
+  readonly readEntryHtml?: (filePath: string) => Promise<HtmlSource>
+  /** Scan each page for its links off the main thread; defaults to the shared link scan worker. */
+  readonly linkScanner?: PreviewLinkScanner
   /** Route a forwarded accelerator (§1.9) to the renderer; defaults to a no-op. */
   readonly onForwardedShortcut?: (panelId: string, key: string) => void
   readonly platform?: NodeJS.Platform

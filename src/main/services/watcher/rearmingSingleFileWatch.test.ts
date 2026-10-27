@@ -18,7 +18,12 @@ import { createRearmingSingleFileWatcher } from './rearmingSingleFileWatch'
 
 interface FakeWatcher {
   path: string
-  handlers: { onChange: () => void; onUnlink: () => void; onError: (e: unknown) => void }
+  handlers: {
+    onChange: () => void
+    onUnlink: () => void
+    onError: (e: unknown) => void
+    onReady?: () => void
+  }
   close: Mock
   closed: boolean
 }
@@ -101,6 +106,36 @@ describe('createRearmingSingleFileWatcher', () => {
     expect(onError).toHaveBeenCalledWith(boom)
   })
 
+  it('tells onReady when the first watcher listens, and nothing after close', async () => {
+    const { factory, created } = makeFactory()
+    const { detector } = makeFakeDetector()
+    const onReady = vi.fn()
+    const handle = createRearmingSingleFileWatcher(
+      '/proj/a.css',
+      { onChange: vi.fn(), onDeleted: vi.fn(), onError: vi.fn(), onReady },
+      { createWatcher: factory, createDetector: () => detector }
+    )
+
+    created[0].handlers.onReady?.()
+    expect(onReady).toHaveBeenCalledTimes(1)
+
+    await handle.close()
+    created[0].handlers.onReady?.()
+    expect(onReady).toHaveBeenCalledTimes(1)
+  })
+
+  it('asks the factory for no ready signal when the caller wants none', () => {
+    const { factory, created } = makeFactory()
+    const { detector } = makeFakeDetector()
+    createRearmingSingleFileWatcher(
+      '/proj/a.css',
+      { onChange: vi.fn(), onDeleted: vi.fn(), onError: vi.fn() },
+      { createWatcher: factory, createDetector: () => detector }
+    )
+
+    expect(created[0].handlers.onReady).toBeUndefined()
+  })
+
   it('treats a non-reappearing unlink as a genuine delete', async () => {
     const missing = join(tmpdir(), 'rearm-missing-xyz', 'gone.css')
     const { factory, created } = makeFactory()
@@ -132,9 +167,10 @@ describe('createRearmingSingleFileWatcher', () => {
       const onDeleted = vi.fn()
       createRearmingSingleFileWatcher(
         file,
-        { onChange, onDeleted, onError: vi.fn() },
+        { onChange, onDeleted, onError: vi.fn(), onReady: vi.fn() },
         { createWatcher: factory, createDetector: () => detector, isPathConfined: async () => true }
       )
+      expect(created[0].handlers.onReady).toBeDefined()
 
       created[0].handlers.onUnlink()
       fire(true)
@@ -144,6 +180,8 @@ describe('createRearmingSingleFileWatcher', () => {
       expect(created).toHaveLength(2)
       expect(created[0].closed).toBe(true)
       expect(onDeleted).not.toHaveBeenCalled()
+      // The re-arm reported its own change: the ready signal is the first watcher's only.
+      expect(created[1].handlers.onReady).toBeUndefined()
     } finally {
       await rm(dir, { recursive: true, force: true })
     }

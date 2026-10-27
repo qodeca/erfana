@@ -182,11 +182,12 @@ export function wirePreviewLiveView(owner: PreviewLiveWiringOwner): PreviewLiveP
     ...core,
     now: () => deps.now(),
     readEntryHtml: deps.readEntryHtml,
+    linkScanner: deps.linkScanner,
     currentPage: () => page.currentPage(),
     urlFor,
     // Frame documents are read for links only inside it (WI-15, fail closed).
     realRoot,
-    setWatchSet: (candidates) => watchCoordinator.setWatchSet(candidates),
+    setWatchSet: (candidates, options) => watchCoordinator.setWatchSet(candidates, options),
     recordChange,
     // How this view reloads; the pipeline decides when, and guards it. A reload
     // is a page load like any other, so it goes through `startPageLoad` (WI-29).
@@ -332,8 +333,12 @@ export function wirePreviewLiveView(owner: PreviewLiveWiringOwner): PreviewLiveP
         // Backdrop transitions are SIBLINGS of the post-load pipeline, never
         // routed through it: `schedule` is rate-limited and drops events
         // during a save burst, and a dropped transition leaves the page
-        // unreadable.
-        onDidStartLoading: () => backdrop.move('start-loading'),
+        // unreadable. The pipeline only notes the time: a file saved from
+        // now on may be one this load does not show.
+        onDidStartLoading: () => {
+          backdrop.move('start-loading')
+          pipeline.loadStarted()
+        },
         onDidStopLoading: () => void backdrop.settle(),
         onDidFailLoad: () => void backdrop.settle('fail-load'),
         // Focus-moving keys hand native focus to the host window first, or the

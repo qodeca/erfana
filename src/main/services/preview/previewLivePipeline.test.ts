@@ -13,7 +13,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PREVIEW } from '../../../shared/constants'
 import { stablePathDigest } from '../../../shared/stablePathDigest'
 import { logger } from '../LoggingService'
+import { inProcessLinkScanner } from './__test-helpers__/inProcessLinkScanner'
+import type { PreviewLinkScanner } from './PreviewLinkScanWorkerAdapter'
+import type { HtmlSource } from './previewLinkScanProtocol'
 import type { WatchSetResult } from './PreviewWatchCoordinator'
+import type { PreviewWatchStartOptions } from './PreviewWatchPool'
 import { createPreviewLivePipeline, type PreviewLivePipelineDeps } from './previewLivePipeline'
 
 afterEach(() => {
@@ -53,9 +57,9 @@ function makeHarness(overrides: Partial<PreviewLivePipelineDeps> = {}) {
       (worldId: number, scripts: { code: string }[]) => Promise<unknown>
     >(() => Promise.resolve(true)),
     readEntryHtml: vi.fn<(filePath: string) => Promise<string>>(() => Promise.resolve(ONE_LINK)),
-    setWatchSet: vi.fn<(candidates: readonly string[]) => Promise<WatchSetResult>>((candidates) =>
-      Promise.resolve({ watched: [...candidates], dropped: [] })
-    ),
+    setWatchSet: vi.fn<
+      (candidates: readonly string[], options: PreviewWatchStartOptions) => Promise<WatchSetResult>
+    >((candidates) => Promise.resolve({ watched: [...candidates], dropped: [] })),
     recordChange: vi.fn<(path: string) => void>(),
     reloadPage: vi.fn<(ignoreCache: boolean) => void>(),
     captureWhileVisible: vi.fn<() => void>()
@@ -67,6 +71,7 @@ function makeHarness(overrides: Partial<PreviewLivePipelineDeps> = {}) {
     stillFrameCache: { invalidate: fakes.invalidate, markLoaded: fakes.markLoaded },
     now: () => state.now,
     readEntryHtml: fakes.readEntryHtml,
+    linkScanner: inProcessLinkScanner,
     currentPage: () => PAGE,
     urlFor: (absPath) => `erfana-preview://token/${absPath}`,
     setWatchSet: fakes.setWatchSet,
@@ -87,7 +92,8 @@ describe('createPreviewLivePipeline — one run', () => {
     await flush()
 
     expect(h.readEntryHtml).toHaveBeenCalledWith(PAGE)
-    expect(h.setWatchSet).toHaveBeenCalledWith([STYLE])
+    // No load start was reported: the pipeline's own birth (clock 0) stands in.
+    expect(h.setWatchSet).toHaveBeenCalledWith([STYLE], { changedSince: 0 })
     // Only pictures from before the load go: a comment popup's fresh still stays (E-011).
     expect(h.invalidate).toHaveBeenCalledWith('panel-A', { keepSinceLoad: true })
     expect(h.loadStateChanged).toHaveBeenCalledWith('panel-A', 'ready', 0)
@@ -263,6 +269,54 @@ describe('createPreviewLivePipeline — rate limit', () => {
   })
 })
 
+describe("createPreviewLivePipeline — the load's start, for the watches a run adds", () => {
+  /** The options each `setWatchSet` call was given, in order. */
+  function handedStarts(h: ReturnType<typeof makeHarness>): PreviewWatchStartOptions[] {
+    return h.setWatchSet.mock.calls.map(([, options]) => options)
+  }
+
+  it('hands over when the load began, not when it finished', async () => {
+    const h = makeHarness()
+    h.state.now = 100
+    h.pipeline.loadStarted()
+    h.state.now = 400
+    h.pipeline.schedule()
+    await flush()
+
+    expect(handedStarts(h)).toEqual([{ changedSince: 100 }])
+  })
+
+  it('counts a reload it starts, which a busy page reports no did-start-loading for', async () => {
+    const h = makeHarness()
+    h.state.now = 700
+    h.pipeline.reload(false)
+    expect(h.reloadPage).toHaveBeenCalledWith(false)
+    h.state.now = 900
+    h.pipeline.schedule()
+    await flush()
+
+    expect(handedStarts(h)).toEqual([{ changedSince: 700 }])
+  })
+
+  it('takes the start as it stood at did-finish-load: a frame starting meanwhile does not move it', async () => {
+    vi.useFakeTimers()
+    const h = makeHarness()
+    h.pipeline.schedule()
+    await vi.advanceTimersByTimeAsync(0)
+    // The next load, inside the rate-limit window: its run trails.
+    h.state.now = 300
+    h.pipeline.loadStarted()
+    h.state.now = 400
+    h.pipeline.schedule()
+    // A frame starts loading on the idle page before the trailing run.
+    h.state.now = 500
+    h.pipeline.loadStarted()
+    await vi.advanceTimersByTimeAsync(PREVIEW.RELOAD_MIN_INTERVAL_MS)
+
+    expect(handedStarts(h)).toEqual([{ changedSince: 0 }, { changedSince: 300 }])
+  })
+})
+
 describe('createPreviewLivePipeline — live reload', () => {
   it('feeds each changed path to the reload policy', () => {
     const h = makeHarness()
@@ -404,7 +458,34 @@ describe('createPreviewLivePipeline — the default entry reader', () => {
     h.pipeline.schedule()
 
     await vi.waitFor(() => expect(h.loadStateChanged).toHaveBeenCalled(), { timeout: 5000 })
-    expect(h.setWatchSet).toHaveBeenCalledWith([join(dir, 'a.css')])
+    expect(h.setWatchSet).toHaveBeenCalledWith([join(dir, 'a.css')], {
+      changedSince: expect.any(Number)
+    })
+  })
+
+  it("hands the link scanner the page's bytes, undecoded, in a buffer of their own that can move", async () => {
+    const page = join(dir, 'index.html')
+    const markup = '<link rel="stylesheet" href="ż.css">'
+    await writeFile(page, markup)
+    const scanned: Array<HtmlSource> = []
+    const linkScanner: PreviewLinkScanner = {
+      scan: (html, options) => {
+        scanned.push(html)
+        return inProcessLinkScanner.scan(html, options)
+      }
+    }
+    const h = makeHarness({ readEntryHtml: undefined, currentPage: () => page, linkScanner })
+    h.pipeline.schedule()
+
+    await vi.waitFor(() => expect(h.loadStateChanged).toHaveBeenCalled(), { timeout: 5000 })
+    const [bytes] = scanned
+    if (!(bytes instanceof Uint8Array)) throw new Error('expected bytes')
+    expect(Buffer.from(bytes).toString('utf8')).toBe(markup)
+    expect(bytes.byteOffset).toBe(0)
+    expect(bytes.byteLength).toBe(bytes.buffer.byteLength)
+    expect(h.setWatchSet).toHaveBeenCalledWith([join(dir, 'ż.css')], {
+      changedSince: expect.any(Number)
+    })
   })
 
   it('stops reading at MAX_ENTRY_HTML_BYTES, so a link past the cap is not watched', async () => {
@@ -418,6 +499,8 @@ describe('createPreviewLivePipeline — the default entry reader', () => {
     h.pipeline.schedule()
 
     await vi.waitFor(() => expect(h.loadStateChanged).toHaveBeenCalled(), { timeout: 5000 })
-    expect(h.setWatchSet).toHaveBeenCalledWith([join(dir, 'early.css')])
+    expect(h.setWatchSet).toHaveBeenCalledWith([join(dir, 'early.css')], {
+      changedSince: expect.any(Number)
+    })
   })
 })

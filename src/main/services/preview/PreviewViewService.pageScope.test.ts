@@ -22,6 +22,7 @@ import type {
   PreviewViewHandle,
   PreviewWebContentsHandle
 } from './PreviewSessionFactory'
+import { inProcessLinkScanner } from './__test-helpers__/inProcessLinkScanner'
 import { PREVIEW_PAGE_CSP_VIOLATION_CHANNEL } from './previewCspViolationBridge'
 import {
   PreviewViewService,
@@ -231,6 +232,7 @@ function makeHarness(root = '/proj', extra: Partial<PreviewViewDeps> = {}) {
     getZoomFactor: () => 1,
     now: () => 0,
     readEntryHtml: vi.fn(() => Promise.resolve('<html></html>')),
+    linkScanner: inProcessLinkScanner,
     platform: 'darwin'
   }
 

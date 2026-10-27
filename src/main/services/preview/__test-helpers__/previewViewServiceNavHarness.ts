@@ -21,6 +21,7 @@ import { vi, type Mock } from 'vitest'
 import { PREVIEW } from '../../../../shared/constants'
 import type { PreviewFailureInput, PreviewStillFrame } from '../../../../shared/ipc/preview-types'
 import { createPreviewFailureLog, type IPreviewFailureLog } from '../PreviewFailureLog'
+import { inProcessLinkScanner } from './inProcessLinkScanner'
 import type { ReloadDecision } from '../PreviewReloadPolicy'
 import type {
   PreviewSession,
@@ -296,6 +297,7 @@ export function makeHarness(
     getZoomFactor: () => 1,
     now: () => clock,
     readEntryHtml,
+    linkScanner: inProcessLinkScanner,
     platform: 'darwin',
     checkEligibility,
     onForwardedShortcut: options.onForwardedShortcut

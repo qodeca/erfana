@@ -6,8 +6,9 @@
  *
  * Owns the rate limit (the last run and the one trailing timer), the swap
  * counter and the watched files the page's frames use. A run reads the page,
- * derives the watch set from its static links and then its frames'
- * (`previewFrameSources.ts`) and reports `ready`; a classified change swaps one
+ * derives the watch set from its static links and then its frames' – each
+ * document scanned in the link scan worker, never on the main thread
+ * (`previewFrameSources.ts`) – and reports `ready`; a classified change swaps one
  * stylesheet in place – unless a frame uses it – or reloads. The watch
  * coordinator, the reload policy and the reload itself are reached through
  * injected functions, so the view that owns them keeps their lifecycles.
@@ -24,6 +25,12 @@
  * page's first run waits for no window: it is that page's only still capture,
  * so holding it back left a tab hidden straight after a move with no picture
  * (RS2-8).
+ *
+ * A file saved after the page loaded it, but before the run watched it (the
+ * scan takes a while), was lost until the next save. So a run hands the watch
+ * set when the page's load began – the latest `loadStarted` or reload started
+ * here, as it stood at `did-finish-load` – and each watch it ADDS reports a file
+ * modified since then once it is listening (`PreviewWatchPool.ts`).
  */
 
 import { open } from 'node:fs/promises'
@@ -34,9 +41,12 @@ import { logger } from '../LoggingService'
 import type { PreviewEmitters } from '../../../shared/ipc/preview-types'
 import type { IPreviewStillFrameCache } from './PreviewStillFrameCache'
 import type { WatchSetResult } from './PreviewWatchCoordinator'
+import type { PreviewWatchStartOptions } from './PreviewWatchPool'
 import { classifyReload, type ReloadDecision } from './PreviewReloadPolicy'
 import type { PreviewWebContentsHandle } from './PreviewSessionFactory'
+import { sharedPreviewLinkScanClient, type PreviewLinkScanner } from './PreviewLinkScanWorkerAdapter'
 import { collectPreviewFrameSources, watchedFrameAssets } from './previewFrameSources'
+import type { HtmlSource } from './previewLinkScanProtocol'
 import { buildCacheBustHref, buildCssSwapScript } from './previewCssSwap'
 
 /** A non-main isolated world for the CSS-swap script (§1.4: page cannot shadow it). */
@@ -61,9 +71,12 @@ export interface PreviewLivePipelineDeps {
   readonly contents: Pick<PreviewWebContentsHandle, 'executeJavaScriptInIsolatedWorld'>
   readonly emit: Pick<PreviewEmitters, 'loadStateChanged'>
   readonly stillFrameCache: Pick<IPreviewStillFrameCache, 'invalidate' | 'markLoaded'>
+  /** The wall clock (`Date.now`): a load's start is compared with file stamps. */
   readonly now: () => number
   /** Reads the page and each frame document; the bounded reader below when absent. */
-  readonly readEntryHtml?: (filePath: string) => Promise<string>
+  readonly readEntryHtml?: (filePath: string) => Promise<HtmlSource>
+  /** Scans each document for its links off the main thread; the shared link scan worker when absent. */
+  readonly linkScanner?: PreviewLinkScanner
   /** The page on screen, asked afresh at every read. */
   readonly currentPage: () => string
   /** The `erfana-preview://` URL a local file is served at. */
@@ -73,8 +86,14 @@ export interface PreviewLivePipelineDeps {
    * inside it; absent, no frame document is read (fail closed, WI-15).
    */
   readonly realRoot?: string
-  /** Replace the view's watch set (its watch coordinator). */
-  readonly setWatchSet: (candidates: readonly string[]) => Promise<WatchSetResult>
+  /**
+   * Replace the view's watch set (its watch coordinator). `options.changedSince`
+   * is when the page's load began, for the watches the call adds.
+   */
+  readonly setWatchSet: (
+    candidates: readonly string[],
+    options: PreviewWatchStartOptions
+  ) => Promise<WatchSetResult>
   /** Feed one changed path to the view's reload policy. */
   readonly recordChange: (path: string) => void
   /** Reload the page. The view decides how a load starts; this module decides when. */
@@ -104,6 +123,8 @@ export interface PreviewPipelineResume {
 export interface PreviewLivePipeline {
   /** A `did-finish-load`: run now, or once at the end of the rate-limit window. */
   schedule(): void
+  /** A load began (`did-start-loading`): a later save may not show (module comment). */
+  loadStarted(): void
   /** Drop the pending trailing run, if there is one. */
   cancel(): void
   /** A watched subresource changed — feed each path to the reload policy. */
@@ -149,20 +170,27 @@ function mergeDecisions(earlier: ReloadDecision | null, later: ReloadDecision): 
 
 /**
  * Read at most `PREVIEW.MAX_ENTRY_HTML_BYTES` of the entry HTML for static-link
- * discovery. Bounding the read bounds the synchronous parse5 parse that follows,
- * so a large or generated entry file cannot freeze the main thread on reload.
+ * discovery, as bytes: the link scan worker decodes and scans them, so the
+ * main thread does neither, and bounding the read bounds that scan too.
+ *
+ * The buffer is sized from the file's length when it is opened (a file that
+ * grows meanwhile is read up to that length; its change event reads it again)
+ * and is its own `ArrayBuffer`, so the bytes MOVE to the worker without a copy.
+ * A file that shrank meanwhile is cut to what was read, and copied on its way.
  */
-async function readEntryHtmlBounded(filePath: string): Promise<string> {
+async function readEntryHtmlBounded(filePath: string): Promise<Uint8Array> {
   const handle = await open(filePath, 'r')
   try {
-    const buffer = Buffer.allocUnsafe(PREVIEW.MAX_ENTRY_HTML_BYTES)
+    const { size } = await handle.stat()
+    // Unpooled: a pooled buffer shares a slab that cannot move to the worker.
+    const buffer = Buffer.allocUnsafeSlow(Math.min(size, PREVIEW.MAX_ENTRY_HTML_BYTES))
     let total = 0
     while (total < buffer.length) {
       const { bytesRead } = await handle.read(buffer, total, buffer.length - total, total)
       if (bytesRead === 0) break
       total += bytesRead
     }
-    return buffer.toString('utf8', 0, total)
+    return buffer.subarray(0, total)
   } finally {
     await handle.close()
   }
@@ -171,6 +199,7 @@ async function readEntryHtmlBounded(filePath: string): Promise<string> {
 /** Create the post-load pipeline for one live view. */
 export function createPreviewLivePipeline(deps: PreviewLivePipelineDeps): PreviewLivePipeline {
   const readEntryHtml = deps.readEntryHtml ?? readEntryHtmlBounded
+  const linkScanner = deps.linkScanner ?? sharedPreviewLinkScanClient()
   let swapVersion = 0
   // Negative-infinity so the FIRST post-load pipeline always clears the rate-limit
   // window and runs immediately; subsequent runs are gated to one per interval.
@@ -189,6 +218,15 @@ export function createPreviewLivePipeline(deps: PreviewLivePipelineDeps): Previe
   let failedPage = false
   let waiting: WaitingWork = { ...NO_WORK }
   let replayTimer: ReturnType<typeof setTimeout> | null = null
+  // When the latest load began (module comment). Built before the view's first
+  // load starts, so that load cannot begin before this.
+  let loadStartedAt = deps.now()
+  // That time as it stood at the last `did-finish-load`: the next run's.
+  let finishedLoadStartedAt = loadStartedAt
+
+  function loadStarted(): void {
+    loadStartedAt = deps.now()
+  }
 
   function reload(ignoreCache: boolean): void {
     if (deps.isTornDown()) {
@@ -198,6 +236,9 @@ export function createPreviewLivePipeline(deps: PreviewLivePipelineDeps): Previe
       waiting.reload = waiting.reload === true || ignoreCache
       return
     }
+    // `did-start-loading` fires only for a page that was idle; this reload
+    // begins now even when the page was still busy.
+    loadStarted()
     deps.reloadPage(ignoreCache)
   }
 
@@ -238,14 +279,16 @@ export function createPreviewLivePipeline(deps: PreviewLivePipelineDeps): Previe
    */
   async function watchPageFiles(
     page: string,
-    html: string,
-    serial: number
+    html: HtmlSource,
+    serial: number,
+    changedSince: number
   ): Promise<WatchSetResult | null> {
     const sources = await collectPreviewFrameSources({
       entryPath: page,
       entryHtml: html,
       readHtml: readEntryHtml,
-      realRoot: deps.realRoot
+      realRoot: deps.realRoot,
+      scanner: linkScanner
     })
     // Another page committed meanwhile (issue #124): its own run sets the watch set.
     if (deps.isTornDown() || deps.currentPage() !== page) {
@@ -254,7 +297,7 @@ export function createPreviewLivePipeline(deps: PreviewLivePipelineDeps): Previe
     const { candidates } = sources
     let result: WatchSetResult
     try {
-      result = await deps.setWatchSet(candidates)
+      result = await deps.setWatchSet(candidates, { changedSince })
     } catch (error) {
       // The page loaded; only auto-refresh is degraded. This used to be an
       // unhandled rejection that left the panel on 'loading' forever (#112).
@@ -288,8 +331,10 @@ export function createPreviewLivePipeline(deps: PreviewLivePipelineDeps): Previe
     // Asked once, so the links resolve against the page that was read.
     const page = deps.currentPage()
     lastRunPage = page
+    // Taken now: a later `did-finish-load` sets it for its own run.
+    const changedSince = finishedLoadStartedAt
 
-    let html: string
+    let html: HtmlSource
     try {
       html = await readEntryHtml(page)
     } catch {
@@ -300,7 +345,7 @@ export function createPreviewLivePipeline(deps: PreviewLivePipelineDeps): Previe
       return
     }
 
-    const result = await watchPageFiles(page, html, serial)
+    const result = await watchPageFiles(page, html, serial, changedSince)
     if (result === null || deps.isTornDown()) {
       return
     }
@@ -331,6 +376,9 @@ export function createPreviewLivePipeline(deps: PreviewLivePipelineDeps): Previe
     }
     // The load finished now, whenever its run gets to `ready`.
     deps.stillFrameCache.markLoaded?.(deps.panelId)
+    // Read here, not when the run starts: a frame starting to load on the idle
+    // page meanwhile fires `did-start-loading` too, later than this page began.
+    finishedLoadStartedAt = loadStartedAt
     if (paused) {
       waiting.run = true
       return
@@ -437,5 +485,15 @@ export function createPreviewLivePipeline(deps: PreviewLivePipelineDeps): Previe
     }
   }
 
-  return { schedule, cancel, onWatchChanged, handleReloadDecision, reload, swap, pause, resume }
+  return {
+    schedule,
+    loadStarted,
+    cancel,
+    onWatchChanged,
+    handleReloadDecision,
+    reload,
+    swap,
+    pause,
+    resume
+  }
 }

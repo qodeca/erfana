@@ -23,6 +23,7 @@ vi.mock('./linkExtract', () => ({
 }))
 
 import { logger } from '../LoggingService'
+import { inProcessLinkScanner } from './__test-helpers__/inProcessLinkScanner'
 import { extractFrameSources, extractStaticLinks } from './linkExtract'
 import type { ConfineFn } from './PreviewWatchCoordinator'
 import { collectPreviewFrameSources } from './previewFrameSources'
@@ -74,7 +75,9 @@ async function collect(entryHtml: string, files: Readonly<Record<string, string>
     entryHtml,
     readHtml,
     realRoot: SITE,
-    confine: insideSite
+    confine: insideSite,
+    // The worker's own scan, in this thread: it calls the mocked extractor.
+    scanner: inProcessLinkScanner
   })
   return { ...sources, reads: readHtml.mock.calls.map(([filePath]) => filePath) }
 }

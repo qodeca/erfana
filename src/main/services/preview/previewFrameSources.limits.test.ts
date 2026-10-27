@@ -17,6 +17,7 @@ vi.mock('../LoggingService', () => ({
 }))
 
 import { logger } from '../LoggingService'
+import { inProcessLinkScanner } from './__test-helpers__/inProcessLinkScanner'
 import { MAX_ATTRIBUTES_PER_TAG } from './htmlElementScan'
 import type { ConfineFn } from './PreviewWatchCoordinator'
 import { collectPreviewFrameSources } from './previewFrameSources'
@@ -48,7 +49,8 @@ async function collect(entryHtml: string, files: Readonly<Record<string, string>
       return html === undefined ? Promise.reject(new Error('ENOENT')) : Promise.resolve(html)
     },
     realRoot: SITE,
-    confine: insideSite
+    confine: insideSite,
+    scanner: inProcessLinkScanner
   })
 }
 
