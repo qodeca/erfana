@@ -81,7 +81,9 @@ export function toastOf(page: Page, type: 'error' | 'info' | 'success' | 'warnin
 export async function dismissAllToasts(page: Page): Promise<void> {
   const dismiss = page.getByTestId('toast-btn-dismiss')
   await expect(async () => {
-    if ((await dismiss.count()) > 0) await dismiss.first().click()
+    // A toast can time out on its own mid-click; an unbounded click would then
+    // wait out the whole budget for a button that is gone. Bound it and re-check.
+    if ((await dismiss.count()) > 0) await dismiss.first().click({ timeout: 1000 }).catch(() => undefined)
     await expect(dismiss).toHaveCount(0, { timeout: 1000 })
   }).toPass({ timeout: PREVIEW_BUDGET_MS })
 }
