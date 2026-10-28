@@ -1,8 +1,0 @@
-[
-  {
-    "id": "leader-context",
-    "script": ".xezar/checks/leader-context.sh",
-    "fixture": "leader-context",
-    "expectedOutputProducer": "leader-context-session-start"
-  }
-]

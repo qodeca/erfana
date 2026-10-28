@@ -2,21 +2,6 @@
   "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "circuit-electron",
-    "xezar",
     "chrome-devtools"
-  ],
-  "hooks": {
-    "SessionStart": [
-      {
-        "matcher": "startup|resume|clear|compact",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR/.xezar/checks/leader-context.sh\"",
-            "timeout": 15
-          }
-        ]
-      }
-    ]
-  }
+  ]
 }

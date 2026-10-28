@@ -279,10 +279,8 @@ export default [
       // then fail `no-undef` on `document`/`window` and break `npm run lint`
       // for reasons unrelated to any change.
       '.e2e-temp/**',
-      // Xezar pipeline: the kit's own scripts (.xezar/), the per-machine skill
-      // installs (.agents/, .claude/skills/xez-*) and local working state (.local/).
-      // None of it is app source.
-      '.xezar/**',
+      // Agent configuration (.agents/, .claude/) and local working state
+      // (.local/). None of it is app source.
       '.agents/**',
       '.claude/**',
       '.local/**',

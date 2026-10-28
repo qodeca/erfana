@@ -20,7 +20,7 @@ This document covers, in order: the research it rests on, the fact audit, the pa
 ### Binding inputs
 
 - Issue #139 body: owner decisions and acceptance criteria (AC-1 … AC-9 below).
-- `.xezar/campaigns/20260925-release-0.21.0/decisions.md`: the owner's interview picks.
+- The release 0.21.0 campaign decisions (no longer in the repository): the owner's interview picks.
 - `CLAUDE.md`: never claim built-in AI (Erfana hosts CLI agents); the context meter is Claude Code-specific; REUSE annotations on new files; the design system (`docs/design-system/`) is the rule of record for anything visual.
 - `TRADEMARKS.md`: "Erfana" and the Erfana logo are Qodeca trademarks; third-party names are used nominatively only.
 - `BACKWARD_COMPATIBILITY.md`: release verification must keep working – the README must not publish key values that drift from `docs/release-pubkey.txt` (`checks.yml` Guard 5 reads `README.md`).
@@ -427,7 +427,7 @@ Changing repository settings is outward-facing. **Decided by the owner (2026-09-
 
 ## UX design
 
-Written to the `xezar-ux-design` authoring questions.
+Written to the UX design skill's authoring questions.
 
 1. **Reader and job.** Someone who followed a link (a post, a search, a colleague) and is deciding in under a minute whether Erfana is worth downloading. They just clicked; next they either download, open the user guide, or leave. A second reader – a contributor – arrives already committed and will scroll or open `CONTRIBUTING.md`.
 2. **First read.** Name and look (banner), what it is (pitch), how to get it (Download), what it does (demo). All on the first screen (AC-1); nothing requires a click or scroll.
@@ -459,7 +459,7 @@ Only decisions that are genuinely the owner's, or that this design cannot settle
 
 1. **Apply the repository metadata** (description, topics, social preview) – **decided** by the owner (2026-09-25): applied only after the README merges, with the values shown to the owner first (see [Repository metadata](#repository-metadata-applied-after-merge)).
 2. **Extend `TRADEMARKS.md` § Logos and brand assets** – **decided** by the owner (2026-09-25): `TRADEMARKS.md` will be extended to name the new banner, wordmark and social image (`docs/assets/readme/banner-*.png`, `social-preview.png`) as Erfana marks that a renamed fork must replace. Done in the build PR (plan step 7).
-3. **A permanent external-link check in CI.** Internal links, anchors and the wording rule are already covered: #138's `scripts/check-links.mjs` (`npm run check:links`) runs in the gate once #138 adds it (`.xezar/checks/repository-checks.sh` runs it whenever the file exists) and its scope reaches `README.md`, which links into `docs/user-guide/`. External URLs and badge fetches are not; a CI job for them would be a new workflow job – a trust-boundary change (`.github/workflows/`) and outside #139's scope. Recommendation: fetch them by hand for this PR (AC-5, AC-6) and file a follow-up issue.
+3. **A permanent external-link check in CI.** Internal links, anchors and the wording rule are already covered: #138's `scripts/check-links.mjs` (`npm run check:links`) runs in the local checks once #138 adds it and its scope reaches `README.md`, which links into `docs/user-guide/`. External URLs and badge fetches are not; a CI job for them would be a new workflow job – a trust-boundary change (`.github/workflows/`) and outside #139's scope. Recommendation: fetch them by hand for this PR (AC-5, AC-6) and file a follow-up issue.
 4. **Recording the light-theme deviation.** The app is dark-only by rule; the banner card renders a light variant because GitHub has a light theme. Recommendation: the card says so in its Exceptions section (`/* deviates: … */` convention); no change to the app rule. Reviewer confirms; owner only if the reviewer disagrees.
 5. **Demo format** – **decided** (owner's pick "A 10–20 second loop (GIF or WebP)"; leader decision 2026-09-25): animated WebP if the step-1 spike shows it plays in Chrome, Safari and Firefox on github.com, otherwise GIF; both produced by #138's `encode.mjs` (R138-9). MP4 via a `user-attachments` upload is not used in the hero (hosted outside the repository, re-uploaded by hand after each recording). This comes back to the owner only if the spike fails for WebP *and* the GIF misses the 5 MiB cap.
 
@@ -515,7 +515,7 @@ Ordered; each step lists its files and its verification. Evidence (screenshots, 
 
 **Step 9 – Rendered QA on github.com.** Push the branch; open the README on github.com with the Chrome DevTools tools at 1440×900, emulating `prefers-color-scheme: light` and `dark` (logged-out GitHub follows the system theme), and additionally at 1280×800, at 375 px, with `prefers-reduced-motion: reduce`, and in the dark-dimmed theme if a logged-in session is available. Measure the [first-screen rule](#first-screen-budget-ac-1) with `getBoundingClientRect()`: the pass measurement on the unscrolled README file view (banner, pitch and Download fully visible; demo top ≤ 700 px from the viewport top), and the recorded one on the home page scrolled to the article top; also read the height of GitHub's chrome above the article and of the `<h1>` rule. The PR states that the unscrolled home page shows the file list first. *Verify*: screenshots of light and dark at 1440×900 (AC-1, AC-2) downscaled and committed under `docs/designs/readme/qa/` so the design review can see them (they contain only public GitHub content); the rest in the evidence directory. Update this document's "Design review" section with the reviewer's verdict link.
 
-**Step 10 – Gates and handoff.** The workflow's gate step runs `.xezar/checks/repo-gates.sh --fast`; CI's seven required checks (AC-9). The PR description carries: the measured sizes and duration, the fact-audit checklist, the proposed repository metadata marked **applied after merge, values shown to the owner first**, the open decisions, and the statement that design approval is by a reviewer agent on a different model, not the owner. Labels: `needs-design`, `needs-qa`.
+**Step 10 – Gates and handoff.** The workflow's gate step runs the local checks (SDLC.md § The checks); CI's seven required checks (AC-9). The PR description carries: the measured sizes and duration, the fact-audit checklist, the proposed repository metadata marked **applied after merge, values shown to the owner first**, the open decisions, and the statement that design approval is by a reviewer agent on a different model, not the owner. Labels: `needs-design`, `needs-qa`.
 
 ### Files
 

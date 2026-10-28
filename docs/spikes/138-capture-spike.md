@@ -231,7 +231,7 @@ subscription token – including whether it shows the account email or organisat
 Neither `/status` nor any login type other than "token variable present" was observed.
 
 **Found by accident: the sandbox must not sit inside a repository.** With the sandbox under
-`.local/xezar/scratch/` in the Erfana checkout, the trust screen said "This folder pre-approves 22
+a `.local/` scratch folder in the Erfana checkout, the trust screen said "This folder pre-approves 22
 tool permissions in .claude/settings.local.json" and listed the repository's own `mcp__…`
 permissions. Claude Code walks up from the working folder and loaded the checkout's
 `.claude/settings.local.json`. From `/tmp` and `/Users/Shared` the warning did not appear.

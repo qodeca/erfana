@@ -10,40 +10,23 @@ The project rules are in [CLAUDE.md](CLAUDE.md) - read it first. It holds the de
 rules; the renderer rules (panel ids, path handling, autosave) are in
 [src/renderer/CLAUDE.md](src/renderer/CLAUDE.md). Both win over anything below.
 
-## The gate
+## The checks
 
-Run the whole gate from the repository root before you hand work back:
+Run these from the repository root before you hand work back:
 
 ```bash
-.xezar/checks/repo-gates.sh
+npm run lint:check && npm run lint:css && npm run design -- --check && npm run typecheck && npm run test:cov && npm run check:headers && npm run check:links && npx electron-vite build
 ```
 
-It reports these steps in canonical order:
-
-1. npm ci
-2. .xezar/checks/security-scan.sh
-3. npm run lint:check
-4. npm run lint:css
-5. npm run design -- --check
-6. npm run typecheck
-7. npm run test:cov
-8. npx electron-vite build
-9. npm run check:headers
-10. .xezar/checks/repository-checks.sh
-
 `npm run test:cov` runs every unit test in the main, main-perf, preload and renderer projects once and checks
-every coverage floor, so the gate has no separate `npm run test:ci` step (#170). CI still runs
+every coverage floor, so there is no separate `npm run test:ci` step (#170). CI still runs
 `test:ci` as the required `Unit tests` check.
 
 The GitHub checks that gate a pull request are `Lint`, `Typecheck`, `Unit tests`, `Build`,
 `Coverage`, `License compliance` (`.github/workflows/checks.yml`) and `Secret scan`
 (`.github/workflows/secret-scan.yml`). CI also runs `reuse lint` and gitleaks over every ref, which the
-local gate does not. CI runs e2e only as the advisory `E2E (Linux, xvfb)` job, not a required check: for Electron-specific
+local checks do not. CI runs e2e only as the advisory `E2E (Linux, xvfb)` job, not a required check: for Electron-specific
 changes run `npm run test:e2e` locally.
-
-The application gates run in two lanes by default (`validation.applicationLanes` in
-`.xezar/pipeline/config.json`); `GATE_APPLICATION_LANES` overrides the schedule. The security
-scan finishes before they start, and the repository checks run after all lanes finish.
 
 `npm run lint:check` reports lint errors without edits. `npm run lint` runs ESLint with `--fix`:
 commit what it changes. Install with `npm ci`, never
@@ -54,8 +37,8 @@ commit what it changes. Install with `npm ci`, never
 - Code: `src/main/` (main process), `src/preload/`, `src/renderer/` (React UI), `src/shared/` (IPC schemas).
 - Tests: `*.test.ts(x)` beside the code (Vitest); e2e in `e2e/` (Playwright with Electron).
 - Documents: `docs/`, by subject; the index is `docs/README.md`. Specs: `specs/` (`specs/registry.json`).
-- The design system: `docs/design-system/` (open `index.html`; the contract is its `README.md`). Feature designs: `docs/designs/<functionality>/`. Both are HTML, CSS and images only. Where the kit design skills disagree with this, follow SDLC.md § Design system in this project.
-- The pipeline: `.xezar/` (workflows, checks, role skills, routing). `SDLC.md` says how work moves.
+- The design system: `docs/design-system/` (open `index.html`; the contract is its `README.md`). Feature designs: `docs/designs/<functionality>/`. Both are HTML, CSS and images only; how agents use them is in SDLC.md § Design system in this project.
+- The process: `SDLC.md` says how work moves; `CODE_REVIEW.md` says what a review checks.
 
 ## Changing a mechanism that already works
 
@@ -67,13 +50,7 @@ one pass. The failure this prevents is the one nobody catches: the new mechanism
 tests are green, the spec is thorough, and the default path quietly lost a guarantee nobody had
 written down.
 
-## Get the skills
+## Stopping processes
 
-The `xez-*` skills are installed per machine and never committed:
-
-```bash
-DISABLE_TELEMETRY=1 npx -y skills add qodeca/xezar-skills --skill '*' --agent claude-code --agent codex --yes
-```
-
-Both `--agent` values matter: together they put the files in `.agents/skills/` with links in
-`.claude/skills/`.
+Never stop a process by command-line pattern (`pkill -f`): it matches every peer agent on this
+machine. Stop only a PID you started.

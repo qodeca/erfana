@@ -12,8 +12,8 @@
  * also refuses wording that claims Erfana has built-in AI (see WORDING_RULES).
  * External URLs are never fetched: the check makes no network calls.
  *
- * This is a trust boundary: it reads contributor-controlled Markdown, and the
- * local gate runs it (`.xezar/checks/repository-checks.sh`). Each threat and
+ * This is a trust boundary: it reads contributor-controlled Markdown, and
+ * `npm run check:links` runs it before a push. Each threat and
  * what bounds it (spec docs/features/138-user-guide.md § 3.4):
  *
  * - Symlink escaping the repository: the file list comes from `git ls-files`,

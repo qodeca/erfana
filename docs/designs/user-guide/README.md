@@ -6,8 +6,8 @@ SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 # Illustrated user guide with automated screenshots (#138)
 
 Status: **proposed** – round 1 of the design review (a reviewer agent on a different model) is
-addressed, waiting for re-review (the owner waived owner approval for this issue; see
-[decisions](../../../.xezar/campaigns/20260925-release-0.21.0/decisions.md)).
+addressed, waiting for re-review (the owner waived owner approval for this issue; the record was in
+the release 0.21.0 campaign decisions, which left the repository with the agent pipeline).
 
 Companion documents:
 
@@ -601,8 +601,7 @@ leader decided them that way (2026-09-25).
    changes. The alternative kept the full tables in `docs/keyboard-shortcuts.md` and duplicated
    them in the guide; two tables drift.
 2. **Link check in CI.** **Decided: local gate now, CI step as a follow-up issue.** The new
-   `scripts/check-links.mjs` runs in the local gate automatically
-   (`.xezar/checks/repository-checks.sh` already calls it if it exists). Adding it as a step in the
+   `scripts/check-links.mjs` runs in the local checks (`npm run check:links`). Adding it as a step in the
    required `Lint` job needs a change to `.github/workflows/checks.yml`, a trust boundary that goes
    to security review and does not ride along in a docs PR. The build PR files the follow-up issue.
 3. **Pixel density.** **Decided: 2×**, within the 12 MB budget. If the spike measures more than
