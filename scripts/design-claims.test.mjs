@@ -602,6 +602,7 @@ describe('bakePage', () => {
   const claims = { 'n-files': 7, 'a-ratio': 4.4951 }
   const regions = {
     ok: () => '<li>one</li>',
+    lines: () => '<li>one</li>\n<li>two</li>',
     broken: () => {
       throw new DesignError('the source moved')
     }
@@ -658,6 +659,14 @@ describe('bakePage', () => {
     const { text, targets } = await bakePage('x.html', stale, { claims, ledger, tokens, regions })
     expect(text).toContain(`content="${CSP_CONTENT}"`)
     expect(targets.find(t => t.kind === 'csp content').stale).toBe(`content="script-src 'none'"`)
+  })
+
+  it('writes a multi-line region with the page line ending, so a CRLF checkout is not stale', async () => {
+    const crlf = PAGE('<ul data-generated="lines"></ul>').replace(/\r?\n/g, '\r\n')
+    const { text } = await bakePage('x.html', crlf, { claims, ledger, tokens, regions })
+    expect(text).toContain('<ul data-generated="lines"><li>one</li>\r\n<li>two</li></ul>')
+    const again = await bakePage('x.html', text, { claims, ledger, tokens, regions })
+    expect(again.targets.filter(t => t.stale !== t.fresh)).toEqual([])
   })
 
   it('is idempotent: a baked page bakes to itself', async () => {

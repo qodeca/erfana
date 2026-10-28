@@ -1045,7 +1045,9 @@ export async function bakePage(file, text, { claims, ledger, tokens, regions = G
         continue
       }
       try {
-        inner = regions[id]()
+        // A region spans lines: write them with the page's own line ending, so a
+        // CRLF checkout (Windows) does not read as stale.
+        inner = regions[id]().replace(/\r?\n/g, text.includes('\r\n') ? '\r\n' : '\n')
       } catch (error) {
         problems.push(`${where} data-generated="${id}": ${error.message}`)
         continue
