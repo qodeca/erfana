@@ -135,6 +135,15 @@ This is the canonical cookbook for `release.yml` failures. Each row below is a r
 - **Platform:** macOS
 - **First seen:** run 39144882739 (v0.21.0 pre-release dry-run, 2026-10-18)
 
+### Row 14: `electron-vite build` runs out of JavaScript heap
+
+- **Regex:** `Ineffective mark-compacts near heap limit Allocation failed - JavaScript heap out of memory`
+- **Human-readable symptom:** A build leg fails in "Bundle sources (electron-vite)" with a V8 `FATAL ERROR` ending in `JavaScript heap out of memory`, then `Abort trap: 6` and `Process completed with exit code 134`. Nothing was signed or notarized yet; the other leg can still pass.
+- **Root cause:** The renderer bundle (about 12 MB in v0.23.0) needs more than Node's default heap on a hosted runner, which is sized from the runner's memory. The same commit can pass on one run and fail on the next, because a bare `node-version: 24` resolves to whichever patch the runner image caches. Reproduced locally: `NODE_OPTIONS=--max-old-space-size=2048 npx electron-vite build` exits 134, 3072 and 4096 exit 0.
+- **Fix:** The bundle step in `build_mac.yml` and `build_win.yml` sets `NODE_OPTIONS: --max-old-space-size=4096`, and both legs pin an exact Node patch. If it returns, raise the heap further (the macOS arm64 runner has 7 GB) and look at why the bundle grew. The tag is burned: bump the patch.
+- **Platform:** macOS (the Windows leg uses the same step)
+- **First seen:** run 40669617826 (v0.23.0 tag run, 2026-10-28)
+
 ## Operator-side failures (not `release.yml`)
 
 These happen on the operator's machine or against the REST API, so no CI log carries them and the analyzer never matches them. They are kept here because they stop a release just as hard.
