@@ -98,7 +98,7 @@ describe('commentPanelStatus', () => {
     expect(s.status.isNotVisible(OTHER, fixedId('c-', 99))).toBe(false)
   })
 
-  it('maps instrumentation\'s reasons to the renderer\'s names, and an unknown one to none', async () => {
+  it('M-069 maps instrumentation\'s reasons to the renderer\'s names, and an unknown one to none', async () => {
     const s = await setup({ reasons: { [PAGE]: 'too-many-elements', [OTHER]: 'collision', '/p/x.html': 'novel' } })
     expect(s.status.reasonFor(PAGE)).toBe('page-too-large')
     expect(s.status.reasonFor(OTHER)).toBe('prepare-failed')
