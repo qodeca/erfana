@@ -60,7 +60,7 @@ export const SCOPE_FILES = [
   'docs/features/README.md'
 ]
 const GUIDE_DIR = 'docs/user-guide/'
-const DESIGN_DIR = 'docs/designs/138-user-guide/'
+const DESIGN_DIR = 'docs/designs/user-guide/'
 
 /**
  * Phrases that claim Erfana itself is, or contains, an AI. Erfana hosts CLI

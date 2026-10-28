@@ -36,7 +36,7 @@
  * - Restart pending uses `aria-disabled` + an early-return handler, NEVER the
  *   `disabled` attribute (Chromium blurs a control the moment it is disabled).
  *
- * @see docs/designs/design-issue-60.md §2.3, §2.7
+ * @see docs/designs/large-projects/design-issue-60.md §2.3, §2.7
  * @module components/RootErrorBoundary/RootErrorFallback
  */
 

@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Splice plans: add, edit and delete one block so that every other byte of
- * the file stays identical (docs/designs/html-preview-comments.md decision 24,
+ * the file stays identical (docs/designs/comments/html-preview-comments.md decision 24,
  * §5.2, §7.6 steps 6–8, §19 R3-8).
  *
  * A plan is `{start, end, insert}` on the decoded text; applying it is

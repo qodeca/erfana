@@ -174,7 +174,7 @@ export function PreviewBandConfirm({
         rather than a prediction about whether it will load. Erfana deliberately
         never predicts that: measured in Electron 39 an http subresource is NOT
         refused as mixed content here, because the preview document sits at an
-        opaque origin — see docs/designs/108-http-and-ipv6-in-the-preview.md. So
+        opaque origin — see docs/designs/html-preview/108-http-and-ipv6-in-the-preview.md. So
         the honest warning is not "this may not work", it is what plaintext
         actually costs.
       */}

@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * The frames of one view and the states they are sent
- * (docs/designs/html-preview-comments.md §4.2, §6 "Frames", §7.1 step 2, §8,
+ * (docs/designs/comments/html-preview-comments.md §4.2, §6 "Frames", §7.1 step 2, §8,
  * §19 R3-3, R3-4, R3-13; M-050, M-059, M-064, SEC-09, SEC-19).
  */
 import { describe, expect, it, vi } from 'vitest'

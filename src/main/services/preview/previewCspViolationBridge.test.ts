@@ -256,7 +256,7 @@ describe('previewCspViolationBridge', () => {
      * The old comment also assumed the http resource "still would not load".
      * Measured in Electron 39, it does: the preview document sits at an opaque
      * origin, so mixed-content restriction never applies. See
-     * docs/designs/108-http-and-ipv6-in-the-preview.md.
+     * docs/designs/html-preview/108-http-and-ipv6-in-the-preview.md.
      */
     it('offers an http origin for approval, because approving it now works', () => {
       const { bridge, onBlockedHost } = makeBridge()

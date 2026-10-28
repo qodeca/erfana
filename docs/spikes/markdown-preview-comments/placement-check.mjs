@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Spike for docs/designs/markdown-preview-comments.md §5.4: where can an
+ * Spike for docs/designs/comments/markdown-preview-comments.md §5.4: where can an
  * `erfana:comment` block go in a Markdown file without changing how it renders?
  *
  * Renders each case before and after inserting a block, with the preview's own

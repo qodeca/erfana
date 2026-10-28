@@ -19,7 +19,7 @@
  *  - bounded growth: {@link forget} drops a retired PTY's entry, an expired entry
  *    is swept on read, and a size cap backstops a pathological pid leak.
  *
- * @see docs/designs/216-claude-status-bar.md §4, §10
+ * @see docs/designs/context-meter/216-claude-status-bar.md §4, §10
  */
 import type { ClaudeDetection, IClaudeProcessDetector } from './types'
 import type { ExecLike } from './exec'

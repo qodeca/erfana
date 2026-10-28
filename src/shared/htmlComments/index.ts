@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * HTML Preview comments – the format core (docs/designs/html-preview-comments.md
+ * HTML Preview comments – the format core (docs/designs/comments/html-preview-comments.md
  * §4.2 "Shared"; public spec docs/html-comments/format-v1.md).
  *
  * Pure code: no Electron, no file system; parse5, zod and @noble/hashes only.

@@ -7,7 +7,7 @@
  * Using constants eliminates typos and enables refactoring.
  *
  * @see Issue #203 - Central text-clipboard service
- * @see docs/designs/issue-203-clipboard-service.md
+ * @see docs/designs/clipboard/issue-203-clipboard-service.md
  */
 
 /**

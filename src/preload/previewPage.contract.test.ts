@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Source-level contract for the preview-page preload (sd-074b §5.1; HTML
- * Preview comments, docs/designs/html-preview-comments.md §9.2, SEC-01, SEC-02;
+ * Preview comments, docs/designs/comments/html-preview-comments.md §9.2, SEC-01, SEC-02;
  * docs/adrs/0005-sub-frame-preload-one-receive-channel.md).
  *
  * This preload runs inside the sealed page's process, so what it does NOT do is

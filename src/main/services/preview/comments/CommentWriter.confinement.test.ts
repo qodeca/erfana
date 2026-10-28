@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Where a comment may be written (docs/designs/html-preview-comments.md §7.6
+ * Where a comment may be written (docs/designs/comments/html-preview-comments.md §7.6
  * step 1, decision 35, threats S8, S11, S12; M-009, M-010, M-063, SEC-10;
  * security review F1, F7 and its path-form gaps).
  * Every refusal leaves every byte of every file involved unchanged.

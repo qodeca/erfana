@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * The parse half of a pick: a draft, and a pin's damaged blocks, worked out
- * from a fresh parse of the file (docs/designs/html-preview-comments.md §6,
+ * from a fresh parse of the file (docs/designs/comments/html-preview-comments.md §6,
  * §7.3 step 3, decisions 16–17, 34, §19 R3-8, R3-11, R3-12; tests M-033,
  * M-054, M-055).
  *

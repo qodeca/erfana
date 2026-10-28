@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * HTML Preview comments – IPC channel names
- * (docs/designs/html-preview-comments.md §8).
+ * (docs/designs/comments/html-preview-comments.md §8).
  *
  * Two families:
  *

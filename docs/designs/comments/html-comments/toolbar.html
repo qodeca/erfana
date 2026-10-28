@@ -1,0 +1,298 @@
+<!-- @card group="HTML preview" name="Comment tools in the toolbar" subtitle="Comment mode, the comments list and pins on or off – every state, the unavailable reasons, and the re-measured narrow tiers" status="decided" reviewed="2026-10-26" -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Erfana — comment tools in the toolbar</title>
+<link rel="stylesheet" href="../../../design-system/tokens.css">
+<link rel="stylesheet" href="../../../design-system/ds.css">
+<link rel="stylesheet" href="../../../design-system/system/components/permission-band/band.css">
+<link rel="stylesheet" href="../../../design-system/system/components/permission-band/nav.css">
+<link rel="stylesheet" href="./demo.css">
+<link rel="stylesheet" href="./overlay.css">
+<link rel="stylesheet" href="./comments.css">
+<script src="./demo.js"></script>
+<style>
+  .full-panel { inline-size: 820px; block-size: 240px; }
+  .tip { display: block; margin-top: var(--space-3); max-inline-size: 300px; padding: var(--space-2) var(--space-4);
+         background: var(--color-bg-tertiary); border: var(--border-width) solid var(--color-border-subtle);
+         font-size: var(--text-sm); color: var(--color-text-primary); }
+  .widths { display: flex; flex-direction: column; gap: var(--space-8); margin-bottom: var(--space-12); }
+  .width-demo { border: var(--border-width) dashed var(--color-border-subtle); }
+  .readout .over { color: var(--color-error); }
+  select { background: var(--color-bg-input); color: var(--color-text-primary);
+           border: var(--border-width) solid var(--color-border-input); font: var(--text-base) var(--font-sans);
+           block-size: var(--input-height-sm); }
+  select:focus-visible { outline: var(--border-width-thick) solid var(--color-border-focus); outline-offset: var(--space-1); }
+</style>
+</head>
+<body>
+
+<h1>Comment tools in the toolbar</h1>
+<p class="ds-lede">
+  Three tools join the preview band after Find, because they act on this page:
+  <strong>Comment mode</strong>, the <strong>Comments</strong> list and <strong>Show comment icons</strong>.
+</p>
+
+<div class="ds-note">
+  <strong>Built from the decided Permission band card.</strong> Same 32 × 28 tools, same inset ring, same
+  <code>aria-disabled</code> rule (the dim goes on the icon, never the button), and the link toggle's pressed
+  signature – a fill plus a 2px lime edge along the bottom – for every “on”: Comment mode pressed, the drawer
+  open, icons shown. A shape appears, so a state is never colour alone (SC 1.4.1). The icons are the registry's
+  lucide <code>message-square-plus</code>, <code>messages-square</code> and
+  <code>message-square</code> / <code>message-square-off</code> (plan §3). Proposed: the plan files these
+  cards as proposed (§10.11), and the narrow tiers below need re-measuring in <code>nav.css</code> before P6
+  ships.
+</div>
+
+<h2>The row</h2>
+<div class="ds-note">
+  <strong>Try it.</strong> Click Comment mode, or put focus anywhere on this card and press
+  <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>M</kbd> (<kbd>Cmd</kbd>+<kbd>Option</kbd>+<kbd>M</kbd> on macOS) – matched on
+  the <em>typed</em> key <code>m</code>, never the physical key, because AltGr+M types µ on a German layout. The
+  page gets its frame and tab, and the band's live region speaks. The accessible name of the toggle never
+  changes; its state is <code>aria-pressed</code>. <kbd>Esc</kbd> with focus in the page leaves the mode – it is
+  the second step of the existing Escape order: an open window first, then comment mode, then “return to chip”.
+</div>
+
+<div class="panel full-panel"><div id="band"></div><div class="panel__body"><div class="page-area" id="area"><div class="page">
+  <h4>Pricing</h4><p>Start free, then pay for what you use.</p>
+  <button class="cta" id="buy" type="button" tabindex="-1">Start free trial</button>
+</div></div></div></div>
+<div class="announce-view" id="region" aria-live="polite"></div>
+
+<h2>Every state</h2>
+<div class="gallery" id="states"></div>
+
+<h2>Unavailable</h2>
+<div class="ds-note">
+  When a page cannot take comments, Comment mode is <code>aria-disabled</code> – it keeps focus and its tooltip,
+  and the tooltip says why. The list and the pins tool stay usable when the file's comments can still be read
+  (a link, a conflicted file – read-only, but readable); they take the same state when nothing can be read.
+  Pick a reason:
+  <br><br>
+  <label>Reason <select id="reason"></select></label>
+</div>
+<div id="unavailable"></div>
+
+<h2>Narrow panels: re-measured with the new tools</h2>
+<div class="ds-note">
+  The band never wraps and never changes height; it steps down by container query (decided Permission band
+  card). <strong>Three more tools make every tier wider</strong>, so the thresholds in <code>nav.css</code> –
+  read below by probing the shipping stylesheet, not typed – no longer match what each row needs.
+  <strong>The comment tools give way before Find.</strong> A new <em>narrow</em> tier sits between compact and
+  minimal: there <strong>Show comment icons leaves the row</strong> – it stays reachable from the drawer's
+  checkbox – and Export to PDF with it (Cmd/Ctrl+S still exports), while <strong>Find stays</strong>. The
+  narrow row fits the editor area's 400px minimum, so Find is on the row at every width the editor can have;
+  it leaves only in the minimal tier, below that. Comment mode and the list stay in every tier: Comment mode
+  has a shortcut but is the feature's front door, and the list is the keyboard route to every thread (it has
+  no shortcut; Find has Cmd/Ctrl+F).
+  <div class="readout" id="tierNeeds"></div>
+</div>
+<div class="widths">
+  <div class="width-demo" data-width="640"></div>
+  <div class="width-demo" data-width="460"></div>
+  <div class="width-demo" data-width="400"></div>
+  <div class="width-demo" data-width="340"></div>
+  <div class="width-demo" data-width="260"></div>
+  <label>Any width – drag it through the tiers <input type="range" id="free" min="160" max="760" value="420"></label>
+  <div class="width-demo" id="freeDemo" data-width="420"></div>
+</div>
+
+<h2>Exceptions</h2>
+<table>
+  <thead><tr><th>Where</th><th>The band card</th><th>The comment tools, and why</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>Comments list width</td>
+      <td>Tools are 32 × 28.</td>
+      <td>The list tool is as wide as its count needs (32px minimum), because the count is the information.</td>
+    </tr>
+    <tr>
+      <td>Group gap</td>
+      <td>The link toggle carries an 8px gap after it.</td>
+      <td>The three comment tools reuse the toggle class but not its trailing gap: one 8px gap before the group,
+        the band's own 2px inside it (<code>erf-band__tool--comment</code>).</td>
+    </tr>
+    <tr>
+      <td>Narrow tier (new)</td>
+      <td>Three tiers: full, compact, minimal – Find and Export to PDF leave together in minimal.</td>
+      <td>A fourth tier between compact and minimal: Show comment icons and Export to PDF leave, Find stays, so
+        the comment tools give way before Find and Find is on the row at the editor area's 400px minimum. Find
+        leaves in minimal only. Matched by accessible name, as the band already matches Find.</td>
+    </tr>
+  </tbody>
+</table>
+
+<script>
+const H = window.HPC;
+const I = H.icon;
+const mac = /Mac/.test(navigator.platform);
+const KEY = mac ? 'Cmd+Option+M' : 'Ctrl+Alt+M';
+
+const TIP = {
+  off: `Comment mode (${KEY}) – off`,
+  on: `Comment mode (${KEY}) – on: click an element to comment, Esc to leave`,
+  notReady: 'Comment mode – available once the page has loaded',
+  pinsOn: 'Show comment icons – on',
+  pinsOff: 'Show comment icons – off: icons hidden on this page'
+};
+const REASONS = ['file too large', 'not a UTF-8 file', 'file is a link', 'inline frame (srcdoc)', 'unresolved git conflict',
+  'the page keeps removing Erfana\'s overlay', 'couldn\'t prepare the page', 'page too large'];
+
+function tools(s) {
+  const mode = `<button class="erf-band__tool erf-band__tool--toggle erf-band__tool--comment erf-band__tool--comment-first" type="button"
+      aria-label="Comment mode" aria-pressed="${s.mode ? 'true' : 'false'}" aria-keyshortcuts="${mac ? 'Meta+Alt+M' : 'Control+Alt+M'}"
+      ${s.modeDisabled ? 'aria-disabled="true"' : ''} title="${H.esc(s.modeTip || (s.mode ? TIP.on : TIP.off))}" data-mode>${I('message-square-plus')}</button>`;
+  const name = s.open === 0 ? 'Comments, none yet' : `Comments, ${s.open} open${s.attention ? `, ${s.attention} need attention` : ''}`;
+  const count = s.open === 0 ? '' : `<span>${s.open}</span>${s.attention ? `<span class="erf-band__tool-attention">· !${s.attention}</span>` : ''}`;
+  const list = `<button class="erf-band__tool erf-band__tool--toggle erf-band__tool--comment erf-band__tool--count" type="button"
+      aria-label="${name}" aria-expanded="${s.drawer ? 'true' : 'false'}" aria-controls="drawer" title="${name}"
+      ${s.listDisabled ? `aria-disabled="true"` : ''} data-list>${I('messages-square')}${count}</button>`;
+  const pins = `<button class="erf-band__tool erf-band__tool--toggle erf-band__tool--comment" type="button"
+      aria-label="Show comment icons" aria-pressed="${s.pins ? 'true' : 'false'}" title="${s.pins ? TIP.pinsOn : TIP.pinsOff}"
+      ${s.listDisabled ? 'aria-disabled="true"' : ''} data-pins>${I(s.pins ? 'message-square' : 'message-square-off')}</button>`;
+  return mode + list + pins;
+}
+
+function band(s, label = 'Preview') {
+  return `<div class="erf-band"><div class="erf-band__bar" role="toolbar" aria-label="${label}">
+    <button class="erf-band__tool" type="button" aria-label="Back" aria-disabled="true" title="Back (Ctrl+[) – no earlier page in this tab">${I('back')}</button>
+    <button class="erf-band__tool erf-band__tool--toggle" type="button" aria-label="Open links in this tab" aria-pressed="false" title="Open links in this tab – off: links open a new tab">${I('links')}</button>
+    <button class="erf-band__tool" type="button" aria-label="Find" title="Find (Cmd/Ctrl+F)">${I('find')}</button>
+    ${tools(s)}
+    <span class="erf-band__spacer"></span>
+    <button class="erf-band__chip" type="button" aria-expanded="false" aria-label="12 blocked · 34 allowed. Remote hosts in this preview. Press Escape in the previewed page to return here.">
+      <span>12 blocked<span class="erf-band__chip-allowed"> · 34 allowed</span></span><span class="erf-band__chip-caret" aria-hidden="true">▸</span></button>
+    <span class="erf-band__separator" aria-hidden="true"></span>
+    <button class="erf-band__tool" type="button" aria-label="Open in default browser" title="Open in default browser">${I('browser')}</button>
+    <button class="erf-band__tool" type="button" aria-label="Export to PDF" title="Export to PDF">${I('pdf')}</button>
+  </div><div class="erf-band__announce" aria-live="polite"></div></div>`;
+}
+
+/* ---------- live ---------- */
+const S = { mode: false, open: 3, attention: 1, drawer: false, pins: true };
+const host = document.getElementById('band');
+const area = document.getElementById('area');
+const region = document.getElementById('region');
+function renderLive(focus) {
+  host.innerHTML = band(S);
+  H.drawMode(area, S.mode, false);
+  area.style.cursor = S.mode ? 'crosshair' : '';
+  H.drawPins(area, S.pins ? [{ box: H.boxIn(area, area.querySelector('#buy')), count: 3, name: '3 comments on button.cta. Open.' }] : []);
+  host.querySelector('[data-mode]').addEventListener('click', toggleMode);
+  host.querySelector('[data-list]').addEventListener('click', () => { S.drawer = !S.drawer; renderLive('[data-list]'); });
+  host.querySelector('[data-pins]').addEventListener('click', () => { S.pins = !S.pins; renderLive('[data-pins]'); });
+  if (focus) host.querySelector(focus).focus();
+}
+function toggleMode() {
+  S.mode = !S.mode;
+  renderLive('[data-mode]');
+  H.announce(region, S.mode ? 'Comment mode on. Click an element, or press Tab to pick one. Esc to leave.' : 'Comment mode off.');
+}
+document.addEventListener('keydown', (e) => {
+  const mods = mac ? e.metaKey && e.altKey : e.ctrlKey && e.altKey;
+  if (mods && e.key.toLowerCase() === 'm') { e.preventDefault(); toggleMode(); }
+});
+renderLive();
+
+/* ---------- states ---------- */
+function state(caption, s, tip) {
+  const fig = document.createElement('figure');
+  fig.className = 'state';
+  fig.innerHTML = `<figcaption>${caption}</figcaption><div class="erf-band" style="inline-size: 400px"><div class="erf-band__bar">${tools(s)}</div></div>` +
+    `<span class="tip">title: ${H.esc(tip)}</span>`;
+  document.getElementById('states').appendChild(fig);
+}
+state('<strong>mode off</strong>', { mode: false, open: 3, pins: true }, TIP.off);
+state('<strong>mode on</strong> – pressed: fill + lime edge', { mode: true, open: 3, pins: true }, TIP.on);
+state('<strong>page not loaded yet</strong> – aria-disabled, keeps focus', { modeDisabled: true, modeTip: TIP.notReady, open: 0, pins: true }, TIP.notReady);
+state('<strong>remote page</strong> – not commentable; aria-disabled · <span class="not-in-plan">tooltip not in §10.10</span>', { modeDisabled: true, modeTip: 'Comments are unavailable for this page: couldn\'t prepare the page', open: 0, pins: true, listDisabled: true }, 'Comments are unavailable for this page: couldn\'t prepare the page');
+state('<strong>list: none yet</strong> – icon only', { open: 0, pins: true }, 'Comments, none yet');
+state('<strong>list: 3 open</strong>', { open: 3, pins: true }, 'Comments, 3 open');
+state('<strong>list: 3 open, 1 needs attention</strong> – · !1', { open: 3, attention: 1, pins: true }, 'Comments, 3 open, 1 need attention');
+state('<strong>list: drawer open</strong> – aria-expanded, pressed look', { open: 3, drawer: true, pins: true }, 'Comments, 3 open');
+state('<strong>icons on</strong> – default for every tab, not saved', { open: 3, pins: true }, TIP.pinsOn);
+state('<strong>icons off</strong> – icon swaps and the edge goes', { open: 3, pins: false }, TIP.pinsOff);
+
+/* ---------- unavailable ---------- */
+const sel = document.getElementById('reason');
+for (const r of REASONS) sel.add(new Option(r, r));
+function renderUnavailable() {
+  const r = sel.value;
+  const readable = r === 'file is a link' || r === 'unresolved git conflict';
+  const tip = `Comments are unavailable for this page: ${r}`;
+  document.getElementById('unavailable').innerHTML =
+    `<figure class="state"><figcaption>${readable ? 'comments can still be read: list and icons stay' : 'nothing can be read: all three are aria-disabled'}${r === 'page too large' ? ' · <span class="not-in-plan">reason from §19 R3-13, not in §10.10</span>' : ''}</figcaption>
+     <div class="erf-band" style="inline-size: 400px"><div class="erf-band__bar">${tools({ modeDisabled: true, modeTip: tip, open: readable ? 2 : 0, pins: true, listDisabled: !readable })}</div></div>
+     <span class="tip">title: ${H.esc(tip)}</span></figure>`;
+}
+sel.addEventListener('change', renderUnavailable);
+renderUnavailable();
+
+/* ---------- tiers ---------- */
+function rowNeeds(bar) {
+  const style = getComputedStyle(bar);
+  const gap = parseFloat(style.columnGap) || 0;
+  const kids = [...bar.children].filter((n) => getComputedStyle(n).display !== 'none' && !n.classList.contains('erf-band__announce'));
+  let total = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight) + gap * (kids.length - 1);
+  for (const n of kids) {
+    if (n.classList.contains('erf-band__spacer')) continue;
+    const b = getComputedStyle(n);
+    total += n.getBoundingClientRect().width + parseFloat(b.marginLeft) + parseFloat(b.marginRight);
+  }
+  return Math.ceil(total);
+}
+function tierOf(b) {
+  const hidden = (sel) => getComputedStyle(b.querySelector(sel)).display === 'none';
+  if (hidden(".erf-band__tool[aria-label='Find']")) return 'minimal';
+  if (hidden(".erf-band__tool[aria-label='Show comment icons']")) return 'narrow';
+  return hidden('.erf-band__chip-allowed') ? 'compact' : 'full';
+}
+/* Where nav.css switches tier, found by probing a band at every width – so the card
+   reports the shipping thresholds without anyone typing them. */
+function probeThresholds() {
+  const probe = document.createElement('div');
+  probe.style.cssText = 'position:absolute; visibility:hidden; inset-inline-start:0; inset-block-start:0';
+  probe.innerHTML = band({ open: 12, attention: 1, pins: true });
+  document.body.appendChild(probe);
+  const found = {};
+  let last = null;
+  for (let w = 800; w >= 150; w -= 1) {
+    probe.style.inlineSize = `${w}px`;
+    const t = tierOf(probe);
+    if (last && t !== last) found[t] = w + 1;
+    last = t;
+  }
+  probe.remove();
+  return found;
+}
+const thresholds = probeThresholds();
+function measure() {
+  const needs = {};
+  for (const demo of document.querySelectorAll('.width-demo')) {
+    demo.innerHTML = band({ open: 12, attention: 1, pins: true }, 'Preview at this width') + '<div class="readout"></div>';
+    demo.style.inlineSize = `${demo.dataset.width}px`;
+    const b = demo.querySelector('.erf-band');
+    const bar = b.querySelector('.erf-band__bar');
+    const need = rowNeeds(bar);
+    const tier = tierOf(b);
+    const fits = need <= bar.clientWidth;
+    needs[tier] = need;
+    demo.querySelector('.readout').innerHTML = `${demo.dataset.width}px wide · <b>${tier}</b> · this row needs ` +
+      `<b class="${fits ? '' : 'over'}">${need}px</b>${fits ? ' – fits' : ' – scrolls sideways'}`;
+  }
+  const t = (tier) => (needs[tier] === undefined ? '– (drag the slider)' : `${needs[tier]}px`);
+  document.getElementById('tierNeeds').innerHTML =
+    `nav.css today: compact below <b>${thresholds.compact}px</b>, narrow below <b>${thresholds.narrow}px</b>, minimal below <b>${thresholds.minimal}px</b>. ` +
+    `With the comment tools: full row needs <b>${t('full')}</b>, compact row needs <b>${t('compact')}</b>, narrow row needs <b>${t('narrow')}</b>, minimal row needs <b>${t('minimal')}</b>. ` +
+    'Each threshold should become the need of the tier above it.';
+}
+document.getElementById('free').addEventListener('input', (e) => { document.getElementById('freeDemo').dataset.width = e.target.value; measure(); });
+measure();
+</script>
+</body>
+</html>

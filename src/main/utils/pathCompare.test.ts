@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * `pathBelowRoot`: the part of a path below a root, under the same case rule
- * as `isInsideRoot` (docs/designs/html-preview-comments.md §19 Rev 4 "case-only
+ * as `isInsideRoot` (docs/designs/comments/html-preview-comments.md §19 Rev 4 "case-only
  * path differences on macOS"). Pure: every row runs on every host, with the
  * POSIX or the Windows path module and the platform injected.
  */

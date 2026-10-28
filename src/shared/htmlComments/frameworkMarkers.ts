@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Pages whose framework would trip over a comment node
- * (docs/designs/html-preview-comments.md §19 R3-11, spike S7).
+ * (docs/designs/comments/html-preview-comments.md §19 R3-11, spike S7).
  *
  * Vue, Svelte and Angular hydrate server-rendered markup by walking the DOM
  * node by node, and none of them skips an unknown comment: Vue re-uses the

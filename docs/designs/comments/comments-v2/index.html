@@ -1,0 +1,439 @@
+<!-- @card group="Comments v2" name="Comments v2 – overview" subtitle="What v2 changes, which card draws each change, and the select → comment → step → resolve journey in both previews" status="proposed" reviewed="2026-10-28" -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Erfana – Comments v2, overview</title>
+<link rel="stylesheet" href="../../../design-system/tokens.css">
+<link rel="stylesheet" href="../../../design-system/ds.css">
+<link rel="stylesheet" href="../../../design-system/system/components/menu/menu.css">
+<link rel="stylesheet" href="../html-comments/demo.css">
+<link rel="stylesheet" href="../html-comments/overlay.css">
+<link rel="stylesheet" href="../html-comments/comments.css">
+<link rel="stylesheet" href="../markdown-comments/markdown-comments.css">
+<link rel="stylesheet" href="./comments-v2.css">
+<style>
+  /* ---------- card chrome: the change map ---------- */
+  .c2i-map { max-inline-size: 1240px; margin-block-end: var(--space-8); }
+  .c2i-map td { vertical-align: top; font-size: var(--text-sm); }
+  .c2i-map td:first-child,
+  .c2i-map td:nth-child(2) { font-family: var(--font-mono); white-space: nowrap; }
+  .c2i-map td:nth-child(4) { color: var(--color-text-secondary); }
+  .c2i-map a { color: var(--color-link); }
+  .c2i-later { color: var(--color-text-tertiary); }
+
+  /* ---------- card chrome: the journey ---------- */
+  .c2i-step { margin-block-end: var(--space-20); }
+  .c2i-step > .step__text, .c2i-wide-text { max-inline-size: 96ch; }
+
+  /* HTML Preview: a panel holding the fake third-party page (demo.css). */
+  .c2i-html { inline-size: 640px; block-size: 250px; }
+  .c2i-html--tall { block-size: 470px; }
+
+  /* Markdown Preview-only view. */
+  .c2i-md { inline-size: 640px; --mdc-body-height: 250px; }
+  .c2i-md--wide { inline-size: 1300px; max-inline-size: none; --mdc-body-height: 520px; }
+  .c2i-md--wide .erf-mdc-content { max-inline-size: 500px; }
+  .c2i-md--wide .c2i-win { inline-size: 360px; }
+  .c2i-narrowp { max-inline-size: 15ch; }
+
+  /* Overlay parts are drawn as children of a page element here (see Exceptions). */
+  .c2i-anchor { position: relative; }
+  .c2i-anchor > .erf-hpc-outline { inset: calc(var(--border-width-thick) * -2); }
+  .c2i-anchor > .erf-hpc-pin {
+    inset-inline-start: calc(100% + var(--space-1));
+    inset-block-start: calc((var(--btn-height-sm) + var(--space-1)) * -1);
+  }
+  /* A zero-width point at the end of the selection's last line: the chip hangs from it. */
+  .c2i-selend { position: relative; display: inline-block; inline-size: 0; block-size: 1em; vertical-align: text-top; }
+
+  /* The page's own selection, as Chromium paints it on a third-party page. */
+  .c2i-native { background-color: Highlight; color: HighlightText; }
+
+  /* Markdown icons are real buttons (C-11): strip the UA button look. */
+  .c2i-pinbtn { padding: 0; border: 0; background: none; }
+  .erf-hpc-pin--selected .erf-hpc-pin__line { fill: var(--color-accent-primary); }
+
+  .c2i-win { inline-size: 400px; }
+  .c2i-disclosure { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); }
+  .c2i-narrow { margin-block-start: var(--space-4); }
+
+  /* A focus ring drawn at rest, for "Close focused". */
+  .c2i-focus { outline: var(--border-width-thick) solid var(--color-border-focus); outline-offset: var(--space-1); }
+
+  /* "All open comments are resolved" */
+  .c2i-done { display: flex; align-items: center; gap: var(--space-4); margin: var(--space-8) 0 0;
+              font-size: var(--text-md); color: var(--color-text-emphasis); }
+  .c2i-done__icon { display: inline-flex; color: var(--color-success); }
+
+  .c2i-announce { max-inline-size: 640px; }
+
+  /* ---------- larger documentation text (owner request) ----------
+     Only the card's own prose grows. The mockups keep the app's real sizes,
+     because a card draws the app to scale. Window titles are h2 too, so the
+     heading rules are scoped to the page's own top-level headings. */
+  body > h1 { font-size: calc(var(--text-2xl) * 1.2); }
+  body > h2 { font-size: var(--text-xl); }
+  .ds-lede { font-size: var(--text-md); }
+  .ds-note { font-size: var(--text-md); }
+  .c2i-map th { font-size: var(--text-sm); }
+  .c2i-map td { font-size: var(--text-md); }
+  .step__no { font-size: var(--text-sm); }
+  .step__title { font-size: var(--text-lg); }
+  .step__text { font-size: var(--text-md); }
+  .c2-grid > figure > figcaption { font-size: var(--text-sm); max-inline-size: 64ch; }
+  .c2-change { font-size: var(--text-sm); }
+  .announce-view { font-size: var(--text-sm); }
+  body > table th { font-size: var(--text-sm); }
+  body > table td { font-size: var(--text-md); }
+  .ds-lede code, .ds-note code, .step__text code, .c2i-map code, body > table code { font-size: var(--text-base); }
+</style>
+</head>
+<body>
+
+<h1>Comments v2 – overview</h1>
+<p class="ds-lede">
+  v2 makes commenting work the same way in the HTML Preview and the Markdown Preview, and fixes the weak spots
+  six reviews found. In plain words: when you select words, a <strong>Comment</strong> chip appears; the window
+  quotes your words and lets you narrow them from the keyboard; a saved comment shows <strong>one mark</strong>
+  that looks the same in both previews; you <strong>step</strong> through comments with ‹ › and resolve as you go;
+  the Markdown side speaks plain words (paragraph, list item) and its window stays beside the text instead of
+  covering it; and "not found" or "changed" now read as "the agent probably did it – check, then resolve".
+</p>
+<div class="ds-note"><strong>Proposed, and static.</strong> Plan: <code>docs/designs/comments/comments-v2.md</code> – owner
+  decisions OD-01…OD-08 (§2), changes C-01…C-27 (§3), owner-decision designs (§4). No script: every state is drawn on its
+  own. The HTML page is the HTML cards' fake third-party page (exempt from tokens); the Markdown panel is the
+  Preview-only view – comments never appear in split or editor view (OD-03).</div>
+
+<!-- ======================================================= map -->
+<h2>Every change, and the card that draws it</h2>
+<table class="c2i-map">
+  <thead><tr><th>Id</th><th>Pri</th><th>Change</th><th>Drawn on</th></tr></thead>
+  <tbody>
+    <tr><td>C-01</td><td>P0</td><td>Readable lines stay v0.23.1-compatible; selected words and Markdown target hints move into the agent-note area</td><td>Nothing to draw – file format only (this card lists it)</td></tr>
+    <tr><td>C-02</td><td>P0</td><td>Markdown-correct agent note; spec retitled for both file types</td><td>Nothing to draw – file format only (this card lists it)</td></tr>
+    <tr><td>C-03</td><td>P0</td><td>One noun system: plain kind names in Markdown, "comment" for the stored item</td><td><a href="./window.html">window.html</a>, <a href="./menus-toolbar.html">menus-toolbar.html</a>, <a href="./drawer.html">drawer.html</a>; this card's Markdown frames</td></tr>
+    <tr><td>C-04</td><td>P0</td><td>One identity notice and Settings text for both previews</td><td><a href="./window.html">window.html</a></td></tr>
+    <tr><td>C-05</td><td>P0</td><td>Every open-thread state keeps Reply and Resolve; not found reads as possible success</td><td><a href="./window.html">window.html</a>; Not found tag on <a href="./drawer.html">drawer.html</a>; ghost icon on <a href="./marks.html">marks.html</a></td></tr>
+    <tr><td>C-06</td><td>P0</td><td>Derived "Changed since comment" and "Words changed" with a Was/Now box</td><td><a href="./window.html">window.html</a>; Changed tag and sort on <a href="./drawer.html">drawer.html</a>; notch and dashed mark on <a href="./marks.html">marks.html</a></td></tr>
+    <tr><td>C-07</td><td>P0</td><td>Keyboard route to selection comments: the "Narrow to words" field</td><td><a href="./window.html">window.html</a> (collapsed and expanded); journey step 2 here</td></tr>
+    <tr><td>C-08</td><td>P0</td><td>Markdown keyboard focus model for comment mode</td><td><a href="./menus-toolbar.html">menus-toolbar.html</a></td></tr>
+    <tr><td>C-09</td><td>P0</td><td>"Comments paused" while the Markdown buffer differs from disk</td><td><a href="./menus-toolbar.html">menus-toolbar.html</a> (bands)</td></tr>
+    <tr><td>C-10</td><td>P0</td><td>Spoken target model: picker steps, window description, accessible names</td><td><a href="./menus-toolbar.html">menus-toolbar.html</a>, <a href="./drawer.html">drawer.html</a>, <a href="./window.html">window.html</a>; announcements in this journey</td></tr>
+    <tr><td>C-11</td><td>P0</td><td>Icons: hidden from assistive tech in HTML, real buttons in Markdown</td><td><a href="./marks.html">marks.html</a>; markup in journey step 3</td></tr>
+    <tr><td>C-12</td><td>P0</td><td>One comment mark for both previews, distinct from selection and links</td><td><a href="./marks.html">marks.html</a>; used in journey steps 3–4</td></tr>
+    <tr><td>C-13</td><td>P1</td><td>Step through comments: stepper, key pair, "Resolve and next", "Reply and resolve"</td><td><a href="./window.html">window.html</a>; journey steps 4–5</td></tr>
+    <tr><td>C-14</td><td>P1</td><td>File changed under an open window: drafts travel and never silently expire, lists refresh</td><td><a href="./window.html">window.html</a></td></tr>
+    <tr><td>C-15</td><td>P1</td><td>Attention badge as a shape, three-cell drawer filter, sort menu</td><td><a href="./drawer.html">drawer.html</a>; toolbar count on <a href="./menus-toolbar.html">menus-toolbar.html</a></td></tr>
+    <tr><td>C-16</td><td>P1</td><td>Visible "Comment" chip, parallel menu items, honest toggle, mode copy that teaches selection</td><td>Chip on <a href="./marks.html">marks.html</a>; menus and mode copy on <a href="./menus-toolbar.html">menus-toolbar.html</a>; empty state on <a href="./drawer.html">drawer.html</a>; journey step 1 and the OD-01 frames here</td></tr>
+    <tr><td>C-17</td><td>P1</td><td>Mark and icon act as one; icons never overlap</td><td><a href="./marks.html">marks.html</a>; journey step 4</td></tr>
+    <tr><td>C-18</td><td>P1</td><td>Non-modal window in Markdown, in the right margin when there is room</td><td><a href="./menus-toolbar.html">menus-toolbar.html</a> (margin, edge tab); journey steps 2 and 4</td></tr>
+    <tr><td>C-19</td><td>P1</td><td>Every refusal names its reason and a next step</td><td>Refusals on <a href="./window.html">window.html</a>; disabled menu item with a reason line on <a href="./menus-toolbar.html">menus-toolbar.html</a></td></tr>
+    <tr><td>C-20</td><td>P1</td><td>Quieter toolbar: icons toggle moves to the drawer, list becomes a labelled count</td><td><a href="./menus-toolbar.html">menus-toolbar.html</a>; checkbox on <a href="./drawer.html">drawer.html</a></td></tr>
+    <tr><td>C-21</td><td>P1</td><td>Window hierarchy: blocked Save looks blocked, quote clamped, labels stop covering text</td><td><a href="./window.html">window.html</a>; HTML label on <a href="./marks.html">marks.html</a>; comment-mode tab on <a href="./menus-toolbar.html">menus-toolbar.html</a>; quote in journey steps 2 and 4</td></tr>
+    <tr><td>C-22</td><td>P1</td><td>Clicking a commented target in comment mode opens its threads</td><td><a href="./window.html">window.html</a></td></tr>
+    <tr><td>C-23</td><td>P1</td><td>Screen-reader acceptance gate</td><td>Nothing to draw – a test document, <code>docs/testing/comments-screen-reader.md</code></td></tr>
+    <tr class="c2i-later"><td>C-24</td><td>P2</td><td>Unread markers and last-activity rows</td><td>Later – <a href="./drawer.html">drawer.html</a>, dot on <a href="./marks.html">marks.html</a></td></tr>
+    <tr class="c2i-later"><td>C-25</td><td>P2</td><td>Guided review pass after an agent run, batched resolves</td><td>Later – pass layout on <a href="./window.html">window.html</a>, band on <a href="./menus-toolbar.html">menus-toolbar.html</a>, multi-select on <a href="./drawer.html">drawer.html</a></td></tr>
+    <tr class="c2i-later"><td>C-26</td><td>P2</td><td>Drawer rows grouped by file; compact banner actions</td><td>Later – <a href="./drawer.html">drawer.html</a>, <a href="./window.html">window.html</a></td></tr>
+    <tr class="c2i-later"><td>C-27</td><td>P2</td><td>Later: folded comments in the editor, "question" comments, margin cards, a finder</td><td>Later – not drawn in v2</td></tr>
+    <tr><td>§4.1</td><td>OD-05</td><td>Rebuild a hand-damaged comment from its data line</td><td><a href="./window.html">window.html</a></td></tr>
+    <tr><td>§4.2</td><td>OD-06</td><td>Note when open comments were removed outside Erfana</td><td><a href="./drawer.html">drawer.html</a></td></tr>
+  </tbody>
+</table>
+
+<!-- ======================================================= journey -->
+<h2>The journey, in both previews</h2>
+<div class="ds-note">Select words → <strong>Comment</strong> chip → window with the words and "Narrow to words" →
+  save → comment mark and icon → click the mark → step with ‹ › and <strong>Resolve and next</strong> → "All open
+  comments are resolved". The HTML window stays modal over a still image of the page; the Markdown window is
+  non-modal and sits in the right margin when there is room (C-18).</div>
+
+<!-- 1. select -->
+<section class="c2i-step" aria-labelledby="s1">
+  <p class="step__no">1 · select</p>
+  <h3 class="step__title" id="s1">Select words – the Comment chip appears</h3>
+  <p class="step__text">About 150 ms after the mouse is released over a selection, a 28 px chip appears 8 px above
+    the end of the selection's last line. It takes no focus, leaves the selection alone, and hides on Esc, scroll or
+    collapse. <strong>HTML:</strong> only in comment mode, because outside it the page owns its mouse.
+    <strong>Markdown:</strong> in and out of comment mode.</p>
+  <div class="c2-grid">
+    <figure><figcaption><strong>HTML Preview, comment mode on</strong> · chip above the selection's end – <span class="c2-change">C-16</span></figcaption>
+      <div class="panel c2i-html" role="group" aria-label="Example: HTML selection with the Comment chip"><div class="panel__body"><div class="page-area">
+        <div class="page">
+          <h4>Pricing</h4>
+          <p class="c2i-anchor" style="margin-block-start: var(--space-20)">We ship the beta soon. Our target is to <span class="c2i-native">ship by Friday</span><span class="c2i-selend"><button class="erf-comment-chip" type="button" tabindex="-1" style="inset-block-end: calc(100% + var(--space-4)); inset-inline-end: calc(var(--space-12) * -1);"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"></path><path d="M12 8v6"></path><path d="M9 11h6"></path></svg><span class="erf-comment-chip__text" data-text="Comment"></span></button></span>, after the security review.<span class="erf-hpc-outline" aria-hidden="true"></span></p>
+          <p>Plans start at <em>10 EUR</em> a month.</p>
+        </div>
+        <div class="erf-hpc-root" aria-hidden="true"><div class="erf-hpc-frame"></div><div class="erf-hpc-tab"><span class="erf-hpc-text" data-text="Comment mode – Esc to leave"></span></div></div>
+      </div></div></div>
+      <p class="announce-view c2i-announce">Text selected in paragraph, line 12. Press Shift+F10 to comment.</p>
+    </figure>
+    <figure><figcaption><strong>Markdown Preview, comment mode off</strong> · the same chip, label as text – <span class="c2-change">C-16</span>, <span class="c2-change">C-03</span></figcaption>
+      <div class="erf-mdc-panel c2i-md" role="group" aria-label="Example: Markdown selection with the Comment chip"><div class="erf-mdc-panel__body"><div class="erf-mdc-preview">
+        <div class="erf-mdc-content">
+          <h2>Launch plan</h2>
+          <p>We ship the beta to ten customers. The target is to <span class="erf-comment-selection">ship by Friday</span><span class="c2i-selend"><button class="erf-comment-chip" type="button" tabindex="-1" style="inset-block-end: calc(100% + var(--space-4)); inset-inline-end: calc(var(--space-12) * -1);"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"></path><path d="M12 8v6"></path><path d="M9 11h6"></path></svg>Comment</button></span>, after the security review.</p>
+        </div>
+      </div></div></div>
+      <p class="announce-view c2i-announce">Text selected in paragraph, line 7. Press Shift+F10 to comment.</p>
+    </figure>
+  </div>
+</section>
+
+<!-- 2. window -->
+<section class="c2i-step" aria-labelledby="s2">
+  <p class="step__no">2 · write</p>
+  <h3 class="step__title" id="s2">The window quotes the words; "Narrow to words" waits, folded</h3>
+  <p class="step__text">The quote is quieter than the comment: body size, primary text, three lines then "Show all"
+    (C-21) – system sans in HTML, the preview's serif in Markdown. Under it, the <strong>Narrow to words</strong>
+    disclosure (C-07) opens a read-only copy of the target's text, the keyboard route to the same result.
+    <strong>HTML:</strong> modal, over a still image of the page. <strong>Markdown:</strong> no modal, no catcher;
+    with at least 376 px free right of the text column, the window sits in that margin, top-aligned with its
+    paragraph, and the preview keeps scrolling (C-18).</p>
+  <div class="c2-grid">
+    <figure><figcaption><strong>HTML Preview</strong> · modal over the still – <span class="c2-change">C-21</span> quote, <span class="c2-change">C-07</span> collapsed</figcaption>
+      <div class="panel c2i-html c2i-html--tall" role="group" aria-label="Example: HTML new-comment window"><div class="panel__body"><div class="page-area">
+        <div class="page">
+          <h4>Pricing</h4>
+          <p class="c2i-anchor c2i-narrowp">We ship the beta to ten customers. The target is to <span class="c2i-native">ship by Friday</span>, after the security review.<span class="erf-hpc-outline erf-hpc-outline--selected" aria-hidden="true"></span></p>
+        </div>
+        <span class="still-tag">still image under the window</span>
+        <div class="erf-comment-window c2-float c2i-win" role="group" aria-label="Example: new comment, HTML" aria-labelledby="w2h-t" style="inset-block-start: var(--space-8); inset-inline-end: var(--space-8);">
+          <div class="erf-comment-window__head"><div class="erf-comment-window__heading">
+            <h2 class="erf-comment-window__title" id="w2h-t" tabindex="-1">New comment</h2>
+            <p class="erf-comment-window__context"><bdi dir="ltr">p.lede</bdi> · index.html, line 12</p>
+            <span class="erf-comment-words"><span class="erf-comment-words__text">ship by Friday</span></span>
+            <div class="c2i-narrow"><button class="erf-comment-link c2i-disclosure" type="button" aria-expanded="false"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 18 6-6-6-6"></path></svg>Narrow to words</button></div>
+          </div><button class="erf-comment-icon-btn" type="button" aria-label="Close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+          <div class="erf-comment-window__body"><div class="erf-comment-field"><label class="erf-comment-field__label" for="f2h">Comment</label>
+            <textarea class="erf-comment-textarea" id="f2h" placeholder="What should change here?">Friday is a holiday in two markets. Say Thursday.</textarea>
+            <div class="erf-comment-field__foot"><p class="erf-comment-field__hint">Plain text. Saved inside index.html.</p><span class="erf-comment-counter">49 / 4000</span></div></div>
+            <p class="erf-comment-identity">Commenting as <bdi>Marcin Obel</bdi> <button class="erf-comment-link" type="button">Change</button></p></div>
+          <div class="erf-comment-window__foot"><button class="erf-comment-btn erf-comment-btn--secondary" type="button"><span>Cancel</span></button><button class="erf-comment-btn erf-comment-btn--primary" type="button"><span>Save</span></button></div>
+        </div>
+      </div></div></div>
+    </figure>
+    <figure><figcaption><strong>Markdown Preview</strong> · non-modal, in the right margin, top-aligned with the paragraph – <span class="c2-change">C-18</span>, serif quote <span class="c2-change">C-21</span>, <span class="c2-change">C-07</span> collapsed, title in plain nouns <span class="c2-change">C-03</span></figcaption>
+      <div class="erf-mdc-panel c2i-md c2i-md--wide" role="group" aria-label="Example: Markdown new-comment window in the margin"><div class="erf-mdc-panel__body"><div class="erf-mdc-preview">
+        <div class="erf-mdc-content">
+          <h2>Launch plan</h2>
+          <p>We ship the beta to ten customers. The target is to <span class="erf-comment-selection">ship by Friday</span>, after the security review.</p>
+          <ul><li>Freeze the API on Monday.</li><li>Run the load test against staging.</li></ul>
+          <p>Rollback is one command, and the on-call engineer owns it for the first week.</p>
+        </div>
+        <div class="erf-comment-window c2-float c2i-win" role="group" aria-label="Example: new comment, Markdown" aria-labelledby="w2m-t" style="inset-block-start: calc(var(--space-24) + var(--space-14)); inset-inline-end: var(--space-12);">
+          <div class="erf-comment-window__head"><div class="erf-comment-window__heading">
+            <h2 class="erf-comment-window__title" id="w2m-t" tabindex="-1">New comment on paragraph</h2>
+            <p class="erf-comment-window__context">plan.md, line 7</p>
+            <span class="erf-comment-words erf-comment-words--md"><span class="erf-comment-words__text">ship by Friday</span></span>
+            <div class="c2i-narrow"><button class="erf-comment-link c2i-disclosure" type="button" aria-expanded="false"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 18 6-6-6-6"></path></svg>Narrow to words</button></div>
+          </div><button class="erf-comment-icon-btn" type="button" aria-label="Close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+          <div class="erf-comment-window__body"><div class="erf-comment-field"><label class="erf-comment-field__label" for="f2m">Comment</label>
+            <textarea class="erf-comment-textarea" id="f2m" placeholder="What should change here?">Friday is a holiday in two of our markets. Thursday?</textarea>
+            <div class="erf-comment-field__foot"><p class="erf-comment-field__hint">Plain text. Saved inside plan.md.</p><span class="erf-comment-counter">52 / 4000</span></div></div>
+            <p class="erf-comment-identity">Commenting as <bdi>Anna K.</bdi> <button class="erf-comment-link" type="button">Change</button></p></div>
+          <div class="erf-comment-window__foot"><button class="erf-comment-btn erf-comment-btn--secondary" type="button"><span>Cancel</span></button><button class="erf-comment-btn erf-comment-btn--primary" type="button"><span>Save</span></button></div>
+        </div>
+      </div></div></div>
+    </figure>
+  </div>
+</section>
+
+<!-- 3. saved -->
+<section class="c2i-step" aria-labelledby="s3">
+  <p class="step__no">3 · saved</p>
+  <h3 class="step__title" id="s3">One comment mark, and the icon on the target's corner</h3>
+  <p class="step__text">The same mark in both previews: a 35 % accent fill with a continuous accent bar along the
+    bottom of the text, never the selection colour and never a thin line that reads as a link (C-12). On a light
+    HTML page a 1 px ink hairline sits on top of the bar. The icon is unchanged in look; in HTML its layer is hidden
+    from assistive tech, in Markdown it is a real button named "1 comment on paragraph, line 7. Open." (C-11).</p>
+  <div class="c2-grid">
+    <figure><figcaption><strong>HTML Preview, white page</strong> · <code>erf-comment-mark--on-light</code>, icon layer <code>aria-hidden</code> – <span class="c2-change">C-12</span>, <span class="c2-change">C-11</span></figcaption>
+      <div class="panel c2i-html" role="group" aria-label="Example: HTML comment mark after saving"><div class="panel__body"><div class="page-area">
+        <div class="page">
+          <h4>Pricing</h4>
+          <p class="c2i-anchor" style="margin-block-start: var(--space-16); max-inline-size: 40ch">We ship the beta to ten customers. The target is to <span class="erf-comment-mark erf-comment-mark--on-light">ship by Friday</span>, after the security review.<span class="erf-hpc-pin" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="erf-hpc-pin__body" d="M2 2H22V17H7L2 22Z"></path><rect class="erf-hpc-pin__line" x="6" y="6" width="12" height="2"></rect><rect class="erf-hpc-pin__line" x="6" y="10" width="8" height="2"></rect></svg></span></p>
+          <p>Plans start at <em>10 EUR</em> a month.</p>
+        </div>
+      </div></div></div>
+    </figure>
+    <figure><figcaption><strong>Markdown Preview</strong> · same mark on the dark preview, icon is a <code>&lt;button&gt;</code> – <span class="c2-change">C-12</span>, <span class="c2-change">C-11</span></figcaption>
+      <div class="erf-mdc-panel c2i-md" role="group" aria-label="Example: Markdown comment mark after saving"><div class="erf-mdc-panel__body"><div class="erf-mdc-preview">
+        <div class="erf-mdc-content">
+          <h2>Launch plan</h2>
+          <p class="erf-mdc-block" aria-details="pin-s3">We ship the beta to ten customers. The target is to <span class="erf-comment-mark">ship by Friday</span>, after the security review.<button class="erf-hpc-pin c2i-pinbtn" id="pin-s3" type="button" tabindex="-1" aria-label="1 comment on paragraph, line 7. Open."><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="erf-hpc-pin__body" d="M2 2H22V17H7L2 22Z"></path><rect class="erf-hpc-pin__line" x="6" y="6" width="12" height="2"></rect><rect class="erf-hpc-pin__line" x="6" y="10" width="8" height="2"></rect></svg></button></p>
+        </div>
+      </div></div></div>
+    </figure>
+  </div>
+</section>
+
+<!-- 4. step -->
+<section class="c2i-step" aria-labelledby="s4">
+  <p class="step__no">4 · open and step</p>
+  <h3 class="step__title" id="s4">Click the mark – its thread opens with the stepper</h3>
+  <p class="step__text">A click on the mark opens that thread, its words in the active fill and its icon selected
+    (C-17; in HTML only in comment mode, where the mark takes clicks like the icon). The head carries
+    <strong>‹ 3 of 12 ›</strong>: two 24 px icon buttons around a muted count, stepping through threads in file order
+    within the drawer's filter, also on Alt+F9 / Shift+Alt+F9. With another open thread left, Resolve becomes
+    <strong>Resolve and next</strong> (C-13). Reply stays blocked – and looks blocked – until there is text (C-21).
+    The footer here shows the stepping pair only; the full footer is on window.html.</p>
+  <div class="c2-grid">
+    <figure><figcaption><strong>HTML Preview, comment mode</strong> · modal over the still – <span class="c2-change">C-13</span> stepper, <span class="c2-change">C-17</span> active mark</figcaption>
+      <div class="panel c2i-html c2i-html--tall" role="group" aria-label="Example: HTML thread with the stepper"><div class="panel__body"><div class="page-area">
+        <div class="page">
+          <h4>Pricing</h4>
+          <p class="c2i-anchor c2i-narrowp">We ship the beta to ten customers. The target is to <span class="erf-comment-mark erf-comment-mark--on-light erf-comment-mark--active">ship by Friday</span>, after the security review.<span class="erf-hpc-pin erf-hpc-pin--selected" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="erf-hpc-pin__body" d="M2 2H22V17H7L2 22Z"></path><rect class="erf-hpc-pin__line" x="6" y="6" width="12" height="2"></rect><rect class="erf-hpc-pin__line" x="6" y="10" width="8" height="2"></rect></svg></span></p>
+        </div>
+        <div class="erf-hpc-root" aria-hidden="true"><div class="erf-hpc-frame"></div></div>
+        <span class="still-tag">still image under the window</span>
+        <div class="erf-comment-window c2-float c2i-win" role="group" aria-label="Example: thread with stepper, HTML" aria-labelledby="w4h-t" style="inset-block-start: var(--space-8); inset-inline-end: var(--space-8);">
+          <div class="erf-comment-window__head"><div class="erf-comment-window__heading">
+            <h2 class="erf-comment-window__title" id="w4h-t" tabindex="-1">Comment on p.lede</h2>
+            <p class="erf-comment-window__context"><bdi dir="ltr">p.lede</bdi> · index.html, line 12</p>
+            <span class="erf-comment-words"><span class="erf-comment-words__text">ship by Friday</span></span>
+          </div>
+            <div class="erf-comment-stepper" role="group" aria-label="Step through comments"><button class="erf-comment-icon-btn" type="button" aria-label="Previous comment"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m15 18-6-6 6-6"></path></svg></button><span>3 of 12</span><button class="erf-comment-icon-btn" type="button" aria-label="Next comment"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 18 6-6-6-6"></path></svg></button></div>
+            <button class="erf-comment-icon-btn" type="button" aria-label="Close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+          <div class="erf-comment-window__body">
+            <section class="erf-comment-thread" aria-label="Thread started by Marcin Obel">
+              <article class="erf-comment-message"><div class="erf-comment-message__meta"><span class="erf-comment-message__meta-text"><bdi class="erf-comment-message__author">Marcin Obel</bdi> · <time datetime="2026-10-28T12:40">Today, 12:40</time></span>
+                <button class="erf-comment-icon-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Actions for the comment by Marcin Obel, Today, 12:40"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg></button></div>
+                <p class="erf-comment-message__text" dir="auto">Friday is a holiday in two markets. Say Thursday.</p></article>
+              <div class="erf-comment-thread__reply"><div class="erf-comment-field"><label class="erf-comment-field__label" for="f4h">Reply</label>
+                <textarea class="erf-comment-textarea erf-comment-textarea--reply" id="f4h"></textarea></div>
+                <div class="erf-comment-thread__actions"><button class="erf-comment-btn erf-comment-btn--primary erf-comment-btn--blocked" type="button" aria-disabled="true"><span>Reply</span></button></div></div>
+            </section>
+          </div>
+          <div class="erf-comment-window__foot"><span class="erf-comment-window__foot-end"><button class="erf-comment-btn erf-comment-btn--secondary" type="button"><span>Resolve and next</span></button><button class="erf-comment-btn erf-comment-btn--secondary" type="button"><span>Close</span></button></span></div>
+        </div>
+      </div></div></div>
+      <p class="announce-view c2i-announce">Comment 3 of 12, on Paragraph, line 12.</p>
+    </figure>
+    <figure><figcaption><strong>Markdown Preview</strong> · non-modal, in the margin; the preview keeps scrolling – <span class="c2-change">C-13</span>, <span class="c2-change">C-17</span>, <span class="c2-change">C-18</span></figcaption>
+      <div class="erf-mdc-panel c2i-md c2i-md--wide" role="group" aria-label="Example: Markdown thread with the stepper"><div class="erf-mdc-panel__body"><div class="erf-mdc-preview">
+        <div class="erf-mdc-content">
+          <h2>Launch plan</h2>
+          <p class="erf-mdc-block" aria-details="pin-s4">We ship the beta to ten customers. The target is to <span class="erf-comment-mark erf-comment-mark--active">ship by Friday</span>, after the security review.<button class="erf-hpc-pin erf-hpc-pin--selected c2i-pinbtn" id="pin-s4" type="button" tabindex="-1" aria-label="1 comment on paragraph, line 7. Open."><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="erf-hpc-pin__body" d="M2 2H22V17H7L2 22Z"></path><rect class="erf-hpc-pin__line" x="6" y="6" width="12" height="2"></rect><rect class="erf-hpc-pin__line" x="6" y="10" width="8" height="2"></rect></svg></button></p>
+          <ul><li>Freeze the API on Monday.</li><li>Run the <span class="erf-comment-mark">load test</span> against staging.</li></ul>
+          <p>Rollback is one command, and the on-call engineer owns it for the first week.</p>
+        </div>
+        <div class="erf-comment-window c2-float c2i-win" role="group" aria-label="Example: thread with stepper, Markdown" aria-labelledby="w4m-t" style="inset-block-start: calc(var(--space-24) + var(--space-14)); inset-inline-end: var(--space-12);">
+          <div class="erf-comment-window__head"><div class="erf-comment-window__heading">
+            <h2 class="erf-comment-window__title" id="w4m-t" tabindex="-1">New comment on paragraph</h2>
+            <p class="erf-comment-window__context">plan.md, line 7</p>
+            <span class="erf-comment-words erf-comment-words--md"><span class="erf-comment-words__text">ship by Friday</span></span>
+          </div>
+            <div class="erf-comment-stepper" role="group" aria-label="Step through comments"><button class="erf-comment-icon-btn" type="button" aria-label="Previous comment"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m15 18-6-6 6-6"></path></svg></button><span>3 of 12</span><button class="erf-comment-icon-btn" type="button" aria-label="Next comment"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 18 6-6-6-6"></path></svg></button></div>
+            <button class="erf-comment-icon-btn" type="button" aria-label="Close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+          <div class="erf-comment-window__body">
+            <section class="erf-comment-thread" aria-label="Thread started by Anna K.">
+              <article class="erf-comment-message"><div class="erf-comment-message__meta"><span class="erf-comment-message__meta-text"><bdi class="erf-comment-message__author">Anna K.</bdi> · <time datetime="2026-10-28T09:10">Today, 09:10</time></span>
+                <button class="erf-comment-icon-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Actions for the comment by Anna K., Today, 09:10"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg></button></div>
+                <p class="erf-comment-message__text" dir="auto">Friday is a holiday in two of our markets. Thursday?</p></article>
+              <div class="erf-comment-thread__reply"><div class="erf-comment-field"><label class="erf-comment-field__label" for="f4m">Reply</label>
+                <textarea class="erf-comment-textarea erf-comment-textarea--reply" id="f4m"></textarea></div>
+                <div class="erf-comment-thread__actions"><button class="erf-comment-btn erf-comment-btn--primary erf-comment-btn--blocked" type="button" aria-disabled="true"><span>Reply</span></button></div></div>
+            </section>
+          </div>
+          <div class="erf-comment-window__foot"><span class="erf-comment-window__foot-end"><button class="erf-comment-btn erf-comment-btn--secondary" type="button"><span>Resolve and next</span></button><button class="erf-comment-btn erf-comment-btn--secondary" type="button"><span>Close</span></button></span></div>
+        </div>
+      </div></div></div>
+      <p class="announce-view c2i-announce">Comment 3 of 12, on Paragraph, line 7.</p>
+    </figure>
+  </div>
+</section>
+
+<!-- 5. done -->
+<section class="c2i-step" aria-labelledby="s5">
+  <p class="step__no">5 · done</p>
+  <h3 class="step__title" id="s5">After the last one: all open comments are resolved</h3>
+  <p class="step__text">Resolving the last open thread folds it to one line and shows the end message; focus moves
+    to Close. The stepper leaves the head, because nothing is left to step to. Same window in both previews; only
+    the title and context follow each preview's naming (C-03).</p>
+  <div class="c2-grid">
+    <figure><figcaption><strong>HTML Preview</strong> · Close focused – <span class="c2-change">C-13</span></figcaption>
+      <div class="erf-comment-window c2i-win" role="group" aria-label="Example: all resolved, HTML" aria-labelledby="w5h-t">
+        <div class="erf-comment-window__head"><div class="erf-comment-window__heading">
+          <h2 class="erf-comment-window__title" id="w5h-t" tabindex="-1">Comment on button.cta</h2>
+          <p class="erf-comment-window__context"><bdi dir="ltr">button.cta</bdi> · index.html, line 42</p>
+        </div><button class="erf-comment-icon-btn" type="button" aria-label="Close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+        <div class="erf-comment-window__body">
+          <div class="erf-comment-resolved"><span class="erf-comment-resolved__text"><span class="erf-comment-resolved__icon" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M20 6 9 17l-5-5"></path></svg></span><span>Resolved by <bdi>Marcin Obel</bdi> · just now</span></span></div>
+          <p class="c2i-done" role="status"><span class="c2i-done__icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0"></path><path d="m9 12 2 2 4-4"></path></svg></span>All open comments are resolved</p>
+        </div>
+        <div class="erf-comment-window__foot"><span class="erf-comment-window__foot-end"><button class="erf-comment-btn erf-comment-btn--secondary c2i-focus" type="button"><span>Close</span></button></span></div>
+      </div>
+    </figure>
+    <figure><figcaption><strong>Markdown Preview</strong> · Close focused – <span class="c2-change">C-13</span>, <span class="c2-change">C-03</span></figcaption>
+      <div class="erf-comment-window c2i-win" role="group" aria-label="Example: all resolved, Markdown" aria-labelledby="w5m-t">
+        <div class="erf-comment-window__head"><div class="erf-comment-window__heading">
+          <h2 class="erf-comment-window__title" id="w5m-t" tabindex="-1">Comment on list item</h2>
+          <p class="erf-comment-window__context">plan.md, line 14</p>
+        </div><button class="erf-comment-icon-btn" type="button" aria-label="Close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+        <div class="erf-comment-window__body">
+          <div class="erf-comment-resolved"><span class="erf-comment-resolved__text"><span class="erf-comment-resolved__icon" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M20 6 9 17l-5-5"></path></svg></span><span>Resolved by <bdi>Anna K.</bdi> · just now</span></span></div>
+          <p class="c2i-done" role="status"><span class="c2i-done__icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0"></path><path d="m9 12 2 2 4-4"></path></svg></span>All open comments are resolved</p>
+        </div>
+        <div class="erf-comment-window__foot"><span class="erf-comment-window__foot-end"><button class="erf-comment-btn erf-comment-btn--secondary c2i-focus" type="button"><span>Close</span></button></span></div>
+      </div>
+    </figure>
+  </div>
+</section>
+
+<!-- OD-01 -->
+<h2>HTML right-click outside comment mode (OD-01)</h2>
+<p class="step__text c2i-wide-text">Outside comment mode, when the page did not cancel its own
+  right-click, Erfana shows one item. <strong>Comment here…</strong> turns comment mode on with the picker on that
+  element; with selected text on the page it reads <strong>Comment on selection</strong>. This changes shipped HTML
+  §10.3: the page no longer owns every right-click.</p>
+<div class="c2-grid">
+  <figure><figcaption><strong>no selection</strong> · one item, "Comment here…" – <span class="c2-change">C-16</span>, OD-01</figcaption>
+    <div class="panel c2i-html" role="group" aria-label="Example: right-click outside comment mode"><div class="panel__body"><div class="page-area">
+      <div class="page">
+        <h4>Pricing</h4>
+        <p>We ship the beta to ten customers. The target is to ship by Friday, after the security review.</p>
+        <button class="cta" type="button" tabindex="-1">Buy now</button>
+      </div>
+      <span class="still-tag">still image under the menu</span>
+      <div class="erf-menu c2-float" role="menu" aria-label="Comment" style="inset-block-start: 128px; inset-inline-start: 120px;">
+        <div class="erf-menu-item erf-menu-item--active" role="menuitem" tabindex="0"><span class="erf-menu-icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"></path><path d="M12 8v6"></path><path d="M9 11h6"></path></svg></span><span class="erf-menu-label">Comment here…</span></div>
+      </div>
+    </div></div></div>
+  </figure>
+  <figure><figcaption><strong>the page has selected text</strong> · the item reads "Comment on selection" – <span class="c2-change">C-16</span>, OD-01</figcaption>
+    <div class="panel c2i-html" role="group" aria-label="Example: right-click outside comment mode with a selection"><div class="panel__body"><div class="page-area">
+      <div class="page">
+        <h4>Pricing</h4>
+        <p>We ship the beta to ten customers. The target is to <span class="c2i-native">ship by Friday</span>, after the security review.</p>
+        <button class="cta" type="button" tabindex="-1">Buy now</button>
+      </div>
+      <span class="still-tag">still image under the menu</span>
+      <div class="erf-menu c2-float" role="menu" aria-label="Comment" style="inset-block-start: 84px; inset-inline-start: 300px;">
+        <div class="erf-menu-item erf-menu-item--active" role="menuitem" tabindex="0"><span class="erf-menu-icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"></path><path d="M12 8v6"></path><path d="M9 11h6"></path></svg></span><span class="erf-menu-label">Comment on selection</span></div>
+      </div>
+    </div></div></div>
+  </figure>
+</div>
+
+<h2>Exceptions</h2>
+<table>
+  <thead><tr><th>Where</th><th>The system</th><th>Here, and why</th></tr></thead>
+  <tbody>
+    <tr><td>Markdown text column in the wide frames</td><td><code>.markdown-preview-content</code> is 860 px wide; the margin rule needs 376 px free beside it (C-18).</td><td>Drawn 500 px wide so the margin placement fits a 1300 px frame. The rule, not the pixel count, is what the frame shows.</td></tr>
+    <tr><td>Overlay parts inside page elements</td><td>Chip, outline, icon and mark are drawn by the overlay (HTML closed shadow root) or measured against the block (Markdown), never inside the content.</td><td>Static card: they are children of the element they belong to, with the same geometry. The chip hangs from a zero-width point at the selection's end.</td></tr>
+    <tr><td>Selection colour on the HTML page</td><td>Chromium paints the page's own selection.</td><td>System colours <code>Highlight</code> / <code>HighlightText</code> stand in for it, as on the selection card.</td></tr>
+    <tr><td>Markdown icon button</td><td>Shipping CSS will style the real <code>&lt;button&gt;</code> (C-11).</td><td>A local reset strips the browser's button padding, border and background so the shared icon look shows.</td></tr>
+    <tr><td>Selected icon lines</td><td><code>overlay.css</code> recolours lines through <code>color</code>.</td><td>The static SVG rects take <code>fill</code>, so a card rule sets it to the accent (as on the Markdown states card).</td></tr>
+    <tr><td>Focus ring on Close</td><td>Drawn by <code>:focus-visible</code>.</td><td>A static card cannot hold focus; a class draws the same ring at rest.</td></tr>
+    <tr><td>Window footer in step 4</td><td>The thread footer also holds Open in source and, when opened by a click, New comment (C-22).</td><td>Only the stepping pair is drawn, to keep the journey on one idea; the full footer is on window.html.</td></tr>
+    <tr><td>Toolbars</td><td>Both previews have a toolbar above the page.</td><td>Left out of the journey frames; they are drawn on menus-toolbar.html.</td></tr>
+  </tbody>
+</table>
+
+</body>
+</html>

@@ -106,7 +106,13 @@ function reduceBlockProblems(rawCss) {
   return problems
 }
 
-const CARD_FILES = walk(ROOT, 'docs/design-system', ['.html']).filter(f => f !== 'docs/design-system/index.html')
+/** Feature screens live in docs/designs/ (comments first), but load the same
+ * claims.js and carry the same @card marker, so they are held to the same checks.
+ * A claim's `card` is relative to docs/design-system/, hence `../designs/...` for them. */
+const CARD_FILES = [
+  ...walk(ROOT, 'docs/design-system', ['.html']).filter(f => f !== 'docs/design-system/index.html'),
+  ...walk(ROOT, 'docs/designs', ['.html'])
+]
 
 const CLAIM_IDS_IN_CARDS = new Set(
   CARD_FILES.flatMap(file =>
@@ -226,7 +232,7 @@ describe('design claims ledger', () => {
     })
 
     it.each(Object.entries(LEDGER))('%s names a card that exists', (id, claim) => {
-      const cards = CARD_FILES.map(f => f.replace(/^docs\/design-system\//, ''))
+      const cards = CARD_FILES.map(f => path.posix.relative('docs/design-system', f))
       expect(cards, `claim "${id}" points at a missing card`).toContain(claim.card)
     })
   })
@@ -259,7 +265,7 @@ describe('a card does not render the contrast failure it warns about', () => {
    * rule of Surface A is read from the card's own <style> and measured against
    * the backdrop it sits on.
    */
-  const CARD = readFileSync(path.join(DESIGN, 'product/html-waiting/index.html'), 'utf8')
+  const CARD = readFileSync(path.join(ROOT, 'docs/designs/html-waiting/index.html'), 'utf8')
   const STYLE = stripCssComments(CARD.slice(CARD.indexOf('<style>'), CARD.indexOf('</style>')))
   const TOKENS = collectCustomProperties(
     readFileSync(path.join(ROOT, 'src/renderer/src/styles/design-tokens.css'), 'utf8')
@@ -361,9 +367,10 @@ describe('design folder hygiene', () => {
 
   it('lists every card in the generated index', () => {
     const index = readFileSync(path.join(DESIGN, 'index.html'), 'utf8')
-    const missing = CARD_FILES.map(f => f.replace(/^docs\/design-system\//, '')).filter(
-      href => !index.includes(`href="${href}"`)
-    )
+    // Only the design system's own cards: feature screens in docs/designs/ are not indexed.
+    const missing = CARD_FILES.filter(f => f.startsWith('docs/design-system/'))
+      .map(f => f.replace(/^docs\/design-system\//, ''))
+      .filter(href => !index.includes(`href="${href}"`))
     expect(
       missing,
       `cards absent from docs/design-system/index.html: ${missing.join(', ')}. ` +
@@ -372,11 +379,12 @@ describe('design folder hygiene', () => {
     ).toEqual([])
   })
 
-  it('keeps the generated files out of the authored tree', () => {
-    // docs/design-system/product/ used to hold copies of ds.css, fonts.css, tokens.css and a
-    // lib/ of component CSS — copies of copies. Committing the folder made the
-    // duplication visible; this stops it growing back.
-    const product = readdirSync(path.join(DESIGN, 'product'), { withFileTypes: true })
-    expect(product.filter(e => e.isFile()).map(e => e.name)).toEqual([])
+  it('keeps feature screens out of the design system', () => {
+    // docs/design-system/product/ once held feature screens, and before that copies of
+    // ds.css, fonts.css, tokens.css and a lib/ of component CSS — copies of copies.
+    // Feature screens now live in docs/designs/<functionality>/; this stops the folder
+    // growing back.
+    const top = readdirSync(DESIGN, { withFileTypes: true }).filter(e => e.isDirectory()).map(e => e.name)
+    expect(top).not.toContain('product')
   })
 })

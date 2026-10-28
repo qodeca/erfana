@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * The parse half of `preview:commentList`: one file's threads, damaged and
- * newer blocks with their lines (docs/designs/html-preview-comments.md §7.7,
+ * newer blocks with their lines (docs/designs/comments/html-preview-comments.md §7.7,
  * §10.4, §10.6, §19 R3-12; tests M-014, M-053).
  *
  * Runs in the comment parse worker as the `list` job (`commentFileJobs.ts`).

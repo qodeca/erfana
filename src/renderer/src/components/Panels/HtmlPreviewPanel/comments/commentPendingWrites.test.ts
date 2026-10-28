@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * The writes still waiting for main to say how they ended
- * (docs/designs/html-preview-comments.md §8 Rev 3 note, §19 "Save pending
+ * (docs/designs/comments/html-preview-comments.md §8 Rev 3 note, §19 "Save pending
  * settles"; review finding H1).
  */
 import { renderHook, act } from '@testing-library/react'

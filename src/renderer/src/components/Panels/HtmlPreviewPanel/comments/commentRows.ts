@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * HTML Preview comments – the drawer's rows, from main's list
- * (docs/designs/html-preview-comments.md decision 8, §8 "Drawer mapping of
+ * (docs/designs/comments/html-preview-comments.md decision 8, §8 "Drawer mapping of
  * block kinds", §10.6; R-009, R-020).
  *
  * Three filters:

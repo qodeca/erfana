@@ -88,7 +88,7 @@
    tail. What stays visible is the START of the chip's accessible name, so
    label-in-name (SC 2.5.3) still holds. Buttons keep their 32 x 28.
    534px is what the full row needs with the three comment tools, measured on
-   docs/design-system/product/html-comments/toolbar.html (was 385px before
+   docs/designs/comments/html-comments/toolbar.html (was 385px before
    them). */
 @container (width < 534px) {
   .erf-band .erf-band__bar {
@@ -142,7 +142,7 @@
 
 /*
  * Comment mode, the Comments list and Show comment icons: one group after Find
- * (docs/design-system/product/html-comments/toolbar.html, proposed). They
+ * (docs/designs/comments/html-comments/toolbar.html, proposed). They
  * reuse the toggle signature above, but not the link toggle's 8px gap after
  * EACH tool: one 8px gap before the group, the band's own 2px inside it.
  */

@@ -70,7 +70,7 @@ Every `html-preview-*` e2e spec drives the preview through `HtmlPreviewPage` (`e
 
 ## HTML Preview comments (`comments/`)
 
-Design: [docs/designs/html-preview-comments.md](../../../../../../docs/designs/html-preview-comments.md) (§19 wins on conflict). Format: [docs/html-comments/format-v1.md](../../../../../../docs/html-comments/format-v1.md). Threat model: [docs/security.md § HTML Preview comments](../../../../../../docs/security.md#html-preview-comments).
+Design: [docs/designs/comments/html-preview-comments.md](../../../../../../docs/designs/comments/html-preview-comments.md) (§19 wins on conflict). Format: [docs/html-comments/format-v1.md](../../../../../../docs/html-comments/format-v1.md). Threat model: [docs/security.md § HTML Preview comments](../../../../../../docs/security.md#html-preview-comments).
 
 - **The comment window is an occluder; the pins and the outline are not DOM.** `CommentWindow` composes on `BaseDialog`, which registers the `dialog` occluder, so the native view hides behind its still frame while the window is open. The outline, label and pins are drawn **inside the page** by the preload in a closed shadow root. Do not draw them in React, and do not expect a DOM element over the page area to be visible or clickable.
 - **A comment window opens with the PAGE holding the keyboard.** Every pick is a click or key inside the native view, and `BaseDialog`'s DOM focus cannot take native focus back from it, so main hands native focus to the host contents just before it sends `preview:commentDraftOpened` (`src/main/ipc/preview/commentEmit.ts` → `focusHostWhileKey`, only while the window is key). Any new comment surface opened from a page event must arrive the same way – a renderer-only `focus()` leaves the reader typing into the page behind the still frame. A Playwright `page.keyboard` test cannot see this (it types into the host regardless); assert native focus with `focusState` (`e2e/pages/html-preview.focus.ts`), as E-016c does.
@@ -85,7 +85,7 @@ Design: [docs/designs/html-preview-comments.md](../../../../../../docs/designs/h
 - **The drawer is windowed above 200 rows** (`VIRTUALISE_ABOVE` in `CommentDrawer.tsx`; `@tanstack` virtualizer, `.erf-comment-list--windowed`). Below that every row is mounted. Anything that focuses or scrolls to a row must go through the virtualizer in the windowed case (`scrollToIndex`), because the row may not exist.
 - **Dirty guard.** `useCommentDirtyGuard` (`hooks/`) blocks Save while an editor tab shows the same file with unsaved changes, matched by the **project-space** path main returns (`CommentFileView.filePath`), not the real path. In the "changed on disk" conflict state it offers **Go to tab** only. `useUnsavedSourcesFeed` sends the same dirty list to main, which refuses the write (`COMMENT_UNSAVED_SOURCE`) even if this check races.
 - **Copy has one home.** Every string is in `commentCopy.ts`; §10.10 of the design is its source of truth and `src/shared/errors.comments.test.ts` pins the error sentences to it. Change both together.
-- **Design-system cards first.** The comment UI follows the cards under `docs/design-system/product/html-comments/`; read the card's `status` (`decided` is binding) and change the card before code that departs from it.
+- **Design-system cards first.** The comment UI follows the cards under `docs/designs/comments/html-comments/`; read the card's `status` (`decided` is binding) and change the card before code that departs from it.
 
 ## The backdrop is a state machine, not a constant
 
@@ -151,6 +151,6 @@ host-source matches only its own spelling, so `evil.com.` and `evil.com` are two
 separate grants that never match each other. The dot is kept by the canonicaliser
 and DRAWN by `HostName`, because two grants that render identically in a
 permission list is a spoof. Rationale and measurements:
-`docs/designs/108-http-and-ipv6-in-the-preview.md`.
+`docs/designs/html-preview/108-http-and-ipv6-in-the-preview.md`.
 
 **The blocked-host list is bounded main-side**, at `PREVIEW.MAX_BLOCKED_HOSTS_PER_VIEW` (50, matching the CSP bridge), with a per-hostname sub-cap of `PREVIEW.MAX_BLOCKED_ORIGINS_PER_HOST` (5). Without the sub-cap a page fetching `http://localhost:1..50` exhausts the budget before main reports the real blocked CDN — dropped, not merely buried. The blocked-host ledger (`src/main/services/preview/previewBlockedLedger.ts`) reports nothing when `mergeBlockedKinds` reports no change — without that, a page pulling forty assets from one host sent forty identical events. The ledger belongs to the **page scope** (`previewPageScope.ts`), so each page load, including the reload after an approval, starts a fresh one: the reload refuses the remaining hosts all over again, and a ledger that survived it would swallow every one of them while the failure log they would have appeared in has just been emptied.

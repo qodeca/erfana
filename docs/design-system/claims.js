@@ -142,37 +142,37 @@ window.ERFANA_CLAIMS = {
   "contrast-gp-wordmark-dark": {
     "value": 17.62,
     "label": "--color-brand-white on --color-brand-black, the wordmark on the dark banner",
-    "card": "product/github-presentation/index.html"
+    "card": "../designs/github-presentation/index.html"
   },
   "contrast-gp-wordmark-light": {
     "value": 17.62,
     "label": "--color-brand-black on --color-brand-white, the wordmark on the light banner",
-    "card": "product/github-presentation/index.html"
+    "card": "../designs/github-presentation/index.html"
   },
   "contrast-gp-prompt": {
     "value": 11.51,
     "label": "--color-text-primary on --color-brand-black, the prompt glyph on the terminal strip",
-    "card": "product/github-presentation/index.html"
+    "card": "../designs/github-presentation/index.html"
   },
   "contrast-gp-cursor": {
     "value": 13.94,
     "label": "--color-brand-lime on --color-brand-black, the cursor on the terminal strip",
-    "card": "product/github-presentation/index.html"
+    "card": "../designs/github-presentation/index.html"
   },
   "contrast-gp-indigo-light": {
     "value": 7.61,
     "label": "--color-brand-indigo on --color-brand-white, the light banner accent",
-    "card": "product/github-presentation/index.html"
+    "card": "../designs/github-presentation/index.html"
   },
   "contrast-gp-lime-light": {
     "value": 1.26,
     "label": "--color-brand-lime on --color-brand-white, why lime never sits on the light banner",
-    "card": "product/github-presentation/index.html"
+    "card": "../designs/github-presentation/index.html"
   },
   "contrast-gp-violet-light": {
     "value": 2.1,
     "label": "--color-brand-violet on --color-brand-white, why violet is only a muted fill on light",
-    "card": "product/github-presentation/index.html"
+    "card": "../designs/github-presentation/index.html"
   },
   "contrast-muted-on-panel": {
     "value": 2.69,
@@ -207,87 +207,87 @@ window.ERFANA_CLAIMS = {
   "contrast-wait-text": {
     "value": 8.52,
     "label": "--color-text-tertiary on --color-brand-black, the waiting message's body text on the pre-paint backdrop",
-    "card": "product/html-waiting/index.html"
+    "card": "../designs/html-waiting/index.html"
   },
   "contrast-wait-aside": {
     "value": 5.01,
     "label": "--color-text-secondary on --color-brand-black, the waiting message's aside on the pre-paint backdrop",
-    "card": "product/html-waiting/index.html"
+    "card": "../designs/html-waiting/index.html"
   },
   "contrast-wait-aside-muted": {
     "value": 3.63,
     "label": "--color-text-muted on --color-brand-black, the aside colour the card used to render",
-    "card": "product/html-waiting/index.html"
+    "card": "../designs/html-waiting/index.html"
   },
   "hpc-accent-ink": {
     "value": 8.4,
     "label": "--color-accent-primary against --color-brand-black: the pin fill against its ink stroke and content, the label tag, the mode tab text",
-    "card": "product/html-comments/overlay.html"
+    "card": "../designs/comments/html-comments/overlay.html"
   },
   "hpc-hover-ink": {
     "value": 6.85,
     "label": "--color-brand-violet-hover against --color-brand-black: a hovered pin against its ink",
-    "card": "product/html-comments/overlay.html"
+    "card": "../designs/comments/html-comments/overlay.html"
   },
   "hpc-warning-ink": {
     "value": 8.01,
     "label": "--color-brand-black on --color-warning: the ink ! on a damaged pin",
-    "card": "product/html-comments/overlay.html"
+    "card": "../designs/comments/html-comments/overlay.html"
   },
   "hpc-label-paper": {
     "value": 17.62,
     "label": "--color-brand-white on --color-brand-black: the element label text",
-    "card": "product/html-comments/overlay.html"
+    "card": "../designs/comments/html-comments/overlay.html"
   },
   "hpc-label-size": {
     "value": 11.51,
     "label": "--color-text-primary on --color-brand-black: the size in the element label",
-    "card": "product/html-comments/overlay.html"
+    "card": "../designs/comments/html-comments/overlay.html"
   },
   "hpc-accent-on-white": {
     "value": 2.1,
     "label": "--color-accent-primary on --color-brand-white: why the accent ring alone fails on a light page",
-    "card": "product/html-comments/overlay.html"
+    "card": "../designs/comments/html-comments/overlay.html"
   },
   "hpc-ink-on-white": {
     "value": 17.62,
     "label": "--color-brand-black on --color-brand-white: the ink line that carries the ring on a light page",
-    "card": "product/html-comments/overlay.html"
+    "card": "../designs/comments/html-comments/overlay.html"
   },
   "hpc-window-meta": {
     "value": 6.33,
     "label": "--color-text-tertiary on --color-bg-elevated: the comment window context, meta, hint and counter",
-    "card": "product/html-comments/window.html"
+    "card": "../designs/comments/html-comments/window.html"
   },
   "hpc-window-secondary": {
     "value": 3.72,
     "label": "--color-text-secondary on --color-bg-elevated: why the comment window does not use secondary for small text",
-    "card": "product/html-comments/window.html"
+    "card": "../designs/comments/html-comments/window.html"
   },
   "hpc-window-input-border": {
     "value": 3.11,
     "label": "--color-border-input against --color-bg-elevated: the comment field edge",
-    "card": "product/html-comments/window.html"
+    "card": "../designs/comments/html-comments/window.html"
   },
   "hpc-window-focus": {
     "value": 6.24,
     "label": "--color-border-focus against --color-bg-elevated: the focus ring in the comment window",
-    "card": "product/html-comments/window.html"
+    "card": "../designs/comments/html-comments/window.html"
   },
   "hpc-drawer-meta": {
     "value": 6.33,
     "label": "--color-text-tertiary on --color-bg-secondary: the drawer meta and count text",
-    "card": "product/html-comments/drawer.html"
+    "card": "../designs/comments/html-comments/drawer.html"
   },
   "hpc-settings-secondary": {
     "value": 3.72,
     "label": "--color-text-secondary on --color-bg-secondary: the shipping Settings description colour, under 4.5:1",
-    "card": "product/html-comments/identity.html"
+    "card": "../designs/comments/html-comments/identity.html"
   },
   "hpc-settings-tertiary": {
     "value": 6.33,
     "label": "--color-text-tertiary on --color-bg-secondary: the description colour the Comments section uses",
-    "card": "product/html-comments/identity.html"
+    "card": "../designs/comments/html-comments/identity.html"
   }
 };
 

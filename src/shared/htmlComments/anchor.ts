@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Anchors: how a block names its element, and how it finds it again
- * (docs/designs/html-preview-comments.md §5.3, §5.9, §19 R3-10).
+ * (docs/designs/comments/html-preview-comments.md §5.3, §5.9, §19 R3-10).
  *
  * A block normally sits right before its element, so the first rule –
  * POSITION – is "the next start tag in the SOURCE TEXT after the block,

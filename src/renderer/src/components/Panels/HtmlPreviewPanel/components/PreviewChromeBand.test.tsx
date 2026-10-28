@@ -584,7 +584,7 @@ describe('PreviewChromeBand — what an unencrypted origin has to say', () => {
     // NOT a prediction that it will fail to load. Measured in Electron 39 an
     // http subresource inside a preview is not refused as mixed content, because
     // the document sits at an opaque origin — see
-    // docs/designs/108-http-and-ipv6-in-the-preview.md. So the honest warning is
+    // docs/designs/html-preview/108-http-and-ipv6-in-the-preview.md. So the honest warning is
     // what plaintext costs, not a guess about whether the grant works.
     const user = userEvent.setup()
     renderBand({ blockedHosts: [host('http://dev.example.com:3000')] })

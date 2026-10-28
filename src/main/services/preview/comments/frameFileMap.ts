@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Which file each frame of one preview view shows
- * (docs/designs/html-preview-comments.md §4.2 "frameFileMap", §9.1 S8, S9,
+ * (docs/designs/comments/html-preview-comments.md §4.2 "frameFileMap", §9.1 S8, S9,
  * §19 R3-14; tests M-050, SEC-09).
  *
  * The ONLY source of "this frame's file" for comments. It is set from

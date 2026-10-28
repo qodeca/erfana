@@ -3,7 +3,7 @@
 /**
  * HTML Preview comments – what the comment window says about its request: the
  * heading (title, context line, note) and the new comment a pin's thread view
- * can switch to (docs/designs/html-preview-comments.md §10.10 "Window titles",
+ * can switch to (docs/designs/comments/html-preview-comments.md §10.10 "Window titles",
  * "Context line"). Pure: no React, no bridge.
  *
  * @module HtmlPreviewPanel/comments/commentWindowHeading

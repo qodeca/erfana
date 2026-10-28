@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * HTML Preview comments – instrumentation exit test (P3;
- * docs/designs/html-preview-comments.md §13 P3 "e2e exit", §6, §19 R3-1).
+ * docs/designs/comments/html-preview-comments.md §13 P3 "e2e exit", §6, §19 R3-1).
  *
  * A page that already carries comment blocks – written by the real P1
  * serializer, the same builder the unit tests use (`commentedPages.ts`) – is

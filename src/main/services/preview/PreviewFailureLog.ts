@@ -21,7 +21,7 @@
  * the latest snapshot, so the log can never become a denial-of-service channel
  * against the IPC bridge.
  *
- * @see docs/designs/sd-074-html-preview.md §1.3, §0 (diagnostic-signal bounds)
+ * @see docs/designs/html-preview/sd-074-html-preview.md §1.3, §0 (diagnostic-signal bounds)
  */
 import { PREVIEW } from '../../../shared/constants'
 import type { ErrorCode } from '../../../shared/errors'

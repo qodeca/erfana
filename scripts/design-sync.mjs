@@ -77,9 +77,9 @@ const SPDX = [
 ].join('\n')
 // REUSE-IgnoreEnd
 
-// Section order is deliberate: read the foundations before the parts, and the
-// parts before the screens built out of them.
-const ORDER = ['Foundations', 'Components', 'HTML preview']
+// Section order is deliberate: read the foundations before the parts built on them.
+// Feature screens are not indexed here: they live in docs/designs/<functionality>/.
+const ORDER = ['Foundations', 'Components']
 
 const MARKER = /<!--\s*@card\s+([^>]*?)-->/
 const FIELD = /([a-z]+)="([^"]*)"/g

@@ -35,7 +35,7 @@
  * so it was load-bearing by accident.
  *
  * @see docs/design-system/system/components/permission-band/index.html - status="decided"
- * @see docs/design-system/product/html-approval/index.html - the nine-state journey
+ * @see docs/designs/html-approval/index.html - the nine-state journey
  */
 import { useCallback, useEffect, useId, useMemo, useReducer, useRef } from 'react'
 

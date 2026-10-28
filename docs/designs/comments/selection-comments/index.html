@@ -1,0 +1,253 @@
+<!-- @card group="HTML preview" name="Commenting on selected text" subtitle="Select words in the HTML or Markdown preview and comment on them – entry, menu, window, underline and every state" status="proposed" reviewed="2026-10-28" -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Erfana — commenting on selected text</title>
+<link rel="stylesheet" href="../../../design-system/tokens.css">
+<link rel="stylesheet" href="../../../design-system/ds.css">
+<link rel="stylesheet" href="../../../design-system/system/components/menu/menu.css">
+<link rel="stylesheet" href="../html-comments/demo.css">
+<link rel="stylesheet" href="../html-comments/overlay.css">
+<link rel="stylesheet" href="../html-comments/comments.css">
+<link rel="stylesheet" href="../markdown-comments/markdown-comments.css">
+<link rel="stylesheet" href="./selection.css">
+</head>
+<body>
+
+<h1>Commenting on selected text</h1>
+<p class="ds-lede">
+  Select a few words in a preview and comment on them. The comment is still stored on the element (HTML) or
+  block (Markdown) that holds the words – so its place in the file, its pin and its thread work as they do
+  today – and it also remembers the words, which stay underlined while they can be found.
+  <strong>This card shows the HTML Preview, where selecting is new; the Markdown side is on the
+  <a href="../markdown-comments/index.html" style="color: var(--color-link)">Markdown cards</a>.</strong>
+</p>
+<div class="ds-note">
+  <strong>Proposed, and static.</strong> Plan: <code>docs/designs/comments/selection-comments.md</code>. No script: every
+  state is drawn on its own. The previewed page is the HTML cards' fake page (third-party look, exempt from
+  tokens). The underline is drawn as a span here; in the app it is boxes in the overlay's closed shadow root.
+</div>
+
+<h2>The journey – HTML Preview</h2>
+
+<!-- 1. drag in comment mode -->
+<section class="sel-step" aria-labelledby="h1">
+  <div class="panel sel-panel" role="group" aria-label="Example: a selection in comment mode"><div class="panel__body"><div class="page-area">
+    <div class="page">
+      <h4>Pricing</h4>
+      <p class="sel-anchor" style="margin-block-start: var(--space-12)">We ship the beta to ten customers. The target is to <span class="erf-sel-native">ship by Friday</span>, after the security review.<span class="erf-hpc-outline" aria-hidden="true"></span><span class="erf-hpc-label" aria-hidden="true"><span class="erf-hpc-label__tag">p.lede</span><span class="erf-hpc-label__size">selection</span></span></p>
+      <p>Plans start at <em>10 EUR</em> a month.</p>
+      <button class="cta" type="button" tabindex="-1">Buy now</button>
+    </div>
+    <div class="erf-hpc-root" aria-hidden="true"><div class="erf-hpc-frame"></div><div class="erf-hpc-tab"><span class="erf-hpc-text" data-text="Comment mode – Esc to leave"></span></div></div>
+  </div></div></div>
+  <div>
+    <p class="step__no">1 · select</p>
+    <h3 class="step__title" id="h1">In comment mode, drag selects</h3>
+    <p class="step__text">Today comment mode cancels the press that starts a selection. Now a press that
+      <strong>moves 4 px or more</strong> selects text; a still click still opens the window on the element.
+      Page scripts still never see the press.</p>
+    <p class="step__text">The outline moves to the <strong>smallest element that holds the whole selection</strong>,
+      labelled <code>p.lede · selection</code>. Announced: "Text selected in p.lede. Press Shift+F10 to comment."</p>
+  </div>
+</section>
+
+<!-- 2. menu -->
+<section class="sel-step" aria-labelledby="h2">
+  <div class="panel sel-panel" role="group" aria-label="Example: the selection menu"><div class="panel__body"><div class="page-area">
+    <div class="page">
+      <h4>Pricing</h4>
+      <p class="sel-anchor">We ship the beta to ten customers. The target is to <span class="erf-sel-native">ship by Friday</span>, after the security review.<span class="erf-hpc-outline erf-hpc-outline--selected" aria-hidden="true"></span></p>
+      <p>Plans start at <em>10 EUR</em> a month.</p>
+    </div>
+    <span class="still-tag">still image under the menu</span>
+    <div class="erf-menu sel-float" role="menu" aria-label="Selection" style="inset-block-start: 96px; inset-inline-start: 260px;">
+      <div class="erf-menu-item erf-menu-item--active" role="menuitem" tabindex="0"><span class="erf-menu-icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"></path><path d="M12 8v6"></path><path d="M9 11h6"></path></svg></span><span class="erf-menu-label">Add comment</span></div>
+      <div class="erf-menu-item" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 3a2 2 0 0 0-2 2"></path><path d="M19 3a2 2 0 0 1 2 2"></path><path d="M21 19a2 2 0 0 1-2 2"></path><path d="M5 21a2 2 0 0 1-2-2"></path><path d="M9 3h1"></path><path d="M9 21h1"></path><path d="M14 3h1"></path><path d="M14 21h1"></path><path d="M3 9v1"></path><path d="M21 9v1"></path><path d="M3 14v1"></path><path d="M21 14v1"></path></svg></span><span class="erf-menu-label">Comment on whole p.lede</span></div>
+    </div>
+  </div></div></div>
+  <div>
+    <p class="step__no">2 · menu</p>
+    <h3 class="step__title" id="h2">Two items: the words, or the whole element</h3>
+    <p class="step__text">Right-click, Shift+F10 or the Menu key. Menu label <strong>"Selection"</strong>.
+      <strong>Add comment</strong> comments on the words and has focus; <strong>Comment on whole p.lede</strong>
+      is today's element comment. Without a selection the menu is unchanged: one item.</p>
+    <p class="step__text">The Markdown preview gets the same two items in comment mode.</p>
+  </div>
+</section>
+
+<!-- 3. window -->
+<section class="sel-step" aria-labelledby="h3">
+  <div class="panel sel-panel sel-panel--tall" role="group" aria-label="Example: the window on a selection"><div class="panel__body"><div class="page-area">
+    <div class="page">
+      <h4>Pricing</h4>
+      <p class="sel-anchor" style="max-inline-size: 24ch">We ship the beta to ten customers. The target is to <span class="erf-hpc-mark erf-hpc-mark--active">ship by Friday</span>, after the security review.<span class="erf-hpc-outline erf-hpc-outline--selected" aria-hidden="true"></span></p>
+    </div>
+    <span class="still-tag">still image under the window</span>
+    <div class="erf-comment-window sel-float" role="group" aria-label="Example: New comment" aria-labelledby="w1-t" style="inset-block-start: var(--space-8); inset-inline-end: var(--space-8);">
+      <div class="erf-comment-window__head"><div class="erf-comment-window__heading">
+        <h2 class="erf-comment-window__title" id="w1-t" tabindex="-1">New comment</h2>
+        <p class="erf-comment-window__context"><bdi dir="ltr">p.lede</bdi> · index.html, line 12</p>
+        <span class="erf-sel-quote">ship by Friday</span>
+      </div><button class="erf-comment-icon-btn" type="button" aria-label="Close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+      <div class="erf-comment-window__body"><div class="erf-comment-field"><label class="erf-comment-field__label" for="f1">Comment</label>
+        <textarea class="erf-comment-textarea" id="f1" placeholder="What should change here?">Friday is a holiday in two markets. Say Thursday.</textarea>
+        <div class="erf-comment-field__foot"><p class="erf-comment-field__hint">Plain text. Saved inside index.html.</p><span class="erf-comment-counter">49 / 4000</span></div></div>
+        <p class="erf-comment-identity">Commenting as <bdi>Marcin Obel</bdi> <button class="erf-comment-link" type="button">Change</button></p></div>
+      <div class="erf-comment-window__foot"><button class="erf-comment-btn erf-comment-btn--secondary" type="button"><span>Cancel</span></button><button class="erf-comment-btn erf-comment-btn--primary" type="button" title="Save (Cmd+Enter)"><span>Save</span></button></div>
+    </div>
+  </div></div></div>
+  <div>
+    <p class="step__no">3 · write</p>
+    <h3 class="step__title" id="h3">The words, quoted</h3>
+    <p class="step__text">The HTML window, unchanged, with the words under the context line on an accent rule – in
+      the <strong>system sans</strong>, because the page's own font is unknown (Markdown uses its serif).</p>
+    <p class="step__text">Main checks that the words are in <code>index.html</code> as written before it saves
+      them. Page text is untrusted; today only its length is checked.</p>
+  </div>
+</section>
+
+<!-- 4. saved -->
+<section class="sel-step" aria-labelledby="h4">
+  <div class="panel sel-panel" role="group" aria-label="Example: the underline after saving"><div class="panel__body"><div class="page-area">
+    <div class="page">
+      <h4>Pricing</h4>
+      <p class="sel-anchor" style="max-inline-size: 30ch">We ship the beta to ten customers. The target is to <span class="erf-hpc-mark">ship by Friday, after the security review</span> has signed off.<span class="erf-hpc-pin" role="button" tabindex="-1" aria-label="1 comment on p.lede. Open."><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="erf-hpc-pin__body" d="M2 2H22V17H7L2 22Z"></path><rect class="erf-hpc-pin__line" x="6" y="6" width="12" height="2"></rect><rect class="erf-hpc-pin__line" x="6" y="10" width="8" height="2"></rect></svg></span></p>
+      <p>Plans start at <em>10 EUR</em> a month.</p>
+    </div>
+  </div></div></div>
+  <div>
+    <p class="step__no">4 · saved</p>
+    <h3 class="step__title" id="h4">Pin on the element, words underlined</h3>
+    <p class="step__text">The pin is today's pin on the element's corner. The underline is <strong>one box per line</strong>
+      of the selection (a wrapped selection gets two), drawn in the overlay – page scripts cannot see or remove it,
+      Find never counts it, and printing hides it.</p>
+    <p class="step__text">Two-tone like the outline: an accent fill and bar with an ink line under it, so it reads on
+      white and black pages.</p>
+  </div>
+</section>
+
+<!-- 5. select first -->
+<section class="sel-step" aria-labelledby="h5">
+  <div class="sel-row" style="margin: 0">
+    <figure><figcaption><strong>mode off</strong> · the page owns the mouse; select as usual</figcaption>
+      <div class="panel sel-mini"><div class="panel__body"><div class="page-area">
+        <div class="page"><h4>Pricing</h4><p>Plans start at <span class="erf-sel-native">10 EUR</span> a month.</p></div>
+      </div></div></div></figure>
+    <figure><figcaption><strong>Cmd+Option+M</strong> · the window opens on the selection at once</figcaption>
+      <div class="panel sel-mini"><div class="panel__body"><div class="page-area">
+        <div class="page"><h4>Pricing</h4><p>Plans start at <span class="erf-hpc-mark erf-hpc-mark--active">10 EUR</span> a month.</p></div>
+        <div class="erf-hpc-root" aria-hidden="true"><div class="erf-hpc-frame"></div></div>
+        <span class="still-tag">window opens beside – see step 3</span>
+      </div></div></div></figure>
+  </div>
+  <div>
+    <p class="step__no">5 · select first</p>
+    <h3 class="step__title" id="h5">Or select, then turn on comment mode</h3>
+    <p class="step__text">With the mode off the page keeps its own mouse, so double-click and triple-click select
+      words and lines. Turning the mode on with a selection skips the picker and opens the window on the words.
+      Announced: "Comment mode on. Commenting on the selected text."</p>
+    <p class="step__text">Works the same in the Markdown preview.</p>
+  </div>
+</section>
+
+<h2>States</h2>
+<div class="sel-row">
+
+  <figure><figcaption><strong>selection across elements</strong> · the container is their nearest common element</figcaption>
+    <div class="panel sel-mini" style="block-size: 200px"><div class="panel__body"><div class="page-area">
+      <div class="page"><div class="sel-anchor" style="margin-block-start: var(--space-12)"><h4>Plans</h4><p>Start <span class="erf-sel-native">free, then pay</span></p><p><span class="erf-sel-native">for what</span> you use.</p><span class="erf-hpc-outline" aria-hidden="true"></span><span class="erf-hpc-label" aria-hidden="true"><span class="erf-hpc-label__tag">section.plans</span><span class="erf-hpc-label__size">selection</span></span></div></div>
+    </div></div></div></figure>
+
+  <figure><figcaption><strong>dark page</strong> · the ink line carries the underline on black</figcaption>
+    <div class="panel sel-mini"><div class="panel__body"><div class="page-area">
+      <div class="page page--dark"><h4>Pricing</h4><p>The target is to <span class="erf-hpc-mark">ship by Friday</span>, after the review.</p></div>
+    </div></div></div></figure>
+
+  <figure class="sel-win"><figcaption><strong>refused</strong> · a script changed the words, so they are not in the file</figcaption>
+    <div class="erf-comment-window" role="group" aria-label="Example: refused selection" aria-labelledby="w2-t">
+      <div class="erf-comment-window__head"><div class="erf-comment-window__heading">
+        <h2 class="erf-comment-window__title" id="w2-t" tabindex="-1">New comment</h2>
+        <p class="erf-comment-window__context"><bdi dir="ltr">span.price</bdi> · index.html, line 30</p>
+      </div><button class="erf-comment-icon-btn" type="button" aria-label="Close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+      <div class="erf-comment-window__body">
+        <div class="erf-comment-banner erf-comment-banner--warning"><span class="erf-comment-banner__icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg></span>
+          <div class="erf-comment-banner__body"><p class="erf-comment-banner__text">This text isn't in index.html as written – a script may have changed it.</p>
+            <span class="erf-comment-quote">9.99 EUR / month</span>
+            <div class="erf-comment-banner__actions"><button class="erf-comment-btn erf-comment-btn--secondary" type="button"><span>Comment on the whole element instead</span></button></div></div></div>
+      </div>
+      <div class="erf-comment-window__foot"><button class="erf-comment-btn erf-comment-btn--secondary" type="button"><span>Cancel</span></button></div>
+    </div></figure>
+
+  <figure class="sel-win"><figcaption><strong>script-built element</strong> · cannot be checked; accepted like today's script quote</figcaption>
+    <div class="erf-comment-window" role="group" aria-label="Example: script-built" aria-labelledby="w3-t">
+      <div class="erf-comment-window__head"><div class="erf-comment-window__heading">
+        <h2 class="erf-comment-window__title" id="w3-t" tabindex="-1">New comment</h2>
+        <p class="erf-comment-window__context"><bdi dir="ltr">div.toast</bdi> · index.html, line 61</p>
+        <p class="erf-comment-note">Added by a script – saved before &lt;section id="pricing"&gt;.</p>
+        <span class="erf-sel-quote">Saved!</span>
+      </div><button class="erf-comment-icon-btn" type="button" aria-label="Close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+      <div class="erf-comment-window__body"><div class="erf-comment-field"><label class="erf-comment-field__label" for="f3">Comment</label>
+        <textarea class="erf-comment-textarea" id="f3">Say "Changes saved".</textarea>
+        <div class="erf-comment-field__foot"><p class="erf-comment-field__hint">Plain text. Saved inside index.html.</p><span class="erf-comment-counter">20 / 4000</span></div></div></div>
+      <div class="erf-comment-window__foot"><button class="erf-comment-btn erf-comment-btn--secondary" type="button"><span>Cancel</span></button><button class="erf-comment-btn erf-comment-btn--primary" type="button"><span>Save</span></button></div>
+    </div></figure>
+
+  <figure class="sel-win"><figcaption><strong>long selection</strong> · cut at 200 characters</figcaption>
+    <div class="erf-comment-window" role="group" aria-label="Example: long selection" aria-labelledby="w4-t">
+      <div class="erf-comment-window__head"><div class="erf-comment-window__heading">
+        <h2 class="erf-comment-window__title" id="w4-t" tabindex="-1">New comment</h2>
+        <p class="erf-comment-window__context"><bdi dir="ltr">section.terms</bdi> · index.html, line 80</p>
+        <span class="erf-sel-quote">You can cancel at any time. Unused days are refunded to the card you paid with within ten working days, and your data stays available for export for thirty days after the end of the billing period, after which…</span>
+        <p class="erf-comment-note" style="margin-block-start: var(--space-3)">Only the first 200 characters are kept.</p>
+      </div><button class="erf-comment-icon-btn" type="button" aria-label="Close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+      <div class="erf-comment-window__body"><div class="erf-comment-field"><label class="erf-comment-field__label" for="f4">Comment</label>
+        <textarea class="erf-comment-textarea" id="f4" placeholder="What should change here?"></textarea>
+        <div class="erf-comment-field__foot"><p class="erf-comment-field__hint">Plain text. Saved inside index.html.</p><span class="erf-comment-counter">0 / 4000</span></div></div></div>
+      <div class="erf-comment-window__foot"><button class="erf-comment-btn erf-comment-btn--secondary" type="button"><span>Cancel</span></button><button class="erf-comment-btn erf-comment-btn--primary" type="button" aria-disabled="true"><span>Save</span></button></div>
+    </div></figure>
+
+  <figure class="sel-win"><figcaption><strong>words changed</strong> · the element is found, the words are not; the pin stays</figcaption>
+    <div class="erf-comment-window" role="group" aria-label="Example: words changed" aria-labelledby="w5-t">
+      <div class="erf-comment-window__head"><div class="erf-comment-window__heading">
+        <h2 class="erf-comment-window__title" id="w5-t" tabindex="-1">Comment on p.lede</h2>
+        <p class="erf-comment-window__context"><bdi dir="ltr">p.lede</bdi> · index.html, line 12</p>
+      </div><button class="erf-comment-icon-btn" type="button" aria-label="Close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+      <div class="erf-comment-window__body">
+        <div class="erf-comment-banner erf-comment-banner--info"><span class="erf-comment-banner__icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0"></path><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg></span>
+          <div class="erf-comment-banner__body"><p class="erf-comment-banner__text">The selected text changed. The comment is still on this element.</p><span class="erf-comment-quote">ship by Friday</span></div></div>
+        <article class="erf-comment-message"><div class="erf-comment-message__meta"><span class="erf-comment-message__meta-text"><bdi class="erf-comment-message__author">Marcin Obel</bdi> · <time datetime="2026-10-28T12:40">Today, 12:40</time></span></div>
+          <p class="erf-comment-message__text" dir="auto">Friday is a holiday in two markets. Say Thursday.</p></article>
+      </div>
+      <div class="erf-comment-window__foot"><span class="erf-comment-window__foot-start"><button class="erf-comment-btn erf-comment-btn--secondary" type="button"><span>Open in source</span></button></span><span class="erf-comment-window__foot-end"><button class="erf-comment-btn erf-comment-btn--secondary" type="button"><span>Close</span></button></span></div>
+    </div></figure>
+</div>
+
+<h2>Markdown preview – the same two items in comment mode</h2>
+<div class="sel-row">
+  <figure><figcaption><strong>comment mode, a selection</strong> · label "Selection"</figcaption>
+    <div class="erf-mdc-panel" style="inline-size: 420px; --mdc-body-height: 190px"><div class="erf-mdc-panel__body"><div class="erf-mdc-preview">
+      <div class="erf-mdc-content"><ul><li>Run the <span class="erf-mdc-selection">load test</span> against staging.</li></ul></div>
+      <div class="erf-menu sel-float" role="menu" aria-label="Selection" style="inset-block-start: 70px; inset-inline-start: 120px;">
+        <div class="erf-menu-item erf-menu-item--active" role="menuitem" tabindex="0"><span class="erf-menu-icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"></path><path d="M12 8v6"></path><path d="M9 11h6"></path></svg></span><span class="erf-menu-label">Add comment</span></div>
+        <div class="erf-menu-item" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 3a2 2 0 0 0-2 2"></path><path d="M19 3a2 2 0 0 1 2 2"></path><path d="M21 19a2 2 0 0 1-2 2"></path><path d="M5 21a2 2 0 0 1-2-2"></path><path d="M9 3h1"></path><path d="M9 21h1"></path><path d="M14 3h1"></path><path d="M14 21h1"></path><path d="M3 9v1"></path><path d="M21 9v1"></path><path d="M3 14v1"></path><path d="M21 14v1"></path></svg></span><span class="erf-menu-label">Comment on whole li</span></div>
+      </div>
+    </div></div></div></figure>
+</div>
+
+<h2>Exceptions</h2>
+<table>
+  <thead><tr><th>Where</th><th>The system</th><th>Here, and why</th></tr></thead>
+  <tbody>
+    <tr><td>Underline as a span</td><td>Shipping: boxes from <code>Range.getClientRects()</code> in the closed shadow root (HTML), <code>::highlight()</code> (Markdown).</td><td>A static card cannot measure; <code>box-decoration-break: clone</code> gives one box per line, as the overlay draws.</td></tr>
+    <tr><td>Overlay parts inside page elements</td><td>The overlay is one host element over the page.</td><td>Static card; same geometry.</td></tr>
+    <tr><td>Native selection colour</td><td>Chromium paints the page's selection.</td><td>The system colours <code>Highlight</code> / <code>HighlightText</code> stand in for it.</td></tr>
+  </tbody>
+</table>
+
+</body>
+</html>

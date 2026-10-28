@@ -19,7 +19,7 @@
  * and are never reflected back to the page; the schemas are the tripwire against
  * a wiring regression, not against the untrusted page (which has no path here).
  *
- * @see docs/designs/sd-074-html-preview.md §1.6, §4.3
+ * @see docs/designs/html-preview/sd-074-html-preview.md §1.6, §4.3
  * @see src/main/ipc/claude-status-handlers.ts (the mirrored emit pattern)
  */
 import {

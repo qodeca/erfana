@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * HTML Preview comments – the drawer as a full-width sheet
- * (docs/designs/html-preview-comments.md §10.6).
+ * (docs/designs/comments/html-preview-comments.md §10.6).
  *
  * Under a {@link DRAWER_FULL_BELOW_PX} panel the drawer takes the whole width
  * of the page area. The page then has nowhere to show, and a native view paints

@@ -37,7 +37,7 @@ exercise the AC7 blocked path.
 - `runaway-loop/index.html` — a recoverable event-loop flood.
 
 [issue #74]: https://github.com/qodeca/erfana/issues/74
-[`sd-074-html-preview.md`]: ../../../docs/designs/sd-074-html-preview.md
+[`sd-074-html-preview.md`]: ../../../docs/designs/html-preview/sd-074-html-preview.md
 
 ## `links/`
 
@@ -105,7 +105,7 @@ failed page without racing a delete – and `extra/page-N.html`, one per
 
 ## `comments/`
 
-Pages for HTML Preview comments ([design](../../../docs/designs/html-preview-comments.md), [format](../../../docs/html-comments/format-v1.md)). Byte-exact (`-text` in `.gitattributes`).
+Pages for HTML Preview comments ([design](../../../docs/designs/comments/html-preview-comments.md), [format](../../../docs/html-comments/format-v1.md)). Byte-exact (`-text` in `.gitattributes`).
 
 | Path | Case |
 |---|---|

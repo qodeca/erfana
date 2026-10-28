@@ -16,7 +16,7 @@
  * KEY not being present, never by a value.
  *
  * Two variants, chosen by `htmlPreview.comments.enabled` when the view is
- * built (docs/designs/html-preview-comments.md §3 "Feature flag", §4.2; ADR
+ * built (docs/designs/comments/html-preview-comments.md §3 "Feature flag", §4.2; ADR
  * 0005): flag off is today's literal exactly; flag on differs in TWO keys.
  * `nodeIntegrationInSubFrames: true` gives frames no Node at all under
  * `sandbox: true` – it makes Electron run the (sandboxed, isolated) preload in

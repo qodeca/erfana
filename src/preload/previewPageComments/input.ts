@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Comment mode's input guards (docs/designs/html-preview-comments.md §3
+ * Comment mode's input guards (docs/designs/comments/html-preview-comments.md §3
  * "Keyboard picker keys", §7.1 steps 3–4, §7.2, decision 19; tests J-003,
  * J-004, J-012, J-013, SEC-02, SEC-03, SEC-29).
  *

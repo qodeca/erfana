@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Test doubles for the browser APIs the comment overlay uses and jsdom lacks
- * (docs/designs/html-preview-comments.md §12.1 L3: "geometry,
+ * (docs/designs/comments/html-preview-comments.md §12.1 L3: "geometry,
  * elementFromPoint, checkVisibility, Popover API and adoptedStyleSheets
  * injected as test doubles").
  *

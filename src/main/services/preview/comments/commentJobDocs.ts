@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * The parsed document a comment file job works on, and the parse worker's
- * cache of them (docs/designs/html-preview-comments.md §19 R3-12).
+ * cache of them (docs/designs/comments/html-preview-comments.md §19 R3-12).
  *
  * Pure apart from a hash: no Electron, no file system, no worker API, so the
  * worker shell (`commentParseWorker.ts`) and the in-process runner the suites

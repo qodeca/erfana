@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * The visible / hidden pin report (docs/designs/html-preview-comments.md §6
+ * The visible / hidden pin report (docs/designs/comments/html-preview-comments.md §6
  * status, §8 `commentAnchors`, §9.1 S25).
  */
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'

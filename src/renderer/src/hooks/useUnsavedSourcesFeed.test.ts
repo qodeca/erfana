@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * The unsaved-HTML-sources feed to main (docs/designs/html-preview-comments.md
+ * The unsaved-HTML-sources feed to main (docs/designs/comments/html-preview-comments.md
  * §7.8, decision 13; R-007).
  */
 import { act, renderHook } from '@testing-library/react'

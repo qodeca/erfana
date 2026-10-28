@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Property tests for the comment format (docs/designs/html-preview-comments.md
+ * Property tests for the comment format (docs/designs/comments/html-preview-comments.md
  * §17, P-001–P-007). P-003 is the proof of decision 24: adding a comment never
  * changes a byte outside the inserted range, and removing it gives the file
  * back exactly.

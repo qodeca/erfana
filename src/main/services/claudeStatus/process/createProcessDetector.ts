@@ -9,7 +9,7 @@
  * a no-op detector that always reports "not running", so the status bar never
  * appears (graceful).
  *
- * @see docs/designs/216-claude-status-bar.md §4, §10
+ * @see docs/designs/context-meter/216-claude-status-bar.md §4, §10
  */
 import type { ClaudeDetection, IClaudeProcessDetector } from './types'
 import { MacClaudeProcessDetector } from './MacClaudeProcessDetector'

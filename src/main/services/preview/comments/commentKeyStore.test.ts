@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Draft tokens and opaque keys (docs/designs/html-preview-comments.md §7.5
+ * Draft tokens and opaque keys (docs/designs/comments/html-preview-comments.md §7.5
  * step 1, §8; M-051, M-053, M-057, SEC-08).
  */
 import { describe, expect, it } from 'vitest'

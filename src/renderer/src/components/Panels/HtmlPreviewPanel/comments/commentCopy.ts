@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * HTML Preview comments – every string the comment chrome shows
- * (docs/designs/html-preview-comments.md §10.10 is the source of truth).
+ * (docs/designs/comments/html-preview-comments.md §10.10 is the source of truth).
  *
  * WHY THE RENDERER MAPS ERROR CODES ITSELF. `src/shared/errors.ts` carries a
  * fallback sentence per code, written without the file name ("This file has

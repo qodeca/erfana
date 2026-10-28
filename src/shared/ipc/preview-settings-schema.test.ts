@@ -3,7 +3,7 @@
 /**
  * PreviewAllowlistSchema / isApprovableHost tests (Issue #74, work item 10).
  *
- * @see docs/designs/sd-074-html-preview.md §3.1
+ * @see docs/designs/html-preview/sd-074-html-preview.md §3.1
  */
 import { describe, it, expect } from 'vitest'
 import {
@@ -236,7 +236,7 @@ describe('parsePreviewOrigin', () => {
     // grant an irreversible button that does nothing. Measured in Electron 39 it
     // is not refused — the document sits at an opaque origin, and mixed content
     // is decided against the origin's scheme, not against isSecureContext.
-    // docs/designs/108-http-and-ipv6-in-the-preview.md
+    // docs/designs/html-preview/108-http-and-ipv6-in-the-preview.md
     expect(parsePreviewOrigin('http://localhost:3000')).toBe('http://localhost:3000')
     expect(parsePreviewOrigin('http://example.com')).toBe('http://example.com')
     // The default port for the scheme is still dropped, per scheme.

@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * The overlay's inlined constants against their main-side sources
- * (docs/designs/html-preview-comments.md §8).
+ * (docs/designs/comments/html-preview-comments.md §8).
  *
  * A preload entry must stay self-contained (#73), so `constants.ts` repeats
  * the channel names, the token format and the limits main uses. Nothing else

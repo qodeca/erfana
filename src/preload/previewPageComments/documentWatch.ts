@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Notices when the page replaces its document element
- * (docs/designs/html-preview-comments.md §9.1 S25; security review M1).
+ * (docs/designs/comments/html-preview-comments.md §9.1 S25; security review M1).
  *
  * `document.open()` erases every event listener of the window and the
  * document – the isolated world's included – and replaces `<html>`. A page

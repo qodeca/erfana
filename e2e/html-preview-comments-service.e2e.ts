@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * HTML Preview comments – service and IPC exit test (P5;
- * docs/designs/html-preview-comments.md §13 P5 "e2e exit", §7.1–§7.7, §8,
+ * docs/designs/comments/html-preview-comments.md §13 P5 "e2e exit", §7.1–§7.7, §8,
  * §12.4; M-040, M-058, SEC-09, SEC-20, SEC-23).
  *
  * Real Chromium, real preload, real main – no stub. The test plays only the

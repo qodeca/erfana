@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * CommentWriter – the only page-driven disk write path
- * (docs/designs/html-preview-comments.md §4.1 B3 → B4, §7.6, §7.7; threats
+ * (docs/designs/comments/html-preview-comments.md §4.1 B3 → B4, §7.6, §7.7; threats
  * S10, S11, S13, S21, S23).
  *
  * Every save, whatever the operation:

@@ -419,8 +419,8 @@ describe('scope', () => {
     expect(inFixedScope('docs/user-guide/how-to/x.md')).toBe(true)
     expect(inFixedScope('docs/keyboard-shortcuts.md')).toBe(true)
     expect(inFixedScope('CLAUDE.md')).toBe(true)
-    expect(inFixedScope('docs/designs/138-user-guide/research.md')).toBe(true)
-    expect(inFixedScope('docs/designs/138-user-guide/sub/x.md')).toBe(false)
+    expect(inFixedScope('docs/designs/user-guide/research.md')).toBe(true)
+    expect(inFixedScope('docs/designs/user-guide/sub/x.md')).toBe(false)
     expect(inFixedScope('docs/ci.md')).toBe(false)
   })
 

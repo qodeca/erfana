@@ -14,7 +14,7 @@
  * through it, rather than holding the controllers directly (whose target does
  * not exist until a view is open).
  *
- * @see docs/designs/sd-074-html-preview.md §5(e), §1.7, §7 item 45
+ * @see docs/designs/html-preview/sd-074-html-preview.md §5(e), §1.7, §7 item 45
  */
 import { type IpcMainInvokeEvent } from 'electron'
 import {

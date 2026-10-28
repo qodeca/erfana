@@ -89,7 +89,7 @@ export interface PreviewHostKeyWindow extends PreviewHostFocusWindow {
 /**
  * Give native keyboard focus to the host contents for an Erfana surface main
  * is about to open over the page – the comment menu or window
- * (docs/designs/html-preview-comments.md §19 "Rev 4 – owner test: comment
+ * (docs/designs/comments/html-preview-comments.md §19 "Rev 4 – owner test: comment
  * window focus and save key").
  *
  * A comment pick is a click or a key INSIDE the page, so the page holds native

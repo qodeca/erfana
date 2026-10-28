@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Main-side client of the persistent comment parse worker
- * (docs/designs/html-preview-comments.md §19 R3-12; pattern
+ * (docs/designs/comments/html-preview-comments.md §19 R3-12; pattern
  * `src/main/services/GitStatusWorkerAdapter.ts`).
  *
  * ONE worker for the whole process, started lazily and warmed when the first

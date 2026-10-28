@@ -1,6 +1,6 @@
 # Agent-review rubric (X-001)
 
-Scoring sheet for the agent check in [docs/designs/html-preview-comments.md § 16](../../../../../docs/designs/html-preview-comments.md): copy **only the three `.html` files** of this folder into a fresh git repo, commit them, then run `claude -p "apply the review comments"` and `codex exec "apply the review comments"`, three runs each. **Never copy this file into the run repo** – it holds the answers.
+Scoring sheet for the agent check in [docs/designs/comments/html-preview-comments.md § 16](../../../../../docs/designs/comments/html-preview-comments.md): copy **only the three `.html` files** of this folder into a fresh git repo, commit them, then run `claude -p "apply the review comments"` and `codex exec "apply the review comments"`, three runs each. **Never copy this file into the run repo** – it holds the answers.
 
 The pages were written by the P1 serializer (`src/shared/htmlComments`), not by hand. Every block is v1 as Erfana writes it, including the three-line `note to agents:` after its header; three blocks were then damaged on purpose. A **Line** below is where the block starts (`<!-- erfana:comment …`); its target follows the block.
 

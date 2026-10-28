@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Regenerates the HTML Preview comments v1 fixtures from the real serializer
- * and parser (docs/designs/html-preview-comments.md: G-001–G-003 in §12,
+ * and parser (docs/designs/comments/html-preview-comments.md: G-001–G-003 in §12,
  * X-001 in §16):
  *
  *   - `v1/<case>.block.txt`: the golden serializations of GOLDEN_CASES;

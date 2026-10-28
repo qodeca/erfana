@@ -8,7 +8,7 @@
  * refactoring across the main/preload/renderer boundary.
  *
  * @see Issue #216 - Per-terminal Claude Code context status bar
- * @see docs/designs/216-claude-status-bar.md §4 - File plan
+ * @see docs/designs/context-meter/216-claude-status-bar.md §4 - File plan
  */
 
 /**

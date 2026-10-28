@@ -10,9 +10,9 @@ SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 - **Campaign:** `release-0.21.0`.
 - **Status:** proposed – design review by a reviewer agent on a different model, not the owner
   (owner's decision, 2026-09-25).
-- **Design:** [docs/designs/138-user-guide/](../designs/138-user-guide/README.md), with the
+- **Design:** [docs/designs/user-guide/](../designs/user-guide/README.md), with the
   [feature inventory](../user-guide/feature-inventory.md) (moved there in #158) and
-  [research notes](../designs/138-user-guide/research.md).
+  [research notes](../designs/user-guide/research.md).
 
 This page is the build contract. The design explains *what* and *why*; this page says *in which
 order*, *which files*, and *how each step is proven*.
@@ -143,7 +143,7 @@ The exact Claude Code variable honoured for the token is fixed in step 1 (spike)
 - `docs/user-guide/**/*.md`;
 - the five folded pages;
 - `docs/README.md`, `CLAUDE.md`, `BACKWARD_COMPATIBILITY.md`, `docs/features/README.md`;
-- `docs/designs/138-user-guide/*.md`;
+- `docs/designs/user-guide/*.md`;
 - every tracked `.md` file that links into `docs/user-guide/`.
 
 `--all` reports on every tracked `.md` file but only warns, so existing debt elsewhere is measured
@@ -207,7 +207,7 @@ args, the same `recordVideo` on CI, the same 1280×800 size). Verified by runnin
 ### 3.6 Requirements from #139 (R138-1…11)
 
 #139's README demo is recorded by this script, not by a second one. Its spec
-([`docs/designs/139-readme-redesign/README.md`](https://github.com/qodeca/erfana/pull/140), draft
+([`docs/designs/readme/README.md`](https://github.com/qodeca/erfana/pull/140), draft
 PR #140) hands these requirements to #138; the numbering is #140's, so both specs name the same
 row. Leader decisions of 2026-09-25 apply to both: one 1280×800 content size, WebP from this
 script's `encode.mjs`, and the privacy pass over the demo's frames. #139 ticks each row against
@@ -368,7 +368,7 @@ Unit tests (`scripts/capture/*.test.mjs`):
 ### Step 5b – README demo scenario (for #139)
 
 Write `scenes/readme-demo.capture.ts` per #139's storyboard and the design's
-[Loop for #139](../designs/138-user-guide/README.md#loop-for-139), and its four manifest rows.
+[Loop for #139](../designs/user-guide/README.md#loop-for-139), and its four manifest rows.
 
 **Verify:**
 

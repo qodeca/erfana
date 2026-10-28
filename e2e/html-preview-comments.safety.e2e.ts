@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * HTML Preview comments – file safety, hostile pages and the edges of the
- * feature, through the real UI (docs/designs/html-preview-comments.md §12.2
+ * feature, through the real UI (docs/designs/comments/html-preview-comments.md §12.2
  * E-009 – E-013, E-015, E-019, E-020, E-022, E-023, E-027; decisions 4, 8,
  * 12, 14, 21, 24, 28, 32; §19 R3-6, R3-8, Rev 4 "folded sections").
  *

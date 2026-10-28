@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * What one view tells the renderer about its comments, read from the frame
- * registry (docs/designs/html-preview-comments.md §8, §10.4, §10.10).
+ * registry (docs/designs/comments/html-preview-comments.md §8, §10.4, §10.10).
  *
  * - The files the drawer lists: the page's, then each same-project frame's,
  *   each once.

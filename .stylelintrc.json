@@ -48,7 +48,8 @@
         "colour to make a point is exactly how the wrong colour gets copied out of it."
       ],
       "files": [
-        "docs/design-system/**/*.html"
+        "docs/design-system/**/*.html",
+        "docs/designs/**/*.html"
       ],
       "customSyntax": "postcss-html"
     },

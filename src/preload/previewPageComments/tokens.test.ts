@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Token capture and strip (docs/designs/html-preview-comments.md §6, §19
+ * Token capture and strip (docs/designs/comments/html-preview-comments.md §6, §19
  * R3-2; J-011, SEC-04, SEC-26, SEC-30).
  *
  * jsdom has no HTML parser feeding a live document, so "parser-inserted"

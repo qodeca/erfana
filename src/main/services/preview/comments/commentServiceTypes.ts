@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * What every view's comment service shares, and the registry the IPC handlers
- * find a panel's service in (docs/designs/html-preview-comments.md §4.2, §8).
+ * find a panel's service in (docs/designs/comments/html-preview-comments.md §4.2, §8).
  *
  * Built once at the composition root (`buildPreviewGraph.ts`) and handed to
  * every live view; a view's service registers itself under its panel and

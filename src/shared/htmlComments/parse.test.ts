@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Finding blocks and locating insertion points
- * (docs/designs/html-preview-comments.md §5.5–§5.7; U-024, U-025, U-030–U-039).
+ * (docs/designs/comments/html-preview-comments.md §5.5–§5.7; U-024, U-025, U-030–U-039).
  *
  * Blocks come from parse5 comment nodes only, so block-shaped text anywhere
  * else is never a block, and every offset is the parser's own.

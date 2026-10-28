@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Element tokens for the served copy of a page
- * (docs/designs/html-preview-comments.md §6, §19 R3-12, R3-13).
+ * (docs/designs/comments/html-preview-comments.md §6, §19 R3-12, R3-13).
  *
  * The preview serves an instrumented COPY – the file on disk never changes –
  * in which every eligible start tag carries `data-erfana-el="<token>"` right

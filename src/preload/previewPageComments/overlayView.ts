@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * What the overlay draws inside its closed shadow root
- * (docs/designs/html-preview-comments.md §10.1, §10.2, §10.5, §10.8).
+ * (docs/designs/comments/html-preview-comments.md §10.1, §10.2, §10.5, §10.8).
  *
  * - the hover / picker outline and its label, above the element's top-left,
  *   flipped below at the viewport top, clamped sideways;

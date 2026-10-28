@@ -8,7 +8,7 @@
  * The argument builders are pure so the unit tests pin them; `runFfmpeg`
  * passes them as an argument array, never through a shell.
  *
- * Design: docs/designs/138-user-guide/README.md § Encoding, § Loop for #139.
+ * Design: docs/designs/user-guide/README.md § Encoding, § Loop for #139.
  */
 
 import { Buffer } from 'node:buffer'

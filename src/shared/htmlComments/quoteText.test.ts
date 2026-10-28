@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Quote text readers (docs/designs/html-preview-comments.md §5.3, §5.9 step 4;
+ * Quote text readers (docs/designs/comments/html-preview-comments.md §5.3, §5.9 step 4;
  * U-088). The readers copy whole runs of text instead of one character at a
  * time; they must read exactly what the character-by-character loop they
  * replaced read, which is kept here as the reference.

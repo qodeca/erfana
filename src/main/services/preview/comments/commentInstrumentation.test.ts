@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Comment instrumentation for one preview view
- * (docs/designs/html-preview-comments.md §3 "Raw vs instrumented bytes", §4.2,
+ * (docs/designs/comments/html-preview-comments.md §3 "Raw vs instrumented bytes", §4.2,
  * §6, §18 logging; M-060 gates). The parse client is the real pipeline run
  * in-process, so a served copy here is exactly what the worker produces.
  */

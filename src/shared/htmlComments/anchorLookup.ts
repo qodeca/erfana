@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Lookup tables for the backup tiers of re-attachment, built once per parse
- * (docs/designs/html-preview-comments.md §5.9 steps 2 and 4).
+ * (docs/designs/comments/html-preview-comments.md §5.9 steps 2 and 4).
  *
  * A block whose element is gone falls through every tier. Scanning for it
  * cost a pass over all elements of its tag and a read of each one's quote –

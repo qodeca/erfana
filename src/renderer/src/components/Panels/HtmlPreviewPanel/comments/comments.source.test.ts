@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Source rules for the comments UI (docs/designs/html-preview-comments.md
+ * Source rules for the comments UI (docs/designs/comments/html-preview-comments.md
  * §12.2): SEC-25 and R-011.
  *
  * SEC-25 asks for an ESLint rule rejecting `dangerouslySetInnerHTML` under

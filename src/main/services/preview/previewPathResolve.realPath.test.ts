@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * `resolveConfined` names the file it read (HTML Preview comments,
- * docs/designs/html-preview-comments.md §4.2 "previewPathResolve.ts"): the
+ * docs/designs/comments/html-preview-comments.md §4.2 "previewPathResolve.ts"): the
  * confined, fully resolved `realPath` – the key the token table and the
  * comment writer use for the file.
  */

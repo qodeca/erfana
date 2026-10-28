@@ -20,7 +20,7 @@
  * - No renderer-supplied pid/cwd: both come from the main-owned terminal record.
  * - No throws: every handler catches and sanitizes; failures hide the bar.
  *
- * @see docs/designs/216-claude-status-bar.md §3, §4, §8, §10
+ * @see docs/designs/context-meter/216-claude-status-bar.md §3, §4, §8, §10
  */
 import { webContents, BrowserWindow, app } from 'electron'
 import type { IpcMainInvokeEvent } from 'electron'

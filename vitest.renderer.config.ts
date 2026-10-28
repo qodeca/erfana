@@ -65,7 +65,7 @@ export default defineConfig({
         'src/renderer/src/services/preview/previewDragFreeze.ts': { lines: 97, functions: 98, branches: 94, statements: 97 },
         // measured 99.22/100/94.89/99.22
         'src/renderer/src/services/preview/previewTabMove.ts': { lines: 97, functions: 98, branches: 92, statements: 97 },
-        // HTML Preview comments, renderer side (docs/designs/html-preview-comments.md
+        // HTML Preview comments, renderer side (docs/designs/comments/html-preview-comments.md
         // §12.5: React comment components ≥ 90). These draw text any editor of the
         // file wrote, gate every write on the dirty-source guard, and own the focus
         // and occluder hand-offs over the native view. Pinned ~2 points under the

@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Reading comment blocks from an HTML file
- * (docs/designs/html-preview-comments.md §5.5, §5.7, decision 12).
+ * (docs/designs/comments/html-preview-comments.md §5.5, §5.7, decision 12).
  *
  * Blocks are found by walking parse5's COMMENT NODES – never by a regex over
  * the file – so block-shaped text inside `<script>`, `<style>`, `<textarea>`,

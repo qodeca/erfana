@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * PDF export with HTML Preview comments' overlay hidden around the print
- * (docs/designs/html-preview-comments.md §10.2; M-064).
+ * (docs/designs/comments/html-preview-comments.md §10.2; M-064).
  */
 import { describe, expect, it, vi } from 'vitest'
 import { ErrorCode } from '../../../shared/errors'

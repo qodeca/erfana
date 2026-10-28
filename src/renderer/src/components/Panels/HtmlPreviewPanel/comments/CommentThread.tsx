@@ -2,8 +2,8 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * HTML Preview comments – one thread in the comment window
- * (docs/designs/html-preview-comments.md §7.7, §10.4; R-004, R-017;
- * docs/design-system/product/html-comments/window.html "A thread").
+ * (docs/designs/comments/html-preview-comments.md §7.7, §10.4; R-004, R-017;
+ * docs/designs/comments/html-comments/window.html "A thread").
  *
  * - Replies one level deep; a resolved thread folds to one line.
  * - Each message – its `…` menu, edit and delete – is `CommentMessageView`

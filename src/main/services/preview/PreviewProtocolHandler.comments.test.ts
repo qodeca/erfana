@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * HTML Preview comments through the real serving path
- * (docs/designs/html-preview-comments.md §4.2, §6, §19 R3-1; M-030, M-031,
+ * (docs/designs/comments/html-preview-comments.md §4.2, §6, §19 R3-1; M-030, M-031,
  * M-059, M-060, M-065, M-066, U-091 at the handler).
  *
  * The REAL request filter notes each request in the session's REAL ledger,

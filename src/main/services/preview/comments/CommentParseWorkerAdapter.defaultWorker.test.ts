@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * The production worker factory of `CommentParseClient`
- * (docs/designs/html-preview-comments.md §19 R3-12): the built bundle next to
+ * (docs/designs/comments/html-preview-comments.md §19 R3-12): the built bundle next to
  * the main bundle, started in its role with a heap cap – or no worker at all
  * when the bundle is missing, which makes comments unavailable instead of
  * failing the load. `node:fs` and `node:worker_threads` are mocked at module

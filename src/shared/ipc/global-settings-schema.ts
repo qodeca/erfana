@@ -61,7 +61,7 @@ export const HtmlPreviewSettingsSchema = z.object({
   /** Master switch for the HTML preview feature. */
   enabled: z.boolean().default(true),
   /**
-   * HTML Preview comments (docs/designs/html-preview-comments.md §3 "Feature
+   * HTML Preview comments (docs/designs/comments/html-preview-comments.md §3 "Feature
    * flag", §18). Absent means on – read it through
    * {@link isHtmlPreviewCommentsEnabled}. Lenient, like `files`: a malformed
    * block resolves to on instead of tripping the corruption reset that would

@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * The v1 comment block: data model, schema, escaping and serializer
- * (docs/designs/html-preview-comments.md §5.1–§5.4, §5.8; public spec
+ * (docs/designs/comments/html-preview-comments.md §5.1–§5.4, §5.8; public spec
  * docs/html-comments/format-v1.md).
  *
  * A block is one HTML comment placed before the element it is about:

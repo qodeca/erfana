@@ -7,7 +7,7 @@
  * TS contract shared by the preload bridge and the renderer service.
  *
  * @see Issue #203 - Central text-clipboard service
- * @see docs/designs/issue-203-clipboard-service.md §3 (IPC contract)
+ * @see docs/designs/clipboard/issue-203-clipboard-service.md §3 (IPC contract)
  */
 import { z } from 'zod'
 

@@ -90,7 +90,7 @@ export const PreviewHostSchema = z
  * `http://` subresource inside a preview is NOT refused as mixed content, because
  * the document sits at an opaque origin and mixed content is decided against the
  * origin's scheme rather than against `isSecureContext`. See
- * `docs/designs/108-http-and-ipv6-in-the-preview.md` — this was assumed to be
+ * `docs/designs/html-preview/108-http-and-ipv6-in-the-preview.md` — this was assumed to be
  * impossible and was measured to be false, which is why the assumption was
  * measured before anything was built on it.
  *

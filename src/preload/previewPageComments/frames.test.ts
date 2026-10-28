@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Child frames ↔ `<iframe>` elements, and the click-shields over frames that
- * cannot take comments (docs/designs/html-preview-comments.md §6 "Frames",
+ * cannot take comments (docs/designs/comments/html-preview-comments.md §6 "Frames",
  * §19 R3-3, R3-4; J-017).
  *
  * jsdom gives every `<iframe>` a real `contentWindow` but does not index them

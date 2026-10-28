@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * The overlay's colours, sizes, spaces and line height as main sends them in
- * `commentState.theme` (docs/designs/html-preview-comments.md §8, §10.9).
+ * `commentState.theme` (docs/designs/comments/html-preview-comments.md §8, §10.9).
  *
  * The page cannot read Erfana's stylesheet, so every value travels resolved,
  * never as `var()`. These are the values of `design-tokens.css` (dark-only,

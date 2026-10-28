@@ -2,8 +2,8 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * HTML Preview comments – the comment window
- * (docs/designs/html-preview-comments.md decision 4, §10.4, §10.7; R-003 –
- * R-008, R-013, R-018, R-019, R-022; docs/design-system/product/html-comments/
+ * (docs/designs/comments/html-preview-comments.md decision 4, §10.4, §10.7; R-003 –
+ * R-008, R-013, R-018, R-019, R-022; docs/designs/comments/html-comments/
  * window.html and identity.html, status="proposed").
  *
  * ERFANA'S OWN WINDOW, over a still image of the page: the page cannot see it,

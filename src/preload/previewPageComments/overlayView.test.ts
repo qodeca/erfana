@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * What the overlay draws holds no text Find in page could count
- * (docs/designs/html-preview-comments.md §10.2, §10.8; test E-022).
+ * (docs/designs/comments/html-preview-comments.md §10.2, §10.8; test E-022).
  */
 import { describe, expect, it } from 'vitest'
 import { MODE_TAB_TEXT, OverlayView } from './overlayView'

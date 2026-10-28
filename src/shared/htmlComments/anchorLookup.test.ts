@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Backup-tier tables (docs/designs/html-preview-comments.md §5.9 steps 2–4).
+ * Backup-tier tables (docs/designs/comments/html-preview-comments.md §5.9 steps 2–4).
  * The tables replaced a scan of every element per block; they must answer
  * exactly what that scan answered, which is kept here as the reference, and a
  * quote budget that runs out must leave blocks orphaned – never attached by a

@@ -16,7 +16,7 @@
  * appear on hover via the native `title` attribute.
  *
  * @module TerminalPanel/components/ClaudeStatusBar
- * @see docs/designs/216-claude-status-bar.md §5, §10
+ * @see docs/designs/context-meter/216-claude-status-bar.md §5, §10
  */
 
 import { useClaudeStatus } from '../../../../stores/useClaudeStatusStore'

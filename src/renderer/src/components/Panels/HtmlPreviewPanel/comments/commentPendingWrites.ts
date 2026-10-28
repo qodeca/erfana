@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * HTML Preview comments – the writes still waiting for main to say how they
- * ended (docs/designs/html-preview-comments.md §8 Rev 3 note, §19 "Save
+ * ended (docs/designs/comments/html-preview-comments.md §8 Rev 3 note, §19 "Save
  * pending settles").
  *
  * A save past main's 15 s answer limit is answered `COMMENT_SAVE_PENDING`:

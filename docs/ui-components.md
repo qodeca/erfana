@@ -381,7 +381,7 @@ Terminal is considered "active" when:
 
 **Location**: `src/renderer/src/components/RootErrorBoundary/`, `src/renderer/src/components/Panels/PanelErrorBoundary.tsx`, `src/renderer/src/utils/installGlobalErrorTrail.ts`, `src/main/utils/rendererCrashHandlers.ts`
 
-Added by [#60](https://github.com/qodeca/erfana/issues/60), where a `RangeError` thrown while flattening a 174k-node project tree unmounted the React root and left a black window. Containment is layered on purpose – full rationale in [design-issue-60](./designs/design-issue-60.md) §2.3.
+Added by [#60](https://github.com/qodeca/erfana/issues/60), where a `RangeError` thrown while flattening a 174k-node project tree unmounted the React root and left a black window. Containment is layered on purpose – full rationale in [design-issue-60](./designs/large-projects/design-issue-60.md) §2.3.
 
 ### Two-tier boundary contract
 

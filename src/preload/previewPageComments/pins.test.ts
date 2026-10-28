@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Pin placement and drawing (docs/designs/html-preview-comments.md §10.5,
+ * Pin placement and drawing (docs/designs/comments/html-preview-comments.md §10.5,
  * decisions 20 and 33; J-005, J-014).
  */
 import { afterEach, describe, expect, it } from 'vitest'

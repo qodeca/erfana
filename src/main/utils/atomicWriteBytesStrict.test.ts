@@ -4,7 +4,7 @@
  * atomicWriteBytesStrict and readFileNoFollow on a real temp directory (no fs
  * mocks – the mocked rename / handle failures live in
  * `atomicWriteBytesStrict.failure.test.ts`, split per the test-file policy).
- * Design: docs/designs/html-preview-comments.md §7.6 step 9, M-061; security
+ * Design: docs/designs/comments/html-preview-comments.md §7.6 step 9, M-061; security
  * review F2–F4 (deny-write ACL, mark of the web, file and folder identity).
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'

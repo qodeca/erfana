@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Which file each frame shows (docs/designs/html-preview-comments.md §4.2
+ * Which file each frame shows (docs/designs/comments/html-preview-comments.md §4.2
  * "frameFileMap"; M-050, SEC-09).
  */
 import { mkdir } from 'node:fs/promises'

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * The overlay's element label (docs/designs/html-preview-comments.md §10.2,
+ * The overlay's element label (docs/designs/comments/html-preview-comments.md §10.2,
  * §10.10; test J-001): `button#buy.cta.primary 120×40`, at most two classes
  * then `…`, at most 40 characters, plus a suffix – ` · script` for a JS-built
  * element, ` · frame other.html` for a same-project frame, ` · 2 comments`,

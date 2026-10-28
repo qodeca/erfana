@@ -2,8 +2,8 @@
 /* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
 /**
  * HTML Preview comments – the comment window, its fields, banners, threads and
- * the identity step (docs/design-system/product/html-comments/window.html and
- * identity.html, status="proposed"; plan docs/designs/html-preview-comments.md
+ * the identity step (docs/designs/comments/html-comments/window.html and
+ * identity.html, status="proposed"; plan docs/designs/comments/html-preview-comments.md
  * §10.4, §10.7).
  *
  * Adopted from the card's comments.css. Buttons are NOT restated: the window
@@ -59,10 +59,10 @@
   display: flex;
   flex-direction: column;
   inline-size: var(--comments-window-width);
-  /* deviates: docs/design-system/product/html-comments/window.html — 320px minimum and 560px maximum height are literals (card Exceptions, "Window size") */
+  /* deviates: docs/designs/comments/html-comments/window.html — 320px minimum and 560px maximum height are literals (card Exceptions, "Window size") */
   min-inline-size: min(320px, 100vw - var(--space-8));
   max-inline-size: min(var(--comments-window-max-width), 100vw - var(--space-8));
-  /* deviates: docs/design-system/product/html-comments/window.html — see "Window size" */
+  /* deviates: docs/designs/comments/html-comments/window.html — see "Window size" */
   max-block-size: min(560px, 100vh - var(--space-8));
   background: var(--color-bg-elevated);
   border: var(--border-width) solid var(--color-border-subtle);
@@ -437,7 +437,7 @@
 .erf-comment-banner--success .erf-comment-banner__icon {
   color: var(--color-success);
 }
-/* deviates: docs/design-system/product/html-comments/identity.html — the Feedback card has no info tone; the notice borrows the accent violet (card Exceptions, "Info banner") */
+/* deviates: docs/designs/comments/html-comments/identity.html — the Feedback card has no info tone; the notice borrows the accent violet (card Exceptions, "Info banner") */
 .erf-comment-banner--info {
   background: var(--color-brand-violet-muted);
   border-color: var(--color-accent-primary);

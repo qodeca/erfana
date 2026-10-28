@@ -19,7 +19,7 @@
  * (`resolveConfined`, §2.4). The exclusion predicate is shared with that layer
  * via `previewExclusion` so both enforce the same rule.
  *
- * @see docs/designs/sd-074-html-preview.md §1.5
+ * @see docs/designs/html-preview/sd-074-html-preview.md §1.5
  */
 import { extname, isAbsolute, relative } from 'node:path'
 

@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * The comment state main sends a frame on `preview-page:commentState`
- * (docs/designs/html-preview-comments.md §8, §10.9, §19 R3-3, R3-4, Rev 4
+ * (docs/designs/comments/html-preview-comments.md §8, §10.9, §19 R3-3, R3-4, Rev 4
  * "folded sections").
  *
  * Main is trusted, but the payload is still parsed field by field: anything

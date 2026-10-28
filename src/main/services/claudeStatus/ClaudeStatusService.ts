@@ -27,7 +27,7 @@
  *    completing so the newest request always runs exactly once more.
  *  - **Watcher owns the dir set**; this service only calls `watchDir/unwatchDir`.
  *
- * @see docs/designs/216-claude-status-bar.md §3, §4, §7, §10
+ * @see docs/designs/context-meter/216-claude-status-bar.md §3, §4, §7, §10
  */
 import os from 'node:os'
 import path from 'node:path'

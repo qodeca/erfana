@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * One parse5 pass over an HTML file, shared by every comment module
- * (docs/designs/html-preview-comments.md §4.2 "one shared parse", §5.5, §5.6).
+ * (docs/designs/comments/html-preview-comments.md §4.2 "one shared parse", §5.5, §5.6).
  *
  * The comment format is located, anchored, spliced and instrumented from the
  * same tree, so they can never disagree about where an element starts. The

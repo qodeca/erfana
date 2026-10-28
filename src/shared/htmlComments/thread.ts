@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Pure thread operations on `@data` (docs/designs/html-preview-comments.md
+ * Pure thread operations on `@data` (docs/designs/comments/html-preview-comments.md
  * §7.7): create, reply, edit, delete a message, resolve and re-open.
  *
  * Each returns a NEW object and keeps every field it does not own – fields a

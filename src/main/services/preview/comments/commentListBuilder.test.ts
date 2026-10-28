@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * `preview:commentList` read from disk (docs/designs/html-preview-comments.md
+ * `preview:commentList` read from disk (docs/designs/comments/html-preview-comments.md
  * §7.7, §8, §10.4, §10.6; M-053, SEC-20).
  */
 import { mkdir, writeFile } from 'node:fs/promises'

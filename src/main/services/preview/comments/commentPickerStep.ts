@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Where the page's keyboard picker moved, for the comment window's live
- * region (docs/designs/html-preview-comments.md §10.2, §10.8, §10.10
+ * region (docs/designs/comments/html-preview-comments.md §10.2, §10.8, §10.10
  * "Announce"; test E-022; security review S-L-A).
  *
  * The page holds no screen-reader text: anything in the page DOM is counted

@@ -14,7 +14,7 @@
  *
  * Restart is deliberately never clicked — it relaunches the app mid-test.
  *
- * @see docs/designs/design-issue-60.md §2.8
+ * @see docs/designs/large-projects/design-issue-60.md §2.8
  */
 
 import { test, expect, _electron as electron, ElectronApplication } from '@playwright/test'

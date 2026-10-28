@@ -13,7 +13,7 @@
  * detector that reports "not running", so the bar simply never appears
  * (graceful) — Windows is deferred to a follow-up issue (design §10).
  *
- * @see docs/designs/216-claude-status-bar.md §4, §10
+ * @see docs/designs/context-meter/216-claude-status-bar.md §4, §10
  */
 
 /**

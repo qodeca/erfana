@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Folded sections – `<details>` – around comments
- * (docs/designs/html-preview-comments.md §7.5 step 6, §7.10, §19 Rev 4
+ * (docs/designs/comments/html-preview-comments.md §7.5 step 6, §7.10, §19 Rev 4
  * "folded sections"; the owner's "Technical details" test).
  *
  * - `openAround`, the reveal: every closed section around the element opens,

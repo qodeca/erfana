@@ -1,0 +1,412 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/**
+ * Markdown preview comments – only what the Markdown preview adds.
+ *
+ * PROPOSED – not adopted. Plan: docs/designs/comments/markdown-preview-comments.md §9.
+ *
+ * Everything a comment looks like is reused unchanged and is NOT restated here:
+ *  - the comment window, thread, drawer, banners, buttons:
+ *    ../html-comments/comments.css (`.erf-comment-*`);
+ *  - the pin, outline, label, comment-mode frame and tab:
+ *    ../html-comments/overlay.css (`.erf-hpc-*`).
+ *
+ * This file adds four things:
+ *  1. a static mirror of the Markdown panel – toolbar and preview – built from the
+ *     rules in MarkdownToolbar.css and MarkdownPreview.css, so the cards show the
+ *     comment parts on the surface they ship on;
+ *  2. the three comment tools in the Markdown toolbar;
+ *  3. the phrase underline (shipping: `::highlight(erf-comment)`; drawn here with
+ *     spans, because a static card cannot call CSS.highlights);
+ *  4. pin and outline placement relative to a block (shipping: measured from the
+ *     block's box into an overlay outside `.markdown-preview-content`).
+ *
+ * The cards carry no script: every state is drawn on its own.
+ */
+
+/* ================= 1. the Markdown panel mirror ================= */
+
+.erf-mdc-panel {
+  display: flex;
+  flex-direction: column;
+  inline-size: 100%;
+  max-inline-size: 980px;
+  border: var(--border-width) solid var(--color-border-subtle);
+  background: var(--color-bg-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  color: var(--color-text-primary);
+}
+
+.erf-mdc-panel__body {
+  position: relative;
+  display: flex;
+  min-block-size: 0;
+  block-size: var(--mdc-body-height, 380px);
+}
+
+/* Mirror of MarkdownToolbar.css `.markdown-toolbar`. */
+.erf-mdc-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-6);
+  background-color: var(--color-bg-primary);
+  border-block-end: var(--border-width) solid var(--color-border-default);
+  flex-shrink: 0;
+}
+
+.erf-mdc-toolbar__spacer { flex: 1; min-inline-size: var(--space-6); }
+
+.erf-mdc-toolbar__sep {
+  inline-size: var(--border-width);
+  block-size: var(--icon-size-lg);
+  background-color: var(--color-border-default);
+  margin: 0 var(--space-4);
+}
+
+.erf-mdc-toolbar__modified {
+  margin-inline-end: var(--space-6);
+  font-size: var(--text-lg);
+  line-height: var(--leading-none);
+  color: var(--color-accent-secondary);
+}
+
+/* Mirror of `.toolbar-btn` and `.view-mode-btn`: 32 x 28. */
+.erf-mdc-tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  inline-size: var(--btn-height-md);
+  block-size: 28px;
+  padding: 0;
+  background-color: transparent;
+  border: var(--border-width) solid transparent;
+  border-radius: var(--border-radius);
+  color: var(--color-text-primary);
+  cursor: pointer;
+}
+.erf-mdc-tool:hover { background-color: var(--color-bg-hover-solid); color: var(--color-white); }
+.erf-mdc-tool:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: calc(var(--space-1) * -1);
+}
+
+/* The view-mode radio: a filled square, as today. */
+.erf-mdc-tool--view[aria-pressed='true'] {
+  background-color: var(--color-btn-primary-bg);
+  border-color: var(--color-btn-primary-bg);
+  color: var(--color-btn-primary-text);
+}
+
+/* ================= 2. the comment tools ================= */
+
+/* One gap before the group, none inside it – the HTML band's grouping. */
+.erf-mdc-tool--comment-first { margin-inline-start: var(--space-4); }
+
+/* Comment mode and Pins are toggles, and the open drawer reads as pressed. They take
+   the HTML band's toggle signature – fill plus a 2px lime foot – NOT the view-mode
+   fill, so "a mode is on" never looks like "this view is chosen". */
+.erf-mdc-tool--toggle { border-block-end: var(--border-width-thick) solid transparent; }
+.erf-mdc-tool--toggle[aria-pressed='true'],
+.erf-mdc-tool--toggle[aria-expanded='true'] {
+  background: var(--color-bg-selected);
+  border-block-end-color: var(--color-brand-lime);
+  color: var(--color-text-emphasis);
+}
+
+/* Comments list: icon plus the open count. */
+.erf-mdc-tool--count {
+  inline-size: auto;
+  min-inline-size: var(--btn-height-md);
+  padding-inline: var(--space-3);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+.erf-mdc-tool__attention { color: var(--color-warning); }
+
+@media (forced-colors: active) {
+  .erf-mdc-tool--toggle[aria-pressed='true'],
+  .erf-mdc-tool--toggle[aria-expanded='true'] { border-block-end-color: Highlight; }
+}
+
+/* ================= the preview mirror ================= */
+
+/* Mirror of MarkdownPreview.css `.markdown-preview`: the scroller. The comment
+   overlay is positioned against it, never inside the content (export reads the
+   content's innerHTML). */
+.erf-mdc-preview {
+  position: relative;
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  overflow: hidden;
+  background-color: var(--color-bg-preview);
+  color: var(--color-gray-200);
+}
+
+/* Mirror of `.markdown-preview-content`. */
+.erf-mdc-content {
+  position: relative;
+  max-inline-size: 860px;
+  margin: 0 auto;
+  padding: var(--space-12) var(--space-16) var(--space-10);
+  font-family: var(--font-serif);
+  font-size: var(--text-prose);
+  line-height: var(--leading-normal);
+}
+.erf-mdc-content > :first-child { margin-block-start: 0; }
+.erf-mdc-content h2 {
+  margin: 1.2em 0 0.5em;
+  padding: 0;
+  border: 0;
+  font-size: 1.6em;
+  font-weight: var(--font-bold);
+  line-height: var(--leading-tight);
+  color: var(--color-text-emphasis);
+}
+.erf-mdc-content h3 {
+  margin: 1.2em 0 0.5em;
+  font-size: 1.3em;
+  font-weight: var(--font-bold);
+  color: var(--color-text-emphasis);
+}
+.erf-mdc-content p { margin: 0 0 var(--space-6); }
+.erf-mdc-content ul,
+.erf-mdc-content ol { margin: 0 0 var(--space-6); padding-inline-start: 1.6em; }
+.erf-mdc-content li { margin: 0 0 var(--space-1); }
+.erf-mdc-content code {
+  padding: 0 var(--space-2);
+  background: var(--color-bg-tertiary);
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+}
+.erf-mdc-content pre {
+  margin: 0 0 var(--space-6);
+  padding: var(--space-6);
+  background: var(--color-bg-secondary);
+  border: var(--border-width) solid var(--color-border-default);
+  font-family: var(--font-mono);
+  font-size: var(--text-base);
+  overflow: hidden;
+}
+.erf-mdc-content pre code { padding: 0; background: none; font-size: inherit; }
+.erf-mdc-content table { inline-size: auto; margin: 0 0 var(--space-6); border-collapse: collapse; }
+.erf-mdc-content th,
+.erf-mdc-content td {
+  padding: var(--space-2) var(--space-6);
+  border: var(--border-width) solid var(--color-border-subtle);
+  text-align: start;
+  font-size: 0.93em;
+}
+.erf-mdc-content th { font-weight: var(--font-semibold); color: var(--color-text-emphasis);
+                      text-transform: none; letter-spacing: normal; }
+.erf-mdc-content blockquote {
+  margin: 0 0 var(--space-6);
+  padding: 0 var(--space-8);
+  border-inline-start: var(--border-width-thick) solid var(--color-border-subtle);
+  color: var(--color-text-tertiary);
+}
+.erf-mdc-content blockquote p:last-child { margin: 0; }
+
+/* A picked code block must not clip its own outline and label. */
+.erf-mdc-content pre.erf-mdc-block { overflow: visible; }
+
+/* A Mermaid diagram stand-in: the wrapper box only. */
+.erf-mdc-diagram {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-8);
+  margin: 0 0 var(--space-6);
+  padding: var(--space-8);
+  border: var(--border-width) solid var(--color-border-default);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+}
+.erf-mdc-diagram__node { padding: var(--space-3) var(--space-6); border: var(--border-width) solid var(--color-accent-primary); }
+
+/* Narrow previews keep a smaller gutter, as the app does under 480px. */
+.erf-mdc-content--narrow { padding-inline: var(--space-8); }
+
+/* ================= 3. the phrase underline ================= */
+
+/* Shipping: ::highlight(erf-comment) and ::highlight(erf-comment-active), set
+   through CSS.highlights – no DOM node is added, so React re-renders, export and
+   copy never see it. A span stands in for it here. Find keeps its lime
+   (::highlight(search-results)); comments use the accent, so the two never read
+   as one another. */
+.erf-mdc-mark {
+  background-color: var(--color-brand-violet-muted);
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--color-accent-primary);
+  text-decoration-thickness: var(--border-width-thick);
+  text-underline-offset: var(--space-1);
+}
+.erf-mdc-mark--active {
+  background-color: color-mix(in srgb, var(--color-accent-primary) 38%, transparent);
+  color: var(--color-text-emphasis);
+}
+/* Find's current match, for the "both apply" state: Find paints last. */
+.erf-mdc-find { background-color: var(--color-brand-lime); color: var(--color-brand-black); }
+
+/* A live text selection, as Chromium draws it in the preview. */
+.erf-mdc-selection { background-color: var(--color-bg-selected); color: var(--color-text-emphasis); }
+
+@media (forced-colors: active) {
+  .erf-mdc-mark, .erf-mdc-mark--active { background-color: Highlight; color: HighlightText; }
+}
+
+/* ================= 4. placing the overlay against a block ================= */
+
+/* A commented or hovered block. Shipping: the overlay measures the block and draws
+   outside the content; here the parts are children of the block, with the same
+   geometry. */
+.erf-mdc-block { position: relative; }
+
+/* The outline is the HTML two-tone ring on the border box, grown outward by the
+   ring so it never covers text. */
+.erf-mdc-block > .erf-hpc-outline,
+tr.erf-mdc-block > td > .erf-hpc-outline {
+  inset: calc(var(--border-width-thick) * -2);
+}
+
+/* The label sits above the block's top-left, flipped below at the top edge. */
+.erf-mdc-block > .erf-hpc-label,
+tr.erf-mdc-block > td > .erf-hpc-label {
+  inset-block-end: calc(100% + var(--border-width-thick) * 2);
+  inset-inline-start: calc(var(--border-width-thick) * -2);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+}
+.erf-mdc-block > .erf-hpc-label--below { inset-block-end: auto; inset-block-start: calc(100% + var(--border-width-thick) * 2); }
+
+/* The pin: tail tip on the block's top-right corner, 4px outward (HTML §10.5).
+   The tail tip is at (2, 22) in the 24-unit box, so the box starts 2px right of
+   the corner and 26px above it. In a full-width block that lands in the
+   content's 32px right padding. */
+.erf-mdc-block > .erf-hpc-pin {
+  inset-inline-start: calc(100% + var(--space-1));
+  inset-block-start: calc((var(--btn-height-sm) + var(--space-1)) * -1);
+}
+/* Two pins on one row: the second moves left in 22px steps (HTML rule). */
+.erf-mdc-block > .erf-hpc-pin--step-1 { inset-inline-start: calc(100% + var(--space-1) - 22px); }
+
+/* The comment-mode frame and tab cover the preview scroller, not the content. */
+.erf-mdc-preview > .erf-hpc-root { z-index: var(--z-dropdown); }
+
+/* Flash after save: one static highlight, 1.5s in the app, drawn here at rest. */
+.erf-mdc-block > .erf-hpc-flash { inset: calc(var(--border-width-thick) * -2); }
+
+/* ================= card chrome (documentation only) ================= */
+
+.mdc-row { display: flex; flex-wrap: wrap; gap: var(--space-16); align-items: flex-start; margin-block-end: var(--space-16); }
+.mdc-state { margin: 0; flex: 0 1 auto; min-inline-size: 0; }
+.mdc-state > figcaption {
+  margin: 0 0 var(--space-4);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+}
+.mdc-state > figcaption strong { color: var(--color-text-bright); font-weight: var(--font-normal); }
+
+.mdc-step {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 300px);
+  gap: var(--space-12);
+  align-items: start;
+  margin-block-end: var(--space-20);
+}
+.mdc-step__no { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-brand-lime); }
+.mdc-step__title { margin: var(--space-2) 0 var(--space-6); font-size: var(--text-lg); color: var(--color-text-emphasis); }
+.mdc-step__text { margin: 0 0 var(--space-6); color: var(--color-text-tertiary); }
+.mdc-step__text strong { color: var(--color-text-bright); }
+
+/* The window or menu drawn at rest over the preview. */
+.mdc-float { position: absolute; z-index: var(--z-modal); }
+
+/* A small, static stand-in for the preview's editor half in split view. */
+.mdc-editor {
+  flex: 0 0 46%;
+  min-inline-size: 0;
+  overflow: hidden;
+  padding: var(--space-6) 0;
+  border-inline-end: var(--border-width) solid var(--color-border-default);
+  background: var(--color-bg-primary);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  color: var(--color-text-primary);
+}
+
+/* Source listings: line numbers, and the lines Erfana inserts. */
+.mdc-src {
+  margin: 0;
+  padding: var(--space-4) 0;
+  background: var(--color-bg-secondary);
+  border: var(--border-width) solid var(--color-border-default);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  overflow-x: auto;
+  counter-reset: mdc-line;
+}
+.mdc-editor .mdc-src { border: 0; background: transparent; padding: 0; }
+.mdc-src > span {
+  display: block;
+  padding-inline: var(--space-4) var(--space-8);
+  white-space: pre;
+  border-inline-start: var(--border-width-thick) solid transparent;
+}
+.mdc-src > span::before {
+  counter-increment: mdc-line;
+  content: counter(mdc-line);
+  display: inline-block;
+  inline-size: 3ch;
+  margin-inline-end: var(--space-6);
+  text-align: end;
+  color: var(--color-text-disabled);
+}
+.mdc-src > .mdc-src__add {
+  background: var(--color-success-bg);
+  border-inline-start-color: var(--color-success);
+  color: var(--color-text-tertiary);
+}
+.mdc-src > .mdc-src__bad {
+  background: var(--color-error-bg);
+  border-inline-start-color: var(--color-error);
+  color: var(--color-text-tertiary);
+}
+.mdc-src > .mdc-src__target { color: var(--color-text-emphasis); }
+
+.mdc-verdict { display: inline-flex; align-items: center; gap: var(--space-3); margin: var(--space-4) 0 0;
+               font-size: var(--text-sm); }
+.mdc-verdict--ok { color: var(--color-success); }
+.mdc-verdict--bad { color: var(--color-error); }
+.mdc-verdict > span { color: var(--color-text-tertiary); }
+
+.mdc-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: var(--space-12);
+            max-inline-size: 1100px; margin-block-end: var(--space-16); }
+.mdc-pair h3 { margin: 0 0 var(--space-4); font-size: var(--text-md); color: var(--color-text-bright); }
+.mdc-pair p { margin: 0 0 var(--space-4); color: var(--color-text-tertiary); max-inline-size: 60ch; }
+
+/* ================= 5. the selected phrase inside the comment window ================= */
+
+/* What the reviewer selected, quoted under the context line. In the preview's serif,
+   so it reads as the document's words, not Erfana's. Not struck through: that look
+   belongs to "no longer found" (`.erf-comment-quote`, reused for "The selected text
+   changed"). */
+.erf-mdc-quote {
+  display: block;
+  margin: var(--space-4) 0 0;
+  padding-inline-start: var(--space-6);
+  border-inline-start: var(--border-width-thick) solid var(--color-accent-primary);
+  font-family: var(--font-serif);
+  font-size: var(--text-md);
+  line-height: var(--leading-snug);
+  color: var(--color-text-bright);
+  overflow-wrap: anywhere;
+}

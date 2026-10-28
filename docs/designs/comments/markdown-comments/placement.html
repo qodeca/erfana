@@ -1,0 +1,109 @@
+<!-- @card group="Markdown preview" name="Where a Markdown comment is written" subtitle="The slot for each kind of block, and the three places that would change how the file renders" status="proposed" reviewed="2026-10-28" -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Erfana — where a Markdown comment is written</title>
+<link rel="stylesheet" href="../../../design-system/tokens.css">
+<link rel="stylesheet" href="../../../design-system/ds.css">
+<link rel="stylesheet" href="./markdown-comments.css">
+</head>
+<body>
+
+<h1>Where a Markdown comment is written</h1>
+<p class="ds-lede">
+  A comment block always takes lines of its own, before its target, with the same line prefix on every line.
+  Most blocks take it right before their first line. Three places would change how the file renders, so
+  Erfana never writes there. <strong>Lines with a lime edge are what Erfana inserts, lines with a red edge are where it never writes, and the bold line is the target.</strong>
+  Blocks are shortened to their first and last line here – the real block carries the note to agents, the
+  status, target and message lines, and <code>@data</code>.
+</p>
+<div class="ds-note">
+  <strong>Rules alone are not trusted.</strong> Every write is checked: main renders the file before and after
+  with the preview's own pipeline and compares the two. If they differ, the next slot is tried; if none passes,
+  the save is refused and the text stays in the window. Evidence:
+  <code>node docs/spikes/markdown-preview-comments/placement-check.mjs</code> (plan §5.4).
+</div>
+
+<h2>Before the block</h2>
+<div class="mdc-pair">
+  <div><h3>Paragraph, heading, code block, diagram, table, quote</h3>
+    <p>Right before the target's first line, no prefix. The same for a whole list or a whole table.</p>
+    <pre class="mdc-src"><span>## Launch plan</span><span></span><span class="mdc-src__add">&lt;!-- erfana:comment v1 id=c-aaaaaaaaaaaaaacn</span><span class="mdc-src__add">…</span><span class="mdc-src__add">--&gt;</span><span class="mdc-src__target">We ship the beta to the first ten customers.</span></pre>
+    <p class="mdc-verdict mdc-verdict--ok">✓ same render</p></div>
+  <div><h3>Directly after a heading</h3>
+    <p>No blank line is needed or added: a comment line can start right under a heading.</p>
+    <pre class="mdc-src"><span>## Launch plan</span><span class="mdc-src__add">&lt;!-- erfana:comment v1 id=c-aaaaaaaaaaaaaacn</span><span class="mdc-src__add">…</span><span class="mdc-src__add">--&gt;</span><span class="mdc-src__target">We ship the beta to the first ten customers.</span></pre>
+    <p class="mdc-verdict mdc-verdict--ok">✓ same render</p></div>
+</div>
+
+<h2>Lists</h2>
+<div class="mdc-pair">
+  <div><h3>First item: before the whole list</h3>
+    <p>The anchor names the item inside the list (<code>li:nth-of-type(1)</code>).</p>
+    <pre class="mdc-src"><span>### Steps</span><span></span><span class="mdc-src__add">&lt;!-- erfana:comment v1 id=c-aaaaaaaaaaaaaacn</span><span class="mdc-src__add">…</span><span class="mdc-src__add">--&gt;</span><span class="mdc-src__target">- Freeze the API on Monday.</span><span>- Run the load test against staging.</span></pre>
+    <p class="mdc-verdict mdc-verdict--ok">✓ same render</p></div>
+  <div><h3>Item 2 and later: end of the previous item</h3>
+    <p>Indented to the previous item's content, so it stays inside that item and the list stays one list. A tight
+      list stays tight.</p>
+    <pre class="mdc-src"><span>- Freeze the API on Monday.</span><span class="mdc-src__add">  &lt;!-- erfana:comment v1 id=c-aaaaaaaaaaaaaacn</span><span class="mdc-src__add">  …</span><span class="mdc-src__add">  --&gt;</span><span class="mdc-src__target">- Run the load test against staging.</span></pre>
+    <p class="mdc-verdict mdc-verdict--ok">✓ same render – bullet, ordered (indent 3), task list, loose list</p></div>
+  <div><h3>Nested item</h3>
+    <p>The same rule one level down, with that level's indent.</p>
+    <pre class="mdc-src"><span>- Release</span><span>  - Tag the build.</span><span class="mdc-src__add">    &lt;!-- erfana:comment v1 id=c-aaaaaaaaaaaaaacn</span><span class="mdc-src__add">    …</span><span class="mdc-src__add">    --&gt;</span><span class="mdc-src__target">  - Sign the installers.</span></pre>
+    <p class="mdc-verdict mdc-verdict--ok">✓ same render</p></div>
+  <div><h3>Never: before item 2 at column 0</h3>
+    <p>The comment ends the list, so one list renders as two – and an ordered list restarts its numbers.</p>
+    <pre class="mdc-src"><span>- Freeze the API on Monday.</span><span class="mdc-src__bad">&lt;!-- erfana:comment v1 id=c-aaaaaaaaaaaaaacn</span><span class="mdc-src__bad">…</span><span class="mdc-src__bad">--&gt;</span><span>- Run the load test against staging.</span></pre>
+    <p class="mdc-verdict mdc-verdict--bad">✗ changed <span>– &lt;ul&gt;&lt;li&gt;a&lt;/li&gt;&lt;/ul&gt;&lt;ul&gt;&lt;li&gt;b&lt;/li&gt;…</span></p></div>
+</div>
+
+<h2>Tables</h2>
+<div class="mdc-pair">
+  <div><h3>Row or cell: before the whole table</h3>
+    <p>The anchor names the row or cell inside it – the format's "comment is about &lt;td&gt; at … inside this
+      element" form. The window says "Saved before the table on line 18."</p>
+    <pre class="mdc-src"><span class="mdc-src__add">&lt;!-- erfana:comment v1 id=c-aaaaaaaaaaaaaacn</span><span class="mdc-src__add">target: &lt;table&gt; (comment is about &lt;tr&gt; at tbody &gt; tr:nth-of-type(2) …)</span><span class="mdc-src__add">--&gt;</span><span>| Owner | Task        | Due |</span><span>|-------|-------------|-----|</span><span>| Anna  | API freeze  | Mon |</span><span class="mdc-src__target">| Piotr | Load test   | Wed |</span></pre>
+    <p class="mdc-verdict mdc-verdict--ok">✓ same render</p></div>
+  <div><h3>Never: between two rows</h3>
+    <p>The table ends at the comment; the rows after it render as plain text.</p>
+    <pre class="mdc-src"><span>| Owner | Task        | Due |</span><span>|-------|-------------|-----|</span><span>| Anna  | API freeze  | Mon |</span><span class="mdc-src__bad">&lt;!-- erfana:comment v1 id=c-aaaaaaaaaaaaaacn</span><span class="mdc-src__bad">…</span><span class="mdc-src__bad">--&gt;</span><span>| Piotr | Load test   | Wed |</span></pre>
+    <p class="mdc-verdict mdc-verdict--bad">✗ changed <span>– the last row becomes &lt;p&gt;| Piotr | …&lt;/p&gt;</span></p></div>
+</div>
+
+<h2>Block quotes and paragraphs</h2>
+<div class="mdc-pair">
+  <div><h3>Inside a quote: the quote's prefix on every line</h3>
+    <p>The format's <code>ind</code> grows from "leading blanks" to "line prefix". Its grammar does not change.</p>
+    <pre class="mdc-src"><span>&gt; Ship small.</span><span>&gt;</span><span class="mdc-src__add">&gt; &lt;!-- erfana:comment v1 id=c-aaaaaaaaaaaaaacn</span><span class="mdc-src__add">&gt; …</span><span class="mdc-src__add">&gt; --&gt;</span><span class="mdc-src__target">&gt; Ship often.</span></pre>
+    <p class="mdc-verdict mdc-verdict--ok">✓ same render</p></div>
+  <div><h3>Never: between two lines of one paragraph</h3>
+    <p>The paragraph splits in two. A block only ever goes before a block's first line, so this slot is never
+      offered; a selection in the middle of a paragraph targets the whole paragraph.</p>
+    <pre class="mdc-src"><span>We ship the beta to the first ten customers,</span><span class="mdc-src__bad">&lt;!-- erfana:comment v1 id=c-aaaaaaaaaaaaaacn</span><span class="mdc-src__bad">…</span><span class="mdc-src__bad">--&gt;</span><span>after the security review.</span></pre>
+    <p class="mdc-verdict mdc-verdict--bad">✗ changed <span>– one &lt;p&gt; becomes two</span></p></div>
+</div>
+
+<h2>Never written</h2>
+<table>
+  <thead><tr><th>Place</th><th>Why</th></tr></thead>
+  <tbody>
+    <tr><td>Above or inside the frontmatter</td><td>The frontmatter must be the file's first lines; a comment above it turns it into text. The menu says "Can't comment here".</td></tr>
+    <tr><td>Mid-line</td><td>Markdown blocks own their lines; HTML's mid-line form is never used in <code>.md</code>.</td></tr>
+    <tr><td>Inside a code block</td><td>It would be code, shown in the preview. A selection inside code targets the whole code block.</td></tr>
+  </tbody>
+</table>
+
+<h2>Exceptions</h2>
+<table>
+  <thead><tr><th>Where</th><th>The system</th><th>Here, and why</th></tr></thead>
+  <tbody>
+    <tr><td>✓ / ✗ glyphs</td><td>Icons come from the lucide registry.</td><td>Text glyphs keep this card free of script and SVG noise; each is paired with the words "same render" or "changed", so colour is never the only cue.</td></tr>
+  </tbody>
+</table>
+
+</body>
+</html>

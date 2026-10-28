@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Anchors and re-attachment (docs/designs/html-preview-comments.md §5.9,
+ * Anchors and re-attachment (docs/designs/comments/html-preview-comments.md §5.9,
  * §19 R3-10; U-080–U-088): position by SOURCE order first, then id, path and
  * quote; ambiguity orphans a block, and nothing here ever writes.
  */

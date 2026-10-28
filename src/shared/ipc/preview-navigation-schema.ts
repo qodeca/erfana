@@ -19,7 +19,7 @@
  *
  * zod v4: `z.enum(ErrorCode)` – never `z.nativeEnum`.
  *
- * @see docs/designs/design-issue-124-part3.md §3.1
+ * @see docs/designs/html-preview/multi-page/design-issue-124-part3.md §3.1
  */
 import { z } from 'zod'
 

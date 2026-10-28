@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Preload HTML Preview comments bridge (docs/designs/html-preview-comments.md
+ * Preload HTML Preview comments bridge (docs/designs/comments/html-preview-comments.md
  * §8): the whole `window.api.previewComments` surface, typed as
  * {@link PreviewCommentsBridge} (the shared contract in
  * `preview-comment-schema.ts`). Channel names come from

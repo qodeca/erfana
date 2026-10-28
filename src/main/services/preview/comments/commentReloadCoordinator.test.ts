@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * One reload per comment write, and the reader put back
- * (docs/designs/html-preview-comments.md §7.5 steps 3, 5–6; M-040, M-041,
+ * (docs/designs/comments/html-preview-comments.md §7.5 steps 3, 5–6; M-040, M-041,
  * M-042, M-058).
  */
 import { describe, expect, it, vi } from 'vitest'

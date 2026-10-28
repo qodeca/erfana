@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * CommentWriter byte identity and damaged blocks, on real files
- * (docs/designs/html-preview-comments.md decision 12, decision 24, §7.6
+ * (docs/designs/comments/html-preview-comments.md decision 12, decision 24, §7.6
  * steps 4–8; SEC-14, SEC-17, M-020).
  *
  * Every check reads the bytes back from disk and compares them byte for byte

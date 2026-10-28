@@ -12,7 +12,7 @@
  * injected `getProjectRoot` accessor (wired to `ProjectService`). A payload that
  * smuggles a `projectRoot` is rejected by `.strict()` before this handler runs.
  *
- * @see docs/designs/sd-074-html-preview.md §3.3, §5(c)
+ * @see docs/designs/html-preview/sd-074-html-preview.md §3.3, §5(c)
  */
 import { type IpcMainInvokeEvent } from 'electron'
 import { PreviewApproveHostRequestSchema } from '../../../shared/ipc/preview-schema'

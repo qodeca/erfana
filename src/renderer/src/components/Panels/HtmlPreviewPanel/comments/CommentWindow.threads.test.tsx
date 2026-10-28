@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * The comment window's threads view
- * (docs/designs/html-preview-comments.md §7.7, §10.4; R-004, R-005, R-006,
+ * (docs/designs/comments/html-preview-comments.md §7.7, §10.4; R-004, R-005, R-006,
  * R-013, R-017, SEC-19).
  */
 import { act, render, screen, waitFor, within } from '@testing-library/react'

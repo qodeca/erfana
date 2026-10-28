@@ -809,7 +809,7 @@ export default [
     }
   },
   // HTML Preview comments render page and file text, so raw HTML is banned there
-  // (docs/designs/html-preview-comments.md SEC-25). A separate rule from
+  // (docs/designs/comments/html-preview-comments.md SEC-25). A separate rule from
   // `no-restricted-syntax`, so it adds to the blocks above instead of replacing them.
   {
     files: ['src/renderer/src/components/Panels/HtmlPreviewPanel/comments/**/*.{ts,tsx}'],

@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * The files each window holds unsaved editor changes for
- * (docs/designs/html-preview-comments.md decision 13, §7.8; tests M-011,
+ * (docs/designs/comments/html-preview-comments.md decision 13, §7.8; tests M-011,
  * M-062).
  *
  * The renderer reports its dirty tabs' paths – absolute, in project space,

@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Finding and reading an HTML file for comments, with every check a comment
- * write needs before it splices (docs/designs/html-preview-comments.md §7.6
+ * write needs before it splices (docs/designs/comments/html-preview-comments.md §7.6
  * steps 1–5; threats S8, S11, S12, S22). Reading never writes (M-014).
  *
  * Step 1 – where the file is, in this order, cheapest first, and before any

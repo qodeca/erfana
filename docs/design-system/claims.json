@@ -272,49 +272,49 @@
   },
   "contrast-gp-wordmark-dark": {
     "kind": "contrast",
-    "card": "product/github-presentation/index.html",
+    "card": "../designs/github-presentation/index.html",
     "label": "--color-brand-white on --color-brand-black, the wordmark on the dark banner",
     "foreground": "--color-brand-white",
     "background": "--color-brand-black"
   },
   "contrast-gp-wordmark-light": {
     "kind": "contrast",
-    "card": "product/github-presentation/index.html",
+    "card": "../designs/github-presentation/index.html",
     "label": "--color-brand-black on --color-brand-white, the wordmark on the light banner",
     "foreground": "--color-brand-black",
     "background": "--color-brand-white"
   },
   "contrast-gp-prompt": {
     "kind": "contrast",
-    "card": "product/github-presentation/index.html",
+    "card": "../designs/github-presentation/index.html",
     "label": "--color-text-primary on --color-brand-black, the prompt glyph on the terminal strip",
     "foreground": "--color-text-primary",
     "background": "--color-brand-black"
   },
   "contrast-gp-cursor": {
     "kind": "contrast",
-    "card": "product/github-presentation/index.html",
+    "card": "../designs/github-presentation/index.html",
     "label": "--color-brand-lime on --color-brand-black, the cursor on the terminal strip",
     "foreground": "--color-brand-lime",
     "background": "--color-brand-black"
   },
   "contrast-gp-indigo-light": {
     "kind": "contrast",
-    "card": "product/github-presentation/index.html",
+    "card": "../designs/github-presentation/index.html",
     "label": "--color-brand-indigo on --color-brand-white, the light banner accent",
     "foreground": "--color-brand-indigo",
     "background": "--color-brand-white"
   },
   "contrast-gp-lime-light": {
     "kind": "contrast",
-    "card": "product/github-presentation/index.html",
+    "card": "../designs/github-presentation/index.html",
     "label": "--color-brand-lime on --color-brand-white, why lime never sits on the light banner",
     "foreground": "--color-brand-lime",
     "background": "--color-brand-white"
   },
   "contrast-gp-violet-light": {
     "kind": "contrast",
-    "card": "product/github-presentation/index.html",
+    "card": "../designs/github-presentation/index.html",
     "label": "--color-brand-violet on --color-brand-white, why violet is only a muted fill on light",
     "foreground": "--color-brand-violet",
     "background": "--color-brand-white"
@@ -363,119 +363,119 @@
   },
   "contrast-wait-text": {
     "kind": "contrast",
-    "card": "product/html-waiting/index.html",
+    "card": "../designs/html-waiting/index.html",
     "label": "--color-text-tertiary on --color-brand-black, the waiting message's body text on the pre-paint backdrop",
     "foreground": "--color-text-tertiary",
     "background": "--color-brand-black"
   },
   "contrast-wait-aside": {
     "kind": "contrast",
-    "card": "product/html-waiting/index.html",
+    "card": "../designs/html-waiting/index.html",
     "label": "--color-text-secondary on --color-brand-black, the waiting message's aside on the pre-paint backdrop",
     "foreground": "--color-text-secondary",
     "background": "--color-brand-black"
   },
   "contrast-wait-aside-muted": {
     "kind": "contrast",
-    "card": "product/html-waiting/index.html",
+    "card": "../designs/html-waiting/index.html",
     "label": "--color-text-muted on --color-brand-black, the aside colour the card used to render",
     "foreground": "--color-text-muted",
     "background": "--color-brand-black"
   },
   "hpc-accent-ink": {
     "kind": "contrast",
-    "card": "product/html-comments/overlay.html",
+    "card": "../designs/comments/html-comments/overlay.html",
     "label": "--color-accent-primary against --color-brand-black: the pin fill against its ink stroke and content, the label tag, the mode tab text",
     "foreground": "--color-accent-primary",
     "background": "--color-brand-black"
   },
   "hpc-hover-ink": {
     "kind": "contrast",
-    "card": "product/html-comments/overlay.html",
+    "card": "../designs/comments/html-comments/overlay.html",
     "label": "--color-brand-violet-hover against --color-brand-black: a hovered pin against its ink",
     "foreground": "--color-brand-violet-hover",
     "background": "--color-brand-black"
   },
   "hpc-warning-ink": {
     "kind": "contrast",
-    "card": "product/html-comments/overlay.html",
+    "card": "../designs/comments/html-comments/overlay.html",
     "label": "--color-brand-black on --color-warning: the ink ! on a damaged pin",
     "foreground": "--color-brand-black",
     "background": "--color-warning"
   },
   "hpc-label-paper": {
     "kind": "contrast",
-    "card": "product/html-comments/overlay.html",
+    "card": "../designs/comments/html-comments/overlay.html",
     "label": "--color-brand-white on --color-brand-black: the element label text",
     "foreground": "--color-brand-white",
     "background": "--color-brand-black"
   },
   "hpc-label-size": {
     "kind": "contrast",
-    "card": "product/html-comments/overlay.html",
+    "card": "../designs/comments/html-comments/overlay.html",
     "label": "--color-text-primary on --color-brand-black: the size in the element label",
     "foreground": "--color-text-primary",
     "background": "--color-brand-black"
   },
   "hpc-accent-on-white": {
     "kind": "contrast",
-    "card": "product/html-comments/overlay.html",
+    "card": "../designs/comments/html-comments/overlay.html",
     "label": "--color-accent-primary on --color-brand-white: why the accent ring alone fails on a light page",
     "foreground": "--color-accent-primary",
     "background": "--color-brand-white"
   },
   "hpc-ink-on-white": {
     "kind": "contrast",
-    "card": "product/html-comments/overlay.html",
+    "card": "../designs/comments/html-comments/overlay.html",
     "label": "--color-brand-black on --color-brand-white: the ink line that carries the ring on a light page",
     "foreground": "--color-brand-black",
     "background": "--color-brand-white"
   },
   "hpc-window-meta": {
     "kind": "contrast",
-    "card": "product/html-comments/window.html",
+    "card": "../designs/comments/html-comments/window.html",
     "label": "--color-text-tertiary on --color-bg-elevated: the comment window context, meta, hint and counter",
     "foreground": "--color-text-tertiary",
     "background": "--color-bg-elevated"
   },
   "hpc-window-secondary": {
     "kind": "contrast",
-    "card": "product/html-comments/window.html",
+    "card": "../designs/comments/html-comments/window.html",
     "label": "--color-text-secondary on --color-bg-elevated: why the comment window does not use secondary for small text",
     "foreground": "--color-text-secondary",
     "background": "--color-bg-elevated"
   },
   "hpc-window-input-border": {
     "kind": "contrast",
-    "card": "product/html-comments/window.html",
+    "card": "../designs/comments/html-comments/window.html",
     "label": "--color-border-input against --color-bg-elevated: the comment field edge",
     "foreground": "--color-border-input",
     "background": "--color-bg-elevated"
   },
   "hpc-window-focus": {
     "kind": "contrast",
-    "card": "product/html-comments/window.html",
+    "card": "../designs/comments/html-comments/window.html",
     "label": "--color-border-focus against --color-bg-elevated: the focus ring in the comment window",
     "foreground": "--color-border-focus",
     "background": "--color-bg-elevated"
   },
   "hpc-drawer-meta": {
     "kind": "contrast",
-    "card": "product/html-comments/drawer.html",
+    "card": "../designs/comments/html-comments/drawer.html",
     "label": "--color-text-tertiary on --color-bg-secondary: the drawer meta and count text",
     "foreground": "--color-text-tertiary",
     "background": "--color-bg-secondary"
   },
   "hpc-settings-secondary": {
     "kind": "contrast",
-    "card": "product/html-comments/identity.html",
+    "card": "../designs/comments/html-comments/identity.html",
     "label": "--color-text-secondary on --color-bg-secondary: the shipping Settings description colour, under 4.5:1",
     "foreground": "--color-text-secondary",
     "background": "--color-bg-secondary"
   },
   "hpc-settings-tertiary": {
     "kind": "contrast",
-    "card": "product/html-comments/identity.html",
+    "card": "../designs/comments/html-comments/identity.html",
     "label": "--color-text-tertiary on --color-bg-secondary: the description colour the Comments section uses",
     "foreground": "--color-text-tertiary",
     "background": "--color-bg-secondary"

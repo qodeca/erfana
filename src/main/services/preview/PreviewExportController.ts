@@ -16,7 +16,7 @@
  * `false`, which drops every CSS background colour and image from the output —
  * exactly what a previewed page relies on (design §1.7).
  *
- * @see docs/designs/sd-074-html-preview.md §1.7
+ * @see docs/designs/html-preview/sd-074-html-preview.md §1.7
  */
 import { writeFile } from 'node:fs/promises'
 import { basename, extname } from 'node:path'
