@@ -4,9 +4,10 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Erfana — commenting on selected text</title>
+<title>Erfana – commenting on selected text</title>
 <link rel="stylesheet" href="../../../design-system/tokens.css">
 <link rel="stylesheet" href="../../../design-system/ds.css">
 <link rel="stylesheet" href="../../../design-system/system/components/menu/menu.css">
@@ -65,8 +66,8 @@
       <p>Plans start at <em>10 EUR</em> a month.</p>
     </div>
     <span class="still-tag">still image under the menu</span>
-    <div class="erf-menu sel-float" role="menu" aria-label="Selection" style="inset-block-start: 96px; inset-inline-start: 260px;">
-      <div class="erf-menu-item erf-menu-item--active" role="menuitem" tabindex="0"><span class="erf-menu-icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"></path><path d="M12 8v6"></path><path d="M9 11h6"></path></svg></span><span class="erf-menu-label">Add comment</span></div>
+    <div class="erf-menu sel-float" role="menu" aria-label="Selection" style="--ds-inset-block-start: 96px; inset-block-start: var(--ds-inset-block-start); --ds-inset-inline-start: 260px; inset-inline-start: var(--ds-inset-inline-start);">
+      <div class="erf-menu-item erf-menu-item--active" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"></path><path d="M12 8v6"></path><path d="M9 11h6"></path></svg></span><span class="erf-menu-label">Add comment</span></div>
       <div class="erf-menu-item" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 3a2 2 0 0 0-2 2"></path><path d="M19 3a2 2 0 0 1 2 2"></path><path d="M21 19a2 2 0 0 1-2 2"></path><path d="M5 21a2 2 0 0 1-2-2"></path><path d="M9 3h1"></path><path d="M9 21h1"></path><path d="M14 3h1"></path><path d="M14 21h1"></path><path d="M3 9v1"></path><path d="M21 9v1"></path><path d="M3 14v1"></path><path d="M21 14v1"></path></svg></span><span class="erf-menu-label">Comment on whole p.lede</span></div>
     </div>
   </div></div></div>
@@ -93,12 +94,12 @@
         <h2 class="erf-comment-window__title" id="w1-t" tabindex="-1">New comment</h2>
         <p class="erf-comment-window__context"><bdi dir="ltr">p.lede</bdi> · index.html, line 12</p>
         <span class="erf-sel-quote">ship by Friday</span>
-      </div><button class="erf-comment-icon-btn" type="button" aria-label="Close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+      </div><button class="erf-comment-icon-btn" type="button" aria-label="Close" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
       <div class="erf-comment-window__body"><div class="erf-comment-field"><label class="erf-comment-field__label" for="f1">Comment</label>
-        <textarea class="erf-comment-textarea" id="f1" placeholder="What should change here?">Friday is a holiday in two markets. Say Thursday.</textarea>
+        <textarea class="erf-comment-textarea" id="f1" placeholder="What should change here?" tabindex="-1">Friday is a holiday in two markets. Say Thursday.</textarea>
         <div class="erf-comment-field__foot"><p class="erf-comment-field__hint">Plain text. Saved inside index.html.</p><span class="erf-comment-counter">49 / 4000</span></div></div>
-        <p class="erf-comment-identity">Commenting as <bdi>Marcin Obel</bdi> <button class="erf-comment-link" type="button">Change</button></p></div>
-      <div class="erf-comment-window__foot"><button class="erf-comment-btn erf-comment-btn--secondary" type="button"><span>Cancel</span></button><button class="erf-comment-btn erf-comment-btn--primary" type="button" title="Save (Cmd+Enter)"><span>Save</span></button></div>
+        <p class="erf-comment-identity">Commenting as <bdi>Marcin Obel</bdi> <button class="erf-comment-link" type="button" tabindex="-1">Change</button></p></div>
+      <div class="erf-comment-window__foot"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Cancel</span></button><button class="erf-comment-btn erf-comment-btn--primary" type="button" title="Save (Cmd+Enter)" tabindex="-1"><span>Save</span></button></div>
     </div>
   </div></div></div>
   <div>
@@ -173,14 +174,14 @@
       <div class="erf-comment-window__head"><div class="erf-comment-window__heading">
         <h2 class="erf-comment-window__title" id="w2-t" tabindex="-1">New comment</h2>
         <p class="erf-comment-window__context"><bdi dir="ltr">span.price</bdi> · index.html, line 30</p>
-      </div><button class="erf-comment-icon-btn" type="button" aria-label="Close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+      </div><button class="erf-comment-icon-btn" type="button" aria-label="Close" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
       <div class="erf-comment-window__body">
         <div class="erf-comment-banner erf-comment-banner--warning"><span class="erf-comment-banner__icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg></span>
           <div class="erf-comment-banner__body"><p class="erf-comment-banner__text">This text isn't in index.html as written – a script may have changed it.</p>
             <span class="erf-comment-quote">9.99 EUR / month</span>
-            <div class="erf-comment-banner__actions"><button class="erf-comment-btn erf-comment-btn--secondary" type="button"><span>Comment on the whole element instead</span></button></div></div></div>
+            <div class="erf-comment-banner__actions"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Comment on the whole element instead</span></button></div></div></div>
       </div>
-      <div class="erf-comment-window__foot"><button class="erf-comment-btn erf-comment-btn--secondary" type="button"><span>Cancel</span></button></div>
+      <div class="erf-comment-window__foot"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Cancel</span></button></div>
     </div></figure>
 
   <figure class="sel-win"><figcaption><strong>script-built element</strong> · cannot be checked; accepted like today's script quote</figcaption>
@@ -190,11 +191,11 @@
         <p class="erf-comment-window__context"><bdi dir="ltr">div.toast</bdi> · index.html, line 61</p>
         <p class="erf-comment-note">Added by a script – saved before &lt;section id="pricing"&gt;.</p>
         <span class="erf-sel-quote">Saved!</span>
-      </div><button class="erf-comment-icon-btn" type="button" aria-label="Close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+      </div><button class="erf-comment-icon-btn" type="button" aria-label="Close" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
       <div class="erf-comment-window__body"><div class="erf-comment-field"><label class="erf-comment-field__label" for="f3">Comment</label>
-        <textarea class="erf-comment-textarea" id="f3">Say "Changes saved".</textarea>
+        <textarea class="erf-comment-textarea" id="f3" tabindex="-1">Say "Changes saved".</textarea>
         <div class="erf-comment-field__foot"><p class="erf-comment-field__hint">Plain text. Saved inside index.html.</p><span class="erf-comment-counter">20 / 4000</span></div></div></div>
-      <div class="erf-comment-window__foot"><button class="erf-comment-btn erf-comment-btn--secondary" type="button"><span>Cancel</span></button><button class="erf-comment-btn erf-comment-btn--primary" type="button"><span>Save</span></button></div>
+      <div class="erf-comment-window__foot"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Cancel</span></button><button class="erf-comment-btn erf-comment-btn--primary" type="button" tabindex="-1"><span>Save</span></button></div>
     </div></figure>
 
   <figure class="sel-win"><figcaption><strong>long selection</strong> · cut at 200 characters</figcaption>
@@ -204,11 +205,11 @@
         <p class="erf-comment-window__context"><bdi dir="ltr">section.terms</bdi> · index.html, line 80</p>
         <span class="erf-sel-quote">You can cancel at any time. Unused days are refunded to the card you paid with within ten working days, and your data stays available for export for thirty days after the end of the billing period, after which…</span>
         <p class="erf-comment-note" style="margin-block-start: var(--space-3)">Only the first 200 characters are kept.</p>
-      </div><button class="erf-comment-icon-btn" type="button" aria-label="Close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+      </div><button class="erf-comment-icon-btn" type="button" aria-label="Close" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
       <div class="erf-comment-window__body"><div class="erf-comment-field"><label class="erf-comment-field__label" for="f4">Comment</label>
-        <textarea class="erf-comment-textarea" id="f4" placeholder="What should change here?"></textarea>
+        <textarea class="erf-comment-textarea" id="f4" placeholder="What should change here?" tabindex="-1"></textarea>
         <div class="erf-comment-field__foot"><p class="erf-comment-field__hint">Plain text. Saved inside index.html.</p><span class="erf-comment-counter">0 / 4000</span></div></div></div>
-      <div class="erf-comment-window__foot"><button class="erf-comment-btn erf-comment-btn--secondary" type="button"><span>Cancel</span></button><button class="erf-comment-btn erf-comment-btn--primary" type="button" aria-disabled="true"><span>Save</span></button></div>
+      <div class="erf-comment-window__foot"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Cancel</span></button><button class="erf-comment-btn erf-comment-btn--primary" type="button" aria-disabled="true" tabindex="-1"><span>Save</span></button></div>
     </div></figure>
 
   <figure class="sel-win"><figcaption><strong>words changed</strong> · the element is found, the words are not; the pin stays</figcaption>
@@ -216,14 +217,14 @@
       <div class="erf-comment-window__head"><div class="erf-comment-window__heading">
         <h2 class="erf-comment-window__title" id="w5-t" tabindex="-1">Comment on p.lede</h2>
         <p class="erf-comment-window__context"><bdi dir="ltr">p.lede</bdi> · index.html, line 12</p>
-      </div><button class="erf-comment-icon-btn" type="button" aria-label="Close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+      </div><button class="erf-comment-icon-btn" type="button" aria-label="Close" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
       <div class="erf-comment-window__body">
         <div class="erf-comment-banner erf-comment-banner--info"><span class="erf-comment-banner__icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0"></path><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg></span>
           <div class="erf-comment-banner__body"><p class="erf-comment-banner__text">The selected text changed. The comment is still on this element.</p><span class="erf-comment-quote">ship by Friday</span></div></div>
         <article class="erf-comment-message"><div class="erf-comment-message__meta"><span class="erf-comment-message__meta-text"><bdi class="erf-comment-message__author">Marcin Obel</bdi> · <time datetime="2026-10-28T12:40">Today, 12:40</time></span></div>
           <p class="erf-comment-message__text" dir="auto">Friday is a holiday in two markets. Say Thursday.</p></article>
       </div>
-      <div class="erf-comment-window__foot"><span class="erf-comment-window__foot-start"><button class="erf-comment-btn erf-comment-btn--secondary" type="button"><span>Open in source</span></button></span><span class="erf-comment-window__foot-end"><button class="erf-comment-btn erf-comment-btn--secondary" type="button"><span>Close</span></button></span></div>
+      <div class="erf-comment-window__foot"><span class="erf-comment-window__foot-start"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Open in source</span></button></span><span class="erf-comment-window__foot-end"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Close</span></button></span></div>
     </div></figure>
 </div>
 
@@ -232,8 +233,8 @@
   <figure><figcaption><strong>comment mode, a selection</strong> · label "Selection"</figcaption>
     <div class="erf-mdc-panel" style="inline-size: 420px; --mdc-body-height: 190px"><div class="erf-mdc-panel__body"><div class="erf-mdc-preview">
       <div class="erf-mdc-content"><ul><li>Run the <span class="erf-mdc-selection">load test</span> against staging.</li></ul></div>
-      <div class="erf-menu sel-float" role="menu" aria-label="Selection" style="inset-block-start: 70px; inset-inline-start: 120px;">
-        <div class="erf-menu-item erf-menu-item--active" role="menuitem" tabindex="0"><span class="erf-menu-icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"></path><path d="M12 8v6"></path><path d="M9 11h6"></path></svg></span><span class="erf-menu-label">Add comment</span></div>
+      <div class="erf-menu sel-float" role="menu" aria-label="Selection" style="--ds-inset-block-start: 70px; inset-block-start: var(--ds-inset-block-start); --ds-inset-inline-start: 120px; inset-inline-start: var(--ds-inset-inline-start);">
+        <div class="erf-menu-item erf-menu-item--active" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"></path><path d="M12 8v6"></path><path d="M9 11h6"></path></svg></span><span class="erf-menu-label">Add comment</span></div>
         <div class="erf-menu-item" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 3a2 2 0 0 0-2 2"></path><path d="M19 3a2 2 0 0 1 2 2"></path><path d="M21 19a2 2 0 0 1-2 2"></path><path d="M5 21a2 2 0 0 1-2-2"></path><path d="M9 3h1"></path><path d="M9 21h1"></path><path d="M14 3h1"></path><path d="M14 21h1"></path><path d="M3 9v1"></path><path d="M21 9v1"></path><path d="M3 14v1"></path><path d="M21 14v1"></path></svg></span><span class="erf-menu-label">Comment on whole li</span></div>
       </div>
     </div></div></div></figure>

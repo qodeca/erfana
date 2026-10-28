@@ -1,0 +1,227 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+
+/* ==========================================================================
+   Empty, loading and error states – PROPOSED component CSS.
+
+   Authored here, no home in src/ yet. When adopted it is a CONSOLIDATION:
+   the app ships the same three shapes under many class names, each with its
+   own copy of "centre a grey line of text" (the Empty, loading and error
+   states card lists them). Adopting this file means deleting those copies,
+   not adding a ninth.
+
+   Text colours are chosen for the surface a state actually lands on:
+   - title: --color-text-primary, readable on every app surface;
+   - hint: --color-text-tertiary, never --color-text-secondary – secondary
+     fails 4.5:1 on --color-bg-tertiary (the project tree) and on
+     --color-bg-secondary, both of which host an empty state today.
+   ========================================================================== */
+
+/* ---------- the shared block ---------- */
+
+/* A whole-region state: the region has nothing else to show, so the state
+   sits in its optical centre. */
+.erf-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-6);
+  padding: var(--space-12) var(--space-8);
+  text-align: center;
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+}
+
+/* An inline state: inside a list, where the first row would be. Left-aligned
+   so the eye finds it where it was already looking. */
+.erf-state--inline {
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: var(--space-4);
+  padding: var(--space-8);
+  text-align: start;
+}
+
+.erf-state__icon {
+  flex: 0 0 auto;
+  width: var(--icon-size-xl);
+  height: var(--icon-size-xl);
+  color: var(--color-text-tertiary);
+}
+
+.erf-state__title {
+  margin: 0;
+  font-weight: var(--font-medium);
+  color: var(--color-text-primary);
+}
+
+.erf-state__hint {
+  margin: 0;
+  max-width: 44ch;
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+}
+
+.erf-state__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-6);
+  justify-content: center;
+}
+.erf-state--inline .erf-state__actions { justify-content: flex-start; }
+
+/* The action. Mirrors the Buttons card's secondary and primary variants so a
+   state never invents a third button look. */
+.erf-state__action {
+  min-height: var(--btn-height-sm);
+  padding: var(--space-3) var(--space-10);
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--border-radius);
+  background: transparent;
+  color: var(--color-text-bright);
+  font: inherit;
+  font-size: var(--text-md);
+  font-weight: var(--font-semibold);
+  cursor: pointer;
+}
+.erf-state__action:hover { background: var(--color-btn-secondary-bg); }
+.erf-state__action:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
+}
+.erf-state__action--primary {
+  border-color: transparent;
+  background: var(--color-btn-primary-bg);
+  color: var(--color-btn-primary-text);
+}
+.erf-state__action--primary:hover { background: var(--color-btn-primary-hover); }
+
+/* ---------- error ---------- */
+
+/* An error is not an empty state with sadder words: it carries the error
+   icon in the error colour, so the two never look alike (EditorLoadError
+   reuses .editor-empty today, and they do). */
+.erf-state--error .erf-state__icon { color: var(--color-error); }
+
+/* ---------- loading ---------- */
+
+/* Inline progress: a spinner and a sentence, in place of the content that is
+   coming. The region it replaces carries aria-busy="true". */
+.erf-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  color: var(--color-text-tertiary);
+  font-size: var(--text-sm);
+}
+
+/* The spinner's shape. Its motion (one keyframe, one duration, and the
+   reduced-motion stop) belongs to the Motion card; a frame on a card is a
+   picture, so it is drawn still here. */
+.erf-progress__spinner {
+  flex: 0 0 auto;
+  width: var(--icon-size-sm);
+  height: var(--icon-size-sm);
+  border: var(--border-width-thick) solid var(--color-border-subtle);
+  border-top-color: var(--color-accent-primary);
+  border-radius: var(--border-radius-circle);
+}
+.erf-progress--block .erf-progress__spinner {
+  width: var(--icon-size-xl);
+  height: var(--icon-size-xl);
+}
+
+/* The full block: the whole window waits. A scrim the pointer cannot pass and
+   one box naming what is happening. */
+.erf-blocker {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-overlay-dialog);
+  cursor: wait;
+}
+.erf-blocker__box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-8);
+  max-width: 36ch;
+  padding: var(--space-12) var(--space-16);
+  border: var(--border-width) solid var(--color-border-default);
+  border-radius: var(--border-radius);
+  background: var(--color-bg-secondary);
+  box-shadow: var(--shadow-md);
+  text-align: center;
+}
+.erf-blocker__message {
+  margin: 0;
+  color: var(--color-text-primary);
+  font-size: var(--text-md);
+  font-weight: var(--font-medium);
+}
+
+/* ---------- the crash screen ---------- */
+
+/* The root fallback: the whole window, because nothing else is left. */
+.erf-crash {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: safe center;
+  padding: var(--space-12);
+  background: var(--color-bg-primary);
+}
+.erf-crash__panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  width: 100%;
+  max-width: var(--dialog-max-width);
+}
+.erf-crash__heading {
+  margin: 0;
+  font-size: var(--text-2xl);
+  font-weight: var(--font-semibold);
+  line-height: var(--leading-tight);
+  color: var(--color-text-emphasis);
+}
+.erf-crash__message {
+  margin: 0;
+  font-size: var(--text-md);
+  line-height: var(--leading-relaxed);
+  color: var(--color-text-primary);
+}
+.erf-crash__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-6);
+}
+.erf-crash__toggle { align-self: flex-start; }
+.erf-crash__details {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding: var(--space-8);
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--border-radius);
+  background: var(--color-bg-primary);
+}
+.erf-crash__meta {
+  margin: 0;
+  color: var(--color-text-tertiary);
+  font-size: var(--text-base);
+}
+.erf-crash__stack {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  color: var(--color-text-tertiary);
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}

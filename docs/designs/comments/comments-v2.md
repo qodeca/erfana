@@ -376,9 +376,9 @@ The mark never uses `--color-bg-selected`. MarkdownPreview.css sets `::selection
 
 Forced colours: Mark/MarkText fill plus a 2px CanvasText bottom edge; active = 4px edge. Highlight/HighlightText is reserved for the live selection.
 
-Cards: a new 'Comment mark' card in docs/design-system/system/, rendered on white, #f5f5f5 and #0f1720 grounds, next to a real link, and overlapping a live selection. Remove the per-surface fills from selection.css and markdown-comments.css. Also replace the literals in markdown-comments.css: 28px → new `--toolbar-tool-height` token shared with the HTML band; the 22px pin step → the C-17 value; drop letter-spacing 0.2px in comments.css or tokenise it.
+Cards: a new 'Comment mark' card (to be created) in docs/design-system/system/components/comment-mark/index.html, rendered on white, #f5f5f5 and #0f1720 grounds, next to a real link, and overlapping a live selection. Remove the per-surface fills from selection.css and markdown-comments.css. Also replace the literals in markdown-comments.css: 28px → new `--toolbar-tool-height` token shared with the HTML band; the 22px pin step → the C-17 value; drop letter-spacing 0.2px in comments.css or tokenise it.
 
-Cards: new docs/design-system/system/comment-mark.html; docs/designs/comments/selection-comments/index.html + selection.css; docs/designs/comments/markdown-comments/states.html + markdown-comments.css; docs/designs/comments/html-comments/comments.css.
+Cards: docs/design-system/system/components/comment-mark/index.html (to be created); docs/designs/comments/selection-comments/index.html + selection.css; docs/designs/comments/markdown-comments/states.html + markdown-comments.css; docs/designs/comments/html-comments/comments.css.
 
 ### C-13
 
@@ -450,7 +450,7 @@ Sort: a menu button in the drawer header, 'Sort: File order' (default) / 'Change
 
 **Owner decision OD-04 applied (2026-10-28):** the third segment is **Can't edit** (damaged and newer-format comments), not Attention. Not-found comments count as Open with a 'Not found' tag. The ▲ badge counts damaged comments only: toolbar '7 comments · ▲1'. Filter: 'Open 7' · 'Resolved 2' · 'Can't edit 1'.
 
-Cards: docs/design-system/system/feedback card (new badge); docs/designs/comments/html-comments/drawer.html; docs/designs/comments/html-comments/toolbar.html; docs/designs/comments/markdown-comments/states.html (drawer, toolbar).
+Cards: docs/design-system/system/components/feedback/index.html (new badge); docs/designs/comments/html-comments/drawer.html; docs/designs/comments/html-comments/toolbar.html; docs/designs/comments/markdown-comments/states.html (drawer, toolbar).
 
 ### C-16
 
@@ -543,7 +543,7 @@ Cards: docs/designs/comments/markdown-comments/index.html (frame 3); docs/design
 
 **Owner decision OD-07 applied (2026-10-28):** no folder is refused, in either preview. The 'build, dependency or hidden folders' refusal and its string are removed; HTML decision 35's never-served list no longer limits commenting. Kept: 'Erfana adds comments only to HTML and Markdown files.' and '{file} is outside this project, so Erfana won't write to it.'
 
-Cards: docs/design-system/system/menu card (description line); docs/designs/comments/html-comments/window.html (refusal strings); docs/designs/comments/markdown-comments/states.html (render check refused, frontmatter menu).
+Cards: docs/design-system/system/components/menu/index.html (description line); docs/designs/comments/html-comments/window.html (refusal strings); docs/designs/comments/markdown-comments/states.html (render check refused, frontmatter menu).
 
 ### C-20
 
@@ -580,7 +580,7 @@ Labels:
 - Markdown has no floating label. The comment-mode tab shows 'Comment mode · List item, line 14 · Esc to leave' (target in mono, updated on hover or keyboard move).
 - HTML keeps the label but drops the pixel size ('86×34') unless Alt is held. When the outline's top touches content, the label moves inside the outline's top-left corner on a solid `--color-brand-black` ground.
 
-Cards: docs/design-system/system/buttons card; docs/designs/comments/html-comments/window.html; docs/designs/comments/html-comments/overlay.html; docs/designs/comments/markdown-comments/states.html; docs/designs/comments/selection-comments/index.html (long selection).
+Cards: docs/design-system/system/components/button/index.html; docs/designs/comments/html-comments/window.html; docs/designs/comments/html-comments/overlay.html; docs/designs/comments/markdown-comments/states.html; docs/designs/comments/selection-comments/index.html (long selection).
 
 ### C-22
 

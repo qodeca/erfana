@@ -1,20 +1,21 @@
-<!-- @card group="Foundations" name="Focus & keyboard" subtitle="One ring, one width — and the rule that outline:none needs a named replacement" status="decided" reviewed="2026-09-01" -->
+<!-- @card group="Foundations" name="Focus & keyboard" subtitle="One ring, one width – where it may go inset, where it never may, and what must never cover it" status="decided" reviewed="2026-09-01" answers="Draw a focus ring; Remove an outline safely; Focus a button on a coloured fill; Keep focus visible under a sticky header" -->
 <!-- SPDX-License-Identifier: GPL-3.0-only -->
 <!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Erfana — focus and keyboard</title>
+<title>Focus and keyboard – Erfana design system</title>
 <link rel="stylesheet" href="../../tokens.css">
 <link rel="stylesheet" href="../../ds.css">
-<script src="../../claims.js"></script>
 <style>
   .demo { display: flex; flex-wrap: wrap; gap: var(--space-12); align-items: center;
           padding: var(--space-12); background: var(--color-bg-secondary); margin-bottom: var(--space-8); }
   .demo-label { width: 132px; font-family: var(--font-mono); font-size: var(--text-sm);
                 color: var(--color-text-tertiary); }
+  .demo-note { font-size: var(--text-sm); color: var(--color-text-tertiary); max-width: 40ch; }
 
   /* ===== THE RULE. Copy this block; do not re-invent it. ===== */
   .focus-ring:focus-visible {
@@ -22,7 +23,8 @@
     outline-offset: var(--space-1);
   }
   /* Inside a scrolling list, an outward ring is clipped by the container.
-     Only then, move it inward — same width, same colour. */
+     Only then, move it inward – same width, same colour. Never on a violet,
+     lime or danger fill (see "Rings on a filled control"). */
   .focus-ring--inset:focus-visible { outline-offset: calc(var(--space-1) * -1); }
   /* ========================================================== */
 
@@ -35,44 +37,84 @@
   .scroller { height: 76px; overflow-y: auto; background: var(--color-bg-tertiary);
               padding: var(--space-4); width: 260px; }
   .scroller .sample { display: block; width: 100%; margin-bottom: var(--space-2); text-align: left; }
+
+  /* ---------- static frames: the ring drawn, not tabbed to ---------- */
+  .stage { display: flex; align-items: center; justify-content: center; gap: var(--space-8);
+           min-height: calc(var(--btn-height-lg) * 2); padding: var(--space-8); background: var(--color-bg-secondary); }
+  .stage--list { display: block; padding: var(--space-4) 0; background: var(--color-bg-tertiary); }
+  .btn { display: inline-flex; align-items: center; height: var(--btn-height-md); padding: 0 var(--space-12);
+         font-size: var(--text-md); font-weight: var(--font-semibold); border: 0; }
+  .btn--primary { background: var(--color-btn-primary-bg); color: var(--color-text-on-accent); }
+  .btn--danger { background: var(--color-btn-danger-bg); color: var(--color-white); }
+  .btn--lime { background: var(--color-brand-lime); color: var(--color-text-on-accent); }
+  .ring-out { outline: var(--border-width-thick) solid var(--color-border-focus); outline-offset: var(--space-1); }
+  .ring-in { outline: var(--border-width-thick) solid var(--color-border-focus); outline-offset: calc(var(--space-1) * -1); }
+  /* A ring flush against the fill: what an inset ring on a fill amounts to. */
+  .ring-flush { outline: var(--border-width-thick) solid var(--color-border-focus); outline-offset: calc(var(--border-width-thick) * -1); }
+  .row { display: flex; align-items: center; height: var(--btn-height-sm); padding: 0 var(--space-8);
+         color: var(--color-text-primary); border-left: var(--border-width-thick) solid transparent; }
+  .row--selected { background: var(--color-bg-selected); border-left-color: var(--color-brand-lime); }
+  /* The Form card's checkbox: a 16px box inside a 24px target, a transparent
+     border between the two, so the inset ring lands in that gap. */
+  .check { display: inline-block; width: var(--btn-height-sm); height: var(--btn-height-sm);
+           border: var(--space-2) solid transparent; background-clip: padding-box;
+           background-color: var(--color-accent-primary); }
+  .check-label { color: var(--color-text-primary); font-size: var(--text-base); }
+
+  /* ---------- Focus Not Obscured frames ---------- */
+  .viewport { position: relative; height: calc(var(--btn-height-sm) * 5); overflow: hidden;
+              background: var(--color-bg-tertiary); }
+  .viewport .rows { padding-top: var(--header-height); }
+  .viewport .rows--under { padding-top: var(--space-6); }
+  .viewport .head { position: absolute; top: 0; left: 0; right: 0; height: var(--header-height);
+                    display: flex; align-items: center; padding: 0 var(--space-8);
+                    background: var(--color-gray-950); border-bottom: var(--border-width) solid var(--color-border-default);
+                    font-size: var(--text-sm); font-weight: var(--font-semibold); color: var(--color-text-primary); }
+  .verdict { font-family: var(--font-mono); font-size: var(--text-sm); }
+
+  pre { margin: 0 0 var(--space-12); padding: var(--space-8); background: var(--color-bg-secondary);
+        max-width: var(--ds-measure-wide); overflow-x: auto; color: var(--color-text-primary); }
 </style>
 </head>
 <body>
-
+<nav class="ds-crumbs" aria-label="Breadcrumb"><a href="../../index.html">Erfana design system</a> <span aria-hidden="true">/</span> <a href="../../index.html#foundations">Foundations</a> <span aria-hidden="true">/</span> <span aria-current="page">Focus and keyboard</span></nav>
+<main>
 <h1>Focus and keyboard</h1>
-<p class="ds-lede">
-  Where the keyboard is, and how you can tell. <strong>Tab through this page</strong> — every ring
-  below is the real one.
+<p class="ds-meta"><span class="ds-status" data-status="decided">decided</span> reviewed 2026-09-01</p>
+<p class="ds-lede" id="decision">
+  <strong>One ring: a 2px solid outline in <code>--color-border-focus</code>, offset 2px outward, shown on
+  <code>:focus-visible</code>.</strong> It goes inset only inside a scroller, never on a violet, lime or danger fill,
+  and nothing on screen may cover it. <strong>Tab through this page</strong> – the live rings below are the real
+  one; the frames further down draw the states you cannot tab to.
 </p>
 
 <div class="ds-note">
-  <strong>The decision.</strong> The app used to ship three focus rings: a 1px outline on tabs and the
+  <strong>Why one ring.</strong> The app used to ship three focus rings: a 1px outline on tabs and the
   activity bar, a 2px outline in dialogs and toasts, and a 3px soft glow on inputs. That was not a style
-  choice, it was drift. <strong>One ring wins: a 2px solid outline in
-  <code>--color-border-focus</code>, offset 2px.</strong>
+  choice, it was drift.
   <br><br>
-  The two numbers come from two different criteria, and this card used to cite the wrong one.
-  <strong>SC 1.4.11</strong> (AA) asks a focus indicator for 3:1 against what is next to it.
-  <strong>SC 2.4.13 Focus Appearance</strong> (AAA) asks for an indicator at least as large as a 2px
-  perimeter, changing contrast by at least 3:1. The 1px ring fails the area half of 2.4.13; the 2px ring
-  meets both, so 2px is the floor here. (SC 2.4.11 is <em>Focus Not Obscured</em> — about the ring
-  being hidden behind a sticky header, not about its width.)
+  The two numbers come from two different criteria. <strong>SC 1.4.11 Non-text Contrast</strong> (AA) asks a
+  focus indicator for 3:1 against what is next to it. <strong>SC 2.4.13 Focus Appearance</strong> (AAA) asks for an
+  indicator at least as large as a 2px perimeter, changing contrast by at least 3:1. The 1px ring fails the area half
+  of 2.4.13; the 2px ring meets both, so 2px is the floor here. <strong>SC 2.4.11 Focus Not Obscured</strong> is a
+  third, separate rule – about the ring being hidden, not about its size – and has <a href="#obscured">its own
+  section</a>.
   <br><br>
-  Every renderer stylesheet is now held to this by <code>focusRing.audit.test.ts</code> (width and
+  Every renderer stylesheet is held to this by <code>focusRing.audit.test.ts</code> (width and
   offset of every drawn ring) and by <code>npm run lint:css</code> (<code>--shadow-focus</code> is
   banned in <code>src/</code> as well as here).
 </div>
 
-<h2>The ring</h2>
+<h2 id="ring">The ring</h2>
 
 <div class="demo">
   <span class="demo-label">default</span>
   <button class="sample focus-ring">Tab to me</button>
   <button class="sample focus-ring">And me</button>
-  <span style="font-size: var(--text-sm); color: var(--color-text-secondary)">
-    <code>outline: 2px solid var(--color-border-focus)</code>, offset 2px —
-    <strong><span data-claim="contrast-focus-ring"></span>:1</strong> against a panel, clear of the
-    3:1 that WCAG 2.2 SC 1.4.11 requires of a focus indicator.
+  <span class="demo-note">
+    <code>outline: 2px solid var(--color-border-focus)</code>, offset 2px –
+    <strong><span data-claim="contrast-focus-ring" title="--color-border-focus against --color-bg-secondary">6.24</span>:1</strong> against a panel, clear of the
+    3:1 that SC 1.4.11 requires of a focus indicator.
   </span>
 </div>
 
@@ -83,13 +125,84 @@
     <button class="sample focus-ring focus-ring--inset">Second row</button>
     <button class="sample focus-ring focus-ring--inset">Third row</button>
   </div>
-  <span style="font-size: var(--text-sm); color: var(--color-text-secondary); max-width: 34ch">
+  <span class="demo-note">
     Same ring, offset <em>inward</em>. An outward ring gets sliced off by the scroll container.
     This is the only permitted variation.
   </span>
 </div>
 
-<h2>Two rules that are not negotiable</h2>
+<h2 id="frames">The ring on every kind of control</h2>
+<p class="ds-muted">Static frames: the ring drawn as it looks on focus, so each case can be checked without a
+keyboard. The ratio under each frame is the ring against what it actually touches.</p>
+<div class="ds-frames">
+  <figure class="ds-frame"><div class="stage" aria-hidden="true"><span class="btn btn--primary ring-out">Save</span></div>
+    <figcaption><strong>Primary violet button</strong> – outward. The ring and the fill are the same violet, so the
+      2px gap of panel between them is what makes the ring a ring. Ring on the panel:
+      <span data-contrast="--color-border-focus on --color-bg-secondary" data-min="3" data-result="pass">6.24:1 · pass</span>.</figcaption></figure>
+  <figure class="ds-frame"><div class="stage" aria-hidden="true"><span class="btn btn--danger ring-out">Delete file</span></div>
+    <figcaption><strong>Danger button</strong> – outward. Ring on the panel:
+      <span data-contrast="--color-border-focus on --color-bg-secondary" data-min="3" data-result="pass">6.24:1 · pass</span>; against the red fill
+      across the gap: <span data-contrast="--color-border-focus on --color-btn-danger-bg">2.49:1</span>.</figcaption></figure>
+  <figure class="ds-frame"><div class="stage stage--list" aria-hidden="true"><div class="row">README.md</div><div class="row row--selected ring-in">notes.md</div><div class="row">plan.md</div></div>
+    <figcaption><strong>Selected row in a list</strong> – inset, because the list scrolls. On the selected fill the ring
+      measures <span data-contrast="--color-border-focus on --color-bg-selected over --color-bg-tertiary" data-min="3" data-result="pass">4.68:1 · pass</span>;
+      the ring covers the lime edge only while the row has focus, and the fill still says selected.</figcaption></figure>
+  <figure class="ds-frame"><div class="stage" aria-hidden="true"><span class="check ring-in"></span><span class="check-label">Wrap long lines</span></div>
+    <figcaption><strong>Checked checkbox</strong> – the inner-gap form: the target is 24 × 24 around a 16px violet box,
+      and the ring is drawn inward into the transparent border between them, so it lands 2px <em>outside</em> the
+      violet, on the panel (<span data-contrast="--color-border-focus on --color-bg-secondary" data-min="3" data-result="pass">6.24:1 · pass</span>). Settings
+      ships exactly this (see Exceptions).</figcaption></figure>
+  <figure class="ds-frame"><div class="stage stage--list" aria-hidden="true"><div class="row">First row</div><div class="row ring-in">Second row</div><div class="row">Third row</div></div>
+    <figcaption><strong>Inset in a scroller</strong> – the permitted variation. Ring on the sidebar:
+      <span data-contrast="--color-border-focus on --color-bg-tertiary" data-min="3" data-result="pass">6.96:1 · pass</span>.</figcaption></figure>
+</div>
+
+<h2 id="fills">Rings on a filled control</h2>
+<div class="ds-note">
+  <strong>Never draw an inset ring on a violet, lime or danger fill.</strong> The ring is the brand violet. On a
+  violet fill an inset ring measures <span data-contrast="--color-border-focus on --color-btn-primary-bg" data-min="3" data-result="fail">1.00:1 · fail</span>
+  – it is not there. On lime it measures <span data-contrast="--color-border-focus on --color-brand-lime" data-min="3" data-result="fail">1.66:1 · fail</span>,
+  and on the danger red <span data-contrast="--color-border-focus on --color-btn-danger-bg" data-min="3" data-result="fail">2.49:1 · fail</span>.
+  <br><br>
+  <strong>The alternative is always one of two:</strong> the ring goes <em>outward</em>, across a 2px gap of the
+  surface colour, or – where outward would be clipped – the control keeps a transparent border and the ring is drawn
+  inward <em>into that border</em> (the inner gap), so it still lands outside the fill. Both keep the ring on the
+  surface, where it measures what the frames above show.
+</div>
+<div class="ds-frames">
+  <figure class="ds-frame"><div class="stage" aria-hidden="true"><span class="btn btn--primary ring-flush">Save</span></div>
+    <figcaption><strong>Wrong – inset on violet.</strong> The ring merges with the fill; nothing changed on screen.</figcaption></figure>
+  <figure class="ds-frame"><div class="stage" aria-hidden="true"><span class="btn btn--lime ring-flush">Run</span></div>
+    <figcaption><strong>Wrong – inset on lime.</strong> Visible, but under 3:1 against the fill it sits on.</figcaption></figure>
+  <figure class="ds-frame"><div class="stage" aria-hidden="true"><span class="btn btn--danger ring-flush">Delete file</span></div>
+    <figcaption><strong>Wrong – inset on danger.</strong> Under 3:1 against the red.</figcaption></figure>
+  <figure class="ds-frame"><div class="stage" aria-hidden="true"><span class="btn btn--lime ring-out">Run</span></div>
+    <figcaption><strong>Right – outward on lime.</strong> The ring sits on the panel.</figcaption></figure>
+</div>
+
+<h2 id="obscured">Focus not obscured</h2>
+<div class="ds-note">
+  <strong>SC 2.4.11 Focus Not Obscured (Minimum)</strong>, level AA: when something takes focus, it may not be
+  <em>entirely</em> hidden by content the author put on top – a sticky header, a docked toolbar, a toast. (SC 2.4.12,
+  AAA, asks that no part is hidden.) Erfana holds itself to the AAA form: no part of the focused element may be hidden. This is binding (owner decision, 2026-10-28).
+  <br><br>
+  <strong>The rule:</strong> a scroll container with a sticky header sets <code>scroll-padding-top</code> to the
+  header's height (<code>var(--header-height)</code>), and one with a sticky footer sets
+  <code>scroll-padding-bottom</code>, so a row scrolled into view by the keyboard stops below the header instead of
+  under it. A toast or floating panel never opens over the element that has focus; if it must cover that area, it
+  moves.
+</div>
+<div class="ds-frames">
+  <figure class="ds-frame"><div class="viewport" aria-hidden="true"><div class="rows"><div class="row ring-in">plan.md</div><div class="row">README.md</div><div class="row">todo.md</div></div><div class="head">Explorer</div></div>
+    <figcaption><strong>Pass</strong> – the list has <code>scroll-padding-top: var(--header-height)</code>, so the
+      focused row stops just below the header. <span class="verdict ds-pass">pass</span></figcaption></figure>
+  <figure class="ds-frame"><div class="viewport" aria-hidden="true"><div class="rows rows--under"><div class="row ring-in">plan.md</div><div class="row">README.md</div><div class="row">todo.md</div><div class="row">notes.md</div></div><div class="head">Explorer</div></div>
+    <figcaption><strong>Fail</strong> – no scroll padding. Arrow-up scrolled the row to the top edge, under the sticky
+      header; the ring and the row are hidden. <span class="verdict ds-fail">fail</span></figcaption></figure>
+</div>
+<pre><code>.erf-scroller { overflow-y: auto; scroll-padding-top: var(--header-height); }</code></pre>
+
+<h2 id="rules">Two rules that are not negotiable</h2>
 
 <div class="ds-note">
   <strong>1 · Use <code>:focus-visible</code>, never bare <code>:focus</code>.</strong>
@@ -104,56 +217,69 @@
   <code>outline: none; /* Remove focus outline */</code> and stopped there. A keyboard user lands in the
   editor and has no idea. If an element takes focus, something must change on screen.
   <br><br>
-  <strong><span data-claim="outline-none-unreplaced"></span> stylesheets</strong> remove an outline
+  <strong><span data-claim="outline-none-unreplaced" title="stylesheets that remove an outline with no :focus-visible rule in the same file">4</span> stylesheets</strong> remove an outline
   without declaring a <code>:focus-visible</code> rule anywhere in the same file. That is a
-  <em>signal</em>, not a verdict — a few of them replace the ring with a box-shadow or sit on an element
-  nothing can focus. It is the list worth reading, not the list of confirmed defects, and it is stated
-  that way rather than inflated into one.
+  <em>signal</em>, not a verdict – a few of them replace the ring with a box-shadow or sit on an element
+  nothing can focus. It is the list worth reading, not the list of confirmed defects. A box-shadow replacement is
+  itself suspect: a forced-colours theme removes box-shadow (<a href="forced-colors.html">Forced colours</a>).
 </div>
 
 <div class="demo">
   <span class="demo-label">what shipped</span>
   <button class="sample bad" style="outline: none">No ring at all</button>
-  <span style="font-size: var(--text-sm); color: var(--color-error); max-width: 40ch">
-    Tab onto this and nothing happens. This is the live defect, reproduced. WCAG 2.4.7, Level A.
+  <span class="demo-note">
+    Tab onto this and nothing happens. This is the live defect, reproduced – SC 2.4.7 Focus Visible, level AA.
   </span>
 </div>
 
-<h2>Retired</h2>
-<p style="max-width: 76ch; color: var(--color-text-tertiary)">
-  <code>--shadow-focus</code> — the 3px soft glow used on inputs — is retired as a focus indicator. It
+<h2 id="retired">Retired</h2>
+<p class="ds-muted">
+  <code>--shadow-focus</code> – the 3px soft glow used on inputs – is retired as a focus indicator. It
   reads as a glow rather than an edge, it is a fourth idiom, and two dialogs hand-rolled its exact
   geometry with a different colour instead of using the token. Inputs take the same outline as
-  everything else — and since #230 they do: the search bar, the settings controls and every dialog
+  everything else – and since #230 they do: the search bar, the settings controls and every dialog
   input and select draw this ring, and the glow has no remaining use in <code>src/</code>.
 </p>
 
-<h2>What a card must promise about the keyboard</h2>
+<h2 id="keyboard">What a card must promise about the keyboard</h2>
 <table>
-  <thead><tr><th>Question</th><th>The answer a component owes you</th></tr></thead>
+  <thead><tr><th scope="col">Question</th><th scope="col">The answer a component owes you</th></tr></thead>
   <tbody>
-    <tr><td>Can I reach it?</td><td>Every control is a real <code>&lt;button&gt;</code> or has a tabIndex. A <code>&lt;div onClick&gt;</code> is not reachable.</td></tr>
-    <tr><td>Can I tell where I am?</td><td>The ring above. Always.</td></tr>
-    <tr><td>Can I move inside it?</td><td>Lists, trees and menus take arrow keys, and hold one Tab stop between them — not one per row.</td></tr>
+    <tr><td>Can I reach it?</td><td><strong>Native element first</strong>: <code>&lt;button&gt;</code>,
+      <code>&lt;a href&gt;</code>, <code>&lt;input&gt;</code>, <code>&lt;select&gt;</code>, <code>&lt;details&gt;</code> bring
+      focus, a role, a name slot and their keys for free. A custom control owes all four by hand: a
+      <strong>role</strong>, an <strong>accessible name</strong>, <code>tabindex="0"</code> (or a roving
+      <code>-1</code>/<code>0</code> inside a composite), and <strong>the keys its role promises</strong> – Enter and
+      Space for a button, the arrows for a list, tree or menu. A <code>&lt;div onClick&gt;</code> has none of the four.</td></tr>
+    <tr><td>Can I tell where I am?</td><td>The ring above. Always, and never covered.</td></tr>
+    <tr><td>Can I move inside it?</td><td>Lists, trees and menus take arrow keys, and hold one Tab stop between them – not one per row.</td></tr>
     <tr><td>Can I get out?</td><td>Escape closes and returns focus to whatever opened it.</td></tr>
-    <tr><td>Do I know what it is?</td><td>A visible label tied by <code>for</code>/<code>id</code>, or an <code>aria-label</code> — never both competing.</td></tr>
+    <tr><td>Do I know what it is?</td><td>A visible label tied by <code>for</code>/<code>id</code>, or an <code>aria-label</code> – never both competing.</td></tr>
   </tbody>
 </table>
 
 <div class="ds-note">
-  Erfana still fails row three in one place: the right-click menu has no arrow keys (#90). The file
-  picker, screen picker and window picker do it correctly, and so does the file tree.
-  <br><br>
-  <strong>The file tree passes it with a roving tabindex.</strong> The whole tree is one Tab stop: the
+  <strong>The file tree passes row three with a roving tabindex.</strong> The whole tree is one Tab stop: the
   focused row has <code>tabIndex="0"</code>, every other row has <code>-1</code>, and the arrow keys
   move focus between rows. Before #87 it failed in the more hostile direction.
   <code>ProjectTreeNode.tsx</code> spread dnd-kit's drag attributes, whose <code>tabIndex: 0</code>
   and button role made every row a Tab stop that answered no key: 400 files, 400 dead stops. The fix
   was not additive. Those attributes had to be dropped first, or the two mechanisms would have fought
   over the same attribute. The tree's rows sit in a scroll container, so they draw the inset ring
-  shown above.
+  shown above. The context menu, and the file, screen and window pickers, take arrow keys too
+  (<a href="../components/menu/index.html">Menus</a>).
 </div>
 
+<h2 id="related">Related</h2>
+<ul class="ds-muted">
+  <li><a href="colors.html#on-accent">Colours – text on a violet fill</a>: the ratios behind the fill rule.</li>
+  <li><a href="forced-colors.html">Forced colours</a>: what the ring becomes in a Windows contrast theme.</li>
+  <li><a href="../components/row/index.html">Rows and lists</a> and <a href="../components/menu/index.html">Menus</a>: the
+    keyboard contracts, key by key.</li>
+  <li><a href="../components/form/index.html">Form controls</a>: the checkbox the inner-gap ring is drawn on.</li>
+</ul>
+
+<section id="exceptions">
 <h2>Exceptions</h2>
 <p style="max-width: 72ch; color: var(--color-text-tertiary)">
   Where the shipping component departs from this card, with the reason. An undocumented deviation is a
@@ -186,10 +312,10 @@
     </tr>
     <tr>
       <td>Settings checkboxes</td>
-      <td>Offset 2px outward, or inset inside a scroller – the only permitted variation.</td>
+      <td>Offset 2px outward, inset inside a scroller, or the inner-gap form – decided on this card since 2026-10-28.</td>
       <td>Inset by 2px. The element is a 24 × 24 target around the Form card's 16px box, with a transparent
         4px border between the two, so the inward ring lands 2px outside the visible box – where the card
-        draws it. Outward, it would float 6px off. See <code>SettingsOverlay.css</code> (#96).</td>
+        draws it. Outward, it would float 6px off. See <code>SettingsOverlay.css</code> (#96). The card now decides this form (<a href="#fills">Rings on a filled control</a>), so the site's <code>deviates:</code> marker can go.</td>
     </tr>
     <tr>
       <td>HTML-preview toolbar tools</td>
@@ -223,6 +349,8 @@
     </tr>
   </tbody>
 </table>
+</section>
 
+</main>
 </body>
 </html>

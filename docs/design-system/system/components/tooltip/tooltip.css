@@ -1,0 +1,155 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/**
+ * The tooltip – a short description that appears on hover AND keyboard focus.
+ *
+ * PROPOSED – not adopted. Its shape is drawn from the two tooltips that ship,
+ * which disagree with each other:
+ *   .dialog-tooltip  src/renderer/src/components/Dialog/Dialog.css
+ *                    (--color-bg-secondary fill, --color-border-default edge)
+ *   .chat-tooltip    src/renderer/src/components/Editor/DiagramViewer/ChatBubble.css
+ *                    (--color-gray-800 fill, --color-border-subtle edge)
+ * This file takes the chat tooltip's fill and edge – the dialog one uses
+ * --color-bg-secondary, which shows inside a dialog but vanishes over any
+ * panel – and the dialog tooltip's padding. Adopting it is a MOVE: both app copies are replaced by this one.
+ *
+ * What it fixes against both: neither ships `pointer-events: none` here, so the
+ * pointer can travel onto the tooltip without it vanishing (WCAG 1.4.13,
+ * hoverable), and the gap between trigger and tooltip is bridged.
+ *
+ * The anchor's .is-open class is a documentation-only hook that forces the
+ * open state in a static frame; it is matched as [class~='is-open'] so the
+ * erf- naming rule stays on for every real class. Classes are prefixed erf-.
+ */
+
+.erf-tooltip-anchor {
+  position: relative;
+  display: inline-flex;
+}
+
+.erf-tooltip {
+  position: absolute;
+  inset-block-end: calc(100% + var(--space-2));
+  inset-inline-start: 0;
+  z-index: var(--z-tooltip);
+  box-sizing: border-box;
+  inline-size: max-content;
+  max-inline-size: 32ch;
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-gray-800);
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-md);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: var(--font-normal);
+  line-height: var(--leading-snug);
+  text-align: start;
+  white-space: normal;
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity var(--transition-fast), visibility var(--transition-fast);
+}
+
+/* The bridge: an invisible strip over the gap, so the pointer moving from the
+   trigger to the tooltip never leaves the anchor's :hover. */
+.erf-tooltip::before {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  inset-block-start: 100%;
+  block-size: calc(var(--space-2) + var(--border-width));
+}
+
+/* Shown while the trigger or the tooltip is hovered, or the trigger holds
+   focus. Hidden only when that ends or Escape is pressed (handled in script in
+   the app – see the card). No timeout: it is persistent. */
+.erf-tooltip-anchor:is(:hover, :focus-within, [class~='is-open']) > .erf-tooltip {
+  visibility: visible;
+  opacity: 1;
+}
+
+/* ---------- placement ---------- */
+
+/* Below: for a trigger at the top edge of a panel. */
+.erf-tooltip--below {
+  inset-block-end: auto;
+  inset-block-start: calc(100% + var(--space-2));
+}
+.erf-tooltip--below::before {
+  inset-block-start: auto;
+  inset-block-end: 100%;
+}
+
+/* End-aligned: for a trigger near the right edge, so the tooltip grows inward. */
+.erf-tooltip--end {
+  inset-inline-start: auto;
+  inset-inline-end: 0;
+}
+
+/* ---------- content ---------- */
+
+/* A shortcut inside a tooltip. Quieter than the page kbd: the tooltip is
+   already small. */
+.erf-tooltip kbd {
+  display: inline-block;
+  padding: 0 var(--space-2);
+  background: var(--color-bg-tertiary);
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--border-radius);
+  color: var(--color-text-bright);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+}
+
+.erf-tooltip__line { display: block; }
+.erf-tooltip__line + .erf-tooltip__line { margin-block-start: var(--space-1); }
+
+/* ---------- user settings ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .erf-tooltip { transition: none; }
+}
+
+@media (forced-colors: active) {
+  .erf-tooltip { border-color: CanvasText; }
+}
+
+/* ---------- toggletip ---------- */
+
+/* When the information is the ONLY job of its button (an "i" that explains the
+   shortcuts), it is a toggletip, not a tooltip: a click or Enter opens it, it
+   stays until dismissed, and it works on touch. Built on the popover attribute,
+   so light dismiss, Escape and focus return come from the browser. Placed with
+   CSS anchor positioning; the trigger names the anchor. */
+.erf-toggletip[popover] {
+  position: fixed;
+  inset: auto;
+  inset-block-start: anchor(bottom);
+  inset-inline-start: anchor(left);
+  margin: var(--space-2) 0 0;
+  box-sizing: border-box;
+  max-inline-size: 32ch;
+  padding: var(--space-4) var(--space-6);
+  background: var(--color-gray-800);
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-md);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+}
+.erf-toggletip kbd {
+  display: inline-block;
+  padding: 0 var(--space-2);
+  background: var(--color-bg-tertiary);
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--border-radius);
+  color: var(--color-text-bright);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+}

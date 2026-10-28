@@ -50,7 +50,7 @@ kbd { font-family: var(--font-mono); font-size: var(--text-sm); padding: 0 var(-
    view's rectangle. */
 .page-area { position: relative; flex: 1 1 auto; min-width: 0; overflow: hidden; }
 
-/* stylelint-disable color-no-hex --
+/* stylelint-disable color-no-hex, declaration-property-unit-disallowed-list --
    These are the PREVIEWED PAGE, not Erfana. It is arbitrary third-party HTML
    in a native view; using Erfana tokens here would make the demo lie about the
    one thing these cards exist to show - where Erfana stops and the page begins.
@@ -68,7 +68,13 @@ kbd { font-family: var(--font-mono); font-size: var(--text-sm); padding: 0 var(-
 .page .tiny { display: inline-block; width: 6px; height: 6px; background: #c2185b; vertical-align: middle; }
 .page .frame { border: 1px dashed #9aa4ad; background: #f4f6f8; height: 60px; max-width: 280px;
                font: 11px/60px system-ui, sans-serif; color: #66727d; text-align: center; }
-/* stylelint-enable color-no-hex */
+/* The page's own spacing, named so a frame never routes a literal through a
+   custom property to get past the token rule (docs/designs/README.md). */
+.page .pg-gap { margin-top: 14px; }
+.page .pg-gap-lg { margin-top: 20px; }
+.page .pg-raise { margin-top: -10px; }
+.page .pg-bleed { margin: 0 -22px; }
+/* stylelint-enable color-no-hex, declaration-property-unit-disallowed-list */
 
 /* The "frozen" marker – card chrome, so the reader knows the page is a still. */
 .still-tag { position: absolute; inset-block-end: var(--space-2); inset-inline-start: var(--space-2);

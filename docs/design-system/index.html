@@ -3,141 +3,314 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Erfana design</title>
+<title>Erfana design system</title>
 <link rel="stylesheet" href="tokens.css">
 <link rel="stylesheet" href="ds.css">
 <style>
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-          gap: var(--border-width); background: var(--color-border-default);
-          border: var(--border-width) solid var(--color-border-default);
-          margin-bottom: var(--space-16); }
-  .card { display: flex; flex-direction: column; gap: var(--space-3);
-          padding: var(--space-8) var(--space-10); background: var(--color-bg-secondary);
-          text-decoration: none; }
-  .card:hover { background: var(--color-bg-hover-solid); }
-  /* The grid does not scroll, so the ring goes OUTSIDE the card. The inset
-     variant is for a target clipped by a scroll container — see
-     docs/design-system/system/foundations/focus.html. */
-  .card:focus-visible { outline: var(--border-width-thick) solid var(--color-border-focus);
-                        outline-offset: var(--space-1); }
-  .card__name { font-family: var(--font-mono); font-size: var(--text-md);
-                color: var(--color-text-emphasis); }
-  .card__sub { font-size: var(--text-sm); line-height: var(--leading-snug);
-               color: var(--color-text-tertiary); }
-  .count { font-family: var(--font-mono); font-size: var(--text-sm);
-           color: var(--color-text-secondary); font-weight: var(--font-normal); }
-  /* Status is on the card, not buried in the page. "proposed" is not a failure
-     state - it is the honest one for most of these, and hiding it is how a
-     sketch gets cited as a decision. */
-  .card__meta { font-family: var(--font-mono); font-size: var(--text-xs);
-                color: var(--color-text-tertiary); }
-  .card__meta[data-status="decided"] { color: var(--color-brand-lime); }
+  .ix-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+             gap: var(--space-4); margin-bottom: var(--space-16); }
+  .ix-card { display: flex; flex-direction: column; gap: var(--space-3);
+             padding: var(--space-8) var(--space-10); background: var(--color-bg-secondary);
+             border: var(--border-width) solid var(--color-border-default); text-decoration: none; }
+  .ix-card:hover { background: var(--color-bg-hover-solid); border-color: var(--color-border-subtle); }
+  /* The grid does not scroll, so the ring goes OUTSIDE the card – see
+     system/foundations/focus.html. */
+  .ix-card:focus-visible { outline: var(--border-width-thick) solid var(--color-border-focus);
+                           outline-offset: var(--space-1); }
+  .ix-card__name { font-family: var(--font-mono); font-size: var(--text-md); color: var(--color-text-emphasis); }
+  .ix-card__sub { font-size: var(--text-sm); line-height: var(--leading-snug); color: var(--color-text-tertiary); }
+  .ix-card__meta { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-tertiary); }
+  .ix-count { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-text-tertiary);
+              font-weight: var(--font-normal); }
+  .ix-summary { display: flex; flex-wrap: wrap; gap: var(--space-8); margin: 0 0 var(--space-12); padding: 0;
+                list-style: none; }
+  .ix-summary li { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-text-tertiary); }
+  .ix-superseded summary { cursor: pointer; color: var(--color-text-bright); }
 </style>
 </head>
 <body>
+<main>
+<h1>Erfana design system</h1>
+<p class="ds-lede">
+  25 cards, generated from the folder itself. Every page reads a synced copy of the app's
+  <code>design-tokens.css</code> and the real bundled Cascadia Mono, and every number a card quotes is
+  baked in from the source by <code>npm run design</code> – no page runs JavaScript.
+</p>
 
-<h1>Erfana design</h1>
-<p class="ds-lede">
-  14 cards, generated from the folder itself. Every page reads a synced copy of
-  the app's <code>design-tokens.css</code> and the real bundled Cascadia Mono, so no value
-  here is transcribed by hand — and <code>npm run design -- --check</code> fails in CI when
-  the copy and the app disagree.
-</p>
-<p class="ds-lede">
-  <strong>Check a card's status before citing it.</strong> <em>decided</em> is binding;
-  <em>proposed</em> is a direction of travel, not settled law.
-</p>
+<ul class="ix-summary" aria-label="Cards by status">
+  <li><span class="ds-status" data-status="decided">decided</span> 5</li>
+  <li><span class="ds-status" data-status="proposed">proposed</span> 20</li>
+  <li><span class="ds-status" data-status="superseded">superseded</span> 0</li>
+</ul>
 
 <div class="ds-note">
-  <strong>New here? Read <a href="README.md">README.md</a> first.</strong> It carries the rules this
-  page cannot show: what <em>decided</em> binds you to, when a card may be promoted from
-  <em>proposed</em>, the six conditions a card must meet to be done, how to record a deviation, and
-  the list of defects these cards have decided but the app still ships.
+  <strong>How to read this.</strong> Check a card's status before citing it.
+  <ul>
+    <li><strong>decided</strong> – binding – the app must match it, or say why at the site.</li>
+    <li><strong>proposed</strong> – a direction of travel, not settled law.</li>
+    <li><strong>superseded</strong> – kept for history – follow &quot;Replaced by&quot;.</li>
+  </ul>
+  A deviation is allowed only when the code says so at the site –
+  <code>/* deviates: docs/design-system/&lt;card&gt; – why */</code> – and the card lists it under
+  Exceptions. Every marker in <code>src/</code> is listed in the <a href="deviations.html">deviation register</a>.
+  The folder is <strong>static by rule</strong>: HTML, CSS and images only, guarded by
+  <code>npm run design -- --check</code> and a content security policy on every page.
+  The full rules are in <a href="README.md">README.md</a>.
 </div>
+
+<div class="ds-note">
+  <strong>Looking for a screen, not a rule?</strong> Feature screens built from these cards live in
+  <a href="../designs/index.html">the designs index</a>. A screen cites a card; it never decides a system rule.
+</div>
+
+<h2 id="start-here">Start here by task</h2>
+<table>
+<thead><tr><th>I need to…</th><th>Card</th></tr></thead>
+<tbody>
+  <tr><td>Add a button</td><td><a href="system/components/button/index.html">Buttons</a></td></tr>
+  <tr><td>Add a context menu</td><td><a href="system/components/menu/index.html">Menu</a></td></tr>
+  <tr><td>Add a dialog</td><td><a href="system/patterns/dialog/index.html">Dialog</a></td></tr>
+  <tr><td>Add a light mode or a colour-scheme query</td><td><a href="system/foundations/theme.html">Theme</a></td></tr>
+  <tr><td>Add a shadow or a border</td><td><a href="system/foundations/surfaces.html">Surfaces and elevation</a></td></tr>
+  <tr><td>Add a tab strip</td><td><a href="system/components/tabs/index.html">Tabs</a></td></tr>
+  <tr><td>Add a tag or chip</td><td><a href="system/components/badge/index.html">Badges, chips and keys</a></td></tr>
+  <tr><td>Add a text field or select</td><td><a href="system/components/form/index.html">Form controls</a></td></tr>
+  <tr><td>Add a toolbar to a panel</td><td><a href="system/components/toolbar/index.html">Toolbar</a></td></tr>
+  <tr><td>Add a tooltip</td><td><a href="system/components/tooltip/index.html">Tooltip</a></td></tr>
+  <tr><td>Animate something</td><td><a href="system/foundations/motion.html">Motion</a></td></tr>
+  <tr><td>Announce a change to a screen reader</td><td><a href="system/components/feedback/index.html">Feedback</a></td></tr>
+  <tr><td>Ask for a name in a dialog</td><td><a href="system/patterns/dialog/index.html">Dialog</a></td></tr>
+  <tr><td>Ask the user to allow a remote host</td><td><a href="system/components/permission-band/index.html">Permission band</a></td></tr>
+  <tr><td>Ask the user to confirm a destructive action</td><td><a href="system/patterns/dialog/index.html">Dialog</a></td></tr>
+  <tr><td>Block the window while it waits</td><td><a href="system/patterns/states/index.html">Empty, loading and error states</a></td></tr>
+  <tr><td>Build a list or tree row</td><td><a href="system/components/row/index.html">Rows &amp; lists</a></td></tr>
+  <tr><td>Check whether a colour token is retired</td><td><a href="system/foundations/colors.html">Colours</a></td></tr>
+  <tr><td>Choose a font size or weight</td><td><a href="system/foundations/type.html">Typography</a></td></tr>
+  <tr><td>Choose a padding or gap</td><td><a href="system/foundations/spacing.html">Spacing</a></td></tr>
+  <tr><td>Choose a z-index</td><td><a href="system/foundations/layering.html">Layering</a></td></tr>
+  <tr><td>Colour a hover, selected or drop-target state</td><td><a href="system/foundations/colors.html">Colours</a></td></tr>
+  <tr><td>Colour git status or the context meter</td><td><a href="system/foundations/colors.html">Colours</a></td></tr>
+  <tr><td>Colour inline code or a syntax token</td><td><a href="system/foundations/terminal.html">Terminal and code colours</a></td></tr>
+  <tr><td>Colour terminal output or the cursor</td><td><a href="system/foundations/terminal.html">Terminal and code colours</a></td></tr>
+  <tr><td>Decide whether an icon needs a name</td><td><a href="system/components/icon/index.html">Icons</a></td></tr>
+  <tr><td>Describe a checkbox</td><td><a href="system/components/form/index.html">Form controls</a></td></tr>
+  <tr><td>Describe what the agent does</td><td><a href="system/foundations/writing.html">Writing</a></td></tr>
+  <tr><td>Draw a focus ring</td><td><a href="system/foundations/focus.html">Focus &amp; keyboard</a></td></tr>
+  <tr><td>Find a registry glyph</td><td><a href="system/components/icon/index.html">Icons</a></td></tr>
+  <tr><td>Focus a button on a coloured fill</td><td><a href="system/foundations/focus.html">Focus &amp; keyboard</a></td></tr>
+  <tr><td>Group toolbar buttons</td><td><a href="system/components/toolbar/index.html">Toolbar</a></td></tr>
+  <tr><td>Handle a toolbar that does not fit</td><td><a href="system/components/toolbar/index.html">Toolbar</a></td></tr>
+  <tr><td>Keep focus visible under a sticky header</td><td><a href="system/foundations/focus.html">Focus &amp; keyboard</a></td></tr>
+  <tr><td>Label a destructive action</td><td><a href="system/components/button/index.html">Buttons</a></td></tr>
+  <tr><td>Let the user resize two panes</td><td><a href="system/components/splitter/index.html">Splitter</a></td></tr>
+  <tr><td>Make a divider keyboard-operable</td><td><a href="system/components/splitter/index.html">Splitter</a></td></tr>
+  <tr><td>Make a popover or dialog stand off the panel</td><td><a href="system/foundations/surfaces.html">Surfaces and elevation</a></td></tr>
+  <tr><td>Make a state visible in a Windows contrast theme</td><td><a href="system/foundations/forced-colors.html">Forced colours</a></td></tr>
+  <tr><td>Make text selectable or not</td><td><a href="system/foundations/theme.html">Theme</a></td></tr>
+  <tr><td>Make text survive zoom and text spacing</td><td><a href="system/foundations/type.html">Typography</a></td></tr>
+  <tr><td>Mark a tab with unsaved changes</td><td><a href="system/components/tabs/index.html">Tabs</a></td></tr>
+  <tr><td>Pick a system colour for focus, selection or disabled</td><td><a href="system/foundations/forced-colors.html">Forced colours</a></td></tr>
+  <tr><td>Pick a text colour that passes contrast</td><td><a href="system/foundations/colors.html">Colours</a></td></tr>
+  <tr><td>Put a button beside a field</td><td><a href="system/components/button/index.html">Buttons</a></td></tr>
+  <tr><td>Remove an outline safely</td><td><a href="system/foundations/focus.html">Focus &amp; keyboard</a></td></tr>
+  <tr><td>Replace a title attribute</td><td><a href="system/components/tooltip/index.html">Tooltip</a></td></tr>
+  <tr><td>Respect reduced motion</td><td><a href="system/foundations/motion.html">Motion</a></td></tr>
+  <tr><td>Set code or paths in the mono face</td><td><a href="system/foundations/type.html">Typography</a></td></tr>
+  <tr><td>Show a count on an icon</td><td><a href="system/components/badge/index.html">Badges, chips and keys</a></td></tr>
+  <tr><td>Show a field error</td><td><a href="system/components/form/index.html">Form controls</a></td></tr>
+  <tr><td>Show a file&#x27;s git state</td><td><a href="system/components/badge/index.html">Badges, chips and keys</a></td></tr>
+  <tr><td>Show a hostname</td><td><a href="system/components/row/index.html">Rows &amp; lists</a></td></tr>
+  <tr><td>Show a keyboard shortcut</td><td><a href="system/components/badge/index.html">Badges, chips and keys</a></td></tr>
+  <tr><td>Show a keyboard shortcut</td><td><a href="system/components/tooltip/index.html">Tooltip</a></td></tr>
+  <tr><td>Show a toast</td><td><a href="system/components/feedback/index.html">Feedback</a></td></tr>
+  <tr><td>Show an empty panel or list</td><td><a href="system/patterns/states/index.html">Empty, loading and error states</a></td></tr>
+  <tr><td>Show an error, warning or success</td><td><a href="system/components/feedback/index.html">Feedback</a></td></tr>
+  <tr><td>Show progress</td><td><a href="system/components/feedback/index.html">Feedback</a></td></tr>
+  <tr><td>Show that a panel or the app failed</td><td><a href="system/patterns/states/index.html">Empty, loading and error states</a></td></tr>
+  <tr><td>Show that something is loading</td><td><a href="system/foundations/motion.html">Motion</a></td></tr>
+  <tr><td>Show that something is loading</td><td><a href="system/patterns/states/index.html">Empty, loading and error states</a></td></tr>
+  <tr><td>Show which tab is active</td><td><a href="system/components/tabs/index.html">Tabs</a></td></tr>
+  <tr><td>Size a clickable target</td><td><a href="system/foundations/surfaces.html">Surfaces and elevation</a></td></tr>
+  <tr><td>Size an icon</td><td><a href="system/components/icon/index.html">Icons</a></td></tr>
+  <tr><td>Space a panel header, a menu or a dialog</td><td><a href="system/foundations/spacing.html">Spacing</a></td></tr>
+  <tr><td>Style a panel title, hint or column header</td><td><a href="system/foundations/type.html">Typography</a></td></tr>
+  <tr><td>Style a scrollbar</td><td><a href="system/foundations/surfaces.html">Surfaces and elevation</a></td></tr>
+  <tr><td>Word a button or a dialog</td><td><a href="system/foundations/writing.html">Writing</a></td></tr>
+  <tr><td>Write a keyboard shortcut</td><td><a href="system/foundations/writing.html">Writing</a></td></tr>
+  <tr><td>Write an error message</td><td><a href="system/foundations/writing.html">Writing</a></td></tr>
+</tbody>
+</table>
+
+<h2 id="foundations">Foundations <span class="ix-count">11</span></h2>
+<div class="ix-grid">
+    <a class="ix-card" href="system/foundations/colors.html">
+      <span class="ix-card__name">Colours</span>
+      <span class="ix-card__sub">Every token resolved from the shipping CSS, every pairing judged on the surface it sits on</span>
+      <span class="ix-card__meta"><span class="ds-status" data-status="proposed">proposed</span> reviewed 2026-08-31</span>
+    </a>
+    <a class="ix-card" href="system/foundations/focus.html">
+      <span class="ix-card__name">Focus &amp; keyboard</span>
+      <span class="ix-card__sub">One ring, one width – where it may go inset, where it never may, and what must never cover it</span>
+      <span class="ix-card__meta"><span class="ds-status" data-status="decided">decided</span> reviewed 2026-09-01</span>
+    </a>
+    <a class="ix-card" href="system/foundations/forced-colors.html">
+      <span class="ix-card__name">Forced colours</span>
+      <span class="ix-card__sub">What survives a Windows contrast theme – every state keeps an edge, not just a fill</span>
+      <span class="ix-card__meta"><span class="ds-status" data-status="proposed">proposed</span> not yet reviewed</span>
+    </a>
+    <a class="ix-card" href="system/foundations/layering.html">
+      <span class="ix-card__name">Layering</span>
+      <span class="ix-card__sub">The z-index ladder – and the rung above it that no z-index can reach</span>
+      <span class="ix-card__meta"><span class="ds-status" data-status="proposed">proposed</span> reviewed 2026-09-01</span>
+    </a>
+    <a class="ix-card" href="system/foundations/motion.html">
+      <span class="ix-card__name">Motion</span>
+      <span class="ix-card__sub">Four durations, the missing easing scale, a proposed spinner, and when everything must stop</span>
+      <span class="ix-card__meta"><span class="ds-status" data-status="proposed">proposed</span> reviewed 2026-08-31</span>
+    </a>
+    <a class="ix-card" href="system/foundations/spacing.html">
+      <span class="ix-card__name">Spacing</span>
+      <span class="ix-card__sub">A 2px grid, drawn to size – the token number is a step, not a pixel count</span>
+      <span class="ix-card__meta"><span class="ds-status" data-status="proposed">proposed</span> reviewed 2026-08-31</span>
+    </a>
+    <a class="ix-card" href="system/foundations/surfaces.html">
+      <span class="ix-card__name">Surfaces and elevation</span>
+      <span class="ix-card__sub">The surface stack, borders, shadows, scrollbars and the 24 × 24 target floor</span>
+      <span class="ix-card__meta"><span class="ds-status" data-status="proposed">proposed</span> reviewed 2026-08-31</span>
+    </a>
+    <a class="ix-card" href="system/foundations/terminal.html">
+      <span class="ix-card__name">Terminal and code colours</span>
+      <span class="ix-card__sub">The xterm palette as it ships, the syntax tokens, and the plan to tokenise the rest</span>
+      <span class="ix-card__meta"><span class="ds-status" data-status="proposed">proposed</span> not yet reviewed</span>
+    </a>
+    <a class="ix-card" href="system/foundations/theme.html">
+      <span class="ix-card__name">Theme</span>
+      <span class="ix-card__sub">Dark only – and which text the reader can select</span>
+      <span class="ix-card__meta"><span class="ds-status" data-status="proposed">proposed</span> not yet reviewed</span>
+    </a>
+    <a class="ix-card" href="system/foundations/type.html">
+      <span class="ix-card__name">Typography</span>
+      <span class="ix-card__sub">Seven sizes, four weights, five line heights, six text styles – rendered at real size</span>
+      <span class="ix-card__meta"><span class="ds-status" data-status="proposed">proposed</span> reviewed 2026-08-31</span>
+    </a>
+    <a class="ix-card" href="system/foundations/writing.html">
+      <span class="ix-card__name">Writing</span>
+      <span class="ix-card__sub">Sentence case, en dashes, verbs on buttons, errors that say what to do – and no overclaiming AI</span>
+      <span class="ix-card__meta"><span class="ds-status" data-status="proposed">proposed</span> not yet reviewed</span>
+    </a>
+</div>
+
+<h2 id="components">Components <span class="ix-count">12</span></h2>
+<div class="ix-grid">
+    <a class="ix-card" href="system/components/badge/index.html">
+      <span class="ix-card__name">Badges, chips and keys</span>
+      <span class="ix-card__sub">Activity-bar badge, git status, counter, chip and kbd – the word or letter carries it, colour repeats it</span>
+      <span class="ix-card__meta"><span class="ds-status" data-status="proposed">proposed</span> not yet reviewed</span>
+    </a>
+    <a class="ix-card" href="system/components/button/index.html">
+      <span class="ix-card__name">Buttons</span>
+      <span class="ix-card__sub">Seven variants, six states, three heights – and the dialog buttons that ship today</span>
+      <span class="ix-card__meta"><span class="ds-status" data-status="proposed">proposed</span> reviewed 2026-08-31</span>
+    </a>
+    <a class="ix-card" href="system/components/feedback/index.html">
+      <span class="ix-card__name">Feedback</span>
+      <span class="ix-card__sub">One warning colour, one banner shape, toasts that never steal focus, and progress that names itself</span>
+      <span class="ix-card__meta"><span class="ds-status" data-status="proposed">proposed</span> reviewed 2026-08-31</span>
+    </a>
+    <a class="ix-card" href="system/components/form/index.html">
+      <span class="ix-card__name">Form controls</span>
+      <span class="ix-card__sub">One input, one select, one checkbox – and an error that a screen reader can find</span>
+      <span class="ix-card__meta"><span class="ds-status" data-status="decided">decided</span> reviewed 2026-08-31</span>
+    </a>
+    <a class="ix-card" href="system/components/icon/index.html">
+      <span class="ix-card__name">Icons</span>
+      <span class="ix-card__sub">Through the registry, by size name, at one stroke weight – and the rule for when an icon has a name</span>
+      <span class="ix-card__meta"><span class="ds-status" data-status="proposed">proposed</span> reviewed 2026-08-31</span>
+    </a>
+    <a class="ix-card" href="system/components/menu/index.html">
+      <span class="ix-card__name">Menu</span>
+      <span class="ix-card__sub">A role is a promise – arrows, typeahead, and the precedence rule for a disabled danger item</span>
+      <span class="ix-card__meta"><span class="ds-status" data-status="decided">decided</span> reviewed 2026-08-31</span>
+    </a>
+    <a class="ix-card" href="system/components/permission-band/index.html">
+      <span class="ix-card__name">Permission band</span>
+      <span class="ix-card__sub">Approve a blocked origin from the preview&#x27;s own chrome – collapsed, expanded, confirming, fail-safe</span>
+      <span class="ix-card__meta"><span class="ds-status" data-status="decided">decided</span> reviewed 2026-09-01</span>
+    </a>
+    <a class="ix-card" href="system/components/row/index.html">
+      <span class="ix-card__name">Rows &amp; lists</span>
+      <span class="ix-card__sub">One selected state instead of four, the arrow-key contract the file tree keeps, and a route that needs no drag</span>
+      <span class="ix-card__meta"><span class="ds-status" data-status="decided">decided</span> reviewed 2026-09-01</span>
+    </a>
+    <a class="ix-card" href="system/components/splitter/index.html">
+      <span class="ix-card__name">Splitter</span>
+      <span class="ix-card__sub">A 1px line with a 24px grip – a separator you can focus, arrow and read the value of</span>
+      <span class="ix-card__meta"><span class="ds-status" data-status="proposed">proposed</span> not yet reviewed</span>
+    </a>
+    <a class="ix-card" href="system/components/tabs/index.html">
+      <span class="ix-card__name">Tabs</span>
+      <span class="ix-card__sub">One tab instead of three – selected, unsaved, deleted, pinned, and a close button the keyboard can reach</span>
+      <span class="ix-card__meta"><span class="ds-status" data-status="proposed">proposed</span> not yet reviewed</span>
+    </a>
+    <a class="ix-card" href="system/components/toolbar/index.html">
+      <span class="ix-card__name">Toolbar</span>
+      <span class="ix-card__sub">Groups, separators, a spacer and an overflow button – one tab stop, arrows between controls</span>
+      <span class="ix-card__meta"><span class="ds-status" data-status="proposed">proposed</span> not yet reviewed</span>
+    </a>
+    <a class="ix-card" href="system/components/tooltip/index.html">
+      <span class="ix-card__name">Tooltip</span>
+      <span class="ix-card__sub">A description on hover and focus – never a name, never the only way to learn something</span>
+      <span class="ix-card__meta"><span class="ds-status" data-status="proposed">proposed</span> not yet reviewed</span>
+    </a>
+</div>
+
+<h2 id="patterns">Patterns <span class="ix-count">2</span></h2>
+<div class="ix-grid">
+    <a class="ix-card" href="system/patterns/dialog/index.html">
+      <span class="ix-card__name">Dialog</span>
+      <span class="ix-card__sub">One modal shell – scrim, header, scrolling body, footer – and the focus contract BaseDialog keeps</span>
+      <span class="ix-card__meta"><span class="ds-status" data-status="proposed">proposed</span> not yet reviewed</span>
+    </a>
+    <a class="ix-card" href="system/patterns/states/index.html">
+      <span class="ix-card__name">Empty, loading and error states</span>
+      <span class="ix-card__sub">What a region shows when it has nothing, is waiting, or has failed – one shape for each</span>
+      <span class="ix-card__meta"><span class="ds-status" data-status="proposed">proposed</span> not yet reviewed</span>
+    </a>
+</div>
+
+<h2 id="token-owners">Which card owns this token</h2>
+<p class="ds-muted">Each token family has exactly one owner card, which shows every token in it or says why not.</p>
+<table>
+<thead><tr><th>Family</th><th>Tokens</th><th>Owner</th></tr></thead>
+<tbody>
+  <tr><td><code>--color-*</code></td><td class="ds-num">110</td><td><a href="system/foundations/colors.html">Colours</a></td></tr>
+  <tr><td><code>--text-*</code></td><td class="ds-num">8</td><td><a href="system/foundations/type.html">Typography</a></td></tr>
+  <tr><td><code>--font-*</code></td><td class="ds-num">8</td><td><a href="system/foundations/type.html">Typography</a></td></tr>
+  <tr><td><code>--leading-*</code></td><td class="ds-num">5</td><td><a href="system/foundations/type.html">Typography</a></td></tr>
+  <tr><td><code>--space-*</code></td><td class="ds-num">15</td><td><a href="system/foundations/spacing.html">Spacing</a></td></tr>
+  <tr><td><code>--shadow-*</code></td><td class="ds-num">8</td><td><a href="system/foundations/surfaces.html">Surfaces and elevation</a></td></tr>
+  <tr><td><code>--border-*</code></td><td class="ds-num">4</td><td><a href="system/foundations/surfaces.html">Surfaces and elevation</a></td></tr>
+  <tr><td><code>--scrollbar-*</code></td><td class="ds-num">4</td><td><a href="system/foundations/surfaces.html">Surfaces and elevation</a></td></tr>
+  <tr><td><code>--opacity-*</code></td><td class="ds-num">5</td><td><a href="system/foundations/surfaces.html">Surfaces and elevation</a></td></tr>
+  <tr><td><code>--transition-*</code></td><td class="ds-num">4</td><td><a href="system/foundations/motion.html">Motion</a></td></tr>
+  <tr><td><code>--z-*</code></td><td class="ds-num">12</td><td><a href="system/foundations/layering.html">Layering</a></td></tr>
+  <tr><td><code>--icon-size-*</code></td><td class="ds-num">5</td><td><a href="system/components/icon/index.html">Icons</a></td></tr>
+  <tr><td><code>--btn-height-*</code></td><td class="ds-num">3</td><td><a href="system/components/button/index.html">Buttons</a></td></tr>
+  <tr><td><code>--input-height-*</code></td><td class="ds-num">3</td><td><a href="system/components/form/index.html">Form controls</a></td></tr>
+</tbody>
+</table>
+
+<h2 id="superseded">Superseded</h2>
+<p class="ds-muted">No card is superseded yet. A superseded card stays in the folder for history and names its replacement.</p>
 
 <div class="ds-note">
   <strong>Rebuild with <code>npm run design</code></strong> after adding a card or changing a token.
-  This index, <code>tokens.css</code> and the fonts are generated — do not edit them.
+  This index, <code>deviations.html</code>, <code>tokens.css</code>, the fonts and the adopted component CSS
+  are generated – do not edit them.
 </div>
-
-  <h2>Foundations <span class="count">7</span></h2>
-  <div class="grid">
-    <a class="card" href="system/foundations/colors.html">
-      <span class="card__name">Colours</span>
-      <span class="card__sub">Every token resolved from the shipping CSS, contrast measured in the page</span>
-      <span class="card__meta" data-status="proposed">proposed · reviewed 2026-08-31</span>
-    </a>
-    <a class="card" href="system/foundations/focus.html">
-      <span class="card__name">Focus &amp; keyboard</span>
-      <span class="card__sub">One ring, one width — and the rule that outline:none needs a named replacement</span>
-      <span class="card__meta" data-status="decided">decided · reviewed 2026-09-01</span>
-    </a>
-    <a class="card" href="system/foundations/layering.html">
-      <span class="card__name">Layering</span>
-      <span class="card__sub">The z-index ladder — and the rung above it that no z-index can reach</span>
-      <span class="card__meta" data-status="proposed">proposed · reviewed 2026-09-01</span>
-    </a>
-    <a class="card" href="system/foundations/motion.html">
-      <span class="card__name">Motion</span>
-      <span class="card__sub">Four durations, the missing easing scale, one spinner, and when everything must stop</span>
-      <span class="card__meta" data-status="proposed">proposed · reviewed 2026-08-31</span>
-    </a>
-    <a class="card" href="system/foundations/spacing.html">
-      <span class="card__name">Spacing</span>
-      <span class="card__sub">The 2px-per-step scale, drawn to size — the token number is NOT the pixel count</span>
-      <span class="card__meta" data-status="proposed">proposed · reviewed 2026-08-31</span>
-    </a>
-    <a class="card" href="system/foundations/surfaces.html">
-      <span class="card__name">Surfaces &amp; sizing</span>
-      <span class="card__sub">Borders, shadows, control heights — and the zero-radius rule</span>
-      <span class="card__meta" data-status="proposed">proposed · reviewed 2026-08-31</span>
-    </a>
-    <a class="card" href="system/foundations/type.html">
-      <span class="card__name">Typography</span>
-      <span class="card__sub">Seven sizes, four weights, five line heights — rendered at real size</span>
-      <span class="card__meta" data-status="proposed">proposed · reviewed 2026-08-31</span>
-    </a>
-  </div>
-  <h2>Components <span class="count">7</span></h2>
-  <div class="grid">
-    <a class="card" href="system/components/button/index.html">
-      <span class="card__name">Buttons</span>
-      <span class="card__sub">Primary, secondary, danger — rules copied verbatim from Dialog.css</span>
-      <span class="card__meta" data-status="proposed">proposed · reviewed 2026-08-31</span>
-    </a>
-    <a class="card" href="system/components/feedback/index.html">
-      <span class="card__name">Feedback</span>
-      <span class="card__sub">One warning colour, one banner shape, and one way to tell a screen reader something happened</span>
-      <span class="card__meta" data-status="proposed">proposed · reviewed 2026-08-31</span>
-    </a>
-    <a class="card" href="system/components/form/index.html">
-      <span class="card__name">Form controls</span>
-      <span class="card__sub">One input, one select, one checkbox — and an error that a screen reader can find</span>
-      <span class="card__meta" data-status="decided">decided · reviewed 2026-08-31</span>
-    </a>
-    <a class="card" href="system/components/icon/index.html">
-      <span class="card__name">Icons</span>
-      <span class="card__sub">Five sizes from the token scale, and the rule for when an icon has a name</span>
-      <span class="card__meta" data-status="proposed">proposed · reviewed 2026-08-31</span>
-    </a>
-    <a class="card" href="system/components/menu/index.html">
-      <span class="card__name">Menu</span>
-      <span class="card__sub">A role is a promise — arrows, typeahead, and the precedence rule for a disabled danger item</span>
-      <span class="card__meta" data-status="decided">decided · reviewed 2026-08-31</span>
-    </a>
-    <a class="card" href="system/components/permission-band/index.html">
-      <span class="card__name">Permission band</span>
-      <span class="card__sub">Approve a blocked origin from the preview&#x27;s own chrome — collapsed, expanded, confirming, fail-safe</span>
-      <span class="card__meta" data-status="decided">decided · reviewed 2026-09-01</span>
-    </a>
-    <a class="card" href="system/components/row/index.html">
-      <span class="card__name">Rows &amp; lists</span>
-      <span class="card__sub">One selected state instead of four, and the arrow-key contract the tree is missing</span>
-      <span class="card__meta" data-status="decided">decided · reviewed 2026-09-01</span>
-    </a>
-  </div>
-
+</main>
 </body>
 </html>

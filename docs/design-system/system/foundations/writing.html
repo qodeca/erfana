@@ -1,0 +1,176 @@
+<!-- @card group="Foundations" name="Writing" subtitle="Sentence case, en dashes, verbs on buttons, errors that say what to do – and no overclaiming AI" status="proposed" reviewed="never" answers="Word a button or a dialog; Write an error message; Write a keyboard shortcut; Describe what the agent does" -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Writing – Erfana design system</title>
+<link rel="stylesheet" href="../../tokens.css">
+<link rel="stylesheet" href="../../ds.css">
+<style>
+  /* Do / don't pairs. The verdict is a word first; the edge colour repeats it. */
+  .wr-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(calc(var(--space-24) * 6), 1fr));
+             gap: var(--space-8); margin: 0 0 var(--space-12); max-width: var(--ds-table-max); }
+  .wr-ex { margin: 0; padding: var(--space-6) var(--space-8); background: var(--color-bg-secondary);
+           border-left: var(--border-width-thick) solid var(--color-border-subtle); }
+  .wr-ex--do { border-left-color: var(--color-brand-lime); }
+  .wr-ex--dont { border-left-color: var(--color-error); }
+  .wr-ex > figcaption { margin-top: var(--space-4); font-size: var(--text-sm); color: var(--color-text-tertiary); }
+  .wr-verdict { display: block; margin-bottom: var(--space-3); font-family: var(--font-mono); font-size: var(--text-xs);
+                text-transform: uppercase; letter-spacing: var(--ds-caps-tracking); }
+  .wr-ex--do .wr-verdict { color: var(--color-brand-lime); }
+  .wr-ex--dont .wr-verdict { color: var(--color-error); }
+
+  /* Miniature UI drawn inside an example. Pictures, not controls. */
+  .wr-dialog { padding: var(--space-6); background: var(--color-bg-primary);
+               border: var(--border-width) solid var(--color-border-subtle); }
+  .wr-dialog__title { margin: 0 0 var(--space-2); font-size: var(--text-md); font-weight: var(--font-semibold);
+                      color: var(--color-text-emphasis); }
+  .wr-dialog__body { margin: 0 0 var(--space-6); font-size: var(--text-base); color: var(--color-text-primary); }
+  .wr-actions { display: flex; justify-content: flex-end; gap: var(--space-4); }
+  .wr-btn { display: inline-block; padding: var(--space-2) var(--space-6); font-size: var(--text-base);
+            font-weight: var(--font-semibold); border: var(--border-width) solid var(--color-border-subtle);
+            color: var(--color-text-primary); }
+  .wr-btn--danger { background: var(--color-btn-danger-bg); border-color: var(--color-btn-danger-bg); color: var(--color-white); }
+  .wr-btn--primary { background: var(--color-btn-primary-bg); border-color: var(--color-btn-primary-bg); color: var(--color-btn-primary-text); }
+  .wr-toast { padding: var(--space-4) var(--space-6); background: var(--color-bg-tertiary);
+              border: var(--border-width) solid var(--color-border-subtle); border-left: var(--border-width-thick) solid var(--color-error);
+              font-size: var(--text-base); color: var(--color-text-primary); }
+  .wr-menu { padding: var(--space-2) 0; background: var(--color-bg-tertiary); border: var(--border-width) solid var(--color-border-subtle);
+             font-size: var(--text-base); color: var(--color-text-primary); }
+  .wr-menu__item { display: flex; justify-content: space-between; gap: var(--space-12); padding: var(--space-2) var(--space-6); }
+  .wr-menu__key { color: var(--color-text-tertiary); font-family: var(--font-mono); font-size: var(--text-sm); }
+  .wr-label { font-size: var(--text-base); color: var(--color-text-primary); }
+  .wr-caps { font-size: var(--text-sm); font-weight: var(--font-semibold); text-transform: uppercase;
+             letter-spacing: var(--ds-caps-tracking); color: var(--color-text-primary); }
+</style>
+</head>
+<body>
+<nav class="ds-crumbs" aria-label="Breadcrumb"><a href="../../index.html">Erfana design system</a> <span aria-hidden="true">/</span> <a href="../../index.html#foundations">Foundations</a> <span aria-hidden="true">/</span> <span aria-current="page">Writing</span></nav>
+<main>
+<h1>Writing</h1>
+<p class="ds-meta"><span class="ds-status" data-status="proposed">proposed</span> not yet reviewed</p>
+<p class="ds-lede" id="decision">
+  Every string in Erfana is written in <strong>sentence case</strong>, uses an <strong>en dash</strong> where a dash is
+  needed, puts a <strong>verb</strong> on every button, says in an error <strong>what happened and what to do</strong>,
+  writes shortcuts the way the platform does, and never claims that Erfana itself is an AI.
+</p>
+
+<h2 id="case">Case</h2>
+<p class="ds-muted">Sentence case everywhere – titles, buttons, menu items, tabs, settings, tooltips, toasts. Capitalise
+the first word and proper nouns only: Erfana, Claude Code, Markdown, Mermaid, GitHub, macOS, Windows. Uppercase is a
+<em>style</em> two roles apply with CSS (panel titles and column headers – see Typography), never typed into the string,
+so a screen reader does not spell it out and a translation is not shouted.</p>
+<div class="wr-pair">
+  <figure class="wr-ex wr-ex--do"><span class="wr-verdict">Do</span><div aria-hidden="true"><span class="wr-label">Open recent project</span></div>
+    <figcaption>Sentence case. Reads as a phrase.</figcaption></figure>
+  <figure class="wr-ex wr-ex--dont"><span class="wr-verdict">Don't</span><div aria-hidden="true"><span class="wr-label">Open Recent Project</span></div>
+    <figcaption>Title case. Every word competes; proper nouns stop standing out.</figcaption></figure>
+  <figure class="wr-ex wr-ex--do"><span class="wr-verdict">Do</span><div aria-hidden="true"><span class="wr-caps">Project</span></div>
+    <figcaption>Typed "Project", uppercased by the panel-title style.</figcaption></figure>
+</div>
+
+<h2 id="punctuation">Dashes and punctuation</h2>
+<table class="ds-tokens">
+<thead><tr><th>Mark</th><th>Use</th><th>Example</th></tr></thead>
+<tbody>
+  <tr><td>En dash – with spaces</td><td>A break or an aside in a sentence, and in a card subtitle</td><td>Saved – 3 files changed</td></tr>
+  <tr><td>En dash, no spaces</td><td>A range</td><td>Lines 12–40, 10–11px</td></tr>
+  <tr><td>Em dash</td><td><strong>Never.</strong> The en dash covers both uses</td><td>–</td></tr>
+  <tr><td>Hyphen</td><td>Compound words and file names only</td><td>read-only, design-tokens.css</td></tr>
+  <tr><td>Ellipsis …</td><td>One character (…), not three dots. On a command that asks for more before it acts, and on a status that is still running</td><td>Rename…, Loading project…</td></tr>
+  <tr><td>Full stop</td><td>Ends a sentence in a body, a hint or a toast. Not on a title, a button, a menu item or a label</td><td>Applies to new terminals only.</td></tr>
+  <tr><td>Quotes</td><td>Curly (“ ” ‘ ’) in UI text; straight only inside code</td><td>Delete “notes.md”?</td></tr>
+</tbody>
+</table>
+
+<h2 id="buttons">Buttons say what happens</h2>
+<p class="ds-muted">A button is a verb, or a verb and its object: the reader should know what will happen without
+reading the dialog. The confirming button repeats the title's verb. Cancel is always "Cancel". "OK", "Yes" and "No"
+are never a choice – they make the reader go back and re-read the question.</p>
+<div class="wr-pair">
+  <figure class="wr-ex wr-ex--do"><span class="wr-verdict">Do</span>
+    <div class="wr-dialog" aria-hidden="true"><p class="wr-dialog__title">Delete “notes.md”?</p><p class="wr-dialog__body">This removes the file from disk.</p>
+      <div class="wr-actions"><span class="wr-btn">Cancel</span><span class="wr-btn wr-btn--danger">Delete file</span></div></div>
+    <figcaption>The title asks, the body says the consequence, the button repeats the verb.</figcaption></figure>
+  <figure class="wr-ex wr-ex--dont"><span class="wr-verdict">Don't</span>
+    <div class="wr-dialog" aria-hidden="true"><p class="wr-dialog__title">Are you sure?</p><p class="wr-dialog__body">This action cannot be undone.</p>
+      <div class="wr-actions"><span class="wr-btn">No</span><span class="wr-btn wr-btn--danger">Yes</span></div></div>
+    <figcaption>Sure of what? Yes to what? The reader has to remember what they clicked.</figcaption></figure>
+</div>
+
+<h2 id="errors">Errors say what to do</h2>
+<p class="ds-muted">Three parts, in this order: <strong>what happened</strong> (in the reader's words, naming the thing),
+<strong>why</strong> if it is known, and <strong>what to do next</strong>. No blame ("you entered an invalid…"), no
+apology theatre ("Oops!"), no bare codes – a code goes after the sentence, for a bug report. The toast keeps the full
+file name; the log file gets it redacted (<code>redactUserInput</code>).</p>
+<div class="wr-pair">
+  <figure class="wr-ex wr-ex--do"><span class="wr-verdict">Do</span>
+    <div class="wr-toast" aria-hidden="true">Couldn't save “notes.md” – the disk is full. Free some space, then save again.</div>
+    <figcaption>What, why, what next. One sentence each, at most.</figcaption></figure>
+  <figure class="wr-ex wr-ex--dont"><span class="wr-verdict">Don't</span>
+    <div class="wr-toast" aria-hidden="true">Oops! Something went wrong (ENOSPC).</div>
+    <figcaption>Cheerful, vague, and only a code the reader cannot act on.</figcaption></figure>
+</div>
+<p class="ds-muted">A field error sits under its field, is linked with <code>aria-describedby</code> and
+<code>aria-invalid</code>, and says how to fix the value: "Enter a port between 1024 and 65535", not "Invalid input".
+See <a href="../components/form/index.html">Form controls</a>.</p>
+
+<h2 id="shortcuts">Keyboard shortcuts</h2>
+<table class="ds-tokens">
+<thead><tr><th>Where</th><th>How it is written</th><th>Example</th></tr></thead>
+<tbody>
+  <tr><td>UI on macOS</td><td>Modifier glyphs in Apple's order ⌃ ⌥ ⇧ ⌘, then the key, no separators</td><td><kbd>⌥⇧⌘F</kbd></td></tr>
+  <tr><td>UI on Windows and Linux</td><td>Ctrl, Alt, Shift spelled out in that order, joined with +</td><td><kbd>Ctrl+Alt+Shift+F</kbd></td></tr>
+  <tr><td>Code that renders a label</td><td>Always <code>formatShortcut(key, { mod, alt, shift })</code> from <code>utils/shortcutLabel.ts</code> – never a typed string</td><td><code>formatShortcut('B', { mod: true })</code></td></tr>
+  <tr><td><code>aria-keyshortcuts</code></td><td>The ARIA key names, <code>Meta</code> and <code>Control</code>, joined with +</td><td><code>Meta+C</code>, <code>Control+V</code></td></tr>
+  <tr><td>Docs, cards and issues</td><td>Both platforms, macOS first, separated by a slash</td><td><kbd>⌘B</kbd> / <kbd>Ctrl+B</kbd></td></tr>
+</tbody>
+</table>
+<div class="wr-pair">
+  <figure class="wr-ex wr-ex--do"><span class="wr-verdict">Do – macOS</span>
+    <div class="wr-menu" aria-hidden="true"><div class="wr-menu__item"><span>Copy</span><span class="wr-menu__key">⌘C</span></div><div class="wr-menu__item"><span>Add comment</span><span class="wr-menu__key">⌥⌘M</span></div></div>
+    <figcaption>What the platform's own menus show.</figcaption></figure>
+  <figure class="wr-ex wr-ex--dont"><span class="wr-verdict">Don't – macOS</span>
+    <div class="wr-menu" aria-hidden="true"><div class="wr-menu__item"><span>Copy</span><span class="wr-menu__key">⌘C</span></div><div class="wr-menu__item"><span>Add comment</span><span class="wr-menu__key">Cmd+Option+M</span></div></div>
+    <figcaption>Two notations in one menu. Spelling out Cmd is the Windows convention applied to a Mac.</figcaption></figure>
+</div>
+
+<h2 id="agent">Erfana hosts the agent – it is not one</h2>
+<p class="ds-muted">Erfana is a workspace with a terminal that runs a CLI coding agent of the user's choosing. The
+intelligence is the agent's. Copy that blurs this overclaims, and breaks the day the user runs a different agent.</p>
+<table class="ds-tokens">
+<thead><tr><th>Write</th><th>Not</th><th>Why</th></tr></thead>
+<tbody>
+  <tr><td>"the agent", "your coding agent"</td><td>"Erfana's AI", "the assistant"</td><td>Erfana has no model of its own</td></tr>
+  <tr><td>"Claude Code" – only where the feature really is Claude Code-specific (the context-window meter reads its transcripts)</td><td>"Claude" for anything the terminal does with any agent</td><td>Naming one vendor for a generic feature is false for every other agent</td></tr>
+  <tr><td>"Ask the agent to explain this"</td><td>"Erfana will explain this"</td><td>The action sends a prompt; the agent answers</td></tr>
+  <tr><td>"Agent-native Markdown workspace"</td><td>"AI-powered editor"</td><td>The product's own description, and the true one</td></tr>
+</tbody>
+</table>
+
+<h2 id="numbers">Numbers and names</h2>
+<ul class="ds-muted">
+  <li>Numerals for every count and size ("3 files", not "three files") – they scan faster in a dense UI.</li>
+  <li>Units with a space, except % and px: "2 KB", "1.5 s", "50%", "24px".</li>
+  <li>Paths, file names, hosts and commands go in the mono face and are never truncated in the middle of the part that identifies them – see <a href="../components/row/index.html">Rows and lists</a>.</li>
+  <li>Name a thing the same way everywhere: if the panel is "Project", the menu does not say "Explorer".</li>
+</ul>
+
+<section id="exceptions">
+<h2>Exceptions</h2>
+<p class="ds-muted">None recorded. A shipping string that departs from this card carries a <code>deviates:</code>
+marker at the site and gets a row here, naming the file.</p>
+<h3 id="defects">Defects this card names</h3>
+<ul class="ds-muted">
+  <li><strong>Two macOS shortcut notations.</strong> <code>commentCopy.ts</code> types "Cmd+Option+M" and
+  "Cmd+Enter" for macOS, while <code>formatShortcut</code> renders the glyph form (⌥⌘M) everywhere else.</li>
+</ul>
+</section>
+
+</main>
+</body>
+</html>

@@ -28,9 +28,12 @@ Plain HTML and CSS, no script. Open them in a browser.
 | [`markdown-comments/`](markdown-comments/index.html) | The Markdown journey, every Markdown state, and where comment blocks go in the source |
 | [`selection-comments/`](selection-comments/index.html) | Comments on selected text in both previews |
 
-The screens use the design system's tokens and shared CSS, and load its generated
-`claims.js`, so their numbers still come from the code. `npm run lint:css` checks them for the
-token rules, and `scripts/design-claims.test.mjs` checks their claims and `@card` markers.
+The screens use the design system's tokens and shared CSS and run no JavaScript. Their numbers
+are bake targets (`data-claim`, `data-contrast`) that `npm run design` fills from the code, so they
+still come from the code. `npm run lint:css` checks them for the token rules,
+`scripts/design-claims.test.mjs` checks their baked values and `@card` markers, and
+`npm run design -- --check` runs the static-by-rule guard over them. The `html-comments/` screens were
+interactive demos driven by a shared `demo.js`; they are now static snapshots of their default state.
 
 ## States
 

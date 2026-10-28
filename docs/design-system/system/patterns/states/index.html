@@ -1,0 +1,407 @@
+<!-- @card group="Patterns" name="Empty, loading and error states" subtitle="What a region shows when it has nothing, is waiting, or has failed – one shape for each" status="proposed" reviewed="never" answers="Show an empty panel or list; Show that something is loading; Block the window while it waits; Show that a panel or the app failed" -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Empty, loading and error states – Erfana design system</title>
+<link rel="stylesheet" href="../../../tokens.css">
+<link rel="stylesheet" href="../../../ds.css">
+<link rel="stylesheet" href="./states.css">
+<style>
+  /* Documentation-only chrome. None of this ships. */
+
+  /* A stand-in for the region a state fills: a panel, a list, a dialog body.
+     The surface class is the real surface that region paints in the app, so
+     every colour in a frame is read against what it lands on. */
+  .mock { position: relative; display: flex; flex-direction: column; overflow: hidden;
+          border: var(--border-width) solid var(--color-border-subtle); }
+  .mock--panel { height: 220px; }
+  .mock--list { min-height: 160px; }
+  .mock--window { height: 300px; }
+  .mock--crash { min-height: 360px; }
+  .on-primary { background: var(--color-bg-primary); }
+  .on-secondary { background: var(--color-bg-secondary); }
+  .on-tertiary { background: var(--color-bg-tertiary); }
+  .mock > .erf-state { flex: 1 1 auto; }
+
+  /* A panel's title strip and a few rows, so a frame reads as a place in the app. */
+  .mock__head { flex: 0 0 auto; padding: var(--space-4) var(--space-8);
+                border-bottom: var(--border-width) solid var(--color-border-default);
+                font-size: var(--text-xs); font-weight: var(--font-semibold); text-transform: uppercase;
+                letter-spacing: var(--ds-caps-tracking); color: var(--color-text-tertiary); }
+  .mock__field { margin: var(--space-6) var(--space-8) 0; padding: var(--space-3) var(--space-6);
+                 border: var(--border-width) solid var(--color-border-input); background: var(--color-bg-input);
+                 color: var(--color-text-primary); font-size: var(--text-sm); }
+  .mock__row { padding: var(--space-3) var(--space-8); font-size: var(--text-sm); color: var(--color-text-primary); }
+  .mock__row--dim { color: var(--color-text-tertiary); }
+  .mock__window-body { flex: 1 1 auto; display: grid; grid-template-columns: 1fr 2fr; }
+  .mock__pane { border-right: var(--border-width) solid var(--color-border-default); }
+
+  /* Wide frames: the crash screen needs room to be read at its real measure. */
+  .wide-frames { display: grid; grid-template-columns: repeat(auto-fill, minmax(460px, 1fr));
+                 gap: var(--space-8); margin: 0 0 var(--space-16); }
+
+  /* A disclosure the reader can open – the one live control on this card. */
+  .live { margin: 0 0 var(--space-16); max-width: var(--ds-measure-wide); }
+  .live summary { cursor: pointer; color: var(--color-text-bright); }
+  .live summary:focus-visible { outline: var(--border-width-thick) solid var(--color-border-focus); outline-offset: var(--space-1); }
+
+  pre.markup { margin: 0 0 var(--space-12); padding: var(--space-8); overflow-x: auto;
+               background: var(--color-bg-secondary); border: var(--border-width) solid var(--color-border-default);
+               color: var(--color-text-primary); font-family: var(--font-mono); font-size: var(--text-sm); }
+</style>
+</head>
+<body>
+<nav class="ds-crumbs" aria-label="Breadcrumb"><a href="../../../index.html">Erfana design system</a> <span aria-hidden="true">/</span> <a href="../../../index.html#patterns">Patterns</a> <span aria-hidden="true">/</span> <span aria-current="page">Empty, loading and error states</span></nav>
+<main>
+<h1>Empty, loading and error states</h1>
+<p class="ds-meta"><span class="ds-status" data-status="proposed">proposed</span> not yet reviewed</p>
+<p class="ds-lede" id="decision">
+  A region that has nothing to show says <strong>what is missing and what to do next</strong>, in one title, one
+  hint and at most one action. A region that is waiting shows <strong>inline progress in its own place</strong>;
+  only a change that would corrupt state if the user kept working blocks the whole window. A region that failed
+  says <strong>what stopped, that the rest still works, and how to try again</strong> – and never looks like an
+  empty state.
+</p>
+
+<div class="ds-note">
+  <strong>Why a pattern, not a component.</strong> The app already ships all three states, many times over, and
+  each copy centres a grey line of text its own way: different paddings, different gaps, different greys – and one
+  of them fails contrast on the surface it sits on. The <a href="#consolidation">consolidation set</a> below lists
+  every copy this card would replace. <code>states.css</code> is the proposed shared shape; adopting it is a
+  consolidation, not a ninth variant.
+</div>
+
+<h2 id="which">Which state is this?</h2>
+<table>
+  <thead><tr><th>The region…</th><th>State</th><th>Shape</th><th>Example</th></tr></thead>
+  <tbody>
+    <tr><td>has never had content – nothing is open yet</td><td>Empty: first run</td><td>Whole region, centred, one action</td><td>The editor with no file open</td></tr>
+    <tr><td>is open, and its container is genuinely empty</td><td>Empty: empty container</td><td>Whole region, centred, action only if it changes the answer</td><td>A project with no Markdown files</td></tr>
+    <tr><td>has content, but a search or filter hides all of it</td><td>Empty: no results</td><td>Inline, where the first row would be, and a way to clear</td><td>Search, the comment drawer's filters</td></tr>
+    <tr><td>is fetching what it is about to show</td><td>Loading: inline progress</td><td>In place of the content, region marked busy</td><td>The window picker's list</td></tr>
+    <tr><td>is changing something every other region depends on</td><td>Loading: full block</td><td>Scrim over the window, one message</td><td>Switching projects</td></tr>
+    <tr><td>threw while rendering, and the rest of the app is fine</td><td>Error: panel</td><td>Whole region, message, Reload</td><td>The project tree crashed</td></tr>
+    <tr><td>could not load what it was asked to show</td><td>Error: load</td><td>Whole region, error icon, reason, Try again</td><td>A file that cannot be read</td></tr>
+    <tr><td>is the whole app, and it threw</td><td>Error: root</td><td>Full window, Restart, details on request</td><td>The crash screen</td></tr>
+  </tbody>
+</table>
+
+<h2 id="states">Every state</h2>
+<p class="ds-muted">Each frame is a picture of one state on the surface it really lands on. Nothing in a frame takes
+focus; the keyboard contract is <a href="#keyboard">the table below</a>.</p>
+
+<h3 id="empty">Empty</h3>
+<div class="ds-frames">
+  <figure class="ds-frame">
+    <div class="mock mock--panel on-primary" inert aria-hidden="true">
+      <div class="erf-state">
+        <svg class="erf-state__icon" data-icon="file-text" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
+        <p class="erf-state__title">No file open</p>
+        <p class="erf-state__hint">Pick a Markdown file in the project panel, or start a new one.</p>
+        <div class="erf-state__actions"><button class="erf-state__action" type="button">New file</button></div>
+      </div>
+    </div>
+    <figcaption><span class="ds-frame__step">1</span><strong>First run</strong> – the editor before anything is open. The hint names where content comes from; the one action is the shortest way to get some.</figcaption>
+  </figure>
+  <figure class="ds-frame">
+    <div class="mock mock--panel on-tertiary" inert aria-hidden="true">
+      <div class="mock__head">Project</div>
+      <div class="erf-state">
+        <svg class="erf-state__icon" data-icon="folder-open" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></svg>
+        <p class="erf-state__title">No Markdown files in this project</p>
+        <p class="erf-state__hint">The tree shows Markdown only. Other files are still on disk.</p>
+        <div class="erf-state__actions"><button class="erf-state__action" type="button">Show all files</button></div>
+      </div>
+    </div>
+    <figcaption><span class="ds-frame__step">2</span><strong>Empty container</strong> – the project tree, on its real surface (<code>--color-bg-tertiary</code>). The action is there only because it changes the answer: the filter is what made the tree empty.</figcaption>
+  </figure>
+  <figure class="ds-frame">
+    <div class="mock mock--list on-tertiary" inert aria-hidden="true">
+      <div class="mock__field">quarterly forecast</div>
+      <div class="erf-state erf-state--inline">
+        <p class="erf-state__title">No results for “quarterly forecast”</p>
+        <p class="erf-state__hint">Check the spelling, or search all files instead of Markdown only.</p>
+        <div class="erf-state__actions"><button class="erf-state__action" type="button">Clear search</button></div>
+      </div>
+    </div>
+    <figcaption><span class="ds-frame__step">3</span><strong>No results</strong> – inline, where the first result would be, with the query quoted back. No icon: the field above already says what this region is.</figcaption>
+  </figure>
+  <figure class="ds-frame">
+    <div class="mock mock--list on-secondary" inert aria-hidden="true">
+      <div class="mock__head">Comments · Unresolved</div>
+      <div class="erf-state erf-state--inline">
+        <p class="erf-state__title">No unresolved comments</p>
+        <p class="erf-state__hint">Resolved comments are under All.</p>
+      </div>
+    </div>
+    <figcaption><span class="ds-frame__step">4</span><strong>No results, from a filter</strong> – the comment drawer. A filter is a search with fixed queries, so it takes the same inline shape and says where the hidden items went.</figcaption>
+  </figure>
+</div>
+
+<div class="ds-note">
+  <strong>The copy rule.</strong> The title names what is missing, in sentence case, without “Oops”, “Sorry” or an
+  exclamation mark. The hint is one sentence that says what to do or why the region is empty – never a restated
+  title. The action, when there is one, is a verb that changes the state (“New file”, “Show all files”, “Clear
+  search”); an empty state with nothing useful to do has no button. <strong>Colour:</strong> title in
+  <code>--color-text-primary</code>, hint in <code>--color-text-tertiary</code>, icon in
+  <code>--color-text-tertiary</code>. Not <code>--color-text-secondary</code>: it measures
+  <span data-contrast="--color-text-secondary on --color-bg-tertiary" data-min="4.5" data-result="fail">4.15:1 · fail</span> on the project tree and
+  <span data-contrast="--color-text-secondary on --color-bg-secondary" data-min="4.5" data-result="fail">3.72:1 · fail</span> on a panel, and both host an
+  empty state.
+</div>
+
+<h3 id="loading">Loading</h3>
+<div class="ds-frames">
+  <figure class="ds-frame">
+    <div class="mock mock--list on-primary" inert aria-hidden="true">
+      <div class="mock__head">Choose a window</div>
+      <div class="erf-state erf-state--inline">
+        <span class="erf-progress"><span class="erf-progress__spinner"></span>Looking for capturable windows…</span>
+      </div>
+    </div>
+    <figcaption><span class="ds-frame__step">5</span><strong>Inline progress</strong> – the default. A small spinner and a sentence in the place the content will appear; the region carries <code>aria-busy="true"</code> and everything around it keeps working.</figcaption>
+  </figure>
+  <figure class="ds-frame">
+    <div class="mock mock--list on-tertiary" inert aria-hidden="true">
+      <div class="mock__head">Project</div>
+      <div class="mock__row">docs/</div>
+      <div class="mock__row">README.md</div>
+      <div class="mock__row mock__row--dim"><span class="erf-progress"><span class="erf-progress__spinner"></span>Loading 2 more folders…</span></div>
+    </div>
+    <figcaption><span class="ds-frame__step">6</span><strong>Inline progress, partial content</strong> – what has arrived is shown and usable; progress sits where the rest will land. Never blank a list that already has rows.</figcaption>
+  </figure>
+  <figure class="ds-frame">
+    <div class="mock mock--window on-primary" inert aria-hidden="true">
+      <div class="mock__head">Erfana</div>
+      <div class="mock__window-body">
+        <div class="mock__pane on-tertiary"><div class="mock__row">docs/</div><div class="mock__row">README.md</div></div>
+        <div><div class="mock__row">Editor</div></div>
+      </div>
+      <div class="erf-blocker">
+        <div class="erf-blocker__box">
+          <span class="erf-progress erf-progress--block"><span class="erf-progress__spinner"></span></span>
+          <p class="erf-blocker__message">Opening erfana-docs…</p>
+        </div>
+      </div>
+    </div>
+    <figcaption><span class="ds-frame__step">7</span><strong>Full block</strong> – <code>UIBlocker</code>. The scrim takes every pointer event and the window takes no input until it ends on its own. The message names the thing being done, with a real ellipsis.</figcaption>
+  </figure>
+</div>
+
+<table>
+  <thead><tr><th>Inline progress when…</th><th>Full block only when…</th></tr></thead>
+  <tbody>
+    <tr><td>The wait belongs to one region – a list, a preview, a dialog body.</td><td>The wait changes something every region reads: the open project, the working folder.</td></tr>
+    <tr><td>Working elsewhere is safe while it runs.</td><td>Input during the wait would act on the old state and corrupt the new one.</td></tr>
+    <tr><td>The user might cancel or navigate away.</td><td>It cannot be cancelled once begun, and it ends on its own.</td></tr>
+    <tr><td>Partial content is useful – show it as it arrives.</td><td>Nothing on screen is valid until it finishes.</td></tr>
+  </tbody>
+</table>
+<p class="ds-muted">If neither column fits – a long job the user should be able to leave running – it is neither state:
+it is a task with its own progress and a way to cancel, and it does not belong on this card yet. A skeleton screen
+(grey placeholder rows) is not part of the system: nothing in the app draws one, and this card does not add one.</p>
+
+<h3 id="error">Error</h3>
+<div class="ds-frames">
+  <figure class="ds-frame">
+    <div class="mock mock--panel on-primary" inert aria-hidden="true">
+      <div class="mock__head">Project</div>
+      <div class="erf-state erf-state--error">
+        <p class="erf-state__title">Project tree unavailable. The rest of Erfana still works.</p>
+        <div class="erf-state__actions"><button class="erf-state__action is-focus" type="button">Reload</button></div>
+      </div>
+    </div>
+    <figcaption><span class="ds-frame__step">8</span><strong>Panel error, first failure</strong> – <code>PanelErrorBoundary</code>. It says the damage is contained. If focus was inside the panel when it died, focus moves to Reload (drawn focused); otherwise it stays where it was.</figcaption>
+  </figure>
+  <figure class="ds-frame">
+    <div class="mock mock--panel on-primary" inert aria-hidden="true">
+      <div class="mock__head">Project</div>
+      <div class="erf-state erf-state--error">
+        <p class="erf-state__title">Project tree is still unavailable.</p>
+        <div class="erf-state__actions"><button class="erf-state__action is-focus" type="button">Reload</button></div>
+      </div>
+    </div>
+    <figcaption><span class="ds-frame__step">9</span><strong>Panel error, retry failed</strong> – the reassurance is not repeated as if nothing was tried. Focus returns to Reload, and its description carries the new sentence.</figcaption>
+  </figure>
+  <figure class="ds-frame">
+    <div class="mock mock--panel on-primary" inert aria-hidden="true">
+      <div class="erf-state erf-state--error">
+        <svg class="erf-state__icon" data-icon="circle-x" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>
+        <p class="erf-state__title">Could not open notes/plan.md</p>
+        <p class="erf-state__hint">Check that the file still exists and can be read.</p>
+        <div class="erf-state__actions"><button class="erf-state__action erf-state__action--primary" type="button">Try again</button></div>
+      </div>
+    </div>
+    <figcaption><span class="ds-frame__step">10</span><strong>Load error</strong> – the error icon in <code>--color-error</code> (<span data-contrast="--color-error on --color-bg-primary" data-min="3" data-result="pass">7.53:1 · pass</span> as a graphic) is what separates it from frame 1. <code>EditorLoadError</code> uses the empty state's class today and looks exactly like it.</figcaption>
+  </figure>
+</div>
+
+<div class="wide-frames">
+  <figure class="ds-frame">
+    <div class="mock mock--crash erf-crash" inert aria-hidden="true">
+      <div class="erf-crash__panel">
+        <p class="erf-crash__heading">Erfana stopped unexpectedly.</p>
+        <p class="erf-crash__message">Files you saved are not affected. Restarting opens Erfana on the welcome screen.</p>
+        <div class="erf-crash__actions">
+          <button class="erf-state__action erf-state__action--primary" type="button">Restart Erfana</button>
+          <button class="erf-state__action" type="button">Copy error details</button>
+          <button class="erf-state__action" type="button">Open logs folder</button>
+        </div>
+        <button class="erf-state__action erf-crash__toggle" type="button">Show error details</button>
+      </div>
+    </div>
+    <figcaption><span class="ds-frame__step">11</span><strong>Root error, details collapsed</strong> – <code>RootErrorFallback</code>. Plain language first: the heading never carries the raw error. Focus lands on the screen itself, not on Restart, so a buffered Return cannot relaunch the app the instant it appears.</figcaption>
+  </figure>
+  <figure class="ds-frame">
+    <div class="mock mock--crash erf-crash" inert aria-hidden="true">
+      <div class="erf-crash__panel">
+        <p class="erf-crash__heading">Erfana stopped unexpectedly.</p>
+        <p class="erf-crash__message">Files you saved are not affected. Restarting opens Erfana on the welcome screen.</p>
+        <div class="erf-crash__actions">
+          <button class="erf-state__action erf-state__action--primary" type="button">Restart Erfana</button>
+          <button class="erf-state__action" type="button">Copy error details</button>
+          <button class="erf-state__action" type="button">Open logs folder</button>
+        </div>
+        <button class="erf-state__action erf-crash__toggle is-focus" type="button">Hide error details</button>
+        <div class="erf-crash__details">
+          <p class="erf-crash__meta">Erfana 0.0.0 · 2026-10-28 14:03</p>
+          <pre class="erf-crash__stack">TypeError: Cannot read properties of undefined (reading 'path')
+    at ProjectTree (ProjectTree.tsx)
+    at PanelErrorBoundary</pre>
+        </div>
+      </div>
+    </div>
+    <figcaption><span class="ds-frame__step">12</span><strong>Root error, details shown</strong> – the toggle's label says what it will do next, and it keeps focus. The details are untrusted text, shown as text only, in a scrollable region the keyboard can reach. The version and stack here are placeholders.</figcaption>
+  </figure>
+  <figure class="ds-frame">
+    <div class="mock mock--crash erf-crash" inert aria-hidden="true">
+      <div class="erf-crash__panel">
+        <p class="erf-crash__heading">Erfana stopped unexpectedly.</p>
+        <p class="erf-crash__message">Files you saved are not affected. Erfana's recovery tools are unavailable, so quit Erfana and open it again. Log files are in:</p>
+        <p class="erf-crash__message"><code>.erfana/logs in your home folder</code></p>
+        <button class="erf-state__action erf-crash__toggle" type="button">Show error details</button>
+      </div>
+    </div>
+    <figcaption><span class="ds-frame__step">13</span><strong>Root error, degraded</strong> – no bridge to the main process, so instructions replace buttons that could not work. A promise about a button is only made when the button exists. The folder comes from the shared <code>LOGS_DIR_RELATIVE</code> constant.</figcaption>
+  </figure>
+</div>
+
+<details class="live">
+  <summary>Open this to see the details pattern work without script</summary>
+  <p class="ds-muted">A card cannot run the fallback's toggle, but <code>&lt;details&gt;</code> shows the same contract:
+  a control whose state is exposed (expanded or collapsed), and a region that is absent from the accessibility tree
+  while closed. The app keeps its <code>button</code> + <code>aria-expanded</code> + <code>hidden</code> region,
+  because its label changes between Show and Hide – a summary's text does not.</p>
+</details>
+
+<h2 id="keyboard">The keyboard contract</h2>
+<table class="ds-keys">
+  <thead><tr><th>Key or event</th><th>Result</th><th>Focus ends on</th></tr></thead>
+  <tbody>
+    <tr><td>A panel throws, focus was inside it</td><td>The panel error replaces it.</td><td>Reload.</td></tr>
+    <tr><td>A panel throws, focus was elsewhere</td><td>The panel error replaces it; nothing is announced.</td><td>Wherever it was. A crash never steals focus.</td></tr>
+    <tr><td><kbd>Enter</kbd> on Reload, success</td><td>The panel renders again.</td><td>The panel's content wrapper.</td></tr>
+    <tr><td><kbd>Enter</kbd> on Reload, failure</td><td>“…is still unavailable.”</td><td>Reload, which announces the new description.</td></tr>
+    <tr><td>The app throws</td><td>The crash screen replaces the app.</td><td>The crash screen container – not Restart.</td></tr>
+    <tr><td><kbd>Tab</kbd> on the crash screen</td><td>Restart, Copy, Open logs, the details toggle, the details region.</td><td>The next of those. There is nothing else to escape to.</td></tr>
+    <tr><td><kbd>Enter</kbd> on the details toggle</td><td>Shows or hides the details; the label flips.</td><td>The toggle.</td></tr>
+    <tr><td>A full block starts</td><td>Pointer and keyboard input stop.</td><td>Unchanged; it returns to the same place when the block ends.</td></tr>
+    <tr><td><kbd>Enter</kbd> on an empty state's action</td><td>Does what it says (opens, clears, shows).</td><td>The first thing the action produced – the new file, the search field.</td></tr>
+  </tbody>
+</table>
+<p class="ds-muted">The tests that hold the shipping parts to this: <code>PanelErrorBoundary.test.tsx</code>,
+<code>RootErrorFallback.test.tsx</code>, <code>RootErrorBoundary.test.tsx</code>, <code>UIBlocker.test.tsx</code> and
+<code>EditorLoadError.test.tsx</code>. No test covers an empty state's copy or focus yet.</p>
+
+<h2 id="announce">What a screen reader hears</h2>
+<table>
+  <thead><tr><th>State</th><th>Announcement</th><th>How</th></tr></thead>
+  <tbody>
+    <tr><td>Empty, whole region</td><td>Nothing on arrival – it is the region's content, read when reached.</td><td>Plain text. Not a live region: an empty editor is not news.</td></tr>
+    <tr><td>No results</td><td>“No results for …” once, after typing stops.</td><td>The search's existing polite status region, not a second one.</td></tr>
+    <tr><td>Inline progress</td><td>The progress sentence, politely; the region is busy until it ends.</td><td><code>role="status"</code> on the sentence, <code>aria-busy</code> on the region.</td></tr>
+    <tr><td>Full block</td><td>The message, politely.</td><td>One status region. Not <code>alert</code>: waiting is not an error.</td></tr>
+    <tr><td>Panel error</td><td>Only through Reload's description, when focus moves there.</td><td>No <code>role="alert"</code>: one announcement channel, not two.</td></tr>
+    <tr><td>Root error</td><td>Heading and message, once.</td><td><code>role="alertdialog"</code>, named by the heading, described by the message.</td></tr>
+  </tbody>
+</table>
+
+<h2 id="consolidation">The consolidation set</h2>
+<p class="ds-muted">Every place the app draws one of these states today, checked in <code>src/renderer/</code> on
+2026-10-28. Text contrast is measured on the surface the region really paints; a dash means the surface is not a
+single token.</p>
+
+<h3 id="consolidation-empty">Empty-state classes</h3>
+<table>
+  <thead><tr><th>Class</th><th>File</th><th>Shows</th><th>Text on its surface</th></tr></thead>
+  <tbody>
+    <tr><td><code>.editor-empty</code></td><td><code>Panels/MarkdownEditorPanel.css</code></td><td>“No file open” and a hint – and, reused by <code>EditorLoadError</code>, a load failure</td><td><span data-contrast="--color-text-secondary on --color-bg-primary" data-min="4.5" data-result="pass">5.01:1 · pass</span></td></tr>
+    <tr><td><code>.emptyState</code></td><td><code>ImageViewerPanel/ImageViewerPanel.module.css</code></td><td>“No image to display” under a 32px icon</td><td><span data-contrast="--color-text-secondary on --color-bg-primary" data-min="4.5" data-result="pass">5.01:1 · pass</span></td></tr>
+    <tr><td><code>.project-tree-empty</code></td><td><code>ProjectTree/ProjectTree.css</code></td><td>“No markdown files found”, “No files found”, “Open a project to get started”</td><td><span data-contrast="--color-text-secondary on --color-bg-tertiary" data-min="4.5" data-result="fail">4.15:1 · fail</span></td></tr>
+    <tr><td><code>.erf-comment-drawer__empty</code></td><td><code>HtmlPreviewPanel/comments/CommentDrawer.css</code></td><td>No comments, and each filter's empty sentence</td><td>–</td></tr>
+    <tr><td><code>.camera-empty-state</code></td><td><code>Dialog/CameraDialog.css</code></td><td>“No camera detected” over the black preview</td><td>–</td></tr>
+    <tr><td><code>.window-picker-empty</code></td><td><code>Dialog/WindowPickerDialog.css</code></td><td>“No capturable windows found.” (shares its rule with the loading line)</td><td><span data-contrast="--color-text-secondary on --color-bg-primary" data-min="4.5" data-result="pass">5.01:1 · pass</span></td></tr>
+    <tr><td><code>.frontmatter-empty</code></td><td><code>Editor/MarkdownPreview.css</code></td><td><code>[]</code> or <code>{}</code> for an empty frontmatter value</td><td><span data-contrast="--color-text-tertiary on --color-bg-preview" data-min="4.5" data-result="pass">8.01:1 · pass</span></td></tr>
+    <tr><td><code>.html-preview-placeholder</code></td><td><code>HtmlPreviewPanel/HtmlPreviewPanel.css</code></td><td>The page area before and between native page paints – a placeholder, not an empty state, but named and busy like one</td><td>–</td></tr>
+  </tbody>
+</table>
+<p class="ds-muted">The first seven are empty states in the sense of this card; the placeholder is listed because it
+is what a reader sees while the preview loads. The frontmatter markers are the one copy that should stay as it is:
+an empty value inside a table is data, not an empty region, so it does not take this shape.</p>
+
+<h3 id="consolidation-loading">Loading</h3>
+<table>
+  <thead><tr><th>Where</th><th>File</th><th>Today</th></tr></thead>
+  <tbody>
+    <tr><td><code>UIBlocker</code></td><td><code>UIBlocker/UIBlocker.tsx</code>, <code>UIBlocker.css</code></td><td>The one full block, shown while the project changes. Its scrim is a colour literal rather than <code>--color-overlay-dialog</code>, its spinner has its own keyframe and duration, and its fallback copy uses three dots instead of an ellipsis.</td></tr>
+    <tr><td>Window picker</td><td><code>Dialog/WindowPickerDialog.tsx</code></td><td>Inline progress as text only, in a polite status – the right shape, no spinner.</td></tr>
+    <tr><td>Spinners</td><td>Many stylesheets</td><td>Counted on the <a href="../../foundations/motion.html">Motion</a> card, which owns the one spinner.</td></tr>
+  </tbody>
+</table>
+
+<h3 id="consolidation-error">Error boundaries and fallbacks</h3>
+<table>
+  <thead><tr><th>Boundary</th><th>File</th><th>What the user sees</th></tr></thead>
+  <tbody>
+    <tr><td><code>RootErrorBoundary</code> → <code>RootErrorFallback</code></td><td><code>RootErrorBoundary/</code></td><td>Frames 11–13. The reference implementation of this card.</td></tr>
+    <tr><td><code>PanelErrorBoundary</code></td><td><code>Panels/PanelErrorBoundary.tsx</code></td><td>Frames 8–9, unless a caller passes its own fallback.</td></tr>
+    <tr><td><code>EditorErrorBoundary</code></td><td><code>Editor/MarkdownEditorPanel/components/EditorErrorBoundary.tsx</code></td><td>“Component failed to render” in inline styles, as <code>role="alert"</code>, with no way to retry – or <code>null</code> where the caller passes it.</td></tr>
+    <tr><td><code>GitErrorBoundary</code></td><td><code>ProjectTree/GitErrorBoundary.tsx</code></td><td>Its fallback or nothing: git decoration disappears silently. Defensible – the tree still works – but nothing says git status is missing.</td></tr>
+    <tr><td><code>EditorLoadError</code></td><td><code>Panels/EditorLoadError.tsx</code></td><td>Not a boundary: a failed load, drawn with <code>.editor-empty</code> and a primary Try again.</td></tr>
+  </tbody>
+</table>
+
+<h2 id="markup">The markup</h2>
+<pre class="markup">&lt;!-- Empty, whole region --&gt;
+&lt;div class="erf-state"&gt;
+  &lt;svg class="erf-state__icon" aria-hidden="true"&gt;…&lt;/svg&gt;
+  &lt;p class="erf-state__title"&gt;No file open&lt;/p&gt;
+  &lt;p class="erf-state__hint"&gt;Pick a Markdown file in the project panel, or start a new one.&lt;/p&gt;
+  &lt;div class="erf-state__actions"&gt;&lt;button class="erf-state__action" type="button"&gt;New file&lt;/button&gt;&lt;/div&gt;
+&lt;/div&gt;
+
+&lt;!-- Inline progress: the region is busy, the sentence is the status --&gt;
+&lt;div aria-busy="true"&gt;
+  &lt;span class="erf-progress" role="status"&gt;&lt;span class="erf-progress__spinner" aria-hidden="true"&gt;&lt;/span&gt;Looking for capturable windows…&lt;/span&gt;
+&lt;/div&gt;
+
+&lt;!-- Panel error --&gt;
+&lt;div class="erf-state erf-state--error"&gt;
+  &lt;p class="erf-state__title" id="m1"&gt;Project tree unavailable. The rest of Erfana still works.&lt;/p&gt;
+  &lt;button class="erf-state__action" type="button" aria-label="Reload project tree" aria-describedby="m1"&gt;Reload&lt;/button&gt;
+&lt;/div&gt;</pre>
+
+<section id="exceptions">
+<h2>Exceptions</h2>
+<p class="ds-muted">None recorded. A shipping component that departs from this card carries a
+<code>deviates:</code> marker at the site and gets a row here, naming the file.</p>
+</section>
+
+</main>
+</body>
+</html>

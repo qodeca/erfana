@@ -4,9 +4,10 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Erfana — commenting in the Markdown preview</title>
+<title>Erfana – commenting in the Markdown preview</title>
 <link rel="stylesheet" href="../../../design-system/tokens.css">
 <link rel="stylesheet" href="../../../design-system/ds.css">
 <link rel="stylesheet" href="../../../design-system/system/components/menu/menu.css">
@@ -55,18 +56,18 @@
 <section class="mdc-step" aria-labelledby="s1-t">
   <div class="erf-mdc-panel" role="group" aria-label="Example: a commented Markdown file in the preview">
     <div class="erf-mdc-toolbar" role="toolbar" aria-label="Markdown formatting">
-      <button class="erf-mdc-tool" type="button" aria-label="Find" title="Find (Cmd+F)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M19 11a8 8 0 1 1-16 0 8 8 0 0 1 16 0"></path><path d="m21 21-4.3-4.3"></path></svg></button>
-      <button class="erf-mdc-tool erf-mdc-tool--toggle erf-mdc-tool--comment-first" type="button" aria-pressed="false" aria-label="Comment mode" title="Comment mode (Cmd+Option+M) – off"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"></path><path d="M12 8v6"></path><path d="M9 11h6"></path></svg></button>
-      <button class="erf-mdc-tool erf-mdc-tool--toggle erf-mdc-tool--count" type="button" aria-expanded="false" aria-label="Comments, 3 open"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M16 10a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 14.286V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path><path d="M20 9a2 2 0 0 1 2 2v10.286a.71.71 0 0 1-1.212.502l-2.202-2.202A2 2 0 0 0 17.172 19H10a2 2 0 0 1-2-2v-1"></path></svg>3</button>
-      <button class="erf-mdc-tool erf-mdc-tool--toggle" type="button" aria-pressed="true" aria-label="Show comment icons" title="Show comment icons – on"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"></path></svg></button>
+      <button class="erf-mdc-tool" type="button" aria-label="Find" title="Find (Cmd+F)" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M19 11a8 8 0 1 1-16 0 8 8 0 0 1 16 0"></path><path d="m21 21-4.3-4.3"></path></svg></button>
+      <button class="erf-mdc-tool erf-mdc-tool--toggle erf-mdc-tool--comment-first" type="button" aria-pressed="false" aria-label="Comment mode" title="Comment mode (Cmd+Option+M) – off" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"></path><path d="M12 8v6"></path><path d="M9 11h6"></path></svg></button>
+      <button class="erf-mdc-tool erf-mdc-tool--toggle erf-mdc-tool--count" type="button" aria-expanded="false" aria-label="Comments, 3 open" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M16 10a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 14.286V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path><path d="M20 9a2 2 0 0 1 2 2v10.286a.71.71 0 0 1-1.212.502l-2.202-2.202A2 2 0 0 0 17.172 19H10a2 2 0 0 1-2-2v-1"></path></svg>3</button>
+      <button class="erf-mdc-tool erf-mdc-tool--toggle" type="button" aria-pressed="true" aria-label="Show comment icons" title="Show comment icons – on" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"></path></svg></button>
       <span class="erf-mdc-toolbar__spacer"></span>
-      <button class="erf-mdc-tool erf-mdc-tool--view" type="button" aria-pressed="false" aria-label="Editor only"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12.5 22H18a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v9.5"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M13.378 15.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"></path></svg></button>
-      <button class="erf-mdc-tool erf-mdc-tool--view" type="button" aria-pressed="false" aria-label="Split horizontal"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"></path><path d="M3 12h18"></path></svg></button>
-      <button class="erf-mdc-tool erf-mdc-tool--view" type="button" aria-pressed="false" aria-label="Split vertical"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"></path><path d="M12 3v18"></path></svg></button>
-      <button class="erf-mdc-tool erf-mdc-tool--view" type="button" aria-pressed="true" aria-label="Preview only"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"></path><path d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0"></path></svg></button>
+      <button class="erf-mdc-tool erf-mdc-tool--view" type="button" aria-pressed="false" aria-label="Editor only" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12.5 22H18a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v9.5"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M13.378 15.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"></path></svg></button>
+      <button class="erf-mdc-tool erf-mdc-tool--view" type="button" aria-pressed="false" aria-label="Split horizontal" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"></path><path d="M3 12h18"></path></svg></button>
+      <button class="erf-mdc-tool erf-mdc-tool--view" type="button" aria-pressed="false" aria-label="Split vertical" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"></path><path d="M12 3v18"></path></svg></button>
+      <button class="erf-mdc-tool erf-mdc-tool--view" type="button" aria-pressed="true" aria-label="Preview only" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"></path><path d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0"></path></svg></button>
       <span class="erf-mdc-toolbar__sep" aria-hidden="true"></span>
-      <button class="erf-mdc-tool" type="button" aria-label="Export to PDF"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M12 18v-6"></path><path d="m9 15 3 3 3-3"></path></svg></button>
-      <button class="erf-mdc-tool" type="button" aria-label="Export to Word"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M10 9H8"></path><path d="M16 13H8"></path><path d="M16 17H8"></path></svg></button>
+      <button class="erf-mdc-tool" type="button" aria-label="Export to PDF" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M12 18v-6"></path><path d="m9 15 3 3 3-3"></path></svg></button>
+      <button class="erf-mdc-tool" type="button" aria-label="Export to Word" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M10 9H8"></path><path d="M16 13H8"></path><path d="M16 17H8"></path></svg></button>
     </div>
     <div class="erf-mdc-panel__body">
       <div class="erf-mdc-preview">
@@ -111,8 +112,8 @@
           </ul>
           <p>The rollback plan is in <code>docs/rollback.md</code>.</p>
         </div>
-        <div class="erf-menu mdc-float" role="menu" aria-label="Selection" style="inset-block-start: 112px; inset-inline-start: 300px;">
-          <div class="erf-menu-item erf-menu-item--active" role="menuitem" tabindex="0"><span class="erf-menu-icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"></path><path d="M12 8v6"></path><path d="M9 11h6"></path></svg></span><span class="erf-menu-label">Add comment</span></div>
+        <div class="erf-menu mdc-float" role="menu" aria-label="Selection" style="--ds-inset-block-start: 112px; inset-block-start: var(--ds-inset-block-start); --ds-inset-inline-start: 300px; inset-inline-start: var(--ds-inset-inline-start);">
+          <div class="erf-menu-item erf-menu-item--active" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"></path><path d="M12 8v6"></path><path d="M9 11h6"></path></svg></span><span class="erf-menu-label">Add comment</span></div>
           <div class="erf-menu-separator" role="separator"></div>
           <div class="erf-menu-item" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"></span><span class="erf-menu-label">Ask</span></div>
           <div class="erf-menu-item" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"></span><span class="erf-menu-label">Explain</span></div>
@@ -155,22 +156,22 @@
               <p class="erf-comment-window__context"><bdi dir="ltr">li</bdi> · plan.md, line 14</p>
               <span class="erf-mdc-quote">load test against staging</span>
             </div>
-            <button class="erf-comment-icon-btn" type="button" aria-label="Close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
+            <button class="erf-comment-icon-btn" type="button" aria-label="Close" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
           </div>
           <div class="erf-comment-window__body">
             <div class="erf-comment-field">
               <label class="erf-comment-field__label" for="f3">Comment</label>
-              <textarea class="erf-comment-textarea" id="f3" placeholder="What should change here?" aria-describedby="f3-h f3-c">Which staging – eu-1 or us-2? Name it here.</textarea>
+              <textarea class="erf-comment-textarea" id="f3" placeholder="What should change here?" aria-describedby="f3-h f3-c" tabindex="-1">Which staging – eu-1 or us-2? Name it here.</textarea>
               <div class="erf-comment-field__foot">
                 <p class="erf-comment-field__hint" id="f3-h">Plain text. Saved inside plan.md.</p>
                 <span class="erf-comment-counter" id="f3-c">43 / 4000</span>
               </div>
             </div>
-            <p class="erf-comment-identity">Commenting as <bdi>Marcin Obel</bdi> <button class="erf-comment-link" type="button">Change</button></p>
+            <p class="erf-comment-identity">Commenting as <bdi>Marcin Obel</bdi> <button class="erf-comment-link" type="button" tabindex="-1">Change</button></p>
           </div>
           <div class="erf-comment-window__foot">
-            <button class="erf-comment-btn erf-comment-btn--secondary" type="button"><span>Cancel</span></button>
-            <button class="erf-comment-btn erf-comment-btn--primary" type="button" title="Save (Cmd+Enter)" aria-keyshortcuts="Meta+Enter"><span>Save</span></button>
+            <button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Cancel</span></button>
+            <button class="erf-comment-btn erf-comment-btn--primary" type="button" title="Save (Cmd+Enter)" aria-keyshortcuts="Meta+Enter" tabindex="-1"><span>Save</span></button>
           </div>
         </div>
       </div>

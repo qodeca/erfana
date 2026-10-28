@@ -1,90 +1,226 @@
-<!-- @card group="Components" name="Icons" subtitle="Five sizes from the token scale, and the rule for when an icon has a name" status="proposed" reviewed="2026-08-31" -->
+<!-- @card group="Components" name="Icons" subtitle="Through the registry, by size name, at one stroke weight – and the rule for when an icon has a name" status="proposed" reviewed="2026-08-31" answers="Size an icon; Decide whether an icon needs a name; Find a registry glyph" -->
 <!-- SPDX-License-Identifier: GPL-3.0-only -->
 <!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Erfana — icons</title>
+<title>Icons – Erfana design system</title>
 <link rel="stylesheet" href="../../../tokens.css">
 <link rel="stylesheet" href="../../../ds.css">
-<script src="../../../claims.js"></script>
 <style>
-  .sizes { display: flex; align-items: flex-end; gap: var(--space-16); flex-wrap: wrap;
-           padding: var(--space-16); background: var(--color-bg-secondary); margin-bottom: var(--space-12); }
-  .size { text-align: center; }
-  .size svg { display: block; margin: 0 auto var(--space-6); color: var(--color-text-primary); }
-  .size .tok { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-tertiary); }
-  .size .px { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-secondary); }
+  /* Every SVG on this card is sized by a token class, never a width attribute. */
+  .ic { display: block; flex: 0 0 auto; color: var(--color-text-primary); }
+  .ic--xs { inline-size: var(--icon-size-xs); block-size: var(--icon-size-xs); }
+  .ic--sm { inline-size: var(--icon-size-sm); block-size: var(--icon-size-sm); }
+  .ic--md { inline-size: var(--icon-size-md); block-size: var(--icon-size-md); }
+  .ic--lg { inline-size: var(--icon-size-lg); block-size: var(--icon-size-lg); }
+  .ic--xl { inline-size: var(--icon-size-xl); block-size: var(--icon-size-xl); }
+  .ic--2xl { inline-size: var(--space-24); block-size: var(--space-24); }
+
+  /* The stroke rule: 1.5px on screen at every size. non-scaling-stroke makes
+     the width a screen measurement instead of a viewBox one; it is what
+     lucide-react's absoluteStrokeWidth does in the app. */
+  .ic--stroke * { vector-effect: non-scaling-stroke; }
+  .ic--stroke { stroke-width: 1.5; }
+
+  .ds-strip { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-16);
+              padding: var(--space-12) var(--space-16); background: var(--color-bg-secondary); margin-bottom: var(--space-4); }
+  .ds-strip + .ds-strip { margin-top: 0; }
+  .ds-strip__cell { display: flex; flex-direction: column; align-items: center; gap: var(--space-4);
+                    font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-tertiary); }
+  .ds-strip__label { align-self: center; inline-size: calc(var(--space-24) * 4); font-size: var(--text-sm);
+                     color: var(--color-text-secondary); }
+  .ds-strip--last { margin-bottom: var(--space-12); }
+
+  /* Colour states: each cell shows the glyph on the surface it sits on. */
+  .ds-state { display: inline-flex; align-items: center; justify-content: center;
+              inline-size: var(--btn-height-sm); block-size: var(--btn-height-sm); }
+  .ds-state--rest { color: var(--color-text-secondary); }
+  .ds-state--hover { color: var(--color-text-bright); background: var(--color-bg-hover); }
+  .ds-state--pressed { color: var(--color-text-bright); background: var(--color-bg-selected);
+                       border-block-end: var(--border-width-thick) solid var(--color-brand-lime); }
+  .ds-state--disabled { color: var(--color-text-secondary); opacity: var(--opacity-disabled); }
+  .ds-state--danger { color: var(--color-error); }
+  .ds-state--success { color: var(--color-success); }
+  .ds-state--never { color: var(--color-text-muted); outline: var(--border-width) dashed var(--color-error); }
+  .ds-state svg { inline-size: var(--icon-size-sm); block-size: var(--icon-size-sm); }
+
+  /* Glyph inventory. */
+  .ds-glyphs { display: grid; grid-template-columns: repeat(auto-fill, minmax(calc(var(--space-24) * 3), 1fr));
+               gap: var(--space-4); margin: 0 0 var(--space-12); padding: 0; list-style: none; }
+  .ds-glyphs li { display: flex; align-items: center; gap: var(--space-6); padding: var(--space-4) var(--space-6);
+                  background: var(--color-bg-secondary); font-family: var(--font-mono); font-size: var(--text-sm);
+                  color: var(--color-text-tertiary); }
 
   .pair { display: flex; gap: var(--space-12); align-items: center; padding: var(--space-8) var(--space-12);
           background: var(--color-bg-secondary); margin-bottom: var(--space-6); }
-  .pair svg { color: var(--color-text-primary); flex: 0 0 auto; }
   .pair p { margin: 0; font-size: var(--text-sm); color: var(--color-text-tertiary); }
-  .btn24 { display: inline-flex; align-items: center; justify-content: center;
-           width: var(--btn-height-sm); height: var(--btn-height-sm); background: transparent;
+  .pair__label { display: inline-flex; align-items: center; gap: var(--space-3); color: var(--color-text-primary); font-size: var(--text-base); }
+  .btn24 { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto;
+           width: var(--btn-height-sm); height: var(--btn-height-sm); padding: 0; background: transparent;
            border: none; color: var(--color-text-primary); cursor: pointer; }
   .btn24:hover { background: var(--color-bg-hover); }
   .btn24:focus-visible { outline: var(--border-width-thick) solid var(--color-border-focus);
                          outline-offset: var(--space-1); }
+  .dot { display: inline-flex; color: var(--color-git-modified-light); }
 </style>
 </head>
 <body>
-
+<nav class="ds-crumbs" aria-label="Breadcrumb"><a href="../../../index.html">Erfana design system</a> <span aria-hidden="true">/</span> <a href="../../../index.html#components">Components</a> <span aria-hidden="true">/</span> <span aria-current="page">Icons</span></nav>
+<main>
 <h1>Icons</h1>
-<p class="ds-lede">
-  Erfana draws icons with a single library, imported directly rather than through the shared registry in
-  <span data-claim="icon-registry-bypass"></span> files. That part is fine. The sizing
-  is not.
+<p class="ds-meta"><span class="ds-status" data-status="proposed">proposed</span> reviewed 2026-08-31</p>
+<p class="ds-lede" id="decision">
+  Every icon comes from the shared registry (<code>utils/iconRegistry.tsx</code>), takes a size <em>name</em> from
+  the token scale and is drawn at one stroke weight. Bypassing the registry is the problem: today
+  <span data-claim="icon-registry-bypass" title="files importing the icon library directly instead of the registry">50</span> files import <code>lucide-react</code> directly, so each picks its own size
+  and stroke at the call site, and nothing can change them in one place.
 </p>
 
 <div class="ds-note">
-  <strong>The problem, counted.</strong> 161 icons are sized with a number typed at the call site —
-  <code>size={14}</code>, <code>size={18}</code>, <code>size={48}</code> — across eight different values.
-  <strong>Three of those eight exist nowhere in the token scale.</strong> The box around the icon is
-  tokenised in 34 places; the icon inside it never is. A shared registry does exist, defaults to
-  <code>14</code> — itself off-scale — and <span data-claim="icon-registry-bypass"></span> files bypass it.
-  Two do use it, both context menus, which is the shape of the fix rather than an exception to it.
+  <strong>The problem, counted.</strong> <span data-claim="icon-size-literals" title="icons sized with a literal size={N} instead of a token">162</span> icons are sized with a
+  number typed at the call site – <code>size={14}</code>, <code>size={18}</code> – across
+  <span data-claim="icon-size-distinct" title="distinct literal icon sizes">8</span> different values.
+  <strong><span data-claim="icon-size-offscale" title="distinct literal icon sizes that are not on the 12/16/20/24/32 scale">3</span> of those exist nowhere in the token scale</strong>
+  (<span data-claim="icon-size-offscale-list" title="the off-scale literal icon sizes, in px">14, 18, 48</span>). The registry itself sizes by number too, and its
+  default size is off the scale. <span data-claim="icon-registry-importers" title="files importing from the icon registry">12</span> files already import from the
+  registry, which is the shape of the fix: once the registry takes a size name, routing the bypassing files through
+  it fixes sizes and strokes together.
 </div>
 
-<h2>The five sizes</h2>
+<h2 id="sizes">The five sizes</h2>
 
-<div class="sizes" id="sizes"></div>
+<table class="ds-tokens">
+<thead><tr><th>Token</th><th>Value</th><th>Sample</th><th>Use</th></tr></thead>
+<tbody>
+  <tr><td><code>--icon-size-xs</code></td><td><code data-token="--icon-size-xs">12px</code></td><td><svg class="ic ic--xs ic--stroke" data-icon="folder" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></td><td>Inline with <code>--text-sm</code> – an error message, a badge</td></tr>
+  <tr><td><code>--icon-size-sm</code></td><td><code data-token="--icon-size-sm">16px</code></td><td><svg class="ic ic--sm ic--stroke" data-icon="folder" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></td><td><strong>The default.</strong> Tree rows, toolbars, menus, and every 24px icon button</td></tr>
+  <tr><td><code>--icon-size-md</code></td><td><code data-token="--icon-size-md">20px</code></td><td><svg class="ic ic--md ic--stroke" data-icon="folder" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></td><td>Beside <code>--text-md</code> and larger – a 40px button, a banner</td></tr>
+  <tr><td><code>--icon-size-lg</code></td><td><code data-token="--icon-size-lg">24px</code></td><td><svg class="ic ic--lg ic--stroke" data-icon="folder" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></td><td>A panel header, a standalone status glyph</td></tr>
+  <tr><td><code>--icon-size-xl</code></td><td><code data-token="--icon-size-xl">32px</code></td><td><svg class="ic ic--xl ic--stroke" data-icon="folder" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></td><td>Dialog headers, empty states</td></tr>
+</tbody>
+</table>
 
 <div class="ds-note">
   <strong>The decision.</strong> Icons take a size <em>name</em>, never a number. The three off-scale
   values map to the nearest token: <code>14 → sm (16)</code>, <code>18 → md (20)</code>,
-  <code>48 → a new --icon-size-2xl</code>. Nothing else is added — eight sizes for one small app is four
-  too many.
+  <code>48 → a new --icon-size-2xl</code> (drawn below at <code>--space-24</code> until the token exists). Nothing
+  else is added – eight sizes for one small app is too many. A tree row or a toolbar is <code>sm</code>, not
+  <code>lg</code>: a 24px glyph fills a 24px button edge to edge and leaves no room for its hover fill.
 </div>
 
-<h2>Does this icon have a name?</h2>
-<p style="max-width: 76ch; color: var(--color-text-tertiary)">
-  This is the only accessibility question an icon raises, and it has exactly two answers.
+<h2 id="stroke">One stroke weight</h2>
+<p class="ds-muted">
+  Lucide draws a 2-unit stroke on a 24-unit grid, so the stroke scales with the icon: thin and grey at 12px, heavy at
+  32px. The rule: <strong>1.5px on screen at every size</strong> – in the app,
+  <code>strokeWidth={1.5}</code> with <code>absoluteStrokeWidth</code>, set once in the registry; on this card,
+  <code>vector-effect: non-scaling-stroke</code>.
+</p>
+<div class="ds-strip" aria-hidden="true">
+  <span class="ds-strip__label">Lucide default – 2 units, scales</span>
+  <span class="ds-strip__cell"><svg class="ic ic--xs" data-icon="file-text" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>xs</span>
+  <span class="ds-strip__cell"><svg class="ic ic--sm" data-icon="file-text" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>sm</span>
+  <span class="ds-strip__cell"><svg class="ic ic--md" data-icon="file-text" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>md</span>
+  <span class="ds-strip__cell"><svg class="ic ic--lg" data-icon="file-text" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>lg</span>
+  <span class="ds-strip__cell"><svg class="ic ic--xl" data-icon="file-text" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>xl</span>
+  <span class="ds-strip__cell"><svg class="ic ic--2xl" data-icon="file-text" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>2xl</span>
+</div>
+<div class="ds-strip ds-strip--last" aria-hidden="true">
+  <span class="ds-strip__label">Decided – 1.5px, non-scaling</span>
+  <span class="ds-strip__cell"><svg class="ic ic--xs ic--stroke" data-icon="file-text" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>xs</span>
+  <span class="ds-strip__cell"><svg class="ic ic--sm ic--stroke" data-icon="file-text" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>sm</span>
+  <span class="ds-strip__cell"><svg class="ic ic--md ic--stroke" data-icon="file-text" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>md</span>
+  <span class="ds-strip__cell"><svg class="ic ic--lg ic--stroke" data-icon="file-text" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>lg</span>
+  <span class="ds-strip__cell"><svg class="ic ic--xl ic--stroke" data-icon="file-text" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>xl</span>
+  <span class="ds-strip__cell"><svg class="ic ic--2xl ic--stroke" data-icon="file-text" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>2xl</span>
+</div>
+<p class="ds-muted">Why 1.5: at the default <code>sm</code> it is a whole number of device pixels on a 2× display (3), and it
+keeps a 12px glyph from going hairline-grey or a 32px one from reading bold.</p>
+
+<h2 id="colour">Colour states</h2>
+<p class="ds-muted">An icon is a graphical object: where it carries meaning it needs 3:1 against its surface (WCAG 1.4.11).
+It takes <code>currentColor</code> and never sets its own fill – the button or row around it decides the colour.</p>
+<table>
+  <thead><tr><th>State</th><th>Drawn</th><th>Colour</th><th>Against <code>--color-bg-secondary</code></th></tr></thead>
+  <tbody>
+    <tr><td>Resting (chrome)</td><td><span class="ds-state ds-state--rest" aria-hidden="true"><svg class="ic--stroke" data-icon="copy" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></span></td><td><code>--color-text-secondary</code></td><td data-contrast="--color-text-secondary on --color-bg-secondary" data-min="3" data-result="pass">3.72:1 · pass</td></tr>
+    <tr><td>Hover, focus</td><td><span class="ds-state ds-state--hover" aria-hidden="true"><svg class="ic--stroke" data-icon="copy" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></span></td><td><code>--color-text-bright</code> on <code>--color-bg-hover</code></td><td data-contrast="--color-text-bright on --color-bg-hover over --color-bg-secondary" data-min="3" data-result="pass">8.92:1 · pass</td></tr>
+    <tr><td>Pressed, selected</td><td><span class="ds-state ds-state--pressed" aria-hidden="true"><svg class="ic--stroke" data-icon="copy" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></span></td><td><code>--color-text-bright</code> on <code>--color-bg-selected</code>, plus the lime edge</td><td data-contrast="--color-text-bright on --color-bg-selected over --color-bg-secondary" data-min="3" data-result="pass">7.05:1 · pass</td></tr>
+    <tr><td>Disabled</td><td><span class="ds-state ds-state--disabled" aria-hidden="true"><svg class="ic--stroke" data-icon="copy" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></span></td><td>Resting colour at <code>--opacity-disabled</code></td><td class="ds-na">exempt – an inactive control</td></tr>
+    <tr><td>Error</td><td><span class="ds-state ds-state--danger" aria-hidden="true"><svg class="ic--stroke" data-icon="circle-x" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg></span></td><td><code>--color-error</code> – always beside words</td><td data-contrast="--color-error on --color-bg-secondary" data-min="3" data-result="pass">5.59:1 · pass</td></tr>
+    <tr><td>Success</td><td><span class="ds-state ds-state--success" aria-hidden="true"><svg class="ic--stroke" data-icon="check" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span></td><td><code>--color-success</code> – always beside words</td><td data-contrast="--color-success on --color-bg-secondary" data-min="3" data-result="pass">10.36:1 · pass</td></tr>
+    <tr><td><strong>Never</strong> for a meaningful icon</td><td><span class="ds-state ds-state--never" aria-hidden="true"><svg class="ic--stroke" data-icon="copy" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></span></td><td><code>--color-text-muted</code></td><td data-contrast="--color-text-muted on --color-bg-secondary" data-min="3" data-result="fail">2.69:1 · fail</td></tr>
+  </tbody>
+</table>
+
+<h2 id="inventory">The registry's glyphs</h2>
+<p class="ds-muted">Every name the registry maps today, drawn from the shipping <code>lucide-react</code> package at
+<code>sm</code> with the decided stroke. The label is the registry name – the one to write in code; where lucide has since renamed the glyph
+(<code>edit-3</code> is now <code>pen-line</code>, <code>alert-triangle</code> is <code>triangle-alert</code>), the drawing uses the new name. A glyph not on this
+list is added to the registry first, then used.</p>
+<ul class="ds-glyphs" aria-label="Registry glyphs">
+  <li><svg class="ic ic--sm ic--stroke" data-icon="maximize-2" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="m21 3-7 7"/><path d="m3 21 7-7"/><path d="M9 21H3v-6"/></svg>maximize2</li>
+  <li><svg class="ic ic--sm ic--stroke" data-icon="minimize-2" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m14 10 7-7"/><path d="M20 10h-6V4"/><path d="m3 21 7-7"/><path d="M4 14h6v6"/></svg>minimize2</li>
+  <li><svg class="ic ic--sm ic--stroke" data-icon="refresh-cw" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>refresh</li>
+  <li><svg class="ic ic--sm ic--stroke" data-icon="sparkles" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/><circle cx="4" cy="20" r="2"/></svg>sparkles</li>
+  <li><svg class="ic ic--sm ic--stroke" data-icon="copy" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>copy</li>
+  <li><svg class="ic ic--sm ic--stroke" data-icon="pen-line" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 21h8"/><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/></svg>edit-3</li>
+  <li><svg class="ic ic--sm ic--stroke" data-icon="circle-question-mark" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>help-circle</li>
+  <li><svg class="ic ic--sm ic--stroke" data-icon="message-circle" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"/></svg>message-circle</li>
+  <li><svg class="ic ic--sm ic--stroke" data-icon="file-text" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>file-text</li>
+  <li><svg class="ic ic--sm ic--stroke" data-icon="circle-alert" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>alert-circle</li>
+  <li><svg class="ic ic--sm ic--stroke" data-icon="triangle-alert" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>alert-triangle</li>
+  <li><svg class="ic ic--sm ic--stroke" data-icon="circle-check" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>check-circle</li>
+  <li><svg class="ic ic--sm ic--stroke" data-icon="arrow-right" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>arrow-right</li>
+  <li><svg class="ic ic--sm ic--stroke" data-icon="arrow-down" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>arrow-down</li>
+  <li><svg class="ic ic--sm ic--stroke" data-icon="arrow-up" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>arrow-up</li>
+  <li><svg class="ic ic--sm ic--stroke" data-icon="arrow-left" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>arrow-left</li>
+  <li><svg class="ic ic--sm ic--stroke" data-icon="mouse-pointer-click" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4.1 12 6"/><path d="m5.1 8-2.9-.8"/><path d="m6 12-1.9 2"/><path d="M7.2 2.2 8 5.1"/><path d="M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z"/></svg>mouse-pointer-click</li>
+  <li><svg class="ic ic--sm ic--stroke" data-icon="check" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>check</li>
+  <li><svg class="ic ic--sm ic--stroke" data-icon="chevron-down" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>chevron-down</li>
+  <li><svg class="ic ic--sm ic--stroke" data-icon="chevron-up" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>chevron-up</li>
+  <li><svg class="ic ic--sm ic--stroke" data-icon="circle-x" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>circle-x</li>
+  <li><svg class="ic ic--sm ic--stroke" data-icon="ellipsis" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>ellipsis</li>
+  <li><svg class="ic ic--sm ic--stroke" data-icon="info" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>info</li>
+  <li><svg class="ic ic--sm ic--stroke" data-icon="message-square" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></svg>message-square</li>
+  <li><svg class="ic ic--sm ic--stroke" data-icon="message-square-off" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 19H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.7.7 0 0 1 2 21.286V5a2 2 0 0 1 1.184-1.826"/><path d="m2 2 20 20"/><path d="M8.656 3H20a2 2 0 0 1 2 2v11.344"/></svg>message-square-off</li>
+  <li><svg class="ic ic--sm ic--stroke" data-icon="message-square-plus" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/><path d="M12 8v6"/><path d="M9 11h6"/></svg>message-square-plus</li>
+  <li><svg class="ic ic--sm ic--stroke" data-icon="messages-square" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 10a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 14.286V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/><path d="M20 9a2 2 0 0 1 2 2v10.286a.71.71 0 0 1-1.212.502l-2.202-2.202A2 2 0 0 0 17.172 19H10a2 2 0 0 1-2-2v-1"/></svg>messages-square</li>
+  <li><svg class="ic ic--sm ic--stroke" data-icon="x" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>x</li>
+</ul>
+<p class="ds-muted">This list is typed from the registry, not generated; no check compares the two yet.</p>
+
+<h2 id="naming">Does this icon have a name?</h2>
+<p class="ds-muted">
+  This is the only accessibility question an icon raises, and it has exactly two answers. A <code>title</code> – on the
+  SVG or on the button – is never the answer: it is not announced reliably and never appears on keyboard focus (see
+  <a href="../tooltip/index.html">Tooltip</a>).
 </p>
 
 <div class="pair">
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M12 5v14"/></svg>
-  <p><strong>No — it sits next to words.</strong> The icon repeats what the label already says, so a
+  <span class="pair__label"><svg class="ic ic--sm ic--stroke" data-icon="plus" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>New file</span>
+  <p><strong>No – it sits next to words.</strong> The icon repeats what the label already says, so a
   screen reader announcing it twice is noise. Mark it <code>aria-hidden="true"</code>.
   This is the common case.</p>
 </div>
 
 <div class="pair">
-  <button class="btn24" aria-label="Close preview">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+  <button type="button" class="btn24" aria-label="Close preview">
+    <svg class="ic ic--sm ic--stroke" data-icon="x" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
   </button>
-  <p><strong>No — but its button does.</strong> The icon stays hidden; the
+  <p><strong>No – but its button does.</strong> The icon stays hidden; the
   <strong>button</strong> carries <code>aria-label="Close preview"</code>. Never put the label on the
-  glyph inside a button — that is one name too deep.</p>
+  glyph inside a button – that is one name too deep.</p>
 </div>
 
 <div class="pair">
-  <span role="img" aria-label="Modified" style="display:inline-flex">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-git-modified-light)" stroke-width="2"><circle cx="12" cy="12" r="7"/></svg>
+  <span class="dot" role="img" aria-label="Modified">
+    <svg class="ic ic--sm" data-icon="circle" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg>
   </span>
-  <p><strong>Yes — the icon <em>is</em> the information.</strong> A git status dot with no text beside
+  <p><strong>Yes – the icon <em>is</em> the information.</strong> A git status dot with no text beside
   it. Give it <code>role="img"</code> and an <code>aria-label</code>. Erfana already does this correctly
   on file badges.</p>
 </div>
@@ -102,35 +238,23 @@
   <code>message-square-off</code> – and the comment pin is <em>not</em> a registry icon: a self-drawn
   square-cornered speech bubble in a 24 × 24 hit box, because it is drawn inside the page and must match the
   zero-radius rule. See the proposed <a href="../../../../designs/comments/html-comments/overlay.html">Comment overlay</a> and
-  <a href="../../../../designs/comments/html-comments/toolbar.html">toolbar</a> cards.
+  <a href="../../../../designs/comments/html-comments/toolbar.html">toolbar</a> screens.
 </div>
 
-<h2>Minimum target</h2>
-<p style="max-width: 76ch; color: var(--color-text-tertiary)">
-  An icon that can be clicked lives in a target of at least <strong>24 × 24</strong> — WCAG 2.2 SC 2.5.8.
+<h2 id="target">Minimum target</h2>
+<p class="ds-muted">
+  An icon that can be clicked lives in a target of at least <strong>24 × 24</strong> – WCAG 2.2 SC 2.5.8.
   The glyph itself is usually smaller: a 16px icon centred in a 24px button is the standard pairing, and
-  it is what the button above does. Never shrink the target to fit the glyph.
+  it is what the button above does. Never shrink the target to fit the glyph. See
+  <a href="../button/index.html#states">Buttons – icon-only</a>.
 </p>
 
-<script>
-const SIZES = [['--icon-size-xs','Inline with small text'],
-               ['--icon-size-sm','Inside a 24px button'],
-               ['--icon-size-md','Default'],
-               ['--icon-size-lg','Toolbars, tree rows'],
-               ['--icon-size-xl','Dialog headers, empty states']];
-function resolved(t){const p=document.createElement('span');p.style.setProperty('--p',`var(${t})`);
-  document.body.appendChild(p);const v=getComputedStyle(p).getPropertyValue('--p').trim();p.remove();return v;}
-const host=document.getElementById('sizes');
-for(const [token,note] of SIZES){
-  const px=resolved(token);
-  const cell=document.createElement('div');
-  cell.className='size';
-  cell.title=note;
-  cell.innerHTML=`<svg width="${px}" height="${px}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 4h16v16H4z"/><path d="M4 10h16"/></svg>
-    <div class="tok">${token.replace('--icon-size-','')}</div><div class="px">${px}</div>`;
-  host.appendChild(cell);
-}
-</script>
+<section id="exceptions">
+<h2>Exceptions</h2>
+<p class="ds-muted">None recorded. A shipping component that departs from this card carries a
+<code>deviates:</code> marker at the site and gets a row here, naming the file.</p>
+</section>
 
+</main>
 </body>
 </html>

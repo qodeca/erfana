@@ -1,0 +1,282 @@
+<!-- @card group="Components" name="Badges, chips and keys" subtitle="Activity-bar badge, git status, counter, chip and kbd – the word or letter carries it, colour repeats it" status="proposed" reviewed="never" answers="Show a count on an icon; Show a file's git state; Show a keyboard shortcut; Add a tag or chip" -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Badges, chips and keys – Erfana design system</title>
+<link rel="stylesheet" href="../../../tokens.css">
+<link rel="stylesheet" href="../../../ds.css">
+<link rel="stylesheet" href="./badge.css">
+<style>
+  /* Documentation-only chrome. None of this ships. */
+
+  /* The activity bar, at its real width and colour (ActivityBar.css paints
+     --color-gray-800 behind a 48px column). */
+  .abar { display: flex; flex-direction: column; width: 48px; background: var(--color-gray-800); }
+  .abar__item { position: relative; display: flex; align-items: center; justify-content: center;
+                height: 48px; color: var(--color-text-primary); }
+  .abar__item svg { width: var(--icon-size-lg); height: var(--icon-size-lg); }
+  .abar__item .erf-badge { position: absolute; top: var(--space-4); right: var(--space-3); }
+  .abar-row { display: flex; gap: var(--space-12); align-items: flex-start; }
+  .abar-name { display: flex; flex-direction: column; }
+  .abar-name > span { display: flex; align-items: center; height: 48px; }
+  .abar-name { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-text-tertiary); }
+
+  /* A tree row, on the tree's real surface. */
+  .tree { background: var(--color-bg-tertiary); padding: var(--space-4) 0; }
+  .tree__row { display: flex; align-items: center; gap: var(--space-4); padding: var(--space-2) var(--space-8);
+               font-size: var(--text-base); color: var(--color-text-primary); }
+  .tree__row svg { width: var(--icon-size-sm); height: var(--icon-size-sm); color: var(--color-text-tertiary); flex: 0 0 auto; }
+  .tree__name { flex: 1 1 auto; }
+
+  .line { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-6);
+          color: var(--color-text-primary); font-size: var(--text-base); }
+  .surface-secondary { padding: var(--space-8); background: var(--color-bg-secondary); }
+  .surface-primary { padding: var(--space-8); background: var(--color-bg-primary); }
+  .tip { display: inline-flex; flex-direction: column; gap: var(--space-2); padding: var(--space-4) var(--space-6);
+         background: var(--color-bg-tertiary); border: var(--border-width) solid var(--color-border-default);
+         font-size: var(--text-sm); color: var(--color-text-primary); }
+  .forced-hover { background: var(--color-bg-hover-solid); }
+
+  pre.markup { margin: 0 0 var(--space-12); padding: var(--space-8); overflow-x: auto;
+               background: var(--color-bg-secondary); border: var(--border-width) solid var(--color-border-default);
+               color: var(--color-text-primary); font-family: var(--font-mono); font-size: var(--text-sm); }
+</style>
+</head>
+<body>
+<nav class="ds-crumbs" aria-label="Breadcrumb"><a href="../../../index.html">Erfana design system</a> <span aria-hidden="true">/</span> <a href="../../../index.html#components">Components</a> <span aria-hidden="true">/</span> <span aria-current="page">Badges, chips and keys</span></nav>
+<main>
+<h1>Badges, chips and keys</h1>
+<p class="ds-meta"><span class="ds-status" data-status="proposed">proposed</span> not yet reviewed</p>
+<p class="ds-lede" id="decision">
+  Five small labels, one rule: <strong>the text is the information</strong> – a number, a letter, a word, a key
+  name – and colour only repeats it. Whatever a badge says on screen is also said in words to a screen reader,
+  in the name of the thing it is attached to. Nothing here is colour alone, and nothing here hides in a
+  <code>title</code>.
+</p>
+
+<table>
+  <thead><tr><th>Use</th><th>For</th><th>Never for</th></tr></thead>
+  <tbody>
+    <tr><td><span class="erf-badge">3</span> Badge</td><td>A count or a presence pinned to an activity-bar icon</td><td>Text inside a sentence – that is a counter</td></tr>
+    <tr><td><span class="erf-git" data-git="modified">M</span> Git badge</td><td>One file's or folder's git state, at the end of its tree row</td><td>Anything that is not git</td></tr>
+    <tr><td><span class="erf-counter">12</span> Counter</td><td>A neutral count next to a label, in the text flow</td><td>A warning – a count that needs attention uses the Feedback card's colours and words</td></tr>
+    <tr><td><span class="erf-chip">draft</span> Chip</td><td>A short static label, or a compact button that opens something</td><td>A primary action – use a button</td></tr>
+    <tr><td><span class="erf-keys"><kbd class="erf-kbd">Cmd</kbd>+<kbd class="erf-kbd">S</kbd></span> Key</td><td>A keyboard shortcut, shown where the user can read it</td><td>A shortcut that is only in a tooltip</td></tr>
+  </tbody>
+</table>
+
+<h2 id="states">Every state</h2>
+<p class="ds-muted">Each frame is a picture on the surface the label really sits on. Nothing in a frame takes focus;
+the one interactive label, the action chip, has <a href="#keyboard">a keyboard contract</a>.</p>
+
+<h3 id="badge">Activity-bar badge</h3>
+<div class="ds-frames">
+  <figure class="ds-frame">
+    <div class="abar-row" inert aria-hidden="true">
+      <div class="abar">
+        <div class="abar__item"><svg data-icon="files" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M15 2a2 2 0 0 1 1.414.586l4 4A2 2 0 0 1 21 8v7a2 2 0 0 1-2 2h-8a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/><path d="M15 2v4a2 2 0 0 0 2 2h4"/><path d="M5 7a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h8a2 2 0 0 0 1.732-1"/></svg><span class="erf-badge">3</span></div>
+        <div class="abar__item"><svg data-icon="files" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M15 2a2 2 0 0 1 1.414.586l4 4A2 2 0 0 1 21 8v7a2 2 0 0 1-2 2h-8a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/><path d="M15 2v4a2 2 0 0 0 2 2h4"/><path d="M5 7a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h8a2 2 0 0 0 1.732-1"/></svg><span class="erf-badge">42</span></div>
+        <div class="abar__item"><svg data-icon="files" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M15 2a2 2 0 0 1 1.414.586l4 4A2 2 0 0 1 21 8v7a2 2 0 0 1-2 2h-8a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/><path d="M15 2v4a2 2 0 0 0 2 2h4"/><path d="M5 7a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h8a2 2 0 0 0 1.732-1"/></svg><span class="erf-badge">99+</span></div>
+      </div>
+      <div class="abar-name"><span>“Project, 3 changed files”</span><span>“Project, 42 changed files”</span><span>“Project, 128 changed files”</span></div>
+    </div>
+    <figcaption><strong>Count: one digit, two digits, capped</strong> – the badge grows sideways and stops at <code>99+</code>. The full number is in the item's accessible name (right), not in a <code>title</code> on the badge.</figcaption>
+  </figure>
+  <figure class="ds-frame">
+    <div class="abar-row" inert aria-hidden="true">
+      <div class="abar">
+        <div class="abar__item"><svg data-icon="terminal" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 19h8"/><path d="m4 17 6-6-6-6"/></svg><span class="erf-badge erf-badge--dot"></span></div>
+        <div class="abar__item"><svg data-icon="terminal" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 19h8"/><path d="m4 17 6-6-6-6"/></svg></div>
+      </div>
+      <div class="abar-name"><span>“Terminal, a session is running”</span><span>“Terminal”</span></div>
+    </div>
+    <figcaption><strong>Presence, and none</strong> – a square dot means “something is happening here” and is allowed only because the name says what. Zero shows no badge at all, never a “0”.</figcaption>
+  </figure>
+</div>
+
+<h3 id="git">Git status badge</h3>
+<div class="ds-frames">
+  <figure class="ds-frame">
+    <div class="tree" inert aria-hidden="true">
+      <div class="tree__row"><svg data-icon="file-text" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg><span class="tree__name">plan.md</span><span class="erf-git" data-git="modified">M</span></div>
+      <div class="tree__row"><svg data-icon="file-text" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg><span class="tree__name">notes.md</span><span class="erf-git" data-git="untracked">U</span></div>
+      <div class="tree__row"><svg data-icon="file-text" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg><span class="tree__name">old.md</span><span class="erf-git" data-git="deleted">D</span></div>
+      <div class="tree__row"><svg data-icon="file-text" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg><span class="tree__name">intro.md</span><span class="erf-git" data-git="staged">A</span></div>
+      <div class="tree__row"><svg data-icon="file-text" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg><span class="tree__name">guide.md</span><span class="erf-git" data-git="renamed">R</span></div>
+      <div class="tree__row"><svg data-icon="file-text" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg><span class="tree__name">merge.md</span><span class="erf-git" data-git="conflicted">!</span></div>
+    </div>
+    <figcaption><strong>Files: all six, filled</strong> – letter on a tile. The row's name is “plan.md, modified”: the letter is spelled out as a word, not read as “M”.</figcaption>
+  </figure>
+  <figure class="ds-frame">
+    <div class="tree" inert aria-hidden="true">
+      <div class="tree__row"><svg data-icon="folder" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg><span class="tree__name">docs</span><span class="erf-git erf-git--folder" data-git="modified">M</span></div>
+      <div class="tree__row"><svg data-icon="folder" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg><span class="tree__name">drafts</span><span class="erf-git erf-git--folder" data-git="untracked">U</span></div>
+      <div class="tree__row"><svg data-icon="folder" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg><span class="tree__name">archive</span><span class="erf-git erf-git--folder" data-git="deleted">D</span></div>
+      <div class="tree__row"><svg data-icon="folder" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg><span class="tree__name">specs</span><span class="erf-git erf-git--folder" data-git="staged">A</span></div>
+      <div class="tree__row"><svg data-icon="folder" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg><span class="tree__name">guides</span><span class="erf-git erf-git--folder" data-git="renamed">R</span></div>
+      <div class="tree__row"><svg data-icon="folder" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg><span class="tree__name">merge</span><span class="erf-git erf-git--folder" data-git="conflicted">!</span></div>
+    </div>
+    <figcaption><strong>Folders: all six, outlined</strong> – the same letter, outlined. Outlined says “something inside”; the letter says what. This replaces today's dot, which is colour alone (#95) and, for renamed, nearly invisible.</figcaption>
+  </figure>
+  <figure class="ds-frame">
+    <div class="tree" inert aria-hidden="true">
+      <div class="tree__row"><span class="tree__name">main</span><span class="line"><span>M3</span><span>U1</span><span>!1</span></span></div>
+      <div class="tree__row"><span class="tree__name">main</span><span class="line"><span class="erf-counter">3 modified</span><span class="erf-counter">1 new</span><span class="erf-counter">1 conflicted</span></span></div>
+    </div>
+    <figcaption><strong>Status bar counts: today, then proposed</strong> – today “M3” is read aloud as “M3”, and renamed has no colour at all. Proposed: neutral counters with the word in them; the words are the information.</figcaption>
+  </figure>
+</div>
+
+<h3 id="counter">Counter</h3>
+<div class="ds-frames">
+  <figure class="ds-frame">
+    <div class="surface-primary" inert aria-hidden="true">
+      <div class="line"><span>Comments</span><span class="erf-counter">3</span></div>
+      <br>
+      <div class="line"><span>Blocked hosts</span><span class="erf-counter">12</span></div>
+      <br>
+      <div class="line"><span>Results</span><span class="erf-counter">1,204</span></div>
+    </div>
+    <figcaption><strong>One, two and four digits</strong> – tabular figures, so a counter that ticks does not jitter. The label beside it is part of the same name: “Comments, 3”.</figcaption>
+  </figure>
+</div>
+
+<h3 id="chip">Chip</h3>
+<div class="ds-frames">
+  <figure class="ds-frame">
+    <div class="surface-secondary" inert aria-hidden="true">
+      <div class="line"><span class="erf-chip">draft</span><span class="erf-chip">review</span><span class="erf-chip">2026-q4</span></div>
+    </div>
+    <figcaption><strong>Static</strong> – a frontmatter tag or a size label. Not focusable, not hoverable, no pointer cursor.</figcaption>
+  </figure>
+  <figure class="ds-frame">
+    <div class="surface-primary" inert aria-hidden="true">
+      <div class="line">
+        <button class="erf-chip erf-chip--action" type="button">12 blocked <span class="erf-chip__caret">▸</span></button>
+        <button class="erf-chip erf-chip--action forced-hover" type="button">12 blocked <span class="erf-chip__caret">▸</span></button>
+      </div>
+      <br>
+      <div class="line">
+        <button class="erf-chip erf-chip--action is-focus" type="button">12 blocked <span class="erf-chip__caret">▸</span></button>
+        <button class="erf-chip erf-chip--action" type="button">12 blocked <span class="erf-chip__caret">▾</span></button>
+      </div>
+    </div>
+    <figcaption><strong>Action: resting, hover, focus, open</strong> – a button that looks like a chip, at least 24px tall. The caret repeats <code>aria-expanded</code>; it is never the only sign. The Permission band's host chip is this shape.</figcaption>
+  </figure>
+</div>
+
+<h3 id="kbd">Key</h3>
+<div class="ds-frames">
+  <figure class="ds-frame">
+    <div class="surface-primary" inert aria-hidden="true">
+      <div class="line"><kbd class="erf-kbd">Esc</kbd><kbd class="erf-kbd">Enter</kbd><kbd class="erf-kbd">[</kbd><kbd class="erf-kbd">↑</kbd></div>
+      <br>
+      <div class="line"><span class="erf-keys"><kbd class="erf-kbd">Cmd</kbd>+<kbd class="erf-kbd">Enter</kbd></span><span class="erf-keys"><kbd class="erf-kbd">Ctrl</kbd>+<kbd class="erf-kbd">Shift</kbd>+<kbd class="erf-kbd">F</kbd></span></div>
+    </div>
+    <figcaption><strong>One key, and a combination</strong> – one box per key, the plus sign outside the boxes, and the whole combination kept on one line. Key names come from <code>formatShortcut</code>, so they match the platform.</figcaption>
+  </figure>
+  <figure class="ds-frame">
+    <div class="surface-secondary" inert aria-hidden="true">
+      <p class="line" style="margin: 0; justify-content: center; font-size: var(--text-sm); color: var(--color-text-tertiary)"><span class="erf-keys"><kbd class="erf-kbd">Cmd</kbd>+<kbd class="erf-kbd">Enter</kbd></span> to submit · <kbd class="erf-kbd">Esc</kbd> to cancel</p>
+    </div>
+    <figcaption><strong>In a dialog hint</strong> – the key, then what it does, in plain words. The hint is visible text, so it is read with the dialog.</figcaption>
+  </figure>
+  <figure class="ds-frame">
+    <div class="surface-primary" inert aria-hidden="true">
+      <span class="tip"><span>Find in page</span><span class="erf-keys"><kbd class="erf-kbd">Cmd</kbd>+<kbd class="erf-kbd">F</kbd></span></span>
+    </div>
+    <figcaption><strong>In a tooltip</strong> – the same key style, a line under the name. A tooltip that shows on hover <em>and</em> on keyboard focus is a visible caption; a <code>title</code> attribute is not, and the control also carries <code>aria-keyshortcuts</code>.</figcaption>
+  </figure>
+</div>
+
+<h2 id="contrast">Contrast, measured</h2>
+<table>
+  <thead><tr><th>Pair</th><th>Where</th><th>Ratio</th></tr></thead>
+  <tbody>
+    <tr><td>Badge label on violet</td><td><code>--color-text-on-accent</code> on <code>--color-brand-violet</code></td><td data-contrast="--color-text-on-accent on --color-brand-violet" data-min="4.5" data-result="pass">8.40:1 · pass</td></tr>
+    <tr><td>Badge against the activity bar</td><td><code>--color-brand-violet</code> on <code>--color-gray-800</code></td><td data-contrast="--color-brand-violet on --color-gray-800" data-min="3" data-result="pass">5.01:1 · pass</td></tr>
+    <tr><td>Git letter, modified</td><td><code>--color-bg-primary</code> on <code>--color-git-modified-light</code></td><td data-contrast="--color-bg-primary on --color-git-modified-light" data-min="4.5" data-result="pass">12.63:1 · pass</td></tr>
+    <tr><td>Git letter, untracked</td><td><code>--color-bg-primary</code> on <code>--color-git-untracked-light</code></td><td data-contrast="--color-bg-primary on --color-git-untracked-light" data-min="4.5" data-result="pass">16.20:1 · pass</td></tr>
+    <tr><td>Git letter, deleted</td><td><code>--color-bg-primary</code> on <code>--color-git-deleted-light</code></td><td data-contrast="--color-bg-primary on --color-git-deleted-light" data-min="4.5" data-result="pass">10.91:1 · pass</td></tr>
+    <tr><td>Git letter, staged</td><td><code>--color-bg-primary</code> on <code>--color-git-staged-light</code></td><td data-contrast="--color-bg-primary on --color-git-staged-light" data-min="4.5" data-result="pass">13.35:1 · pass</td></tr>
+    <tr><td>Git letter, renamed</td><td><code>--color-bg-primary</code> on <code>--color-git-renamed-light</code></td><td data-contrast="--color-bg-primary on --color-git-renamed-light" data-min="4.5" data-result="pass">6.36:1 · pass</td></tr>
+    <tr><td>Git letter, conflicted</td><td><code>--color-bg-primary</code> on <code>--color-git-conflicted-light</code></td><td data-contrast="--color-bg-primary on --color-git-conflicted-light" data-min="4.5" data-result="pass">9.30:1 · pass</td></tr>
+    <tr><td>Folder letter, renamed (the weakest outline)</td><td><code>--color-git-renamed-light</code> on <code>--color-bg-tertiary</code></td><td data-contrast="--color-git-renamed-light on --color-bg-tertiary" data-min="4.5" data-result="pass">5.27:1 · pass</td></tr>
+    <tr><td>Folder letter, conflicted</td><td><code>--color-git-conflicted-light</code> on <code>--color-bg-tertiary</code></td><td data-contrast="--color-git-conflicted-light on --color-bg-tertiary" data-min="4.5" data-result="pass">7.70:1 · pass</td></tr>
+    <tr><td>Today's folder dot, renamed</td><td><code>--color-git-renamed</code> on <code>--color-bg-tertiary</code></td><td data-contrast="--color-git-renamed on --color-bg-tertiary" data-min="3" data-result="fail">1.92:1 · fail</td></tr>
+    <tr><td>Today's folder dot, conflicted</td><td><code>--color-git-conflicted</code> on <code>--color-bg-tertiary</code></td><td data-contrast="--color-git-conflicted on --color-bg-tertiary" data-min="3" data-result="pass">4.41:1 · pass</td></tr>
+    <tr><td>Counter and chip text</td><td><code>--color-text-primary</code> on <code>--color-bg-tertiary</code></td><td data-contrast="--color-text-primary on --color-bg-tertiary" data-min="4.5" data-result="pass">9.54:1 · pass</td></tr>
+    <tr><td>Action chip, hover</td><td><code>--color-text-primary</code> on <code>--color-bg-hover-solid</code></td><td data-contrast="--color-text-primary on --color-bg-hover-solid" data-min="4.5" data-result="pass">8.64:1 · pass</td></tr>
+    <tr><td>Key label</td><td><code>--color-text-bright</code> on <code>--color-bg-primary</code></td><td data-contrast="--color-text-bright on --color-bg-primary" data-min="4.5" data-result="pass">14.00:1 · pass</td></tr>
+    <tr><td>Key edge (decorative – the label carries it)</td><td><code>--color-border-subtle</code> on <code>--color-bg-tertiary</code></td><td data-contrast="--color-border-subtle on --color-bg-tertiary">1.60:1</td></tr>
+  </tbody>
+</table>
+
+<h2 id="keyboard">The keyboard contract</h2>
+<table class="ds-keys">
+  <thead><tr><th>Key</th><th>Result</th><th>Focus ends on</th></tr></thead>
+  <tbody>
+    <tr><td><kbd>Tab</kbd></td><td>Reaches an action chip; skips static chips, badges, counters and keys.</td><td>The action chip.</td></tr>
+    <tr><td><kbd>Enter</kbd> / <kbd>Space</kbd> on an action chip</td><td>Opens or closes what it controls; <code>aria-expanded</code> and the caret flip.</td><td>The chip, or the first item it opened when it opened by keyboard.</td></tr>
+    <tr><td><kbd>Escape</kbd> in what the chip opened</td><td>Closes it.</td><td>The chip.</td></tr>
+  </tbody>
+</table>
+<p class="ds-muted">The activity-bar item that carries a badge is its own control, with its own contract; the badge
+adds nothing to focus. The Permission band's chip is held to this by <code>PreviewChromeBand.test.tsx</code>. No test
+covers the badge, git or key styles yet.</p>
+
+<h2 id="names">What a screen reader hears</h2>
+<table>
+  <thead><tr><th>Label</th><th>Visible</th><th>Heard</th><th>How</th></tr></thead>
+  <tbody>
+    <tr><td>Badge</td><td><code>99+</code></td><td>“Project, 128 changed files”</td><td>The count goes into the item's name; the badge is <code>aria-hidden</code>.</td></tr>
+    <tr><td>Git, file</td><td><code>M</code></td><td>“plan.md, modified”</td><td>The word goes into the row's name or description; the tile is <code>aria-hidden</code>.</td></tr>
+    <tr><td>Git, folder</td><td><code>M</code> outlined</td><td>“docs, contains modified files”</td><td>As for a file.</td></tr>
+    <tr><td>Git, a change</td><td>The letter swaps</td><td>“plan.md is now staged”, once</td><td>One polite status region for the tree, not one per row (#95).</td></tr>
+    <tr><td>Counter</td><td><code>3</code></td><td>“Comments, 3”</td><td>Plain text beside its label, read as one name.</td></tr>
+    <tr><td>Key</td><td><code>Cmd</code>+<code>F</code></td><td>“Command F” where the caption is read; the control says it via <code>aria-keyshortcuts="Meta+F"</code></td><td>Visible text and the attribute, never <code>title</code> alone.</td></tr>
+  </tbody>
+</table>
+
+<h2 id="markup">The markup</h2>
+<pre class="markup">&lt;!-- Badge: the name carries the number --&gt;
+&lt;button class="activity-bar-item" aria-label="Project, 128 changed files"&gt;…&lt;span class="erf-badge" aria-hidden="true"&gt;99+&lt;/span&gt;&lt;/button&gt;
+
+&lt;!-- Git, file row --&gt;
+&lt;div role="treeitem" aria-label="plan.md, modified"&gt;plan.md &lt;span class="erf-git" data-git="modified" aria-hidden="true"&gt;M&lt;/span&gt;&lt;/div&gt;
+
+&lt;!-- A shortcut shown, and declared --&gt;
+&lt;button aria-label="Find" aria-keyshortcuts="Meta+F"&gt;…&lt;/button&gt;
+&lt;span class="erf-keys"&gt;&lt;kbd class="erf-kbd"&gt;Cmd&lt;/kbd&gt;+&lt;kbd class="erf-kbd"&gt;F&lt;/kbd&gt;&lt;/span&gt;</pre>
+
+<h2 id="consolidation">The consolidation set</h2>
+<table>
+  <thead><tr><th>Today</th><th>File</th><th>What changes</th></tr></thead>
+  <tbody>
+    <tr><td><code>.activity-bar-badge</code></td><td><code>ActivityBar/ActivityBar.css</code>, <code>ActivityBarBadge.tsx</code></td><td>The full value moves from <code>title</code> into the item's name. Both badge sources return <code>null</code> today, so no badge has ever rendered.</td></tr>
+    <tr><td><code>.git-status-badge</code></td><td><code>ProjectTree/ProjectTree.css</code>, <code>GitStatusBadge.tsx</code></td><td>Already letter + colour; the <code>role="img"</code> label moves to the row's name.</td></tr>
+    <tr><td><code>.git-status-dot</code></td><td>The same files</td><td>Replaced by the outlined letter.</td></tr>
+    <tr><td><code>.git-count-item</code></td><td><code>ProjectTree/ProjectTree.css</code>, <code>GitStatusBar.tsx</code></td><td>Becomes counters with words; gains renamed.</td></tr>
+    <tr><td><code>.erf-row__badge</code></td><td><code>docs/design-system/system/components/row/row.css</code></td><td>The Rows card's proposed copy of the git tile; one of the two goes when either is adopted.</td></tr>
+    <tr><td><code>.terminal-claude-statusbar__badge</code></td><td><code>TerminalPanel/components/ClaudeStatusBar.css</code></td><td>A static chip.</td></tr>
+    <tr><td><code>.frontmatter-tag</code></td><td><code>Editor/MarkdownPreview.css</code></td><td>A static chip.</td></tr>
+    <tr><td><code>.erf-band__chip</code></td><td><code>HtmlPreviewPanel/components/PreviewChromeBand.css</code></td><td>Already an action chip; the reference.</td></tr>
+    <tr><td><code>.dialog-keyboard-hint kbd</code>, <code>.dialog-tooltip-content kbd</code></td><td><code>Dialog/Dialog.css</code></td><td>One key style instead of two.</td></tr>
+    <tr><td><code>.chat-tooltip-content kbd</code></td><td><code>Editor/DiagramViewer/ChatBubble.css</code></td><td>The third style: a different surface, border and size.</td></tr>
+  </tbody>
+</table>
+
+<section id="exceptions">
+<h2>Exceptions</h2>
+<p class="ds-muted">None recorded. A shipping component that departs from this card carries a
+<code>deviates:</code> marker at the site and gets a row here, naming the file.</p>
+</section>
+
+</main>
+</body>
+</html>

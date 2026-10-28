@@ -417,7 +417,7 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
                           e.stopPropagation()
                           if (!isDisabled) void handleRemoveProject(project.path)
                         }}
-                        /* deviates: docs/design-system/system/components/row — the card gives a
+                        /* deviates: docs/design-system/system/components/row/index.html — the card gives a
                            list ONE Tab stop; the active row's Remove is a second
                            one, so removing a project needs no extra shortcut to
                            learn. Every other row's Remove stays out of the Tab

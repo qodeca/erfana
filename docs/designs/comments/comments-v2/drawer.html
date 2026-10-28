@@ -4,6 +4,7 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Erfana – comments v2, the comments drawer</title>
@@ -101,22 +102,22 @@
   <figure><figcaption><strong>HTML · Open</strong> – C-15 filter and sort, C-06 Changed, OD-04 Not found, C-20 checkbox, C-26 one file heading. 7 open, the list scrolls.</figcaption>
     <div class="c2d-box"><aside class="erf-comment-drawer" aria-labelledby="a1-t">
       <div class="erf-comment-drawer__head c2d-head"><h2 class="erf-comment-drawer__title" id="a1-t">Comments</h2>
-        <button class="erf-comment-sort" type="button" aria-haspopup="menu" aria-expanded="false">Sort: File order<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"></path></svg></button>
-        <button class="erf-comment-icon-btn" type="button" aria-label="Close comments"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+        <button class="erf-comment-sort" type="button" aria-haspopup="menu" aria-expanded="false" tabindex="-1">Sort: File order<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"></path></svg></button>
+        <button class="erf-comment-icon-btn" type="button" aria-label="Close comments" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
       <div class="erf-comment-drawer__controls">
-        <div class="erf-comment-filter erf-comment-filter--grid" role="radiogroup" aria-label="Show"><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="true">Open <span class="erf-comment-filter__count">7</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Resolved <span class="erf-comment-filter__count">2</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Can't edit <span class="erf-comment-filter__count">1</span></button></div>
-        <label class="erf-comment-drawer__check"><input class="erf-comment-check" type="checkbox" checked> Show comment icons and underlines</label>
+        <div class="erf-comment-filter erf-comment-filter--grid" role="radiogroup" aria-label="Show"><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="true" tabindex="-1">Open <span class="erf-comment-filter__count">7</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Resolved <span class="erf-comment-filter__count">2</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Can't edit <span class="erf-comment-filter__count">1</span></button></div>
+        <label class="erf-comment-drawer__check"><input class="erf-comment-check" type="checkbox" checked tabindex="-1"> Show comment icons and underlines</label>
         <p class="c2d-help">Changes to attributes or styles only are not detected.</p>
       </div>
       <div class="erf-comment-drawer__scroll">
         <div role="group" aria-labelledby="a1-g1"><h3 class="erf-comment-drawer__group" id="a1-g1">index.html · 7 open</h3>
         <ul class="erf-comment-list" aria-label="Open comments">
-          <li class="erf-comment-row erf-comment-row--active"><button class="erf-comment-row__main" type="button" title="Open thread" aria-labelledby="a1-r1-x" aria-describedby="a1-r1-d"></button>
+          <li class="erf-comment-row erf-comment-row--active"><button class="erf-comment-row__main" type="button" title="Open thread" aria-labelledby="a1-r1-x" aria-describedby="a1-r1-d" tabindex="-1"></button>
             <div class="erf-comment-row__line"><span class="erf-comment-row__label" dir="ltr">button.cta</span><span class="erf-comment-row__count">2 replies</span><span class="erf-comment-tag erf-comment-tag--changed">Changed</span></div>
             <p class="erf-comment-row__excerpt" id="a1-r1-x" dir="auto">Make this say “Start free trial”, and check the contrast on the green.</p>
             <p class="erf-comment-row__meta"><bdi>Marcin Obel</bdi> · Today, 14:32</p>
             <span class="erf-comment-sr" id="a1-r1-d">on Button, line 42 · 2 replies · Marcin Obel, Today 14:32</span>
-            <button class="erf-comment-action erf-comment-row__open" type="button">Open</button></li>
+            <button class="erf-comment-action erf-comment-row__open" type="button" tabindex="-1">Open</button></li>
           <li class="erf-comment-row"><button class="erf-comment-row__main" type="button" tabindex="-1" title="Open thread" aria-labelledby="a1-r2-x"></button>
             <div class="erf-comment-row__line"><span class="erf-comment-row__label" dir="ltr">p.lede</span><span class="erf-comment-tag erf-comment-tag--changed">Changed</span></div>
             <p class="c2d-words">“ship by Friday” → “ship by Thursday”</p>
@@ -141,23 +142,23 @@
   <figure><figcaption><strong>Markdown · Open</strong> – C-03 labels, C-06 Changed with the words, OD-04 Not found. One file, so no group headings: the plain file line stays.</figcaption>
     <div class="c2d-box"><aside class="erf-comment-drawer" aria-labelledby="a2-t">
       <div class="erf-comment-drawer__head c2d-head"><h2 class="erf-comment-drawer__title" id="a2-t">Comments</h2>
-        <button class="erf-comment-sort" type="button" aria-haspopup="menu" aria-expanded="false">Sort: File order<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"></path></svg></button>
-        <button class="erf-comment-icon-btn" type="button" aria-label="Close comments"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+        <button class="erf-comment-sort" type="button" aria-haspopup="menu" aria-expanded="false" tabindex="-1">Sort: File order<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"></path></svg></button>
+        <button class="erf-comment-icon-btn" type="button" aria-label="Close comments" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
       <div class="erf-comment-drawer__controls">
-        <div class="erf-comment-filter erf-comment-filter--grid" role="radiogroup" aria-label="Show"><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="true">Open <span class="erf-comment-filter__count">3</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Resolved <span class="erf-comment-filter__count">1</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Can't edit <span class="erf-comment-filter__count">1</span></button></div>
-        <label class="erf-comment-drawer__check"><input class="erf-comment-check" type="checkbox" checked> Show comment icons and underlines</label>
+        <div class="erf-comment-filter erf-comment-filter--grid" role="radiogroup" aria-label="Show"><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="true" tabindex="-1">Open <span class="erf-comment-filter__count">3</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Resolved <span class="erf-comment-filter__count">1</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Can't edit <span class="erf-comment-filter__count">1</span></button></div>
+        <label class="erf-comment-drawer__check"><input class="erf-comment-check" type="checkbox" checked tabindex="-1"> Show comment icons and underlines</label>
         <p class="c2d-help">Changes to attributes or styles only are not detected.</p>
       </div>
       <div class="erf-comment-drawer__scroll">
         <p class="erf-comment-drawer__file">plan.md</p>
         <ul class="erf-comment-list" aria-label="Open comments">
-          <li class="erf-comment-row erf-comment-row--active"><button class="erf-comment-row__main" type="button" title="Open thread" aria-labelledby="a2-r1-x" aria-describedby="a2-r1-d"></button>
+          <li class="erf-comment-row erf-comment-row--active"><button class="erf-comment-row__main" type="button" title="Open thread" aria-labelledby="a2-r1-x" aria-describedby="a2-r1-d" tabindex="-1"></button>
             <div class="erf-comment-row__line"><span class="erf-comment-row__label" dir="ltr">Paragraph · line 7</span><span class="erf-comment-row__count">1 reply</span><span class="erf-comment-tag erf-comment-tag--changed">Changed</span></div>
             <p class="c2d-words">“ship by Friday” → “ship by Thursday”</p>
             <p class="erf-comment-row__excerpt" id="a2-r1-x" dir="auto">Friday is a holiday in two of our markets. Thursday?</p>
             <p class="erf-comment-row__meta"><bdi>Anna K.</bdi> · Today, 09:10</p>
             <span class="erf-comment-sr" id="a2-r1-d">on paragraph, line 7 · 1 reply · Anna K., Today 09:10</span>
-            <button class="erf-comment-action erf-comment-row__open" type="button">Open</button></li>
+            <button class="erf-comment-action erf-comment-row__open" type="button" tabindex="-1">Open</button></li>
           <li class="erf-comment-row"><button class="erf-comment-row__main" type="button" tabindex="-1" title="Open thread" aria-labelledby="a2-r2-x"></button>
             <div class="erf-comment-row__line"><span class="erf-comment-row__label" dir="ltr">List item · line 14</span><span class="erf-comment-row__count">2 replies</span></div>
             <p class="erf-comment-row__excerpt" id="a2-r2-x" dir="auto">Which staging – eu-1 or us-2?</p>
@@ -173,20 +174,20 @@
   <figure><figcaption><strong>HTML · icons and underlines off</strong> – C-20. The checkbox is the only switch; the toolbar keeps only Comment mode and the “7 comments” count.</figcaption>
     <div class="c2d-box c2d-box--short"><aside class="erf-comment-drawer" aria-labelledby="a3-t">
       <div class="erf-comment-drawer__head c2d-head"><h2 class="erf-comment-drawer__title" id="a3-t">Comments</h2>
-        <button class="erf-comment-sort" type="button" aria-haspopup="menu" aria-expanded="false">Sort: File order<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"></path></svg></button>
-        <button class="erf-comment-icon-btn" type="button" aria-label="Close comments"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+        <button class="erf-comment-sort" type="button" aria-haspopup="menu" aria-expanded="false" tabindex="-1">Sort: File order<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"></path></svg></button>
+        <button class="erf-comment-icon-btn" type="button" aria-label="Close comments" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
       <div class="erf-comment-drawer__controls">
-        <div class="erf-comment-filter erf-comment-filter--grid" role="radiogroup" aria-label="Show"><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="true">Open <span class="erf-comment-filter__count">7</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Resolved <span class="erf-comment-filter__count">2</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Can't edit <span class="erf-comment-filter__count">1</span></button></div>
-        <label class="erf-comment-drawer__check"><input class="erf-comment-check" type="checkbox"> Show comment icons and underlines</label>
+        <div class="erf-comment-filter erf-comment-filter--grid" role="radiogroup" aria-label="Show"><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="true" tabindex="-1">Open <span class="erf-comment-filter__count">7</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Resolved <span class="erf-comment-filter__count">2</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Can't edit <span class="erf-comment-filter__count">1</span></button></div>
+        <label class="erf-comment-drawer__check"><input class="erf-comment-check" type="checkbox" tabindex="-1"> Show comment icons and underlines</label>
         <p class="c2d-help">Changes to attributes or styles only are not detected.</p>
       </div>
       <div class="erf-comment-drawer__scroll">
         <div role="group" aria-labelledby="a3-g1"><h3 class="erf-comment-drawer__group" id="a3-g1">index.html · 7 open</h3>
         <ul class="erf-comment-list" aria-label="Open comments">
-          <li class="erf-comment-row erf-comment-row--active"><button class="erf-comment-row__main" type="button" title="Open thread" aria-labelledby="a3-r1-x"></button>
+          <li class="erf-comment-row erf-comment-row--active"><button class="erf-comment-row__main" type="button" title="Open thread" aria-labelledby="a3-r1-x" tabindex="-1"></button>
             <div class="erf-comment-row__line"><span class="erf-comment-row__label" dir="ltr">button.cta</span><span class="erf-comment-row__count">2 replies</span></div>
             <p class="erf-comment-row__excerpt" id="a3-r1-x" dir="auto">Make this say “Start free trial”, and check the contrast on the green.</p>
-            <button class="erf-comment-action erf-comment-row__open" type="button">Open</button></li>
+            <button class="erf-comment-action erf-comment-row__open" type="button" tabindex="-1">Open</button></li>
         </ul></div>
       </div>
     </aside></div></figure>
@@ -205,20 +206,20 @@
   <figure><figcaption><strong>HTML · Resolved</strong> – C-15. A resolved comment whose element is gone keeps its neutral Not found tag here.</figcaption>
     <div class="c2d-box c2d-box--short"><aside class="erf-comment-drawer" aria-labelledby="b1-t">
       <div class="erf-comment-drawer__head c2d-head"><h2 class="erf-comment-drawer__title" id="b1-t">Comments</h2>
-        <button class="erf-comment-sort" type="button" aria-haspopup="menu" aria-expanded="false">Sort: File order<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"></path></svg></button>
-        <button class="erf-comment-icon-btn" type="button" aria-label="Close comments"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+        <button class="erf-comment-sort" type="button" aria-haspopup="menu" aria-expanded="false" tabindex="-1">Sort: File order<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"></path></svg></button>
+        <button class="erf-comment-icon-btn" type="button" aria-label="Close comments" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
       <div class="erf-comment-drawer__controls">
-        <div class="erf-comment-filter erf-comment-filter--grid" role="radiogroup" aria-label="Show"><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Open <span class="erf-comment-filter__count">7</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="true">Resolved <span class="erf-comment-filter__count">2</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Can't edit <span class="erf-comment-filter__count">1</span></button></div>
-        <label class="erf-comment-drawer__check"><input class="erf-comment-check" type="checkbox" checked> Show comment icons and underlines</label>
+        <div class="erf-comment-filter erf-comment-filter--grid" role="radiogroup" aria-label="Show"><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Open <span class="erf-comment-filter__count">7</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="true" tabindex="-1">Resolved <span class="erf-comment-filter__count">2</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Can't edit <span class="erf-comment-filter__count">1</span></button></div>
+        <label class="erf-comment-drawer__check"><input class="erf-comment-check" type="checkbox" checked tabindex="-1"> Show comment icons and underlines</label>
       </div>
       <div class="erf-comment-drawer__scroll">
         <div role="group" aria-labelledby="b1-g1"><h3 class="erf-comment-drawer__group" id="b1-g1">index.html · 2 resolved</h3>
         <ul class="erf-comment-list" aria-label="Resolved comments">
-          <li class="erf-comment-row erf-comment-row--active"><button class="erf-comment-row__main" type="button" title="Open thread" aria-labelledby="b1-r1-x"></button>
+          <li class="erf-comment-row erf-comment-row--active"><button class="erf-comment-row__main" type="button" title="Open thread" aria-labelledby="b1-r1-x" tabindex="-1"></button>
             <div class="erf-comment-row__line"><span class="erf-comment-row__label" dir="ltr">div.card</span><span class="erf-comment-row__count">1 reply</span></div>
             <p class="erf-comment-row__excerpt" id="b1-r1-x" dir="auto">Add the seat limit.</p>
             <p class="erf-comment-row__meta"><bdi>Anna K.</bdi> · 20 Oct, 10:00</p>
-            <button class="erf-comment-action erf-comment-row__open" type="button">Open</button></li>
+            <button class="erf-comment-action erf-comment-row__open" type="button" tabindex="-1">Open</button></li>
           <li class="erf-comment-row"><button class="erf-comment-row__main" type="button" tabindex="-1" title="Open thread" aria-labelledby="b1-r2-x"></button>
             <div class="erf-comment-row__line"><span class="erf-comment-row__label" dir="ltr">img.logo</span><span class="erf-comment-tag">Not found</span></div>
             <p class="erf-comment-row__excerpt" id="b1-r2-x" dir="auto">Blurry on retina.</p></li>
@@ -229,19 +230,19 @@
   <figure><figcaption><strong>HTML · Can't edit</strong> – C-15 / OD-04. ▲ Damaged in the badge shape; newer format neutral. The count is 2 here because one of each is drawn.</figcaption>
     <div class="c2d-box c2d-box--short"><aside class="erf-comment-drawer" aria-labelledby="b2-t">
       <div class="erf-comment-drawer__head c2d-head"><h2 class="erf-comment-drawer__title" id="b2-t">Comments</h2>
-        <button class="erf-comment-sort" type="button" aria-haspopup="menu" aria-expanded="false">Sort: File order<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"></path></svg></button>
-        <button class="erf-comment-icon-btn" type="button" aria-label="Close comments"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+        <button class="erf-comment-sort" type="button" aria-haspopup="menu" aria-expanded="false" tabindex="-1">Sort: File order<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"></path></svg></button>
+        <button class="erf-comment-icon-btn" type="button" aria-label="Close comments" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
       <div class="erf-comment-drawer__controls">
-        <div class="erf-comment-filter erf-comment-filter--grid" role="radiogroup" aria-label="Show"><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Open <span class="erf-comment-filter__count">7</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Resolved <span class="erf-comment-filter__count">2</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="true">Can't edit <span class="erf-comment-filter__count">2</span></button></div>
-        <label class="erf-comment-drawer__check"><input class="erf-comment-check" type="checkbox" checked> Show comment icons and underlines</label>
+        <div class="erf-comment-filter erf-comment-filter--grid" role="radiogroup" aria-label="Show"><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Open <span class="erf-comment-filter__count">7</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Resolved <span class="erf-comment-filter__count">2</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="true" tabindex="-1">Can't edit <span class="erf-comment-filter__count">2</span></button></div>
+        <label class="erf-comment-drawer__check"><input class="erf-comment-check" type="checkbox" checked tabindex="-1"> Show comment icons and underlines</label>
       </div>
       <div class="erf-comment-drawer__scroll">
         <div role="group" aria-labelledby="b2-g1"><h3 class="erf-comment-drawer__group" id="b2-g1">index.html · 2 can't edit</h3>
         <ul class="erf-comment-list" aria-label="Comments Erfana can't edit">
-          <li class="erf-comment-row erf-comment-row--active"><button class="erf-comment-row__main" type="button" title="Open thread" aria-label="Damaged comment" aria-describedby="b2-r1-d"></button>
+          <li class="erf-comment-row erf-comment-row--active"><button class="erf-comment-row__main" type="button" title="Open thread" aria-label="Damaged comment" aria-describedby="b2-r1-d" tabindex="-1"></button>
             <div class="erf-comment-row__line"><span class="erf-comment-row__label" dir="ltr">index.html, line 57</span><span class="erf-comment-badge">▲ Damaged</span></div>
             <span class="erf-comment-sr" id="b2-r1-d">index.html, line 57 · can't be edited</span>
-            <button class="erf-comment-action erf-comment-row__open" type="button">Open</button></li>
+            <button class="erf-comment-action erf-comment-row__open" type="button" tabindex="-1">Open</button></li>
           <li class="erf-comment-row"><button class="erf-comment-row__main" type="button" tabindex="-1" title="Open thread" aria-label="Newer-format comment"></button>
             <div class="erf-comment-row__line"><span class="erf-comment-row__label" dir="ltr">index.html, line 203</span><span class="erf-comment-tag">Newer format – read-only</span></div></li>
         </ul></div>
@@ -251,18 +252,18 @@
   <figure><figcaption><strong>Markdown · Can't edit</strong> – C-15 / OD-04 / C-03. A damaged comment has no kind Erfana can trust, so the label is the file and line.</figcaption>
     <div class="c2d-box c2d-box--short"><aside class="erf-comment-drawer" aria-labelledby="b3-t">
       <div class="erf-comment-drawer__head c2d-head"><h2 class="erf-comment-drawer__title" id="b3-t">Comments</h2>
-        <button class="erf-comment-sort" type="button" aria-haspopup="menu" aria-expanded="false">Sort: File order<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"></path></svg></button>
-        <button class="erf-comment-icon-btn" type="button" aria-label="Close comments"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+        <button class="erf-comment-sort" type="button" aria-haspopup="menu" aria-expanded="false" tabindex="-1">Sort: File order<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"></path></svg></button>
+        <button class="erf-comment-icon-btn" type="button" aria-label="Close comments" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
       <div class="erf-comment-drawer__controls">
-        <div class="erf-comment-filter erf-comment-filter--grid" role="radiogroup" aria-label="Show"><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Open <span class="erf-comment-filter__count">3</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Resolved <span class="erf-comment-filter__count">1</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="true">Can't edit <span class="erf-comment-filter__count">1</span></button></div>
-        <label class="erf-comment-drawer__check"><input class="erf-comment-check" type="checkbox" checked> Show comment icons and underlines</label>
+        <div class="erf-comment-filter erf-comment-filter--grid" role="radiogroup" aria-label="Show"><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Open <span class="erf-comment-filter__count">3</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Resolved <span class="erf-comment-filter__count">1</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="true" tabindex="-1">Can't edit <span class="erf-comment-filter__count">1</span></button></div>
+        <label class="erf-comment-drawer__check"><input class="erf-comment-check" type="checkbox" checked tabindex="-1"> Show comment icons and underlines</label>
       </div>
       <div class="erf-comment-drawer__scroll">
         <p class="erf-comment-drawer__file">plan.md</p>
         <ul class="erf-comment-list" aria-label="Comments Erfana can't edit">
-          <li class="erf-comment-row erf-comment-row--active"><button class="erf-comment-row__main" type="button" title="Open thread" aria-label="Damaged comment"></button>
+          <li class="erf-comment-row erf-comment-row--active"><button class="erf-comment-row__main" type="button" title="Open thread" aria-label="Damaged comment" tabindex="-1"></button>
             <div class="erf-comment-row__line"><span class="erf-comment-row__label" dir="ltr">plan.md, line 30</span><span class="erf-comment-badge">▲ Damaged</span></div>
-            <button class="erf-comment-action erf-comment-row__open" type="button">Open</button></li>
+            <button class="erf-comment-action erf-comment-row__open" type="button" tabindex="-1">Open</button></li>
         </ul>
       </div>
     </aside></div></figure>
@@ -280,25 +281,25 @@
   <figure><figcaption><strong>HTML · sort menu open</strong> – C-15. File order / Changed first / Latest activity; the button wears the expanded fill.</figcaption>
     <div class="c2d-box"><aside class="erf-comment-drawer" aria-labelledby="c1-t">
       <div class="erf-comment-drawer__head c2d-head"><h2 class="erf-comment-drawer__title" id="c1-t">Comments</h2>
-        <button class="erf-comment-sort" type="button" aria-haspopup="menu" aria-expanded="true" aria-controls="c1-m">Sort: File order<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"></path></svg></button>
-        <button class="erf-comment-icon-btn" type="button" aria-label="Close comments"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
+        <button class="erf-comment-sort" type="button" aria-haspopup="menu" aria-expanded="true" aria-controls="c1-m" tabindex="-1">Sort: File order<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"></path></svg></button>
+        <button class="erf-comment-icon-btn" type="button" aria-label="Close comments" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
         <div class="erf-menu c2d-menu" id="c1-m" role="menu" aria-label="Sort comments">
           <div class="erf-menu-item" role="menuitemradio" aria-checked="true" tabindex="-1"><span class="erf-menu-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M20 6 9 17l-5-5"></path></svg></span><span class="erf-menu-label">File order</span></div>
-          <div class="erf-menu-item erf-menu-item--active" role="menuitemradio" aria-checked="false" tabindex="0"><span class="erf-menu-icon"></span><span class="erf-menu-label">Changed first</span></div>
+          <div class="erf-menu-item erf-menu-item--active" role="menuitemradio" aria-checked="false" tabindex="-1"><span class="erf-menu-icon"></span><span class="erf-menu-label">Changed first</span></div>
           <div class="erf-menu-item" role="menuitemradio" aria-checked="false" tabindex="-1"><span class="erf-menu-icon"></span><span class="erf-menu-label">Latest activity</span></div>
         </div></div>
       <div class="erf-comment-drawer__controls">
-        <div class="erf-comment-filter erf-comment-filter--grid" role="radiogroup" aria-label="Show"><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="true">Open <span class="erf-comment-filter__count">7</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Resolved <span class="erf-comment-filter__count">2</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Can't edit <span class="erf-comment-filter__count">1</span></button></div>
-        <label class="erf-comment-drawer__check"><input class="erf-comment-check" type="checkbox" checked> Show comment icons and underlines</label>
+        <div class="erf-comment-filter erf-comment-filter--grid" role="radiogroup" aria-label="Show"><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="true" tabindex="-1">Open <span class="erf-comment-filter__count">7</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Resolved <span class="erf-comment-filter__count">2</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Can't edit <span class="erf-comment-filter__count">1</span></button></div>
+        <label class="erf-comment-drawer__check"><input class="erf-comment-check" type="checkbox" checked tabindex="-1"> Show comment icons and underlines</label>
         <p class="c2d-help">Changes to attributes or styles only are not detected.</p>
       </div>
       <div class="erf-comment-drawer__scroll">
         <div role="group" aria-labelledby="c1-g1"><h3 class="erf-comment-drawer__group" id="c1-g1">index.html · 7 open</h3>
         <ul class="erf-comment-list" aria-label="Open comments">
-          <li class="erf-comment-row erf-comment-row--active"><button class="erf-comment-row__main" type="button" title="Open thread" aria-labelledby="c1-r1-x"></button>
+          <li class="erf-comment-row erf-comment-row--active"><button class="erf-comment-row__main" type="button" title="Open thread" aria-labelledby="c1-r1-x" tabindex="-1"></button>
             <div class="erf-comment-row__line"><span class="erf-comment-row__label" dir="ltr">h2.old-title</span><span class="erf-comment-tag">Not found</span></div>
             <p class="erf-comment-row__excerpt" id="c1-r1-x" dir="auto">Rename to “Plans”.</p>
-            <button class="erf-comment-action erf-comment-row__open" type="button">Open</button></li>
+            <button class="erf-comment-action erf-comment-row__open" type="button" tabindex="-1">Open</button></li>
           <li class="erf-comment-row"><button class="erf-comment-row__main" type="button" tabindex="-1" title="Open thread" aria-labelledby="c1-r2-x"></button>
             <div class="erf-comment-row__line"><span class="erf-comment-row__label" dir="ltr">button.cta</span><span class="erf-comment-row__count">2 replies</span><span class="erf-comment-tag erf-comment-tag--changed">Changed</span></div>
             <p class="erf-comment-row__excerpt" id="c1-r2-x" dir="auto">Make this say “Start free trial”, and check the contrast on the green.</p></li>
@@ -309,21 +310,21 @@
   <figure><figcaption><strong>HTML · Sort: Changed first</strong> – C-06 / C-15. Changed rows lead, then file order. Within the file heading, not across files.</figcaption>
     <div class="c2d-box"><aside class="erf-comment-drawer" aria-labelledby="c2-t">
       <div class="erf-comment-drawer__head c2d-head"><h2 class="erf-comment-drawer__title" id="c2-t">Comments</h2>
-        <button class="erf-comment-sort" type="button" aria-haspopup="menu" aria-expanded="false">Sort: Changed first<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"></path></svg></button>
-        <button class="erf-comment-icon-btn" type="button" aria-label="Close comments"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+        <button class="erf-comment-sort" type="button" aria-haspopup="menu" aria-expanded="false" tabindex="-1">Sort: Changed first<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"></path></svg></button>
+        <button class="erf-comment-icon-btn" type="button" aria-label="Close comments" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
       <div class="erf-comment-drawer__controls">
-        <div class="erf-comment-filter erf-comment-filter--grid" role="radiogroup" aria-label="Show"><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="true">Open <span class="erf-comment-filter__count">7</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Resolved <span class="erf-comment-filter__count">2</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Can't edit <span class="erf-comment-filter__count">1</span></button></div>
-        <label class="erf-comment-drawer__check"><input class="erf-comment-check" type="checkbox" checked> Show comment icons and underlines</label>
+        <div class="erf-comment-filter erf-comment-filter--grid" role="radiogroup" aria-label="Show"><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="true" tabindex="-1">Open <span class="erf-comment-filter__count">7</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Resolved <span class="erf-comment-filter__count">2</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Can't edit <span class="erf-comment-filter__count">1</span></button></div>
+        <label class="erf-comment-drawer__check"><input class="erf-comment-check" type="checkbox" checked tabindex="-1"> Show comment icons and underlines</label>
         <p class="c2d-help">Changes to attributes or styles only are not detected.</p>
       </div>
       <div class="erf-comment-drawer__scroll">
         <div role="group" aria-labelledby="c2-g1"><h3 class="erf-comment-drawer__group" id="c2-g1">index.html · 7 open</h3>
         <ul class="erf-comment-list" aria-label="Open comments, changed first">
-          <li class="erf-comment-row erf-comment-row--active"><button class="erf-comment-row__main" type="button" title="Open thread" aria-labelledby="c2-r1-x"></button>
+          <li class="erf-comment-row erf-comment-row--active"><button class="erf-comment-row__main" type="button" title="Open thread" aria-labelledby="c2-r1-x" tabindex="-1"></button>
             <div class="erf-comment-row__line"><span class="erf-comment-row__label" dir="ltr">button.cta</span><span class="erf-comment-row__count">2 replies</span><span class="erf-comment-tag erf-comment-tag--changed">Changed</span></div>
             <p class="erf-comment-row__excerpt" id="c2-r1-x" dir="auto">Make this say “Start free trial”, and check the contrast on the green.</p>
             <p class="erf-comment-row__meta"><bdi>Marcin Obel</bdi> · Today, 14:32</p>
-            <button class="erf-comment-action erf-comment-row__open" type="button">Open</button></li>
+            <button class="erf-comment-action erf-comment-row__open" type="button" tabindex="-1">Open</button></li>
           <li class="erf-comment-row"><button class="erf-comment-row__main" type="button" tabindex="-1" title="Open thread" aria-labelledby="c2-r2-x"></button>
             <div class="erf-comment-row__line"><span class="erf-comment-row__label" dir="ltr">p.lede</span><span class="erf-comment-tag erf-comment-tag--changed">Changed</span></div>
             <p class="c2d-words">“ship by Friday” → “ship by Thursday”</p>
@@ -351,15 +352,15 @@
   <figure><figcaption><strong>HTML · pointer over the second row</strong> – C-13. Hover is the Rows card's solid fill; the title says what a click does.</figcaption>
     <div class="c2d-box c2d-box--short"><aside class="erf-comment-drawer" aria-labelledby="d1-t">
       <div class="erf-comment-drawer__head c2d-head"><h2 class="erf-comment-drawer__title" id="d1-t">Comments</h2>
-        <button class="erf-comment-sort" type="button" aria-haspopup="menu" aria-expanded="false">Sort: File order<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"></path></svg></button>
-        <button class="erf-comment-icon-btn" type="button" aria-label="Close comments"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+        <button class="erf-comment-sort" type="button" aria-haspopup="menu" aria-expanded="false" tabindex="-1">Sort: File order<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"></path></svg></button>
+        <button class="erf-comment-icon-btn" type="button" aria-label="Close comments" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
       <div class="erf-comment-drawer__scroll">
         <div role="group" aria-labelledby="d1-g1"><h3 class="erf-comment-drawer__group" id="d1-g1">index.html · 7 open</h3>
         <ul class="erf-comment-list" aria-label="Open comments">
-          <li class="erf-comment-row erf-comment-row--active"><button class="erf-comment-row__main" type="button" title="Open thread" aria-labelledby="d1-r1-x"></button>
+          <li class="erf-comment-row erf-comment-row--active"><button class="erf-comment-row__main" type="button" title="Open thread" aria-labelledby="d1-r1-x" tabindex="-1"></button>
             <div class="erf-comment-row__line"><span class="erf-comment-row__label" dir="ltr">button.cta</span><span class="erf-comment-row__count">2 replies</span></div>
             <p class="erf-comment-row__excerpt" id="d1-r1-x" dir="auto">Make this say “Start free trial”, and check the contrast on the green.</p>
-            <button class="erf-comment-action erf-comment-row__open" type="button">Open</button></li>
+            <button class="erf-comment-action erf-comment-row__open" type="button" tabindex="-1">Open</button></li>
           <li class="erf-comment-row c2d-hover"><button class="erf-comment-row__main" type="button" tabindex="-1" title="Open thread" aria-labelledby="d1-r2-x"></button>
             <div class="erf-comment-row__line"><span class="erf-comment-row__label" dir="ltr">p#lead</span></div>
             <p class="erf-comment-row__excerpt" id="d1-r2-x" dir="auto">Too long for a phone. One sentence?</p>
@@ -392,19 +393,19 @@
   <figure><figcaption><strong>HTML · page and one frame</strong> – C-26. “index.html · 3 open”, “pricing-table.html · in a frame · 1 open”.</figcaption>
     <div class="c2d-box"><aside class="erf-comment-drawer" aria-labelledby="e1-t">
       <div class="erf-comment-drawer__head c2d-head"><h2 class="erf-comment-drawer__title" id="e1-t">Comments</h2>
-        <button class="erf-comment-sort" type="button" aria-haspopup="menu" aria-expanded="false">Sort: File order<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"></path></svg></button>
-        <button class="erf-comment-icon-btn" type="button" aria-label="Close comments"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+        <button class="erf-comment-sort" type="button" aria-haspopup="menu" aria-expanded="false" tabindex="-1">Sort: File order<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"></path></svg></button>
+        <button class="erf-comment-icon-btn" type="button" aria-label="Close comments" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
       <div class="erf-comment-drawer__controls">
-        <div class="erf-comment-filter erf-comment-filter--grid" role="radiogroup" aria-label="Show"><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="true">Open <span class="erf-comment-filter__count">4</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Resolved <span class="erf-comment-filter__count">2</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Can't edit <span class="erf-comment-filter__count">1</span></button></div>
-        <label class="erf-comment-drawer__check"><input class="erf-comment-check" type="checkbox" checked> Show comment icons and underlines</label>
+        <div class="erf-comment-filter erf-comment-filter--grid" role="radiogroup" aria-label="Show"><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="true" tabindex="-1">Open <span class="erf-comment-filter__count">4</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Resolved <span class="erf-comment-filter__count">2</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Can't edit <span class="erf-comment-filter__count">1</span></button></div>
+        <label class="erf-comment-drawer__check"><input class="erf-comment-check" type="checkbox" checked tabindex="-1"> Show comment icons and underlines</label>
       </div>
       <div class="erf-comment-drawer__scroll">
         <div role="group" aria-labelledby="e1-g1"><h3 class="erf-comment-drawer__group" id="e1-g1">index.html · 3 open</h3>
         <ul class="erf-comment-list" aria-label="Open comments in index.html">
-          <li class="erf-comment-row erf-comment-row--active"><button class="erf-comment-row__main" type="button" title="Open thread" aria-labelledby="e1-r1-x"></button>
+          <li class="erf-comment-row erf-comment-row--active"><button class="erf-comment-row__main" type="button" title="Open thread" aria-labelledby="e1-r1-x" tabindex="-1"></button>
             <div class="erf-comment-row__line"><span class="erf-comment-row__label" dir="ltr">button.cta</span><span class="erf-comment-row__count">2 replies</span></div>
             <p class="erf-comment-row__excerpt" id="e1-r1-x" dir="auto">Make this say “Start free trial”.</p>
-            <button class="erf-comment-action erf-comment-row__open" type="button">Open</button></li>
+            <button class="erf-comment-action erf-comment-row__open" type="button" tabindex="-1">Open</button></li>
           <li class="erf-comment-row"><button class="erf-comment-row__main" type="button" tabindex="-1" title="Open thread" aria-labelledby="e1-r2-x"></button>
             <div class="erf-comment-row__line"><span class="erf-comment-row__label" dir="ltr">p#lead</span></div>
             <p class="erf-comment-row__excerpt" id="e1-r2-x" dir="auto">Too long for a phone. One sentence?</p></li>
@@ -425,16 +426,16 @@
   <figure><figcaption><strong>HTML · scrolled to the frame</strong> – C-26. The frame's heading has pushed the page's heading off and sticks at the top of the scroll.</figcaption>
     <div class="c2d-box c2d-box--short"><aside class="erf-comment-drawer" aria-labelledby="e2-t">
       <div class="erf-comment-drawer__head c2d-head"><h2 class="erf-comment-drawer__title" id="e2-t">Comments</h2>
-        <button class="erf-comment-sort" type="button" aria-haspopup="menu" aria-expanded="false">Sort: File order<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"></path></svg></button>
-        <button class="erf-comment-icon-btn" type="button" aria-label="Close comments"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+        <button class="erf-comment-sort" type="button" aria-haspopup="menu" aria-expanded="false" tabindex="-1">Sort: File order<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"></path></svg></button>
+        <button class="erf-comment-icon-btn" type="button" aria-label="Close comments" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
       <div class="erf-comment-drawer__scroll">
         <div role="group" aria-labelledby="e2-g2"><h3 class="erf-comment-drawer__group" id="e2-g2">pricing-table.html · in a frame · 1 open</h3>
         <ul class="erf-comment-list" aria-label="Open comments in pricing-table.html">
-          <li class="erf-comment-row erf-comment-row--active"><button class="erf-comment-row__main" type="button" title="Open thread" aria-labelledby="e2-r4-x"></button>
+          <li class="erf-comment-row erf-comment-row--active"><button class="erf-comment-row__main" type="button" title="Open thread" aria-labelledby="e2-r4-x" tabindex="-1"></button>
             <div class="erf-comment-row__line"><span class="erf-comment-row__label" dir="ltr">td.price</span><span class="erf-comment-row__count">1 reply</span></div>
             <p class="erf-comment-row__excerpt" id="e2-r4-x" dir="auto">Round to whole euros.</p>
             <p class="erf-comment-row__meta"><bdi>Marcin Obel</bdi> · 24 Oct, 11:20</p>
-            <button class="erf-comment-action erf-comment-row__open" type="button">Open</button></li>
+            <button class="erf-comment-action erf-comment-row__open" type="button" tabindex="-1">Open</button></li>
         </ul></div>
       </div>
     </aside></div></figure>
@@ -453,24 +454,24 @@
   <figure><figcaption><strong>HTML · note</strong> – OD-06. [Show] [Dismiss] in the compact drawer action size (C-26).</figcaption>
     <div class="c2d-box"><aside class="erf-comment-drawer" aria-labelledby="f1-t">
       <div class="erf-comment-drawer__head c2d-head"><h2 class="erf-comment-drawer__title" id="f1-t">Comments</h2>
-        <button class="erf-comment-sort" type="button" aria-haspopup="menu" aria-expanded="false">Sort: File order<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"></path></svg></button>
-        <button class="erf-comment-icon-btn" type="button" aria-label="Close comments"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+        <button class="erf-comment-sort" type="button" aria-haspopup="menu" aria-expanded="false" tabindex="-1">Sort: File order<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"></path></svg></button>
+        <button class="erf-comment-icon-btn" type="button" aria-label="Close comments" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
       <div class="erf-comment-drawer__controls">
-        <div class="erf-comment-filter erf-comment-filter--grid" role="radiogroup" aria-label="Show"><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="true">Open <span class="erf-comment-filter__count">5</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Resolved <span class="erf-comment-filter__count">2</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Can't edit <span class="erf-comment-filter__count">0</span></button></div>
-        <label class="erf-comment-drawer__check"><input class="erf-comment-check" type="checkbox" checked> Show comment icons and underlines</label>
+        <div class="erf-comment-filter erf-comment-filter--grid" role="radiogroup" aria-label="Show"><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="true" tabindex="-1">Open <span class="erf-comment-filter__count">5</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Resolved <span class="erf-comment-filter__count">2</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Can't edit <span class="erf-comment-filter__count">0</span></button></div>
+        <label class="erf-comment-drawer__check"><input class="erf-comment-check" type="checkbox" checked tabindex="-1"> Show comment icons and underlines</label>
       </div>
       <div class="erf-comment-drawer__note"><div class="erf-comment-banner erf-comment-banner--info" role="status">
         <span class="erf-comment-banner__icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0"></path><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg></span>
         <div class="erf-comment-banner__body"><p class="erf-comment-banner__text">2 open comments were removed from index.html outside Erfana.</p>
-          <div class="erf-comment-banner__actions"><button class="erf-comment-action" type="button" aria-expanded="false">Show</button><button class="erf-comment-action" type="button">Dismiss</button></div></div>
+          <div class="erf-comment-banner__actions"><button class="erf-comment-action" type="button" aria-expanded="false" tabindex="-1">Show</button><button class="erf-comment-action" type="button" tabindex="-1">Dismiss</button></div></div>
       </div></div>
       <div class="erf-comment-drawer__scroll">
         <div role="group" aria-labelledby="f1-g1"><h3 class="erf-comment-drawer__group" id="f1-g1">index.html · 5 open</h3>
         <ul class="erf-comment-list" aria-label="Open comments">
-          <li class="erf-comment-row erf-comment-row--active"><button class="erf-comment-row__main" type="button" title="Open thread" aria-labelledby="f1-r1-x"></button>
+          <li class="erf-comment-row erf-comment-row--active"><button class="erf-comment-row__main" type="button" title="Open thread" aria-labelledby="f1-r1-x" tabindex="-1"></button>
             <div class="erf-comment-row__line"><span class="erf-comment-row__label" dir="ltr">button.cta</span><span class="erf-comment-row__count">2 replies</span></div>
             <p class="erf-comment-row__excerpt" id="f1-r1-x" dir="auto">Make this say “Start free trial”.</p>
-            <button class="erf-comment-action erf-comment-row__open" type="button">Open</button></li>
+            <button class="erf-comment-action erf-comment-row__open" type="button" tabindex="-1">Open</button></li>
           <li class="erf-comment-row"><button class="erf-comment-row__main" type="button" tabindex="-1" title="Open thread" aria-labelledby="f1-r2-x"></button>
             <div class="erf-comment-row__line"><span class="erf-comment-row__label" dir="ltr">p#lead</span></div>
             <p class="erf-comment-row__excerpt" id="f1-r2-x" dir="auto">Too long for a phone. One sentence?</p></li>
@@ -481,11 +482,11 @@
   <figure><figcaption><strong>HTML · note expanded</strong> – OD-06. Read-only: no Open, no Reply. Show becomes Hide.</figcaption>
     <div class="c2d-box c2d-box--tall"><aside class="erf-comment-drawer" aria-labelledby="f2-t">
       <div class="erf-comment-drawer__head c2d-head"><h2 class="erf-comment-drawer__title" id="f2-t">Comments</h2>
-        <button class="erf-comment-sort" type="button" aria-haspopup="menu" aria-expanded="false">Sort: File order<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"></path></svg></button>
-        <button class="erf-comment-icon-btn" type="button" aria-label="Close comments"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+        <button class="erf-comment-sort" type="button" aria-haspopup="menu" aria-expanded="false" tabindex="-1">Sort: File order<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"></path></svg></button>
+        <button class="erf-comment-icon-btn" type="button" aria-label="Close comments" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
       <div class="erf-comment-drawer__controls">
-        <div class="erf-comment-filter erf-comment-filter--grid" role="radiogroup" aria-label="Show"><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="true">Open <span class="erf-comment-filter__count">5</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Resolved <span class="erf-comment-filter__count">2</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Can't edit <span class="erf-comment-filter__count">0</span></button></div>
-        <label class="erf-comment-drawer__check"><input class="erf-comment-check" type="checkbox" checked> Show comment icons and underlines</label>
+        <div class="erf-comment-filter erf-comment-filter--grid" role="radiogroup" aria-label="Show"><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="true" tabindex="-1">Open <span class="erf-comment-filter__count">5</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Resolved <span class="erf-comment-filter__count">2</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Can't edit <span class="erf-comment-filter__count">0</span></button></div>
+        <label class="erf-comment-drawer__check"><input class="erf-comment-check" type="checkbox" checked tabindex="-1"> Show comment icons and underlines</label>
       </div>
       <div class="erf-comment-drawer__note"><div class="erf-comment-banner erf-comment-banner--info" role="status">
         <span class="erf-comment-banner__icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0"></path><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg></span>
@@ -494,21 +495,21 @@
             <li><span class="c2d-removed__label" dir="ltr">button.secondary</span>
               <p class="c2d-removed__text" dir="auto">Use the outline style here, like the other secondary buttons.</p>
               <p class="c2d-removed__meta"><bdi>Anna K.</bdi> · Yesterday, 16:20</p>
-              <button class="erf-comment-action" type="button" aria-label="Copy text of the comment on button.secondary">Copy text</button></li>
+              <button class="erf-comment-action" type="button" aria-label="Copy text of the comment on button.secondary" tabindex="-1">Copy text</button></li>
             <li><span class="c2d-removed__label" dir="ltr">p.note</span>
               <p class="c2d-removed__text" dir="auto">Shorten to one line.</p>
               <p class="c2d-removed__meta"><bdi>Marcin Obel</bdi> · Today, 11:02</p>
-              <button class="erf-comment-action" type="button" aria-label="Copy text of the comment on p.note">Copy text</button></li>
+              <button class="erf-comment-action" type="button" aria-label="Copy text of the comment on p.note" tabindex="-1">Copy text</button></li>
           </ul>
-          <div class="erf-comment-banner__actions"><button class="erf-comment-action" type="button" aria-expanded="true" aria-controls="f2-list">Hide</button><button class="erf-comment-action" type="button">Dismiss</button></div></div>
+          <div class="erf-comment-banner__actions"><button class="erf-comment-action" type="button" aria-expanded="true" aria-controls="f2-list" tabindex="-1">Hide</button><button class="erf-comment-action" type="button" tabindex="-1">Dismiss</button></div></div>
       </div></div>
       <div class="erf-comment-drawer__scroll">
         <div role="group" aria-labelledby="f2-g1"><h3 class="erf-comment-drawer__group" id="f2-g1">index.html · 5 open</h3>
         <ul class="erf-comment-list" aria-label="Open comments">
-          <li class="erf-comment-row erf-comment-row--active"><button class="erf-comment-row__main" type="button" title="Open thread" aria-labelledby="f2-r1-x"></button>
+          <li class="erf-comment-row erf-comment-row--active"><button class="erf-comment-row__main" type="button" title="Open thread" aria-labelledby="f2-r1-x" tabindex="-1"></button>
             <div class="erf-comment-row__line"><span class="erf-comment-row__label" dir="ltr">button.cta</span><span class="erf-comment-row__count">2 replies</span></div>
             <p class="erf-comment-row__excerpt" id="f2-r1-x" dir="auto">Make this say “Start free trial”.</p>
-            <button class="erf-comment-action erf-comment-row__open" type="button">Open</button></li>
+            <button class="erf-comment-action erf-comment-row__open" type="button" tabindex="-1">Open</button></li>
         </ul></div>
       </div>
     </aside></div></figure>
@@ -516,11 +517,11 @@
   <figure><figcaption><strong>Markdown · note expanded</strong> – OD-06 / C-03. Same note; the target is a kind and a line.</figcaption>
     <div class="c2d-box c2d-box--tall"><aside class="erf-comment-drawer" aria-labelledby="f3-t">
       <div class="erf-comment-drawer__head c2d-head"><h2 class="erf-comment-drawer__title" id="f3-t">Comments</h2>
-        <button class="erf-comment-sort" type="button" aria-haspopup="menu" aria-expanded="false">Sort: File order<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"></path></svg></button>
-        <button class="erf-comment-icon-btn" type="button" aria-label="Close comments"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+        <button class="erf-comment-sort" type="button" aria-haspopup="menu" aria-expanded="false" tabindex="-1">Sort: File order<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"></path></svg></button>
+        <button class="erf-comment-icon-btn" type="button" aria-label="Close comments" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
       <div class="erf-comment-drawer__controls">
-        <div class="erf-comment-filter erf-comment-filter--grid" role="radiogroup" aria-label="Show"><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="true">Open <span class="erf-comment-filter__count">1</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Resolved <span class="erf-comment-filter__count">1</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Can't edit <span class="erf-comment-filter__count">0</span></button></div>
-        <label class="erf-comment-drawer__check"><input class="erf-comment-check" type="checkbox" checked> Show comment icons and underlines</label>
+        <div class="erf-comment-filter erf-comment-filter--grid" role="radiogroup" aria-label="Show"><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="true" tabindex="-1">Open <span class="erf-comment-filter__count">1</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Resolved <span class="erf-comment-filter__count">1</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Can't edit <span class="erf-comment-filter__count">0</span></button></div>
+        <label class="erf-comment-drawer__check"><input class="erf-comment-check" type="checkbox" checked tabindex="-1"> Show comment icons and underlines</label>
       </div>
       <div class="erf-comment-drawer__note"><div class="erf-comment-banner erf-comment-banner--info" role="status">
         <span class="erf-comment-banner__icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0"></path><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg></span>
@@ -529,21 +530,21 @@
             <li><span class="c2d-removed__label" dir="ltr">List item · line 22</span>
               <p class="c2d-removed__text" dir="auto">Run the load test against staging, not production.</p>
               <p class="c2d-removed__meta"><bdi>Anna K.</bdi> · Today, 08:45</p>
-              <button class="erf-comment-action" type="button" aria-label="Copy text of the comment on list item, line 22">Copy text</button></li>
+              <button class="erf-comment-action" type="button" aria-label="Copy text of the comment on list item, line 22" tabindex="-1">Copy text</button></li>
             <li><span class="c2d-removed__label" dir="ltr">H2 heading · line 30</span>
               <p class="c2d-removed__text" dir="auto">Call this section “Next steps”.</p>
               <p class="c2d-removed__meta"><bdi>Marcin Obel</bdi> · Today, 11:02</p>
-              <button class="erf-comment-action" type="button" aria-label="Copy text of the comment on H2 heading, line 30">Copy text</button></li>
+              <button class="erf-comment-action" type="button" aria-label="Copy text of the comment on H2 heading, line 30" tabindex="-1">Copy text</button></li>
           </ul>
-          <div class="erf-comment-banner__actions"><button class="erf-comment-action" type="button" aria-expanded="true" aria-controls="f3-list">Hide</button><button class="erf-comment-action" type="button">Dismiss</button></div></div>
+          <div class="erf-comment-banner__actions"><button class="erf-comment-action" type="button" aria-expanded="true" aria-controls="f3-list" tabindex="-1">Hide</button><button class="erf-comment-action" type="button" tabindex="-1">Dismiss</button></div></div>
       </div></div>
       <div class="erf-comment-drawer__scroll">
         <p class="erf-comment-drawer__file">plan.md</p>
         <ul class="erf-comment-list" aria-label="Open comments">
-          <li class="erf-comment-row erf-comment-row--active"><button class="erf-comment-row__main" type="button" title="Open thread" aria-labelledby="f3-r1-x"></button>
+          <li class="erf-comment-row erf-comment-row--active"><button class="erf-comment-row__main" type="button" title="Open thread" aria-labelledby="f3-r1-x" tabindex="-1"></button>
             <div class="erf-comment-row__line"><span class="erf-comment-row__label" dir="ltr">Paragraph · line 7</span></div>
             <p class="erf-comment-row__excerpt" id="f3-r1-x" dir="auto">Friday is a holiday in two of our markets.</p>
-            <button class="erf-comment-action erf-comment-row__open" type="button">Open</button></li>
+            <button class="erf-comment-action erf-comment-row__open" type="button" tabindex="-1">Open</button></li>
         </ul>
       </div>
     </aside></div></figure>
@@ -559,10 +560,10 @@
   <figure><figcaption><strong>HTML · no comments in the file</strong> – C-16.</figcaption>
     <div class="c2d-box c2d-box--short"><aside class="erf-comment-drawer" aria-labelledby="g1-t">
       <div class="erf-comment-drawer__head c2d-head"><h2 class="erf-comment-drawer__title" id="g1-t">Comments</h2>
-        <button class="erf-comment-icon-btn" type="button" aria-label="Close comments"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+        <button class="erf-comment-icon-btn" type="button" aria-label="Close comments" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
       <div class="erf-comment-drawer__controls">
-        <div class="erf-comment-filter erf-comment-filter--grid" role="radiogroup" aria-label="Show"><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="true">Open <span class="erf-comment-filter__count">0</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Resolved <span class="erf-comment-filter__count">0</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Can't edit <span class="erf-comment-filter__count">0</span></button></div>
-        <label class="erf-comment-drawer__check"><input class="erf-comment-check" type="checkbox" checked> Show comment icons and underlines</label>
+        <div class="erf-comment-filter erf-comment-filter--grid" role="radiogroup" aria-label="Show"><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="true" tabindex="-1">Open <span class="erf-comment-filter__count">0</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Resolved <span class="erf-comment-filter__count">0</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Can't edit <span class="erf-comment-filter__count">0</span></button></div>
+        <label class="erf-comment-drawer__check"><input class="erf-comment-check" type="checkbox" checked tabindex="-1"> Show comment icons and underlines</label>
       </div>
       <div class="erf-comment-drawer__scroll"><p class="erf-comment-drawer__empty">No comments in this file yet. Turn on comment mode, then click an element or select text.</p></div>
     </aside></div></figure>
@@ -570,10 +571,10 @@
   <figure><figcaption><strong>Markdown · no comments in the file</strong> – C-16.</figcaption>
     <div class="c2d-box c2d-box--short"><aside class="erf-comment-drawer" aria-labelledby="g2-t">
       <div class="erf-comment-drawer__head c2d-head"><h2 class="erf-comment-drawer__title" id="g2-t">Comments</h2>
-        <button class="erf-comment-icon-btn" type="button" aria-label="Close comments"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+        <button class="erf-comment-icon-btn" type="button" aria-label="Close comments" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
       <div class="erf-comment-drawer__controls">
-        <div class="erf-comment-filter erf-comment-filter--grid" role="radiogroup" aria-label="Show"><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="true">Open <span class="erf-comment-filter__count">0</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Resolved <span class="erf-comment-filter__count">0</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Can't edit <span class="erf-comment-filter__count">0</span></button></div>
-        <label class="erf-comment-drawer__check"><input class="erf-comment-check" type="checkbox" checked> Show comment icons and underlines</label>
+        <div class="erf-comment-filter erf-comment-filter--grid" role="radiogroup" aria-label="Show"><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="true" tabindex="-1">Open <span class="erf-comment-filter__count">0</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Resolved <span class="erf-comment-filter__count">0</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Can't edit <span class="erf-comment-filter__count">0</span></button></div>
+        <label class="erf-comment-drawer__check"><input class="erf-comment-check" type="checkbox" checked tabindex="-1"> Show comment icons and underlines</label>
       </div>
       <div class="erf-comment-drawer__scroll"><p class="erf-comment-drawer__empty">No comments in this file yet. Select text and click Comment, or turn on comment mode and click a paragraph.</p></div>
     </aside></div></figure>
@@ -581,11 +582,11 @@
   <figure><figcaption><strong>empty: Open</strong> – C-15, both previews.</figcaption>
     <div class="c2d-box c2d-box--short"><aside class="erf-comment-drawer" aria-labelledby="g3-t">
       <div class="erf-comment-drawer__head c2d-head"><h2 class="erf-comment-drawer__title" id="g3-t">Comments</h2>
-        <button class="erf-comment-sort" type="button" aria-haspopup="menu" aria-expanded="false">Sort: File order<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"></path></svg></button>
-        <button class="erf-comment-icon-btn" type="button" aria-label="Close comments"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+        <button class="erf-comment-sort" type="button" aria-haspopup="menu" aria-expanded="false" tabindex="-1">Sort: File order<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"></path></svg></button>
+        <button class="erf-comment-icon-btn" type="button" aria-label="Close comments" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
       <div class="erf-comment-drawer__controls">
-        <div class="erf-comment-filter erf-comment-filter--grid" role="radiogroup" aria-label="Show"><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="true">Open <span class="erf-comment-filter__count">0</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Resolved <span class="erf-comment-filter__count">4</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Can't edit <span class="erf-comment-filter__count">0</span></button></div>
-        <label class="erf-comment-drawer__check"><input class="erf-comment-check" type="checkbox" checked> Show comment icons and underlines</label>
+        <div class="erf-comment-filter erf-comment-filter--grid" role="radiogroup" aria-label="Show"><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="true" tabindex="-1">Open <span class="erf-comment-filter__count">0</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Resolved <span class="erf-comment-filter__count">4</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Can't edit <span class="erf-comment-filter__count">0</span></button></div>
+        <label class="erf-comment-drawer__check"><input class="erf-comment-check" type="checkbox" checked tabindex="-1"> Show comment icons and underlines</label>
       </div>
       <div class="erf-comment-drawer__scroll"><p class="erf-comment-drawer__empty">No open comments.</p></div>
     </aside></div></figure>
@@ -593,11 +594,11 @@
   <figure><figcaption><strong>empty: Resolved</strong> – C-15, both previews.</figcaption>
     <div class="c2d-box c2d-box--short"><aside class="erf-comment-drawer" aria-labelledby="g4-t">
       <div class="erf-comment-drawer__head c2d-head"><h2 class="erf-comment-drawer__title" id="g4-t">Comments</h2>
-        <button class="erf-comment-sort" type="button" aria-haspopup="menu" aria-expanded="false">Sort: File order<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"></path></svg></button>
-        <button class="erf-comment-icon-btn" type="button" aria-label="Close comments"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+        <button class="erf-comment-sort" type="button" aria-haspopup="menu" aria-expanded="false" tabindex="-1">Sort: File order<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"></path></svg></button>
+        <button class="erf-comment-icon-btn" type="button" aria-label="Close comments" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
       <div class="erf-comment-drawer__controls">
-        <div class="erf-comment-filter erf-comment-filter--grid" role="radiogroup" aria-label="Show"><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Open <span class="erf-comment-filter__count">7</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="true">Resolved <span class="erf-comment-filter__count">0</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Can't edit <span class="erf-comment-filter__count">1</span></button></div>
-        <label class="erf-comment-drawer__check"><input class="erf-comment-check" type="checkbox" checked> Show comment icons and underlines</label>
+        <div class="erf-comment-filter erf-comment-filter--grid" role="radiogroup" aria-label="Show"><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Open <span class="erf-comment-filter__count">7</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="true" tabindex="-1">Resolved <span class="erf-comment-filter__count">0</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Can't edit <span class="erf-comment-filter__count">1</span></button></div>
+        <label class="erf-comment-drawer__check"><input class="erf-comment-check" type="checkbox" checked tabindex="-1"> Show comment icons and underlines</label>
       </div>
       <div class="erf-comment-drawer__scroll"><p class="erf-comment-drawer__empty">No resolved comments.</p></div>
     </aside></div></figure>
@@ -605,11 +606,11 @@
   <figure><figcaption><strong>empty: Can't edit</strong> – C-15 / OD-04, both previews. <em>String proposed here; the plan gives none.</em></figcaption>
     <div class="c2d-box c2d-box--short"><aside class="erf-comment-drawer" aria-labelledby="g5-t">
       <div class="erf-comment-drawer__head c2d-head"><h2 class="erf-comment-drawer__title" id="g5-t">Comments</h2>
-        <button class="erf-comment-sort" type="button" aria-haspopup="menu" aria-expanded="false">Sort: File order<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"></path></svg></button>
-        <button class="erf-comment-icon-btn" type="button" aria-label="Close comments"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+        <button class="erf-comment-sort" type="button" aria-haspopup="menu" aria-expanded="false" tabindex="-1">Sort: File order<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"></path></svg></button>
+        <button class="erf-comment-icon-btn" type="button" aria-label="Close comments" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
       <div class="erf-comment-drawer__controls">
-        <div class="erf-comment-filter erf-comment-filter--grid" role="radiogroup" aria-label="Show"><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Open <span class="erf-comment-filter__count">7</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Resolved <span class="erf-comment-filter__count">2</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="true">Can't edit <span class="erf-comment-filter__count">0</span></button></div>
-        <label class="erf-comment-drawer__check"><input class="erf-comment-check" type="checkbox" checked> Show comment icons and underlines</label>
+        <div class="erf-comment-filter erf-comment-filter--grid" role="radiogroup" aria-label="Show"><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Open <span class="erf-comment-filter__count">7</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Resolved <span class="erf-comment-filter__count">2</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="true" tabindex="-1">Can't edit <span class="erf-comment-filter__count">0</span></button></div>
+        <label class="erf-comment-drawer__check"><input class="erf-comment-check" type="checkbox" checked tabindex="-1"> Show comment icons and underlines</label>
       </div>
       <div class="erf-comment-drawer__scroll"><p class="erf-comment-drawer__empty">Every comment in this file can be edited.</p></div>
     </aside></div></figure>
@@ -628,22 +629,22 @@
   <figure><figcaption><strong>HTML · two unseen</strong> – C-24 <span class="c2d-later">(later)</span>. “Anna K. replied · Today, 09:10” on an old thread.</figcaption>
     <div class="c2d-box"><aside class="erf-comment-drawer" aria-labelledby="h1-t">
       <div class="erf-comment-drawer__head c2d-head"><h2 class="erf-comment-drawer__title" id="h1-t">Comments</h2>
-        <button class="erf-comment-sort" type="button" aria-haspopup="menu" aria-expanded="false">Sort: Latest activity<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"></path></svg></button>
-        <button class="erf-comment-icon-btn" type="button" aria-label="Close comments"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
-      <div class="c2d-subhead"><button class="erf-comment-action" type="button">Mark all as seen</button></div>
+        <button class="erf-comment-sort" type="button" aria-haspopup="menu" aria-expanded="false" tabindex="-1">Sort: Latest activity<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"></path></svg></button>
+        <button class="erf-comment-icon-btn" type="button" aria-label="Close comments" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+      <div class="c2d-subhead"><button class="erf-comment-action" type="button" tabindex="-1">Mark all as seen</button></div>
       <div class="erf-comment-drawer__controls">
-        <div class="erf-comment-filter erf-comment-filter--grid" role="radiogroup" aria-label="Show"><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="true">Open <span class="erf-comment-filter__count">7</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Resolved <span class="erf-comment-filter__count">2</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Can't edit <span class="erf-comment-filter__count">1</span></button></div>
-        <label class="erf-comment-drawer__check"><input class="erf-comment-check" type="checkbox" checked> Show comment icons and underlines</label>
+        <div class="erf-comment-filter erf-comment-filter--grid" role="radiogroup" aria-label="Show"><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="true" tabindex="-1">Open <span class="erf-comment-filter__count">7</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Resolved <span class="erf-comment-filter__count">2</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Can't edit <span class="erf-comment-filter__count">1</span></button></div>
+        <label class="erf-comment-drawer__check"><input class="erf-comment-check" type="checkbox" checked tabindex="-1"> Show comment icons and underlines</label>
       </div>
       <div class="erf-comment-drawer__scroll">
         <div role="group" aria-labelledby="h1-g1"><h3 class="erf-comment-drawer__group" id="h1-g1">index.html · 7 open</h3>
         <ul class="erf-comment-list" aria-label="Open comments, latest activity first">
-          <li class="erf-comment-row erf-comment-row--active"><button class="erf-comment-row__main" type="button" title="Open thread" aria-labelledby="h1-r1-x" aria-describedby="h1-r1-d"></button>
+          <li class="erf-comment-row erf-comment-row--active"><button class="erf-comment-row__main" type="button" title="Open thread" aria-labelledby="h1-r1-x" aria-describedby="h1-r1-d" tabindex="-1"></button>
             <div class="erf-comment-row__line"><span class="erf-comment-dot" aria-hidden="true"></span><span class="erf-comment-row__label" dir="ltr">p#lead</span><span class="erf-comment-row__count">1 reply</span></div>
             <p class="erf-comment-row__excerpt" id="h1-r1-x" dir="auto">Too long for a phone. One sentence?</p>
             <p class="erf-comment-row__meta"><span class="erf-comment-tag erf-comment-tag--new">New</span> <bdi>Anna K.</bdi> replied · Today, 09:10</p>
             <span class="erf-comment-sr" id="h1-r1-d">New · on Paragraph, line 18 · 1 reply · Anna K. replied, Today 09:10</span>
-            <button class="erf-comment-action erf-comment-row__open" type="button">Open</button></li>
+            <button class="erf-comment-action erf-comment-row__open" type="button" tabindex="-1">Open</button></li>
           <li class="erf-comment-row"><button class="erf-comment-row__main" type="button" tabindex="-1" title="Open thread" aria-labelledby="h1-r2-x"></button>
             <div class="erf-comment-row__line"><span class="erf-comment-dot" aria-hidden="true"></span><span class="erf-comment-row__label" dir="ltr">img.hero</span></div>
             <p class="erf-comment-row__excerpt" id="h1-r2-x" dir="auto">Crop tighter on mobile.</p>
@@ -659,21 +660,21 @@
   <figure><figcaption><strong>Markdown · Resolved, last activity</strong> – C-24 <span class="c2d-later">(later)</span>. “Resolved by Marcin Obel · 25 Oct”.</figcaption>
     <div class="c2d-box c2d-box--short"><aside class="erf-comment-drawer" aria-labelledby="h2-t">
       <div class="erf-comment-drawer__head c2d-head"><h2 class="erf-comment-drawer__title" id="h2-t">Comments</h2>
-        <button class="erf-comment-sort" type="button" aria-haspopup="menu" aria-expanded="false">Sort: File order<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"></path></svg></button>
-        <button class="erf-comment-icon-btn" type="button" aria-label="Close comments"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
-      <div class="c2d-subhead"><button class="erf-comment-action" type="button">Mark all as seen</button></div>
+        <button class="erf-comment-sort" type="button" aria-haspopup="menu" aria-expanded="false" tabindex="-1">Sort: File order<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"></path></svg></button>
+        <button class="erf-comment-icon-btn" type="button" aria-label="Close comments" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+      <div class="c2d-subhead"><button class="erf-comment-action" type="button" tabindex="-1">Mark all as seen</button></div>
       <div class="erf-comment-drawer__controls">
-        <div class="erf-comment-filter erf-comment-filter--grid" role="radiogroup" aria-label="Show"><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Open <span class="erf-comment-filter__count">3</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="true">Resolved <span class="erf-comment-filter__count">1</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Can't edit <span class="erf-comment-filter__count">0</span></button></div>
-        <label class="erf-comment-drawer__check"><input class="erf-comment-check" type="checkbox" checked> Show comment icons and underlines</label>
+        <div class="erf-comment-filter erf-comment-filter--grid" role="radiogroup" aria-label="Show"><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Open <span class="erf-comment-filter__count">3</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="true" tabindex="-1">Resolved <span class="erf-comment-filter__count">1</span></button><button class="erf-comment-filter__option" type="button" role="radio" aria-checked="false" tabindex="-1">Can't edit <span class="erf-comment-filter__count">0</span></button></div>
+        <label class="erf-comment-drawer__check"><input class="erf-comment-check" type="checkbox" checked tabindex="-1"> Show comment icons and underlines</label>
       </div>
       <div class="erf-comment-drawer__scroll">
         <p class="erf-comment-drawer__file">plan.md</p>
         <ul class="erf-comment-list" aria-label="Resolved comments">
-          <li class="erf-comment-row erf-comment-row--active"><button class="erf-comment-row__main" type="button" title="Open thread" aria-labelledby="h2-r1-x"></button>
+          <li class="erf-comment-row erf-comment-row--active"><button class="erf-comment-row__main" type="button" title="Open thread" aria-labelledby="h2-r1-x" tabindex="-1"></button>
             <div class="erf-comment-row__line"><span class="erf-comment-row__label" dir="ltr">List item · line 14</span><span class="erf-comment-row__count">2 replies</span></div>
             <p class="erf-comment-row__excerpt" id="h2-r1-x" dir="auto">Which staging – eu-1 or us-2?</p>
             <p class="erf-comment-row__meta">Resolved by <bdi>Marcin Obel</bdi> · 25 Oct</p>
-            <button class="erf-comment-action erf-comment-row__open" type="button">Open</button></li>
+            <button class="erf-comment-action erf-comment-row__open" type="button" tabindex="-1">Open</button></li>
         </ul>
       </div>
     </aside></div></figure>

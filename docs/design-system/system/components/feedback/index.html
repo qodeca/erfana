@@ -1,135 +1,374 @@
-<!-- @card group="Components" name="Feedback" subtitle="One warning colour, one banner shape, and one way to tell a screen reader something happened" status="proposed" reviewed="2026-08-31" -->
+<!-- @card group="Components" name="Feedback" subtitle="One warning colour, one banner shape, toasts that never steal focus, and progress that names itself" status="proposed" reviewed="2026-08-31" answers="Show an error, warning or success; Announce a change to a screen reader; Show a toast; Show progress" -->
 <!-- SPDX-License-Identifier: GPL-3.0-only -->
 <!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Erfana — feedback</title>
+<title>Feedback – Erfana design system</title>
 <link rel="stylesheet" href="../../../tokens.css">
 <link rel="stylesheet" href="../../../ds.css">
-<script src="../../../claims.js"></script>
 <style>
-  .banner { display: flex; gap: var(--space-8); align-items: flex-start;
-            padding: var(--space-6) var(--space-8);
-            border: var(--border-width) solid; margin-bottom: var(--space-6); }
-  .banner__icon { flex: 0 0 auto; font-size: var(--text-md); line-height: var(--leading-tight); }
-  .banner__body { flex: 1 1 auto; min-width: 0; }
-  .banner__title { margin: 0 0 var(--space-2); font-size: var(--text-base);
-                   font-weight: var(--font-semibold); color: var(--color-text-emphasis); }
-  .banner__text { margin: 0; font-size: var(--text-base); color: var(--color-text-tertiary); }
-  .banner__action { flex: 0 0 auto; height: var(--btn-height-sm); padding: 0 var(--space-8);
-                    background: transparent; border: var(--border-width) solid currentColor;
-                    color: var(--color-text-primary); font: var(--text-sm) var(--font-sans); cursor: pointer; }
-  .banner__action:focus-visible { outline: var(--border-width-thick) solid var(--color-border-focus);
-                                  outline-offset: var(--space-1); }
+  /* ---------- proposed tokens, named here until they exist ----------
+     The info tone has --color-info and nothing else. These two follow the alpha
+     pattern the other three severities already use (a 10% fill, a 30% border of
+     the severity colour) and are the proposed --color-info-bg and
+     --color-info-border. */
+  :root {
+    --ds-proposed-info-bg: color-mix(in srgb, var(--color-info) 10%, transparent);
+    --ds-proposed-info-border: color-mix(in srgb, var(--color-info) 30%, transparent);
+    /* 1.5s is the sweep the document import ships; the proposed --duration-progress. */
+    --ds-duration-indeterminate: 1.5s;
+  }
 
-  .banner--warning { background: var(--color-warning-bg); border-color: var(--color-warning-border); }
-  .banner--warning .banner__icon { color: var(--color-warning); }
-  .banner--error   { background: var(--color-error-bg);   border-color: var(--color-error-border); }
-  .banner--error .banner__icon { color: var(--color-error); }
-  .banner--success { background: var(--color-success-bg); border-color: var(--color-success-border); }
-  .banner--success .banner__icon { color: var(--color-success); }
-  .banner--info    { background: var(--color-brand-violet-muted); border-color: var(--color-accent-primary); }
-  .banner--info .banner__icon { color: var(--color-accent-primary); }
+  /* ---------- the banner (decided shape) ---------- */
+  .erf-banner { display: flex; gap: var(--space-8); align-items: flex-start;
+                padding: var(--space-6) var(--space-8);
+                border: var(--border-width) solid; margin-bottom: var(--space-6); max-width: var(--ds-measure-wide); }
+  .erf-banner__icon { flex: 0 0 auto; display: inline-flex; padding-top: var(--space-1); }
+  .erf-banner__icon svg { width: var(--icon-size-sm); height: var(--icon-size-sm); }
+  .erf-banner__body { flex: 1 1 auto; min-width: 0; }
+  .erf-banner__title { margin: 0 0 var(--space-2); font-size: var(--text-base);
+                       font-weight: var(--font-semibold); color: var(--color-text-emphasis); }
+  /* Primary text in every tone – the comment window's banner already ships this. */
+  .erf-banner__text { margin: 0; font-size: var(--text-base); color: var(--color-text-primary); }
+  .erf-banner__action { flex: 0 0 auto; height: var(--btn-height-sm); padding: 0 var(--space-8);
+                        background: transparent; border: var(--border-width) solid currentColor;
+                        color: var(--color-text-primary); font-family: var(--font-sans); font-size: var(--text-sm); cursor: pointer; }
+  .erf-banner__action:hover { background: var(--color-bg-hover); }
+  .erf-banner__action:focus-visible { outline: var(--border-width-thick) solid var(--color-border-focus);
+                                      outline-offset: var(--space-1); }
 
+  .erf-banner--warning { background: var(--color-warning-bg); border-color: var(--color-warning-border); }
+  .erf-banner--warning .erf-banner__icon { color: var(--color-warning); }
+  .erf-banner--error   { background: var(--color-error-bg);   border-color: var(--color-error-border); }
+  .erf-banner--error .erf-banner__icon { color: var(--color-error); }
+  .erf-banner--success { background: var(--color-success-bg); border-color: var(--color-success-border); }
+  .erf-banner--success .erf-banner__icon { color: var(--color-success); }
+  .erf-banner--info    { background: var(--ds-proposed-info-bg); border-color: var(--ds-proposed-info-border); }
+  .erf-banner--info .erf-banner__icon { color: var(--color-info); }
+
+  /* ---------- swatches ---------- */
   .swatches { display: flex; gap: var(--space-8); flex-wrap: wrap; margin-bottom: var(--space-8); }
   .sw { width: 148px; }
   .sw-chip { height: var(--space-16); border: var(--border-width) solid var(--color-border-subtle); }
   .sw-name { font-family: var(--font-mono); font-size: var(--text-xs);
              color: var(--color-text-tertiary); margin-top: var(--space-2); }
-  .sw--out .sw-name { color: var(--color-error); }
+  .ds-grey { filter: grayscale(1); }
+  .pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-8); margin-bottom: var(--space-8);
+          max-width: var(--ds-table-max); }
+  .pair .erf-banner { margin-bottom: 0; }
+
+  /* ---------- what ships today: approximations of the shipping CSS ---------- */
+  .ship-stage { background: var(--color-bg-primary); border: var(--border-width) solid var(--color-border-default); }
+  .ship-deleted { display: flex; align-items: center; gap: var(--space-4); padding: var(--space-3) var(--space-6);
+                  font-size: var(--text-sm); border-bottom: var(--border-width) solid; }
+  .ship-deleted svg { width: var(--icon-size-sm); height: var(--icon-size-sm); flex: 0 0 auto; }
+  .ship-deleted__msg { flex: 1 1 auto; }
+  .ship-deleted button { height: var(--btn-height-sm); padding: 0 var(--space-6); background: transparent;
+                         border: var(--border-width) solid currentColor; color: inherit; font-family: inherit; font-size: inherit; }
+  .ship-deleted--error { background: var(--color-error-bg); border-color: var(--color-error-border); color: var(--color-error); }
+  .ship-deleted--warning { background: var(--color-warning-bg); border-color: var(--color-warning-border); color: var(--color-warning); }
+  .ship-md-deleted { display: flex; align-items: center; padding: var(--space-5) var(--space-7);
+                     background: var(--color-error-bg); border: var(--border-width) solid var(--color-error-border);
+                     color: var(--color-error); font-size: var(--text-base); font-weight: var(--font-medium); }
+  .ship-preview { display: flex; flex-direction: column; align-items: center; gap: var(--space-6);
+                  padding: var(--space-16); text-align: center; color: var(--color-text-secondary); }
+  .ship-preview p { margin: 0; font-size: var(--text-md); color: var(--color-text-primary); }
+  .ship-preview button { height: var(--btn-height-md); padding: 0 var(--space-12); background: var(--color-btn-secondary-bg);
+                         border: var(--border-width) solid var(--color-border-default); color: var(--color-text-primary);
+                         font-family: inherit; font-size: var(--text-base); font-weight: var(--font-medium); }
+  .ship-ocr { padding: var(--space-4) var(--space-6); font-size: var(--text-sm); color: var(--color-warning);
+              background: var(--color-warning-bg); border: var(--border-width) solid var(--color-warning-border); }
+
+  /* ---------- the toast ---------- */
+  .erf-toast { display: flex; align-items: flex-start; gap: var(--space-6);
+               min-width: 300px; max-width: 400px; padding: var(--space-6) var(--space-8);
+               background: var(--color-bg-tertiary); border: var(--border-width) solid var(--color-border-default);
+               box-shadow: var(--shadow-md); }
+  .erf-toast__icon { flex: 0 0 auto; display: inline-flex; }
+  .erf-toast__icon svg { width: var(--icon-size-md); height: var(--icon-size-md); }
+  .erf-toast--success .erf-toast__icon { color: var(--color-success); }
+  .erf-toast--error .erf-toast__icon { color: var(--color-error); }
+  .erf-toast--warning .erf-toast__icon { color: var(--color-warning); }
+  .erf-toast--info .erf-toast__icon { color: var(--color-info); }
+  .erf-toast__content { flex: 1 1 auto; min-width: 0; }
+  .erf-toast__title { margin: 0 0 var(--space-1); font-size: var(--text-base); font-weight: var(--font-semibold);
+                      color: var(--color-text-primary); }
+  .erf-toast__count { margin-left: var(--space-2); font-weight: var(--font-normal); color: var(--color-text-tertiary); }
+  /* --color-text-tertiary, not the --color-text-secondary Toast.css ships: the
+     message is --text-sm, and secondary fails 4.5:1 on the toast surface. */
+  .erf-toast__message { margin: 0; font-size: var(--text-sm); line-height: var(--leading-snug); color: var(--color-text-tertiary); }
+  .erf-toast__action { display: inline-flex; align-items: center; margin-top: var(--space-4); height: var(--btn-height-sm); padding: 0 var(--space-6);
+                       background: var(--color-btn-primary-bg); color: var(--color-btn-primary-text); border: none;
+                       font-family: var(--font-sans); font-size: var(--text-sm); font-weight: var(--font-semibold); cursor: pointer; }
+  .erf-toast__close { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+                      width: var(--icon-size-lg); height: var(--icon-size-lg); padding: 0;
+                      background: transparent; border: none; color: var(--color-text-tertiary); cursor: pointer; }
+  .erf-toast__close svg { width: var(--icon-size-sm); height: var(--icon-size-sm); }
+  .erf-toast__close:hover, .erf-toast__close.is-hover { background: var(--color-border-default); color: var(--color-text-primary); }
+  .erf-toast__close:focus-visible { outline: var(--border-width-thick) solid var(--color-border-focus); outline-offset: var(--space-1); }
+  .erf-toast.is-paused { border-color: var(--color-border-subtle); }
+
+  /* A window, scaled down, to show where the stack sits. */
+  .ds-window { position: relative; height: 360px; background: var(--color-bg-primary);
+               border: var(--border-width) solid var(--color-border-default); overflow: hidden; }
+  .ds-window__tree { position: absolute; top: 0; bottom: 0; left: 0; width: 160px; background: var(--color-bg-tertiary);
+                     border-right: var(--border-width) solid var(--color-border-default); }
+  .ds-window__stack { position: absolute; bottom: var(--space-8); left: var(--space-8);
+                      display: flex; flex-direction: column; gap: var(--space-4); }
+  .ds-window__label { position: absolute; top: var(--space-4); right: var(--space-6); margin: 0;
+                      font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-tertiary); }
+  .toasts { display: flex; flex-direction: column; gap: var(--space-8); }
+
+  /* ---------- progress ---------- */
+  .erf-progress { max-width: 360px; }
+  .erf-progress__label { display: flex; justify-content: space-between; gap: var(--space-4);
+                         margin-bottom: var(--space-2); font-size: var(--text-sm); color: var(--color-text-tertiary); }
+  .erf-progress__value { color: var(--color-text-primary); font-weight: var(--font-medium); font-variant-numeric: tabular-nums; }
+  .erf-progress__track { position: relative; height: var(--space-4); overflow: hidden;
+                         background: var(--color-bg-tertiary); border: var(--border-width) solid var(--color-border-subtle); }
+  .erf-progress__fill { height: 100%; background: var(--color-accent-primary); }
+  .erf-progress--indeterminate .erf-progress__fill { width: 40%;
+      animation: erf-progress-sweep var(--ds-duration-indeterminate) ease-in-out infinite; }
+  @keyframes erf-progress-sweep { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+  /* Reduced motion: no sweep, and no 40% bar parked at the start either – that
+     reads as "40% done". A full-width hatched fill says "busy, amount unknown". */
+  .erf-progress--still .erf-progress__fill,
+  .erf-progress--indeterminate.erf-progress--still .erf-progress__fill { width: 100%; animation: none;
+      background: repeating-linear-gradient(-45deg, var(--color-accent-primary) 0 var(--space-2),
+                                            var(--color-bg-tertiary) var(--space-2) var(--space-4)); }
+  @media (prefers-reduced-motion: reduce) {
+    .erf-progress--indeterminate .erf-progress__fill { width: 100%; animation: none;
+      background: repeating-linear-gradient(-45deg, var(--color-accent-primary) 0 var(--space-2),
+                                            var(--color-bg-tertiary) var(--space-2) var(--space-4)); }
+  }
+  .ds-frame .erf-toast { min-width: 0; }
+  .ds-code { max-width: var(--ds-table-max); padding: var(--space-8); overflow-x: auto;
+             background: var(--color-bg-tertiary); border: var(--border-width) solid var(--color-border-default); }
 </style>
 </head>
 <body>
-
+<nav class="ds-crumbs" aria-label="Breadcrumb"><a href="../../../index.html">Erfana design system</a> <span aria-hidden="true">/</span> <a href="../../../index.html#components">Components</a> <span aria-hidden="true">/</span> <span aria-current="page">Feedback</span></nav>
+<main>
 <h1>Feedback</h1>
-<p class="ds-lede">
-  How Erfana says <em>that worked</em>, <em>that failed</em>, or <em>this needs you</em>.
+<p class="ds-meta"><span class="ds-status" data-status="proposed">proposed</span> reviewed 2026-08-31</p>
+<p class="ds-lede" id="decision">
+  How Erfana says <em>that worked</em>, <em>that failed</em>, <em>this needs you</em> or <em>still working</em>:
+  the semantic severity tokens and nothing else, one banner shape whose severity is spoken as a word, a toast that
+  never takes focus and never times out on an error, and a progress bar that always has a name.
 </p>
 
-<h2>Decision one — which amber is "warning"</h2>
+<h2 id="colour">Decision one – which amber is "warning"</h2>
 
 <div class="ds-note">
-  Erfana declares <strong><span data-claim="warning-tokens"></span></strong> tokens for the meaning
-  "warning" and <strong><span data-claim="error-tokens"></span></strong> for "error". The toast — the
-  surface users see most — is the odd one out, using an icon tint rather than the warning colour.
+  Erfana declares <strong><span data-claim="warning-tokens" title="tokens whose name carries the meaning &quot;warning&quot; anywhere">7</span></strong> tokens for the meaning
+  "warning" and <strong><span data-claim="error-tokens" title="tokens whose name carries the meaning &quot;error&quot; anywhere">7</span></strong> for "error". The toast – the
+  surface users see most – is the odd one out, using an icon tint rather than the warning colour.
   <strong>The semantic tokens win.</strong> Everything else is retired for this purpose, and the retired
   ones now say so in <code>design-tokens.css</code>.
   <br><br>
   <strong>Those two numbers count declared tokens, and the basis matters.</strong> This card previously
-  said "four warning, three error" with no basis given — it was both wrong and unfalsifiable, because
+  said "four warning, three error" with no basis given – it was both wrong and unfalsifiable, because
   nobody could tell whether it meant tokens, literal values, or foreground hues. A count with no stated
   denominator is not evidence.
 </div>
 
-<div class="swatches" id="swatches"></div>
+<div class="swatches">
+  <div class="sw"><div class="sw-chip" style="background: var(--color-warning)"></div><div class="sw-name">--color-warning · warning</div><code class="sw-name" data-token="--color-warning">#cca700</code></div>
+  <div class="sw"><div class="sw-chip" style="background: var(--color-error)"></div><div class="sw-name">--color-error · error</div><code class="sw-name" data-token="--color-error">#f48771</code></div>
+  <div class="sw"><div class="sw-chip" style="background: var(--color-success)"></div><div class="sw-name">--color-success · success</div><code class="sw-name" data-token="--color-success">#E3E829</code></div>
+  <div class="sw"><div class="sw-chip" style="background: var(--color-info)"></div><div class="sw-name">--color-info · info</div><code class="sw-name" data-token="--color-info">#A0A8FF</code></div>
+</div>
+<div class="ds-retired">
+  <strong>Retired for these meanings – drop them. They are listed, struck through, so no one copies a swatch.</strong>
+  <span><s>--color-warning-icon</s> → <code>--color-warning</code></span>
+  <span><s>--color-warning-bright</s> → <code>--color-warning</code></span>
+  <span><s>--color-error-bright</s> → <code>--color-error</code></span>
+  <span><s>--color-error-text-light</s> → <code>--color-error</code></span>
+</div>
 
-<h2>Decision two — one banner</h2>
+<h3 id="collision">Open defect: success and warning are both yellow</h3>
+<p class="ds-muted"><code>--color-success</code> is the brand lime and <code>--color-warning</code> an amber-yellow. Side by side
+the two measure only <span data-contrast="--color-success on --color-warning">1.74:1</span> apart, and with the hue taken away –
+the right-hand pair below, in greyscale, as a reader with a colour-vision deficiency or a washed-out screen
+gets it – the two banners are the same banner.</p>
+<div class="pair" aria-hidden="true">
+  <div class="erf-banner erf-banner--success">
+    <span class="erf-banner__icon"><svg data-icon="circle-check" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg></span>
+    <div class="erf-banner__body"><p class="erf-banner__title">Exported to PDF</p><p class="erf-banner__text">Saved to your Downloads folder.</p></div>
+  </div>
+  <div class="erf-banner erf-banner--success ds-grey">
+    <span class="erf-banner__icon"><svg data-icon="circle-check" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg></span>
+    <div class="erf-banner__body"><p class="erf-banner__title">Exported to PDF</p><p class="erf-banner__text">Saved to your Downloads folder.</p></div>
+  </div>
+  <div class="erf-banner erf-banner--warning">
+    <span class="erf-banner__icon"><svg data-icon="triangle-alert" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
+    <div class="erf-banner__body"><p class="erf-banner__title">This file changed on disk</p><p class="erf-banner__text">Reloading discards your unsaved changes.</p></div>
+  </div>
+  <div class="erf-banner erf-banner--warning ds-grey">
+    <span class="erf-banner__icon"><svg data-icon="triangle-alert" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
+    <div class="erf-banner__body"><p class="erf-banner__title">This file changed on disk</p><p class="erf-banner__text">Reloading discards your unsaved changes.</p></div>
+  </div>
+</div>
+<div class="ds-note">
+  <strong>Until the palette changes, the shape and the word carry the difference.</strong> Every banner and toast
+  draws a different icon per severity (a circle-check is not a triangle) and names its severity in text (see
+  decision two). Colour is the third signal, never the first. The fix itself – moving one of the two off yellow – is
+  a palette decision for the Colours card and is listed in the README's defects; this card does not pick the
+  replacement.
+</div>
 
-<p style="max-width: 76ch; color: var(--color-text-tertiary)">
-  Four severities, one shape: an icon, a title, a sentence, and — when there is something the reader can
-  do — one action. Erfana has this pattern duplicated under two class prefixes that have already
-  diverged, plus three unrelated full-panel variants.
+<h2 id="banner">Decision two – one banner</h2>
+
+<p class="ds-muted">
+  Four severities, one shape: an icon, a title, a sentence, and – when there is something the reader can
+  do – one action. Erfana spells a banner <span data-claim="banner-prefixes" title="distinct banner class families in the renderer">3</span> different ways in its
+  stylesheets (distinct banner class families, already diverged), and the comment panel's banner alone has
+  <span data-claim="comment-banner-variants" title="variants of the comment panel banner (.erf-comment-banner--*)">5</span> variants.
 </p>
 
-<div class="banner banner--warning">
-  <span class="banner__icon" aria-hidden="true">⚠</span>
-  <div class="banner__body">
-    <p class="banner__title">This file changed on disk</p>
-    <p class="banner__text">Someone edited it outside Erfana. Reloading discards your unsaved changes.</p>
+<div class="erf-banner erf-banner--warning">
+  <span class="erf-banner__icon"><svg data-icon="triangle-alert" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
+  <div class="erf-banner__body">
+    <p class="erf-banner__title"><span class="erf-visually-hidden">Warning: </span>This file changed on disk</p>
+    <p class="erf-banner__text">Someone edited it outside Erfana. Reloading discards your unsaved changes.</p>
   </div>
-  <button class="banner__action">Reload</button>
+  <button class="erf-banner__action">Reload</button>
 </div>
 
-<div class="banner banner--error">
-  <span class="banner__icon" aria-hidden="true">✕</span>
-  <div class="banner__body">
-    <p class="banner__title">Could not save the approved host</p>
-    <p class="banner__text">The project settings file could not be written. Check that the folder is not read-only.</p>
+<div class="erf-banner erf-banner--error">
+  <span class="erf-banner__icon"><svg data-icon="circle-x" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg></span>
+  <div class="erf-banner__body">
+    <p class="erf-banner__title"><span class="erf-visually-hidden">Error: </span>Could not save the approved host</p>
+    <p class="erf-banner__text">The project settings file could not be written. Check that the folder is not read-only.</p>
   </div>
-  <button class="banner__action">Try again</button>
+  <button class="erf-banner__action">Try again</button>
 </div>
 
-<div class="banner banner--success">
-  <span class="banner__icon" aria-hidden="true">✓</span>
-  <div class="banner__body">
-    <p class="banner__title">Exported to PDF</p>
-    <p class="banner__text">Saved to your Downloads folder.</p>
+<div class="erf-banner erf-banner--success">
+  <span class="erf-banner__icon"><svg data-icon="circle-check" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg></span>
+  <div class="erf-banner__body">
+    <p class="erf-banner__title"><span class="erf-visually-hidden">Success: </span>Exported to PDF</p>
+    <p class="erf-banner__text">Saved to your Downloads folder.</p>
   </div>
 </div>
 
-<div class="banner banner--info">
-  <span class="banner__icon" aria-hidden="true">i</span>
-  <div class="banner__body">
-    <p class="banner__title">Preview paused</p>
-    <p class="banner__text">The page is hidden while this list is open, so it cannot cover the buttons.</p>
+<div class="erf-banner erf-banner--info">
+  <span class="erf-banner__icon"><svg data-icon="info" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></span>
+  <div class="erf-banner__body">
+    <p class="erf-banner__title"><span class="erf-visually-hidden">Note: </span>Preview paused</p>
+    <p class="erf-banner__text">The page is hidden while this list is open, so it cannot cover the buttons.</p>
   </div>
 </div>
+
+<div class="ds-note">
+  <strong>The severity is a word, not only a colour.</strong> The icon is <code>aria-hidden</code> and the tint is
+  invisible to a screen reader, so each title starts with a visually hidden prefix – “Warning:”, “Error:”,
+  “Success:”, “Note:” – and a screen-reader user hears what a sighted user sees. The prefix lives in the title, not
+  in an <code>aria-label</code>, so it is read in order and survives translation.
+</div>
+
+<pre class="ds-code"><code>&lt;div class=&quot;erf-banner erf-banner--warning&quot;&gt;
+  &lt;span class=&quot;erf-banner__icon&quot;&gt;&lt;svg aria-hidden=&quot;true&quot;&gt;…&lt;/svg&gt;&lt;/span&gt;
+  &lt;div class=&quot;erf-banner__body&quot;&gt;
+    &lt;p class=&quot;erf-banner__title&quot;&gt;&lt;span class=&quot;erf-visually-hidden&quot;&gt;Warning: &lt;/span&gt;This file changed on disk&lt;/p&gt;
+    &lt;p class=&quot;erf-banner__text&quot;&gt;Someone edited it outside Erfana. Reloading discards your unsaved changes.&lt;/p&gt;
+  &lt;/div&gt;
+  &lt;button class=&quot;erf-banner__action&quot;&gt;Reload&lt;/button&gt;
+&lt;/div&gt;</code></pre>
+
+<div class="ds-note">
+  <strong>The info tone, proposed.</strong> Warning, error and success each have a fill and a border: the severity
+  colour at 10% and at 30%. Info has only <code>--color-info</code>, so the comment window's info banner borrows the
+  accent violet at full strength for its border – louder than an error. The banner above uses the same alpha pattern
+  as the other three, named in this card as the proposed <code>--color-info-bg</code> and
+  <code>--color-info-border</code> until they exist in <code>design-tokens.css</code>. The text is
+  <code>--color-text-primary</code> in every tone, as the comment window already ships.
+</div>
+
+<table>
+  <thead><tr><th>Banner text on</th><th><code>--color-text-primary</code></th><th>Title, <code>--color-text-emphasis</code></th></tr></thead>
+  <tbody>
+    <tr><td>Warning fill, over the page</td><td data-contrast="--color-text-primary on --color-warning-bg over --color-bg-primary" data-min="4.5" data-result="pass">9.87:1 · pass</td><td data-contrast="--color-text-emphasis on --color-warning-bg over --color-bg-primary" data-min="4.5" data-result="pass">15.85:1 · pass</td></tr>
+    <tr><td>Error fill</td><td data-contrast="--color-text-primary on --color-error-bg" data-min="4.5" data-result="pass">9.29:1 · pass</td><td data-contrast="--color-text-emphasis on --color-error-bg" data-min="4.5" data-result="pass">14.92:1 · pass</td></tr>
+    <tr><td>Success fill, over the page</td><td data-contrast="--color-text-primary on --color-success-bg over --color-bg-primary" data-min="4.5" data-result="pass">9.22:1 · pass</td><td data-contrast="--color-text-emphasis on --color-success-bg over --color-bg-primary" data-min="4.5" data-result="pass">14.80:1 · pass</td></tr>
+  </tbody>
+</table>
+<p class="ds-muted">The info row is missing because its fill is not a token yet, and a ratio is only ever computed from
+the shipping tokens.</p>
 
 <div class="ds-note">
   <strong>An error names the way out.</strong> "Could not save" is half a message. What went wrong, and
-  what the reader can do about it — no apology, no stack trace, no blame.
-  <br><br>
-  <strong>The same message deserves the same quality everywhere.</strong> Today "this file was deleted on
-  disk" is a proper alert with an icon and a Reload button in the image viewer, and a bare unlabelled
-  <code>&lt;div&gt;</code> with no way to recover in the markdown editor.
+  what the reader can do about it – no apology, no stack trace, no blame.
 </div>
 
 <div class="ds-note">
-  <strong>Proposed: this banner inside a window.</strong> The comment window uses this exact shape for unsaved
-  edits elsewhere, damaged and lost comments, and every save failure – placed in the window, about the thing in
-  it, so it stays until the situation changes. See the proposed
-  <a href="../../../../designs/comments/html-comments/window.html">Comment window</a> card.
+  <strong>The same banner inside a window.</strong> The comment window uses this exact shape for unsaved edits
+  elsewhere, damaged and lost comments, and every save failure – placed in the window, about the thing in it, so it
+  stays until the situation changes. That is a feature screen built from this card, not part of the design system:
+  <a href="../../../../designs/comments/html-comments/window.html">Comment window (feature screen)</a>.
 </div>
 
-<h2>Decision three — telling a screen reader</h2>
+<h3 id="ships-today">What ships today</h3>
+<p class="ds-muted">The banner families in the app now, drawn from their stylesheets so the gap to the decided shape is
+visible. Where a family reads a retired token, the frame draws its replacement and the caption says so – the
+retired tokens are banned from this folder.</p>
+<div class="ds-frames">
+<figure class="ds-frame">
+<div class="ship-stage" aria-hidden="true">
+  <div class="erf-banner erf-banner--warning" style="margin: var(--space-6)">
+    <span class="erf-banner__icon"><svg data-icon="triangle-alert" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
+    <div class="erf-banner__body"><p class="erf-banner__title">Edited in another window</p><p class="erf-banner__text">Saving here replaces those changes.</p></div>
+  </div>
+</div>
+<figcaption><strong>Comment window</strong> (<code>.erf-comment-banner</code>, four tones) – The decided shape. Its info tone borrows the accent violet; see above.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div class="ship-stage" inert aria-hidden="true">
+  <div class="ship-deleted ship-deleted--error"><svg data-icon="triangle-alert" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg><span class="ship-deleted__msg">This file was deleted on disk.</span><button>Reload</button></div>
+  <div class="ship-deleted ship-deleted--warning"><svg data-icon="triangle-alert" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg><span class="ship-deleted__msg">Auto-refresh unavailable – close some tabs.</span><button>Reload</button></div>
+</div>
+<figcaption><strong>Image viewer</strong> (<code>.deletedBanner</code>, deleted / unavailable / stale) – One line, one action, the same triangle for an error and a warning. Ships its text in the retired <code>--color-error-text-light</code> and <code>--color-warning-icon</code>; drawn here in their replacements.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div class="ship-stage" aria-hidden="true">
+  <div class="ship-md-deleted">This file was deleted on disk. Save to restore it.</div>
+</div>
+<figcaption><strong>Markdown editor</strong> (<code>.file-deleted-warning</code>) – The same message as the image viewer, with no icon, no action and no role. Ships in the retired <code>--color-error-text-light</code>.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div class="ship-stage" inert aria-hidden="true">
+  <div class="ship-preview"><p>pricing.html could not be shown – it may have been moved or deleted.</p><button>Reload</button></div>
+</div>
+<figcaption><strong>HTML preview</strong> (<code>.html-preview-banner</code>) – Fills the panel, centred and neutral: no severity colour, no icon, no title.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div class="ship-stage" aria-hidden="true" style="padding: var(--space-6)">
+  <div class="ship-ocr">Text recognition is not available, so scanned pages import as images.</div>
+</div>
+<figcaption><strong>Document import</strong> (<code>.doc-import-warning</code>) – A warning-tinted box with the whole sentence in <code>--color-warning</code>, no icon and no title.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div class="ship-stage" aria-hidden="true" style="padding: var(--space-6)">
+  <div class="erf-toast erf-toast--warning">
+    <span class="erf-toast__icon"><svg data-icon="circle-alert" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg></span>
+    <div class="erf-toast__content"><p class="erf-toast__title">Link points outside the project</p><p class="erf-toast__message" style="color: var(--color-text-secondary)">Opened in your browser instead.</p></div>
+    <span class="erf-toast__close"><svg data-icon="x" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span>
+  </div>
+</div>
+<figcaption><strong>Toast</strong> (<code>Toast.css</code>) – Its warning icon reads the retired <code>--color-warning-icon</code> (drawn here in <code>--color-warning</code>), and the message is <code>--color-text-secondary</code>, which fails at this size – see the Toast section.</figcaption>
+</figure>
+</div>
+
+<h2 id="announce">Decision three – telling a screen reader</h2>
 
 <div class="ds-note">
   Erfana has <strong>four incompatible strategies</strong> for this, and three of them are unreliable.
-  <code>role="alert"</code> alone appears in <strong><span data-claim="alert-role-files"></span></strong>
-  files — the most-used of the four, and the one whose own comments call it unreliable.
+  <code>role="alert"</code> alone appears in <strong><span data-claim="alert-role-files" title="files announcing with role=&quot;alert&quot;">12</span></strong>
+  files – the most-used of the four, and the one whose own comments call it unreliable.
   Only one is correct, and it is already in the toast module.
 </div>
 
@@ -138,11 +377,11 @@
   <tbody>
     <tr>
       <td>A hidden region that is <strong>always mounted</strong> and empty until there is news</td>
-      <td style="color: var(--color-brand-lime)"><strong>This one.</strong> The browser watches the region for changes. It has to exist <em>before</em> the text arrives.</td>
+      <td data-verdict="pass"><strong>This one.</strong> The browser watches the region for changes. It has to exist <em>before</em> the text arrives.</td>
     </tr>
     <tr>
       <td><code>role="alert"</code> on a box that appears at the same moment as its text</td>
-      <td style="color: var(--color-error)">Unreliable. There was nothing to watch until the moment it changed. Erfana's own code comments say so, and five surfaces do it anyway.</td>
+      <td style="color: var(--color-error)">Unreliable. There was nothing to watch until the moment it changed. Erfana's own code comments say so, yet <code>role="alert"</code> appears in <span data-claim="alert-role-files" title="files announcing with role=&quot;alert&quot;">12</span> files, and not every one of them is mounted before its text.</td>
     </tr>
     <tr>
       <td>Move focus and hope <code>aria-describedby</code> gets read</td>
@@ -156,19 +395,151 @@
 </table>
 
 <div class="ds-note">
-  <strong>Politeness.</strong> <code>aria-live="polite"</code> for everything — it waits for a pause.
+  <strong>Politeness.</strong> <code>aria-live="polite"</code> for everything – it waits for a pause.
   <code>assertive</code> interrupts whatever the person is reading, so it is for errors only.
   <br><br>
   <strong>Reserve the height.</strong> A message appearing in an empty region shoves the page down. The
-  crash screen reserves two lines for exactly this reason, and nothing else does.
+  crash screen reserves the space for its message for exactly this reason, and nothing else does.
 </div>
 
-<h2>Toast, or banner?</h2>
+<h2 id="toast">Toast</h2>
+<p class="ds-muted">A toast reports something that has finished. It sits in a corner, it never takes focus, and it leaves on
+its own only when missing it costs nothing. The rules below are what <code>toastDwell.ts</code>,
+<code>toastStack.ts</code> and <code>ToastNotification.tsx</code> already enforce; the card adopts them and fixes the
+toast's colours.</p>
+
+<h3 id="toast-states">Every state</h3>
+<div class="ds-frames">
+<figure class="ds-frame">
+<div class="erf-toast erf-toast--info" aria-hidden="true">
+  <span class="erf-toast__icon"><svg data-icon="info" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></span>
+  <div class="erf-toast__content"><p class="erf-toast__title">Cut</p><p class="erf-toast__message">"toastService.ts" ready to move</p></div>
+  <span class="erf-toast__close"><svg data-icon="x" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span>
+</div>
+<figcaption><strong>Info</strong> – Leaves on its own after its duration.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div class="erf-toast erf-toast--success" aria-hidden="true">
+  <span class="erf-toast__icon"><svg data-icon="circle-check" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg></span>
+  <div class="erf-toast__content"><p class="erf-toast__title">Exported to PDF</p><p class="erf-toast__message">Saved to your Downloads folder.</p></div>
+  <span class="erf-toast__close"><svg data-icon="x" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span>
+</div>
+<figcaption><strong>Success</strong> – Leaves on its own after its duration.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div class="erf-toast erf-toast--warning" aria-hidden="true">
+  <span class="erf-toast__icon"><svg data-icon="circle-alert" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg></span>
+  <div class="erf-toast__content"><p class="erf-toast__title">Link points outside the project</p><p class="erf-toast__message">Opened in your browser instead.</p></div>
+  <span class="erf-toast__close"><svg data-icon="x" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span>
+</div>
+<figcaption><strong>Warning</strong> – Stays at least the warning floor, however short a duration the caller asked for.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div class="erf-toast erf-toast--error" aria-hidden="true">
+  <span class="erf-toast__icon"><svg data-icon="circle-x" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg></span>
+  <div class="erf-toast__content"><p class="erf-toast__title">Could not save notes.md</p><p class="erf-toast__message">The disk is full. Free some space, then save again.</p></div>
+  <span class="erf-toast__close"><svg data-icon="x" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span>
+</div>
+<figcaption><strong>Error</strong> – Stays until closed. Announced assertively.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div class="erf-toast erf-toast--warning" aria-hidden="true">
+  <span class="erf-toast__icon"><svg data-icon="circle-alert" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg></span>
+  <div class="erf-toast__content"><p class="erf-toast__title">Page blocked a remote host</p><p class="erf-toast__message">cdn.jsdelivr.net was not loaded.</p><span class="erf-toast__action">Review hosts</span></div>
+  <span class="erf-toast__close"><svg data-icon="x" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span>
+</div>
+<figcaption><strong>With an action</strong> – Never leaves on its own, whatever its severity: a timer must not remove a button the reader may be reaching for. A labelled group, so its action has a name.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div class="erf-toast erf-toast--error" aria-hidden="true">
+  <span class="erf-toast__icon"><svg data-icon="circle-x" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg></span>
+  <div class="erf-toast__content"><p class="erf-toast__title">Could not save notes.md<span class="erf-toast__count">×3</span></p><p class="erf-toast__message">The disk is full. Free some space, then save again.</p></div>
+  <span class="erf-toast__close"><svg data-icon="x" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span>
+</div>
+<figcaption><strong>Repeated</strong> – The same type, title and message merge into one toast with a count. The repeat is not announced again.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div class="erf-toast erf-toast--success is-paused" aria-hidden="true">
+  <span class="erf-toast__icon"><svg data-icon="circle-check" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg></span>
+  <div class="erf-toast__content"><p class="erf-toast__title">Exported to PDF</p><p class="erf-toast__message">Saved to your Downloads folder.</p></div>
+  <span class="erf-toast__close is-hover"><svg data-icon="x" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span>
+</div>
+<figcaption><strong>Paused</strong> – The pointer is over it (here, on Close) or focus is inside it. The countdown stops and resumes with the time that was left, not a fresh one.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div class="erf-toast erf-toast--success" aria-hidden="true">
+  <span class="erf-toast__icon"><svg data-icon="circle-check" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg></span>
+  <div class="erf-toast__content"><p class="erf-toast__title">Exported to PDF</p><p class="erf-toast__message">Saved to your Downloads folder.</p></div>
+  <span class="erf-toast__close is-focus"><svg data-icon="x" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span>
+</div>
+<figcaption><strong>Close, focused</strong> – Reached by Tab like any button. <kbd>Escape</kbd> on a focused toast closes that toast and nothing under it.</figcaption>
+</figure>
+</div>
+
+<h3 id="toast-place">Where it sits</h3>
+<div class="ds-frames">
+<figure class="ds-frame" style="grid-column: 1 / -1">
+<div class="ds-window" aria-hidden="true">
+  <div class="ds-window__tree"></div>
+  <p class="ds-window__label">the window, scaled</p>
+  <div class="ds-window__stack">
+    <div class="erf-toast erf-toast--error">
+      <span class="erf-toast__icon"><svg data-icon="circle-x" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg></span>
+      <div class="erf-toast__content"><p class="erf-toast__title">Could not save notes.md</p><p class="erf-toast__message">The disk is full. Free some space, then save again.</p></div>
+      <span class="erf-toast__close"><svg data-icon="x" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span>
+    </div>
+    <div class="erf-toast erf-toast--success">
+      <span class="erf-toast__icon"><svg data-icon="circle-check" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg></span>
+      <div class="erf-toast__content"><p class="erf-toast__title">Exported to PDF</p><p class="erf-toast__message">Saved to your Downloads folder.</p></div>
+      <span class="erf-toast__close"><svg data-icon="x" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span>
+    </div>
+  </div>
+</div>
+<figcaption><strong>Bottom left, newest nearest the corner</strong> – A column one gap apart, inset from the window's bottom-left corner, above the project tree. When a live HTML preview would cover it, the stack slides clear of the preview; only when no clear spot exists does the preview hide for the toast's lifetime.</figcaption>
+</figure>
+</div>
+
+<table>
+  <thead><tr><th>Rule</th><th>Value</th><th>Why</th></tr></thead>
+  <tbody>
+    <tr><td>Position</td><td>Bottom left, <code>--space-8</code> from both edges</td><td>Away from the editor's own top-right controls, and the corner the eye leaves last.</td></tr>
+    <tr><td>Width</td><td><span data-claim="toast-min-width" title="min-width of .toast in Toast.css, px">300</span>–<span data-claim="toast-max-width" title="max-width of .toast in Toast.css, px">400</span> px</td><td>Wide enough for a title and a sentence; narrow enough not to cover a panel. The message wraps, it is never cut.</td></tr>
+    <tr><td>Stack</td><td>A column, <code>--space-4</code> apart, newest at the bottom</td><td>The newest is nearest the corner and does not push the older ones under the reader's pointer.</td></tr>
+    <tr><td>Toasts that stay until closed</td><td>At most <span data-claim="toast-sticky-cap" title="MAX_STICKY_TOASTS in toastStack.ts – toasts that stay until closed, at most on screen">5</span></td><td>A sixth drops the oldest one that does not hold focus. Repeats merge first, so this is rare.</td></tr>
+    <tr><td>Info, success</td><td><span data-claim="toast-dwell-default-ms" title="DEFAULT_DWELL_MS in toastDwell.ts – an info or success toast with no duration given, ms">3000</span> ms unless the caller asks for more</td><td>Nothing is lost if it is missed.</td></tr>
+    <tr><td>Warning</td><td>At least <span data-claim="toast-dwell-warning-ms" title="WARNING_MIN_DWELL_MS in toastDwell.ts – the shortest a warning toast is shown, ms">8000</span> ms</td><td>A warning asks the reader to notice something, which takes longer to read than a confirmation.</td></tr>
+    <tr><td>Error, or any toast with an action</td><td>Until closed</td><td>WCAG 2.2.1 (Timing adjustable): a timer may not take away the only explanation of a failure, or a button.</td></tr>
+    <tr><td>Pointer over it, or focus inside it</td><td>The countdown pauses</td><td>Resumes with what was left, so hovering is not a way to keep it forever – leaving is.</td></tr>
+  </tbody>
+</table>
+
+<h3 id="toast-keys">The keyboard and screen-reader contract</h3>
+<table class="ds-keys">
+  <thead><tr><th>Key or event</th><th>Result</th><th>Focus ends on</th></tr></thead>
+  <tbody>
+    <tr><td>A toast appears</td><td>Its title and message are written into an always-mounted hidden live region – polite for info, success and warning, assertive for an error. The toast itself carries no live role.</td><td><strong>Wherever it was.</strong> A toast never takes focus.</td></tr>
+    <tr><td><kbd>Tab</kbd></td><td>Reaches the toast's action and Close like any other buttons, in document order.</td><td>The action or Close.</td></tr>
+    <tr><td><kbd>Escape</kbd> in a toast</td><td>Closes that toast only – not the dialog or menu under it.</td><td>The element focus came from before it entered the toast.</td></tr>
+    <tr><td><kbd>Enter</kbd> on the action</td><td>Runs the action, then closes the toast.</td><td>The element focus came from.</td></tr>
+    <tr><td>The toast times out</td><td>Never while focus is inside it.</td><td>Unchanged.</td></tr>
+  </tbody>
+</table>
+
+<div class="ds-note">
+  <strong>The toast message is <code>--color-text-tertiary</code>.</strong> It is <code>--text-sm</code> on
+  <code>--color-bg-tertiary</code>, where the <code>--color-text-secondary</code> <code>Toast.css</code> ships measures
+  <span data-contrast="--color-text-secondary on --color-bg-tertiary" data-min="4.5" data-result="fail">4.15:1 · fail</span> and
+  <code>--color-text-tertiary</code> measures <span data-contrast="--color-text-tertiary on --color-bg-tertiary" data-min="4.5" data-result="pass">7.06:1 · pass</span>.
+  The warning icon is <code>--color-warning</code>
+  (<span data-contrast="--color-warning on --color-bg-tertiary" data-min="3" data-result="pass">6.63:1 · pass</span> as a graphic), not the retired icon tint.
+</div>
+
+<h2 id="choose">Toast, or banner?</h2>
 <table>
   <thead><tr><th>Use a toast when</th><th>Use a banner when</th></tr></thead>
   <tbody>
     <tr>
-      <td>It is finished and needs no reply — "Exported to PDF". It may vanish because nothing is lost if it is missed.</td>
+      <td>It is finished and needs no reply – "Exported to PDF". It may vanish because nothing is lost if it is missed.</td>
       <td>It is about the thing on screen, or the reader has to decide something. It stays until the situation changes.</td>
     </tr>
   </tbody>
@@ -176,27 +547,81 @@
 
 <div class="ds-note">
   <strong>A permission is never a toast.</strong> Approving a remote host is a decision with consequences
-  that outlive the message, so it belongs on the surface it affects — see the Permission band card. This
+  that outlive the message, so it belongs on the surface it affects – see the Permission band card. This
   card exists partly because that rule was learned the hard way.
 </div>
 
-<script>
-const KEEP = [['--color-warning','warning'],['--color-error','error'],
-              ['--color-success','success'],['--color-info','info']];
-const DROP = [['--color-warning-icon','retired'],['--color-warning-bright','retired'],
-              ['--color-error-bright','retired'],['--color-error-text-light','retired']];
-const host = document.getElementById('swatches');
-function add(token, label, out){
-  const el = document.createElement('div');
-  el.className = 'sw' + (out ? ' sw--out' : '');
-  el.innerHTML = `<div class="sw-chip"></div><div class="sw-name"></div>`;
-  el.firstElementChild.style.background = `var(${token})`;
-  el.lastElementChild.textContent = `${token} · ${label}`;
-  host.appendChild(el);
-}
-for (const [t,l] of KEEP) add(t,l,false);
-for (const [t,l] of DROP) add(t,l,true);
-</script>
+<h2 id="progress">Progress</h2>
+<p class="ds-muted">A bar for work that takes more than a moment and happens inside a dialog or panel the reader is
+watching. <span data-claim="progressbar-files" title="files rendering role=&quot;progressbar&quot;">2</span> files ship one today (the transcription and
+document-import dialogs). A short wait inside a control is the Motion card's spinner, not a bar.</p>
 
+<div class="ds-frames">
+<figure class="ds-frame">
+<div class="erf-progress" aria-hidden="true">
+  <div class="erf-progress__label"><span>Importing report.pdf</span><span class="erf-progress__value">0%</span></div>
+  <div class="erf-progress__track"><div class="erf-progress__fill" style="width: 0%"></div></div>
+</div>
+<figcaption><strong>Determinate, starting</strong> – An empty track and a written 0%. Never a bar with no number.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div class="erf-progress" aria-hidden="true">
+  <div class="erf-progress__label"><span>Importing report.pdf – page 9 of 20</span><span class="erf-progress__value">45%</span></div>
+  <div class="erf-progress__track"><div class="erf-progress__fill" style="width: 45%"></div></div>
+</div>
+<figcaption><strong>Determinate, under way</strong> – The fill, the percentage and, when there is one, the step in words.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div class="erf-progress" aria-hidden="true">
+  <div class="erf-progress__label"><span>Imported report.pdf</span><span class="erf-progress__value">100%</span></div>
+  <div class="erf-progress__track"><div class="erf-progress__fill" style="width: 100%"></div></div>
+</div>
+<figcaption><strong>Done</strong> – The bar fills, then the surface moves on (the dialog closes or shows the result). Completion is announced once, politely.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div class="erf-progress erf-progress--indeterminate" aria-hidden="true">
+  <div class="erf-progress__label"><span>Starting import…</span></div>
+  <div class="erf-progress__track"><div class="erf-progress__fill"></div></div>
+</div>
+<figcaption><strong>Indeterminate</strong> – The amount is unknown: a segment sweeps the track, and no number is shown. This frame moves unless your system asks for reduced motion.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div class="erf-progress erf-progress--indeterminate erf-progress--still" aria-hidden="true">
+  <div class="erf-progress__label"><span>Starting import…</span></div>
+  <div class="erf-progress__track"><div class="erf-progress__fill"></div></div>
+</div>
+<figcaption><strong>Indeterminate, reduced motion</strong> – No sweep. A full-width hatched fill says “busy, amount unknown”; a still segment would read as a percentage.</figcaption>
+</figure>
+</div>
+
+<pre class="ds-code"><code>&lt;!-- determinate: a stable name, the value in aria-valuenow --&gt;
+&lt;div role=&quot;progressbar&quot; aria-label=&quot;Import progress&quot;
+     aria-valuemin=&quot;0&quot; aria-valuemax=&quot;100&quot; aria-valuenow=&quot;45&quot;
+     aria-valuetext=&quot;45%, page 9 of 20&quot;&gt;…&lt;/div&gt;
+
+&lt;!-- indeterminate: the same name, and NO aria-valuenow --&gt;
+&lt;div role=&quot;progressbar&quot; aria-label=&quot;Import progress&quot;
+     aria-valuetext=&quot;Starting import&quot;&gt;…&lt;/div&gt;</code></pre>
+
+<table>
+  <thead><tr><th>Rule</th><th>Why</th></tr></thead>
+  <tbody>
+    <tr><td><code>role="progressbar"</code> with an <code>aria-label</code> that <strong>never changes</strong></td><td>A progress bar must have an accessible name. Putting the percentage in the name makes the name change on every tick; the value belongs in <code>aria-valuenow</code>.</td></tr>
+    <tr><td>Determinate: <code>aria-valuemin</code>, <code>aria-valuemax</code>, <code>aria-valuenow</code></td><td>Assistive tech reads the value on request, without a live region shouting every percent.</td></tr>
+    <tr><td>Indeterminate: no <code>aria-valuenow</code></td><td>Its absence is what tells assistive tech the amount is unknown.</td></tr>
+    <tr><td>Only start and finish are announced</td><td>Through the always-mounted live region of decision three – never once per percent.</td></tr>
+    <tr><td>Reduced motion stops the sweep</td><td>And replaces it with a still fill that cannot be mistaken for a value.</td></tr>
+    <tr><td>The fill is <code>--color-accent-primary</code></td><td><span data-contrast="--color-accent-primary on --color-bg-tertiary" data-min="3" data-result="pass">6.96:1 · pass</span> against the track, the 3:1 a graphic needs (WCAG 1.4.11).</td></tr>
+  </tbody>
+</table>
+
+<section id="exceptions">
+<h2>Exceptions</h2>
+<p class="ds-muted">None recorded. A shipping component that departs from this card carries a
+<code>deviates:</code> marker at the site and gets a row here, naming the file. (The comment window's info banner
+carries one, but it points at its feature screen, not at this card.)</p>
+</section>
+
+</main>
 </body>
 </html>

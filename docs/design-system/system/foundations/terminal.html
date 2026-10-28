@@ -1,0 +1,241 @@
+<!-- @card group="Foundations" name="Terminal and code colours" subtitle="The xterm palette as it ships, the syntax tokens, and the plan to tokenise the rest" status="proposed" reviewed="never" answers="Colour terminal output or the cursor; Colour inline code or a syntax token" -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Terminal and code colours – Erfana design system</title>
+<link rel="stylesheet" href="../../tokens.css">
+<link rel="stylesheet" href="../../ds.css">
+<style>
+  /* stylelint-disable color-no-hex -- Not tokenised: these are the literal xterm theme
+     values from XTERM_OPTIONS.theme in useXtermSession.ts, drawn so the card shows what
+     ships. They are the defect this card names, not a palette to copy; each moves to a
+     --color-terminal-* token when the theme is tokenised (README defects). */
+  :root {
+    --ds-xterm-background: #000000;
+    --ds-xterm-foreground: #ffffff;
+    --ds-xterm-selection: #264f78;
+    --ds-ansi-black: #000000;
+    --ds-ansi-red: #cd3131;
+    --ds-ansi-green: #0dbc79;
+    --ds-ansi-yellow: #e5e510;
+    --ds-ansi-blue: #2472c8;
+    --ds-ansi-magenta: #bc3fbc;
+    --ds-ansi-cyan: #11a8cd;
+    --ds-ansi-white: #e5e5e5;
+    --ds-ansi-bright-black: #666666;
+    --ds-ansi-bright-red: #f14c4c;
+    --ds-ansi-bright-green: #23d18b;
+    --ds-ansi-bright-yellow: #f5f543;
+    --ds-ansi-bright-blue: #3b8eea;
+    --ds-ansi-bright-magenta: #d670d6;
+    --ds-ansi-bright-cyan: #29b8db;
+    --ds-ansi-bright-white: #ffffff;
+  }
+  /* stylelint-enable color-no-hex */
+
+  .rules { max-width: var(--ds-measure-wide); margin: 0 0 var(--space-16); padding-left: var(--space-16);
+           color: var(--color-text-tertiary); }
+  .rules li { margin-bottom: var(--space-4); }
+  .rules strong { color: var(--color-text-bright); font-weight: var(--font-semibold); }
+  tbody th { text-align: left; font-weight: var(--font-normal); text-transform: none; letter-spacing: normal;
+             font-size: var(--text-base); color: var(--color-text-primary);
+             padding: var(--space-4) var(--space-8) var(--space-4) 0;
+             border-bottom: var(--border-width) solid var(--color-border-default); }
+
+  /* A terminal, drawn: the panel's own header and the xterm surface below it. */
+  .term { max-width: var(--ds-measure-wide); margin: 0 0 var(--space-12);
+          border: var(--border-width) solid var(--color-border-default); }
+  .term__head { display: flex; align-items: center; height: var(--header-height); padding: 0 var(--space-6);
+                background: var(--color-gray-950); border-bottom: var(--border-width) solid var(--color-border-default);
+                font-size: var(--text-sm); font-weight: var(--font-semibold); text-transform: uppercase;
+                letter-spacing: var(--ds-caps-tracking); color: var(--color-text-primary); }
+  .term__body { display: flex; background: var(--color-black); }
+  .term__screen { flex: 1 1 auto; margin: 0; padding: var(--space-4); font-family: var(--font-mono);
+                  font-size: var(--text-md); line-height: var(--leading-normal);
+                  color: var(--ds-xterm-foreground); white-space: pre-wrap; }
+  .term__bar { flex: 0 0 var(--scrollbar-width); display: flex; flex-direction: column; justify-content: flex-start;
+               padding-top: var(--space-16); }
+  .term__thumb { height: var(--space-24); background: var(--color-gray-700); }
+  .cur { background: var(--color-cursor); color: var(--color-black); }
+  .sel { background: var(--ds-xterm-selection); }
+  .a-red { color: var(--ds-ansi-red); } .a-green { color: var(--ds-ansi-green); }
+  .a-yellow { color: var(--ds-ansi-yellow); } .a-blue { color: var(--ds-ansi-blue); }
+  .a-magenta { color: var(--ds-ansi-magenta); } .a-cyan { color: var(--ds-ansi-cyan); }
+  .a-bblack { color: var(--ds-ansi-bright-black); } .a-bred { color: var(--ds-ansi-bright-red); }
+  .a-bgreen { color: var(--ds-ansi-bright-green); } .a-bblue { color: var(--ds-ansi-bright-blue); }
+
+  /* The 16-colour grid: each cell is the colour as text on the terminal black. */
+  .ansi { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--space-2);
+          max-width: var(--ds-table-max); margin: 0 0 var(--space-8); }
+  .ansi > div { display: flex; align-items: center; gap: var(--space-6); padding: var(--space-4) var(--space-6);
+                background: var(--ds-xterm-background); font-family: var(--font-mono); font-size: var(--text-sm); }
+  .ansi i { display: inline-block; width: var(--space-12); height: var(--space-12);
+            border: var(--border-width) solid var(--color-border-subtle); }
+  .tag { display: inline-block; padding: 0 var(--space-3); border: var(--border-width) solid var(--color-warning);
+         color: var(--color-warning); font-family: var(--font-mono); font-size: var(--text-xs); }
+
+  .thumbs { display: flex; gap: var(--space-4); }
+  .thumbs > span { display: block; width: var(--scrollbar-width); height: var(--space-20); }
+
+  .code-sample { padding: var(--space-8); margin: 0 0 var(--space-12); max-width: var(--ds-measure-wide);
+                 background: var(--color-bg-preview); color: var(--color-text-primary); }
+  .inline-code { padding: var(--space-1) var(--space-3); background: var(--color-bg-secondary);
+                 border: var(--border-width) solid var(--color-border-default);
+                 font-family: var(--font-mono); color: var(--color-syntax-string); }
+</style>
+</head>
+<body>
+<nav class="ds-crumbs" aria-label="Breadcrumb"><a href="../../index.html">Erfana design system</a> <span aria-hidden="true">/</span> <a href="../../index.html#foundations">Foundations</a> <span aria-hidden="true">/</span> <span aria-current="page">Terminal and code colours</span></nav>
+<main>
+<h1>Terminal and code colours</h1>
+<p class="ds-meta"><span class="ds-status" data-status="proposed">proposed</span> not yet reviewed</p>
+<p class="ds-lede" id="decision">
+  The terminal is the one surface whose colours do not come from <code>design-tokens.css</code>: xterm.js takes a
+  JavaScript theme object, and today that object is literal hex. <strong>The direction: every colour the terminal
+  paints becomes a <code>--color-terminal-*</code> token, read into the xterm theme from the computed style, and
+  there is one theme object, not two.</strong> Until then this card draws what ships, and labels every value that is
+  not a token.
+</p>
+
+<h2 id="rules">The rules</h2>
+<ol class="rules">
+  <li><strong>A colour the terminal paints is a token or a named defect.</strong> Where the panel's CSS already
+    overrides xterm with a token – the background, the cursor, the scrollbar – the token is the rule.</li>
+  <li><strong>The cursor is a block in <code>--color-cursor</code>, its character in <code>--color-black</code></strong>,
+    focused or not. It is the only thing in the terminal that says where typing goes, so it is held to 3:1 against the
+    background, and the character under it to 4.5:1 against the cursor.</li>
+  <li><strong>The terminal scrollbar is the app scrollbar.</strong> It takes <code>--scrollbar-thumb</code> and
+    <code>--scrollbar-thumb-hover</code>, not a separate grey ramp.</li>
+  <li><strong>Program output keeps its own colours.</strong> The ANSI palette is the program's choice of meaning;
+    Erfana picks the 16 values, not which one a program uses. So the palette is judged as a set: each normal colour
+    readable on the background, each bright one brighter than its normal twin.</li>
+  <li><strong>Code in the editor and the preview takes the <code>--color-syntax-*</code> tokens</strong>, and every one
+    clears 4.5:1 on each surface code sits on.</li>
+</ol>
+
+<h2 id="terminal">The terminal as it ships</h2>
+<div class="term" aria-hidden="true">
+  <div class="term__head">Terminal</div>
+  <div class="term__body">
+<pre class="term__screen"><span class="a-green">~/erfana</span> <span class="a-bblack">(develop)</span> $ git status --short
+<span class="a-red"> M</span> src/renderer/src/index.css
+<span class="a-green">A </span> docs/design-system/system/foundations/terminal.html
+<span class="a-red">??</span> notes.md
+<span class="a-green">~/erfana</span> <span class="a-bblack">(develop)</span> $ npm test
+<span class="a-bgreen">✓</span> 212 passed  <span class="a-yellow">⚠</span> 2 skipped  <span class="a-bred">✗</span> 0 failed
+<span class="a-cyan">info</span> coverage written to <span class="a-blue">coverage/index.html</span>
+<span class="a-green">~/erfana</span> <span class="a-bblack">(develop)</span> $ <span class="sel">claude --continue</span><span class="cur">_</span></pre>
+    <div class="term__bar"><div class="term__thumb"></div></div>
+  </div>
+</div>
+<p class="ds-muted">A picture, not output: the command and the counts are illustrative. The background, cursor and
+scrollbar are tokens; the text colours and the selection behind <code>claude --continue</code> are the literal theme
+values.</p>
+
+<h3 id="parts">Every part, and where its colour comes from</h3>
+<table class="ds-tokens">
+<thead><tr><th scope="col">Part</th><th scope="col">Drawn by</th><th scope="col">Value</th><th scope="col">Contrast</th></tr></thead>
+<tbody>
+  <tr><th scope="row">Background</th><td><code>--color-black</code> in <code>TerminalPanel.css</code>, over a literal in the theme</td><td><code data-token="--color-black">#000000</code></td><td class="ds-muted">The surface the rest is measured on</td></tr>
+  <tr><th scope="row">Default text</th><td>Theme literal only</td><td><span class="tag">not tokenised</span></td><td class="ds-muted">Not measured – see README defect</td></tr>
+  <tr><th scope="row">Cursor block</th><td><code>--color-cursor</code> in <code>TerminalPanel.css</code> (<code>!important</code>, focused and unfocused)</td><td><code data-token="--color-cursor">#4fc1ff</code></td><td data-contrast="--color-cursor on --color-black" data-min="3" data-result="pass">10.40:1 · pass</td></tr>
+  <tr><th scope="row">Character under the cursor</th><td><code>--color-black</code> in <code>TerminalPanel.css</code></td><td><code data-token="--color-black">#000000</code></td><td data-contrast="--color-black on --color-cursor" data-min="4.5" data-result="pass">10.40:1 · pass</td></tr>
+  <tr><th scope="row">Selection</th><td>Theme literal only</td><td><span class="tag">not tokenised</span></td><td class="ds-muted">Not measured – see README defect</td></tr>
+  <tr><th scope="row">Panel header</th><td><code>--color-gray-950</code></td><td><code data-token="--color-gray-950">#252526</code></td><td class="ds-muted">Title text: <span data-contrast="--color-text-primary on --color-gray-950" data-min="4.5" data-result="pass">9.54:1 · pass</span></td></tr>
+</tbody>
+</table>
+
+<h3 id="scrollbar">The terminal scrollbar</h3>
+<p class="ds-muted">xterm draws its own scrollbar widget. <code>TerminalPanel.css</code> paints it with a grey ramp of its
+own; the rest of the app uses the scrollbar tokens. Rest matches; hover does not.</p>
+<table class="ds-tokens">
+<thead><tr><th scope="col">State</th><th scope="col">Terminal ships</th><th scope="col">App token</th><th scope="col">Thumb on the terminal black</th></tr></thead>
+<tbody>
+  <tr><th scope="row">Rest</th><td><div class="thumbs"><span style="background: var(--color-gray-700)"></span></div> <code>--color-gray-700</code> <code data-token="--color-gray-700">#454545</code></td><td><div class="thumbs"><span style="background: var(--scrollbar-thumb)"></span></div> <code>--scrollbar-thumb</code> <code data-token="--scrollbar-thumb">#454545</code></td><td data-contrast="--color-gray-700 on --color-black">2.19:1</td></tr>
+  <tr><th scope="row">Hover</th><td><div class="thumbs"><span style="background: var(--color-gray-600)"></span></div> <code>--color-gray-600</code> <code data-token="--color-gray-600">#6e6e6e</code></td><td><div class="thumbs"><span style="background: var(--scrollbar-thumb-hover)"></span></div> <code>--scrollbar-thumb-hover</code> <code data-token="--scrollbar-thumb-hover">#4e4e4e</code></td><td data-contrast="--color-gray-600 on --color-black">4.12:1</td></tr>
+  <tr><th scope="row">Dragging</th><td><div class="thumbs"><span style="background: var(--color-gray-500)"></span></div> <code>--color-gray-500</code> <code data-token="--color-gray-500">#858585</code></td><td class="ds-muted">No token</td><td data-contrast="--color-gray-500 on --color-black">5.69:1</td></tr>
+</tbody>
+</table>
+<p class="ds-muted">A scrollbar thumb is not held to SC 1.4.11 – the scroll position is also reachable with the keyboard
+and the wheel – so these are steps, not verdicts. The mismatch is a consistency defect: the terminal's hover is a
+different grey from every other scrollbar in the window.</p>
+
+<h2 id="ansi">The ANSI 16 palette</h2>
+<p class="ds-muted">The 16 colours a program can ask for, each drawn as text on the terminal background. None is a
+token, so no ratio can be baked; every cell carries the label instead of a number.</p>
+<div class="ansi" aria-hidden="true">
+  <div><i style="background: var(--ds-ansi-black)"></i><span style="color: var(--ds-ansi-white)">black</span></div>
+  <div><i style="background: var(--ds-ansi-red)"></i><span style="color: var(--ds-ansi-red)">red</span></div>
+  <div><i style="background: var(--ds-ansi-green)"></i><span style="color: var(--ds-ansi-green)">green</span></div>
+  <div><i style="background: var(--ds-ansi-yellow)"></i><span style="color: var(--ds-ansi-yellow)">yellow</span></div>
+  <div><i style="background: var(--ds-ansi-blue)"></i><span style="color: var(--ds-ansi-blue)">blue</span></div>
+  <div><i style="background: var(--ds-ansi-magenta)"></i><span style="color: var(--ds-ansi-magenta)">magenta</span></div>
+  <div><i style="background: var(--ds-ansi-cyan)"></i><span style="color: var(--ds-ansi-cyan)">cyan</span></div>
+  <div><i style="background: var(--ds-ansi-white)"></i><span style="color: var(--ds-ansi-white)">white</span></div>
+  <div><i style="background: var(--ds-ansi-bright-black)"></i><span style="color: var(--ds-ansi-bright-black)">bright black</span></div>
+  <div><i style="background: var(--ds-ansi-bright-red)"></i><span style="color: var(--ds-ansi-bright-red)">bright red</span></div>
+  <div><i style="background: var(--ds-ansi-bright-green)"></i><span style="color: var(--ds-ansi-bright-green)">bright green</span></div>
+  <div><i style="background: var(--ds-ansi-bright-yellow)"></i><span style="color: var(--ds-ansi-bright-yellow)">bright yellow</span></div>
+  <div><i style="background: var(--ds-ansi-bright-blue)"></i><span style="color: var(--ds-ansi-bright-blue)">bright blue</span></div>
+  <div><i style="background: var(--ds-ansi-bright-magenta)"></i><span style="color: var(--ds-ansi-bright-magenta)">bright magenta</span></div>
+  <div><i style="background: var(--ds-ansi-bright-cyan)"></i><span style="color: var(--ds-ansi-bright-cyan)">bright cyan</span></div>
+  <div><i style="background: var(--ds-ansi-bright-white)"></i><span style="color: var(--ds-ansi-bright-white)">bright white</span></div>
+</div>
+<p class="ds-muted"><span class="tag">not tokenised – see README defect</span> All 16, plus the default text and the
+selection, are literal hex in <code>XTERM_OPTIONS.theme</code> (<code>useXtermSession.ts</code>). The "black" cell writes
+its name in the white so it can be read; a program writing black on the black background is invisible by design. The
+dark blue is the one to look at first when the palette becomes tokens: it is the darkest normal colour after black.</p>
+
+<h2 id="syntax">Syntax tokens</h2>
+<p class="ds-muted">Three tokens colour code outside the terminal: inline code and front-matter values in the preview
+(<code>MarkdownPreview.css</code>) and the editor (<code>MonacoMarkdownEditor.css</code>).</p>
+<div class="code-sample" aria-hidden="true">
+  Run <span class="inline-code">npm run design</span> after a token change. Front matter:
+  <code style="color: var(--color-syntax-keyword)">draft: true</code>,
+  <code style="color: var(--color-syntax-number)">order: 3</code>.
+</div>
+<table class="ds-tokens">
+<thead><tr><th scope="col">Token</th><th scope="col">Value</th><th scope="col">Used for</th><th scope="col">Inline-code fill</th><th scope="col">Preview</th><th scope="col">App bg</th></tr></thead>
+<tbody>
+  <tr><th scope="row"><code style="color: var(--color-syntax-string)">--color-syntax-string</code></th><td><code data-token="--color-syntax-string">#ce9178</code></td><td>Inline code, strings</td><td data-contrast="--color-syntax-string on --color-bg-secondary" data-min="4.5" data-result="pass">5.19:1 · pass</td><td data-contrast="--color-syntax-string on --color-bg-preview" data-min="4.5" data-result="pass">6.58:1 · pass</td><td data-contrast="--color-syntax-string on --color-bg-primary" data-min="4.5" data-result="pass">6.99:1 · pass</td></tr>
+  <tr><th scope="row"><code style="color: var(--color-syntax-keyword)">--color-syntax-keyword</code></th><td><code data-token="--color-syntax-keyword">#569cd6</code></td><td>Keywords, booleans</td><td data-contrast="--color-syntax-keyword on --color-bg-secondary" data-min="4.5" data-result="pass">4.66:1 · pass</td><td data-contrast="--color-syntax-keyword on --color-bg-preview" data-min="4.5" data-result="pass">5.89:1 · pass</td><td data-contrast="--color-syntax-keyword on --color-bg-primary" data-min="4.5" data-result="pass">6.27:1 · pass</td></tr>
+  <tr><th scope="row"><code style="color: var(--color-syntax-number)">--color-syntax-number</code></th><td><code data-token="--color-syntax-number">#b5cea8</code></td><td>Numbers</td><td data-contrast="--color-syntax-number on --color-bg-secondary" data-min="4.5" data-result="pass">8.08:1 · pass</td><td data-contrast="--color-syntax-number on --color-bg-preview" data-min="4.5" data-result="pass">10.23:1 · pass</td><td data-contrast="--color-syntax-number on --color-bg-primary" data-min="4.5" data-result="pass">10.88:1 · pass</td></tr>
+</tbody>
+</table>
+<p class="ds-muted">The editor's code blocks are coloured by Monaco's own theme, not by these tokens; that theme is out
+of this card's reach until it is read from the tokens too.</p>
+
+<h2 id="defects">Named defects</h2>
+<ul class="ds-muted">
+  <li><strong>Two theme objects.</strong> <code>TERMINAL_THEME</code> in <code>terminalPanel.logic.ts</code> and
+    <code>XTERM_OPTIONS.theme</code> in <code>useXtermSession.ts</code> carry the same palette twice. Only the second
+    ships; the first also carries scrollbar colours that are never applied.</li>
+  <li><strong>Literal palette.</strong> The default text, the selection and the 16 ANSI colours are hex, so no ratio
+    can be checked and no token change reaches them.</li>
+  <li><strong>Scrollbar hover.</strong> <code>--color-gray-600</code> in the terminal against
+    <code>--scrollbar-thumb-hover</code> everywhere else.</li>
+  <li><strong>Header border.</strong> <code>TerminalPanel.css</code> draws the header's bottom border with a literal
+    translucent white instead of <code>--color-border-default</code>.</li>
+</ul>
+
+<h2 id="related">Related</h2>
+<ul class="ds-muted">
+  <li><a href="colors.html">Colours</a> – owns every token named here, including <code>--color-cursor</code> and the syntax tokens.</li>
+  <li><a href="surfaces.html#scrollbars">Surfaces and elevation – scrollbars</a>.</li>
+  <li><a href="type.html">Typography</a> – the terminal's font is <code>--font-mono</code>'s family.</li>
+</ul>
+
+<section id="exceptions">
+<h2>Exceptions</h2>
+<p class="ds-muted">None recorded. A shipping component that departs from this card carries a
+<code>deviates:</code> marker at the site and gets a row here, naming the file.</p>
+</section>
+
+</main>
+</body>
+</html>

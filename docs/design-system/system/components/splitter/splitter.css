@@ -1,0 +1,93 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/**
+ * The splitter – the line between two panes that the user drags (or arrows)
+ * to share the space between them.
+ *
+ * PROPOSED – not adopted. The app's version is
+ * src/renderer/src/components/Editor/ResizableDivider.tsx and its .css: an
+ * 8px coloured bar with no role, no tab stop, no keyboard and no value (an open
+ * defect in the design-system README). The dock's own sash (dockview, styled
+ * in AppDockLayout.css) is a second splitter with a 4px hit area.
+ *
+ * The shape: a 1px line in the layout, and a 24px hit area drawn by ::before
+ * over the panes on either side, so the target meets WCAG 2.2 SC 2.5.8
+ * without the line costing 24px of layout. The hit area is positioned, so it
+ * paints above the (static) panes without any z-index.
+ *
+ * Classes are prefixed erf-.
+ */
+
+.erf-splitter {
+  --erf-splitter-hit: var(--btn-height-sm); /* 24px – the target floor */
+  position: relative;
+  flex: 0 0 var(--border-width);
+  align-self: stretch;
+  background-color: var(--color-border-default);
+  cursor: col-resize;
+  touch-action: none;
+  transition: background-color var(--transition-fast);
+}
+
+/* The hit area: centred on the line, transparent, taking the pointer. */
+.erf-splitter::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc((var(--erf-splitter-hit) - var(--border-width)) / -2);
+  width: var(--erf-splitter-hit);
+}
+
+/* The active line: 2px of lime, drawn over the 1px rest line on hover, during
+   a drag and under keyboard focus – the same colour the dock sash uses when it
+   is active, so the two splitters read as one thing. */
+.erf-splitter::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc((var(--border-width-thick) - var(--border-width)) / -2);
+  width: var(--border-width-thick);
+  background-color: var(--color-accent-secondary);
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.erf-splitter:hover::after,
+.erf-splitter--dragging::after,
+.erf-splitter:focus-visible::after {
+  opacity: 1;
+}
+
+/* Focus: the one ring, drawn around the whole 24px hit area rather than the
+   1px line, so it is a ring and not a sliver. */
+.erf-splitter:focus-visible { outline: none; }
+.erf-splitter:focus-visible::before {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: calc(var(--border-width-thick) * -1);
+}
+
+/* Horizontal: a line between a top and a bottom pane. */
+.erf-splitter--horizontal { cursor: row-resize; }
+.erf-splitter--horizontal::before {
+  top: calc((var(--erf-splitter-hit) - var(--border-width)) / -2);
+  right: 0;
+  bottom: auto;
+  left: 0;
+  width: auto;
+  height: var(--erf-splitter-hit);
+}
+.erf-splitter--horizontal::after {
+  top: calc((var(--border-width-thick) - var(--border-width)) / -2);
+  right: 0;
+  bottom: auto;
+  left: 0;
+  width: auto;
+  height: var(--border-width-thick);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .erf-splitter,
+  .erf-splitter::after { transition: none; }
+}

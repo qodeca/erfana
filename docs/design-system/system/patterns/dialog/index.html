@@ -1,0 +1,298 @@
+<!-- @card group="Patterns" name="Dialog" subtitle="One modal shell – scrim, header, scrolling body, footer – and the focus contract BaseDialog keeps" status="proposed" reviewed="never" answers="Add a dialog; Ask the user to confirm a destructive action; Ask for a name in a dialog" -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dialog – Erfana design system</title>
+<link rel="stylesheet" href="../../../tokens.css">
+<link rel="stylesheet" href="../../../ds.css">
+<link rel="stylesheet" href="./dialog.css">
+<style>
+  /* One frame per row: a dialog is drawn at its real width, over a stand-in app. */
+  .ds-frames--wide { grid-template-columns: 1fr; }
+  .ds-frame--overflow { overflow-x: auto; }
+
+  /* The stage stands in for the window. The scrim is fixed in the app; in a
+     frame it is absolute to the stage, and frames are pictures, so nothing animates. */
+  .ds-stage { position: relative; min-height: 420px; overflow: hidden;
+              background: var(--color-bg-secondary); border: var(--border-width) solid var(--color-border-default); }
+  .ds-stage--tall { min-height: 520px; }
+  .ds-stage .erf-dialog-scrim { position: absolute; z-index: auto; animation: none; }
+  .ds-stage .erf-dialog { animation: none; }
+  .ds-stage .erf-dialog--scrolls { max-block-size: 400px; }
+
+  /* The app behind the scrim: a few grey lines, enough to see the scrim dim it. */
+  .ds-app { padding: var(--space-8); }
+  .ds-app__line { height: var(--space-4); margin-bottom: var(--space-6); background: var(--color-border-default); }
+  .ds-app__line:nth-child(2n) { width: 70%; }
+  .ds-app__line:nth-child(3n) { width: 45%; }
+
+  /* Mid-animation pictures for the reduced-motion pair. */
+  .ds-stage .erf-dialog.ds-mid-rise { opacity: 0.55; transform: translateY(var(--space-5)); }
+  .ds-stage .erf-dialog.ds-mid-fade { opacity: 0.55; }
+
+  /* Stand-ins for the Buttons card's three variants (Dialog.css .dialog-btn),
+     so the frames show real buttons. The Buttons card owns these rules. */
+  .ds-btn { padding: var(--space-5) var(--space-12); border: var(--border-width) solid transparent;
+            border-radius: var(--border-radius); font: inherit; font-size: var(--text-md);
+            font-weight: var(--font-semibold); }
+  .ds-btn--primary { background: var(--color-btn-primary-bg); color: var(--color-btn-primary-text); }
+  .ds-btn--danger { background: var(--color-btn-danger-bg); color: var(--color-white); }
+  .ds-btn--secondary { background: transparent; color: var(--color-gray-200); border-color: var(--color-border-subtle); }
+  .ds-btn.is-focus { outline: var(--border-width-thick) solid var(--color-border-focus); outline-offset: var(--space-1); }
+
+  /* Stand-ins for the Form controls card's field and its linked error. */
+  .ds-label { display: block; margin-bottom: var(--space-3); font-size: var(--text-base); color: var(--color-text-primary); }
+  .ds-input { display: flex; align-items: center; width: 100%; height: var(--input-height-md); padding: 0 var(--space-6);
+              background: var(--color-bg-input); border: var(--border-width) solid var(--color-error);
+              color: var(--color-text-primary); font-family: var(--font-sans); font-size: var(--text-base); }
+  .ds-input.is-focus { outline-offset: var(--space-1); }
+  .ds-error { display: flex; gap: var(--space-3); margin: var(--space-3) 0 var(--space-8);
+              font-size: var(--text-sm); color: var(--color-error); }
+
+  .erf-dialog__icon svg { width: 100%; height: 100%; }
+  .ds-code { max-width: var(--ds-table-max); padding: var(--space-8); overflow-x: auto;
+             background: var(--color-bg-tertiary); border: var(--border-width) solid var(--color-border-default); }
+</style>
+</head>
+<body>
+<nav class="ds-crumbs" aria-label="Breadcrumb"><a href="../../../index.html">Erfana design system</a> <span aria-hidden="true">/</span> <a href="../../../index.html#patterns">Patterns</a> <span aria-hidden="true">/</span> <span aria-current="page">Dialog</span></nav>
+<main>
+<h1>Dialog</h1>
+<p class="ds-meta"><span class="ds-status" data-status="proposed">proposed</span> not yet reviewed</p>
+<p class="ds-lede" id="decision">
+  Every modal dialog is one shell: a scrim, a titled container, a body that is the <strong>only</strong> part that
+  scrolls, and a footer of actions that is always on screen. The focus contract is not restated per dialog –
+  <code>BaseDialog</code> keeps it, and its tests hold it.
+</p>
+
+<div class="ds-note">
+  <strong>Why a pattern, not a component.</strong> A dialog is assembled from parts other cards own: the buttons
+  are the <a href="../../components/button/index.html">Buttons</a> card's, the fields the
+  <a href="../../components/form/index.html">Form controls</a> card's, the stacking order the
+  <a href="../../foundations/layering.html">Layering</a> card's, the entrance the
+  <a href="../../foundations/motion.html">Motion</a> card's. This card decides only how they are put together and
+  how the keyboard moves through them.
+  <br><br>
+  <strong>The one visual change against the app:</strong> today <code>.dialog-container</code> scrolls as a whole
+  (<code>max-height: 85vh; overflow-y: auto</code>), so a long body scrolls the title and the buttons out of view.
+  Here only <code>.erf-dialog__body</code> scrolls.
+</div>
+
+<h2 id="anatomy">Anatomy</h2>
+<table>
+  <thead><tr><th>Part</th><th>Class</th><th>Rule</th></tr></thead>
+  <tbody>
+    <tr><td>Scrim</td><td><code>.erf-dialog-scrim</code></td><td>Covers the window in <code>--color-overlay-dialog</code> (<code data-token="--color-overlay-dialog">rgba(0, 0, 0, 0.75)</code>). Its z-index comes from <code>DialogContext</code>, counting up from <code>--z-dialog</code>.</td></tr>
+    <tr><td>Container</td><td><code>.erf-dialog</code></td><td><code>role="dialog"</code>, <code>aria-modal="true"</code>, <code>aria-labelledby</code> the title. Width from <code>--dialog-min-width</code> (<code data-token="--dialog-min-width">500px</code>) to <code>--dialog-max-width</code> (<code data-token="--dialog-max-width">800px</code>), shrinking with a narrow window. Edge <code>--color-border-subtle</code>, depth <code>--shadow-dialog</code>, corners 0.</td></tr>
+    <tr><td>Header</td><td><code>.erf-dialog__header</code></td><td>The title, an <code>h2</code> in <code>--text-xl</code>, and an optional decorative icon. The title says what is being decided: “Delete 3 files?”, not “Confirm”.</td></tr>
+    <tr><td>Body</td><td><code>.erf-dialog__body</code></td><td>The only part that scrolls. <code>aria-describedby</code> points at a short message when there is exactly one.</td></tr>
+    <tr><td>Footer</td><td><code>.erf-dialog__footer</code></td><td>Actions on the right: Cancel, then the action that answers the title. A hint or count goes in <code>.erf-dialog__footer-start</code> on the left.</td></tr>
+  </tbody>
+</table>
+
+<h2 id="states">Every state</h2>
+<div class="ds-frames ds-frames--wide">
+
+<figure class="ds-frame ds-frame--overflow">
+<div class="ds-stage" aria-hidden="true">
+  <div class="ds-app"><div class="ds-app__line"></div><div class="ds-app__line"></div><div class="ds-app__line"></div><div class="ds-app__line"></div><div class="ds-app__line"></div><div class="ds-app__line"></div></div>
+  <div class="erf-dialog-scrim">
+    <div class="erf-dialog">
+      <div class="erf-dialog__header"><h2 class="erf-dialog__title">Discard unsaved changes?</h2></div>
+      <div class="erf-dialog__body"><p class="erf-dialog__message"><code>notes.md</code> has changes that are not saved. Closing the tab without saving loses them.</p></div>
+      <div class="erf-dialog__footer">
+        <span class="ds-btn ds-btn--secondary">Cancel</span>
+        <span class="ds-btn ds-btn--primary is-focus">Save and close</span>
+      </div>
+    </div>
+  </div>
+</div>
+<figcaption><strong>Confirm</strong> – a question with a safe answer. Initial focus is the primary action, because pressing it loses nothing. Cancel sits to its left.</figcaption>
+</figure>
+
+<figure class="ds-frame ds-frame--overflow">
+<div class="ds-stage" aria-hidden="true">
+  <div class="ds-app"><div class="ds-app__line"></div><div class="ds-app__line"></div><div class="ds-app__line"></div><div class="ds-app__line"></div><div class="ds-app__line"></div><div class="ds-app__line"></div></div>
+  <div class="erf-dialog-scrim">
+    <div class="erf-dialog">
+      <div class="erf-dialog__header"><span class="erf-dialog__icon erf-dialog__icon--danger"><svg data-icon="triangle-alert" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span><h2 class="erf-dialog__title">Delete 3 files?</h2></div>
+      <div class="erf-dialog__body"><p class="erf-dialog__message">The files move to the system trash. You can restore them from there.</p></div>
+      <div class="erf-dialog__footer">
+        <span class="ds-btn ds-btn--secondary is-focus">Cancel</span>
+        <span class="ds-btn ds-btn--danger">Delete 3 files</span>
+      </div>
+    </div>
+  </div>
+</div>
+<figcaption><strong>Destructive confirm</strong> – the danger button is rightmost and says what goes. <strong>Initial focus is Cancel</strong>, so a second <kbd>Enter</kbd> meant for something else cannot delete. The icon is decorative; the title carries the meaning.</figcaption>
+</figure>
+
+<figure class="ds-frame ds-frame--overflow">
+<div class="ds-stage" aria-hidden="true">
+  <div class="ds-app"><div class="ds-app__line"></div><div class="ds-app__line"></div><div class="ds-app__line"></div><div class="ds-app__line"></div><div class="ds-app__line"></div><div class="ds-app__line"></div></div>
+  <div class="erf-dialog-scrim">
+    <div class="erf-dialog">
+      <div class="erf-dialog__header"><h2 class="erf-dialog__title">Rename file</h2></div>
+      <div class="erf-dialog__body">
+        <span class="ds-label">New name</span>
+        <span class="ds-input is-focus">notes/2026.md</span>
+        <p class="ds-error"><span>✕</span><span>A name cannot contain a slash. Try <code>notes-2026.md</code>.</span></p>
+      </div>
+      <div class="erf-dialog__footer">
+        <span class="erf-dialog__footer-start"><kbd>Enter</kbd> to rename</span>
+        <span class="ds-btn ds-btn--secondary">Cancel</span>
+        <span class="ds-btn ds-btn--primary">Rename</span>
+      </div>
+    </div>
+  </div>
+</div>
+<figcaption><strong>Prompt with a field error</strong> – focus stays in the field. The field carries <code>aria-invalid="true"</code> and <code>aria-describedby</code> the error, which says how to fix it. Rename stays enabled: pressing it re-shows the error rather than doing nothing silently.</figcaption>
+</figure>
+
+<figure class="ds-frame ds-frame--overflow">
+<div class="ds-stage ds-stage--tall" aria-hidden="true">
+  <div class="ds-app"><div class="ds-app__line"></div><div class="ds-app__line"></div><div class="ds-app__line"></div><div class="ds-app__line"></div><div class="ds-app__line"></div><div class="ds-app__line"></div></div>
+  <div class="erf-dialog-scrim">
+    <div class="erf-dialog erf-dialog--scrolls">
+      <div class="erf-dialog__header"><h2 class="erf-dialog__title">Import 14 documents</h2></div>
+      <div class="erf-dialog__body">
+        <p class="erf-dialog__message">These files will be converted to Markdown and added to <code>docs/imported/</code>. Files that already exist there are skipped.</p>
+        <p class="erf-dialog__message"><code>Quarterly report.docx</code> – 12 pages, 4 images, 2 tables.</p>
+        <p class="erf-dialog__message"><code>Meeting notes 2026-10-01.docx</code> – 3 pages.</p>
+        <p class="erf-dialog__message"><code>Architecture overview.pdf</code> – 28 pages. Diagrams are kept as images.</p>
+        <p class="erf-dialog__message"><code>Onboarding checklist.docx</code> – 2 pages, 1 table.</p>
+        <p class="erf-dialog__message"><code>Release plan.pdf</code> – 6 pages.</p>
+        <p class="erf-dialog__message"><code>Glossary.docx</code> – 9 pages.</p>
+        <p class="erf-dialog__message">…and 8 more.</p>
+      </div>
+      <div class="erf-dialog__footer">
+        <span class="erf-dialog__footer-start">14 files, 61 pages</span>
+        <span class="ds-btn ds-btn--secondary">Cancel</span>
+        <span class="ds-btn ds-btn--primary is-focus">Import</span>
+      </div>
+    </div>
+  </div>
+</div>
+<figcaption><strong>Long, scrolling body</strong> – the title and the buttons stay put; only the list scrolls, and a line above and below the body shows there is more. The body is reachable by keyboard because it holds focusable content or is itself <code>tabindex="0"</code> with a name.</figcaption>
+</figure>
+
+<figure class="ds-frame ds-frame--overflow">
+<div class="ds-stage" aria-hidden="true">
+  <div class="ds-app"><div class="ds-app__line"></div><div class="ds-app__line"></div><div class="ds-app__line"></div><div class="ds-app__line"></div><div class="ds-app__line"></div><div class="ds-app__line"></div></div>
+  <div class="erf-dialog-scrim">
+    <div class="erf-dialog erf-dialog--wide">
+      <div class="erf-dialog__header"><h2 class="erf-dialog__title">Transcribing recording.m4a</h2></div>
+      <div class="erf-dialog__body"><p class="erf-dialog__message">About two minutes left. You can keep working; the text is inserted at the cursor when it is done.</p></div>
+      <div class="erf-dialog__footer"><span class="ds-btn ds-btn--danger">Cancel transcription</span></div>
+    </div>
+  </div>
+  <div class="erf-dialog-scrim">
+    <div class="erf-dialog">
+      <div class="erf-dialog__header"><h2 class="erf-dialog__title">Quit Erfana?</h2></div>
+      <div class="erf-dialog__body"><p class="erf-dialog__message">A transcription is still running. Quitting stops it and its text is lost.</p></div>
+      <div class="erf-dialog__footer">
+        <span class="ds-btn ds-btn--secondary is-focus">Keep working</span>
+        <span class="ds-btn ds-btn--danger">Quit</span>
+      </div>
+    </div>
+  </div>
+</div>
+<figcaption><strong>Stacked dialog</strong> – the second dialog gets its own scrim one rung higher, which dims the first. Only the top dialog takes <kbd>Tab</kbd> and <kbd>Escape</kbd>; one <kbd>Escape</kbd> closes it and nothing beneath (#229). Closing it returns focus to the control in the first dialog that opened it.</figcaption>
+</figure>
+
+<figure class="ds-frame ds-frame--overflow">
+<div class="ds-stage" aria-hidden="true">
+  <div class="ds-app"><div class="ds-app__line"></div><div class="ds-app__line"></div><div class="ds-app__line"></div><div class="ds-app__line"></div><div class="ds-app__line"></div><div class="ds-app__line"></div></div>
+  <div class="erf-dialog-scrim">
+    <div class="erf-dialog ds-mid-rise">
+      <div class="erf-dialog__header"><h2 class="erf-dialog__title">Discard unsaved changes?</h2></div>
+      <div class="erf-dialog__body"><p class="erf-dialog__message"><code>notes.md</code> has changes that are not saved.</p></div>
+      <div class="erf-dialog__footer"><span class="ds-btn ds-btn--secondary">Cancel</span><span class="ds-btn ds-btn--primary">Save and close</span></div>
+    </div>
+  </div>
+</div>
+<figcaption><span class="ds-frame__step">a</span><strong>Opening, default motion</strong> – halfway through: the scrim fades in over <code>--transition-normal</code> (<code data-token="--transition-normal">0.15s ease</code>) and the dialog rises into place over <code>--transition-slow</code> (<code data-token="--transition-slow">0.2s ease</code>).</figcaption>
+</figure>
+
+<figure class="ds-frame ds-frame--overflow">
+<div class="ds-stage" aria-hidden="true">
+  <div class="ds-app"><div class="ds-app__line"></div><div class="ds-app__line"></div><div class="ds-app__line"></div><div class="ds-app__line"></div><div class="ds-app__line"></div><div class="ds-app__line"></div></div>
+  <div class="erf-dialog-scrim">
+    <div class="erf-dialog ds-mid-fade">
+      <div class="erf-dialog__header"><h2 class="erf-dialog__title">Discard unsaved changes?</h2></div>
+      <div class="erf-dialog__body"><p class="erf-dialog__message"><code>notes.md</code> has changes that are not saved.</p></div>
+      <div class="erf-dialog__footer"><span class="ds-btn ds-btn--secondary">Cancel</span><span class="ds-btn ds-btn--primary">Save and close</span></div>
+    </div>
+  </div>
+</div>
+<figcaption><span class="ds-frame__step">b</span><strong>Opening, reduced motion</strong> – the same moment with <code>prefers-reduced-motion: reduce</code>: the dialog is already where it will stay and only fades. Nothing moves. The rule is in <code>dialog.css</code>, not left to the app's global 1ms override.</figcaption>
+</figure>
+
+</div>
+
+<h2 id="keyboard">The keyboard contract</h2>
+<p class="ds-muted">This is the contract <code>BaseDialog.tsx</code> implements for every dialog (#91). The last column names
+the app test that holds the shipping component to each row; a row without one is unproven, not untrue.</p>
+<table class="ds-keys">
+  <thead><tr><th>Key or event</th><th>Result</th><th>Focus ends on</th><th>Held by</th></tr></thead>
+  <tbody>
+    <tr><td>The dialog opens</td><td>The opener is remembered. After the portal mounts, focus moves in.</td><td>The <code>initialFocusRef</code> control if it can take focus, else the first tabbable control. For a destructive confirm, Cancel.</td><td><code>BaseDialog.test.tsx</code> – “initial focus”, “initialFocusRef containment”</td></tr>
+    <tr><td><kbd>Tab</kbd></td><td>Next control. From the last, wraps to the first. Disabled controls are skipped.</td><td>Inside the dialog, always.</td><td><code>BaseDialog.test.tsx</code> – “trapFocus”: cycles Tab from the last control back to the first</td></tr>
+    <tr><td><kbd>Shift</kbd>+<kbd>Tab</kbd></td><td>Previous control. From the first, wraps to the last.</td><td>Inside the dialog.</td><td><code>BaseDialog.test.tsx</code> – “trapFocus”: cycles Shift+Tab from the first control back to the last</td></tr>
+    <tr><td>Focus escapes (a backdrop click, a control disabled while focused)</td><td>The next <kbd>Tab</kbd> or the focusout rescue pulls focus back.</td><td>The first control, or <code>focusRescueRef</code>.</td><td><code>BaseDialog.test.tsx</code> – “trapFocus recovery of escaped focus”, “trapFocus focusout rescue”</td></tr>
+    <tr><td><kbd>Escape</kbd></td><td>Closes the <strong>topmost</strong> dialog only, unless it sets <code>closeOnEscape={false}</code> – then nothing happens; it does not fall through.</td><td>The opener (next row).</td><td><code>overlayStack.test.ts</code> – “Escape”: runs only the topmost handler when two overlays are stacked</td></tr>
+    <tr><td>The dialog closes</td><td>Focus goes back to the opener; if the opener is gone, to the tree or <code>[data-focus-return]</code> region it lived in. Focus the close action already moved elsewhere is left alone.</td><td>The opener.</td><td><code>BaseDialog.test.tsx</code> – “focus return on close”</td></tr>
+    <tr><td><kbd>Enter</kbd> <kbd>Space</kbd></td><td>Activate the focused button. There is no hidden default button: <kbd>Enter</kbd> on Cancel cancels.</td><td>The opener, once the dialog closes.</td><td>No app test</td></tr>
+    <tr><td>Screen reader</td><td><code>role="dialog"</code>, <code>aria-modal="true"</code> exactly while the trap is on, <code>aria-labelledby</code> the title, <code>aria-describedby</code> the message.</td><td>–</td><td><code>BaseDialog.test.tsx</code> – “modality and the trap travel together (#91)”. <code>aria-labelledby</code> on every dialog: <strong>no app test</strong></td></tr>
+    <tr><td>Everything behind the scrim</td><td>Should be <code>inert</code>, so a pointer, <kbd>Tab</kbd> or a screen reader's virtual cursor cannot reach it.</td><td>–</td><td><strong>Not implemented, no app test</strong> – the app relies on <code>aria-modal</code> and the Tab trap alone (see Open defects)</td></tr>
+  </tbody>
+</table>
+
+<h2 id="wording">Wording</h2>
+<ul class="ds-muted">
+  <li>The title is a question or a task, in sentence case: “Delete 3 files?”, “Rename file”.</li>
+  <li>The action button repeats the verb of the title: “Delete 3 files”, not “OK” or “Yes”.</li>
+  <li>The message says what happens and whether it can be undone. One or two sentences.</li>
+  <li>Cancel is “Cancel”, unless a plainer phrase says what staying means: “Keep working”, “Keep editing”.</li>
+</ul>
+
+<h2 id="markup">Markup</h2>
+<pre class="ds-code"><code>&lt;div class="erf-dialog-scrim"&gt;
+  &lt;div class="erf-dialog" role="dialog" aria-modal="true"
+       aria-labelledby="d-title" aria-describedby="d-msg"&gt;
+    &lt;div class="erf-dialog__header"&gt;
+      &lt;h2 class="erf-dialog__title" id="d-title"&gt;Delete 3 files?&lt;/h2&gt;
+    &lt;/div&gt;
+    &lt;div class="erf-dialog__body"&gt;
+      &lt;p class="erf-dialog__message" id="d-msg"&gt;The files move to the system trash.&lt;/p&gt;
+    &lt;/div&gt;
+    &lt;div class="erf-dialog__footer"&gt;
+      &lt;button class="dialog-btn dialog-btn-secondary"&gt;Cancel&lt;/button&gt;   &lt;!-- initial focus --&gt;
+      &lt;button class="dialog-btn dialog-btn-danger"&gt;Delete 3 files&lt;/button&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;</code></pre>
+
+<h2 id="open-defects">Open defects this card names</h2>
+<ul class="ds-muted">
+  <li><strong>The page behind a dialog is not <code>inert</code>.</strong> A screen reader's virtual cursor and a pointer
+    can still reach it; only <kbd>Tab</kbd> is trapped. Fix in <code>BaseDialog.tsx</code>: mark the app root
+    <code>inert</code> while the topmost modal is open.</li>
+  <li><strong>The whole container scrolls</strong> (<code>Dialog.css</code>, <code>.dialog-container</code>), so a long body
+    hides the title and the buttons.</li>
+  <li><strong>No test asserts a name.</strong> Nothing fails if a dialog ships without <code>aria-labelledby</code>.</li>
+</ul>
+
+<section id="exceptions">
+<h2>Exceptions</h2>
+<p class="ds-muted">None recorded. A shipping dialog that departs from this card carries a
+<code>deviates:</code> marker at the site and gets a row here, naming the file.</p>
+</section>
+</main>
+</body>
+</html>

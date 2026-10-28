@@ -9,14 +9,31 @@
  * the file back here the way it syncs tokens.css, so this card renders what
  * actually ships.
  *
- * The visual layer here is close to what ships already. What is missing in the
- * app is not CSS at all — it is the keyboard contract that `role="menu"`
- * promises. See the card: a role is a promise, and this one is currently broken
- * for every one of its dependants.
+ * Where the app stands. The keyboard contract that `role="menu"` promises
+ * shipped in #90: ContextMenu.tsx moves a roving tabindex with the arrows,
+ * Home, End and typeahead, moves focus in on open and hands it back on close,
+ * and ContextMenu.keyboard.test.tsx and ContextMenu.focus.test.tsx hold it
+ * there. The visual layer below differs from ContextMenu.css in three places,
+ * each a decision of the Menu card, not drift:
+ *
+ *   1. The shortcut hint is --color-text-tertiary, not --color-text-secondary,
+ *      so it clears 4.5:1 on the menu, a highlighted item and a highlighted
+ *      destructive item.
+ *   2. Disabled is `[aria-disabled='true']`, not a `.disabled` class – the item
+ *      stays reachable, so the attribute is the state.
+ *   3. An item is at least 28px tall (min-height), so a one-line item never
+ *      drops under the 24 × 24 target floor.
+ *
+ * One place where this file used to lag the app: a destructive item now gets
+ * the same danger fill under the pointer, under keyboard focus and as the
+ * active item, as ContextMenu.css already did.
  *
  * Classes are prefixed `erf-`, like every other component file here.
  */
 
+/* deviates: docs/design-system/system/components/menu/index.html — tokens only.
+   180px is the floor ContextMenu.css ships, kept as a literal until the proposed
+   --menu-min-width token exists. See the Menu card's Exceptions. */
 .erf-menu {
   min-width: 180px;
   padding: var(--space-2) 0;
@@ -75,7 +92,13 @@
  * be dim. It is the one place on this card where low contrast is the point.
  */
 .erf-menu-item--danger { color: var(--color-error); }
-.erf-menu-item--danger:hover:not([aria-disabled='true']) {
+
+/* Hover = keyboard focus = active, for a destructive item too. This file's
+   hover rule used to be the only one with the danger fill, so a keyboard user
+   landing on Delete saw the neutral grey a pointer user never did. */
+.erf-menu-item--danger:hover:not([aria-disabled='true']),
+.erf-menu-item--danger:focus-visible:not([aria-disabled='true']),
+.erf-menu-item--danger.erf-menu-item--active:not([aria-disabled='true']) {
   background-color: var(--color-bg-danger-hover);
 }
 
@@ -96,12 +119,15 @@
 .erf-menu-label { flex: 1 1 auto; }
 
 /* The shortcut is a HINT, not a control. It never takes focus and it is never
-   the only place a capability is announced. */
+   the only place a capability is announced: the glyph is aria-hidden and the
+   item names the keys with aria-keyshortcuts ("Meta+X", not "⌘X").
+   --color-text-tertiary, not --color-text-secondary: secondary fell under
+   4.5:1 on a highlighted item, which is exactly when the hint is being read. */
 .erf-menu-shortcut {
   margin-left: var(--space-8);
   font-family: var(--font-mono);
   font-size: var(--text-sm);
-  color: var(--color-text-secondary);
+  color: var(--color-text-tertiary);
 }
 
 .erf-menu-separator {

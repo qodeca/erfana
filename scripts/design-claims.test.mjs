@@ -2,48 +2,61 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 
 /**
- * The guard behind the claims ledger.
+ * The guard behind the claims ledger, and behind the baked cards.
  *
- * docs/design-system/ states numbers to make its rules credible — "six spinners at three
+ * docs/design-system/ states numbers to make its rules credible – "six spinners at three
  * speeds", "49 files bypass the icon registry", "3.72:1". Two reviews found nine
  * such numbers were wrong, and then found eighteen more errors in the plan
  * written to fix them. Numbers copied instead of derived go stale silently, and
  * a wrong number does not just fail on its own: it hands the reader a reason to
  * reopen every decision on the card.
  *
- * So no card holds a digit. A card writes `<span data-claim="id"></span>`, the
- * value is derived from src/ at build time into docs/design-system/claims.js, and this file
- * re-derives it on every CI run. When someone deletes a spinner, the Motion card
- * does not quietly become wrong — this goes red and names it.
+ * So no card types a count of the app. A card writes `<span data-claim="id"></span>`,
+ * `npm run design` derives the value from src/ and BAKES it into the card's own
+ * text (the cards run no JavaScript), and this file re-derives it on every CI run
+ * and compares it with what is baked. When someone deletes a spinner, the Motion
+ * card does not quietly become wrong – this goes red and names the card and line.
  *
  * @see scripts/lib/design-claims.mjs for the predicate kinds and their limits
  * @see docs/design-system/claims.json for the ledger itself
+ * @see scripts/design-sync.mjs for the baker and the governance guards
  */
 
-import { readFileSync, readdirSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { parse } from 'parse5'
 import { describe, expect, it } from 'vitest'
 
 import {
   collectCustomProperties,
   contrastRatio,
   evaluate,
+  parseColor,
+  relativeLuminance,
   resolveVar,
   stripCssComments,
   walk
 } from './lib/design-claims.mjs'
+import { nodesOf } from './lib/design-static.mjs'
+import {
+  COMPONENT_CSS,
+  GROUP_FOLDERS,
+  TOKEN_OWNERS,
+  anatomyProblems,
+  authoredPages,
+  bakePage,
+  collectCards,
+  deviationProblems,
+  loadClaims,
+  ownershipProblems,
+  readMarker,
+  stylelintCoverageProblems
+} from './design-sync.mjs'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-
-/**
- * The generator's own source, read as text so the manifest test below cannot
- * drift from it. Importing would be cleaner, but design-sync.mjs runs its CLI on
- * import and does not export its file list; reading the text keeps the test
- * honest without reshaping the script around it.
- */
-const SYNC_SOURCE = readFileSync(path.join(ROOT, 'scripts/design-sync.mjs'), 'utf8')
 const DESIGN = path.join(ROOT, 'docs/design-system')
+const TOKEN_FILE = path.join(ROOT, 'src/renderer/src/styles/design-tokens.css')
 
 const LEDGER = (() => {
   const parsed = JSON.parse(readFileSync(path.join(DESIGN, 'claims.json'), 'utf8'))
@@ -51,15 +64,35 @@ const LEDGER = (() => {
   return parsed
 })()
 
-/** The committed, generated values the cards actually render. */
-const COMMITTED = (() => {
-  const source = readFileSync(path.join(DESIGN, 'claims.js'), 'utf8')
-  const start = source.indexOf('{', source.indexOf('window.ERFANA_CLAIMS'))
-  // The FIRST `\n};` after the object — not the last, which closes the IIFE
-  // that fills the spans.
-  const end = source.indexOf('\n};', start)
-  return JSON.parse(source.slice(start, end + 2))
-})()
+/** Every page that can carry a bake target, repo-relative. */
+const PAGES = authoredPages()
+
+/** The text of a node, children included. */
+function textOf(node) {
+  const parts = []
+  for (const n of nodesOf(node)) if (n.nodeName === '#text') parts.push(n.value)
+  return parts.join('')
+}
+
+/**
+ * What the cards actually render: every data-claim element, read with parse5
+ * from the committed HTML. Replaces the old COMMITTED object parsed out of the
+ * generated claims.js – there is no script any more, the text IS the value.
+ */
+const BAKED = PAGES.flatMap(file => {
+  const doc = parse(readFileSync(path.join(ROOT, file), 'utf8'), { sourceCodeLocationInfo: true })
+  return [...nodesOf(doc)]
+    .filter(n => n.attrs?.some(a => a.name === 'data-claim'))
+    .map(n => ({
+      file,
+      line: n.sourceCodeLocation?.startLine,
+      id: n.attrs.find(a => a.name === 'data-claim').value,
+      text: textOf(n)
+    }))
+})
+
+/** A claim value as the baker writes it. */
+const formatted = (id, value) => (LEDGER[id].kind === 'contrast' ? value.toFixed(2) : String(value))
 
 /**
  * What is wrong with a stylesheet's app-wide reduced-motion rule, as a list of
@@ -106,19 +139,11 @@ function reduceBlockProblems(rawCss) {
   return problems
 }
 
-/** Feature screens live in docs/designs/ (comments first), but load the same
- * claims.js and carry the same @card marker, so they are held to the same checks.
- * A claim's `card` is relative to docs/design-system/, hence `../designs/...` for them. */
-const CARD_FILES = [
-  ...walk(ROOT, 'docs/design-system', ['.html']).filter(f => f !== 'docs/design-system/index.html'),
-  ...walk(ROOT, 'docs/designs', ['.html'])
-]
-
-const CLAIM_IDS_IN_CARDS = new Set(
-  CARD_FILES.flatMap(file =>
-    [...readFileSync(path.join(ROOT, file), 'utf8').matchAll(/data-claim="([^"]+)"/g)].map(m => m[1])
-  )
-)
+/** Feature screens live in docs/designs/ and carry the same @card marker and bake
+ * targets, so they are held to the same checks. A claim's `card` is relative to
+ * docs/design-system/, hence `../designs/...` for them. */
+const CARD_FILES = PAGES
+const CLAIM_IDS_IN_CARDS = new Set(BAKED.map(b => b.id))
 
 describe('design claims ledger', () => {
   describe('the contrast formula itself', () => {
@@ -132,6 +157,32 @@ describe('design claims ledger', () => {
     it('is order-independent', () => {
       expect(contrastRatio('#161312', '#858585')).toBe(contrastRatio('#858585', '#161312'))
     })
+
+    it('reads every colour form the token file uses', () => {
+      expect(parseColor('#fff')).toEqual({ r: 255, g: 255, b: 255, a: 1 })
+      expect(parseColor('#E3E829')).toEqual({ r: 227, g: 232, b: 41, a: 1 })
+      expect(parseColor('#00000080').a).toBeCloseTo(0.502, 3)
+      expect(parseColor('rgba(160, 168, 255, 0.2)')).toEqual({ r: 160, g: 168, b: 255, a: 0.2 })
+      expect(parseColor('rgb(1 2 3 / 50%)')).toEqual({ r: 1, g: 2, b: 3, a: 0.5 })
+      expect(() => parseColor('red')).toThrow(/not a colour/)
+      expect(() => parseColor('#12')).toThrow(/not a colour/)
+    })
+
+    it('uses the 0.04045 sRGB threshold', () => {
+      // 10/255 = 0.0392 is linear under both thresholds; 0.0400-0.0404 is where they differ.
+      expect(relativeLuminance('#0a0a0a')).toBeCloseTo((10 / 255 / 12.92), 6)
+    })
+
+    it('composites a translucent foreground over the background before measuring', () => {
+      // 50% white over black is mid-grey #808080, not white.
+      expect(contrastRatio('rgba(255, 255, 255, 0.5)', '#000000')).toBe(contrastRatio('rgb(127.5, 127.5, 127.5)', '#000000'))
+    })
+
+    it('takes an "over" surface for a translucent background, and refuses to guess without one', () => {
+      expect(() => contrastRatio('#ffffff', 'rgba(0, 0, 0, 0.5)')).toThrow(/needs an "over" surface/)
+      expect(() => contrastRatio('#ffffff', 'rgba(0, 0, 0, 0.5)', 'rgba(0, 0, 0, 0.5)')).toThrow(/must be opaque/)
+      expect(contrastRatio('#ffffff', 'rgba(0, 0, 0, 0.5)', '#ffffff')).toBe(contrastRatio('#ffffff', 'rgb(127.5, 127.5, 127.5)'))
+    })
   })
 
   describe('every predicate still runs', () => {
@@ -139,23 +190,44 @@ describe('design claims ledger', () => {
       expect(() => evaluate(ROOT, LEDGER)).not.toThrow()
     })
 
-    it.each(Object.keys(LEDGER))('derives a finite value for %s', id => {
+    it.each(Object.keys(LEDGER))('derives a usable value for %s', id => {
       const value = evaluate(ROOT, { [id]: LEDGER[id] })[id]
-      expect(Number.isFinite(value)).toBe(true)
+      if (typeof value === 'string') expect(value.length).toBeGreaterThan(0)
+      else expect(Number.isFinite(value)).toBe(true)
     })
   })
 
-  describe('the committed values match the code', () => {
+  describe('the baked values match the code', () => {
     // This is the one that goes red when someone changes src/ and does not
-    // re-run `npm run design`. `npm run design -- --check` catches it too; both
-    // are required checks, and this one names the card.
-    it.each(Object.keys(LEDGER))('%s is still what the source says', id => {
-      const fresh = evaluate(ROOT, { [id]: LEDGER[id] })[id]
+    // re-run `npm run design`. `npm run design -- --check` catches it too; this
+    // one names the card and line in the test run.
+    const FRESH = evaluate(ROOT, LEDGER)
+    it.each(BAKED.map(b => [`${b.file}:${b.line} ${b.id}`, b]))('%s is still what the source says', (_label, baked) => {
       expect(
-        COMMITTED[id]?.value,
-        `docs/design-system/claims.js is stale for "${id}" (card: ${LEDGER[id].card}). ` +
-          `Run \`npm run design\` and commit the result.`
-      ).toBe(fresh)
+        baked.text,
+        `${baked.file}:${baked.line} data-claim="${baked.id}" is stale. Run \`npm run design\` and commit the result.`
+      ).toBe(formatted(baked.id, FRESH[baked.id]))
+    })
+
+    it('has no empty bake target', () => {
+      const empty = BAKED.filter(b => b.text.trim() === '').map(b => `${b.file}:${b.line} ${b.id}`)
+      expect(empty, 'run `npm run design` to fill these').toEqual([])
+    })
+
+    it('has every data-token and data-contrast fresh, and every target well formed', async () => {
+      const { ledger, claims } = loadClaims()
+      const tokens = collectCustomProperties(readFileSync(TOKEN_FILE, 'utf8'))
+      const stale = []
+      for (const file of PAGES) {
+        const text = readFileSync(path.join(ROOT, file), 'utf8')
+        const { targets } = await bakePage(file, text, { claims, ledger, tokens })
+        for (const t of targets) if (t.stale !== t.fresh) stale.push(`${file}:${t.line} ${t.kind}="${t.id}"`)
+      }
+      expect(stale, 'run `npm run design`').toEqual([])
+    })
+
+    it('no longer ships a claims.js – the values live in the cards', () => {
+      expect(existsSync(path.join(DESIGN, 'claims.js'))).toBe(false)
     })
   })
 
@@ -231,9 +303,11 @@ describe('design claims ledger', () => {
       expect(unused, `claims declared but never rendered: ${unused.join(', ')}`).toEqual([])
     })
 
-    it.each(Object.entries(LEDGER))('%s names a card that exists', (id, claim) => {
+    it.each(Object.entries(LEDGER))('%s names a card that exists, and that card shows it', (id, claim) => {
       const cards = CARD_FILES.map(f => path.posix.relative('docs/design-system', f))
       expect(cards, `claim "${id}" points at a missing card`).toContain(claim.card)
+      const on = BAKED.filter(b => b.id === id).map(b => path.posix.relative('docs/design-system', b.file))
+      expect(on, `claim "${id}" says its card is ${claim.card}, but it is rendered on ${on.join(', ')}`).toContain(claim.card)
     })
   })
 
@@ -241,10 +315,6 @@ describe('design claims ledger', () => {
     it('finds cards to check', () => {
       // Guards against a rename silently emptying every assertion above.
       expect(CARD_FILES.length).toBeGreaterThan(5)
-    })
-
-    it('keeps docs/design-system/claims.js generated, never hand-edited', () => {
-      expect(readFileSync(path.join(DESIGN, 'claims.js'), 'utf8')).toContain('GENERATED by')
     })
 
     it('has no stray tokens.css copies left from the old two-project layout', () => {
@@ -323,13 +393,23 @@ describe('design folder hygiene', () => {
     // either synced from src/ or listed here as a proposal with no incumbent.
     const PROPOSED_NOT_YET_ADOPTED = [
       'docs/design-system/system/components/menu/menu.css',
-      'docs/design-system/system/components/row/row.css'
+      'docs/design-system/system/components/row/row.css',
+      'docs/design-system/system/components/badge/badge.css',
+      'docs/design-system/system/components/button/button.css',
+      'docs/design-system/system/components/splitter/splitter.css',
+      'docs/design-system/system/components/tabs/tabs.css',
+      'docs/design-system/system/components/toolbar/toolbar.css',
+      'docs/design-system/system/components/tooltip/tooltip.css',
+      'docs/design-system/system/patterns/dialog/dialog.css',
+      'docs/design-system/system/patterns/states/states.css'
     ]
 
-    const synced = SYNC_SOURCE.match(/rel: '([^']+\.css)'/g)
-      .map(m => `docs/design-system/${m.slice(6, -1)}`)
+    const synced = COMPONENT_CSS.map(({ rel }) => `docs/design-system/${rel}`)
 
-    const onDisk = walk(ROOT, 'docs/design-system/system/components', ['.css'])
+    const onDisk = [
+      ...walk(ROOT, 'docs/design-system/system/components', ['.css']),
+      ...walk(ROOT, 'docs/design-system/system/patterns', ['.css'])
+    ]
     const unaccounted = onDisk.filter(
       f => !synced.includes(f) && !PROPOSED_NOT_YET_ADOPTED.includes(f)
     )
@@ -346,23 +426,29 @@ describe('design folder hygiene', () => {
     expect(stale, `declared proposed but actually synced: ${stale.join(', ')}`).toEqual([])
   })
 
-  it('has every card carrying its @card marker', () => {
+  it('has every card carrying its @card marker on line 1 – exactly line 1', () => {
+    // A scan of "the first few lines" let a marker drift below the SPDX header
+    // unnoticed. The rule is one line, and the message says which.
     const missing = CARD_FILES.filter(file => {
-      const head = readFileSync(path.join(ROOT, file), 'utf8').split('\n').slice(0, 5).join('\n')
-      return !/<!--\s*@card\s+group="/.test(head)
+      const first = readFileSync(path.join(ROOT, file), 'utf8').split(/\r?\n/, 1)[0]
+      return !/^<!--\s*@card\s+group="/.test(first)
     })
-    expect(missing, `cards missing an @card marker: ${missing.join(', ')}`).toEqual([])
+    expect(missing, `the @card marker must be on line 1, before the SPDX lines: ${missing.join(', ')}`).toEqual([])
+  })
+
+  it('refuses a marker that is not on line 1', () => {
+    expect(() => readMarker('<!-- SPDX -->\n<!-- @card group="Foundations" name="X" -->', 'x.html')).toThrow(/line 1/)
+    expect(readMarker('<!-- @card group="Foundations" name="X" status="proposed" -->\n', 'x.html')).toMatchObject({ name: 'X' })
   })
 
   it.each(CARD_FILES)('%s declares a status and a review date', file => {
-    // The generator already refuses to build without these. Asserting them here
-    // too means the failure names the card in the test run as well as the build,
-    // and it is what stops "is this decided or a sketch?" being unanswerable.
     const head = readFileSync(path.join(ROOT, file), 'utf8').split('\n')[0]
     expect(head, `${file}: status must be decided | proposed | superseded`).toMatch(
       /status="(decided|proposed|superseded)"/
     )
-    expect(head, `${file}: reviewed must be an ISO date`).toMatch(/reviewed="\d{4}-\d{2}-\d{2}"/)
+    expect(head, `${file}: reviewed must be an ISO date, or "never" on a proposed card`).toMatch(
+      /reviewed="\d{4}-\d{2}-\d{2}"|status="proposed"[^>]*reviewed="never"/
+    )
   })
 
   it('lists every card in the generated index', () => {
@@ -374,8 +460,7 @@ describe('design folder hygiene', () => {
     expect(
       missing,
       `cards absent from docs/design-system/index.html: ${missing.join(', ')}. ` +
-        `Run \`npm run design\`. If the marker moved off the first few lines, the ` +
-        `scan silently skipped it — that trap ate the whole index once already.`
+        `Run \`npm run design\`. The marker must be on line 1.`
     ).toEqual([])
   })
 
@@ -386,5 +471,54 @@ describe('design folder hygiene', () => {
     // growing back.
     const top = readdirSync(DESIGN, { withFileTypes: true }).filter(e => e.isDirectory()).map(e => e.name)
     expect(top).not.toContain('product')
+  })
+
+  it('keeps every system card in a group folder, including the new patterns/', () => {
+    expect(Object.keys(GROUP_FOLDERS)).toContain('system/patterns/')
+    expect(() => collectCards()).not.toThrow()
+  })
+})
+
+describe('design system governance', () => {
+  const tokens = collectCustomProperties(readFileSync(TOKEN_FILE, 'utf8'))
+
+  it('gives every owned token family an owner card that exists', () => {
+    for (const href of new Set(Object.values(TOKEN_OWNERS))) {
+      expect(existsSync(path.join(DESIGN, href)), href).toBe(true)
+    }
+  })
+
+  it('shows every owned token on its owner card, or says why not', () => {
+    expect(ownershipProblems(tokens)).toEqual([])
+  })
+
+  it('flags a token its owner card neither shows nor excuses', () => {
+    const extra = new Map(tokens)
+    extra.set('--space-999', '999px')
+    expect(ownershipProblems(extra).join('\n')).toMatch(/--space-999: not shown on its owner card/)
+  })
+
+  it('has #decision, #exceptions, a breadcrumb, <main> and a status badge matching the marker on every system card', () => {
+    expect(anatomyProblems(collectCards())).toEqual([])
+  })
+
+  it('requires replaced-by on a superseded card', () => {
+    for (const card of collectCards().filter(c => c.status === 'superseded')) {
+      expect(card['replaced-by'], card.file).toBeTruthy()
+      expect(existsSync(path.join(DESIGN, card['replaced-by'])), card.file).toBe(true)
+    }
+  })
+
+  it('keeps every adopted stylesheet under the erf- stylelint rule', () => {
+    expect(stylelintCoverageProblems()).toEqual([])
+  })
+
+  it('has every deviates: marker in src/ pointing at a real card that lists it', () => {
+    expect(deviationProblems()).toEqual([])
+  })
+
+  it('writes no em dash in a card subtitle', () => {
+    const bad = CARD_FILES.filter(f => /subtitle="[^"]*—/.test(readFileSync(path.join(ROOT, f), 'utf8').split('\n')[0]))
+    expect(bad).toEqual([])
   })
 })

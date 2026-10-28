@@ -1,0 +1,218 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/**
+ * The button – every clickable action that is not a link and not a menu item.
+ *
+ * PROPOSED – not adopted. The closest thing that ships is the .dialog-btn family
+ * in src/renderer/src/components/Dialog/Dialog.css, which the Buttons card draws
+ * beside this file as an illustration. Adopting this is a MOVE, not a copy: the
+ * rules land in src/, and scripts/design-sync.mjs then syncs the file back here.
+ *
+ * What it changes against Dialog.css, each for a stated reason:
+ *   - height comes from --btn-height-* (Dialog.css derives ~37px from padding);
+ *   - no translateY lift on hover (motion that carries no meaning);
+ *   - no letter-spacing literal (0.2px was the one tracking value in the app);
+ *   - secondary hover really changes something (fill, edge and label);
+ *   - every state also has a .is-* hook so the card can draw it statically.
+ *
+ * .is-hover, [class~='is-active'] and .is-focus are documentation-only hooks; they never
+ * ship in src/. Classes are prefixed erf-.
+ */
+
+.erf-button {
+  /* Proposed --duration-spin, named here until the token exists (Motion card). */
+  --erf-button-spin: 0.8s;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  box-sizing: border-box;
+  block-size: var(--btn-height-md);
+  padding: 0 var(--space-8);
+  margin: 0;
+  border: var(--border-width) solid transparent;
+  border-radius: var(--border-radius);
+  background: transparent;
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  line-height: var(--leading-none);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.erf-button svg {
+  flex: 0 0 auto;
+  inline-size: var(--icon-size-sm);
+  block-size: var(--icon-size-sm);
+}
+
+/* The one focus ring (Focus card). Never removed, never recoloured per variant. */
+.erf-button:is(:focus-visible, [class~='is-focus']) {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
+}
+
+/* ---------- sizes: the height is the token, nothing else ---------- */
+
+.erf-button--sm {
+  block-size: var(--btn-height-sm);
+  padding: 0 var(--space-4);
+  font-size: var(--text-sm);
+}
+
+.erf-button--lg {
+  block-size: var(--btn-height-lg);
+  padding: 0 var(--space-12);
+  font-size: var(--text-md);
+}
+
+/* Beside a field, a button takes the FIELD's height so the two edges line up.
+   The button and field scales do not pair (24/32/40 against 28/36/44); this is
+   the stop-gap until they do. */
+.erf-button--field-sm { block-size: var(--input-height-sm); }
+.erf-button--field-md { block-size: var(--input-height-md); }
+.erf-button--field-lg { block-size: var(--input-height-lg); }
+
+/* ---------- variants ---------- */
+
+/* Primary: one per surface. Near-black label – white on the violet fails 1.4.3. */
+.erf-button--primary {
+  background: var(--color-btn-primary-bg);
+  color: var(--color-btn-primary-text);
+}
+.erf-button--primary:is(:hover, [class~='is-hover']) { background: var(--color-btn-primary-hover); }
+.erf-button--primary:is(:active, [class~='is-active']) { background: var(--color-btn-primary-active); }
+
+/* Secondary: Cancel, and every action that is not the point of the surface. */
+.erf-button--secondary {
+  border-color: var(--color-border-subtle);
+  color: var(--color-text-primary);
+}
+.erf-button--secondary:is(:hover, [class~='is-hover']) {
+  background: var(--color-btn-secondary-bg);
+  border-color: var(--color-gray-600);
+  color: var(--color-text-bright);
+}
+.erf-button--secondary:is(:active, [class~='is-active']) {
+  background: var(--color-btn-secondary-hover);
+  border-color: var(--color-gray-600);
+  color: var(--color-text-bright);
+}
+
+/* Danger: the action cannot be undone. Hover goes DARKER (6.80:1, not 4.31:1). */
+.erf-button--danger {
+  background: var(--color-btn-danger-bg);
+  color: var(--color-white);
+}
+.erf-button--danger:is(:hover, [class~='is-hover']),
+.erf-button--danger:is(:active, [class~='is-active']) { background: var(--color-btn-danger-hover); }
+.erf-button--danger:is(:active, [class~='is-active']) { border-color: var(--color-white); }
+
+/* Ghost: toolbars and dense chrome. No resting fill, no resting edge. */
+.erf-button--ghost { color: var(--color-text-primary); }
+.erf-button--ghost:is(:hover, [class~='is-hover']) { background: var(--color-bg-hover); color: var(--color-text-bright); }
+.erf-button--ghost:is(:active, [class~='is-active']) { background: var(--color-bg-hover-solid); color: var(--color-text-bright); }
+
+/* Icon-only: a 24 x 24 target (WCAG 2.2 SC 2.5.8) around a 16px glyph. It has
+   no visible text, so it MUST carry aria-label – never title. */
+.erf-button--icon {
+  inline-size: var(--btn-height-sm);
+  block-size: var(--btn-height-sm);
+  padding: 0;
+  color: var(--color-text-secondary);
+}
+.erf-button--icon:is(:hover, [class~='is-hover']) { background: var(--color-bg-hover); color: var(--color-text-bright); }
+.erf-button--icon:is(:active, [class~='is-active']) { background: var(--color-bg-hover-solid); color: var(--color-text-bright); }
+
+/* Toggle: aria-pressed carries the state. Pressed is a fill AND a lime bottom
+   edge – the permission band's toggle signature – never colour alone (1.4.1). */
+.erf-button--toggle { color: var(--color-text-secondary); }
+.erf-button--toggle:is(:hover, [class~='is-hover']) { background: var(--color-bg-hover); color: var(--color-text-bright); }
+.erf-button--toggle[aria-pressed='true'] {
+  background: var(--color-bg-selected);
+  border-block-end-color: var(--color-brand-lime);
+  color: var(--color-text-bright);
+}
+
+/* Text: an action that reads as a link but does something (Retry, Show more).
+   A real navigation is an <a>, not this. */
+.erf-button--text {
+  block-size: auto;
+  padding: 0;
+  font-weight: var(--font-normal);
+  color: var(--color-link);
+  text-decoration: underline;
+  text-underline-offset: var(--space-1);
+}
+.erf-button--text:is(:hover, [class~='is-hover']) { color: var(--color-link-hover); }
+.erf-button--text:is(:active, [class~='is-active']) { color: var(--color-brand-violet-active); }
+
+/* ---------- disabled and busy ---------- */
+
+/* Disabled: one rule for every variant. Hover and active do nothing, which is
+   why each variant's hover rule is overridden here rather than guarded with
+   :not(:disabled) in seven places. */
+.erf-button:is(:disabled, [aria-disabled='true']),
+.erf-button:is(:disabled, [aria-disabled='true']):is(:hover, [class~='is-hover'], :active, [class~='is-active']) {
+  opacity: var(--opacity-disabled);
+  cursor: not-allowed;
+}
+.erf-button--secondary:is(:disabled, [aria-disabled='true']):is(:hover, [class~='is-hover'], :active, [class~='is-active']) {
+  background: transparent;
+  border-color: var(--color-border-subtle);
+  color: var(--color-text-primary);
+}
+.erf-button--ghost:is(:disabled, [aria-disabled='true']):is(:hover, [class~='is-hover'], :active, [class~='is-active']),
+.erf-button--icon:is(:disabled, [aria-disabled='true']):is(:hover, [class~='is-hover'], :active, [class~='is-active']),
+.erf-button--toggle:is(:disabled, [aria-disabled='true']):is(:hover, [class~='is-hover'], :active, [class~='is-active']) {
+  background: transparent;
+}
+.erf-button--primary:is(:disabled, [aria-disabled='true']):is(:hover, [class~='is-hover'], :active, [class~='is-active']) {
+  background: var(--color-btn-primary-bg);
+}
+.erf-button--danger:is(:disabled, [aria-disabled='true']):is(:hover, [class~='is-hover'], :active, [class~='is-active']) {
+  background: var(--color-btn-danger-bg);
+  border-color: transparent;
+}
+
+/* Busy: the action is running. The button keeps its width and its label, adds
+   a spinner, and stays focusable (aria-disabled, not disabled) so focus is not
+   thrown to <body> mid-action. The label may change ("Saving…"); the width
+   may not jump. */
+/* Busy is not disabled-looking: full opacity, so the label stays readable
+   while the work runs. */
+.erf-button[aria-busy='true'],
+.erf-button[aria-busy='true']:is(:hover, [class~='is-hover']) { opacity: 1; cursor: progress; }
+.erf-button[aria-busy='true']::before {
+  content: '';
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  inline-size: var(--icon-size-xs);
+  block-size: var(--icon-size-xs);
+  border: var(--border-width-thick) solid currentColor;
+  border-block-start-color: transparent;
+  border-radius: var(--border-radius-circle);
+  animation: erf-button-spin var(--erf-button-spin) linear infinite;
+}
+@keyframes erf-button-spin { to { transform: rotate(360deg); } }
+
+/* ---------- user settings ---------- */
+
+/* Reduced motion: colour still changes, nothing travels, the spinner rests as a
+   still ring with a gap, so "busy" survives without movement (Motion card). */
+@media (prefers-reduced-motion: reduce) {
+  .erf-button { transition: none; }
+  .erf-button[aria-busy='true']::before { animation: none; }
+}
+
+/* A contrast theme drops fills; the ghost, icon and toggle buttons would then
+   have no boundary, and pressed would read as resting. */
+@media (forced-colors: active) {
+  .erf-button { border-color: ButtonText; }
+  .erf-button--text { border-color: transparent; }
+  .erf-button--toggle[aria-pressed='true'] { border-block-end-color: Highlight; }
+}

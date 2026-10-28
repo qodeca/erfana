@@ -2,24 +2,23 @@
 <!-- SPDX-License-Identifier: GPL-3.0-only -->
 <!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
-<head>
+<html lang="en" data-theme="dark"><head>
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Erfana — GitHub presentation</title>
+<title>Erfana – GitHub presentation</title>
 <link rel="stylesheet" href="../../design-system/tokens.css">
 <link rel="stylesheet" href="../../design-system/fonts.css">
 <link rel="stylesheet" href="../../design-system/ds.css">
-<script src="../../design-system/claims.js"></script>
 <style>
   /* The artwork below is an IMAGE at a fixed canvas, not app UI: scripts/capture/brand.mjs
      screenshots each #gp-* element at deviceScaleFactor 2. Every colour is a token. */
 
-  /* deviates: docs/design-system/README.md — the gp- classes are not erf- namespaced. The erf- rule is for
+  /* deviates: docs/design-system/README.md – the gp- classes are not erf- namespaced. The erf- rule is for
      component CSS destined for src/; this artwork only ever becomes a PNG, and its #gp-* ids
      are the contract brand.mjs and brand.test.mjs read. See Exceptions. */
 
-  /* deviates: docs/design-system/system/foundations/colors.html — Erfana is dark-only, but GitHub has a
+  /* deviates: docs/design-system/system/foundations/colors.html – Erfana is dark-only, but GitHub has a
      light theme, so the README banner needs a light variant. It is an asset on github.com,
      never app chrome; the app rule is unchanged. See Exceptions. */
   .gp-art--dark {
@@ -45,7 +44,7 @@
     font-family: var(--font-mono);
     border-radius: var(--border-radius);
   }
-  /* deviates: docs/design-system/system/foundations/type.html — the banner is drawn at image scale, so
+  /* deviates: docs/design-system/system/foundations/type.html – the banner is drawn at image scale, so
      its icon (88px) and wordmark (60px, 38px in the social card) sit outside the UI type
      scale. They are values this card decides; see Exceptions. */
   .gp-banner { width: 800px; height: 200px; padding: 0 var(--space-16); }
@@ -53,6 +52,10 @@
 
   .gp-brand { display: flex; align-items: center; gap: var(--space-10); }
   .gp-brand img { display: block; width: 88px; height: 88px; }
+  /* stylelint-disable declaration-property-unit-disallowed-list, declaration-property-value-allowed-list --
+     Artwork, not UI: the wordmark and pitch are set at fixed sizes on a fixed
+     canvas that scripts/capture/brand.mjs screenshots. No UI type token is that
+     large, and the image must not move when the UI scale does. */
   .gp-wordmark { margin: 0; font-size: 60px; font-weight: var(--font-bold); line-height: 1;
                  letter-spacing: -0.02em; color: var(--gp-fg); }
 
@@ -62,6 +65,7 @@
   .gp-social .gp-wordmark { font-size: 38px; }
   .gp-pitch { margin: 0; font-size: var(--text-lg); font-weight: 400; line-height: 1.4;
               color: var(--gp-fg); max-width: 22ch; }
+  /* stylelint-enable declaration-property-unit-disallowed-list, declaration-property-value-allowed-list */
   .gp-nowrap { white-space: nowrap; }
 
   /* The abstract window: tree, editor with one selected line, preview with a two-node flow,
@@ -109,7 +113,7 @@
 <p class="ds-lede">
   The README banner, the wordmark and the repository's social preview. <strong>This page is their
   source</strong>: <code>npm run docs:brand</code> screenshots the three pieces of artwork below at
-  2&times; into <code>docs/assets/readme/</code>, so a token change is one re-run away from a new
+  2× into <code>docs/assets/readme/</code>, so a token change is one re-run away from a new
   banner, and no image editor holds a second copy of the brand.
 </p>
 
@@ -134,7 +138,7 @@
 
 <h2>Banner – dark</h2>
 <p>Shown by GitHub's dark themes through <code>&lt;picture&gt;</code> with
-<code>prefers-color-scheme: dark</code>. 800&times;200 layout, exported at 1600&times;400.</p>
+<code>prefers-color-scheme: dark</code>. 800×200 layout, exported at 1600×400.</p>
 <figure class="gp-stage">
   <div id="gp-banner-dark" class="gp-art gp-art--dark gp-banner">
     <div class="gp-brand">
@@ -147,7 +151,7 @@
         <div class="gp-pane gp-pane--editor"><div class="gp-bar gp-bar--head"></div><div class="gp-bar gp-w90"></div><div class="gp-bar gp-bar--sel gp-w75"></div><div class="gp-bar gp-w60"></div><div class="gp-bar gp-w75"></div></div>
         <div class="gp-pane gp-pane--preview"><div class="gp-bar gp-bar--head"></div><div class="gp-flow"><div class="gp-node"></div><div class="gp-edge"></div><div class="gp-node"></div></div></div>
       </div>
-      <div class="gp-term"><span>&#x276F;</span><span class="gp-cursor"></span></div>
+      <div class="gp-term"><span>❯</span><span class="gp-cursor"></span></div>
     </div>
   </div>
   <figcaption>Output: <code>docs/assets/readme/banner-dark.png</code></figcaption>
@@ -168,15 +172,15 @@ not honour <code>&lt;picture&gt;</code>. Same geometry; indigo replaces violet f
         <div class="gp-pane gp-pane--editor"><div class="gp-bar gp-bar--head"></div><div class="gp-bar gp-w90"></div><div class="gp-bar gp-bar--sel gp-w75"></div><div class="gp-bar gp-w60"></div><div class="gp-bar gp-w75"></div></div>
         <div class="gp-pane gp-pane--preview"><div class="gp-bar gp-bar--head"></div><div class="gp-flow"><div class="gp-node"></div><div class="gp-edge"></div><div class="gp-node"></div></div></div>
       </div>
-      <div class="gp-term"><span>&#x276F;</span><span class="gp-cursor"></span></div>
+      <div class="gp-term"><span>❯</span><span class="gp-cursor"></span></div>
     </div>
   </div>
   <figcaption>Output: <code>docs/assets/readme/banner-light.png</code></figcaption>
 </figure>
 
 <h2>Social preview</h2>
-<p>The card link sites draw for <code>github.com/qodeca/erfana</code>. 640&times;320 layout, exported at
-1280&times;640 (GitHub's recommended size); content stays inside the 1200&times;560 safe area. Dark
+<p>The card link sites draw for <code>github.com/qodeca/erfana</code>. 640×320 layout, exported at
+1280×640 (GitHub's recommended size); content stays inside the 1200×560 safe area. Dark
 only – it is not theme-aware. Uploaded by hand in Settings after the README merges.</p>
 <figure class="gp-stage">
   <div id="gp-social" class="gp-art gp-art--dark gp-social">
@@ -193,7 +197,7 @@ only – it is not theme-aware. Uploaded by hand in Settings after the README me
         <div class="gp-pane gp-pane--editor"><div class="gp-bar gp-bar--head"></div><div class="gp-bar gp-w90"></div><div class="gp-bar gp-bar--sel gp-w75"></div><div class="gp-bar gp-w60"></div><div class="gp-bar gp-w75"></div><div class="gp-bar gp-w45"></div></div>
         <div class="gp-pane gp-pane--preview"><div class="gp-bar gp-bar--head"></div><div class="gp-flow"><div class="gp-node"></div><div class="gp-edge"></div><div class="gp-node"></div></div></div>
       </div>
-      <div class="gp-term"><span>&#x276F;</span><span class="gp-cursor"></span></div>
+      <div class="gp-term"><span>❯</span><span class="gp-cursor"></span></div>
     </div>
   </div>
   <figcaption>Output: <code>docs/assets/readme/social-preview.png</code></figcaption>
@@ -203,13 +207,13 @@ only – it is not theme-aware. Uploaded by hand in Settings after the README me
 <table>
   <thead><tr><th>Element</th><th>Pair</th><th>Ratio</th></tr></thead>
   <tbody>
-    <tr><td>Wordmark, dark banner</td><td><code>--color-brand-white</code> on <code>--color-brand-black</code></td><td class="ds-ratio ds-pass"><span data-claim="contrast-gp-wordmark-dark"></span>:1</td></tr>
-    <tr><td>Wordmark, light banner</td><td><code>--color-brand-black</code> on <code>--color-brand-white</code></td><td class="ds-ratio ds-pass"><span data-claim="contrast-gp-wordmark-light"></span>:1</td></tr>
-    <tr><td>Prompt glyph (both)</td><td><code>--color-text-primary</code> on <code>--color-brand-black</code></td><td class="ds-ratio ds-pass"><span data-claim="contrast-gp-prompt"></span>:1</td></tr>
-    <tr><td>Cursor (both, on the dark strip)</td><td><code>--color-brand-lime</code> on <code>--color-brand-black</code></td><td class="ds-ratio ds-pass"><span data-claim="contrast-gp-cursor"></span>:1</td></tr>
-    <tr><td>Accent, light banner</td><td><code>--color-brand-indigo</code> on <code>--color-brand-white</code></td><td class="ds-ratio ds-pass"><span data-claim="contrast-gp-indigo-light"></span>:1</td></tr>
-    <tr><td>Why lime never sits on the light surface</td><td><code>--color-brand-lime</code> on <code>--color-brand-white</code></td><td class="ds-ratio ds-fail"><span data-claim="contrast-gp-lime-light"></span>:1</td></tr>
-    <tr><td>Why violet is only a muted fill on light</td><td><code>--color-brand-violet</code> on <code>--color-brand-white</code></td><td class="ds-ratio ds-fail"><span data-claim="contrast-gp-violet-light"></span>:1</td></tr>
+    <tr><td>Wordmark, dark banner</td><td><code>--color-brand-white</code> on <code>--color-brand-black</code></td><td class="ds-ratio ds-pass"><span data-claim="contrast-gp-wordmark-dark" title="--color-brand-white on --color-brand-black, the wordmark on the dark banner">17.62</span>:1</td></tr>
+    <tr><td>Wordmark, light banner</td><td><code>--color-brand-black</code> on <code>--color-brand-white</code></td><td class="ds-ratio ds-pass"><span data-claim="contrast-gp-wordmark-light" title="--color-brand-black on --color-brand-white, the wordmark on the light banner">17.62</span>:1</td></tr>
+    <tr><td>Prompt glyph (both)</td><td><code>--color-text-primary</code> on <code>--color-brand-black</code></td><td class="ds-ratio ds-pass"><span data-claim="contrast-gp-prompt" title="--color-text-primary on --color-brand-black, the prompt glyph on the terminal strip">11.51</span>:1</td></tr>
+    <tr><td>Cursor (both, on the dark strip)</td><td><code>--color-brand-lime</code> on <code>--color-brand-black</code></td><td class="ds-ratio ds-pass"><span data-claim="contrast-gp-cursor" title="--color-brand-lime on --color-brand-black, the cursor on the terminal strip">13.94</span>:1</td></tr>
+    <tr><td>Accent, light banner</td><td><code>--color-brand-indigo</code> on <code>--color-brand-white</code></td><td class="ds-ratio ds-pass"><span data-claim="contrast-gp-indigo-light" title="--color-brand-indigo on --color-brand-white, the light banner accent">7.61</span>:1</td></tr>
+    <tr><td>Why lime never sits on the light surface</td><td><code>--color-brand-lime</code> on <code>--color-brand-white</code></td><td class="ds-ratio ds-fail"><span data-claim="contrast-gp-lime-light" title="--color-brand-lime on --color-brand-white, why lime never sits on the light banner">1.26</span>:1</td></tr>
+    <tr><td>Why violet is only a muted fill on light</td><td><code>--color-brand-violet</code> on <code>--color-brand-white</code></td><td class="ds-ratio ds-fail"><span data-claim="contrast-gp-violet-light" title="--color-brand-violet on --color-brand-white, why violet is only a muted fill on light">2.10</span>:1</td></tr>
   </tbody>
 </table>
 <p>Frames, pane bars and the selected line are decorative and carry no meaning; the README says in
@@ -236,5 +240,6 @@ text everything the banner shows.</p>
   </tbody>
 </table>
 
-</body>
-</html>
+
+
+</body></html>

@@ -1,0 +1,152 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+
+/* ==========================================================================
+   Badges, counters, chips and keys – PROPOSED component CSS.
+
+   Authored here, no home in src/ yet. Adopting it is a consolidation: the
+   app draws each of these under its own class names (the Badges card lists
+   them), and three stylesheets each style <kbd> differently.
+
+   The rule every class here keeps: the information is in the TEXT. Colour
+   repeats it; it never carries it alone (SC 1.4.1, issue #95).
+   ========================================================================== */
+
+/* ---------- activity-bar badge ---------- */
+
+/* A count pinned to an activity-bar icon. Violet fill, near-black label:
+   white on the brand violet fails (the Buttons card measures it). */
+.erf-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--icon-size-sm);
+  height: var(--icon-size-sm);
+  padding: 0 var(--space-2);
+  border-radius: var(--border-radius);
+  background: var(--color-brand-violet);
+  color: var(--color-text-on-accent);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold);
+  line-height: var(--leading-none);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Presence without a number ("a session is running"). Square, like every
+   corner in Erfana. Allowed only when the item's accessible name says the
+   same thing in words. */
+.erf-badge--dot {
+  min-width: 0;
+  width: var(--space-4);
+  height: var(--space-4);
+  padding: 0;
+}
+
+/* ---------- git status badge ---------- */
+
+/* A file: the letter on a filled tile. The letter is the information. */
+.erf-git {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--space-7);
+  height: var(--space-7);
+  padding: 0 var(--space-1);
+  border: var(--border-width) solid transparent;
+  border-radius: var(--border-radius);
+  color: var(--color-bg-primary);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold);
+  line-height: var(--leading-none);
+}
+.erf-git[data-git="modified"]   { background: var(--color-git-modified-light); }
+.erf-git[data-git="untracked"]  { background: var(--color-git-untracked-light); }
+.erf-git[data-git="deleted"]    { background: var(--color-git-deleted-light); }
+.erf-git[data-git="staged"]     { background: var(--color-git-staged-light); }
+.erf-git[data-git="renamed"]    { background: var(--color-git-renamed-light); }
+.erf-git[data-git="conflicted"] { background: var(--color-git-conflicted-light); }
+
+/* A folder: the SAME letter, outlined instead of filled. Outlined says
+   "something inside"; the letter says what. Replaces the colour-only dot. */
+.erf-git.erf-git--folder { background: transparent; border-color: currentColor; }
+.erf-git--folder[data-git="modified"]   { color: var(--color-git-modified-light); }
+.erf-git--folder[data-git="untracked"]  { color: var(--color-git-untracked-light); }
+.erf-git--folder[data-git="deleted"]    { color: var(--color-git-deleted-light); }
+.erf-git--folder[data-git="staged"]     { color: var(--color-git-staged-light); }
+.erf-git--folder[data-git="renamed"]    { color: var(--color-git-renamed-light); }
+.erf-git--folder[data-git="conflicted"] { color: var(--color-git-conflicted-light); }
+
+/* ---------- counter ---------- */
+
+/* A neutral count beside a label: "12 blocked", "3 comments". Not a badge –
+   it sits in the text flow and never on an icon. */
+.erf-counter {
+  display: inline-block;
+  min-width: var(--space-8);
+  padding: 0 var(--space-3);
+  border: var(--border-width) solid var(--color-border-default);
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold);
+  line-height: var(--leading-normal);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- chip ---------- */
+
+/* A static label: a frontmatter tag, a window size. Not a control. */
+.erf-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border: var(--border-width) solid var(--color-border-default);
+  border-radius: var(--border-radius);
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+}
+
+/* A chip that does something is a button first: the 24px target floor, a
+   hover fill and the one focus ring. */
+.erf-chip--action {
+  min-height: var(--btn-height-sm);
+  cursor: pointer;
+}
+.erf-chip--action:hover { background: var(--color-bg-hover-solid); }
+.erf-chip--action:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
+}
+.erf-chip__caret { color: var(--color-text-tertiary); }
+
+/* ---------- key ---------- */
+
+/* One key. A combination is several keys joined by "+" OUTSIDE the boxes,
+   inside an .erf-keys wrapper that never breaks across lines. */
+.erf-kbd {
+  display: inline-block;
+  min-width: var(--space-10);
+  padding: 0 var(--space-3);
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-bottom-width: var(--border-width-thick);
+  border-radius: var(--border-radius);
+  background: var(--color-bg-primary);
+  color: var(--color-text-bright);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: var(--font-normal);
+  line-height: var(--leading-normal);
+  text-align: center;
+}
+.erf-keys {
+  white-space: nowrap;
+  color: var(--color-text-tertiary);
+}

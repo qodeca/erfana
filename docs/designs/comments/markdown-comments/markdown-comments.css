@@ -293,6 +293,7 @@ tr.erf-mdc-block > td > .erf-hpc-label {
   inset-block-start: calc((var(--btn-height-sm) + var(--space-1)) * -1);
 }
 /* Two pins on one row: the second moves left in 22px steps (HTML rule). */
+/* stylelint-disable-next-line declaration-property-unit-disallowed-list -- 22px is the pin glyph width, a drawing coordinate that aligns the pin to the block edge */
 .erf-mdc-block > .erf-hpc-pin--step-1 { inset-inline-start: calc(100% + var(--space-1) - 22px); }
 
 /* The comment-mode frame and tab cover the preview scroller, not the content. */

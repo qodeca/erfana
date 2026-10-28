@@ -1,11 +1,13 @@
 {
   "$comment": [
     "Every number a card states lives here, with the code that derives it.",
-    "A card writes <span data-claim=\"id\"></span> and has nowhere to type a digit.",
-    "Values are computed by scripts/lib/design-claims.mjs into the generated",
-    "docs/design-system/claims.js, and re-derived by scripts/design-claims.test.mjs on every CI run.",
-    "Adding a number to a card without an entry here fails that test.",
-    "See scripts/lib/design-claims.mjs for why this is a mechanism and not a rule."
+    "A card writes <span data-claim=\"id\"></span>; scripts/design-sync.mjs (npm run design) evaluates the",
+    "predicate with scripts/lib/design-claims.mjs and BAKES the value into the card's own text, so the",
+    "cards stay static HTML with no JavaScript. `npm run design -- --check` and scripts/design-claims.test.mjs",
+    "re-derive every value on each CI run and fail, naming the card and line, when the baked text is stale.",
+    "A data-claim id with no entry here, or an entry no card names, fails that check. Nothing scans a card",
+    "for hand-typed digits: a count of the app belongs here, a value a card decides may be literal.",
+    "See scripts/lib/design-claims.mjs for the predicate kinds and their limits."
   ],
   "spinner-keyframes": {
     "kind": "count",
@@ -69,12 +71,12 @@
   "zindex-css-literals": {
     "kind": "count",
     "card": "system/foundations/layering.html",
-    "label": "stylesheets setting a bare z-index instead of a token",
+    "label": "stylesheets setting a bare z-index on the app-wide ladder (the documented local stacking in CameraDialog.css and the off-screen park in TerminalPanel.css excluded)",
     "dir": "src/renderer",
     "ext": [
       ".css"
     ],
-    "excludePath": "design-tokens\\.css",
+    "excludePath": "design-tokens\\.css|Panels/TerminalPanel\\.css$|Dialog/CameraDialog\\.css$",
     "match": "z-index:\\s*[0-9]",
     "unit": "files"
   },
@@ -133,7 +135,7 @@
     "foreground": "--color-text-secondary",
     "background": "--color-bg-secondary"
   },
-  "contrast-tertiary-on-panel": {
+  "contrast-tertiary-on-band": {
     "kind": "contrast",
     "card": "system/components/permission-band/index.html",
     "label": "--color-text-tertiary on --color-bg-primary",
@@ -164,26 +166,26 @@
   "warning-tokens": {
     "kind": "count",
     "card": "system/components/feedback/index.html",
-    "label": "tokens declared for the meaning \"warning\"",
+    "label": "tokens whose name carries the meaning \"warning\" anywhere",
     "dir": "src/renderer/src/styles",
     "ext": [
       ".css"
     ],
     "includePath": "design-tokens\\.css",
     "unit": "matches",
-    "match": "^\\s*--color-warning[\\w-]*\\s*:"
+    "match": "^\\s*--[\\w-]*warning[\\w-]*\\s*:"
   },
   "error-tokens": {
     "kind": "count",
     "card": "system/components/feedback/index.html",
-    "label": "tokens declared for the meaning \"error\"",
+    "label": "tokens whose name carries the meaning \"error\" anywhere",
     "dir": "src/renderer/src/styles",
     "ext": [
       ".css"
     ],
     "includePath": "design-tokens\\.css",
     "unit": "matches",
-    "match": "^\\s*--color-error[\\w-]*\\s*:"
+    "match": "^\\s*--[\\w-]*error[\\w-]*\\s*:"
   },
   "alert-role-files": {
     "kind": "count",
@@ -200,14 +202,14 @@
   "context-menu-dependants": {
     "kind": "count",
     "card": "system/components/menu/index.html",
-    "label": "files that import a context menu component",
+    "label": "files that import a context menu component (a value import of ContextMenu, EditorContextMenu, TerminalContextMenu, PreviewContextMenu or TextareaContextMenu – not a type, helper or hook)",
     "dir": "src/renderer",
     "ext": [
       ".tsx",
       ".ts"
     ],
     "excludePath": "\\.test\\.|components/ContextMenu/",
-    "match": "import[^\n]*ContextMenu",
+    "match": "^import \\{[^}]*\\b[A-Za-z]*ContextMenu\\b[^}]*\\} from '[^']*/ContextMenu/[A-Za-z]*ContextMenu'",
     "unit": "files"
   },
   "outline-none-unreplaced": {
@@ -228,10 +230,10 @@
     "foreground": "--color-border-focus",
     "background": "--color-bg-secondary"
   },
-  "contrast-warning-on-panel": {
+  "contrast-warning-on-confirm": {
     "kind": "contrast",
     "card": "system/components/permission-band/index.html",
-    "label": "--color-warning on --color-bg-tertiary",
+    "label": "--color-warning on --color-bg-tertiary, the confirm step's warning text",
     "foreground": "--color-warning",
     "background": "--color-bg-tertiary"
   },
@@ -479,5 +481,415 @@
     "label": "--color-text-tertiary on --color-bg-secondary: the description colour the Comments section uses",
     "foreground": "--color-text-tertiary",
     "background": "--color-bg-secondary"
+  },
+  "icon-size-literals": {
+    "kind": "count",
+    "card": "system/components/icon/index.html",
+    "label": "icons sized with a literal size={N} instead of a token",
+    "dir": "src/renderer",
+    "ext": [
+      ".tsx"
+    ],
+    "excludePath": "\\.test\\.",
+    "match": "size=\\{[0-9]+\\}",
+    "unit": "matches"
+  },
+  "icon-size-distinct": {
+    "kind": "distinct",
+    "card": "system/components/icon/index.html",
+    "label": "distinct literal icon sizes",
+    "dir": "src/renderer",
+    "ext": [
+      ".tsx"
+    ],
+    "excludePath": "\\.test\\.",
+    "match": "size=\\{([0-9]+)\\}",
+    "group": 1
+  },
+  "icon-size-offscale": {
+    "kind": "distinct",
+    "card": "system/components/icon/index.html",
+    "label": "distinct literal icon sizes that are not on the 12/16/20/24/32 scale",
+    "dir": "src/renderer",
+    "ext": [
+      ".tsx"
+    ],
+    "excludePath": "\\.test\\.",
+    "match": "size=\\{(?!(?:12|16|20|24|32)\\})([0-9]+)\\}",
+    "group": 1
+  },
+  "icon-size-offscale-list": {
+    "kind": "list",
+    "card": "system/components/icon/index.html",
+    "label": "the off-scale literal icon sizes, in px",
+    "dir": "src/renderer",
+    "ext": [
+      ".tsx"
+    ],
+    "excludePath": "\\.test\\.",
+    "match": "size=\\{(?!(?:12|16|20|24|32)\\})([0-9]+)\\}",
+    "group": 1
+  },
+  "icon-registry-importers": {
+    "kind": "count",
+    "card": "system/components/icon/index.html",
+    "label": "files importing from the icon registry",
+    "dir": "src/renderer",
+    "ext": [
+      ".ts",
+      ".tsx"
+    ],
+    "excludePath": "\\.test\\.|utils/iconRegistry",
+    "match": "from '[^']*iconRegistry'",
+    "unit": "files"
+  },
+  "transition-stylesheets": {
+    "kind": "count",
+    "card": "system/foundations/motion.html",
+    "label": "renderer stylesheets that declare a transition",
+    "dir": "src/renderer",
+    "ext": [
+      ".css"
+    ],
+    "match": "transition(?:-[a-z]+)?\\s*:",
+    "unit": "files"
+  },
+  "transition-literal-stylesheets": {
+    "kind": "count",
+    "card": "system/foundations/motion.html",
+    "label": "renderer stylesheets that write a transition duration as a literal instead of a --transition-* token",
+    "dir": "src/renderer",
+    "ext": [
+      ".css"
+    ],
+    "match": "transition(?:-duration)?\\s*:[^;}]*?(?:^|[\\s,:])[0-9]*\\.?[0-9]+m?s\\b",
+    "unit": "files"
+  },
+  "spinner-keyframe-files": {
+    "kind": "count",
+    "card": "system/foundations/motion.html",
+    "label": "stylesheets that each carry their own copy of a spin keyframe",
+    "dir": "src/renderer",
+    "ext": [
+      ".css"
+    ],
+    "match": "@keyframes\\s+[A-Za-z0-9_-]*[Ss]pin\\b",
+    "unit": "files"
+  },
+  "input-height-users": {
+    "kind": "count",
+    "card": "system/components/form/index.html",
+    "label": "renderer stylesheets that size a field with an --input-height-* token",
+    "dir": "src/renderer",
+    "ext": [
+      ".css"
+    ],
+    "match": "var\\(--input-height-",
+    "unit": "files"
+  },
+  "banner-prefixes": {
+    "kind": "distinct",
+    "card": "system/components/feedback/index.html",
+    "label": "distinct banner class families in the renderer",
+    "dir": "src/renderer",
+    "ext": [
+      ".css"
+    ],
+    "match": "\\.([A-Za-z0-9-]*?[Bb]anner)(?![A-Za-z0-9])",
+    "group": 1
+  },
+  "comment-banner-variants": {
+    "kind": "distinct",
+    "card": "system/components/feedback/index.html",
+    "label": "variants of the comment panel banner (.erf-comment-banner--*)",
+    "dir": "src/renderer",
+    "ext": [
+      ".css"
+    ],
+    "match": "\\.erf-comment-banner--([a-z]+)",
+    "group": 1
+  },
+  "contrast-secondary-on-tertiary": {
+    "kind": "contrast",
+    "card": "system/foundations/colors.html",
+    "label": "--color-text-secondary on --color-bg-tertiary, the sidebar and tree",
+    "foreground": "--color-text-secondary",
+    "background": "--color-bg-tertiary"
+  },
+  "contrast-muted-on-tertiary": {
+    "kind": "contrast",
+    "card": "system/foundations/colors.html",
+    "label": "--color-text-muted on --color-bg-tertiary",
+    "foreground": "--color-text-muted",
+    "background": "--color-bg-tertiary"
+  },
+  "contrast-muted-on-hover-solid": {
+    "kind": "contrast",
+    "card": "system/foundations/colors.html",
+    "label": "--color-text-muted on --color-bg-hover-solid",
+    "foreground": "--color-text-muted",
+    "background": "--color-bg-hover-solid"
+  },
+  "contrast-muted-on-selected": {
+    "kind": "contrast",
+    "card": "system/foundations/colors.html",
+    "label": "--color-text-muted on --color-bg-selected over --color-bg-tertiary",
+    "foreground": "--color-text-muted",
+    "background": "--color-bg-selected",
+    "over": "--color-bg-tertiary"
+  },
+  "menu-shortcut-on-tertiary": {
+    "kind": "contrast",
+    "card": "system/components/menu/index.html",
+    "label": "--color-text-secondary (the shortcut hint) on --color-bg-tertiary",
+    "foreground": "--color-text-secondary",
+    "background": "--color-bg-tertiary"
+  },
+  "menu-shortcut-on-hover-solid": {
+    "kind": "contrast",
+    "card": "system/components/menu/index.html",
+    "label": "--color-text-secondary (the shortcut hint) on --color-bg-hover-solid, a highlighted item",
+    "foreground": "--color-text-secondary",
+    "background": "--color-bg-hover-solid"
+  },
+  "menu-shortcut-on-danger-hover": {
+    "kind": "contrast",
+    "card": "system/components/menu/index.html",
+    "label": "--color-text-secondary (the shortcut hint) on --color-bg-danger-hover, a highlighted destructive item",
+    "foreground": "--color-text-secondary",
+    "background": "--color-bg-danger-hover"
+  },
+  "band-pressed-icon": {
+    "kind": "contrast",
+    "card": "system/components/permission-band/index.html",
+    "label": "--color-text-primary on --color-bg-selected over --color-bg-primary, the icon on a pressed band toggle",
+    "foreground": "--color-text-primary",
+    "background": "--color-bg-selected",
+    "over": "--color-bg-primary"
+  },
+  "band-pressed-ring": {
+    "kind": "contrast",
+    "card": "system/components/permission-band/index.html",
+    "label": "--color-border-focus on --color-bg-selected over --color-bg-primary, the ring on a pressed band toggle",
+    "foreground": "--color-border-focus",
+    "background": "--color-bg-selected",
+    "over": "--color-bg-primary"
+  },
+  "nav-tier-1": {
+    "kind": "capture",
+    "card": "system/components/permission-band/index.html",
+    "label": "first band tier breakpoint in PreviewNavControls.css, px",
+    "dir": "src/renderer",
+    "ext": [
+      ".css"
+    ],
+    "includePath": "PreviewNavControls\\.css$",
+    "match": "@container\\s*\\(width\\s*<\\s*([0-9]+)px\\)",
+    "group": 1,
+    "index": 0
+  },
+  "nav-tier-2": {
+    "kind": "capture",
+    "card": "system/components/permission-band/index.html",
+    "label": "second band tier breakpoint in PreviewNavControls.css, px",
+    "dir": "src/renderer",
+    "ext": [
+      ".css"
+    ],
+    "includePath": "PreviewNavControls\\.css$",
+    "match": "@container\\s*\\(width\\s*<\\s*([0-9]+)px\\)",
+    "group": 1,
+    "index": 1
+  },
+  "nav-tier-3": {
+    "kind": "capture",
+    "card": "system/components/permission-band/index.html",
+    "label": "third band tier breakpoint in PreviewNavControls.css, px",
+    "dir": "src/renderer",
+    "ext": [
+      ".css"
+    ],
+    "includePath": "PreviewNavControls\\.css$",
+    "match": "@container\\s*\\(width\\s*<\\s*([0-9]+)px\\)",
+    "group": 1,
+    "index": 2
+  },
+  "scrollbar-webkit-copies": {
+    "kind": "count",
+    "card": "system/foundations/surfaces.html",
+    "label": "renderer stylesheets carrying their own ::-webkit-scrollbar rules",
+    "dir": "src/renderer",
+    "ext": [
+      ".css"
+    ],
+    "match": "::-webkit-scrollbar",
+    "unit": "files"
+  },
+  "dialog-components": {
+    "kind": "count",
+    "card": "system/foundations/layering.html",
+    "label": "renderer components that declare aria-modal",
+    "dir": "src/renderer",
+    "ext": [
+      ".tsx"
+    ],
+    "excludePath": "\\.test\\.",
+    "match": "aria-modal",
+    "unit": "files"
+  },
+  "unused-colour-tokens": {
+    "kind": "unusedTokens",
+    "card": "system/foundations/colors.html",
+    "label": "colour tokens declared in design-tokens.css that nothing in src/ reads",
+    "dir": "src",
+    "ext": [
+      ".css",
+      ".ts",
+      ".tsx"
+    ],
+    "excludePath": "\\.test\\.",
+    "prefix": "^--color-"
+  },
+  "unused-layout-tokens": {
+    "kind": "unusedTokens",
+    "card": "system/foundations/surfaces.html",
+    "label": "non-colour tokens declared in design-tokens.css that nothing in src/ reads",
+    "dir": "src",
+    "ext": [
+      ".css",
+      ".ts",
+      ".tsx"
+    ],
+    "excludePath": "\\.test\\.",
+    "prefix": "^--(?!color-)"
+  },
+  "context-menu-min-width": {
+    "kind": "capture",
+    "card": "system/components/menu/index.html",
+    "label": "min-width of .context-menu in ContextMenu.css, px",
+    "dir": "src/renderer",
+    "ext": [
+      ".css"
+    ],
+    "includePath": "components/ContextMenu/ContextMenu\\.css$",
+    "match": "\\.context-menu\\s*\\{[^}]*?min-width:\\s*([0-9]+)px",
+    "group": 1
+  },
+  "tree-cut-opacity": {
+    "kind": "capture",
+    "card": "system/components/row/index.html",
+    "label": "opacity ProjectTree.css fades a cut row to",
+    "dir": "src/renderer",
+    "ext": [
+      ".css"
+    ],
+    "includePath": "components/ProjectTree/ProjectTree\\.css$",
+    "match": "data-clipboard-cut=\"true\"\\]\\s*\\{[^}]*?opacity:\\s*([0-9.]+)",
+    "group": 1
+  },
+  "toast-dwell-default-ms": {
+    "kind": "capture",
+    "card": "system/components/feedback/index.html",
+    "label": "DEFAULT_DWELL_MS in toastDwell.ts – an info or success toast with no duration given, ms",
+    "dir": "src/renderer",
+    "ext": [
+      ".ts"
+    ],
+    "includePath": "components/Toast/toastDwell\\.ts$",
+    "match": "export const DEFAULT_DWELL_MS = ([0-9]+)",
+    "group": 1
+  },
+  "toast-dwell-warning-ms": {
+    "kind": "capture",
+    "card": "system/components/feedback/index.html",
+    "label": "WARNING_MIN_DWELL_MS in toastDwell.ts – the shortest a warning toast is shown, ms",
+    "dir": "src/renderer",
+    "ext": [
+      ".ts"
+    ],
+    "includePath": "components/Toast/toastDwell\\.ts$",
+    "match": "export const WARNING_MIN_DWELL_MS = ([0-9]+)",
+    "group": 1
+  },
+  "toast-sticky-cap": {
+    "kind": "capture",
+    "card": "system/components/feedback/index.html",
+    "label": "MAX_STICKY_TOASTS in toastStack.ts – toasts that stay until closed, at most on screen",
+    "dir": "src/renderer",
+    "ext": [
+      ".ts"
+    ],
+    "includePath": "components/Toast/toastStack\\.ts$",
+    "match": "export const MAX_STICKY_TOASTS = ([0-9]+)",
+    "group": 1
+  },
+  "toast-min-width": {
+    "kind": "capture",
+    "card": "system/components/feedback/index.html",
+    "label": "min-width of .toast in Toast.css, px",
+    "dir": "src/renderer",
+    "ext": [
+      ".css"
+    ],
+    "includePath": "components/Toast/Toast\\.css$",
+    "match": "\\.toast\\s*\\{[^}]*?min-width:\\s*([0-9]+)px",
+    "group": 1
+  },
+  "toast-max-width": {
+    "kind": "capture",
+    "card": "system/components/feedback/index.html",
+    "label": "max-width of .toast in Toast.css, px",
+    "dir": "src/renderer",
+    "ext": [
+      ".css"
+    ],
+    "includePath": "components/Toast/Toast\\.css$",
+    "match": "\\.toast\\s*\\{[^}]*?max-width:\\s*([0-9]+)px",
+    "group": 1
+  },
+  "progressbar-files": {
+    "kind": "count",
+    "card": "system/components/feedback/index.html",
+    "label": "files rendering role=\"progressbar\"",
+    "dir": "src/renderer",
+    "ext": [
+      ".tsx"
+    ],
+    "excludePath": "\\.test\\.",
+    "match": "role=\"progressbar\"",
+    "unit": "files"
+  },
+  "tab-height-literal": {
+    "kind": "count",
+    "card": "system/components/tabs/index.html",
+    "label": "tab stylesheets that type height: 41px instead of reading --tab-height",
+    "dir": "src/renderer/src/components/Tabs",
+    "ext": [
+      ".css"
+    ],
+    "match": "^\\s*height:\\s*41px",
+    "unit": "files"
+  },
+  "tab-radius-literal": {
+    "kind": "count",
+    "card": "system/components/tabs/index.html",
+    "label": "tab stylesheets whose close button types border-radius: 0",
+    "dir": "src/renderer/src/components/Tabs",
+    "ext": [
+      ".css"
+    ],
+    "match": "^\\s*border-radius:\\s*0;",
+    "unit": "files"
+  },
+  "tab-floor-literal": {
+    "kind": "count",
+    "card": "system/components/tabs/index.html",
+    "label": "tab stylesheets that type the 80px floor",
+    "dir": "src/renderer/src/components/Tabs",
+    "ext": [
+      ".css"
+    ],
+    "match": "min-width:\\s*80px",
+    "unit": "files"
   }
 }

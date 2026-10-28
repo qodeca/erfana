@@ -2,17 +2,15 @@
 <!-- SPDX-License-Identifier: GPL-3.0-only -->
 <!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
-<head>
+<html lang="en" data-theme="dark"><head>
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Erfana — who is commenting</title>
+<title>Erfana – who is commenting</title>
 <link rel="stylesheet" href="../../../design-system/tokens.css">
 <link rel="stylesheet" href="../../../design-system/ds.css">
-<script src="../../../design-system/claims.js"></script>
 <link rel="stylesheet" href="./demo.css">
 <link rel="stylesheet" href="./comments.css">
-<script src="./demo.js"></script>
 <style>
   .settings { inline-size: 640px; padding: var(--space-16); background: var(--color-bg-secondary);
               border: var(--border-width) solid var(--color-border-default); }
@@ -38,18 +36,156 @@
   the plan files it; its copy is the plan's §10.7 word for word.
 </div>
 
-<h2>Live – the identity step</h2>
+<h2>The identity step</h2>
 <div class="ds-note">
-  Tab through it. <strong>Continue</strong> with an empty name, or a malformed email, says what is wrong under the
+  The step at rest. <strong>Continue</strong> with an empty name, or a malformed email, says what is wrong under the
   field (decided Form card: <code>aria-invalid</code>, <code>aria-describedby</code>, icon plus text). With a
   name, Continue turns the same window into the new comment, with your text field focused. <strong>Cancel</strong>
   closes the window; nothing is saved and the notice will show again next time.
 </div>
-<div id="live"></div>
-<div class="readout" id="out"></div>
+<div id="live"><div class="erf-comment-window" role="dialog" aria-modal="true" aria-labelledby="t0" aria-describedby="n0">
+    <div class="erf-comment-window__head"><div class="erf-comment-window__heading">
+      <h2 class="erf-comment-window__title" id="t0" tabindex="-1">Before your first comment</h2>
+      <p class="erf-comment-window__context"><bdi dir="ltr">button.cta</bdi> · index.html, line 42</p></div>
+      <button class="erf-comment-icon-btn" type="button" aria-label="Close" data-cancel="" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+    <div class="erf-comment-window__body">
+      <p class="erf-comment-notice" id="n0">Erfana writes your name – and your email, if you add one – into the HTML file next to each comment. Anyone who can open the file can read them: in Erfana, in the page source, and in git history once the file is committed and pushed. Scripts in pages previewed in this project can read them too. Deleting a comment later does not remove it from git history.</p>
+      <div class="erf-comment-field">
+    <label class="erf-comment-field__label" for="i1">Name</label>
+    <input class="erf-comment-input" id="i1" type="text" value="" autocomplete="name" aria-describedby="i1-h" aria-required="true" data-field="name" tabindex="-1">
+    
+    <p class="erf-comment-note" id="i1-h">Shown next to your comments.</p>
+  </div>
+      <div class="erf-comment-field">
+    <label class="erf-comment-field__label" for="i2">Email (optional)</label>
+    <input class="erf-comment-input" id="i2" type="email" value="" autocomplete="email" aria-describedby="i2-h" data-field="email" tabindex="-1">
+    
+    <p class="erf-comment-note" id="i2-h">Leave empty to keep your email out of the file.</p>
+  </div>
+    </div>
+    <div class="erf-comment-window__foot">
+      <button class="erf-comment-btn erf-comment-btn--secondary" type="button" data-cancel="" tabindex="-1"><span>Cancel</span></button>
+      <button class="erf-comment-btn erf-comment-btn--primary" type="button" data-continue="" tabindex="-1"><span>Continue</span></button>
+    </div></div></div>
 
 <h2>Every state</h2>
-<div class="gallery" id="states"></div>
+<div class="gallery" id="states"><figure class="state"><figcaption><strong>first comment, nothing set</strong></figcaption><div class="erf-comment-window" role="group" aria-label="Example: identity step" aria-labelledby="t2" aria-describedby="n2">
+    <div class="erf-comment-window__head"><div class="erf-comment-window__heading">
+      <h2 class="erf-comment-window__title" id="t2" tabindex="-1">Before your first comment</h2>
+      <p class="erf-comment-window__context"><bdi dir="ltr">button.cta</bdi> · index.html, line 42</p></div>
+      <button class="erf-comment-icon-btn" type="button" aria-label="Close" data-cancel="" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+    <div class="erf-comment-window__body">
+      <p class="erf-comment-notice" id="n2">Erfana writes your name – and your email, if you add one – into the HTML file next to each comment. Anyone who can open the file can read them: in Erfana, in the page source, and in git history once the file is committed and pushed. Scripts in pages previewed in this project can read them too. Deleting a comment later does not remove it from git history.</p>
+      <div class="erf-comment-field">
+    <label class="erf-comment-field__label" for="i3">Name</label>
+    <input class="erf-comment-input" id="i3" type="text" value="" autocomplete="name" aria-describedby="i3-h" aria-required="true" data-field="name" tabindex="-1">
+    
+    <p class="erf-comment-note" id="i3-h">Shown next to your comments.</p>
+  </div>
+      <div class="erf-comment-field">
+    <label class="erf-comment-field__label" for="i4">Email (optional)</label>
+    <input class="erf-comment-input" id="i4" type="email" value="" autocomplete="email" aria-describedby="i4-h" data-field="email" tabindex="-1">
+    
+    <p class="erf-comment-note" id="i4-h">Leave empty to keep your email out of the file.</p>
+  </div>
+    </div>
+    <div class="erf-comment-window__foot">
+      <button class="erf-comment-btn erf-comment-btn--secondary" type="button" data-cancel="" tabindex="-1"><span>Cancel</span></button>
+      <button class="erf-comment-btn erf-comment-btn--primary" type="button" data-continue="" tabindex="-1"><span>Continue</span></button>
+    </div></div></figure><figure class="state"><figcaption><strong>name already set in Settings</strong> – pre-filled; the notice still shows, once</figcaption><div class="erf-comment-window" role="group" aria-label="Example: identity step" aria-labelledby="t4" aria-describedby="n4">
+    <div class="erf-comment-window__head"><div class="erf-comment-window__heading">
+      <h2 class="erf-comment-window__title" id="t4" tabindex="-1">Before your first comment</h2>
+      <p class="erf-comment-window__context"><bdi dir="ltr">button.cta</bdi> · index.html, line 42</p></div>
+      <button class="erf-comment-icon-btn" type="button" aria-label="Close" data-cancel="" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+    <div class="erf-comment-window__body">
+      <p class="erf-comment-notice" id="n4">Erfana writes your name – and your email, if you add one – into the HTML file next to each comment. Anyone who can open the file can read them: in Erfana, in the page source, and in git history once the file is committed and pushed. Scripts in pages previewed in this project can read them too. Deleting a comment later does not remove it from git history.</p>
+      <div class="erf-comment-field">
+    <label class="erf-comment-field__label" for="i5">Name</label>
+    <input class="erf-comment-input" id="i5" type="text" value="Marcin Obel" autocomplete="name" aria-describedby="i5-h" aria-required="true" data-field="name" tabindex="-1">
+    
+    <p class="erf-comment-note" id="i5-h">Shown next to your comments.</p>
+  </div>
+      <div class="erf-comment-field">
+    <label class="erf-comment-field__label" for="i6">Email (optional)</label>
+    <input class="erf-comment-input" id="i6" type="email" value="marcin@qodeca.example" autocomplete="email" aria-describedby="i6-h" data-field="email" tabindex="-1">
+    
+    <p class="erf-comment-note" id="i6-h">Leave empty to keep your email out of the file.</p>
+  </div>
+    </div>
+    <div class="erf-comment-window__foot">
+      <button class="erf-comment-btn erf-comment-btn--secondary" type="button" data-cancel="" tabindex="-1"><span>Cancel</span></button>
+      <button class="erf-comment-btn erf-comment-btn--primary" type="button" data-continue="" tabindex="-1"><span>Continue</span></button>
+    </div></div></figure><figure class="state"><figcaption><strong>no name</strong> – Continue says why</figcaption><div class="erf-comment-window" role="group" aria-label="Example: identity step" aria-labelledby="t6" aria-describedby="n6">
+    <div class="erf-comment-window__head"><div class="erf-comment-window__heading">
+      <h2 class="erf-comment-window__title" id="t6" tabindex="-1">Before your first comment</h2>
+      <p class="erf-comment-window__context"><bdi dir="ltr">button.cta</bdi> · index.html, line 42</p></div>
+      <button class="erf-comment-icon-btn" type="button" aria-label="Close" data-cancel="" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+    <div class="erf-comment-window__body">
+      <p class="erf-comment-notice" id="n6">Erfana writes your name – and your email, if you add one – into the HTML file next to each comment. Anyone who can open the file can read them: in Erfana, in the page source, and in git history once the file is committed and pushed. Scripts in pages previewed in this project can read them too. Deleting a comment later does not remove it from git history.</p>
+      <div class="erf-comment-field">
+    <label class="erf-comment-field__label" for="i7">Name</label>
+    <input class="erf-comment-input" id="i7" type="text" value="" autocomplete="name" aria-describedby="i7-e i7-h" aria-invalid="true" aria-required="true" data-field="name" tabindex="-1">
+    <p class="erf-comment-error" id="i7-e"><span aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0"></path><path d="m15 9-6 6"></path><path d="m9 9 6 6"></path></svg></span><span>Enter a name to continue.</span></p>
+    <p class="erf-comment-note" id="i7-h">Shown next to your comments.</p>
+  </div>
+      <div class="erf-comment-field">
+    <label class="erf-comment-field__label" for="i8">Email (optional)</label>
+    <input class="erf-comment-input" id="i8" type="email" value="" autocomplete="email" aria-describedby="i8-h" data-field="email" tabindex="-1">
+    
+    <p class="erf-comment-note" id="i8-h">Leave empty to keep your email out of the file.</p>
+  </div>
+    </div>
+    <div class="erf-comment-window__foot">
+      <button class="erf-comment-btn erf-comment-btn--secondary" type="button" data-cancel="" tabindex="-1"><span>Cancel</span></button>
+      <button class="erf-comment-btn erf-comment-btn--primary" type="button" data-continue="" tabindex="-1"><span>Continue</span></button>
+    </div></div></figure><figure class="state"><figcaption><strong>malformed email</strong></figcaption><div class="erf-comment-window" role="group" aria-label="Example: identity step" aria-labelledby="t8" aria-describedby="n8">
+    <div class="erf-comment-window__head"><div class="erf-comment-window__heading">
+      <h2 class="erf-comment-window__title" id="t8" tabindex="-1">Before your first comment</h2>
+      <p class="erf-comment-window__context"><bdi dir="ltr">button.cta</bdi> · index.html, line 42</p></div>
+      <button class="erf-comment-icon-btn" type="button" aria-label="Close" data-cancel="" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+    <div class="erf-comment-window__body">
+      <p class="erf-comment-notice" id="n8">Erfana writes your name – and your email, if you add one – into the HTML file next to each comment. Anyone who can open the file can read them: in Erfana, in the page source, and in git history once the file is committed and pushed. Scripts in pages previewed in this project can read them too. Deleting a comment later does not remove it from git history.</p>
+      <div class="erf-comment-field">
+    <label class="erf-comment-field__label" for="i9">Name</label>
+    <input class="erf-comment-input" id="i9" type="text" value="Marcin Obel" autocomplete="name" aria-describedby="i9-h" aria-required="true" data-field="name" tabindex="-1">
+    
+    <p class="erf-comment-note" id="i9-h">Shown next to your comments.</p>
+  </div>
+      <div class="erf-comment-field">
+    <label class="erf-comment-field__label" for="i10">Email (optional)</label>
+    <input class="erf-comment-input" id="i10" type="email" value="marcin@" autocomplete="email" aria-describedby="i10-e i10-h" aria-invalid="true" data-field="email" tabindex="-1">
+    <p class="erf-comment-error" id="i10-e"><span aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0"></path><path d="m15 9-6 6"></path><path d="m9 9 6 6"></path></svg></span><span>That doesn't look like an email address.</span></p>
+    <p class="erf-comment-note" id="i10-h">Leave empty to keep your email out of the file.</p>
+  </div>
+    </div>
+    <div class="erf-comment-window__foot">
+      <button class="erf-comment-btn erf-comment-btn--secondary" type="button" data-cancel="" tabindex="-1"><span>Cancel</span></button>
+      <button class="erf-comment-btn erf-comment-btn--primary" type="button" data-continue="" tabindex="-1"><span>Continue</span></button>
+    </div></div></figure><figure class="state"><figcaption><strong>Change, inline</strong> – the identity line opens in place; no second dialog</figcaption><div class="erf-comment-window" role="group" aria-label="Example: changing the identity inline">
+    <div class="erf-comment-window__head"><div class="erf-comment-window__heading"><h2 class="erf-comment-window__title">New comment</h2>
+      <p class="erf-comment-window__context"><bdi dir="ltr">button.cta</bdi> · index.html, line 42</p></div>
+      <button class="erf-comment-icon-btn" type="button" aria-label="Close" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+    <div class="erf-comment-window__body">
+      <div class="erf-comment-field"><label class="erf-comment-field__label" for="cc">Comment</label>
+        <textarea class="erf-comment-textarea" id="cc" tabindex="-1">Make the button text bigger</textarea></div>
+      <div style="margin-top: var(--space-8)">
+        <div class="erf-comment-field">
+    <label class="erf-comment-field__label" for="i11">Name</label>
+    <input class="erf-comment-input" id="i11" type="text" value="Marcin Obel" autocomplete="name" aria-describedby="i11-h" aria-required="true" data-field="n2" tabindex="-1">
+    
+    <p class="erf-comment-note" id="i11-h">Shown next to your comments.</p>
+  </div>
+        <div class="erf-comment-field">
+    <label class="erf-comment-field__label" for="i12">Email (optional)</label>
+    <input class="erf-comment-input" id="i12" type="email" value="" autocomplete="email" aria-describedby="i12-h" data-field="e2" tabindex="-1">
+    
+    <p class="erf-comment-note" id="i12-h">Leave empty to keep your email out of the file.</p>
+  </div>
+        <div class="erf-comment-thread__actions">
+          <button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Cancel</span></button>
+          <button class="erf-comment-btn erf-comment-btn--primary" type="button" tabindex="-1"><span>Save changes</span></button></div>
+      </div>
+    </div></div></figure></div>
 
 <h2>Settings › Comments</h2>
 <div class="ds-note">
@@ -57,11 +193,131 @@
   someone who sets their name in Settings first is still told. The section follows the shipping
   <code>.settings-row</code> layout with the Form card's controls – and one correction:
   <strong>descriptions are tertiary, not secondary.</strong> <code>--color-text-secondary</code> on the Settings
-  surface measures <strong><span data-claim="hpc-settings-secondary"></span>:1</strong>, under the 4.5:1 that
-  <code>--text-sm</code> needs; tertiary is <strong><span data-claim="hpc-settings-tertiary"></span>:1</strong>.
+  surface measures <strong><span data-claim="hpc-settings-secondary" title="--color-text-secondary on --color-bg-secondary: the shipping Settings description colour, under 4.5:1">3.72</span>:1</strong>, under the 4.5:1 that
+  <code>--text-sm</code> needs; tertiary is <strong><span data-claim="hpc-settings-tertiary" title="--color-text-tertiary on --color-bg-secondary: the description colour the Comments section uses">6.33</span>:1</strong>.
   The shipping sections use secondary today; this card does not copy that.
 </div>
-<div class="gallery" id="settings"></div>
+<div class="gallery" id="settings"><figure class="state"><figcaption><strong>set</strong> – the usual state</figcaption><section class="settings" aria-labelledby="s13">
+    <h2 class="erf-comment-settings__title" id="s13">Comments</h2>
+    <div class="erf-comment-settings__row">
+      <div class="erf-comment-settings__field">
+        <label class="erf-comment-settings__label" for="s13-f">Comments in HTML preview</label>
+        <p class="erf-comment-settings__desc" id="s13-fd">Lets you add comments to elements of a previewed page.</p></div>
+      <input class="erf-comment-check" type="checkbox" id="s13-f" aria-describedby="s13-fd" checked="" tabindex="-1">
+    </div>
+    <div class="erf-comment-settings__row">
+      <div class="erf-comment-settings__field">
+        <label class="erf-comment-settings__label" for="s13-n">Your name</label>
+        <p class="erf-comment-settings__desc" id="s13-nd">Saved into HTML files next to each comment you write. Changing it affects new comments only.</p></div>
+      <div class="erf-comment-settings__control">
+        <input class="erf-comment-input" id="s13-n" type="text" autocomplete="name" value="Marcin Obel" aria-describedby="s13-nd" tabindex="-1">
+        
+      </div>
+    </div>
+    <div class="erf-comment-settings__row">
+      <div class="erf-comment-settings__field">
+        <label class="erf-comment-settings__label" for="s13-e">Your email (optional)</label>
+        <p class="erf-comment-settings__desc" id="s13-ed">Also saved into the file. Leave empty to keep it out.</p></div>
+      <div class="erf-comment-settings__control">
+        <input class="erf-comment-input" id="s13-e" type="email" autocomplete="email" value="" aria-describedby="s13-ed" tabindex="-1">
+        
+      </div>
+    </div>
+    <div class="erf-comment-banner erf-comment-banner--info" style="margin: var(--space-4) 0 0">
+      <span class="erf-comment-banner__icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0"></path><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg></span>
+      <div class="erf-comment-banner__body"><p class="erf-comment-banner__text">Both are visible to anyone who can open the file – in the page source and in git history once pushed.</p></div>
+    </div>
+  </section></figure><figure class="state"><figcaption><strong>name cleared</strong> – what that means, said under the field</figcaption><section class="settings" aria-labelledby="s14">
+    <h2 class="erf-comment-settings__title" id="s14">Comments</h2>
+    <div class="erf-comment-settings__row">
+      <div class="erf-comment-settings__field">
+        <label class="erf-comment-settings__label" for="s14-f">Comments in HTML preview</label>
+        <p class="erf-comment-settings__desc" id="s14-fd">Lets you add comments to elements of a previewed page.</p></div>
+      <input class="erf-comment-check" type="checkbox" id="s14-f" aria-describedby="s14-fd" checked="" tabindex="-1">
+    </div>
+    <div class="erf-comment-settings__row">
+      <div class="erf-comment-settings__field">
+        <label class="erf-comment-settings__label" for="s14-n">Your name</label>
+        <p class="erf-comment-settings__desc" id="s14-nd">Saved into HTML files next to each comment you write. Changing it affects new comments only.</p></div>
+      <div class="erf-comment-settings__control">
+        <input class="erf-comment-input" id="s14-n" type="text" autocomplete="name" value="" aria-describedby="s14-nd s14-nm" tabindex="-1">
+        <p class="erf-comment-note" id="s14-nm">Enter a name to add comments. Existing comments keep the name they were saved with.</p>
+      </div>
+    </div>
+    <div class="erf-comment-settings__row">
+      <div class="erf-comment-settings__field">
+        <label class="erf-comment-settings__label" for="s14-e">Your email (optional)</label>
+        <p class="erf-comment-settings__desc" id="s14-ed">Also saved into the file. Leave empty to keep it out.</p></div>
+      <div class="erf-comment-settings__control">
+        <input class="erf-comment-input" id="s14-e" type="email" autocomplete="email" value="" aria-describedby="s14-ed" tabindex="-1">
+        
+      </div>
+    </div>
+    <div class="erf-comment-banner erf-comment-banner--info" style="margin: var(--space-4) 0 0">
+      <span class="erf-comment-banner__icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0"></path><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg></span>
+      <div class="erf-comment-banner__body"><p class="erf-comment-banner__text">Both are visible to anyone who can open the file – in the page source and in git history once pushed.</p></div>
+    </div>
+  </section></figure><figure class="state"><figcaption><strong>malformed email</strong> – checked on blur</figcaption><section class="settings" aria-labelledby="s15">
+    <h2 class="erf-comment-settings__title" id="s15">Comments</h2>
+    <div class="erf-comment-settings__row">
+      <div class="erf-comment-settings__field">
+        <label class="erf-comment-settings__label" for="s15-f">Comments in HTML preview</label>
+        <p class="erf-comment-settings__desc" id="s15-fd">Lets you add comments to elements of a previewed page.</p></div>
+      <input class="erf-comment-check" type="checkbox" id="s15-f" aria-describedby="s15-fd" checked="" tabindex="-1">
+    </div>
+    <div class="erf-comment-settings__row">
+      <div class="erf-comment-settings__field">
+        <label class="erf-comment-settings__label" for="s15-n">Your name</label>
+        <p class="erf-comment-settings__desc" id="s15-nd">Saved into HTML files next to each comment you write. Changing it affects new comments only.</p></div>
+      <div class="erf-comment-settings__control">
+        <input class="erf-comment-input" id="s15-n" type="text" autocomplete="name" value="Marcin Obel" aria-describedby="s15-nd" tabindex="-1">
+        
+      </div>
+    </div>
+    <div class="erf-comment-settings__row">
+      <div class="erf-comment-settings__field">
+        <label class="erf-comment-settings__label" for="s15-e">Your email (optional)</label>
+        <p class="erf-comment-settings__desc" id="s15-ed">Also saved into the file. Leave empty to keep it out.</p></div>
+      <div class="erf-comment-settings__control">
+        <input class="erf-comment-input" id="s15-e" type="email" autocomplete="email" value="marcin@" aria-describedby="s15-ed s15-ee" aria-invalid="true" tabindex="-1">
+        <p class="erf-comment-error" id="s15-ee"><span aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0"></path><path d="m15 9-6 6"></path><path d="m9 9 6 6"></path></svg></span><span>That doesn't look like an email address.</span></p>
+      </div>
+    </div>
+    <div class="erf-comment-banner erf-comment-banner--info" style="margin: var(--space-4) 0 0">
+      <span class="erf-comment-banner__icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0"></path><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg></span>
+      <div class="erf-comment-banner__body"><p class="erf-comment-banner__text">Both are visible to anyone who can open the file – in the page source and in git history once pushed.</p></div>
+    </div>
+  </section></figure><figure class="state"><figcaption><strong>feature off</strong> – the fields keep their values but take no input</figcaption><section class="settings" aria-labelledby="s16">
+    <h2 class="erf-comment-settings__title" id="s16">Comments</h2>
+    <div class="erf-comment-settings__row">
+      <div class="erf-comment-settings__field">
+        <label class="erf-comment-settings__label" for="s16-f">Comments in HTML preview</label>
+        <p class="erf-comment-settings__desc" id="s16-fd">Lets you add comments to elements of a previewed page.</p></div>
+      <input class="erf-comment-check" type="checkbox" id="s16-f" aria-describedby="s16-fd" tabindex="-1">
+    </div>
+    <div class="erf-comment-settings__row">
+      <div class="erf-comment-settings__field">
+        <label class="erf-comment-settings__label" for="s16-n">Your name</label>
+        <p class="erf-comment-settings__desc" id="s16-nd">Saved into HTML files next to each comment you write. Changing it affects new comments only.</p></div>
+      <div class="erf-comment-settings__control">
+        <input class="erf-comment-input" id="s16-n" type="text" autocomplete="name" value="Marcin Obel" aria-describedby="s16-nd" disabled="" tabindex="-1">
+        
+      </div>
+    </div>
+    <div class="erf-comment-settings__row">
+      <div class="erf-comment-settings__field">
+        <label class="erf-comment-settings__label" for="s16-e">Your email (optional)</label>
+        <p class="erf-comment-settings__desc" id="s16-ed">Also saved into the file. Leave empty to keep it out.</p></div>
+      <div class="erf-comment-settings__control">
+        <input class="erf-comment-input" id="s16-e" type="email" autocomplete="email" value="" aria-describedby="s16-ed" disabled="" tabindex="-1">
+        
+      </div>
+    </div>
+    <div class="erf-comment-banner erf-comment-banner--info" style="margin: var(--space-4) 0 0">
+      <span class="erf-comment-banner__icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0"></path><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg></span>
+      <div class="erf-comment-banner__body"><p class="erf-comment-banner__text">Both are visible to anyone who can open the file – in the page source and in git history once pushed.</p></div>
+    </div>
+  </section></figure></div>
 
 <h2>Exceptions</h2>
 <table>
@@ -79,172 +335,6 @@
   </tbody>
 </table>
 
-<script>
-const H = window.HPC;
-const I = H.icon;
-let uid = 0;
 
-const NOTICE = 'Erfana writes your name – and your email, if you add one – into the HTML file next to each comment. ' +
-  'Anyone who can open the file can read them: in Erfana, in the page source, and in git history once the file is ' +
-  'committed and pushed. Scripts in pages previewed in this project can read them too. Deleting a comment later does ' +
-  'not remove it from git history.';
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-function input(o) {
-  const id = `i${uid += 1}`;
-  return `<div class="erf-comment-field">
-    <label class="erf-comment-field__label" for="${id}">${o.label}</label>
-    <input class="erf-comment-input" id="${id}" type="${o.type || 'text'}" value="${H.esc(o.value || '')}" autocomplete="${o.auto}"
-      aria-describedby="${o.error ? `${id}-e ` : ''}${id}-h" ${o.error ? 'aria-invalid="true"' : ''} ${o.required ? 'aria-required="true"' : ''} data-field="${o.key}">
-    ${o.error ? `<p class="erf-comment-error" id="${id}-e"><span aria-hidden="true">${I('circle-x', 14)}</span><span>${o.error}</span></p>` : ''}
-    <p class="erf-comment-note" id="${id}-h">${o.hint}</p>
-  </div>`;
-}
-
-function step(o = {}) {
-  const role = o.live ? 'role="dialog" aria-modal="true"' : 'role="group" aria-label="Example: identity step"';
-  return `<div class="erf-comment-window" ${role} aria-labelledby="t${uid}" aria-describedby="n${uid}">
-    <div class="erf-comment-window__head"><div class="erf-comment-window__heading">
-      <h2 class="erf-comment-window__title" id="t${uid}" tabindex="-1">Before your first comment</h2>
-      <p class="erf-comment-window__context"><bdi dir="ltr">button.cta</bdi> · index.html, line 42</p></div>
-      <button class="erf-comment-icon-btn" type="button" aria-label="Close" data-cancel>${I('x')}</button></div>
-    <div class="erf-comment-window__body">
-      <p class="erf-comment-notice" id="n${uid}">${NOTICE}</p>
-      ${input({ label: 'Name', key: 'name', value: o.name, hint: 'Shown next to your comments.', error: o.nameError, required: true, auto: 'name' })}
-      ${input({ label: 'Email (optional)', key: 'email', type: 'email', value: o.email, hint: 'Leave empty to keep your email out of the file.', error: o.emailError, auto: 'email' })}
-    </div>
-    <div class="erf-comment-window__foot">
-      <button class="erf-comment-btn erf-comment-btn--secondary" type="button" data-cancel><span>Cancel</span></button>
-      <button class="erf-comment-btn erf-comment-btn--primary" type="button" data-continue><span>Continue</span></button>
-    </div></div>`;
-}
-
-function newComment(name) {
-  return `<div class="erf-comment-window" role="dialog" aria-modal="true" aria-labelledby="nc">
-    <div class="erf-comment-window__head"><div class="erf-comment-window__heading">
-      <h2 class="erf-comment-window__title" id="nc" tabindex="-1">New comment</h2>
-      <p class="erf-comment-window__context"><bdi dir="ltr">button.cta</bdi> · index.html, line 42</p></div>
-      <button class="erf-comment-icon-btn" type="button" aria-label="Close" data-cancel>${I('x')}</button></div>
-    <div class="erf-comment-window__body">
-      <div class="erf-comment-field"><label class="erf-comment-field__label" for="nct">Comment</label>
-        <textarea class="erf-comment-textarea" id="nct" placeholder="What should change here?" aria-describedby="nch"></textarea>
-        <div class="erf-comment-field__foot"><p class="erf-comment-field__hint" id="nch">Plain text. Saved inside index.html.</p><span class="erf-comment-counter">0 / 4000</span></div></div>
-      <p class="erf-comment-identity">Commenting as <bdi>${H.esc(name)}</bdi> <button class="erf-comment-link" type="button" data-change>Change</button></p>
-    </div>
-    <div class="erf-comment-window__foot">
-      <button class="erf-comment-btn erf-comment-btn--secondary" type="button" data-cancel><span>Cancel</span></button>
-      <button class="erf-comment-btn erf-comment-btn--primary" type="button" aria-disabled="true" title="Save (Ctrl+Enter)"><span>Save</span></button>
-    </div></div>`;
-}
-
-/* ---------- live ---------- */
-const live = document.getElementById('live');
-const out = document.getElementById('out');
-let release = null;
-function showStep(o = {}) {
-  if (release) release();
-  live.innerHTML = step({ live: true, ...o });
-  const w = live.firstElementChild;
-  release = H.trapFocus(w, cancel);
-  w.querySelectorAll('[data-cancel]').forEach((b) => b.addEventListener('click', cancel));
-  w.querySelector('[data-continue]').addEventListener('click', () => {
-    const name = w.querySelector('[data-field="name"]').value.trim();
-    const email = w.querySelector('[data-field="email"]').value.trim();
-    const nameError = name ? '' : 'Enter a name to continue.';
-    const emailError = email && !EMAIL_RE.test(email) ? 'That doesn\'t look like an email address.' : '';
-    if (nameError || emailError) {
-      showStep({ name, email, nameError, emailError });
-      live.querySelector(nameError ? '[data-field="name"]' : '[data-field="email"]').focus();
-      return;
-    }
-    if (release) release();
-    live.innerHTML = newComment(name);
-    const nc = live.firstElementChild;
-    release = H.trapFocus(nc, cancel);
-    nc.querySelectorAll('[data-cancel]').forEach((b) => b.addEventListener('click', cancel));
-    nc.querySelector('textarea').focus();
-    out.innerHTML = 'identityNoticeSeen = <b>true</b> · the same window is now the new comment; focus is in the text field';
-  });
-  if (!o.name && !o.nameError) w.querySelector('[data-field="name"]').focus();
-}
-function cancel() {
-  if (release) release();
-  release = null;
-  live.innerHTML = '<button class="erf-comment-btn erf-comment-btn--secondary" type="button" id="again"><span>Add comment</span></button>';
-  out.textContent = 'Cancelled – nothing saved; the notice shows again next time';
-  const again = document.getElementById('again');
-  again.addEventListener('click', () => { out.textContent = ''; showStep(); });
-  again.focus();
-}
-showStep();
-
-/* ---------- states ---------- */
-function add(host, caption, html) {
-  const fig = document.createElement('figure');
-  fig.className = 'state';
-  fig.innerHTML = `<figcaption>${caption}</figcaption>${html}`;
-  document.getElementById(host).appendChild(fig);
-}
-add('states', '<strong>first comment, nothing set</strong>', step());
-add('states', '<strong>name already set in Settings</strong> – pre-filled; the notice still shows, once', step({ name: 'Marcin Obel', email: 'marcin@qodeca.example' }));
-add('states', '<strong>no name</strong> – Continue says why', step({ nameError: 'Enter a name to continue.' }));
-add('states', '<strong>malformed email</strong>', step({ name: 'Marcin Obel', email: 'marcin@', emailError: 'That doesn\'t look like an email address.' }));
-add('states', '<strong>Change, inline</strong> – the identity line opens in place; no second dialog',
-  `<div class="erf-comment-window" role="group" aria-label="Example: changing the identity inline">
-    <div class="erf-comment-window__head"><div class="erf-comment-window__heading"><h2 class="erf-comment-window__title">New comment</h2>
-      <p class="erf-comment-window__context"><bdi dir="ltr">button.cta</bdi> · index.html, line 42</p></div>
-      <button class="erf-comment-icon-btn" type="button" aria-label="Close">${I('x')}</button></div>
-    <div class="erf-comment-window__body">
-      <div class="erf-comment-field"><label class="erf-comment-field__label" for="cc">Comment</label>
-        <textarea class="erf-comment-textarea" id="cc">Make the button text bigger</textarea></div>
-      <div style="margin-top: var(--space-8)">
-        ${input({ label: 'Name', key: 'n2', value: 'Marcin Obel', hint: 'Shown next to your comments.', required: true, auto: 'name' })}
-        ${input({ label: 'Email (optional)', key: 'e2', type: 'email', value: '', hint: 'Leave empty to keep your email out of the file.', auto: 'email' })}
-        <div class="erf-comment-thread__actions">
-          <button class="erf-comment-btn erf-comment-btn--secondary" type="button"><span>Cancel</span></button>
-          <button class="erf-comment-btn erf-comment-btn--primary" type="button"><span>Save changes</span></button></div>
-      </div>
-    </div></div>`);
-
-/* ---------- settings ---------- */
-function settings(o = {}) {
-  const id = `s${uid += 1}`;
-  return `<section class="settings" aria-labelledby="${id}">
-    <h2 class="erf-comment-settings__title" id="${id}">Comments</h2>
-    <div class="erf-comment-settings__row">
-      <div class="erf-comment-settings__field">
-        <label class="erf-comment-settings__label" for="${id}-f">Comments in HTML preview</label>
-        <p class="erf-comment-settings__desc" id="${id}-fd">Lets you add comments to elements of a previewed page.</p></div>
-      <input class="erf-comment-check" type="checkbox" id="${id}-f" aria-describedby="${id}-fd" ${o.off ? '' : 'checked'}>
-    </div>
-    <div class="erf-comment-settings__row">
-      <div class="erf-comment-settings__field">
-        <label class="erf-comment-settings__label" for="${id}-n">Your name</label>
-        <p class="erf-comment-settings__desc" id="${id}-nd">Saved into HTML files next to each comment you write. Changing it affects new comments only.</p></div>
-      <div class="erf-comment-settings__control">
-        <input class="erf-comment-input" id="${id}-n" type="text" autocomplete="name" value="${H.esc(o.name ?? 'Marcin Obel')}" aria-describedby="${id}-nd${o.name === '' ? ` ${id}-nm` : ''}" ${o.off ? 'disabled' : ''}>
-        ${o.name === '' ? `<p class="erf-comment-note" id="${id}-nm">Enter a name to add comments. Existing comments keep the name they were saved with.</p>` : ''}
-      </div>
-    </div>
-    <div class="erf-comment-settings__row">
-      <div class="erf-comment-settings__field">
-        <label class="erf-comment-settings__label" for="${id}-e">Your email (optional)</label>
-        <p class="erf-comment-settings__desc" id="${id}-ed">Also saved into the file. Leave empty to keep it out.</p></div>
-      <div class="erf-comment-settings__control">
-        <input class="erf-comment-input" id="${id}-e" type="email" autocomplete="email" value="${H.esc(o.email ?? '')}" aria-describedby="${id}-ed${o.emailError ? ` ${id}-ee` : ''}" ${o.emailError ? 'aria-invalid="true"' : ''} ${o.off ? 'disabled' : ''}>
-        ${o.emailError ? `<p class="erf-comment-error" id="${id}-ee"><span aria-hidden="true">${I('circle-x', 14)}</span><span>That doesn't look like an email address.</span></p>` : ''}
-      </div>
-    </div>
-    <div class="erf-comment-banner erf-comment-banner--info" style="margin: var(--space-4) 0 0">
-      <span class="erf-comment-banner__icon" aria-hidden="true">${I('info')}</span>
-      <div class="erf-comment-banner__body"><p class="erf-comment-banner__text">Both are visible to anyone who can open the file – in the page source and in git history once pushed.</p></div>
-    </div>
-  </section>`;
-}
-add('settings', '<strong>set</strong> – the usual state', settings());
-add('settings', '<strong>name cleared</strong> – what that means, said under the field', settings({ name: '' }));
-add('settings', '<strong>malformed email</strong> – checked on blur', settings({ email: 'marcin@', emailError: true }));
-add('settings', '<strong>feature off</strong> – the fields keep their values but take no input', settings({ off: true }));
-</script>
-</body>
-</html>
+</body></html>
