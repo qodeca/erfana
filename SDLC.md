@@ -152,9 +152,9 @@ A change is done when every line holds, each with named evidence:
 
 ## Labels
 
-Issues and pull requests carry GitHub's category labels (`bug`, `enhancement`, `documentation`,
-`dependencies`, `security` and the like) and the project's area labels (`windows`, `graph-engine`,
-…). Labels describe the work; they do not drive a process, and no check reads them.
+Issues and pull requests carry GitHub's triage labels (`enhancement`, `duplicate`, `wontfix` and
+the like), Dependabot's ecosystem labels (`javascript`, `github_actions`, `docker`) and the
+project's area labels (`windows`, `graph-engine`, …). A bug is marked by its `[Bug]: ` title prefix. Labels describe the work; they do not drive a process, and no check reads them.
 
 ## The checks
 

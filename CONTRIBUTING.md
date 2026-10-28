@@ -161,8 +161,8 @@ Never commit a real secret, even to history – rewrite it out and rotate the cr
 
 - **What gates your pull request** is only the required GitHub checks: `Lint`, `Typecheck`,
   `Unit tests`, `Build`, `Coverage`, `License compliance` and `Secret scan`.
-- **Labels**: you may suggest a category (`bug`, `enhancement`, `documentation`, `dependencies`,
-  `security`). A maintainer applies the rest.
+- **Labels**: a feature request carries `enhancement`; a bug report is marked by its `[Bug]: `
+  title prefix. A maintainer applies the rest.
 - **Documents** go under `docs/`, by subject; [docs/README.md](docs/README.md) lists the folders.
 - **Pull request titles** follow Conventional Commits, so the merge commit on `develop` reads well.
 - **How work moves**, stage by stage, is in [SDLC.md](SDLC.md). Branch from `develop`, open a pull

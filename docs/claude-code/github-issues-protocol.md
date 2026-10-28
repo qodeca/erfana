@@ -16,7 +16,7 @@ These read-only operations can be performed freely for context gathering:
 # List issues for context
 gh issue list
 gh issue list --state all --limit 20
-gh issue list --label "bug" --json number,title,state
+gh issue list --search "[Bug]: in:title" --json number,title,state
 
 # View specific issue details
 gh issue view <number>
@@ -106,21 +106,19 @@ When user asks for help organizing issues:
 
 ## Available labels
 
-All 15 labels below exist on `qodeca/erfana` (read live with `gh label list --repo qodeca/erfana` on 2026-08-23). Do not create new ones without user approval — and check this list before assuming a label is missing.
+The labels below exist on `qodeca/erfana` (read live with `gh label list --repo qodeca/erfana` on 2026-10-29; `bug`, `documentation`, `dependencies` and `security` were removed with the agent pipeline's label set, and a bug is marked by its `[Bug]: ` title prefix). Do not create new ones without user approval — and check this list before assuming a label is missing.
 
 | Label | Color | Purpose |
 |-------|-------|---------|
-| `bug` | #d73a4a | Something isn't working |
 | `enhancement` | #a2eeef | New feature or request |
-| `documentation` | #0075ca | Documentation improvements |
 | `duplicate` | #cfd3d7 | Already exists |
 | `good first issue` | #7057ff | Good for newcomers |
 | `help wanted` | #008672 | Extra attention needed |
 | `invalid` | #e4e669 | Doesn't seem right |
 | `question` | #d876e3 | Further information requested |
 | `wontfix` | #ffffff | Will not be worked on |
-| `dependencies` | #0366d6 | Dependency updates (applied by Dependabot) |
 | `github_actions` | #000000 | GitHub Actions updates (applied by Dependabot) |
+| `docker` | #21ceff | Docker image updates (applied by Dependabot) |
 | `javascript` | #168700 | JavaScript code changes (applied by Dependabot) |
 | `graph-engine` | #5319e7 | Graph engine (spec 004 / R1) work |
 | `canary` | #fbca04 | Scheduled canary-run failures; applied by `whisper-binaries-canary.yml` notify-on-failure |
@@ -137,7 +135,7 @@ form. Fill the form's fields; do not invent your own heading structure.
 
 | Form | File | Auto title prefix | Auto label |
 |---|---|---|---|
-| Bug report | [`bug_report.yml`](../../.github/ISSUE_TEMPLATE/bug_report.yml) | `[Bug]: ` | `bug` |
+| Bug report | [`bug_report.yml`](../../.github/ISSUE_TEMPLATE/bug_report.yml) | `[Bug]: ` | none |
 | Feature request | [`feature_request.yml`](../../.github/ISSUE_TEMPLATE/feature_request.yml) | `[Feature]: ` | `enhancement` |
 
 `config.yml` also offers three contact links away from the issue tracker entirely: security
@@ -173,7 +171,6 @@ heading in the body:
 ```bash
 gh issue create \
   --title "[Bug]: file watcher misses changes in symlinked directories" \
-  --label bug \
   --body "## What happened?
 …
 
