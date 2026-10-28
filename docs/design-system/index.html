@@ -3,7 +3,7 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
-<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Erfana design system</title>
@@ -21,13 +21,13 @@
   .ix-card:focus-visible { outline: var(--border-width-thick) solid var(--color-border-focus);
                            outline-offset: var(--space-1); }
   .ix-card__name { font-family: var(--font-mono); font-size: var(--text-md); color: var(--color-text-emphasis); }
-  .ix-card__sub { font-size: var(--text-sm); line-height: var(--leading-snug); color: var(--color-text-tertiary); }
-  .ix-card__meta { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-tertiary); }
-  .ix-count { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-text-tertiary);
+  .ix-card__sub { font-size: var(--ds-text-small); line-height: var(--leading-snug); color: var(--color-text-tertiary); }
+  .ix-card__meta { font-family: var(--font-mono); font-size: var(--ds-text-small); color: var(--color-text-tertiary); }
+  .ix-count { font-family: var(--font-mono); font-size: var(--ds-text-small); color: var(--color-text-tertiary);
               font-weight: var(--font-normal); }
   .ix-summary { display: flex; flex-wrap: wrap; gap: var(--space-8); margin: 0 0 var(--space-12); padding: 0;
                 list-style: none; }
-  .ix-summary li { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-text-tertiary); }
+  .ix-summary li { font-family: var(--font-mono); font-size: var(--ds-text-small); color: var(--color-text-tertiary); }
   .ix-superseded summary { cursor: pointer; color: var(--color-text-bright); }
 </style>
 </head>
@@ -57,7 +57,7 @@
   <code>/* deviates: docs/design-system/&lt;card&gt; – why */</code> – and the card lists it under
   Exceptions. Every marker in <code>src/</code> is listed in the <a href="deviations.html">deviation register</a>.
   The folder is <strong>static by rule</strong>: HTML, CSS and images only, guarded by
-  <code>npm run design -- --check</code> and a content security policy on every page.
+  <code class="ds-nowrap">npm run design -- --check</code> and a content security policy on every page.
   The full rules are in <a href="README.md">README.md</a>.
 </div>
 
@@ -65,84 +65,6 @@
   <strong>Looking for a screen, not a rule?</strong> Feature screens built from these cards live in
   <a href="../designs/index.html">the designs index</a>. A screen cites a card; it never decides a system rule.
 </div>
-
-<h2 id="start-here">Start here by task</h2>
-<table>
-<thead><tr><th>I need to…</th><th>Card</th></tr></thead>
-<tbody>
-  <tr><td>Add a button</td><td><a href="system/components/button/index.html">Buttons</a></td></tr>
-  <tr><td>Add a context menu</td><td><a href="system/components/menu/index.html">Menu</a></td></tr>
-  <tr><td>Add a dialog</td><td><a href="system/patterns/dialog/index.html">Dialog</a></td></tr>
-  <tr><td>Add a light mode or a colour-scheme query</td><td><a href="system/foundations/theme.html">Theme</a></td></tr>
-  <tr><td>Add a shadow or a border</td><td><a href="system/foundations/surfaces.html">Surfaces and elevation</a></td></tr>
-  <tr><td>Add a tab strip</td><td><a href="system/components/tabs/index.html">Tabs</a></td></tr>
-  <tr><td>Add a tag or chip</td><td><a href="system/components/badge/index.html">Badges, chips and keys</a></td></tr>
-  <tr><td>Add a text field or select</td><td><a href="system/components/form/index.html">Form controls</a></td></tr>
-  <tr><td>Add a toolbar to a panel</td><td><a href="system/components/toolbar/index.html">Toolbar</a></td></tr>
-  <tr><td>Add a tooltip</td><td><a href="system/components/tooltip/index.html">Tooltip</a></td></tr>
-  <tr><td>Animate something</td><td><a href="system/foundations/motion.html">Motion</a></td></tr>
-  <tr><td>Announce a change to a screen reader</td><td><a href="system/components/feedback/index.html">Feedback</a></td></tr>
-  <tr><td>Ask for a name in a dialog</td><td><a href="system/patterns/dialog/index.html">Dialog</a></td></tr>
-  <tr><td>Ask the user to allow a remote host</td><td><a href="system/components/permission-band/index.html">Permission band</a></td></tr>
-  <tr><td>Ask the user to confirm a destructive action</td><td><a href="system/patterns/dialog/index.html">Dialog</a></td></tr>
-  <tr><td>Block the window while it waits</td><td><a href="system/patterns/states/index.html">Empty, loading and error states</a></td></tr>
-  <tr><td>Build a list or tree row</td><td><a href="system/components/row/index.html">Rows &amp; lists</a></td></tr>
-  <tr><td>Check whether a colour token is retired</td><td><a href="system/foundations/colors.html">Colours</a></td></tr>
-  <tr><td>Choose a font size or weight</td><td><a href="system/foundations/type.html">Typography</a></td></tr>
-  <tr><td>Choose a padding or gap</td><td><a href="system/foundations/spacing.html">Spacing</a></td></tr>
-  <tr><td>Choose a z-index</td><td><a href="system/foundations/layering.html">Layering</a></td></tr>
-  <tr><td>Colour a hover, selected or drop-target state</td><td><a href="system/foundations/colors.html">Colours</a></td></tr>
-  <tr><td>Colour git status or the context meter</td><td><a href="system/foundations/colors.html">Colours</a></td></tr>
-  <tr><td>Colour inline code or a syntax token</td><td><a href="system/foundations/terminal.html">Terminal and code colours</a></td></tr>
-  <tr><td>Colour terminal output or the cursor</td><td><a href="system/foundations/terminal.html">Terminal and code colours</a></td></tr>
-  <tr><td>Decide whether an icon needs a name</td><td><a href="system/components/icon/index.html">Icons</a></td></tr>
-  <tr><td>Describe a checkbox</td><td><a href="system/components/form/index.html">Form controls</a></td></tr>
-  <tr><td>Describe what the agent does</td><td><a href="system/foundations/writing.html">Writing</a></td></tr>
-  <tr><td>Draw a focus ring</td><td><a href="system/foundations/focus.html">Focus &amp; keyboard</a></td></tr>
-  <tr><td>Find a registry glyph</td><td><a href="system/components/icon/index.html">Icons</a></td></tr>
-  <tr><td>Focus a button on a coloured fill</td><td><a href="system/foundations/focus.html">Focus &amp; keyboard</a></td></tr>
-  <tr><td>Group toolbar buttons</td><td><a href="system/components/toolbar/index.html">Toolbar</a></td></tr>
-  <tr><td>Handle a toolbar that does not fit</td><td><a href="system/components/toolbar/index.html">Toolbar</a></td></tr>
-  <tr><td>Keep focus visible under a sticky header</td><td><a href="system/foundations/focus.html">Focus &amp; keyboard</a></td></tr>
-  <tr><td>Label a destructive action</td><td><a href="system/components/button/index.html">Buttons</a></td></tr>
-  <tr><td>Let the user resize two panes</td><td><a href="system/components/splitter/index.html">Splitter</a></td></tr>
-  <tr><td>Make a divider keyboard-operable</td><td><a href="system/components/splitter/index.html">Splitter</a></td></tr>
-  <tr><td>Make a popover or dialog stand off the panel</td><td><a href="system/foundations/surfaces.html">Surfaces and elevation</a></td></tr>
-  <tr><td>Make a state visible in a Windows contrast theme</td><td><a href="system/foundations/forced-colors.html">Forced colours</a></td></tr>
-  <tr><td>Make text selectable or not</td><td><a href="system/foundations/theme.html">Theme</a></td></tr>
-  <tr><td>Make text survive zoom and text spacing</td><td><a href="system/foundations/type.html">Typography</a></td></tr>
-  <tr><td>Mark a tab with unsaved changes</td><td><a href="system/components/tabs/index.html">Tabs</a></td></tr>
-  <tr><td>Pick a system colour for focus, selection or disabled</td><td><a href="system/foundations/forced-colors.html">Forced colours</a></td></tr>
-  <tr><td>Pick a text colour that passes contrast</td><td><a href="system/foundations/colors.html">Colours</a></td></tr>
-  <tr><td>Put a button beside a field</td><td><a href="system/components/button/index.html">Buttons</a></td></tr>
-  <tr><td>Remove an outline safely</td><td><a href="system/foundations/focus.html">Focus &amp; keyboard</a></td></tr>
-  <tr><td>Replace a title attribute</td><td><a href="system/components/tooltip/index.html">Tooltip</a></td></tr>
-  <tr><td>Respect reduced motion</td><td><a href="system/foundations/motion.html">Motion</a></td></tr>
-  <tr><td>Set code or paths in the mono face</td><td><a href="system/foundations/type.html">Typography</a></td></tr>
-  <tr><td>Show a count on an icon</td><td><a href="system/components/badge/index.html">Badges, chips and keys</a></td></tr>
-  <tr><td>Show a field error</td><td><a href="system/components/form/index.html">Form controls</a></td></tr>
-  <tr><td>Show a file&#x27;s git state</td><td><a href="system/components/badge/index.html">Badges, chips and keys</a></td></tr>
-  <tr><td>Show a hostname</td><td><a href="system/components/row/index.html">Rows &amp; lists</a></td></tr>
-  <tr><td>Show a keyboard shortcut</td><td><a href="system/components/badge/index.html">Badges, chips and keys</a></td></tr>
-  <tr><td>Show a keyboard shortcut</td><td><a href="system/components/tooltip/index.html">Tooltip</a></td></tr>
-  <tr><td>Show a toast</td><td><a href="system/components/feedback/index.html">Feedback</a></td></tr>
-  <tr><td>Show an empty panel or list</td><td><a href="system/patterns/states/index.html">Empty, loading and error states</a></td></tr>
-  <tr><td>Show an error, warning or success</td><td><a href="system/components/feedback/index.html">Feedback</a></td></tr>
-  <tr><td>Show progress</td><td><a href="system/components/feedback/index.html">Feedback</a></td></tr>
-  <tr><td>Show that a panel or the app failed</td><td><a href="system/patterns/states/index.html">Empty, loading and error states</a></td></tr>
-  <tr><td>Show that something is loading</td><td><a href="system/foundations/motion.html">Motion</a></td></tr>
-  <tr><td>Show that something is loading</td><td><a href="system/patterns/states/index.html">Empty, loading and error states</a></td></tr>
-  <tr><td>Show which tab is active</td><td><a href="system/components/tabs/index.html">Tabs</a></td></tr>
-  <tr><td>Size a clickable target</td><td><a href="system/foundations/surfaces.html">Surfaces and elevation</a></td></tr>
-  <tr><td>Size an icon</td><td><a href="system/components/icon/index.html">Icons</a></td></tr>
-  <tr><td>Space a panel header, a menu or a dialog</td><td><a href="system/foundations/spacing.html">Spacing</a></td></tr>
-  <tr><td>Style a panel title, hint or column header</td><td><a href="system/foundations/type.html">Typography</a></td></tr>
-  <tr><td>Style a scrollbar</td><td><a href="system/foundations/surfaces.html">Surfaces and elevation</a></td></tr>
-  <tr><td>Word a button or a dialog</td><td><a href="system/foundations/writing.html">Writing</a></td></tr>
-  <tr><td>Write a keyboard shortcut</td><td><a href="system/foundations/writing.html">Writing</a></td></tr>
-  <tr><td>Write an error message</td><td><a href="system/foundations/writing.html">Writing</a></td></tr>
-</tbody>
-</table>
 
 <h2 id="foundations">Foundations <span class="ix-count">11</span></h2>
 <div class="ix-grid">
@@ -152,9 +74,9 @@
       <span class="ix-card__meta"><span class="ds-status" data-status="proposed">proposed</span> reviewed 2026-08-31</span>
     </a>
     <a class="ix-card" href="system/foundations/focus.html">
-      <span class="ix-card__name">Focus &amp; keyboard</span>
+      <span class="ix-card__name">Focus and keyboard</span>
       <span class="ix-card__sub">One ring, one width – where it may go inset, where it never may, and what must never cover it</span>
-      <span class="ix-card__meta"><span class="ds-status" data-status="decided">decided</span> reviewed 2026-09-01</span>
+      <span class="ix-card__meta"><span class="ds-status" data-status="decided">decided</span> reviewed 2026-10-28</span>
     </a>
     <a class="ix-card" href="system/foundations/forced-colors.html">
       <span class="ix-card__name">Forced colours</span>
@@ -168,7 +90,7 @@
     </a>
     <a class="ix-card" href="system/foundations/motion.html">
       <span class="ix-card__name">Motion</span>
-      <span class="ix-card__sub">Four durations, the missing easing scale, a proposed spinner, and when everything must stop</span>
+      <span class="ix-card__sub">The durations, the missing easing scale, a proposed spinner, and when everything must stop</span>
       <span class="ix-card__meta"><span class="ds-status" data-status="proposed">proposed</span> reviewed 2026-08-31</span>
     </a>
     <a class="ix-card" href="system/foundations/spacing.html">
@@ -193,7 +115,7 @@
     </a>
     <a class="ix-card" href="system/foundations/type.html">
       <span class="ix-card__name">Typography</span>
-      <span class="ix-card__sub">Seven sizes, four weights, five line heights, six text styles – rendered at real size</span>
+      <span class="ix-card__sub">The type scale, its weights, line heights and text styles – rendered at real size</span>
       <span class="ix-card__meta"><span class="ds-status" data-status="proposed">proposed</span> reviewed 2026-08-31</span>
     </a>
     <a class="ix-card" href="system/foundations/writing.html">
@@ -212,7 +134,7 @@
     </a>
     <a class="ix-card" href="system/components/button/index.html">
       <span class="ix-card__name">Buttons</span>
-      <span class="ix-card__sub">Seven variants, six states, three heights – and the dialog buttons that ship today</span>
+      <span class="ix-card__sub">One button in every variant, state and height – and the dialog buttons that ship today</span>
       <span class="ix-card__meta"><span class="ds-status" data-status="proposed">proposed</span> reviewed 2026-08-31</span>
     </a>
     <a class="ix-card" href="system/components/feedback/index.html">
@@ -223,7 +145,7 @@
     <a class="ix-card" href="system/components/form/index.html">
       <span class="ix-card__name">Form controls</span>
       <span class="ix-card__sub">One input, one select, one checkbox – and an error that a screen reader can find</span>
-      <span class="ix-card__meta"><span class="ds-status" data-status="decided">decided</span> reviewed 2026-08-31</span>
+      <span class="ix-card__meta"><span class="ds-status" data-status="decided">decided</span> reviewed 2026-10-28</span>
     </a>
     <a class="ix-card" href="system/components/icon/index.html">
       <span class="ix-card__name">Icons</span>
@@ -233,17 +155,17 @@
     <a class="ix-card" href="system/components/menu/index.html">
       <span class="ix-card__name">Menu</span>
       <span class="ix-card__sub">A role is a promise – arrows, typeahead, and the precedence rule for a disabled danger item</span>
-      <span class="ix-card__meta"><span class="ds-status" data-status="decided">decided</span> reviewed 2026-08-31</span>
+      <span class="ix-card__meta"><span class="ds-status" data-status="decided">decided</span> reviewed 2026-10-28</span>
     </a>
     <a class="ix-card" href="system/components/permission-band/index.html">
       <span class="ix-card__name">Permission band</span>
       <span class="ix-card__sub">Approve a blocked origin from the preview&#x27;s own chrome – collapsed, expanded, confirming, fail-safe</span>
-      <span class="ix-card__meta"><span class="ds-status" data-status="decided">decided</span> reviewed 2026-09-01</span>
+      <span class="ix-card__meta"><span class="ds-status" data-status="decided">decided</span> reviewed 2026-10-28</span>
     </a>
     <a class="ix-card" href="system/components/row/index.html">
-      <span class="ix-card__name">Rows &amp; lists</span>
+      <span class="ix-card__name">Rows and lists</span>
       <span class="ix-card__sub">One selected state instead of four, the arrow-key contract the file tree keeps, and a route that needs no drag</span>
-      <span class="ix-card__meta"><span class="ds-status" data-status="decided">decided</span> reviewed 2026-09-01</span>
+      <span class="ix-card__meta"><span class="ds-status" data-status="decided">decided</span> reviewed 2026-10-28</span>
     </a>
     <a class="ix-card" href="system/components/splitter/index.html">
       <span class="ix-card__name">Splitter</span>
@@ -252,7 +174,7 @@
     </a>
     <a class="ix-card" href="system/components/tabs/index.html">
       <span class="ix-card__name">Tabs</span>
-      <span class="ix-card__sub">One tab instead of three – selected, unsaved, deleted, pinned, and a close button the keyboard can reach</span>
+      <span class="ix-card__sub">One tab instead of three – selected, unsaved, deleted, pinned, and a close the keyboard reaches with Delete</span>
       <span class="ix-card__meta"><span class="ds-status" data-status="proposed">proposed</span> not yet reviewed</span>
     </a>
     <a class="ix-card" href="system/components/toolbar/index.html">
@@ -280,6 +202,82 @@
       <span class="ix-card__meta"><span class="ds-status" data-status="proposed">proposed</span> not yet reviewed</span>
     </a>
 </div>
+
+<h2 id="start-here">Start here by task</h2>
+<table>
+<thead><tr><th>I need to…</th><th>Card</th></tr></thead>
+<tbody>
+  <tr><td>Add a button</td><td><a href="system/components/button/index.html">Buttons</a></td></tr>
+  <tr><td>Add a context menu</td><td><a href="system/components/menu/index.html">Menu</a></td></tr>
+  <tr><td>Add a dialog</td><td><a href="system/patterns/dialog/index.html">Dialog</a></td></tr>
+  <tr><td>Add a light mode or a colour-scheme query</td><td><a href="system/foundations/theme.html">Theme</a></td></tr>
+  <tr><td>Add a shadow or a border</td><td><a href="system/foundations/surfaces.html">Surfaces and elevation</a></td></tr>
+  <tr><td>Add a tab strip</td><td><a href="system/components/tabs/index.html">Tabs</a></td></tr>
+  <tr><td>Add a tag or chip</td><td><a href="system/components/badge/index.html">Badges, chips and keys</a></td></tr>
+  <tr><td>Add a text field or select</td><td><a href="system/components/form/index.html">Form controls</a></td></tr>
+  <tr><td>Add a toolbar to a panel</td><td><a href="system/components/toolbar/index.html">Toolbar</a></td></tr>
+  <tr><td>Add a tooltip</td><td><a href="system/components/tooltip/index.html">Tooltip</a></td></tr>
+  <tr><td>Animate something</td><td><a href="system/foundations/motion.html">Motion</a></td></tr>
+  <tr><td>Announce a change to a screen reader</td><td><a href="system/components/feedback/index.html">Feedback</a></td></tr>
+  <tr><td>Ask for a name in a dialog</td><td><a href="system/patterns/dialog/index.html">Dialog</a></td></tr>
+  <tr><td>Ask the user to allow a remote host</td><td><a href="system/components/permission-band/index.html">Permission band</a></td></tr>
+  <tr><td>Ask the user to confirm a destructive action</td><td><a href="system/patterns/dialog/index.html">Dialog</a></td></tr>
+  <tr><td>Block the window while it waits</td><td><a href="system/patterns/states/index.html">Empty, loading and error states</a></td></tr>
+  <tr><td>Build a list or tree row</td><td><a href="system/components/row/index.html">Rows and lists</a></td></tr>
+  <tr><td>Check whether a colour token is retired</td><td><a href="system/foundations/colors.html">Colours</a></td></tr>
+  <tr><td>Choose a font size or weight</td><td><a href="system/foundations/type.html">Typography</a></td></tr>
+  <tr><td>Choose a padding or gap</td><td><a href="system/foundations/spacing.html">Spacing</a></td></tr>
+  <tr><td>Choose a z-index</td><td><a href="system/foundations/layering.html">Layering</a></td></tr>
+  <tr><td>Colour a hover, selected or drop-target state</td><td><a href="system/foundations/colors.html">Colours</a></td></tr>
+  <tr><td>Colour git status or the context meter</td><td><a href="system/foundations/colors.html">Colours</a></td></tr>
+  <tr><td>Colour inline code or a syntax token</td><td><a href="system/foundations/terminal.html">Terminal and code colours</a></td></tr>
+  <tr><td>Colour terminal output or the cursor</td><td><a href="system/foundations/terminal.html">Terminal and code colours</a></td></tr>
+  <tr><td>Decide whether an icon needs a name</td><td><a href="system/components/icon/index.html">Icons</a></td></tr>
+  <tr><td>Describe a checkbox</td><td><a href="system/components/form/index.html">Form controls</a></td></tr>
+  <tr><td>Describe what the agent does</td><td><a href="system/foundations/writing.html">Writing</a></td></tr>
+  <tr><td>Draw a focus ring</td><td><a href="system/foundations/focus.html">Focus and keyboard</a></td></tr>
+  <tr><td>Find a registry glyph</td><td><a href="system/components/icon/index.html">Icons</a></td></tr>
+  <tr><td>Focus a button on a coloured fill</td><td><a href="system/foundations/focus.html">Focus and keyboard</a></td></tr>
+  <tr><td>Group toolbar buttons</td><td><a href="system/components/toolbar/index.html">Toolbar</a></td></tr>
+  <tr><td>Handle a toolbar that does not fit</td><td><a href="system/components/toolbar/index.html">Toolbar</a></td></tr>
+  <tr><td>Keep focus visible under a sticky header</td><td><a href="system/foundations/focus.html">Focus and keyboard</a></td></tr>
+  <tr><td>Label a destructive action</td><td><a href="system/components/button/index.html">Buttons</a></td></tr>
+  <tr><td>Let the user resize two panes</td><td><a href="system/components/splitter/index.html">Splitter</a></td></tr>
+  <tr><td>Make a divider keyboard-operable</td><td><a href="system/components/splitter/index.html">Splitter</a></td></tr>
+  <tr><td>Make a popover or dialog stand off the panel</td><td><a href="system/foundations/surfaces.html">Surfaces and elevation</a></td></tr>
+  <tr><td>Make a state visible in a Windows contrast theme</td><td><a href="system/foundations/forced-colors.html">Forced colours</a></td></tr>
+  <tr><td>Make text selectable or not</td><td><a href="system/foundations/theme.html">Theme</a></td></tr>
+  <tr><td>Make text survive zoom and text spacing</td><td><a href="system/foundations/type.html">Typography</a></td></tr>
+  <tr><td>Mark a tab with unsaved changes</td><td><a href="system/components/tabs/index.html">Tabs</a></td></tr>
+  <tr><td>Pick a system colour for focus, selection or disabled</td><td><a href="system/foundations/forced-colors.html">Forced colours</a></td></tr>
+  <tr><td>Pick a text colour that passes contrast</td><td><a href="system/foundations/colors.html">Colours</a></td></tr>
+  <tr><td>Put a button beside a field</td><td><a href="system/components/button/index.html">Buttons</a></td></tr>
+  <tr><td>Remove an outline safely</td><td><a href="system/foundations/focus.html">Focus and keyboard</a></td></tr>
+  <tr><td>Replace a title attribute</td><td><a href="system/components/tooltip/index.html">Tooltip</a></td></tr>
+  <tr><td>Respect reduced motion</td><td><a href="system/foundations/motion.html">Motion</a></td></tr>
+  <tr><td>Set code or paths in the mono face</td><td><a href="system/foundations/type.html">Typography</a></td></tr>
+  <tr><td>Show a count on an icon</td><td><a href="system/components/badge/index.html">Badges, chips and keys</a></td></tr>
+  <tr><td>Show a field error</td><td><a href="system/components/form/index.html">Form controls</a></td></tr>
+  <tr><td>Show a file&#x27;s git state</td><td><a href="system/components/badge/index.html">Badges, chips and keys</a></td></tr>
+  <tr><td>Show a hostname</td><td><a href="system/components/row/index.html">Rows and lists</a></td></tr>
+  <tr><td>Show a keyboard shortcut</td><td><a href="system/components/badge/index.html">Badges, chips and keys</a>, <a href="system/components/tooltip/index.html">Tooltip</a></td></tr>
+  <tr><td>Show a toast</td><td><a href="system/components/feedback/index.html">Feedback</a></td></tr>
+  <tr><td>Show an empty panel or list</td><td><a href="system/patterns/states/index.html">Empty, loading and error states</a></td></tr>
+  <tr><td>Show an error, warning or success</td><td><a href="system/components/feedback/index.html">Feedback</a></td></tr>
+  <tr><td>Show progress</td><td><a href="system/components/feedback/index.html">Feedback</a></td></tr>
+  <tr><td>Show that a panel or the app failed</td><td><a href="system/patterns/states/index.html">Empty, loading and error states</a></td></tr>
+  <tr><td>Show that something is loading</td><td><a href="system/foundations/motion.html">Motion</a>, <a href="system/patterns/states/index.html">Empty, loading and error states</a></td></tr>
+  <tr><td>Show which tab is active</td><td><a href="system/components/tabs/index.html">Tabs</a></td></tr>
+  <tr><td>Size a clickable target</td><td><a href="system/foundations/surfaces.html">Surfaces and elevation</a></td></tr>
+  <tr><td>Size an icon</td><td><a href="system/components/icon/index.html">Icons</a></td></tr>
+  <tr><td>Space a panel header, a menu or a dialog</td><td><a href="system/foundations/spacing.html">Spacing</a></td></tr>
+  <tr><td>Style a panel title, hint or column header</td><td><a href="system/foundations/type.html">Typography</a></td></tr>
+  <tr><td>Style a scrollbar</td><td><a href="system/foundations/surfaces.html">Surfaces and elevation</a></td></tr>
+  <tr><td>Word a button or a dialog</td><td><a href="system/foundations/writing.html">Writing</a></td></tr>
+  <tr><td>Write a keyboard shortcut</td><td><a href="system/foundations/writing.html">Writing</a></td></tr>
+  <tr><td>Write an error message</td><td><a href="system/foundations/writing.html">Writing</a></td></tr>
+</tbody>
+</table>
 
 <h2 id="token-owners">Which card owns this token</h2>
 <p class="ds-muted">Each token family has exactly one owner card, which shows every token in it or says why not.</p>

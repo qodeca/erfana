@@ -5,10 +5,11 @@
  * to share the space between them.
  *
  * PROPOSED – not adopted. The app's version is
- * src/renderer/src/components/Editor/ResizableDivider.tsx and its .css: an
- * 8px coloured bar with no role, no tab stop, no keyboard and no value (an open
- * defect in the design-system README). The dock's own sash (dockview, styled
- * in AppDockLayout.css) is a second splitter with a 4px hit area.
+ * src/renderer/src/components/Editor/ResizableDivider.tsx and its .css: a
+ * coloured bar with no role, no tab stop, no keyboard and no value, and a
+ * target under the 24 x 24 floor (an open defect in the design-system README).
+ * The dock's own sash (dockview, styled in AppDockLayout.css) is a second
+ * splitter, with a hit area that is also under the floor.
  *
  * The shape: a 1px line in the layout, and a 24px hit area drawn by ::before
  * over the panes on either side, so the target meets WCAG 2.2 SC 2.5.8

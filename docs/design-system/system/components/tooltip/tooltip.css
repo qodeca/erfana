@@ -122,14 +122,13 @@
 /* When the information is the ONLY job of its button (an "i" that explains the
    shortcuts), it is a toggletip, not a tooltip: a click or Enter opens it, it
    stays until dismissed, and it works on touch. Built on the popover attribute,
-   so light dismiss, Escape and focus return come from the browser. Placed with
-   CSS anchor positioning; the trigger names the anchor. */
-.erf-toggletip[popover] {
-  position: fixed;
-  inset: auto;
-  inset-block-start: anchor(bottom);
-  inset-inline-start: anchor(left);
-  margin: var(--space-2) 0 0;
+   so light dismiss, Escape and focus return come from the browser; closing on
+   Tab away does not (a popover is not dismissed when focus leaves it), so the
+   app adds that. Placed with CSS anchor positioning; the trigger names the
+   anchor. The look below is shared with the card's static "open" frame, which
+   has no popover attribute. */
+.erf-toggletip {
+  display: block;
   box-sizing: border-box;
   max-inline-size: 32ch;
   padding: var(--space-4) var(--space-6);
@@ -142,6 +141,16 @@
   font-size: var(--text-sm);
   line-height: var(--leading-snug);
 }
+/* The live one: a popover placed under its anchor. A popover that is not
+   open keeps the browser's display: none. */
+.erf-toggletip[popover] {
+  position: fixed;
+  inset: auto;
+  inset-block-start: anchor(bottom);
+  inset-inline-start: anchor(left);
+  margin: var(--space-2) 0 0;
+}
+.erf-toggletip[popover]:not(:popover-open) { display: none; }
 .erf-toggletip kbd {
   display: inline-block;
   padding: 0 var(--space-2);

@@ -437,7 +437,7 @@
 .erf-comment-banner--success .erf-comment-banner__icon {
   color: var(--color-success);
 }
-/* deviates: docs/designs/comments/html-comments/identity.html — the Feedback card has no info tone; the notice borrows the accent violet (card Exceptions, "Info banner") */
+/* deviates: docs/design-system/system/components/feedback/index.html — the Feedback card has no info tone; the notice borrows the accent violet (card Exceptions, "Info banner") */
 .erf-comment-banner--info {
   background: var(--color-brand-violet-muted);
   border-color: var(--color-accent-primary);

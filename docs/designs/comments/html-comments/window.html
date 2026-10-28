@@ -3,7 +3,7 @@
 <!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
 <!DOCTYPE html>
 <html lang="en" data-theme="dark"><head>
-<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Erfana – comment window</title>
@@ -18,7 +18,7 @@
   .live .erf-comment-window { position: absolute; inset-block-start: var(--space-8); inset-inline-end: var(--space-8); }
   .sheet-demo { block-size: 420px; inline-size: 360px; }
   .gallery .erf-comment-window { max-block-size: none; }
-  .times td:first-child { font-family: var(--font-mono); font-size: var(--text-sm); }
+  .times td:first-child { font-family: var(--font-mono); font-size: var(--ds-text-small); }
 </style>
 </head>
 <body>
@@ -49,8 +49,8 @@
   <strong><span data-claim="hpc-window-meta" title="--color-text-tertiary on --color-bg-elevated: the comment window context, meta, hint and counter">6.33</span>:1</strong>; <code>--color-text-secondary</code>, which
   much of the app uses for hints, is <strong><span data-claim="hpc-window-secondary" title="--color-text-secondary on --color-bg-elevated: why the comment window does not use secondary for small text">3.72</span>:1</strong> here –
   under the 4.5:1 small text needs. The field's edge is <code>--color-border-input</code>,
-  <strong><span data-claim="hpc-window-input-border" title="--color-border-input against --color-bg-elevated: the comment field edge">3.11</span>:1</strong>, and the focus ring
-  <strong><span data-claim="hpc-window-focus" title="--color-border-focus against --color-bg-elevated: the focus ring in the comment window">6.24</span>:1</strong>, both clear of 3:1.
+  <strong><span data-claim="hpc-window-input-border" title="--color-border-input against --color-bg-elevated: the comment field edge">3.10</span>:1</strong>, and the focus ring
+  <strong><span data-claim="hpc-window-focus" title="--color-border-focus against --color-bg-elevated: the focus ring in the comment window">6.23</span>:1</strong>, both clear of 3:1.
 </div>
 
 <div class="ds-note">

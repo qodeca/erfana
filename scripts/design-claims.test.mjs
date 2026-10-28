@@ -22,7 +22,8 @@
  * @see scripts/design-sync.mjs for the baker and the governance guards
  */
 
-import { existsSync, readFileSync, readdirSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parse } from 'parse5'
@@ -32,6 +33,7 @@ import {
   collectCustomProperties,
   contrastRatio,
   evaluate,
+  formatRatio,
   parseColor,
   relativeLuminance,
   resolveVar,
@@ -39,19 +41,32 @@ import {
   walk
 } from './lib/design-claims.mjs'
 import { nodesOf } from './lib/design-static.mjs'
+import { CSP_CONTENT } from './lib/design-static.mjs'
 import {
+  ANSI_KEYS,
   COMPONENT_CSS,
+  DesignError,
   GROUP_FOLDERS,
+  REASON_MAX,
   TOKEN_OWNERS,
   anatomyProblems,
+  ansiContrast,
   authoredPages,
   bakePage,
   collectCards,
   deviationProblems,
+  deviationsIn,
+  iconMarkup,
+  iconRegistryRegion,
   loadClaims,
   ownershipProblems,
+  readIconRegistry,
   readMarker,
-  stylelintCoverageProblems
+  readXtermTheme,
+  renderDeviations,
+  renderIndex,
+  stylelintCoverageProblems,
+  xtermDuplicateProblems
 } from './design-sync.mjs'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -92,7 +107,7 @@ const BAKED = PAGES.flatMap(file => {
 })
 
 /** A claim value as the baker writes it. */
-const formatted = (id, value) => (LEDGER[id].kind === 'contrast' ? value.toFixed(2) : String(value))
+const formatted = (id, value) => (LEDGER[id].kind === 'contrast' ? formatRatio(value) : String(value))
 
 /**
  * What is wrong with a stylesheet's app-wide reduced-motion rule, as a list of
@@ -150,8 +165,9 @@ describe('design claims ledger', () => {
     // If the maths is wrong every ratio below is confidently wrong, which is the
     // exact failure this whole mechanism exists to stop.
     it('computes the WCAG reference extremes', () => {
-      expect(contrastRatio('#ffffff', '#000000')).toBe(21)
+      expect(contrastRatio('#ffffff', '#000000')).toBeCloseTo(21, 10)
       expect(contrastRatio('#ffffff', '#ffffff')).toBe(1)
+      expect(formatRatio(contrastRatio('#ffffff', '#000000'))).toBe('21.00')
     })
 
     it('is order-independent', () => {
@@ -166,6 +182,16 @@ describe('design claims ledger', () => {
       expect(parseColor('rgb(1 2 3 / 50%)')).toEqual({ r: 1, g: 2, b: 3, a: 0.5 })
       expect(() => parseColor('red')).toThrow(/not a colour/)
       expect(() => parseColor('#12')).toThrow(/not a colour/)
+    })
+
+    it('returns the raw ratio, and quotes it rounded DOWN', () => {
+      // #767676 on white is the classic 4.54:1 – unrounded it carries more digits.
+      const raw = contrastRatio('#767676', '#ffffff')
+      expect(raw).not.toBe(Math.round(raw * 100) / 100)
+      expect(formatRatio(4.4951)).toBe('4.49')
+      expect(formatRatio(4.5)).toBe('4.50')
+      expect(formatRatio(10.4)).toBe('10.40')
+      expect(formatRatio(2.999)).toBe('2.99')
     })
 
     it('uses the 0.04045 sRGB threshold', () => {
@@ -520,5 +546,272 @@ describe('design system governance', () => {
   it('writes no em dash in a card subtitle', () => {
     const bad = CARD_FILES.filter(f => /subtitle="[^"]*—/.test(readFileSync(path.join(ROOT, f), 'utf8').split('\n')[0]))
     expect(bad).toEqual([])
+  })
+})
+
+/* ---------------------------------------------------------------- the baker's error paths */
+
+/** A grey whose ratio on black is `target`, found by bisection (the ratio grows with the grey). */
+function greyAt(target) {
+  let lo = 0
+  let hi = 255
+  for (let i = 0; i < 80; i += 1) {
+    const mid = (lo + hi) / 2
+    if (contrastRatio(`rgb(${mid} ${mid} ${mid})`, '#000000') < target) lo = mid
+    else hi = mid
+  }
+  return `rgb(${lo} ${lo} ${lo})`
+}
+
+const PAGE = body => `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta http-equiv="Content-Security-Policy" content="${CSP_CONTENT}">
+<title>t</title>
+</head>
+<body>
+${body}
+</body>
+</html>`
+
+describe('bakePage', () => {
+  const tokens = new Map([
+    ['--fg', '#ffffff'],
+    ['--bg', '#000000'],
+    ['--near', greyAt(4.4951)],
+    ['--shadow', '0 0 var(--bg)'],
+    ['--alias', 'var(--bg)']
+  ])
+  const ledger = { 'n-files': { kind: 'count', label: 'files' }, 'a-ratio': { kind: 'contrast', label: 'a ratio' } }
+  const claims = { 'n-files': 7, 'a-ratio': 4.4951 }
+  const regions = {
+    ok: () => '<li>one</li>',
+    broken: () => {
+      throw new DesignError('the source moved')
+    }
+  }
+  const bake = body => bakePage('x.html', PAGE(body), { claims, ledger, tokens, regions })
+
+  it.each([
+    ['an unknown claim', '<span data-claim="nope"></span>', /data-claim="nope" is not in docs\/design-system\/claims\.json/],
+    ['an unknown token', '<code data-token="--nope"></code>', /data-token="--nope" is not declared/],
+    ['a token that resolves to a value holding var()', '<code data-token="--shadow"></code>', /still holds a var\(\)/],
+    ['a malformed contrast spec', '<span data-contrast="--fg against --bg"></span>', /expected "--fg on --bg"/],
+    ['a non-numeric bar', '<span data-contrast="--fg on --bg" data-min="AA"></span>', /data-min="AA" is not a number/],
+    ['a contrast on an undeclared token', '<span data-contrast="--fg on --missing" data-min="4.5"></span>', /undefined custom property: --missing/],
+    ['an unknown region', '<div data-generated="nope"></div>', /data-generated="nope" names no region/],
+    ['a region whose reader fails', '<div data-generated="broken"></div>', /data-generated="broken": the source moved/],
+    ['an icon off an <svg>', '<span data-icon="x"></span>', /data-icon belongs on an <svg>/],
+    ['an icon name that walks the filesystem', '<svg data-icon="../../package"></svg>', /is not a lucide icon name/],
+    ['an unknown icon', '<svg data-icon="no-such-glyph-at-all"></svg>', /unknown lucide icon "no-such-glyph-at-all"/],
+    ['two kinds on one element', '<span data-claim="n-files" data-token="--fg"></span>', /may carry only one of/],
+    ['a target holding an element', '<span data-claim="n-files"><b>7</b></span>', /holds an element/],
+    ['a target with no end tag', '<img data-claim="n-files">', /needs an explicit end tag/]
+  ])('refuses %s', async (_name, body, problem) => {
+    await expect(bake(body)).rejects.toThrow(problem)
+  })
+
+  it('reports every problem in the page at once, each with its line', async () => {
+    await expect(bake('<span data-claim="a"></span>\n<span data-claim="b"></span>')).rejects.toThrow(/x\.html:8 .*"a"[\s\S]*x\.html:9 .*"b"/)
+  })
+
+  it('bakes a verdict on the RAW ratio: 4.4951 fails 4.5 and is quoted as 4.49', async () => {
+    const { text } = await bake('<span data-contrast="--near on --bg" data-min="4.5"></span>')
+    expect(text).toContain('<span data-contrast="--near on --bg" data-min="4.5" data-result="fail">4.49:1 · fail</span>')
+  })
+
+  it('quotes a contrast claim rounded down too', async () => {
+    const { text } = await bake('<span data-claim="a-ratio"></span>')
+    expect(text).toContain('<span data-claim="a-ratio" title="a ratio">4.49</span>')
+  })
+
+  it('follows a whole-value var() chain for a token', async () => {
+    const { text } = await bake('<code data-token="--alias"></code>')
+    expect(text).toContain('<code data-token="--alias">#000000</code>')
+  })
+
+  it('inserts every missing attribute of one tag in one edit, in order', async () => {
+    const { text } = await bake('<svg data-icon="x"></svg>')
+    expect(text).toMatch(
+      /<svg data-icon="x" xmlns="http:\/\/www\.w3\.org\/2000\/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">/
+    )
+  })
+
+  it('bakes the CSP meta to the current policy', async () => {
+    const stale = PAGE('<p>x</p>').replace(CSP_CONTENT, "script-src 'none'")
+    const { text, targets } = await bakePage('x.html', stale, { claims, ledger, tokens, regions })
+    expect(text).toContain(`content="${CSP_CONTENT}"`)
+    expect(targets.find(t => t.kind === 'csp content').stale).toBe(`content="script-src 'none'"`)
+  })
+
+  it('is idempotent: a baked page bakes to itself', async () => {
+    const { text } = await bake('<span data-claim="n-files"></span><div data-generated="ok"></div><svg data-icon="x"></svg>')
+    const again = await bakePage('x.html', text, { claims, ledger, tokens, regions })
+    expect(again.text).toBe(text)
+    expect(again.targets.filter(t => t.stale !== t.fresh)).toEqual([])
+  })
+})
+
+describe('lucide icons are read as text', () => {
+  it('follows an alias module to the glyph it re-exports', () => {
+    expect(iconMarkup('edit-3')).toBe(iconMarkup('pen-line'))
+    expect(iconMarkup('edit-3')).toMatch(/^<path d="/)
+  })
+
+  it('resolves CheckCircle to circle-check-big, not circle-check', () => {
+    const entry = readIconRegistry().find(e => e.name === 'check-circle')
+    expect(entry).toEqual({ name: 'check-circle', component: 'CheckCircle', file: 'circle-check-big' })
+    expect(iconMarkup('check-circle')).toBe(iconMarkup('circle-check-big'))
+    expect(iconMarkup('check-circle')).not.toBe(iconMarkup('circle-check'))
+  })
+
+  it.each(['../../package', 'x/../../y', 'X', 'a--b', '-a', 'a.js', ''])('refuses the name %j before touching the disk', name => {
+    expect(() => iconMarkup(name)).toThrow(/is not a lucide icon name/)
+  })
+
+  it('throws a DesignError for an alias it cannot resolve, or a module with neither', () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'ds-lucide-'))
+    try {
+      const icons = path.join(dir, 'node_modules/lucide-react/dist/esm/icons')
+      mkdirSync(icons, { recursive: true })
+      writeFileSync(path.join(icons, 'dangling.js'), "export { default } from './gone.js';\n")
+      writeFileSync(path.join(icons, 'odd.js'), 'export default 1\n')
+      writeFileSync(path.join(icons, 'loop-a.js'), "export { default } from './loop-b.js';\n")
+      writeFileSync(path.join(icons, 'loop-b.js'), "export { default } from './loop-a.js';\n")
+      expect(() => iconMarkup('dangling', dir)).toThrow(DesignError)
+      expect(() => iconMarkup('dangling', dir)).toThrow(/unknown lucide icon "gone"/)
+      expect(() => iconMarkup('odd', dir)).toThrow(/no __iconNode and no single alias/)
+      expect(() => iconMarkup('loop-a', dir)).toThrow(/no __iconNode and no single alias/)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('generated regions read the code', () => {
+  it('lists every registry name, with the glyph an alias really draws', () => {
+    const entries = readIconRegistry()
+    const source = readFileSync(path.join(ROOT, 'src/renderer/src/utils/iconRegistry.tsx'), 'utf8')
+    const union = /export type IconName\s*=([\s\S]*?)\n\s*\n/.exec(source)[1]
+    expect(entries.length).toBe([...union.matchAll(/\|\s*'/g)].length)
+    const region = iconRegistryRegion()
+    expect([...region.matchAll(/<li>/g)]).toHaveLength(entries.length)
+    expect(region).toContain('<span>edit-3 <span class="ic-glyphs__src">draws pen-line</span></span>')
+    expect(region).toContain('<span>x</span>')
+  })
+
+  it('reads all 21 theme colours and the font size from XTERM_OPTIONS', () => {
+    const { theme, fontSize } = readXtermTheme()
+    expect(Object.keys(theme).length).toBeGreaterThanOrEqual(21)
+    expect(Number.isFinite(fontSize)).toBe(true)
+    expect(ansiContrast().map(c => c.key)).toEqual(ANSI_KEYS)
+  })
+
+  it('fails when the theme it reads is short', () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'ds-xterm-'))
+    try {
+      const file = path.join(dir, 'src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts')
+      mkdirSync(path.dirname(file), { recursive: true })
+      writeFileSync(file, "const XTERM_OPTIONS = {\n  fontSize: 12,\n  theme: {\n    background: '#000000',\n    red: '#cd3131'\n  }\n}\n")
+      expect(() => readXtermTheme(dir)).toThrow(/lacks foreground, cursor/)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('keeps the two copies of the terminal palette equal, and notices when they drift', () => {
+    expect(xtermDuplicateProblems()).toEqual([])
+    const dir = mkdtempSync(path.join(tmpdir(), 'ds-xterm-'))
+    try {
+      const base = 'src/renderer/src/components/Panels/TerminalPanel'
+      mkdirSync(path.join(dir, base, 'hooks'), { recursive: true })
+      const hook = readFileSync(path.join(ROOT, base, 'hooks/useXtermSession.ts'), 'utf8')
+      const logic = readFileSync(path.join(ROOT, base, 'terminalPanel.logic.ts'), 'utf8')
+      writeFileSync(path.join(dir, base, 'hooks/useXtermSession.ts'), hook)
+      writeFileSync(path.join(dir, base, 'terminalPanel.logic.ts'), logic.replace("red: '#cd3131'", "red: '#ff0000'"))
+      expect(xtermDuplicateProblems(dir).join('\n')).toMatch(/TERMINAL_THEME\.red is #ff0000 but XTERM_OPTIONS\.theme\.red .* is #cd3131/)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('the deviation register', () => {
+  it('reads a reason across a three-line block comment', () => {
+    const css = [
+      '.a { color: red; }',
+      '/* deviates: docs/design-system/system/foundations/focus.html — inset, not outward.',
+      ' * The bar is a scroller, so an outward ring',
+      '   would be clipped by it. */',
+      '.b { outline: 0; }'
+    ].join('\n')
+    expect(deviationsIn('x.css', css)).toEqual([
+      {
+        file: 'x.css',
+        line: 2,
+        target: 'docs/design-system/system/foundations/focus.html',
+        reason: 'inset, not outward. The bar is a scroller, so an outward ring would be clipped by it.'
+      }
+    ])
+  })
+
+  it('reads a marker that sits on a * line of a comment opened above', () => {
+    const ts = "/*\n * deviates: docs/designs/comments/html-comments/overlay.html — the pin's\n * focus ring is the accent.\n */\nexport const x = 1\n"
+    expect(deviationsIn('x.ts', ts)[0].reason).toBe("the pin's focus ring is the accent.")
+  })
+
+  it('stops a line-comment reason at the first line that is not a comment', () => {
+    const ts = '// deviates: docs/design-system/system/components/menu/index.html – no aria-haspopup:\n// xterm owns its textarea.\nconst x = 1\n// unrelated\n'
+    expect(deviationsIn('x.ts', ts)[0].reason).toBe('no aria-haspopup: xterm owns its textarea.')
+  })
+
+  it('stops at a blank line inside a block comment', () => {
+    const css = '/* deviates: docs/design-system/system/foundations/focus.html – one\n   two\n\n   not part of it */'
+    expect(deviationsIn('x.css', css)[0].reason).toBe('one two')
+  })
+
+  it('caps a long reason with an ellipsis', () => {
+    const css = `/* deviates: docs/design-system/system/foundations/focus.html – ${'word '.repeat(80)}*/`
+    const { reason } = deviationsIn('x.css', css)[0]
+    expect(reason.length).toBeLessThanOrEqual(REASON_MAX)
+    expect(reason.endsWith('…')).toBe(true)
+  })
+})
+
+describe('generated pages are LF on every OS (#104)', () => {
+  it('renders the index and the register with no carriage return, whatever the inputs carried', () => {
+    const cards = collectCards()
+    const tokens = collectCustomProperties(readFileSync(TOKEN_FILE, 'utf8').replace(/\n/g, '\r\n'))
+    expect(renderIndex(cards, tokens)).not.toContain('\r')
+    const crlf = '/* deviates: docs/design-system/system/foundations/focus.html – one\r\n   two */\r\n'
+    const entries = deviationsIn('x.css', crlf)
+    expect(entries[0].reason).toBe('one two')
+    expect(renderDeviations(entries, cards)).not.toContain('\r')
+  })
+})
+
+describe('the index', () => {
+  const card = (href, name, answers) => ({ href, name, answers, subtitle: '', status: 'proposed', reviewed: 'never', group: 'Foundations' })
+
+  it('puts the card grids before "Start here by task"', () => {
+    const html = renderIndex(collectCards(), new Map())
+    expect(html.indexOf('id="foundations"')).toBeGreaterThan(-1)
+    expect(html.indexOf('id="foundations"')).toBeLessThan(html.indexOf('id="start-here"'))
+    expect(html.indexOf('id="patterns"')).toBeLessThan(html.indexOf('id="start-here"'))
+  })
+
+  it('merges a task two cards answer into one row that lists both', () => {
+    const html = renderIndex([card('a.html', 'Alpha', 'Pick a colour; Size a gap'), card('b.html', 'Beta', 'pick a colour')], new Map())
+    const rows = [...html.matchAll(/<tr><td>([^<]*)<\/td><td>(.*?)<\/td><\/tr>/g)].filter(m => /colour|gap/i.test(m[1]))
+    expect(rows.map(m => [m[1], m[2]])).toEqual([
+      ['Pick a colour', '<a href="a.html">Alpha</a>, <a href="b.html">Beta</a>'],
+      ['Size a gap', '<a href="a.html">Alpha</a>']
+    ])
+  })
+})
+
+describe('readMarker', () => {
+  it('reads a marker behind a byte-order mark', () => {
+    expect(readMarker('﻿<!-- @card group="Foundations" name="X" status="proposed" reviewed="never" -->\n', 'x.html')).toMatchObject({ name: 'X' })
   })
 })

@@ -4,7 +4,7 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
-<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Surfaces and elevation – Erfana design system</title>
@@ -25,7 +25,7 @@
   .size-box { width: var(--ds-tile-w); background: var(--color-brand-violet-muted);
               border: var(--border-width) solid var(--color-accent-primary); }
   .size-bar { height: var(--space-4); background: var(--color-accent-primary); }
-  .sf-label { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-tertiary); }
+  .sf-label { font-family: var(--font-mono); font-size: var(--ds-text-small); color: var(--color-text-tertiary); }
 
   /* ---------- the stack ---------- */
   .sf-stack { position: relative; height: var(--ds-stack-h); max-width: calc(var(--space-24) * 16);
@@ -42,7 +42,7 @@
 
   /* ---------- floating: border + shadow ---------- */
   .sf-float-host { padding: var(--space-12); background: var(--color-bg-secondary); }
-  .sf-float { width: var(--ds-tile-w); height: var(--ds-tile-h); background: var(--color-bg-elevated);
+  .sf-float { /* mockup: app scale – a popover */ width: var(--ds-tile-w); height: var(--ds-tile-h); background: var(--color-bg-elevated);
               padding: var(--space-4); font-size: var(--text-sm); color: var(--color-text-primary); }
   .sf-float--shadow { box-shadow: var(--shadow-md); }
   .sf-float--border { border: var(--border-width) solid var(--color-border-subtle); }
@@ -51,7 +51,7 @@
   /* ---------- scrollbars ---------- */
   .sb-box { position: relative; display: flex; height: calc(var(--space-24) * 2.5); background: var(--color-bg-tertiary);
             border: var(--border-width) solid var(--color-border-default); }
-  .sb-lines { flex: 1; padding: var(--space-2) var(--space-4); font-size: var(--text-sm); color: var(--color-text-primary);
+  .sb-lines { /* mockup: app scale – a list */ flex: 1; padding: var(--space-2) var(--space-4); font-size: var(--text-sm); color: var(--color-text-primary);
               overflow: hidden; }
   .sb-lines p { margin: 0; line-height: var(--leading-normal); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .sb-track { width: var(--scrollbar-width); background: var(--scrollbar-track); position: relative; }
@@ -71,7 +71,7 @@
              border: var(--border-width) solid var(--color-border-default); }
   .sb-live { margin-bottom: var(--space-8); }
   .sf-code { white-space: pre-wrap; }
-  .sb-live p { margin: 0; padding: var(--space-1) var(--space-4); font-size: var(--text-sm); color: var(--color-text-primary); }
+  .sb-live p { /* mockup: app scale – a list */ margin: 0; padding: var(--space-1) var(--space-4); font-size: var(--text-sm); color: var(--color-text-primary); }
 
   /* ---------- targets ---------- */
   .tg-stage { display: flex; align-items: center; gap: var(--space-4); min-height: var(--space-24);
@@ -94,8 +94,6 @@
   .tg-row--packed .tg--circle::after { border-color: var(--color-error); }
   .tg-row--short .tg--wide { outline: var(--border-width) dashed var(--color-error); outline-offset: 0; }
   .tg-inline { font-size: var(--text-base); color: var(--color-text-primary); }
-  .verdict-pass { color: var(--color-brand-lime); font-family: var(--font-mono); font-size: var(--text-sm); }
-  .verdict-fail { color: var(--color-error); font-family: var(--font-mono); font-size: var(--text-sm); }
 </style>
 </head>
 <body>
@@ -125,8 +123,8 @@ separating them, and the edge has to come from a border.</p>
 <thead><tr><th>Layer</th><th>Token</th><th>Value</th><th>Sits on</th><th>Step from it</th></tr></thead>
 <tbody>
   <tr><td>App background</td><td><code>--color-bg-primary</code></td><td><code data-token="--color-bg-primary">#161312</code></td><td>–</td><td>–</td></tr>
-  <tr><td>Panel</td><td><code>--color-bg-secondary</code></td><td><code data-token="--color-bg-secondary">#2d2d30</code></td><td>App background</td><td data-contrast="--color-bg-secondary on --color-bg-primary">1.35:1</td></tr>
-  <tr><td>Sidebar, tree, menu</td><td><code>--color-bg-tertiary</code></td><td><code data-token="--color-bg-tertiary">#252526</code></td><td>Panel</td><td data-contrast="--color-bg-tertiary on --color-bg-secondary">1.12:1</td></tr>
+  <tr><td>Panel</td><td><code>--color-bg-secondary</code></td><td><code data-token="--color-bg-secondary">#2d2d30</code></td><td>App background</td><td data-contrast="--color-bg-secondary on --color-bg-primary">1.34:1</td></tr>
+  <tr><td>Sidebar, tree, menu</td><td><code>--color-bg-tertiary</code></td><td><code data-token="--color-bg-tertiary">#252526</code></td><td>Panel</td><td data-contrast="--color-bg-tertiary on --color-bg-secondary">1.11:1</td></tr>
   <tr><td>Popover (elevated)</td><td><code>--color-bg-elevated</code></td><td><code data-token="--color-bg-elevated">#2d2d30</code></td><td>Panel</td><td data-contrast="--color-bg-elevated on --color-bg-secondary">1.00:1</td></tr>
   <tr><td>Scrim</td><td><code>--color-overlay-dialog</code></td><td><code data-token="--color-overlay-dialog">rgba(0, 0, 0, 0.75)</code></td><td>Panel (dimmed)</td><td data-contrast="--color-bg-secondary on --color-overlay-dialog over --color-bg-secondary">1.43:1</td></tr>
   <tr><td>Dialog</td><td><code>--color-bg-primary</code> (via <code>--dialog-bg</code>)</td><td><code data-token="--color-bg-primary">#161312</code></td><td>Scrim over a panel</td><td data-contrast="--color-bg-primary on --color-overlay-dialog over --color-bg-secondary">1.06:1</td></tr>
@@ -147,11 +145,11 @@ separating them, and the edge has to come from a border.</p>
 <h2 id="floating">Floating surfaces: border and shadow</h2>
 <div class="ds-frames">
   <figure class="ds-frame"><div class="sf-float-host" aria-hidden="true"><div class="sf-float sf-float--shadow">Rename</div></div>
-    <figcaption><strong>Shadow only</strong> – <span class="verdict-fail">fail</span>: black on near-black; the edge disappears.</figcaption></figure>
+    <figcaption><strong>Shadow only</strong> – <span class="ds-verdict ds-fail">fail</span>: black on near-black; the edge disappears.</figcaption></figure>
   <figure class="ds-frame"><div class="sf-float-host" aria-hidden="true"><div class="sf-float sf-float--border">Rename</div></div>
     <figcaption><strong>Border only</strong> – visible, but flat: it reads as part of the panel, not over it.</figcaption></figure>
   <figure class="ds-frame"><div class="sf-float-host" aria-hidden="true"><div class="sf-float sf-float--both">Rename</div></div>
-    <figcaption><strong>Border and shadow</strong> – <span class="verdict-pass">the rule</span>: <code>--color-border-subtle</code> plus <code>--shadow-md</code>; a dialog takes <code>--shadow-dialog</code>.</figcaption></figure>
+    <figcaption><strong>Border and shadow</strong> – <span class="ds-verdict ds-pass">the rule</span>: <code>--color-border-subtle</code> plus <code>--shadow-md</code>; a dialog takes <code>--shadow-dialog</code>.</figcaption></figure>
 </div>
 
 <h2 id="elevation">Shadows</h2>
@@ -197,8 +195,8 @@ separating them, and the edge has to come from a border.</p>
 <tbody>
   <tr><td><code>--color-border-default</code></td><td><code data-token="--color-border-default">#3c3c3c</code></td><td><div class="tile tile--edge" style="border: var(--border-width) solid var(--color-border-default)"></div></td><td data-contrast="--color-border-default on --color-bg-secondary">1.24:1</td><td>Dividers between regions</td></tr>
   <tr><td><code>--color-border-subtle</code></td><td><code data-token="--color-border-subtle">#454545</code></td><td><div class="tile tile--edge" style="border: var(--border-width) solid var(--color-border-subtle)"></div></td><td data-contrast="--color-border-subtle on --color-bg-secondary">1.43:1</td><td>Floating edges, secondary buttons. Despite the name, lighter than default</td></tr>
-  <tr><td><code>--color-border-input</code></td><td><code data-token="--color-border-input">#787878</code></td><td><div class="tile tile--edge" style="border: var(--border-width) solid var(--color-border-input)"></div></td><td data-contrast="--color-border-input on --color-bg-secondary" data-min="3" data-result="pass">3.11:1 · pass</td><td>The edge that identifies a field</td></tr>
-  <tr><td><code>--color-border-focus</code></td><td><code data-token="--color-border-focus">#A0A8FF</code></td><td><div class="tile tile--edge" style="border: var(--border-width-thick) solid var(--color-border-focus)"></div></td><td data-contrast="--color-border-focus on --color-bg-secondary" data-min="3" data-result="pass">6.24:1 · pass</td><td>The focus ring – see the Focus card</td></tr>
+  <tr><td><code>--color-border-input</code></td><td><code data-token="--color-border-input">#787878</code></td><td><div class="tile tile--edge" style="border: var(--border-width) solid var(--color-border-input)"></div></td><td data-contrast="--color-border-input on --color-bg-secondary" data-min="3" data-result="pass">3.10:1 · pass</td><td>The edge that identifies a field</td></tr>
+  <tr><td><code>--color-border-focus</code></td><td><code data-token="--color-border-focus">#A0A8FF</code></td><td><div class="tile tile--edge" style="border: var(--border-width-thick) solid var(--color-border-focus)"></div></td><td data-contrast="--color-border-focus on --color-bg-secondary" data-min="3" data-result="pass">6.23:1 · pass</td><td>The focus ring – see the Focus card</td></tr>
   <tr><td><code>--color-border-warning</code></td><td><code data-token="--color-border-warning">rgba(204, 167, 0, 0.3)</code></td><td><div class="tile tile--edge" style="border: var(--border-width) solid var(--color-border-warning)"></div></td><td data-contrast="--color-border-warning on --color-bg-secondary over --color-bg-secondary">1.75:1</td><td>Duplicates <code>--color-warning-border</code> – see the Feedback card</td></tr>
 </tbody>
 </table>
@@ -224,7 +222,7 @@ separating them, and the edge has to come from a border.</p>
 <thead><tr><th>Token</th><th>Value</th><th>Sample</th><th>Use</th></tr></thead>
 <tbody>
   <tr><td><code>--scrollbar-width</code></td><td><code data-token="--scrollbar-width">10px</code></td><td><div class="size-bar" style="width: var(--scrollbar-width)"></div></td><td>Track thickness</td></tr>
-  <tr><td><code>--scrollbar-thumb</code></td><td><code data-token="--scrollbar-thumb">#454545</code></td><td><div class="ds-swatch" style="background: var(--scrollbar-thumb)"></div></td><td>Thumb at rest – <span data-contrast="--scrollbar-thumb on --scrollbar-track">1.93:1</span> on its track</td></tr>
+  <tr><td><code>--scrollbar-thumb</code></td><td><code data-token="--scrollbar-thumb">#454545</code></td><td><div class="ds-swatch" style="background: var(--scrollbar-thumb)"></div></td><td>Thumb at rest – <span data-contrast="--scrollbar-thumb on --scrollbar-track">1.92:1</span> on its track</td></tr>
   <tr><td><code>--scrollbar-thumb-hover</code></td><td><code data-token="--scrollbar-thumb-hover">#4e4e4e</code></td><td><div class="ds-swatch" style="background: var(--scrollbar-thumb-hover)"></div></td><td>Thumb under the pointer – a raw hex, not a grey step (README defects)</td></tr>
   <tr><td><code>--scrollbar-track</code></td><td><code data-token="--scrollbar-track">#161312</code></td><td><div class="ds-swatch" style="background: var(--scrollbar-track)"></div></td><td>Track</td></tr>
 </tbody>
@@ -244,9 +242,9 @@ separating them, and the edge has to come from a border.</p>
   <figure class="ds-frame"><div class="sb-box" aria-hidden="true"><div class="sb-lines"><p class="sb-row"><span>notes.md</span><span>2 KB</span></p><p class="sb-row"><span>plan.md</span><span>4 KB</span></p></div></div>
     <figcaption><strong>Short, no gutter</strong> – sizes sit at the right edge…</figcaption></figure>
   <figure class="ds-frame"><div class="sb-box" aria-hidden="true"><div class="sb-lines"><p class="sb-row"><span>notes.md</span><span>2 KB</span></p><p class="sb-row"><span>plan.md</span><span>4 KB</span></p><p class="sb-row"><span>spec.md</span><span>9 KB</span></p><p class="sb-row"><span>todo.md</span><span>1 KB</span></p><p class="sb-row"><span>log.md</span><span>7 KB</span></p></div><div class="sb-track"><div class="sb-thumb"></div></div></div>
-    <figcaption><strong>Grown, no gutter</strong> – <span class="verdict-fail">fail</span>: the bar appears and every row jumps left by its width.</figcaption></figure>
+    <figcaption><strong>Grown, no gutter</strong> – <span class="ds-verdict ds-fail">fail</span>: the bar appears and every row jumps left by its width.</figcaption></figure>
   <figure class="ds-frame"><div class="sb-box" aria-hidden="true"><div class="sb-lines"><p class="sb-row"><span>notes.md</span><span>2 KB</span></p><p class="sb-row"><span>plan.md</span><span>4 KB</span></p></div><div class="sb-gutter"></div></div>
-    <figcaption><strong>Short, <code>scrollbar-gutter: stable</code></strong> – <span class="verdict-pass">pass</span>: the width is reserved, so nothing moves when the list grows.</figcaption></figure>
+    <figcaption><strong>Short, <code>scrollbar-gutter: stable</code></strong> – <span class="ds-verdict ds-pass">pass</span>: the width is reserved, so nothing moves when the list grows.</figcaption></figure>
 </div>
 
 <h3 id="erf-scroll">Proposed: one <code>erf-scroll</code> utility</h3>
@@ -278,15 +276,15 @@ focusable so a keyboard can scroll it.</p>
 </div>
 <div class="ds-frames">
   <figure class="ds-frame"><div class="tg-stage" aria-hidden="true"><span class="tg tg--24"></span></div>
-    <figcaption><strong>24 × 24</strong> – <span class="verdict-pass">pass</span>: <code>--btn-height-sm</code> sits exactly on the floor.</figcaption></figure>
+    <figcaption><strong>24 × 24</strong> – <span class="ds-verdict ds-pass">pass</span>: <code>--btn-height-sm</code> sits exactly on the floor.</figcaption></figure>
   <figure class="ds-frame"><div class="tg-stage" aria-hidden="true"><span class="tg--hitbox"><span class="tg tg--16"></span></span><span class="tg--hitbox"><span class="tg tg--16"></span></span></div>
-    <figcaption><strong>16px icon, 24 × 24 hit box</strong> – <span class="verdict-pass">pass</span>: the dashed box is the padded button.</figcaption></figure>
+    <figcaption><strong>16px icon, 24 × 24 hit box</strong> – <span class="ds-verdict ds-pass">pass</span>: the dashed box is the padded button.</figcaption></figure>
   <figure class="ds-frame"><div class="tg-stage tg-row--spaced" aria-hidden="true"><span class="tg tg--16 tg--circle"></span><span class="tg tg--16 tg--circle"></span><span class="tg tg--16 tg--circle"></span></div>
-    <figcaption><strong>16px, centres 24px apart</strong> – <span class="verdict-pass">pass by spacing</span>: the circles touch, never cross.</figcaption></figure>
+    <figcaption><strong>16px, centres 24px apart</strong> – <span class="ds-verdict ds-pass">pass by spacing</span>: the circles touch, never cross.</figcaption></figure>
   <figure class="ds-frame"><div class="tg-stage tg-row--packed" aria-hidden="true"><span class="tg tg--16 tg--circle"></span><span class="tg tg--16 tg--circle"></span><span class="tg tg--16 tg--circle"></span></div>
-    <figcaption><strong>16px, packed</strong> – <span class="verdict-fail">fail</span>: the circles overlap, so neither the size nor the spacing rule holds.</figcaption></figure>
+    <figcaption><strong>16px, packed</strong> – <span class="ds-verdict ds-fail">fail</span>: the circles overlap, so neither the size nor the spacing rule holds.</figcaption></figure>
   <figure class="ds-frame"><div class="tg-stage tg-row--short" aria-hidden="true"><span class="tg tg--wide"></span></div>
-    <figcaption><strong>Wide but 16px tall</strong> – <span class="verdict-fail">fails Erfana's floor</span>, a house rule stricter than WCAG: we hold both dimensions to 24px, not area. Alone like this, SC 2.5.8 would let it pass by spacing; placed beside another target, its 24px circle crosses that target and it fails 2.5.8 too.</figcaption></figure>
+    <figcaption><strong>Wide but 16px tall</strong> – <span class="ds-verdict ds-fail">fails Erfana's floor</span>, a house rule stricter than WCAG: we hold both dimensions to 24px, not area. Alone like this, SC 2.5.8 would let it pass by spacing; placed beside another target, its 24px circle crosses that target and it fails 2.5.8 too.</figcaption></figure>
   <figure class="ds-frame"><div class="tg-stage" inert aria-hidden="true"><span class="tg-inline">See the <a href="#targets">release notes</a> for details.</span></div>
     <figcaption><strong>A link in a sentence</strong> – exempt: its size is set by the line of text.</figcaption></figure>
 </div>

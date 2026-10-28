@@ -1,10 +1,10 @@
-<!-- @card group="Foundations" name="Typography" subtitle="Seven sizes, four weights, five line heights, six text styles – rendered at real size" status="proposed" reviewed="2026-08-31" answers="Choose a font size or weight; Set code or paths in the mono face; Style a panel title, hint or column header; Make text survive zoom and text spacing" -->
+<!-- @card group="Foundations" name="Typography" subtitle="The type scale, its weights, line heights and text styles – rendered at real size" status="proposed" reviewed="2026-08-31" answers="Choose a font size or weight; Set code or paths in the mono face; Style a panel title, hint or column header; Make text survive zoom and text spacing" -->
 <!-- SPDX-License-Identifier: GPL-3.0-only -->
 <!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
-<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Typography – Erfana design system</title>
@@ -40,20 +40,21 @@
 
   .ty-sample { color: var(--color-text-primary); }
 
-  /* The text styles. Each class is the proposed role, built from tokens only. */
-  .ty-role-panel-title { font-family: var(--font-sans); font-size: var(--text-sm); font-weight: var(--font-semibold);
+  /* The text styles. Each class is the proposed role, built from tokens only.
+     mockup: app scale – the specimens render each role at the size it ships. */
+  .ty-role-panel-title { /* mockup: app scale */ font-family: var(--font-sans); font-size: var(--text-sm); font-weight: var(--font-semibold);
                          line-height: var(--leading-none); text-transform: uppercase; letter-spacing: var(--ds-tracking-caps);
                          color: var(--color-text-primary); }
   .ty-role-dialog-title { font-family: var(--font-sans); font-size: var(--text-lg); font-weight: var(--font-semibold);
                           line-height: var(--leading-tight); color: var(--color-text-emphasis); }
   .ty-role-row { font-family: var(--font-sans); font-size: var(--text-base); font-weight: var(--font-normal);
                  line-height: var(--leading-snug); color: var(--color-text-primary); }
-  .ty-role-hint { font-family: var(--font-sans); font-size: var(--text-sm); font-weight: var(--font-normal);
+  .ty-role-hint { /* mockup: app scale */ font-family: var(--font-sans); font-size: var(--text-sm); font-weight: var(--font-normal);
                   line-height: var(--leading-snug); color: var(--color-text-tertiary); }
-  .ty-role-colhead { font-family: var(--font-sans); font-size: var(--text-sm); font-weight: var(--font-medium);
+  .ty-role-colhead { /* mockup: app scale */ font-family: var(--font-sans); font-size: var(--text-sm); font-weight: var(--font-medium);
                      line-height: var(--leading-none); text-transform: uppercase; letter-spacing: var(--ds-tracking-caps);
                      color: var(--color-text-tertiary); }
-  .ty-role-code { font-family: var(--font-mono); font-size: var(--text-sm); font-weight: var(--font-normal);
+  .ty-role-code { /* mockup: app scale */ font-family: var(--font-mono); font-size: var(--text-sm); font-weight: var(--font-normal);
                   line-height: var(--leading-normal); color: var(--color-text-primary); }
   .ty-role-prose { font-family: var(--font-serif); font-size: var(--text-prose); font-weight: var(--font-normal);
                    line-height: var(--leading-relaxed); color: var(--color-text-primary); }
@@ -61,7 +62,7 @@
                               padding-left: var(--space-6); }
 
   /* Tracking comparison. */
-  .ty-caps { font-size: var(--text-sm); font-weight: var(--font-semibold); text-transform: uppercase;
+  .ty-caps { /* mockup: app scale – a panel title */ font-size: var(--text-sm); font-weight: var(--font-semibold); text-transform: uppercase;
              color: var(--color-text-primary); }
   .ty-caps--none { letter-spacing: 0; }
   .ty-caps--legacy { letter-spacing: var(--ds-tracking-legacy); }
@@ -77,9 +78,9 @@
   .ty-chip--fixed { height: var(--btn-height-sm); overflow: hidden; white-space: nowrap; }
   .ty-chip--fluid { min-height: var(--btn-height-sm); }
   .ty-frame-body { min-height: calc(var(--space-24) * 2); }
-  .ty-verdict { font-family: var(--font-mono); font-size: var(--text-sm); }
-  .ty-verdict--fail { color: var(--color-error); }
-  .ty-verdict--pass { color: var(--color-brand-lime); }
+  /* The --leading-none sample sets its lines tighter than the row; pad the
+     cell so the descenders stay inside it. */
+  .ty-tight-cell { padding-block: var(--space-2); }
 
   .ty-fam { display: flex; gap: var(--space-12); flex-wrap: wrap; }
   .ty-fam figure { margin: 0; }
@@ -107,13 +108,13 @@ family, size, weight, leading, case and colour; the contrast cell measures the r
 <tbody>
   <tr><td>Panel title</td><td><span class="ty-role-panel-title">Project</span></td>
       <td><code>--text-sm</code> · <code>--font-semibold</code> · <code>--leading-none</code> · uppercase · <code>--tracking-caps</code> · <code>--color-text-primary</code></td>
-      <td data-contrast="--color-text-primary on --color-bg-secondary" data-min="4.5" data-result="pass">8.55:1 · pass</td></tr>
+      <td data-contrast="--color-text-primary on --color-bg-secondary" data-min="4.5" data-result="pass">8.54:1 · pass</td></tr>
   <tr><td>Dialog title</td><td><span class="ty-role-dialog-title">Delete this file?</span></td>
       <td><code>--text-lg</code> · <code>--font-semibold</code> · <code>--leading-tight</code> · <code>--color-text-emphasis</code></td>
-      <td data-contrast="--color-text-emphasis on --color-bg-secondary" data-min="4.5" data-result="pass">13.73:1 · pass</td></tr>
+      <td data-contrast="--color-text-emphasis on --color-bg-secondary" data-min="4.5" data-result="pass">13.72:1 · pass</td></tr>
   <tr><td>Row label</td><td><span class="ty-role-row">design-tokens.css</span></td>
       <td><code>--text-base</code> · <code>--font-normal</code> · <code>--leading-snug</code> · <code>--color-text-primary</code></td>
-      <td data-contrast="--color-text-primary on --color-bg-secondary" data-min="4.5" data-result="pass">8.55:1 · pass</td></tr>
+      <td data-contrast="--color-text-primary on --color-bg-secondary" data-min="4.5" data-result="pass">8.54:1 · pass</td></tr>
   <tr><td>Hint</td><td><span class="ty-role-hint">Applies to new terminals only.</span></td>
       <td><code>--text-sm</code> · <code>--font-normal</code> · <code>--leading-snug</code> · <code>--color-text-tertiary</code></td>
       <td data-contrast="--color-text-tertiary on --color-bg-secondary" data-min="4.5" data-result="pass">6.33:1 · pass</td></tr>
@@ -122,7 +123,7 @@ family, size, weight, leading, case and colour; the contrast cell measures the r
       <td data-contrast="--color-text-tertiary on --color-bg-secondary" data-min="4.5" data-result="pass">6.33:1 · pass</td></tr>
   <tr><td>Code, paths, ids</td><td><span class="ty-role-code">src/renderer/index.css</span></td>
       <td><code>--font-mono</code> · <code>--text-sm</code> · <code>--font-normal</code> · <code>--leading-normal</code> · <code>--color-text-primary</code></td>
-      <td data-contrast="--color-text-primary on --color-bg-secondary" data-min="4.5" data-result="pass">8.55:1 · pass</td></tr>
+      <td data-contrast="--color-text-primary on --color-bg-secondary" data-min="4.5" data-result="pass">8.54:1 · pass</td></tr>
   <tr><td>Prose (rendered document)</td><td><span class="ty-role-prose">A document is read for minutes.</span></td>
       <td><code>--font-serif</code> · <code>--text-prose</code> · <code>--font-normal</code> · <code>--leading-relaxed</code> · measure about 66ch</td>
       <td data-contrast="--color-text-primary on --color-bg-preview" data-min="4.5" data-result="pass">10.82:1 · pass</td></tr>
@@ -141,8 +142,8 @@ family, size, weight, leading, case and colour; the contrast cell measures the r
 <table class="ds-tokens">
 <thead><tr><th>Token</th><th>Value</th><th>Sample</th><th>Use</th></tr></thead>
 <tbody>
-  <tr><td><code>--text-xs</code></td><td><code data-token="--text-xs">10px</code></td><td><span class="ty-sample" style="font-size: var(--text-xs)">The quick brown fox</span></td><td>A count or a chip – a label, never a sentence</td></tr>
-  <tr><td><code>--text-sm</code></td><td><code data-token="--text-sm">11px</code></td><td><span class="ty-sample" style="font-size: var(--text-sm)">The quick brown fox</span></td><td>Panel titles, column headers, hints, code in chrome</td></tr>
+  <tr><td><code>--text-xs</code></td><td><code data-token="--text-xs">10px</code></td><td><span class="ty-sample" style="font-size: var(--text-xs) /* mockup: the step itself */">The quick brown fox</span></td><td>A count or a chip – a label, never a sentence</td></tr>
+  <tr><td><code>--text-sm</code></td><td><code data-token="--text-sm">11px</code></td><td><span class="ty-sample" style="font-size: var(--text-sm) /* mockup: the step itself */">The quick brown fox</span></td><td>Panel titles, column headers, hints, code in chrome</td></tr>
   <tr><td><code>--text-base</code></td><td><code data-token="--text-base">13px</code></td><td><span class="ty-sample" style="font-size: var(--text-base)">The quick brown fox</span></td><td>Default chrome text – row labels, menu items, field values</td></tr>
   <tr><td><code>--text-md</code></td><td><code data-token="--text-md">14px</code></td><td><span class="ty-sample" style="font-size: var(--text-md)">The quick brown fox</span></td><td>Dialog body and button labels</td></tr>
   <tr><td><code>--text-lg</code></td><td><code data-token="--text-lg">16px</code></td><td><span class="ty-sample" style="font-size: var(--text-lg)">The quick brown fox</span></td><td>Dialog titles, section headings</td></tr>
@@ -184,7 +185,7 @@ of every line box, so the space a line takes is measured, not described.</p>
 <table class="ds-tokens">
 <thead><tr><th>Token</th><th>Value</th><th>Three lines over the line-box grid</th><th>Use</th></tr></thead>
 <tbody>
-  <tr><td><code>--leading-none</code></td><td><code data-token="--leading-none">1</code></td><td><p class="ty-grid" style="line-height: var(--leading-none)">Single-line chrome only. Set a paragraph this tight and the descenders touch the next line's capitals.</p></td><td>Single-line chrome: titles, chips, tabs</td></tr>
+  <tr><td><code>--leading-none</code></td><td><code data-token="--leading-none">1</code></td><td class="ty-tight-cell"><p class="ty-grid" style="line-height: var(--leading-none)">Single-line chrome only. Set a paragraph this tight and the descenders touch the next line's capitals.</p></td><td>Single-line chrome: titles, chips, tabs</td></tr>
   <tr><td><code>--leading-tight</code></td><td><code data-token="--leading-tight">1.25</code></td><td><p class="ty-grid" style="line-height: var(--leading-tight)">Headings that may wrap to a second line. Tight enough to read as one block, loose enough to read.</p></td><td>Headings</td></tr>
   <tr><td><code>--leading-snug</code></td><td><code data-token="--leading-snug">1.375</code></td><td><p class="ty-grid" style="line-height: var(--leading-snug)">Dense lists and hints. A row label that wraps keeps its two lines visibly together.</p></td><td>Rows, hints, menus</td></tr>
   <tr><td><code>--leading-normal</code></td><td><code data-token="--leading-normal">1.5</code></td><td><p class="ty-grid" style="line-height: var(--leading-normal)">The default for any paragraph in the chrome. It is also the floor WCAG 1.4.12 asks text to survive.</p></td><td>Default – dialog and settings text</td></tr>
@@ -229,8 +230,8 @@ value. In <code>em</code> it scales with the size it sits on, so one value serve
   <code>'Segoe UI'</code>), so on macOS and Windows they resolve to the same font and the two samples above are
   identical. They can only differ on Linux, where <code>--font-system</code> skips the distribution faces and falls to
   Roboto or the generic sans – the opposite of "the system face". A second name for the same intent is how a
-  scale grows a fourth member nobody chose. One stylesheet reads it today (<code>MermaidToolbar.css</code>), so
-  the migration is a one-line change, then the token moves to the retired strip on this card.
+  scale grows a fourth member nobody chose. Today it is read in <code>MermaidToolbar.css</code>, so
+  the migration is a small change, then the token moves to the retired strip on this card.
 </div>
 
 <h2 id="resize">Zoom, reflow and text spacing</h2>
@@ -258,9 +259,9 @@ satisfied by the type scale alone; each is a rule about the box the text sits in
   <figure class="ds-frame"><div class="ty-frame-body" aria-hidden="true"><span class="ty-chip ty-chip--fixed">Untitled document</span></div>
     <figcaption><strong>Normal spacing, fixed height</strong> – looks fine until the reader changes anything.</figcaption></figure>
   <figure class="ds-frame"><div class="ty-frame-body ty-spaced" aria-hidden="true"><span class="ty-chip ty-chip--fixed">Untitled document</span></div>
-    <figcaption><strong>1.4.12 spacing, fixed height</strong> – <span class="ty-verdict ty-verdict--fail">fail</span>: the label is cropped mid-word.</figcaption></figure>
+    <figcaption><strong>1.4.12 spacing, fixed height</strong> – <span class="ds-verdict ds-fail">fail</span>: the label is cropped mid-word.</figcaption></figure>
   <figure class="ds-frame"><div class="ty-frame-body ty-spaced" aria-hidden="true"><span class="ty-chip ty-chip--fluid">Untitled document</span></div>
-    <figcaption><strong>1.4.12 spacing, <code>min-height</code></strong> – <span class="ty-verdict ty-verdict--pass">pass</span>: the box grows and the label wraps.</figcaption></figure>
+    <figcaption><strong>1.4.12 spacing, <code>min-height</code></strong> – <span class="ds-verdict ds-pass">pass</span>: the box grows and the label wraps.</figcaption></figure>
 </div>
 
 <section id="exceptions">

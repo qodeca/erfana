@@ -278,7 +278,7 @@ Home icon tab (41px fixed, non-draggable, no scaling).
 
 Auto-focus on tab change ensures the active indicator shows immediately, so a panel needs `tabIndex={0}`.
 
-**Do not add `outline: none`.** This document used to instruct exactly that, which contradicts the `decided` [Focus & keyboard card](design-system/system/foundations/focus.html): `outline: none` is allowed *only* with a replacement on the very next line. A panel that is a tab stop with no visible focus is a WCAG 2.4.7 failure, and it already ships — `AppDockLayout.css:138` carries a bare `outline: none; /* Remove focus outline */`, tracked by [#93](https://github.com/qodeca/erfana/issues/93). The instruction here was creating the next one.
+**Do not add `outline: none`.** This document used to instruct exactly that, which contradicts the `decided` [Focus and keyboard card](design-system/system/foundations/focus.html): `outline: none` is allowed *only* with a replacement on the very next line. A panel that is a tab stop with no visible focus is a WCAG 2.4.7 failure, and it already ships — `AppDockLayout.css:138` carries a bare `outline: none; /* Remove focus outline */`, tracked by [#93](https://github.com/qodeca/erfana/issues/93). The instruction here was creating the next one.
 
 ## Welcome Tab & Panel
 

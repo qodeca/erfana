@@ -4,7 +4,7 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
-<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Feedback – Erfana design system</title>
@@ -52,18 +52,29 @@
 
   /* ---------- swatches ---------- */
   .swatches { display: flex; gap: var(--space-8); flex-wrap: wrap; margin-bottom: var(--space-8); }
-  .sw { width: 148px; }
+  .sw { width: calc(var(--space-24) * 4); }
   .sw-chip { height: var(--space-16); border: var(--border-width) solid var(--color-border-subtle); }
-  .sw-name { font-family: var(--font-mono); font-size: var(--text-xs);
+  .sw-name { font-family: var(--font-mono); font-size: var(--ds-text-small);
              color: var(--color-text-tertiary); margin-top: var(--space-2); }
-  .ds-grey { filter: grayscale(1); }
+  .fb-grey { filter: grayscale(1); }
   .pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-8); margin-bottom: var(--space-8);
           max-width: var(--ds-table-max); }
   .pair .erf-banner { margin-bottom: 0; }
+  /* The success/warning collision, drawn as fill and edge only. */
+  .fb-tints { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-8); padding: var(--space-8); }
+  .fb-tint { height: var(--space-24); padding: var(--space-4) var(--space-6); border: var(--border-width) solid;
+             font-size: var(--ds-text-small); color: var(--color-text-tertiary); }
+  /* Proposed option A: a thick start edge on warning and error. */
+  .erf-banner.fb-edge-strong { border-inline-start: var(--border-width-thick) solid var(--color-warning); }
+  /* Proposed option B: a true green success, drawn with the shipping context-safe green
+     in the same 10% / 30% alpha pattern the other severities use. */
+  .erf-banner.fb-success-green { background: color-mix(in srgb, var(--color-context-safe) 10%, transparent);
+                                 border-color: color-mix(in srgb, var(--color-context-safe) 30%, transparent); }
+  .erf-banner.fb-success-green .erf-banner__icon { color: var(--color-context-safe); }
 
   /* ---------- what ships today: approximations of the shipping CSS ---------- */
   .ship-stage { background: var(--color-bg-primary); border: var(--border-width) solid var(--color-border-default); }
-  .ship-deleted { display: flex; align-items: center; gap: var(--space-4); padding: var(--space-3) var(--space-6);
+  .ship-deleted { /* mockup: app scale */ display: flex; align-items: center; gap: var(--space-4); padding: var(--space-3) var(--space-6);
                   font-size: var(--text-sm); border-bottom: var(--border-width) solid; }
   .ship-deleted svg { width: var(--icon-size-sm); height: var(--icon-size-sm); flex: 0 0 auto; }
   .ship-deleted__msg { flex: 1 1 auto; }
@@ -80,7 +91,7 @@
   .ship-preview button { height: var(--btn-height-md); padding: 0 var(--space-12); background: var(--color-btn-secondary-bg);
                          border: var(--border-width) solid var(--color-border-default); color: var(--color-text-primary);
                          font-family: inherit; font-size: var(--text-base); font-weight: var(--font-medium); }
-  .ship-ocr { padding: var(--space-4) var(--space-6); font-size: var(--text-sm); color: var(--color-warning);
+  .ship-ocr { /* mockup: app scale */ padding: var(--space-4) var(--space-6); font-size: var(--text-sm); color: var(--color-warning);
               background: var(--color-warning-bg); border: var(--border-width) solid var(--color-warning-border); }
 
   /* ---------- the toast ---------- */
@@ -113,14 +124,14 @@
   .erf-toast.is-paused { border-color: var(--color-border-subtle); }
 
   /* A window, scaled down, to show where the stack sits. */
-  .ds-window { position: relative; height: 360px; background: var(--color-bg-primary);
+  .fb-window { position: relative; height: 360px; background: var(--color-bg-primary);
                border: var(--border-width) solid var(--color-border-default); overflow: hidden; }
-  .ds-window__tree { position: absolute; top: 0; bottom: 0; left: 0; width: 160px; background: var(--color-bg-tertiary);
+  .fb-window__tree { position: absolute; top: 0; bottom: 0; left: 0; width: 160px; background: var(--color-bg-tertiary);
                      border-right: var(--border-width) solid var(--color-border-default); }
-  .ds-window__stack { position: absolute; bottom: var(--space-8); left: var(--space-8);
+  .fb-window__stack { position: absolute; bottom: var(--space-8); left: var(--space-8);
                       display: flex; flex-direction: column; gap: var(--space-4); }
-  .ds-window__label { position: absolute; top: var(--space-4); right: var(--space-6); margin: 0;
-                      font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-tertiary); }
+  .fb-window__label { position: absolute; top: var(--space-4); right: var(--space-6); margin: 0;
+                      font-family: var(--font-mono); font-size: var(--ds-text-small); color: var(--color-text-tertiary); }
   .toasts { display: flex; flex-direction: column; gap: var(--space-8); }
 
   /* ---------- progress ---------- */
@@ -146,8 +157,6 @@
                                             var(--color-bg-tertiary) var(--space-2) var(--space-4)); }
   }
   .ds-frame .erf-toast { min-width: 0; }
-  .ds-code { max-width: var(--ds-table-max); padding: var(--space-8); overflow-x: auto;
-             background: var(--color-bg-tertiary); border: var(--border-width) solid var(--color-border-default); }
 </style>
 </head>
 <body>
@@ -200,7 +209,7 @@ gets it – the two banners are the same banner.</p>
     <span class="erf-banner__icon"><svg data-icon="circle-check" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg></span>
     <div class="erf-banner__body"><p class="erf-banner__title">Exported to PDF</p><p class="erf-banner__text">Saved to your Downloads folder.</p></div>
   </div>
-  <div class="erf-banner erf-banner--success ds-grey">
+  <div class="erf-banner erf-banner--success fb-grey">
     <span class="erf-banner__icon"><svg data-icon="circle-check" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg></span>
     <div class="erf-banner__body"><p class="erf-banner__title">Exported to PDF</p><p class="erf-banner__text">Saved to your Downloads folder.</p></div>
   </div>
@@ -208,17 +217,69 @@ gets it – the two banners are the same banner.</p>
     <span class="erf-banner__icon"><svg data-icon="triangle-alert" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
     <div class="erf-banner__body"><p class="erf-banner__title">This file changed on disk</p><p class="erf-banner__text">Reloading discards your unsaved changes.</p></div>
   </div>
-  <div class="erf-banner erf-banner--warning ds-grey">
+  <div class="erf-banner erf-banner--warning fb-grey">
     <span class="erf-banner__icon"><svg data-icon="triangle-alert" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
     <div class="erf-banner__body"><p class="erf-banner__title">This file changed on disk</p><p class="erf-banner__text">Reloading discards your unsaved changes.</p></div>
   </div>
 </div>
+<div class="ds-frames">
+<figure class="ds-frame">
+<div class="ship-stage fb-tints" aria-hidden="true">
+  <div class="fb-tint erf-banner--warning">Warning fill and edge</div>
+  <div class="fb-tint erf-banner--success">Success fill and edge</div>
+</div>
+<figcaption><strong>The two tints, side by side, as they ship</strong> – no icon, no words: only the fill and the edge.
+Over the app background the warning fill steps <span data-contrast="--color-warning-bg on --color-bg-primary">1.16:1</span>
+from it and the success fill <span data-contrast="--color-success-bg on --color-bg-primary">1.24:1</span>. Both are their
+colour at the same low alpha over the same dark grey, so the two fills are almost the same dark olive. The edges step
+<span data-contrast="--color-warning-border on --color-bg-primary">1.79:1</span> and
+<span data-contrast="--color-success-border on --color-bg-primary">2.30:1</span>. Without the icon and the word, a reader cannot tell which is which.</figcaption>
+</figure>
+</div>
 <div class="ds-note">
   <strong>Until the palette changes, the shape and the word carry the difference.</strong> Every banner and toast
   draws a different icon per severity (a circle-check is not a triangle) and names its severity in text (see
-  decision two). Colour is the third signal, never the first. The fix itself – moving one of the two off yellow – is
-  a palette decision for the Colours card and is listed in the README's defects; this card does not pick the
-  replacement.
+  decision two). Colour is the third signal, never the first.
+</div>
+
+<h3 id="collision-direction">Proposed direction: make the two banners differ without the colour</h3>
+<p class="ds-muted"><span class="ds-status" data-status="proposed">proposed</span> Two ways out, drawn so they can be
+compared. Neither is decided; the palette change belongs to the Colours card, and the defect stays in the README until
+one ships.</p>
+<div class="ds-frames">
+<figure class="ds-frame">
+<div class="ship-stage" aria-hidden="true" style="padding: var(--space-6)">
+  <div class="erf-banner erf-banner--warning fb-edge-strong">
+    <span class="erf-banner__icon"><svg data-icon="triangle-alert" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
+    <div class="erf-banner__body"><p class="erf-banner__title">This file changed on disk</p><p class="erf-banner__text">Reloading discards your unsaved changes.</p></div>
+  </div>
+  <div class="erf-banner erf-banner--success">
+    <span class="erf-banner__icon"><svg data-icon="circle-check" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg></span>
+    <div class="erf-banner__body"><p class="erf-banner__title">Exported to PDF</p><p class="erf-banner__text">Saved to your Downloads folder.</p></div>
+  </div>
+</div>
+<figcaption><strong>Option A – shape and edge weight</strong> (proposed). Keep both colours. A warning or an error gets a
+thick start edge (<code>--border-width-thick</code>) in its severity colour; success and info keep the thin edge. With the
+triangle against the circle, the difference survives greyscale and a washed-out screen. Costs no token.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div class="ship-stage" aria-hidden="true" style="padding: var(--space-6)">
+  <div class="erf-banner erf-banner--warning">
+    <span class="erf-banner__icon"><svg data-icon="triangle-alert" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
+    <div class="erf-banner__body"><p class="erf-banner__title">This file changed on disk</p><p class="erf-banner__text">Reloading discards your unsaved changes.</p></div>
+  </div>
+  <div class="erf-banner fb-success-green">
+    <span class="erf-banner__icon"><svg data-icon="circle-check" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg></span>
+    <div class="erf-banner__body"><p class="erf-banner__title">Exported to PDF</p><p class="erf-banner__text">Saved to your Downloads folder.</p></div>
+  </div>
+</div>
+<figcaption><strong>Option B – a green success token</strong> (proposed). Success moves off the brand lime to a true green.
+Drawn here with the green the app already ships for the context meter's safe band, <code>--color-context-safe</code>.
+It fixes the hue, not the lightness: the green is <span data-contrast="--color-context-safe on --color-warning">1.10:1</span>
+from the warning amber, closer than the lime's <span data-contrast="--color-success on --color-warning">1.74:1</span>, so in
+greyscale it is no better. On its own it helps a reader who sees hue; it still needs Option A's edge or the icon for
+everyone else. It also needs a new <code>--color-success</code> value with its fill and edge, so it is the Colours card's call.</figcaption>
+</figure>
 </div>
 
 <h2 id="banner">Decision two – one banner</h2>
@@ -292,9 +353,9 @@ gets it – the two banners are the same banner.</p>
 <table>
   <thead><tr><th>Banner text on</th><th><code>--color-text-primary</code></th><th>Title, <code>--color-text-emphasis</code></th></tr></thead>
   <tbody>
-    <tr><td>Warning fill, over the page</td><td data-contrast="--color-text-primary on --color-warning-bg over --color-bg-primary" data-min="4.5" data-result="pass">9.87:1 · pass</td><td data-contrast="--color-text-emphasis on --color-warning-bg over --color-bg-primary" data-min="4.5" data-result="pass">15.85:1 · pass</td></tr>
-    <tr><td>Error fill</td><td data-contrast="--color-text-primary on --color-error-bg" data-min="4.5" data-result="pass">9.29:1 · pass</td><td data-contrast="--color-text-emphasis on --color-error-bg" data-min="4.5" data-result="pass">14.92:1 · pass</td></tr>
-    <tr><td>Success fill, over the page</td><td data-contrast="--color-text-primary on --color-success-bg over --color-bg-primary" data-min="4.5" data-result="pass">9.22:1 · pass</td><td data-contrast="--color-text-emphasis on --color-success-bg over --color-bg-primary" data-min="4.5" data-result="pass">14.80:1 · pass</td></tr>
+    <tr><td>Warning fill, over the page</td><td data-contrast="--color-text-primary on --color-warning-bg over --color-bg-primary" data-min="4.5" data-result="pass">9.86:1 · pass</td><td data-contrast="--color-text-emphasis on --color-warning-bg over --color-bg-primary" data-min="4.5" data-result="pass">15.84:1 · pass</td></tr>
+    <tr><td>Error fill</td><td data-contrast="--color-text-primary on --color-error-bg" data-min="4.5" data-result="pass">9.28:1 · pass</td><td data-contrast="--color-text-emphasis on --color-error-bg" data-min="4.5" data-result="pass">14.91:1 · pass</td></tr>
+    <tr><td>Success fill, over the page</td><td data-contrast="--color-text-primary on --color-success-bg over --color-bg-primary" data-min="4.5" data-result="pass">9.21:1 · pass</td><td data-contrast="--color-text-emphasis on --color-success-bg over --color-bg-primary" data-min="4.5" data-result="pass">14.80:1 · pass</td></tr>
   </tbody>
 </table>
 <p class="ds-muted">The info row is missing because its fill is not a token yet, and a ratio is only ever computed from
@@ -472,17 +533,17 @@ toast's colours.</p>
   <div class="erf-toast__content"><p class="erf-toast__title">Exported to PDF</p><p class="erf-toast__message">Saved to your Downloads folder.</p></div>
   <span class="erf-toast__close is-focus"><svg data-icon="x" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span>
 </div>
-<figcaption><strong>Close, focused</strong> – Reached by Tab like any button. <kbd>Escape</kbd> on a focused toast closes that toast and nothing under it.</figcaption>
+<figcaption><strong>Close, focused</strong> – Reached by Tab like any button. <kbd>Esc</kbd> on a focused toast closes that toast and nothing under it.</figcaption>
 </figure>
 </div>
 
 <h3 id="toast-place">Where it sits</h3>
 <div class="ds-frames">
 <figure class="ds-frame" style="grid-column: 1 / -1">
-<div class="ds-window" aria-hidden="true">
-  <div class="ds-window__tree"></div>
-  <p class="ds-window__label">the window, scaled</p>
-  <div class="ds-window__stack">
+<div class="fb-window" aria-hidden="true">
+  <div class="fb-window__tree"></div>
+  <p class="fb-window__label">the window, scaled</p>
+  <div class="fb-window__stack">
     <div class="erf-toast erf-toast--error">
       <span class="erf-toast__icon"><svg data-icon="circle-x" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg></span>
       <div class="erf-toast__content"><p class="erf-toast__title">Could not save notes.md</p><p class="erf-toast__message">The disk is full. Free some space, then save again.</p></div>
@@ -519,7 +580,7 @@ toast's colours.</p>
   <tbody>
     <tr><td>A toast appears</td><td>Its title and message are written into an always-mounted hidden live region – polite for info, success and warning, assertive for an error. The toast itself carries no live role.</td><td><strong>Wherever it was.</strong> A toast never takes focus.</td></tr>
     <tr><td><kbd>Tab</kbd></td><td>Reaches the toast's action and Close like any other buttons, in document order.</td><td>The action or Close.</td></tr>
-    <tr><td><kbd>Escape</kbd> in a toast</td><td>Closes that toast only – not the dialog or menu under it.</td><td>The element focus came from before it entered the toast.</td></tr>
+    <tr><td><kbd>Esc</kbd> in a toast</td><td>Closes that toast only – not the dialog or menu under it.</td><td>The element focus came from before it entered the toast.</td></tr>
     <tr><td><kbd>Enter</kbd> on the action</td><td>Runs the action, then closes the toast.</td><td>The element focus came from.</td></tr>
     <tr><td>The toast times out</td><td>Never while focus is inside it.</td><td>Unchanged.</td></tr>
   </tbody>
@@ -611,15 +672,23 @@ document-import dialogs). A short wait inside a control is the Motion card's spi
     <tr><td>Indeterminate: no <code>aria-valuenow</code></td><td>Its absence is what tells assistive tech the amount is unknown.</td></tr>
     <tr><td>Only start and finish are announced</td><td>Through the always-mounted live region of decision three – never once per percent.</td></tr>
     <tr><td>Reduced motion stops the sweep</td><td>And replaces it with a still fill that cannot be mistaken for a value.</td></tr>
-    <tr><td>The fill is <code>--color-accent-primary</code></td><td><span data-contrast="--color-accent-primary on --color-bg-tertiary" data-min="3" data-result="pass">6.96:1 · pass</span> against the track, the 3:1 a graphic needs (WCAG 1.4.11).</td></tr>
+    <tr><td>The fill is <code>--color-accent-primary</code></td><td><span data-contrast="--color-accent-primary on --color-bg-tertiary" data-min="3" data-result="pass">6.95:1 · pass</span> against the track, the 3:1 a graphic needs (WCAG 1.4.11).</td></tr>
   </tbody>
 </table>
 
 <section id="exceptions">
 <h2>Exceptions</h2>
-<p class="ds-muted">None recorded. A shipping component that departs from this card carries a
-<code>deviates:</code> marker at the site and gets a row here, naming the file. (The comment window's info banner
-carries one, but it points at its feature screen, not at this card.)</p>
+<p class="ds-muted">A shipping component that departs from this card carries a <code>deviates:</code> marker at the
+site and gets a row here, naming the file.</p>
+<table>
+  <thead><tr><th>File</th><th>Departure</th><th>Why it is still there</th></tr></thead>
+  <tbody>
+    <tr><td><code>CommentWindow.css</code></td><td>Info banner – <code>.erf-comment-banner--info</code> fills with
+    <code>--color-brand-violet-muted</code> and draws its edge in <code>--color-accent-primary</code> at full strength, because
+    there is no <code>--color-info-bg</code> or <code>--color-info-border</code> yet. The edge is louder than an error's.</td>
+    <td>Until the proposed info tokens above exist in <code>design-tokens.css</code></td></tr>
+  </tbody>
+</table>
 </section>
 
 </main>

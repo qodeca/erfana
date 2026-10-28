@@ -1,10 +1,10 @@
-<!-- @card group="Components" name="Rows & lists" subtitle="One selected state instead of four, the arrow-key contract the file tree keeps, and a route that needs no drag" status="decided" reviewed="2026-09-01" answers="Build a list or tree row; Show a hostname" -->
+<!-- @card group="Components" name="Rows and lists" subtitle="One selected state instead of four, the arrow-key contract the file tree keeps, and a route that needs no drag" status="decided" reviewed="2026-10-28" answers="Build a list or tree row; Show a hostname" -->
 <!-- SPDX-License-Identifier: GPL-3.0-only -->
 <!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
-<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Rows and lists – Erfana design system</title>
@@ -16,13 +16,14 @@
   .stage { display: flex; gap: var(--space-16); flex-wrap: wrap; align-items: flex-start; }
   .list-frame { width: 340px; background: var(--color-bg-tertiary);
                 border: var(--border-width) solid var(--color-border-default); padding: var(--space-4) 0; }
-  .notes { max-width: 42ch; }
+  /* The notes take the space beside the frame, up to the reading measure. */
+  .notes { flex: 1 1 32ch; max-width: var(--ds-measure); }
   .ds-frame .list-frame { width: auto; }
   .states { display: flex; flex-direction: column; gap: var(--border-width);
             background: var(--color-border-default);
             border: var(--border-width) solid var(--color-border-default); width: 340px; }
   .state-demo { background: var(--color-bg-tertiary); padding: var(--space-2) 0; }
-  .state-name { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-tertiary);
+  .state-name { font-family: var(--font-mono); font-size: var(--ds-text-small); color: var(--color-text-tertiary);
                 padding: var(--space-2) var(--space-8) 0; }
   /* The host demo is deliberately squeezable: wrapping only shows when a host
      actually stops fitting, and the old elide survived unseen because no demo
@@ -36,15 +37,13 @@
   /* A rough menu for the "Move to…" sketch – the Menu card owns the real one. */
   .erf-menu-sketch { background: var(--color-bg-tertiary); border: var(--border-width) solid var(--color-border-subtle);
                      padding: var(--space-2) 0; }
-  .ds-code { max-width: var(--ds-table-max); padding: var(--space-8); overflow-x: auto;
-             background: var(--color-bg-tertiary); border: var(--border-width) solid var(--color-border-default); }
 </style>
 </head>
 <body>
 <nav class="ds-crumbs" aria-label="Breadcrumb"><a href="../../../index.html">Erfana design system</a> <span aria-hidden="true">/</span> <a href="../../../index.html#components">Components</a> <span aria-hidden="true">/</span> <span aria-current="page">Rows and lists</span></nav>
 <main>
 <h1>Rows and lists</h1>
-<p class="ds-meta"><span class="ds-status" data-status="decided">decided</span> reviewed 2026-09-01</p>
+<p class="ds-meta"><span class="ds-status" data-status="decided">decided</span> reviewed 2026-10-28</p>
 <p class="ds-lede" id="decision">
   The densest thing in Erfana. A file tree row, a picker option, a host in the permission band – all the
   same primitive: one selected state, one keyboard contract, and no state carried by colour alone. The frames
@@ -295,7 +294,7 @@ order and survives translation, where an <code>aria-label</code> on a span may n
     </div>
     <div class="ds-note">
       <strong>The drop edge is solid <code>--color-accent-drag</code>.</strong> It measures
-      <span data-contrast="--color-accent-drag on --color-bg-tertiary" data-min="3" data-result="pass">6.96:1 · pass</span> against the tree and
+      <span data-contrast="--color-accent-drag on --color-bg-tertiary" data-min="3" data-result="pass">6.95:1 · pass</span> against the tree and
       <span data-contrast="--color-accent-drag on --color-accent-drag-bg over --color-bg-tertiary" data-min="3" data-result="pass">4.68:1 · pass</span>
       against the drop fill. The <code>--color-accent-drag-border</code> tint it replaces composites to
       <span data-contrast="--color-accent-drag-border on --color-bg-tertiary over --color-bg-tertiary" data-min="3" data-result="fail">1.84:1 · fail</span> –
@@ -320,7 +319,7 @@ order and survives translation, where an <code>aria-label</code> on a span may n
     <div class="ds-note">
       <strong>Six, not four.</strong> This card used to paint backgrounds for four states and seed only
       three, so a renamed or conflicted badge was a near-black label on a transparent row – measured
-      <strong><span data-contrast="--color-text-on-accent on --color-bg-tertiary" data-min="4.5" data-result="fail">1.21:1 · fail</span></strong> against
+      <strong><span data-contrast="--color-text-on-accent on --color-bg-tertiary" data-min="4.5" data-result="fail">1.20:1 · fail</span></strong> against
       <code>--color-bg-tertiary</code>, which is invisible. Nothing rendered
       them, so nobody saw it.
       <br><br>

@@ -1,10 +1,10 @@
-<!-- @card group="Components" name="Permission band" subtitle="Approve a blocked origin from the preview's own chrome – collapsed, expanded, confirming, fail-safe" status="decided" reviewed="2026-09-01" answers="Ask the user to allow a remote host" -->
+<!-- @card group="Components" name="Permission band" subtitle="Approve a blocked origin from the preview's own chrome – collapsed, expanded, confirming, fail-safe" status="decided" reviewed="2026-10-28" answers="Ask the user to allow a remote host" -->
 <!-- SPDX-License-Identifier: GPL-3.0-only -->
 <!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
-<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Permission band – Erfana design system</title>
@@ -55,7 +55,7 @@
   /* The tooltip a tool shows on hover AND on keyboard focus, drawn open. */
   .tip-demo { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); }
   .tip-demo > .erf-band { align-self: stretch; }
-  .tip { display: inline-flex; flex-direction: column; gap: var(--space-2); padding: var(--space-4) var(--space-6);
+  .tip { /* mockup: app scale – the band tooltip */ display: inline-flex; flex-direction: column; gap: var(--space-2); padding: var(--space-4) var(--space-6);
          background: var(--color-bg-tertiary); border: var(--border-width) solid var(--color-border-default);
          font-size: var(--text-sm); color: var(--color-text-primary); }
   /* Documentation-only state hooks: a frame is a picture, so the focused state is
@@ -72,65 +72,23 @@
 <nav class="ds-crumbs" aria-label="Breadcrumb"><a href="../../../index.html">Erfana design system</a> <span aria-hidden="true">/</span> <a href="../../../index.html#components">Components</a> <span aria-hidden="true">/</span> <span aria-current="page">Permission band</span></nav>
 <main>
 <h1>Permission band</h1>
-<p class="ds-meta"><span class="ds-status" data-status="decided">decided</span> reviewed 2026-09-01</p>
+<p class="ds-meta"><span class="ds-status" data-status="decided">decided</span> reviewed 2026-10-28</p>
 <p class="ds-lede" id="decision">
   A preview page that asks for a remote host gets <strong>one row</strong> here, not a toast.
   The chip opens the list; <em>Allow</em> opens a confirm step on that row; Confirm or Cancel ends it, and
-  <kbd>Escape</kbd> closes. Every one of those states is drawn below as its own frame.
+  <kbd>Esc</kbd> closes. Every one of those states is drawn below as its own frame.
 </p>
 
 <div class="ds-note">
-  <strong>This card used to decide that the band carried a permanent
-  “Preview – content below is not Erfana” label, and a 2px accent seam the page could not
-  paint over. It no longer does.</strong> Both were removed by owner decision when the bar became a
-  toolbar matching <code>MarkdownToolbar</code>, and the seam is now the same 1px neutral rule.
+  <strong>What this card decides:</strong> the band is <em>always present</em>, and it is a flow sibling
+  <em>above</em> the page area rather than an overlay on it. That placement is the only thing left separating
+  Erfana's chrome from untrusted content. Conditional rendering or <code>position: absolute</code> would remove
+  the last of it.
   <br><br>
-  Recorded here rather than quietly deleted, because a <code>decided</code> card that changes its
-  mind owes the next reader the reason. <code>docs/design-system/README.md</code> is explicit that this is
-  allowed – “a <code>decided</code> card the app keeps having to deviate from is a card that was
-  wrong” – but the cost is real and belongs on the card: <strong>nothing on screen names the
-  boundary any more</strong>, and 1px of <code>--color-border-default</code> is weak against the
-  white paper a page picks by default. <code>docs/security.md</code> residual risk 8 carries the
-  accepted residual.
-  <br><br>
-  <strong>What this card still decides, and it is now the whole of it:</strong> the band is
-  <em>always present</em>, and it is a flow sibling <em>above</em> the page area rather than an
-  overlay on it. That placement is the only thing left separating Erfana's chrome from untrusted
-  content. Conditional rendering or <code>position: absolute</code> would remove the last of it.
-</div>
-
-<div class="ds-note">
-  <strong>The band's own text is measured, not assumed – and the measurement was wrong.</strong>
-  Its labels use <code>--color-text-tertiary</code>, which is
-  <strong><span data-claim="contrast-tertiary-on-band" title="--color-text-tertiary on --color-bg-primary">8.52</span>:1</strong> on the band's real surface,
-  <code>--color-bg-primary</code> – clear of the 4.5:1 floor.
-  <br><br>
-  This card used to say <code>--color-text-secondary</code> <em>failed</em> here. It does not:
-  <strong><span data-claim="contrast-secondary-on-band" title="--color-text-secondary on --color-bg-primary">5.01</span>:1</strong> against the same surface,
-  which passes. The failing figure was measured against <code>--color-bg-secondary</code>, borrowed
-  from a claim that belongs to the <a href="../../foundations/colors.html">colours foundation</a>,
-  and left behind when the band moved to <code>--color-bg-primary</code>. Every gate stayed green
-  throughout, because the number was right about the pair it named and the pair was not this one.
-  <strong>So the tertiary choice currently has no stated reason.</strong> It is kept for now, and
-  re-deciding it is open work rather than a settled rule.
-  <br><br>
-  The one warning line – an unencrypted origin, in the confirm box – uses
-  <code>--color-warning</code> at <strong><span data-claim="contrast-warning-on-confirm" title="--color-warning on --color-bg-tertiary, the confirm step&#x27;s warning text">6.63</span>:1</strong>
-  against <code>--color-bg-tertiary</code>, the confirm block's own surface rather than the band's,
-  also clear of the floor. It is <em>distinguished</em> rather than louder: the whole box is a security
-  question, and colouring one line inside it would suggest the other lines are safe.
-  <br><br>
-  A pressed toggle – the link mode, on – sits on <code>--color-bg-selected</code> over the band. Its icon measures
-  <strong><span data-claim="band-pressed-icon" title="--color-text-primary on --color-bg-selected over --color-bg-primary, the icon on a pressed band toggle">7.94</span>:1</strong> on that fill and its focus ring
-  <strong><span data-claim="band-pressed-ring" title="--color-border-focus on --color-bg-selected over --color-bg-primary, the ring on a pressed band toggle">5.79</span>:1</strong>, both measured after compositing the translucent
-  fill over <code>--color-bg-primary</code>.
-</div>
-
-<div class="ds-note">
-  <strong>Why this replaces the toast.</strong> Approval used to be a pop-up per host, capped at
-  three. A page reaching four hosts produced three stacked walls of identical text over the file
-  tree – and the fourth host could not be approved at all. The band lists every host, in the
-  preview's own chrome, and each decision is read once on the row it belongs to.
+  <strong>Why it replaces the toast.</strong> Approval used to be a pop-up per host, capped at three. A page
+  reaching four hosts produced three stacked walls of identical text over the file tree – and the fourth host
+  could not be approved at all. The band lists every host, in the preview's own chrome, and each decision is
+  read once on the row it belongs to. How the card reached this is under <a href="#history">History</a>.
 </div>
 
 <h2 id="states">Every state, as the band renders it</h2>
@@ -250,7 +208,7 @@ contract is the table below.</p>
         could be sitting on top of – or imitate.</p>
     </div>
   </div>
-<figcaption><span class="ds-frame__step">B</span><strong>List open – the chip pressed</strong> – Every blocked origin has its own row and its own Allow. The list is clamped to 240px and scrolls with a stable gutter, so the scrollbar never lands on an Allow button.</figcaption>
+<figcaption><span class="ds-frame__step">B</span><strong>List open – the chip pressed</strong> – Every blocked origin has its own row and its own Allow. The list is clamped to <span data-claim="band-list-max-height" title="host-list clamp in PreviewChromeBand.css, px">240</span>px and scrolls with a stable gutter, so the scrollbar never lands on an Allow button.</figcaption>
 </figure>
 <figure class="ds-frame">
 <div class="panel" style="height: 520px;" inert="" aria-hidden="true">
@@ -478,7 +436,7 @@ contract is the table below.</p>
         could be sitting on top of – or imitate.</p>
     </div>
   </div>
-<figcaption><span class="ds-frame__step">F</span><strong>A page that never yields</strong> – The page has 300 ms to acknowledge that it moved. Silence means “assume it is still covering you”, so the page is hidden and the band says so.</figcaption>
+<figcaption><span class="ds-frame__step">F</span><strong>A page that never yields</strong> – The page has <span data-claim="band-ack-timeout-ms" title="time the previewed page has to confirm it moved, ms (src/shared/constants.ts)">300</span> ms to acknowledge that it moved. Silence means “assume it is still covering you”, so the page is hidden and the band says so.</figcaption>
 </figure>
 <figure class="ds-frame">
 <div class="panel" style="height: 300px;" inert="" aria-hidden="true">
@@ -535,7 +493,7 @@ contract is the table below.</p>
         could be sitting on top of – or imitate.</p>
     </div>
   </div>
-<figcaption><span class="ds-frame__step">G</span><strong>A short panel: 300px tall, list open</strong> – A 64px sliver of page is not a preview, so the band hides the page instead of insetting it, and says so.</figcaption>
+<figcaption><span class="ds-frame__step">G</span><strong>A short panel: 300px tall, list open</strong> – Below <span data-claim="band-min-split-height" title="panel height below which the page and an open host list cannot share the space, px (htmlPreview.logic.ts)">320</span>px the sliver of page left is not a preview, so the band hides the page instead of insetting it, and says so.</figcaption>
 </figure>
 </div>
 
@@ -547,11 +505,11 @@ contract is the table below.</p>
     <tr><td><kbd>Tab</kbd> in the open list</td><td>Walks the rows' Allow buttons in order.</td><td>The next Allow.</td></tr>
     <tr><td><kbd>Enter</kbd> on Allow</td><td>Opens that row's confirm step.</td><td>Cancel, the first button of the step.</td></tr>
     <tr><td><kbd>Tab</kbd> inside the confirm step</td><td>Stays inside it: Cancel, Confirm, Cancel.</td><td>The other button.</td></tr>
-    <tr><td><kbd>Escape</kbd> in the confirm step</td><td>Closes the step; nothing is granted.</td><td>The chip.</td></tr>
+    <tr><td><kbd>Esc</kbd> in the confirm step</td><td>Closes the step; nothing is granted.</td><td>The chip.</td></tr>
     <tr><td><kbd>Enter</kbd> on Confirm</td><td>Saves the grant and reloads the preview, or reports Not saved.</td><td>The chip.</td></tr>
-    <tr><td><kbd>Escape</kbd> in the open list</td><td>Closes the list.</td><td>The chip.</td></tr>
-    <tr><td><kbd>Cmd</kbd>+<kbd>[</kbd> / <kbd>Cmd</kbd>+<kbd>]</kbd> (macOS), <kbd>Alt</kbd>+<kbd>←</kbd> / <kbd>Alt</kbd>+<kbd>→</kbd> (Windows, Linux), focus anywhere in the panel</td><td>Steps this tab back or forward; matched on the physical key.</td><td>Unchanged; with no earlier page, Back stays focused and <code>aria-disabled</code>.</td></tr>
-    <tr><td><kbd>Cmd/Ctrl</kbd>+<kbd>F</kbd>, <kbd>Cmd/Ctrl</kbd>+<kbd>S</kbd></td><td>Find in the page; export it to PDF. Both keep working at the minimal width, where their buttons leave the row.</td><td>The find field; unchanged for export.</td></tr>
+    <tr><td><kbd>Esc</kbd> in the open list</td><td>Closes the list.</td><td>The chip.</td></tr>
+    <tr><td><kbd>⌘[</kbd> / <kbd>⌘]</kbd> (macOS), <kbd>Alt+←</kbd> / <kbd>Alt+→</kbd> (Windows, Linux), focus anywhere in the panel</td><td>Steps this tab back or forward; matched on the physical key.</td><td>Unchanged; with no earlier page, Back stays focused and <code>aria-disabled</code>.</td></tr>
+    <tr><td><kbd>⌘F</kbd> / <kbd>Ctrl+F</kbd>, <kbd>⌘S</kbd> / <kbd>Ctrl+S</kbd></td><td>Find in the page; export it to PDF. Both keep working at the minimal width, where their buttons leave the row.</td><td>The find field; unchanged for export.</td></tr>
   </tbody>
 </table>
 <p class="ds-muted">The tests that hold the shipping band to this: <code>PreviewChromeBand.test.tsx</code>,
@@ -572,11 +530,11 @@ remote host</a> screen.</p>
   <br><br>
   <strong>Back, in the frames below.</strong> With an earlier page, its tooltip names that page. With none, it is
   <code>aria-disabled</code>, still focused, its tooltip says why, and the live region says "Showing overview.html."
-  With focus anywhere in the panel, <kbd>Cmd</kbd>+<kbd>[</kbd> and <kbd>Cmd</kbd>+<kbd>]</kbd> (macOS) or
-  <kbd>Alt</kbd>+<kbd>←</kbd> and <kbd>Alt</kbd>+<kbd>→</kbd> (Windows, Linux) step the tab, matched on the physical
+  With focus anywhere in the panel, <kbd>⌘[</kbd> and <kbd>⌘]</kbd> (macOS) or
+  <kbd>Alt+←</kbd> and <kbd>Alt+→</kbd> (Windows, Linux) step the tab, matched on the physical
   key. The toggle's two states and Open in default browser's busy state are drawn as their own frames.
   <br><br>
-  <strong>The pressed state is a shape, not a colour</strong> (SC 1.4.1): the Rows card's "selected" signature,
+  <strong>The pressed state is a shape, not a colour</strong> (SC 1.4.1): the Rows and lists card's "selected" signature,
   a fill plus a 2px lime edge along the bottom. Both states carry the edge – transparent when off, with a
   matching transparent one on top – so the icon sits where every other tool's sits and never moves. It is a
   border, so it survives a Windows contrast theme, where a <code>forced-colors</code> rule turns it
@@ -594,7 +552,7 @@ remote host</a> screen.</p>
   inside, and the ring came out at roughly 2.3:1 there – under the 3:1 SC 1.4.11 asks of a focus indicator,
   and under "visible" (SC 2.4.7). No ring colour repairs that, because the dim is applied after the colour.
   Outside the group it is the band's ordinary ring:
-  <strong><span data-claim="contrast-focus-ring-on-band" title="--color-border-focus on --color-bg-primary, the ring a disabled or busy control keeps">8.40</span>:1</strong> against
+  <strong><span data-claim="contrast-focus-ring-on-band" title="--color-border-focus on --color-bg-primary, the ring a disabled or busy control keeps">8.39</span>:1</strong> against
   <code>--color-bg-primary</code>. This is the common case rather than an edge one – the panel moves focus
   to Back after a move, which is the moment Back has nowhere to go. <strong>Tab to the disabled Back below:</strong>
   the arrow stays dim, the ring does not. Where a control's whole content is a bare text node there is no box to
@@ -604,49 +562,49 @@ remote host</a> screen.</p>
 
 <div class="ds-frames tool-frames">
   <figure class="ds-frame">
-    <div class="erf-band" inert aria-hidden="true><div class="erf-band__bar">
+    <div class="erf-band" inert aria-hidden="true"><div class="erf-band__bar">
       <button class="erf-band__tool" type="button" aria-label="Back" aria-keyshortcuts="Meta+[" title="Back to overview.html"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg></button>
     </div></div>
     <figcaption><strong>Back</strong> – an earlier page exists; the tooltip names it</figcaption>
   </figure>
   <figure class="ds-frame">
-    <div class="erf-band" inert aria-hidden="true><div class="erf-band__bar">
+    <div class="erf-band" inert aria-hidden="true"><div class="erf-band__bar">
       <button class="erf-band__tool is-focus" type="button" aria-label="Back" aria-disabled="true" aria-keyshortcuts="Meta+[" title="Back – no earlier page in this tab"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg></button>
     </div></div>
     <figcaption><strong>Back</strong> – nowhere to go, focused: <code>aria-disabled</code>, still focusable, tooltip says why. The icon is dim, the ring is not</figcaption>
   </figure>
   <figure class="ds-frame">
-    <div class="erf-band" inert aria-hidden="true><div class="erf-band__bar">
+    <div class="erf-band" inert aria-hidden="true"><div class="erf-band__bar">
       <button class="erf-band__tool erf-band__tool--toggle" type="button" aria-label="Open links in this tab" aria-pressed="false" title="Open links in this tab – off: links open a new tab"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4.1 12 6"></path><path d="m5.1 8-2.9-.8"></path><path d="m6 12-1.9 2"></path><path d="M7.2 2.2 8 5.1"></path><path d="M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z"></path></svg></button>
     </div></div>
     <figcaption><strong>Link mode off</strong> – links open a new tab (every tab starts here)</figcaption>
   </figure>
   <figure class="ds-frame">
-    <div class="erf-band" inert aria-hidden="true><div class="erf-band__bar">
+    <div class="erf-band" inert aria-hidden="true"><div class="erf-band__bar">
       <button class="erf-band__tool erf-band__tool--toggle" type="button" aria-label="Open links in this tab" aria-pressed="true" title="Open links in this tab – on: links replace this page"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4.1 12 6"></path><path d="m5.1 8-2.9-.8"></path><path d="m6 12-1.9 2"></path><path d="M7.2 2.2 8 5.1"></path><path d="M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z"></path></svg></button>
     </div></div>
     <figcaption><strong>Link mode on</strong> – fill plus the lime edge</figcaption>
   </figure>
   <figure class="ds-frame">
-    <div class="erf-band" inert aria-hidden="true><div class="erf-band__bar">
+    <div class="erf-band" inert aria-hidden="true"><div class="erf-band__bar">
       <button class="erf-band__tool erf-band__tool--toggle" type="button" aria-label="Open links in this tab" aria-pressed="true" title="Open links in this tab – on: links replace this page"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4.1 12 6"></path><path d="m5.1 8-2.9-.8"></path><path d="m6 12-1.9 2"></path><path d="M7.2 2.2 8 5.1"></path><path d="M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z"></path></svg></button>
     </div></div>
     <figcaption><strong>On + hover</strong> – drawn the same as On on purpose: hover keeps the fill and the lime edge</figcaption>
   </figure>
   <figure class="ds-frame">
-    <div class="erf-band" inert aria-hidden="true><div class="erf-band__bar">
+    <div class="erf-band" inert aria-hidden="true"><div class="erf-band__bar">
       <button class="erf-band__tool erf-band__tool--toggle is-focus" type="button" aria-label="Open links in this tab" aria-pressed="true" title="Open links in this tab – on: links replace this page"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4.1 12 6"></path><path d="m5.1 8-2.9-.8"></path><path d="m6 12-1.9 2"></path><path d="M7.2 2.2 8 5.1"></path><path d="M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z"></path></svg></button>
     </div></div>
     <figcaption><strong>On + focus</strong> – the band's inset ring draws over the fill</figcaption>
   </figure>
   <figure class="ds-frame">
-    <div class="erf-band" inert aria-hidden="true><div class="erf-band__bar">
+    <div class="erf-band" inert aria-hidden="true"><div class="erf-band__bar">
       <button class="erf-band__tool" type="button" aria-label="Open in default browser" aria-disabled="true" title="Open in default browser"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg></button>
     </div></div>
     <figcaption><strong>Open in default browser</strong> – busy: <code>aria-disabled</code>, keeps focus</figcaption>
   </figure>
   <figure class="ds-frame">
-    <div class="erf-band" inert aria-hidden="true><div class="erf-band__bar">
+    <div class="erf-band" inert aria-hidden="true"><div class="erf-band__bar">
       <button class="erf-band__tool" type="button" aria-label="Export to PDF" aria-keyshortcuts="Meta+S" title="Export to PDF" disabled><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M12 18v-6"></path><path d="m9 15 3 3 3-3"></path></svg></button>
     </div></div>
     <figcaption><strong>Export to PDF</strong> – exporting: <code>disabled</code> (see Exceptions)</figcaption>
@@ -671,23 +629,23 @@ remote host</a> screen.</p>
       </div></div>
       <span class="tip"><span>Back to overview.html</span><span class="erf-keys"><kbd class="erf-kbd">Cmd</kbd>+<kbd class="erf-kbd">[</kbd></span><span>Forward <span class="erf-keys"><kbd class="erf-kbd">Cmd</kbd>+<kbd class="erf-kbd">]</kbd></span></span></span>
     </div>
-    <figcaption><strong>Back, focused by keyboard</strong> – the tooltip opens on focus too. <code>aria-keyshortcuts="Meta+["</code>; Forward has no button, so its key lives in this caption.</figcaption>
+    <figcaption><strong>Back, focused by keyboard</strong> – the tooltip opens on focus too. <code>aria-keyshortcuts="Meta+["</code>; Forward has no button, so its key lives in this caption. <strong>Shipping string:</strong> “Cmd+[” and “Cmd+]” are what <code>PreviewNavControls.tsx</code> prints today, drawn as it ships; the macOS UI form is ⌘[ and ⌘] (the <a href="../../foundations/writing.html">Writing</a> card logs the two notations as a defect).</figcaption>
   </figure>
   <figure class="ds-frame">
     <div class="tip-demo" inert aria-hidden="true">
       <div class="erf-band"><div class="erf-band__bar">
         <button class="erf-band__tool is-focus" type="button"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg></button>
       </div></div>
-      <span class="tip"><span>Find</span><span class="erf-keys"><kbd class="erf-kbd">Cmd</kbd>+<kbd class="erf-kbd">F</kbd></span></span>
+      <span class="tip"><span>Find</span><span class="erf-keys"><kbd class="erf-kbd">⌘F</kbd></span></span>
     </div>
-    <figcaption><strong>Find</strong> – <code>aria-keyshortcuts="Meta+F"</code> (<code>Control+F</code> on Windows and Linux).</figcaption>
+    <figcaption><strong>Find</strong> – ⌘F / Ctrl+F; <code>aria-keyshortcuts="Meta+F"</code> (<code>Control+F</code> on Windows and Linux).</figcaption>
   </figure>
   <figure class="ds-frame">
     <div class="tip-demo" inert aria-hidden="true">
       <div class="erf-band"><div class="erf-band__bar">
         <button class="erf-band__tool is-focus" type="button"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M12 18v-6"></path><path d="m9 15 3 3 3-3"></path></svg></button>
       </div></div>
-      <span class="tip"><span>Export to PDF</span><span class="erf-keys"><kbd class="erf-kbd">Cmd</kbd>+<kbd class="erf-kbd">S</kbd></span></span>
+      <span class="tip"><span>Export to PDF</span><span class="erf-keys"><kbd class="erf-kbd">⌘S</kbd></span></span>
     </div>
     <figcaption><strong>Export to PDF</strong> – <code>aria-keyshortcuts="Meta+S"</code>. Today its key is named nowhere at all.</figcaption>
   </figure>
@@ -712,7 +670,7 @@ remote host</a> screen.</p>
 
 <h2 id="narrow">Narrow panels: the row never wraps</h2>
 <div class="ds-note">
-  A taller band pushes the native page down – a bounds push and the 300 ms proof cycle – so the row never wraps
+  A taller band pushes the native page down – a bounds push and the <span data-claim="band-ack-timeout-ms" title="time the previewed page has to confirm it moved, ms (src/shared/constants.ts)">300</span> ms proof cycle – so the row never wraps
   and never changes height. It steps down instead, by a container query on <code>.erf-band</code>.
   <strong>Compact</strong>, below the width the full row needs: tighter padding and gaps, and the chip keeps
   "12 blocked" but drops "· 34 allowed", so what stays visible is still the start of its accessible name
@@ -833,7 +791,7 @@ remote host</a> screen.</p>
   De-emphasised is not hidden. The scheme and port use <code>--color-text-tertiary</code>,
   <strong><span data-claim="contrast-tertiary-on-band" title="--color-text-tertiary on --color-bg-primary">8.52</span>:1</strong> on the band's <code>--color-bg-primary</code>,
   – quieter than the host name, still far clear of the 4.5:1 floor. (<code>--color-text-secondary</code> would also pass
-  here, at <span data-claim="contrast-secondary-on-band" title="--color-text-secondary on --color-bg-primary">5.01</span>:1; the <span data-contrast="--color-text-secondary on --color-bg-secondary">3.72:1</span> failure this card once quoted was
+  here, at <span data-claim="contrast-secondary-on-band" title="--color-text-secondary on --color-bg-primary">5.00</span>:1; the <span data-contrast="--color-text-secondary on --color-bg-secondary">3.72:1</span> failure this card once quoted was
   measured on <code>--color-bg-secondary</code>, a surface the band no longer uses.) A part of a security decision
   may be quietened, not made hard to read. And the accessible name carries the
   <strong>full origin</strong> whether or not it is drawn, so a screen-reader user and a sighted user
@@ -880,37 +838,80 @@ remote host</a> screen.</p>
   <br><br>
   <strong>Decided: the filled variant alone takes an outward ring</strong>, at the chip's offset, so it lands
   on the confirm block's own surface –
-  <strong><span data-claim="contrast-focus-ring-on-confirm" title="--color-border-focus on --color-bg-tertiary, where Confirm&#x27;s outward ring lands">6.96</span>:1</strong> against
+  <strong><span data-claim="contrast-focus-ring-on-confirm" title="--color-border-focus on --color-bg-tertiary, where Confirm&#x27;s outward ring lands">6.95</span>:1</strong> against
   <code>--color-bg-tertiary</code>, clear of the 3:1 a focus indicator needs. Every other
   <code>.erf-band__allow</code> keeps the inset ring: those are transparent, so their ring never lands on a
   fill. This button is inside the scroller too, but it sits within the confirm block's 16px padding and the
   ring needs 4px of it, so the clip cannot reach it – <strong>keep that padding if the rule moves</strong>.
   <br><br>
   A second ring <em>colour</em> for one button was the alternative and was rejected: one ring colour is the
-  <a href="../../foundations/focus.html">Focus foundation's</a> decision, and a per-variant exception is a
+  <a href="../../foundations/focus.html">Focus and keyboard</a> card's decision, and a per-variant exception is a
   second rule to keep in step for a case that placement already solves.
 </div>
 
 <div class="ds-frames tool-frames">
   <figure class="ds-frame">
-    <div class="erf-band" inert aria-hidden="true><div class="erf-band__confirm"><div class="erf-band__confirm-actions">
+    <div class="erf-band" inert aria-hidden="true"><div class="erf-band__confirm"><div class="erf-band__confirm-actions">
       <button class="erf-band__allow" type="button">Cancel</button>
       <button class="erf-band__allow erf-band__allow--primary" type="button">Confirm</button>
     </div></div></div>
     <figcaption><strong>Confirm</strong> – resting: the accent fill marks the one-way door, Cancel stays the plain outline</figcaption>
   </figure>
   <figure class="ds-frame">
-    <div class="erf-band" inert aria-hidden="true><div class="erf-band__confirm"><div class="erf-band__confirm-actions">
+    <div class="erf-band" inert aria-hidden="true"><div class="erf-band__confirm"><div class="erf-band__confirm-actions">
       <button class="erf-band__allow erf-band__allow--primary is-focus" type="button">Confirm</button>
     </div></div></div>
     <figcaption><strong>Confirm + focus</strong> – the ring sits outside the fill, on the confirm surface</figcaption>
   </figure>
   <figure class="ds-frame">
-    <div class="erf-band" inert aria-hidden="true><div class="erf-band__confirm"><div class="erf-band__confirm-actions">
+    <div class="erf-band" inert aria-hidden="true"><div class="erf-band__confirm"><div class="erf-band__confirm-actions">
       <button class="erf-band__allow erf-band__allow--primary is-focus" type="button" aria-disabled="true" aria-busy="true"><span>Saving…</span></button>
     </div></div></div>
     <figcaption><strong>Confirm</strong> – busy and focused: <code>aria-disabled</code>, keeps focus, label says so. The label stays dim, the ring does not</figcaption>
   </figure>
+</div>
+
+<h2 id="contrast">The band's text contrast</h2>
+<div class="ds-note">
+  The band's labels use <code>--color-text-tertiary</code>, which is
+  <strong><span data-claim="contrast-tertiary-on-band" title="--color-text-tertiary on --color-bg-primary">8.52</span>:1</strong> on the band's real surface,
+  <code>--color-bg-primary</code> – clear of the 4.5:1 floor. <code>--color-text-secondary</code> would also pass, at
+  <strong><span data-claim="contrast-secondary-on-band" title="--color-text-secondary on --color-bg-primary">5.00</span>:1</strong>, so the tertiary choice currently has no stated reason. It is kept for now, and
+  re-deciding it is open work rather than a settled rule.
+  <br><br>
+  The one warning line – an unencrypted origin, in the confirm box – uses
+  <code>--color-warning</code> at <strong><span data-claim="contrast-warning-on-confirm" title="--color-warning on --color-bg-tertiary, the confirm step&#x27;s warning text">6.63</span>:1</strong>
+  against <code>--color-bg-tertiary</code>, the confirm block's own surface rather than the band's,
+  also clear of the floor. It is <em>distinguished</em> rather than louder: the whole box is a security
+  question, and colouring one line inside it would suggest the other lines are safe.
+  <br><br>
+  A pressed toggle – the link mode, on – sits on <code>--color-bg-selected</code> over the band. Its icon measures
+  <strong><span data-claim="band-pressed-icon" title="--color-text-primary on --color-bg-selected over --color-bg-primary, the icon on a pressed band toggle">7.94</span>:1</strong> on that fill and its focus ring
+  <strong><span data-claim="band-pressed-ring" title="--color-border-focus on --color-bg-selected over --color-bg-primary, the ring on a pressed band toggle">5.79</span>:1</strong>, both measured after compositing the translucent
+  fill over <code>--color-bg-primary</code>.
+</div>
+
+<h2 id="history">History</h2>
+<div class="ds-note">
+  <strong>This card used to decide that the band carried a permanent
+  “Preview – content below is not Erfana” label, and a 2px accent seam the page could not
+  paint over. It no longer does.</strong> Both were removed by owner decision when the bar became a
+  toolbar matching <code>MarkdownToolbar</code>, and the seam is now the same 1px neutral rule.
+  <br><br>
+  Recorded here rather than quietly deleted, because a <code>decided</code> card that changes its
+  mind owes the next reader the reason. <code>docs/design-system/README.md</code> is explicit that this is
+  allowed – “a <code>decided</code> card the app keeps having to deviate from is a card that was
+  wrong” – but the cost is real and belongs on the card: <strong>nothing on screen names the
+  boundary any more</strong>, and 1px of <code>--color-border-default</code> is weak against the
+  white paper a page picks by default. <code>docs/security.md</code> residual risk 8 carries the
+  accepted residual.
+  <br><br>
+  <strong>The contrast measurement was once wrong.</strong> This card used to say
+  <code>--color-text-secondary</code> <em>failed</em> on the band. It does not. The failing figure was measured
+  against <code>--color-bg-secondary</code>, borrowed from a claim that belongs to the
+  <a href="../../foundations/colors.html">Colours</a> card, and left behind when the band moved to
+  <code>--color-bg-primary</code>. Every gate stayed green throughout, because the number was right about the
+  pair it named and the pair was not this one.
 </div>
 
 <section id="exceptions">
@@ -926,7 +927,7 @@ remote host</a> screen.</p>
       <td>Confirm</td>
       <td>Answers immediately.</td>
       <td>Is an async IPC round trip, followed by a CSP rebuild and a reload. Confirm carries
-        <code>aria-disabled</code> while the write is in flight, and Escape is ignored in that state –
+        <code>aria-disabled</code> while the write is in flight, and Esc is ignored in that state –
         there is no safe way to cancel a write already sent.</td>
     </tr>
     <tr>
@@ -942,14 +943,14 @@ remote host</a> screen.</p>
       <td>Find and Export to PDF, narrow panels</td>
       <td>Every control keeps its place in the row.</td>
       <td>Below the compact row's width both leave the row with <code>display: none</code> – out of the Tab order
-        rather than clipped while still focusable. Their shortcuts, Cmd/Ctrl+F and Cmd/Ctrl+S, keep working with focus in the page, which is
+        rather than clipped while still focusable. Their shortcuts, ⌘F / Ctrl+F and ⌘S / Ctrl+S, keep working with focus in the page, which is
         reachable by keyboard.</td>
     </tr>
     <tr>
       <td>Host-list clamp and the row's middle track</td>
       <td>Spacing from the scale (<a href="../../foundations/spacing.html">Spacing</a>, tokens only).</td>
-      <td>Two literals: the list clamps at <code>240px</code>, and the middle track is <code>72px</code>, sized to the
-        short failure text it carries. The scale stops at 48px and neither is a step of it. The clamp used to read
+      <td>Two literals: the list clamps at <code><span data-claim="band-list-max-height" title="host-list clamp in PreviewChromeBand.css, px">240</span>px</code>, and the middle track is <code><span data-claim="band-middle-track" title="middle track of a host row in PreviewChromeBand.css, px">72</span>px</code>, sized to the
+        short failure text it carries. The scale stops at <code data-token="--space-24">48px</code> (<code>--space-24</code>) and neither is a step of it. The clamp used to read
         <code>var(--erf-band-max-list, 240px)</code>, a property defined nowhere; it is now plainly the literal it
         always was. See <code>PreviewChromeBand.css</code>.</td>
     </tr>

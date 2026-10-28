@@ -84,7 +84,7 @@
 .sel-float { position: absolute; z-index: var(--z-modal); }
 .sel-row { display: flex; flex-wrap: wrap; gap: var(--space-16); align-items: flex-start; margin-block-end: var(--space-16); }
 .sel-row > figure { margin: 0; }
-.sel-row > figure > figcaption { margin: 0 0 var(--space-4); font-family: var(--font-mono); font-size: var(--text-xs);
+.sel-row > figure > figcaption { margin: 0 0 var(--space-4); font-family: var(--font-mono); font-size: var(--ds-text-small);
                                  color: var(--color-text-tertiary); max-inline-size: 52ch; }
 .sel-row > figure > figcaption strong { color: var(--color-text-bright); font-weight: var(--font-normal); }
 .sel-mini { inline-size: 380px; block-size: 170px; }

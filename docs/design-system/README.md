@@ -72,7 +72,7 @@ The design system and the feature screens are **HTML, CSS and images only.** No 
 a content security policy: the first element in every page's `<head>` is
 
 ```html
-<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
 ```
 
 so a script that slipped past the guard still cannot run in a browser.
@@ -105,6 +105,21 @@ one. An unknown id, an element inside a text target or a malformed contrast spec
 in the ledger; a standard (`4.5:1`, `24 × 24`, SC numbers) or a value the card is *deciding* is legitimately
 literal.
 
+## Documentation text size
+
+Documentation text never goes below `--ds-text-small` (13px); prose sits at `--ds-text-body` (14px). Both
+are aliases in `ds.css`. Mockups that draw the app keep the app's sizes and say `/* mockup */` – the
+static guard fails any 10px or 11px rule in `ds.css` or a page's `<style>` that has neither an `erf-`
+selector nor that comment, and any `style=` value at those sizes that is not inside an `erf-`, `inert` or
+`aria-hidden` frame and carries no mockup comment. A mockup comment covers the element its rule styles, so
+a documentation note gets its own class rather than borrowing a mockup's.
+
+The page's own headings step down from the h1 (`--ds-text-title`, one step above the scale) through h2
+(`--text-xl`) and h3 (`--text-lg`) to the lede (`--text-prose`) and body prose. A short command or
+attribute name in prose takes `class="ds-nowrap"`, because a browser may wrap inline code after any hyphen.
+
+`ds-` is reserved for `ds.css`; card-private helpers use a card prefix (`dl-`, `tt-`, `ic-` …).
+
 ## The one rule
 
 **Generated files are committed and never hand-edited:** `tokens.css`, `fonts/`, `index.html`,
@@ -116,7 +131,10 @@ quietly describing an app that no longer exists.
 ## Adding a card
 
 1. Create `system/<foundations|components|patterns>/<name>.html` (a component gets its own folder with an
-   `index.html`). Start from this skeleton – the anatomy is fixed and `npm run design -- --check` enforces it:
+   `index.html`). Start from this skeleton – the anatomy is fixed and `npm run design -- --check` enforces it.
+   The skeleton is a component card, in its own folder, so its links start `../../../`; a pattern card is the
+   same. A foundation card sits directly in `system/foundations/`, one level up, so its links start `../../`
+   instead (`../../tokens.css`, `../../ds.css`, `../../index.html`):
 
    ```html
    <!-- @card group="Components" name="Tabs" subtitle="One tab instead of three" status="proposed" reviewed="never" answers="Add a tab strip; Show which tab is active" -->
@@ -125,7 +143,7 @@ quietly describing an app that no longer exists.
    <!DOCTYPE html>
    <html lang="en" data-theme="dark">
    <head>
-   <meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+   <meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
    <meta charset="utf-8">
    <meta name="viewport" content="width=device-width, initial-scale=1">
    <title>Tabs – Erfana design system</title>
@@ -188,7 +206,16 @@ Not "when it looks finished". All of these:
 - **It is linted**: `npm run lint:css` covers the card's inline `<style>` and its style attributes, and in
   these two trees bans literal spacing, font sizes, durations and colour functions.
 - **A human has opened it in a browser and tabbed through it.** Every serious defect in this folder was found
-  by looking; every wrong claim came from measuring instead of looking.
+  by looking at the rendered page. The wrong claims came from numbers read out of the code and never checked
+  against the screen.
+- **A screenshot is taken after the page has settled.** Headless Chrome captures before fonts and icons finish
+  loading unless it is given time, so the recipe carries a virtual time budget:
+
+  ```bash
+  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new \
+    --user-data-dir="$(mktemp -d)" --virtual-time-budget=3000 \
+    --window-size=1400,1800 --screenshot=card.png "file://$PWD/docs/design-system/<card path>"
+  ```
 
 ### Status lifecycle
 
@@ -258,29 +285,53 @@ A card decides; the app has to catch up. Checked on 2026-10-28 against GitHub an
 
 | Where | What still ships | Decided by |
 |---|---|---|
-| [#88](https://github.com/qodeca/erfana/issues/88) | File tree keyboard navigation – the issue is still open; the Rows card records the roving-tabindex work against it | Rows & lists |
-| [#89](https://github.com/qodeca/erfana/issues/89) | `role="treeitem"` wrapping its child group – still open on GitHub | Rows & lists |
+| [#88](https://github.com/qodeca/erfana/issues/88) | File tree keyboard navigation – the issue is still open; the Rows card records the roving-tabindex work against it | [Rows and lists](system/components/row/index.html) |
+| [#89](https://github.com/qodeca/erfana/issues/89) | `role="treeitem"` wrapping its child group – still open on GitHub | [Rows and lists](system/components/row/index.html) |
 | [#92](https://github.com/qodeca/erfana/issues/92) | The app's root document has no `lang`. Closed as not planned, **still shipping** | – |
-| [#93](https://github.com/qodeca/erfana/issues/93) | Places with `outline: none` and no visible focus replacement. Closed as not planned, **still shipping** | Focus & keyboard |
-| [#94](https://github.com/qodeca/erfana/issues/94) | Unnamed fields; no error linked to its field | Form controls |
-| [#95](https://github.com/qodeca/erfana/issues/95) | Folder git state is colour-alone; status changes unannounced | Rows & lists |
-| [#96](https://github.com/qodeca/erfana/issues/96) | Reduced motion and 24 × 24 targets – still open on GitHub | Motion, Surfaces |
-| Terminal palette | The xterm theme is hex outside the tokens: a `#000000` background, a `#264f78` selection and a scrollbar hover that does not match `--scrollbar-thumb-hover` (`terminalPanel.logic.ts`, `useXtermSession.ts`) | Colours |
-| `ResizableDivider` | The editor/preview divider has no role, no keyboard operation and no value (`Editor/ResizableDivider.tsx`) | Focus & keyboard |
-| `AppDockLayout.css` | `:is([textContent="Project"], …)` selectors never match – `textContent` is not an attribute | – |
-| `--scrollbar-thumb-hover` | A raw hex (`#4e4e4e`) instead of a step of the grey scale | Surfaces and elevation |
-| Dock sash | The dockview sash width is a literal `4px`, not a token | Surfaces and elevation |
-| `design-tokens.css` spacing header | Says "4px base grid"; the scale steps by 2px (`--space-1` is 2px) | Spacing |
-| `--color-border-warning` | Duplicates `--color-warning-border` (same value, two names) | Feedback |
-| Retired tokens | `--color-warning-bright`, `--color-warning-icon`, `--color-error-bright` or `--color-error-text-light` are still read by 8 app stylesheets, `Toast.css` among them | Colours, Feedback |
-| Success and warning | `--color-success` (lime) and `--color-warning` (amber-yellow) are both yellow; only the icon and text separate them | Feedback |
-| Info | There are no `--color-info-*` tokens beyond `--color-info`: no info background or border, so an info banner borrows the accent | Feedback |
-| Elevation | `--color-bg-elevated` resolves to the same colour as `--color-bg-secondary`, so a floating surface has no fill step from a panel | Surfaces and elevation |
-| Control heights | The button scale (24/32/40) and the field scale (28/36/44) do not pair, so a button beside a field never lines up | Buttons, Form controls |
-| Focus after Cancel on the permission band | After Cancel, and after a failed approval, focus goes to the row's *Allow* button. The card returns it to the chip – the owner confirmed the chip on 2026-10-28, so this is a defect, not an exception | Permission band |
-| Confirm inside the list clamp | `.erf-band__confirm` renders inside `.erf-band__scroll`, which is clamped to `max-height: 240px` (`PreviewChromeBand.css`). With one row and the question the content measures 259px at 612px wide (only the block's bottom padding is cut) and 279px at 532px (Cancel and Confirm are cut in half and must be scrolled to) – against "one question, on screen in full". The frames draw what ships | Permission band |
-| Renamed folder dot | `.git-status-dot[data-git-status="renamed"]` paints `--color-git-renamed`, which fails 3:1 on the sidebar; the badge and the file name already use `--color-git-renamed-light` (`ProjectTree/ProjectTree.css`) | Colours |
-| Tab height literals | `EditorTab.css` and `ImageTab.css` type `height: 41px` and a close-button `border-radius: 0` instead of reading `--tab-height` and the radius token, as `HtmlPreviewTab.css` does | Surfaces and elevation, Tabs |
+| [#93](https://github.com/qodeca/erfana/issues/93) | Places with `outline: none` and no visible focus replacement. Closed as not planned, **still shipping** | [Focus and keyboard](system/foundations/focus.html) |
+| [#94](https://github.com/qodeca/erfana/issues/94) | Unnamed fields; no error linked to its field | [Form controls](system/components/form/index.html) |
+| [#95](https://github.com/qodeca/erfana/issues/95) | Folder git state is colour-alone; status changes unannounced | [Rows and lists](system/components/row/index.html) |
+| [#96](https://github.com/qodeca/erfana/issues/96) | Reduced motion and 24 × 24 targets – still open on GitHub | [Motion](system/foundations/motion.html), [Surfaces and elevation](system/foundations/surfaces.html) |
+| `ResizableDivider` | The editor/preview divider has no role, no keyboard operation and no value (`Editor/ResizableDivider.tsx`) | [Focus and keyboard](system/foundations/focus.html) |
+| `AppDockLayout.css` | `:is([textContent="Project"], …)` selectors never match – `textContent` is not an attribute (`AppDockLayout.css:164`) | – |
+| `--scrollbar-thumb-hover` | A raw hex instead of a step of the grey scale (`design-tokens.css:441`) | [Surfaces and elevation](system/foundations/surfaces.html) |
+| Dock sash | The dockview sash width is a pixel literal, not a token (`AppDockLayout.css:39`) | [Surfaces and elevation](system/foundations/surfaces.html) |
+| `design-tokens.css` spacing header | Says "4px base grid"; the scale steps by 2px (`design-tokens.css:268`) | [Spacing](system/foundations/spacing.html) |
+| `--color-border-warning` | Duplicates `--color-warning-border` – same value, two names (`design-tokens.css:263`) | [Feedback](system/components/feedback/index.html) |
+| Retired tokens | `--color-warning-bright`, `--color-warning-icon`, `--color-error-bright` and `--color-error-text-light` are still read by app stylesheets, `Toast.css:91` among them. How many stylesheets still read one is baked on the [Colours card](system/foundations/colors.html#retired) | [Colours](system/foundations/colors.html), [Feedback](system/components/feedback/index.html) |
+| Success and warning | `--color-success` (lime) and `--color-warning` (amber-yellow) are both yellow, and their fills and edges read alike – only the icon and the text separate them (`design-tokens.css:202`, `:209`). The card draws two proposed ways out | [Feedback](system/components/feedback/index.html) |
+| Info | There are no `--color-info-*` tokens beyond `--color-info`: no info background or border, so an info banner borrows the accent (`CommentWindow.css:441`, a recorded exception) | [Feedback](system/components/feedback/index.html) |
+| Elevation | `--color-bg-elevated` resolves to the same colour as `--color-bg-secondary`, so a floating surface has no fill step from a panel (`design-tokens.css:84`) | [Surfaces and elevation](system/foundations/surfaces.html) |
+| Control heights | The button heights and the field heights do not pair, so a button beside a field never lines up. Both scales are baked on their cards: [Buttons § heights](system/components/button/index.html#heights), [Form controls § sizes](system/components/form/index.html#sizes) | [Buttons](system/components/button/index.html), [Form controls](system/components/form/index.html) |
+| [#431](https://github.com/qodeca/erfana/issues/431) | Deleting a file or folder is permanent (`rm`), with no way back. The owner chose the system trash on 2026-10-28; the Dialog card keeps "deleted permanently" until the app changes | Dialog |
+| [#432](https://github.com/qodeca/erfana/issues/432) | Success and warning banners share an olive tint, because `--color-success` is the brand lime. The owner chose a distinct green on 2026-10-28; it needs a `design-tokens.css` change | Feedback |
+| Focus after Cancel on the permission band | After Cancel, and after a failed approval, focus goes to the row's *Allow* button. The card returns it to the chip – the owner confirmed the chip on 2026-10-28, so this is a defect, not an exception | [Permission band](system/components/permission-band/index.html) |
+| Confirm inside the list clamp | `.erf-band__confirm` renders inside `.erf-band__scroll`, whose height is clamped (`PreviewChromeBand.css:215`). With one row and the question, the content is taller than the clamp, and at a narrower band Cancel and Confirm are cut and must be scrolled to – against "one question, on screen in full". The card's frames draw what ships and give the measurements | [Permission band](system/components/permission-band/index.html) |
+| Renamed folder dot | `.git-status-dot[data-git-status="renamed"]` paints `--color-git-renamed`, which fails 3:1 on the sidebar; the badge and the file name already use `--color-git-renamed-light` (`ProjectTree/ProjectTree.css:620`) | [Colours](system/foundations/colors.html) |
+| Tab height literals | `EditorTab.css:19` and `ImageTab.css:22` type a pixel height, and their close buttons type `border-radius: 0`, instead of reading `--tab-height` and the radius token as `HtmlPreviewTab.css` does | [Surfaces and elevation](system/foundations/surfaces.html), [Tabs](system/components/tabs/index.html) |
+| Tab keys | The tab strip has no arrow-key, Home/End or Delete handling and no test for it. The only key handler on a tab is the context-menu key (`Tabs/useTabMenuKey.ts:55`) | [Tabs](system/components/tabs/index.html) |
+| Tab close button | Hidden with `opacity: 0` and shown only on hover or when dirty (`Tabs/EditorTab.css:112`, `:118`, `:123`) – never for keyboard focus and never on the selected tab | [Tabs](system/components/tabs/index.html) |
+| Toolbar keyboard | `role="toolbar"` with no roving `tabindex` and no arrow keys (`MarkdownToolbar.tsx:130`, `MermaidToolbar.tsx:110`, `ImageViewerToolbar.tsx:173`) | [Toolbar](system/components/toolbar/index.html) |
+| Toolbar view mode | The current view mode is a `.active` class with no `aria-pressed`, so a screen reader cannot tell which mode is on (`MarkdownToolbar.tsx:291`) | [Toolbar](system/components/toolbar/index.html) |
+| Toolbar literals | `MarkdownToolbar.css` types its button height (`:72`, `:102`) and its separator width (`:126`) as pixel literals, off the button scale and the border token | [Toolbar](system/components/toolbar/index.html) |
+| Dialog backdrop not inert | The page behind a modal is not `inert`; only Tab is trapped, so a pointer or a screen reader's virtual cursor still reaches it (`Dialog/BaseDialog.tsx:677` sets `aria-modal` only) | [Dialog](system/patterns/dialog/index.html) |
+| Dialog scrolls as a whole | `.dialog-container` caps its height in `vh` and scrolls itself (`Dialog/Dialog.css:60`–`61`), so a long body scrolls the title and the buttons away | [Dialog](system/patterns/dialog/index.html) |
+| Dialog name untested | `BaseDialog` does not require `aria-labelledby`, and no shared test fails if a dialog ships without a name; only some dialogs' own tests check it (`CameraDialog.test.tsx:823`) | [Dialog](system/patterns/dialog/index.html) |
+| Tooltip not hoverable | `pointer-events: none` on the shipping tooltips (`Dialog/Dialog.css:411`, `DiagramViewer/ChatBubble.css:349`) – the pointer cannot move onto them, which fails SC 1.4.13 | [Tooltip](system/components/tooltip/index.html) |
+| `title` as the only name | Icon buttons named only by `title=`, for example `TerminalToolbar.tsx:170` – no name on keyboard focus or touch | [Tooltip](system/components/tooltip/index.html) |
+| No selection colour | No renderer stylesheet declares `::selection`, so selected text takes the OS accent and the terminal its own colour | [Theme](system/foundations/theme.html) |
+| Selection-policy count | The `utilities.css:26` comment names two CSS-module surfaces that set `user-select: text`; `ImageViewerPanel.module.css` sets it on four (`:117`, `:307`, `:409`, `:518`) | [Theme](system/foundations/theme.html) |
+| Two terminal themes | `TERMINAL_THEME` (`terminalPanel.logic.ts:56`) and `XTERM_OPTIONS.theme` (`useXtermSession.ts:64`) carry the same palette twice; only the second ships, and the first carries scrollbar colours that are never applied | [Terminal and code colours](system/foundations/terminal.html) |
+| Terminal palette literals | The background, the selection, `theme.cursor` and `cursorAccent` (overridden by `--color-cursor` in CSS), the default text and the 16 ANSI colours are hex (`useXtermSession.ts:65`–`85`), so no token change reaches them. On the black background red, blue and bright black fall below 4.5:1 | [Terminal and code colours](system/foundations/terminal.html) |
+| Terminal header border | The header's bottom border is a literal translucent white, not `--color-border-default` (`TerminalPanel.css:26`) | [Terminal and code colours](system/foundations/terminal.html) |
+| Terminal scrollbar hover | `--color-gray-600` in the terminal (`TerminalPanel.css:160`) against `--scrollbar-thumb-hover` everywhere else | [Terminal and code colours](system/foundations/terminal.html) |
+| Shortcut notation | `commentCopy.ts:46` types "Cmd+Option+M" for macOS while `formatShortcut` renders the glyph form (⌥⌘M) everywhere else | [Writing](system/foundations/writing.html) |
+| Activity bar badge | `ActivityBarBadge.tsx:12` carries its full value only in `title`, not in the item's name | [Badges, chips and keys](system/components/badge/index.html) |
+| Hover lifts under reduced motion | Buttons move on hover with `transform` and no reduced-motion block: `Dialog/Dialog.css:171`, `:198`, `FileConflictNotification.css:87`, `DiagramViewer/ChatBubble.css:33` | [Motion](system/foundations/motion.html) |
+| No shared spinner | Every spinner is a local copy of its own keyframes; the Motion card bakes the count | [Motion](system/foundations/motion.html) |
+| Dialog buttons | `.dialog-btn` departs from the button scale: its height comes from padding (`Dialog/Dialog.css:120`), `transition: all` (`:126`) and a letter-spacing literal (`:127`). The full list is the Buttons card's Exceptions table | [Buttons](system/components/button/index.html) |
+| Load error looks empty | `EditorLoadError` uses the empty state's class (`Panels/EditorLoadError.tsx:36`), so a failure looks exactly like nothing to show | [Empty, loading and error states](system/patterns/states/index.html) |
+| Crash heading | "Erfana stopped unexpectedly." is a heading that ends with a full stop; the Writing card puts no full stop on a title (`RootErrorFallback.tsx:55`, `RootErrorBoundary.tsx:61`) | [Empty, loading and error states](system/patterns/states/index.html), [Writing](system/foundations/writing.html) |
 
 ### Fixed (kept for history)
 

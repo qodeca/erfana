@@ -4,7 +4,7 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
-<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Layering – Erfana design system</title>
@@ -20,10 +20,10 @@
             background: var(--color-border-default); border: var(--border-width) solid var(--color-border-default); }
   .rung { display: grid; grid-template-columns: calc(var(--space-24) * 4) calc(var(--space-24) * 2.5) 1fr; gap: var(--space-8);
           align-items: center; padding: var(--space-6) var(--space-8); background: var(--color-bg-secondary); }
-  .rung .tok { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-text-tertiary); }
-  .rung .val { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-text-secondary);
+  .rung .tok { font-family: var(--font-mono); font-size: var(--ds-text-small); color: var(--color-text-tertiary); }
+  .rung .val { font-family: var(--font-mono); font-size: var(--ds-text-small); color: var(--color-text-tertiary);
                text-align: right; font-variant-numeric: tabular-nums; }
-  .rung .use { font-size: var(--text-sm); color: var(--color-text-tertiary); }
+  .rung .use { font-size: var(--ds-text-small); color: var(--color-text-tertiary); }
   .rung--native { background: var(--color-brand-white); }
   .rung--native .tok, .rung--native .val, .rung--native .use { color: var(--color-brand-black); }
   .rung--broken { box-shadow: inset var(--border-width-thick) 0 0 var(--color-error); }

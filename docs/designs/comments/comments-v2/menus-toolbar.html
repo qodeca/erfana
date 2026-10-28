@@ -4,7 +4,7 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
-<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Erfana – comments v2, toolbars, menus, keyboard and bands</title>
@@ -50,12 +50,13 @@
   .erf-mdc-tool[aria-disabled='true'] { background: transparent; color: var(--color-text-primary); cursor: default; }
   .erf-mdc-tool[aria-disabled='true'] > * { opacity: var(--opacity-disabled); }
 
-  .c2mt-more { margin: 0 var(--space-2); font-size: var(--text-sm); color: var(--color-text-tertiary); }
+  .c2mt-more { /* mockup: app scale – stands in for toolbar buttons */ margin: 0 var(--space-2); font-size: var(--text-sm); color: var(--color-text-tertiary); }
 
-  /* Tooltip and live-region renderings under a state. */
+  /* Each button's title string under its state. The OS draws the real bubble,
+     so there is no app scale to keep: documentation size (owner request). */
   .c2mt-tip { display: block; margin-block-start: var(--space-3); max-inline-size: 420px; padding: var(--space-2) var(--space-4);
               background: var(--color-bg-tertiary); border: var(--border-width) solid var(--color-border-subtle);
-              font-size: var(--text-sm); color: var(--color-text-primary); }
+              font-size: var(--ds-text-small); color: var(--color-text-primary); }
   .c2mt-tip::before { content: 'title: '; color: var(--color-text-tertiary); }
 
   /* Menu placement inside a preview, at the pointer. */
@@ -74,7 +75,7 @@
   .c2mt-tab__target { font-family: var(--font-mono); }
 
   /* Frontmatter, drawn as Erfana's preview draws it. */
-  .c2mt-front { margin: 0 0 var(--space-6); padding: var(--space-4) var(--space-6); background: var(--color-bg-tertiary);
+  .c2mt-front { /* mockup: app scale – frontmatter in the preview */ margin: 0 0 var(--space-6); padding: var(--space-4) var(--space-6); background: var(--color-bg-tertiary);
                 font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-text-tertiary); white-space: pre; }
 
   /* C-18: a wide panel, drawn to scale and then shown at 80% so it fits the card. */
@@ -89,8 +90,8 @@
   /* Bands. */
   .c2mt-band-icon { display: inline-flex; color: var(--color-accent-primary); }
   .c2mt-later { display: inline-block; padding: 0 var(--space-2); border: var(--border-width) solid var(--color-border-subtle);
-                font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-secondary); }
-  .c2mt-derived { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-tertiary); }
+                font-family: var(--font-mono); font-size: var(--ds-text-small); color: var(--color-text-secondary); }
+  .c2mt-derived { font-family: var(--font-mono); font-size: var(--ds-text-small); color: var(--color-text-tertiary); }
   .c2mt-strings td:nth-child(2) { max-inline-size: 60ch; }
 </style>
 </head>

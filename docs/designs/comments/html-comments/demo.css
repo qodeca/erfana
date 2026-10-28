@@ -13,7 +13,7 @@
 
 .step { display: grid; grid-template-columns: minmax(0, 620px) minmax(0, 1fr);
         gap: var(--space-16); align-items: start; margin-bottom: var(--space-24); }
-.step__no { font-family: var(--font-mono); font-size: var(--text-sm);
+.step__no { font-family: var(--font-mono); font-size: var(--ds-text-small);
             color: var(--color-accent-primary); letter-spacing: 0.1em; margin: 0 0 var(--space-2); }
 .step__title { margin: 0 0 var(--space-6); font-size: var(--text-lg);
                font-weight: var(--font-semibold); color: var(--color-text-emphasis); }
@@ -23,20 +23,23 @@
 .gallery { display: flex; flex-wrap: wrap; gap: var(--space-16); align-items: flex-start;
            margin-bottom: var(--space-16); }
 .state { margin: 0; }
-.state > figcaption { font-family: var(--font-mono); font-size: var(--text-xs);
+.state > figcaption { font-family: var(--font-mono); font-size: var(--ds-text-small);
                       color: var(--color-text-tertiary); padding-bottom: var(--space-3);
-                      max-width: 52ch; }
+                      max-width: 52ch;
+                      /* The caption wraps to the drawing's width and never widens
+                         the figure, so the window keeps the width it is drawn at. */
+                      contain: inline-size; }
 .state > figcaption strong { color: var(--color-text-bright); font-weight: var(--font-normal); }
 
-.readout { font-family: var(--font-mono); font-size: var(--text-sm);
+.readout { font-family: var(--font-mono); font-size: var(--ds-text-small);
            color: var(--color-text-secondary); min-height: var(--space-14); margin-top: var(--space-4); }
 .readout b { color: var(--color-brand-lime); font-weight: var(--font-normal); }
 
-.copy-source { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-tertiary); }
-.not-in-plan { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-warning);
+.copy-source { font-family: var(--font-mono); font-size: var(--ds-text-small); color: var(--color-text-tertiary); }
+.not-in-plan { font-family: var(--font-mono); font-size: var(--ds-text-small); color: var(--color-warning);
                border: var(--border-width) solid var(--color-warning-border); padding: 0 var(--space-2); }
 
-kbd { font-family: var(--font-mono); font-size: var(--text-sm); padding: 0 var(--space-2);
+kbd { font-family: var(--font-mono); font-size: var(--ds-text-small); padding: 0 var(--space-2);
       border: var(--border-width) solid var(--color-border-subtle); background: var(--color-bg-secondary); }
 
 /* ---------- a preview panel, drawn to scale ---------- */
@@ -78,11 +81,11 @@ kbd { font-family: var(--font-mono); font-size: var(--text-sm); padding: 0 var(-
 
 /* The "frozen" marker – card chrome, so the reader knows the page is a still. */
 .still-tag { position: absolute; inset-block-end: var(--space-2); inset-inline-start: var(--space-2);
-             font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-tertiary);
+             font-family: var(--font-mono); font-size: var(--ds-text-small); color: var(--color-text-tertiary);
              background: var(--color-bg-primary); padding: 0 var(--space-2); }
 
 /* A live region made visible, so a card can show what a screen reader hears. */
-.announce-view { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-text-secondary);
+.announce-view { font-family: var(--font-mono); font-size: var(--ds-text-small); color: var(--color-text-secondary);
                  border-inline-start: var(--border-width-thick) solid var(--color-border-subtle);
                  padding-inline-start: var(--space-4); margin-top: var(--space-4); min-height: var(--space-10); }
 .announce-view::before { content: 'live region: '; color: var(--color-text-tertiary); }

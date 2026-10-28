@@ -349,9 +349,9 @@
 .c2-grid { display: flex; flex-wrap: wrap; gap: var(--space-16); align-items: flex-start; margin-block-end: var(--space-16); }
 .c2-grid > figure { margin: 0; }
 .c2-grid > figure > figcaption { margin: 0 0 var(--space-4); max-inline-size: 56ch; font-family: var(--font-mono);
-                                 font-size: var(--text-xs); color: var(--color-text-tertiary); }
+                                 font-size: var(--ds-text-small); color: var(--color-text-tertiary); }
 .c2-grid > figure > figcaption strong { color: var(--color-text-bright); font-weight: var(--font-normal); }
-.c2-change { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-brand-lime); }
+.c2-change { font-family: var(--font-mono); font-size: var(--ds-text-small); color: var(--color-brand-lime); }
 .c2-win { inline-size: 380px; }
 .c2-float { position: absolute; z-index: var(--z-modal); }
 .c2-anchor { position: relative; }

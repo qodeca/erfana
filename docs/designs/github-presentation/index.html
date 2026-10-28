@@ -3,7 +3,7 @@
 <!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
 <!DOCTYPE html>
 <html lang="en" data-theme="dark"><head>
-<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Erfana – GitHub presentation</title>
@@ -104,7 +104,7 @@
 
   .gp-stage { margin: var(--space-8) 0 var(--space-24); }
   .gp-stage figcaption { margin-top: var(--space-4); color: var(--color-text-tertiary);
-                         font-size: var(--text-sm); }
+                         font-size: var(--ds-text-small); }
 </style>
 </head>
 <body>
@@ -211,9 +211,9 @@ only – it is not theme-aware. Uploaded by hand in Settings after the README me
     <tr><td>Wordmark, light banner</td><td><code>--color-brand-black</code> on <code>--color-brand-white</code></td><td class="ds-ratio ds-pass"><span data-claim="contrast-gp-wordmark-light" title="--color-brand-black on --color-brand-white, the wordmark on the light banner">17.62</span>:1</td></tr>
     <tr><td>Prompt glyph (both)</td><td><code>--color-text-primary</code> on <code>--color-brand-black</code></td><td class="ds-ratio ds-pass"><span data-claim="contrast-gp-prompt" title="--color-text-primary on --color-brand-black, the prompt glyph on the terminal strip">11.51</span>:1</td></tr>
     <tr><td>Cursor (both, on the dark strip)</td><td><code>--color-brand-lime</code> on <code>--color-brand-black</code></td><td class="ds-ratio ds-pass"><span data-claim="contrast-gp-cursor" title="--color-brand-lime on --color-brand-black, the cursor on the terminal strip">13.94</span>:1</td></tr>
-    <tr><td>Accent, light banner</td><td><code>--color-brand-indigo</code> on <code>--color-brand-white</code></td><td class="ds-ratio ds-pass"><span data-claim="contrast-gp-indigo-light" title="--color-brand-indigo on --color-brand-white, the light banner accent">7.61</span>:1</td></tr>
+    <tr><td>Accent, light banner</td><td><code>--color-brand-indigo</code> on <code>--color-brand-white</code></td><td class="ds-ratio ds-pass"><span data-claim="contrast-gp-indigo-light" title="--color-brand-indigo on --color-brand-white, the light banner accent">7.60</span>:1</td></tr>
     <tr><td>Why lime never sits on the light surface</td><td><code>--color-brand-lime</code> on <code>--color-brand-white</code></td><td class="ds-ratio ds-fail"><span data-claim="contrast-gp-lime-light" title="--color-brand-lime on --color-brand-white, why lime never sits on the light banner">1.26</span>:1</td></tr>
-    <tr><td>Why violet is only a muted fill on light</td><td><code>--color-brand-violet</code> on <code>--color-brand-white</code></td><td class="ds-ratio ds-fail"><span data-claim="contrast-gp-violet-light" title="--color-brand-violet on --color-brand-white, why violet is only a muted fill on light">2.10</span>:1</td></tr>
+    <tr><td>Why violet is only a muted fill on light</td><td><code>--color-brand-violet</code> on <code>--color-brand-white</code></td><td class="ds-ratio ds-fail"><span data-claim="contrast-gp-violet-light" title="--color-brand-violet on --color-brand-white, why violet is only a muted fill on light">2.09</span>:1</td></tr>
   </tbody>
 </table>
 <p>Frames, pane bars and the selected line are decorative and carry no meaning; the README says in

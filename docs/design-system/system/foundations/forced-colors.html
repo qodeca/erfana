@@ -4,7 +4,7 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
-<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Forced colours – Erfana design system</title>
@@ -76,11 +76,11 @@
 <h1>Forced colours</h1>
 <p class="ds-meta"><span class="ds-status" data-status="proposed">proposed</span> not yet reviewed</p>
 <p class="ds-lede" id="decision">
-  On Windows, a contrast theme replaces every colour Erfana chooses with a handful of system colours, drops every
-  background image and box-shadow, and flattens fills. <strong>The rule: every state that carries information – focus,
-  selected, pressed, checked, disabled, invalid – keeps a border, an outline or text that survives that, and a state
-  repainted for forced colours uses the system colour named below for it.</strong> A state that is only a fill or a
-  shadow vanishes.
+  On Windows, a contrast theme replaces every colour Erfana chooses with a handful of system colours, removes
+  <code>box-shadow</code>, <code>text-shadow</code> and gradient backgrounds, and flattens fills. Images set with
+  <code>url()</code> survive. <strong>The rule: every state that carries information keeps a border, an outline or text
+  that survives that. This holds for focus, selected, pressed, checked, disabled and invalid. A state repainted for
+  forced colours uses the system colour named below for it.</strong> A state that is only a fill or a shadow vanishes.
 </p>
 
 <h2 id="rules">The rules</h2>
@@ -138,7 +138,10 @@ it.</p>
       <code>Highlight</code> fill and <code>HighlightText</code>: the picker dialogs' pattern.</figcaption></figure>
   <figure class="ds-frame"><div class="fc" aria-hidden="true"><span class="fc-btn fc-pressed">Show comments</span> <span class="fc-btn">Same tab</span></div>
     <figcaption><strong>Pressed toggle – survives.</strong> The lime bottom edge is repainted in <code>Highlight</code>
-      (<code>PreviewNavControls.css</code>); the unpressed toggle beside it has none.</figcaption></figure>
+      (<code>PreviewNavControls.css</code>). The unpressed toggle beside it keeps a plain button border and no
+      <code>Highlight</code> edge. This frame is drawn, not measured: how the shipping toggles look under a real
+      contrast theme is unverified. The proposed <code>button.css</code> gives every button a <code>ButtonText</code>
+      border in forced colours, so an unpressed toggle there is never edge-less.</figcaption></figure>
   <figure class="ds-frame"><div class="fc" aria-hidden="true"><span class="fc-check fc-check--on"></span>Wrap long lines<br><span class="fc-check"></span>Show line numbers</div>
     <figcaption><strong>Checkbox – repainted.</strong> On: a solid <code>Highlight</code> box. Off: a
       <code>Canvas</code> box with a <code>CanvasText</code> edge (<code>SettingsOverlay.css</code>).</figcaption></figure>
@@ -176,7 +179,7 @@ Rendering and emulate <code>forced-colors: active</code>, then Tab to them: the 
 
 <h2 id="gaps">Known gaps</h2>
 <ul class="ds-muted">
-  <li>The screen and window pickers draw their selected and focused ring as a 3px <code>box-shadow</code>. Their
+  <li>The screen and window pickers draw their selected and focused ring as a <code>box-shadow</code>. Their
     forced-colours block repaints the item with <code>Highlight</code>, so they survive there – but the default ring is
     still a shadow, and a fourth ring idiom (<a href="focus.html">Focus card</a>).</li>
   <li>Nothing checks this mechanically. For this card only the stylesheets that already carry a forced-colours block
@@ -186,7 +189,7 @@ Rendering and emulate <code>forced-colors: active</code>, then Tab to them: the 
 <h2 id="related">Related</h2>
 <ul class="ds-muted">
   <li><a href="focus.html">Focus and keyboard</a> – the outline that survives without a rule.</li>
-  <li><a href="colors.html#states">Colours – interaction-state layers</a> – which states are fill-only by design.</li>
+  <li><a href="colors.html#states">Colours, interaction-state layers</a> – which states are fill-only by design.</li>
   <li><a href="../components/form/index.html">Form controls</a> and <a href="../components/permission-band/index.html">Permission band</a> – components that ship a forced-colours block.</li>
 </ul>
 

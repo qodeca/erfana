@@ -4,7 +4,7 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
-<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Theme – Erfana design system</title>
@@ -14,7 +14,7 @@
   .th-surfaces { display: grid; grid-template-columns: repeat(auto-fill, minmax(calc(var(--space-24) * 5), 1fr));
                  gap: var(--space-8); margin: 0 0 var(--space-12); }
   .th-swatch { height: var(--space-24); padding: var(--space-4) var(--space-6); font-family: var(--font-mono);
-               font-size: var(--text-sm); border: var(--border-width) solid var(--color-border-subtle); }
+               font-size: var(--ds-text-small); border: var(--border-width) solid var(--color-border-subtle); }
   .th-swatch--app { background: var(--color-bg-primary); color: var(--color-text-primary); }
   .th-swatch--diagram { background: var(--color-bg-diagram); color: var(--color-brand-black); }
   .th-swatch--page { background: var(--color-white); color: var(--color-black); }
@@ -29,9 +29,9 @@
   .th-block--text { user-select: text; }
   .th-block--none { user-select: none; cursor: default; }
   .th-block--chrome { display: flex; justify-content: space-between; user-select: none; cursor: pointer; }
-  .th-block--chrome .th-data { user-select: text; cursor: text; font-family: var(--font-mono); font-size: var(--text-sm);
+  .th-block--chrome .th-data { /* mockup: app scale – chrome text */ user-select: text; cursor: text; font-family: var(--font-mono); font-size: var(--text-sm);
                                color: var(--color-text-tertiary); }
-  .th-try figcaption { margin-top: var(--space-4); font-size: var(--text-sm); color: var(--color-text-tertiary); }
+  .th-try figcaption { margin-top: var(--space-4); font-size: var(--ds-text-small); color: var(--color-text-tertiary); }
 
   /* The proposed highlight: one token, not the OS accent. */
   .th-proposed ::selection, .th-proposed::selection { background: var(--color-bg-selected); color: var(--color-text-emphasis); }
@@ -64,17 +64,18 @@
 </div>
 
 <h3 id="light-surfaces">The light surfaces that are not a theme</h3>
-<p class="ds-muted">Three places show light pixels on purpose. None is a light mode; each is content, not chrome.</p>
+<p class="ds-muted">Two places show light pixels on purpose. Neither is a light mode; each is content, not chrome. The
+dark app surface is drawn first, for comparison.</p>
 <div class="th-surfaces">
   <figure class="ds-frame"><div class="th-swatch th-swatch--app" aria-hidden="true">--color-bg-primary</div>
-    <figcaption><strong>The app</strong> – every surface of the chrome.</figcaption></figure>
+    <figcaption><strong>For comparison: the app</strong> – every surface of the chrome. Not an exception.</figcaption></figure>
   <figure class="ds-frame"><div class="th-swatch th-swatch--diagram" aria-hidden="true">--color-bg-diagram</div>
     <figcaption><strong>A Mermaid diagram</strong> – drawn on <code data-token="--color-bg-diagram">#F8FAF8</code>, because diagram themes and exported images expect paper.</figcaption></figure>
   <figure class="ds-frame"><div class="th-swatch th-swatch--page" aria-hidden="true">the page's own colours</div>
     <figcaption><strong>A previewed HTML page</strong> – the page decides. Erfana never restyles it, and chrome drawn near it must work on any colour.</figcaption></figure>
 </div>
-<p class="ds-muted">The screenshot overlay is the third exception: it paints over arbitrary desktop content, so its
-colours are fixed rather than themed – recorded on the <a href="colors.html">Colours</a> card.</p>
+<p class="ds-muted">The screenshot overlay is a separate exception, not a light surface: it paints over arbitrary
+desktop content, so its colours are fixed rather than themed. It is recorded on the <a href="colors.html">Colours</a> card.</p>
 
 <h2 id="selection">Text selection</h2>
 <p class="ds-muted"><code>dockview-core</code> sets <code>user-select: none</code> on panel chrome, and it inherits into
@@ -104,8 +105,9 @@ nothing when it was empty.</p>
 </div>
 
 <div class="ds-note">
-  <strong>Decision rule.</strong> Would a reader reasonably want to copy this text? Yes – make it selectable. A clickable or
-  draggable label acting as chrome – leave it <code>none</code>. A component that owns its selection – do not interfere.
+  <strong>Decision rule.</strong> Would a reader reasonably want to copy this text? Then make it selectable. Is it a
+  label the reader clicks or drags, acting as chrome? Then keep it not selectable (<code>user-select: none</code>, usually
+  inherited from dockview). Does a component own its selection? Then do not interfere.
   <br><br>
   <strong>Scope rule.</strong> Opt in on the element that holds the data, not on a clickable or draggable ancestor: a row
   with both <code>cursor: pointer</code> and <code>user-select: text</code> makes drag-to-select fight click-to-pick. The
@@ -115,8 +117,9 @@ nothing when it was empty.</p>
   buttons (the welcome screen's recent-project rows), list the data selectors one by one.
   <br><br>
   <strong>Where it lives.</strong> One grouped rule in <code>src/renderer/src/styles/utilities.css</code>, with a row for each
-  selector in <code>userSelect.audit.test.ts</code>. The only exceptions are the CSS-module surfaces in
-  <code>ImageViewerPanel.module.css</code>, whose hashed class names a global selector cannot match. The unprefixed
+  selector in <code>userSelect.audit.test.ts</code>. The only exceptions are the selectable surfaces in
+  <code>ImageViewerPanel.module.css</code>, whose hashed class names a global selector cannot match, so the rule is
+  declared in that file. The unprefixed
   property is enough – the app runs on Chromium.
   <br><br>
   <strong>Cascade assumption.</strong> The overrides win because app stylesheets load after
@@ -145,9 +148,10 @@ marker at the site and gets a row here, naming the file.</p>
 <h3 id="defects">Defects this card names</h3>
 <ul class="ds-muted">
   <li><strong>No app-wide selection colour.</strong> No renderer stylesheet declares <code>::selection</code>; selection
-  follows the OS accent, and the terminal uses its own hex (already in the README's terminal-palette row).</li>
-  <li><strong>The selection-policy count disagrees with itself.</strong> <code>utilities.css</code> says two CSS-module
-  surfaces declare the rule in place; <code>docs/ui-style-guide.md</code> says four. The card names the file, not a count.</li>
+  follows the OS accent, and the terminal uses its own hex (the README's "Terminal palette literals" row).</li>
+  <li><strong>The selection-policy comment undercounts.</strong> The header comment in <code>utilities.css</code> names
+  two CSS-module surfaces that declare <code>user-select: text</code> in place; <code>ImageViewerPanel.module.css</code>
+  declares it on four. The card names the file, not a count.</li>
 </ul>
 </section>
 

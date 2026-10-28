@@ -891,5 +891,77 @@
     ],
     "match": "min-width:\\s*80px",
     "unit": "files"
+  },
+  "retired-token-stylesheets": {
+    "kind": "count",
+    "card": "system/foundations/colors.html",
+    "label": "stylesheets in src/ that still read a retired token (design-tokens.css excluded)",
+    "dir": "src",
+    "ext": [
+      ".css"
+    ],
+    "excludePath": "design-tokens\\.css$",
+    "match": "var\\(\\s*--(?:shadow-focus|color-warning-bright|color-warning-icon|color-error-bright|color-error-text-light)\\s*[,)]",
+    "unit": "files"
+  },
+  "xterm-font-size": {
+    "kind": "capture",
+    "card": "system/foundations/terminal.html",
+    "label": "XTERM_OPTIONS.fontSize in useXtermSession.ts, in px",
+    "dir": "src/renderer/src/components/Panels/TerminalPanel/hooks",
+    "ext": [
+      ".ts"
+    ],
+    "includePath": "useXtermSession\\.ts$",
+    "match": "const XTERM_OPTIONS = \\{[\\s\\S]*?fontSize:\\s*(\\d+)"
+  },
+  "band-ack-timeout-ms": {
+    "kind": "capture",
+    "card": "system/components/permission-band/index.html",
+    "label": "time the previewed page has to confirm it moved, ms (src/shared/constants.ts)",
+    "dir": "src/shared",
+    "ext": [
+      ".ts"
+    ],
+    "includePath": "constants\\.ts$",
+    "match": "BOUNDS_ACK_TIMEOUT_MS:\\s*([0-9]+)",
+    "group": 1
+  },
+  "band-list-max-height": {
+    "kind": "capture",
+    "card": "system/components/permission-band/index.html",
+    "label": "host-list clamp in PreviewChromeBand.css, px",
+    "dir": "src/renderer",
+    "ext": [
+      ".css"
+    ],
+    "includePath": "PreviewChromeBand\\.css$",
+    "match": "max-height:\\s*([0-9]+)px",
+    "group": 1,
+    "index": 0
+  },
+  "band-middle-track": {
+    "kind": "capture",
+    "card": "system/components/permission-band/index.html",
+    "label": "middle track of a host row in PreviewChromeBand.css, px",
+    "dir": "src/renderer",
+    "ext": [
+      ".css"
+    ],
+    "includePath": "PreviewChromeBand\\.css$",
+    "match": "grid-template-columns:\\s*minmax\\(0,\\s*1fr\\)\\s+([0-9]+)px\\s+auto",
+    "group": 1
+  },
+  "band-min-split-height": {
+    "kind": "capture",
+    "card": "system/components/permission-band/index.html",
+    "label": "panel height below which the page and an open host list cannot share the space, px (htmlPreview.logic.ts)",
+    "dir": "src/renderer",
+    "ext": [
+      ".ts"
+    ],
+    "includePath": "htmlPreview\\.logic\\.ts$",
+    "match": "PREVIEW_MIN_SPLIT_HEIGHT_PX\\s*=\\s*([0-9]+)",
+    "group": 1
   }
 }

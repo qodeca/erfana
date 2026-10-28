@@ -4,7 +4,7 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
-<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Erfana – comments v2, the comment window</title>
@@ -22,14 +22,14 @@
   .c2-win .erf-comment-window { inline-size: 100%; min-inline-size: 0; max-inline-size: none; max-block-size: none; }
   .c2-desc { margin: var(--space-4) 0 0; max-inline-size: 380px; padding-inline-start: var(--space-4);
              border-inline-start: var(--border-width-thick) solid var(--color-border-subtle);
-             font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-tertiary); }
+             font-family: var(--font-mono); font-size: var(--ds-text-small); color: var(--color-text-tertiary); }
   .c2-desc b { font-weight: var(--font-normal); color: var(--color-text-bright); }
   /* A static stand-in for :focus-visible, so "takes focus" can be seen without script. */
   .c2-focus { outline: var(--border-width-thick) solid var(--color-border-focus); outline-offset: var(--space-1); }
   .c2-menu { position: absolute; inset-block-start: calc(var(--btn-height-sm) + var(--space-1)); inset-inline-end: 0;
              z-index: var(--z-dropdown); min-inline-size: 180px; }
   .c2-strings { max-inline-size: 1100px; margin-block-end: var(--space-16); }
-  .c2-strings td:first-child { font-family: var(--font-mono); font-size: var(--text-sm); white-space: nowrap; }
+  .c2-strings td:first-child { font-family: var(--font-mono); font-size: var(--ds-text-small); white-space: nowrap; }
 
   /* ---------- window parts this card adds (proposed for comments-v2.css) ---------- */
 

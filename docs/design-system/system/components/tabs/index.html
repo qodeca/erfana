@@ -1,16 +1,17 @@
-<!-- @card group="Components" name="Tabs" subtitle="One tab instead of three – selected, unsaved, deleted, pinned, and a close button the keyboard can reach" status="proposed" reviewed="never" answers="Add a tab strip; Show which tab is active; Mark a tab with unsaved changes" -->
+<!-- @card group="Components" name="Tabs" subtitle="One tab instead of three – selected, unsaved, deleted, pinned, and a close the keyboard reaches with Delete" status="proposed" reviewed="never" answers="Add a tab strip; Show which tab is active; Mark a tab with unsaved changes" -->
 <!-- SPDX-License-Identifier: GPL-3.0-only -->
 <!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
-<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Tabs – Erfana design system</title>
 <link rel="stylesheet" href="../../../tokens.css">
 <link rel="stylesheet" href="../../../ds.css">
 <link rel="stylesheet" href="./tabs.css">
+<link rel="stylesheet" href="../tooltip/tooltip.css">
 <style>
   /* Forced states for the frames (documentation-only hooks, never shipped). */
   .erf-tab.is-hover { background-color: var(--color-bg-hover-solid); }
@@ -18,13 +19,17 @@
   .erf-tab__close.is-hover { background-color: var(--color-border-default); color: var(--color-text-primary); }
   .erf-tab.is-focus { outline-offset: calc(var(--border-width-thick) * -1); }
   .erf-tab.is-focus .erf-tab__close { opacity: 1; }
+  /* A frame is a still picture: no fade, so a capture never catches a close
+     button half-way through its opacity transition. */
+  .ds-frame .erf-tab__close { transition: none; }
 
   /* The panel under the strip, so the strip reads as a header. */
-  .ds-panel { height: var(--space-20); background: var(--color-bg-preview); border-top: var(--border-width) solid var(--color-border-default); }
-  .ds-narrow { width: 340px; max-width: 100%; }
-  .ds-frames--two { grid-template-columns: repeat(auto-fill, minmax(min(440px, 100%), 1fr)); }
-  .ds-code { max-width: var(--ds-table-max); padding: var(--space-8); overflow-x: auto;
-             background: var(--color-bg-tertiary); border: var(--border-width) solid var(--color-border-default); }
+  .tb-panel { height: var(--space-20); background: var(--color-bg-preview); border-top: var(--border-width) solid var(--color-border-default); }
+  .tb-narrow { width: 340px; max-width: 100%; }
+  /* The path tooltip, placed under the second of two equal tabs. */
+  .tb-tip-host { position: relative; }
+  .tb-tip-at { position: absolute; inset-block-start: var(--tab-height); inset-inline-start: 50%; }
+  .tb-frames-two { grid-template-columns: repeat(auto-fill, minmax(min(440px, 100%), 1fr)); }
 </style>
 </head>
 <body>
@@ -35,7 +40,8 @@
 <p class="ds-lede" id="decision">
   One tab, <code>.erf-tab</code>, for every document a panel group shows. The selected tab has a lime underline in
   every group; the focused group sits on the panel surface. Unsaved and deleted are said in a shape and in words,
-  never in colour alone. Close is a 24 × 24 target, and the keyboard closes a tab with <kbd>Delete</kbd>.
+  never in colour alone, and both are part of the tab's name. Close is a 24 × 24 pointer target that is hidden from
+  assistive technology; the keyboard closes a tab with <kbd>Delete</kbd> or the tab menu's Close.
 </p>
 
 <div class="ds-note">
@@ -45,13 +51,13 @@
   (<span data-claim="tab-height-literal" title="tab stylesheets that type height: 41px instead of reading --tab-height">2</span> of the three files) where <code>HtmlPreviewTab.css</code> reads
   <code>--tab-height</code> (<code data-token="--tab-height">41px</code>); the same two give the close button
   <code>border-radius: 0</code> (<span data-claim="tab-radius-literal" title="tab stylesheets whose close button types border-radius: 0">2</span> files) where
-  <code>HtmlPreviewTab.css</code> reads the token; the 80px floor and 300px ceiling are typed in
+  <code>HtmlPreviewTab.css</code> reads the token; the width floor and ceiling are typed in
   <span data-claim="tab-floor-literal" title="tab stylesheets that type the 80px floor">3</span> of the three, and again as <code>!important</code> dockview
   overrides. <code>tabs.css</code> is the one file they become.
 </div>
 
 <h2 id="states">Every state</h2>
-<div class="ds-frames ds-frames--two">
+<div class="ds-frames tb-frames-two">
 
 <figure class="ds-frame">
 <div aria-hidden="true">
@@ -60,7 +66,7 @@
     <span class="erf-tab"><svg class="erf-tab__icon" data-icon="file-text" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg><span class="erf-tab__label">CHANGELOG.md</span><span class="erf-tab__close"><svg data-icon="x" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span></span>
     <span class="erf-tab"><svg class="erf-tab__icon" data-icon="file-code" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M10 12.5 8 15l2 2.5"/><path d="m14 12.5 2 2.5-2 2.5"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/></svg><span class="erf-tab__label">index.html</span><span class="erf-tab__close"><svg data-icon="x" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span></span>
   </div>
-  <div class="ds-panel"></div>
+  <div class="tb-panel"></div>
 </div>
 <figcaption><strong>Inactive</strong> – CHANGELOG.md and index.html. Primary text on the panel surface, no underline, no close button until the pointer or focus arrives.</figcaption>
 </figure>
@@ -72,7 +78,7 @@
     <span class="erf-tab is-hover"><svg class="erf-tab__icon" data-icon="file-text" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg><span class="erf-tab__label">CHANGELOG.md</span><span class="erf-tab__close"><svg data-icon="x" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span></span>
     <span class="erf-tab"><svg class="erf-tab__icon" data-icon="file-code" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M10 12.5 8 15l2 2.5"/><path d="m14 12.5 2 2.5-2 2.5"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/></svg><span class="erf-tab__label">index.html</span><span class="erf-tab__close"><svg data-icon="x" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span></span>
   </div>
-  <div class="ds-panel"></div>
+  <div class="tb-panel"></div>
 </div>
 <figcaption><strong>Hover</strong> – the pointer is on CHANGELOG.md: <code>--color-bg-hover-solid</code>, and its close button appears.</figcaption>
 </figure>
@@ -83,9 +89,9 @@
     <span class="erf-tab" aria-selected="true"><svg class="erf-tab__icon" data-icon="file-text" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg><span class="erf-tab__label">README.md</span><span class="erf-tab__close"><svg data-icon="x" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span></span>
     <span class="erf-tab"><svg class="erf-tab__icon" data-icon="file-text" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg><span class="erf-tab__label">CHANGELOG.md</span><span class="erf-tab__close"><svg data-icon="x" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span></span>
   </div>
-  <div class="ds-panel"></div>
+  <div class="tb-panel"></div>
 </div>
-<figcaption><strong>Active, in the focused group</strong> – README.md: <code>aria-selected="true"</code>, emphasis text, a 2px <code>--color-accent-secondary</code> underline, and its close button always shown.</figcaption>
+<figcaption><strong>Active, in the focused group</strong> – README.md: <code>aria-selected="true"</code>, emphasis text, a <code data-token="--border-width-thick">2px</code> <code>--color-accent-secondary</code> underline, and its close button always shown.</figcaption>
 </figure>
 
 <figure class="ds-frame">
@@ -94,9 +100,9 @@
     <span class="erf-tab" aria-selected="true"><svg class="erf-tab__icon" data-icon="file-text" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg><span class="erf-tab__label">README.md</span><span class="erf-tab__close"><svg data-icon="x" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span></span>
     <span class="erf-tab"><svg class="erf-tab__icon" data-icon="file-text" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg><span class="erf-tab__label">CHANGELOG.md</span><span class="erf-tab__close"><svg data-icon="x" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span></span>
   </div>
-  <div class="ds-panel"></div>
+  <div class="tb-panel"></div>
 </div>
-<figcaption><strong>Active, in an unfocused group</strong> – focus is in another group. The strip drops to <code>--color-bg-tertiary</code> and the text dims a step, but the underline stays: it still says which file this group shows.</figcaption>
+<figcaption><strong>Active, in an unfocused group</strong> – focus is in another group. The strip drops to <code>--color-bg-tertiary</code> and the text dims a step, to <code>--color-text-tertiary</code> (the selected tab keeps <code>--color-text-primary</code>), but the underline stays: it still says which file this group shows.</figcaption>
 </figure>
 
 <figure class="ds-frame">
@@ -105,7 +111,7 @@
     <span class="erf-tab" aria-selected="true"><svg class="erf-tab__icon" data-icon="file-text" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg><span class="erf-tab__dirty"><span class="erf-visually-hidden">Unsaved changes</span></span><span class="erf-tab__label">README.md</span><span class="erf-tab__close"><svg data-icon="x" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span></span>
     <span class="erf-tab"><svg class="erf-tab__icon" data-icon="file-text" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg><span class="erf-tab__dirty"><span class="erf-visually-hidden">Unsaved changes</span></span><span class="erf-tab__label">CHANGELOG.md</span><span class="erf-tab__close"><svg data-icon="x" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span></span>
   </div>
-  <div class="ds-panel"></div>
+  <div class="tb-panel"></div>
 </div>
 <figcaption><strong>Dirty</strong> – a dot before the name, in the text colour, plus a visually hidden “Unsaved changes”. Close stays visible on a dirty tab; pressing it asks first (the <a href="../../patterns/dialog/index.html">Dialog</a> card's confirm).</figcaption>
 </figure>
@@ -116,7 +122,7 @@
     <span class="erf-tab"><svg class="erf-tab__icon" data-icon="file-text" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg><span class="erf-tab__label">README.md</span><span class="erf-tab__close"><svg data-icon="x" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span></span>
     <span class="erf-tab" aria-selected="true"><svg class="erf-tab__icon" data-icon="file-text" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg><span class="erf-tab__label">draft.md</span><span class="erf-tab__deleted">(deleted)</span><span class="erf-tab__close"><svg data-icon="x" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span></span>
   </div>
-  <div class="ds-panel"></div>
+  <div class="tb-panel"></div>
 </div>
 <figcaption><strong>Deleted on disk</strong> – the name keeps its place and “(deleted)” follows in <code>--color-warning</code>. The words carry it; the colour only repeats it. The marker never truncates – the name does.</figcaption>
 </figure>
@@ -127,9 +133,9 @@
     <span class="erf-tab" aria-selected="true"><svg class="erf-tab__icon" data-icon="file-text" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg><span class="erf-tab__label">README.md</span><span class="erf-tab__close"><svg data-icon="x" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span></span>
     <span class="erf-tab is-hover"><svg class="erf-tab__icon" data-icon="file-text" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg><span class="erf-tab__label">CHANGELOG.md</span><span class="erf-tab__close is-hover"><svg data-icon="x" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span></span>
   </div>
-  <div class="ds-panel"></div>
+  <div class="tb-panel"></div>
 </div>
-<figcaption><strong>Close reveal</strong> – the pointer is on the close button: a 24 × 24 square in <code>--color-border-default</code> around the 14px cross. The whole square takes the click, not just the glyph.</figcaption>
+<figcaption><strong>Close reveal</strong> – the pointer is on the close button: a 24 × 24 square in <code>--color-border-default</code> around a <code data-token="--space-7">14px</code> cross. The whole square takes the click, not just the glyph.</figcaption>
 </figure>
 
 <figure class="ds-frame">
@@ -138,22 +144,34 @@
     <span class="erf-tab" aria-selected="true"><svg class="erf-tab__icon" data-icon="file-text" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg><span class="erf-tab__label">README.md</span><span class="erf-tab__close"><svg data-icon="x" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span></span>
     <span class="erf-tab is-focus"><svg class="erf-tab__icon" data-icon="file-text" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg><span class="erf-tab__label">CHANGELOG.md</span><span class="erf-tab__close"><svg data-icon="x" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span></span>
   </div>
-  <div class="ds-panel"></div>
+  <div class="tb-panel"></div>
 </div>
 <figcaption><strong>Focus-visible</strong> – <kbd>→</kbd> moved focus to CHANGELOG.md. The ring is the one ring, inset because the strip clips. The close button shows while the tab is focused, so the keyboard user sees what <kbd>Delete</kbd> will do.</figcaption>
 </figure>
 
 <figure class="ds-frame">
 <div aria-hidden="true">
-  <div class="erf-tablist erf-tablist--active-group ds-narrow">
+  <div class="erf-tablist erf-tablist--active-group tb-narrow">
     <span class="erf-tab"><svg class="erf-tab__icon" data-icon="file-text" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg><span class="erf-tab__label">architecture-overview.md</span><span class="erf-tab__close"><svg data-icon="x" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span></span>
     <span class="erf-tab" aria-selected="true"><svg class="erf-tab__icon" data-icon="file-text" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg><span class="erf-tab__label">release-plan-2026.md</span><span class="erf-tab__close"><svg data-icon="x" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span></span>
     <span class="erf-tab"><svg class="erf-tab__icon" data-icon="image" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg><span class="erf-tab__label">diagram.png</span><span class="erf-tab__close"><svg data-icon="x" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span></span>
     <span class="erf-tab"><svg class="erf-tab__icon" data-icon="file-code" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M10 12.5 8 15l2 2.5"/><path d="m14 12.5 2 2.5-2 2.5"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/></svg><span class="erf-tab__label">index.html</span><span class="erf-tab__close"><svg data-icon="x" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span></span>
   </div>
-  <div class="ds-panel ds-narrow"></div>
+  <div class="tb-panel tb-narrow"></div>
 </div>
-<figcaption><strong>Overflow and truncation</strong> – every tab shrinks equally to the 80px floor, the name truncates with an ellipsis (the full path is in the tooltip and the accessible name), then the strip scrolls sideways. Selecting a tab scrolls it into view.</figcaption>
+<figcaption><strong>Overflow and truncation</strong> – every tab shrinks equally to the width floor (<code>--erf-tab-min-width</code> in <code>tabs.css</code>), the name truncates with an ellipsis (the full path is the tab's description, shown in a tooltip), then the strip scrolls sideways. Selecting a tab scrolls it into view.</figcaption>
+</figure>
+
+<figure class="ds-frame">
+<div aria-hidden="true" class="tb-tip-host">
+  <div class="erf-tablist erf-tablist--active-group">
+    <span class="erf-tab" aria-selected="true"><svg class="erf-tab__icon" data-icon="file-text" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg><span class="erf-tab__label">README.md</span><span class="erf-tab__close"><svg data-icon="x" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span></span>
+    <span class="erf-tab is-focus"><svg class="erf-tab__icon" data-icon="file-text" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg><span class="erf-tab__label">CHANGELOG.md</span><span class="erf-tab__close"><svg data-icon="x" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span></span>
+  </div>
+  <span class="erf-tooltip-anchor is-open tb-tip-at"><span class="erf-tooltip erf-tooltip--below">docs/CHANGELOG.md</span></span>
+  <div class="tb-panel"></div>
+</div>
+<figcaption><strong>The full path, on hover or focus</strong> – CHANGELOG.md holds focus, and its path shows in an <code>.erf-tooltip</code> (the <a href="../tooltip/index.html">Tooltip</a> card). The tab points at it with <code>aria-describedby</code>, so a screen reader reads the path after the name. No <code>title</code>.</figcaption>
 </figure>
 
 <figure class="ds-frame">
@@ -163,7 +181,7 @@
     <span class="erf-tab" aria-selected="true"><svg class="erf-tab__icon" data-icon="file-text" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg><span class="erf-tab__label">README.md</span><span class="erf-tab__close"><svg data-icon="x" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span></span>
     <span class="erf-tab"><svg class="erf-tab__icon" data-icon="image" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg><span class="erf-tab__label">diagram.png</span><span class="erf-tab__close"><svg data-icon="x" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span></span>
   </div>
-  <div class="ds-panel"></div>
+  <div class="tb-panel"></div>
 </div>
 <figcaption><strong>Pinned, no close</strong> – the Home tab: a fixed square, an icon, <code>aria-label="Home"</code>, and no close button. It does not grow or shrink with the others.</figcaption>
 </figure>
@@ -181,8 +199,32 @@
     <span class="erf-tab"><svg class="erf-tab__icon" data-icon="file-code" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M10 12.5 8 15l2 2.5"/><path d="m14 12.5 2 2.5-2 2.5"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/></svg><span class="erf-tab__label">index.html</span><span class="erf-tab__close"><svg data-icon="x" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span></span>
     <span class="erf-tab"><svg class="erf-tab__icon" data-icon="file-text" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg><span class="erf-tab__label">draft.md</span><span class="erf-tab__deleted">(deleted)</span><span class="erf-tab__close"><svg data-icon="x" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span></span>
   </div>
-  <div class="ds-panel"></div>
+  <div class="tb-panel"></div>
 </div>
+
+<h2 id="contrast">Contrast</h2>
+<p class="ds-muted">Every text colour a tab takes, on every surface it sits on. Text needs 4.5:1; the underline, the
+glyphs and the ring are non-text and need 3:1. A tab in an unfocused group takes <code>--color-text-tertiary</code>, not
+<code>--color-text-secondary</code>: secondary measures under 4.5:1 on the strip.</p>
+<table>
+  <thead><tr><th>Tab · state</th><th>Pair</th><th>Ratio</th></tr></thead>
+  <tbody>
+    <tr><td>focused group · inactive</td><td><code>--color-text-primary</code> on <code>--color-bg-secondary</code></td><td data-contrast="--color-text-primary on --color-bg-secondary" data-min="4.5" data-result="pass">8.54:1 · pass</td></tr>
+    <tr><td>focused group · selected</td><td><code>--color-text-emphasis</code> on <code>--color-bg-secondary</code></td><td data-contrast="--color-text-emphasis on --color-bg-secondary" data-min="4.5" data-result="pass">13.72:1 · pass</td></tr>
+    <tr><td>focused group · hover</td><td><code>--color-text-primary</code> on <code>--color-bg-hover-solid</code></td><td data-contrast="--color-text-primary on --color-bg-hover-solid" data-min="4.5" data-result="pass">8.64:1 · pass</td></tr>
+    <tr><td>unfocused group · inactive</td><td><code>--color-text-tertiary</code> on <code>--color-bg-tertiary</code></td><td data-contrast="--color-text-tertiary on --color-bg-tertiary" data-min="4.5" data-result="pass">7.06:1 · pass</td></tr>
+    <tr><td>unfocused group · selected</td><td><code>--color-text-primary</code> on <code>--color-bg-tertiary</code></td><td data-contrast="--color-text-primary on --color-bg-tertiary" data-min="4.5" data-result="pass">9.53:1 · pass</td></tr>
+    <tr><td>unfocused group · hover</td><td><code>--color-text-tertiary</code> on <code>--color-bg-hover-solid</code></td><td data-contrast="--color-text-tertiary on --color-bg-hover-solid" data-min="4.5" data-result="pass">6.39:1 · pass</td></tr>
+    <tr><td>“(deleted)” · focused group</td><td><code>--color-warning</code> on <code>--color-bg-secondary</code></td><td data-contrast="--color-warning on --color-bg-secondary" data-min="4.5" data-result="pass">5.94:1 · pass</td></tr>
+    <tr><td>“(deleted)” · unfocused group</td><td><code>--color-warning</code> on <code>--color-bg-tertiary</code></td><td data-contrast="--color-warning on --color-bg-tertiary" data-min="4.5" data-result="pass">6.63:1 · pass</td></tr>
+    <tr><td>underline · focused group (3:1)</td><td><code>--color-accent-secondary</code> on <code>--color-bg-secondary</code></td><td data-contrast="--color-accent-secondary on --color-bg-secondary" data-min="3" data-result="pass">10.35:1 · pass</td></tr>
+    <tr><td>underline · unfocused group (3:1)</td><td><code>--color-accent-secondary</code> on <code>--color-bg-tertiary</code></td><td data-contrast="--color-accent-secondary on --color-bg-tertiary" data-min="3" data-result="pass">11.55:1 · pass</td></tr>
+    <tr><td>icon and close glyph · strip (3:1)</td><td><code>--color-text-secondary</code> on <code>--color-bg-tertiary</code></td><td data-contrast="--color-text-secondary on --color-bg-tertiary" data-min="3" data-result="pass">4.15:1 · pass</td></tr>
+    <tr><td>icon and close glyph · panel (3:1)</td><td><code>--color-text-secondary</code> on <code>--color-bg-secondary</code></td><td data-contrast="--color-text-secondary on --color-bg-secondary" data-min="3" data-result="pass">3.72:1 · pass</td></tr>
+    <tr><td>icon and close glyph · hover (3:1)</td><td><code>--color-text-secondary</code> on <code>--color-bg-hover-solid</code></td><td data-contrast="--color-text-secondary on --color-bg-hover-solid" data-min="3" data-result="pass">3.76:1 · pass</td></tr>
+    <tr><td>focus ring · strip (3:1)</td><td><code>--color-border-focus</code> on <code>--color-bg-tertiary</code></td><td data-contrast="--color-border-focus on --color-bg-tertiary" data-min="3" data-result="pass">6.95:1 · pass</td></tr>
+  </tbody>
+</table>
 
 <h2 id="layering">The underline and the stacking order</h2>
 <p class="ds-muted">Today the active underline is an <code>::after</code> with <code>z-index: 100</code> in
@@ -195,6 +237,12 @@ number instead of choosing a rung: a positioned <code>::after</code> already pai
 <p class="ds-muted">The strip is <code>role="tablist"</code>; each tab is <code>role="tab"</code> with <code>aria-selected</code> and
 <code>aria-controls</code> its panel; dockview owns those attributes today. One tab stop for the whole strip (roving
 <code>tabindex</code>). Activation is automatic – the panels are already mounted, so moving is cheap.</p>
+<p class="ds-muted"><strong>Names, said once.</strong> A tab is named with <code>aria-labelledby</code>: its label, then its
+state span – “unsaved changes” (visually hidden, beside the dot) or the visible “(deleted)”. So a listener hears
+“README.md unsaved changes, tab, 2 of 4”. The full path is its description (<code>aria-describedby</code>, the tooltip),
+never <code>title</code>. The close button is not part of the tab for assistive technology: a <code>role="tab"</code>
+cannot hold another control, so the close is <code>aria-hidden</code> and pointer-only, and <kbd>Delete</kbd> and the tab
+menu's Close are the stated route.</p>
 <table class="ds-keys">
   <thead><tr><th>Key</th><th>Result</th><th>Focus ends on</th><th>Held by</th></tr></thead>
   <tbody>
@@ -202,10 +250,10 @@ number instead of choosing a rung: a positioned <code>::after</code> already pai
     <tr><td><kbd>←</kbd> <kbd>→</kbd></td><td>Previous or next tab, and show it. Wraps at both ends.</td><td>That tab.</td><td>No app test</td></tr>
     <tr><td><kbd>Home</kbd> <kbd>End</kbd></td><td>First and last tab (Home is the pinned tab when there is one).</td><td>That tab.</td><td>No app test</td></tr>
     <tr><td><kbd>Delete</kbd></td><td>Close the focused tab. A dirty tab asks first. A pinned tab ignores it.</td><td>The tab that takes its place – the next one, else the previous.</td><td>No app test</td></tr>
-    <tr><td><kbd>Shift</kbd>+<kbd>F10</kbd>, <kbd>Menu</kbd>, right-click</td><td>The tab menu: Close, Close others, Close all (the <a href="../menu/index.html">Menu</a> card).</td><td>The first menu item; <kbd>Escape</kbd> returns to the tab.</td><td><code>EditorTab.test.tsx</code> – right-click opens it, it lists Close, Close Others, Close All</td></tr>
+    <tr><td><kbd>Shift</kbd>+<kbd>F10</kbd>, <kbd>Menu</kbd>, right-click</td><td>The tab menu: Close, Close others, Close all (the <a href="../menu/index.html">Menu</a> card).</td><td>The first menu item; <kbd>Esc</kbd> returns to the tab.</td><td><code>EditorTab.test.tsx</code> – right-click opens it, it lists Close, Close Others, Close All</td></tr>
     <tr><td>Click the close button</td><td>Closes; a dirty tab asks first.</td><td>As <kbd>Delete</kbd>.</td><td><code>EditorTab.test.tsx</code> – close on click, confirmation when dirty</td></tr>
     <tr><td>Middle click</td><td>Closes, the same as the close button.</td><td>As <kbd>Delete</kbd>.</td><td><code>EditorTab.test.tsx</code> – should close on middle mouse button click</td></tr>
-    <tr><td>Screen reader</td><td>Name: the file name, then “modified” or “deleted” when true. The close button is “Close &lt;file name&gt;”.</td><td>–</td><td><code>EditorTab.test.tsx</code> – close button aria-label, dirty indicator</td></tr>
+    <tr><td>Screen reader</td><td>Name: the label, then “unsaved changes” or “(deleted)” when true (<code>aria-labelledby</code>). Description: the full path (<code>aria-describedby</code>). The close button is hidden; <code>aria-keyshortcuts="Delete"</code> on the tab says how to close it.</td><td>–</td><td>No app test for this model. <code>EditorTab.test.tsx</code> checks today's shape – a close button named “Close &lt;file name&gt;” and a dirty indicator</td></tr>
   </tbody>
 </table>
 
@@ -213,13 +261,18 @@ number instead of choosing a rung: a positioned <code>::after</code> already pai
 <pre class="ds-code"><code>&lt;div class="erf-tablist erf-tablist--active-group" role="tablist" aria-label="Editor"&gt;
   &lt;div class="erf-tab erf-tab--pinned" role="tab" aria-selected="false" aria-label="Home" tabindex="-1"&gt;…&lt;/div&gt;
   &lt;div class="erf-tab" role="tab" aria-selected="true" aria-controls="p-readme" tabindex="0"
-       title="docs/README.md"&gt;
+       aria-labelledby="t-readme-label t-readme-state" aria-describedby="t-readme-path"
+       aria-keyshortcuts="Delete"&gt;
     &lt;svg class="erf-tab__icon" aria-hidden="true"&gt;…&lt;/svg&gt;
-    &lt;span class="erf-tab__dirty"&gt;&lt;span class="erf-visually-hidden"&gt;Unsaved changes&lt;/span&gt;&lt;/span&gt;
-    &lt;span class="erf-tab__label"&gt;README.md&lt;/span&gt;
-    &lt;button class="erf-tab__close" tabindex="-1" aria-label="Close README.md"&gt;…&lt;/button&gt;
+    &lt;span class="erf-tab__dirty"&gt;&lt;/span&gt;
+    &lt;span class="erf-visually-hidden" id="t-readme-state"&gt;unsaved changes&lt;/span&gt;
+    &lt;span class="erf-tab__label" id="t-readme-label"&gt;README.md&lt;/span&gt;
+    &lt;span class="erf-tab__close" aria-hidden="true"&gt;…&lt;/span&gt;  &lt;!-- pointer only --&gt;
   &lt;/div&gt;
-&lt;/div&gt;</code></pre>
+&lt;/div&gt;
+&lt;div class="erf-tooltip" role="tooltip" id="t-readme-path"&gt;docs/README.md&lt;/div&gt;
+&lt;!-- A deleted tab: the visible marker is the state span.
+     &lt;span class="erf-tab__deleted" id="t-draft-state"&gt;(deleted)&lt;/span&gt; --&gt;</code></pre>
 
 <h2 id="consolidation">What this replaces</h2>
 <table>
@@ -232,13 +285,25 @@ number instead of choosing a rung: a positioned <code>::after</code> already pai
   </tbody>
 </table>
 
-<h2 id="open-defects">Open defects this card names</h2>
+<section id="defects">
+<h2>Defects this card names</h2>
 <ul class="ds-muted">
-  <li>The tab strip has no arrow-key, <kbd>Home</kbd>/<kbd>End</kbd> or <kbd>Delete</kbd> handling and no test for any of it.</li>
-  <li>The close button is shown only on hover or when dirty – never for keyboard focus and never on the selected tab.</li>
-  <li>The active underline's <code>z-index: 100</code> ties with <code>--z-dropdown</code> (<code>AppDockLayout.css</code>).</li>
-  <li>Three copies of one tab with drift between them, listed above.</li>
+  <li><strong>No keyboard in the strip.</strong> No arrow-key, <kbd>Home</kbd>/<kbd>End</kbd> or <kbd>Delete</kbd> handling, no
+  roving <code>tabindex</code>, and no test for any of it.</li>
+  <li><strong>A control inside a tab.</strong> <code>EditorTab.tsx</code> puts a <code>&lt;button&gt;</code> named “Close &lt;file name&gt;”
+  inside the tab, with <code>title="Close"</code> as well – a nested interactive control that assistive technology may
+  flatten or skip.</li>
+  <li><strong>The path lives in <code>title</code>.</strong> The tab's full path is its <code>title</code>, which the keyboard never
+  shows and a screen reader may read as the name.</li>
+  <li><strong>The dirty dot names nothing.</strong> It is an empty <code>&lt;span&gt;</code> with <code>aria-label="Unsaved changes"</code>
+  and no role, so many screen readers skip it.</li>
+  <li><strong>The close button hides from the keyboard.</strong> It shows only on hover or when dirty – never for keyboard
+  focus and never on the selected tab.</li>
+  <li><strong>A stacking tie.</strong> The active underline's <code>z-index: 100</code> ties with <code>--z-dropdown</code>
+  (<code>AppDockLayout.css</code>).</li>
+  <li><strong>Three copies of one tab</strong>, with the drift listed above.</li>
 </ul>
+</section>
 
 <section id="exceptions">
 <h2>Exceptions</h2>

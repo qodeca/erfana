@@ -4,7 +4,7 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
-<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Erfana – comments v2, the comments drawer</title>
@@ -44,10 +44,13 @@
               inset-inline-end: calc(var(--space-4) + var(--btn-height-sm) + var(--space-4)); }
 
   /* The help line under the checkbox (C-06). */
-  .c2d-help { margin: var(--space-3) 0 0; font-size: var(--text-sm); color: var(--color-text-tertiary); }
+  .c2d-help { /* mockup: app scale – the drawer help line */ margin: var(--space-3) 0 0; font-size: var(--text-sm); color: var(--color-text-tertiary); }
+
+  /* A documentation note under a figure – not the drawer's help line. */
+  .c2d-note { margin: var(--space-3) 0 0; font-size: var(--ds-text-small); color: var(--color-text-tertiary); }
 
   /* The words of a selection comment whose words changed (C-06). */
-  .c2d-words { position: relative; pointer-events: none; grid-column: 1; margin: 0; font-size: var(--text-sm);
+  .c2d-words { /* mockup: app scale – drawer text */ position: relative; pointer-events: none; grid-column: 1; margin: 0; font-size: var(--text-sm);
                color: var(--color-text-bright); overflow-wrap: anywhere; }
 
   /* Group headings are h3s: keep ds.css heading rules off them. */
@@ -58,9 +61,9 @@
   .c2d-removed { list-style: none; margin: var(--space-6) 0 0; padding: 0; }
   .c2d-removed > li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-1) var(--space-4);
                       padding: var(--space-4) 0; border-block-start: var(--border-width) solid var(--color-border-subtle); }
-  .c2d-removed__label { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-text-bright); overflow-wrap: anywhere; }
+  .c2d-removed__label { /* mockup: app scale – drawer text */ font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-text-bright); overflow-wrap: anywhere; }
   .c2d-removed__text { grid-column: 1; margin: 0; overflow-wrap: anywhere; }
-  .c2d-removed__meta { grid-column: 1; margin: 0; font-size: var(--text-sm); color: var(--color-text-tertiary); }
+  .c2d-removed__meta { /* mockup: app scale – drawer text */ grid-column: 1; margin: 0; font-size: var(--text-sm); color: var(--color-text-tertiary); }
   .c2d-removed .erf-comment-action { grid-column: 2; grid-row: 1; align-self: start; }
 
   /* C-24: Mark all as seen is a second header row, so the sort label is never cut. */
@@ -71,7 +74,7 @@
 
   .c2-grid > figure > figcaption em { color: var(--color-text-secondary); font-style: normal; }
   .c2d-later { color: var(--color-warning); }
-  .c2d-names td:first-child, .c2d-names td:nth-child(2) { font-family: var(--font-mono); font-size: var(--text-sm); }
+  .c2d-names td:first-child, .c2d-names td:nth-child(2) { font-family: var(--font-mono); font-size: var(--ds-text-small); }
 </style>
 </head>
 <body>
@@ -378,7 +381,7 @@
         <tr><td>index.html, line 57</td><td>“Damaged comment” / index.html, line 57 · can't be edited</td></tr>
       </tbody>
     </table>
-    <p class="c2d-help">Tags (Changed, Not found) are read after the description. The visible mono selector stays in HTML; Markdown shows the C-03 noun.</p>
+    <p class="c2d-note">Tags (Changed, Not found) are read after the description. The visible mono selector stays in HTML; Markdown shows the C-03 noun.</p>
   </figure>
 </div>
 

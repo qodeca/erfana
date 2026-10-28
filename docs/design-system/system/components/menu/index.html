@@ -1,47 +1,49 @@
-<!-- @card group="Components" name="Menu" subtitle="A role is a promise – arrows, typeahead, and the precedence rule for a disabled danger item" status="decided" reviewed="2026-08-31" answers="Add a context menu" -->
+<!-- @card group="Components" name="Menu" subtitle="A role is a promise – arrows, typeahead, and the precedence rule for a disabled danger item" status="decided" reviewed="2026-10-28" answers="Add a context menu" -->
 <!-- SPDX-License-Identifier: GPL-3.0-only -->
 <!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
-<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Menu – Erfana design system</title>
 <link rel="stylesheet" href="../../../tokens.css">
 <link rel="stylesheet" href="../../../ds.css">
+<link rel="stylesheet" href="../row/row.css">
 <link rel="stylesheet" href="./menu.css">
 <style>
   /* A frame's stand-in for the panel the menu opens over. */
-  .ds-frame-surface { position: relative; min-height: 320px; padding: var(--space-6);
+  .mn-frame-surface { position: relative; min-height: 420px; padding: var(--space-4) 0;
                       background: var(--color-bg-secondary);
                       border: var(--border-width) solid var(--color-border-default); }
-  .ds-frame-surface p { margin: 0; font-size: var(--text-sm); color: var(--color-text-tertiary); }
-  .ds-frame-menu { min-width: 220px; }
-  .ds-popover-menu { min-width: 240px; margin: 0; inset: auto; position-area: bottom span-right; }
-  .ds-popover-menu::backdrop { background: transparent; }
-  .ds-trigger { height: var(--btn-height-md); padding: 0 var(--space-8); background: var(--color-btn-secondary-bg);
+  .mn-frame-menu { min-width: 220px; }
+  /* The menu opens under the row it acts on: the frame draws it below the third
+     row (notes.md), over the rows that follow, as the app's menu floats. */
+  .mn-frame-surface > .mn-frame-menu { position: absolute; inset-block-start: calc(var(--space-4) + var(--space-14) * 3);
+                                       inset-inline-start: var(--space-20); }
+  .mn-popover-menu { min-width: 240px; margin: 0; inset: auto; position-area: bottom span-right; }
+  .mn-popover-menu::backdrop { background: transparent; }
+  .mn-trigger { height: var(--btn-height-md); padding: 0 var(--space-8); background: var(--color-btn-secondary-bg);
                 border: var(--border-width) solid var(--color-border-subtle); color: var(--color-text-primary);
                 font: inherit; cursor: pointer; anchor-name: --menu-trigger; }
-  .ds-popover-menu { position-anchor: --menu-trigger; }
-  .ds-trigger:hover { background: var(--color-btn-secondary-hover); }
-  .ds-trigger:focus-visible { outline: var(--border-width-thick) solid var(--color-border-focus); outline-offset: var(--space-1); }
+  .mn-popover-menu { position-anchor: --menu-trigger; }
+  .mn-trigger:hover { background: var(--color-btn-secondary-hover); }
+  .mn-trigger:focus-visible { outline: var(--border-width-thick) solid var(--color-border-focus); outline-offset: var(--space-1); }
   /* A frame's stand-in for :focus-visible, mirroring menu.css – inset, because a
      long menu scrolls and an outward ring on the first or last item is clipped. */
   .erf-menu-item.is-focus { outline: var(--border-width-thick) solid var(--color-border-focus);
                             outline-offset: calc(var(--space-1) * -1); }
-  .ds-code { max-width: var(--ds-table-max); padding: var(--space-8); overflow-x: auto;
-             background: var(--color-bg-tertiary); border: var(--border-width) solid var(--color-border-default); }
 </style>
 </head>
 <body>
 <nav class="ds-crumbs" aria-label="Breadcrumb"><a href="../../../index.html">Erfana design system</a> <span aria-hidden="true">/</span> <a href="../../../index.html#components">Components</a> <span aria-hidden="true">/</span> <span aria-current="page">Menu</span></nav>
 <main>
 <h1>Menu</h1>
-<p class="ds-meta"><span class="ds-status" data-status="decided">decided</span> reviewed 2026-08-31</p>
+<p class="ds-meta"><span class="ds-status" data-status="decided">decided</span> reviewed 2026-10-28</p>
 <p class="ds-lede" id="decision">
   A menu that declares <code>role="menu"</code> keeps the whole keyboard contract – arrows, Home, End,
-  Enter, Escape and a letter to jump – and a destructive item looks the same under the pointer and under the
+  Enter, Esc and a letter to jump – and a destructive item looks the same under the pointer and under the
   keyboard. Shown as a table, a frame-by-frame pass, and every visual state.
 </p>
 
@@ -50,7 +52,7 @@
   <strong>Before #90</strong>, Erfana's context menu declared <code>role="menu"</code> and
   <code>role="menuitem"</code> and implemented none of the keyboard behaviour those roles commit to – no
   <code>tabIndex</code>, no arrow keys, no focus moved on open, no focus returned on close. Only
-  <kbd>Escape</kbd> was bound.
+  <kbd>Esc</kbd> was bound.
   <br><br>
   That was <strong>worse than declaring nothing</strong>. A screen reader switches to application mode on
   a <code>menu</code> and hands the arrow keys straight to the widget, so the user lost their normal
@@ -73,7 +75,7 @@ shipping menu to this table: <code>ContextMenu.keyboard.test.tsx</code> and <cod
     <tr><td><kbd>↑</kbd> <kbd>↓</kbd></td><td>Move between items, skipping separators. Wraps at both ends.</td><td>The previous or next item.</td></tr>
     <tr><td><kbd>Home</kbd> <kbd>End</kbd></td><td>First and last item.</td><td>That item.</td></tr>
     <tr><td><kbd>Enter</kbd> <kbd>Space</kbd></td><td>Activate. A disabled item does nothing and the menu stays open.</td><td>The trigger, or stays put on a disabled item.</td></tr>
-    <tr><td><kbd>Escape</kbd></td><td>Close.</td><td><strong>Whatever opened it.</strong></td></tr>
+    <tr><td><kbd>Esc</kbd></td><td>Close.</td><td><strong>Whatever opened it.</strong></td></tr>
     <tr><td><kbd>a</kbd>–<kbd>z</kbd></td><td>Jump to the next item starting with that letter.</td><td>That item.</td></tr>
     <tr><td><kbd>Tab</kbd></td><td>Closes the menu. A menu is modal to the keyboard while open.</td><td>The trigger.</td></tr>
   </tbody>
@@ -82,14 +84,25 @@ shipping menu to this table: <code>ContextMenu.keyboard.test.tsx</code> and <cod
 <h3 id="sequence">One pass through it, frame by frame</h3>
 <div class="ds-frames">
 <figure class="ds-frame">
-<div class="ds-frame-surface is-focus" aria-hidden="true">
-<p>A file row, focused.</p>
+<div class="mn-frame-surface" aria-hidden="true">
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">README.md</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"><svg data-icon="chevron-down" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="m6 9 6 6 6-6"/></svg></span><span class="erf-row__name">docs</span></div>
+  <div class="erf-row erf-row--selected erf-row--focus" style="padding-left: calc(var(--space-4) + 1 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">notes.md</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 1 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">plan.md</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">package.json</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">tsconfig.json</span></div>
 </div>
-<figcaption><span class="ds-frame__step">1</span><strong>Focus is on the trigger</strong> – A tree row (here the panel) holds focus. Nothing is open.</figcaption>
+<figcaption><span class="ds-frame__step">1</span><strong>Focus is on the trigger</strong> – The file row <code>notes.md</code> in the project tree holds focus, ring and all. Nothing is open.</figcaption>
 </figure>
 <figure class="ds-frame">
-<div class="ds-frame-surface" aria-hidden="true">
-<div class="erf-menu ds-frame-menu">
+<div class="mn-frame-surface" aria-hidden="true">
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">README.md</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"><svg data-icon="chevron-down" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="m6 9 6 6 6-6"/></svg></span><span class="erf-row__name">docs</span></div>
+  <div class="erf-row erf-row--selected" style="padding-left: calc(var(--space-4) + 1 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">notes.md</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 1 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">plan.md</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">package.json</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">tsconfig.json</span></div>
+<div class="erf-menu mn-frame-menu">
   <div class="erf-menu-item erf-menu-item--active"><span class="erf-menu-icon">↗</span><span class="erf-menu-label">Open</span><span class="erf-menu-shortcut">Enter</span></div>
   <div class="erf-menu-item"><span class="erf-menu-icon">⇥</span><span class="erf-menu-label">Open to the side</span></div>
   <div class="erf-menu-separator"></div>
@@ -102,11 +115,17 @@ shipping menu to this table: <code>ContextMenu.keyboard.test.tsx</code> and <cod
   <div class="erf-menu-item erf-menu-item--danger" aria-disabled="true"><span class="erf-menu-icon">⌫</span><span class="erf-menu-label">Delete permanently</span></div>
 </div>
 </div>
-<figcaption><span class="ds-frame__step">2</span><strong><kbd>Shift</kbd>+<kbd>F10</kbd> or the <kbd>Menu</kbd> key</strong> – The menu opens at the trigger. Focus moves to the first item, <em>Open</em>, which takes <code>tabindex="0"</code>.</figcaption>
+<figcaption><span class="ds-frame__step">2</span><strong><kbd>Shift</kbd>+<kbd>F10</kbd> or the <kbd>Menu</kbd> key</strong> – The menu opens under <code>notes.md</code>, which stays selected without a ring. Focus moves to the first item, <em>Open</em>, which takes <code>tabindex="0"</code>.</figcaption>
 </figure>
 <figure class="ds-frame">
-<div class="ds-frame-surface" aria-hidden="true">
-<div class="erf-menu ds-frame-menu">
+<div class="mn-frame-surface" aria-hidden="true">
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">README.md</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"><svg data-icon="chevron-down" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="m6 9 6 6 6-6"/></svg></span><span class="erf-row__name">docs</span></div>
+  <div class="erf-row erf-row--selected" style="padding-left: calc(var(--space-4) + 1 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">notes.md</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 1 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">plan.md</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">package.json</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">tsconfig.json</span></div>
+<div class="erf-menu mn-frame-menu">
   <div class="erf-menu-item"><span class="erf-menu-icon">↗</span><span class="erf-menu-label">Open</span><span class="erf-menu-shortcut">Enter</span></div>
   <div class="erf-menu-item erf-menu-item--active"><span class="erf-menu-icon">⇥</span><span class="erf-menu-label">Open to the side</span></div>
   <div class="erf-menu-separator"></div>
@@ -122,8 +141,14 @@ shipping menu to this table: <code>ContextMenu.keyboard.test.tsx</code> and <cod
 <figcaption><span class="ds-frame__step">3</span><strong><kbd>↓</kbd></strong> – Focus moves to the next item. The separator is skipped.</figcaption>
 </figure>
 <figure class="ds-frame">
-<div class="ds-frame-surface" aria-hidden="true">
-<div class="erf-menu ds-frame-menu">
+<div class="mn-frame-surface" aria-hidden="true">
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">README.md</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"><svg data-icon="chevron-down" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="m6 9 6 6 6-6"/></svg></span><span class="erf-row__name">docs</span></div>
+  <div class="erf-row erf-row--selected" style="padding-left: calc(var(--space-4) + 1 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">notes.md</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 1 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">plan.md</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">package.json</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">tsconfig.json</span></div>
+<div class="erf-menu mn-frame-menu">
   <div class="erf-menu-item"><span class="erf-menu-icon">↗</span><span class="erf-menu-label">Open</span><span class="erf-menu-shortcut">Enter</span></div>
   <div class="erf-menu-item"><span class="erf-menu-icon">⇥</span><span class="erf-menu-label">Open to the side</span></div>
   <div class="erf-menu-separator"></div>
@@ -139,8 +164,14 @@ shipping menu to this table: <code>ContextMenu.keyboard.test.tsx</code> and <cod
 <figcaption><span class="ds-frame__step">4</span><strong><kbd>↓</kbd> <kbd>↓</kbd> <kbd>↓</kbd></strong> – A disabled item is still reached – <code>aria-disabled</code>, not <code>disabled</code> – so the capability stays discoverable.</figcaption>
 </figure>
 <figure class="ds-frame">
-<div class="ds-frame-surface" aria-hidden="true">
-<div class="erf-menu ds-frame-menu">
+<div class="mn-frame-surface" aria-hidden="true">
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">README.md</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"><svg data-icon="chevron-down" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="m6 9 6 6 6-6"/></svg></span><span class="erf-row__name">docs</span></div>
+  <div class="erf-row erf-row--selected" style="padding-left: calc(var(--space-4) + 1 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">notes.md</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 1 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">plan.md</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">package.json</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">tsconfig.json</span></div>
+<div class="erf-menu mn-frame-menu">
   <div class="erf-menu-item"><span class="erf-menu-icon">↗</span><span class="erf-menu-label">Open</span><span class="erf-menu-shortcut">Enter</span></div>
   <div class="erf-menu-item"><span class="erf-menu-icon">⇥</span><span class="erf-menu-label">Open to the side</span></div>
   <div class="erf-menu-separator"></div>
@@ -156,21 +187,26 @@ shipping menu to this table: <code>ContextMenu.keyboard.test.tsx</code> and <cod
 <figcaption><span class="ds-frame__step">5</span><strong>type <kbd>d</kbd></strong> – Typeahead jumps to the next item starting with “d”.</figcaption>
 </figure>
 <figure class="ds-frame">
-<div class="ds-frame-surface is-focus" aria-hidden="true">
-<p>Back on the file row.</p>
+<div class="mn-frame-surface" aria-hidden="true">
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">README.md</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"><svg data-icon="chevron-down" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="m6 9 6 6 6-6"/></svg></span><span class="erf-row__name">docs</span></div>
+  <div class="erf-row erf-row--selected erf-row--focus" style="padding-left: calc(var(--space-4) + 1 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">notes.md</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 1 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">plan.md</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">package.json</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">tsconfig.json</span></div>
 </div>
-<figcaption><span class="ds-frame__step">6</span><strong><kbd>Escape</kbd></strong> – The menu closes and focus returns to the trigger, remembered when the menu opened.</figcaption>
+<figcaption><span class="ds-frame__step">6</span><strong><kbd>Esc</kbd></strong> – The menu closes and focus returns to <code>notes.md</code>, the row remembered when the menu opened.</figcaption>
 </figure>
 </div>
 
 <h3 id="try-it">Open and close it for real</h3>
-<p class="ds-muted">This button opens the menu as a browser <code>popover</code>, with no script. <kbd>Escape</kbd> or a
+<p class="ds-muted">This button opens the menu as a browser <code>popover</code>, with no script. <kbd>Esc</kbd> or a
 click outside closes it and the browser returns focus to the button – the open and close half of the contract.
 The arrow keys and typeahead are the app's code; the frames above show them. The demo practises what the card
 preaches: with no arrow keys behind it, it declares <strong>no</strong> <code>menu</code> role and no
 <code>aria-haspopup</code> – it is a labelled group of text.</p>
-<p><button class="ds-trigger" popovertarget="menu-popover">Open the file menu</button></p>
-<div popover id="menu-popover" class="erf-menu ds-popover-menu" role="group" aria-label="File actions (demo)">
+<p><button class="mn-trigger" popovertarget="menu-popover">Open the file menu</button></p>
+<div popover id="menu-popover" class="erf-menu mn-popover-menu" role="group" aria-label="File actions (demo)">
   <div class="erf-menu-item"><span class="erf-menu-icon" aria-hidden="true">↗</span><span class="erf-menu-label">Open</span><span class="erf-menu-shortcut" aria-hidden="true">Enter</span></div>
   <div class="erf-menu-item"><span class="erf-menu-icon" aria-hidden="true">⇥</span><span class="erf-menu-label">Open to the side</span></div>
   <div class="erf-menu-separator"></div>
@@ -224,8 +260,8 @@ app converts one to the other in <code>ariaKeyShortcuts.ts</code>.</p>
 
 <div class="ds-note">
   <strong>Focus must come back.</strong> Closing a menu without restoring focus drops the user at
-  the top of the document – the same defect the Permission band card fixes on its Allow button. The
-  trigger is remembered when the menu opens, not looked up when it closes.
+  the top of the document – the same rule the <a href="../permission-band/index.html#keyboard">Permission band</a>
+  card applies when its confirm step closes, returning focus to the chip. The trigger is remembered when the menu opens, not looked up when it closes.
 </div>
 
 <div class="ds-note">
@@ -328,12 +364,12 @@ moves it to <code>--color-text-tertiary</code>.</p>
   <thead><tr><th>Surface</th><th><code>--color-text-tertiary</code> (decided)</th><th><code>--color-text-secondary</code> (ships today)</th></tr></thead>
   <tbody>
     <tr><td>The menu, <code>--color-bg-tertiary</code></td><td data-contrast="--color-text-tertiary on --color-bg-tertiary" data-min="4.5" data-result="pass">7.06:1 · pass</td><td class="ds-ratio"><span data-claim="menu-shortcut-on-tertiary" title="--color-text-secondary (the shortcut hint) on --color-bg-tertiary">4.15</span>:1</td></tr>
-    <tr><td>A highlighted item, <code>--color-bg-hover-solid</code></td><td data-contrast="--color-text-tertiary on --color-bg-hover-solid" data-min="4.5" data-result="pass">6.40:1 · pass</td><td class="ds-ratio"><span data-claim="menu-shortcut-on-hover-solid" title="--color-text-secondary (the shortcut hint) on --color-bg-hover-solid, a highlighted item">3.76</span>:1</td></tr>
-    <tr><td>A highlighted destructive item, <code>--color-bg-danger-hover</code></td><td data-contrast="--color-text-tertiary on --color-bg-danger-hover" data-min="4.5" data-result="pass">5.95:1 · pass</td><td class="ds-ratio"><span data-claim="menu-shortcut-on-danger-hover" title="--color-text-secondary (the shortcut hint) on --color-bg-danger-hover, a highlighted destructive item">3.50</span>:1</td></tr>
+    <tr><td>A highlighted item, <code>--color-bg-hover-solid</code></td><td data-contrast="--color-text-tertiary on --color-bg-hover-solid" data-min="4.5" data-result="pass">6.39:1 · pass</td><td class="ds-ratio"><span data-claim="menu-shortcut-on-hover-solid" title="--color-text-secondary (the shortcut hint) on --color-bg-hover-solid, a highlighted item">3.76</span>:1</td></tr>
+    <tr><td>A highlighted destructive item, <code>--color-bg-danger-hover</code></td><td data-contrast="--color-text-tertiary on --color-bg-danger-hover" data-min="4.5" data-result="pass">5.94:1 · pass</td><td class="ds-ratio"><span data-claim="menu-shortcut-on-danger-hover" title="--color-text-secondary (the shortcut hint) on --color-bg-danger-hover, a highlighted destructive item">3.49</span>:1</td></tr>
   </tbody>
 </table>
 <p class="ds-muted">And the labels themselves: the danger label <code>--color-error</code> measures
-<span data-contrast="--color-error on --color-bg-tertiary" data-min="4.5" data-result="pass">6.24:1 · pass</span> at rest and
+<span data-contrast="--color-error on --color-bg-tertiary" data-min="4.5" data-result="pass">6.23:1 · pass</span> at rest and
 <span data-contrast="--color-error on --color-bg-danger-hover" data-min="4.5" data-result="pass">5.25:1 · pass</span> on the danger fill; an ordinary
 label <code>--color-text-primary</code> measures <span data-contrast="--color-text-primary on --color-bg-hover-solid" data-min="4.5" data-result="pass">8.64:1 · pass</span>
 on the hover fill.</p>

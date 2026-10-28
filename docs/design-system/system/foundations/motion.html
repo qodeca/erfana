@@ -1,10 +1,10 @@
-<!-- @card group="Foundations" name="Motion" subtitle="Four durations, the missing easing scale, a proposed spinner, and when everything must stop" status="proposed" reviewed="2026-08-31" answers="Animate something; Respect reduced motion; Show that something is loading" -->
+<!-- @card group="Foundations" name="Motion" subtitle="The durations, the missing easing scale, a proposed spinner, and when everything must stop" status="proposed" reviewed="2026-08-31" answers="Animate something; Respect reduced motion; Show that something is loading" -->
 <!-- SPDX-License-Identifier: GPL-3.0-only -->
 <!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
-<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Motion – Erfana design system</title>
@@ -41,7 +41,7 @@
   .mo-curve .axis { stroke: var(--color-border-subtle); fill: none; }
   .mo-curve .curve { stroke: var(--color-accent-primary); fill: none; stroke-width: 2.5; }
   .mo-curve .curve--today { stroke: var(--color-brand-lime); }
-  .mo-curve figcaption { margin-top: var(--space-4); font-size: var(--text-sm); color: var(--color-text-tertiary); }
+  .mo-curve figcaption { margin-top: var(--space-4); font-size: var(--ds-text-small); color: var(--color-text-tertiary); }
   .mo-curve figcaption strong { color: var(--color-text-bright); font-weight: var(--font-medium); }
 
   /* 0.8s is the proposed --duration-spin, named here until the token exists. */

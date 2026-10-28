@@ -1,10 +1,10 @@
-<!-- @card group="Components" name="Form controls" subtitle="One input, one select, one checkbox – and an error that a screen reader can find" status="decided" reviewed="2026-08-31" answers="Add a text field or select; Show a field error; Describe a checkbox" -->
+<!-- @card group="Components" name="Form controls" subtitle="One input, one select, one checkbox – and an error that a screen reader can find" status="decided" reviewed="2026-10-28" answers="Add a text field or select; Show a field error; Describe a checkbox" -->
 <!-- SPDX-License-Identifier: GPL-3.0-only -->
 <!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
-<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Form controls – Erfana design system</title>
@@ -17,8 +17,8 @@
   .field { max-width: calc(var(--space-24) * 9); margin-bottom: var(--space-12); }
   .field__label { display: block; margin-bottom: var(--space-3);
                   font-size: var(--text-base); color: var(--color-text-primary); }
-  .field__hint { margin: var(--space-2) 0 0; font-size: var(--text-sm); color: var(--color-text-tertiary); }
-  .field__error { display: flex; gap: var(--space-3); align-items: flex-start;
+  .field__hint { /* mockup: app scale */ margin: var(--space-2) 0 0; font-size: var(--text-sm); color: var(--color-text-tertiary); }
+  .field__error { /* mockup: app scale */ display: flex; gap: var(--space-3); align-items: flex-start;
                   margin: var(--space-3) 0 0; font-size: var(--text-sm); color: var(--color-error); }
   .field__error svg { flex: 0 0 auto; inline-size: var(--icon-size-xs); block-size: var(--icon-size-xs);
                       margin-top: var(--space-1); }
@@ -101,11 +101,11 @@
      and a screen reader read the whole sentence as the checkbox's name. */
   .check-body { min-width: 0; padding-top: var(--space-1); }
   .check-text { font-size: var(--text-base); color: var(--color-text-primary); cursor: pointer; }
-  .check-desc { margin: var(--space-1) 0 0; font-size: var(--text-sm); color: var(--color-text-tertiary); }
+  .check-desc { /* mockup: app scale */ margin: var(--space-1) 0 0; font-size: var(--text-sm); color: var(--color-text-tertiary); }
 
   .panel { padding: var(--space-16); background: var(--color-bg-secondary); }
   .panel .ds-frame { background: var(--color-bg-secondary); }
-  .ds-frames--form .field { margin-bottom: 0; }
+  .fm-frames .field { margin-bottom: 0; }
   .size-box { width: calc(var(--space-24) * 2.5); background: var(--color-brand-violet-muted);
               border: var(--border-width) solid var(--color-accent-primary); }
 </style>
@@ -114,7 +114,7 @@
 <nav class="ds-crumbs" aria-label="Breadcrumb"><a href="../../../index.html">Erfana design system</a> <span aria-hidden="true">/</span> <a href="../../../index.html#components">Components</a> <span aria-hidden="true">/</span> <span aria-current="page">Form controls</span></nav>
 <main>
 <h1>Form controls</h1>
-<p class="ds-meta"><span class="ds-status" data-status="decided">decided</span> reviewed 2026-08-31</p>
+<p class="ds-meta"><span class="ds-status" data-status="decided">decided</span> reviewed 2026-10-28</p>
 <p class="ds-lede" id="decision">
   One text field, one select and one checkbox. The boundary is <code>--color-border-input</code>, hover brightens
   it, focus draws the one ring, and a field has exactly one name. An error is three things at once –
@@ -131,15 +131,15 @@
   <br><br>
   1.4.11 is met if <em>either</em> the fill or the boundary reaches 3:1. Neither did, on any of the
   three surfaces an input actually sits on. The fix is a new <code>--color-border-input</code>, now
-  <strong><span data-claim="contrast-input-border" title="--color-border-input against --color-bg-secondary">3.11</span>:1</strong> here – not a brighter fill, which
+  <strong><span data-claim="contrast-input-border" title="--color-border-input against --color-bg-secondary">3.10</span>:1</strong> here – not a brighter fill, which
   would have to clear 3:1 against all three surfaces and would end up reading as a button.
   <code>--color-border-default</code> and <code>--color-border-subtle</code> are unchanged; 1.4.11 does
   not govern decorative dividers. An unchecked checkbox is identified by its edge alone too, so it takes
   <code>--color-border-input</code> for the same reason (#96).
   <br><br>
-  Separately, and under a different rule: the placeholder was 2.69:1. Placeholders are text, so the bar
+  Separately, and under a different rule: the placeholder was <code>--color-gray-600</code>, <span data-contrast="--color-gray-600 on --color-bg-input">2.69:1</span>. Placeholders are text, so the bar
   is 1.4.3's 4.5:1, not 3:1 – it is now
-  <strong><span data-claim="contrast-placeholder" title="--color-text-placeholder on --color-bg-input">4.53</span>:1</strong>.
+  <strong><span data-claim="contrast-placeholder" title="--color-text-placeholder on --color-bg-input">4.52</span>:1</strong>.
 </div>
 
 <div class="ds-note">
@@ -207,28 +207,28 @@
 
 <h2 id="states">Every state</h2>
 <p class="ds-muted">Static pictures, one state each, forced with the <code>.is-hover</code> and
-<code>.is-focus</code> hooks. They are inert: tab through the live controls above instead.</p>
+<code>.is-focus</code> hooks. Each picture is inert and the captions stay readable: tab through the live controls above instead.</p>
 
-<div class="ds-frames ds-frames--form" inert>
-  <figure class="ds-frame"><div aria-hidden="true"><input class="input" type="text" placeholder="my-notes"></div>
-    <figcaption><strong>Resting</strong> – <code>--color-border-input</code>, <span data-contrast="--color-border-input on --color-bg-tertiary" data-min="3" data-result="pass">3.47:1 · pass</span> on this frame.</figcaption></figure>
-  <figure class="ds-frame"><div aria-hidden="true"><input class="input is-hover" type="text" placeholder="my-notes"></div>
+<div class="ds-frames fm-frames">
+  <figure class="ds-frame"><div inert aria-hidden="true"><input class="input" type="text" placeholder="my-notes"></div>
+    <figcaption><strong>Resting</strong> – <code>--color-border-input</code>, <span data-contrast="--color-border-input on --color-bg-tertiary" data-min="3" data-result="pass">3.46:1 · pass</span> on this frame.</figcaption></figure>
+  <figure class="ds-frame"><div inert aria-hidden="true"><input class="input is-hover" type="text" placeholder="my-notes"></div>
     <figcaption><strong>Hover</strong> – the edge brightens to <code>--color-gray-500</code>, <span data-contrast="--color-gray-500 on --color-bg-tertiary" data-min="3" data-result="pass">4.15:1 · pass</span>. Never darker than resting.</figcaption></figure>
-  <figure class="ds-frame"><div aria-hidden="true"><input class="input is-focus" type="text" value="my-notes"></div>
+  <figure class="ds-frame"><div inert aria-hidden="true"><input class="input is-focus" type="text" value="my-notes"></div>
     <figcaption><strong>Focus-visible</strong> – the one ring, offset <code>--space-1</code>.</figcaption></figure>
-  <figure class="ds-frame"><div aria-hidden="true"><input class="input" type="text" value="my notes/2" aria-invalid="true">
+  <figure class="ds-frame"><div inert aria-hidden="true"><input class="input" type="text" value="my notes/2" aria-invalid="true">
     <p class="field__error"><svg data-icon="circle-x" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg><span>Cannot contain a space.</span></p></div>
     <figcaption><strong>Invalid</strong> – red edge, icon and message. Hover does not repaint it grey.</figcaption></figure>
-  <figure class="ds-frame"><div aria-hidden="true"><input class="input is-focus" type="text" value="my notes/2" aria-invalid="true">
+  <figure class="ds-frame"><div inert aria-hidden="true"><input class="input is-focus" type="text" value="my notes/2" aria-invalid="true">
     <p class="field__error"><svg data-icon="circle-x" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg><span>Cannot contain a space.</span></p></div>
     <figcaption><strong>Invalid and focused</strong> – after submit: the ring outside, the red edge inside.</figcaption></figure>
-  <figure class="ds-frame"><div aria-hidden="true"><input class="input" type="text" value="my-notes" disabled></div>
+  <figure class="ds-frame"><div inert aria-hidden="true"><input class="input" type="text" value="my-notes" disabled></div>
     <figcaption><strong>Disabled</strong> – <code>--opacity-disabled</code>, no hover.</figcaption></figure>
-  <figure class="ds-frame"><div aria-hidden="true"><div class="check-row"><input class="check" type="checkbox"><span class="check-text">Unchecked</span></div>
+  <figure class="ds-frame"><div inert aria-hidden="true"><div class="check-row"><input class="check" type="checkbox"><span class="check-text">Unchecked</span></div>
     <div class="check-row"><input class="check is-hover" type="checkbox"><span class="check-text">Unchecked, hover</span></div>
     <div class="check-row"><input class="check" type="checkbox" checked><span class="check-text">Checked</span></div></div>
     <figcaption><strong>Checkbox</strong> – resting, hover, checked. Checked is a fill <em>and</em> a tick.</figcaption></figure>
-  <figure class="ds-frame"><div aria-hidden="true"><div class="check-row"><input class="check is-focus" type="checkbox"><span class="check-text">Focus</span></div>
+  <figure class="ds-frame"><div inert aria-hidden="true"><div class="check-row"><input class="check is-focus" type="checkbox"><span class="check-text">Focus</span></div>
     <div class="check-row"><input class="check is-focus" type="checkbox" checked><span class="check-text">Checked, focus</span></div>
     <div class="check-row"><input class="check" type="checkbox" checked disabled><span class="check-text">Checked, disabled</span></div></div>
     <figcaption><strong>Checkbox</strong> – focus, checked and focused, disabled. The ring sits inside the 24 × 24 target.</figcaption></figure>
@@ -290,7 +290,7 @@
 <div class="ds-note">
   <strong>Proposed addition, not yet part of this decided card: a multi-line field.</strong> HTML preview comments
   need a textarea – four lines to start, grows by dragging, a character counter beside the hint (glyph plus
-  colour from 3,600, an error past 4,000), and <kbd>Cmd</kbd>/<kbd>Ctrl</kbd>+<kbd>Enter</kbd> to save the
+  colour from 3,600, an error past 4,000), and <kbd>⌘↩</kbd> / <kbd>Ctrl+Enter</kbd> to save the
   focused field. It uses this card's border, ring and error contract unchanged. It is drawn in the proposed
   <a href="../../../../designs/comments/html-comments/window.html">Comment window</a> screen and joins this card when that one is
   promoted.

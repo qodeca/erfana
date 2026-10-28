@@ -18,6 +18,16 @@
   --ds-measure: 76ch;
   --ds-measure-wide: 82ch;
   --ds-table-max: 1100px;
+  /* Documentation text sizes. The app's chrome is small and dense (Typography
+     card), but these pages are read for minutes, so their own text never goes
+     below 13px and prose sits at 14px. A mockup that draws the app at real
+     scale keeps the app's sizes and says so with a mockup comment –
+     scripts/lib/design-static.mjs fails a 10px or 11px rule that does not. */
+  --ds-text-small: var(--text-base); /* 13px – the floor: labels, captions, code, meta */
+  --ds-text-body: var(--text-md);    /* 14px – prose: paragraphs, lists, notes, table cells */
+  /* The page title: one step above the scale's top (--text-2xl), so the steps
+     read h1 > h2 (--text-xl) > h3 (--text-lg) > lede (--text-prose) > body. */
+  --ds-text-title: calc(var(--text-2xl) * 1.2);
 }
 
 * { box-sizing: border-box; }
@@ -28,13 +38,22 @@ body {
   background: var(--color-bg-primary);
   color: var(--color-text-primary);
   font-family: var(--font-sans);
+  /* Stays at --text-base: a mockup that inherits its size from the page must
+     not grow. Prose takes --ds-text-body through the selectors below. */
   font-size: var(--text-base);
   line-height: var(--leading-normal);
 }
 
+/* Documentation prose. Excludes anything inside a drawing of the app – an erf-
+   component, a figure, or a frame marked inert or aria-hidden – so a picture
+   keeps the size it inherits. */
+main :where(p, li, dd):not(:where([class*='erf-'], [class*='erf-'] *, figure *, [inert] *, [aria-hidden='true'] *)) {
+  font-size: var(--ds-text-body);
+}
+
 h1 {
   margin: 0 0 var(--space-2);
-  font-size: var(--text-2xl);
+  font-size: var(--ds-text-title);
   font-weight: var(--font-semibold);
   color: var(--color-text-emphasis);
 }
@@ -43,8 +62,11 @@ h1 {
   margin: 0 0 var(--space-16);
   max-width: var(--ds-measure);
   color: var(--color-text-secondary);
-  font-size: var(--text-md);
+  font-size: var(--text-prose);
 }
+/* A lede built from paragraphs keeps the lede size: the prose rule above
+   would otherwise pull each paragraph down to --ds-text-body. */
+.ds-lede :where(p, li) { font-size: inherit; }
 
 /* Documentation headings only: a component's own title (erf-dialog__title,
    erf-comment-window__title …) is a picture of the app and must not inherit the
@@ -53,7 +75,7 @@ h2:not(:where([class*='erf-'])) {
   margin: var(--space-20) 0 var(--space-8);
   padding-bottom: var(--space-4);
   border-bottom: var(--border-width) solid var(--color-border-default);
-  font-size: var(--text-lg);
+  font-size: var(--text-xl);
   font-weight: var(--font-semibold);
   color: var(--color-text-bright);
 }
@@ -71,13 +93,14 @@ main > h2:first-child,
   background: var(--color-bg-secondary);
   max-width: var(--ds-measure-wide);
   color: var(--color-text-tertiary);
+  font-size: var(--ds-text-body);
 }
 
 .ds-note strong { color: var(--color-text-emphasis); }
 
 code, .ds-mono {
   font-family: var(--font-mono);
-  font-size: var(--text-sm);
+  font-size: var(--ds-text-small);
 }
 
 table { border-collapse: collapse; width: 100%; max-width: var(--ds-table-max); }
@@ -86,7 +109,7 @@ th {
   text-align: left;
   padding: var(--space-4) var(--space-8) var(--space-4) 0;
   border-bottom: var(--border-width) solid var(--color-border-subtle);
-  font-size: var(--text-sm);
+  font-size: var(--ds-text-small);
   font-weight: var(--font-medium);
   text-transform: uppercase;
   letter-spacing: var(--ds-caps-tracking);
@@ -98,6 +121,25 @@ td {
   border-bottom: var(--border-width) solid var(--color-border-default);
   vertical-align: middle;
 }
+/* A documentation table cell reads as prose; a cell inside a drawing of the
+   app (a rendered Markdown table, an inert frame) keeps what it inherits. */
+td:not(:where([class*='erf-'] *, [inert] *, [aria-hidden='true'] *)) { font-size: var(--ds-text-body); }
+
+/* A header on a panel surface (a note, a frame) takes tertiary text:
+   secondary fails AA on --color-bg-secondary (the Colours card bakes the ratio). */
+:where(.ds-note, .ds-frame) th { color: var(--color-text-tertiary); }
+
+/* A token name in a table's first column stays on one line – a wrapped
+   "--color-text-" / "tertiary" reads as two tokens. */
+.ds-tokens td:first-child code,
+td:first-child > code:only-child { white-space: nowrap; }
+
+/* A browser may wrap inline code after any "-", and in the mono font a split
+   "design -" / "- --check" reads as an en dash. A short command or attribute
+   name in prose takes .ds-nowrap so it stays whole on one line. */
+.ds-nowrap { white-space: nowrap; }
+/* A lede quotes only short names (a file, a token, an attribute): keep each whole. */
+.ds-lede code { white-space: nowrap; }
 
 .ds-swatch {
   width: var(--ds-swatch-width);
@@ -111,7 +153,7 @@ td {
    decoration and disabled only (Colours card). */
 .ds-na { color: var(--color-text-tertiary); }
 
-.ds-ratio { font-family: var(--font-mono); font-size: var(--text-sm); }
+.ds-ratio { font-family: var(--font-mono); font-size: var(--ds-text-small); }
 
 /* ---------- card chrome ---------- */
 
@@ -122,7 +164,7 @@ main { display: block; max-width: calc(var(--ds-table-max) + var(--space-24)); }
 .ds-crumbs {
   margin: 0 0 var(--space-8);
   font-family: var(--font-mono);
-  font-size: var(--text-sm);
+  font-size: var(--ds-text-small);
   color: var(--color-text-tertiary);
 }
 .ds-crumbs [aria-current="page"] { color: var(--color-text-bright); }
@@ -133,7 +175,7 @@ main { display: block; max-width: calc(var(--ds-table-max) + var(--space-24)); }
   padding: 0 var(--space-3);
   border: var(--border-width) solid currentColor;
   font-family: var(--font-mono);
-  font-size: var(--text-xs);
+  font-size: var(--ds-text-small);
   font-weight: var(--font-normal);
   line-height: var(--leading-normal);
   vertical-align: middle;
@@ -164,16 +206,16 @@ kbd {
   background: var(--color-bg-tertiary);
   color: var(--color-text-bright);
   font-family: var(--font-mono);
-  font-size: var(--text-sm);
+  font-size: var(--ds-text-small);
   line-height: var(--leading-normal);
 }
 
 /* A baked verdict: the text says pass or fail, the colour repeats it. */
 [data-result="pass"] { color: var(--color-brand-lime); }
 [data-result="fail"] { color: var(--color-error); }
-td[data-contrast], span[data-contrast] { font-family: var(--font-mono); font-size: var(--text-sm); white-space: nowrap; }
+td[data-contrast], span[data-contrast] { font-family: var(--font-mono); font-size: var(--ds-text-small); white-space: nowrap; }
 
-.ds-num { font-family: var(--font-mono); font-size: var(--text-sm); text-align: right; }
+.ds-num { font-family: var(--font-mono); font-size: var(--ds-text-small); text-align: right; }
 
 /* A token row's sample cell. */
 .ds-swatch--wide { width: calc(var(--ds-swatch-width) * 2); }
@@ -198,7 +240,7 @@ td[data-contrast], span[data-contrast] { font-family: var(--font-mono); font-siz
 }
 .ds-frame > figcaption {
   margin-top: var(--space-6);
-  font-size: var(--text-sm);
+  font-size: var(--ds-text-small);
   line-height: var(--leading-snug);
   color: var(--color-text-tertiary);
 }
@@ -241,7 +283,7 @@ td[data-contrast], span[data-contrast] { font-family: var(--font-mono); font-siz
   padding: var(--space-6) var(--space-8);
   border: var(--border-width) dashed var(--color-border-subtle);
   font-family: var(--font-mono);
-  font-size: var(--text-sm);
+  font-size: var(--ds-text-small);
   color: var(--color-text-tertiary);
 }
 .ds-retired > strong { flex-basis: 100%; color: var(--color-text-bright); font-family: var(--font-sans); font-weight: var(--font-medium); }
@@ -265,15 +307,64 @@ td[data-contrast], span[data-contrast] { font-family: var(--font-mono); font-siz
 .ds-meta {
   margin: 0 0 var(--space-12);
   font-family: var(--font-mono);
-  font-size: var(--text-sm);
+  font-size: var(--ds-text-small);
   color: var(--color-text-tertiary);
 }
 
 /* Token tables. h3 groups a family inside a card. */
-h3 {
+h3:not(:where([class*='erf-'])) {
   margin: var(--space-12) 0 var(--space-4);
-  font-size: var(--text-md);
+  font-size: var(--text-lg);
   font-weight: var(--font-semibold);
   color: var(--color-text-bright);
 }
 .ds-tokens { margin-bottom: var(--space-8); }
+
+/* ---------- shared documentation labels ----------
+   One owner for the small documentation classes cards used to copy. All sit at
+   the floor, --ds-text-small. Card-private helpers use a card prefix (sf-,
+   mx-, dl- …); ds- is reserved for this file. */
+
+/* A code sample shown as text: markup a reader copies (<pre class="ds-code">). */
+.ds-code {
+  max-width: var(--ds-table-max);
+  padding: var(--space-8);
+  overflow-x: auto;
+  border: var(--border-width) solid var(--color-border-default);
+  background: var(--color-bg-tertiary);
+  font-family: var(--font-mono);
+  font-size: var(--ds-text-small);
+}
+
+/* A caption or note under a sample, a swatch or a figure. */
+.ds-caption {
+  font-size: var(--ds-text-small);
+  line-height: var(--leading-snug);
+  color: var(--color-text-tertiary);
+}
+
+/* A short name above or beside a sample: a token, a state, a surface. */
+.ds-label {
+  font-family: var(--font-mono);
+  font-size: var(--ds-text-small);
+  color: var(--color-text-tertiary);
+}
+
+/* A pass or fail verdict in words; pair it with .ds-pass or .ds-fail. */
+.ds-verdict {
+  font-family: var(--font-mono);
+  font-size: var(--ds-text-small);
+}
+
+/* mockup: app scale – code, a key or a table header inside a drawing of the
+   app keeps the app's 11px. Specificity (0,0,1) beats the documentation rules
+   above and loses to any component class rule. */
+:where([class*='erf-']) code,
+:where([class*='erf-']) kbd,
+:where([class*='erf-']) th { font-size: var(--text-sm); }
+
+/* mockup: app scale – a component set inline in documentation prose or a
+   table cell keeps the page's base size instead of inheriting the larger
+   prose size. Zero specificity, so the component's own rules still win. */
+:where(main p, main li, main dd, td):not(:where([class*='erf-'], [class*='erf-'] *, figure *, [inert] *, [aria-hidden='true'] *, [style]))
+  > :where([class*='erf-']) { font-size: var(--text-base); }

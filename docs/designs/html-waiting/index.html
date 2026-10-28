@@ -3,7 +3,7 @@
 <!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
 <!DOCTYPE html>
 <html lang="en" data-theme="dark"><head>
-<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Erfana – waiting for a page</title>
@@ -15,17 +15,17 @@
   /* ---------- documentation chrome ---------- */
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
           gap: var(--space-16); margin-bottom: var(--space-16); }
-  .case__no { font-family: var(--font-mono); font-size: var(--text-sm);
+  .case__no { font-family: var(--font-mono); font-size: var(--ds-text-small);
               color: var(--color-accent-primary); letter-spacing: 0.1em; margin: 0 0 var(--space-2); }
   .case__title { margin: 0 0 var(--space-4); font-size: var(--text-md);
                  font-weight: var(--font-semibold); color: var(--color-text-emphasis); }
-  .case__text { margin: 0 0 var(--space-6); color: var(--color-text-tertiary); font-size: var(--text-sm); }
+  .case__text { margin: 0 0 var(--space-6); color: var(--color-text-tertiary); font-size: var(--ds-text-small); }
   .case__text:last-child { margin-bottom: 0; }
   .case__text strong { color: var(--color-text-bright); }
 
   .widths { display: flex; flex-direction: column; gap: var(--space-12);
             margin-bottom: var(--space-24); }
-  .width__label { margin: 0 0 var(--space-4); font-size: var(--text-xs);
+  .width__label { margin: 0 0 var(--space-4); font-size: var(--ds-text-small);
                   font-family: var(--font-mono); color: var(--color-text-secondary); }
 
   .controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-8);
@@ -35,12 +35,12 @@
     border: var(--border-width) solid var(--color-border-default);
     border-radius: var(--border-radius);
     background: var(--color-bg-secondary); color: var(--color-text-primary);
-    font-family: inherit; font-size: var(--text-sm);
+    font-family: inherit; font-size: var(--ds-text-small);
   }
   .controls button:focus-visible, .controls select:focus-visible {
     outline: var(--border-width-thick) solid var(--color-border-focus); outline-offset: var(--space-1);
   }
-  .clock { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-text-secondary); }
+  .clock { font-family: var(--font-mono); font-size: var(--ds-text-small); color: var(--color-text-secondary); }
   .clock b { color: var(--color-text-emphasis); font-weight: var(--font-semibold); }
 
   /* ---------- a preview panel, drawn to scale ---------- */
@@ -179,7 +179,7 @@
     outline: var(--border-width-thick) solid var(--color-border-focus); outline-offset: var(--space-1);
   }
 
-  .verdict { font-size: var(--text-sm); }
+  .verdict { font-size: var(--ds-text-small); }
   .verdict--suppressed { color: var(--color-text-muted); }
   .verdict--shown { color: var(--color-brand-lime); }
   .wt-film td:first-child { white-space: nowrap; color: var(--color-text-bright); }
@@ -861,9 +861,9 @@
   backdrop is provably the brand black, so the text is measured against it: the body text
   (<code>--color-text-tertiary</code>) is <strong><span data-claim="contrast-wait-text" title="--color-text-tertiary on --color-brand-black, the waiting message&#x27;s body text on the pre-paint backdrop">8.52</span>:1</strong>
   and the quieter aside (<code>--color-text-secondary</code>) is
-  <strong><span data-claim="contrast-wait-aside" title="--color-text-secondary on --color-brand-black, the waiting message&#x27;s aside on the pre-paint backdrop">5.01</span>:1</strong>, both clear of the 4.5:1 small text
+  <strong><span data-claim="contrast-wait-aside" title="--color-text-secondary on --color-brand-black, the waiting message&#x27;s aside on the pre-paint backdrop">5.00</span>:1</strong>, both clear of the 4.5:1 small text
   needs. The aside used to be <code>--color-text-muted</code>, at
-  <strong><span data-claim="contrast-wait-aside-muted" title="--color-text-muted on --color-brand-black, the aside colour the card used to render">3.63</span>:1</strong> – this card rendered a
+  <strong><span data-claim="contrast-wait-aside-muted" title="--color-text-muted on --color-brand-black, the aside colour the card used to render">3.62</span>:1</strong> – this card rendered a
   contrast failure in every case that showed it. If this surface
   were ever allowed to render over the page's own paper – which the page chooses – the contrast
   would be uncontrollable. That timing is a precondition of the design, not a detail of it.

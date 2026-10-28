@@ -11,7 +11,7 @@
  *   src/renderer/src/components/Panels/TerminalPanel/components/TerminalToolbar.css
  *   src/renderer/src/components/Panels/ImageViewerPanel/ImageViewerPanel.module.css
  * This file owns the ROW only. The icon button and the toggle inside it are
- * the Buttons card's, and are never restyled here.
+ * the Buttons card's button.css, and are never restyled here.
  *
  * The overflow rule is drawn with a container query: a group marked
  * collapsible leaves the row below a width, and the More button takes its

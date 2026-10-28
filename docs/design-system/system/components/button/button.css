@@ -50,7 +50,7 @@
   block-size: var(--icon-size-sm);
 }
 
-/* The one focus ring (Focus card). Never removed, never recoloured per variant. */
+/* The one focus ring (Focus and keyboard card). Never removed, never recoloured per variant. */
 .erf-button:is(:focus-visible, [class~='is-focus']) {
   outline: var(--border-width-thick) solid var(--color-border-focus);
   outline-offset: var(--space-1);
@@ -129,10 +129,14 @@
 .erf-button--icon:is(:active, [class~='is-active']) { background: var(--color-bg-hover-solid); color: var(--color-text-bright); }
 
 /* Toggle: aria-pressed carries the state. Pressed is a fill AND a lime bottom
-   edge – the permission band's toggle signature – never colour alone (1.4.1). */
-.erf-button--toggle { color: var(--color-text-secondary); }
+   edge – the permission band's toggle signature – never colour alone (1.4.1).
+   A radio in a toolbar's one-of-many group (role="radio", aria-checked) wears
+   the same look; the Toolbar card's view-mode group is the case.
+   Resting text is tertiary: secondary measures under 4.5:1 on a panel, and a
+   toggle usually carries a word, not only a glyph. */
+.erf-button--toggle { color: var(--color-text-tertiary); }
 .erf-button--toggle:is(:hover, [class~='is-hover']) { background: var(--color-bg-hover); color: var(--color-text-bright); }
-.erf-button--toggle[aria-pressed='true'] {
+.erf-button--toggle:is([aria-pressed='true'], [aria-checked='true']) {
   background: var(--color-bg-selected);
   border-block-end-color: var(--color-brand-lime);
   color: var(--color-text-bright);
@@ -214,5 +218,5 @@
 @media (forced-colors: active) {
   .erf-button { border-color: ButtonText; }
   .erf-button--text { border-color: transparent; }
-  .erf-button--toggle[aria-pressed='true'] { border-block-end-color: Highlight; }
+  .erf-button--toggle:is([aria-pressed='true'], [aria-checked='true']) { border-block-end-color: Highlight; }
 }

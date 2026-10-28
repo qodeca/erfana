@@ -36,12 +36,19 @@ export const ALLOWED_EXTENSIONS = new Set([
 
 /** The policy every page carries as the FIRST element of <head>. With it, a
  * script that slipped past this guard still cannot run in the browser. */
-export const CSP_CONTENT = "script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"
+export const CSP_CONTENT =
+  "script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'"
 export const CSP_META = `<meta http-equiv="Content-Security-Policy" content="${CSP_CONTENT}">`
 
 const BANNED_ELEMENTS = new Set(['object', 'embed', 'frame', 'frameset', 'applet'])
 const SVG_PAINT_ATTRS = new Set(['fill', 'stroke', 'stop-color', 'flood-color', 'lighting-color'])
+/** The only values an SVG paint attribute may take: a token comes in through
+ * CSS or var(), never as a literal or a named colour. */
+const PAINT_VALUE = /^(?:none|currentColor|url\(\s*#[^)]*\)|var\(\s*--[\w-]+\s*(?:,[^)]*)?\))$/i
 const LITERAL_COLOUR = /#[0-9a-f]{3,8}\b|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch)\s*\(/i
+/** A url(...) reference is stripped before the colour test: url(#a1b2c3) names
+ * a fragment, not a colour. */
+const withoutUrls = value => value.replace(/url\(\s*(['"]?)[^)]*?\1\s*\)/gi, 'url()')
 const SCRIPT_URL = /^(?:javascript|vbscript):/i
 const CSS_BANNED = [
   [/expression\s*\(/i, 'CSS expression()'],
@@ -60,8 +67,114 @@ const CSS_BANNED = [
  *    it takes focus and is announced as nothing (a frame is a picture).
  */
 const SMUGGLED_SPACING = /--ds-(?:margin|padding|gap)[a-z-]*\s*:/gi
+/* The same rule judged where the value is USED: a margin, padding or gap whose
+ * value reads a --ds-* property, whatever that property is called. Positions
+ * (top, left, inset-*) may still go through --ds-*, as above – a drawn popover
+ * pinned at a spot is a position, not spacing. */
+const SPACING_FROM_DS = /(?:^|[;{\s])((?:margin|padding)(?:-[a-z-]+)?|gap|row-gap|column-gap)\s*:\s*[^;}]*var\(\s*--ds-/gi
 const EM_DASH = '\u2014'
+/** An em dash as the source spells it: the character or any entity for it. */
+const EM_DASH_SOURCE = /\u2014|&mdash;?|&#0*8212;?|&#x0*2014;?/gi
 const FOCUSABLE_TAGS = new Set(['button', 'input', 'select', 'textarea', 'summary'])
+
+/*
+ * READABILITY. Documentation text – prose, captions, notes, table labels, meta
+ * lines, code in prose – never goes below --ds-text-small (13px). The two
+ * label sizes, --text-xs (10px) and --text-sm (11px), are for the app's own
+ * chrome, so a rule may use them only when it draws the app at real scale:
+ * its selector names an erf- class, or the rule carries a mockup comment
+ * (any comment starting "mockup") before its selector or inside its body.
+ * Applies to ds.css and to every <style> block in the two trees; component
+ * CSS files (which ship verbatim) are out of scope.
+ */
+export const DOC_TEXT_CSS = new Set(['docs/design-system/ds.css'])
+const SMALL_TEXT = /\bfont(?:-size)?\s*:[^;}]*var\(\s*--text-(?:xs|sm)\s*\)/gi
+const MOCKUP_MARK = /\/\*\s*mockup\b/i
+
+/**
+ * Rules whose font-size is --text-xs or --text-sm without an erf- selector or a
+ * mockup comment, as [{ line, message }] with lines relative to `baseLine`.
+ */
+export function smallTextProblems(css, baseLine = 1) {
+  const problems = []
+  // Walk the text once, keeping each block's prelude (with any comments that
+  // precede it). An at-rule's block (@media, @supports, @container) is entered,
+  // so the style rules inside it are checked like any other.
+  let i = 0
+  let preludeStart = 0
+  while (i < css.length) {
+    if (css.startsWith('/*', i)) {
+      const end = css.indexOf('*/', i + 2)
+      i = end < 0 ? css.length : end + 2
+      continue
+    }
+    const ch = css[i]
+    if (ch === '{') {
+      const prelude = css.slice(preludeStart, i)
+      const selector = prelude.replace(/\/\*[\s\S]*?\*\//g, ' ').trim()
+      if (selector.startsWith('@')) {
+        i += 1
+        preludeStart = i
+        continue
+      }
+      // A style rule: find its matching close, skipping comments.
+      let j = i + 1
+      let inner = 1
+      while (j < css.length && inner > 0) {
+        if (css.startsWith('/*', j)) {
+          const end = css.indexOf('*/', j + 2)
+          j = end < 0 ? css.length : end + 2
+          continue
+        }
+        if (css[j] === '{') inner += 1
+        else if (css[j] === '}') inner -= 1
+        j += 1
+      }
+      const body = css.slice(i + 1, j - 1)
+      const marked = MOCKUP_MARK.test(prelude) || MOCKUP_MARK.test(body)
+      // Every selector in the list must draw the app – one erf- selector does
+      // not excuse a documentation selector beside it.
+      const appScale = selector
+        .split(',')
+        .every(part => /\.erf-|\[class[*^|~]?=['"]?erf-/.test(part))
+      if (!marked && !appScale) {
+        const cleanBody = body.replace(/\/\*[\s\S]*?\*\//g, m => m.replace(/[^\n]/g, ' '))
+        for (const hit of cleanBody.matchAll(SMALL_TEXT)) {
+          problems.push({
+            line: baseLine + lineAt(css, i + 1 + hit.index) - 1,
+            message: `documentation text below 13px in "${selector.replace(/\s+/g, ' ')}" – use var(--ds-text-small), or mark an app-scale drawing with /* mockup: app scale */`
+          })
+        }
+      }
+      i = j
+      preludeStart = i
+      continue
+    }
+    i += 1
+    // A closing at-rule brace or an at-statement (@import …;) ends a prelude.
+    if (ch === '}' || ch === ';') preludeStart = i
+  }
+  return problems
+}
+
+/**
+ * A style= value that sets --text-xs or --text-sm on documentation: the
+ * element and every ancestor are outside a drawing of the app (no erf- class,
+ * no inert, no aria-hidden="true") and the value carries no mockup comment.
+ * The same READABILITY rule as smallTextProblems, for inline styles.
+ */
+export function smallInlineText(node, value) {
+  if (MOCKUP_MARK.test(value)) return false
+  const clean = value.replace(/\/\*[\s\S]*?\*\//g, ' ')
+  if (!new RegExp(SMALL_TEXT.source, 'i').test(clean)) return false
+  for (let n = node; n && n.attrs; n = n.parentNode) {
+    const attr = name => n.attrs.find(a => a.name.toLowerCase() === name)?.value
+    if (/(?:^|\s)erf-/.test(attr('class') ?? '')) return false
+    if (attr('inert') !== undefined) return false
+    if ((attr('aria-hidden') ?? '').toLowerCase() === 'true') return false
+  }
+  return true
+}
 
 /** Every file under `dir`, repo-relative and posix, dot-files included. */
 export function walkAll(root, dir) {
@@ -105,6 +218,17 @@ function schemeOf(value) {
   return value.replace(/[\u0000- \u007f]+/g, '')
 }
 
+/** Literal colours in an SVG image's CSS (its <style> and style= values), as [{ line, message }]. */
+function svgColourProblems(css, baseLine, where) {
+  const problems = []
+  const clean = withoutUrls(css.replace(/\/\*[\s\S]*?\*\//g, match => match.replace(/[^\n]/g, ' ')))
+  const global = new RegExp(LITERAL_COLOUR.source, 'gi')
+  for (const hit of clean.matchAll(global)) {
+    problems.push({ line: baseLine + lineAt(clean, hit.index) - 1, message: `literal colour "${hit[0]}" in ${where} – paint SVG with currentColor or a token` })
+  }
+  return problems
+}
+
 /** Problems in a CSS text, as [{ line, message }] with lines relative to `baseLine`. */
 export function cssProblems(css, baseLine = 1) {
   const problems = []
@@ -113,6 +237,12 @@ export function cssProblems(css, baseLine = 1) {
     problems.push({
       line: baseLine + lineAt(clean, hit.index) - 1,
       message: 'spacing through a --ds-* custom property – use a --space-* token (only positions may go through --ds-*)'
+    })
+  }
+  for (const hit of clean.matchAll(SPACING_FROM_DS)) {
+    problems.push({
+      line: baseLine + lineAt(clean, hit.index + hit[0].length - hit[0].trimStart().length) - 1,
+      message: `${hit[1]} reads a --ds-* custom property – spacing takes a --space-* token (only positions may go through --ds-*)`
     })
   }
   for (const [re, what] of CSS_BANNED) {
@@ -128,10 +258,25 @@ export function cssProblems(css, baseLine = 1) {
  * Problems in one HTML or SVG document, as [{ line, message }].
  * `requireCsp` is true for a page (.html) and false for an image (.svg).
  */
-export function markupProblems(text, { requireCsp = true } = {}) {
+export function markupProblems(text, { requireCsp = true, image = false } = {}) {
   const problems = []
-  const doc = parse(text, { sourceCodeLocationInfo: true })
+  const parseErrors = []
+  const doc = parse(text, { sourceCodeLocationInfo: true, onParseError: error => parseErrors.push(error) })
   const at = node => node.sourceCodeLocation?.startLine ?? 1
+
+  // Malformed markup. A browser recovers from it silently, and the recovery is
+  // rarely what the author meant: a missing quote turns the rest of a tag into
+  // attribute NAMES (aria-hidden="true><div class="x" once hid a whole frame's
+  // worth of markup inside one attribute). A fragment (an SVG image, a srcdoc)
+  // has no doctype by design, so that one code is not a problem there.
+  const seen = new Set()
+  for (const error of parseErrors) {
+    if (!requireCsp && error.code === 'missing-doctype') continue
+    const key = `${error.startLine}:${error.code}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    problems.push({ line: error.startLine ?? 1, message: `malformed markup (${error.code}) – a browser would guess what this means` })
+  }
 
   for (const node of nodesOf(doc)) {
     if (!node.tagName) continue
@@ -149,12 +294,32 @@ export function markupProblems(text, { requireCsp = true } = {}) {
       if (SCRIPT_URL.test(schemeOf(value))) problems.push({ line, message: `a script URL in ${name}= is banned` })
       if (lower === 'style') {
         for (const p of cssProblems(value, line)) problems.push(p)
+        if (smallInlineText(node, value)) {
+          problems.push({
+            line,
+            message: `documentation text below 13px in a style= value on <${tag}> – use var(--ds-text-small), or draw the app inside an erf-, inert or aria-hidden frame, or add /* mockup: app scale */ to the value`
+          })
+        }
       }
-      if (SVG_PAINT_ATTRS.has(lower) && LITERAL_COLOUR.test(value)) {
-        problems.push({ line, message: `literal colour in ${name}="${value}" – paint SVG with currentColor or a token through CSS` })
+      if (SVG_PAINT_ATTRS.has(lower) && !PAINT_VALUE.test(value.trim())) {
+        problems.push({
+          line,
+          message: LITERAL_COLOUR.test(withoutUrls(value))
+            ? `literal colour in ${name}="${value}" – paint SVG with currentColor or a token through CSS`
+            : `${name}="${value}" – an SVG paint attribute takes none, currentColor, url(#id) or var(--token) only`
+        })
+      }
+      if (lower.includes('><') || /[<>"'=]/.test(lower) || value.includes('><')) {
+        problems.push({ line, message: `malformed attribute ${name}="${value.slice(0, 40)}" – a quote is missing` })
+      }
+      if (image && lower === 'style') {
+        for (const p of svgColourProblems(value, line, 'a style= value')) problems.push(p)
       }
     }
 
+    if ((tag === 'iframe' || tag === 'frame') && attr('src') !== undefined) {
+      problems.push({ line, message: `<${tag} src> is banned – a frame loads a page this guard never reads (and the CSP sets frame-src 'none')` })
+    }
     if (tag === 'iframe' && attr('srcdoc') !== undefined) {
       for (const p of markupProblems(attr('srcdoc'), { requireCsp: false })) {
         problems.push({ line, message: `iframe srcdoc: ${p.message}` })
@@ -176,12 +341,15 @@ export function markupProblems(text, { requireCsp = true } = {}) {
       const css = node.childNodes.map(c => c.value ?? '').join('')
       const first = node.childNodes[0]?.sourceCodeLocation?.startLine ?? line
       for (const p of cssProblems(css, first)) problems.push(p)
+      for (const p of smallTextProblems(css, first)) problems.push(p)
+      if (image) for (const p of svgColourProblems(css, first, '<style>')) problems.push(p)
     }
   }
 
   if (requireCsp) {
-    const offset = text.indexOf(EM_DASH)
-    if (offset >= 0) problems.push({ line: lineAt(text, offset), message: 'an em dash – use an en dash (–), as the Writing card decides' })
+    for (const line of emDashLines(doc, text)) {
+      problems.push({ line, message: 'an em dash – use an en dash (–), as the Writing card decides' })
+    }
     for (const line of focusableInsideHidden(doc)) {
       problems.push({ line, message: 'a focusable element inside aria-hidden="true" – add inert to the frame, or tabindex="-1" to the control' })
     }
@@ -204,6 +372,31 @@ export function markupProblems(text, { requireCsp = true } = {}) {
     }
   }
   return problems
+}
+
+/**
+ * Lines holding an em dash, judged on the DECODED text: parse5 turns &mdash;
+ * and &#8212; into the character, so a text node, comment or attribute value
+ * that renders one is found however it was spelled. The line is then found in
+ * the node's own source slice, one entry per occurrence.
+ */
+function emDashLines(doc, text) {
+  const lines = []
+  const report = (decoded, loc) => {
+    if (!decoded.includes(EM_DASH) || !loc) return
+    const raw = text.slice(loc.startOffset, loc.endOffset)
+    let found = false
+    for (const hit of raw.matchAll(EM_DASH_SOURCE)) {
+      found = true
+      lines.push(loc.startLine + lineAt(raw, hit.index) - 1)
+    }
+    if (!found) lines.push(loc.startLine)
+  }
+  for (const node of nodesOf(doc)) {
+    if (node.nodeName === '#text' || node.nodeName === '#comment') report(node.value ?? node.data ?? '', node.sourceCodeLocation)
+    for (const { name, value } of node.attrs ?? []) report(value, node.sourceCodeLocation?.attrs?.[name])
+  }
+  return [...new Set(lines)].sort((a, b) => a - b)
 }
 
 /** Lines of focusable elements that sit inside aria-hidden="true" without an inert ancestor. */
@@ -239,8 +432,11 @@ export function fileProblems(file, text) {
   }
   let found = []
   if (ext === 'html') found = markupProblems(text, { requireCsp: true })
-  else if (ext === 'svg') found = markupProblems(text, { requireCsp: false })
-  else if (ext === 'css') found = cssProblems(text)
+  else if (ext === 'svg') found = markupProblems(text, { requireCsp: false, image: true })
+  else if (ext === 'css') {
+    found = cssProblems(text)
+    if (DOC_TEXT_CSS.has(file)) found = found.concat(smallTextProblems(text))
+  }
   return found.map(p => `${file}:${p.line} ${p.message}`)
 }
 
@@ -312,12 +508,20 @@ export function brokenLinks(root, trees = STATIC_TREES) {
         if (ref === '' || /^[a-z][a-z0-9+.-]*:/i.test(ref) || ref.startsWith('//')) continue
         const [beforeHash, fragment] = ref.split('#')
         const target = beforeHash.split('?')[0]
-        const resolved = target === '' ? abs : path.resolve(path.dirname(abs), decodeURIComponent(target))
+        let resolved
+        let anchor
+        try {
+          resolved = target === '' ? abs : path.resolve(path.dirname(abs), decodeURIComponent(target))
+          anchor = fragment ? decodeURIComponent(fragment) : fragment
+        } catch {
+          problems.push(`${file}:${line} malformed link "${ref}" – a % escape that does not decode`)
+          continue
+        }
         if (!existsSync(resolved)) {
           problems.push(`${file}:${line} broken link "${ref}"`)
           continue
         }
-        if (fragment && resolved.endsWith('.html') && !ids(resolved).has(decodeURIComponent(fragment))) {
+        if (anchor && resolved.endsWith('.html') && !ids(resolved).has(anchor)) {
           problems.push(`${file}:${line} link "${ref}" names an anchor the target does not have`)
         }
       }

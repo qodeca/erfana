@@ -10,10 +10,11 @@
  *   src/renderer/src/components/Tabs/ImageTab.css        (.image-tab)
  * plus the dockview overrides and the active underline in
  * src/renderer/src/components/DockLayout/AppDockLayout.css.
- * Drift found while writing this: EditorTab hardcodes `height: 41px` where the
- * other two use --tab-height; its close button says `border-radius: 0` where
- * the others say var(--border-radius); the 80px / 300px width limits are
- * literals repeated in all three and again as !important dockview overrides.
+ * Drift found while writing this: EditorTab.css and ImageTab.css both
+ * hardcode `height: 41px` and give the close button `border-radius: 0`, where
+ * HtmlPreviewTab.css reads --tab-height and the radius token. The width floor
+ * and ceiling are literals in all three, and again as !important dockview
+ * overrides. The Tabs card counts each of these from the files.
  *
  * Adopting is a MOVE: the three files become one, and scripts/design-sync.mjs
  * syncs it back here. Classes are prefixed erf-.
@@ -37,7 +38,7 @@
    floor that still shows a few characters and a ceiling that stops one long
    name eating the strip. */
 .erf-tab {
-  --erf-tab-min-width: calc(var(--space-20) * 2); /* 80px */
+  --erf-tab-min-width: calc(var(--space-20) * 2);
   --erf-tab-max-width: 300px;
   position: relative;
   display: flex;
@@ -49,7 +50,8 @@
   height: var(--tab-height);
   padding: 0 var(--space-2) 0 var(--space-6);
   background-color: var(--color-bg-tertiary);
-  color: var(--color-text-secondary);
+  /* Tertiary, not secondary: secondary is under 4.5:1 on the strip. */
+  color: var(--color-text-tertiary);
   font-size: var(--text-base);
   cursor: pointer;
   user-select: none;
@@ -105,9 +107,9 @@
   white-space: nowrap;
 }
 
-/* Unsaved changes: a dot before the name. Never colour or shape alone – the
-   dot carries a visually hidden "Unsaved changes" and the tab's accessible
-   name says "modified". */
+/* Unsaved changes: a dot before the name. Never colour or shape alone – a
+   visually hidden state span beside it says "unsaved changes", and the tab is
+   aria-labelledby its label, then that span. The dot itself says nothing. */
 .erf-tab__dirty {
   flex-shrink: 0;
   width: var(--space-4);
@@ -117,7 +119,8 @@
 }
 
 /* The file is gone from disk. Words, in the warning colour – "(deleted)" is
-   readable without the colour. */
+   readable without the colour, and this span is the state span the tab's
+   aria-labelledby names after the label. */
 .erf-tab__deleted {
   flex-shrink: 0;
   color: var(--color-warning);
@@ -127,9 +130,10 @@
 /* Close. A 24 x 24 target around a 14px glyph (WCAG 2.2 SC 2.5.8). Hidden at
    rest so a strip of tabs is not a strip of crosses; revealed on hover, on
    the selected tab, on a tab with unsaved changes, and whenever the tab holds
-   keyboard focus – a control that is only there under the pointer does not
-   exist for the keyboard. It is tabindex="-1": the keyboard closes a tab
-   with Delete on the tab itself, so a strip has one tab stop, not two per tab. */
+   keyboard focus, so the keyboard user sees what Delete will do. It is
+   aria-hidden and pointer-only: a role="tab" cannot hold another control, so
+   the keyboard and assistive technology close a tab with Delete on the tab
+   itself or the tab menu's Close, and a strip has one tab stop, not two per tab. */
 .erf-tab__close {
   display: flex;
   flex-shrink: 0;

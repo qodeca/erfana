@@ -172,7 +172,9 @@ export function relativeLuminance(color) {
 }
 
 /**
- * WCAG 2.x contrast ratio, rounded to two decimals – the precision a card quotes.
+ * WCAG 2.x contrast ratio, UNROUNDED. A verdict compares this raw value with the
+ * bar, and a card quotes it through formatRatio(), which rounds DOWN: rounding
+ * to nearest let 4.4951:1 print as "4.50:1 · pass" while it fails 4.5:1.
  *
  * A translucent foreground is composited over the background first, which is
  * what the screen shows. A translucent BACKGROUND has no single colour until it
@@ -194,7 +196,16 @@ export function contrastRatio(foreground, background, over) {
   const a = relativeLuminance(fg)
   const b = relativeLuminance(bg)
   const [light, dark] = a > b ? [a, b] : [b, a]
-  return Math.round(((light + 0.05) / (dark + 0.05)) * 100) / 100
+  return (light + 0.05) / (dark + 0.05)
+}
+
+/**
+ * A ratio as a card quotes it: two decimals, rounded DOWN, so the printed figure
+ * never overstates the raw value a verdict was judged on ("4.49", never "4.50"
+ * for 4.4951). The 1e-9 absorbs float noise in an exact value such as 21.
+ */
+export function formatRatio(ratio) {
+  return (Math.floor(ratio * 100 + 1e-9) / 100).toFixed(2)
 }
 
 /** The shipping token file, parsed once per call site. */

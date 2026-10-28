@@ -3,7 +3,7 @@
 <!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
 <!DOCTYPE html>
 <html lang="en" data-theme="dark"><head>
-<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Erfana – comment overlay in the page</title>
@@ -17,7 +17,7 @@
   .scene--wide { inline-size: 560px; block-size: 260px; }
   .swatch { display: inline-block; inline-size: var(--space-12); block-size: var(--space-8); vertical-align: middle;
             border: var(--border-width) solid var(--color-border-subtle); margin-inline-end: var(--space-4); }
-  .map td:nth-child(3) { font-family: var(--font-mono); font-size: var(--text-sm); }
+  .map td:nth-child(3) { font-family: var(--font-mono); font-size: var(--ds-text-small); }
 </style>
 </head>
 <body>
@@ -60,14 +60,14 @@
 
 <div class="ds-note" style="margin-top: var(--space-8)">
   <strong>Contrast, derived.</strong> The pin's fill against its ink stroke and content, the label's tag on its
-  ink ground and the mode tab's text are all one pair: <strong><span data-claim="hpc-accent-ink" title="--color-accent-primary against --color-brand-black: the pin fill against its ink stroke and content, the label tag, the mode tab text">8.40</span>:1</strong>.
-  Hover keeps the ink: <strong><span data-claim="hpc-hover-ink" title="--color-brand-violet-hover against --color-brand-black: a hovered pin against its ink">6.85</span>:1</strong>. A damaged pin's ink
-  <code>!</code> on the warning fill: <strong><span data-claim="hpc-warning-ink" title="--color-brand-black on --color-warning: the ink ! on a damaged pin">8.01</span>:1</strong>. The label's
+  ink ground and the mode tab's text are all one pair: <strong><span data-claim="hpc-accent-ink" title="--color-accent-primary against --color-brand-black: the pin fill against its ink stroke and content, the label tag, the mode tab text">8.39</span>:1</strong>.
+  Hover keeps the ink: <strong><span data-claim="hpc-hover-ink" title="--color-brand-violet-hover against --color-brand-black: a hovered pin against its ink">6.84</span>:1</strong>. A damaged pin's ink
+  <code>!</code> on the warning fill: <strong><span data-claim="hpc-warning-ink" title="--color-brand-black on --color-warning: the ink ! on a damaged pin">8.00</span>:1</strong>. The label's
   text: <strong><span data-claim="hpc-label-paper" title="--color-brand-white on --color-brand-black: the element label text">17.62</span>:1</strong>, and its size in the muted grey:
   <strong><span data-claim="hpc-label-size" title="--color-text-primary on --color-brand-black: the size in the element label">11.51</span>:1</strong>. All clear the 4.5:1 small text needs.
   <br><br>
   <strong>Why the ring is two-tone.</strong> The accent alone on a white page is
-  <strong><span data-claim="hpc-accent-on-white" title="--color-accent-primary on --color-brand-white: why the accent ring alone fails on a light page">2.10</span>:1</strong> – under the 3:1 a focus or selection
+  <strong><span data-claim="hpc-accent-on-white" title="--color-accent-primary on --color-brand-white: why the accent ring alone fails on a light page">2.09</span>:1</strong> – under the 3:1 a focus or selection
   indicator needs (SC 1.4.11). The 1px ink line on both sides of it is
   <strong><span data-claim="hpc-ink-on-white" title="--color-brand-black on --color-brand-white: the ink line that carries the ring on a light page">17.62</span>:1</strong> there; on a black page the accent carries it
   instead. Whatever the page paints, one of the two edges clears 3:1. The pin's focus ring uses the same

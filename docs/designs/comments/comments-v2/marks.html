@@ -4,7 +4,7 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
-<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Erfana – comments v2, marks, icons and the chip</title>
@@ -80,7 +80,7 @@
               border: var(--border-width) solid var(--color-border-subtle); background: var(--color-bg-preview); }
 
   /* C-17 hover: the native title tooltip, drawn as a box. */
-  .mk-tip { position: absolute; z-index: var(--z-tooltip); inset-block-start: calc(100% + var(--space-3));
+  .mk-tip { /* mockup: app scale – the mark tooltip */ position: absolute; z-index: var(--z-tooltip); inset-block-start: calc(100% + var(--space-3));
             inset-inline-start: 0; padding: var(--space-1) var(--space-3); white-space: nowrap;
             background: var(--color-bg-elevated); border: var(--border-width) solid var(--color-border-subtle);
             color: var(--color-text-primary); font-family: var(--font-sans); font-size: var(--text-sm);
@@ -98,7 +98,7 @@
              border: var(--border-width) solid var(--color-border-subtle); margin-inline-end: var(--space-4); }
   .mk-icon > .erf-hpc-pin, .mk-icon > .erf-comment-ghost { inset-block-start: var(--space-2); inset-inline-start: var(--space-2); }
   .mk-icon > .page { padding: 0; }
-  .mk-icons td:nth-child(4) { font-family: var(--font-mono); font-size: var(--text-sm); }
+  .mk-icons td:nth-child(4) { font-family: var(--font-mono); font-size: var(--ds-text-small); }
 
   /* Forced colours, simulated with the system colour keywords. */
   .mk-fc { padding: var(--space-8); background: Canvas; color: CanvasText; font-family: var(--font-serif);
@@ -109,7 +109,7 @@
 
   .mk-code { margin: 0 0 var(--space-8); padding: var(--space-6) var(--space-8); max-inline-size: 960px;
              background: var(--color-bg-secondary); border: var(--border-width) solid var(--color-border-default);
-             font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-text-primary);
+             font-family: var(--font-mono); font-size: var(--ds-text-small); color: var(--color-text-primary);
              white-space: pre-wrap; overflow-wrap: anywhere; }
   .mk-muted { color: var(--color-text-tertiary); }
 </style>

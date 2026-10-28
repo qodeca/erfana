@@ -29,6 +29,10 @@
  *   <svg data-icon="x"></svg>              the lucide-react icon's children, plus stroke attributes
  *   <div data-generated="host-elide"></div> a region from GENERATED_REGIONS (markup only Node can compute)
  *
+ * The Content-Security-Policy meta that opens every page's <head> is baked the
+ * same way: its content attribute is rewritten to CSP_CONTENT, so tightening the
+ * policy in scripts/lib/design-static.mjs reaches every page on the next build.
+ *
  * Only the bytes between the tags (and the one attribute) change, so a CRLF
  * checkout stays byte-identical to an LF one everywhere else (#104).
  */
@@ -39,8 +43,16 @@ import path from 'node:path'
 import { URL, fileURLToPath, pathToFileURL } from 'node:url'
 import { parse } from 'parse5'
 
-import { collectCustomProperties, evaluate, resolveVar, tokenContrast } from './lib/design-claims.mjs'
 import {
+  collectCustomProperties,
+  contrastRatio,
+  evaluate,
+  formatRatio,
+  resolveVar,
+  tokenContrast
+} from './lib/design-claims.mjs'
+import {
+  CSP_CONTENT,
   CSP_META,
   STATIC_TREES,
   brokenLinks,
@@ -151,7 +163,7 @@ const REQUIRED_FIELDS = ['group', 'name', 'status', 'reviewed']
 const VALID_STATUS = new Set(['decided', 'proposed', 'superseded'])
 
 /** A build failure: collected, reported together, exit 1. */
-class DesignError extends Error {}
+export class DesignError extends Error {}
 
 function escapeHtml(value) {
   return String(value)
@@ -185,7 +197,9 @@ function lfBytes(text) {
  * header itself moved to line 1; the rule is now one line, stated and checked.
  */
 export function readMarker(text, file) {
-  const first = text.split(/\r?\n/, 1)[0]
+  // A byte-order mark is invisible in an editor and would hide the marker from
+  // the line-1 match; it is stripped rather than reported as "no marker".
+  const first = text.replace(/^\uFEFF/, '').split(/\r?\n/, 1)[0]
   const found = MARKER.exec(first)
   if (!found) {
     if (/@card\b/.test(text.split(/\r?\n/).slice(0, 8).join('\n'))) {
@@ -299,7 +313,7 @@ const STATUS_MEANING = {
 
 /* ---------------------------------------------------------------- index.html */
 
-function renderIndex(cards, tokens) {
+export function renderIndex(cards, tokens) {
   const live = cards.filter(c => c.status !== 'superseded')
   const superseded = cards.filter(c => c.status === 'superseded')
   const counts = Object.fromEntries([...VALID_STATUS].map(s => [s, cards.filter(c => c.status === s).length]))
@@ -331,12 +345,24 @@ function renderIndex(cards, tokens) {
     )
   }
 
-  const tasks = cards
-    .filter(c => c.answers && c.status !== 'superseded')
-    .flatMap(c => c.answers.split(';').map(a => a.trim()).filter(Boolean).map(answer => ({ answer, c })))
-    .sort((a, b) => (a.answer.toLowerCase() < b.answer.toLowerCase() ? -1 : 1))
+  // One row per task: two cards that answer the same question share its row,
+  // so the reader sees every card that answers it in one place.
+  const byTask = new Map()
+  for (const c of cards.filter(card => card.answers && card.status !== 'superseded')) {
+    for (const answer of c.answers.split(';').map(a => a.trim()).filter(Boolean)) {
+      const key = answer.toLowerCase()
+      if (!byTask.has(key)) byTask.set(key, { answer, cards: [] })
+      if (!byTask.get(key).cards.includes(c)) byTask.get(key).cards.push(c)
+    }
+  }
+  const tasks = [...byTask.values()].sort((a, b) => (a.answer.toLowerCase() < b.answer.toLowerCase() ? -1 : 1))
   const taskRows = tasks
-    .map(({ answer, c }) => `  <tr><td>${escapeHtml(answer)}</td><td><a href="${escapeHtml(c.href)}">${escapeHtml(c.name)}</a></td></tr>`)
+    .map(
+      ({ answer, cards: list }) =>
+        `  <tr><td>${escapeHtml(answer)}</td><td>${list
+          .map(c => `<a href="${escapeHtml(c.href)}">${escapeHtml(c.name)}</a>`)
+          .join(', ')}</td></tr>`
+    )
     .join('\n')
 
   const families = Object.entries(TOKEN_OWNERS)
@@ -374,13 +400,13 @@ ${head('Erfana design system')}
   .ix-card:focus-visible { outline: var(--border-width-thick) solid var(--color-border-focus);
                            outline-offset: var(--space-1); }
   .ix-card__name { font-family: var(--font-mono); font-size: var(--text-md); color: var(--color-text-emphasis); }
-  .ix-card__sub { font-size: var(--text-sm); line-height: var(--leading-snug); color: var(--color-text-tertiary); }
-  .ix-card__meta { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-tertiary); }
-  .ix-count { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-text-tertiary);
+  .ix-card__sub { font-size: var(--ds-text-small); line-height: var(--leading-snug); color: var(--color-text-tertiary); }
+  .ix-card__meta { font-family: var(--font-mono); font-size: var(--ds-text-small); color: var(--color-text-tertiary); }
+  .ix-count { font-family: var(--font-mono); font-size: var(--ds-text-small); color: var(--color-text-tertiary);
               font-weight: var(--font-normal); }
   .ix-summary { display: flex; flex-wrap: wrap; gap: var(--space-8); margin: 0 0 var(--space-12); padding: 0;
                 list-style: none; }
-  .ix-summary li { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-text-tertiary); }
+  .ix-summary li { font-family: var(--font-mono); font-size: var(--ds-text-small); color: var(--color-text-tertiary); }
   .ix-superseded summary { cursor: pointer; color: var(--color-text-bright); }
 </style>
 </head>
@@ -406,7 +432,7 @@ ${[...VALID_STATUS].map(s => `    <li><strong>${s}</strong> – ${escapeHtml(STA
   <code>/* deviates: docs/design-system/&lt;card&gt; – why */</code> – and the card lists it under
   Exceptions. Every marker in <code>src/</code> is listed in the <a href="deviations.html">deviation register</a>.
   The folder is <strong>static by rule</strong>: HTML, CSS and images only, guarded by
-  <code>npm run design -- --check</code> and a content security policy on every page.
+  <code class="ds-nowrap">npm run design -- --check</code> and a content security policy on every page.
   The full rules are in <a href="README.md">README.md</a>.
 </div>
 
@@ -415,10 +441,10 @@ ${[...VALID_STATUS].map(s => `    <li><strong>${s}</strong> – ${escapeHtml(STA
   <a href="../designs/index.html">the designs index</a>. A screen cites a card; it never decides a system rule.
 </div>
 
+${sections.join('\n\n')}
+
 <h2 id="start-here">Start here by task</h2>
 ${tasks.length ? `<table>\n<thead><tr><th>I need to…</th><th>Card</th></tr></thead>\n<tbody>\n${taskRows}\n</tbody>\n</table>` : '<p class="ds-muted">No card declares an <code>answers</code> field yet.</p>'}
-
-${sections.join('\n\n')}
 
 <h2 id="token-owners">Which card owns this token</h2>
 <p class="ds-muted">Each token family has exactly one owner card, which shows every token in it or says why not.</p>
@@ -445,18 +471,76 @@ ${supersededBlock}
 
 /* ---------------------------------------------------------------- deviations.html */
 
-/** Every `deviates:` marker in src/, as { file, line, target, reason }. */
+/** The longest reason the register quotes; the site holds the rest. */
+export const REASON_MAX = 200
+
+/**
+ * The reason a `deviates:` marker gives, read across its continuation lines.
+ * `lines` is the file, `i` the marker's line index and `rest` the text after the
+ * target on that line. A block comment continues until its close; a line
+ * comment while the next line is one too. Either stops at a blank comment line,
+ * and the result is capped at REASON_MAX characters with an ellipsis.
+ */
+export function deviationReason(lines, i, rest) {
+  const marker = lines[i]
+  const before = marker.slice(0, marker.indexOf('deviates:'))
+  // Inside a block comment when the marker line opens one, or when it is itself
+  // a ` * ` continuation line of a comment opened above.
+  const block = before.lastIndexOf('/*') > before.lastIndexOf('*/') || /^\s*\*\s*$/.test(before)
+  const parts = []
+  let open = block
+  const closeAt = rest.indexOf('*/')
+  if (closeAt >= 0) {
+    parts.push(rest.slice(0, closeAt))
+    open = false
+  } else parts.push(rest)
+  const lineComment = !block && /\/\/[^/]*$/.test(before)
+  for (let j = i + 1; j < lines.length && (open || lineComment); j += 1) {
+    let text = lines[j]
+    if (open) {
+      const close = text.indexOf('*/')
+      if (close >= 0) text = text.slice(0, close)
+      text = text.replace(/^\s*\*?\s?/, '')
+      if (text.trim() === '' && close < 0) break
+      parts.push(text)
+      if (close >= 0) break
+    } else {
+      const m = /^\s*\/\/\s?(.*)$/.exec(text)
+      if (!m || m[1].trim() === '') break
+      parts.push(m[1])
+    }
+  }
+  const reason = parts.join(' ').replace(/\s+/g, ' ').trim()
+  return reason.length > REASON_MAX ? `${reason.slice(0, REASON_MAX - 1).trimEnd()}…` : reason
+}
+
+/** Markers in one file's lines, as { file, line, target, reason }. */
+export function deviationsIn(file, text, extra = {}) {
+  const found = []
+  const lines = text.split(/\r?\n/)
+  lines.forEach((line, i) => {
+    const hit = /deviates:\s*(docs\/design(?:s|-system)\/[^\s,)*]*)\s*(?:[–—-]\s*)?(.*)$/.exec(line)
+    if (!hit) return
+    found.push({ file, line: i + 1, target: hit[1].replace(/[.,;:]$/, ''), reason: deviationReason(lines, i, hit[2]), ...extra })
+  })
+  return found
+}
+
+/**
+ * Every `deviates:` marker in src/, plus those in the PROPOSED component CSS
+ * under docs/design-system/system/ (labelled so: they ship nothing yet). The
+ * adopted copies in COMPONENT_CSS are skipped – their markers are the src/ ones.
+ */
 export function collectDeviations() {
   const found = []
   for (const file of walkAll(ROOT, 'src')) {
     if (!/\.(css|ts|tsx|js|mjs|html)$/.test(file) || /\.test\./.test(file)) continue
-    const lines = readFileSync(path.join(ROOT, file), 'utf8').split(/\r?\n/)
-    lines.forEach((text, i) => {
-      const hit = /deviates:\s*(docs\/design(?:s|-system)\/[^\s,)*]*)\s*(?:[–—-]\s*)?(.*)$/.exec(text)
-      if (!hit) return
-      const reason = hit[2].replace(/\*\/\s*$/, '').trim()
-      found.push({ file, line: i + 1, target: hit[1].replace(/[.,;:]$/, ''), reason })
-    })
+    found.push(...deviationsIn(file, readFileSync(path.join(ROOT, file), 'utf8')))
+  }
+  const adopted = new Set(COMPONENT_CSS.map(({ rel }) => `docs/design-system/${rel}`))
+  for (const file of walkAll(ROOT, 'docs/design-system/system')) {
+    if (!file.endsWith('.css') || adopted.has(file)) continue
+    found.push(...deviationsIn(file, readFileSync(path.join(ROOT, file), 'utf8'), { proposed: true }))
   }
   return found
 }
@@ -494,14 +578,15 @@ function sectionText(html, id) {
   return null
 }
 
-function renderDeviations(entries, cards) {
+export function renderDeviations(entries, cards) {
   const rows = entries
-    .map(({ file, line, target, reason }) => {
+    .map(({ file, line, target, reason, proposed }) => {
       const href = target.startsWith('docs/design-system/')
         ? target.slice('docs/design-system/'.length)
         : `../${target.slice('docs/'.length)}`
       const card = cards.find(c => c.file === target)
-      return `  <tr><td><code>${escapeHtml(file)}:${line}</code></td><td><a href="${escapeHtml(href)}">${escapeHtml(card?.name ?? target.replace(/^docs\//, ''))}</a></td><td>${escapeHtml(reason || '(reason continues on the next lines at the site)')}</td></tr>`
+      const label = proposed ? ' <span class="ds-muted">proposed component</span>' : ''
+      return `  <tr><td class="dv-site"><code>${escapeHtml(file).replace(/\//g, '/<wbr>')}:${line}</code>${label}</td><td><a href="${escapeHtml(href)}">${escapeHtml(card?.name ?? target.replace(/^docs\//, ''))}</a></td><td>${escapeHtml(reason || '(reason continues on the next lines at the site)')}</td></tr>`
     })
     .join('\n')
   return `${SPDX}
@@ -509,14 +594,20 @@ function renderDeviations(entries, cards) {
 <html lang="en" data-theme="dark">
 <head>
 ${head('Deviation register')}
+<style>
+  /* A site path may break after any slash, so the reason column keeps its width. */
+  .dv-site code { white-space: normal; }
+  .dv-site { inline-size: 40%; }
+</style>
 </head>
 <body>
 <main>
 <nav class="ds-crumbs" aria-label="Breadcrumb"><a href="index.html">Erfana design system</a> <span aria-hidden="true">/</span> <span aria-current="page">Deviation register</span></nav>
 <h1>Deviation register</h1>
 <p class="ds-lede">
-  Every <code>deviates:</code> marker in <code>src/</code> – ${entries.length} today – generated by
-  <code>npm run design</code>. A deviation is legal only when the code says so at the site and the card it
+  Every <code>deviates:</code> marker in <code>src/</code>, and in the proposed component CSS under
+  <code>system/</code> – ${entries.length} today – generated by <code>npm run design</code>. A reason longer
+  than ${REASON_MAX} characters is cut short here; the site holds the whole text. A deviation is legal only when the code says so at the site and the card it
   departs from lists the file under Exceptions; <code>npm run design -- --check</code> fails otherwise.
 </p>
 <table>
@@ -590,24 +681,210 @@ const ICON_ATTRS = [
   ['aria-hidden', 'true']
 ]
 
+const LUCIDE_ICONS = 'node_modules/lucide-react/dist/esm/icons'
+const LUCIDE_INDEX = 'node_modules/lucide-react/dist/esm/lucide-react.js'
+/** A lucide file name: lower-case words joined by single hyphens, nothing else –
+ * checked BEFORE the name reaches a path, so "../x" never touches the disk. */
+export const ICON_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
+const ICON_NODE = /const __iconNode = (\[[\s\S]*?\]);\r?\n/
+const ICON_ALIAS = /^export \{ default \} from '\.\/([a-z0-9-]+)\.js';?$/m
+
+/**
+ * The __iconNode array of a lucide icon module, read as TEXT and never
+ * imported: the baker runs no code from node_modules. The array is a JS literal
+ * with bare keys and double-quoted strings; quoting the keys makes it JSON. A
+ * module that is only `export { default } from './x.js'` (lucide's alias for a
+ * renamed glyph, e.g. edit-3 -> pen-line) is followed once.
+ */
+export function readIconNode(name, root = ROOT, hops = 0) {
+  if (!ICON_NAME.test(name)) throw new DesignError(`"${name}" is not a lucide icon name (lower-case words and hyphens)`)
+  const file = path.join(root, LUCIDE_ICONS, `${name}.js`)
+  if (!existsSync(file)) throw new DesignError(`unknown lucide icon "${name}"`)
+  const text = readFileSync(file, 'utf8')
+  const node = ICON_NODE.exec(text)
+  if (node) {
+    try {
+      return { file: name, node: JSON.parse(node[1].replace(/([{,]\s*)([A-Za-z_$][\w$-]*)\s*:/g, '$1"$2":')) }
+    } catch (error) {
+      throw new DesignError(`lucide icon "${name}": its __iconNode is not a plain literal (${error.message})`)
+    }
+  }
+  const alias = ICON_ALIAS.exec(text)
+  if (!alias || hops > 0) throw new DesignError(`lucide icon "${name}" has no __iconNode and no single alias to follow`)
+  return readIconNode(alias[1], root, hops + 1)
+}
+
 const iconCache = new Map()
 /** The SVG children for a lucide icon, from the shipping package. */
-async function iconMarkup(name) {
-  if (!iconCache.has(name)) {
-    const file = path.join(ROOT, 'node_modules/lucide-react/dist/esm/icons', `${name}.js`)
-    if (!existsSync(file)) throw new DesignError(`unknown lucide icon "${name}"`)
-    const { __iconNode } = await import(pathToFileURL(file).href)
+export function iconMarkup(name, root = ROOT) {
+  const key = `${root}\0${name}`
+  if (!iconCache.has(key)) {
     iconCache.set(
-      name,
-      __iconNode
-        .map(([tag, attrs]) => {
+      key,
+      readIconNode(name, root)
+        .node.map(([tag, attrs]) => {
           const list = Object.entries(attrs).filter(([k]) => k !== 'key')
           return `<${tag}${list.map(([k, v]) => ` ${k}="${escapeHtml(v)}"`).join('')}/>`
         })
         .join('')
     )
   }
-  return iconCache.get(name)
+  return iconCache.get(key)
+}
+
+/** lucide-react's export map: component name -> icon file name. */
+export function lucideExports(root = ROOT) {
+  const map = new Map()
+  const text = readFileSync(path.join(root, LUCIDE_INDEX), 'utf8')
+  for (const [, names, file] of text.matchAll(/^export \{([^}]*)\} from '\.\/icons\/([a-z0-9-]+)\.js';$/gm)) {
+    for (const [, exported] of names.matchAll(/default as (\w+)/g)) map.set(exported, file)
+  }
+  return map
+}
+
+const ICON_REGISTRY_FILE = 'src/renderer/src/utils/iconRegistry.tsx'
+
+/**
+ * The registry, read from iconRegistry.tsx: every IconName, the component the
+ * registry maps it to, and the lucide file that component resolves to through
+ * lucide-react's own export map. Throws when the union and the map disagree or
+ * a component does not resolve – a list that silently lost a glyph is the
+ * failure this replaces.
+ */
+export function readIconRegistry(root = ROOT) {
+  const text = readFileSync(path.join(root, ICON_REGISTRY_FILE), 'utf8')
+  const union = /export type IconName\s*=([\s\S]*?)\n\s*\n/.exec(text)
+  const map = /const ICON_REGISTRY[^=]*=\s*\{([\s\S]*?)\n\}/.exec(text)
+  if (!union || !map) throw new DesignError(`${ICON_REGISTRY_FILE}: IconName or ICON_REGISTRY not found`)
+  const names = [...union[1].replace(/\/\/.*$/gm, '').matchAll(/\|\s*'([^']+)'/g)].map(m => m[1])
+  const entries = [...map[1].replace(/\/\/.*$/gm, '').matchAll(/'([^']+)'\s*:\s*(\w+)/g)].map(m => ({ name: m[1], component: m[2] }))
+  if (names.length === 0 || entries.length !== names.length || entries.some(e => !names.includes(e.name))) {
+    throw new DesignError(
+      `${ICON_REGISTRY_FILE}: IconName has ${names.length} names but ICON_REGISTRY maps ${entries.length} – the reader expected them to match`
+    )
+  }
+  const exports = lucideExports(root)
+  return entries.map(({ name, component }) => {
+    const file = exports.get(component)
+    if (!file) throw new DesignError(`${ICON_REGISTRY_FILE}: ${component} (for '${name}') is not exported by lucide-react`)
+    return { name, component, file }
+  })
+}
+
+/** The registry's glyphs as <li> items, drawn from the file each import resolves to. */
+export function iconRegistryRegion(root = ROOT) {
+  const svgAttrs = ICON_ATTRS.filter(([k]) => k !== 'aria-hidden').map(([k, v]) => ` ${k}="${v}"`).join('')
+  return readIconRegistry(root)
+    .map(({ name, file }) => {
+      const drawn = readIconNode(file, root).file
+      const source = drawn === name ? '' : ` <span class="ic-glyphs__src">draws ${escapeHtml(drawn)}</span>`
+      return (
+        `<li><svg class="ic ic--sm ic--stroke" aria-hidden="true"${svgAttrs}>${iconMarkup(file, root)}</svg>` +
+        `<span>${escapeHtml(name)}${source}</span></li>`
+      )
+    })
+    .join('')
+}
+
+/* ---- the xterm theme, read from the hook that ships it ---- */
+
+const XTERM_FILE = 'src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts'
+const XTERM_DUPLICATE_FILE = 'src/renderer/src/components/Panels/TerminalPanel/terminalPanel.logic.ts'
+/** The theme keys the card draws; the reader fails when any is missing. */
+export const XTERM_SURFACE_KEYS = ['background', 'foreground', 'cursor', 'cursorAccent', 'selectionBackground']
+export const ANSI_KEYS = [
+  'black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white',
+  'brightBlack', 'brightRed', 'brightGreen', 'brightYellow', 'brightBlue', 'brightMagenta', 'brightCyan', 'brightWhite'
+]
+/** The bar the Terminal card sets for program output on the terminal background. */
+export const ANSI_TEXT_MIN = 4.5
+
+/** `key: '#hex'` pairs inside the first `<opener> {` … `}` block of a TS source. */
+function themeLiteral(text, opener, file) {
+  const start = text.indexOf(opener)
+  if (start < 0) throw new DesignError(`${file}: "${opener}" not found`)
+  const end = text.indexOf('}', start + opener.length)
+  const body = text.slice(start + opener.length, end)
+  return Object.fromEntries([...body.matchAll(/(\w+)\s*:\s*'(#[0-9a-fA-F]{3,8})'/g)].map(m => [m[1], m[2].toLowerCase()]))
+}
+
+/** XTERM_OPTIONS from useXtermSession.ts: { theme, fontSize }. Throws on a short read. */
+export function readXtermTheme(root = ROOT) {
+  const text = readFileSync(path.join(root, XTERM_FILE), 'utf8')
+  const options = text.indexOf('const XTERM_OPTIONS')
+  if (options < 0) throw new DesignError(`${XTERM_FILE}: XTERM_OPTIONS not found`)
+  const theme = themeLiteral(text.slice(options), 'theme: {', XTERM_FILE)
+  const missing = [...XTERM_SURFACE_KEYS, ...ANSI_KEYS].filter(k => !(k in theme))
+  if (missing.length) throw new DesignError(`${XTERM_FILE}: XTERM_OPTIONS.theme lacks ${missing.join(', ')} – the reader expected all ${XTERM_SURFACE_KEYS.length + ANSI_KEYS.length} colours`)
+  const fontSize = Number(/fontSize\s*:\s*(\d+(?:\.\d+)?)/.exec(text.slice(options))?.[1])
+  if (!Number.isFinite(fontSize)) throw new DesignError(`${XTERM_FILE}: XTERM_OPTIONS.fontSize not found`)
+  return { theme, fontSize }
+}
+
+/** The second copy of the palette (TERMINAL_THEME), compared key by key with the one that ships. */
+export function xtermDuplicateProblems(root = ROOT) {
+  const { theme } = readXtermTheme(root)
+  const text = readFileSync(path.join(root, XTERM_DUPLICATE_FILE), 'utf8')
+  const copy = themeLiteral(text, 'TERMINAL_THEME: ITheme = {', XTERM_DUPLICATE_FILE)
+  return [...XTERM_SURFACE_KEYS, ...ANSI_KEYS]
+    .filter(k => copy[k] !== theme[k])
+    .map(k => `${XTERM_DUPLICATE_FILE}: TERMINAL_THEME.${k} is ${copy[k] ?? 'missing'} but XTERM_OPTIONS.theme.${k} in useXtermSession.ts is ${theme[k]} – the two copies must agree until one is deleted (Terminal card, Named defects)`)
+}
+
+const kebab = key => key.replace(/[A-Z]/g, c => `-${c.toLowerCase()}`)
+
+/** Each ANSI colour with its raw ratio on the theme background and its verdict. */
+export function ansiContrast(root = ROOT) {
+  const { theme } = readXtermTheme(root)
+  return ANSI_KEYS.map(key => {
+    const ratio = contrastRatio(theme[key], theme.background)
+    // Black on the black background is invisible by design, so it has no bar.
+    const verdict = key === 'black' ? null : ratio >= ANSI_TEXT_MIN ? 'pass' : 'fail'
+    return { key, name: kebab(key).replace('-', ' '), value: theme[key], ratio, verdict }
+  })
+}
+
+function xtermThemeRegion(root = ROOT) {
+  const { theme, fontSize } = readXtermTheme(root)
+  const props = [
+    ['--ds-xterm-background', theme.background],
+    ['--ds-xterm-foreground', theme.foreground],
+    ['--ds-xterm-cursor', theme.cursor],
+    ['--ds-xterm-cursor-accent', theme.cursorAccent],
+    ['--ds-xterm-selection', theme.selectionBackground],
+    ...ANSI_KEYS.map(k => [`--ds-ansi-${kebab(k)}`, theme[k]])
+  ]
+  return (
+    '\n  /* Generated by npm run design from XTERM_OPTIONS in useXtermSession.ts – do not edit.\n' +
+    '     Literal hex because the shipping theme is literal hex: this is the defect the card names. */\n' +
+    '  /* stylelint-disable color-no-hex -- the shipping xterm theme is literal hex; this mirrors it */\n' +
+    `  :root {\n${props.map(([k, v]) => `    ${k}: ${v};`).join('\n')}\n` +
+    '    /* deviates: docs/design-system/system/foundations/type.html – xterm draws at its own fontSize,\n' +
+    '       which has no token: the screen is drawn at the size that ships. */\n' +
+    `    --ds-xterm-font-size: ${fontSize}px;\n  }\n` +
+    '  /* stylelint-enable color-no-hex */\n'
+  )
+}
+
+function xtermAnsiRegion(root = ROOT) {
+  return ansiContrast(root)
+    .map(({ key, name, ratio, verdict }) => {
+      const ink = key === 'black' ? 'white' : kebab(key)
+      const result = verdict
+        ? `<b data-result="${verdict}">${formatRatio(ratio)}:1 · ${verdict}</b>`
+        : `<b>${formatRatio(ratio)}:1 · no bar</b>`
+      return (
+        `<div><i style="background: var(--ds-ansi-${kebab(key)})"></i>` +
+        `<span style="color: var(--ds-ansi-${ink})">${escapeHtml(name)}</span>${result}</div>`
+      )
+    })
+    .join('')
+}
+
+function xtermAnsiFailsRegion(root = ROOT) {
+  const failing = ansiContrast(root).filter(c => c.verdict === 'fail').map(c => c.name)
+  if (failing.length === 0) return 'none'
+  return failing.length === 1 ? failing[0] : `${failing.slice(0, -1).join(', ')} and ${failing.at(-1)}`
 }
 
 /**
@@ -649,7 +926,11 @@ export function hostRow(origin) {
 }
 
 export const GENERATED_REGIONS = {
-  'host-elide': () => HOST_ORIGINS.map(hostRow).join('')
+  'host-elide': () => HOST_ORIGINS.map(hostRow).join(''),
+  'icon-registry': () => iconRegistryRegion(),
+  'xterm-theme': () => xtermThemeRegion(),
+  'xterm-ansi': () => xtermAnsiRegion(),
+  'xterm-ansi-fails': () => xtermAnsiFailsRegion()
 }
 
 /** Parse "--fg on --bg [over --surface]". */
@@ -663,11 +944,27 @@ function parseContrastSpec(spec) {
  * target with its line, what it asked for, the stale inner text and the fresh
  * one – the check mode reports from that list.
  */
-export async function bakePage(file, text, { claims, ledger, tokens }) {
+export async function bakePage(file, text, { claims, ledger, tokens, regions = GENERATED_REGIONS }) {
   const doc = parse(text, { sourceCodeLocationInfo: true })
   const edits = []
   const targets = []
   const problems = []
+
+  // The policy meta: when the first element of <head> is one, its content is
+  // baked to CSP_CONTENT. A page with none is left to the static guard.
+  const head = doc.childNodes.find(n => n.tagName === 'html')?.childNodes.find(n => n.tagName === 'head')
+  const first = head?.childNodes.find(n => n.tagName)
+  if (
+    first?.tagName === 'meta' &&
+    first.sourceCodeLocation?.attrs?.content &&
+    (first.attrs.find(a => a.name === 'http-equiv')?.value ?? '').toLowerCase() === 'content-security-policy'
+  ) {
+    const attrLoc = first.sourceCodeLocation.attrs.content
+    const current = text.slice(attrLoc.startOffset, attrLoc.endOffset)
+    const wanted = `content="${CSP_CONTENT}"`
+    targets.push({ line: attrLoc.startLine, kind: 'csp content', id: 'Content-Security-Policy', stale: current, fresh: wanted })
+    if (current !== wanted) edits.push([attrLoc.startOffset, attrLoc.endOffset, wanted])
+  }
 
   for (const node of nodesOf(doc)) {
     if (!node.tagName) continue
@@ -699,14 +996,21 @@ export async function bakePage(file, text, { claims, ledger, tokens }) {
         continue
       }
       // A ratio is quoted to two decimals, as WCAG tools quote it: 2.20, not 2.2.
-      inner = escapeHtml(ledger[id].kind === 'contrast' ? claims[id].toFixed(2) : String(claims[id]))
+      inner = escapeHtml(ledger[id].kind === 'contrast' ? formatRatio(claims[id]) : String(claims[id]))
       setAttrs.title = ledger[id].label
     } else if (kind === 'data-token') {
       if (!tokens.has(id)) {
         problems.push(`${where} data-token="${id}" is not declared in design-tokens.css`)
         continue
       }
-      inner = escapeHtml(resolveVar(`var(${id})`, tokens).replace(/\s+/g, ' '))
+      const literal = resolveVar(`var(${id})`, tokens).replace(/\s+/g, ' ')
+      // resolveVar follows a whole-value var() only; a var() inside a longer
+      // value (a shadow, a calc) would be quoted half-resolved.
+      if (/var\(/.test(literal)) {
+        problems.push(`${where} data-token="${id}" resolves to "${literal}", which still holds a var() – quote a token whose value is a literal`)
+        continue
+      }
+      inner = escapeHtml(literal)
     } else if (kind === 'data-contrast') {
       const spec = parseContrastSpec(id)
       const min = Number(attrs['data-min'])
@@ -726,23 +1030,29 @@ export async function bakePage(file, text, { claims, ledger, tokens }) {
         continue
       }
       if ('data-min' in attrs) {
-        // A verdict: pass or fail against the bar the card names.
+        // A verdict: the RAW ratio against the bar the card names. The quoted
+        // figure rounds down, so it never reads as a pass the verdict denies.
         const verdict = ratio >= min ? 'pass' : 'fail'
-        inner = `${ratio.toFixed(2)}:1 · ${verdict}`
+        inner = `${formatRatio(ratio)}:1 · ${verdict}`
         setAttrs['data-result'] = verdict
       } else {
         // A measurement with no bar – a surface's step from its neighbour.
-        inner = `${ratio.toFixed(2)}:1`
+        inner = `${formatRatio(ratio)}:1`
       }
     } else if (kind === 'data-generated') {
-      if (!(id in GENERATED_REGIONS)) {
+      if (!Object.hasOwn(regions, id)) {
         problems.push(`${where} data-generated="${id}" names no region in GENERATED_REGIONS`)
         continue
       }
-      inner = GENERATED_REGIONS[id]()
+      try {
+        inner = regions[id]()
+      } catch (error) {
+        problems.push(`${where} data-generated="${id}": ${error.message}`)
+        continue
+      }
     } else {
       try {
-        inner = await iconMarkup(id)
+        inner = iconMarkup(id)
       } catch (error) {
         problems.push(`${where} ${error.message}`)
         continue
@@ -760,6 +1070,9 @@ export async function bakePage(file, text, { claims, ledger, tokens }) {
     targets.push({ line: loc.startLine, kind, id, stale, fresh: inner })
     if (stale !== inner) edits.push([start, end, inner])
 
+    // Attributes the tag lacks go in as ONE insertion, in the order listed, so
+    // two inserts at the same offset cannot land reversed.
+    const inserted = []
     for (const [name, value] of Object.entries(setAttrs)) {
       const encoded = escapeHtml(value)
       const attrLoc = loc.startTag.attrs?.[name.toLowerCase()]
@@ -769,11 +1082,14 @@ export async function bakePage(file, text, { claims, ledger, tokens }) {
         if (current !== wanted) edits.push([attrLoc.startOffset, attrLoc.endOffset, wanted])
         if (current !== wanted) targets.push({ line: loc.startLine, kind: `${kind} ${name}`, id, stale: current, fresh: wanted })
       } else {
-        const close = text.slice(loc.startTag.startOffset, loc.startTag.endOffset).endsWith('/>') ? 2 : 1
-        const at = loc.startTag.endOffset - close
-        edits.push([at, at, ` ${name}="${encoded}"`])
+        inserted.push(` ${name}="${encoded}"`)
         targets.push({ line: loc.startLine, kind: `${kind} ${name}`, id, stale: '(missing)', fresh: `${name}="${encoded}"` })
       }
+    }
+    if (inserted.length) {
+      const close = text.slice(loc.startTag.startOffset, loc.startTag.endOffset).endsWith('/>') ? 2 : 1
+      const at = loc.startTag.endOffset - close
+      edits.push([at, at, inserted.join('')])
     }
   }
   if (problems.length) throw new DesignError(problems.join('\n'))
@@ -971,6 +1287,7 @@ async function run() {
   problems.push(...ownershipProblems(tokens))
   problems.push(...anatomyProblems(cards))
   problems.push(...stylelintCoverageProblems())
+  problems.push(...xtermDuplicateProblems())
 
   if (problems.length > 0) {
     console.error(`design-sync: ${problems.length} problem(s):`)

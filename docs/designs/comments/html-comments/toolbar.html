@@ -3,7 +3,7 @@
 <!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
 <!DOCTYPE html>
 <html lang="en" data-theme="dark"><head>
-<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Erfana – comment tools in the toolbar</title>
@@ -16,9 +16,11 @@
 <link rel="stylesheet" href="./comments.css">
 <style>
   .full-panel { inline-size: 820px; block-size: 240px; }
+  /* Documents each button's title string – the OS draws the real bubble, so
+     there is no app scale to keep: documentation size. */
   .tip { display: block; margin-top: var(--space-3); max-inline-size: 300px; padding: var(--space-2) var(--space-4);
          background: var(--color-bg-tertiary); border: var(--border-width) solid var(--color-border-subtle);
-         font-size: var(--text-sm); color: var(--color-text-primary); }
+         font-size: var(--ds-text-small); color: var(--color-text-primary); }
   .widths { display: flex; flex-direction: column; gap: var(--space-8); margin-bottom: var(--space-12); }
   .width-demo { border: var(--border-width) dashed var(--color-border-subtle); }
   .readout .over { color: var(--color-error); }

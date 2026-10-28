@@ -4,7 +4,7 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
-<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Erfana – Comments v2, overview</title>
@@ -19,7 +19,7 @@
 <style>
   /* ---------- card chrome: the change map ---------- */
   .c2i-map { max-inline-size: 1240px; margin-block-end: var(--space-8); }
-  .c2i-map td { vertical-align: top; font-size: var(--text-sm); }
+  .c2i-map td { vertical-align: top; font-size: var(--ds-text-small); }
   .c2i-map td:first-child,
   .c2i-map td:nth-child(2) { font-family: var(--font-mono); white-space: nowrap; }
   .c2i-map td:nth-child(4) { color: var(--color-text-secondary); }
@@ -59,7 +59,7 @@
   .erf-hpc-pin--selected .erf-hpc-pin__line { fill: var(--color-accent-primary); }
 
   .c2i-win { inline-size: 400px; }
-  .c2i-disclosure { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); }
+  .c2i-disclosure { /* mockup: app scale – the window disclosure */ display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); }
   .c2i-narrow { margin-block-start: var(--space-4); }
 
   /* A focus ring drawn at rest, for "Close focused". */
@@ -76,19 +76,18 @@
      Only the card's own prose grows. The mockups keep the app's real sizes,
      because a card draws the app to scale. Window titles are h2 too, so the
      heading rules are scoped to the page's own top-level headings. */
-  body > h1 { font-size: calc(var(--text-2xl) * 1.2); }
+  body > h1 { font-size: var(--ds-text-title); }
   body > h2 { font-size: var(--text-xl); }
-  .ds-lede { font-size: var(--text-md); }
   .ds-note { font-size: var(--text-md); }
-  .c2i-map th { font-size: var(--text-sm); }
+  .c2i-map th { font-size: var(--ds-text-small); }
   .c2i-map td { font-size: var(--text-md); }
-  .step__no { font-size: var(--text-sm); }
+  .step__no { font-size: var(--ds-text-small); }
   .step__title { font-size: var(--text-lg); }
   .step__text { font-size: var(--text-md); }
-  .c2-grid > figure > figcaption { font-size: var(--text-sm); max-inline-size: 64ch; }
-  .c2-change { font-size: var(--text-sm); }
-  .announce-view { font-size: var(--text-sm); }
-  body > table th { font-size: var(--text-sm); }
+  .c2-grid > figure > figcaption { font-size: var(--ds-text-small); max-inline-size: 64ch; }
+  .c2-change { font-size: var(--ds-text-small); }
+  .announce-view { font-size: var(--ds-text-small); }
+  body > table th { font-size: var(--ds-text-small); }
   body > table td { font-size: var(--text-md); }
   .ds-lede code, .ds-note code, .step__text code, .c2i-map code, body > table code { font-size: var(--text-base); }
 </style>

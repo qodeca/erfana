@@ -129,8 +129,10 @@
 
 /* ---------- key ---------- */
 
-/* One key. A combination is several keys joined by "+" OUTSIDE the boxes,
-   inside an .erf-keys wrapper that never breaks across lines. */
+/* One box per CHORD, on every platform: the box holds exactly the string
+   formatShortcut() returns – glyphs on macOS ("⇧⌘F"), Ctrl+ on Windows and
+   Linux ("Ctrl+Shift+F"). Never one box per glyph or per word. The rule is
+   owned by the Writing card (#shortcuts); this only draws it. */
 .erf-kbd {
   display: inline-block;
   min-width: var(--space-10);
@@ -145,7 +147,10 @@
   font-weight: var(--font-normal);
   line-height: var(--leading-normal);
   text-align: center;
+  white-space: nowrap;
 }
+/* Kept for the Permission band card's tooltip drawings, which still split a
+   chord into boxes; retire it once that card draws one box per chord. */
 .erf-keys {
   white-space: nowrap;
   color: var(--color-text-tertiary);

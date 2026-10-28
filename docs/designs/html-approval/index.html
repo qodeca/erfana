@@ -3,7 +3,7 @@
 <!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
 <!DOCTYPE html>
 <html lang="en" data-theme="dark"><head>
-<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Erfana – approving a remote host</title>
@@ -15,7 +15,7 @@
   .step { display: grid; grid-template-columns: minmax(0, 560px) minmax(0, 1fr);
           gap: var(--space-16); align-items: start; margin-bottom: var(--space-24); }
 
-  .step__no { font-family: var(--font-mono); font-size: var(--text-sm);
+  .step__no { font-family: var(--font-mono); font-size: var(--ds-text-small);
               color: var(--color-accent-primary); letter-spacing: 0.1em; margin: 0 0 var(--space-2); }
   .step__title { margin: 0 0 var(--space-6); font-size: var(--text-lg);
                  font-weight: var(--font-semibold); color: var(--color-text-emphasis); }

@@ -4,12 +4,13 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
-<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Writing – Erfana design system</title>
 <link rel="stylesheet" href="../../tokens.css">
 <link rel="stylesheet" href="../../ds.css">
+<link rel="stylesheet" href="../components/badge/badge.css">
 <style>
   /* Do / don't pairs. The verdict is a word first; the edge colour repeats it. */
   .wr-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(calc(var(--space-24) * 6), 1fr));
@@ -18,8 +19,9 @@
            border-left: var(--border-width-thick) solid var(--color-border-subtle); }
   .wr-ex--do { border-left-color: var(--color-brand-lime); }
   .wr-ex--dont { border-left-color: var(--color-error); }
-  .wr-ex > figcaption { margin-top: var(--space-4); font-size: var(--text-sm); color: var(--color-text-tertiary); }
-  .wr-verdict { display: block; margin-bottom: var(--space-3); font-family: var(--font-mono); font-size: var(--text-xs);
+  .wr-ex > figcaption { margin-top: var(--space-4); font-size: var(--ds-text-small); color: var(--color-text-tertiary); }
+  /* Size and face from ds.css .ds-verdict; this adds the block and the caps. */
+  .wr-verdict { display: block; margin-bottom: var(--space-3);
                 text-transform: uppercase; letter-spacing: var(--ds-caps-tracking); }
   .wr-ex--do .wr-verdict { color: var(--color-brand-lime); }
   .wr-ex--dont .wr-verdict { color: var(--color-error); }
@@ -42,9 +44,11 @@
   .wr-menu { padding: var(--space-2) 0; background: var(--color-bg-tertiary); border: var(--border-width) solid var(--color-border-subtle);
              font-size: var(--text-base); color: var(--color-text-primary); }
   .wr-menu__item { display: flex; justify-content: space-between; gap: var(--space-12); padding: var(--space-2) var(--space-6); }
-  .wr-menu__key { color: var(--color-text-tertiary); font-family: var(--font-mono); font-size: var(--text-sm); }
+  .wr-menu__key { /* mockup: app scale – a menu shortcut */ color: var(--color-text-tertiary); font-family: var(--font-mono); font-size: var(--text-sm); }
+  .wr-hint { /* mockup: app scale – a dialog hint */ display: flex; flex-direction: column; gap: var(--space-3);
+             padding: var(--space-6); background: var(--color-bg-secondary); font-size: var(--text-sm); color: var(--color-text-tertiary); }
   .wr-label { font-size: var(--text-base); color: var(--color-text-primary); }
-  .wr-caps { font-size: var(--text-sm); font-weight: var(--font-semibold); text-transform: uppercase;
+  .wr-caps { /* mockup: app scale – a panel title */ font-size: var(--text-sm); font-weight: var(--font-semibold); text-transform: uppercase;
              letter-spacing: var(--ds-caps-tracking); color: var(--color-text-primary); }
 </style>
 </head>
@@ -65,11 +69,11 @@ the first word and proper nouns only: Erfana, Claude Code, Markdown, Mermaid, Gi
 <em>style</em> two roles apply with CSS (panel titles and column headers – see Typography), never typed into the string,
 so a screen reader does not spell it out and a translation is not shouted.</p>
 <div class="wr-pair">
-  <figure class="wr-ex wr-ex--do"><span class="wr-verdict">Do</span><div aria-hidden="true"><span class="wr-label">Open recent project</span></div>
+  <figure class="wr-ex wr-ex--do"><span class="ds-verdict wr-verdict">Do</span><div aria-hidden="true"><span class="wr-label">Open recent project</span></div>
     <figcaption>Sentence case. Reads as a phrase.</figcaption></figure>
-  <figure class="wr-ex wr-ex--dont"><span class="wr-verdict">Don't</span><div aria-hidden="true"><span class="wr-label">Open Recent Project</span></div>
+  <figure class="wr-ex wr-ex--dont"><span class="ds-verdict wr-verdict">Don't</span><div aria-hidden="true"><span class="wr-label">Open Recent Project</span></div>
     <figcaption>Title case. Every word competes; proper nouns stop standing out.</figcaption></figure>
-  <figure class="wr-ex wr-ex--do"><span class="wr-verdict">Do</span><div aria-hidden="true"><span class="wr-caps">Project</span></div>
+  <figure class="wr-ex wr-ex--do"><span class="ds-verdict wr-verdict">Do</span><div aria-hidden="true"><span class="wr-caps">Project</span></div>
     <figcaption>Typed "Project", uppercased by the panel-title style.</figcaption></figure>
 </div>
 
@@ -83,6 +87,7 @@ so a screen reader does not spell it out and a translation is not shouted.</p>
   <tr><td>Hyphen</td><td>Compound words and file names only</td><td>read-only, design-tokens.css</td></tr>
   <tr><td>Ellipsis …</td><td>One character (…), not three dots. On a command that asks for more before it acts, and on a status that is still running</td><td>Rename…, Loading project…</td></tr>
   <tr><td>Full stop</td><td>Ends a sentence in a body, a hint or a toast. Not on a title, a button, a menu item or a label</td><td>Applies to new terminals only.</td></tr>
+  <tr><td>Ampersand &amp;</td><td>Never in UI text, a title or a card name – write “and”</td><td>Rows and lists, Focus and keyboard</td></tr>
   <tr><td>Quotes</td><td>Curly (“ ” ‘ ’) in UI text; straight only inside code</td><td>Delete “notes.md”?</td></tr>
 </tbody>
 </table>
@@ -92,11 +97,11 @@ so a screen reader does not spell it out and a translation is not shouted.</p>
 reading the dialog. The confirming button repeats the title's verb. Cancel is always "Cancel". "OK", "Yes" and "No"
 are never a choice – they make the reader go back and re-read the question.</p>
 <div class="wr-pair">
-  <figure class="wr-ex wr-ex--do"><span class="wr-verdict">Do</span>
+  <figure class="wr-ex wr-ex--do"><span class="ds-verdict wr-verdict">Do</span>
     <div class="wr-dialog" aria-hidden="true"><p class="wr-dialog__title">Delete “notes.md”?</p><p class="wr-dialog__body">This removes the file from disk.</p>
       <div class="wr-actions"><span class="wr-btn">Cancel</span><span class="wr-btn wr-btn--danger">Delete file</span></div></div>
     <figcaption>The title asks, the body says the consequence, the button repeats the verb.</figcaption></figure>
-  <figure class="wr-ex wr-ex--dont"><span class="wr-verdict">Don't</span>
+  <figure class="wr-ex wr-ex--dont"><span class="ds-verdict wr-verdict">Don't</span>
     <div class="wr-dialog" aria-hidden="true"><p class="wr-dialog__title">Are you sure?</p><p class="wr-dialog__body">This action cannot be undone.</p>
       <div class="wr-actions"><span class="wr-btn">No</span><span class="wr-btn wr-btn--danger">Yes</span></div></div>
     <figcaption>Sure of what? Yes to what? The reader has to remember what they clicked.</figcaption></figure>
@@ -108,10 +113,10 @@ are never a choice – they make the reader go back and re-read the question.</p
 apology theatre ("Oops!"), no bare codes – a code goes after the sentence, for a bug report. The toast keeps the full
 file name; the log file gets it redacted (<code>redactUserInput</code>).</p>
 <div class="wr-pair">
-  <figure class="wr-ex wr-ex--do"><span class="wr-verdict">Do</span>
+  <figure class="wr-ex wr-ex--do"><span class="ds-verdict wr-verdict">Do</span>
     <div class="wr-toast" aria-hidden="true">Couldn't save “notes.md” – the disk is full. Free some space, then save again.</div>
     <figcaption>What, why, what next. One sentence each, at most.</figcaption></figure>
-  <figure class="wr-ex wr-ex--dont"><span class="wr-verdict">Don't</span>
+  <figure class="wr-ex wr-ex--dont"><span class="ds-verdict wr-verdict">Don't</span>
     <div class="wr-toast" aria-hidden="true">Oops! Something went wrong (ENOSPC).</div>
     <figcaption>Cheerful, vague, and only a code the reader cannot act on.</figcaption></figure>
 </div>
@@ -120,21 +125,34 @@ file name; the log file gets it redacted (<code>redactUserInput</code>).</p>
 See <a href="../components/form/index.html">Form controls</a>.</p>
 
 <h2 id="shortcuts">Keyboard shortcuts</h2>
+<p class="ds-muted">This card owns shortcut notation. Other cards draw shortcuts – the
+<a href="../components/badge/index.html#kbd">key style</a>, tooltips, menus – and link here instead of restating
+the rule.</p>
 <table class="ds-tokens">
 <thead><tr><th>Where</th><th>How it is written</th><th>Example</th></tr></thead>
 <tbody>
-  <tr><td>UI on macOS</td><td>Modifier glyphs in Apple's order ⌃ ⌥ ⇧ ⌘, then the key, no separators</td><td><kbd>⌥⇧⌘F</kbd></td></tr>
-  <tr><td>UI on Windows and Linux</td><td>Ctrl, Alt, Shift spelled out in that order, joined with +</td><td><kbd>Ctrl+Alt+Shift+F</kbd></td></tr>
-  <tr><td>Code that renders a label</td><td>Always <code>formatShortcut(key, { mod, alt, shift })</code> from <code>utils/shortcutLabel.ts</code> – never a typed string</td><td><code>formatShortcut('B', { mod: true })</code></td></tr>
-  <tr><td><code>aria-keyshortcuts</code></td><td>The ARIA key names, <code>Meta</code> and <code>Control</code>, joined with +</td><td><code>Meta+C</code>, <code>Control+V</code></td></tr>
-  <tr><td>Docs, cards and issues</td><td>Both platforms, macOS first, separated by a slash</td><td><kbd>⌘B</kbd> / <kbd>Ctrl+B</kbd></td></tr>
+  <tr><td>UI on macOS</td><td>Modifier glyphs in Apple's order ⌃ ⌥ ⇧ ⌘, then the key, no separators</td><td><kbd>⌘S</kbd>, <kbd>⌥⇧⌘F</kbd></td></tr>
+  <tr><td>UI on Windows and Linux</td><td>Ctrl, Alt, Shift spelled out in that order, then the key, joined with +</td><td><kbd>Ctrl+S</kbd>, <kbd>Ctrl+Alt+Shift+F</kbd></td></tr>
+  <tr><td>Key names</td><td>A named key is spelled out with a capital: Esc, Enter, Tab, Space, Backspace, Delete. Arrow keys are the glyphs ↑ ↓ ← →. A letter key is upper case. The same on every platform, alone or in a chord</td><td><kbd>Esc</kbd>, <kbd>⌘Enter</kbd>, <kbd>Ctrl+Enter</kbd>, <kbd>↑</kbd></td></tr>
+  <tr><td>Boxes</td><td>One <code>&lt;kbd&gt;</code> per chord, on both platforms: the box holds the whole label. Never one box per glyph or per word, and never a + between boxes – the app already renders <code>&lt;kbd&gt;{formatShortcut(…)}&lt;/kbd&gt;</code></td><td><kbd>⌘S</kbd> / <kbd>Ctrl+S</kbd></td></tr>
+  <tr><td>Code that renders a label</td><td>Always <code>formatShortcut(key, { mod, alt, shift })</code> from <code>utils/shortcutLabel.ts</code> – glyphs on macOS, Ctrl+ on Windows and Linux. Never a typed string</td><td><code>formatShortcut('B', { mod: true })</code></td></tr>
+  <tr><td><code>aria-keyshortcuts</code></td><td>The ARIA key names – Control, Alt, Shift, Meta, in that order, then the key – joined with +. <code>toAriaKeyShortcuts</code> in <code>ContextMenu/ariaKeyShortcuts.ts</code> derives it from the label</td><td><code>Meta+C</code>, <code>Alt+Meta+C</code>, <code>Control+V</code></td></tr>
+  <tr><td>Docs, cards and issues</td><td>Both platforms, macOS first, separated by a slash. A card that draws the app at one platform shows that platform's form</td><td><kbd>⌘B</kbd> / <kbd>Ctrl+B</kbd></td></tr>
 </tbody>
 </table>
 <div class="wr-pair">
-  <figure class="wr-ex wr-ex--do"><span class="wr-verdict">Do – macOS</span>
+  <figure class="wr-ex wr-ex--do"><span class="ds-verdict wr-verdict">Do – one box per chord</span>
+    <div class="wr-hint" aria-hidden="true"><span><kbd class="erf-kbd">⌘Enter</kbd> to submit · <kbd class="erf-kbd">Esc</kbd> to cancel</span><span><kbd class="erf-kbd">Ctrl+Enter</kbd> to submit · <kbd class="erf-kbd">Esc</kbd> to cancel</span></div>
+    <figcaption>macOS, then Windows and Linux. Each box is exactly what <code>formatShortcut</code> returns.</figcaption></figure>
+  <figure class="wr-ex wr-ex--dont"><span class="ds-verdict wr-verdict">Don't – a box per key</span>
+    <div class="wr-hint" aria-hidden="true"><span><kbd class="erf-kbd">⌘</kbd><kbd class="erf-kbd">Enter</kbd> to submit · <kbd class="erf-kbd">Escape</kbd> to cancel</span><span><kbd class="erf-kbd">Ctrl</kbd>+<kbd class="erf-kbd">Enter</kbd> to submit · <kbd class="erf-kbd">esc</kbd> to cancel</span></div>
+    <figcaption>Split chords read as separate keys, and the key names drift from line to line.</figcaption></figure>
+</div>
+<div class="wr-pair">
+  <figure class="wr-ex wr-ex--do"><span class="ds-verdict wr-verdict">Do – macOS</span>
     <div class="wr-menu" aria-hidden="true"><div class="wr-menu__item"><span>Copy</span><span class="wr-menu__key">⌘C</span></div><div class="wr-menu__item"><span>Add comment</span><span class="wr-menu__key">⌥⌘M</span></div></div>
     <figcaption>What the platform's own menus show.</figcaption></figure>
-  <figure class="wr-ex wr-ex--dont"><span class="wr-verdict">Don't – macOS</span>
+  <figure class="wr-ex wr-ex--dont"><span class="ds-verdict wr-verdict">Don't – macOS</span>
     <div class="wr-menu" aria-hidden="true"><div class="wr-menu__item"><span>Copy</span><span class="wr-menu__key">⌘C</span></div><div class="wr-menu__item"><span>Add comment</span><span class="wr-menu__key">Cmd+Option+M</span></div></div>
     <figcaption>Two notations in one menu. Spelling out Cmd is the Windows convention applied to a Mac.</figcaption></figure>
 </div>
