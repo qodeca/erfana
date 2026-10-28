@@ -2,7 +2,7 @@
 
 Project-wide index of `ErrorCode` values in `src/shared/errors.ts`, grouped by category. For each code: the enum name, the user-facing message (from `ERROR_MESSAGES` map), and the primary throw site. For whisper + transcription codes, also the operator action on encounter.
 
-**Why this document exists**: Phase 4 introduced 6 new whisper codes (see [ADR 0001](./adrs/0001-self-host-whisper-binaries.md)); the full enum has grown to 150 codes (counted on 2026-10-25, v0.22.0). A single mapping table saves every future maintainer a `grep -r ErrorCode` sweep.
+**Why this document exists**: Phase 4 introduced 6 new whisper codes (see [ADR 0001](./adrs/0001-self-host-whisper-binaries.md)); the full enum has grown to 167 codes (counted on 2026-10-28, v0.23.1). A single mapping table saves every future maintainer a `grep -r ErrorCode` sweep.
 
 **Source of truth**: `src/shared/errors.ts`. If this doc drifts, `errors.ts` wins — file an issue.
 
@@ -247,6 +247,32 @@ The renderer (`previewOpenInBrowser.ts`) does not show the `error` text. Every r
 The launch-failure text is also what the renderer shows when the `invoke` rejects or the reply does not match `BrowserOpenFileResponseSchema`; its log then carries `INVOKE_REJECTED` or `INVALID_RESPONSE` instead of a code.
 
 Not an error: when the default-browser lookup fails, times out or returns an unusable path – and on Linux, always – the file opens in the system's `.html` app and the reply is `{ success: true, usedFallback: true }`, shown as an info toast "Opened in the app for .html files".
+
+---
+
+## HTML Preview comments (17 codes)
+
+17 `COMMENT_*` in `src/shared/errors.ts`, added with HTML Preview comments in v0.23.0. The meanings come from `src/main/services/preview/comments/commentRefusals.ts`, which maps each finer refusal reason (logged with a path digest, never a path, a name or comment text) to one of these codes. User guide: [HTML preview § Comments](./html-preview/README.md#comments). `{file}` in the user copy is filled in with the file's name.
+
+| Code | User copy | Notes |
+|------|-----------|-------|
+| `COMMENT_PATH_REFUSED` | "Erfana doesn't write comments to this file." | Not a file comments may be written to: not absolute, outside the project, a never-served path (`node_modules`, `dist`, `out`, `coverage`, `.git`, dot-folders), not `.html` / `.htm`, an NTFS stream name or an 8.3 short name |
+| `COMMENT_FILE_GONE` | "{file} no longer exists. Copy your text before closing." | The file, or a folder on its path, no longer exists |
+| `COMMENT_WRITE_REFUSED_LINK` | "{file} is a link to another file, so Erfana won't write to it." | The file is a symlink or has other hard links |
+| `COMMENT_FILE_TOO_LARGE` | "Erfana adds comments only to files of up to 25 MB and 640,000 elements." | Over `COMMENT_FILE_MAX_BYTES` (25 MB) |
+| `COMMENT_ENCODING_UNSUPPORTED` | "Erfana can only add comments to UTF-8 files." | Not UTF-8 (with or without a BOM) with a byte-identical round trip |
+| `COMMENT_FILE_CONFLICTED` | "{file} has unresolved git conflicts. Resolve them first." | A complete git conflict hunk in the file |
+| `COMMENT_FILE_READ_ONLY` | "Couldn't save: {file} is read-only. Your text is still here." | Read-only on disk, another user's file, an unwritable folder, or an unterminated comment block (read-only for comments) |
+| `COMMENT_LIMIT` | "This would go over a comment size limit, so nothing was saved." | The write would break a limit (message, replies, block bytes, blocks per file, file size) or push a `<meta charset>` out of the prescan |
+| `COMMENT_UNSAVED_SOURCE` | "{file} has unsaved changes in another tab. Save them first so your edits and this comment don't overwrite each other." | An editor holds unsaved changes for the file |
+| `COMMENT_IDENTITY_REQUIRED` | "Enter a name to add comments." | No usable author name in the app settings |
+| `COMMENT_TARGET_MOVED` | "This element changed in the file since you picked it. Close and pick it again – your text will be restored." | The picked element is no longer in the file, or not uniquely |
+| `COMMENT_BLOCK_CHANGED` | "This block changed on disk. Reopen it and try again." | The block changed, turned damaged or is gone since the window read it |
+| `COMMENT_WRITE_UNSUPPORTED_FS` | "Erfana can't write to {file} on this drive." | The drive cannot rename or fsync (network and FUSE mounts) |
+| `COMMENT_WRITE_FAILED` | "Couldn't save the comment. Your text is still here – try again." | Anything else: a file that kept changing during the save, a held file, a splice that failed its verification (fail closed), or a parse the comment parse worker could not run (`busy`, `parse-failed`) |
+| `COMMENT_DRAFT_EXPIRED` | "This comment window was open too long. Pick the element again – your text is kept." | Draft and key layer (`commentKeyStore.ts`), before any write: a draft lives ten minutes (`DRAFT_TTL_MS`) |
+| `COMMENT_KEY_INVALID` | "This comment is no longer open here. Reopen it and try again." | Draft and key layer: an unknown key, a key of another window, panel or view, or a key of another kind – without saying which |
+| `COMMENT_SAVE_PENDING` | "Still saving to {file}. Your comment appears here once it is written – no need to save again." | Not a refusal: the save outlasted its answer and is still being written (`commentSaveFlow.ts`) |
 
 ---
 

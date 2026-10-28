@@ -31,8 +31,8 @@ body:
     id: version
     attributes:
       label: Erfana version
-      description: Help → About, or the app's version string.
-      placeholder: "0.20.0"
+      description: Shown in the window title as `ERFANA v<version>`; on macOS also under Erfana → About Erfana.
+      placeholder: "0.23.1"
     validations:
       required: true
   - type: dropdown
