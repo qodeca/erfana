@@ -5,13 +5,15 @@ import { ProjectChangedSchema, TerminalDataSchema, TerminalExitSchema, TerminalE
 
 describe('IPC schema contracts', () => {
   it('validates project:changed payloads', () => {
-    expect(ProjectChangedSchema.parse({ oldPath: '/a', newPath: null })).toEqual({ oldPath: '/a', newPath: null })
-    expect(ProjectChangedSchema.parse({ oldPath: null, newPath: '/b' })).toEqual({ oldPath: null, newPath: '/b' })
+    expect(ProjectChangedSchema.parse({ oldPath: '/a', newPath: null, generation: 2 })).toEqual({ oldPath: '/a', newPath: null, generation: 2 })
+    expect(ProjectChangedSchema.parse({ oldPath: null, newPath: '/b', generation: 1 })).toEqual({ oldPath: null, newPath: '/b', generation: 1 })
   })
 
   it('rejects invalid project:changed payloads', () => {
     expect(() => ProjectChangedSchema.parse({ oldPath: 1, newPath: null } as any)).toThrow()
     expect(() => ProjectChangedSchema.parse({} as any)).toThrow()
+    expect(() => ProjectChangedSchema.parse({ oldPath: null, newPath: '/b' } as any)).toThrow()
+    expect(() => ProjectChangedSchema.parse({ oldPath: null, newPath: '/b', generation: -1 })).toThrow()
   })
 
   it('validates terminal event payloads', () => {

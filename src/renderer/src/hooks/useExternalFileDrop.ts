@@ -14,6 +14,7 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { AUTO_EXPAND } from '../components/ProjectTree/constants'
 import { logger } from '../utils/logger'
 import { isPathInside } from '../utils/fileUtils'
+import { utilsGateway } from '../services/utilsGateway'
 
 /**
  * Represents a file dropped from an external source.
@@ -136,7 +137,7 @@ export function extractDroppedFiles(files: FileList): ExternalDropFile[] {
 
     try {
       // Use Electron's webUtils.getPathForFile() exposed via preload
-      filePath = window.api.utils.getPathForFile(file)
+      filePath = utilsGateway.getPathForFile(file)
     } catch {
       logger.warn('Failed to get file path via webUtils', { fileName: file.name })
     }
@@ -314,11 +315,21 @@ export function useExternalFileDrop(
     // Walk up the DOM tree looking for a tree node with path data
     let current: HTMLElement | null = target
     while (current) {
+      // A lazy folder's placeholder line (#320) stands for its folder
+      if (current.dataset?.dropFolder) return current.dataset.dropFolder
       const path = current.dataset?.path
       const type = current.dataset?.type
 
       if (path && type === 'directory') {
         return path
+      }
+
+      // A file row drops into its folder. The tree is a flat, virtualised
+      // list, so the folder is not an ancestor element to walk up to: the row
+      // names it in `data-parent-path`.
+      const parentPath = current.dataset?.parentPath
+      if (path && type === 'file' && parentPath) {
+        return parentPath
       }
 
       // Also check for the root folder (project path)

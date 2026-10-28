@@ -29,20 +29,82 @@ import {
   detectFilePaths,
   createPathCache,
   resolvePath,
-  normalizePath
+  normalizePath,
+  isSearchableBareName
 } from '../utils/filePathLinks.logic'
 import { useFilenameIndex } from './useFilenameIndex'
+import { useLatestRef } from './useLatestRef'
 import {
+  extractFilenameFromPath,
+  mergeNameSearch,
   resolvePathSmart,
+  type NameSearchResult,
   type SmartResolutionResult
 } from '../utils/smartPathResolver.logic'
 import type { PathScore } from '../utils/pathScoring'
 import { findCliWrapGroup, joinedPosToBuffer, type JoinSegment } from '../utils/cliWrapJoin.logic'
 import { logger } from '../utils/logger'
+import { fileGateway } from '../services/fileGateway'
+import { terminalGateway } from '../services/terminalGateway'
+import { getLastSeenProjectGeneration } from '../services/projectGeneration'
 
 // Create a module-level cache shared across hook instances
 // This ensures cache hits across terminal restarts and multiple terminals
 const pathCache = createPathCache(100, 30000)
+
+/**
+ * Name searches on a truncated tree, by project session generation + project
+ * + lower-case name, so a reopened project never reuses an older answer; same
+ * lifetime as `pathCache`
+ */
+const NAME_SEARCH_TTL_MS = 30_000
+const NAME_SEARCH_CACHE_MAX = 100
+const nameSearchCache = new Map<string, { result: NameSearchResult; at: number }>()
+/** Searches in flight by the same key: every line and terminal asking shares one */
+const nameSearchInFlight = new Map<string, Promise<NameSearchResult>>()
+const NOTHING_FOUND: NameSearchResult = { paths: [], truncated: false }
+/** A search that failed: nothing found, and the search did not finish */
+const SEARCH_FAILED: NameSearchResult = { paths: [], truncated: true }
+
+/**
+ * Files named `filename` in the project, from main's bounded search. One
+ * search per key is in flight at a time, and an answer is cached for
+ * {@link NAME_SEARCH_TTL_MS} so hovering a line does not repeat it – except a
+ * failure, or a cut-short search that found nothing (main may have been busy),
+ * which the next hover asks again. A failure answers nothing, `truncated`:
+ * the search did not finish.
+ */
+export function searchProjectByName(projectRoot: string, filename: string): Promise<NameSearchResult> {
+  const key = `${getLastSeenProjectGeneration() ?? ''}\0${projectRoot}\0${filename.toLowerCase()}`
+  const cached = nameSearchCache.get(key)
+  if (cached && Date.now() - cached.at < NAME_SEARCH_TTL_MS) return Promise.resolve(cached.result)
+  const running = nameSearchInFlight.get(key)
+  if (running) return running
+  const search = (async (): Promise<NameSearchResult> => {
+    try {
+      const { paths, truncated } = await fileGateway.findByName({ dirPath: projectRoot, name: filename })
+      const result = { paths, truncated }
+      if (paths.length > 0 || !truncated) {
+        if (nameSearchCache.size >= NAME_SEARCH_CACHE_MAX) nameSearchCache.clear()
+        nameSearchCache.set(key, { result, at: Date.now() })
+      }
+      return result
+    } catch (e) {
+      logger.warn('[FileLinks] Name search failed', { error: e instanceof Error ? e.name : typeof e })
+      return SEARCH_FAILED
+    } finally {
+      nameSearchInFlight.delete(key)
+    }
+  })()
+  nameSearchInFlight.set(key, search)
+  return search
+}
+
+/** Forget cached name searches (tests). */
+export function clearNameSearchCache(): void {
+  nameSearchCache.clear()
+  nameSearchInFlight.clear()
+}
 
 export interface UseTerminalFileLinksOptions {
   /** Reference to xterm Terminal instance */
@@ -56,6 +118,22 @@ export interface UseTerminalFileLinksOptions {
    * When provided, enables smart file lookup when exact path validation fails.
    */
   files?: FileNode[]
+  /**
+   * `files` is incomplete: a walk bound left some folder unread (review
+   * finding 32, `useMergedProjectFiles`). Links still come from `files` on
+   * hover, so they show at once; a click then searches the project in main
+   * (bounded, confined to the project) and offers every match in the picker,
+   * a single one too. A bare file name `files` lacks is a link too, whose
+   * click runs that search ({@link UseTerminalFileLinksOptions.onNameNotFound}
+   * when it finds nothing).
+   */
+  treeTruncated?: boolean
+  /**
+   * A clicked name was searched for and nothing was found (an incomplete
+   * tree). `cutShort`: the search did not finish – a bound stopped it, main
+   * was busy, or it failed – so the file may still exist.
+   */
+  onNameNotFound?: (filename: string, details: { cutShort: boolean }) => void
   /**
    * Callback when a file link is clicked.
    * Should open the file in the Monaco editor at the specified position.
@@ -73,7 +151,7 @@ export interface UseTerminalFileLinksOptions {
    * @param query The original query string
    * @returns Promise resolving to selected path, or null if cancelled
    */
-  onShowPicker?: (candidates: PathScore[], query: string) => Promise<string | null>
+  onShowPicker?: (candidates: PathScore[], query: string, options?: { incomplete?: boolean }) => Promise<string | null>
   /**
    * Optional error handler for link provider errors.
    * Note: Should be memoized (useCallback) to prevent unnecessary re-renders.
@@ -119,22 +197,61 @@ const SMART_LINK_DECORATIONS: ILinkDecorations = {
   pointerCursor: true
 }
 
+/**
+ * Whether a validated path can be a terminal link. With a project open, only a
+ * file inside it is: the main process answers for every readable file and says
+ * where it lies. An answer without `insideProject` counts as inside.
+ */
+export function isLinkableFile(
+  result: { exists: boolean; insideProject?: boolean },
+  projectRoot: string | null | undefined
+): boolean {
+  return result.exists && !(projectRoot && result.insideProject === false)
+}
+
 export function useTerminalFileLinks(
   options: UseTerminalFileLinksOptions
 ): UseTerminalFileLinksReturn {
-  const { terminalRef, terminalId, projectRoot, files = [], onFileOpen, onShowPicker, onError } =
+  const {
+    terminalRef,
+    terminalId,
+    projectRoot,
+    files = [],
+    treeTruncated = false,
+    onFileOpen,
+    onShowPicker,
+    onNameNotFound,
+    onError
+  } =
     options
 
-  // Track terminal readiness with state to trigger re-renders when terminal is created
-  const [terminalReady, setTerminalReady] = useState(false)
+  // The terminal instance, mirrored from the caller's ref into state so render
+  // never reads the ref (null until the terminal is created). The caller
+  // (TerminalPanel) sets its ref before it reports the new terminal's id and
+  // clears it together with the id, so re-reading on an id change sees every
+  // instance. The mirror remembers which id it was read for and counts only
+  // for that id: on the render where the id changes (a teardown disposes the
+  // old xterm first) the stale instance is already gone, so nothing is ever
+  // registered on a disposed terminal while the effect catches up.
+  const [mirror, setMirror] = useState<{ terminalId: string | null; terminal: Terminal | null }>({
+    terminalId: null,
+    terminal: null
+  })
+  const terminal = mirror.terminalId === terminalId ? mirror.terminal : null
+  // The ref object itself is read through a latest ref, NOT listed as a
+  // dependency: a caller that builds a fresh `{ current }` each render (the
+  // tests do) would otherwise re-run the check every render, find a "new"
+  // instance every time and loop.
+  const terminalRefLatest = useLatestRef(terminalRef)
 
   // Check terminal availability when terminalId changes (terminal created)
   useEffect(() => {
     const checkTerminal = () => {
-      const hasTerminal = !!terminalRef.current
-      if (hasTerminal !== terminalReady) {
-        setTerminalReady(hasTerminal)
-      }
+      const current = terminalRefLatest.current.current
+      // Same id and instance: keep the old object, so React bails out
+      setMirror((prev) =>
+        prev.terminalId === terminalId && prev.terminal === current ? prev : { terminalId, terminal: current }
+      )
     }
 
     // Check immediately
@@ -142,16 +259,13 @@ export function useTerminalFileLinks(
 
     // If no terminal yet but we have terminalId, poll briefly
     // (terminal ref is set synchronously after terminal creation)
-    if (terminalId && !terminalRef.current) {
+    if (terminalId && !terminalRefLatest.current.current) {
       const timeoutId = setTimeout(checkTerminal, 100)
       return () => clearTimeout(timeoutId)
     }
 
     return undefined
-  }, [terminalId, terminalReady, terminalRef])
-
-  // Get terminal from ref (will be null until terminal is created)
-  const terminal = terminalRef.current
+  }, [terminalId, terminalRefLatest])
 
   // Use filename index for smart resolution
   const { getIndex } = useFilenameIndex({ files })
@@ -164,7 +278,7 @@ export function useTerminalFileLinks(
     if (!terminalId) return null
 
     try {
-      const result = await window.api.terminal.getInfo(terminalId)
+      const result = await terminalGateway.getInfo(terminalId)
       if (result.success && result.info) {
         cwdRef.current = result.info.cwd
         return result.info.cwd
@@ -190,18 +304,22 @@ export function useTerminalFileLinks(
       }
 
       try {
-        const result = await window.api.file.validatePath(path, projectRoot || undefined)
+        const result = await fileGateway.validatePath({ filePath: path })
+
+        // With a project open, only files inside it are links (the main process
+        // answers for every readable path and says where it lies)
+        const exists = isLinkableFile(result, projectRoot)
 
         // Cache the result
         pathCache.set(path, {
-          exists: result.exists,
-          absolutePath: result.absolutePath || null,
+          exists,
+          absolutePath: exists ? result.absolutePath || null : null,
           timestamp: Date.now()
         })
 
         return {
-          exists: result.exists,
-          absolutePath: result.absolutePath
+          exists,
+          absolutePath: exists ? result.absolutePath : undefined
         }
       } catch (e) {
         const errorMsg = e instanceof Error ? e.message : String(e)
@@ -327,10 +445,12 @@ export function useTerminalFileLinks(
             finalPath: string | null
             wasSmartResolved: boolean
             pendingCandidates: PathScore[] | null
+            incomplete: boolean
           }> => {
             let finalPath: string | null = null
             let wasSmartResolved = false
             let pendingCandidates: PathScore[] | null = null
+            let incomplete = false
 
             if (files.length > 0) {
               const smartResult: SmartResolutionResult = await resolvePathSmart({
@@ -342,7 +462,8 @@ export function useTerminalFileLinks(
                 validateExactPath: async (p) => {
                   const v = await validatePath(p)
                   return v.exists
-                }
+                },
+                treeTruncated
               })
 
               if (smartResult.status === 'exact') {
@@ -354,6 +475,7 @@ export function useTerminalFileLinks(
                 pendingCandidates = smartResult.candidates!
                 finalPath = smartResult.candidates![0].path
                 wasSmartResolved = true
+                incomplete = smartResult.incomplete === true
               }
             } else {
               const validation = await validatePath(candidatePath)
@@ -362,7 +484,7 @@ export function useTerminalFileLinks(
               }
             }
 
-            return { finalPath, wasSmartResolved, pendingCandidates }
+            return { finalPath, wasSmartResolved, pendingCandidates, incomplete }
           }
 
           // Convert matches to ILinks
@@ -385,7 +507,7 @@ export function useTerminalFileLinks(
             resolvedPath = normalizePath(resolvedPath)
 
             // Try smart resolution (includes exact path validation as first step)
-            const { finalPath: resolvedFinalPath, wasSmartResolved, pendingCandidates } =
+            const { finalPath: resolvedFinalPath, wasSmartResolved, pendingCandidates, incomplete } =
               await tryResolveCandidate(resolvedPath)
             let finalPath = resolvedFinalPath
 
@@ -404,10 +526,19 @@ export function useTerminalFileLinks(
               }
             }
 
-            // Skip if no valid path found
-            if (!finalPath) continue
+            // On an incomplete tree a bare name the index lacks may still be on
+            // disk: it is a link whose click searches for it
+            const searchOnly =
+              !finalPath &&
+              treeTruncated &&
+              projectRoot !== null &&
+              isSearchableBareName({ path: strippedPath, line: match.line, column: match.column })
 
-            const absolutePath = finalPath
+            // Skip if no valid path found
+            if (!finalPath && !searchOnly) continue
+
+            const absolutePath = finalPath ?? ''
+            const searchesOnClick = searchOnly || incomplete
 
             // Map logical positions to buffer coordinates (handles wrapped lines)
             const rangeStart = logicalToBuffer(match.startIndex)
@@ -423,8 +554,25 @@ export function useTerminalFileLinks(
                 end: rangeEnd
               },
               text: match.fullMatch, // includes @ prefix intentionally – shows CLI tool reference context
-              decorations: wasSmartResolved ? SMART_LINK_DECORATIONS : undefined,
+              decorations: wasSmartResolved || searchOnly ? SMART_LINK_DECORATIONS : undefined,
               activate: async () => {
+                if (searchesOnClick) {
+                  // The search runs on the click, never on hover (review of #320)
+                  const name = extractFilenameFromPath(strippedPath)
+                  const found = projectRoot ? await searchProjectByName(projectRoot, name) : NOTHING_FOUND
+                  const candidates = mergeNameSearch(pendingCandidates?.map((c) => c.path) ?? [], found, match.path)
+                  if (candidates.length === 0) {
+                    onNameNotFound?.(name, { cutShort: found.truncated })
+                    return
+                  }
+                  if (!onShowPicker) {
+                    onFileOpen(candidates[0].path, match.line, match.column)
+                    return
+                  }
+                  const selected = await onShowPicker(candidates, match.path, { incomplete: true })
+                  if (selected) onFileOpen(selected, match.line, match.column)
+                  return
+                }
                 // If multiple candidates and picker available, show picker
                 if (pendingCandidates && onShowPicker) {
                   const selected = await onShowPicker(pendingCandidates, match.path)
@@ -455,7 +603,19 @@ export function useTerminalFileLinks(
         }
       }
     }
-  }, [terminal, terminalReady, fetchCwd, validatePath, projectRoot, files, getIndex, onFileOpen, onShowPicker, onError])
+  }, [
+    terminal,
+    fetchCwd,
+    validatePath,
+    projectRoot,
+    files,
+    treeTruncated,
+    getIndex,
+    onFileOpen,
+    onShowPicker,
+    onNameNotFound,
+    onError
+  ])
 
   // Register the link provider with xterm
   useEffect(() => {
@@ -476,6 +636,8 @@ export function useTerminalFileLinks(
 
   return {
     linkProvider,
-    isReady: !!linkProvider
+    // The provider is null exactly when there is no terminal (see the memo);
+    // reading the provider object here would count as reading its refs
+    isReady: terminal !== null
   }
 }

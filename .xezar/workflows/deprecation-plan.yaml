@@ -1,0 +1,43 @@
+# A deprecation-plan run writes down how something people depend on is retired: who is affected,
+# the replacement, the stages with dates, the warning text word for word, how anyone will know it
+# is safe to remove. It removes nothing. The page lands under paths.deprecations with the
+# compatibility entry and the upgrade note.
+name: deprecation-plan
+description: "Plan the retirement of something people depend on – who is affected, the replacement with worked examples, dated stages, the warning text, the removal signal – as a page under paths.deprecations plus the compatibility entry and upgrade note. Removes nothing. Then gates and a draft PR."
+steps:
+  - id: kit
+    name: Snapshot the local project kit
+    command: 'bash "$(git rev-parse --path-format=absolute --git-common-dir)/../.xezar/checks/bootstrap.sh"'
+    resultScope: routine
+  - id: preflight
+    name: Verify worktree isolation
+    command: ".xezar/checks/worktree-preflight.sh"
+    resultScope: routine
+  - id: setup
+    name: Prepare the worktree
+    command: ".xezar/checks/worktree-setup.sh"
+    resultScope: routine
+  - id: plan
+    name: Write the deprecation plan
+    prompt: "Plan the deprecation in: {{task}}. Follow xezar-deprecation-plan instructions: find who depends on it by reading, and say what you could not see. Write one page under paths.deprecations in .xezar/pipeline/config.json: what goes exactly, why in words a user would accept, the replacement with worked before-and-after, the stages with dates or versions, the warning text word for word, the signal that makes removal safe, and what is honestly lost. Take the notice period from BACKWARD_COMPATIBILITY.md; where it is silent, propose one as the owner's decision. Land the compatibility entry and a symptom-keyed upgrade note in the same change. Remove nothing and change no code. Finish focused checks and commits before the existing readiness, gates, evidence and PR handoff stages."
+    skill: xezar-deprecation-plan
+    timeout: 2h
+  - id: readiness
+    name: Confirm the phase record is complete and nothing blocks
+    command: ".xezar/checks/worktree-preflight.sh --readiness"
+    resultScope: stage
+  - id: gates
+    name: Quality gates
+    command: ".xezar/checks/repo-gates.sh --fast --producer gates"
+    resultScope: stage
+    onFail:
+      retry: plan
+      max: 2
+  - id: evidence
+    name: Seal the gate evidence
+    command: ".xezar/checks/worktree-preflight.sh --record-gate-evidence"
+    resultScope: stage
+  - id: handoff
+    name: Draft PR into the base branch
+    prompt: "Hand off the deprecation plan for: {{task}}. Verify the sealed head and open the draft PR; make no content changes here. The body leads with what is going, what replaces it, and the dates; then the decisions that are the owner's and the follow-up tasks in order. The PR changes documents only."
+    skill: xezar-handoff-draft-pr

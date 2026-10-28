@@ -1,0 +1,121 @@
+<!-- @card group="Foundations" name="Surfaces & sizing" subtitle="Borders, shadows, control heights — and the zero-radius rule" status="proposed" reviewed="2026-08-31" -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Erfana — surfaces and sizing</title>
+<link rel="stylesheet" href="../../tokens.css">
+<link rel="stylesheet" href="../../ds.css">
+<style>
+  .grid { display: flex; flex-wrap: wrap; gap: var(--space-12); margin-bottom: var(--space-12); }
+  .tile { width: 180px; height: 96px; background: var(--color-bg-secondary);
+          border: var(--border-width) solid var(--color-border-default);
+          display: flex; align-items: flex-end; padding: var(--space-6);
+          font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-text-tertiary); }
+  .size-row { display: grid; grid-template-columns: 180px 64px 1fr; gap: var(--space-8);
+              align-items: center; padding: var(--space-4) 0;
+              border-bottom: var(--border-width) solid var(--color-border-default); }
+  .size-token { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-text-tertiary); }
+  .size-px { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-text-secondary); }
+  .size-box { background: var(--color-brand-violet-muted);
+              border: var(--border-width) solid var(--color-accent-primary); width: 120px; }
+  .target { position: relative; }
+  .target::after { content: ''; position: absolute; inset: 0; }
+</style>
+</head>
+<body>
+
+<h1>Surfaces and sizing</h1>
+<p class="ds-lede">Depth, edges and the standard dimensions of a control.</p>
+
+<div class="ds-note">
+  <strong>Corners are square. Always.</strong> <code>--border-radius</code> is <code>0</code> and it
+  is not a variable to override. The single exception is <code>--border-radius-circle</code> for
+  things that are genuinely round, like an avatar or a status dot.
+</div>
+
+<h2>Elevation</h2>
+<div class="grid" id="shadows"></div>
+
+<h2>Control heights</h2>
+<div class="ds-note">
+  A pointer target must be at least <strong>24 × 24</strong> CSS pixels — WCAG 2.2 SC 2.5.8.
+  <code>--btn-height-sm</code> sits exactly on that line, so anything smaller fails.
+  A destructive or irreversible action should never be the smallest target on screen.
+</div>
+<div id="sizes"></div>
+
+<h2>Icon sizes</h2>
+<div id="icons"></div>
+
+<script>
+const SHADOWS = ['--shadow-xs', '--shadow-sm', '--shadow-md', '--shadow-lg', '--shadow-xl',
+                 '--shadow-focus', '--shadow-dialog'];
+const HEIGHTS = [
+  ['--btn-height-sm', 'Compact button — exactly the 24px WCAG minimum'],
+  ['--btn-height-md', 'Default button'],
+  ['--btn-height-lg', 'Prominent button'],
+  ['--input-height-sm', 'Compact input'],
+  ['--input-height-md', 'Default input'],
+  ['--input-height-lg', 'Prominent input'],
+  ['--header-height', 'Window header'],
+  ['--tab-height', 'Tab strip']
+];
+const ICONS = [['--icon-size-xs', ''], ['--icon-size-sm', ''], ['--icon-size-md', ''],
+               ['--icon-size-lg', ''], ['--icon-size-xl', '']];
+
+function resolved(token) {
+  const probe = document.createElement('span');
+  probe.style.setProperty('--probe', `var(${token})`);
+  document.body.appendChild(probe);
+  const value = getComputedStyle(probe).getPropertyValue('--probe').trim();
+  probe.remove();
+  return value;
+}
+
+const shadowHost = document.getElementById('shadows');
+for (const token of SHADOWS) {
+  const tile = document.createElement('div');
+  tile.className = 'tile';
+  tile.style.boxShadow = `var(${token})`;
+  tile.textContent = token;
+  shadowHost.appendChild(tile);
+}
+
+function sizeRow(host, token, note) {
+  const px = resolved(token);
+  const row = document.createElement('div');
+  row.className = 'size-row';
+  row.innerHTML = '<div class="size-token"></div><div class="size-px"></div><div><div class="size-box"></div></div>';
+  row.children[0].textContent = token;
+  row.children[1].textContent = px;
+  row.children[2].firstElementChild.style.height = `var(${token})`;
+  const label = document.createElement('span');
+  label.style.cssText = 'margin-left: var(--space-8); font-size: var(--text-sm); color: var(--color-text-secondary)';
+  label.textContent = note;
+  row.children[2].appendChild(label);
+  row.children[2].style.display = 'flex';
+  row.children[2].style.alignItems = 'center';
+  host.appendChild(row);
+}
+
+for (const [token, note] of HEIGHTS) sizeRow(document.getElementById('sizes'), token, note);
+
+const iconHost = document.getElementById('icons');
+for (const [token] of ICONS) {
+  const row = document.createElement('div');
+  row.className = 'size-row';
+  row.innerHTML = '<div class="size-token"></div><div class="size-px"></div><div></div>';
+  row.children[0].textContent = token;
+  row.children[1].textContent = resolved(token);
+  const box = document.createElement('div');
+  box.style.cssText = `width: var(${token}); height: var(${token}); background: var(--color-accent-secondary)`;
+  row.children[2].appendChild(box);
+  iconHost.appendChild(row);
+}
+</script>
+</body>
+</html>

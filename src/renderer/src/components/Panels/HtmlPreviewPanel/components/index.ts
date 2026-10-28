@@ -13,4 +13,10 @@ export { PreviewFailureBadge } from './PreviewFailureBadge'
 export type { PreviewFailureBadgeProps } from './PreviewFailureBadge'
 
 export { PreviewBanner } from './PreviewBanner'
-export type { PreviewBannerProps } from './PreviewBanner'
+export type { PreviewBannerProps, PreviewBannerReturnAction } from './PreviewBanner'
+
+export { PreviewNavControls, backTooltip, linkModeTooltip } from './PreviewNavControls'
+export type { PreviewNavControlsProps } from './PreviewNavControls'
+
+export { PreviewFindTool, PreviewToolbarTools } from './PreviewToolbarTools'
+export type { PreviewFindToolProps, PreviewToolbarToolsProps } from './PreviewToolbarTools'

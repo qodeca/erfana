@@ -12,7 +12,7 @@
  * - Edge cases: null projectPath, async operations, ref state
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import { withWatcherPause } from './withWatcherPause'
 
 const { mockLogger } = vi.hoisted(() => ({
@@ -43,7 +43,7 @@ global.window = {
 
 describe('withWatcherPause', () => {
   let isInternalOperationRef: React.MutableRefObject<boolean>
-  let setLoading: ReturnType<typeof vi.fn>
+  let setLoading: Mock
 
   beforeEach(() => {
     vi.clearAllMocks()
@@ -264,6 +264,25 @@ describe('withWatcherPause', () => {
 
       // The ref must be false BEFORE resume is called
       // This prevents a race where watcher events fire between resume and ref reset
+      expect(refValueWhenResumeWasCalled).toBe(false)
+    })
+
+    it('resets isInternalOperationRef to false BEFORE calling resume on the error path (AC-010, #210)', async () => {
+      let refValueWhenResumeWasCalled: boolean | undefined
+
+      mockWindowApi.directoryWatch.resume.mockImplementation(async () => {
+        refValueWhenResumeWasCalled = isInternalOperationRef.current
+        return { success: true }
+      })
+
+      const testError = new Error('Operation failed')
+      const operation = vi.fn().mockRejectedValue(testError)
+
+      await expect(
+        withWatcherPause('/test/project', isInternalOperationRef, setLoading, operation)
+      ).rejects.toBe(testError)
+
+      // A catch-up broadcast sent at resume must not meet a still-set flag
       expect(refValueWhenResumeWasCalled).toBe(false)
     })
   })

@@ -7,14 +7,15 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mkdtempSync, rmSync, writeFileSync, symlinkSync, mkdirSync } from 'node:fs'
 import { realpath } from 'node:fs/promises'
-import { join } from 'node:path'
+import { join, parse } from 'node:path'
 import { tmpdir } from 'node:os'
 import {
   assertInsideProject,
   assertNoConfinementEscape,
   classifyConfinement,
   isLexicallyInside,
-  OUTSIDE_PROJECT_MESSAGE
+  OUTSIDE_PROJECT_MESSAGE,
+  resolveInsideProject
 } from './projectConfinement'
 
 const skipOnWindows = process.platform === 'win32'
@@ -104,6 +105,68 @@ describe('classifyConfinement', () => {
   })
 })
 
+describe('resolveInsideProject', () => {
+  it('returns the canonical path of a real file in the project', async () => {
+    const file = join(project, 'page.html')
+    writeFileSync(file, '<p>hi</p>')
+    expect(await resolveInsideProject(file, project)).toEqual({
+      verdict: 'inside',
+      realPath: await realpath(file)
+    })
+  })
+
+  it.skipIf(skipOnWindows)('returns the target of an in-project link, not the link', async () => {
+    const target = join(project, 'real.html')
+    writeFileSync(target, '<p>hi</p>')
+    const link = join(project, 'alias.html')
+    symlinkSync(target, link, 'file')
+
+    expect(await resolveInsideProject(link, project)).toEqual({
+      verdict: 'inside',
+      realPath: await realpath(target)
+    })
+  })
+
+  it.skipIf(skipOnWindows)('gives no path for an in-project link that points outside', async () => {
+    const target = join(outside, 'secret.html')
+    writeFileSync(target, 'secret')
+    const link = join(project, 'innocent.html')
+    symlinkSync(target, link, 'file')
+
+    expect(await resolveInsideProject(link, project)).toEqual({ verdict: 'outside' })
+  })
+
+  it('gives no path for a missing in-project file', async () => {
+    expect(await resolveInsideProject(join(project, 'gone.html'), project)).toEqual({
+      verdict: 'missing'
+    })
+  })
+
+  it('stays outside, not missing, for a missing path out of the project', async () => {
+    expect(await resolveInsideProject(join(outside, 'gone.html'), project)).toEqual({
+      verdict: 'outside'
+    })
+  })
+
+  it.skipIf(skipOnWindows)('gives no path when realpath fails for a reason other than ENOENT', async () => {
+    const file = join(project, 'note.md')
+    writeFileSync(file, '# hi')
+    expect(await resolveInsideProject(join(file, 'child.html'), project)).toEqual({
+      verdict: 'unverifiable'
+    })
+  })
+
+  it('agrees with classifyConfinement', async () => {
+    const file = join(project, 'page.html')
+    writeFileSync(file, '<p>hi</p>')
+    for (const candidate of [file, join(project, 'gone.html'), join(outside, 'x.html')]) {
+      expect((await resolveInsideProject(candidate, project)).verdict).toBe(
+        await classifyConfinement(candidate, project)
+      )
+    }
+  })
+})
+
 describe('assertInsideProject', () => {
   it('passes for an in-project file', async () => {
     const file = join(project, 'note.md')
@@ -160,4 +223,35 @@ describe('assertNoConfinementEscape', () => {
 
     await expect(assertNoConfinementEscape(link, project)).rejects.toThrow(OUTSIDE_PROJECT_MESSAGE)
   })
+})
+
+describe('isLexicallyInside – volume roots and Unicode spellings', () => {
+  it('a project at the volume root holds every path on the volume', () => {
+    // Why a volume root is refused when a project is opened (pathSecurity): as the project it
+    // would make the boundary cover everything
+    const root = parse(tmpdir()).root
+    expect(isLexicallyInside(join(root, 'anywhere', 'x.md'), root)).toBe(true)
+    expect(isLexicallyInside(root, root)).toBe(true)
+  })
+
+  it('a sibling that merely starts with the project name is outside', () => {
+    expect(isLexicallyInside(`${project}-other`, project)).toBe(false)
+  })
+
+  const composed = 'caf\u00e9'
+  const decomposed = 'cafe\u0301'
+
+  it.runIf(process.platform === 'darwin')(
+    'a normalisation variant of the project name is the same folder on macOS',
+    () => {
+      expect(isLexicallyInside(join(tmpdir(), decomposed, 'x.md'), join(tmpdir(), composed))).toBe(true)
+    }
+  )
+
+  it.skipIf(process.platform === 'darwin')(
+    'a normalisation variant of the project name is a different folder elsewhere',
+    () => {
+      expect(isLexicallyInside(join(tmpdir(), decomposed, 'x.md'), join(tmpdir(), composed))).toBe(false)
+    }
+  )
 })

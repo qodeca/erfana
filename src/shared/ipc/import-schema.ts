@@ -11,6 +11,8 @@
  * @see Spec #021 - LiteParse document import
  */
 import { z } from 'zod'
+import { UNSAFE_TOOL_NAMES, UNSAFE_TOOL_REASONS } from '../unsafeTool'
+import type { IpcAck } from './schema'
 
 /**
  * Import options for document conversion
@@ -67,17 +69,124 @@ export interface DocumentImportResult {
 }
 
 /**
- * Dependency detection complete event
+ * What LibreOffice detection found (#250). `unsafe`: a LibreOffice exists, but
+ * the one a conversion would run is in the open project, a temp folder, a
+ * network share or a relative PATH entry, so Office conversions are refused.
+ */
+export const ToolStateSchema = z.enum(['found', 'missing', 'unsafe'])
+export type ToolState = z.infer<typeof ToolStateSchema>
+
+/** For an `unsafe` LibreOffice: which program and why – never a path. Null otherwise. */
+export const UnsafeToolSchema = z
+  .object({ tool: z.enum(UNSAFE_TOOL_NAMES), reason: z.enum(UNSAFE_TOOL_REASONS) })
+  .strict()
+  .nullable()
+export type UnsafeTool = z.infer<typeof UnsafeToolSchema>
+
+/**
+ * Dependency detection result event
  *
- * Fired once after DependencyDetector runs at startup.
- * Tells the renderer which system tools are available
- * and the updated list of supported document extensions.
+ * Broadcast to every window after each detection (startup and "Check again").
+ * Tells the renderer whether LibreOffice can be used and the updated list of
+ * supported document extensions. Images and PDF need no external tool.
  */
 export interface DependencyReadyEvent {
-  /** Whether LibreOffice (soffice) is available */
-  libreOffice: boolean
-  /** Whether ImageMagick (magick/convert) is available */
-  imageMagick: boolean
+  libreOffice: ToolState
+  /** Set only when `libreOffice` is `unsafe` */
+  unsafe: UnsafeTool
   /** Full list of supported document extensions after detection */
   extensions: string[]
+}
+
+/**
+ * Request for the optional import tools' status (#250).
+ *
+ * `recheck: false` returns the per-session cached result (detecting once if it
+ * has not run yet). `recheck: true` clears that cache and probes again – the
+ * "Check again" action, so installing a tool needs no restart. Main rate-limits
+ * rechecks (see `DOCUMENT_IMPORT.TOOL_RECHECK_MIN_INTERVAL_MS`). Strict: nothing else
+ * can ride along.
+ */
+export const ImportToolStatusRequestSchema = z.object({ recheck: z.boolean() }).strict()
+export type ImportToolStatusRequest = z.infer<typeof ImportToolStatusRequestSchema>
+
+/** What detection found, plus the document extensions that follow from it. */
+export const ImportToolStatusSchema = z
+  .object({
+    /** What LibreOffice detection found */
+    libreOffice: ToolStateSchema,
+    /** Set only when `libreOffice` is `unsafe`: which program and why */
+    unsafe: UnsafeToolSchema,
+    /** Supported document extensions after detection (same list as `DependencyReadyEvent`) */
+    extensions: z.array(z.string()),
+    /**
+     * True when a recheck was asked for too soon after the previous one and the
+     * existing result was returned without probing again.
+     */
+    throttled: z.boolean()
+  })
+  .strict()
+export type ImportToolStatus = z.infer<typeof ImportToolStatusSchema>
+
+/**
+ * Response of `import:toolStatus`. Never rejects: a refused sender or a
+ * malformed request arrives as `success: false`.
+ */
+export type ImportToolStatusResponse =
+  | ({ success: true } & ImportToolStatus)
+  | { success: false; error: string }
+
+/** `import:selectFile`: the file the native dialog returned. */
+export interface ImportFileSelection {
+  path: string
+  name: string
+  sizeInMB: number
+  extension: string
+}
+
+/** `import:validate`: whether the file can be imported, and why not. */
+export interface ImportValidation {
+  valid: boolean
+  error?: string
+  sizeInMB: number
+  fileName: string
+}
+
+/** `import:process`: where the converted file was written, or why it was not. */
+export interface ImportProcessResult {
+  success: boolean
+  outputPath?: string
+  error?: string
+  errorCode?: string
+}
+
+/**
+ * Shared contract for the preload `import` bridge (PDF, text and document
+ * import into the project's `import/` folder).
+ *
+ * Implemented by `window.api.import` (preload, `importBridge.ts`) and consumed
+ * by the renderer import gateway. The event subscriptions return their
+ * unsubscribe function.
+ */
+export interface ImportBridge {
+  /** Native file dialog; `null` when cancelled. */
+  selectFile(): Promise<ImportFileSelection | null>
+  validate(filePath: string): Promise<ImportValidation>
+  /** Validate, convert and write to `import/`. */
+  process(filePath: string): Promise<ImportProcessResult>
+  getSupportedExtensions(): Promise<string[]>
+  isSupported(extension: string): Promise<boolean>
+  /** Import a document through the LiteParse converter. */
+  documentImport(request: DocumentImportRequest): Promise<DocumentImportResult>
+  cancelDocument(): Promise<IpcAck>
+  /** Document extensions the installed tools can read. */
+  getDocumentExtensions(): Promise<string[]>
+  /**
+   * LibreOffice found, missing or unsafe (#250). `{ recheck: true }` runs the
+   * detection again ("Check again"); main rate-limits it. Never rejects:
+   * failures arrive as `success: false`.
+   */
+  toolStatus(request: ImportToolStatusRequest): Promise<ImportToolStatusResponse>
+  onDocumentProgress(callback: (progress: DocumentImportProgress) => void): () => void
+  onDependenciesReady(callback: (event: DependencyReadyEvent) => void): () => void
 }

@@ -14,13 +14,15 @@
  *   - `render-process-gone`  ⇒ `onRenderProcessGone` (design: `failed` + badge)
  *   - `unresponsive`         ⇒ `onUnresponsive`      (design: `failed` + badge)
  *   - `did-finish-load`      ⇒ `onDidFinishLoad`     (the rate-limited pipeline)
+ *   - `did-fail-load`        ⇒ `onDidFailLoad`, the main frame's only — a
+ *     frame's failure is not the page's (issue #124, RX2-3)
  *   - `console-message`      ⇒ `onConsoleMessage`    (classified page diagnostics:
  *     uncaught exceptions ⇒ `script-error`, bad ES-module specifiers ⇒
  *     `unresolved-specifier`; design §0/§1.3)
  *   - `before-input-event`   ⇒ the 4 forwarded accelerators (§1.9) via item 36
- *   - entry-file `change`    ⇒ `onEntryChange` (reload the page)
- *   - entry-file `unlink`    ⇒ `onEntryDeleted` (design: `failed` + "file deleted";
- *     a rename fires `unlink` on the old path, so rename is treated as delete)
+ *
+ * The page's own file watcher lived here too, until a same-tab move made it
+ * follow the page (issue #124, WI-17b): it is `previewEntryWatch.ts` now.
  *
  * Trust model: `before-input-event` is Chromium's pre-dispatch pipeline, not a
  * page-callable API, and only the 4 enumerated accelerators cross it.
@@ -28,12 +30,12 @@
 
 import type { PreviewFailureInput } from '../../../shared/ipc/preview-types'
 import type { PreviewWebContentsHandle } from './PreviewSessionFactory'
-import { logger } from '../LoggingService'
-import { redactPath } from '../../utils/redactUserInput'
+import { PREVIEW_PAGE_LINK_CHANNEL, PREVIEW_PAGE_LINK_NOTE_CHANNEL } from './previewLinkBridge'
+import { PREVIEW_PAGE_CSP_VIOLATION_CHANNEL } from './previewCspViolationBridge'
 import { classifyConsoleMessage } from './previewConsoleClassify'
-import { attachInputForwarding } from './previewInputForward'
+import { attachInputForwarding, type CommentKeyState } from './previewInputForward'
 
-/** The disposable single-file watcher the service uses for the entry HTML. */
+/** The disposable single-file watcher the service uses for the page's HTML (`previewEntryWatch.ts`). */
 export interface PreviewFileWatcherHandle {
   close(): Promise<void>
 }
@@ -44,11 +46,46 @@ export interface PreviewLifecycleHooks {
   onRenderProcessGone(reason?: string): void
   onUnresponsive(): void
   onDidFinishLoad(): void
-  onEntryChange(): void
-  onEntryDeleted(): void
+  /**
+   * The frame tree started loading. Fires for the initial navigation AND for
+   * every reload, and — because Chromium scopes it to the whole frame tree —
+   * again whenever a subframe begins loading.
+   */
+  onDidStartLoading(): void
+  /**
+   * The frame tree stopped loading, by success, failure or `window.stop()`.
+   *
+   * This is the symmetric counterpart of `did-start-loading`. `did-finish-load`
+   * is NOT: it is scoped to the primary main frame's `onload`, so pairing the
+   * two would leave a page with a lazily-loaded subframe stuck in the loading
+   * state for good.
+   */
+  onDidStopLoading(): void
+  /**
+   * The page's load failed or was cancelled – the main frame's, never a
+   * frame's (issue #124). Belt-and-braces beside `onDidStopLoading`.
+   */
+  onDidFailLoad(): void
   onForwardedShortcut(key: string): void
   /** A page console message already classified as a preview failure. */
   onConsoleMessage(input: PreviewFailureInput): void
+  /**
+   * A link was activated in the page and reported by the preview preload
+   * (sd-074b §5.1). The payload is UNVALIDATED — the bridge parses it.
+   */
+  onLinkActivated?(payload: unknown): void
+  /**
+   * The preload's `seen` / `cancelled` note about a click it reports one task
+   * later (see previewNavigationHold). UNVALIDATED — the bridge parses it.
+   */
+  onLinkNote?(payload: unknown): void
+  /** The page's CSP refused a subresource (see previewCspViolationBridge). */
+  onCspViolation?(payload: unknown): void
+  /**
+   * The page tried to navigate itself. The navigation is still cancelled; the
+   * URL is handed on so a plain link works even when the preload is absent.
+   */
+  onNavigationAttempt?(url: string): void
 }
 
 /**
@@ -78,12 +115,9 @@ const CONSOLE_LEVEL_TO_NUMBER: Readonly<Record<string, number>> = {
 /** Everything the wiring needs beyond the hooks. */
 export interface PreviewLifecycleParams {
   readonly webContents: PreviewWebContentsHandle
-  readonly entryFilePath: string
-  readonly createEntryWatcher: (
-    filePath: string,
-    handlers: { onChange: () => void; onUnlink: () => void; onError: (error: unknown) => void }
-  ) => PreviewFileWatcherHandle
   readonly platform?: NodeJS.Platform
+  /** The view's comments, for the toggle and Esc (`previewInputForward.ts`); absent: neither. */
+  readonly comments?: CommentKeyState
 }
 
 /** A `will-navigate`-style event carrying `preventDefault`. */
@@ -92,9 +126,8 @@ interface PreventableEvent {
 }
 
 /**
- * Wire every lifecycle listener + guard onto `params.webContents` and start the
- * entry-file watcher. Returns an async disposer that removes the listeners and
- * closes the watcher.
+ * Wire every lifecycle listener + guard onto `params.webContents`. Returns an
+ * async disposer that removes the listeners.
  */
 export function wirePreviewLifecycle(
   params: PreviewLifecycleParams,
@@ -105,8 +138,12 @@ export function wirePreviewLifecycle(
   // No popups: every window-open request is denied.
   wc.setWindowOpenHandler(() => ({ action: 'deny' }))
 
-  const onWillNavigate = (event: PreventableEvent): void => {
+  const onWillNavigate = (event: PreventableEvent, url?: unknown): void => {
+    // The page never navigates itself; Erfana decides what a link means.
     event.preventDefault()
+    if (typeof url === 'string' && url !== '') {
+      hooks.onNavigationAttempt?.(url)
+    }
   }
   // Electron delivers `(event, details)`; `details.reason` distinguishes a crash
   // ('crashed'/'oom'/'killed'/…) from a clean exit — carried through for the badge.
@@ -116,6 +153,19 @@ export function wirePreviewLifecycle(
   }
   const onUnresponsive = (): void => hooks.onUnresponsive()
   const onDidFinishLoad = (): void => hooks.onDidFinishLoad()
+  const onDidStartLoading = (): void => hooks.onDidStartLoading()
+  const onDidStopLoading = (): void => hooks.onDidStopLoading()
+  // Only the page's own failure settles its load (issue #124, RX2-3). Every
+  // refused frame fires a `did-fail-load` (S10), and each would otherwise step
+  // the backdrop and run the isolated-world colour read. Electron passes
+  // `(event, code, description, url, isMainFrame, …)`; an event without the
+  // flag still counts, so only an explicit `isMainFrame: false` is a frame's.
+  const onDidFailLoad = (...args: unknown[]): void => {
+    if (args[4] === false) {
+      return
+    }
+    hooks.onDidFailLoad()
+  }
   // Page console output is untrusted DATA: it is only classified, never executed.
   const onConsoleMessage = (details: PreviewConsoleMessageDetails): void => {
     const input = classifyConsoleMessage(
@@ -132,29 +182,60 @@ export function wirePreviewLifecycle(
   wc.on('render-process-gone', onRenderProcessGone as (...args: never[]) => void)
   wc.on('unresponsive', onUnresponsive as (...args: never[]) => void)
   wc.on('did-finish-load', onDidFinishLoad as (...args: never[]) => void)
+  // Registered as SIBLINGS of `did-finish-load`, deliberately not routed through
+  // it: `onDidFinishLoad` delegates to the rate-limited post-load pipeline,
+  // which drops events during a save burst. A dropped backdrop transition
+  // leaves the page unreadable, so it must not share that budget.
+  wc.on('did-start-loading', onDidStartLoading as (...args: never[]) => void)
+  wc.on('did-stop-loading', onDidStopLoading as (...args: never[]) => void)
+  wc.on('did-fail-load', onDidFailLoad as (...args: never[]) => void)
   wc.on('console-message', onConsoleMessage as (...args: never[]) => void)
+
+  // Page → main link reports. Registered on the WebContents-scoped `ipc`, never
+  // on the global `ipcMain`: it is invisible to every other handler in the app
+  // and needs no sender predicate, because only this WebContents can reach it.
+  // WebContents-scoped rather than frame-scoped because a `WebFrameMain` is
+  // replaced when a navigated page replaces it (sd-074b §5.3).
+  /**
+   * Sub-frames are not trusted to speak for the page, and a message whose
+   * sender frame is unknown is refused (fails closed). `undefined` used to
+   * count as the main frame, which was safe only while frames had no preload;
+   * with HTML Preview comments every frame runs it (SEC-27,
+   * docs/adrs/0005-sub-frame-preload-one-receive-channel.md). `null` – a
+   * frame that navigated away or was destroyed – was already refused.
+   */
+  const fromMainFrame = (event: unknown): boolean => {
+    const senderFrame = (event as { senderFrame?: unknown } | null | undefined)?.senderFrame
+    return senderFrame !== undefined && senderFrame !== null && senderFrame === wc.mainFrame
+  }
+  const onLinkActivated = (event: unknown, payload: unknown): void => {
+    if (!fromMainFrame(event)) return
+    hooks.onLinkActivated?.(payload)
+  }
+  wc.ipc?.on(PREVIEW_PAGE_LINK_CHANNEL, onLinkActivated as (...args: never[]) => void)
+
+  // The link report's early half, on its own channel with the same gate.
+  const onLinkNote = (event: unknown, payload: unknown): void => {
+    if (!fromMainFrame(event)) return
+    hooks.onLinkNote?.(payload)
+  }
+  wc.ipc?.on(PREVIEW_PAGE_LINK_NOTE_CHANNEL, onLinkNote as (...args: never[]) => void)
+
+  // Same channel discipline as the link one above, and the same main-frame gate:
+  // a sub-frame does not speak for the page. This is the CSP half of the
+  // blocked-host signal — the half `onBeforeRequest` structurally cannot see.
+  const onCspViolation = (event: unknown, payload: unknown): void => {
+    if (!fromMainFrame(event)) return
+    hooks.onCspViolation?.(payload)
+  }
+  wc.ipc?.on(PREVIEW_PAGE_CSP_VIOLATION_CHANNEL, onCspViolation as (...args: never[]) => void)
 
   const detachInput = attachInputForwarding(
     wc as never,
     hooks.onForwardedShortcut,
-    params.platform
+    params.platform,
+    params.comments
   )
-
-  const entryWatcher = params.createEntryWatcher(params.entryFilePath, {
-    onChange: () => hooks.onEntryChange(),
-    // A rename fires `unlink` on the old path — treat it as a delete.
-    onUnlink: () => hooks.onEntryDeleted(),
-    onError: (error) => {
-      // A watcher error is not itself a page failure (the next load surfaces a
-      // genuinely missing file), so it is still swallowed to avoid crashing
-      // teardown — but it is logged now, filename redacted, so an EMFILE or
-      // permission fault on the entry watch leaves a diagnostic trail.
-      logger.warn('Preview entry watcher error', {
-        path: redactPath(params.entryFilePath),
-        error: error instanceof Error ? error.message : String(error)
-      })
-    }
-  })
 
   return {
     async dispose(): Promise<void> {
@@ -163,8 +244,19 @@ export function wirePreviewLifecycle(
       wc.removeListener('render-process-gone', onRenderProcessGone as (...args: never[]) => void)
       wc.removeListener('unresponsive', onUnresponsive as (...args: never[]) => void)
       wc.removeListener('did-finish-load', onDidFinishLoad as (...args: never[]) => void)
+      wc.removeListener('did-start-loading', onDidStartLoading as (...args: never[]) => void)
+      wc.removeListener('did-stop-loading', onDidStopLoading as (...args: never[]) => void)
+      wc.removeListener('did-fail-load', onDidFailLoad as (...args: never[]) => void)
       wc.removeListener('console-message', onConsoleMessage as (...args: never[]) => void)
-      await entryWatcher.close()
+      wc.ipc?.removeListener(
+        PREVIEW_PAGE_LINK_CHANNEL,
+        onLinkActivated as (...args: never[]) => void
+      )
+      wc.ipc?.removeListener(PREVIEW_PAGE_LINK_NOTE_CHANNEL, onLinkNote as (...args: never[]) => void)
+      wc.ipc?.removeListener(
+        PREVIEW_PAGE_CSP_VIOLATION_CHANNEL,
+        onCspViolation as (...args: never[]) => void
+      )
     }
   }
 }

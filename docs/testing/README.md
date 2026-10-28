@@ -2,10 +2,12 @@
 
 Complete guide for testing Erfana. This covers both automated tests (Vitest/Playwright) and visual/manual testing using Circuit Electron MCP.
 
+> **Note**: bare issue numbers below without a `github.com/qodeca/erfana` link (#104, #137, #157, #159, #168, #211, #237) predate the 2026-06 open-source migration and no longer resolve on `qodeca/erfana`; they are retained as provenance. A pre-migration number at or below #120 now points at an unrelated public issue, so do not follow it.
+
 ## 📚 Documentation Index
 
 ### Automated Tests (Unit/Integration)
-- Runner: Vitest workspace (`main`, `preload`, `renderer`)
+- Runner: Vitest projects (`main`, `main-perf`, `preload`, `renderer`). `main-perf` holds the main process's timing-budget suites (`*.perf.test.*`), which run last and one at a time – see [ci.md § Quality checks](../ci.md#quality-checks-checksyml), "Timing-budget suites run alone"
 - Commands:
   - `npm run test` — run all projects once
   - `npm run test:renderer` — renderer tests
@@ -22,7 +24,13 @@ Complete guide for testing Erfana. This covers both automated tests (Vitest/Play
 
 #### Key test areas
 
-Run `npm run test` for current totals. The workspace holds **376 test files** — main 165 (`src/main` 151 + `src/shared` 12 + `scripts` 2), renderer 206, preload 5 — and runs **10,474 cases**, all passing. Both figures were measured on 2026-08-24 on the #73 image-export branch, which is ahead of `develop`; re-run `npm run test:ci` for the live figure, since the case count moves with every commit while the file count is checkable with a glob. ~78 cases platform-gate on Windows — 77 POSIX-only `pathSecurity.test.ts` + 1 macOS-only `LiteParseConverter.test.ts`. For the version-by-version test-addition history, see [`docs/CHANGELOG.md`](../CHANGELOG.md).
+Run `npm run test` for current totals. The workspace holds **792 test files** at v0.22.0 (counted 2026-10-25 with `git ls-files` against the three vitest `include` globs): main 417 (`src/main` 358 · `src/shared` 35 · `scripts` 24), renderer 360, preload 15. The case counts below are older and were taken on the 563-file tree of September 2026: a full `npm run test:ci` reported **13,853 cases passing with 5 skipped** across 563 files on a macOS host at v0.20.0 (counted 2026-09-16, Node 24.20.0), and **13,729 passing with 123 skipped** across the same 563 files on a Windows 11 host on 2026-09-15 (Node 24.14.1, after #128–#130). Re-run `npm run test:ci` for the live figure, since the case count moves with every commit while the file count is checkable with a glob. **The two host figures are not comparable and neither is wrong** – the gap is the skip set below, which is what a Windows host declines to run.
+
+At v0.19.0, **108 cases were skipped on a Windows host** (the macOS skip set at v0.20.0 is 5), all of them in the `main` project: 77 in the POSIX-only `pathSecurity.test.ts`, 20 in `scripts/fuses.test.mjs` (the POSIX chmod and symlink cases), 5 in `projectConfinement.test.ts`, 5 across the file handlers, and 1 macOS-only `LiteParseConverter.test.ts` case. #124 then added more, and **#130 took most of them back out** after the first Windows run showed the suites passed there: `previewNavigation.integration.test.ts` runs in full on Windows again, while `previewFrames.integration.test.ts` and `BrowserLaunchService.integration.test.ts` each skip a single case rather than the whole file. What still gates on win32 is the inner `symlinks` describe in `previewRequestKind.integration.test.ts` and `it.skipIf` cases in `BrowserLaunchService.test.ts`, `previewFrameSources.test.ts` and `projectConfinement.test.ts`, all in `main`. That is the 174 → 123 drop measured on 2026-09-15. (`tarArchive.test.ts` gates its symlink case with an early `return` instead, so it reports as passing rather than skipped – which is why the coverage floors, not the test run, are what fail on Windows.)
+
+**A platform skip needs a stated reason.** All three blocks #130 removed sat on a whole `describe` with no comment, and between them hid 54 passing tests from every Windows run – the sender-gating cases among them. Skip the one case that needs it, and write down why at the skip.
+
+For the version-by-version test-addition history, see [`docs/CHANGELOG.md`](../CHANGELOG.md).
 
 | Area | Key files | Docs |
 |------|-----------|------|
@@ -34,10 +42,12 @@ Run `npm run test` for current totals. The workspace holds **376 test files** �
 | ProjectTree & watchers | `*.logic.test.ts`, `*.pipeline.test.ts`, `*.switching.test.ts` | [Architecture – ProjectTree](../architecture.md#projecttree-modularization) |
 | Local whisper (Phase 4) | `LocalWhisperService.test.ts`, `WhisperModelManager.test.ts`, `WhisperModelManager.downgrade.test.ts` + utility tests (`zipArchive`, `tarArchive`, `secureDownloader`, `verifyManifest`) | [Phase 4 test inventory](../windows/implementation-plan.md#phase-4-test-inventory) · [Trust chain](../windows/whisper-trust-chain.md) · [API services – features](../api-services-features.md) |
 | Settings overlay | `SettingsOverlay.test.tsx` | [Settings](../settings.md) |
+| Design system (`docs/design-system/`) | `scripts/design-claims.test.mjs` (the claims ledger: re-derives every number a design card states, from `src/`, and fails naming the card that drifted — a card has nowhere to type a number by hand), `scripts/design-authority.test.mjs` (asserts a retired style-guide section stays a stub and cannot grow a rule back) | [`docs/design-system/README.md`](../design-system/README.md) · `scripts/lib/design-claims.mjs` |
 | Build tooling | `scripts/fuses.test.mjs` (afterPack chmod helper — 9 cases: happy / idempotent / multi-arch / missing / empty+requireMatch / empty+lenient / symlink / dir / EROFS) | [Build – Fuses](../build/fuses.md#afterpack-also-chmods-node-pty-spawn-helper) |
-| Error containment (#60) | `RootErrorBoundary.test.tsx`, `RootErrorFallback.test.tsx`, `PanelErrorBoundary.test.tsx`, `useDragDropTree.test.ts` (explicit-stack `flattenTree`), `rendererCrashHandlers.test.ts` (main-side crash/hang trail) | [UI components § Error containment](../ui-components.md#error-containment) · [`design-issue-60.md`](../design/design-issue-60.md) |
+| Error containment (#60) | `RootErrorBoundary.test.tsx`, `RootErrorFallback.test.tsx`, `PanelErrorBoundary.test.tsx`, `useDragDropTree.test.ts` (explicit-stack `flattenTree`), `rendererCrashHandlers.test.ts` (main-side crash/hang trail) | [UI components § Error containment](../ui-components.md#error-containment) · [`design-issue-60.md`](../designs/design-issue-60.md) |
 | Image viewer + single-file watch (#70) | Main: `FileWatcherService.atomicSave.test.ts`, `watcher/SubscriberCounter.test.ts`, `watcher/singleFileWatch.rename.integration.test.ts` (**real** chokidar + real `rename`, pins the platform's event sequence). Renderer: `hooks/useFileChangeSubscription.test.ts`, `hooks/fileWatchSlot.test.ts`, `utils/openFileInPanel.test.ts`, and the `ImageViewerPanel/` suite (`.test.tsx`, `.refresh`, `.status`, `.deleted`, `.integration`) | [File watching § Single-file watch internals](../file-watching/README.md#single-file-watch-internals-70) · [UI components § Image Viewer Panel](../ui-components.md#image-viewer-panel) |
 | Image export – PNG / PDF / clipboard (#73) | Main: `services/imageExport/` (`imageMetadata`, `declaredDimensions`, `exportPaths`, `pdfGeometry`, `rasterizeSession`, `ImageRasterizeWindow`, `exportSinks`, and `ImageExportService` split across `.test`, `.errors.test`, `.sinks.test`), `utils/ExportLock.test.ts`, `ipc/image-export-handlers.test.ts`. Shared: `ipc/image-formats.test.ts`. Renderer: `ImageViewerPanel/imageExportToast.logic.test.ts`, `hooks/useImageExportHandlers{,.announcement}.test.ts`, `components/ImageViewerExportControls.test.tsx`, `ImageViewerPanel.export.test.tsx`, `ImageViewerPanel.toolbarOverflow.test.ts`. The rasterize harness itself is the one piece with no unit coverage — it only runs inside a real Chromium page, so it is proven by the four e2e specs that actually export (`image-export`, `image-export.behaviour`, `image-export.matrix`, `image-export.overlay-matrix`) and the manual checklist | [API services – features § ImageExportService](../api-services-features.md#imageexportservice) · [UI components § Image Viewer Panel](../ui-components.md#image-viewer-panel) · [Error codes § Image export](../error-codes.md#image-export-15-codes) |
+| Multi-page HTML preview (#124) | Main: `services/preview/` (`previewFrameGuard`, `previewFrameSources`, `previewTabHistory`, the `previewFrames` / `previewNavigation` / `previewRequestKind` integration suites) and `services/browserLaunch/` (`BrowserLaunchService` unit and integration, `browserLauncher`). Shared: `ipc/preview-navigation-schema.test.ts`, `ipc/browser-schema.test.ts`, `previewNavKeys.test.ts`. Renderer: `services/preview/previewTabMove{,.autosave,.logging}.test.ts`, `previewDragFreeze.test.ts`, `PreviewLinkRouter.test.ts`, `services/editorSaveRegistry.test.ts`. Several of these carry per-file coverage floors (see *Coverage gates* below) | [HTML preview](../html-preview/README.md) |
 
 **Testing patterns used**:
 - "Extract Pure Logic" – business logic in `.logic.ts` files, tested without React overhead
@@ -53,7 +63,7 @@ Run `npm run test` for current totals. The workspace holds **376 test files** �
 - **Crypto fixture pattern** — `verifyManifest.test.ts` uses a real published manifest + signature as fixture. Don't synthesise test manifests with test keypairs; refresh the fixture when the whisper pin advances. See [ADR 0002](../adrs/0002-minisign-over-cosign-sigstore.md)
 - **Cross-cutting CSS-policy audits** (`*.audit.test.ts`) — verify a stylesheet contract that spans many component files without depending on jsdom's `getComputedStyle` (which is unreliable for non-standard properties like `user-select` — vitest #1689, #8017). Pattern: import each component CSS as raw text via Vite's `?raw` suffix (the renderer vitest project sets `css: true`), then `it.each` over an exported `AUDIT_<N>_SURFACES` constant and assert `new RegExp(escapedSelector + '[\\s\\S]{0,800}?user-select:\\s*text\\s*;')` matches the source. Reference: [`src/renderer/src/styles/userSelect.audit.test.ts`](../../src/renderer/src/styles/userSelect.audit.test.ts) (#211) covers 22 surfaces deterministically. Pair with a small organic E2E rather than per-surface E2E variants (the raw-CSS pass is the cross-cutting gate).
 - **CPU probe mocking** — simulate pre-SSE4.2 CPUs in UI tests via `vi.spyOn(os, 'cpus').mockReturnValue([...])` + `__resetCpuProbeForTests()` before import. Pattern lives in `LocalWhisperService.test.ts` `describe('checkCpuSupport() pre-flight probe')`
-- **Coverage gates and ratchet policy** — aggregate thresholds in the 3 vitest configs (`vitest.{main,preload,renderer}.ts`) currently sit at `lines/functions/statements: 10`, `branches: 5`. They are aggregate (`perFile: false`) and only fire under `--coverage` (`npm run test:cov`), not under `test:ci`. **Trust-chain modules** (`src/main/utils/{verifyManifest,secureDownloader,zipArchive,tarArchive}.ts`) carry per-file 90% floors via glob-keyed thresholds in `vitest.main.ts` — these protect the whisper-binary download verification chain (ADRs 0001–0004). The per-file global gate (`perFile: true`) and a measurement-based floor raise are deferred until a clean coverage measurement is captured. The Windows blocker on that measurement is cleared: `scripts/fuses.test.mjs` has been platform-skipped since 2026-06-04 (`describe.skipIf(process.platform === 'win32')` on both top-level describes), so `npm run test:cov` runs on Windows hosts — see [`docs/windows/known-flakes.md`](../windows/known-flakes.md). **Ratchet pattern**: when raising floors, never set them to the measured value; set them to (measured − 5 percentage points, rounded down to nearest 5) so single-PR coverage dips don't break the build, then ratchet again after each cycle of new tests lands.
+- **Coverage gates and ratchet policy** – all three vitest configs carry floors, and they only fire under `--coverage` (`npm run test:cov`, and the required `Coverage` job, which runs one pass per config with a 15-minute timeout), not under `test:ci`. Each config sets `all: true`, so a file no test loads counts at 0 %, and carries a project-wide floor (lines / functions / branches / statements): `vitest.main.config.ts` 90 / 92 / 90 / 90, `vitest.preload.config.ts` 74 / 53 / 97 / 74, `vitest.renderer.config.ts` 85 / 90 / 89 / 85. What each project counts and leaves out, and the values they were measured at, are in [docs/ci.md § Quality checks](../ci.md#quality-checks-checksyml). `vitest.renderer.config.ts` also carries per-file floors for the #124 HTML-preview modules `usePreviewBounds.ts`, `previewClip.ts`, `previewDragFreeze.ts` and `previewTabMove.ts`, and `vitest.main.config.ts` has #124 per-file floors for the `services/preview/` and `services/browserLaunch/` modules and `src/shared/ipc/browser-schema.ts`, each pinned about 2 points under its measured value. **Trust-chain modules** (`src/main/utils/{verifyManifest,secureDownloader,zipArchive,tarArchive}.ts`) carry per-file 90% floors in `vitest.main.config.ts` – these protect the whisper-binary download verification chain (ADRs 0001–0004). The threshold keys are **exact repo-relative paths, not globs**, so a per-file floor covers precisely the one file it names; alongside the four trust-chain modules the same block declares `scripts/fuses.js` (86 lines/statements, 88 functions, 93 branches), `src/main/services/claudeStatus/modelId.ts` (95% each metric) and `src/main/utils/rendererCrashHandlers.ts` (90% each metric). The per-file global gate (`perFile: true`) is still deferred. `npm run test:cov` passes on Windows hosts too (since 2026-09-30): `tarArchive.test.ts` builds its hostile archives header by header instead of staging real symlinks, and `scripts/fuses.test.mjs` gates only its POSIX mode-bit assertions on win32 and skips its symlink cases only where the host cannot create one – history in [`docs/windows/known-flakes.md`](../windows/known-flakes.md#npm-run-testcov-cannot-pass-on-a-windows-host). **Ratchet pattern**: never set a floor to the measured value. A project-wide floor is the measured value rounded down, minus one point (91.42 → 90), so a dip of under a point from one PR does not break the build; the #124 per-file floors sit about 2 points under theirs. Raise them again the same way after new tests land, and never lower one to make a change pass.
 
 ---
 
@@ -61,13 +71,13 @@ Run `npm run test` for current totals. The workspace holds **376 test files** �
 
 **[e2e-testing.md](./e2e-testing.md)** – Comprehensive E2E testing guide
 
-- Playwright setup and configuration for Electron (three projects in `playwright.config.ts`: `electron` functional, `transcription` env-gated, `visual` regression)
+- Playwright setup and configuration for Electron (four projects in `playwright.config.ts`: `electron` functional, `transcription` env-gated, `bench` env-gated benchmarks, `visual` regression)
 - Testing patterns for third-party components (Monaco, xterm.js, Mermaid)
-- Complete selector catalog (256 testids) – see [e2e-selectors.md](./e2e-selectors.md)
+- Complete selector catalog (274 testids) – see [e2e-selectors.md](./e2e-selectors.md)
 - Test helper utilities documentation
 - Troubleshooting guide
 
-**E2E workflow is currently disabled on CI** (2026-04-25, commit `997ba65`) — both the functional `electron` and `visual` suites run locally only until the `macos-latest` instability is root-caused. See [docs/ci.md § E2E Tests (disabled)](../ci.md#e2e-tests-e2eyml-disabled) for the disable rationale and re-enable command.
+**E2E workflow is currently disabled on CI** (2026-04-25, pre-migration commit `997ba65`, which does not resolve on `qodeca/erfana`) — both the functional `electron` and `visual` suites run locally only until the `macos-latest` instability is root-caused. See [docs/ci.md § E2E Tests (disabled)](../ci.md#e2e-tests-e2eyml-disabled) for the disable rationale and re-enable command.
 
 **Commands**:
 ```bash
@@ -76,8 +86,27 @@ npm run test:e2e:visual            # Visual regression tests (visual project) �
 npm run test:e2e:update-screenshots  # Update visual baselines
 ```
 
-**E2E test files** (all 25 specs in `e2e/`):
+**E2E test files** (a selection of the 66 specs in `e2e/`, counted 2026-10-25 – the full list is in [e2e-testing.md § Test files](./e2e-testing.md#test-files)):
+- `html-preview-corpus.e2e.ts` - HTML-preview corpus acceptance (#74): the fixture corpus renders, the native view is sized on open, and the process-isolation floor holds
+- `html-preview-links.e2e.ts` - in-page links and independent previews (sd-074b): a new tab per target and reuse on a second click, `javascript:` refused, a link out of the project refused, `#anchor` scrolls; plus the external-link case, where an `https:` link asks first and the cancelled outcome is read back from the main log
+- `html-preview-perf.e2e.ts` - the save-to-visible-change gate (sd-074b AC24), asserting the P95 against its budget
+- `html-preview-approval.e2e.ts` - #111: nothing is fetched before approval, Allow then Confirm reaches a terminal state, the script loads inside the page, and the origin is written under `htmlPreview.allowlist.origins`. Uses the `localServer` fixture
+- `html-preview-eviction.e2e.ts` - the fourth preview evicts the first to a still frame, and clicking its tab wakes it live again
+- `html-preview-bounds.e2e.ts` – #124: the native page stays on its placeholder while the layout moves (editor squeeze, tree splitter, expanded terminal, zoom, window resize and maximize, find bar, permission band list). Helpers in `html-preview-bounds.harness.ts`
+- `html-preview-drag-freeze.e2e.ts` – #124: during a splitter drag the page is hidden until main confirms and returns after the release, never drawn over the toolbar, tree or terminal
+- `html-preview-frames.e2e.ts` – #124: same-project `src` and `srcdoc` frames on the `frames/` corpus – sealed execution, reload on save, blocked hosts in the permission band, refused frames on the badge, and the depth and count limits
+- `html-preview-keyboard-focus.e2e.ts` – #124: Enter on the placeholder puts native focus in the page, and Escape hands it back to the band chip. The first test needs an unlocked screen
+- `html-preview-open-in-browser.e2e.ts` – #124: the tree item and the toolbar button hand the file's real path to the browser-launch seam (`ERFANA_E2E_BROWSER_SEAM`), so no browser starts
+- `html-preview-same-tab.e2e.ts` – #124: the link table with the "Open links in this tab" mode on and off, mode inheritance, and a moved tab's title, badge, watcher, Find, PDF name and zoom following the new page
+- `html-preview-same-tab.history.e2e.ts` – #124: one file per tab, Back and Forward from the button and keys, a deleted page dropped from history, and what a page may do to history on its own
 - `app-launch.e2e.ts` – Application launch, activity bar, welcome panel visibility
+- `file-operations.e2e.ts` – Project tree file management (New File / New Folder / Rename / Delete / Copy + Paste), asserted against both the tree and the filesystem
+- `tab-lifecycle.e2e.ts` – Editor tabs: open, switch, dirty state, and the unsaved-changes gate on every close path (button, Cmd/Ctrl+W, Close Others, Close All)
+- `editor-save.e2e.ts` – Autosave and manual save reaching real disk, and the file-changed-on-disk conflict (Reload from Disk / Keep My Version)
+- `markdown-toolbar.e2e.ts` – The four view modes, the formatting commands against the real editor, and the document statistics footer
+- `search-bar.e2e.ts` – Find in document: opening, match counting, next/prev with wrap, case sensitivity, closing, and reset on file change
+- `settings-persistence.e2e.ts` – Settings overlay controls plus four settings asserted across a real restart (isolated `HOME`, because `~/.erfana/settings.json` is not covered by `--user-data-dir`)
+- `workspace-layout.e2e.ts` – Activity-bar toggles, the Cmd/Ctrl+B and Cmd/Ctrl+J shortcuts, the markdown-only filter, recent projects, and the empty states
 - `third-party-components.e2e.ts` – Monaco editor, xterm.js terminal, Mermaid diagrams
 - `directory-watcher.e2e.ts` – Directory watcher pipeline (#104): verifies file creation via terminal appears in Project Tree within latency budget
 - `context-menu-explain.e2e.ts` – Context menu Explain prompt flow: preview (selection gating, menu items, click-outside dismiss, Explain → terminal) and editor (disabled state, enabled after selection, Explain → terminal)
@@ -109,6 +138,7 @@ npm run test:e2e:update-screenshots  # Update visual baselines
 |----------|-----------|--------|
 | `ERFANA_E2E_FORCE_CRASH=1` | Launch environment of the Electron process (the spec sets it per launch) | Makes the main process append `--erfana-force-crash` to `webPreferences.additionalArguments`; the preload re-exposes it as `window.__ERFANA_FORCE_CRASH__` and `App.tsx` throws during render. **Launcher-only** (the renderer cannot set it) and gated on `!app.isPackaged`, so a shipped build ignores it outright. Drives `root-error-boundary.e2e.ts`. See `buildAdditionalArguments()` in `src/main/index.ts` |
 | `ERFANA_E2E_FAST_SHELL=1` | Launch environment | POSIX only: the PTY bootstrap execs `/bin/sh -i` instead of `exec -l "$SHELL" -i`, so no user rc files are sourced and terminal specs start deterministically (a heavy zsh framework can otherwise cost seconds). Production and any run without the variable are unchanged. See `TerminalService.createTerminal()` and [known issues](../known-issues.md) |
+| `ERFANA_E2E_BROWSER_SEAM=1` | Launch environment (`html-preview-open-in-browser.e2e.ts` sets it in `test.beforeAll`) | #124: in an unpackaged build only (`app.isPackaged` is checked first), a function at `globalThis.__erfanaE2eBrowserLaunch` in the main process replaces the real browser launch, so no test ever starts a browser. See `browserLauncher.ts` and [e2e-testing.md](./e2e-testing.md) |
 | `ERFANA_E2E_TRANSCRIPTION=1` | Shell running Playwright | Enables the `transcription` Playwright project (`audio-transcription.e2e.ts`), which makes real, paid OpenAI API calls; also needs `OPENAI_API_KEY`. Without it the project is `grepInvert`-ed to nothing, and the `capability-summary` reporter prints a `SKIPPED CAPABILITIES` line so the gap is auditable rather than a silent green tick |
 | `ERFANA_TEST_BUILD=true` | Build environment (`npm run build:mac:test`) | afterPack (`scripts/fuses.js`) leaves `EnableNodeCliInspectArguments` **on** and renames the bundle with a "(TEST BUILD)" suffix. Required for `--inspect`-based debugging of a packaged app; never distribute such a build |
 
@@ -131,13 +161,13 @@ Screenshot-based comparison for 6 core UI states:
 - **(c)** Terminal open – split view with terminal
 - **(d)** Settings overlay – full-screen settings
 - **(e)** Confirm dialog – quit confirmation overlay
-- **(f)** Image viewer toolbar – narrow panel (#73); the only case about a single row rather than a whole window, and it seeds its image fixtures through its own extended test object so states (a)–(e) keep byte-identical baselines. Its baseline exists for darwin only — a Windows host has to generate and commit the `win32` one
+- **(f)** Image viewer toolbar – narrow panel (#73); the only case about a single row rather than a whole window, and it seeds its image fixtures through its own extended test object so states (a)–(e) keep byte-identical baselines
 
 **Key details**:
-- Baselines in `e2e/screenshots/` with platform suffix (e.g., `welcome-empty-darwin.png`)
-- Deterministic rendering: 1280x800 window, 1x DPR (`--force-device-scale-factor=1`)
+- Baselines in `e2e/screenshots/` with platform suffix (e.g., `welcome-empty-darwin.png`). Both the `darwin` and the `win32` set are committed for all six states; the `win32` set was regenerated on 2026-09-04 after page-level captures were clipped
+- Deterministic rendering: the fixture pins the window's content size (`VISUAL_CONTENT_SIZE` in `e2e/fixtures/index.ts`: 1384x861 on Windows, 1400x868 on macOS – the content area of the app's default window, which the baselines were captured at) and checks the size was granted; 1x DPR (`--force-device-scale-factor=1`); page-level captures (a)–(c) pass `clip: PAGE_CLIP`, a 1280x800 rectangle. Before #267 the resize ran before the window existed and usually did nothing, so a slow run that let it land failed all five cases. Element-level captures (d)–(f) need no clip
 - Monaco cursor blink disabled; minimap and scrollbar masked
-- Tests skip gracefully when no baseline exists for the current platform
+- A missing baseline does **not** skip: `assertBaselineExists()` throws, and `playwright.config.ts` sets `updateSnapshots: 'none'`, so nothing is auto-written on a first run. Generate a new platform's set with `npm run test:e2e:update-screenshots` and commit it
 - `maxDiffPixelRatio: 0.01`, `retries: 0` (diffs must be investigated, not retried)
 - CI records video on failure for debugging
 
@@ -147,7 +177,7 @@ See `specs/archived/spec-t2-019-visual-regression-ci/` for the full specificatio
 - Generate per-project coverage reports: `npm run test:cov`
 - Reports written under `coverage/<project>/` (lcov + HTML)
 - Build outputs (`out/`) are excluded from coverage to keep signal clean
-- Initial thresholds are low (10%) to avoid blocking early adoption
+- Thresholds and per-file floors: see *Coverage gates and ratchet policy* above
 
 ---
 
@@ -195,6 +225,8 @@ See `specs/archived/spec-t2-019-visual-regression-ci/` for the full specificatio
 ## 📋 Prerequisites
 
 For unit/integration: `npm ci` (vitest, Testing Library, and jsdom are already devDependencies), then `npm run test`.
+
+Each vitest run uses at most half the cores (at least two) – `vitest.workers.ts`, #171 – so parallel agent runs do not saturate the machine; `VITEST_MAX_WORKERS=8` or `VITEST_MAX_WORKERS=75%` overrides it for one run or one machine.
 
 For MCP visual testing:
 1. Build: `npm run build`

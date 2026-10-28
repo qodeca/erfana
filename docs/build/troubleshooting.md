@@ -1,6 +1,6 @@
 # Build Troubleshooting
 
-**Last updated**: August 2026 (v0.17.2)
+**Last updated**: October 2026 (v0.22.0)
 
 This document provides solutions to common build errors.
 
@@ -71,7 +71,7 @@ npm rebuild node-pty
 ### Error Message
 
 ```
-Cannot find module '@electron-toolkit/preload'
+Cannot find module 'some-package'
 ```
 
 ### Cause
@@ -132,17 +132,57 @@ Error references app.asar paths
 
 ### Cause
 
-ASAR is enabled but dependencies can't be loaded from inside archive
+A JavaScript package was moved to `app.asar.unpacked/` (an `asarUnpack` glob that matches `.js` files, or `smartUnpack` turned back on). An unpacked package resolves its `require`s from `app.asar.unpacked/node_modules/`, where its still-packed dependencies are not.
 
 ### Solution
 
-Verify ASAR is disabled:
-```yaml
-# electron-builder.yml
-asar: false
-```
+Unpack only native addons and executables, never a package's JavaScript – keep `asar.smartUnpack: false` and the file-level `asarUnpack` list. Do **not** fall back to `asar: false`: `afterPack` refuses to flip the asar fuses onto a bundle without `app.asar`.
 
 **See**: [ASAR Packaging](./asar.md)
+
+---
+
+## ASAR Integrity Violation at start-up
+
+### Error Message
+
+```
+ASAR Integrity Violation: got a hash mismatch (… vs …)
+```
+
+or `FATAL:… Integrity check failed for asar archive entry '<header>'`.
+
+### Cause
+
+`app.asar` changed after electron-builder embedded its hash – something edited the archive after packing (a hook, a manual patch), or the file is damaged.
+
+### Solution
+
+Rebuild. Never modify `app.asar` after packing; anything that must change goes in before `electron-builder` packs, or into `app.asar.unpacked/` (which is not hashed).
+
+---
+
+## Windows `afterSign` cannot read the signed exe
+
+### Error Message
+
+```
+⨯ Parsing signed executable binary is not allowed by default.  failedTask=build stackTrace=Error: Parsing signed executable binary is not allowed by default.
+    at NtExecutable.from (...\node_modules\pe-library\dist\NtExecutable.js:66:23)
+    at readEmbeddedAsarIntegrity (...\scripts\fuses.js:1731:38)
+    at afterPack.assertEmbeddedIntegrityMatches (...\scripts\fuses.js:1821:21)
+    at verifySignedWindowsBundle (...\scripts\resign.js:64:27)
+```
+
+(From the failed v0.22.0 dry-run, run `40172951976`; line numbers are from before the fix.)
+
+### Cause
+
+After Azure signs `Erfana.exe`, `afterSign` reads the asar integrity resource back with `resedit`, which refuses a signed binary unless it is opened with `{ ignoreCert: true }`. Only a signed build reaches this step, so a local unsigned build never shows it. It broke the first v0.22.0 release dry-run and was fixed in PR #407.
+
+### Solution
+
+Keep `{ ignoreCert: true }` on the `resedit.NtExecutable.from` call in `readEmbeddedAsarIntegrity` – the read leaves the signature intact. `scripts/fuses.test.mjs` pins the option and parses a Microsoft-signed `OpenConsole.exe` with the real `resedit`. See [asar.md § Limits](./asar.md#limits) and [release.md § Lessons from v0.22.0](./release.md#lessons-from-v0220).
 
 ---
 
@@ -238,8 +278,7 @@ Build fails during `npm run typecheck`
 1. Check TypeScript version: `npx tsc --version` (should be 6.0.x; `package.json` declares `typescript: ^6.0.3`)
 2. Clean and reinstall:
    ```bash
-   rm -rf node_modules/
-   npm install
+   npm ci   # replaces node_modules itself; not `npm install`
    ```
 3. Check for type errors: `npm run typecheck`
 
@@ -278,7 +317,7 @@ Tests fail, preventing build
    npm run test:renderer
    ```
 2. Fix failing tests before building
-3. All tests must pass – `npm run test:ci` reported **356 test files, 10,057 cases, all passing** on `develop` on 2026-08-23 (v0.17.2). The vitest workspace has three projects, and the `main` project covers more than `src/main`: main 152 files (`src/main` 139 · `src/shared` 11 · `scripts` 2) · renderer 200 · preload 4. Run `npm run test:ci` for the live figure – see [Testing overview](../testing/README.md#key-test-areas)
+3. All tests must pass. vitest runs four projects – `main-perf` is the main process's timing-budget suites (`*.perf.test.*`), split out of `main` to run last and alone – and the `main` project covers more than `src/main`: at v0.22.0 it holds 792 test files – main 417 (`src/main` 358 · `src/shared` 35 · `scripts` 24) · renderer 360 · preload 15, counted 2026-10-25 from the vitest `include` globs. The last recorded case count (13,853 passing, 5 skipped on macOS) dates from v0.20.0. Run `npm run test:ci` for the live figure – see [Testing overview](../testing/README.md#key-test-areas)
 
 ---
 

@@ -1,0 +1,574 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+/**
+ * E2E for in-page links and independent previews (sd-074b).
+ *
+ * Two behaviours that could not be tested before because neither existed: a
+ * link click inside a previewed page, and a second preview running at the same
+ * time as the first.
+ *
+ * Everything is asserted against the REAL `erfana-preview://` web contents read
+ * from the main process, never a DOM stand-in — the page runs in its own sealed
+ * `WebContentsView`, so the renderer's DOM cannot see it. Those reads live in
+ * `HtmlPreviewPage` (e2e/pages/html-preview.page.ts).
+ *
+ * Clicks land inside that sealed view, which Playwright cannot reach, so they
+ * are dispatched main-side. `clickInPreview` uses `executeJavaScript`, and those
+ * synthesised clicks are UNTRUSTED (`isTrusted === false`) — which is precisely
+ * what the preload refuses — so those tests drive the `will-navigate` path, the
+ * fallback that keeps plain links working when the preload is absent. The
+ * external-link case needs the TRUSTED path (a gesture is the only thing that
+ * may reach the OS browser), so it uses `clickTrusted`, a real input event via
+ * `webContents.sendInputEvent`.
+ *
+ * Condition-based waits only — never a sleep.
+ *
+ * Since #124 (part 3) a tab has a link mode; off by default. The link-table
+ * block clicks with REAL input (`clickLink`) and pins the new-tab mode (P3-AC5):
+ * every row but `_self` opens a new tab, and a click with no gesture proof
+ * never moves a tab, whatever the mode. The same-tab mode is
+ * `html-preview-same-tab.e2e.ts`. The final block, also with real input,
+ * checks that a link the page cancels in its own listener is not followed.
+ *
+ * @see docs/html-preview/README.md#links
+ * @see docs/designs/sd-074b-preview-navigation-and-multiview.md
+ */
+
+import * as crypto from 'crypto'
+import * as fs from 'fs'
+import * as fsp from 'fs/promises'
+import * as path from 'path'
+
+import type { ElectronApplication } from '@playwright/test'
+import type { BaseWindow, MessageBoxOptions } from 'electron'
+
+import { test, expect } from './fixtures/index'
+import { LogTail, appMainLogPath } from './fixtures/logTail'
+import { HtmlPreviewPage, PREVIEW_BUDGET_MS } from './pages/html-preview.page'
+import {
+  clickLink,
+  linkModeToggle,
+  livePages,
+  previewTabs,
+  turnSameTabOn,
+  waitForLivePages,
+  type LinkClick
+} from './pages/html-preview.navigation'
+
+const CORPUS_DIR = path.join(__dirname, 'fixtures', 'html-preview-corpus')
+
+/** Read one corpus file's real content so the tests exercise the shipped input. */
+function corpus(relPath: string): string {
+  return fs.readFileSync(path.join(CORPUS_DIR, relPath), 'utf-8')
+}
+
+/**
+ * Click `elementId`, then drive a known-good link behind it and wait for that
+ * to land.
+ *
+ * Why a barrier rather than a poll: `expect.poll(...).not.toContain(...)` stops
+ * the moment the assertion holds, and a negative assertion holds on the FIRST
+ * sample — before a click can possibly have been routed. Playwright's own
+ * matcher returns `continuePolling: false` as soon as a `.not` matcher does not
+ * throw. So the timeout never applied and the effect was never waited for.
+ *
+ * Both clicks traverse the same preload → main → policy → renderer pipeline in
+ * order, so once the second has visibly landed the first has had its full
+ * chance. The negative is then asserted once, on settled state.
+ */
+async function clickThenSettle(preview: HtmlPreviewPage, elementId: string): Promise<void> {
+  expect(await preview.clickInPreview('-LINKS-1', elementId)).toBe(true)
+  expect(await preview.clickInPreview('-LINKS-1', 'plain')).toBe(true)
+  await preview.waitForTitled('-LINKS-TARGET-')
+}
+
+/**
+ * A page that cancels one of its own links from a `window` click listener.
+ *
+ * The page's listener is registered after the preload's (which listens on
+ * `document`), and `window` is the last stop of a bubbling click, so it runs
+ * after the preload's listener has returned. `data-cancelled` counts the
+ * cancellations, so a test can tell the listener actually ran. `#kept` is left
+ * alone and serves as the barrier: its target opening means the cancelled
+ * click has had its full chance to be routed.
+ */
+const CANCELLING_PAGE = `<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>-CANCEL-PAGE-</title></head>
+<body>
+  <p><a id="cancelled" href="cancelled-target.html">a link the page cancels</a></p>
+  <p><a id="kept" href="target.html">a link the page leaves alone</a></p>
+  <script>
+    window.addEventListener('click', (event) => {
+      const link = event.target instanceof Element ? event.target.closest('a') : null
+      if (link && link.id === 'cancelled') {
+        event.preventDefault()
+        document.body.dataset.cancelled = String(Number(document.body.dataset.cancelled || 0) + 1)
+      }
+    })
+  </script>
+</body>
+</html>
+`
+
+/** The cancelled link's target: a real page, so following the link would open a tab. */
+const CANCELLED_TARGET_PAGE = `<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>-CANCELLED-TARGET-</title></head>
+<body><p>Reached only if a cancelled link was followed.</p></body>
+</html>
+`
+
+/**
+ * The page behind the external-link case. Written at runtime with a host that
+ * is unique to this run, because the assertion reads `main.log`, which every
+ * Erfana process on the machine appends to — a fixed host could match a line
+ * written by a sibling worker. `.invalid` is reserved (RFC 2606): even if the
+ * dialog were somehow accepted, nothing resolves.
+ */
+function externalLinkPage(host: string): string {
+  return `<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>External link page -EXTERNAL-1</title></head>
+<body>
+  <p><a id="ext" href="https://${host}/page">Open the outside</a></p>
+</body>
+</html>
+`
+}
+
+test.use({
+  testProjectFiles: {
+    'links/index.html': corpus('links/index.html'),
+    'links/target.html': corpus('links/target.html'),
+    'links/base-self.html': corpus('links/base-self.html'),
+    'links/cancelling.html': CANCELLING_PAGE,
+    'links/cancelled-target.html': CANCELLED_TARGET_PAGE,
+    'self-contained/index.html': corpus('self-contained/index.html'),
+    // Placeholder; the test rewrites it with a run-unique host before opening it.
+    'external/index.html': externalLinkPage('placeholder.invalid'),
+    'notes.md': '# Notes\n'
+  }
+})
+
+test.describe('HTML preview — independent previews', () => {
+  test('two .html files run at the same time, with no refusal', async ({
+    windowWithTestProject,
+    appWithTestProject
+  }) => {
+    const preview = new HtmlPreviewPage(windowWithTestProject, appWithTestProject)
+    await preview.open('links/index.html')
+    await preview.waitForTitled('-LINKS-1')
+
+    await preview.open('self-contained/index.html')
+    await preview.waitForTitled('-OK-1')
+
+    // The refusal that used to appear for a second preview is gone.
+    await expect(
+      windowWithTestProject.getByText('This file is already previewed in another window.')
+    ).toHaveCount(0)
+
+    // Both pages are alive at once — the whole point of the change.
+    const titles = await preview.liveTitles()
+    expect(titles).toContain('-LINKS-1')
+    expect(titles).toContain('-OK-1')
+  })
+})
+
+test.describe('HTML preview — link routing', () => {
+  test('a plain link opens its target in a new tab', async ({
+    windowWithTestProject,
+    appWithTestProject
+  }) => {
+    const preview = new HtmlPreviewPage(windowWithTestProject, appWithTestProject)
+    await preview.open('links/index.html')
+    await preview.waitForTitled('-LINKS-1')
+
+    expect(await preview.clickInPreview('-LINKS-1', 'plain')).toBe(true)
+
+    // The target opens as its OWN running preview; the source page stays open.
+    await preview.waitForTitled('-LINKS-TARGET-')
+    expect(await preview.liveTitles()).toContain('-LINKS-1')
+  })
+
+  test('a javascript: link cannot navigate the preview or open anything', async ({
+    windowWithTestProject,
+    appWithTestProject
+  }) => {
+    // WHAT THIS DOES AND DOES NOT CLAIM. The previous version of this test was
+    // called "a javascript: link never runs", and that is false: measured on
+    // Electron 39, clicking the fixture's `javascript:` link executes it and
+    // replaces the document with the expression's value.
+    //
+    // That is not an escalation, and it is not a hole. `script-src` carries
+    // 'unsafe-inline' and 'unsafe-eval' DELIBERATELY (previewCsp.ts), because a
+    // preview exists to run the page. The threat model's primary attacker, T1,
+    // is defined as an .html file that "runs arbitrary JavaScript, including
+    // unsafe-eval" (docs/security.md). A javascript: URL gives the page a second
+    // route to something it is already allowed to do to its own document. The
+    // boundary is the sandboxed opaque origin and the sealed in-memory session,
+    // not script-src.
+    //
+    // Two things worth recording about the old assertion. It polled with
+    // `.not.toContain(...)`, which returns on the first sample, so it never
+    // waited. And it watched the document TITLE — which a successful payload
+    // wipes, because the expression yields a string and the browser then
+    // replaces the whole document. It could not have detected the thing it
+    // named even given unlimited time.
+    //
+    // So this asserts the invariants that DO hold and that do matter: the view
+    // does not navigate, and nothing new is opened.
+    const preview = new HtmlPreviewPage(windowWithTestProject, appWithTestProject)
+    await preview.open('links/index.html')
+    await preview.waitForTitled('-LINKS-1')
+    const before = await preview.livePreviews()
+    const sourceUrl = before[0].url
+
+    expect(await preview.clickInPreview('-LINKS-1', 'dangerous')).toBe(true)
+
+    // The barrier cannot be another click on this page — the payload replaced
+    // its document, so there is no `-LINKS-1` left to click. Drive a real UI
+    // action instead and wait for it, which drains the same pipeline.
+    await preview.open('self-contained/index.html')
+    await preview.waitForTitled('-OK-1')
+
+    const after = await preview.livePreviews()
+    // The sealed view stayed on its own document: no navigation escaped.
+    expect(after.map((p) => p.url)).toContain(sourceUrl)
+    // Only the preview this test opened on purpose is new.
+    expect(after.length).toBe(before.length + 1)
+  })
+
+  test('a link escaping the project opens nothing', async ({
+    windowWithTestProject,
+    appWithTestProject
+  }) => {
+    const preview = new HtmlPreviewPage(windowWithTestProject, appWithTestProject)
+    await preview.open('links/index.html')
+    await preview.waitForTitled('-LINKS-1')
+
+    const before = (await preview.livePreviews()).length
+    await clickThenSettle(preview, 'escape')
+
+    // Nothing new is ever shown for a path outside the project. The barrier's
+    // own target accounts for exactly one new preview; a third would be the
+    // escaped file.
+    expect((await preview.livePreviews()).length).toBe(before + 1)
+    expect(await preview.liveTitles()).not.toContain('hosts')
+  })
+
+  test('a same-page anchor scrolls instead of opening a tab', async ({
+    windowWithTestProject,
+    appWithTestProject
+  }) => {
+    const preview = new HtmlPreviewPage(windowWithTestProject, appWithTestProject)
+    await preview.open('links/index.html')
+    await preview.waitForTitled('-LINKS-1')
+
+    const before = (await preview.livePreviews()).length
+    await clickThenSettle(preview, 'anchor')
+
+    // A fragment on the same document is a scroll, so only the barrier's own
+    // target may appear.
+    expect((await preview.livePreviews()).length).toBe(before + 1)
+  })
+})
+
+test.describe('HTML preview — external links', () => {
+  test('an https: link asks before opening, and Cancel is logged as the outcome', async ({
+    windowWithTestProject,
+    appWithTestProject,
+    testProject,
+    homeDir
+  }) => {
+    // The question is a NATIVE message box parented to the window
+    // (`dialog.showMessageBox` in externalLinkConsent.ts). Playwright cannot
+    // click it and a CDP key press goes to the renderer, not to the box, so the
+    // outcome is observed where the app records it: `main.log` gains one line
+    // per step — `asking`, then `cancelled` / `opened` / `refused`.
+    //
+    // To answer the box, the test wraps `dialog.showMessageBox` so the REAL box
+    // still opens with the app's own options, plus Electron's documented
+    // `signal`: aborting it closes the box "as if it was cancelled by the user"
+    // and the unmodified consent code then logs `cancelled`. No button is
+    // stubbed and no result is invented; only the dismissal is driven.
+    const host = `e2e-${crypto.randomBytes(6).toString('hex')}.invalid`
+    await fsp.writeFile(
+      path.join(testProject.path, 'external', 'index.html'),
+      externalLinkPage(host),
+      'utf-8'
+    )
+
+    const preview = new HtmlPreviewPage(windowWithTestProject, appWithTestProject)
+    await preview.open('external/index.html')
+    await preview.waitForTitled('-EXTERNAL-1')
+
+    await appWithTestProject.evaluate(({ dialog }) => {
+      const original = dialog.showMessageBox.bind(dialog)
+      const controller = new AbortController()
+      ;(globalThis as { __erfanaE2eExternalDialog?: AbortController }).__erfanaE2eExternalDialog =
+        controller
+      // The app always calls the parented form (externalLinkConsent.ts:
+      // "always parented"), so only that overload is wrapped.
+      dialog.showMessageBox = ((window: BaseWindow, options: MessageBoxOptions) =>
+        original(window, { ...options, signal: controller.signal })) as typeof dialog.showMessageBox
+    })
+
+    const log = new LogTail(appMainLogPath(homeDir))
+    await log.mark()
+
+    // A trusted click: the preload reports a gesture, main routes it as
+    // `external`, and only a gesture may reach the consent step.
+    expect(await preview.clickTrusted('ext', HtmlPreviewPage.target('external/index.html'))).toBe(
+      true
+    )
+
+    const asking = new RegExp(`Preview external link: asking.*https://${host}`)
+    await log.waitFor(asking, {
+      timeout: PREVIEW_BUDGET_MS,
+      message: 'main.log never recorded the external-link question being asked'
+    })
+    // Dismiss the real box the way Electron lets a caller cancel it.
+    await appWithTestProject.evaluate(() => {
+      ;(globalThis as { __erfanaE2eExternalDialog?: AbortController }).__erfanaE2eExternalDialog?.abort()
+    })
+
+    const cancelled = new RegExp(`Preview external link: cancelled.*https://${host}`)
+    await log.waitFor(cancelled, {
+      timeout: PREVIEW_BUDGET_MS,
+      message: 'main.log never recorded the external-link question being cancelled'
+    })
+
+    // The whole outcome, in order, and nothing was handed to the OS.
+    const trail = await log.appended()
+    expect(trail).not.toMatch(new RegExp(`Preview external link: opened.*https://${host}`))
+    expect(trail.indexOf('external link: asking')).toBeLessThan(
+      trail.indexOf('external link: cancelled')
+    )
+  })
+})
+
+test.describe('HTML preview — the link table in new-tab mode (#124, P3-AC5)', () => {
+  const INDEX = 'links/index.html'
+  const TARGET = 'links/target.html'
+
+  const NEW_TAB_ROWS: Array<{ name: string; id: string; how?: LinkClick }> = [
+    { name: 'a plain link', id: 'plain' },
+    { name: 'a _blank link', id: 'blank' },
+    { name: 'a link with a named target', id: 'named' },
+    { name: 'a Cmd/Ctrl-click', id: 'cmd-click', how: { accel: true } },
+    { name: 'a middle-click', id: 'middle-click', how: { button: 'middle' } }
+  ]
+  for (const row of NEW_TAB_ROWS) {
+    test(`should open ${row.name} in a new tab while the mode is off`, async ({
+      windowWithTestProject,
+      appWithTestProject
+    }) => {
+      const preview = new HtmlPreviewPage(windowWithTestProject, appWithTestProject)
+      await preview.open(INDEX)
+      await preview.waitForTitled('-LINKS-1')
+      await expect(linkModeToggle(preview, 'index.html')).toHaveAttribute('aria-pressed', 'false')
+
+      expect(await clickLink(appWithTestProject, row.id, HtmlPreviewPage.target(INDEX), row.how)).toBe(true)
+
+      await waitForLivePages(appWithTestProject, [INDEX, TARGET])
+      await expect(previewTabs(windowWithTestProject)).toHaveCount(2)
+    })
+  }
+
+  test('should show a _self link in the same tab even while the mode is off', async ({
+    windowWithTestProject,
+    appWithTestProject
+  }) => {
+    const preview = new HtmlPreviewPage(windowWithTestProject, appWithTestProject)
+    await preview.open(INDEX)
+    await preview.waitForTitled('-LINKS-1')
+
+    expect(await clickLink(appWithTestProject, 'self', HtmlPreviewPage.target(INDEX))).toBe(true)
+
+    await waitForLivePages(appWithTestProject, [TARGET])
+    await expect(previewTabs(windowWithTestProject)).toHaveCount(1)
+  })
+
+  test('should show a link in the same tab when the page sets <base target="_self">', async ({
+    windowWithTestProject,
+    appWithTestProject
+  }) => {
+    const preview = new HtmlPreviewPage(windowWithTestProject, appWithTestProject)
+    await preview.open('links/base-self.html')
+    await preview.waitForTitled('-LINKS-BASE-SELF-')
+
+    expect(await clickLink(appWithTestProject, 'plain', HtmlPreviewPage.target('links/base-self.html'))).toBe(true)
+
+    await waitForLivePages(appWithTestProject, [TARGET])
+    await expect(previewTabs(windowWithTestProject)).toHaveCount(1)
+  })
+
+  test('should open a link with no click proof in a new tab even with the mode on', async ({
+    windowWithTestProject,
+    appWithTestProject
+  }) => {
+    // Row 1 of the link table, a security invariant: a navigation the preload
+    // did not report as a gesture (here an untrusted `el.click()`, which only
+    // `will-navigate` sees) never moves a tab.
+    const preview = new HtmlPreviewPage(windowWithTestProject, appWithTestProject)
+    await preview.open(INDEX)
+    await preview.waitForTitled('-LINKS-1')
+    await turnSameTabOn(preview, 'index.html')
+
+    expect(await preview.clickInPreview('-LINKS-1', 'plain')).toBe(true)
+
+    await waitForLivePages(appWithTestProject, [INDEX, TARGET])
+    await expect(previewTabs(windowWithTestProject)).toHaveCount(2)
+  })
+})
+
+/**
+ * The preview preload's link channels as main listens on them, plus the
+ * browser's own navigation attempt. The channel names are copied, like the
+ * preload's own (`previewLinkBridge.ts` holds the constants); if they drift the
+ * tap hears nothing and the test's wait times out rather than passing.
+ */
+const LINK_REPORT_CHANNEL = 'preview-page:linkActivated'
+const LINK_NOTE_CHANNEL = 'preview-page:linkNote'
+const WILL_NAVIGATE = 'will-navigate'
+
+/** Where the tap keeps what it heard, in the main process. */
+const LINK_TAP_KEY = '__erfanaE2eLinkTap'
+
+/** One thing the page sent main, in the order main heard it. */
+interface HeardLinkMessage {
+  readonly channel: string
+  readonly payload: { readonly kind?: string; readonly gestureId?: number; readonly href?: string }
+}
+
+/**
+ * Listen, main-side, beside the link bridge of the preview showing `urlIncludes`.
+ *
+ * Read-only: one more listener on that page's `webContents`, so it hears what
+ * the bridge hears, in the same order, and changes nothing. The app is
+ * launched per test, so the listeners go with it.
+ */
+async function tapLinkMessages(app: ElectronApplication, urlIncludes: string): Promise<boolean> {
+  return app.evaluate(
+    ({ webContents }, { wanted, channels, key, willNavigate }) => {
+      const wc = webContents.getAllWebContents().find((c) => {
+        try {
+          return c.getURL().startsWith('erfana-preview://') && c.getURL().includes(wanted)
+        } catch {
+          return false
+        }
+      })
+      if (!wc) return false
+      const heard: unknown[] = []
+      ;(globalThis as Record<string, unknown>)[key] = heard
+      for (const channel of channels) {
+        wc.ipc.on(channel, (_event, payload: unknown) => heard.push({ channel, payload }))
+      }
+      wc.on('will-navigate', (_event, url: string) => heard.push({ channel: willNavigate, payload: { href: url } }))
+      return true
+    },
+    {
+      wanted: urlIncludes,
+      channels: [LINK_REPORT_CHANNEL, LINK_NOTE_CHANNEL],
+      key: LINK_TAP_KEY,
+      willNavigate: WILL_NAVIGATE
+    }
+  )
+}
+
+/** Everything the tap has heard so far. */
+async function heardLinkMessages(app: ElectronApplication): Promise<HeardLinkMessage[]> {
+  return app.evaluate((_electron, key) => {
+    const heard = (globalThis as Record<string, unknown>)[key]
+    return Array.isArray(heard) ? (heard as HeardLinkMessage[]) : []
+  }, LINK_TAP_KEY)
+}
+
+/** Whether main heard the click on a link to `target` withdrawn, reported, or neither yet. */
+function clickOutcome(heard: readonly HeardLinkMessage[], target: string): 'pending' | 'cancelled' | 'reported' {
+  const pointsAtTarget = (message: HeardLinkMessage): boolean => message.payload.href?.endsWith(`/${target}`) === true
+  if (heard.some((message) => message.channel === LINK_REPORT_CHANNEL && pointsAtTarget(message))) {
+    return 'reported'
+  }
+  const seen = heard.find(
+    (message) => message.channel === LINK_NOTE_CHANNEL && message.payload.kind === 'seen' && pointsAtTarget(message)
+  )
+  const withdrawn =
+    seen !== undefined &&
+    heard.some(
+      (message) =>
+        message.channel === LINK_NOTE_CHANNEL &&
+        message.payload.kind === 'cancelled' &&
+        message.payload.gestureId === seen.payload.gestureId
+    )
+  return withdrawn ? 'cancelled' : 'pending'
+}
+
+test.describe('HTML preview — a link the page cancels', () => {
+  const PAGE = 'links/cancelling.html'
+  const KEPT_TARGET = 'links/target.html'
+  const CANCELLED_TARGET = 'links/cancelled-target.html'
+
+  test('is not followed when the page cancels it after the preload has seen the click', async ({
+    windowWithTestProject,
+    appWithTestProject
+  }) => {
+    // A REAL click, so the preload sees a trusted event and would report it.
+    // The page cancels this link from a `window` listener, which runs after the
+    // preload's `document` listener. In Chromium a user click runs microtasks
+    // after every listener, so a report deferred only to a microtask went out
+    // before this cancellation (jsdom's synchronous dispatch cannot show that;
+    // see src/preload/previewPage.test.ts).
+    const preview = new HtmlPreviewPage(windowWithTestProject, appWithTestProject)
+    await preview.open(PAGE)
+    await preview.waitForTitled('-CANCEL-PAGE-')
+    expect(await tapLinkMessages(appWithTestProject, `/${PAGE}`)).toBe(true)
+
+    expect(await clickLink(appWithTestProject, 'cancelled', HtmlPreviewPage.target(PAGE))).toBe(true)
+
+    // The page's own listener ran and cancelled the click.
+    await expect
+      .poll(() => preview.eval('document.body.dataset.cancelled || ""', HtmlPreviewPage.target(PAGE)), {
+        timeout: PREVIEW_BUDGET_MS,
+        message: 'the page never saw (and cancelled) the click'
+      })
+      .toBe('1')
+
+    // Barrier, causal rather than timed: wait until main has HEARD the
+    // preload's decision on this click. It sends either the report or the
+    // `cancelled` note, never both, so once either has arrived nothing more
+    // can come for it.
+    await expect
+      .poll(async () => clickOutcome(await heardLinkMessages(appWithTestProject), CANCELLED_TARGET), {
+        timeout: PREVIEW_BUDGET_MS,
+        message: 'main never heard what became of the cancelled click'
+      })
+      .toMatch(/^(cancelled|reported)$/)
+    expect(clickOutcome(await heardLinkMessages(appWithTestProject), CANCELLED_TARGET)).toBe('cancelled')
+
+    // A real click on the link the page leaves alone still opens: the page and
+    // the preload are working, so the absence below means something. The
+    // browser handles one frame's navigations in order, so once this click's
+    // own `will-navigate` is heard, none for the cancelled click can follow.
+    expect(await clickLink(appWithTestProject, 'kept', HtmlPreviewPage.target(PAGE))).toBe(true)
+    await waitForLivePages(appWithTestProject, [PAGE, KEPT_TARGET])
+    await expect
+      .poll(
+        async () =>
+          (await heardLinkMessages(appWithTestProject)).some(
+            (message) => message.channel === WILL_NAVIGATE && message.payload.href?.endsWith(`/${KEPT_TARGET}`)
+          ),
+        { timeout: PREVIEW_BUDGET_MS, message: 'main never heard the kept link’s navigation' }
+      )
+      .toBe(true)
+
+    // Settled: nothing ever asked for the cancelled link's target, and it never opened.
+    const towardCancelled = (await heardLinkMessages(appWithTestProject)).filter(
+      (message) => message.channel !== LINK_NOTE_CHANNEL && message.payload.href?.endsWith(`/${CANCELLED_TARGET}`)
+    )
+    expect(towardCancelled).toEqual([])
+    expect(await livePages(appWithTestProject)).toEqual([PAGE, KEPT_TARGET].sort())
+    await expect(previewTabs(windowWithTestProject)).toHaveCount(2)
+  })
+})

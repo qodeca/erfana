@@ -18,6 +18,7 @@ import { openFileInPanel } from '../../utils/openFileInPanel'
 import { resolvePanelKind } from '../../utils/resolvePanelKind'
 import './ProjectPanel.css'
 import { logger } from '../../utils/logger'
+import { settingsGateway } from '../../services/settingsGateway'
 
 /**
  * Runtime type guard for FilterMode
@@ -39,7 +40,7 @@ export function ProjectPanel(props: ISplitviewPanelProps) {
   useEffect(() => {
     const loadFilterMode = async () => {
       try {
-        const result = await window.api.settings.getProjectFilterMode()
+        const result = await settingsGateway.getProjectFilterMode()
         if (result.success && result.mode) {
           // Validate before setting
           if (isValidFilterMode(result.mode)) {
@@ -63,7 +64,7 @@ export function ProjectPanel(props: ISplitviewPanelProps) {
     setFilterMode(mode)
 
     try {
-      await window.api.settings.setProjectFilterMode(mode)
+      await settingsGateway.setProjectFilterMode(mode)
     } catch (err) {
       logger.error('Error saving filter mode:', err instanceof Error ? err : undefined)
       // Continue anyway - the filter still works for the current session

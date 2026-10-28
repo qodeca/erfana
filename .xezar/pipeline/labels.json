@@ -1,0 +1,135 @@
+{
+  "colors": {
+    "pipeline": "0e8a16",
+    "category": "1d76db",
+    "meta": "5319e7",
+    "priority": "d93f0b",
+    "risk": "b60205"
+  },
+  "labels": {
+    "review": {
+      "group": "pipeline",
+      "description": "Waiting for a review verdict."
+    },
+    "changes-requested": {
+      "group": "pipeline",
+      "description": "A reviewer asked for changes; the author owns the next move."
+    },
+    "qa": {
+      "group": "pipeline",
+      "description": "In the QA stage."
+    },
+    "qa-failed": {
+      "group": "pipeline",
+      "description": "QA found a defect; the change goes back to the author."
+    },
+    "merge-queue": {
+      "group": "pipeline",
+      "description": "Approved and queued to merge."
+    },
+    "blocked": {
+      "group": "pipeline",
+      "description": "Cannot proceed until something outside this change is resolved."
+    },
+    "do-not-merge": {
+      "group": "pipeline",
+      "description": "Must not merge, whatever the checks say."
+    },
+    "bug": {
+      "group": "category",
+      "description": "Fixes behaviour that is wrong today."
+    },
+    "feature": {
+      "group": "category",
+      "description": "Adds behaviour that did not exist."
+    },
+    "refactor": {
+      "group": "category",
+      "description": "Changes structure without changing behaviour."
+    },
+    "security": {
+      "group": "category",
+      "description": "Affects a security property."
+    },
+    "dependencies": {
+      "group": "category",
+      "description": "Changes third-party dependencies."
+    },
+    "documentation": {
+      "group": "category",
+      "description": "Changes documents only."
+    },
+    "needs-qa": {
+      "group": "meta",
+      "description": "QA must sign this change off before it merges."
+    },
+    "skip-qa": {
+      "group": "meta",
+      "description": "QA is not required, with the reason stated on the change."
+    },
+    "qa-approved": {
+      "group": "meta",
+      "description": "QA signed off. Never applied by automation."
+    },
+    "qa-self-verified": {
+      "group": "meta",
+      "description": "The agent verified its own work under the documented self-QA exception."
+    },
+    "in-progress": {
+      "group": "meta",
+      "description": "An agent holds an active claim on this change."
+    },
+    "ci-monitoring": {
+      "group": "meta",
+      "description": "A finished run still owes a CI-result comment. Not a claim."
+    },
+    "needs-design": {
+      "group": "meta",
+      "description": "The flow and its states must be settled before the code is written."
+    },
+    "design-approved": {
+      "group": "meta",
+      "description": "The design was reviewed and accepted by a named authority."
+    },
+    "priority-low": {
+      "group": "priority",
+      "description": "Can wait behind everything else."
+    },
+    "priority-medium": {
+      "group": "priority",
+      "description": "Normal queue position."
+    },
+    "priority-high": {
+      "group": "priority",
+      "description": "Ahead of normal work."
+    },
+    "priority-extreme": {
+      "group": "priority",
+      "description": "Interrupt whatever is in flight."
+    },
+    "risk-low": {
+      "group": "risk",
+      "description": "Contained; a mistake is cheap to undo."
+    },
+    "risk-medium": {
+      "group": "risk",
+      "description": "Affects a shared surface; reversible with effort."
+    },
+    "risk-high": {
+      "group": "risk",
+      "description": "Hard to undo, or affects data, security or a public contract."
+    },
+    "design": {
+      "group": "pipeline",
+      "description": "Waiting for a design review of the proposed screens."
+    },
+    "design-failed": {
+      "group": "pipeline",
+      "description": "The design review found problems; rework the design."
+    },
+    "skip-design": {
+      "group": "meta",
+      "description": "Rendered output is unchanged; no design review needed. State why in the PR."
+    }
+  }
+}

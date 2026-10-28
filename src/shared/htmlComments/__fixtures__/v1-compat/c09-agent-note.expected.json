@@ -1,0 +1,235 @@
+{
+  "writable": true,
+  "blocks": [
+    {
+      "kind": "ok",
+      "range": [
+        249,
+        1113
+      ],
+      "nodeRange": [
+        249,
+        1108
+      ],
+      "rawHash": "a6ba8b7d4f60e776fc6a88825c595e7b9205b45698d85d56087e1e7cd3bf7ef6",
+      "target": {
+        "state": "attached",
+        "startOffset": 1113,
+        "via": "position",
+        "tag": "li"
+      },
+      "data": {
+        "v": 1,
+        "id": "c-aaaaaaaaaaaaaad7",
+        "status": "open",
+        "anchor": {
+          "tag": "li",
+          "path": ""
+        },
+        "view": {
+          "w": 1280,
+          "h": 800,
+          "dpr": 2,
+          "x": 0,
+          "y": 120
+        },
+        "msgs": [
+          {
+            "id": "m-aaaaaaaaaaaaaad7",
+            "by": {
+              "name": "Ada Lovelace",
+              "email": "ada@example.com",
+              "role": "human"
+            },
+            "at": "2026-10-25T14:03:00Z",
+            "text": "Note as written."
+          }
+        ]
+      }
+    },
+    {
+      "kind": "ok",
+      "range": [
+        1137,
+        1635
+      ],
+      "nodeRange": [
+        1137,
+        1630
+      ],
+      "rawHash": "f056e4850987e73c0093231568bbaa86f23306d8a62bb4ca8cf7f16b1208d3ec",
+      "target": {
+        "state": "attached",
+        "startOffset": 1635,
+        "via": "position",
+        "tag": "li"
+      },
+      "data": {
+        "v": 1,
+        "id": "c-aaaaaaaaaaaaaaea",
+        "status": "open",
+        "anchor": {
+          "tag": "li",
+          "path": ""
+        },
+        "view": {
+          "w": 1280,
+          "h": 800,
+          "dpr": 2,
+          "x": 0,
+          "y": 120
+        },
+        "msgs": [
+          {
+            "id": "m-aaaaaaaaaaaaaaea",
+            "by": {
+              "name": "Ada Lovelace",
+              "email": "ada@example.com",
+              "role": "human"
+            },
+            "at": "2026-10-25T14:03:00Z",
+            "text": "Note absent."
+          }
+        ]
+      }
+    },
+    {
+      "kind": "ok",
+      "range": [
+        1655,
+        2234
+      ],
+      "nodeRange": [
+        1655,
+        2229
+      ],
+      "rawHash": "a16c08d3960657e66a0c207b923cb8ea22127f5a0bc0d9daebd9f9ee5a4e29d8",
+      "target": {
+        "state": "attached",
+        "startOffset": 2234,
+        "via": "position",
+        "tag": "li"
+      },
+      "data": {
+        "v": 1,
+        "id": "c-aaaaaaaaaaaaaaeb",
+        "status": "open",
+        "anchor": {
+          "tag": "li",
+          "path": ""
+        },
+        "view": {
+          "w": 1280,
+          "h": 800,
+          "dpr": 2,
+          "x": 0,
+          "y": 120
+        },
+        "msgs": [
+          {
+            "id": "m-aaaaaaaaaaaaaaeb",
+            "by": {
+              "name": "Ada Lovelace",
+              "email": "ada@example.com",
+              "role": "human"
+            },
+            "at": "2026-10-25T14:03:00Z",
+            "text": "Note reworded."
+          }
+        ]
+      }
+    },
+    {
+      "kind": "ok",
+      "range": [
+        2256,
+        2906
+      ],
+      "nodeRange": [
+        2256,
+        2901
+      ],
+      "rawHash": "230b43d9d7b80fe4a952cd9cee0f91f89e03d8d91b5927a0d783866fded9309f",
+      "target": {
+        "state": "attached",
+        "startOffset": 2906,
+        "via": "position",
+        "tag": "li"
+      },
+      "data": {
+        "v": 1,
+        "id": "c-aaaaaaaaaaaaaaec",
+        "status": "open",
+        "anchor": {
+          "tag": "li",
+          "path": ""
+        },
+        "view": {
+          "w": 1280,
+          "h": 800,
+          "dpr": 2,
+          "x": 0,
+          "y": 120
+        },
+        "msgs": [
+          {
+            "id": "m-aaaaaaaaaaaaaaec",
+            "by": {
+              "name": "Ada Lovelace",
+              "email": "ada@example.com",
+              "role": "human"
+            },
+            "at": "2026-10-25T14:03:00Z",
+            "text": "Note first line only."
+          }
+        ]
+      }
+    },
+    {
+      "kind": "ok",
+      "range": [
+        2935,
+        3796
+      ],
+      "nodeRange": [
+        2935,
+        3791
+      ],
+      "rawHash": "26d49c2044bbbf228b0dcc53e65fc0411ada94b0ed246b3746fe4033acc1b1ee",
+      "target": {
+        "state": "attached",
+        "startOffset": 3796,
+        "via": "position",
+        "tag": "li"
+      },
+      "data": {
+        "v": 1,
+        "id": "c-aaaaaaaaaaaaaaed",
+        "status": "open",
+        "anchor": {
+          "tag": "li",
+          "path": ""
+        },
+        "view": {
+          "w": 1280,
+          "h": 800,
+          "dpr": 2,
+          "x": 0,
+          "y": 120
+        },
+        "msgs": [
+          {
+            "id": "m-aaaaaaaaaaaaaaed",
+            "by": {
+              "name": "Ada Lovelace",
+              "email": "ada@example.com",
+              "role": "human"
+            },
+            "at": "2026-10-25T14:03:00Z",
+            "text": "Note re-indented."
+          }
+        ]
+      }
+    }
+  ]
+}

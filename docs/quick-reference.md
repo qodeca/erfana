@@ -1,3 +1,8 @@
+<!--
+SPDX-License-Identifier: GPL-3.0-only
+SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+-->
+
 # Quick Reference
 
 One-page cheat sheet for common tasks.
@@ -12,39 +17,28 @@ npm run build:mac        # macOS package (.dmg)
 npm run build:win        # Windows package (NSIS .exe; needs Developer Mode)
 
 # Quality
-npm run typecheck        # Type checking (node + web)
-npm run lint             # Linting
-npm run test             # All tests (vitest workspace: main + renderer + preload)
-npm run test:main        # vitest.main.ts config: src/main + src/shared + scripts (144 test files: 132 + 10 + 2)
-npm run test:renderer    # vitest.renderer.ts config: src/renderer/src only (jsdom)
-npm run test:preload     # vitest.preload.ts config: preload tests
+npm run typecheck        # Type checking (node + web, and their tests + e2e)
+npm run lint             # eslint (JS/TS) + shebang check + 500-line file limit
+npm run lint:css         # stylelint: src/ CSS + the docs/design-system/ cards' inline styles
+npm run design           # Rebuild docs/design-system/ (index, token copy, claims)
+npm run design -- --check # Fail if a generated file under docs/design-system/ is stale
+npm run test             # All tests (vitest projects: main + main-perf + renderer + preload)
+npm run test:main        # vitest.main.config.ts config: src/main + src/shared + scripts (main-perf last)
+npm run test:renderer    # vitest.renderer.config.ts config: src/renderer/src only (jsdom)
+npm run test:preload     # vitest.preload.config.ts config: preload tests
 npm run test:cov         # Coverage report (all 3 projects)
 npm run test:e2e         # E2E tests (Playwright + Electron)
 npm run test:e2e:visual            # Visual regression baselines
 npm run test:e2e:update-screenshots # Refresh visual baselines
+
+# Docs
+npm run check:links          # Relative links and heading anchors in docs
+npm run check:version-drift  # Docs that state a stale version
 ```
 
 ## Keyboard Shortcuts
 
-| Action | macOS | Windows |
-|--------|-------|---------|
-| Save | `Cmd+S` | `Ctrl+S` |
-| Search | `Cmd+F` | `Ctrl+F` |
-| Next / previous match | `Cmd+G` / `Cmd+Shift+G` | `Ctrl+G` / `Ctrl+Shift+G` |
-| Close editor tab | `Cmd+W` | `Ctrl+W` |
-| Insert link | `Cmd+K` | `Ctrl+K` |
-| Command palette | `F1` | `F1` |
-| Toggle sidebar | `Cmd+B` | `Ctrl+B` |
-| Toggle terminal | `Cmd+J` | `Ctrl+J` |
-| Maximize terminal | `Cmd+Shift+M` | `Ctrl+Shift+M` |
-| Refresh project tree | `Cmd+Option+R` | `Ctrl+Alt+R` |
-| New window | `Cmd+Shift+N` | `Ctrl+Shift+N` |
-| Comment line | `Cmd+/` | `Ctrl+/` |
-| Multi-cursor | `Option+Click` | `Alt+Click` |
-
-Settings has no keyboard shortcut – open it with the gear icon at the bottom of the left activity bar (`Esc` closes it). Erfana ships for macOS and Windows only.
-
-Full list: [Keyboard Shortcuts](./keyboard-shortcuts.md)
+See the complete [user shortcut reference](./user-guide/reference/keyboard-shortcuts.md).
 
 ## Design Tokens (UI)
 
@@ -69,7 +63,7 @@ Full list: [Keyboard Shortcuts](./keyboard-shortcuts.md)
 --text-sm   /* 11px */
 ```
 
-Full guide: [UI Style Guide](./ui-style-guide.md)
+Full guide: the [design system](design-system/index.html) — open it in a browser. [UI Style Guide](./ui-style-guide.md) keeps the text-selection policy.
 
 ## Project Structure
 
@@ -115,10 +109,21 @@ Schemas: `src/shared/ipc/*.ts`
 
 ## UI Rules (Non-negotiable)
 
-- Use design tokens (no hardcoded values)
-- `border-radius: 0` (no rounded corners)
-- Use `var(--transition-normal)` for animations
-- Test focus states (accessibility)
+Open [`docs/design-system/index.html`](design-system/index.html) first — the cards decide these, and
+render each rule live.
+
+Machine-enforced by `npm run lint:css` in the required `Lint` job:
+
+- Design tokens only — no raw hex outside `design-tokens.css`
+- `border-radius: 0` (or the circle token); nothing else
+- No bare `z-index` — use a rung from the scale
+
+Nobody checks these but you:
+
+- The focus ring is visible and reaches 3:1 — tab to it and look
+- Every state has a non-colour cue as well as a colour one
+- Anything that loops forever stops under `prefers-reduced-motion: reduce`
+- Interactive targets are at least 24 x 24 (WCAG 2.2 SC 2.5.8)
 
 ---
 

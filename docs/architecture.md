@@ -1,11 +1,12 @@
 # Architecture
-*Live architecture overview. Past refactoring reviews and retrospectives → [`architecture-reviews/`](./architecture-reviews/).*
+*Live architecture overview.*
 
 ## Three-Process Model
 
 1. **Main Process** (`src/main/`): Node.js environment
    - Window lifecycle, file system, native OS integration
    - IPC request handlers
+   - The one record of the open project (`ProjectService.session`) and every path check against it – the renderer's word for where a path leads is never taken
 
 2. **Preload Script** (`src/preload/`): Secure bridge
    - Exposes APIs via `contextBridge`
@@ -40,12 +41,6 @@ SplitviewReact (outer horizontal 3-column split)
       └─ Added only when a project is open; cap relaxed while maximized
 ```
 
-**SplitviewReact** (outer layer):
-- 3-column horizontal split with resizable dividers ✅
-- Proper flex-grow behavior (center auto-fills space) ✅
-- Built-in resize handles that actually work ✅
-- Min/max constraints enforced ✅
-
 **DockviewReact** (center panel only):
 - Tabbed docking for editor files
 - Tab drag-and-drop reordering
@@ -65,7 +60,12 @@ Reference: [Dockview Documentation](https://dockview.dev/)
 
 ## Directory Structure
 
-The tree below is annotated rather than exhaustive: `services/`, `interfaces/`, `ipc/` and `components/` are listed in full, everything else (`utils/`, `hooks/`, `stores/`, …) shows representative entries only. Run `ls` for the authoritative listing.
+The tree below covers `src/` and is annotated rather than exhaustive: `interfaces/`, `ipc/` and `components/` are listed in full, `services/` lists every top-level module but summarises its subdirectories, and everything else (`utils/`, `hooks/`, `stores/`, …) shows representative entries only. Run `ls` for the authoritative listing.
+
+Two tracked trees sit outside `src/` and are not shown below:
+
+- **`docs/design-system/`** — the design system. Plain HTML cards, opened in a browser, that decide the visual rules and render them live. Built by `scripts/design-sync.mjs`; see [`docs/design-system/README.md`](design-system/README.md).
+- **`scripts/`** — build and check tooling (`.mjs`/`.js`, no shell or Python), including `scripts/lib/` for shared helpers.
 
 ```
 src/
@@ -74,7 +74,7 @@ src/
 │   ├── services/                # Business logic (OOP)
 │   │   ├── FileService.ts       # File operations + rename
 │   │   ├── FileWatcherService.ts    # File content auto-refresh
-│   │   ├── DirectoryWatcherService.ts  # Directory tree auto-refresh
+│   │   ├── DirectoryWatcherService.ts  # Directory tree auto-refresh (public lifecycle; layers in watcher/)
 │   │   ├── SettingsService.ts   # Persistent settings (electron-store)
 │   │   ├── GlobalSettingsService.ts  # App-wide settings (~/.erfana/)
 │   │   ├── LoggingService.ts    # File-based logging with rotation
@@ -84,7 +84,9 @@ src/
 │   │   ├── GitWatcherService.ts # Git state file watching (v0.6.3)
 │   │   ├── GitPollingService.ts # Hybrid polling fallback (v0.6.3)
 │   │   ├── ProjectLockService.ts # Multi-instance project locking (v0.6.5)
-│   │   ├── ProjectService.ts    # Project switching orchestration
+│   │   ├── ProjectService.ts    # Project open/switch/close, one at a time; owns the project session
+│   │   ├── session/             # ProjectSession (root, real root, generation, owning window – v0.22.0),
+│   │   │                        #   defaultSessionPermissions
 │   │   ├── PdfService.ts        # PDF export
 │   │   ├── DocxService.ts       # DOCX export
 │   │   ├── TranscriptionService.ts  # OpenAI audio transcription with chunking
@@ -95,10 +97,16 @@ src/
 │   │   ├── AudioMetadataService.ts  # Audio metadata extraction (music-metadata)
 │   │   ├── AudioExtractionService.ts # Video → audio extraction (ffmpeg)
 │   │   ├── ApiKeyService.ts     # Encrypted API key storage (Electron safeStorage)
-│   │   ├── TerminalService.ts   # PTY management with node-pty
+│   │   ├── TerminalService.ts   # PTY management with node-pty; owner-checked per window
 │   │   ├── WindowsTerminalBootstrap.ts # Shell-specific ConPTY bootstrap strategies
+│   │   ├── terminalOutputFlow.ts, terminalForeground.ts, terminalTreeKill.ts, conptyHostReaper.ts,
+│   │   │   nodePtyWindowsShim.ts  # Output batching + flow control, foreground-process check, process-tree kill,
+│   │   │                          #   Windows quit cleanup (#305)
 │   │   ├── ProjectSettingsService.ts   # Per-project settings (.erfana/settings.json)
-│   │   ├── ExternalFileService.ts      # Files opened from outside the project root (realpath confinement)
+│   │   ├── ExternalFileService.ts      # Files dropped or picked from outside the project (copy, move, batch move)
+│   │   ├── ExternalMoveConfirmer.ts, ExternalSourceGrants.ts  # Native "Move?" box before an original is removed;
+│   │   │                                #   which files the Add files dialog picked
+│   │   ├── pdfExportSession.ts  # Sealed in-memory session for the PDF export window
 │   │   ├── ScreenshotService.ts # Screenshot dispatcher + pickCapturer/createScreenshotService factory
 │   │   ├── CameraService.ts     # Webcam photo capture
 │   │   ├── HtmlToDocxConverter.ts      # DOCX export: strips remote images + wraps, delegates to docx/ child
@@ -108,36 +116,78 @@ src/
 │   │   ├── claudeStatus/        # ClaudeStatusService, ClaudeTranscriptWatcher/Parser/Locator,
 │   │   │                        #   ClaudeWindowDetector, encodeCwd, modelId, friendlyModelName, thresholds,
 │   │   │                        #   process/ (Mac/Win detectors + createProcessDetector)
+│   │   ├── browserLaunch/       # BrowserLaunchService (7 ordered checks), browserLauncher (per-platform launch,
+│   │   │                        #   shell.openPath fallback only when the browser lookup fails) – #124
 │   │   ├── workers/             # worker_threads scripts (git-status.worker.ts)
+│   │   ├── file/                # imageRead, readDocumentImage, findByName (bounded name search), restoreParentDirectory
+│   │   ├── imageExport/         # ImageExportService, ImageRasterizeWindow, rasterizeSession, exportSinks,
+│   │   │                        #   exportPaths, imageMetadata, declaredDimensions, pdfGeometry
+│   │   ├── preview/             # HTML preview engine (70 modules): PreviewViewService, PreviewViewRegistry,
+│   │   │                        #   PreviewLiveView, PreviewSessionFactory, PreviewProtocolHandler, previewCsp,
+│   │   │                        #   PreviewAllowlistStore, PreviewWatchCoordinator, PreviewFindController,
+│   │   │                        #   previewPageNavigator, previewTabHistory, previewLinkDisposition,
+│   │   │                        #   previewFrameGuard, previewResizeHold, previewHostFocus (#124), …
 │   │   ├── docx/                # DOCX conversion isolation: docxImageStrip (parse5 SSRF strip),
 │   │   │                        #   DocxConvertProcessAdapter (utilityProcess lifecycle), docx-convert.process (child)
 │   │   ├── watcher/             # ThrottledWorker (offset-deque, #173), EventCoalescer, GitEventCoalescer,
-│   │   │                        #   AtomicSaveDetector, RepoPresenceWatcher, WatcherMetrics, PlatformConfig
-│   │   └── import/              # ImportService, ConverterRegistry, DependencyDetector, extensions,
+│   │   │                        #   AtomicSaveDetector, RepoPresenceWatcher, WatcherMetrics, PlatformConfig,
+│   │   │                        #   DirectoryWatcherCore ← DirectoryWatcherRecovery ← DirectoryWatcherEvents
+│   │   │                        #   (the directory watcher's layers, finding [65]), directoryWatchBuilders,
+│   │   │                        #   DirectoryWatchListeners, WatcherHealthLogger, watchErrorTypes, directoryWatchTypes,
+│   │   │                        #   NativeRecursiveWatcher + directoryWatchBackend (native on macOS and Windows),
+│   │   │                        #   KnownEntries, PauseEpisode, single-file watch helpers
+│   │   └── import/              # ImportService, ConverterRegistry, DependencyDetector, ImportToolStatusService,
+│   │                            #   conversionToolGuard (LibreOffice lookup, #250), extensions,
 │   │                            #   converters/ (LiteParseConverter, Audio/VideoConverter, TextConverter – IConverter)
 │   ├── interfaces/              # 9 service interfaces (DIP seams)
 │   │   ├── IFileService.ts, IFileWatcherService.ts, IDirectoryWatcherService.ts
 │   │   ├── IGitStatusWorker.ts, IGitWatcherService.ts, IGitPollingService.ts
 │   │   └── IProjectLockService.ts, IProjectSettingsService.ts, ISettingsService.ts
-│   ├── ipc/                     # 22 handler modules + senderValidation.ts (frame/origin gate)
+│   ├── ipc/                     # 27 *-handlers.ts modules + registry.ts (registerHandle gate) + senderValidation.ts (frame/origin gate)
 │   │   ├── file-handlers.ts, file-watcher-handlers.ts, directory-watcher-handlers.ts
 │   │   ├── terminal-handlers.ts, shell-handlers.ts, quit-handlers.ts, system-handlers.ts
 │   │   ├── settings-handlers.ts, global-settings-handlers.ts, logging-handlers.ts
 │   │   ├── git-handlers.ts, git-watcher-handlers.ts, project-lock-handlers.ts, external-file-handlers.ts
 │   │   ├── screenshot-handlers.ts, camera-handlers.ts, clipboard-handlers.ts, claude-status-handlers.ts
-│   │   └── import-handlers.ts, transcription-handlers.ts, docx-handlers.ts, pdf-handlers.ts
+│   │   ├── import-handlers.ts, transcription-handlers.ts, docx-handlers.ts, pdf-handlers.ts
+│   │   ├── image-export-handlers.ts, preview-handlers.ts, markdown-image-handlers.ts
+│   │   ├── terminal-screen-reader-handlers.ts  # terminal:getScreenReaderSupport + change broadcast
+│   │   ├── browser-handlers.ts  # browser:openFile – isTrustedSender before Zod (#124)
+│   │   ├── confinement/         # registerConfinedHandle, resolveConfinedPath, ConfinementError – path checks (v0.22.0)
+│   │   └── preview/             # Preview IPC split: lifecycle-, allowlist-, find-, navigation- (navigate, pageChanged,
+│   │                            #   resizeHold), focus-handlers (focusPage), buildPreviewGraph, externalLinkConsent,
+│   │                            #   isTrustedPreviewSender, emit
 │   └── utils/
 │       ├── PauseController.ts   # Pause/resume with safety timeout
 │       ├── RateLimitedLogger.ts # Cooldown-based log deduplication
 │       ├── validateFilename.ts  # Phase 2 #161: assertValid + deriveSafe, Unicode bidi-strip
+│       ├── atomicWrite.ts       # Crash-safe writes (temp file + rename) for documents, settings, locks
+│       ├── pathCompare.ts, projectConfinement.ts, pathSecurity.ts, systemPathBlock.ts  # Path rules
+│       ├── hardenedGit.ts       # Neutral cwd, env allowlist, config overrides for every git spawn
 │       └── {zipArchive,tarArchive,secureDownloader,verifyManifest}.ts  # Phase 4 trust chain (#165)
 ├── preload/
 │   ├── index.ts              # contextBridge setup
-│   └── index.d.ts            # TypeScript definitions
+│   ├── index.d.ts            # TypeScript definitions
+│   ├── *Bridge.ts            # One module per window.api domain, typed as its shared contract
+│   ├── ipcSubscribe.ts       # Event subscription helper (unsubscribe returns nothing)
+│   ├── previewBridge.ts      # window.api.preview surface
+│   ├── previewPage.ts        # Preload for the sealed preview page (link clicks, CSP refusals; exposes nothing)
+│   ├── imageExport.ts        # Preload for the hidden image-rasterize window
+│   └── screenshotOverlay.ts  # Preload for the area-select overlay window
+├── shared/                   # Imported by main, preload and renderer
+│   ├── ipc/                  # Payload schemas (*-schema.ts, Zod) and channel-name constants (*-channels.ts)
+│   ├── errors.ts             # ErrorCode enum + ERROR_MESSAGES
+│   ├── errorCodeMarker.ts    # Carries an ErrorCode across IPC on the end of a message (v0.22.0)
+│   ├── redactQuotedPaths.ts, unsafeTool.ts, powershellQuote.ts, coalescingRunner.ts, whisper-model-pins.ts
+│   ├── stablePathDigest.ts   # 16-hex path digest for long panel ids and log lines (#124)
+│   ├── previewNavKeys.ts     # HTML preview Back/Forward key table (#124)
+│   ├── preview-limits.ts     # #124 preview caps and timers
+│   ├── dropReporter.ts       # Rate-capped reporter for dropped preview bounds updates (#124)
+│   └── constants.ts, linkProtocolPolicy.ts, previewFrameBadgeText.ts, shellKind.ts, config/
 └── renderer/
     └── src/
         ├── assets/              # Vendored fonts (Cascadia Mono) and static assets
-        ├── components/          # 19 directories
+        ├── components/          # 20 directories
         │   ├── ActivityBar/     # Vertical activity bars (left/right) + activityBarConfig.ts
         │   ├── ContextMenu/     # Right-click menus (tree, editor, preview, terminal)
         │   ├── Dialog/          # Unified dialog system (Context + Provider + Hook) – inventory in Dialog/CLAUDE.md
@@ -145,13 +195,14 @@ src/
         │   ├── DocumentImport/  # DocumentImportDialog, OcrLanguageSelect
         │   ├── Editor/          # Monaco + Preview + formatting toolbar
         │   ├── FileConflictNotification/  # External-change conflict banner
-        │   ├── Panels/          # Panel implementations (Project, Terminal, Editor, ImageViewer) + WelcomePanel
+        │   ├── HostName/        # Renders a preview origin with scheme/port de-emphasised (preview chrome)
+        │   ├── Panels/          # Panel implementations (Project, Terminal, Editor, ImageViewer, HtmlPreview) + WelcomePanel, WelcomeTab
         │   ├── ProjectTree/     # Project tree with context menu
         │   ├── RootErrorBoundary/  # Crash boundary of last resort + FallbackGuard, recovery screen, errorDetails
         │   ├── Screenshot/      # ScreenshotOverlay (area-select surface for the overlay window)
         │   ├── Search/          # SearchBar (app-level unified search)
         │   ├── Settings/        # Settings overlay
-        │   ├── Tabs/            # EditorTab, WelcomeTab (Chrome-style tabs)
+        │   ├── Tabs/            # EditorTab, HtmlPreviewTab, ImageTab (Chrome-style tabs)
         │   ├── Toast/           # Toast notification system
         │   ├── Toolbar/         # Top application toolbar (app title bar)
         │   ├── Transcription/   # TranscriptionDialog, LanguageSelect
@@ -170,18 +221,23 @@ src/
         │   ├── helpers.ts       # Template helper functions
         │   └── types.ts         # TypeScript interfaces
         ├── providers/           # React provider components
-        ├── services/            # Renderer-side services (textClipboard transport)
-        ├── stores/              # 12 Zustand stores: ActivityBar, ClaudeStatus, Clipboard, DiagramViewer,
-        │                        #   DocumentImport, Git, GlobalSettings, Project, Search, Settings,
-        │                        #   Terminal, Transcription
+        ├── services/            # One gateway per window.api domain (fileGateway, terminalGateway, …), bridgePresence,
+        │                        #   projectGeneration, textClipboard transport, editorSaveRegistry (#124),
+        │                        #   preview/ (PreviewLinkRouter, previewTabMove, previewDragFreeze, OverlayGuardService)
+        ├── imageExport/         # harness.ts – rasterize pixel pump loaded in the hidden image-export window
+        ├── stores/              # 20 Zustand stores: ActivityBar, CameraMirror, ClaudeStatus, Clipboard,
+        │                        #   DiagramViewer, DocumentImport, Git, GlobalSettings, LazyFolder, OverlayOccluder,
+        │                        #   Preview, PreviewChromeGate, PreviewCollapsed, PreviewTab, PreviewViewport,
+        │                        #   Project, Search, Settings, Terminal, Transcription
         ├── styles/              # Global stylesheets
         │   ├── fonts.css            # @font-face declarations (Cascadia Mono)
-        │   ├── design-tokens.css    # Design system tokens (colors, spacing, typography)
+        │   ├── design-tokens.css    # Design tokens - governed by the cards in docs/design-system/
+        │   ├── hostName.css         # HostName badge styles
         │   ├── utilities.css        # Cross-cutting CSS policies (text-selection, etc.)
         │   └── userSelect.audit.test.ts  # Raw-CSS policy audit (#211/#228)
         ├── test-utils/          # Vitest helpers for renderer-side tests
         ├── types/               # Shared TypeScript types (filters.ts)
-        ├── utils/               # Shared utilities (fileUtils.ts, panelUtils.ts, platform.ts)
+        ├── utils/               # Shared utilities (fileUtils.ts, openFileInPanel.ts, panelUtils.ts, platform.ts)
         ├── App.css              # Root layout styles
         ├── App.tsx              # Root component
         ├── index.css            # Global stylesheet entry (imports fonts/tokens/utilities)
@@ -194,25 +250,33 @@ src/
 - **OOP Services**: Business logic in service classes
   - FileService: File operations (read, write, create, rename, delete)
   - FileWatcherService: Auto-reload files on external changes (300ms debounce)
-  - DirectoryWatcherService: Auto-refresh file tree on create/delete/rename and in-place edits (75 ms collect + 200 ms throttle main side, 250 ms renderer debounce; ignored patterns; `.git/` content events suppressed in favor of `GitWatcherService`)
+  - DirectoryWatcherService: Auto-refresh file tree on create/delete/rename (75 ms collect + 200 ms throttle main side, 250 ms renderer debounce; ignored patterns; `.git/` content events suppressed in favor of `GitWatcherService`). A batch of only in-place edits goes out with `structural: false`: git badges refresh, the tree is not re-read – so a save no longer reloads the tree (v0.22.0). The public lifecycle sits on three layers in `services/watcher/` – `DirectoryWatcherCore` (state, path rules, backend choice) ← `DirectoryWatcherRecovery` (error classes, restarts) ← `DirectoryWatcherEvents` (event pipeline, pauses) – see [API services § DirectoryWatcherService](./api-services.md#directorywatcherservice)
   - SettingsService: Persistent storage with electron-store (dynamic ES Module import)
-  - TerminalService: Terminal emulator with xterm.js + node-pty (PTY lifecycle, auto-resize)
-- **Auto-Refresh**: Chokidar-based watching with pause/resume race prevention
+  - TerminalService: PTY lifecycle with node-pty; xterm.js draws it in the renderer
+- **Auto-Refresh**: pause/resume race prevention around the app's own file operations
+  - Directory watch backend: one native recursive watcher per project on macOS and Windows (`fs.watch`, so no file handle per file), chokidar on Linux; `ERFANA_DIRECTORY_WATCHER=chokidar` forces chokidar for diagnosis. Single-file and git watchers use chokidar everywhere. See [File watching § Watch backends](./file-watching/README.md#watch-backends-211)
   - Session token guards drop stale events during project switches
   - Configurable depth cap (settings-driven) to limit recursion in large projects
+- **One project session in main (v0.22.0)**: `ProjectService` owns a `ProjectSession` – root, canonical root, case sensitivity, owning window and a `generation` counter – and is its only writer. Open, switch and close run one at a time on one queue; a failed open never touches the session. `FileService`, the watchers and the project settings follow it through `onChange`. The renderer reads it with `file:getSession`, gets the new generation with every `project:changed`, and sends it back on tree reads, writes and closes, so work meant for a project that is no longer open is refused. See [API services § ProjectService](./api-services.md#projectservice-and-the-project-session)
+- **Path checks in main (v0.22.0)**: every `file:*` channel that takes a path, `markdown-image:read` and the `cwd` of `terminal:create` register through `registerConfinedHandle` (`src/main/ipc/confinement/`). It checks each project path against the session's canonical root by whole folder names, with links, junctions, drive aliases and letter case resolved, before the handler runs. See [IPC patterns § Path checks](./ipc-patterns.md#path-checks-in-the-main-process)
+- **IPC object payloads and gateways**: new and reworked channels take one strict request object (`src/shared/ipc/*-schema.ts`); the whole `file:*` domain does since v0.22.0. Renderer code reaches `window.api` only through one gateway per domain in `src/renderer/src/services/` (lint-enforced). See [IPC patterns § Renderer gateways](./ipc-patterns.md#renderer-gateways)
+- **Terminal contract (v0.22.0)**: `terminal:create` is strict `{ cwd?, cols, rows }` – main picks the shell and its environment. A terminal belongs to the window that created it; its events go only there, and another window's id answers like an unknown one. Output is batched (8 ms or 64 KiB) with flow control on macOS and Linux. In the renderer every way a terminal closes – unmount, project switch, restart – goes through one `teardownTerminal` in `useXtermSession`, which clears its timers and listeners before the next one starts, and a start that is overtaken ends the shell main created for it. See [Terminal](./terminal/README.md)
+- **Large trees (v0.22.0)**: the tree walk leaves ignored folders (`dist`, `.venv`, …) and everything past 50,000 entries as `lazy` rows that are read on expand (`useLazyFolderChildren`, one shallow `file:readDirectory`), and the project tree draws only the rows on screen (`@tanstack/react-virtual`, flat rows from `visibleRows.ts`). See [Project panel](./project-panel.md#large-trees)
+- **Deferred Markdown preview (v0.22.0)**: the preview re-renders when typing pauses (`useIdleDebouncedValue` plus React `useDeferredValue` in `MarkdownPreview.tsx`) rather than on every keystroke, and link checks are remembered. Measurements: [deferred preview](./performance/2026-10-21-deferred-preview.md), [remembered link checks](./performance/deferred-markdown-preview.md)
+- **Crash-safe writes**: documents, global settings and lock files are written to a temp file and renamed over the target (`src/main/utils/atomicWrite.ts`)
 - **Secure IPC**: All main↔renderer communication via contextBridge
 - **State Management**: Zustand for activity bar state (sidebar widths, active panels)
 - **Component Registry**: Splitview and Dockview use string-based component lookup
 - **Multi-model Editor**: Single Monaco instance, swap models per file
-- **Worker thread offloading**: Git status runs in a `worker_threads` Worker to keep the main thread responsive. Three-layer design: `IGitStatusWorker` (interface) → `GitStatusWorkerAdapter` (wraps worker_threads) → `git-status.worker.ts` (runs isomorphic-git or native git). Circuit breaker disables worker after repeated crashes. Strategy selector uses `.git/index` file size to choose between isomorphic-git (small repos) and native `git status --porcelain` (large repos). See [API Services – Features](./api-services-features.md) for details.
+- **Worker thread offloading**: Git status runs in a `worker_threads` Worker to keep the main thread responsive. Three-layer design: `IGitStatusWorker` (interface) → `GitStatusWorkerAdapter` (wraps worker_threads) → `git-status.worker.ts` (runs isomorphic-git or native git). Circuit breaker disables worker after repeated crashes. Native `git status --porcelain` is always preferred, whatever the repo size; the worker falls back to isomorphic-git only when no git binary is found, the binary fails to start, or native git fails transiently three times in a row. See [API Services – Features](./api-services-features.md) for details.
 - **Process isolation for DOCX conversion**: `@turbodocx/html-to-docx` decodes images synchronously, so a malformed image could spin the CPU in a loop that an in-thread `Promise.race` timeout cannot interrupt. The conversion therefore runs in a killable Electron `utilityProcess` child: `HtmlToDocxConverter` (main-side strip + wrap) → `DocxConvertProcessAdapter` (forks the child, mirrors `GitStatusWorkerAdapter`'s lifecycle, `kill()`s on timeout) → `docx-convert.process.ts` (child entry). A separate process — not a worker thread — is used deliberately, to also cap memory against decompression bombs. See [API Services – Features](./api-services-features.md#docxservice).
-- **Sandboxed HTML preview subsystem (#74)**: live HTML/CSS/JS previews render in a dedicated Electron `WebContentsView` overlaid on the preview panel — a separate web contents, **not** the renderer DOM — so a hostile page cannot reach Erfana's own renderer. Its assets are served over a registered privileged `erfana-preview://` scheme by `PreviewProtocolHandler`; the view runs on a sealed in-memory `session` (no persistent cookies, cache or storage) minted by `PreviewSessionFactory`/`PreviewStorageSeal`; and `PreviewRequestFilter` enforces the per-project host allowlist plus a Content-Security-Policy on every request, blocking un-approved remote hosts. `PreviewViewService` owns the native view lifecycle; IPC is sender-gated by `isTrustedPreviewSender`. See [HTML preview](./html-preview/README.md) and [Security](./security.md).
+- **Sandboxed HTML preview subsystem (#74)**: live HTML/CSS/JS previews render in a dedicated Electron `WebContentsView` overlaid on the preview panel – a separate web contents, **not** the renderer DOM – so a hostile page cannot reach Erfana's own renderer. Its assets are served over a registered privileged `erfana-preview://` scheme by `PreviewProtocolHandler`; the view runs on a sealed in-memory `session` (no persistent cookies, cache or storage) minted by `PreviewSessionFactory`/`PreviewStorageSeal`; and `PreviewRequestFilter` enforces the per-project host allowlist plus a Content-Security-Policy on every request, blocking un-approved remote hosts. `PreviewViewService` owns the native view lifecycle; IPC is sender-gated by `isTrustedPreviewSender`. Since #124 a page can show same-project pages in frames, and a tab can move to another page in place with its own Back/Forward history; opening a file in the default browser is a separate `browser:` IPC domain, not part of `preview:`. See [HTML preview](./html-preview/README.md) and [Security](./security.md).
 - **Factory injection over module-eval singletons**: `ScreenshotService` is built by `createScreenshotService(capturer?, platform?)`, which falls back to `pickCapturer(platform)` – `darwin` → `MacScreenshotCapturer` (native `/usr/sbin/screencapture`), `win32` → `DesktopCapturerScreenshotCapturer` (Electron `desktopCapturer` + renderer-driven area-select overlay), anything else → `UnsupportedCapturer`. Both arguments are optional, so production gets `process.platform` while tests inject a fake capturer and a fake platform without stubbing globals. This replaced a module-eval singleton that froze the platform choice at import time (#164). `pickCapturer` is exported separately so the routing table can be asserted directly. The capturers implement one `IScreenshotCapturer.capture(request)` method over a discriminated-union request rather than three per-mode methods, keeping the platform branch in exactly one place.
 - **Mermaid Integration**: Client-side diagram rendering (22 types) with dark theme
-- **Prompt Template System**: CSP-compliant markdown templates with Handlebars-style syntax for context menu AI prompts (see [Prompt Templates](./prompts/README.md))
+- **Prompt Template System**: CSP-compliant markdown templates with Handlebars-style syntax for context menu prompt templates sent to the CLI agent in the terminal (see [Prompt Templates](./prompts/README.md))
 - **Line Range Tracking**: Enhanced markdown preview with `data-line-start/end` attributes for accurate source mapping
-- **Project Persistence**: The last opened project is remembered — `SettingsService` persists `lastProjectPath` and the project appears in the Recent Projects list on the welcome screen — but **start-up never auto-opens it**. The "Load last project on mount - DISABLED" effect in `src/renderer/src/hooks/useProjectManagement.ts` marks the initial load complete without loading anything, and `useProjectManagement.noAutoLoad.test.ts` pins that. This is load bearing, not a preference: the crash screen's Restart button is only safe because a relaunch cannot reopen the project that caused the crash — see [UI Components § Restart-safety invariant](./ui-components.md#restart-safety-invariant) before changing it
-- **Layered error containment**: `PanelErrorBoundary` (panel-scoped, degrades one sidebar panel) → `RootErrorBoundary` plus a **distinct** `FallbackGuard` class (last-resort recovery screen, then an inline-styled `document.body` sibling) → `installGlobalErrorTrail()` (async / event-handler / unhandled-rejection trail) → main-process `rendererCrashHandlers` (process death, hangs, entry-module and preload failures). Every main-side layer is log-only by design: a crash caused by restored state would re-crash on reload, so no auto-reload, dialog or relaunch. Layer-by-layer coverage table in [UI Components § Error containment](./ui-components.md#error-containment)
+- **Project Persistence**: The last opened project is remembered – `SettingsService` persists `lastProjectPath` (main-only; the unused `file:getLastProjectPath` channel was removed in v0.22.0) and the project appears in the Recent Projects list on the welcome screen – but **start-up never auto-opens it**. The "Load last project on mount - DISABLED" effect in `src/renderer/src/hooks/useProjectManagement.ts` marks the initial load complete without loading anything, and `useProjectManagement.noAutoLoad.test.ts` pins that. This is load bearing, not a preference: the crash screen's Restart button is only safe because a relaunch cannot reopen the project that caused the crash – see [UI Components § Restart-safety invariant](./ui-components.md#restart-safety-invariant) before changing it
+- **Layered error containment**: `PanelErrorBoundary` (panel-scoped, degrades one panel or tab; HTML preview tabs are keyed by panel id with `resetKey={filePath}`, so moving a tab to another page does not remount it) → `RootErrorBoundary` plus a **distinct** `FallbackGuard` class (last-resort recovery screen, then an inline-styled `document.body` sibling) → `installGlobalErrorTrail()` (async / event-handler / unhandled-rejection trail) → main-process `rendererCrashHandlers` (process death, hangs, entry-module and preload failures). Every main-side layer is log-only by design: a crash caused by restored state would re-crash on reload, so no auto-reload, dialog or relaunch. The only dialog in the main process is the **start-up** one: if the global settings or the logging service fail to initialise, `index.ts` still registers its handlers and opens the window, writes a `crash.log` line, and shows one non-blocking message box once the window is shown (see [Logging](./logging.md#crashlog-start-up-and-crash-fallback)). Layer-by-layer coverage table in [UI Components § Error containment](./ui-components.md#error-containment)
 - **Shared Utilities**: `types/` for shared TypeScript types (FilterMode), `utils/` for shared functions (sanitizeFilePath, isMarkdownFile, panelUtils)
 
 ## Activity Bar System
@@ -236,7 +300,7 @@ Dual vertical activity bars (VS Code-style):
 
 **Architecture**:
 - **Context + Provider + Hook**: `DialogContext.tsx` provides `useDialog()` hook
-- **Promise-based API**: `showConfirm()`, `showPrompt()`, `showAlert()` return Promises
+- **Promise-based API**: `showConfirm()`, `showPrompt()`, `showAlert()` and `showUnsavedChanges()` return Promises
 - **Auto-incrementing Z-index**: Supports stacked dialogs
 - **Portal rendering**: All dialogs render to `#portal-root`
 - **Shared styling**: `Dialog.css` with CSS variables for consistent theming
@@ -248,27 +312,15 @@ Dual vertical activity bars (VS Code-style):
 - `ConfirmDialog.tsx` - Confirmation dialogs (confirm/cancel with danger mode)
 - `PromptDialog.tsx` - Text input dialogs (validation, character count)
 - `AlertDialog.tsx` - Simple alert dialogs (single OK button)
+- `UnsavedChangesDialog.tsx` - Asks what to do with another tab's unsaved edits before a preview tab shows that page (#124)
 - `dialogService.ts` - Non-React imperative API for global dialogs
 
 **Usage**:
 ```typescript
-// Before: 20+ lines of boilerplate
-const [confirmDialog, setConfirmDialog] = useState(null)
-setConfirmDialog({ title: 'Delete', message: '...', onConfirm: ... })
-{confirmDialog && <ConfirmDialog {...confirmDialog} />}
-
-// After: 2-3 lines
 const { showConfirm } = useDialog()
 const confirmed = await showConfirm({ title: 'Delete', message: '...', danger: true })
 if (confirmed) await deleteFile()
 ```
-
-**Benefits**:
-- 85% code reduction per dialog usage
-- Consistent UX across all dialogs
-- No manual state management required
-- Type-safe API with full TypeScript support
-- Focus management and keyboard shortcuts built-in
 
 ### File System Dialogs (SOLID Architecture)
 
@@ -313,13 +365,6 @@ if (confirmed) await deleteFile()
 - `src/renderer/src/components/Dialog/FileSystemDialog.test.tsx` - component behavior
 - `src/renderer/src/components/Dialog/WrapperDialogs.test.tsx` - integration tests for the wrapper components
 
-**Benefits of SOLID Refactoring**:
-- DRY: Eliminated duplication across 3 dialog types
-- Maintainability: Single source of truth for validation logic
-- Testability: Validation logic testable independently of UI
-- Extensibility: Easy to add new file system operations
-- Type Safety: Shared TypeScript interfaces enforce consistency
-
 ## Drag-Drop File Reorganization
 
 VS Code-style drag-drop for reorganizing files and folders in the project tree:
@@ -341,20 +386,13 @@ See also: [IPC](./ipc-patterns.md) - [UI](./ui-components.md) - [Security](./sec
 
 ## ProjectTree Modularization
 
-**v0.3.7 refactoring**: cut ProjectTree.tsx from 1,338 to 824 lines (38.4%) by applying SOLID principles and design patterns. That was the state at v0.3.7 – the file has grown back since (1,457 lines today) as features landed, so treat the figures below as the record of that refactoring, not a current measurement.
-
-**Key Achievements**:
-- Applied Strategy + Command + Factory patterns for context menus
-- Created 3 custom hooks: useProjectManagement, useFileOperations, useDirectoryWatcher
-- Extracted 57 pure functions using "Extract Pure Logic" pattern
-- Added 320 comprehensive tests (964 total tests passing)
-- Zero breaking changes
+The v0.3.7 refactoring split `ProjectTree.tsx` using Strategy + Command + Factory patterns for the context menu, custom hooks, and pure logic extracted into `.logic.ts` files.
 
 **Architecture Components**:
 - **Custom Hooks**: useProjectManagement (project lifecycle), useFileOperations (CRUD), useDirectoryWatcher (monitoring)
-- **Context Menu**: 11 command classes, node-type strategies, factory selection
+- **Context Menu**: 13 command classes, node-type strategies, factory selection
 - **Helper Functions**: switchHelpers (terminal activity tracking), withWatcherPause (race prevention), constants
-- **Pure Logic**: 57 functions extracted to `.logic.ts` files for fast, deterministic testing
+- **Pure Logic**: functions extracted to `.logic.ts` files for fast, deterministic testing
 
 **Pure Logic Pattern Examples** (v0.6.3):
 - `markdownEditorPanel.logic.ts` - Stats calculation, scroll sync algorithms (587 lines, 82 tests)
@@ -364,9 +402,6 @@ See also: [IPC](./ipc-patterns.md) - [UI](./ui-components.md) - [Security](./sec
 **Shared utility patterns** (cross-platform / cross-process):
 - `src/main/utils/validateFilename.ts` (#161, Phase 2) — two self-documenting entry points: `assertValidUserFilename` throws on invalid input (FileService callers); `deriveSafeFilename` is a total function that silently transforms (Pdf/DocxService callers). Single 9-step pipeline, platform-aware policy, security checks (Unicode bidi-override stripping). Renderer detects via shared `INVALID_FILENAME_MARKER` constant in `src/shared/errors.ts` since `AppError.code` does not survive Electron IPC.
 - `tests/setup/flakeGuard.ts` — surfaces post-teardown unhandled rejections / uncaught exceptions across all 3 vitest projects with scope-labeled stack traces. Exposes counters on `globalThis.__flakeGuardCount__` for future CI assertions.
-
-**SOLID Principles Applied**:
-- Single Responsibility, Open/Closed, Liskov Substitution, Interface Segregation, Dependency Inversion
 
 ## ProjectManagementContext
 

@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import { render, act } from '@testing-library/react'
 import { MarkdownPreview } from './MarkdownPreview'
 import { ToastProvider } from '../Toast/ToastContext'
+import type { FileBridge } from '../../../../shared/ipc/file-schema'
+import { gatewayBridgeMock, type BridgeMock } from '../../test-utils/gatewayBridgeMock'
+
+const fileMock = (): BridgeMock<FileBridge> => gatewayBridgeMock('file')
 
 /**
  * Test wrapper that provides ToastContext
@@ -217,7 +221,7 @@ describe('MarkdownPreview Link Features', () => {
       await renderWithToastAsync(<MarkdownPreview content={markdown} filePath="/test/file.md" />)
 
       // Verify getProjectPath was called for link resolution
-      expect(window.api.file.getProjectPath).toHaveBeenCalled()
+      expect(fileMock().getProjectPath).toHaveBeenCalled()
     })
 
     it('should not resolve links when filePath is not provided', () => {
@@ -225,7 +229,72 @@ describe('MarkdownPreview Link Features', () => {
       renderWithToast(<MarkdownPreview content={markdown} />)
 
       // Should not call getProjectPath when no filePath
-      expect(window.api.file.getProjectPath).not.toHaveBeenCalled()
+      expect(fileMock().getProjectPath).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('Checked links are keyed by the rendered href', () => {
+    beforeEach(() => {
+      global.window.api = {
+        utils: { getPlatform: () => 'darwin' },
+        file: {
+          getProjectPath: vi.fn().mockResolvedValue('/test/project'),
+          exists: vi.fn().mockResolvedValue(false)
+        }
+      } as any
+    })
+
+    it.each([
+      ['[a](.\\docs\\a.md)'],
+      ['[a](<my file.md>)'],
+      ['[a](zażółć.md)']
+    ])('gives %s the broken-link class and tooltip', async (markdown) => {
+      const { container } = await renderWithToastAsync(
+        <MarkdownPreview content={markdown} filePath="/test/project/file.md" />
+      )
+      const link = container.querySelector('a')
+      expect(link?.className).toContain('broken-link')
+      expect(link?.getAttribute('title')).toContain('File not found')
+    })
+
+    it('collects raw-HTML and reference-style links, and ignores images', async () => {
+      const markdown = [
+        '<a href="./raw.md">raw</a>',
+        '',
+        '[ref][1]',
+        '',
+        '![pic](./pic.png)',
+        '',
+        '[1]: ./ref.md'
+      ].join('\n')
+      const { container } = await renderWithToastAsync(
+        <MarkdownPreview content={markdown} filePath="/test/project/file.md" />
+      )
+      const checked = (fileMock().exists as Mock).mock.calls.map(
+        ([request]) => (request as { filePath: string }).filePath
+      )
+      expect(checked).toContain('/test/project/raw.md')
+      expect(checked).toContain('/test/project/ref.md')
+      expect(checked).not.toContain('/test/project/pic.png')
+      expect(container.querySelector('a[href="./raw.md"]')?.className).toContain('broken-link')
+    })
+
+    it('checks nothing for a file the links were not read for', async () => {
+      const { rerender } = await renderWithToastAsync(
+        <MarkdownPreview content="[a](./x.md)" filePath="/test/project/one.md" />
+      )
+      ;(fileMock().exists as Mock).mockClear()
+      await act(async () => {
+        rerender(
+          <ToastProvider>
+            <MarkdownPreview content="[a](./x.md)" filePath="/test/project/docs/two.md" />
+          </ToastProvider>
+        )
+      })
+      const checked = (fileMock().exists as Mock).mock.calls.map(
+        ([request]) => (request as { filePath: string }).filePath
+      )
+      expect(checked).toEqual(['/test/project/docs/x.md'])
     })
   })
 

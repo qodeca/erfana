@@ -19,6 +19,7 @@
 
 import { test, expect, _electron as electron } from '@playwright/test'
 import * as path from 'path'
+import { E2E_CHROMIUM_ARGS } from './fixtures/isolation'
 import {
   TEST_IDS,
   byTestId,
@@ -44,7 +45,7 @@ test.describe('Dockview drag-to-resize (#211 AC #7 regression guard)', () => {
     )
 
     const electronApp = await electron.launch({
-      args: [path.join(__dirname, '..'), `--user-data-dir=${userDataDir}`],
+      args: [path.join(__dirname, '..'), `--user-data-dir=${userDataDir}`, ...E2E_CHROMIUM_ARGS],
       env: { ...process.env, NODE_ENV: 'development' }
     })
 
@@ -77,16 +78,16 @@ test.describe('Dockview drag-to-resize (#211 AC #7 regression guard)', () => {
       await window.mouse.down()
       await window.mouse.move(startX + 80, startY, { steps: 10 })
       await window.mouse.up()
-      await window.waitForTimeout(250) // settle layout
 
-      const afterBox = await projectTreePane.boundingBox()
-      const afterWidth = afterBox?.width ?? 0
-
-      expect(
-        afterWidth,
-        `Sash drag should widen the project tree pane (before=${beforeWidth}px, after=${afterWidth}px). ` +
-        `If this fails, a CSS change has interfered with dockview's drag-to-resize behavior.`
-      ).toBeGreaterThan(beforeWidth + 20)
+      // Poll until the layout settles past the threshold instead of sleeping.
+      await expect
+        .poll(async () => (await projectTreePane.boundingBox())?.width ?? 0, {
+          message:
+            `Sash drag should widen the project tree pane (before=${beforeWidth}px). ` +
+            `If this fails, a CSS change has interfered with dockview's drag-to-resize behavior.`,
+          timeout: 5_000
+        })
+        .toBeGreaterThan(beforeWidth + 20)
     } finally {
       await closeApp(electronApp)
       await cleanupProject()

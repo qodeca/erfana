@@ -316,4 +316,4 @@ graph TD
 - [Main Overview](../graph-engine.md)
 - [Performance & Scalability](./performance.md)
 - [Production Readiness](./production-readiness-checklist.md)
-- [Implementation Guide](./implementation-guide.md)
+- [Implementation Guide](./implementation-guide/README.md)

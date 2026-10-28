@@ -11,9 +11,15 @@ import type { WhisperModel } from '../../../../shared/ipc/transcription-schema'
 import { LOCAL_WHISPER } from '../../../../shared/constants'
 import { logger } from '../../utils/logger'
 import { useOccluder } from '../../hooks/useOccluder'
+import { useOverlayStackEntry } from '../../hooks/useOverlayStackEntry'
 import { TEST_IDS } from '../../constants/testids'
 import { HtmlPreviewSection } from './sections/HtmlPreviewSection'
+import { TerminalSection } from './sections/TerminalSection'
+import { ImportToolsSection } from './sections/ImportToolsSection'
 import './SettingsOverlay.css'
+import { loggingGateway } from '../../services/loggingGateway'
+import { transcriptionGateway, whisperGateway } from '../../services/transcriptionGateway'
+import { utilsGateway } from '../../services/utilsGateway'
 
 // Small delay to ensure overlay is fully rendered before focusing
 const FOCUS_DELAY_MS = 10
@@ -42,6 +48,31 @@ function formatModelSize(bytes: number): string {
   return `~${Math.round(bytes / 1_000_000)} MB`
 }
 
+// Download progress reaches the screen reader at most every 10 % or every 5 s,
+// so the status region does not flood it (WCAG 4.1.3 Status Messages).
+const ANNOUNCE_STEP_PERCENT = 10
+const ANNOUNCE_INTERVAL_MS = 5000
+
+/** The last progress the status region announced. */
+interface Announced {
+  percent: number
+  at: number
+}
+
+/**
+ * Whether new download progress is worth announcing. A percent lower than the
+ * last one means a new file started (the binary, then the model), so it counts
+ * from zero again.
+ */
+function shouldAnnounceProgress(last: Announced | null, percent: number, now: number): boolean {
+  if (!last || percent < last.percent) return true
+  if (percent === last.percent) return false
+  return (
+    Math.floor(percent / ANNOUNCE_STEP_PERCENT) > Math.floor(last.percent / ANNOUNCE_STEP_PERCENT) ||
+    now - last.at >= ANNOUNCE_INTERVAL_MS
+  )
+}
+
 // Whisper model options derived from shared constants
 const WHISPER_MODEL_OPTIONS: { value: WhisperModel; label: string }[] =
   LOCAL_WHISPER.SUPPORTED_MODELS.map((model) => ({
@@ -55,12 +86,12 @@ const WHISPER_MODEL_OPTIONS: { value: WhisperModel; label: string }[] =
  * Features:
  * - Portal rendering to #portal-root
  * - Full-screen overlay with backdrop
- * - Keyboard handling (Escape key)
+ * - Escape closes Settings while it is the topmost overlay (#229)
  * - Focus management for accessibility
  * - Logging settings section
  */
 export function SettingsOverlay() {
-  const { isOpen, closeSettings } = useSettingsStore()
+  const { isOpen, closeSettings, focusSection } = useSettingsStore()
 
   // Register a 'settings' occluder while the overlay is open so the native
   // preview WebContentsView hides behind a still frame (design §1.8). Called
@@ -77,6 +108,7 @@ export function SettingsOverlay() {
     updateWhisperModel
   } = useGlobalSettingsStore()
   const closeButtonRef = useRef<HTMLButtonElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
   const previousActiveElement = useRef<HTMLElement | null>(null)
 
   // Platform gate for local whisper support.
@@ -87,8 +119,8 @@ export function SettingsOverlay() {
   //   - Linux, others — no binary shipped
   //
   // Mirrors `classifyPlatform()` in src/main/services/whisper-assets.ts.
-  const whisperPlatform = window.api.utils.getPlatform()
-  const whisperArch = window.api.utils.getArch()
+  const whisperPlatform = utilsGateway.getPlatform()
+  const whisperArch = utilsGateway.getArch()
   const isLocalWhisperSupported =
     whisperPlatform === 'darwin' ||
     (whisperPlatform === 'win32' && whisperArch === 'x64')
@@ -101,6 +133,19 @@ export function SettingsOverlay() {
   const [modelDownloading, setModelDownloading] = useState(false)
   const [downloadProgress, setDownloadProgress] = useState<{ percent: number; downloadedBytes: number; totalBytes: number } | null>(null)
   const [downloadError, setDownloadError] = useState<string | null>(null)
+  // Text of the always-mounted status region: throttled progress, then the outcome
+  const [downloadAnnouncement, setDownloadAnnouncement] = useState('')
+  const lastAnnounced = useRef<Announced | null>(null)
+  // Set by Cancel; also stops a model download the binary step had not started yet
+  const cancelRequested = useRef(false)
+  // Cancel was pressed and the download has not settled yet ("Cancelling…")
+  const [cancelPending, setCancelPending] = useState(false)
+  // Where focus goes when the download ends and the control that held it is gone
+  const focusAfterDownload = useRef<'download' | 'model' | null>(null)
+  const downloadControlsRef = useRef<HTMLDivElement>(null)
+  const downloadButtonRef = useRef<HTMLButtonElement>(null)
+  const modelSelectRef = useRef<HTMLSelectElement>(null)
+  const [apiKeyError, setApiKeyError] = useState<string | null>(null)
 
   // Logs folder path for display in settings
   const [logsDir, setLogsDir] = useState<string>('')
@@ -111,7 +156,7 @@ export function SettingsOverlay() {
    */
   useEffect(() => {
     if (!isOpen) return
-    window.api.transcription.hasApiKey()
+    transcriptionGateway.hasApiKey()
       .then((result) => setHasApiKey(result))
       .catch(() => setHasApiKey(false))
   }, [isOpen])
@@ -121,7 +166,7 @@ export function SettingsOverlay() {
    */
   useEffect(() => {
     if (!isOpen) return
-    window.api.logging.getLogsDir()
+    loggingGateway.getLogsDir()
       .then((dir) => setLogsDir(dir))
       .catch(() => setLogsDir(''))
   }, [isOpen])
@@ -131,7 +176,7 @@ export function SettingsOverlay() {
    */
   useEffect(() => {
     if (!isOpen) return
-    window.api.whisper.listModels()
+    whisperGateway.listModels()
       .then((result) => {
         if (result.success && result.models) {
           const installed = result.models
@@ -148,18 +193,36 @@ export function SettingsOverlay() {
    */
   useEffect(() => {
     if (!isOpen) return undefined
-    const cleanup = window.api.whisper.onDownloadProgress((progress) => {
+    const cleanup = whisperGateway.onDownloadProgress((progress) => {
       setDownloadProgress(progress)
+      const percent = Math.round(progress.percent)
+      const now = Date.now()
+      if (shouldAnnounceProgress(lastAnnounced.current, percent, now)) {
+        lastAnnounced.current = { percent, at: now }
+        setDownloadAnnouncement(`Downloading, ${percent}%`)
+      }
     })
     return cleanup
   }, [isOpen])
+
+  /**
+   * Hand focus on when a download ends and the control that held it went away:
+   * the Cancel button (to Download) or, once the model is ready, both buttons
+   * (to the model select).
+   */
+  useEffect(() => {
+    if (modelDownloading || !focusAfterDownload.current) return
+    const target = focusAfterDownload.current === 'model' ? modelSelectRef.current : downloadButtonRef.current
+    focusAfterDownload.current = null
+    target?.focus()
+  }, [modelDownloading, installedModels])
 
   /**
    * Open logs folder in the system file manager.
    */
   const handleOpenLogsFolder = useCallback(async () => {
     try {
-      const result = await window.api.logging.openLogsFolder()
+      const result = await loggingGateway.openLogsFolder()
       if (result) {
         logger.error('Failed to open logs folder', undefined, { reason: result })
       }
@@ -178,9 +241,18 @@ export function SettingsOverlay() {
     setModelDownloading(true)
     setDownloadProgress({ percent: 0, downloadedBytes: 0, totalBytes: 0 })
     setDownloadError(null)
+    cancelRequested.current = false
+    setCancelPending(false)
+    lastAnnounced.current = null
+    setDownloadAnnouncement('Download started')
+    let outcome: 'ready' | 'cancelled' | 'failed' = 'failed'
     try {
       // Ensure binary is available before downloading the model
-      const binaryResult = await window.api.whisper.ensureBinary()
+      const binaryResult = await whisperGateway.ensureBinary()
+      if (binaryResult.cancelled || (binaryResult.success && cancelRequested.current)) {
+        outcome = 'cancelled'
+        return
+      }
       if (!binaryResult.success) {
         const errorMsg = binaryResult.error || 'Binary setup failed'
         setDownloadError(errorMsg)
@@ -188,9 +260,12 @@ export function SettingsOverlay() {
         return
       }
 
-      const result = await window.api.whisper.ensureModel(model)
+      const result = await whisperGateway.ensureModel(model)
       if (result.success) {
+        outcome = 'ready'
         setInstalledModels((prev) => prev.includes(model) ? prev : [...prev, model])
+      } else if (result.cancelled) {
+        outcome = 'cancelled'
       } else {
         const errorMsg = result.error || 'Download failed'
         setDownloadError(errorMsg)
@@ -201,10 +276,37 @@ export function SettingsOverlay() {
       setDownloadError(errorMsg)
       logger.error('Failed to download whisper model', error instanceof Error ? error : undefined)
     } finally {
+      // An error is announced by its own alert; the status region says the rest
+      if (outcome === 'ready') setDownloadAnnouncement('Model ready')
+      else if (outcome === 'cancelled') setDownloadAnnouncement('Download cancelled')
+      else setDownloadAnnouncement('')
+      if (downloadControlsRef.current?.contains(document.activeElement)) {
+        focusAfterDownload.current = outcome === 'ready' ? 'model' : 'download'
+      }
       setModelDownloading(false)
+      setCancelPending(false)
       setDownloadProgress(null)
     }
   }, [settings?.transcription.whisperModel, modelDownloading])
+
+  /**
+   * Cancel the running download. The main process deletes the partial file and
+   * the pending ensure call resolves as cancelled. Only the first press sends
+   * the request; the button then reads "Cancelling…" until the download
+   * settles, or until the request fails.
+   */
+  const handleCancelDownload = useCallback(() => {
+    // The ref, not the state: a second press can land before the re-render
+    if (cancelRequested.current) return
+    cancelRequested.current = true
+    setCancelPending(true)
+    whisperGateway.cancelDownload().catch((error: unknown) => {
+      logger.warn('Failed to cancel whisper download', { error: String(error) })
+      // The cancel request itself failed, so nothing was cancelled: offer Cancel again
+      cancelRequested.current = false
+      setCancelPending(false)
+    })
+  }, [])
 
   /**
    * Save API key on input blur.
@@ -216,12 +318,14 @@ export function SettingsOverlay() {
       if (!value || value.length < 8) return
 
       try {
-        const result = await window.api.transcription.setApiKey(value)
+        const result = await transcriptionGateway.setApiKey(value)
         if (result.success) {
+          setApiKeyError(null)
           setHasApiKey(true)
           // Clear the input after successful save
           e.target.value = ''
         } else {
+          setApiKeyError(result.error ?? 'The key could not be saved.')
           logger.warn('Failed to save API key', { error: result.error })
         }
       } catch (error) {
@@ -236,7 +340,7 @@ export function SettingsOverlay() {
    */
   const handleClearApiKey = useCallback(async () => {
     try {
-      const result = await window.api.transcription.clearApiKey()
+      const result = await transcriptionGateway.clearApiKey()
       if (result.success) {
         setHasApiKey(false)
       } else {
@@ -254,36 +358,28 @@ export function SettingsOverlay() {
     }
   }, [isOpen])
 
-  // Focus close button when overlay opens
+  // Focus close button when overlay opens – unless a section was asked for,
+  // in which case that section moves focus to its own heading (#250).
   useEffect(() => {
-    if (!isOpen) return undefined
+    if (!isOpen || focusSection) return undefined
 
     const timer = setTimeout(() => {
       closeButtonRef.current?.focus()
     }, FOCUS_DELAY_MS)
 
     return () => clearTimeout(timer)
-  }, [isOpen])
+  }, [isOpen, focusSection])
 
-  // Keyboard event handler (Escape key)
-  useEffect(() => {
-    if (!isOpen) return undefined
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        e.stopPropagation()
-        closeSettings()
-      }
-    }
-
-    // Add listener with capture to ensure it runs before other handlers
-    document.addEventListener('keydown', handleKeyDown, true)
-
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown, true)
-    }
-  }, [isOpen, closeSettings])
+  // Escape closes Settings only while Settings is the topmost overlay: a
+  // dialog opened over it (the Cmd+Q quit prompt, a confirm from a section)
+  // takes Escape first, and one press must not close both (#229).
+  useOverlayStackEntry(containerRef, {
+    active: isOpen,
+    // The token `.settings-overlay` paints with, so every dialog (10000+)
+    // ranks above Settings for Escape exactly as it paints above it.
+    zIndex: '--z-modal',
+    onEscape: closeSettings
+  })
 
   // Restore focus when overlay closes
   useEffect(() => {
@@ -304,6 +400,7 @@ export function SettingsOverlay() {
   const overlayContent = (
     <div className="settings-overlay" data-testid={TEST_IDS.SETTINGS_OVERLAY}>
       <div
+        ref={containerRef}
         className="settings-container"
         role="dialog"
         aria-modal="true"
@@ -517,6 +614,16 @@ export function SettingsOverlay() {
                   </div>
                 </div>
               )}
+              {settings?.transcription.backend === 'openai' && apiKeyError && (
+                <div className="settings-row">
+                  <p
+                    className="settings-inline-error"
+                    data-testid={TEST_IDS.SETTINGS_API_KEY_ERROR}
+                  >
+                    {apiKeyError}
+                  </p>
+                </div>
+              )}
 
               {/* Local backend: whisper model selection and download */}
               {settings?.transcription.backend === 'local' && (
@@ -545,6 +652,7 @@ export function SettingsOverlay() {
                           logger.warn('Invalid whisper model selected', { value: e.target.value })
                         }
                       }}
+                      ref={modelSelectRef}
                       disabled={modelDownloading}
                       data-testid={TEST_IDS.SETTINGS_SELECT_WHISPER_MODEL}
                     >
@@ -571,20 +679,52 @@ export function SettingsOverlay() {
                             : 'Model not downloaded'}
                       </p>
                     </div>
-                    <div className="settings-api-key-controls">
+                    <div className="settings-api-key-controls" ref={downloadControlsRef}>
                       {installedModels.includes(settings.transcription.whisperModel ?? 'base') ? (
                         <span className="settings-status-ready">Ready</span>
                       ) : (
-                        <button
-                          className="settings-btn-secondary"
-                          onClick={handleDownloadModel}
-                          disabled={modelDownloading}
-                          data-testid={TEST_IDS.SETTINGS_BTN_WHISPER_MODEL}
-                        >
-                          {modelDownloading ? 'Downloading...' : 'Download model'}
-                        </button>
+                        <>
+                          {/* aria-disabled, not disabled: a disabled button drops
+                              the focus of the user who just pressed it */}
+                          <button
+                            ref={downloadButtonRef}
+                            className="settings-btn-secondary"
+                            onClick={handleDownloadModel}
+                            aria-disabled={modelDownloading || undefined}
+                            data-testid={TEST_IDS.SETTINGS_BTN_WHISPER_MODEL}
+                          >
+                            {modelDownloading ? 'Downloading...' : 'Download model'}
+                          </button>
+                          {modelDownloading && (
+                            <button
+                              className="settings-btn-secondary"
+                              onClick={handleCancelDownload}
+                              aria-disabled={cancelPending || undefined}
+                              data-testid={TEST_IDS.SETTINGS_BTN_WHISPER_CANCEL}
+                            >
+                              {cancelPending ? 'Cancelling…' : 'Cancel'}
+                            </button>
+                          )}
+                        </>
                       )}
                     </div>
+                  </div>
+                  {/* Mounted before any download starts, so a screen reader hears
+                      their updates (docs/design-system/system/components/feedback, decision three):
+                      progress and outcome as a status, a failure as an alert */}
+                  <div
+                    role="status"
+                    className="settings-sr-only"
+                    data-testid={TEST_IDS.SETTINGS_WHISPER_DOWNLOAD_LIVE}
+                  >
+                    {downloadAnnouncement}
+                  </div>
+                  <div
+                    role="alert"
+                    className="settings-sr-only"
+                    data-testid={TEST_IDS.SETTINGS_WHISPER_DOWNLOAD_ALERT}
+                  >
+                    {downloadError ?? ''}
                   </div>
                   {downloadError && (
                     <div className="settings-row">
@@ -600,7 +740,11 @@ export function SettingsOverlay() {
               )}
             </section>
 
+            <ImportToolsSection />
+
             <HtmlPreviewSection />
+
+            <TerminalSection />
           </div>
         </div>
       </div>

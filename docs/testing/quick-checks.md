@@ -38,6 +38,10 @@ See also: testing/README.md, terminal.md, file-watching.md.
 
 - External change, no local edits → silent reload + brief toolbar message
 - External change with unsaved edits → orange conflict bar (Reload / Keep / Dismiss)
+  - **Reload from Disk** → the editor shows the disk version and the bar clears. This button
+    used to crash the renderer to the "Erfana stopped unexpectedly" screen; if you ever see
+    that screen here, it is a regression (`e2e/editor-save.e2e.ts` guards it)
+  - **Keep My Version** → your edits survive in the editor and win the next save
 - External delete → red warning banner; editor content retained
 
 ## Tips

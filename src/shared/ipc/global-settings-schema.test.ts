@@ -7,6 +7,8 @@
  */
 import { describe, it, expect } from 'vitest'
 import {
+  CommentIdentityWriteSchema,
+  GLOBAL_SETTINGS_WRITE_SCHEMAS,
   GlobalSettingsSchema,
   LoggingLevelSchema,
   GitStatusSettingsSchema,
@@ -109,6 +111,16 @@ describe('GlobalSettingsSchema', () => {
         },
         htmlPreview: {
           enabled: true
+        },
+        files: {
+          exclude: ['tmp']
+        },
+        terminal: {
+          screenReaderMode: 'on' as const
+        },
+        comments: {
+          authorName: 'Ada',
+          identityNoticeSeen: true
         }
       }
 
@@ -135,6 +147,16 @@ describe('GlobalSettingsSchema', () => {
         },
         htmlPreview: {
           enabled: true
+        },
+        files: {
+          exclude: ['tmp']
+        },
+        terminal: {
+          screenReaderMode: 'on' as const
+        },
+        comments: {
+          authorName: 'Ada',
+          identityNoticeSeen: true
         }
       }
 
@@ -182,6 +204,125 @@ describe('GlobalSettingsSchema', () => {
     })
   })
 
+  describe('files.exclude (Issue #211)', () => {
+    it('defaults a missing files section to an empty exclude list', () => {
+      const result = GlobalSettingsSchema.parse({})
+      expect(result.files).toEqual({ exclude: [] })
+    })
+
+    it('keeps a valid exclude list', () => {
+      const result = GlobalSettingsSchema.parse({ files: { exclude: ['tmp', '**/test-tmp'] } })
+      expect(result.files.exclude).toEqual(['tmp', '**/test-tmp'])
+    })
+
+    it.each([
+      ['a number', 42],
+      ['a string', 'tmp'],
+      ['null', null],
+      ['an array', ['tmp']]
+    ])('never fails when files is %s, and keeps every other value', (_label, files) => {
+      const result = GlobalSettingsSchema.safeParse({
+        logging: { level: 'debug' },
+        gitStatus: { pollingEnabled: false, pollingInterval: 3000 },
+        files
+      })
+
+      expect(result.success).toBe(true)
+      expect(result.data?.files).toEqual({ exclude: [] })
+      expect(result.data?.logging.level).toBe('debug')
+      expect(result.data?.gitStatus).toEqual({ pollingEnabled: false, pollingInterval: 3000 })
+    })
+
+    it('never fails when exclude is not an array', () => {
+      const result = GlobalSettingsSchema.safeParse({ files: { exclude: 'tmp' } })
+      expect(result.success).toBe(true)
+      expect(result.data?.files).toEqual({ exclude: [] })
+    })
+
+    it('keeps a non-string entry as an empty string so indexes stay stable', () => {
+      const result = GlobalSettingsSchema.parse({ files: { exclude: ['a', 7, 'b'] } })
+      expect(result.files.exclude).toEqual(['a', '', 'b'])
+    })
+  })
+
+  describe('terminal.screenReaderMode (lens review [23])', () => {
+    it('defaults to auto when the section is missing', () => {
+      expect(GlobalSettingsSchema.parse({}).terminal).toEqual({ screenReaderMode: 'auto' })
+    })
+
+    it.each(['auto', 'on', 'off'] as const)('keeps %s', (mode) => {
+      expect(GlobalSettingsSchema.parse({ terminal: { screenReaderMode: mode } }).terminal.screenReaderMode).toBe(mode)
+    })
+
+    it('never fails on a bad value, so it cannot trip the corruption reset', () => {
+      const badMode = GlobalSettingsSchema.safeParse({ terminal: { screenReaderMode: 'loud' } })
+      expect(badMode.success).toBe(true)
+      expect(badMode.data?.terminal).toEqual({ screenReaderMode: 'auto' })
+
+      const badSection = GlobalSettingsSchema.safeParse({ terminal: 'on' })
+      expect(badSection.success).toBe(true)
+      expect(badSection.data?.terminal).toEqual({ screenReaderMode: 'auto' })
+    })
+
+    it('strips unknown keys', () => {
+      const parsed = GlobalSettingsSchema.parse({ terminal: { screenReaderMode: 'on', extra: 1 } })
+      expect(parsed.terminal).toEqual({ screenReaderMode: 'on' })
+    })
+  })
+
+  describe('comments – the reviewer identity (html-preview-comments §7.9)', () => {
+    it('defaults to "not set" with the notice unseen', () => {
+      expect(GlobalSettingsSchema.parse({}).comments).toEqual({ identityNoticeSeen: false })
+    })
+
+    it('keeps a name, an email and the notice flag', () => {
+      const parsed = GlobalSettingsSchema.parse({
+        comments: { authorName: 'Ada', authorEmail: 'ada@example.com', identityNoticeSeen: true }
+      })
+      expect(parsed.comments).toEqual({ authorName: 'Ada', authorEmail: 'ada@example.com', identityNoticeSeen: true })
+    })
+
+    it('reads an over-cap or non-string value as unset, never failing the whole file', () => {
+      const result = GlobalSettingsSchema.safeParse({
+        comments: { authorName: 'x'.repeat(101), authorEmail: 7, identityNoticeSeen: 'yes' }
+      })
+      expect(result.success).toBe(true)
+      expect(result.data?.comments).toEqual({ authorName: undefined, authorEmail: undefined, identityNoticeSeen: false })
+
+      const badSection = GlobalSettingsSchema.safeParse({ comments: 'me' })
+      expect(badSection.success).toBe(true)
+      expect(badSection.data?.comments).toEqual({ identityNoticeSeen: false })
+    })
+
+    it('strips unknown keys', () => {
+      const parsed = GlobalSettingsSchema.parse({ comments: { authorName: 'Ada', identityNoticeSeen: true, role: 'admin' } })
+      expect(parsed.comments).toEqual({ authorName: 'Ada', identityNoticeSeen: true })
+    })
+
+    it('L6 reads a name or email with a control or invisible character as unset – the writer\'s own rule', () => {
+      for (const code of [0x202e, 0x200b, 0x2060, 0xfeff, 0x0007, 0xe000, 0x2028]) {
+        const char = String.fromCodePoint(code)
+        const parsed = GlobalSettingsSchema.parse({
+          comments: { authorName: `Ada${char}`, authorEmail: `a${char}@example.com`, identityNoticeSeen: true }
+        })
+        expect(parsed.comments).toEqual({ authorName: undefined, authorEmail: undefined, identityNoticeSeen: true })
+      }
+      expect(GlobalSettingsSchema.parse({ comments: { authorName: 'Zoë Ångström 李', identityNoticeSeen: true } }).comments.authorName).toBe('Zoë Ångström 李')
+    })
+
+    it('L6 a write of comments is checked strictly: a refused value is an error with a clear message', () => {
+      const write = GLOBAL_SETTINGS_WRITE_SCHEMAS.comments!
+      expect(write.safeParse({ authorName: 'Ada', authorEmail: 'ada@example.com', identityNoticeSeen: false }).success).toBe(true)
+      const bidi = write.safeParse({ authorName: `Ada${String.fromCodePoint(0x202e)}`, identityNoticeSeen: false })
+      expect(bidi.success).toBe(false)
+      expect(bidi.error?.issues[0]).toMatchObject({ path: ['authorName'], message: 'The name contains a control or invisible character.' })
+      const long = CommentIdentityWriteSchema.safeParse({ authorName: 'x'.repeat(101), identityNoticeSeen: false })
+      expect(long.error?.issues[0]).toMatchObject({ path: ['authorName'], message: 'The name is longer than 100 characters.' })
+      const email = CommentIdentityWriteSchema.safeParse({ authorEmail: `${'x'.repeat(250)}@a.io`, identityNoticeSeen: false })
+      expect(email.error?.issues[0]).toMatchObject({ path: ['authorEmail'], message: 'The email is longer than 254 characters.' })
+    })
+  })
+
   describe('type inference', () => {
     it('infers correct type for logging.level', () => {
       const settings: GlobalSettings = {
@@ -202,6 +343,15 @@ describe('GlobalSettingsSchema', () => {
         },
         htmlPreview: {
           enabled: true
+        },
+        files: {
+          exclude: []
+        },
+        terminal: {
+          screenReaderMode: 'auto'
+        },
+        comments: {
+          identityNoticeSeen: false
         }
       }
 
@@ -217,7 +367,10 @@ describe('GlobalSettingsSchema', () => {
         editor: { preserveLineBreaks: false },
         gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
         transcription: { backend: 'openai', openaiApiKeyStored: false, whisperModel: 'base' },
-        htmlPreview: { enabled: true }
+        htmlPreview: { enabled: true },
+        files: { exclude: [] },
+        terminal: { screenReaderMode: 'auto' },
+        comments: { identityNoticeSeen: false }
       }
       expect(validSettings.logging.level).toBe('info')
     })
@@ -279,5 +432,10 @@ describe('getDefaultGlobalSettings', () => {
   it('returns transcription.whisperModel as base by default', () => {
     const defaults = getDefaultGlobalSettings()
     expect(defaults.transcription.whisperModel).toBe('base')
+  })
+
+  it('returns files.exclude as an empty list by default (Issue #211)', () => {
+    const defaults = getDefaultGlobalSettings()
+    expect(defaults.files).toEqual({ exclude: [] })
   })
 })

@@ -28,6 +28,18 @@
  * `callback({ cancel: true })`. The network filter governs remote EGRESS; the
  * protocol handler governs local reads.
  *
+ * Frames (issue #124 WI-12, design part 2 §2.2, §2.4). Before `decideRequest`,
+ * which stays pure, a `subFrame` request is the second frame guard: a frame on
+ * anything but this session's own `erfana-preview://<token>` or `about:` is
+ * cancelled and listed – `frame-remote` WHATEVER THE ALLOWLIST SAYS (an approved
+ * host loads as a subresource, never as a frame), `frame-escape` for another
+ * token, a stale one on a recycled partition included (RX9). The browser's
+ * own-token `frame-src` refuses such frames first (spike S10); this is the
+ * line behind it. A frame refusal goes to the failure badge, never to the
+ * permission band. Every preview-scheme request the filter lets through is
+ * noted in the session's request-kind ledger, because the protocol handler
+ * cannot see a request's type itself (S1).
+ *
  * `onCompleted` and `onErrorOccurred` settle in-flight requests so the bounded
  * timeout sweep records `network-timeout` only for genuinely stuck requests, and
  * an allowed request that completes never produces a timeout entry (AC10).
@@ -39,9 +51,16 @@
 
 import type { Session } from 'electron'
 import type { PreviewFailureType } from '../../../shared/ipc/preview-types'
-import { isApprovableHost } from '../../../shared/ipc/preview-settings-schema'
+import { parsePreviewOrigin } from '../../../shared/ipc/preview-settings-schema'
+import {
+  kindFromResourceType,
+  type PreviewBlockedKind
+} from '../../../shared/ipc/previewBlockedKind'
 import { logger } from '../LoggingService'
+import { redactedLogError } from '../../utils/redactUserInput'
 import { decideRequest } from './previewFilterDecision'
+import type { PreviewFrameRefusalType } from './previewFrameRefusals'
+import type { PreviewRequestKindLedger } from './PreviewRequestKindLedger'
 
 /**
  * How long an allowed, still-in-flight request may run before the sweep records
@@ -64,11 +83,33 @@ export interface PreviewFilterContext {
   /** The currently-approved hosts for this project (ASCII, lower-cased). */
   getAllowedHosts(): ReadonlySet<string>
   /**
+   * This session's root token, the host of every page it serves. A frame on
+   * any other token is refused; an empty one refuses every preview frame.
+   */
+  readonly ownToken: string
+  /**
+   * Where each preview-scheme request's type is noted for the protocol handler
+   * (S1), and forgotten when that request fails before reaching it (S1e).
+   */
+  readonly ledger: Pick<PreviewRequestKindLedger, 'note' | 'forget'>
+  /**
+   * List a refused frame on the page on screen – the failure badge, never the
+   * permission band. The page is looked up at every write.
+   */
+  recordFrameRefusal(type: PreviewFrameRefusalType, url: string): void
+  /**
    * Record a refused (or timed-out) request as a failure entry. `approvable` is
    * `true` only for a blocked HTTPS host the user could add to the allowlist;
    * the notifier decides whether to also raise a toast.
    */
-  onBlocked(kind: PreviewFailureType, host: string, url: string, approvable: boolean): void
+  onBlocked(
+    kind: PreviewFailureType,
+    host: string,
+    url: string,
+    approvable: boolean,
+    /** What the resource WAS, so a consent row can say more than a hostname. */
+    resourceKind: PreviewBlockedKind
+  ): void
   /** A request `onBeforeRequest` allowed and that is now in flight. */
   onRequestStarted(id: number): void
   /** A previously-started request that completed, errored or timed out. */
@@ -121,6 +162,17 @@ export function attach(
     }
 
     try {
+      // The second frame guard (#124, part 2 §2.4), before anything else: a
+      // frame may show only this session's own pages. Cancel FIRST, then list.
+      if (details.resourceType === 'subFrame') {
+        const refusal = subFrameRefusal(details.url, ctx.ownToken)
+        if (refusal !== null) {
+          answer({ cancel: true })
+          ctx.recordFrameRefusal(refusal.type, refusal.address)
+          return
+        }
+      }
+
       // A request carrying the LOCAL `erfana-preview:` scheme — the entry
       // document AND every relative subresource it references (CSS, JS, images,
       // fonts) — is served by the confining `protocol.handle` pipeline, NOT the
@@ -135,6 +187,10 @@ export function attach(
       // hosts — is unaffected; `decideRequest` below still governs every https:
       // (and other-scheme) request exactly as before.
       if (isPreviewSchemeUrl(details.url)) {
+        // Its type, for the handler, which cannot see it (S1). Noted only for
+        // what is let through, so a refused request leaves no note behind; the
+        // id lets a request that fails before the handler drop its note (S1e).
+        ctx.ledger.note(details.url, details.resourceType, details.id)
         inFlight.set(details.id, { startedAt: now(), host: hostOf(details.url), url: details.url })
         ctx.onRequestStarted(details.id)
         answer({ cancel: false })
@@ -160,17 +216,25 @@ export function attach(
         return
       }
 
-      const approvable = verdict.reason === 'blocked-host' && isApprovableHost(verdict.host)
-      ctx.onBlocked(verdict.reason, verdict.host, details.url, approvable)
+      // `verdict.host` is an ORIGIN now, so the question is whether that origin
+      // could be written to the allowlist — not whether some hostname could.
+      // Asking the old question here returned false for every origin, because a
+      // hostname predicate rejects anything containing `://`.
+      const approvable =
+        verdict.reason === 'blocked-host' && parsePreviewOrigin(verdict.host) !== null
+      ctx.onBlocked(
+        verdict.reason,
+        verdict.host,
+        details.url,
+        approvable,
+        kindFromResourceType(details.resourceType)
+      )
     } catch (error) {
       // Fail closed: deny by default (matching the filter's posture) and drop any
       // half-recorded in-flight entry so the sweep does not later badge it.
       inFlight.delete(details.id)
       answer({ cancel: true })
-      logger.error(
-        'Preview request filter listener error',
-        error instanceof Error ? error : undefined
-      )
+      logger.error('Preview request filter listener error', redactedLogError(error))
     }
   })
 
@@ -184,6 +248,10 @@ export function attach(
     settle(details.id)
   })
   session.webRequest.onErrorOccurred((details) => {
+    // A request aborted before the handler (a reload cancelling a page's own
+    // fetch) must not leave a note for the next request of its URL (S1e).
+    // Once the handler took the note, this finds nothing.
+    ctx.ledger.forget(details.id)
     settle(details.id)
   })
 
@@ -194,7 +262,10 @@ export function attach(
     for (const [id, req] of inFlight) {
       if (req.startedAt <= deadline) {
         inFlight.delete(id)
-        ctx.onBlocked('network-timeout', req.host, req.url, false)
+        // The in-flight record keeps only host, url and a timestamp, so the
+      // resource type is genuinely unknown here. `other` says "something",
+      // which is honest; inventing a specific kind would not be.
+      ctx.onBlocked('network-timeout', req.host, req.url, false, 'other')
         ctx.onRequestSettled(id)
       }
     }
@@ -220,6 +291,43 @@ function isPreviewSchemeUrl(url: string): boolean {
     return new URL(url).protocol === PREVIEW_SCHEME_PREFIX
   } catch {
     return false
+  }
+}
+
+/** Frame schemes whose URL IS the content: only the scheme is listed. */
+const INLINE_FRAME_SCHEMES: ReadonlySet<string> = new Set(['data:', 'blob:'])
+
+/** Why a subframe is refused at the request level. */
+interface SubFrameRefusal {
+  readonly type: Extract<PreviewFrameRefusalType, 'frame-remote' | 'frame-escape'>
+  /** What the badge lists: the address, or the scheme alone for an inline URL. */
+  readonly address: string
+}
+
+/**
+ * The request-level frame decision (part 2 §2.4), or `null` to go on to the
+ * usual rules. `about:` frames (`about:blank`, `about:srcdoc`) carry no
+ * document of their own; a preview-scheme frame must name `ownToken` exactly;
+ * everything else is remote. A URL that does not parse fails closed.
+ */
+function subFrameRefusal(url: string, ownToken: string): SubFrameRefusal | null {
+  let parsed: URL
+  try {
+    parsed = new URL(url)
+  } catch {
+    return { type: 'frame-remote', address: url }
+  }
+  if (parsed.protocol === 'about:') {
+    return null
+  }
+  if (parsed.protocol === PREVIEW_SCHEME_PREFIX) {
+    return ownToken !== '' && parsed.hostname === ownToken
+      ? null
+      : { type: 'frame-escape', address: url }
+  }
+  return {
+    type: 'frame-remote',
+    address: INLINE_FRAME_SCHEMES.has(parsed.protocol) ? parsed.protocol : url
   }
 }
 

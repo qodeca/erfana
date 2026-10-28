@@ -8,21 +8,38 @@
  * ONLY on a change, and `sync()` recomputes on active-tab change. All fakes —
  * no real `window.api` or zustand store is touched.
  */
-import { describe, it, expect, vi } from 'vitest'
-import { createOverlayGuard, type OverlayGuardDeps } from './OverlayGuardService'
+import { afterEach, describe, it, expect, vi, type Mock } from 'vitest'
+import { usePreviewChromeGateStore } from '../../stores/usePreviewChromeGateStore'
+import { usePreviewCollapsedStore } from '../../stores/usePreviewCollapsedStore'
+import { usePreviewCoveredStore } from '../../stores/usePreviewCoveredStore'
+import { usePreviewStore } from '../../stores/usePreviewStore'
+import {
+  createOverlayGuard,
+  getOverlayGuard,
+  resetOverlayGuard,
+  type OverlayGuardDeps,
+  type PreviewPanelGate
+} from './OverlayGuardService'
 
 /** A mutable fake environment plus the constructed guard. */
 function makeGuard(overrides: Partial<OverlayGuardDeps> = {}): {
   guard: ReturnType<typeof createOverlayGuard>
-  setVisibility: ReturnType<typeof vi.fn>
-  state: { occluded: boolean; livePanelId: string | null }
+  setVisibility: Mock
+  state: { occluded: boolean; livePanelIds: readonly string[]; gates: Map<string, PreviewPanelGate> }
   fireOccluded: () => void
   firePreview: () => void
+  fireGate: () => void
 } {
-  const state = { occluded: false, livePanelId: 'preview-1' as string | null }
+  const state = {
+    occluded: false,
+    livePanelIds: ['preview-1'] as readonly string[],
+    /** Per-panel gate reasons. Absent means the page may be shown. */
+    gates: new Map<string, PreviewPanelGate>()
+  }
   const setVisibility = vi.fn()
   let occludedListener: () => void = () => {}
   let previewListener: () => void = () => {}
+  let gateListener: () => void = () => {}
 
   const deps: OverlayGuardDeps = {
     isOccluded: () => state.occluded,
@@ -30,9 +47,14 @@ function makeGuard(overrides: Partial<OverlayGuardDeps> = {}): {
       occludedListener = l
       return () => {}
     },
-    getLivePreviewPanelId: () => state.livePanelId,
+    getLivePreviewPanelIds: () => state.livePanelIds,
     subscribePreview: (l) => {
       previewListener = l
+      return () => {}
+    },
+    getPanelGate: (panelId) => state.gates.get(panelId) ?? null,
+    subscribeGate: (l) => {
+      gateListener = l
       return () => {}
     },
     setVisibility,
@@ -45,9 +67,64 @@ function makeGuard(overrides: Partial<OverlayGuardDeps> = {}): {
     setVisibility,
     state,
     fireOccluded: () => occludedListener(),
-    firePreview: () => previewListener()
+    firePreview: () => previewListener(),
+    fireGate: () => gateListener()
   }
 }
+
+describe('OverlayGuardService — reconciling with what main actually did', () => {
+  /**
+   * The guard writes `lastVisible` at SEND time and re-sends only on a change,
+   * so a send main drops is permanent — the panel is black and stays black until
+   * some unrelated transition. A reported fault looked exactly like that. Main
+   * already reports what it applied; the guard now listens.
+   */
+  it('re-sends when main reports the opposite of what was sent', () => {
+    let applied: (panelId: string, visible: boolean) => void = () => {}
+    const { guard, setVisibility } = makeGuard({
+      subscribeVisibilityApplied: (l) => {
+        applied = l
+        return () => {}
+      }
+    })
+
+    guard.sync('preview-1')
+    expect(setVisibility).toHaveBeenCalledWith('preview-1', true, expect.any(String))
+    setVisibility.mockClear()
+
+    // Main says the view is hidden. The guard believed it was visible, so its
+    // belief is wrong and the next recompute must speak again.
+    applied('preview-1', false)
+
+    expect(setVisibility).toHaveBeenCalledWith('preview-1', true, expect.any(String))
+  })
+
+  it('stays quiet when main agrees', () => {
+    // Reconciliation must not turn every confirmation into another message.
+    let applied: (panelId: string, visible: boolean) => void = () => {}
+    const { guard, setVisibility } = makeGuard({
+      subscribeVisibilityApplied: (l) => {
+        applied = l
+        return () => {}
+      }
+    })
+
+    // Positive controls, in this test: the guard DID emit (so the spy is wired to
+    // the real send), and the listener IS live (a disagreement below makes it
+    // speak). Without them the silence would equally hold for a guard that never
+    // sent anything or a listener that was never attached.
+    guard.sync('preview-1')
+    expect(setVisibility).toHaveBeenCalledTimes(1)
+    expect(setVisibility).toHaveBeenLastCalledWith('preview-1', true, expect.any(String))
+    setVisibility.mockClear()
+
+    applied('preview-1', true)
+    expect(setVisibility).not.toHaveBeenCalled()
+
+    applied('preview-1', false)
+    expect(setVisibility).toHaveBeenCalledWith('preview-1', true, expect.any(String))
+  })
+})
 
 describe('OverlayGuardService (item 69)', () => {
   it('shows the preview when it is the active tab and not occluded', () => {
@@ -107,12 +184,12 @@ describe('OverlayGuardService (item 69)', () => {
     const { guard, setVisibility, state, firePreview } = makeGuard()
 
     // No live preview yet: nothing to send even if a tab is "active".
-    state.livePanelId = null
+    state.livePanelIds = []
     guard.sync('preview-1')
     expect(setVisibility).not.toHaveBeenCalled()
 
     // A preview opens under the active tab id → store change → show.
-    state.livePanelId = 'preview-1'
+    state.livePanelIds = ['preview-1']
     firePreview()
     expect(setVisibility).toHaveBeenCalledTimes(1)
     expect(setVisibility).toHaveBeenLastCalledWith('preview-1', true, 'active-tab')
@@ -126,7 +203,7 @@ describe('OverlayGuardService (item 69)', () => {
 
     // The preview closes: no live panel remains, nothing to hide (main already
     // destroyed the view on close).
-    state.livePanelId = null
+    state.livePanelIds = []
     firePreview()
     expect(setVisibility).not.toHaveBeenCalled()
   })
@@ -134,14 +211,290 @@ describe('OverlayGuardService (item 69)', () => {
   it('detaches its store subscriptions on dispose', () => {
     const unsubOccluded = vi.fn()
     const unsubPreview = vi.fn()
+    const unsubGate = vi.fn()
+    const unsubApplied = vi.fn()
     const { guard } = makeGuard({
       subscribeOccluded: () => unsubOccluded,
-      subscribePreview: () => unsubPreview
+      subscribePreview: () => unsubPreview,
+      subscribeGate: () => unsubGate,
+      subscribeVisibilityApplied: () => unsubApplied
     })
 
     guard.dispose()
 
     expect(unsubOccluded).toHaveBeenCalledTimes(1)
     expect(unsubPreview).toHaveBeenCalledTimes(1)
+    expect(unsubGate).toHaveBeenCalledTimes(1)
+    expect(unsubApplied).toHaveBeenCalledTimes(1)
+  })
+
+  it('hides ONLY the gated panel, not its sibling in a split view', () => {
+    // The reason this gate is per-panel state and not the global occluder store.
+    // A permission band waiting for one page to prove it moved must not blank a
+    // second preview that has nothing to do with it.
+    const { guard, setVisibility, state, fireGate } = makeGuard()
+    state.livePanelIds = ['preview-1', 'preview-2']
+    guard.sync('preview-1')
+    setVisibility.mockClear()
+
+    state.gates.set('preview-1', 'unconfirmed')
+    fireGate()
+
+    expect(setVisibility).toHaveBeenCalledTimes(1)
+    expect(setVisibility).toHaveBeenCalledWith('preview-1', false, 'chrome-unconfirmed')
+  })
+
+  it('names the too-short fail-safe distinctly from occlusion', () => {
+    const { guard, setVisibility, state, fireGate } = makeGuard()
+    guard.sync('preview-1')
+    setVisibility.mockClear()
+
+    state.gates.set('preview-1', 'too-short')
+    fireGate()
+
+    expect(setVisibility).toHaveBeenCalledWith('preview-1', false, 'chrome-too-short')
+  })
+})
+
+describe('OverlayGuardService — several live previews (sd-074b §4.8)', () => {
+  it('shows only the active tab and hides the other live previews', () => {
+    const { guard, setVisibility, state } = makeGuard()
+    state.livePanelIds = ['preview-1', 'preview-2', 'preview-3']
+
+    guard.sync('preview-2')
+
+    expect(setVisibility).toHaveBeenCalledWith('preview-2', true, 'active-tab')
+    expect(setVisibility).toHaveBeenCalledWith('preview-1', false, 'inactive-tab')
+    expect(setVisibility).toHaveBeenCalledWith('preview-3', false, 'inactive-tab')
+  })
+
+  it('hides every live preview while an overlay occludes them', () => {
+    const { guard, setVisibility, state, fireOccluded } = makeGuard()
+    state.livePanelIds = ['preview-1', 'preview-2']
+    guard.sync('preview-1')
+    setVisibility.mockClear()
+
+    state.occluded = true
+    fireOccluded()
+
+    expect(setVisibility).toHaveBeenCalledWith('preview-1', false, 'occluded')
+    // preview-2 was already hidden, so no redundant send for it.
+    expect(setVisibility).toHaveBeenCalledTimes(1)
+  })
+
+  it('treats a re-opened panel as new rather than reusing its stale visibility', () => {
+    const { guard, setVisibility, state, firePreview } = makeGuard()
+    state.livePanelIds = ['preview-1']
+    guard.sync('preview-1')
+    setVisibility.mockClear()
+
+    // Suspended: main destroyed the view, so the panel leaves the live set.
+    state.livePanelIds = []
+    firePreview()
+    expect(setVisibility).not.toHaveBeenCalled()
+
+    // Re-opened under the same active tab: the cached `true` must not suppress
+    // the send, or the fresh view would never be shown.
+    state.livePanelIds = ['preview-1']
+    firePreview()
+    expect(setVisibility).toHaveBeenCalledWith('preview-1', true, 'active-tab')
+  })
+})
+
+describe('OverlayGuardService — the collapsed gate (#124 C2)', () => {
+  it('hides a collapsed panel with the reason `collapsed`, and shows it once the flag clears', () => {
+    const { guard, setVisibility, state, fireGate } = makeGuard()
+    guard.sync('preview-1')
+
+    state.gates.set('preview-1', 'collapsed')
+    fireGate()
+    expect(setVisibility).toHaveBeenLastCalledWith('preview-1', false, 'collapsed')
+
+    state.gates.delete('preview-1')
+    fireGate()
+    expect(setVisibility).toHaveBeenLastCalledWith('preview-1', true, 'active-tab')
+  })
+
+  it('still names an inactive tab first', () => {
+    const { guard, setVisibility, state } = makeGuard()
+    state.gates.set('preview-1', 'collapsed')
+
+    guard.sync('editor-2')
+
+    expect(setVisibility).toHaveBeenLastCalledWith('preview-1', false, 'inactive-tab')
+  })
+})
+
+describe('OverlayGuardService — the covered gate (the comments drawer as a sheet)', () => {
+  it('hides a covered panel with the reason `covered`, and shows it once the flag clears', () => {
+    const { guard, setVisibility, state, fireGate } = makeGuard()
+    guard.sync('preview-1')
+
+    state.gates.set('preview-1', 'covered')
+    fireGate()
+    expect(setVisibility).toHaveBeenLastCalledWith('preview-1', false, 'covered')
+
+    state.gates.delete('preview-1')
+    fireGate()
+    expect(setVisibility).toHaveBeenLastCalledWith('preview-1', true, 'active-tab')
+  })
+
+  // Owner bug: a drawer left open in one preview tab froze the other tab on its
+  // still frame, because the sheet's hide was the window's global occluder.
+  it('a covered panel in a hidden tab never hides the tab on screen, and is never shown over its sheet', () => {
+    const { guard, setVisibility, state } = makeGuard()
+    state.livePanelIds = ['preview-a', 'preview-b']
+    state.gates.set('preview-a', 'covered')
+    guard.sync('preview-a')
+    expect(setVisibility).toHaveBeenCalledWith('preview-a', false, 'covered')
+
+    guard.sync('preview-b')
+    expect(setVisibility).toHaveBeenLastCalledWith('preview-b', true, 'active-tab')
+    expect(guard.visiblePanelId()).toBe('preview-b')
+
+    // Back to the covered tab: the gate is still set, so it stays hidden.
+    guard.sync('preview-a')
+    expect(setVisibility).toHaveBeenLastCalledWith('preview-b', false, 'inactive-tab')
+    expect(setVisibility).not.toHaveBeenCalledWith('preview-a', true, expect.anything())
+    expect(guard.visiblePanelId()).toBeNull()
+  })
+})
+
+describe('OverlayGuardService — production wiring of the panel gate', () => {
+  const setVisibility = vi.fn()
+
+  /** The real singleton over the real stores, with a live active preview. */
+  function liveGuard(): void {
+    setVisibility.mockClear()
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: { preview: { setVisibility, onVisibilityApplied: () => () => {} } }
+    })
+    usePreviewStore.getState().setLoadState('preview-1', 'ready')
+    getOverlayGuard().sync('preview-1')
+  }
+
+  afterEach(() => {
+    resetOverlayGuard()
+    usePreviewStore.setState({ panels: new Map() })
+    usePreviewChromeGateStore.setState({ gates: new Map() })
+    usePreviewCollapsedStore.setState({ collapsed: new Set() })
+    usePreviewCoveredStore.setState({ covered: new Set() })
+  })
+
+  it('hides on the collapsed store and shows when it clears', () => {
+    liveGuard()
+    expect(setVisibility).toHaveBeenLastCalledWith('preview-1', true, 'active-tab')
+
+    usePreviewCollapsedStore.getState().setCollapsed('preview-1')
+    expect(setVisibility).toHaveBeenLastCalledWith('preview-1', false, 'collapsed')
+
+    usePreviewCollapsedStore.getState().clearCollapsed('preview-1')
+    expect(setVisibility).toHaveBeenLastCalledWith('preview-1', true, 'active-tab')
+  })
+
+  it('names the chrome gate first when both apply, and stays hidden until both clear', () => {
+    usePreviewChromeGateStore.getState().setGate('preview-1', 'unconfirmed')
+    usePreviewCollapsedStore.getState().setCollapsed('preview-1')
+    liveGuard()
+    expect(setVisibility).toHaveBeenLastCalledWith('preview-1', false, 'chrome-unconfirmed')
+
+    usePreviewChromeGateStore.getState().clearGate('preview-1')
+    expect(setVisibility).toHaveBeenCalledTimes(1)
+
+    usePreviewCollapsedStore.getState().clearCollapsed('preview-1')
+    expect(setVisibility).toHaveBeenLastCalledWith('preview-1', true, 'active-tab')
+  })
+
+  it('hides on the covered store and shows when it clears', () => {
+    liveGuard()
+    usePreviewCoveredStore.getState().setCovered('preview-1')
+    expect(setVisibility).toHaveBeenLastCalledWith('preview-1', false, 'covered')
+
+    usePreviewCoveredStore.getState().clearCovered('preview-1')
+    expect(setVisibility).toHaveBeenLastCalledWith('preview-1', true, 'active-tab')
+  })
+
+  it('names collapsed before covered, and stays hidden until both clear', () => {
+    usePreviewCollapsedStore.getState().setCollapsed('preview-1')
+    usePreviewCoveredStore.getState().setCovered('preview-1')
+    liveGuard()
+    expect(setVisibility).toHaveBeenLastCalledWith('preview-1', false, 'collapsed')
+
+    usePreviewCollapsedStore.getState().clearCollapsed('preview-1')
+    expect(setVisibility).toHaveBeenCalledTimes(1)
+
+    usePreviewCoveredStore.getState().clearCovered('preview-1')
+    expect(setVisibility).toHaveBeenLastCalledWith('preview-1', true, 'active-tab')
+  })
+
+  it('covers only its own panel: the active preview beside a covered one is shown', () => {
+    usePreviewStore.getState().setLoadState('preview-2', 'ready')
+    usePreviewCoveredStore.getState().setCovered('preview-2')
+    liveGuard()
+    expect(setVisibility).toHaveBeenCalledWith('preview-1', true, 'active-tab')
+    expect(setVisibility).toHaveBeenCalledWith('preview-2', false, 'inactive-tab')
+  })
+
+  it('detaches from every gate store on dispose', () => {
+    liveGuard()
+    resetOverlayGuard()
+    setVisibility.mockClear()
+
+    usePreviewCollapsedStore.getState().setCollapsed('preview-1')
+    usePreviewChromeGateStore.getState().setGate('preview-1', 'too-short')
+    usePreviewCoveredStore.getState().setCovered('preview-1')
+
+    expect(setVisibility).not.toHaveBeenCalled()
+  })
+})
+
+describe('OverlayGuardService — visiblePanelId (#124 drag freeze)', () => {
+  // The splitter drag freeze asks this before hiding anything, so a page that is
+  // not on screen is never waited on for a hide confirmation that cannot come.
+  it('returns null while no panel is shown', () => {
+    const { guard, state } = makeGuard()
+    expect(guard.visiblePanelId()).toBeNull() // before the first sync
+
+    state.livePanelIds = []
+    guard.sync('preview-1')
+    expect(guard.visiblePanelId()).toBeNull()
+  })
+
+  it('returns the one visible live panel, not its hidden siblings', () => {
+    const { guard, state } = makeGuard()
+    state.livePanelIds = ['preview-1', 'preview-2']
+    guard.sync('preview-2')
+    expect(guard.visiblePanelId()).toBe('preview-2')
+  })
+
+  it('does not return a panel that is hidden or gated', () => {
+    const { guard, state, fireOccluded, fireGate } = makeGuard()
+    guard.sync('editor-1') // another tab is active
+    expect(guard.visiblePanelId()).toBeNull()
+
+    guard.sync('preview-1')
+    state.occluded = true
+    fireOccluded()
+    expect(guard.visiblePanelId()).toBeNull()
+
+    state.occluded = false
+    state.gates.set('preview-1', 'unconfirmed')
+    fireGate()
+    expect(guard.visiblePanelId()).toBeNull()
+  })
+
+  it('excludes a collapsed panel, and returns it once the flag clears', () => {
+    const { guard, state, fireGate } = makeGuard()
+    guard.sync('preview-1')
+    expect(guard.visiblePanelId()).toBe('preview-1')
+
+    state.gates.set('preview-1', 'collapsed')
+    fireGate()
+    expect(guard.visiblePanelId()).toBeNull()
+
+    state.gates.delete('preview-1')
+    fireGate()
+    expect(guard.visiblePanelId()).toBe('preview-1')
   })
 })

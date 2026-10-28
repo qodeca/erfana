@@ -119,12 +119,48 @@ This is the canonical cookbook for `release.yml` failures. Each row below is a r
 - **Human-readable symptom:** `Prepare draft` fails within seconds of the tag push, before any build leg starts. `Build macOS` / `Build Windows` / `Finalize draft` all show `skipped`; `Cleanup on failure` shows `failure` (by design — its last step is `exit 1`). CI is **not** red: `checks.yml` for the same SHA goes green a minute or two later.
 - **Root cause:** A race, not a regression. `prepare`'s green-checks gate queries `actions/workflows/checks.yml/runs?head_sha=$SHA&status=success`, which matches only runs whose **workflow run** has reached `completed`.
 
-  `checks.yml` has 8 jobs, of which 5 are branch-protection required contexts (`Lint`, `Typecheck`, `Unit tests`, `Build`, `License compliance`; the sixth required check, `Secret scan`, comes from `secret-scan.yml`). The three advisory jobs — `windows-checks` on windows-latest, `audit-signatures`, `release-guards` — keep the run `in_progress` for roughly 2–3 minutes after the required ones report green.
+  `checks.yml` has 9 jobs, of which 6 are branch-protection required contexts (`Lint`, `Typecheck`, `Unit tests`, `Build`, `Coverage`, `License compliance`; the seventh required check, `Secret scan`, comes from `secret-scan.yml`). `Lint` runs three steps — `npm run lint`, `npm run lint:css` and `npm run design -- --check` — because branch protection matches the job name, so splitting them into their own jobs would make them advisory. The three advisory jobs — `windows-checks` on windows-latest, `audit-signatures`, `release-guards` — keep the run `in_progress` for roughly 2–3 minutes after the required ones report green.
 
   An operator who waits on the required *check-runs* (the correct gate for pushing to protected `main`) and then tags immediately lands inside that window. Pushing through develop → main → tag in quick succession also fires three separate `checks.yml` runs for the same SHA, none of which has finished yet.
 - **Fix:** Do **not** delete the tag — the `v*.*.*` ruleset forbids tag deletion (`push declined due to repository rule violations`), and the tag is not burned (nothing built, signed, or drafted). Wait until `gh api "repos/qodeca/erfana/actions/workflows/checks.yml/runs?head_sha=$SHA&status=success" --jq .total_count` returns ≥ 1, then `gh run rerun <run-id>` on the same run. Prevention: before Phase 2 tags, poll that same `total_count` query rather than `commits/$SHA/check-runs` filtered to the required check names.
 - **Platform:** All
 - **First seen:** run 31264941055 (v0.17.0 attempt 1) — see `docs/release-incidents/v0.17.0-attempt-1.md`
+
+### Row 13: Apple developer agreement missing or expired
+
+- **Regex:** `HTTP status code: 403\. A required agreement is missing or has expired`
+- **Human-readable symptom:** `Build macOS` fails at notarization with `⨯ Failed to notarize via notarytool. Failed with unexpected result: Error: HTTP status code: 403. A required agreement is missing or has expired.` The app was already packaged and code-signed; `Build Windows` can still pass.
+- **Root cause:** Not a code or secrets problem. Apple has published a new Apple Developer Program License Agreement (or a paid-apps agreement lapsed) and the team's Account Holder has not accepted it, so Apple's notary service refuses every submission from that team. Credentials stay valid; every release attempt fails the same way until the agreement is accepted.
+- **Fix:** The Apple Developer team's **Account Holder** signs in at developer.apple.com/account (and App Store Connect → Business, if it lists a pending agreement) and accepts the new agreement. Nothing in the repo changes. Re-run the macOS leg (`gh run rerun <run-id> --failed`) or, for a dry-run, dispatch `release.yml` again. Prevention: run a `release.yml` dry-run (`gh workflow run release.yml --ref main -f dry-run=true`) before tagging, so the 403 shows up before a tag is spent.
+- **Platform:** macOS
+- **First seen:** run 39144882739 (v0.21.0 pre-release dry-run, 2026-10-18)
+
+## Operator-side failures (not `release.yml`)
+
+These happen on the operator's machine or against the REST API, so no CI log carries them and the analyzer never matches them. They are kept here because they stop a release just as hard.
+
+### `git push origin main` rejected with `GH006`
+
+- **Symptom:** `remote: error: GH006: Protected branch update failed for refs/heads/main` followed by `7 of 7 required status checks have not succeeded`. Nothing is wrong with the commit; it is signed, the tree is clean and `main` is not behind.
+- **Root cause:** required status checks on `main` are enforced on **push**, not only on merge, and they must already have reached `completed`/`success` **for that exact SHA**. A brand-new release-prep commit has no runs yet, so the push is refused. This is the push-side half of the same timing problem as Row 12 above (the tag-side half).
+- **Fix:** land the same SHA on `develop` first, let it earn its checks, then push `main`:
+  ```bash
+  git push origin main:develop
+  SHA=$(git rev-parse HEAD)
+  # poll until both runs for this SHA read completed/success
+  gh run list --branch develop --limit 10 --json name,status,conclusion,headSha \
+    --jq "[.[] | select(.headSha==\"$SHA\")] | .[] | \"\(.name): \(.status) \(.conclusion)\""
+  git push origin main
+  ```
+  Waiting on the **runs** (not on the seven check contexts) also clears Row 12 before Phase 2 tags. Keeping `develop` on the same SHA is a side benefit, not a detour: release-prep commits would otherwise live only on `main`.
+- **First seen:** v0.20.0 release prep, twice (the version-bump commit and the release-notes commit).
+
+### Approving `production-signing` returns HTTP 422 `not an integer`
+
+- **Symptom:** `gh api -X POST repos/qodeca/erfana/actions/runs/<id>/pending_deployments -f state=approved -f comment=… -F "environment_ids[]=<id>"` fails with `422 Invalid request. For 'items', "<id>" is not an integer`.
+- **Root cause:** `environment_ids` is a JSON array of integers. `-f`/`-F` can only send scalars and form fields, so the array arrives as a string.
+- **Fix:** send the body as JSON: `printf '{"environment_ids":[%s],"state":"approved","comment":"release approved"}' "$ENV_ID" | gh api -X POST repos/qodeca/erfana/actions/runs/$RUN_ID/pending_deployments --input -`. A missing `comment` also returns 422, with a different message. The Actions UI route ("Review deployments") is unaffected.
+- **First seen:** v0.20.0 release, run 35058594403.
 
 ### Adding a new row (template)
 
@@ -201,6 +237,9 @@ npm run test:preload
 # Check specific config
 npm run typecheck:node
 npm run typecheck:web
+npm run typecheck:test:node   # main, preload and shared tests
+npm run typecheck:test:web    # renderer tests
+npm run typecheck:test:e2e    # Playwright specs
 ```
 
 ## Local signature verification

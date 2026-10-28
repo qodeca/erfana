@@ -11,6 +11,9 @@
  * - Handle project opening with dirty editor + terminal activity checks
  * - Handle project closing with confirmations
  * - Token-based race guards for async operations
+ * - Single-flight tree refresh with stale-result dropping (#208)
+ * - Watcher gate: the directory watcher starts only after the first tree read
+ *   of the current project has settled (#211, D12)
  * - Error handling and user notifications
  *
  * Extracted from ProjectTree.tsx (lines 102-332, ~230 lines)
@@ -19,22 +22,28 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { IProjectTreeApi, FileNode } from '../interfaces/IProjectTreeApi'
+import { getDefaultProjectTreeApi } from '../services/projectTreeApi'
 import type { IUseProjectManagementOptions, IUseProjectManagementReturn } from '../interfaces/IProjectManagement'
 import { useDialog } from '../components/Dialog'
 import { showGlobalToast } from '../components/Toast/toastService'
-import { TERMINAL } from '../components/ProjectTree/constants'
 import { logger } from '../utils/logger'
+import { recordTreeReadMs } from '../utils/treeReadTiming'
+import { noteProjectGeneration } from '../services/projectGeneration'
+import { useLatestRef } from './useLatestRef'
+import { confinementCodeFromMessage } from '../../../shared/ipc/confinement'
 import {
-  checkHasDirtyEditors,
-  checkTerminalBusy,
-  confirmProjectSwitch,
+  createCoalescingRunner,
+  type CoalescedRunInfo,
+  type CoalescingRunner
+} from '../../../shared/coalescingRunner'
+import {
+  prepareProjectTransition,
   interruptActiveTerminalIfAny,
   openProjectWithTokenGuard,
   closeProjectWithTokenGuard
 } from '../components/ProjectTree/switchHelpers'
 import {
   shouldOpenExternalProject,
-  shouldMarkInitialLoadComplete,
   shouldRefreshFiles,
   createProjectOpenedMessage,
   createProjectClosedMessage,
@@ -47,7 +56,9 @@ import {
   createNewProjectTreeErrorLog,
   createRefreshErrorLog,
   createOpenProjectErrorLog,
-  createCloseProjectErrorLog
+  createCloseProjectErrorLog,
+  isTreeReadCurrent,
+  type TreeReadTicket
 } from './useProjectManagement.logic'
 
 /**
@@ -59,8 +70,8 @@ import {
 export function useProjectManagement(
   options?: IUseProjectManagementOptions
 ): IUseProjectManagementReturn {
-  // Use provided API or default to window.api
-  const api: IProjectTreeApi = (options?.api ?? (window.api as unknown as IProjectTreeApi))
+  // Use provided API or the default gateways
+  const api: IProjectTreeApi = (options?.api ?? getDefaultProjectTreeApi())
   const { showConfirm } = useDialog()
 
   // Project state
@@ -69,21 +80,113 @@ export function useProjectManagement(
   const [loading, setLoading] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
   const [isSwitchingProject, setIsSwitchingProject] = useState<boolean>(false)
-  const initialLoadCompleteRef = useRef<boolean>(false)
+  // True from the moment a project-changed open starts its first tree read
+  // until that read (or the read that superseded it) settles, success or
+  // failure (#211, D12). Keeps the directory watcher from walking the project
+  // at the same time as the first tree read on a large project.
+  const [firstReadPending, setFirstReadPending] = useState<boolean>(false)
   const switchTokenRef = useRef<number>(0)
 
-  // Load last project on mount - DISABLED
-  // Now shows welcome screen with recent projects instead of auto-loading
-  useEffect(() => {
-    // Mark initial load as complete immediately (no auto-load)
-    initialLoadCompleteRef.current = true
-    setLoading(false)
-  }, [])
+  // Tree-read guards (#208). Separate from switchTokenRef on purpose: that
+  // token moves before the picker/confirm dialogs, and externally-initiated
+  // changes (menu, shortcuts) never touch it.
+  // Authoritative project for refresh reads; written only via beginRefreshScope.
+  const projectPathRef = useRef<string | null>(null)
+  // Refresh scope; bumped on every project open/switch/close.
+  const refreshGenerationRef = useRef<number>(0)
+  // Monotonic sequence handed to every tree read (listener and refresh) as it starts.
+  const readSeqRef = useRef<number>(0)
+  // Sequence of the last tree actually applied with setFiles.
+  const appliedSeqRef = useRef<number>(0)
+  // Single-flight runner for the current scope; replaced by beginRefreshScope.
+  const refreshRunnerRef = useRef<CoalescingRunner<void> | null>(null)
+  // Scope of the listener load still in flight, or null when there is none.
+  const pendingLoadGenerationRef = useRef<number | null>(null)
+
+  /** Open a new refresh scope: later results from older scopes are dropped. */
+  const beginRefreshScope = (path: string | null): CoalescingRunner<void> => {
+    refreshGenerationRef.current++
+    projectPathRef.current = path
+    const runner = createCoalescingRunner<void>()
+    refreshRunnerRef.current = runner
+    return runner
+  }
+
+  /**
+   * The project-path setter handed to the open/close helpers: keeps the
+   * authoritative ref in step with the state even if the project-changed event
+   * never arrives. Opens a scope only on a real change, so it never
+   * invalidates a load the listener already started for the same path.
+   *
+   * If the new scope supersedes a listener load still in flight, that load
+   * had cleared the tree and will no longer show its result or clear the
+   * spinner, and main may send no project-changed event at all (the same
+   * project re-opened through a different path string is a no-op there). So
+   * the tree is read once more through the new scope's runner. Only then:
+   * on the normal open path the listener's own load is the only read.
+   */
+  const setProjectPathAndScope = (path: string | null): void => {
+    if (projectPathRef.current !== path) {
+      const supersedesPendingLoad = pendingLoadGenerationRef.current === refreshGenerationRef.current
+      const runner = beginRefreshScope(path)
+      if (path !== null && supersedesPendingLoad) {
+        // The gate stays closed until the replacement read settles.
+        reloadSupersededTree(runner)
+      } else {
+        setLoading(false)
+        // Close, or main's no-op re-open (no project-changed event follows),
+        // so no first read is coming for this scope: open the gate.
+        setFirstReadPending(false)
+      }
+    }
+    // NOTE: the same-path branch never touches firstReadPending (#211, M1).
+    // The IPC reply of a normal open lands here while the listener's first
+    // read is still pending; clearing the flag would start the watcher early.
+    setProjectPath(path)
+  }
+
+  /**
+   * Replace a superseded listener load with one read in the current scope.
+   * The spinner stays on until that read settles. Fire-and-forget: both
+   * outcomes are handled, so no rejection can go unhandled.
+   *
+   * A failure here only logs (in runRefreshRead) – no error state, no toast –
+   * on purpose: this path is rare, and the next watcher-driven or manual
+   * refresh recovers the tree.
+   */
+  const reloadSupersededTree = (runner: CoalescingRunner<void>): void => {
+    const generation = refreshGenerationRef.current
+    const endSpinner = (): void => {
+      if (generation === refreshGenerationRef.current) {
+        setLoading(false)
+        setFirstReadPending(false)
+      }
+    }
+    runner.run((info) => runRefreshRead(generation, info)).then(endSpinner, endSpinner)
+  }
+
+  const takeReadTicket = (generation: number): TreeReadTicket => ({
+    generation,
+    seq: ++readSeqRef.current
+  })
+
+  /** Show `tree` only if its read is current (never go backwards). */
+  const applyTreeIfCurrent = (ticket: TreeReadTicket, tree: FileNode[]): boolean => {
+    if (!isTreeReadCurrent(ticket, refreshGenerationRef.current, appliedSeqRef.current)) return false
+    appliedSeqRef.current = ticket.seq
+    setFiles(tree)
+    return true
+  }
+
+  // No "load last project on mount": the welcome screen shows recent projects
+  // instead, and `loading` starts false. Crash recovery relies on this: never
+  // reopen the last project on mount (#60).
 
   // Listen for external project changes (e.g., from menu bar, shortcuts)
   useEffect(() => {
     const unsubscribe = api.file.onProjectChanged(async (data) => {
       logger.info(createProjectChangedLogMessage(data))
+      noteProjectGeneration(data.generation)
 
       // Notify consumer to reset UI state
       try {
@@ -95,27 +198,50 @@ export function useProjectManagement(
       setError(null)
 
       if (shouldOpenExternalProject(data.newPath)) {
+        const newPath = data.newPath!
+        // New scope first, before any state update or await: every older
+        // read (listener or refresh) is from now on dropped when it lands.
+        beginRefreshScope(newPath)
+        const generation = refreshGenerationRef.current
         // New project opened externally
         // Clear old project files immediately before loading new ones
-        setProjectPath(data.newPath)
+        setProjectPath(newPath)
+        // Same synchronous block as setProjectPath, before the await: the
+        // render that remounts ProjectTree must already see the gate closed.
+        setFirstReadPending(true)
         setFiles([]) // Clear tree to show empty state during transition
+        const ticket = takeReadTicket(generation)
+        pendingLoadGenerationRef.current = generation
         try {
           setLoading(true)
           const treeLoadStart = performance.now()
-          const fileTree = await api.file.readDirectory(data.newPath!)
+          const fileTree = await api.file.readDirectory({ dirPath: newPath, generation: data.generation })
           const treeLoadDuration = Math.round(performance.now() - treeLoadStart)
-          logger.info('[useProjectManagement] File tree loaded', { durationMs: treeLoadDuration, itemCount: fileTree.length })
-          setFiles(fileTree)
-          if (shouldMarkInitialLoadComplete(data.newPath, fileTree)) {
-            initialLoadCompleteRef.current = true
+          if (generation !== refreshGenerationRef.current) {
+            // A newer switch or close superseded this load: no tree, no toast.
+            logger.info('[useProjectManagement] Stale project load dropped', { durationMs: treeLoadDuration, itemCount: fileTree.length })
+            return
           }
+          const applied = applyTreeIfCurrent(ticket, fileTree)
+          logger.info('[useProjectManagement] File tree loaded', { durationMs: treeLoadDuration, itemCount: fileTree.length, applied })
           // Show success toast after files are loaded
           showGlobalToast({
             type: 'success',
             title: 'Project Opened',
-            message: createProjectOpenedMessage(data.newPath!)
+            message: createProjectOpenedMessage(newPath)
           })
         } catch (err) {
+          if (generation !== refreshGenerationRef.current) {
+            logger.debug('[useProjectManagement] Stale project load failed; ignored')
+            return
+          }
+          // Main refused the read because a newer open had already replaced
+          // this project. Its project-changed event can still be on the way,
+          // so the generation check above has not seen it: the load is stale.
+          if (confinementCodeFromMessage(err instanceof Error ? err.message : String(err)) === 'PROJECT_CHANGED') {
+            logger.debug('[useProjectManagement] Project load refused as superseded; ignored')
+            return
+          }
           logger.error(createNewProjectTreeErrorLog(), err instanceof Error ? err : undefined)
           setError(createLoadErrorMessage(err))
           showGlobalToast({
@@ -124,12 +250,23 @@ export function useProjectManagement(
             message: createLoadErrorMessage(err)
           })
         } finally {
-          setLoading(false)
+          if (pendingLoadGenerationRef.current === generation) pendingLoadGenerationRef.current = null
+          // A newer open owns the spinner and the watcher gate once this load
+          // is superseded. On failure the gate still opens, so the watcher can
+          // heal the tree once the folder becomes readable.
+          if (generation === refreshGenerationRef.current) {
+            setLoading(false)
+            setFirstReadPending(false)
+          }
         }
       } else {
         // Project closed externally
+        beginRefreshScope(null)
         setProjectPath(null)
         setFiles([])
+        // Clears a spinner left by an open-load this close superseded.
+        setLoading(false)
+        setFirstReadPending(false)
         showGlobalToast({
           type: 'info',
           title: 'Project Closed',
@@ -147,8 +284,8 @@ export function useProjectManagement(
    * Open a new project
    *
    * Flow:
-   * 1. Check for unsaved editors and terminal activity
-   * 2. Request confirmation if needed
+   * 1. Save dirty editors (autosave held), check terminal activity
+   * 2. Request confirmation if a tab could not be saved or the terminal is busy
    * 3. Interrupt terminal if busy
    * 4. Open project with race guard
    * 5. Show success toast
@@ -158,32 +295,34 @@ export function useProjectManagement(
       setIsSwitchingProject(true)
       setError(null)
 
-      // Check for unsaved changes and terminal activity in parallel
-      const [hasDirty, terminalBusy] = await Promise.all([
-        checkHasDirtyEditors(),
-        checkTerminalBusy(TERMINAL.RECENT_ACTIVITY_WINDOW)
-      ])
-
-      // Ask for confirmation if needed
-      const confirmed = await confirmProjectSwitch(hasDirty, terminalBusy, 'switch', showConfirm)
-      if (!confirmed) {
+      // Save dirty tabs first, then ask only about what could not be saved
+      const transition = await prepareProjectTransition('switch', showConfirm)
+      if (!transition.proceed) {
         return
       }
 
-      // Gracefully interrupt terminal if it was busy
-      if (terminalBusy) {
-        await interruptActiveTerminalIfAny()
-      }
+      let projectChanged = false
+      try {
+        // Gracefully interrupt terminal if it was busy
+        if (transition.terminalBusy) {
+          await interruptActiveTerminalIfAny()
+        }
 
-      // Open project with race guard (files will be loaded by IPC event)
-      // Success toast will be shown by IPC listener after files load
-      await openProjectWithTokenGuard(switchTokenRef, setProjectPath)
+        // Open project with race guard (files will be loaded by IPC event)
+        // Success toast will be shown by IPC listener after files load
+        const previousPath = projectPathRef.current
+        const openedPath = await openProjectWithTokenGuard(switchTokenRef, setProjectPathAndScope)
+        // null: picker cancelled or superseded; same path: main's no-op
+        projectChanged = openedPath !== null && openedPath !== previousPath
+      } finally {
+        transition.settle(projectChanged)
+      }
     } catch (err) {
       setError(formatErrorForState(err))
       logger.error(createOpenProjectErrorLog(), err instanceof Error ? err : undefined)
       showGlobalToast({
         type: 'error',
-        title: 'Open Project Failed',
+        title: 'Failed to Open Project',
         message: createOpenErrorMessage(err)
       })
     } finally {
@@ -195,8 +334,8 @@ export function useProjectManagement(
    * Close the current project
    *
    * Flow:
-   * 1. Check for unsaved editors and terminal activity
-   * 2. Request confirmation if needed
+   * 1. Save dirty editors (autosave held), check terminal activity
+   * 2. Request confirmation if a tab could not be saved or the terminal is busy
    * 3. Interrupt terminal if busy
    * 4. Close project with race guard
    * 5. Show info toast
@@ -206,35 +345,31 @@ export function useProjectManagement(
       setIsSwitchingProject(true)
       setError(null)
 
-      // Check for unsaved changes and terminal activity in parallel
-      const [hasDirty, terminalBusy] = await Promise.all([
-        checkHasDirtyEditors(),
-        checkTerminalBusy(TERMINAL.RECENT_ACTIVITY_WINDOW)
-      ])
-
-      // Ask for confirmation if needed
-      const confirmed = await confirmProjectSwitch(hasDirty, terminalBusy, 'close', showConfirm)
-      if (!confirmed) {
+      // Save dirty tabs first, then ask only about what could not be saved
+      const transition = await prepareProjectTransition('close', showConfirm)
+      if (!transition.proceed) {
         return
       }
 
-      // Gracefully interrupt terminal if it was busy
-      if (terminalBusy) {
-        await interruptActiveTerminalIfAny()
-      }
+      let projectChanged = false
+      try {
+        // Gracefully interrupt terminal if it was busy
+        if (transition.terminalBusy) {
+          await interruptActiveTerminalIfAny()
+        }
 
-      // Close project with race guard (files and UI state cleared by IPC event)
-      const closed = await closeProjectWithTokenGuard(switchTokenRef, setProjectPath)
-      if (closed) {
+        // Close project with race guard (files and UI state cleared by IPC event)
         // Success toast will be shown by IPC listener after state is cleared
-        // No toast needed here to avoid duplicate
+        projectChanged = await closeProjectWithTokenGuard(switchTokenRef, setProjectPathAndScope)
+      } finally {
+        transition.settle(projectChanged)
       }
     } catch (err) {
       setError(formatErrorForState(err))
       logger.error(createCloseProjectErrorLog(), err instanceof Error ? err : undefined)
       showGlobalToast({
         type: 'error',
-        title: 'Close Project Failed',
+        title: 'Failed to Close Project',
         message: createCloseErrorMessage(err)
       })
     } finally {
@@ -246,8 +381,8 @@ export function useProjectManagement(
    * Open a project by direct path (for recent projects)
    *
    * Flow:
-   * 1. Check for unsaved editors and terminal activity
-   * 2. Request confirmation if needed
+   * 1. Save dirty editors (autosave held), check terminal activity
+   * 2. Request confirmation if a tab could not be saved or the terminal is busy
    * 3. Interrupt terminal if busy
    * 4. Open project directly by path (no file picker dialog)
    *
@@ -259,27 +394,29 @@ export function useProjectManagement(
       setIsSwitchingProject(true)
       setError(null)
 
-      // Check for unsaved changes and terminal activity in parallel
-      const [hasDirty, terminalBusy] = await Promise.all([
-        checkHasDirtyEditors(),
-        checkTerminalBusy(TERMINAL.RECENT_ACTIVITY_WINDOW)
-      ])
-
-      // Ask for confirmation if needed
-      const confirmed = await confirmProjectSwitch(hasDirty, terminalBusy, 'switch', showConfirm)
-      if (!confirmed) {
+      // Save dirty tabs first, then ask only about what could not be saved
+      const transition = await prepareProjectTransition('switch', showConfirm)
+      if (!transition.proceed) {
         return false
       }
 
-      // Gracefully interrupt terminal if it was busy
-      if (terminalBusy) {
-        await interruptActiveTerminalIfAny()
-      }
+      let projectChanged = false
+      try {
+        // Gracefully interrupt terminal if it was busy
+        if (transition.terminalBusy) {
+          await interruptActiveTerminalIfAny()
+        }
 
-      // Open project directly by path (files will be loaded by IPC event)
-      // Success toast will be shown by IPC listener after files load
-      await api.file.openProjectByPath(projectPath)
-      return true
+        // Open project directly by path (files will be loaded by IPC event)
+        // Success toast will be shown by IPC listener after files load
+        const previousPath = projectPathRef.current
+        const openedPath = await api.file.openProjectByPath({ projectPath })
+        // Main answers the path for a no-op too, so an unchanged path is the no-op
+        projectChanged = openedPath !== previousPath
+        return true
+      } finally {
+        transition.settle(projectChanged)
+      }
     } catch (err) {
       setError(formatErrorForState(err))
       logger.error(createOpenProjectErrorLog(), err instanceof Error ? err : undefined)
@@ -291,24 +428,76 @@ export function useProjectManagement(
   }
 
   /**
+   * One refresh read – the task the scope's runner executes (#208).
+   *
+   * Skips without IPC if the project changed or closed before the read could
+   * start. The result is shown only if it is still current; `applied: false`
+   * on the log line records a dropped stale result.
+   */
+  const runRefreshRead = async (generation: number, info: CoalescedRunInfo): Promise<void> => {
+    if (generation !== refreshGenerationRef.current) {
+      logger.debug('[useProjectManagement] File tree refresh skipped – project changed')
+      return
+    }
+    const path = projectPathRef.current
+    if (path === null || !shouldRefreshFiles(path)) return
+    try {
+      const ticket = takeReadTicket(generation)
+      const refreshStart = performance.now()
+      const fileTree = await api.file.readDirectory({ dirPath: path })
+      const refreshDuration = Math.round(performance.now() - refreshStart)
+      recordTreeReadMs(refreshDuration)
+      const applied = applyTreeIfCurrent(ticket, fileTree)
+      logger.info('[useProjectManagement] File tree refreshed', {
+        durationMs: refreshDuration,
+        itemCount: fileTree.length,
+        followUp: info.followUp,
+        callers: info.callers,
+        applied
+      })
+    } catch (err) {
+      if (generation === refreshGenerationRef.current) {
+        logger.error(createRefreshErrorLog(), err instanceof Error ? err : undefined)
+      } else {
+        logger.debug('[useProjectManagement] File tree refresh failed for a project no longer open')
+      }
+    }
+  }
+  // runRefreshRead is rebuilt every render; refreshFiles reaches it through a
+  // ref so its own identity (which consumers depend on) stays stable.
+  const runRefreshReadRef = useLatestRef(runRefreshRead)
+
+  /**
    * Refresh the file tree
    *
    * Used by file operations to update the tree after making changes.
    * Wrapped in useCallback to stabilize the reference and prevent
    * unnecessary re-renders of context consumers.
+   *
+   * Single-flight per project scope (#208): calls made while a read runs
+   * share one follow-up read that starts after it, so a burst of watcher
+   * events or file operations never stacks full-tree reads. Never rejects.
    */
   const refreshFiles = useCallback(async (): Promise<void> => {
-    if (!shouldRefreshFiles(projectPath)) return
     try {
-      const refreshStart = performance.now()
-      const fileTree = await api.file.readDirectory(projectPath!)
-      const refreshDuration = Math.round(performance.now() - refreshStart)
-      logger.info('[useProjectManagement] File tree refreshed', { durationMs: refreshDuration, itemCount: fileTree.length })
-      setFiles(fileTree)
-    } catch (err) {
-      logger.error(createRefreshErrorLog(), err instanceof Error ? err : undefined)
+      // projectPathRef is authoritative; the closure value only detects a
+      // caller that belongs to a project that is no longer open.
+      if (projectPath !== projectPathRef.current) {
+        logger.debug('[useProjectManagement] File tree refresh skipped – stale caller')
+        return
+      }
+      if (!shouldRefreshFiles(projectPathRef.current)) return
+      const generation = refreshGenerationRef.current
+      // Defensive: a non-null project path is only ever set by beginRefreshScope,
+      // which installs a runner, so this fallback does not run today.
+      const runner = (refreshRunnerRef.current ??= createCoalescingRunner<void>())
+      await runner.run((info) => runRefreshReadRef.current(generation, info))
+    } catch {
+      // Contract backstop: refreshFiles never rejects, whatever the task did
+      // (a throwing logger or setter included). Errors are logged in the task.
     }
-  }, [projectPath, api.file])
+    // api.file is used only inside runRefreshRead, which the ref keeps current.
+  }, [projectPath, runRefreshReadRef])
 
   return {
     projectPath,
@@ -316,7 +505,7 @@ export function useProjectManagement(
     loading,
     error,
     isSwitchingProject,
-    initialLoadComplete: initialLoadCompleteRef.current,
+    initialLoadComplete: projectPath !== null && !firstReadPending,
     handleOpenProject,
     handleCloseProject,
     handleOpenProjectByPath,

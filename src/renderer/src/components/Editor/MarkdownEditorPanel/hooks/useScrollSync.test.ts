@@ -9,7 +9,8 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
-import { useScrollSync, UseScrollSyncOptions } from './useScrollSync'
+import { useScrollSync, UseScrollSyncOptions, type UseScrollSyncReturn } from './useScrollSync'
+import { buildScrollMapEntries, type ScrollMapEntry } from '../../../../components/Panels/markdownEditorPanel.logic'
 import type { MonacoEditorHandle } from '../../MonacoMarkdownEditor'
 import * as monaco from 'monaco-editor'
 
@@ -24,6 +25,11 @@ vi.mock('../../../../utils/logger', () => ({
 }))
 
 // Store mock return values so we can control them per test
+/** The hook owns this ref; a test writes it directly to stand in for a map build. */
+function setScrollMap(ref: UseScrollSyncReturn['scrollMapRef'], entries: ScrollMapEntry[]): void {
+  ;(ref as React.MutableRefObject<ScrollMapEntry[]>).current = entries
+}
+
 const mockScrollMapEntries = [
   { line: 1, editorOffset: 0, previewOffset: 0 },
   { line: 10, editorOffset: 200, previewOffset: 200 }
@@ -157,8 +163,7 @@ describe('useScrollSync', () => {
       editorRef,
       previewRef,
       viewMode: 'split',
-      currentFilePath: '/path/to/file.md',
-      currentContent: '# Hello World'
+      currentFilePath: '/path/to/file.md'
     }
 
     // Mock requestAnimationFrame to execute synchronously
@@ -168,11 +173,11 @@ describe('useScrollSync', () => {
     })
 
     // Mock ResizeObserver
-    global.ResizeObserver = vi.fn().mockImplementation(() => ({
+    global.ResizeObserver = vi.fn().mockImplementation(function () { return ({
       observe: vi.fn(),
       unobserve: vi.fn(),
       disconnect: vi.fn()
-    }))
+    }) })
   })
 
   afterEach(() => {
@@ -403,7 +408,7 @@ describe('useScrollSync', () => {
 
       // Manually populate scroll map for this test
       act(() => {
-        result.current.scrollMapRef.current = mockScrollMapEntries
+        setScrollMap(result.current.scrollMapRef, mockScrollMapEntries)
       })
 
       // Trigger editor scroll
@@ -448,7 +453,7 @@ describe('useScrollSync', () => {
 
       // Manually populate scroll map for this test
       act(() => {
-        result.current.scrollMapRef.current = mockScrollMapEntries
+        setScrollMap(result.current.scrollMapRef, mockScrollMapEntries)
       })
 
       // Trigger preview scroll
@@ -492,18 +497,12 @@ describe('useScrollSync', () => {
   })
 
   describe('content changes', () => {
-    it('should not throw when content changes', () => {
-      const { rerender } = renderHook(
-        (props: UseScrollSyncOptions) => useScrollSync(props),
-        { initialProps: defaultOptions }
-      )
+    it('should not throw when the preview reports a render before the editor is ready', () => {
+      const { result } = renderHook(() => useScrollSync(defaultOptions))
 
-      // Change content - should not throw
       expect(() => {
-        rerender({ ...defaultOptions, currentContent: '# New Content' })
-
-        // Allow async operations to complete
         act(() => {
+          result.current.handlePreviewRendered({ root: previewRef.current!, reason: 'content' })
           vi.advanceTimersByTime(1000)
         })
       }).not.toThrow()
@@ -580,7 +579,7 @@ describe('useScrollSync', () => {
 
       act(() => {
         result.current.setIsEditorReady(true)
-        result.current.scrollMapRef.current = mockScrollMapEntries
+        setScrollMap(result.current.scrollMapRef, mockScrollMapEntries)
       })
 
       // Should not throw when element is detached
@@ -642,7 +641,7 @@ describe('useScrollSync', () => {
 
       act(() => {
         result.current.setIsEditorReady(true)
-        result.current.scrollMapRef.current = mockScrollMapEntries
+        setScrollMap(result.current.scrollMapRef, mockScrollMapEntries)
       })
 
       // Should not throw
@@ -658,6 +657,11 @@ describe('useScrollSync', () => {
       throwingEditor.getTopForLineNumber = vi.fn(() => {
         throw new Error('Test error')
       })
+      // The module mock returns a fixed map without asking the editor, so let
+      // this build call through to the editor offset like the real one does.
+      vi.mocked(buildScrollMapEntries).mockImplementationOnce((_lineToOffset, getEditorOffset) => [
+        { line: 1, editorOffset: getEditorOffset(1), previewOffset: 0 }
+      ])
 
       const { result } = renderHook(() =>
         useScrollSync({
@@ -673,6 +677,7 @@ describe('useScrollSync', () => {
         })
       }).not.toThrow()
 
+      expect(throwingEditor.getTopForLineNumber).toHaveBeenCalled()
       expect(result.current.scrollMapRef.current).toEqual([])
     })
   })
@@ -683,7 +688,7 @@ describe('useScrollSync', () => {
 
       act(() => {
         result.current.setIsEditorReady(true)
-        result.current.scrollMapRef.current = mockScrollMapEntries
+        setScrollMap(result.current.scrollMapRef, mockScrollMapEntries)
       })
 
       // First scroll should work - should not throw
@@ -700,11 +705,11 @@ describe('useScrollSync', () => {
 
   describe('ResizeObserver integration', () => {
     it('should create ResizeObserver in split mode when editor is ready', () => {
-      const resizeObserverMock = vi.fn().mockImplementation(() => ({
+      const resizeObserverMock = vi.fn().mockImplementation(function () { return ({
         observe: vi.fn(),
         unobserve: vi.fn(),
         disconnect: vi.fn()
-      }))
+      }) })
       global.ResizeObserver = resizeObserverMock
 
       const { result } = renderHook(() => useScrollSync(defaultOptions))
@@ -721,13 +726,13 @@ describe('useScrollSync', () => {
 
     it('should not create new ResizeObserver when switching from split to non-split mode', () => {
       const observeCallsMade: number[] = []
-      const resizeObserverMock = vi.fn().mockImplementation(() => ({
+      const resizeObserverMock = vi.fn().mockImplementation(function () { return ({
         observe: vi.fn(() => {
           observeCallsMade.push(1)
         }),
         unobserve: vi.fn(),
         disconnect: vi.fn()
-      }))
+      }) })
       global.ResizeObserver = resizeObserverMock
 
       const { rerender, result } = renderHook(
@@ -751,24 +756,154 @@ describe('useScrollSync', () => {
   })
 
   describe('mermaid event handling', () => {
-    it('should add mermaid:rendered event listener', () => {
-      const addEventListenerSpy = vi.spyOn(previewRef.current!, 'addEventListener')
-
+    it('should rebuild (debounced) when the preview reports a drawn diagram', async () => {
       const { result } = renderHook(() => useScrollSync(defaultOptions))
-
       act(() => {
         result.current.setIsEditorReady(true)
       })
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000)
+      })
+      vi.mocked(buildScrollMapEntries).mockClear()
 
-      // Wait for effects
       act(() => {
-        vi.advanceTimersByTime(100)
+        result.current.handlePreviewRendered({ root: previewRef.current!, reason: 'diagram' })
+        result.current.handlePreviewRendered({ root: previewRef.current!, reason: 'diagram' })
+      })
+      expect(buildScrollMapEntries).not.toHaveBeenCalled()
+
+      act(() => {
+        vi.advanceTimersByTime(150)
+      })
+      expect(buildScrollMapEntries).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('project image notifications (#71)', () => {
+    it('should rebuild (debounced, once per burst) when project images arrive', async () => {
+      const { result } = renderHook(() => useScrollSync(defaultOptions))
+      act(() => {
+        result.current.setIsEditorReady(true)
+      })
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000)
+      })
+      vi.mocked(buildScrollMapEntries).mockClear()
+
+      // Images arrive one by one after the commit; each moves content below it
+      await act(async () => {
+        result.current.handlePreviewRendered({ root: previewRef.current!, reason: 'image' })
+        result.current.handlePreviewRendered({ root: previewRef.current!, reason: 'image' })
+        result.current.handlePreviewRendered({ root: previewRef.current!, reason: 'image' })
+        await vi.advanceTimersByTimeAsync(0)
+      })
+      expect(buildScrollMapEntries).not.toHaveBeenCalled()
+
+      act(() => {
+        vi.advanceTimersByTime(150)
+      })
+      expect(buildScrollMapEntries).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('preview render notifications (the only content trigger)', () => {
+    it('rebuilds the map when the preview commits new content', async () => {
+      const { result } = renderHook(() => useScrollSync(defaultOptions))
+      act(() => {
+        result.current.setIsEditorReady(true)
+      })
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000)
+      })
+      vi.mocked(buildScrollMapEntries).mockClear()
+
+      await act(async () => {
+        result.current.handlePreviewRendered({ root: previewRef.current!, reason: 'content' })
+        await vi.advanceTimersByTimeAsync(1000)
       })
 
-      expect(addEventListenerSpy).toHaveBeenCalledWith(
-        'mermaid:rendered',
-        expect.any(Function)
+      expect(buildScrollMapEntries).toHaveBeenCalledTimes(1)
+    })
+
+    it('does nothing outside a split view', async () => {
+      const { result } = renderHook(() => useScrollSync({ ...defaultOptions, viewMode: 'preview' }))
+      act(() => {
+        result.current.setIsEditorReady(true)
+      })
+      vi.mocked(buildScrollMapEntries).mockClear()
+
+      await act(async () => {
+        result.current.handlePreviewRendered({ root: previewRef.current!, reason: 'content' })
+        await vi.advanceTimersByTimeAsync(1000)
+      })
+
+      expect(buildScrollMapEntries).not.toHaveBeenCalled()
+    })
+
+    it('measures the remounted preview after split -> split-horizontal, then typing', async () => {
+      // The preview is keyed by view mode, so switching between the two split
+      // layouts replaces its root element. A listener bound to the old element
+      // would never hear about the new one; the notification carries the root.
+      const { result, rerender } = renderHook(
+        (props: UseScrollSyncOptions) => useScrollSync(props),
+        { initialProps: defaultOptions }
       )
+      act(() => {
+        result.current.setIsEditorReady(true)
+      })
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000)
+      })
+
+      const oldRoot = previewRef.current!
+      rerender({ ...defaultOptions, viewMode: 'split-horizontal' })
+      act(() => {
+        // The editor remounts too and reports ready again.
+        result.current.setIsEditorReady(true)
+      })
+      const newRoot = createMockPreviewElement()
+
+      // Mount commit of the new preview, then a commit after typing.
+      await act(async () => {
+        result.current.handlePreviewRendered({ root: newRoot, reason: 'content' })
+        await vi.advanceTimersByTimeAsync(1000)
+      })
+      vi.mocked(newRoot.querySelectorAll).mockClear()
+      vi.mocked(oldRoot.querySelectorAll).mockClear()
+      vi.mocked(buildScrollMapEntries).mockClear()
+
+      await act(async () => {
+        result.current.handlePreviewRendered({ root: newRoot, reason: 'content' })
+        await vi.advanceTimersByTimeAsync(1000)
+      })
+
+      expect(previewRef.current).toBe(newRoot)
+      expect(buildScrollMapEntries).toHaveBeenCalledTimes(1)
+      expect(newRoot.querySelectorAll).toHaveBeenCalledWith('[data-line-start]')
+      expect(oldRoot.querySelectorAll).not.toHaveBeenCalledWith('[data-line-start]')
+    })
+
+    it('lets a newer content render supersede a pending one', async () => {
+      const { result } = renderHook(() => useScrollSync(defaultOptions))
+      act(() => {
+        result.current.setIsEditorReady(true)
+      })
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000)
+      })
+      // An image still loading keeps the first rebuild waiting.
+      const img = document.createElement('img')
+      Object.defineProperty(img, 'complete', { value: false })
+      previewRef.current!.appendChild(img)
+      vi.mocked(buildScrollMapEntries).mockClear()
+
+      await act(async () => {
+        result.current.handlePreviewRendered({ root: previewRef.current!, reason: 'content' })
+        result.current.handlePreviewRendered({ root: previewRef.current!, reason: 'content' })
+        await vi.advanceTimersByTimeAsync(700)
+      })
+
+      expect(buildScrollMapEntries).toHaveBeenCalledTimes(1)
     })
   })
 

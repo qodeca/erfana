@@ -14,14 +14,10 @@
  * @see docs/designs/sd-074-html-preview.md §4.2 - Schemas
  */
 import { z } from 'zod'
+
+import { PREVIEW_BLOCKED_KINDS } from './previewBlockedKind'
 import { ErrorCode } from '../errors'
-import { PreviewHostSchema } from './preview-settings-schema'
-import type {
-  PdfExportResult,
-  PreviewApproveResult,
-  PreviewFindResult,
-  PreviewOpenResult
-} from './preview-types'
+import { MAX_ALLOWLIST_HOSTS, PreviewOriginSchema } from './preview-settings-schema'
 
 /** A panel id: non-empty, bounded. */
 export const PanelIdSchema = z.string().min(1).max(256)
@@ -43,7 +39,7 @@ export type PreviewBoundsPayload = z.infer<typeof PreviewBoundsSchema>
  */
 export const PreviewCheckEligibilityRequestSchema = z
   .object({
-    filePath: z.string().min(1)
+    filePath: z.string().min(1).max(4096)
   })
   .strict()
 export type PreviewCheckEligibilityRequest = z.infer<typeof PreviewCheckEligibilityRequestSchema>
@@ -73,7 +69,7 @@ export type PreviewCheckEligibilityResponse = z.infer<
 export const PreviewOpenRequestSchema = z
   .object({
     panelId: PanelIdSchema,
-    filePath: z.string().min(1),
+    filePath: z.string().min(1).max(4096),
     bounds: PreviewBoundsSchema
   })
   .strict()
@@ -83,9 +79,18 @@ export type PreviewOpenRequest = z.infer<typeof PreviewOpenRequestSchema>
 export const PreviewApproveHostRequestSchema = z
   .object({
     panelId: PanelIdSchema,
-    // Validate approvability (and reject CSP-delimiter / CRLF chars) AT the
-    // boundary via the shared host schema, not only downstream in the store.
-    host: PreviewHostSchema
+    /*
+     * Validate approvability (and reject CSP-delimiter / CRLF chars) AT the
+     * boundary, not only downstream in the store.
+     *
+     * The field is named `host` for wire compatibility but carries an ORIGIN —
+     * scheme, host and port. It MUST be the origin schema: the renderer sends
+     * what it was told was blocked, and that is now `https://example.com:8443`,
+     * which the hostname schema refuses outright. Left as a host schema this
+     * rejects every approval the band can make, and the renderer surfaces that
+     * as a bare "Not saved".
+     */
+    host: PreviewOriginSchema
   })
   .strict()
 export type PreviewApproveHostRequest = z.infer<typeof PreviewApproveHostRequestSchema>
@@ -95,10 +100,97 @@ export const PreviewSetBoundsSchema = z
   .object({
     panelId: PanelIdSchema,
     bounds: PreviewBoundsSchema,
-    seq: z.number().int().nonnegative()
+    seq: z.number().int().nonnegative(),
+    /**
+     * Ask for a `boundsApplied` confirmation once the page has repainted at the
+     * new size.
+     *
+     * OPTIONAL, and set only on the pushes that need it — a transition that
+     * reveals Erfana's chrome. While a growth is unproved (a window-edge resize
+     * hold, repeated growth pushes) every push asks, so main keeps at most two
+     * confirmation scripts alive and starts the newest at once. Absent means
+     * today's fire-and-forget.
+     */
+    ack: z.boolean().optional(),
+    /**
+     * The forced push that ends a window-edge resize hold (issue #124, part 1
+     * §1.5): sent even when the rect is unchanged, and main releases the hold
+     * once it is applied. Absent on every other push.
+     */
+    settled: z.boolean().optional()
   })
   .strict()
 export type PreviewSetBounds = z.infer<typeof PreviewSetBoundsSchema>
+
+/**
+ * Sent once for a push that asked for it, AFTER the page has painted at its new
+ * size — never merely after `view.setBounds` returned.
+ *
+ * The distinction is the whole point. Whether a view's composited texture is
+ * clipped to its bounds in the same frame the call returns could not be
+ * measured from inside the app: `capturePage` on the host does not include
+ * native child views, so the host cannot observe what the compositor did.
+ * Rather than rest on an unverifiable claim, the confirmation asks the page
+ * itself — two animation frames in an isolated world — which is directly
+ * observable. Measured on Electron 39: ~17 ms for an idle page, ~130 ms for a
+ * heavy one, and never for a page that refuses to yield, which is why every
+ * caller needs a timeout and a safe fallback.
+ */
+/**
+ * The project's approved hosts, as main knows them.
+ *
+ * Validated with the SAME `PreviewOriginSchema` that gates the WRITE path, so this
+ * emitter is a tripwire on anything the load path let through — `load()` already
+ * fails closed to `[]`, so a valid set is the only thing that should reach here.
+ *
+ * The whole set, never a delta: the on-disk allowlist is the record, and a delta
+ * protocol would need the renderer to hold a correct running copy across a
+ * project switch, a reload and a second panel.
+ */
+/**
+ * A visibility change landed. `visible` is what was APPLIED, not what was asked.
+ *
+ * Sent for the hide path only when the hide actually completed — a hide that was
+ * superseded by a show mid-capture emits nothing, so silence continues to mean
+ * "assume the page is still there", which is the only safe reading.
+ */
+export const PreviewVisibilityAppliedPayloadSchema = z
+  .object({
+    panelId: PanelIdSchema,
+    visible: z.boolean()
+  })
+  .strict()
+
+export type PreviewVisibilityAppliedPayload = z.infer<
+  typeof PreviewVisibilityAppliedPayloadSchema
+>
+
+export const PreviewAllowlistChangedPayloadSchema = z
+  .object({
+    panelId: PanelIdSchema,
+    /*
+     * ORIGINS, under a legacy field name. This is a TRIPWIRE as much as a
+     * validator: the store is the only writer, so anything failing here is
+     * something the load path let through, and the event is dropped rather than
+     * shown. Which is exactly why it has to match what the store now emits —
+     * against the hostname schema every allowlist event would be discarded and
+     * the renderer would never learn that anything had been approved.
+     */
+    hosts: z.array(PreviewOriginSchema).max(MAX_ALLOWLIST_HOSTS)
+  })
+  .strict()
+
+export type PreviewAllowlistChangedPayload = z.infer<
+  typeof PreviewAllowlistChangedPayloadSchema
+>
+
+export const PreviewBoundsAppliedPayloadSchema = z
+  .object({
+    panelId: PanelIdSchema,
+    seq: z.number().int().nonnegative()
+  })
+  .strict()
+export type PreviewBoundsAppliedPayload = z.infer<typeof PreviewBoundsAppliedPayloadSchema>
 
 export const PreviewSetVisibilitySchema = z
   .object({
@@ -141,13 +233,40 @@ export type PreviewPanelRequest = z.infer<typeof PreviewPanelRequestSchema>
 
 /**
  * The host here is a REPORTING value, not an approval value (SEC-019).
- * `PreviewHostSchema` gates the APPROVE path only.
+ * `PreviewOriginSchema` gates the APPROVE path only.
+ *
+ * Deliberately loose, because this is what was OBSERVED rather than what may be
+ * granted — a refusal must be reportable even when the thing refused could never
+ * be approved. The length allows a full origin: a 253-character host plus a
+ * scheme and a `:65535`. At the old 253 a long host's blocked event silently
+ * failed to parse and the row never appeared at all.
  */
 export const PreviewHostBlockedPayloadSchema = z
   .object({
     panelId: PanelIdSchema,
-    host: z.string().min(1).max(253),
-    approvable: z.boolean()
+    host: z.string().min(1).max(300),
+    approvable: z.boolean(),
+    /**
+     * What the host was refused FOR, accumulated across sightings.
+     *
+     * A hostname alone is not something most people can judge. One host is
+     * often refused for several things, so this grows rather than recording
+     * only the first — labelling a host that will run scripts as "font" would
+     * misinform the reader through the very surface built to inform them.
+     */
+    kinds: z.array(z.enum(PREVIEW_BLOCKED_KINDS)).min(1).max(PREVIEW_BLOCKED_KINDS.length),
+    /**
+     * This view has reached its distinct-host cap; further hosts are not reported.
+     *
+     * Rides the event for the LAST host that fits, because the events for the
+     * ones that do not fit are exactly what is being suppressed. Without it the
+     * band would present a truncated list as complete, which for a permission
+     * surface is worse than admitting the limit.
+     *
+     * REPLACED `notify`, a three-toast budget verdict. That field was a hint the
+     * renderer could ignore; this one is a fact about completeness it must show.
+     */
+    truncated: z.boolean()
   })
   .strict()
 export type PreviewHostBlockedPayload = z.infer<typeof PreviewHostBlockedPayloadSchema>
@@ -171,7 +290,15 @@ export const PreviewFailureSchema = z
       'render-crash',
       'unresolved-specifier',
       'allowlist-invalid',
-      'allowlist-unsupported-version'
+      'allowlist-unsupported-version',
+      'blocked-link',
+      // Frame refusals (issue #124, part 2 §2.12)
+      'frame-remote',
+      'frame-escape',
+      'frame-excluded',
+      'frame-too-deep',
+      'frame-over-limit',
+      'frame-link-blocked'
     ]),
     // Page-influenced value. The `record()` producer strips control chars; this
     // regex is the emit-time tripwire that actually enforces "no CR/LF", so a
@@ -213,7 +340,12 @@ export const PreviewStillFrameSchema = z
     dataUrl: z.string(),
     width: z.number().int().nonnegative(),
     height: z.number().int().nonnegative(),
-    capturedAt: z.number().int().nonnegative()
+    capturedAt: z.number().int().nonnegative(),
+    /** The view's CSS size at capture; the still is drawn at it, top-left (issue #124). */
+    cssWidth: z.number().nonnegative().optional(),
+    cssHeight: z.number().nonnegative().optional(),
+    /** Real input reached the page after the capture. Omitted when false. */
+    stale: z.boolean().optional()
   })
   .strict()
 export type PreviewStillFramePayload = z.infer<typeof PreviewStillFrameSchema>
@@ -222,60 +354,72 @@ export type PreviewStillFramePayload = z.infer<typeof PreviewStillFrameSchema>
 export const PreviewLoadStatePayloadSchema = z
   .object({
     panelId: PanelIdSchema,
-    state: z.enum(['idle', 'loading', 'ready', 'failed']),
+    state: z.enum(['idle', 'loading', 'ready', 'failed', 'suspended']),
     dropped: z.number().int().nonnegative()
   })
   .strict()
 export type PreviewLoadStatePayload = z.infer<typeof PreviewLoadStatePayloadSchema>
 
-/** `preview:forwardedShortcut` event payload — the 4 accelerators of §1.9. */
+/**
+ * `preview:backdropChanged` event payload.
+ *
+ * The colour painted BEHIND the previewed page — Erfana's chrome black before
+ * the page paints, the page's own resolved paper afterwards. The renderer paints
+ * the same value on `.html-preview-placeholder` so the DOM and the native view
+ * never disagree; that equality is what keeps a bounds update, a hide without a
+ * cached still frame, and a show all seamless.
+ *
+ * `color` is derived main-side from an UNTRUSTED page's computed style, so it is
+ * bounded to a strict 6-digit hex here rather than trusted as a CSS string: it is
+ * interpolated into a style property in the renderer.
+ */
+export const PreviewBackdropPayloadSchema = z
+  .object({
+    panelId: PanelIdSchema,
+    color: z.string().regex(/^#[0-9a-fA-F]{6}$/)
+  })
+  .strict()
+export type PreviewBackdropPayload = z.infer<typeof PreviewBackdropPayloadSchema>
+
+/**
+ * `preview:openFileRequested` event payload (sd-074b §5.4).
+ *
+ * `filePath` is absolute and has ALREADY been confined to the project root by
+ * main; the renderer still routes it through `resolvePanelKind` +
+ * `openFileInPanel` like any other open, so eligibility stays a renderer
+ * decision and `preview-` ids stay minted in one place.
+ */
+export const PreviewOpenFileRequestedSchema = z
+  .object({
+    sourcePanelId: PanelIdSchema,
+    filePath: z.string().min(1).max(4096),
+    anchor: z.string().max(512).nullable(),
+    /**
+     * Where the link may open (issue #124, part 3 §3.2). Optional in the
+     * contract: absent means `new-tab`, which is every link before #124.
+     */
+    disposition: z.enum(['same-tab', 'new-tab', 'by-mode']).optional()
+  })
+  .strict()
+export type PreviewOpenFileRequestedPayload = z.infer<typeof PreviewOpenFileRequestedSchema>
+
+/**
+ * `preview:forwardedShortcut` event payload — the 4 accelerators of §1.9, plus
+ * Back and Forward (issue #124, part 3 §3.7). Exactly the keys of
+ * `PREVIEW_FORWARDED_SHORTCUTS`; `previewInputForward.test.ts` compares them.
+ */
 export const PreviewForwardedShortcutSchema = z
   .object({
     panelId: PanelIdSchema,
-    key: z.enum(['f', 's', 'w', 'Escape']),
+    key: z.enum(['f', 's', 'w', 'Escape', 'back', 'forward']),
     accel: z.boolean()
   })
   .strict()
 export type PreviewForwardedShortcut = z.infer<typeof PreviewForwardedShortcutSchema>
 
 /**
- * Shared contract for the preload preview bridge (`window.api.preview`).
- *
- * Single source of truth consumed by both the preload implementation and the
- * renderer typing, mirroring {@link ClaudeStatusBridge}. `setBounds` /
- * `setVisibility` are fire-and-forget sends; the rest are invoke round-trips.
+ * The preload bridge contract lives in `preview-bridge-types.ts` since issue
+ * #124, because this file is at its size cap; re-exported so every existing
+ * import keeps its path.
  */
-export interface PreviewBridge {
-  /** Check whether a path may open as a running preview. */
-  checkEligibility(filePath: string): Promise<PreviewCheckEligibilityResponse>
-  /** Open a preview for a panel; may refuse when a preview is already live. */
-  open(req: PreviewOpenRequest): Promise<PreviewOpenResult>
-  /** Close and destroy the preview for a panel. */
-  close(panelId: string): Promise<void>
-  /** Update the native view bounds (fire-and-forget; stale seqs dropped). */
-  setBounds(panelId: string, bounds: PreviewBoundsPayload, seq: number): void
-  /** Update view visibility with a diagnostic reason (fire-and-forget). */
-  setVisibility(panelId: string, visible: boolean, reason: string): void
-  /** Reload the previewed page. */
-  reload(panelId: string, opts?: { ignoreCache?: boolean }): Promise<void>
-  /** Approve a remote host, writing back to the project allowlist. */
-  approveHost(panelId: string, host: string): Promise<PreviewApproveResult>
-  /** Start / advance an in-page find. */
-  find(req: PreviewFindRequest): Promise<void>
-  /** Stop the active in-page find. */
-  stopFind(panelId: string): Promise<void>
-  /** Export the live previewed page to PDF. */
-  exportPdf(panelId: string): Promise<PdfExportResult>
-  /** Subscribe to failure-log changes; returns an unsubscribe. */
-  onFailuresChanged(callback: (payload: PreviewFailureListPayload) => void): () => void
-  /** Subscribe to host-block events; returns an unsubscribe. */
-  onHostBlocked(callback: (payload: PreviewHostBlockedPayload) => void): () => void
-  /** Subscribe to in-page find results; returns an unsubscribe. */
-  onFindResult(callback: (result: PreviewFindResult) => void): () => void
-  /** Subscribe to still-frame changes; returns an unsubscribe. */
-  onStillFrameChanged(callback: (payload: PreviewStillFramePayload) => void): () => void
-  /** Subscribe to load-state changes; returns an unsubscribe. */
-  onLoadStateChanged(callback: (payload: PreviewLoadStatePayload) => void): () => void
-  /** Subscribe to forwarded keyboard accelerators; returns an unsubscribe. */
-  onForwardedShortcut(callback: (payload: PreviewForwardedShortcut) => void): () => void
-}
+export type { PreviewBridge } from './preview-bridge-types'

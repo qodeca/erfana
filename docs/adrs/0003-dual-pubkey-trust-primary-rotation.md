@@ -80,7 +80,7 @@ A future "simplify this!" proposal will suggest dropping the rotation key ("it's
 ## References
 
 - `src/main/services/whisper-pubkeys.ts` — the two `readonly` pubkey constants
-- `src/main/utils/verifyManifest.ts:99-121` — the dual-key accept loop
+- `src/main/utils/verifyManifest.ts` — the dual-key accept loop (`for (const trusted of pubkeys)` inside `verifyManifest()`)
 - `docs/build/whisper-binaries.md` §"Cert-revocation runbook" — operational procedure when either key is compromised
 - Published primary key ID: `4AEBCE8499845646`
 - Published rotation key ID: `E8E4B205269790F1`

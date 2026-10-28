@@ -9,7 +9,7 @@
  * @see import-handlers.test.ts
  */
 
-import { vi } from 'vitest'
+import { vi, type Mock } from 'vitest'
 import * as path from 'path'
 import * as os from 'os'
 import type { IpcMainInvokeEvent } from 'electron'
@@ -61,7 +61,7 @@ export const mockIsConfigurableConverter = vi.fn()
 
 /** Retrieve a registered IPC handler by channel name */
 export function getHandler(
-  mockIpcMainHandle: ReturnType<typeof vi.fn>,
+  mockIpcMainHandle: Mock,
   channel: string
 ): ((...args: unknown[]) => Promise<unknown>) | undefined {
   const call = mockIpcMainHandle.mock.calls.find((c) => c[0] === channel)

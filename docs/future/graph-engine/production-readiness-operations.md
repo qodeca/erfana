@@ -307,4 +307,4 @@ ipcMain.handle('graph:backup', async (event, backupPath: string) => {
 - [Architecture](./architecture-overview.md) – System design decisions
 - [Performance](./performance.md) – Benchmarks and optimization
 - [Packaging](./packaging.md) – Native module configuration
-- [Implementation Guide](./implementation-guide.md) – Milestone checklist
+- [Implementation Guide](./implementation-guide/README.md) – Milestone checklist

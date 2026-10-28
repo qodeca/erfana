@@ -27,6 +27,7 @@ import type { FilePanelKind } from './openFileInPanel'
 import { isHtmlFile } from './fileUtils'
 import { isImageFile } from './imageUtils'
 import { logger } from './logger'
+import { previewGateway } from '../services/previewGateway'
 
 /**
  * In-flight resolutions keyed by absolute file path.
@@ -57,7 +58,7 @@ async function computePanelKind(filePath: string): Promise<FilePanelKind> {
   // Any failure – ineligible, IPC error, or the bridge being unavailable –
   // degrades to opening the file as source, never blocks the open.
   try {
-    const result = await window.api.preview.checkEligibility(filePath)
+    const result = await previewGateway.checkEligibility(filePath)
     return result.eligible ? 'preview' : 'editor'
   } catch (error) {
     logger.warn('Preview eligibility check failed; opening as source', {

@@ -282,5 +282,5 @@ private async handleFileSaved(event: { path: string }): Promise<void> {
 - [Data ingestion – updates and performance](./data-ingestion-updates.md) – incremental updates, progress reporting, error handling, performance
 - [Architecture](./architecture-overview.md) – Event-driven integration with FileWatcherService
 - [User Guide](./user-guide-features.md) – User-facing features and workflows
-- [Implementation Guide](./implementation-guide.md) – M1 indexing pipeline tasks
+- [Implementation Guide](./implementation-guide/README.md) – M1 indexing pipeline tasks
 - [Performance](./performance.md) – Indexing benchmarks and optimization

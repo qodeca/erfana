@@ -22,14 +22,16 @@ The names **"Erfana"** and **"Qodeca"**, the Qodeca and Erfana logos, and any as
 
 The repository ships the Erfana application icon (`resources/icon.png`) so the app builds and runs out of the box. It is provided as a functional default; treat the Erfana and Qodeca marks as trademarks per the rules above — do not present them as your own brand, and replace them when distributing a renamed fork.
 
+The README and the repository's GitHub presentation use further Erfana brand assets: the banner with the Erfana wordmark (`docs/assets/readme/banner-dark.png`, `docs/assets/readme/banner-light.png`), the social preview image (`docs/assets/readme/social-preview.png`), and the design card they are rendered from (`docs/design-system/product/github-presentation/index.html`). The wordmark – the name "Erfana" set beside the icon – is an Erfana mark like the icon itself. A renamed fork must replace these images and must not use the wordmark.
+
 ## Third-party trademarks
 
 Erfana names third-party tools descriptively (nominative use) and is not affiliated with, sponsored by, or endorsed by their owners.
 
 - **Anthropic / "Claude" / "Claude Code"** – "Claude" and "Claude Code" are trademarks of Anthropic. Erfana is not affiliated with, sponsored by, or endorsed by Anthropic; it simply runs the `claude` CLI like any other terminal program.
-- **OpenAI / "Whisper"** – "OpenAI" and "Whisper" are trademarks of OpenAI. Erfana is not affiliated with, sponsored by, or endorsed by OpenAI; it optionally calls the OpenAI API for transcription and bundles `whisper.cpp` (an independent open-source project, MIT-licensed, not produced by OpenAI) for offline transcription.
+- **OpenAI / "Whisper"** – "OpenAI" and "Whisper" are trademarks of OpenAI. Erfana is not affiliated with, sponsored by, or endorsed by OpenAI; it optionally calls the OpenAI API for transcription and downloads and runs `whisper.cpp` (an independent open-source project, MIT-licensed, not produced by OpenAI) on demand for offline transcription.
 - **LlamaIndex / "LiteParse"** – "LiteParse" is a product of LlamaIndex. Erfana is not affiliated with, sponsored by, or endorsed by LlamaIndex; it bundles the `@llamaindex/liteparse` library to import documents.
-- **Open-source components and external tools** – Erfana also names the Monaco Editor (Microsoft), xterm.js, Mermaid, LibreOffice (The Document Foundation), and ImageMagick (ImageMagick Studio LLC) descriptively. These names are the trademarks or marks of their respective owners; Erfana uses them as independent open-source components or external tools and is not affiliated with, sponsored by, or endorsed by their owners.
+- **Open-source components and external tools** – Erfana also names the Monaco Editor (Microsoft), xterm.js, Mermaid, and LibreOffice (The Document Foundation) descriptively. These names are the trademarks or marks of their respective owners; Erfana uses them as independent open-source components or external tools and is not affiliated with, sponsored by, or endorsed by their owners.
 
 All other third-party names and marks are the property of their respective owners; bundled third-party components are listed in [THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md).
 

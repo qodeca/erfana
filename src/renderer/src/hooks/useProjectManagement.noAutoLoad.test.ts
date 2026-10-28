@@ -3,9 +3,8 @@
 /**
  * useProjectManagement — "no auto-load on mount" invariant (issue #60)
  *
- * The mount effect (`useProjectManagement.ts`, "Load last project on mount -
- * DISABLED") only marks the initial load complete; it never reopens the last
- * project. Crash recovery leans on that: relaunching after a crash caused BY a
+ * The hook has no "load last project on mount" step (`useProjectManagement.ts`,
+ * `loading` starts false); it never reopens the last project. Crash recovery leans on that: relaunching after a crash caused BY a
  * project must land on the welcome screen, not reopen the offending project and
  * crash again.
  *
@@ -15,6 +14,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook } from '@testing-library/react'
 import { useProjectManagement } from './useProjectManagement'
+import { getLastSeenProjectGeneration } from '../services/projectGeneration'
 
 vi.mock('../components/Dialog', async () => {
   const actual = await vi.importActual<typeof import('../components/Dialog')>('../components/Dialog')
@@ -39,7 +39,6 @@ const fileApi = {
   openProject: vi.fn(async () => null),
   openProjectByPath: vi.fn(async () => '/should-not-open'),
   closeProject: vi.fn(async () => true),
-  getLastProjectPath: vi.fn(async () => '/previous-project'),
   readDirectory: vi.fn(async () => []),
   onProjectChanged: vi.fn(() => unsubscribe)
 }
@@ -62,23 +61,22 @@ afterEach(() => {
 })
 
 describe('useProjectManagement — no auto-load of the last project', () => {
-  it('marks the initial load complete on mount and never enters a loading state', () => {
+  it('never enters a loading state on mount and keeps the watcher gate closed', () => {
     const { result, rerender } = renderHook(() => useProjectManagement())
 
     // Nothing is awaited, so the hook never shows a spinner on mount.
     expect(result.current.loading).toBe(false)
     expect(result.current.error).toBeNull()
 
-    // `initialLoadComplete` is backed by a ref the mount effect flips; the
-    // flag is therefore observable from the next render onwards.
+    // With no project open there is nothing to watch, so the directory-watcher
+    // gate stays closed (#211, D12).
     rerender()
-    expect(result.current.initialLoadComplete).toBe(true)
+    expect(result.current.initialLoadComplete).toBe(false)
   })
 
   it('opens no project on mount', () => {
     const { result } = renderHook(() => useProjectManagement())
 
-    expect(fileApi.getLastProjectPath).not.toHaveBeenCalled()
     expect(fileApi.readDirectory).not.toHaveBeenCalled()
     expect(fileApi.openProject).not.toHaveBeenCalled()
     expect(fileApi.openProjectByPath).not.toHaveBeenCalled()
@@ -102,9 +100,17 @@ describe('useProjectManagement — no auto-load of the last project', () => {
     const { result, rerender } = renderHook(() => useProjectManagement())
     rerender()
 
-    expect(fileApi.getLastProjectPath).not.toHaveBeenCalled()
     expect(fileApi.readDirectory).not.toHaveBeenCalled()
     expect(result.current.projectPath).toBeNull()
-    expect(result.current.initialLoadComplete).toBe(true)
+    expect(result.current.initialLoadComplete).toBe(false)
+  })
+
+  it('remembers the generation of the last project:changed event for a later close', () => {
+    renderHook(() => useProjectManagement())
+    const listener = (fileApi.onProjectChanged.mock.calls[0] as unknown as [(data: unknown) => void])[0]
+
+    listener({ oldPath: null, newPath: null, generation: 12 })
+
+    expect(getLastSeenProjectGeneration()).toBe(12)
   })
 })

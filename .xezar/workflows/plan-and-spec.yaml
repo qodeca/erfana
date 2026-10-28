@@ -1,0 +1,39 @@
+name: plan-and-spec
+description: Design an approach and write a right-sized spec under docs/features/ (this kit's one fixed document folder) before substantial work.
+steps:
+  - id: kit
+    name: Snapshot the local project kit
+    command: 'bash "$(git rev-parse --path-format=absolute --git-common-dir)/../.xezar/checks/bootstrap.sh"'
+    resultScope: routine
+  - id: preflight
+    name: Verify worktree isolation
+    command: ".xezar/checks/worktree-preflight.sh"
+    resultScope: routine
+  - id: setup
+    name: Prepare the worktree
+    command: ".xezar/checks/worktree-setup.sh"
+    resultScope: routine
+  - id: plan
+    name: Design and specify
+    prompt: "{{task}}"
+    skill: xezar-planning-spec
+    timeout: 2h
+  - id: readiness
+    name: Confirm the phase record is complete and nothing blocks
+    command: ".xezar/checks/worktree-preflight.sh --readiness"
+    resultScope: stage
+  - id: gates
+    name: Quality gates
+    command: ".xezar/checks/repo-gates.sh --fast --producer gates"
+    resultScope: stage
+    onFail:
+      retry: plan
+      max: 2
+  - id: evidence
+    name: Seal the gate evidence
+    command: ".xezar/checks/worktree-preflight.sh --record-gate-evidence"
+    resultScope: stage
+  - id: handoff
+    name: Draft PR into the base branch
+    prompt: "Hand off the spec and plan produced for: {{task}}"
+    skill: xezar-handoff-draft-pr

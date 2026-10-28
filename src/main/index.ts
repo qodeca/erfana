@@ -1,14 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { app, shell, BrowserWindow, Menu } from 'electron'
+import { app, BrowserWindow, Menu, dialog, session } from 'electron'
 import { join } from 'path'
+import { APP_ID } from '../shared/constants'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { spawnNewInstance } from './utils/spawnNewInstance'
-import { registerFileHandlers } from './ipc/file-handlers'
+import { moveToSafeWorkingDirectory } from './utils/safeWorkingDirectory'
+import { registerFileHandlers, projectService } from './ipc/file-handlers'
 import { registerFileWatcherHandlers } from './ipc/file-watcher-handlers'
 import { registerDirectoryWatcherHandlers } from './ipc/directory-watcher-handlers'
 import { registerSettingsHandlers } from './ipc/settings-handlers'
 import { registerTerminalHandlers } from './ipc/terminal-handlers'
+import { registerTerminalScreenReaderHandlers } from './ipc/terminal-screen-reader-handlers'
 import { registerImportHandlers, registerDocumentImportHandlers } from './ipc/import-handlers'
 import { registerGitHandlers } from './ipc/git-handlers'
 import { registerGitWatcherHandlers } from './ipc/git-watcher-handlers'
@@ -24,29 +27,40 @@ import { registerQuitHandlers } from './ipc/quit-handlers'
 import { registerProjectLockHandlers } from './ipc/project-lock-handlers'
 import { registerExternalFileHandlers } from './ipc/external-file-handlers'
 import { registerTranscriptionHandlers } from './ipc/transcription-handlers'
+import { whisperModelManager } from './services/WhisperModelManager'
 import { registerClipboardHandlers } from './ipc/clipboard-handlers'
 import { registerImageExportHandlers } from './ipc/image-export-handlers'
+import { registerBrowserHandlers } from './ipc/browser-handlers'
+import { registerMarkdownImageHandlers } from './ipc/markdown-image-handlers'
 import { registerClaudeStatusHandlers } from './ipc/claude-status-handlers'
 import { registerPreviewHandlers } from './ipc/preview-handlers'
 import { registerPreviewScheme } from './services/preview/previewScheme'
-import { DependencyDetector, converterRegistry, getExtensionsForDependencies } from './services/import'
-import { FORCE_CRASH_ARG } from '../shared/constants'
-import { IMPORT_CHANNELS } from '../shared/ipc/import-channels'
-import type { DependencyReadyEvent } from '../shared/ipc/import-schema'
-import { createApplicationMenu } from './menu'
+import { importToolStatusService, killActiveLibreOfficeProbes } from './services/import'
+import { FORCE_CRASH_ARG, LOGS_DIR_RELATIVE, TEST_HOOKS_ARG } from '../shared/constants'
+import { createApplicationMenu, setPreviewZoomHandler } from './menu'
 import { fileService } from './services/FileService'
+import { redactedLogError } from './utils/redactUserInput'
 import { fileWatcherService } from './services/FileWatcherService'
 import { directoryWatcherService } from './services/DirectoryWatcherService'
 import { terminalService } from './services/TerminalService'
 import { settingsService } from './services/SettingsService'
 import { globalSettingsService } from './services/GlobalSettingsService'
 import { loggingService, logger } from './services/LoggingService'
+import { logNodePtyBinding } from './utils/logNodePtyBinding'
+import { createQuitGuard } from './utils/quitGuard'
+import { armLastResortExit, LAUNCHER_WAIT_MS, runQuitSequence, waitBounded } from './utils/quitSequence'
+import { QUIT_TRACE_FILE, startConptyHostReaper } from './services/conptyHostReaper'
 import { gitWatcherService } from './services/GitWatcherService'
 import { gitPollingService } from './services/GitPollingService'
 import { projectLockService } from './services/ProjectLockService'
 import { gitStatusService } from './services/GitStatusService'
 import { installSafeConsole } from './utils/safeConsole'
+import { openExternalSafeDetached } from './utils/openExternalSafe'
+import { registerWebContentsBaseline } from './utils/webContentsBaseline'
+import { registerProcessCrashLogging } from './utils/processCrashLogging'
+import { writeCrashFallbackLine } from './utils/crashFallbackLog'
 import { isBenignShutdownTimerError } from './utils/isBenignShutdownTimerError'
+import { installDefaultSessionPermissions } from './services/session/defaultSessionPermissions'
 import {
   registerAppCrashLogging,
   registerWindowErrorSignals,
@@ -56,11 +70,23 @@ import {
 // Install safe console logging to prevent EPIPE crashes
 // Must be called before any other code that uses console.log
 installSafeConsole()
+registerProcessCrashLogging()
 
 // Register the `erfana-preview://` privileged scheme (#74). MUST run before
 // `app.whenReady()`, so it lives here at module scope beside the other pre-ready
 // setup (`registerSchemesAsPrivileged` is a no-op once the app is ready).
 registerPreviewScheme()
+
+// Packaged: leave the launching folder (possibly a cloned repo) as cwd, so no
+// bare-name spawn can resolve into it (#250). Dev keeps the repo as cwd.
+moveToSafeWorkingDirectory({
+  isPackaged: app.isPackaged,
+  platform: process.platform,
+  execPath: process.execPath,
+  userDataPath: () => app.getPath('userData'),
+  chdir: (dir) => process.chdir(dir),
+  warn: (message, context) => logger.warn(message, context)
+})
 
 // Strip --new-window flag to prevent infinite spawn loops
 // Must happen before any window creation
@@ -131,7 +157,12 @@ function isRendererGone(win: BrowserWindow): boolean {
 let claudeStatusHandlers: { dispose: () => Promise<void> } | null = null
 
 /** HTML preview handler bundle (#74); disposed on app shutdown. */
-let previewHandlers: { dispose: () => Promise<void> } | null = null
+let previewHandlers: {
+  dispose: () => Promise<void>
+  zoomFocused: (step: number) => Promise<boolean>
+  closeWindow: (windowId: number) => Promise<void>
+  setResizeHold: (windowId: number, held: boolean) => void
+} | null = null
 
 // WebGL Command Line Switches (originally added for Electron 33+)
 // Fixes WebGL context creation issues and terminal flickering in production builds
@@ -152,10 +183,15 @@ app.commandLine.appendSwitch('ignore-gpu-blocklist')
  * `ERFANA_E2E_FORCE_CRASH` outright.
  */
 function buildAdditionalArguments(): string[] {
+  const args: string[] = []
   if (!app.isPackaged && process.env.ERFANA_E2E_FORCE_CRASH === '1') {
-    return [FORCE_CRASH_ARG]
+    args.push(FORCE_CRASH_ARG)
   }
-  return []
+  // The e2e test hooks follow the same rule: a packaged build ignores the variable
+  if (!app.isPackaged && process.env.ERFANA_E2E_TEST_HOOKS === '1') {
+    args.push(TEST_HOOKS_ARG)
+  }
+  return args
 }
 
 function createWindow(): BrowserWindow {
@@ -247,7 +283,7 @@ function createWindow(): BrowserWindow {
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url)
+    openExternalSafeDetached(details.url)
     return { action: 'deny' }
   })
 
@@ -267,15 +303,38 @@ function createWindow(): BrowserWindow {
   // This prevents stale watchers and terminal processes from accumulating
   // CRITICAL: Must also clear project state so new window can re-open the same project
   const webContentsId = mainWindow.webContents.id
+
+  // Previews belong to a WINDOW, so they are reaped when the window goes — the
+  // same rule watchers, terminals and git already follow below. Without this the
+  // only teardown was the app-level disposer at `before-quit`, which runs AFTER
+  // `mainWindowRef.destroy()`: every view was detached from a dead window and
+  // logged a teardown warning on each clean exit, and a second window's views
+  // would simply have leaked.
+  const previewWindowId = mainWindow.id
+  mainWindow.on('closed', () => {
+    void previewHandlers?.closeWindow(previewWindowId).catch((error) => {
+      logger.warn('Preview teardown on window close failed', {
+        windowId: previewWindowId,
+        error: error instanceof Error ? error.message : String(error)
+      })
+    })
+  })
+  // A window-edge drag hides this window's previews until they settle (#124).
+  mainWindow.on('will-resize', () => previewHandlers?.setResizeHold(previewWindowId, true))
+  mainWindow.on('resized', () => previewHandlers?.setResizeHold(previewWindowId, false))
+
   mainWindow.webContents.on('destroyed', () => {
     logger.info('WebContents destroyed, cleaning up services', { webContentsId })
 
-    // CRITICAL FIX (issue #59): Clear project state in services
-    // Without this, ProjectService.isSameProject() returns true and does 'noop'
-    // when user clicks same project in new window, causing empty file tree
-    fileService.setProjectPath('')
-    fileWatcherService.setProjectPath('')
-    directoryWatcherService.setProjectPath('')
+    // CRITICAL FIX (issue #59): Close the project, which clears the session and
+    // the services that follow it. Without this, the same-project check returns
+    // true and does 'noop' when the user clicks the same project in a new
+    // window, causing an empty file tree. The lock is released too.
+    projectService
+      .close({ senderId: webContentsId, reason: 'window-destroyed' })
+      .catch((err) => {
+        logger.error('Error closing project', redactedLogError(err))
+      })
 
     // Cleanup watcher services asynchronously
     // Pattern: Fire-and-forget with error logging - cleanup must not block the destroyed event
@@ -324,6 +383,42 @@ function createWindow(): BrowserWindow {
   return mainWindow
 }
 
+// Deny-by-default window-open and navigation policy for every webContents
+// (windows set stricter handlers of their own where they need them).
+registerWebContentsBaseline(app)
+
+/**
+ * Tell the user, once, that start-up had to fall back.
+ *
+ * Non-blocking by design: the box is a sheet on the main window (macOS) or a
+ * window-modal dialog, opened only after the window is first shown, and nothing
+ * awaits it – start-up, the renderer and an automated launch (e2e) all carry on
+ * without anyone clicking it. It only appears when an init step failed, which a
+ * healthy launch never does. The "saved to crash.log" sentence is only added
+ * when the fallback line was actually written.
+ */
+function showStartupProblems(win: BrowserWindow, problems: string[], detailsSaved: boolean): void {
+  const detailsLine = detailsSaved
+    ? `Details were saved to crash.log in the ${LOGS_DIR_RELATIVE} folder in your home folder.`
+    : 'Details could not be saved to a file.'
+  win.once('show', () => {
+    if (win.isDestroyed()) return
+    dialog
+      .showMessageBox(win, {
+        type: 'warning',
+        title: 'Erfana started with problems',
+        message: 'Erfana started with problems',
+        detail: `${problems.join('\n\n')}\n\nErfana will keep running. ${detailsLine}`,
+        buttons: ['OK']
+      })
+      .catch((error: unknown) => {
+        logger.warn('Could not show the start-up problems message', {
+          error: error instanceof Error ? error.message : String(error)
+        })
+      })
+  })
+}
+
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
@@ -331,12 +426,23 @@ app.whenReady().then(async () => {
   // Set application name (shows in macOS menu bar)
   app.setName('ERFANA')
 
+  // Windows: record which conpty.node node-pty loaded (patched build vs prebuild, #305)
+  logNodePtyBinding()
+
+  // ERFANA_DIAG_SKIP_TREE_KILL is honoured in dev builds and e2e only; a packaged build
+  // ignores it, so an environment variable cannot change quit cleanup there (#305)
+  terminalService.allowDiagnostics(!app.isPackaged)
+
+  // Deny every page permission except the camera preview (Electron grants all by default)
+  installDefaultSessionPermissions(session.defaultSession)
+
   // Set application menu with Edit roles for native clipboard support
   // Required for Cmd+C/V to work in textarea and input elements
   Menu.setApplicationMenu(createApplicationMenu())
 
-  // Set app user model id for windows
-  electronApp.setAppUserModelId('com.erfana')
+  // Set app user model id for windows. Must equal the installer's appId so the running window
+  // groups with its pinned shortcut (and any future toast notifications resolve the app name/icon).
+  electronApp.setAppUserModelId(APP_ID)
 
   // Default open or close DevTools by F12 in development
   // and ignore CommandOrControl + R in production.
@@ -345,11 +451,32 @@ app.whenReady().then(async () => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  // Initialize global settings service (creates ~/.erfana/settings.json if needed)
-  await globalSettingsService.initialize()
+  // A failure here must not leave a windowless process: each step falls back
+  // (in-memory default settings, console logging), the failure is written to
+  // the crash fallback file, and start-up carries on to the window. The user
+  // is told once, by a non-blocking message box once the window is shown.
+  const startupProblems: string[] = []
+  let startupDetailsSaved = false
 
-  // Initialize logging service (after global settings so level is loaded)
-  await loggingService.initialize()
+  // Initialize global settings service (creates ~/.erfana/settings.json if needed).
+  // On failure the service keeps the in-memory defaults it was built with.
+  try {
+    await globalSettingsService.initialize()
+  } catch (error) {
+    startupDetailsSaved = writeCrashFallbackLine('[crash] startup-settings-init', error) || startupDetailsSaved
+    startupProblems.push(
+      'Your saved settings could not be loaded, so default settings are in use. Your settings file is not changed until you change a setting, and a copy of it is kept first.'
+    )
+  }
+
+  // Initialize logging service (after global settings so level is loaded).
+  // On failure the service has already switched itself to console logging.
+  try {
+    await loggingService.initialize()
+  } catch (error) {
+    startupDetailsSaved = writeCrashFallbackLine('[crash] startup-logging-init', error) || startupDetailsSaved
+    startupProblems.push('The log files could not be set up, so activity is not being recorded to disk.')
+  }
 
   // Record renderer / child-process deaths (#60 E). Registered once, app-wide,
   // so it also covers the overlay windows, the PDF/DOCX render window and the
@@ -362,12 +489,32 @@ app.whenReady().then(async () => {
     () => gitWatcherService.isWatching()
   )
 
-  // Register IPC handlers
+  // An open file whose parent folder is renamed, moved or deleted outside the
+  // app is seen only by the project watcher (a single-file watch hears nothing),
+  // so its removals are handed to the single-file watches
+  directoryWatcherService.onPathsRemoved((removedPaths) =>
+    fileWatcherService.handleAncestorRemovals(removedPaths)
+  )
+  // ...and where it cannot tell (a pause lost the paths, or the file's folder is
+  // filtered out), the single-file watches check the disk (#252)
+  directoryWatcherService.onRemovalsLost((root, isOwnRemoval) => {
+    fileWatcherService
+      .checkWatchedFilesUnder(root, isOwnRemoval)
+      .catch((error: unknown) => logger.error('Re-checking open files failed', redactedLogError(error)))
+  })
+  fileWatcherService.watchUnseenFiles(directoryWatcherService)
+
+  // Register IPC handlers. Every global channel is gated on the app's own
+  // top-level renderer by construction: the handlers register through
+  // `src/main/ipc/registry.ts`, and an ESLint rule stops `ipcMain` being
+  // imported anywhere else (sd-074b §7). There is no install step to forget and
+  // no ordering to get wrong.
   registerFileHandlers()
   registerFileWatcherHandlers()
   registerDirectoryWatcherHandlers()
   registerSettingsHandlers()
-  registerTerminalHandlers()
+  registerTerminalHandlers(projectService.session)
+  registerTerminalScreenReaderHandlers()
   registerImportHandlers()
   registerDocumentImportHandlers()
   registerGitHandlers()
@@ -381,10 +528,14 @@ app.whenReady().then(async () => {
   registerGlobalSettingsHandlers()
   registerLoggingHandlers()
   registerProjectLockHandlers()
-  registerExternalFileHandlers()
+  registerExternalFileHandlers(projectService.session)
   registerTranscriptionHandlers()
   registerClipboardHandlers()
   registerImageExportHandlers()
+  // Open in default browser (#124): sender-gated, confined to the open project.
+  registerBrowserHandlers()
+  // Images referenced from Markdown (#71): sender-gated, confined to the open project.
+  registerMarkdownImageHandlers(projectService.session)
   // Per-terminal Claude Code context status bar (#216). Uses the same
   // terminalService singleton so it can look up the main-owned PTY pid + cwd.
   claudeStatusHandlers = registerClaudeStatusHandlers(terminalService)
@@ -393,8 +544,22 @@ app.whenReady().then(async () => {
   // built inside the composition root.
   previewHandlers = registerPreviewHandlers({
     getProjectPath: () => fileService.getProjectPath(),
+    // Main-side teardown on project switch. Until now this seam had no
+    // producer, so only the renderer's own `preview:close` tore views down
+    // (sd-074b §4.9).
+    subscribeProjectChanged: (listener) =>
+      projectService.session.onChange((prev, next) =>
+        listener(prev?.root ?? null, next?.root ?? null)
+      ),
     globalSettings: globalSettingsService
   })
+
+  // Route View-menu zoom to a focused previewed page. A menu accelerator is
+  // global to the app, so with a preview focused Cmd/Ctrl-+ would otherwise fire
+  // the menu AND be forwarded to the page — zooming the window and the page at
+  // once. The menu holds a late-bound handler because it is installed before this
+  // graph exists.
+  setPreviewZoomHandler((step) => previewHandlers?.zoomFocused(step) ?? Promise.resolve(false))
 
   // RELIABILITY FIX (todo012): Clean up stale projects on startup
   // This runs asynchronously but doesn't block window creation
@@ -413,26 +578,18 @@ app.whenReady().then(async () => {
   })
 
   // Create main window
-  createWindow()
+  const startupWindow = createWindow()
+
+  if (startupProblems.length > 0) {
+    showStartupProblems(startupWindow, startupProblems, startupDetailsSaved)
+  }
 
   // Fire-and-forget: detect system dependencies for LiteParse document import
-  // Runs async after window creation so it doesn't block startup
-  const dependencyDetector = new DependencyDetector()
-  dependencyDetector.detect().then((deps) => {
-    const extensions = getExtensionsForDependencies(deps)
-    if (extensions.length > 0) {
-      converterRegistry.updateConverterExtensions('document', extensions)
-    }
-    // Notify renderer that dependencies have been detected
-    if (mainWindowRef && !mainWindowRef.isDestroyed()) {
-      const payload: DependencyReadyEvent = {
-        libreOffice: deps.libreOffice,
-        imageMagick: deps.imageMagick,
-        extensions: converterRegistry.getExtensionsByConversionType().requiresConversion
-      }
-      mainWindowRef.webContents.send(IMPORT_CHANNELS.DEPENDENCIES_READY, payload)
-    }
-  }).catch((error) => {
+  // Runs async after window creation so it doesn't block startup. The service
+  // maps the found tools' extensions into the converter registry, caches the
+  // result for `import:toolStatus`, and broadcasts `import:dependenciesReady`
+  // to every window (#250).
+  importToolStatusService.getStatus().catch((error) => {
     logger.error('Failed to detect document import dependencies', error instanceof Error ? error : undefined)
   })
 
@@ -489,6 +646,8 @@ app.whenReady().then(async () => {
   app.on('activate', function () {
     // On macOS it's common to re-create a window in the app when the
     // dock icon is clicked and there are no other windows open.
+    // Not during the shutdown: a window would reopen the project and retake its lock (#305)
+    if (quitGuard.isShuttingDown()) return
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 })
@@ -497,12 +656,18 @@ app.whenReady().then(async () => {
 // Note: On macOS, apps typically stay active but we want consistent quit behavior
 // since confirmation already happened via close handler
 app.on('window-all-closed', () => {
-  app.quit()
+  // Destroying the window inside the quit sequence lands here; a second app.quit()
+  // would make Electron emit another before-quit while the shutdown is running (#305)
+  quitGuard.handleWindowAllClosed(() => app.quit())
 })
+
+// A LibreOffice detection probe still running at quit must not outlive the app.
+app.on('will-quit', killActiveLibreOfficeProbes)
 
 // Cleanup file watchers, directory watchers, terminals, git watchers, and project locks before app quits.
 // Pattern B (F11): preventDefault + sequenced shutdown guarantees lock release before exit.
-// isShuttingDown guards against the second before-quit Electron emits after preventDefault.
+// quitGuard (utils/quitGuard.ts) prevents the second before-quit Electron emits and keeps
+// window-all-closed from calling app.quit() while the shutdown runs.
 const SHUTDOWN_TIMEOUT_MS = 2_000
 
 /**
@@ -515,7 +680,7 @@ const SHUTDOWN_TIMEOUT_MS = 2_000
  * is a local file unlink on the happy path.
  */
 const LOCK_DISPOSE_TIMEOUT_MS = 1_000
-let isShuttingDown = false
+const quitGuard = createQuitGuard()
 
 /**
  * Runs one disposer and returns when it settles or when `timeoutMs` elapses,
@@ -583,51 +748,98 @@ function handleShutdownException(err: unknown): void {
   )
 }
 
-app.on('before-quit', async (event) => {
-  if (isShuttingDown) return
-  isShuttingDown = true
-  event.preventDefault()
+app.on('before-quit', (event): Promise<void> | undefined => {
+  // Always prevented: Electron emits a second before-quit when the quit-confirm handler
+  // destroys the window (window-all-closed -> app.quit()). Letting that one through
+  // quits 1 ms after the shutdown started, before any disposer finishes (#305). The
+  // only way out is app.exit(0), which runQuitSequence always reaches.
+  if (!quitGuard.handleBeforeQuit(event)) return
+  // app.exit(0) below skips `will-quit`, so a running LibreOffice probe is killed here.
+  killActiveLibreOfficeProbes()
 
   // Install the guard synchronously, before the first await, so an already-queued
   // chokidar read callback can't crash the process before the handler is registered.
   process.on('uncaughtException', handleShutdownException)
 
-  logger.info('App quitting, cleaning up services')
+  // Last resort: a step that never settles must not leave the app un-quittable (the
+  // guard blocks every later quit). Not unref'd.
+  armLastResortExit(() => app.exit(0))
+  let launcherDone: Promise<void> = Promise.resolve()
 
-  // Priority: lock release runs first and alone, so the next launch can open
-  // the project without waiting for heartbeat staleness — but bounded, so a
-  // disposer that never settles cannot strand the process short of app.exit(0).
-  await disposeWithin(
-    'projectLockService.dispose()',
-    () => projectLockService.dispose(),
-    LOCK_DISPOSE_TIMEOUT_MS
+  return runQuitSequence(
+    [
+      () => {
+        // Windows (#305): a hidden helper (started by a short launcher, so it outlives us)
+        // that force-ends us if teardown hangs and then
+        // ends every console host, terminal shell and process they started that is still
+        // running. Started FIRST so a main thread that blocks in a disposer is still
+        // force-ended, and outside the dispose race so it always runs. The quit moment it
+        // records is the start of the shutdown; no terminal is created after it. What it
+        // saw and ended is written to QUIT_TRACE_FILE in the log folder.
+        terminalService.beginShutdown()
+        const quitHelper = startConptyHostReaper({
+          shells: terminalService.getLiveShells(),
+          tracePath: join(loggingService.getLogsDir(), QUIT_TRACE_FILE),
+          treeKillSkipped: terminalService.treeKillSkipped()
+        })
+        launcherDone = quitHelper.launcherDone
+        logger.info('App quitting, cleaning up services', {
+          quitHelperStarted: quitHelper.started,
+          quitTrace: QUIT_TRACE_FILE
+        })
+      },
+      // Priority: lock release runs first and alone, so the next launch can open
+      // the project without waiting for heartbeat staleness — but bounded, so a
+      // disposer that never settles cannot strand the process short of app.exit(0).
+      () =>
+        disposeWithin(
+          'projectLockService.dispose()',
+          () => projectLockService.dispose(),
+          LOCK_DISPOSE_TIMEOUT_MS
+        ),
+      // Best-effort: the remaining disposers run together, bounded by the same
+      // helper the lock release uses — so the timer is cleared on both branches and
+      // a timeout leaves a log line instead of passing silently.
+      // `Promise.allSettled` swallows individual failures so one bad disposer
+      // can't cancel the others.
+      () =>
+        disposeWithin(
+          'best-effort disposers',
+          async () => {
+            await Promise.allSettled([
+              fileWatcherService.dispose(),
+              directoryWatcherService.dispose(),
+              terminalService.dispose(),
+              claudeStatusHandlers ? claudeStatusHandlers.dispose() : Promise.resolve(),
+              previewHandlers ? previewHandlers.dispose() : Promise.resolve(),
+              gitWatcherService.dispose(),
+              gitStatusService.dispose(),
+              // Abort an in-flight model download so its temp file is removed now.
+              whisperModelManager.dispose()
+            ])
+          },
+          SHUTDOWN_TIMEOUT_MS
+        ),
+      // Sync disposer — always runs after the race
+      () => {
+        gitPollingService.dispose()
+        // electron-log writes synchronously, so this line is on disk before the process exits
+        logger.info('App quit: disposers done, exiting')
+      },
+      // Last: the quit helper's launcher is inside libuv's kill-on-close job until it has
+      // started the helper, so wait for it (bounded; it is usually long done by now). Only
+      // the launcher is waited for, never the helper (#305)
+      async () => {
+        const { settled, waitedMs } = await waitBounded(launcherDone, LAUNCHER_WAIT_MS)
+        logger.info('App quit: quit helper launcher wait', { settled, waitedMs })
+      }
+    ],
+    () => app.exit(0),
+    (error) =>
+      logger.error('App quit: a shutdown step threw', error instanceof Error ? error : undefined, {
+        error: error instanceof Error ? error.message : String(error)
+      })
   )
-
-  // Best-effort: the remaining disposers run together, bounded by the same
-  // helper the lock release uses — so the timer is cleared on both branches and
-  // a timeout leaves a log line instead of passing silently.
-  // `Promise.allSettled` swallows individual failures so one bad disposer
-  // can't cancel the others.
-  await disposeWithin(
-    'best-effort disposers',
-    async () => {
-      await Promise.allSettled([
-        fileWatcherService.dispose(),
-        directoryWatcherService.dispose(),
-        terminalService.dispose(),
-        claudeStatusHandlers ? claudeStatusHandlers.dispose() : Promise.resolve(),
-        previewHandlers ? previewHandlers.dispose() : Promise.resolve(),
-        gitWatcherService.dispose(),
-        gitStatusService.dispose()
-      ])
-    },
-    SHUTDOWN_TIMEOUT_MS
-  )
-
-  // Sync disposer — always runs after the race
-  gitPollingService.dispose()
-
-  app.exit(0)
 })
 
 // In this file you can include the rest of your app's specific main process

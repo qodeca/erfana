@@ -1,0 +1,19 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<!--
+  Part 2 corpus (P2-AC4, frame links): the top page. Its frame shows
+  frame-nav-b.html. Following a link inside the frame changes only the frame:
+  this title, the tab and Back stay as they are. A link inside the frame to a
+  remote site is refused and listed by scheme and host only (https://example.com).
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Frame links -FRAMENAV-</title>
+  </head>
+  <body>
+    <h1>Frame links</h1>
+    <iframe id="nav-frame" title="link frame" src="frame-nav-b.html" width="480" height="220"></iframe>
+  </body>
+</html>

@@ -49,7 +49,7 @@ export function ActivityBar({ side, activePanel, onPanelClick, projectPath }: Ac
       {side === 'left' && (
         <div
           className="activity-bar-settings-btn"
-          onClick={openSettings}
+          onClick={() => openSettings()}
           title="Settings"
           role="button"
           aria-label="Settings"

@@ -5,6 +5,7 @@ import { Info } from 'lucide-react'
 import { BaseDialog } from './BaseDialog'
 import { CharacterCount } from '../shared'
 import { TextareaContextMenu } from '../ContextMenu/TextareaContextMenu'
+import { isKeyboardMenuEcho, openMenuFromKey } from '../ContextMenu/contextMenuKey'
 import { useTextareaClipboard } from '../../hooks/useTextareaClipboard'
 import { validateFileSystemName, ValidationErrorCode } from '../../utils/fileValidation'
 
@@ -163,9 +164,22 @@ export function FileSystemDialog({
   // Context menu handlers
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
+    // The Windows Menu-key echo of a menu the keyboard already opened (#90).
+    if (isKeyboardMenuEcho()) return
     setContextMenu({ x: e.clientX, y: e.clientY })
     handleSelect()
   }, [handleSelect])
+
+  // Shift+F10 / the Menu key open the same menu under the field (#90).
+  const handleMenuKey = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      openMenuFromKey(e, (anchor) => {
+        setContextMenu(anchor)
+        handleSelect()
+      })
+    },
+    [handleSelect]
+  )
 
   const handleCloseContextMenu = useCallback(() => {
     setContextMenu(null)
@@ -223,7 +237,12 @@ export function FileSystemDialog({
               value={inputValue}
               onChange={handleChange}
               onKeyDown={handleKeyDown}
+              onKeyDownCapture={handleMenuKey}
               onContextMenu={handleContextMenu}
+              /* deviates: docs/design-system/system/components/menu/index.html — aria-haspopup
+                 only: ARIA does not allow aria-expanded on a textbox. See the
+                 card's Exceptions. */
+              aria-haspopup="menu"
               onSelect={handleSelect}
               placeholder={inputPlaceholder}
               maxLength={255}

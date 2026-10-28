@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { ipcMain, WebContents } from 'electron'
+import { WebContents } from 'electron'
 import { fileWatcherService } from '../services/FileWatcherService'
 import { logger } from '../services/LoggingService'
+import { registerHandle } from './registry'
 
 export function registerFileWatcherHandlers(): void {
   const getErrorMessage = (error: unknown): string =>
@@ -10,7 +11,7 @@ export function registerFileWatcherHandlers(): void {
   /**
    * Start watching a file
    */
-  ipcMain.handle('file-watch:start', async (event, filePath: string) => {
+  registerHandle('file-watch:start', async (event, filePath: string) => {
     try {
       // Validate input
       if (!filePath || typeof filePath !== 'string') {
@@ -30,7 +31,7 @@ export function registerFileWatcherHandlers(): void {
   /**
    * Stop watching a file
    */
-  ipcMain.handle('file-watch:stop', async (event, filePath: string) => {
+  registerHandle('file-watch:stop', async (event, filePath: string) => {
     try {
       // Validate input
       if (!filePath || typeof filePath !== 'string') {
@@ -50,7 +51,7 @@ export function registerFileWatcherHandlers(): void {
   /**
    * Stop watching all files for this window
    */
-  ipcMain.handle('file-watch:stopAll', async (event) => {
+  registerHandle('file-watch:stopAll', async (event) => {
     try {
       const webContents = event.sender as WebContents
       await fileWatcherService.unwatchAll(webContents)
@@ -65,7 +66,7 @@ export function registerFileWatcherHandlers(): void {
   /**
    * Pause watching a file (during save operations)
    */
-  ipcMain.handle('file-watch:pause', async (_event, filePath: string) => {
+  registerHandle('file-watch:pause', async (_event, filePath: string) => {
     try {
       // Validate input
       if (!filePath || typeof filePath !== 'string') {
@@ -84,7 +85,7 @@ export function registerFileWatcherHandlers(): void {
   /**
    * Resume watching a file (after save completes)
    */
-  ipcMain.handle('file-watch:resume', async (_event, filePath: string) => {
+  registerHandle('file-watch:resume', async (_event, filePath: string) => {
     try {
       // Validate input
       if (!filePath || typeof filePath !== 'string') {
@@ -103,7 +104,7 @@ export function registerFileWatcherHandlers(): void {
   /**
    * Get watch statistics (for debugging)
    */
-  ipcMain.handle('file-watch:stats', async () => {
+  registerHandle('file-watch:stats', async () => {
     try {
       const stats = fileWatcherService.getStats()
       return { success: true, stats }

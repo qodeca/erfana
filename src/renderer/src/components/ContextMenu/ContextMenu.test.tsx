@@ -11,6 +11,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ContextMenu, ContextMenuItem } from './ContextMenu'
+import { BaseDialog } from '../Dialog/BaseDialog'
 import { TEST_IDS } from '../../constants/testids'
 
 describe('ContextMenu', () => {
@@ -108,6 +109,64 @@ describe('ContextMenu', () => {
     fireEvent.keyDown(document, { key: 'Escape' })
 
     expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  it('Escape closes only the menu when it is open over a dialog (#229)', () => {
+    const onClose = vi.fn()
+    const dialogClose = vi.fn()
+    // jsdom loads no stylesheet; give the menu's layering token its value.
+    document.documentElement.style.setProperty('--z-context-menu', '100000')
+    render(
+      <>
+        <BaseDialog isOpen onClose={dialogClose} zIndex={10001}>
+          <button>Dialog button</button>
+        </BaseDialog>
+        <ContextMenu x={100} y={200} items={defaultItems} onClose={onClose} />
+      </>
+    )
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    expect(onClose).toHaveBeenCalledOnce()
+    expect(dialogClose).not.toHaveBeenCalled()
+    document.documentElement.style.removeProperty('--z-context-menu')
+  })
+
+  it('leaves the Tab trap of a dialog beneath it working', () => {
+    // A menu is not modal: opened inside a trapping dialog it must not make
+    // that dialog think something modal is stacked above it.
+    document.documentElement.style.setProperty('--z-context-menu', '100000')
+    render(
+      <>
+        <BaseDialog isOpen onClose={vi.fn()} zIndex={10001} trapFocus>
+          <button data-testid="first">First</button>
+          <button data-testid="last">Last</button>
+        </BaseDialog>
+        <ContextMenu x={100} y={200} items={defaultItems} onClose={vi.fn()} />
+      </>
+    )
+
+    screen.getByTestId('last').focus()
+    const notPrevented = fireEvent.keyDown(document, { key: 'Tab' })
+
+    expect(notPrevented).toBe(false)
+    expect(document.activeElement).toBe(screen.getByTestId('first'))
+    document.documentElement.style.removeProperty('--z-context-menu')
+  })
+
+  it('keeps Escape from reaching the control underneath the menu', () => {
+    // A terminal context menu sits over xterm's textarea: an Escape that leaks
+    // through would interrupt the agent running in the terminal.
+    const underneath = vi.fn()
+    const input = document.createElement('textarea')
+    document.body.appendChild(input)
+    input.addEventListener('keydown', underneath)
+    renderMenu()
+
+    fireEvent.keyDown(input, { key: 'Escape' })
+
+    expect(underneath).not.toHaveBeenCalled()
+    input.remove()
   })
 
   it('clicking outside closes the menu', () => {

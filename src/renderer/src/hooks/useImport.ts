@@ -31,6 +31,11 @@ import { scheduleScrollIfNeeded } from '../utils/promptScrollScheduler.logic'
 import { logger } from '../utils/logger'
 import { useTranscriptionStore } from '../stores/useTranscriptionStore'
 import { useDocumentImportStore } from '../stores/useDocumentImportStore'
+import { useSettingsStore } from '../stores/useSettingsStore'
+import type { ToolState, UnsafeTool } from '../../../shared/ipc/import-schema'
+import { untrustedToolMessage } from '../../../shared/errors'
+import { importGateway } from '../services/importGateway'
+import { transcriptionGateway } from '../services/transcriptionGateway'
 
 /** Size threshold for confirmation dialog (in MB) */
 const LARGE_FILE_THRESHOLD_MB = IMPORT.SIZE_WARNING_THRESHOLD / BYTES_PER_MB
@@ -103,7 +108,7 @@ interface UseImportReturn {
  */
 export function useImport(): UseImportReturn {
   const [isImporting, setIsImporting] = useState(false)
-  const { showConfirm, showAlert } = useDialog()
+  const { showConfirm } = useDialog()
 
   // Terminal portal context for scroll scheduling (issue #52)
   const terminalPortal = useTerminalPortalOptional()
@@ -196,22 +201,15 @@ export function useImport(): UseImportReturn {
 
     // Check for files that need missing dependencies (e.g., dropped before detection completes)
     const depState = useDocumentImportStore.getState()
+    // Images need no external tool (#250): LiteParse reads them natively.
     const missingDepFiles = filesToProcess.filter(f => {
       const ext = f.name.split('.').pop()?.toLowerCase() || ''
-      if ((DOCUMENT_IMPORT.LIBREOFFICE_EXTENSIONS as readonly string[]).includes(ext) && !depState.hasLibreOffice) return true
-      if ((DOCUMENT_IMPORT.IMAGEMAGICK_EXTENSIONS as readonly string[]).includes(ext) && !depState.hasImageMagick) return true
-      return false
+      return (DOCUMENT_IMPORT.LIBREOFFICE_EXTENSIONS as readonly string[]).includes(ext) && !depState.hasLibreOffice
     })
 
     if (missingDepFiles.length > 0) {
       const ext = missingDepFiles[0].name.split('.').pop()?.toLowerCase() || ''
-      const needsLibreOffice = (DOCUMENT_IMPORT.LIBREOFFICE_EXTENSIONS as readonly string[]).includes(ext)
-      await showAlert({
-        title: needsLibreOffice ? 'LibreOffice required' : 'ImageMagick required',
-        message: needsLibreOffice
-          ? `Importing .${ext} files requires LibreOffice.\n\nInstall LibreOffice from https://www.libreoffice.org/download and restart the application.`
-          : `Importing .${ext} files requires ImageMagick.\n\nInstall via Homebrew: brew install imagemagick\nor download from https://imagemagick.org/script/download.php`
-      })
+      await offerImportTools(showConfirm, ext, depState.libreOfficeState, depState.libreOfficeUnsafe)
       filesToProcess = filesToProcess.filter(f => !missingDepFiles.includes(f))
       if (filesToProcess.length === 0) {
         return { successCount: 0, failCount: 0, skippedCount: missingDepFiles.length + mediaFiles.length + documentFiles.length, outputPaths: [], failures: [] }
@@ -248,7 +246,7 @@ export function useImport(): UseImportReturn {
 
         // Process import
         try {
-          const result = await window.api.import.process(file.path)
+          const result = await importGateway.process(file.path)
 
           if (result.success) {
             if (!result.outputPath) {
@@ -322,7 +320,7 @@ export function useImport(): UseImportReturn {
     // 1. Select file via native file dialog
     let selectedFile: { path: string; name: string; sizeInMB: number; extension: string } | null
     try {
-      selectedFile = await window.api.import.selectFile()
+      selectedFile = await importGateway.selectFile()
     } catch (error) {
       logger.error('Failed to open file dialog:', error instanceof Error ? error : undefined)
       showErrorToast('File selection failed', 'Could not open file selection dialog')
@@ -338,7 +336,7 @@ export function useImport(): UseImportReturn {
     if (isAudioFile(selectedFile.name)) {
       // Validate audio file before opening dialog (spec FR-018)
       try {
-        const validation = await window.api.transcription.validate(selectedFile.path)
+        const validation = await transcriptionGateway.validate(selectedFile.path)
         if (!validation.valid) {
           showErrorToast(
             'Invalid audio file',
@@ -378,18 +376,7 @@ export function useImport(): UseImportReturn {
     const depState = useDocumentImportStore.getState()
 
     if ((DOCUMENT_IMPORT.LIBREOFFICE_EXTENSIONS as readonly string[]).includes(ext) && !depState.hasLibreOffice) {
-      await showAlert({
-        title: 'LibreOffice required',
-        message: `Importing .${ext} files requires LibreOffice.\n\nInstall LibreOffice from https://www.libreoffice.org/download and restart the application.`
-      })
-      return null
-    }
-
-    if ((DOCUMENT_IMPORT.IMAGEMAGICK_EXTENSIONS as readonly string[]).includes(ext) && !depState.hasImageMagick) {
-      await showAlert({
-        title: 'ImageMagick required',
-        message: `Importing .${ext} files requires ImageMagick.\n\nInstall via Homebrew: brew install imagemagick\nor download from https://imagemagick.org/script/download.php`
-      })
+      await offerImportTools(showConfirm, ext, depState.libreOfficeState, depState.libreOfficeUnsafe)
       return null
     }
 
@@ -405,12 +392,61 @@ export function useImport(): UseImportReturn {
     const result = await processFiles([fileInfo])
 
     return result.outputPaths[0] ?? null
-  }, [processFiles, showAlert])
+  }, [processFiles, showConfirm])
 
   return {
     isImporting,
     importFile,
     processFiles
+  }
+}
+
+/**
+ * The refusal shown when an Office file cannot be imported (#250): LibreOffice
+ * was not found, or the copy Erfana would run is in an unsafe location. It
+ * points at Settings → Import tools, which has the install hint for this
+ * platform and a "Check again" that needs no restart.
+ */
+export function missingToolMessage(ext: string, state: ToolState | null, unsafe: UnsafeTool = null): string {
+  if (state === 'unsafe' && unsafe) {
+    // Same wording as the conversion refusal in main and the Settings hint.
+    return (
+      `Importing .${ext} files needs LibreOffice. ${untrustedToolMessage(unsafe.tool, unsafe.reason)}\n\n` +
+      `Import tools in Settings has details.`
+    )
+  }
+  if (state === 'unsafe') {
+    return (
+      `Importing .${ext} files needs LibreOffice. A copy was found, but Erfana will not run it: it is in the open ` +
+      `project, a temporary folder or a network share, or comes from a relative PATH entry.\n\n` +
+      `Import tools in Settings has details.`
+    )
+  }
+  return (
+    `Importing .${ext} files needs LibreOffice, which was not found on this computer.\n\n` +
+    `Import tools in Settings shows how to install it. After installing, choose Check again there.`
+  )
+}
+
+/**
+ * Refuse the import and offer to open Settings → Import tools (#250).
+ * Confirm opens the section with focus on its heading; Close just closes.
+ */
+async function offerImportTools(
+  showConfirm: ReturnType<typeof useDialog>['showConfirm'],
+  ext: string,
+  state: ToolState | null,
+  unsafe: UnsafeTool
+): Promise<void> {
+  const open = await showConfirm({
+    title: state === 'unsafe' ? 'LibreOffice in an unsafe location' : 'LibreOffice required',
+    message: missingToolMessage(ext, state, unsafe),
+    confirmLabel: 'Open import tools',
+    cancelLabel: 'Close',
+    danger: false
+  })
+  if (open) {
+    useSettingsStore.getState().openSettings({ section: 'import-tools' })
   }
 }
 

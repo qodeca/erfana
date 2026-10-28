@@ -24,19 +24,31 @@
  */
 import {
   PreviewFailureListPayloadSchema,
+  PreviewAllowlistChangedPayloadSchema,
   PreviewHostBlockedPayloadSchema,
+  PreviewVisibilityAppliedPayloadSchema,
   PreviewFindResultSchema,
   PreviewStillFrameSchema,
+  PreviewBackdropPayloadSchema,
+  PreviewBoundsAppliedPayloadSchema,
   PreviewLoadStatePayloadSchema,
   PreviewForwardedShortcutSchema,
+  PreviewOpenFileRequestedSchema,
   type PreviewFailure
 } from '../../../shared/ipc/preview-schema'
+import {
+  PreviewPageChangedPayloadSchema,
+  PreviewResizeHoldPayloadSchema
+} from '../../../shared/ipc/preview-navigation-schema'
+import type { PreviewBlockedKind } from '../../../shared/ipc/previewBlockedKind'
 import { PreviewEvents } from '../../../shared/ipc/preview-channels'
 import { PREVIEW_FORWARDED_SHORTCUTS } from '../../services/preview/previewInputForward'
 import type {
   PreviewEmitters,
   PreviewFailureInput,
   PreviewFindResult,
+  PreviewLinkDisposition,
+  PreviewPageChange,
   PreviewStillFrame
 } from '../../../shared/ipc/preview-types'
 import { logger } from '../../services/LoggingService'
@@ -48,6 +60,24 @@ import { logger } from '../../services/LoggingService'
 export interface PreviewEmitTarget {
   isDestroyed(): boolean
   send(channel: string, payload: unknown): void
+  /**
+   * `BrowserWindow.id` of the window this target belongs to, when known.
+   *
+   * Most preview events carry a `panelId` and are harmless to broadcast, but
+   * `openFileRequested` ACTS: broadcasting it would make every window open a
+   * tab for one window's link click (sd-074b §4.9). Targets without an id are
+   * always included, so test fakes and any future non-window target keep
+   * receiving.
+   */
+  readonly windowId?: number
+  /**
+   * Give this window's own contents native keyboard focus, only while the
+   * window is the OS key window (`focusHostWhileKey`). The comment emitters
+   * call it before `preview:commentDraftOpened`, whose menu or window opens
+   * while the page still holds focus. Absent on test fakes and non-window
+   * targets: then nothing is focused.
+   */
+  readonly focusHost?: () => boolean
 }
 
 /** Injectable dependencies (all but `resolveTargets` defaulted). */
@@ -69,6 +99,10 @@ export interface PreviewEmittersDeps {
  * a `dispose` that cancels any pending coalesced flush.
  */
 export interface PreviewEmitterBundle extends PreviewEmitters {
+  /** Required here: the real bundle always tells the renderer about a resize hold (issue #124). */
+  resizeHold(panelId: string, held: boolean): void
+  /** Required here: the real bundle always tells the renderer a tab's page changed (issue #124). */
+  pageChanged(panelId: string, change: PreviewPageChange): void
   /** Forward one of the four enumerated accelerators (§1.9) to the renderer. */
   forwardedShortcut(panelId: string, key: string): void
   /** Cancel a pending coalesced flush; drop buffered snapshots without sending. */
@@ -95,11 +129,15 @@ export function createPreviewEmitters(deps: PreviewEmittersDeps): PreviewEmitter
   /** Monotonic id source for synthesised failure entries (schema requires `id`). */
   let failureSeq = 0
 
-  const send = (channel: string, payload: unknown): void => {
+  const send = (channel: string, payload: unknown, windowId?: number): void => {
     for (const target of deps.resolveTargets()) {
-      if (!target.isDestroyed()) {
-        target.send(channel, payload)
+      if (target.isDestroyed()) continue
+      // Scoped send: skip windows other than the requested one. A target that
+      // reports no id is never skipped.
+      if (windowId !== undefined && target.windowId !== undefined && target.windowId !== windowId) {
+        continue
       }
+      target.send(channel, payload)
     }
   }
 
@@ -107,7 +145,8 @@ export function createPreviewEmitters(deps: PreviewEmittersDeps): PreviewEmitter
   const validateAndSend = (
     channel: string,
     schema: { safeParse: (v: unknown) => { success: boolean; error?: { message: string } } },
-    payload: unknown
+    payload: unknown,
+    windowId?: number
   ): void => {
     const parsed = schema.safeParse(payload)
     if (!parsed.success) {
@@ -116,7 +155,7 @@ export function createPreviewEmitters(deps: PreviewEmittersDeps): PreviewEmitter
       })
       return
     }
-    send(channel, payload)
+    send(channel, payload, windowId)
   }
 
   const toFailure = (input: PreviewFailureInput): PreviewFailure => ({
@@ -163,12 +202,34 @@ export function createPreviewEmitters(deps: PreviewEmittersDeps): PreviewEmitter
       }
     },
 
-    hostBlocked(panelId: string, host: string, approvable: boolean): void {
+    hostBlocked(
+      panelId: string,
+      host: string,
+      approvable: boolean,
+      kinds: readonly PreviewBlockedKind[],
+      truncated: boolean
+    ): void {
       validateAndSend(PreviewEvents.HOST_BLOCKED, PreviewHostBlockedPayloadSchema, {
         panelId,
         host,
-        approvable
+        approvable,
+        kinds: [...kinds],
+        truncated
       })
+    },
+
+    /*
+     * NOT coalesced, unlike `failuresChanged`. This fires at most twice per view
+     * — once when the view is installed, once per approval — so there is nothing
+     * to batch, and an approval's reload depends on the renderer seeing the new
+     * set promptly.
+     */
+    allowlistChanged(panelId: string, hosts: readonly string[]): void {
+      validateAndSend(
+        PreviewEvents.ALLOWLIST_CHANGED,
+        PreviewAllowlistChangedPayloadSchema,
+        { panelId, hosts: [...hosts] }
+      )
     },
 
     findResult(r: PreviewFindResult): void {
@@ -186,13 +247,19 @@ export function createPreviewEmitters(deps: PreviewEmittersDeps): PreviewEmitter
         dataUrl: frame.dataUrl,
         width: frame.width,
         height: frame.height,
-        capturedAt: frame.capturedAt
+        capturedAt: frame.capturedAt,
+        // Issue #124: the CSS size the still is drawn at, and whether real input
+        // made it stale. Each travels only when present, so a frame without them
+        // is the payload it always was.
+        ...(frame.cssWidth !== undefined ? { cssWidth: frame.cssWidth } : {}),
+        ...(frame.cssHeight !== undefined ? { cssHeight: frame.cssHeight } : {}),
+        ...(frame.stale === true ? { stale: true } : {})
       })
     },
 
     loadStateChanged(
       panelId: string,
-      state: 'idle' | 'loading' | 'ready' | 'failed',
+      state: 'idle' | 'loading' | 'ready' | 'failed' | 'suspended',
       dropped: number
     ): void {
       validateAndSend(PreviewEvents.LOAD_STATE_CHANGED, PreviewLoadStatePayloadSchema, {
@@ -200,6 +267,80 @@ export function createPreviewEmitters(deps: PreviewEmittersDeps): PreviewEmitter
         state,
         dropped
       })
+    },
+
+    backdropChanged(panelId: string, color: string): void {
+      validateAndSend(PreviewEvents.BACKDROP_CHANGED, PreviewBackdropPayloadSchema, {
+        panelId,
+        color
+      })
+    },
+
+    /*
+     * NOT coalesced, for the same reason `boundsApplied` is not: a renderer
+     * waiting for a specific transition must not have it collapsed away.
+     */
+    visibilityApplied(panelId: string, visible: boolean): void {
+      validateAndSend(
+        PreviewEvents.VISIBILITY_APPLIED,
+        PreviewVisibilityAppliedPayloadSchema,
+        { panelId, visible }
+      )
+    },
+
+    boundsApplied(panelId: string, seq: number): void {
+      // Deliberately NOT coalesced. It is sent only for a push that asked for
+      // it, which is a user-initiated transition, not the per-frame pump; and a
+      // renderer waiting on a specific `seq` must not have it collapsed away.
+      validateAndSend(PreviewEvents.BOUNDS_APPLIED, PreviewBoundsAppliedPayloadSchema, {
+        panelId,
+        seq
+      })
+    },
+
+    /*
+     * NOT coalesced, like `visibilityApplied`: the renderer answers every end of
+     * a hold with a settled push, so no transition may be collapsed away.
+     */
+    resizeHold(panelId: string, held: boolean): void {
+      validateAndSend(PreviewEvents.RESIZE_HOLD, PreviewResizeHoldPayloadSchema, { panelId, held })
+    },
+
+    /*
+     * NOT coalesced: the renderer matches each one to the move it announced
+     * (issue #124, part 3 §3.8), so none may be collapsed away. A page drives
+     * the in-page ones, but Chromium throttles same-document navigations, and
+     * each is one small message.
+     */
+    pageChanged(panelId: string, change: PreviewPageChange): void {
+      validateAndSend(PreviewEvents.PAGE_CHANGED, PreviewPageChangedPayloadSchema, {
+        panelId,
+        filePath: change.filePath,
+        anchor: change.anchor,
+        sameDocument: change.sameDocument,
+        canGoBack: change.canGoBack,
+        canGoForward: change.canGoForward,
+        backTarget: change.backTarget,
+        forwardTarget: change.forwardTarget,
+        generation: change.generation,
+        failed: change.failed
+      })
+    },
+
+    openFileRequested(
+      sourcePanelId: string,
+      filePath: string,
+      anchor: string | null,
+      windowId?: number,
+      disposition?: PreviewLinkDisposition
+    ): void {
+      validateAndSend(
+        PreviewEvents.OPEN_FILE_REQUESTED,
+        PreviewOpenFileRequestedSchema,
+        // Absent means `new-tab` in the contract, so it travels only when set.
+        { sourcePanelId, filePath, anchor, ...(disposition !== undefined ? { disposition } : {}) },
+        windowId
+      )
     },
 
     forwardedShortcut(panelId: string, key: string): void {

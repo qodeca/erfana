@@ -8,12 +8,14 @@
  * disclosure — never as HTML, never in the heading.
  *
  * RESTART SAFETY INVARIANT. Relaunching after a crash is only safe because
- * Erfana does NOT auto-restore the last project on start-up — see the
- * "Load last project on mount - DISABLED" effect in
- * `src/renderer/src/hooks/useProjectManagement.ts:75`. Were that ever re-enabled,
+ * Erfana does NOT auto-restore the last project on start-up — nothing in the
+ * renderer asks for it (the `file:getLastProjectPath` channel is gone), and the
+ * mount effect in `src/renderer/src/hooks/useProjectManagement.ts` opens
+ * nothing. Were restore ever re-added,
  * restarting after a crash *caused by* a project would reopen that project and
  * crash again, in a loop. Rather than depend on the coupling, Restart calls
- * `window.api.file.closeProject()` best-effort (clearing `lastProjectPath`) before
+ * `fileGateway.closeProject()` best-effort (which forgets the saved last
+ * project path) before
  * `relaunchApp()`. That call is BOUNDED, not merely wrapped: after a crash the
  * main process may never answer, and a rejection, a hang, and a success all have
  * to end at the relaunch — so it races a
@@ -34,7 +36,7 @@
  * - Restart pending uses `aria-disabled` + an early-return handler, NEVER the
  *   `disabled` attribute (Chromium blurs a control the moment it is disabled).
  *
- * @see docs/design/design-issue-60.md §2.3, §2.7
+ * @see docs/designs/design-issue-60.md §2.3, §2.7
  * @module components/RootErrorBoundary/RootErrorFallback
  */
 
@@ -44,6 +46,10 @@ import { TEST_IDS } from '../../constants/testids'
 import { textClipboard } from '../../services/textClipboard'
 import { formatErrorReport, type ErrorDetails } from './errorDetails'
 import './RootErrorBoundary.css'
+import { fileGateway } from '../../services/fileGateway'
+import { loggingGateway } from '../../services/loggingGateway'
+import { systemGateway } from '../../services/systemGateway'
+import { hasBridgeMethod } from '../../services/bridgePresence'
 
 /** Copy deck (design §2.3). */
 const HEADING = 'Erfana stopped unexpectedly.'
@@ -99,7 +105,7 @@ const DEGRADED_INSTRUCTION =
 /**
  * Where `LoggingService` writes, spelled as platform-neutral prose.
  *
- * Degraded mode is exactly the case where `window.api.logging.getLogsDir()`
+ * Degraded mode is exactly the case where `loggingGateway.getLogsDir()`
  * cannot be called, so neither the real path nor the platform can be read from
  * the bridge. `~/…` would be wrong on Windows and `process.platform` is
  * `undefined` under the sandbox, so the folder is described instead of spelled
@@ -127,20 +133,7 @@ export interface RootErrorFallbackProps {
 }
 
 /**
- * Is a bridge method callable right now?
- *
- * Per-action rather than one "is the bridge present" flag: a partially exposed
- * `window.api` must disable only the affected action, not the whole screen.
- *
- * @param method - The candidate bridge method, read through optional chaining
- * @returns `true` when it can be invoked
- */
-function isCallable(method: unknown): boolean {
-  return typeof method === 'function'
-}
-
-/**
- * Clear `lastProjectPath` before a relaunch, without ever blocking it.
+ * Forget the saved last project path before a relaunch, without ever blocking it.
  *
  * Three outcomes, one behaviour. A resolution is the happy path; a rejection is
  * ignored (the restart-safety invariant in the module docblock explains why the
@@ -156,7 +149,7 @@ async function closeProjectBestEffort(): Promise<void> {
   // a broken bridge is caught here too.
   const closed = (async () => {
     try {
-      await window.api?.file?.closeProject?.()
+      await fileGateway.closeProject()
     } catch {
       /* intentionally ignored — see the restart-safety invariant above */
     }
@@ -203,10 +196,12 @@ export function RootErrorFallback({ details }: RootErrorFallbackProps) {
 
   // Capability probes. Read per render rather than memoised: the bridge is
   // injected before first paint and never changes, and a stale memo here would
-  // be a dead button on the one screen that must not have any.
-  const canRestart = isCallable(window.api?.system?.relaunchApp)
-  const canCopy = isCallable(window.api?.clipboard?.writeText)
-  const canOpenLogs = isCallable(window.api?.logging?.openLogsFolder)
+  // be a dead button on the one screen that must not have any. Per action
+  // rather than one "is the bridge present" flag: a partially exposed
+  // `window.api` must disable only the affected action, not the whole screen.
+  const canRestart = hasBridgeMethod('system', 'relaunchApp')
+  const canCopy = hasBridgeMethod('clipboard', 'writeText')
+  const canOpenLogs = hasBridgeMethod('logging', 'openLogsFolder')
   const isDegraded = !canRestart && !canCopy && !canOpenLogs
 
   // The description branches on CAPABILITY, never on taste: promising that
@@ -236,6 +231,7 @@ export function RootErrorFallback({ details }: RootErrorFallbackProps) {
 
   useEffect(() => {
     if (announcement.seq === 0) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the second commit is the point: a live region speaks only when its content mutates, so announce() empties it and this fills it one commit later
     setStatus(announcement.text)
   }, [announcement])
 
@@ -270,7 +266,7 @@ export function RootErrorFallback({ details }: RootErrorFallbackProps) {
     await closeProjectBestEffort()
 
     try {
-      await window.api.system.relaunchApp()
+      await systemGateway.relaunchApp()
     } catch {
       clearStalledTimer()
       setIsRestarting(false)
@@ -291,7 +287,7 @@ export function RootErrorFallback({ details }: RootErrorFallbackProps) {
   const handleOpenLogs = useCallback(async () => {
     try {
       // Resolves to '' on success, or an error string on failure.
-      const failure = await window.api.logging.openLogsFolder()
+      const failure = await loggingGateway.openLogsFolder()
       announce(failure ? STATUS_LOGS_FAILED : STATUS_LOGS_OPENED)
     } catch {
       announce(STATUS_LOGS_FAILED)

@@ -40,10 +40,12 @@ import {
 } from './chatBubble.logic'
 import { formatZoomLevel } from './diagramViewer.logic'
 import { TextareaContextMenu } from '../../ContextMenu/TextareaContextMenu'
+import { isKeyboardMenuEcho, openMenuFromKey } from '../../ContextMenu/contextMenuKey'
 import { useTextareaClipboard } from '../../../hooks/useTextareaClipboard'
 import { CharacterCount } from '../../shared'
 import { scheduleScrollIfNeeded } from '../../../utils/promptScrollScheduler.logic'
 import { logger } from '../../../utils/logger'
+import { formatShortcut } from '../../../utils/shortcutLabel'
 import { TEST_IDS } from '../../../constants/testids'
 import './ChatBubble.css'
 
@@ -97,10 +99,14 @@ export function ChatBubble({
   const [isExpanded, setIsExpanded] = useState(false)
   const [message, setMessage] = useState('')
   const [showTooltip, setShowTooltip] = useState(false)
-  const [textareaContextMenu, setTextareaContextMenu] = useState<{ x: number; y: number } | null>(null)
+  const [textareaContextMenu, setTextareaContextMenu] = useState<{
+    x: number
+    y: number
+    hasSelection: boolean
+  } | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
-  const terminalContainerRef = useRef<HTMLDivElement>(null)
+  const terminalContainerRef = useRef<HTMLDivElement | null>(null)
 
   // Resize state
   const isResizing = useRef(false)
@@ -340,11 +346,28 @@ export function ChatBubble({
     setIsExpanded(true)
   }
 
+  // Read when the menu opens, not during render: the selection lives in the
+  // DOM, and the menu takes focus, so it cannot change while the menu is open.
+  const hasTextSelection = useCallback(() => {
+    if (!textareaRef.current) return false
+    const textarea = textareaRef.current
+    return textarea.selectionStart !== textarea.selectionEnd
+  }, [])
+
   // Context menu handlers for textarea copy/paste (issue #37)
   const handleTextareaContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
-    setTextareaContextMenu({ x: e.clientX, y: e.clientY })
-  }, [])
+    // The Windows Menu-key echo of a menu the keyboard already opened (#90).
+    if (isKeyboardMenuEcho()) return
+    setTextareaContextMenu({ x: e.clientX, y: e.clientY, hasSelection: hasTextSelection() })
+  }, [hasTextSelection])
+
+  // Shift+F10 / the Menu key open the same menu under the field (#90).
+  const handleTextareaMenuKey = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    openMenuFromKey(e, (anchor) =>
+      setTextareaContextMenu({ ...anchor, hasSelection: hasTextSelection() })
+    )
+  }, [hasTextSelection])
 
   const handleCloseTextareaContextMenu = useCallback(() => {
     setTextareaContextMenu(null)
@@ -382,11 +405,21 @@ export function ChatBubble({
     [handleSubmit]
   )
 
-  const hasTextSelection = useCallback(() => {
-    if (!textareaRef.current) return false
-    const textarea = textareaRef.current
-    return textarea.selectionStart !== textarea.selectionEnd
-  }, [])
+  // The terminal portal target is shared with the portal context, which moves
+  // the live terminal into it. Re-created only when the context's ref object
+  // changes; React then detaches the old ref (null) and attaches the new one.
+  const diagramViewerContainerRef = portalContext?.diagramViewerContainerRef
+  /* eslint-disable react-hooks/immutability -- the portal context hands out a mutable ref object to be filled with this element; writing it from a ref callback is its intended use, the compiler just cannot see a context value is a ref */
+  const setTerminalContainer = useCallback(
+    (el: HTMLDivElement | null) => {
+      terminalContainerRef.current = el
+      if (diagramViewerContainerRef) {
+        ;(diagramViewerContainerRef as React.MutableRefObject<HTMLDivElement | null>).current = el
+      }
+    },
+    [diagramViewerContainerRef]
+  )
+  /* eslint-enable react-hooks/immutability */
 
   // Note: Panel closes via click-outside or Escape key (no header close button - issue #37)
 
@@ -539,14 +572,7 @@ export function ChatBubble({
           <div className="chat-panel-body">
             {/* Terminal container - portal target (context menu handled by TerminalPanel) */}
             <div
-              ref={(el) => {
-                // Store ref locally
-                (terminalContainerRef as React.MutableRefObject<HTMLDivElement | null>).current = el
-                // Also set the portal context ref
-                if (portalContext?.diagramViewerContainerRef) {
-                  (portalContext.diagramViewerContainerRef as React.MutableRefObject<HTMLDivElement | null>).current = el
-                }
-              }}
+              ref={setTerminalContainer}
               className="chat-terminal-container"
             />
 
@@ -558,7 +584,12 @@ export function ChatBubble({
                 value={message}
                 onChange={handleChange}
                 onKeyDown={handleKeyDown}
+                onKeyDownCapture={handleTextareaMenuKey}
                 onContextMenu={handleTextareaContextMenu}
+                /* deviates: docs/design-system/system/components/menu/index.html — aria-haspopup
+                   only: ARIA does not allow aria-expanded on a textbox. See the
+                   card's Exceptions. */
+                aria-haspopup="menu"
                 placeholder="Describe changes to this diagram..."
                 rows={3}
                 maxLength={CHAT_LIMITS.MAX_LENGTH}
@@ -586,7 +617,7 @@ export function ChatBubble({
                     aria-hidden={!showTooltip}
                   >
                     <div className="chat-tooltip-content">
-                      <kbd>Cmd/Ctrl+Enter</kbd> to send
+                      <kbd>{formatShortcut('Enter', { mod: true })}</kbd> to send
                       <br />
                       <kbd>Esc</kbd> to close
                     </div>
@@ -611,7 +642,7 @@ export function ChatBubble({
                     className="chat-send-btn"
                     onClick={handleSubmit}
                     disabled={!validation.canSubmit}
-                    title="Send (Cmd/Ctrl+Enter)"
+                    title={`Send (${formatShortcut('Enter', { mod: true })})`}
                     aria-label="Send message"
                     data-testid={TEST_IDS.CHAT_BTN_SEND}
                   >
@@ -629,7 +660,7 @@ export function ChatBubble({
         <TextareaContextMenu
           x={textareaContextMenu.x}
           y={textareaContextMenu.y}
-          hasSelection={hasTextSelection()}
+          hasSelection={textareaContextMenu.hasSelection}
           onCut={handleCutText}
           onCopy={handleCopyText}
           onPaste={handlePasteText}

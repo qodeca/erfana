@@ -1,0 +1,66 @@
+# LAUNCH THIS WITH WORKTREE **ON** (the composer default). The changelog is written and committed
+# on this task's own `xez/<id8>` branch and reaches `main` only through a pull request; the
+# primary checkout is never touched. Bringing the primary checkout up to the bump merge commit
+# afterwards is the separate `root-sync` workflow (Worktree OFF), by design — a root write cannot
+# share a run with a worktree write.
+#
+# EVERY WAIT LIVES IN THE LAST STEP. The engine kills any agent step that is not the last step of
+# its workflow at its configured timeout (default 30 minutes, issue #22). CI on the changelog PR, the Release run, npm and the
+# bot's bump PR together take longer than that, so the publish step (`handoff`) is the final
+# agent step: it is the only step that may block on remote state, and being last also keeps
+# XEZ:ASK live for every stop.
+#
+# `{{task}}` is the operator's one-line brief: `bump: patch` (or `minor` / `major`), optionally
+# `version: 0.11.2` and `dry-run: true`. No changelog brief: the `changelog` step derives the entry
+# from the PRs merged into main since the last release tag (see skills/xezar-release-changelog.md).
+name: release
+description: Write the changelog from merged PRs, gate it, merge the changelog PR, dispatch the manually authorized Release workflow and merge the bump PR — one task per release. Worktree ON.
+steps:
+  - id: kit
+    name: Snapshot the local project kit
+    command: 'bash "$(git rev-parse --path-format=absolute --git-common-dir)/../.xezar/checks/bootstrap.sh"'
+    resultScope: routine
+  - id: preflight
+    name: Verify worktree isolation
+    command: ".xezar/checks/worktree-preflight.sh"
+    resultScope: routine
+  - id: setup
+    name: Prepare the worktree
+    command: ".xezar/checks/worktree-setup.sh"
+    resultScope: routine
+  # THE MCP MUTATION GATE IS NOT HERE ANY MORE. It used to be the first check step, before
+  # anything was authored, and it is gone because a nearly four-hour measurement whose only
+  # repair — a stronger test — lives in somebody else's pull request must not stand between a
+  # finished, approved release and publication. Its first end-to-end exercise arrived at release
+  # time, which is when failure costs most: one release attempt died in the mutation runner's own
+  # dry run on a config mismatch and found zero product defects.
+  #
+  # **Its home is a nightly workflow of its own**, against the base branch, and a
+  # release does not wait on it. Do not add it back here. The gate itself is unchanged: same scope,
+  # the same break threshold this project's mutation config states.
+  - id: changelog
+    name: Write the changelog entry from merged PRs
+    prompt: "{{task}}"
+    skill: xezar-release-changelog
+  - id: readiness
+    name: Confirm the phase record is complete and nothing blocks
+    command: ".xezar/checks/worktree-preflight.sh --readiness"
+    resultScope: stage
+  - id: gates
+    name: Quality gates
+    command: ".xezar/checks/repo-gates.sh --fast --producer gates"
+    resultScope: stage
+    onFail:
+      retry: changelog
+      max: 2
+  - id: evidence
+    name: Seal the gate evidence
+    command: ".xezar/checks/worktree-preflight.sh --record-gate-evidence"
+    resultScope: stage
+  # The id is `handoff`, not `publish`: catalog-check.mjs' writing-workflow phase contract (#116)
+  # requires that id after `evidence`, and this step IS the handoff — it pushes the branch and
+  # opens the changelog PR — before it goes on to dispatch and merge.
+  - id: handoff
+    name: Publish — merge the changelog, dispatch Release, merge the bump PR
+    prompt: "Publish the release for: {{task}}"
+    skill: xezar-release-publish

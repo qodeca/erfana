@@ -5,11 +5,17 @@
  *
  * Every electron + collaborator surface is injected as a typed fake, so the §5(a)
  * sequence is verified with no real `Session`/`WebContentsView`.
+ *
+ * Split by topic (docs/windows/contributing.md § "Test-file split policy"):
+ * unwinding a partial construction is in `PreviewSessionFactory.unwind.test.ts`,
+ * partition recycling in `PreviewSessionFactory.partitionRecycling.test.ts`, and
+ * the shared fakes in `__test-helpers__/previewSessionFactoryMocks.ts`.
  */
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi, type Mock } from 'vitest'
+import { ErrorCode } from '../../../shared/errors'
+import type { PreviewFailureInput } from '../../../shared/ipc/preview-types'
 
-import type { PreviewAllowlistState, IPreviewAllowlistStore } from './PreviewAllowlistStore'
-import type { IPreviewRootRegistry, PreviewRootEntry } from './PreviewRootRegistry'
+import type { PreviewFrameRefusalType } from './previewFrameRefusals'
 import type { PreviewProtocolContext } from './PreviewProtocolHandler'
 import type { PreviewFilterContext } from './PreviewRequestFilter'
 import type {
@@ -18,60 +24,123 @@ import type {
   PreviewWebContentsHandle
 } from './PreviewSessionFactory'
 import { PreviewSessionFactory } from './PreviewSessionFactory'
+import {
+  ENTRY,
+  SESSION,
+  TOKEN,
+  makeRegistry,
+  makeStore,
+  makeView,
+  scopesRecordingTo
+} from './__test-helpers__/previewSessionFactoryMocks'
 
-const TOKEN = 'abc123abc123abc123abc123abc123ab'
-const ENTRY: PreviewRootEntry = {
-  realRoot: '/real/proj',
-  projectPath: '/proj',
-  csp: "default-src 'none'; sandbox allow-scripts"
-}
-
-function makeRegistry(): IPreviewRootRegistry & {
-  revoke: ReturnType<typeof vi.fn<(token: string) => void>>
-} {
+/** A page as the session sees it: a failure log and a refused-frame set (WI-29, WI-12). */
+function makePage() {
   return {
-    issue: vi.fn<(projectPath: string, hosts: readonly string[]) => Promise<string>>(() =>
-      Promise.resolve(TOKEN)
-    ),
-    resolve: vi.fn<(token: string) => PreviewRootEntry | undefined>(() => ENTRY),
-    revoke: vi.fn<(token: string) => void>(),
-    rebuildCsp: vi.fn<(token: string, hosts: readonly string[]) => void>(),
-    clear: vi.fn<() => void>()
+    recordFailure: vi.fn<(input: PreviewFailureInput) => void>(),
+    frameRefusals: { record: vi.fn<(type: PreviewFrameRefusalType, address: string) => void>() }
   }
 }
-
-function makeStore(hosts: string[]): IPreviewAllowlistStore {
-  return {
-    load: vi.fn<() => Promise<PreviewAllowlistState>>(() =>
-      Promise.resolve({ hosts, writeBackEnabled: true })
-    ),
-    approveHost: vi.fn<(host: string) => Promise<readonly string[]>>(() => Promise.resolve(hosts)),
-    getHosts: vi.fn<() => ReadonlySet<string>>(() => new Set(hosts)),
-    isWriteBackEnabled: vi.fn<() => boolean>(() => true)
-  }
-}
-
-function makeView(): PreviewViewHandle {
-  const wc = {
-    id: 'wc',
-    isDestroyed: vi.fn(() => false),
-    destroy: vi.fn()
-  } as unknown as PreviewWebContentsHandle
-  return {
-    webContents: wc,
-    setBounds: vi.fn(),
-    setBackgroundColor: vi.fn(),
-    setVisible: vi.fn()
-  } as unknown as PreviewViewHandle
-}
-
-const SESSION = { storagePath: null, isPersistent: () => false } as unknown as PreviewSessionLike
 
 describe('PreviewSessionFactory', () => {
+  it('records the badges a bad allowlist raised at load on the new view (#115)', async () => {
+    // The store logs its parse badge process-wide because it has no panel to
+    // address; the factory is the first place that has the panel's failure log.
+    const store = makeStore([])
+    const badge: PreviewFailureInput = {
+      type: 'allowlist-invalid',
+      resourceUrlOrHost: '.erfana/settings.json',
+      reasonCode: ErrorCode.PROJECT_SETTINGS_VALIDATION_FAILED
+    }
+    ;(store.drainBadges as Mock).mockReturnValueOnce([badge])
+    const factory = new PreviewSessionFactory({
+      registry: makeRegistry(),
+      allowlistStore: store,
+      createSession: vi.fn<(p: string) => PreviewSessionLike>(() => SESSION),
+      buildWebPreferences: vi.fn<() => unknown>(() => ({})),
+      createView: vi.fn<() => PreviewViewHandle>(() => makeView()),
+      hardenSession: vi.fn<() => () => void>(() => () => undefined),
+      attachProtocol: vi.fn<() => () => void>(() => () => undefined),
+      attachFilter: vi.fn<() => () => void>(() => () => undefined),
+      assertSealed: vi.fn<() => void>(() => undefined)
+    })
+    const recordFailure = vi.fn()
+
+    await factory.create({
+      projectPath: '/proj',
+      pageScopes: scopesRecordingTo(recordFailure),
+      onBlocked: vi.fn()
+    })
+
+    expect(recordFailure).toHaveBeenCalledWith(badge)
+  })
+
+  it('asks the page scopes at every write and never keeps one (#124, WI-29)', async () => {
+    // The page under a session changes with every load main starts, so a scope
+    // captured at build time would put a later page's diagnostics in an old badge.
+    const badge: PreviewFailureInput = {
+      type: 'allowlist-invalid',
+      resourceUrlOrHost: '.erfana/settings.json',
+      reasonCode: ErrorCode.PROJECT_SETTINGS_VALIDATION_FAILED
+    }
+    const store = makeStore([])
+    ;(store.drainBadges as Mock).mockReturnValueOnce([badge])
+    let protocolCtx: PreviewProtocolContext | undefined
+    const factory = new PreviewSessionFactory({
+      registry: makeRegistry(),
+      allowlistStore: store,
+      createSession: vi.fn<(p: string) => PreviewSessionLike>(() => SESSION),
+      buildWebPreferences: vi.fn<() => unknown>(() => ({})),
+      createView: vi.fn<() => PreviewViewHandle>(() => makeView()),
+      hardenSession: vi.fn<() => () => void>(() => () => undefined),
+      attachProtocol: vi.fn<(s: PreviewSessionLike, ctx: PreviewProtocolContext) => () => void>(
+        (_s, ctx) => {
+          protocolCtx = ctx
+          return () => undefined
+        }
+      ),
+      attachFilter: vi.fn<() => () => void>(() => () => undefined),
+      assertSealed: vi.fn<() => void>(() => undefined)
+    })
+    const pageA = makePage()
+    const pageB = makePage()
+    const loading = { recordFailure: vi.fn<(input: PreviewFailureInput) => void>() }
+    const recordViewFailure = vi.fn<(input: PreviewFailureInput) => void>()
+    let onScreen = pageA
+
+    await factory.create({
+      projectPath: '/proj',
+      pageScopes: () => ({
+        committed: () => onScreen,
+        forMainDocument: () => loading,
+        recordViewFailure
+      }),
+      onBlocked: vi.fn()
+    })
+    // The allowlist's badge is the view's, not page A's, so a reload keeps it.
+    expect(recordViewFailure).toHaveBeenCalledWith(badge)
+    expect(pageA.recordFailure).not.toHaveBeenCalled()
+
+    // A load commits: the next diagnostic goes to the new page on screen, and a
+    // protocol diagnostic never goes to the page still loading.
+    onScreen = pageB
+    const failure: PreviewFailureInput = {
+      type: 'csp-missing',
+      resourceUrlOrHost: '/x',
+      reasonCode: ErrorCode.PREVIEW_CSP_INVALID
+    }
+    protocolCtx?.recordFailure(failure)
+
+    expect(pageB.recordFailure).toHaveBeenCalledWith(failure)
+    expect(pageA.recordFailure).not.toHaveBeenCalled()
+    expect(recordViewFailure).toHaveBeenCalledTimes(1)
+    expect(loading.recordFailure).not.toHaveBeenCalled()
+  })
+
   it('runs the §5(a) sequence in order and returns a wired session', async () => {
     const order: string[] = []
     const registry = makeRegistry()
-    const store = makeStore(['cdn.example.com'])
+    const store = makeStore(['https://cdn.example.com'])
     const view = makeView()
 
     const detachProtocol = vi.fn<() => void>()
@@ -124,10 +193,14 @@ describe('PreviewSessionFactory', () => {
 
     const recordFailure = vi.fn()
     const onBlocked = vi.fn()
-    const result = await factory.create({ projectPath: '/proj', recordFailure, onBlocked })
+    const result = await factory.create({
+      projectPath: '/proj',
+      pageScopes: scopesRecordingTo(recordFailure),
+      onBlocked
+    })
 
     expect(store.load).toHaveBeenCalledTimes(1)
-    expect(registry.issue).toHaveBeenCalledWith('/proj', ['cdn.example.com'])
+    expect(registry.issue).toHaveBeenCalledWith('/proj', ['https://cdn.example.com'])
     expect(order).toEqual([
       'createSession:erfana-preview-test',
       'buildWebPreferences',
@@ -152,10 +225,25 @@ describe('PreviewSessionFactory', () => {
     })
     expect(recordFailure).toHaveBeenCalledTimes(1)
 
-    // The filter reads the LIVE allowed-host set and forwards blocks.
-    expect([...(filterCtx?.getAllowedHosts() ?? [])]).toEqual(['cdn.example.com'])
-    filterCtx?.onBlocked('blocked-host', 'evil.com', 'https://evil.com/x', true)
-    expect(onBlocked).toHaveBeenCalledWith('blocked-host', 'evil.com', 'https://evil.com/x', true)
+    // The filter reads the LIVE allowed-host set: an approval made after the
+    // session was built must reach the filter without rebuilding it. A snapshot
+    // taken at create() would keep answering with the old set.
+    expect([...(filterCtx?.getAllowedHosts() ?? [])]).toEqual(['https://cdn.example.com'])
+    vi.mocked(store.getOrigins).mockReturnValue(
+      new Set(['https://cdn.example.com', 'https://later.example.com'])
+    )
+    expect([...(filterCtx?.getAllowedHosts() ?? [])]).toEqual([
+      'https://cdn.example.com',
+      'https://later.example.com'
+    ])
+    filterCtx?.onBlocked('blocked-host', 'https://evil.com', 'https://evil.com/x', true, 'script')
+    expect(onBlocked).toHaveBeenCalledWith(
+      'blocked-host',
+      'https://evil.com',
+      'https://evil.com/x',
+      true,
+      'script'
+    )
 
     // teardown detaches everything the factory attached.
     result.teardown()
@@ -186,12 +274,99 @@ describe('PreviewSessionFactory', () => {
     })
 
     await expect(
-      factory.create({ projectPath: '/proj', recordFailure: vi.fn(), onBlocked: vi.fn() })
+      factory.create({ projectPath: '/proj', pageScopes: scopesRecordingTo(vi.fn()), onBlocked: vi.fn() })
     ).rejects.toThrow('persistent partition')
 
     expect(detachFilter).toHaveBeenCalledTimes(1)
     expect(detachProtocol).toHaveBeenCalledTimes(1)
     expect(disposeHarden).toHaveBeenCalledTimes(1)
     expect(registry.revoke).toHaveBeenCalledWith(TOKEN)
+  })
+})
+
+describe('PreviewSessionFactory – the handler and filter contexts (#124, WI-12)', () => {
+  /** A factory that keeps every context it hands to the two attach steps. */
+  function capturingFactory() {
+    const protocol: PreviewProtocolContext[] = []
+    const filter: PreviewFilterContext[] = []
+    const factory = new PreviewSessionFactory({
+      registry: makeRegistry(),
+      allowlistStore: makeStore([]),
+      createSession: vi.fn<(p: string) => PreviewSessionLike>(() => SESSION),
+      buildWebPreferences: vi.fn<() => unknown>(() => ({})),
+      createView: vi.fn<() => PreviewViewHandle>(() => makeView()),
+      hardenSession: vi.fn<() => () => void>(() => () => undefined),
+      attachProtocol: vi.fn<(s: PreviewSessionLike, ctx: PreviewProtocolContext) => () => void>(
+        (_s, ctx) => {
+          protocol.push(ctx)
+          return () => undefined
+        }
+      ),
+      attachFilter: vi.fn<(s: PreviewSessionLike, ctx: PreviewFilterContext) => () => void>(
+        (_s, ctx) => {
+          filter.push(ctx)
+          return () => undefined
+        }
+      ),
+      assertSealed: vi.fn<() => void>(() => undefined)
+    })
+    return { factory, protocol, filter }
+  }
+
+  const URL_CHILD = `erfana-preview://${TOKEN}/child.html`
+
+  it("gives the filter the session's token and one ledger shared with the handler", async () => {
+    const { factory, protocol, filter } = capturingFactory()
+    await factory.create({ projectPath: '/proj', pageScopes: scopesRecordingTo(vi.fn()), onBlocked: vi.fn() })
+
+    expect(filter[0].ownToken).toBe(TOKEN)
+    filter[0].ledger.note(URL_CHILD, 'subFrame')
+    expect(protocol[0].ledger.take(URL_CHILD)).toBe('subFrame')
+    expect(protocol[0].resolve(TOKEN)).toBe(ENTRY)
+  })
+
+  it('rebuilds both contexts, and the ledger, in every create', async () => {
+    const { factory, protocol, filter } = capturingFactory()
+    const ctx = () => ({ projectPath: '/proj', pageScopes: scopesRecordingTo(vi.fn()), onBlocked: vi.fn() })
+    await factory.create(ctx())
+    await factory.create(ctx())
+
+    expect(filter[1]).not.toBe(filter[0])
+    expect(protocol[1]).not.toBe(protocol[0])
+    filter[0].ledger.note(URL_CHILD, 'mainFrame')
+    expect(protocol[1].ledger.take(URL_CHILD)).toBeUndefined()
+  })
+
+  it('sends a main-document refusal to the page loading and every frame refusal to the page on screen, per write', async () => {
+    const { factory, protocol, filter } = capturingFactory()
+    const pageA = makePage()
+    const pageB = makePage()
+    const loading = { recordFailure: vi.fn<(input: PreviewFailureInput) => void>() }
+    let onScreen = pageA
+    await factory.create({
+      projectPath: '/proj',
+      pageScopes: () => ({
+        committed: () => onScreen,
+        forMainDocument: () => loading,
+        recordViewFailure: vi.fn()
+      }),
+      onBlocked: vi.fn()
+    })
+    const refused: PreviewFailureInput = {
+      type: 'missing-local-file',
+      resourceUrlOrHost: '/gone.html',
+      reasonCode: ErrorCode.PREVIEW_LOCAL_FILE_MISSING
+    }
+
+    protocol[0].recordDocumentFailure(refused)
+    filter[0].recordFrameRefusal('frame-remote', 'https://evil.example/')
+    onScreen = pageB
+    protocol[0].recordFrameRefusal('missing-local-file', '/missing.html')
+
+    expect(loading.recordFailure).toHaveBeenCalledWith(refused)
+    expect(pageA.frameRefusals.record).toHaveBeenCalledWith('frame-remote', 'https://evil.example/')
+    expect(pageB.frameRefusals.record).toHaveBeenCalledWith('missing-local-file', '/missing.html')
+    expect(pageA.recordFailure).not.toHaveBeenCalled()
+    expect(pageB.recordFailure).not.toHaveBeenCalled()
   })
 })

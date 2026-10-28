@@ -1,9 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { ipcMain, dialog } from 'electron'
+import { dialog, type OpenDialogOptions } from 'electron'
 import { stat, writeFile, mkdir, cp, rm } from 'fs/promises'
 import { basename, extname, isAbsolute, normalize, join } from 'path'
-import { importService, converterRegistry } from '../services/import'
+import {
+  importService,
+  converterRegistry,
+  importToolStatusService,
+  missingToolsDialogMessage
+} from '../services/import'
 import { fileService } from '../services/FileService'
 import type { ValidationResult, ImportResult } from '../services/import'
 import { logger } from '../services/LoggingService'
@@ -11,12 +16,17 @@ import { VIDEO_IMPORT, IMPORT } from '../../shared/constants'
 import { IMPORT_CHANNELS } from '../../shared/ipc/import-channels'
 import {
   DocumentImportRequestSchema,
+  ImportToolStatusRequestSchema,
   type DocumentImportResult,
-  type DocumentImportProgress
+  type DocumentImportProgress,
+  type ImportToolStatusResponse
 } from '../../shared/ipc/import-schema'
+import { isTrustedSender } from './senderValidation'
 import { ErrorCode, AppError, getUserFriendlyMessage } from '../../shared/errors'
 import { isConfigurableConverter } from '../services/import/types'
 import { changeExtension, sanitizeFileName, findAvailableFileName } from '../utils/fileUtils'
+import { registerHandle } from './registry'
+import { rememberDialogResult, withLastDirectory } from '../utils/lastDialogDirectory'
 
 /**
  * File selection result from the native dialog
@@ -44,15 +54,19 @@ export function registerImportHandlers(): void {
    * Shows a unified file dialog with filters for all supported file types.
    * Returns file info or null if cancelled.
    */
-  ipcMain.handle('import:selectFile', async (): Promise<FileSelection | null> => {
+  registerHandle('import:selectFile', async (): Promise<FileSelection | null> => {
     // Build file filters from supported extensions
     const extensions = converterRegistry.getSupportedExtensions()
     const { requiresConversion, passthrough } = converterRegistry.getExtensionsByConversionType()
 
-    const result = await dialog.showOpenDialog({
+    // Formats whose tool is missing are not in "All Importable Files"; say why (#250).
+    const missingNote = missingToolsDialogMessage(importToolStatusService?.peek() ?? null)
+
+    const result = await dialog.showOpenDialog(withLastDirectory<OpenDialogOptions>({
       properties: ['openFile'],
       title: 'Select File to Import',
       buttonLabel: 'Import',
+      ...(missingNote ? { message: missingNote } : {}),
       filters: [
         // All supported files as default
         { name: 'All Importable Files', extensions: [...extensions] },
@@ -67,11 +81,12 @@ export function registerImportHandlers(): void {
         // Allow any file for advanced users
         { name: 'All Files', extensions: ['*'] }
       ]
-    })
+    }))
 
     if (result.canceled || result.filePaths.length === 0) {
       return null
     }
+    rememberDialogResult(result.filePaths)
 
     const filePath = result.filePaths[0]
     const fileName = basename(filePath)
@@ -100,7 +115,7 @@ export function registerImportHandlers(): void {
    * Returns validation result with any warnings/errors.
    * Warnings (like file too large) don't prevent import but inform the user.
    */
-  ipcMain.handle('import:validate', async (_event, filePath: string): Promise<ValidationResult> => {
+  registerHandle('import:validate', async (_event, filePath: string): Promise<ValidationResult> => {
     // Input validation
     if (!filePath || typeof filePath !== 'string') {
       throw new Error('Invalid file path: must be a non-empty string')
@@ -130,7 +145,7 @@ export function registerImportHandlers(): void {
    * Requires a project to be open.
    * Returns import result with output path or error info.
    */
-  ipcMain.handle('import:process', async (_event, filePath: string): Promise<ImportResult> => {
+  registerHandle('import:process', async (_event, filePath: string): Promise<ImportResult> => {
     // Input validation
     if (!filePath || typeof filePath !== 'string') {
       throw new Error('Invalid file path: must be a non-empty string')
@@ -161,7 +176,7 @@ export function registerImportHandlers(): void {
    * Returns array of extensions (lowercase, without dot).
    * Useful for file dialog filters and validation on renderer side.
    */
-  ipcMain.handle('import:getSupportedExtensions', async (): Promise<string[]> => {
+  registerHandle('import:getSupportedExtensions', async (): Promise<string[]> => {
     return importService.getSupportedExtensions()
   })
 
@@ -171,7 +186,7 @@ export function registerImportHandlers(): void {
    * @param extension - File extension (with or without dot)
    * @returns true if the file type can be imported
    */
-  ipcMain.handle('import:isSupported', async (_event, extension: string): Promise<boolean> => {
+  registerHandle('import:isSupported', async (_event, extension: string): Promise<boolean> => {
     if (!extension || typeof extension !== 'string') {
       return false
     }
@@ -189,6 +204,7 @@ let activeDocumentController: AbortController | null = null
  * - import:document           - Import document with options and progress streaming
  * - import:documentCancel     - Cancel active document import
  * - import:getDocumentExtensions - Get supported document extensions
+ * - import:toolStatus          - Optional import tools' status, and "Check again" (#250)
  *
  * @see Issue #133 - LiteParse IPC handlers
  * @see Spec #021 - LiteParse document import
@@ -204,7 +220,7 @@ export function registerDocumentImportHandlers(): void {
    * 5. Runs conversion with progress streaming
    * 6. Writes result to import/ directory
    */
-  ipcMain.handle(
+  registerHandle(
     IMPORT_CHANNELS.DOCUMENT,
     async (event, request: unknown): Promise<DocumentImportResult> => {
       // Validate request schema
@@ -377,7 +393,7 @@ export function registerDocumentImportHandlers(): void {
    * Aborts the AbortController (best-effort since LiteParse has no AbortSignal).
    * The import handler checks the abort flag before writing output.
    */
-  ipcMain.handle(
+  registerHandle(
     IMPORT_CHANNELS.DOCUMENT_CANCEL,
     async (): Promise<{ success: boolean; error?: string }> => {
       if (activeDocumentController) {
@@ -396,11 +412,42 @@ export function registerDocumentImportHandlers(): void {
    * Returns the current list of supported document extensions,
    * which may change after DependencyDetector completes.
    */
-  ipcMain.handle(
+  registerHandle(
     IMPORT_CHANNELS.GET_DOCUMENT_EXTENSIONS,
     async (): Promise<string[]> => {
       const { requiresConversion } = converterRegistry.getExtensionsByConversionType()
       return requiresConversion
+    }
+  )
+
+  /**
+   * Optional import tools' status (#250)
+   *
+   * `{ recheck: false }` returns the session's cached detection result;
+   * `{ recheck: true }` clears it and probes again ("Check again"), rate-limited
+   * in {@link importToolStatusService}. Sender-gated before the payload is
+   * parsed, because a recheck spawns processes. Never rejects.
+   */
+  registerHandle(
+    IMPORT_CHANNELS.TOOL_STATUS,
+    async (event, request: unknown): Promise<ImportToolStatusResponse> => {
+      if (!isTrustedSender(event)) {
+        logger.warn('Rejected import:toolStatus from untrusted sender')
+        return { success: false, error: 'Request refused' }
+      }
+      const parsed = ImportToolStatusRequestSchema.safeParse(request)
+      if (!parsed.success) {
+        return { success: false, error: 'Invalid request' }
+      }
+      try {
+        const status = parsed.data.recheck
+          ? await importToolStatusService.recheck()
+          : await importToolStatusService.getStatus()
+        return { success: true, ...status }
+      } catch (error) {
+        logger.error('Import tool detection failed', error instanceof Error ? error : undefined)
+        return { success: false, error: 'Could not check the import tools' }
+      }
     }
   )
 }

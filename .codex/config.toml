@@ -1,0 +1,17 @@
+# The project's own MCP servers for Codex runs. The engine gives a Codex run only the servers this
+# file declares, and Codex reads it only once the project is trusted. An MCP server runs outside
+# Codex's sandbox, so `enabled_tools` is the limit: ad-hoc browsing, never uploads or page scripts.
+[mcp_servers.chrome-devtools]
+command = "npx"
+args = ["-y", "chrome-devtools-mcp@1.10.1", "--isolated", "--headless"]
+startup_timeout_sec = 30
+# The engine runs Codex with approvals set to never, so an unapproved MCP call fails. Only the
+# tools listed below exist, so approving them here approves nothing wider.
+default_tools_approval_mode = "approve"
+enabled_tools = [
+  "navigate_page", "new_page", "list_pages", "select_page", "close_page",
+  "take_snapshot", "take_screenshot",
+  "list_console_messages", "get_console_message", "list_network_requests", "get_network_request",
+  "click", "fill", "fill_form", "hover", "press_key", "type_text", "wait_for", "handle_dialog",
+  "resize_page", "get_css_styles",
+]

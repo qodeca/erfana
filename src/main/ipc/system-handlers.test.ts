@@ -26,8 +26,9 @@ vi.mock('electron', () => ({
   }
 }))
 
-const mockIsTrusted = vi.fn(() => true)
-vi.mock('./senderValidation', () => ({ isTrustedSender: (e: unknown) => mockIsTrusted(e) }))
+const mockIsTrusted = vi.fn((_event: unknown) => true)
+vi.mock('./senderValidation', () => ({ isTrustedSender: (e: unknown) => mockIsTrusted(e),
+    isTrustedAppSender: () => true }))
 
 const mockLogger = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }
 vi.mock('../services/LoggingService', () => ({ logger: mockLogger }))

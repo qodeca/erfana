@@ -8,6 +8,7 @@
  */
 
 import { getBasename } from '../utils/fileUtils'
+import { getDisplayMessage } from '../../../shared/errors'
 
 /**
  * Project change event data structure
@@ -15,6 +16,8 @@ import { getBasename } from '../utils/fileUtils'
 export interface ProjectChangeData {
   oldPath: string | null
   newPath: string | null
+  /** Project session generation after this change */
+  generation?: number
 }
 
 /**
@@ -58,6 +61,33 @@ export function shouldRefreshFiles(projectPath: string | null): boolean {
 }
 
 /**
+ * Identifies one file-tree read (#208): the refresh scope (project
+ * generation) it belongs to and the sequence number taken when it started.
+ */
+export interface TreeReadTicket {
+  generation: number
+  seq: number
+}
+
+/**
+ * A tree read may be shown only if it belongs to the current project scope
+ * and started after the last shown one, so the tree never goes backwards –
+ * not after a newer read, a project switch, or a close.
+ *
+ * @param ticket - The ticket taken when the read started
+ * @param currentGeneration - The refresh scope now in effect
+ * @param lastAppliedSeq - Sequence of the last tree actually shown
+ * @returns true if the result may be applied
+ */
+export function isTreeReadCurrent(
+  ticket: TreeReadTicket,
+  currentGeneration: number,
+  lastAppliedSeq: number
+): boolean {
+  return ticket.generation === currentGeneration && ticket.seq > lastAppliedSeq
+}
+
+/**
  * Determines if component is still valid for state updates
  *
  * @param mounted - Whether the component is mounted
@@ -94,10 +124,7 @@ export function createProjectClosedMessage(): string {
  * @returns Formatted error message
  */
 export function createOpenErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message
-  }
-  return String(error)
+  return getDisplayMessage(error)
 }
 
 /**
@@ -107,10 +134,7 @@ export function createOpenErrorMessage(error: unknown): string {
  * @returns Formatted error message
  */
 export function createCloseErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message
-  }
-  return String(error)
+  return getDisplayMessage(error)
 }
 
 /**
@@ -133,11 +157,8 @@ export function createLoadErrorMessage(error: unknown): string {
  * @returns Formatted error string
  */
 export function formatErrorForState(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message
-  }
-  if (typeof error === 'string') {
-    return error
+  if (error instanceof Error || typeof error === 'string') {
+    return getDisplayMessage(error)
   }
   return 'An unknown error occurred'
 }
@@ -205,20 +226,6 @@ export function createOpenProjectErrorLog(): string {
  */
 export function createCloseProjectErrorLog(): string {
   return 'Error closing project:'
-}
-
-/**
- * Determines the initial load complete value
- *
- * @param lastPath - The last project path
- * @param fileTree - The loaded file tree
- * @returns true if initial load should be marked complete
- */
-export function shouldMarkInitialLoadComplete(
-  lastPath: string | null,
-  fileTree: unknown[]
-): boolean {
-  return lastPath !== null && fileTree !== null && fileTree !== undefined
 }
 
 /**

@@ -14,10 +14,11 @@
  *
  * @see Issue #50 - global settings service
  */
-import { readFile, writeFile, mkdir, copyFile, access, constants } from 'fs/promises'
+import { readFile, mkdir, copyFile, access, constants } from 'fs/promises'
 import { homedir } from 'os'
 import { Mutex } from 'async-mutex'
 import {
+  GLOBAL_SETTINGS_WRITE_SCHEMAS,
   GlobalSettingsSchema,
   type GlobalSettings,
   type GlobalSettingsChanged,
@@ -25,6 +26,7 @@ import {
 } from '../../shared/ipc/global-settings-schema'
 import { AppError, ErrorCode } from '../../shared/errors'
 import { logger } from './LoggingService'
+import { atomicWriteJSON } from '../utils/atomicWrite'
 
 /** Global settings directory */
 const SETTINGS_DIR = '.erfana'
@@ -32,6 +34,13 @@ const SETTINGS_DIR = '.erfana'
 const SETTINGS_FILE = 'settings.json'
 /** Backup file name (used when corruption detected) */
 const BACKUP_FILE = 'settings.json.bak'
+
+/** Validation issues as the lines of an error message; `prefix` names the setting a value was checked as. */
+function issueLines(issues: ReadonlyArray<{ path: PropertyKey[]; message: string }>, prefix?: string): string {
+  return issues
+    .map(i => `  - ${[...(prefix === undefined ? [] : [prefix]), ...i.path.map(String)].join('.')}: ${i.message}`)
+    .join('\n')
+}
 
 /**
  * Global settings service implementation
@@ -41,6 +50,13 @@ export class GlobalSettingsService {
   private readonly settingsPath: string
   private readonly backupPath: string
   private readonly writeMutex = new Mutex()
+  /**
+   * Set when initialize() failed for a reason other than "no settings file".
+   * The settings file on disk may then hold real user settings that were never
+   * loaded, so the next save backs it up first instead of overwriting it with
+   * in-memory defaults.
+   */
+  private loadFailed = false
   private readonly changeListeners: Set<(event: GlobalSettingsChanged) => void> = new Set()
 
   constructor() {
@@ -54,8 +70,13 @@ export class GlobalSettingsService {
    * Initialize service - create directory and load settings
    */
   async initialize(): Promise<void> {
-    await this.ensureSettingsDir()
-    await this.loadSettings()
+    try {
+      await this.ensureSettingsDir()
+      await this.loadSettings()
+    } catch (error) {
+      this.loadFailed = true
+      throw error
+    }
   }
 
   /**
@@ -87,6 +108,13 @@ export class GlobalSettingsService {
 
     const previousValue = this.settings[key]
 
+    // A setting whose read schema is lenient is checked strictly on its way in
+    const strict = GLOBAL_SETTINGS_WRITE_SCHEMAS[key as string]
+    const checked = strict?.safeParse(value)
+    if (checked !== undefined && !checked.success) {
+      throw new AppError(`Invalid settings value:\n${issueLines(checked.error.issues, key as string)}`, ErrorCode.GLOBAL_SETTINGS_VALIDATION_FAILED)
+    }
+
     // Build new settings object
     const newSettings = {
       ...this.settings,
@@ -96,11 +124,8 @@ export class GlobalSettingsService {
     // Validate entire settings object
     const result = GlobalSettingsSchema.safeParse(newSettings)
     if (!result.success) {
-      const issues = result.error.issues
-        .map(i => `  - ${i.path.join('.')}: ${i.message}`)
-        .join('\n')
       throw new AppError(
-        `Invalid settings value:\n${issues}`,
+        `Invalid settings value:\n${issueLines(result.error.issues)}`,
         ErrorCode.GLOBAL_SETTINGS_VALIDATION_FAILED
       )
     }
@@ -234,8 +259,8 @@ export class GlobalSettingsService {
   private async saveSettings(): Promise<void> {
     return this.writeMutex.runExclusive(async () => {
       try {
-        const content = JSON.stringify(this.settings, null, 2)
-        await writeFile(this.settingsPath, content, 'utf-8')
+        if (this.loadFailed) await this.backupBeforeOverwrite()
+        await atomicWriteJSON(this.settingsPath, this.settings, 2)
       } catch (error) {
         throw new AppError(
           `Failed to write settings to ${this.settingsPath}: ${error instanceof Error ? error.message : String(error)}`,
@@ -268,6 +293,22 @@ export class GlobalSettingsService {
 
     // Save defaults
     await this.saveSettings()
+  }
+
+  /**
+   * After a failed load, keep the real file as `settings.json.bak-<timestamp>`
+   * before the first save replaces it with in-memory defaults. If the copy
+   * fails, the save is refused (the throw is reported as a write failure) –
+   * losing the user's settings is worse than not saving. The flag is cleared
+   * only once the backup exists, so a failed attempt is retried on the next save.
+   */
+  private async backupBeforeOverwrite(): Promise<void> {
+    if (await this.fileExists(this.settingsPath)) {
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+      await copyFile(this.settingsPath, `${this.settingsPath}.bak-${stamp}`)
+      logger.warn('Settings failed to load earlier; kept a copy before saving defaults')
+    }
+    this.loadFailed = false
   }
 
   /**

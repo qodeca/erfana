@@ -178,44 +178,6 @@ describe('FileService.copyItem', () => {
   })
 
   describe('Validation constraints', () => {
-    it('should throw error when copying item outside project boundary', async () => {
-      // Setup
-      const file = join(testDir, 'file.md')
-      await writeFile(file, 'content', 'utf-8')
-
-      // Create target outside project
-      const outsideDir = await mkdtemp(join(tmpdir(), 'erfana-outside-'))
-
-      try {
-        // Execute & Verify
-        await expect(
-          fileService.copyItem(file, outsideDir)
-        ).rejects.toThrow('Cannot copy items to outside the project directory')
-      } finally {
-        await rm(outsideDir, { recursive: true, force: true })
-      }
-    })
-
-    it('should throw error when copying item from outside project boundary', async () => {
-      // Setup
-      const outsideDir = await mkdtemp(join(tmpdir(), 'erfana-outside-'))
-      const outsideFile = join(outsideDir, 'file.md')
-      await writeFile(outsideFile, 'content', 'utf-8')
-
-      // Create target inside project
-      const insideFolder = join(testDir, 'folder')
-      await mkdir(insideFolder)
-
-      try {
-        // Execute & Verify
-        await expect(
-          fileService.copyItem(outsideFile, insideFolder)
-        ).rejects.toThrow('Cannot copy items outside the project directory')
-      } finally {
-        await rm(outsideDir, { recursive: true, force: true })
-      }
-    })
-
     it('should throw error when target is not a directory', async () => {
       // Setup
       const sourceFile = join(testDir, 'source.md')

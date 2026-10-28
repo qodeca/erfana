@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { APP_ID } from '../shared/constants'
 
 /**
  * Main Process Window Creation Tests
@@ -20,6 +21,17 @@ import { join } from 'node:path'
  * applies when the import is genuinely slow; a hung test still fails.
  */
 vi.setConfig({ testTimeout: 20_000 })
+
+/**
+ * The quit helper is mocked for the whole file: the real one would start PowerShell on
+ * Windows, take the test runner for the app, end its console hosts and force-end it
+ * after the grace period (#305). One test replaces it with its own mock.
+ */
+const reaperMock = (): Record<string, unknown> => ({
+  QUIT_TRACE_FILE: 'quit-cleanup.log',
+  startConptyHostReaper: vi.fn(() => ({ started: false, launcherDone: Promise.resolve() }))
+})
+vi.mock('./services/conptyHostReaper', () => reaperMock())
 
 /** Renderer token file — the source of truth for the window's paint colour. */
 const DESIGN_TOKENS_PATH = join(__dirname, '../renderer/src/styles/design-tokens.css')
@@ -55,15 +67,32 @@ describe('Main Process - Window Creation', () => {
   let mockRegisterWindowResponsiveness: any
   let mockRegisterWindowErrorSignals: any
   let mockRegisterQuitHandlers: any
+  let mockShowMessageBox: any
+  let mockWriteCrashFallbackLine: any
+  let mockRegisterProcessCrashLogging: any
 
   beforeEach(() => {
     // Reset modules to allow fresh imports
     vi.resetModules()
     delete process.env.ERFANA_E2E_FORCE_CRASH
+    delete process.env.ERFANA_E2E_TEST_HOOKS
+
+    mockShowMessageBox = vi.fn(() => Promise.resolve({ response: 0 }))
+    mockWriteCrashFallbackLine = vi.fn(() => true)
+    mockRegisterProcessCrashLogging = vi.fn()
+    vi.doMock('./utils/crashFallbackLog', () => ({
+      writeCrashFallbackLine: mockWriteCrashFallbackLine
+    }))
+    // Process-wide listeners would pile up across the repeated re-imports here;
+    // the wiring is asserted below, the behaviour in processCrashLogging.test.ts.
+    vi.doMock('./utils/processCrashLogging', () => ({
+      registerProcessCrashLogging: mockRegisterProcessCrashLogging
+    }))
 
     // Mock BrowserWindow
     createdWindow = {
       on: vi.fn(),
+      once: vi.fn(),
       show: vi.fn(),
       loadURL: vi.fn(),
       loadFile: vi.fn(),
@@ -82,7 +111,7 @@ describe('Main Process - Window Creation', () => {
       }
     }
 
-    mockBrowserWindow = vi.fn(() => createdWindow)
+    mockBrowserWindow = vi.fn(function () { return createdWindow })
     // #216: registerClaudeStatusHandlers wires window-destroy cleanup over the
     // currently-open windows, so the BrowserWindow factory needs getAllWindows.
     ;(mockBrowserWindow as unknown as { getAllWindows: () => unknown[] }).getAllWindows = vi.fn(
@@ -128,6 +157,7 @@ describe('Main Process - Window Creation', () => {
       app: mockApp,
       shell: { openExternal: vi.fn() },
       BrowserWindow: mockBrowserWindow,
+      dialog: { showMessageBox: mockShowMessageBox },
       Menu: {
         buildFromTemplate: vi.fn(() => ({})),
         setApplicationMenu: vi.fn()
@@ -135,19 +165,29 @@ describe('Main Process - Window Creation', () => {
       ipcMain: {
         on: vi.fn(),
         handle: vi.fn(),
-        removeHandler: vi.fn()
+        removeHandler: vi.fn(),
+        // The preview handlers dispose their `on` listeners through
+        // registry.unregisterOn on quit, which calls removeListener.
+        removeListener: vi.fn()
       },
       // #216: claude-status handler imports `webContents` for the targeted send.
       webContents: {
         fromId: vi.fn(() => null)
       },
       // #74: preview scheme registration runs at module load.
-      protocol: { registerSchemesAsPrivileged: vi.fn() }
+      protocol: { registerSchemesAsPrivileged: vi.fn() },
+      session: { defaultSession: {} }
+    }))
+
+    // Mock default-session permission policy (covered by its own suite)
+    vi.doMock('./services/session/defaultSessionPermissions', () => ({
+      installDefaultSessionPermissions: vi.fn()
     }))
 
     // Mock menu module
     vi.doMock('./menu', () => ({
-      createApplicationMenu: vi.fn(() => ({}))
+      createApplicationMenu: vi.fn(() => ({})),
+      setPreviewZoomHandler: vi.fn()
     }))
 
     // Mock @electron-toolkit/utils
@@ -169,27 +209,36 @@ describe('Main Process - Window Creation', () => {
     // Mock service modules
     vi.doMock('./services/FileService', () => ({
       fileService: {
-        setProjectPath: vi.fn() // issue #59: clear project state on destroy
+        getProjectPath: vi.fn(() => null)
       }
     }))
     vi.doMock('./services/FileWatcherService', () => ({
       fileWatcherService: {
         dispose: vi.fn(),
         setProjectPath: vi.fn(), // issue #59: clear project state on destroy
-        cleanupForWebContentsId: vi.fn(() => Promise.resolve()) // issue #59
+        cleanupForWebContentsId: vi.fn(() => Promise.resolve()), // issue #59
+        handleAncestorRemovals: vi.fn(), // save after a folder rename
+        checkWatchedFilesUnder: vi.fn(() => Promise.resolve()), // #252
+        watchUnseenFiles: vi.fn() // #252
       }
     }))
     vi.doMock('./services/DirectoryWatcherService', () => ({
       directoryWatcherService: {
         dispose: vi.fn(),
         setProjectPath: vi.fn(), // issue #59: clear project state on destroy
-        cleanupForWebContentsId: vi.fn(() => Promise.resolve()) // issue #59
+        cleanupForWebContentsId: vi.fn(() => Promise.resolve()), // issue #59
+        onPathsRemoved: vi.fn(() => () => {}), // save after a folder rename
+        onRemovalsLost: vi.fn(() => () => {}) // #252
       }
     }))
     vi.doMock('./services/TerminalService', () => ({
       terminalService: {
         dispose: vi.fn(),
-        cleanupForWebContentsId: vi.fn() // issue #59
+        cleanupForWebContentsId: vi.fn(), // issue #59
+        allowDiagnostics: vi.fn(), // #305
+        beginShutdown: vi.fn(),
+        getLiveShells: vi.fn(() => []),
+        treeKillSkipped: vi.fn(() => false)
       }
     }))
     vi.doMock('./services/SettingsService', () => ({
@@ -200,7 +249,12 @@ describe('Main Process - Window Creation', () => {
 
     // Mock IPC handler registration
     vi.doMock('./ipc/file-handlers', () => ({
-      registerFileHandlers: vi.fn()
+      registerFileHandlers: vi.fn(),
+      // The session owner: the preview teardown subscribes, a destroyed window closes it
+      projectService: {
+        session: { onChange: vi.fn(() => () => {}) },
+        close: vi.fn(() => Promise.resolve())
+      }
     }))
     vi.doMock('./ipc/file-watcher-handlers', () => ({
       registerFileWatcherHandlers: vi.fn()
@@ -219,14 +273,14 @@ describe('Main Process - Window Creation', () => {
       registerDocumentImportHandlers: vi.fn()
     }))
     vi.doMock('./services/import', () => ({
-      DependencyDetector: vi.fn().mockImplementation(() => ({
-        detect: vi.fn().mockResolvedValue({ libreOffice: false, imageMagick: false })
-      })),
-      converterRegistry: {
-        updateConverterExtensions: vi.fn(),
-        getExtensionsByConversionType: vi.fn().mockReturnValue({ requiresConversion: ['pdf'], passthrough: [] })
-      },
-      getExtensionsForDependencies: vi.fn().mockReturnValue([])
+      killActiveLibreOfficeProbes: vi.fn(),
+      importToolStatusService: {
+        getStatus: vi.fn().mockResolvedValue({
+          libreOffice: 'missing',
+          extensions: ['pdf'],
+          throttled: false
+        })
+      }
     }))
     vi.doMock('../shared/ipc/import-channels', () => ({
       IMPORT_CHANNELS: {
@@ -260,7 +314,9 @@ describe('Main Process - Window Creation', () => {
           if (key === 'logging') return { level: 'info', console: true }
           return undefined
         }),
-        onSettingsChanged: vi.fn()
+        // Returns an unsubscribe, like the real service: the preview teardown
+        // calls it on quit.
+        onSettingsChanged: vi.fn(() => () => {})
       }
     }))
 
@@ -269,6 +325,8 @@ describe('Main Process - Window Creation', () => {
       loggingService: {
         initialize: vi.fn(() => Promise.resolve()),
         cleanupOldLogs: vi.fn(() => Promise.resolve()),
+        // the quit step reads it for the quit-helper trace path (#305)
+        getLogsDir: vi.fn(() => '/tmp/erfana-test-logs'),
         info: vi.fn(),
         debug: vi.fn(),
         warn: vi.fn(),
@@ -392,6 +450,160 @@ describe('Main Process - Window Creation', () => {
     vi.clearAllMocks()
     vi.resetModules()
     delete process.env.ERFANA_E2E_FORCE_CRASH
+    delete process.env.ERFANA_E2E_TEST_HOOKS
+  })
+
+  describe('Watcher wiring (save after a folder rename)', () => {
+    it('hands the project watcher’s removals to the single-file watches', async () => {
+      await import('./index')
+      await flushStartup()
+      const { directoryWatcherService } = await import('./services/DirectoryWatcherService')
+      const { fileWatcherService } = await import('./services/FileWatcherService')
+
+      const onPathsRemoved = directoryWatcherService.onPathsRemoved as unknown as Mock
+      expect(onPathsRemoved).toHaveBeenCalledTimes(1)
+      const listener = onPathsRemoved.mock.calls[0][0] as (paths: readonly string[]) => void
+      listener(['/proj/docs'])
+      expect(fileWatcherService.handleAncestorRemovals).toHaveBeenCalledWith(['/proj/docs'])
+    })
+
+    it('re-checks the open files where the project watcher cannot tell (#252)', async () => {
+      await import('./index')
+      await flushStartup()
+      const { directoryWatcherService } = await import('./services/DirectoryWatcherService')
+      const { fileWatcherService } = await import('./services/FileWatcherService')
+
+      // Removals a paused watch lost without their paths: check the disk under that root
+      const onRemovalsLost = directoryWatcherService.onRemovalsLost as unknown as Mock
+      expect(onRemovalsLost).toHaveBeenCalledTimes(1)
+      const lost = onRemovalsLost.mock.calls[0][0] as (
+        root: string,
+        isOwnRemoval: (filePath: string) => boolean
+      ) => void
+      const isOwnRemoval = (): boolean => false
+      lost('/proj', isOwnRemoval)
+      expect(fileWatcherService.checkWatchedFilesUnder).toHaveBeenCalledWith('/proj', isOwnRemoval)
+
+      // Files the project watcher cannot see: the project watcher itself says which those are
+      const watchUnseen = fileWatcherService.watchUnseenFiles as unknown as Mock
+      expect(watchUnseen).toHaveBeenCalledTimes(1)
+      expect(watchUnseen).toHaveBeenCalledWith(directoryWatcherService)
+    })
+  })
+
+  describe('Start-up failures keep the app alive', () => {
+    async function failInit(which: 'settings' | 'logging' | 'both'): Promise<void> {
+      const { globalSettingsService } = await import('./services/GlobalSettingsService')
+      const { loggingService } = await import('./services/LoggingService')
+      if (which !== 'logging') {
+        ;(globalSettingsService.initialize as Mock).mockRejectedValue(
+          new Error('settings dir is read-only')
+        )
+      }
+      if (which !== 'settings') {
+        ;(loggingService.initialize as Mock).mockRejectedValue(
+          new Error('logs dir is a symlink')
+        )
+      }
+    }
+
+    it('registers the process-wide crash logging at module load', async () => {
+      await import('./index')
+      expect(mockRegisterProcessCrashLogging).toHaveBeenCalledTimes(1)
+    })
+
+    it.each(['settings', 'logging', 'both'] as const)(
+      'still registers handlers and creates the window when %s init throws',
+      async (which) => {
+        await failInit(which)
+        const { registerFileHandlers } = await import('./ipc/file-handlers')
+        const { registerLoggingHandlers } = await import('./ipc/logging-handlers')
+
+        await import('./index')
+        await flushStartup()
+
+        expect(registerFileHandlers).toHaveBeenCalledTimes(1)
+        expect(registerLoggingHandlers).toHaveBeenCalledTimes(1)
+        expect(mockBrowserWindow).toHaveBeenCalledTimes(1)
+      }
+    )
+
+    /** Fires the window's one-time 'show' listener, as Electron does after ready-to-show. */
+    function fireShow(): void {
+      const call = createdWindow.once.mock.calls.find((c: unknown[]) => c[0] === 'show')
+      expect(call).toBeDefined()
+      call![1]()
+    }
+
+    it('writes a fallback crash line for each failed step', async () => {
+      await failInit('both')
+
+      await import('./index')
+      await flushStartup()
+
+      expect(mockWriteCrashFallbackLine).toHaveBeenCalledWith(
+        '[crash] startup-settings-init',
+        expect.any(Error)
+      )
+      expect(mockWriteCrashFallbackLine).toHaveBeenCalledWith(
+        '[crash] startup-logging-init',
+        expect.any(Error)
+      )
+    })
+
+    it('tells the user with a non-blocking message box, only once the window is shown', async () => {
+      await failInit('both')
+
+      await import('./index')
+      await flushStartup()
+
+      // start-up finished and the window exists, but nothing has been shown yet
+      expect(mockBrowserWindow).toHaveBeenCalledTimes(1)
+      expect(mockShowMessageBox).not.toHaveBeenCalled()
+
+      fireShow()
+
+      expect(mockShowMessageBox).toHaveBeenCalledTimes(1)
+      const [parent, options] = mockShowMessageBox.mock.calls[0]
+      expect(parent).toBe(createdWindow)
+      expect(options.title).toBe('Erfana started with problems')
+      expect(options.detail).toContain('settings')
+      expect(options.detail).toContain('log files')
+      expect(options.detail).toContain('crash.log')
+    })
+
+    it('does not claim details were saved when the fallback write failed', async () => {
+      mockWriteCrashFallbackLine.mockReturnValue(false)
+      await failInit('logging')
+
+      await import('./index')
+      await flushStartup()
+      fireShow()
+
+      const { detail } = mockShowMessageBox.mock.calls[0][1]
+      expect(detail).not.toContain('crash.log')
+      expect(detail).toContain('could not be saved')
+    })
+
+    it('survives a message box that fails to open', async () => {
+      mockShowMessageBox.mockRejectedValue(new Error('no display'))
+      await failInit('settings')
+
+      await import('./index')
+      await flushStartup()
+
+      expect(() => fireShow()).not.toThrow()
+      await flushStartup()
+    })
+
+    it('shows no dialog and writes no fallback line when start-up is healthy', async () => {
+      await import('./index')
+      await flushStartup()
+
+      expect(createdWindow.once).not.toHaveBeenCalledWith('show', expect.any(Function))
+      expect(mockShowMessageBox).not.toHaveBeenCalled()
+      expect(mockWriteCrashFallbackLine).not.toHaveBeenCalled()
+    })
   })
 
   describe('Window Title Configuration', () => {
@@ -477,16 +689,21 @@ describe('Main Process - Window Creation', () => {
           ipcMain: {
             on: vi.fn(),
             handle: vi.fn(),
-            removeHandler: vi.fn()
+            removeHandler: vi.fn(),
+            // The preview handlers dispose their `on` listeners through
+            // registry.unregisterOn on quit, which calls removeListener.
+            removeListener: vi.fn()
           },
           webContents: {
             fromId: vi.fn(() => null)
           },
-          protocol: { registerSchemesAsPrivileged: vi.fn() }
+          protocol: { registerSchemesAsPrivileged: vi.fn() },
+          session: { defaultSession: {} }
         }))
 
         vi.doMock('./menu', () => ({
-          createApplicationMenu: vi.fn(() => ({}))
+          createApplicationMenu: vi.fn(() => ({})),
+          setPreviewZoomHandler: vi.fn()
         }))
 
         vi.doMock('@electron-toolkit/utils', () => ({
@@ -629,6 +846,24 @@ describe('Main Process - Window Creation', () => {
         reason: 'close'
       })
       expect(createdWindow.destroy).not.toHaveBeenCalled()
+    })
+
+    it('should close the project session when the window contents are destroyed', async () => {
+      // Issue #59: without it the same-project check answers 'noop' for a new
+      // window. The session close also releases the project lock.
+      await loadAndGetCloseHandler()
+      const destroyed = createdWindow.webContents.on.mock.calls.find(
+        ([event]: [string]) => event === 'destroyed'
+      )?.[1]
+      expect(destroyed).toBeInstanceOf(Function)
+      const { projectService } = await import('./ipc/file-handlers')
+
+      destroyed()
+
+      expect(projectService.close).toHaveBeenCalledWith({
+        senderId: createdWindow.webContents.id,
+        reason: 'window-destroyed'
+      })
     })
 
     it('should close on the FIRST click when the renderer has already crashed', async () => {
@@ -802,6 +1037,18 @@ describe('Main Process - Window Creation', () => {
       }
     })
 
+    it('should kill any in-flight LibreOffice probe, since app.exit skips will-quit', async () => {
+      const { killActiveLibreOfficeProbes } = (await import('./services/import')) as any
+      const { run, cleanup } = await loadAndGetBeforeQuit()
+
+      try {
+        await run({ preventDefault: vi.fn() })
+        expect(killActiveLibreOfficeProbes).toHaveBeenCalledTimes(1)
+      } finally {
+        cleanup()
+      }
+    })
+
     it('should release the project lock before the best-effort disposers', async () => {
       const { projectLockService } = (await import('./services/ProjectLockService')) as any
       const { terminalService } = (await import('./services/TerminalService')) as any
@@ -840,6 +1087,36 @@ describe('Main Process - Window Creation', () => {
         expect(mockApp.exit).toHaveBeenCalledWith(0)
       } finally {
         cleanup()
+      }
+    })
+
+    it('waits at most 3 s for the quit-helper launcher, last, and logs the wait (#305)', async () => {
+      vi.doMock('./services/conptyHostReaper', () => ({
+        QUIT_TRACE_FILE: 'quit-cleanup.log',
+        startConptyHostReaper: vi.fn(() => ({ started: true, launcherDone: new Promise<void>(() => {}) }))
+      }))
+      const { logger } = (await import('./services/LoggingService')) as any
+      const { run, cleanup } = await loadAndGetBeforeQuit()
+
+      try {
+        vi.useFakeTimers()
+        const shutdown = run({ preventDefault: vi.fn() })
+        await vi.advanceTimersByTimeAsync(2_999)
+        expect(mockApp.exit).not.toHaveBeenCalled()
+        await vi.advanceTimersByTimeAsync(1)
+        await shutdown
+
+        expect(mockApp.exit).toHaveBeenCalledWith(0)
+        const waitLog = logger.info.mock.calls.find(([m]: [string]) => m === 'App quit: quit helper launcher wait')
+        expect(waitLog?.[1]).toEqual({ settled: false, waitedMs: 3_000 })
+        // the wait comes after the disposers
+        const order = logger.info.mock.calls.map(([m]: [string]) => m)
+        expect(order.indexOf('App quit: disposers done, exiting')).toBeLessThan(
+          order.indexOf('App quit: quit helper launcher wait')
+        )
+      } finally {
+        cleanup()
+        vi.doMock('./services/conptyHostReaper', () => reaperMock())
       }
     })
 
@@ -897,6 +1174,64 @@ describe('Main Process - Window Creation', () => {
     })
   })
 
+  describe('E2E Test Hooks Flag', () => {
+    it('passes the flag to the renderer when ERFANA_E2E_TEST_HOOKS=1', async () => {
+      mockIs.dev = false
+      process.env.ERFANA_E2E_TEST_HOOKS = '1'
+
+      await import('./index')
+
+      const windowConfig = mockBrowserWindow.mock.calls[0][0]
+
+      expect(windowConfig.webPreferences.additionalArguments).toContain('--erfana-test-hooks')
+    })
+
+    it('does not pass the flag when the env var is unset', async () => {
+      mockIs.dev = false
+
+      await import('./index')
+
+      const windowConfig = mockBrowserWindow.mock.calls[0][0]
+
+      expect(windowConfig.webPreferences.additionalArguments ?? []).not.toContain(
+        '--erfana-test-hooks'
+      )
+    })
+
+    it('ignores the env var in a packaged build', async () => {
+      mockIs.dev = false
+      mockApp.isPackaged = true
+      process.env.ERFANA_E2E_TEST_HOOKS = '1'
+
+      await import('./index')
+
+      const windowConfig = mockBrowserWindow.mock.calls[0][0]
+
+      expect(windowConfig.webPreferences.additionalArguments ?? []).not.toContain(
+        '--erfana-test-hooks'
+      )
+    })
+  })
+
+  describe('Tree-kill diagnostics switch (#305)', () => {
+    it('allows the switch in a dev build', async () => {
+      mockApp.isPackaged = false
+      await import('./index')
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      const { terminalService } = await import('./services/TerminalService')
+      expect(terminalService.allowDiagnostics).toHaveBeenCalledWith(true)
+    })
+
+    it('never allows it in a packaged build', async () => {
+      mockApp.isPackaged = true
+      await import('./index')
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      const { terminalService } = await import('./services/TerminalService')
+      expect(terminalService.allowDiagnostics).toHaveBeenCalledWith(false)
+      expect(terminalService.allowDiagnostics).not.toHaveBeenCalledWith(true)
+    })
+  })
+
   describe('Application Menu Configuration', () => {
     it('should set application menu on startup', async () => {
       mockIs.dev = false
@@ -913,6 +1248,17 @@ describe('Main Process - Window Creation', () => {
       // Verify Menu.setApplicationMenu was called with the menu
       expect(Menu.setApplicationMenu).toHaveBeenCalledTimes(1)
       expect(Menu.setApplicationMenu).toHaveBeenCalledWith({})
+    })
+  })
+
+  describe('Windows AppUserModelID', () => {
+    it('sets the AppUserModelID to the installer appId', async () => {
+      mockIs.dev = false
+
+      await import('./index')
+
+      const { electronApp } = await import('@electron-toolkit/utils')
+      expect(electronApp.setAppUserModelId).toHaveBeenCalledWith(APP_ID)
     })
   })
 

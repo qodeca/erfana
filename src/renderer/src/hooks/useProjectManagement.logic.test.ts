@@ -27,16 +27,34 @@ import {
   createRefreshErrorLog,
   createOpenProjectErrorLog,
   createCloseProjectErrorLog,
-  shouldMarkInitialLoadComplete,
   extractProjectName,
   formatProjectPath,
   isValidProjectPath,
   isFileOperationError,
   isSafeToInvokeCallback,
+  isTreeReadCurrent,
   type ProjectChangeData
 } from './useProjectManagement.logic'
 
 describe('useProjectManagement.logic', () => {
+  describe('isTreeReadCurrent (#208)', () => {
+    it('rejects a read from another project scope', () => {
+      expect(isTreeReadCurrent({ generation: 1, seq: 5 }, 2, 0)).toBe(false)
+    })
+
+    it('rejects a read that started before the last shown one', () => {
+      expect(isTreeReadCurrent({ generation: 2, seq: 3 }, 2, 4)).toBe(false)
+    })
+
+    it('rejects the read that is already shown', () => {
+      expect(isTreeReadCurrent({ generation: 2, seq: 4 }, 2, 4)).toBe(false)
+    })
+
+    it('accepts a newer read from the current scope', () => {
+      expect(isTreeReadCurrent({ generation: 2, seq: 5 }, 2, 4)).toBe(true)
+    })
+  })
+
   describe('shouldLoadLastProject', () => {
     it('should return true when mounted is true', () => {
       expect(shouldLoadLastProject(true)).toBe(true)
@@ -180,6 +198,19 @@ describe('useProjectManagement.logic', () => {
       expect(formatErrorForState(error)).toBe('State error')
     })
 
+    it('should show a coded refusal in words, without the Electron prefix or the marker', () => {
+      const error = new Error(
+        "Error invoking remote method 'file:openProject': Error: Security validation failed: x [PATH_SYSTEM_DIR]"
+      )
+      expect(formatErrorForState(error)).toBe('System directories cannot be opened as projects')
+      expect(createOpenErrorMessage(error)).toBe(formatErrorForState(error))
+    })
+
+    it('should show a refused link in words too', () => {
+      const error = new Error('Security validation failed: link [SYMLINK_ATTACK]')
+      expect(createOpenErrorMessage(error)).toBe('This directory link points to a protected location')
+    })
+
     it('should return string error as-is', () => {
       expect(formatErrorForState('Direct error')).toBe('Direct error')
     })
@@ -234,25 +265,6 @@ describe('useProjectManagement.logic', () => {
 
     it('createCloseProjectErrorLog should return consistent message', () => {
       expect(createCloseProjectErrorLog()).toBe('Error closing project:')
-    })
-  })
-
-  describe('shouldMarkInitialLoadComplete', () => {
-    it('should return true when lastPath and fileTree are valid', () => {
-      expect(shouldMarkInitialLoadComplete('/test/project', [])).toBe(true)
-      expect(shouldMarkInitialLoadComplete('/test/project', [{ name: 'file' }])).toBe(true)
-    })
-
-    it('should return false when lastPath is null', () => {
-      expect(shouldMarkInitialLoadComplete(null, [])).toBe(false)
-    })
-
-    it('should return false when fileTree is null', () => {
-      expect(shouldMarkInitialLoadComplete('/test/project', null as any)).toBe(false)
-    })
-
-    it('should return false when fileTree is undefined', () => {
-      expect(shouldMarkInitialLoadComplete('/test/project', undefined as any)).toBe(false)
     })
   })
 

@@ -256,6 +256,9 @@ export const terminal = {
   async waitForReady(page: Page): Promise<void> {
     return getTerminal(page).waitForReady()
   },
+  async waitForOutputLine(page: Page, line: string, options?: { timeout?: number }): Promise<void> {
+    return getTerminal(page).waitForOutputLine(line, options)
+  },
   async waitForPrompt(page: Page, options?: { timeout?: number }): Promise<void> {
     return getTerminal(page).waitForPrompt(options)
   }
@@ -370,7 +373,7 @@ export async function openProject(page: Page, projectPath: string): Promise<void
 
   await page.evaluate(async (p: string) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (window as any).api.file.openProjectByPath(p)
+    await (window as any).api.file.openProjectByPath({ projectPath: p })
   }, projectPath)
 
   const fileNodes = page.locator(`[data-testid^="${TEST_IDS.PROJECT_TREE_NODE_FILE}-"]`)
@@ -430,14 +433,15 @@ export async function closeApp(
     try {
       const confirmBtn = byTestId(page, TEST_IDS.DIALOG_BTN_CONFIRM)
       await expect(confirmBtn).toBeVisible({ timeout: 1500 })
+      // Hold the clicked element, not the locator: a next dialog reuses the
+      // same test id, and the locator would match its button instead.
+      const clicked = await confirmBtn.elementHandle()
       await confirmBtn.click()
 
-      try {
-        // KNOWN_WAIT: Inter-dialog pause during quit – page may be destroyed
-        await page.waitForTimeout(300)
-      } catch {
-        break
-      }
+      // Let this dialog go before looking for the next one, so the loop never
+      // clicks a dialog that is already closing. A destroyed page or a reused
+      // node ends the wait; the next round finds (or misses) the next dialog.
+      await clicked?.waitForElementState('hidden', { timeout: 1500 }).catch(() => undefined)
       continue
     } catch {
       break

@@ -103,6 +103,9 @@ import { globalSettingsService } from './GlobalSettingsService'
 import { readdir, stat, unlink, statfs } from 'fs/promises'
 import { existsSync, unlinkSync, renameSync, lstatSync } from 'fs'
 
+// electron-vite declares ELECTRON_RENDERER_URL read-only; this file sets and clears it.
+const writableEnv: Record<string, string | undefined> = process.env
+
 // Get references to mocked modules
 const mockGlobalSettingsService = globalSettingsService as any
 const mockReaddir = readdir as any
@@ -253,7 +256,7 @@ describe('LoggingService', () => {
 
     it('disables console transport in production for all loggers', async () => {
       const originalEnv = process.env.ELECTRON_RENDERER_URL
-      delete process.env.ELECTRON_RENDERER_URL
+      delete writableEnv.ELECTRON_RENDERER_URL
 
       await service.initialize()
 
@@ -263,13 +266,13 @@ describe('LoggingService', () => {
 
       // Restore
       if (originalEnv) {
-        process.env.ELECTRON_RENDERER_URL = originalEnv
+        writableEnv.ELECTRON_RENDERER_URL = originalEnv
       }
     })
 
     it('keeps console transport only for combinedLogger in development', async () => {
       const originalEnv = process.env.ELECTRON_RENDERER_URL
-      process.env.ELECTRON_RENDERER_URL = 'http://localhost:3000'
+      writableEnv.ELECTRON_RENDERER_URL = 'http://localhost:3000'
 
       mockCombinedLogger.transports.console.level = 'info'
       mockMainLogger.transports.console.level = 'info'
@@ -285,9 +288,9 @@ describe('LoggingService', () => {
 
       // Restore
       if (originalEnv !== undefined) {
-        process.env.ELECTRON_RENDERER_URL = originalEnv
+        writableEnv.ELECTRON_RENDERER_URL = originalEnv
       } else {
-        delete process.env.ELECTRON_RENDERER_URL
+        delete writableEnv.ELECTRON_RENDERER_URL
       }
     })
 
@@ -317,6 +320,22 @@ describe('LoggingService', () => {
         code: ErrorCode.LOGGING_INIT_FAILED,
         message: expect.stringContaining('Settings error')
       })
+    })
+
+    it('switches off file logging when initialization fails', async () => {
+      mockGlobalSettingsService.getSettings.mockImplementation(() => {
+        throw new Error('Settings error')
+      })
+
+      for (const mockLogger of [mockCombinedLogger, mockMainLogger, mockRendererLogger]) {
+        mockLogger.transports.file.level = 'info'
+      }
+
+      await expect(service.initialize()).rejects.toBeDefined()
+
+      for (const mockLogger of [mockCombinedLogger, mockMainLogger, mockRendererLogger]) {
+        expect(mockLogger.transports.file.level).toBe(false)
+      }
     })
 
     it('handles settings change to logging key', async () => {
@@ -731,10 +750,72 @@ describe('LoggingService', () => {
     })
   })
 
+  describe('main-process formatting', () => {
+    beforeEach(async () => {
+      await service.initialize()
+      vi.clearAllMocks()
+    })
+
+    it('escapes control characters interpolated into a main-process message', () => {
+      service.info('CWD: /tmp/evil\n[2026-01-01] [deadbeef] [error] forged\u001b[2J')
+
+      const written = mockMainLogger.info.mock.calls[0][0] as string
+      // eslint-disable-next-line no-control-regex
+      expect(written).not.toMatch(/[\u0000-\u001f\u007f-\u009f]/)
+      expect(written).toContain('/tmp/evil\\n[2026-01-01]')
+    })
+
+    it('escapes control characters in error messages and stacks', () => {
+      const error = new Error('bad\nthing')
+      error.stack = 'Error: bad\n    at fn (file.ts:1:1)'
+
+      service.error('failed', error, { note: 'line\rbreak' })
+
+      const written = mockMainLogger.error.mock.calls[0][0] as string
+       
+      expect(written).not.toMatch(/[\r\n]/)
+      expect(written).toContain('Stack: Error: bad\\n    at fn')
+    })
+  })
+
   describe('logFromRenderer()', () => {
     beforeEach(async () => {
       await service.initialize()
       vi.clearAllMocks()
+    })
+
+    it('escapes CR and LF so a renderer message cannot forge a log line', () => {
+      const entry: LogEntry = {
+        level: 'info',
+        message: 'first\r\n[2026-01-01 00:00:00.000] [deadbeef] [error] forged',
+        timestamp: new Date().toISOString(),
+        source: 'renderer',
+        error: { name: 'Error', message: 'bad\nline', stack: 'at a\n    at b' }
+      }
+
+      service.logFromRenderer(entry)
+
+      const written = mockCombinedLogger.info.mock.calls[0][0] as string
+      expect(written).not.toMatch(/[\r\n]/)
+      expect(written).toContain('first\\r\\n[2026-01-01')
+      expect(written).toContain('bad\\nline')
+      expect(written).toContain('at a\\n    at b')
+    })
+
+    it('escapes every control character, not only CR and LF', () => {
+      const entry: LogEntry = {
+        level: 'info',
+        message: 'a\u001b[31mred\u0000\u007f\u0085\u2028\u2029b\tc',
+        timestamp: new Date().toISOString(),
+        source: 'renderer'
+      }
+
+      service.logFromRenderer(entry)
+
+      const written = mockCombinedLogger.info.mock.calls[0][0] as string
+      // eslint-disable-next-line no-control-regex
+      expect(written).not.toMatch(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/)
+      expect(written).toContain('a\\u001b[31mred\\u0000\\u007f\\u0085\\u2028\\u2029b\\tc')
     })
 
     it('logs trace from renderer to combined and renderer logs', () => {
@@ -912,63 +993,32 @@ describe('LoggingService', () => {
       vi.clearAllMocks()
     })
 
+    const LOGS = path.join(MOCK_TMP, 'erfana-test-logs')
+    const inLogs = (name: string): string => path.join(LOGS, name)
+
     it('shifts files correctly when rotating', async () => {
-      // Setup: simulate having main.1.log, main.2.log, main.3.log already
-      mockExistsSync.mockImplementation((path: string) => {
-        // main.100.log doesn't exist (for deletion check)
-        if (path === path.join(MOCK_TMP, 'erfana-test-logs', 'main.100.log')) return false
-        // main.1.log, main.2.log, main.3.log exist
-        if (path === path.join(MOCK_TMP, 'erfana-test-logs', 'main.1.log')) return true
-        if (path === path.join(MOCK_TMP, 'erfana-test-logs', 'main.2.log')) return true
-        if (path === path.join(MOCK_TMP, 'erfana-test-logs', 'main.3.log')) return true
-        // main.log exists
-        if (path === path.join(MOCK_TMP, 'erfana-test-logs', 'main.log')) return true
-        // All other numbered files don't exist
-        return false
-      })
-
       const archiveLogFn = mockMainLogger.transports.file.archiveLogFn
+      archiveLogFn({ path: inLogs('main.log') })
 
-      // Create a mock LogFile object
-      const mockLogFile = { path: path.join(MOCK_TMP, 'erfana-test-logs', 'main.log') }
-
-      // Call archive function
-      archiveLogFn(mockLogFile)
-
-      // Should shift files down: 3->4, 2->3, 1->2
-      expect(mockRenameSync).toHaveBeenCalledWith(
-        path.join(MOCK_TMP, 'erfana-test-logs', 'main.3.log'),
-        path.join(MOCK_TMP, 'erfana-test-logs', 'main.4.log')
-      )
-      expect(mockRenameSync).toHaveBeenCalledWith(
-        path.join(MOCK_TMP, 'erfana-test-logs', 'main.2.log'),
-        path.join(MOCK_TMP, 'erfana-test-logs', 'main.3.log')
-      )
-      expect(mockRenameSync).toHaveBeenCalledWith(
-        path.join(MOCK_TMP, 'erfana-test-logs', 'main.1.log'),
-        path.join(MOCK_TMP, 'erfana-test-logs', 'main.2.log')
-      )
-
-      // Should move current log to .1
-      expect(mockRenameSync).toHaveBeenCalledWith(
-        path.join(MOCK_TMP, 'erfana-test-logs', 'main.log'),
-        path.join(MOCK_TMP, 'erfana-test-logs', 'main.1.log')
-      )
+      // Highest first, so no file is overwritten before it moved on: 4->5 ... 1->2, then current -> 1
+      expect(mockRenameSync.mock.calls).toEqual([
+        [inLogs('main.4.log'), inLogs('main.5.log')],
+        [inLogs('main.3.log'), inLogs('main.4.log')],
+        [inLogs('main.2.log'), inLogs('main.3.log')],
+        [inLogs('main.1.log'), inLogs('main.2.log')],
+        [inLogs('main.log'), inLogs('main.1.log')]
+      ])
     })
 
-    it('deletes oldest file when at max rotation', async () => {
-      // Setup: simulate having main.100.log (oldest)
-      mockExistsSync.mockImplementation((path: string) => {
-        return path === path.join(MOCK_TMP, 'erfana-test-logs', 'main.100.log') || path === path.join(MOCK_TMP, 'erfana-test-logs', 'main.log')
-      })
-
+    it('replaces the oldest by renaming onto it – no existence check, no separate delete', async () => {
+      // Five sync calls on the main thread per rotation: one rename per file
       const archiveLogFn = mockMainLogger.transports.file.archiveLogFn
-      const mockLogFile = { path: path.join(MOCK_TMP, 'erfana-test-logs', 'main.log') }
+      archiveLogFn({ path: inLogs('main.log') })
 
-      archiveLogFn(mockLogFile)
-
-      // Should delete the oldest file
-      expect(mockUnlinkSync).toHaveBeenCalledWith(path.join(MOCK_TMP, 'erfana-test-logs', 'main.100.log'))
+      expect(mockExistsSync).not.toHaveBeenCalled()
+      expect(mockUnlinkSync).not.toHaveBeenCalled()
+      expect(mockRenameSync).toHaveBeenCalledTimes(5)
+      expect(mockRenameSync).toHaveBeenCalledWith(inLogs('main.4.log'), inLogs('main.5.log'))
     })
 
     it('handles rotation when no previous rotated files exist', async () => {
@@ -984,34 +1034,16 @@ describe('LoggingService', () => {
         throw error
       })
 
-      mockUnlinkSync.mockImplementation(() => {
-        const error: any = new Error('ENOENT: no such file')
-        error.code = 'ENOENT'
-        throw error
-      })
-
       const archiveLogFn = mockMainLogger.transports.file.archiveLogFn
-      const mockLogFile = { path: path.join(MOCK_TMP, 'erfana-test-logs', 'main.log') }
+      archiveLogFn({ path: inLogs('main.log') })
 
-      archiveLogFn(mockLogFile)
-
-      // Should attempt 100 renames (99 shifts + 1 current log rotation) + 1 delete
-      // But only main.log -> main.1.log succeeds
-      expect(mockRenameSync).toHaveBeenCalledTimes(100)
-      expect(mockUnlinkSync).toHaveBeenCalledTimes(1)
-
-      // Verify the successful call
-      expect(mockRenameSync).toHaveBeenCalledWith(
-        path.join(MOCK_TMP, 'erfana-test-logs', 'main.log'),
-        path.join(MOCK_TMP, 'erfana-test-logs', 'main.1.log')
-      )
+      // 5 renames (4 shifts + 1 current log rotation); only main.log -> main.1.log succeeds
+      expect(mockRenameSync).toHaveBeenCalledTimes(5)
+      expect(mockRenameSync).toHaveBeenCalledWith(inLogs('main.log'), inLogs('main.1.log'))
+      expect(consoleErrorSpy).not.toHaveBeenCalled()
     })
 
     it('works with different log file names', async () => {
-      mockExistsSync.mockImplementation((path: string) => {
-        return path === path.join(MOCK_TMP, 'erfana-test-logs', 'renderer.log')
-      })
-
       const archiveLogFn = mockRendererLogger.transports.file.archiveLogFn
       const mockLogFile = { path: path.join(MOCK_TMP, 'erfana-test-logs', 'renderer.log') }
 
@@ -1036,7 +1068,7 @@ describe('LoggingService', () => {
       })
     })
 
-    it('skips cleanup when disk space is below 100MB', async () => {
+    it('still prunes oldest-first when disk space is below 100MB', async () => {
       // Mock low disk space (50MB available)
       mockStatfs.mockReset()
       mockStatfs.mockResolvedValue({
@@ -1044,31 +1076,42 @@ describe('LoggingService', () => {
         bsize: 4096 // 4KB block size = 52.4MB available
       })
 
-      mockReaddir.mockResolvedValue(['old.log'])
-      mockStat.mockResolvedValue({ mtimeMs: 0 }) // Very old
+      const now = Date.now()
+      const day = 24 * 60 * 60 * 1000
+      const mtimes: Record<string, number> = {
+        'newer.log': now - 9 * day,
+        'oldest.log': now - 30 * day,
+        'fresh.log': now
+      }
+      mockReaddir.mockResolvedValue(['newer.log', 'oldest.log', 'fresh.log'])
+      mockStat.mockImplementation(async (file: string) => ({ mtimeMs: mtimes[path.basename(file)] }))
 
       await service.cleanupOldLogs()
 
-      // Verify statfs was called
-      expect(mockStatfs).toHaveBeenCalled()
+      // Low disk must not skip the prune, and the oldest file goes first
+      expect(mockUnlink.mock.calls.map((call) => path.basename(call[0] as string))).toEqual([
+        'oldest.log',
+        'newer.log'
+      ])
 
-      // Should NOT attempt to delete files
-      expect(mockUnlink).not.toHaveBeenCalled()
-
-      // Should log warning about low disk space
-      // The message and context are formatted together into a single string
       expect(mockCombinedLogger.warn).toHaveBeenCalledWith(
-        expect.stringContaining('Low disk space, skipping log cleanup')
+        expect.stringContaining('Low disk space, pruning old logs')
       )
       expect(mockCombinedLogger.warn).toHaveBeenCalledWith(
         expect.stringContaining('"availableMB"')
       )
-      expect(mockMainLogger.warn).toHaveBeenCalledWith(
-        expect.stringContaining('Low disk space, skipping log cleanup')
-      )
-      expect(mockMainLogger.warn).toHaveBeenCalledWith(
-        expect.stringContaining('"availableMB"')
-      )
+    })
+
+    it('deletes rotated files beyond the rotation cap even when they are recent', async () => {
+      mockReaddir.mockResolvedValue(['main.5.log', 'main.6.log', 'main.100.log'])
+      mockStat.mockResolvedValue({ mtimeMs: Date.now() })
+
+      await service.cleanupOldLogs()
+
+      expect(mockUnlink.mock.calls.map((call) => path.basename(call[0] as string)).sort()).toEqual([
+        'main.100.log',
+        'main.6.log'
+      ])
     })
 
     it('continues cleanup when disk space is above 100MB', async () => {
@@ -1268,7 +1311,6 @@ describe('LoggingService', () => {
     })
 
     it('ignores ENOENT errors when shifting files', () => {
-      mockExistsSync.mockReturnValue(false)
       mockRenameSync.mockImplementation(() => {
         const error: any = new Error('ENOENT: no such file')
         error.code = 'ENOENT'
@@ -1283,7 +1325,6 @@ describe('LoggingService', () => {
     })
 
     it('logs non-ENOENT errors when shifting files', () => {
-      mockExistsSync.mockReturnValue(true)
       mockRenameSync.mockImplementation(() => {
         const error: any = new Error('EACCES: permission denied')
         error.code = 'EACCES'
@@ -1318,37 +1359,6 @@ describe('LoggingService', () => {
       expect(() => archiveLogFn(mockLogFile)).not.toThrow()
     })
 
-    it('ignores ENOENT when deleting oldest file', () => {
-      mockUnlinkSync.mockImplementation(() => {
-        const error: any = new Error('ENOENT: no such file')
-        error.code = 'ENOENT'
-        throw error
-      })
-
-      const archiveLogFn = mockMainLogger.transports.file.archiveLogFn
-      const mockLogFile = { path: path.join(MOCK_TMP, 'erfana-test-logs', 'main.log') }
-
-      expect(() => archiveLogFn(mockLogFile)).not.toThrow()
-    })
-
-    it('logs non-ENOENT errors when deleting oldest file', () => {
-      mockUnlinkSync.mockImplementation(() => {
-        const error: any = new Error('EACCES: permission denied')
-        error.code = 'EACCES'
-        throw error
-      })
-
-      const archiveLogFn = mockMainLogger.transports.file.archiveLogFn
-      const mockLogFile = { path: path.join(MOCK_TMP, 'erfana-test-logs', 'main.log') }
-
-      archiveLogFn(mockLogFile)
-
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to delete oldest log'),
-        expect.anything()
-      )
-    })
-
     it('catches and logs catastrophic errors', () => {
       mockRenameSync.mockImplementation(() => {
         throw new Error('Unexpected catastrophic error')
@@ -1363,7 +1373,7 @@ describe('LoggingService', () => {
       // We just verify it doesn't crash and logs errors
       expect(consoleErrorSpy).toHaveBeenCalled()
       expect(consoleErrorSpy.mock.calls.some(call =>
-        call[0]?.includes('Failed to shift')
+        typeof call[0] === 'string' && call[0].includes('Failed to shift')
       )).toBe(true)
     })
   })

@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { ipcMain } from 'electron'
 import { cameraService } from '../services/CameraService'
 import {
   CameraSaveRequestSchema,
@@ -8,6 +7,7 @@ import {
 } from '../../shared/ipc/camera-schema'
 import { ErrorCode } from '../../shared/errors'
 import { logger } from '../services/LoggingService'
+import { registerHandle } from './registry'
 
 /**
  * Register camera capture IPC handlers
@@ -26,7 +26,7 @@ export function registerCameraHandlers(): void {
    * @param request - { dataUrl: string, timestamp?: number }
    * @returns Save result with file path or error
    */
-  ipcMain.handle(
+  registerHandle(
     'camera:save',
     async (_event, request: unknown): Promise<CameraSaveResponse> => {
       // Validate request schema

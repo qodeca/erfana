@@ -12,14 +12,19 @@
  *   1. `lstat` — if `.erfana` exists AND is a symlink → REFUSE.
  *   2. absent → `mkdir` NON-recursively (mode 0o700), so an existing symlink
  *      raises `EEXIST` rather than being silently followed (`mkdir -p` does).
- *   3. `realpath`, then require `relative(realRoot, real) === '.erfana'` — the
- *      same `path.relative`-based containment rule `previewPathResolve` uses,
- *      not a second one, tightened to the exact expected name.
+ *   3. `realpath`, then require `realPathWithin(realRoot, real) === '.erfana'` —
+ *      the exact realpath-prefix containment rule `previewPathResolve` decides
+ *      with, not a second one, tightened to the exact expected name. Never
+ *      `path.relative`: on win32 it folds case with JavaScript's `toLowerCase`,
+ *      which maps U+212A KELVIN SIGN to `k`, so a `.erfana` swapped after
+ *      step 1 for a junction into the sibling `…\proj<U+212A>\.erfana` would
+ *      count as inside the root `…\projk` (security review F1).
  */
 
 import { lstat, mkdir, realpath } from 'node:fs/promises'
-import { join, relative } from 'node:path'
+import { join } from 'node:path'
 import { AppError, ErrorCode } from '../../../shared/errors'
+import { realPathWithin } from './previewPathResolve'
 
 const ERFANA_DIR_NAME = '.erfana'
 const ERFANA_DIR_MODE = 0o700
@@ -29,7 +34,8 @@ const ERFANA_DIR_MODE = 0o700
  * symlinked or out-of-root resolution.
  *
  * @param realRoot MUST already be the `fsPromises.realpath` of the project root,
- *   so the final `relative` comparison is symlink-free on the root side.
+ *   so the final exact-prefix comparison is symlink-free on the root side and
+ *   spelled the way `realpath` spells the resolved `.erfana`.
  * @returns the real absolute path to `<realRoot>/.erfana`.
  * @throws AppError(SYMLINK_ATTACK) if `.erfana` is a symlink or resolves outside
  *   the root.
@@ -75,10 +81,11 @@ export async function resolveErfanaDir(realRoot: string): Promise<string> {
     }
   }
 
-  // 3. Resolve and require containment at exactly `.erfana` (same relative-based
-  // rule as previewPathResolve's confinement, tightened to the exact name).
+  // 3. Resolve and require containment at exactly `.erfana`: the exact
+  // realpath-prefix rule previewPathResolve decides with (see the header for
+  // why it is not `path.relative`), tightened to the exact name.
   const real = await realpath(erfanaPath)
-  if (relative(realRoot, real) !== ERFANA_DIR_NAME) {
+  if (realPathWithin(realRoot, real) !== ERFANA_DIR_NAME) {
     throw new AppError(
       'Resolved .erfana directory escapes the project root',
       ErrorCode.SYMLINK_ATTACK

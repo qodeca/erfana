@@ -190,3 +190,51 @@ The observable-state gate is strictly more robust: it waits for the specific DOM
 **Related**: mask specificity matters — pick the narrowest element that covers ephemeral content. In this codebase, `(b) editor-loaded` and `(c) terminal-open` now both mask `TERMINAL_INSTANCE` (xterm canvas only), not the full `TERMINAL_PANEL`, so panel-chrome regressions still register.
 
 **Lesson**: flakes are usually a signal that the test is expressing *timing* instead of *causality*. Find the observable signal the test actually depends on and wait for that; remove ephemeral content at the source rather than papering over it with masks.
+
+---
+
+## 11. A `window` listener inside a dockview panel fires once per open panel
+
+Dockview keeps **every** opened panel mounted. A background tab is not a torn-down
+component — it is a live React tree with live effects and live global listeners.
+
+`MarkdownEditorPanel` mounts `useKeyboardShortcuts`, which registers on `window`.
+With N tabs open, that is N listeners, and one keypress was handled N times: a
+single `Cmd/Ctrl+W` closed every tab, and a single `Cmd/Ctrl+S` wrote every open
+buffer to disk — including files the user never chose to save.
+
+**Lesson**: anything panel-scoped that reaches for a global — `window`
+listeners, `document` handlers, singleton stores keyed by "current" anything —
+needs an explicit active-panel gate. Wire it to the dockview panel API
+(`props.api.isActive`, kept in step via `onDidActiveChange`) and read the flag
+through a ref so toggling it never re-registers the listener.
+
+**How to test it**: the assertion has to involve *two* panels. A one-tab test
+passes against the broken code, because with one panel mounted there is exactly
+one listener. `e2e/tab-lifecycle.e2e.ts` and `e2e/editor-save.e2e.ts` both open
+a second file and assert on what did **not** happen to it.
+
+## 12. TypeScript will not catch `onClick={handler}` when the handler takes an optional argument
+
+A zero-argument signature is assignable to a one-argument DOM handler, so this
+compiles cleanly:
+
+```tsx
+// onReload is reloadFromDisk(prefetchedContent?: string)
+<button onClick={onReload}>Reload from Disk</button>
+```
+
+React passes the synthetic mouse event as the first argument. That event became
+the file's new content, and the panel crashed on the next render with
+`content.split is not a function` — the whole renderer dropped to the
+`RootErrorBoundary` recovery screen.
+
+**Lesson**: wrap the call at the JSX site (`onClick={() => onReload()}`) whenever
+the callback accepts any argument at all, and make the receiving function reject
+an argument of the wrong type rather than trusting its own signature.
+
+**How to test it**: a "was it called?" assertion passes against the bug. The
+existing unit test used `toHaveBeenCalledOnce()` and never failed. Assert the
+**argument list** (`toHaveBeenCalledWith()`), and in an e2e test assert the app
+did not crash (`expect(byTestId(page, TEST_IDS.ROOT_ERROR_BOUNDARY)).toHaveCount(0)`)
+— otherwise a repeat reads as "wrong content" rather than "the app died".

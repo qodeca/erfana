@@ -8,7 +8,7 @@ Erfana's project tree supports VS Code-style drag-drop file reorganization with:
 - **Keyboard shortcuts** - Ctrl+X/C/V for cut/copy/paste operations
 - **Cross-filesystem support** - Automatic fallback for moves across volumes
 - **Conflict resolution** - Automatic numbering for copy operations, confirm dialog for moves
-- **Accessibility** - ARIA live announcements for all operations
+- **Feedback** - Toast notifications (`showGlobalToast`) confirm cut, copy, move and copy results and report failures; there is no ARIA live announcer (see [visual-feedback.md § Accessibility](./visual-feedback.md#accessibility))
 
 ## Quick Start
 
@@ -72,10 +72,10 @@ Right-click any file/folder in the project tree:
 
 ## References
 
-- **Main Implementation**: [src/renderer/src/components/ProjectTree/ProjectTree.tsx](/src/renderer/src/components/ProjectTree/ProjectTree.tsx)
-- **Tree Utilities**: [src/renderer/src/hooks/useDragDropTree.ts](/src/renderer/src/hooks/useDragDropTree.ts)
-- **Clipboard Store**: [src/renderer/src/stores/useClipboardStore.ts](/src/renderer/src/stores/useClipboardStore.ts)
-- **File Service**: [src/main/services/FileService.ts](/src/main/services/FileService.ts)
+- **Main Implementation**: [src/renderer/src/components/ProjectTree/ProjectTree.tsx](../../src/renderer/src/components/ProjectTree/ProjectTree.tsx)
+- **Tree Utilities**: [src/renderer/src/hooks/useDragDropTree.ts](../../src/renderer/src/hooks/useDragDropTree.ts)
+- **Clipboard Store**: [src/renderer/src/stores/useClipboardStore.ts](../../src/renderer/src/stores/useClipboardStore.ts)
+- **File Service**: [src/main/services/FileService.ts](../../src/main/services/FileService.ts)
 - **dnd-kit Documentation**: https://docs.dndkit.com/
 - **VS Code File Explorer**: https://code.visualstudio.com/docs/getstarted/userinterface#_explorer
 
@@ -100,11 +100,25 @@ Users can drag files from external sources (Finder, file managers) into the proj
 - Not-allowed cursor on files (invalid targets)
 - Auto-expand collapsed folders after 1 second hover
 
+### Drop size limit
+
+A drop of more than 100 files (`EXTERNAL_DROP_MAX` in `src/renderer/src/components/ProjectTree/externalDropLimit.ts` – the smaller of `EXTERNAL_MOVE_BATCH_MAX` and `IMPORT.MAX_BATCH_SIZE`, both 100) is refused **before** the Move / Copy / Import choice opens, with a "Too many files" toast ("Cannot add more than 100 files at once. Please drop fewer files."). Since v0.22.0 Copy has the same limit as the Add files picker; before, the choice opened first.
+
 ### Conflict resolution
 
 When a file with the same name exists at the target:
 - **Replace**: Overwrites existing file
 - **Keep both**: Creates auto-numbered copy (e.g., `file (1).md`)
+
+### Move asks before the original is removed
+
+A move takes the original out of a folder outside the project, so main asks first (`ExternalMoveConfirmer`, `src/main/services/ExternalMoveConfirmer.ts`, v0.22.0). The original is deleted only after the user answers **Move** in a native box, modal to the window that owns the project:
+
+- The box names each file and its folder, relative to the home folder (`~/Downloads`), never as a full path. It says the original will be removed from its current folder. Cancel is the default button.
+- **A group move asks once.** The renderer sends all the dropped files in one `file:moveBatchFromExternal` request (`moveExternalBatch` in `ProjectTree/externalMoveBatch.ts`), and main shows one box: "Move N files into the project?". Moves that arrive within 150 ms of each other also share a box.
+- A box lists at most 10 files (`MAX_FILES_PER_BOX`); a larger group gets further boxes. The boxes of one drop are **one decision**: the files move only if every box answers Move. Cancel in any box, or a box that cannot be shown, moves none of them.
+- A box cannot be shown when the window is minimised or hidden, or when it has already opened 10 boxes in the last minute. Then nothing is moved and one toast says so: "The confirmation box could not be shown, so none of the N files were moved. Try again in a minute, or copy them instead."
+- Cancel is not an error: it shows no failure toast.
 
 ### Keyboard shortcut
 
@@ -123,7 +137,8 @@ When a file with the same name exists at the target:
 
 - `useExternalFileDrop` hook handles drag detection and state
 - `ExternalFileService` handles security validation and file operations
-- IPC channels: `file:validateExternal`, `file:copyFromExternal`, `file:moveFromExternal`
+- `ExternalMoveConfirmer` asks before any original is removed (see [Move asks before the original is removed](#move-asks-before-the-original-is-removed))
+- IPC channels: `file:validateExternal`, `file:copyFromExternal`, `file:moveFromExternal`, `file:moveBatchFromExternal` (a drop's moves, at most 100 per request), `file:selectExternalFiles` (the Add files picker)
 
 ### Batch document filtering
 
@@ -131,7 +146,7 @@ When multiple files are dropped simultaneously, document files (PDF, Office, ima
 - A warning toast notifies the user that document files require individual import
 - Non-document files proceed with the normal move/copy/import flow
 - To import document files, drop them individually – this opens the DocumentImportDialog with OCR, language, screenshot, and DPI options
-- If required dependencies (LibreOffice, ImageMagick) are missing, a dependency-missing modal appears with install guidance
+- If LibreOffice is missing (or found in an unsafe location), a dependency-missing modal appears that opens Settings → Import tools
 
 See [ui-components.md](../ui-components.md) for DocumentImportDialog details.
 

@@ -9,17 +9,18 @@
  * @see Issue #50 - global settings service
  */
 
-import { ipcMain, BrowserWindow } from 'electron'
+import { BrowserWindow } from 'electron'
 import { globalSettingsService } from '../services/GlobalSettingsService'
 import type { GlobalSettings, GlobalSettingsChanged } from '../../shared/ipc/global-settings-schema'
 import { logger } from '../services/LoggingService'
+import { registerHandle } from './registry'
 
 /**
  * Register all global settings IPC handlers
  */
 export function registerGlobalSettingsHandlers(): void {
   // Get all global settings
-  ipcMain.handle('globalSettings:get', async () => {
+  registerHandle('globalSettings:get', async () => {
     try {
       const settings = globalSettingsService.getSettings()
       return { success: true, settings }
@@ -31,7 +32,7 @@ export function registerGlobalSettingsHandlers(): void {
   })
 
   // Set a specific global setting
-  ipcMain.handle('globalSettings:set', async (_event, payload: { key: keyof GlobalSettings; value: unknown }) => {
+  registerHandle('globalSettings:set', async (_event, payload: { key: keyof GlobalSettings; value: unknown }) => {
     try {
       await globalSettingsService.setSetting(payload.key, payload.value as GlobalSettings[typeof payload.key])
       return { success: true }
@@ -43,7 +44,7 @@ export function registerGlobalSettingsHandlers(): void {
   })
 
   // Reset all global settings to defaults
-  ipcMain.handle('globalSettings:reset', async () => {
+  registerHandle('globalSettings:reset', async () => {
     try {
       await globalSettingsService.resetSettings()
       return { success: true }

@@ -31,6 +31,7 @@ import {
 } from './utils/helpers'
 import { writeImageFixtures, IMAGE_FIXTURES } from './fixtures/images/generateImageFixtures'
 import { ImageViewerNarrowPage } from './pages/image-viewer-narrow.page'
+import { TabBarPage } from './pages/tab-bar.page'
 
 /**
  * The visual fixture set for state (f), with the image fixtures seeded into the
@@ -48,7 +49,7 @@ import { ImageViewerNarrowPage } from './pages/image-viewer-narrow.page'
  * disk before Electron opens the project, so the tree is never at the mercy of
  * the directory watcher.
  */
-const imageViewerVisualTest = visualTest.extend<Record<string, never>>({
+const imageViewerVisualTest = visualTest.extend({
   visualTestProject: async ({ visualTestProject }, use) => {
     writeImageFixtures(visualTestProject)
     await use(visualTestProject)
@@ -129,10 +130,21 @@ async function stabilizeEditor(page: import('@playwright/test').Page): Promise<v
     console.warn('stabilizeEditor: no Monaco editors found – cursor blink may not be disabled')
   }
   await clearSelection(page)
-  // Monaco rendering pipeline settle – no DOM signal for cursorBlinking change;
-  // toHaveScreenshot does two-pass stability check on top of this
-  await page.waitForTimeout(500)
+  // Monaco marks the cursor layer `cursor-solid` once the option is applied;
+  // toHaveScreenshot's two-pass stability check covers the rest of the paint.
+  if (editorCount > 0) {
+    await expect(page.locator('.monaco-editor .cursors-layer.cursor-solid').first()).toBeAttached()
+  }
 }
+
+/**
+ * Page-level captures are clipped to a fixed 1280×800 rectangle in the top
+ * left of the window. The fixture pins the window's content size
+ * (`VISUAL_CONTENT_SIZE` in `e2e/fixtures/index.ts`); the clip keeps the
+ * page-level baselines at the size they were committed with (#267,
+ * `docs/windows/known-flakes.md`). Element-level captures need no clip.
+ */
+const PAGE_CLIP = { x: 0, y: 0, width: 1280, height: 800 } as const
 
 // ---------------------------------------------------------------------------
 // (a) Welcome panel – no project loaded
@@ -143,7 +155,7 @@ visualTest.describe('Visual regression – no project', () => {
 
   visualTest('(a) welcome panel', async ({ visualWindow }, testInfo) => {
     assertBaselineExists('welcome-empty', testInfo)
-    await expect(visualWindow).toHaveScreenshot({ name: 'welcome-empty.png' })
+    await expect(visualWindow).toHaveScreenshot('welcome-empty.png', { clip: PAGE_CLIP })
   })
 })
 
@@ -176,7 +188,7 @@ visualTest.describe('Visual regression – with project', () => {
       byTestId(page, TEST_IDS.TOAST_CONTAINER)
     ]
 
-    await expect(page).toHaveScreenshot({ name: 'editor-loaded.png', mask: masks })
+    await expect(page).toHaveScreenshot('editor-loaded.png', { mask: masks, clip: PAGE_CLIP })
   })
 
   visualTest('(c) terminal open', async ({ visualWindowWithProject }, testInfo) => {
@@ -199,7 +211,7 @@ visualTest.describe('Visual regression – with project', () => {
       byTestId(page, TEST_IDS.TERMINAL_INSTANCE)
     ]
 
-    await expect(page).toHaveScreenshot({ name: 'terminal-open.png', mask: masks })
+    await expect(page).toHaveScreenshot('terminal-open.png', { mask: masks, clip: PAGE_CLIP })
   })
 
   visualTest('(d) settings overlay', async ({ visualWindowWithProject }, testInfo) => {
@@ -212,7 +224,7 @@ visualTest.describe('Visual regression – with project', () => {
 
     // Element-level screenshot of the settings overlay only
     const settingsOverlay = byTestId(page, TEST_IDS.SETTINGS_OVERLAY)
-    await expect(settingsOverlay).toHaveScreenshot({ name: 'settings-overlay.png' })
+    await expect(settingsOverlay).toHaveScreenshot('settings-overlay.png')
   })
 
   visualTest('(e) confirm dialog', async ({ visualAppWithProject, visualWindowWithProject }, testInfo) => {
@@ -226,17 +238,15 @@ visualTest.describe('Visual regression – with project', () => {
 
     // Switch to source/editor mode (markdown defaults to preview mode)
     await byTestId(page, TEST_IDS.VIEW_MODE_BTN_EDITOR).click()
-    // View mode transition animation settle – no testid for "mode ready" state
-    await page.waitForTimeout(500)
 
     // Focus and type in Monaco to create dirty (unsaved) state
     const monacoEditor = page.locator('.monaco-editor .view-lines')
+    await expect(monacoEditor).toBeVisible()
     await monacoEditor.click()
-    // Monaco focus acquisition – needed before keyboard.type works reliably
-    await page.waitForTimeout(200)
+    await expect(page.locator('.monaco-editor.focused')).toBeVisible()
     await page.keyboard.type('x')
-    // Dirty state propagation to Zustand store – needed before quit:requested checks blockers
-    await page.waitForTimeout(500)
+    // The tab's dirty dot renders from the same store quit:requested reads
+    await expect(new TabBarPage(page).dirtyDot('README.md')).toBeVisible()
 
     // Send quit:requested IPC to renderer – dirty editor triggers confirm dialog
     // Using IPC directly avoids the main process close flow and isQuitting flag
@@ -252,7 +262,7 @@ visualTest.describe('Visual regression – with project', () => {
     await expect(dialogOverlay).toBeVisible({ timeout: 5000 })
 
     // Element-level screenshot of the dialog
-    await expect(dialogOverlay).toHaveScreenshot({ name: 'confirm-dialog.png' })
+    await expect(dialogOverlay).toHaveScreenshot('confirm-dialog.png')
 
     // Click cancel to keep the app open (fixture cleanup handles closing)
     await byTestId(page, TEST_IDS.DIALOG_BTN_CANCEL).click()
@@ -285,8 +295,6 @@ imageViewerVisualTest.describe('Visual regression – image viewer toolbar', () 
     // the status slot is empty at rest, and the zoom label is the settled
     // fit-to-view value. `toHaveScreenshot`'s two-pass stability check is the
     // wait — there is no sleep.
-    await expect(viewer.toolbar()).toHaveScreenshot({
-      name: 'image-viewer-toolbar-narrow.png'
-    })
+    await expect(viewer.toolbar()).toHaveScreenshot('image-viewer-toolbar-narrow.png')
   })
 })

@@ -585,3 +585,107 @@ export function getDefaultViewMode(
 ): 'split' | 'split-horizontal' | 'editor' | 'preview' {
   return isMarkdownFile(filePath) ? 'preview' : 'editor'
 }
+
+/**
+ * Who asked for a save. It decides the two things a save may do beyond the
+ * write itself:
+ *
+ * - `user` - the tab's own Cmd/Ctrl+S. The only trigger that may recreate a
+ *   missing folder (the banner's "Save to restore it"), and it always shows a
+ *   failure toast.
+ * - `autosave` - never recreates a folder; a failure toast repeats only when
+ *   the reason changes, since it retries every few seconds.
+ * - `registry` - a save by id from outside the tab (`editorSaveRegistry`, e.g.
+ *   the unsaved-changes prompt of a preview tab move). Never recreates a folder,
+ *   and shows no toast: the registry contract makes the caller toast on `false`.
+ */
+export type SaveTrigger = 'user' | 'autosave' | 'registry'
+
+/**
+ * Whether this save may recreate the folder a deleted-state file lived in.
+ *
+ * @param trigger - Who asked for the save
+ * @param isFileDeleted - The tab shows the "deleted on disk" banner
+ */
+export function shouldRecreateParentDirs(trigger: SaveTrigger, isFileDeleted: boolean): boolean {
+  return trigger === 'user' && isFileDeleted
+}
+
+/**
+ * Whether a failed save shows the panel's own toast (see {@link SaveTrigger}).
+ *
+ * @param trigger - Who asked for the save
+ * @param message - This failure's toast text
+ * @param lastShown - The last save-failure toast this panel showed for this
+ *   file, or null after a success or a file switch
+ */
+export function shouldToastSaveError(
+  trigger: SaveTrigger,
+  message: string,
+  lastShown: string | null
+): boolean {
+  if (trigger === 'registry') return false
+  return trigger === 'user' || message !== lastShown
+}
+
+/**
+ * Start tracking a save that is in flight.
+ *
+ * The panel keeps the promise of its running save in a ref, so a project
+ * switch can wait for it (`editorSaveRegistry.flushAll`) instead of starting a
+ * second write beside it.
+ *
+ * @param ref - The panel's in-flight ref
+ * @returns A function to call when the save has finished; it clears the ref
+ *   only if no newer save has replaced the promise
+ */
+export function trackSaveInFlight(ref: { current: Promise<void> | null }): () => void {
+  let finish: () => void = () => {}
+  const inFlight = new Promise<void>((resolve) => {
+    finish = resolve
+  })
+  ref.current = inFlight
+  return () => {
+    finish()
+    if (ref.current === inFlight) ref.current = null
+  }
+}
+
+/** The part of the panel's file state a finished save settles. */
+export interface SavedFileState {
+  /** Document text React holds */
+  content: string
+  /** Unsaved edits exist (drives the tab title, autosave and the dirty dot) */
+  modified: boolean
+}
+
+/**
+ * The file state after a successful write, in one step.
+ *
+ * The write is async, so the user can type while it runs: the buffer then no
+ * longer equals what was written. Taking the buffer's text and comparing it
+ * with the written text in the same update means React never renders the
+ * written (older) text as current, so the editor never sees a stale value
+ * and the tab is never briefly shown clean while it is not.
+ *
+ * @param prev - File state before the update (null when no file is open)
+ * @param written - Text that was written to disk
+ * @param bufferNow - The editor's text right after the write, or undefined
+ *   when no editor is mounted (the written text is then authoritative)
+ * @returns The new file state, or null when `prev` is null
+ *
+ * @example
+ * ```ts
+ * settleSavedFile({ content: 'a', modified: true }, 'ab', 'ab')  // { content: 'ab', modified: false }
+ * settleSavedFile({ content: 'a', modified: true }, 'ab', 'abc') // { content: 'abc', modified: true }
+ * ```
+ */
+export function settleSavedFile<T extends SavedFileState>(
+  prev: T | null,
+  written: string,
+  bufferNow: string | undefined
+): T | null {
+  if (!prev) return prev
+  const content = bufferNow ?? written
+  return { ...prev, content, modified: content !== written }
+}

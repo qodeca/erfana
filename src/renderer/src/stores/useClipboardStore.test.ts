@@ -92,13 +92,11 @@ describe('useClipboardStore (with dependency injection)', () => {
       cut('/project/file.md', 'file.md', 'file')
       const result = await paste('/project/target')
 
-      // Updated to expect all 4 parameters (last two undefined)
-      expect(mockMoveItem).toHaveBeenCalledWith(
-        '/project/file.md',
-        '/project/target',
-        undefined,
-        undefined
-      )
+      // A request object: the optional newName and replaceExisting are left out
+      expect(mockMoveItem).toHaveBeenCalledWith({
+        sourcePath: '/project/file.md',
+        targetParentPath: '/project/target'
+      })
       expect(result).toEqual({
         success: true,
         newPath: '/project/target/file.md'
@@ -118,7 +116,10 @@ describe('useClipboardStore (with dependency injection)', () => {
       copy('/project/file.md', 'file.md', 'file')
       const result = await paste('/project/target')
 
-      expect(mockCopyItem).toHaveBeenCalledWith('/project/file.md', '/project/target')
+      expect(mockCopyItem).toHaveBeenCalledWith({
+        sourcePath: '/project/file.md',
+        targetParentPath: '/project/target'
+      })
       expect(result).toEqual({
         success: true,
         newPath: '/project/target/file.md'
@@ -275,12 +276,11 @@ describe('useClipboardStore (with dependency injection)', () => {
       await paste('/project/target', true)
 
       // Verify moveItem called with 4 parameters including replaceExisting=true
-      expect(mockMoveItem).toHaveBeenCalledWith(
-        '/project/file.md',
-        '/project/target',
-        undefined,
-        true
-      )
+      expect(mockMoveItem).toHaveBeenCalledWith({
+        sourcePath: '/project/file.md',
+        targetParentPath: '/project/target',
+        replaceExisting: true
+      })
     })
 
     it('should pass replaceExisting=false to moveItem for cut operations', async () => {
@@ -292,12 +292,11 @@ describe('useClipboardStore (with dependency injection)', () => {
       await paste('/project/target', false)
 
       // Verify moveItem called with replaceExisting=false
-      expect(mockMoveItem).toHaveBeenCalledWith(
-        '/project/file.md',
-        '/project/target',
-        undefined,
-        false
-      )
+      expect(mockMoveItem).toHaveBeenCalledWith({
+        sourcePath: '/project/file.md',
+        targetParentPath: '/project/target',
+        replaceExisting: false
+      })
     })
 
     it('should pass replaceExisting=undefined when not provided', async () => {
@@ -309,12 +308,10 @@ describe('useClipboardStore (with dependency injection)', () => {
       await paste('/project/target')
 
       // Verify moveItem called with undefined for replaceExisting (default behavior)
-      expect(mockMoveItem).toHaveBeenCalledWith(
-        '/project/file.md',
-        '/project/target',
-        undefined,
-        undefined
-      )
+      expect(mockMoveItem).toHaveBeenCalledWith({
+        sourcePath: '/project/file.md',
+        targetParentPath: '/project/target'
+      })
     })
 
     it('should not pass replaceExisting to copyItem (copy operations)', async () => {
@@ -326,10 +323,14 @@ describe('useClipboardStore (with dependency injection)', () => {
       await paste('/project/target', true)
 
       // Copy operations don't use replaceExisting (auto-rename behavior)
-      expect(mockCopyItem).toHaveBeenCalledWith('/project/file.md', '/project/target')
+      expect(mockCopyItem).toHaveBeenCalledWith({
+        sourcePath: '/project/file.md',
+        targetParentPath: '/project/target'
+      })
       expect(mockCopyItem).toHaveBeenCalledTimes(1)
-      // Verify it was called with exactly 2 arguments (no replaceExisting)
-      expect(mockCopyItem.mock.calls[0]).toHaveLength(2)
+      // The request names no replaceExisting at all
+      expect(mockCopyItem.mock.calls[0]).toHaveLength(1)
+      expect(Object.keys(mockCopyItem.mock.calls[0][0]).sort()).toEqual(['sourcePath', 'targetParentPath'])
     })
   })
 })

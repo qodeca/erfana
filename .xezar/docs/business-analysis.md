@@ -1,0 +1,7 @@
+# Business analysis and acceptance
+
+Author and semantic reviewer use the same fifteen fields: revision, intake, problem, evidence, material assumptions, scope, non-goals, business rules, status quo, alternatives, acceptance criteria, failure paths, unknowns, recommendation, authority. Alternatives include status quo. One recommendation: analyze further, implement, spec first, defer or reject. No self-total substitutes for the actual list.
+
+Every AC has stable ID, verification and a concrete falsifier. Cover error, empty, partial, unauthorized, unavailable and already-done. Distinguish evidence/inference; cite file:line plus short safe fragment. Do not invent domain standards, acceptance or cleanup promises. Pin accepted content with revision+path/version or immutable criteria snapshot; a mutable rN label is insufficient. Hash final content into an external record, never inside the bytes being hashed. Reassess material changes before dependent work. Do not modify tool-managed manifests ad hoc.
+
+Independent review assesses meaning, not just headings or code gates. Reviewers report prioritized actionable findings, authors fix/dispute with evidence or propose scoped deferral, leader adjudicates. Required blockers prevent PASS; partial review has an explicit boundary and cannot certify all scope. Stop on remaining risk, not votes or minimum rounds. Green build, draft PR and merge are not business acceptance.

@@ -9,14 +9,15 @@
  * Test groups:
  * - Event listener registration (2 tests)
  * - Save shortcut (Cmd/Ctrl+S) (6 tests)
- * - Close shortcut (Cmd/Ctrl+W) (7 tests)
+ * - Close shortcut (Cmd/Ctrl+W) (6 tests)
  * - Platform detection (3 tests)
  * - Modifier key combinations (4 tests)
+ * - Enabled gate for multi-panel mounts (5 tests)
  *
- * Total: 22 tests
+ * Total: 26 tests
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import { renderHook } from '@testing-library/react'
 import { useKeyboardShortcuts } from './useKeyboardShortcuts'
 import { isMacOS } from '../utils/platform'
@@ -32,9 +33,9 @@ const mockIsMacOS = vi.mocked(isMacOS)
 describe('useKeyboardShortcuts', () => {
   let addEventListenerSpy: ReturnType<typeof vi.spyOn>
   let removeEventListenerSpy: ReturnType<typeof vi.spyOn>
-  let mockOnSave: ReturnType<typeof vi.fn>
-  let mockOnClose: ReturnType<typeof vi.fn>
-  let mockShowConfirm: ReturnType<typeof vi.fn>
+  let mockOnSave: Mock
+  let mockOnClose: Mock
+  let mockShowConfirm: Mock
 
   beforeEach(() => {
     vi.clearAllMocks()
@@ -273,6 +274,42 @@ describe('useKeyboardShortcuts', () => {
       })
     })
 
+    it('reads a function isModified at keypress time, not at render', async () => {
+      // The render-time value can trail the edit; a ⌘W in that gap used to
+      // close a dirty tab without asking.
+      let dirty = false
+      renderHook(() =>
+        useKeyboardShortcuts({
+          ...defaultOptions(),
+          isModified: () => dirty
+        })
+      )
+
+      dirty = true
+      window.dispatchEvent(createKeyboardEvent('w', { metaKey: true }))
+
+      await vi.waitFor(() => {
+        expect(mockShowConfirm).toHaveBeenCalledTimes(1)
+      })
+      expect(mockOnClose).not.toHaveBeenCalled()
+    })
+
+    it('closes without asking when a function isModified returns false', async () => {
+      renderHook(() =>
+        useKeyboardShortcuts({
+          ...defaultOptions(),
+          isModified: () => false
+        })
+      )
+
+      window.dispatchEvent(createKeyboardEvent('w', { metaKey: true }))
+
+      await vi.waitFor(() => {
+        expect(mockOnClose).toHaveBeenCalledTimes(1)
+      })
+      expect(mockShowConfirm).not.toHaveBeenCalled()
+    })
+
     it('does not trigger on Cmd+Shift+W', () => {
       renderHook(() => useKeyboardShortcuts(defaultOptions()))
 
@@ -378,6 +415,70 @@ describe('useKeyboardShortcuts', () => {
       window.dispatchEvent(event)
 
       expect(preventDefaultSpy).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('enabled gate (multi-panel mounts)', () => {
+    // Dockview keeps every opened editor panel mounted, so N open tabs means N
+    // copies of this hook share one `window` keydown stream. Before `enabled`
+    // existed, a single Cmd+W closed every tab and a single Cmd+S wrote every
+    // open buffer to disk. These tests pin the gate that stops that.
+    beforeEach(() => {
+      setPlatform('MacIntel')
+    })
+
+    it('ignores Cmd+S when disabled', () => {
+      renderHook(() => useKeyboardShortcuts({ ...defaultOptions(), enabled: false }))
+
+      window.dispatchEvent(createKeyboardEvent('s', { metaKey: true }))
+
+      expect(mockOnSave).not.toHaveBeenCalled()
+    })
+
+    it('ignores Cmd+W when disabled', () => {
+      renderHook(() => useKeyboardShortcuts({ ...defaultOptions(), enabled: false }))
+
+      window.dispatchEvent(createKeyboardEvent('w', { metaKey: true }))
+
+      expect(mockOnClose).not.toHaveBeenCalled()
+    })
+
+    it('does not prompt about unsaved changes when disabled', async () => {
+      renderHook(() =>
+        useKeyboardShortcuts({ ...defaultOptions(), isModified: true, enabled: false })
+      )
+
+      window.dispatchEvent(createKeyboardEvent('w', { metaKey: true }))
+      await Promise.resolve()
+
+      // A background tab must not raise a dialog for a keystroke aimed
+      // somewhere else.
+      expect(mockShowConfirm).not.toHaveBeenCalled()
+    })
+
+    it('handles shortcuts when enabled is omitted', () => {
+      renderHook(() => useKeyboardShortcuts(defaultOptions()))
+
+      window.dispatchEvent(createKeyboardEvent('s', { metaKey: true }))
+
+      expect(mockOnSave).toHaveBeenCalledTimes(1)
+    })
+
+    it('lets exactly one of two mounted instances act on a keypress', () => {
+      const activeClose = vi.fn()
+      const backgroundClose = vi.fn()
+
+      renderHook(() =>
+        useKeyboardShortcuts({ ...defaultOptions(), onClose: activeClose, enabled: true })
+      )
+      renderHook(() =>
+        useKeyboardShortcuts({ ...defaultOptions(), onClose: backgroundClose, enabled: false })
+      )
+
+      window.dispatchEvent(createKeyboardEvent('w', { metaKey: true }))
+
+      expect(activeClose).toHaveBeenCalledTimes(1)
+      expect(backgroundClose).not.toHaveBeenCalled()
     })
   })
 })

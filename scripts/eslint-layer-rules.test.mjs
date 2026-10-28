@@ -1,0 +1,373 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+
+/**
+ * The layer-import rules in eslint.config.mjs, proven to fire.
+ *
+ * shared imports nothing from main, renderer, preload or electron; renderer
+ * imports nothing from main and only types from preload; main imports nothing
+ * from renderer or preload. Each case lints a one-line source as if it lived at
+ * a real path, so a config edit that drops a rule (flat config replaces a rule
+ * wholesale, so this is easy to do by accident) turns this red.
+ */
+
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { ESLint } from 'eslint'
+import { describe, expect, it } from 'vitest'
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+const eslint = new ESLint({ cwd: ROOT })
+
+const LAYER = /Layer rule/
+
+/** Lint messages for `code` linted as if it were the file at `rel` */
+async function lint(rel, code) {
+  const [result] = await eslint.lintText(code, { filePath: path.join(ROOT, rel) })
+  return result.messages
+}
+
+/** Only the layer-rule messages */
+async function layerMessages(rel, code) {
+  return (await lint(rel, code)).filter((m) => LAYER.test(m.message))
+}
+
+const SHARED = 'src/shared/ipc/probe.ts'
+const MAIN = 'src/main/services/probe.ts'
+const MAIN_TEST = 'src/main/services/probe.test.ts'
+const MAIN_REGISTRY = 'src/main/ipc/registry.ts'
+const PRELOAD = 'src/preload/probe.ts'
+const RENDERER = 'src/renderer/src/utils/probe.ts'
+const HARNESS = 'src/renderer/src/imageExport/probe.ts'
+
+const val = (spec) => `import { a } from '${spec}'\nexport { a }`
+const typ = (spec) => `import type { a } from '${spec}'\nexport type { a }`
+
+describe('layer import rules', () => {
+  it.each([
+    ['main', val('../../main/a')],
+    ['main alias', val('@main/a')],
+    ['renderer', typ('../../renderer/src/a')],
+    ['renderer alias', typ('@renderer/a')],
+    ['preload', typ('../../preload/index')],
+    ['preload alias', typ('@preload/index')],
+    ['electron', val('electron')],
+    ['electron/main', val('electron/main')]
+  ])('src/shared may not import %s', async (_layer, code) => {
+    expect(await layerMessages(SHARED, code)).toHaveLength(1)
+  })
+
+  it('src/shared may import its own siblings and look-alike names', async () => {
+    for (const spec of ['./a', './main', './preload', '@electron-toolkit/preload']) {
+      expect(await layerMessages(SHARED, val(spec))).toHaveLength(0)
+    }
+  })
+
+  it.each([MAIN, MAIN_TEST, MAIN_REGISTRY])('%s may not import renderer or preload', async (file) => {
+    for (const code of [
+      val('../../renderer/src/a'),
+      val('@renderer/a'),
+      typ('../../preload/index'),
+      typ('@preload/index')
+    ]) {
+      expect(await layerMessages(file, code)).toHaveLength(1)
+    }
+  })
+
+  it('src/main may import shared and look-alike names', async () => {
+    for (const spec of ['../../shared/a', './preload', './renderer', '@electron-toolkit/preload']) {
+      expect(await layerMessages(MAIN, val(spec))).toHaveLength(0)
+    }
+  })
+
+  it('src/main still may not take ipcMain, from electron or electron/main', async () => {
+    for (const spec of ['electron', 'electron/main']) {
+      const messages = await lint(MAIN, `import { ipcMain } from '${spec}'\nexport { ipcMain }`)
+      expect(messages.some((m) => /ipcMain/.test(m.message))).toBe(true)
+    }
+  })
+
+  it('src/preload may not import the renderer, but may import main', async () => {
+    expect(await layerMessages(PRELOAD, val('../renderer/src/a'))).toHaveLength(1)
+    expect(await layerMessages(PRELOAD, val('@renderer/a'))).toHaveLength(1)
+    expect(await layerMessages(PRELOAD, val('../main/a'))).toHaveLength(0)
+  })
+
+  it.each([RENDERER, HARNESS])('%s may not import main', async (file) => {
+    expect(await layerMessages(file, val('../../../main/a'))).toHaveLength(1)
+    expect(await layerMessages(file, val('@main/a'))).toHaveLength(1)
+  })
+
+  it.each([RENDERER, HARNESS])('%s may import preload/index as a type only', async (file) => {
+    for (const spec of ['../../../preload/index', '../../../preload', '@preload/index']) {
+      expect(await layerMessages(file, val(spec))).toHaveLength(1)
+      expect(await layerMessages(file, typ(spec))).toHaveLength(0)
+    }
+  })
+
+  it('the renderer may not import any other preload file, even as a type', async () => {
+    // (Not asserted for the harness: its `../*` group exempts every type import.)
+    expect(await layerMessages(RENDERER, typ('../../../preload/x'))).toHaveLength(1)
+    expect(await layerMessages(RENDERER, typ('@preload/x'))).toHaveLength(1)
+  })
+
+  it('the renderer layer rule does not hit look-alike names', async () => {
+    for (const spec of ['./main', './preload', '@electron-toolkit/preload']) {
+      expect(await layerMessages(RENDERER, val(spec))).toHaveLength(0)
+    }
+  })
+
+  it('the image-export harness keeps its own "no app code" message (block order)', async () => {
+    const messages = await lint(HARNESS, "import { log } from '../utils/logger'\nexport { log }")
+    expect(messages.some((m) => /must not import app code/.test(m.message))).toBe(true)
+  })
+})
+
+describe('renderer gateway rule', () => {
+  const GATEWAY = /through their gateway in services\//
+  const gatewayMessages = async (rel, code) =>
+    (await lint(rel, code)).filter((m) => GATEWAY.test(m.message))
+
+  const READ_FILE = 'export const f = () => window.api.file.readFile("a")'
+  const READ_TERMINAL = 'export const t = () => window.api.terminal.kill("a")'
+
+  it('flags a renderer read of window.api.file and window.api.terminal', async () => {
+    expect(await gatewayMessages(RENDERER, READ_FILE)).toHaveLength(1)
+    expect(await gatewayMessages(RENDERER, READ_TERMINAL)).toHaveLength(1)
+    expect(await gatewayMessages(RENDERER, 'export const f = () => window.api?.file?.exists("a")')).toHaveLength(1)
+  })
+
+  it.each([
+    'export const f = () => window.api.fileWatch.start("a")',
+    'export const f = () => window.api.directoryWatch.pause("a")',
+    'export const f = () => window.api?.directoryWatch?.onDirectoryChanged?.(() => {})',
+    'export const f = () => window.api.git.getStatus("a")',
+    'export const f = () => window.api.gitWatcher.stop()',
+    'export const f = () => window.api.gitPolling.setEnabled(true)'
+  ])('flags the watcher and git bridges: %s', async (code) => {
+    expect(await gatewayMessages(RENDERER, code)).toHaveLength(1)
+  })
+
+  it.each([
+    'export const f = () => window.api.settings.getRecentProjects()',
+    'export const f = () => window.api.globalSettings.reset()',
+    'export const f = () => window.api.logging.getLevel()',
+    'export const f = () => window.api?.logging?.log',
+    'export const f = () => window.api.quit.sendQuitResponse(true)',
+    'export const f = () => window.api.system.relaunchApp()',
+    'export const f = () => window.api.clipboard.readText()',
+    'export const f = () => window.api?.testHooks?.enabled'
+  ])('flags the app bridges: %s', async (code) => {
+    expect(await gatewayMessages(RENDERER, code)).toHaveLength(1)
+  })
+
+  it.each([
+    'export const f = () => window.api.import.selectFile()',
+    'export const f = () => window.api?.import?.toolStatus',
+    'export const f = () => window.api.transcription.cancel()',
+    'export const f = () => window.api.whisper.listModels()',
+    'export const f = () => window.api.camera.save({})',
+    'export const f = () => window.api.pdf.exportToPdf({})',
+    'export const f = () => window.api.docx.exportToDocx({})',
+    'export const f = () => window.api.imageExport.run({})',
+    'export const f = () => window.api.browser.openFile("a")',
+    'export const f = () => window.api?.markdownImage?.read({})'
+  ])('flags the import, media and export bridges: %s', async (code) => {
+    expect(await gatewayMessages(RENDERER, code)).toHaveLength(1)
+  })
+
+  it.each([
+    'export const f = () => window.api.preview.reload("p")',
+    'export const f = () => window.api?.preview?.onOpenFileRequested(() => {})',
+    'export const f = () => new Provider("p", window.api.preview)'
+  ])('flags the preview bridge: %s', async (code) => {
+    expect(await gatewayMessages(RENDERER, code)).toHaveLength(1)
+  })
+
+  it.each([
+    'export const f = () => window.api.claudeStatus.nudge("t")',
+    'export const f = () => window.api?.claudeStatus?.onChanged(() => {})',
+    'export const f = () => window.api.utils.getPlatform()',
+    'export const f = () => window.api?.utils?.getPlatform?.()',
+    'export const f = () => window.api.screenshot.getDisplays()',
+    'export const f = () => window.api.projectLock.isLocked("p")',
+    'export const f = () => window.api.notABridgeYet.call()',
+    'export const f = () => window.api',
+    'export const f = () => globalThis.api.file'
+  ])('flags every read of window.api: %s', async (code) => {
+    expect(await gatewayMessages(RENDERER, code)).toHaveLength(1)
+  })
+
+  it.each([
+    ['destructuring', 'const { file } = window.api\nexport { file }'],
+    ['aliasing', 'const a = window.api\nexport { a }'],
+    ['assignment aliasing', 'let a\na = window.api\nexport { a }'],
+    ['computed on window.api', 'export const f = (k) => window.api[k]'],
+    ['computed literal on window.api', "export const f = () => window.api['file']"],
+    ['computed on window', "export const f = () => window['api']"],
+    ['computed on globalThis', 'export const f = (k) => globalThis[k]'],
+    ['globalThis.api', 'export const f = () => globalThis.api.file'],
+    ['self.api', 'export const f = () => self.api'],
+    ['a cast window', 'export const f = () => (window as unknown as { api: object }).api'],
+    ['optional-chain aliasing', 'const a = window?.api\nexport { a }'],
+    ['optional-chain assignment', 'let a\na = window?.api\nexport { a }'],
+    ['optional-chain destructuring', 'const { file } = window?.api\nexport { file }'],
+    ['destructuring api off window', 'const { api } = window\nexport { api }'],
+    ['destructuring api off globalThis', 'const { api } = globalThis\nexport { api }'],
+    ['destructuring api off self, renamed', 'const { api: a } = self\nexport { a }'],
+    ['destructuring a string api key', "const { 'api': a } = window\nexport { a }"],
+    ['destructuring api off a cast window', 'const { api } = window as unknown as { api: object }\nexport { api }'],
+    ['destructuring api off a non-null window', 'const { api } = window!\nexport { api }'],
+    ['destructuring api off an angle-bracket cast', 'const { api } = <{ api: object }>window\nexport { api }'],
+    ['assignment destructuring', 'let api\n;({ api } = window)\nexport { api }'],
+    ['assignment destructuring off a cast', 'let api\n;({ api } = globalThis as never)\nexport { api }'],
+    ['a parameter default', 'export const f = ({ api } = window) => api'],
+    ['a parameter default off a cast', 'export const f = ({ api } = window as never) => api'],
+    ['a nested default', 'export const f = (deps) => {\n  const { a: { api } = self } = deps\n  return api\n}'],
+    ['an angle-bracket cast', 'export const f = () => (<{ api: object }>window).api']
+  ])('flags %s', async (_name, code) => {
+    expect(await gatewayMessages(RENDERER, code)).toHaveLength(1)
+  })
+
+  it('leaves the image-export harness handle alone', async () => {
+    const code = 'export const h = (window as unknown as { imageExportApi: object }).imageExportApi'
+    expect(await gatewayMessages(HARNESS, code)).toHaveLength(0)
+  })
+
+  it('leaves look-alike names alone', async () => {
+    for (const code of [
+      'export const f = () => deps.window[method]("a")',
+      'export const f = (api) => api.file.readFile("a")',
+      'export const f = () => window.apiVersion',
+      'export const f = () => deps.window.api.file',
+      // An `api` key is everyday code (dockview: `const { api } = props`); only the global's counts
+      'export const f = (props) => {\n  const { api } = props\n  return api\n}',
+      'export const f = (deps) => {\n  const { api } = deps.window\n  return api\n}',
+      'export const f = (props) => {\n  let api\n  ;({ api } = props)\n  return api\n}',
+      'export const f = ({ api } = props) => api',
+      'const { location } = window\nexport { location }'
+    ]) {
+      expect(await gatewayMessages(RENDERER, code)).toHaveLength(0)
+    }
+  })
+
+  describe('the TerminalPanel files (temporary allowance)', () => {
+    const TERMINAL_PANEL_FILES = [
+      'src/renderer/src/components/Panels/TerminalPanel/hooks/useScreenshotCapture.ts',
+      'src/renderer/src/components/Panels/TerminalPanel/hooks/useTerminalDragDrop.ts'
+    ]
+
+    it.each(TERMINAL_PANEL_FILES)('%s may still read utils and screenshot', async (file) => {
+      for (const code of [
+        'export const f = (file) => window.api.utils.getPathForFile(file)',
+        'export const f = () => window.api.screenshot.getCapabilities()'
+      ]) {
+        expect(await gatewayMessages(file, code)).toHaveLength(0)
+      }
+    })
+
+    it.each(TERMINAL_PANEL_FILES)('%s may not read anything else off window.api', async (file) => {
+      for (const code of [
+        READ_FILE,
+        READ_TERMINAL,
+        'export const f = () => window.api.preview.reload("p")',
+        'export const f = (id) => window.api?.claudeStatus?.nudge(id)',
+        'export const f = (id) => window.api.claudeStatus.register(id)',
+        'const a = window.api\nexport { a }',
+        'const { utils } = window.api\nexport { utils }',
+        'const { api } = window\nexport { api }',
+        "export const f = () => window.api['utils']",
+        "export const f = () => window['api']",
+        'export const f = () => (window as unknown as { api: object }).api'
+      ]) {
+        expect(await gatewayMessages(file, code)).toHaveLength(1)
+      }
+    })
+
+    it('still applies the shared selectors there', async () => {
+      const messages = await lint(TERMINAL_PANEL_FILES[0], 'export const b = (p) => p.split("/").pop()')
+      expect(messages.some((m) => /POSIX-only basename/.test(m.message))).toBe(true)
+    })
+
+    it.each([
+      'src/renderer/src/components/Panels/TerminalPanel.tsx',
+      'src/renderer/src/components/Panels/TerminalPanel/hooks/useTerminalResize.ts',
+      'src/renderer/src/components/Panels/TerminalPanel/hooks/useXtermSession.ts'
+    ])('does not extend to %s', async (other) => {
+      const code = 'export const f = () => window.api.utils.getPlatform()'
+      expect(await gatewayMessages(other, code)).toHaveLength(1)
+    })
+  })
+
+  it.each([
+    'src/renderer/src/services/fileGateway.ts',
+    'src/renderer/src/services/terminalGateway.ts',
+    'src/renderer/src/services/fileWatchGateway.ts',
+    'src/renderer/src/services/directoryWatchGateway.ts',
+    'src/renderer/src/services/gitGateway.ts',
+    'src/renderer/src/services/settingsGateway.ts',
+    'src/renderer/src/services/loggingGateway.ts',
+    'src/renderer/src/services/quitGateway.ts',
+    'src/renderer/src/services/systemGateway.ts',
+    'src/renderer/src/services/clipboardGateway.ts',
+    'src/renderer/src/services/testHooksGateway.ts',
+    'src/renderer/src/services/importGateway.ts',
+    'src/renderer/src/services/transcriptionGateway.ts',
+    'src/renderer/src/services/cameraGateway.ts',
+    'src/renderer/src/services/documentExportGateway.ts',
+    'src/renderer/src/services/imageExportGateway.ts',
+    'src/renderer/src/services/browserGateway.ts',
+    'src/renderer/src/services/markdownImageGateway.ts',
+    'src/renderer/src/services/previewGateway.ts',
+    'src/renderer/src/services/claudeStatusGateway.ts',
+    'src/renderer/src/services/screenshotGateway.ts',
+    'src/renderer/src/services/utilsGateway.ts',
+    'src/renderer/src/services/bridgePresence.ts'
+  ])('exempts %s from the gateway rule only', async (file) => {
+    expect(await gatewayMessages(file, READ_FILE)).toHaveLength(0)
+    const messages = await lint(file, 'export const b = (p) => p.split("/").pop()')
+    expect(messages.some((m) => /POSIX-only basename/.test(m.message))).toBe(true)
+  })
+
+  it.each([
+    'src/renderer/src/utils/probe.test.ts',
+    'src/renderer/src/components/X/__test__/helper.ts',
+    'src/renderer/src/components/X/__tests__/helper.ts',
+    'src/renderer/src/components/X/__test-utils__/helper.ts'
+  ])('lets %s install mocks, and still applies the other selectors', async (file) => {
+    expect(await gatewayMessages(file, READ_FILE)).toHaveLength(0)
+    const messages = await lint(file, 'export const b = (p) => p.split("/").pop()')
+    expect(messages.some((m) => /POSIX-only basename/.test(m.message))).toBe(true)
+  })
+
+  it('keeps the gateway rule on the files that own a banned pattern', async () => {
+    expect(await gatewayMessages('src/renderer/src/utils/fileUtils.ts', READ_FILE)).toHaveLength(1)
+    const messages = await lint('src/renderer/src/utils/fileUtils.ts', 'export const b = (p) => p.split("/").pop()')
+    expect(messages.some((m) => /POSIX-only basename/.test(m.message))).toBe(false)
+  })
+})
+
+describe('preview visibility owner rule', () => {
+  const OWNER = /Preview visibility is owned by services\/preview\/OverlayGuardService/
+  const ownerMessages = async (rel, code) =>
+    (await lint(rel, code)).filter((m) => OWNER.test(m.message))
+  const OVERLAY_GUARD = 'src/renderer/src/services/preview/OverlayGuardService.ts'
+
+  it.each([
+    ['the gateway call', 'export const f = () => previewGateway.setVisibility("p", false, "r")'],
+    ['the bridge call', 'export const f = (api) => api.preview.setVisibility("p", false, "r")'],
+    ['the channel name', "export const c = 'preview:setVisibility'"]
+  ])('flags %s outside OverlayGuardService', async (_name, code) => {
+    expect(await ownerMessages(RENDERER, code)).toHaveLength(1)
+  })
+
+  it('lets OverlayGuardService call previewGateway.setVisibility', async () => {
+    const code = 'export const f = () => previewGateway.setVisibility("p", false, "r")'
+    expect(await ownerMessages(OVERLAY_GUARD, code)).toHaveLength(0)
+  })
+
+  it('leaves the gateway its own forwarder', async () => {
+    const code = 'const bridge = () => ({})\nexport const g = { setVisibility: (...a) => bridge().setVisibility(...a) }'
+    expect(await ownerMessages('src/renderer/src/services/previewGateway.ts', code)).toHaveLength(0)
+  })
+})

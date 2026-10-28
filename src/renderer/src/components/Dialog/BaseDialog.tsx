@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { useEffect, useRef, ReactNode } from 'react'
+import { useEffect, useRef, useState, ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { logger } from '../../utils/logger'
 import { TEST_IDS } from '../../constants/testids'
 import { useOccluder } from '../../hooks/useOccluder'
+import { useOverlayStackEntry } from '../../hooks/useOverlayStackEntry'
+import { isTopmostOverlay } from '../../utils/overlayStack'
 import './Dialog.css'
 
 // Small delay to ensure dialog is fully rendered before focusing
@@ -35,15 +37,76 @@ const FOCUS_DELAY_MS = 10
 // AT testing can confirm or refute the concern before anyone "fixes" it.
 const FOCUS_PROMOTION_WINDOW_MS = 1500
 
-// Focusable elements, excluding disabled controls. A disabled control cannot
-// take focus, so including it made `focusableElements[0]` a dead target and
-// made the Tab trap's first/last boundaries wrong. Matches the idiom of the
-// two per-dialog traps this file absorbed (DocumentImportDialog,
-// TranscriptionDialog), extended with the two selectors this dialog already
-// carried ([href], textarea) — a superset, so no dialog loses a boundary.
-const FOCUSABLE_SELECTOR =
-  'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), ' +
-  'textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
+// TABBABLE elements: what Tab can actually land on. Two exclusions matter:
+//
+// - Disabled controls cannot take focus, so including one made the first/last
+//   trap boundary a dead target.
+// - `tabindex="-1"` takes an element out of the Tab order, and EVERY arm has
+//   to say so, not only the bare `[tabindex]` one. The screen and window
+//   pickers use roving tabindex (only the selected option is 0); counting the
+//   `-1` options made the trap wrap Tab onto an UNSELECTED option (Enter then
+//   captured the wrong window) and let Shift+Tab from a selected option that
+//   was not first in DOM order walk out of the modal.
+//
+// Hidden inputs and invisible elements are skipped too: the browser's Tab
+// skips them, so a trap boundary on one would never be reached.
+const NOT_REMOVED = ':not([tabindex="-1"])'
+const TABBABLE_SELECTOR = [
+  `button:not(:disabled)${NOT_REMOVED}`,
+  `[href]${NOT_REMOVED}`,
+  `input:not(:disabled):not([type="hidden"])${NOT_REMOVED}`,
+  `select:not(:disabled)${NOT_REMOVED}`,
+  `textarea:not(:disabled)${NOT_REMOVED}`,
+  `[tabindex]${NOT_REMOVED}:not(:disabled)`
+].join(', ')
+
+/**
+ * The elements inside `root` that Tab can land on, in DOM order.
+ *
+ * `checkVisibility()` drops rendered-but-invisible controls (`display: none`
+ * ancestors, `visibility: hidden`). Where it is unavailable (jsdom) every
+ * selector match counts.
+ *
+ * @param root - The dialog container
+ * @returns Tabbable descendants in document order (possibly empty)
+ *
+ * @example
+ * ```ts
+ * const [first] = getTabbable(dialogElement)
+ * first?.focus()
+ * ```
+ */
+export function getTabbable(root: HTMLElement): HTMLElement[] {
+  return Array.from(root.querySelectorAll<HTMLElement>(TABBABLE_SELECTOR)).filter((el) =>
+    typeof el.checkVisibility === 'function' ? el.checkVisibility({ visibilityProperty: true }) : true
+  )
+}
+
+/**
+ * Ancestors of an opener that focus may fall back to when the opener itself
+ * has gone. `role="tree"` covers the project tree without touching it;
+ * `data-focus-return` lets any other widget opt in.
+ */
+const FOCUS_RETURN_REGION = '[role="tree"], [data-focus-return]'
+
+/**
+ * Where focus should go when a dialog closes: the opener while it is still in
+ * the document, otherwise its region – the region itself when it can take
+ * focus, else the first tabbable control inside it.
+ *
+ * @param opener - What had focus when the dialog opened, or null
+ * @param region - The opener's focus-return region, or null
+ * @returns The element to focus, or null to leave focus alone
+ */
+export function resolveFocusReturnTarget(
+  opener: HTMLElement | null,
+  region: HTMLElement | null
+): HTMLElement | null {
+  if (opener?.isConnected) return opener
+  if (region === null || !region.isConnected) return null
+  if (region.hasAttribute('tabindex')) return region
+  return getTabbable(region)[0] ?? null
+}
 
 // ---------------------------------------------------------------------------
 // Open-dialog stack
@@ -59,12 +122,18 @@ const FOCUSABLE_SELECTOR =
 // control, and Tab can therefore never advance. The concrete shipping case is
 // Cmd+Q during a transcription — the quit ConfirmDialog mounts on top of the
 // still-open TranscriptionDialog and neither Quit nor Cancel can be reached by
-// keyboard.
+// keyboard. The same stack decides who receives Escape (#229): before it did,
+// one Escape on that quit prompt also cancelled the transcription beneath it.
 //
-// The stack holds EVERY open BaseDialog, not only the trapping ones, because
-// the dialog that lands on top is frequently a plain ConfirmDialog that never
-// opted into `trapFocus`. Registering only trapping dialogs would leave exactly
-// the case above unfixed.
+// The stack itself lives in `utils/overlayStack.ts`, shared with the
+// non-BaseDialog overlays (SettingsOverlay, ContextMenu), so a context menu or
+// the Settings overlay ranks against dialogs on one scale.
+//
+// The stack holds EVERY open BaseDialog, not only the trapping ones. Since #91
+// every shipping dialog traps, but `trapFocus={false}` remains possible, and a
+// non-trapping dialog on top must still suppress the trap beneath it — the
+// quit ConfirmDialog was exactly that case before #91 made trapping the
+// default.
 //
 // ORDERING CONTRACT: the frontmost dialog is the one with the HIGHEST
 // `zIndex`, and registration order breaks a tie. Painted order is what the user
@@ -82,61 +151,24 @@ const FOCUSABLE_SELECTOR =
 // topmost, and reinstates the very app-wide keyboard trap this stack exists to
 // prevent. Comparing z-index removes the assumption instead of documenting it.
 //
-// Entries pair the per-instance container ref with the `zIndex` that instance
-// is rendering at. The ref is stable for the lifetime of a component instance
-// (so registration is idempotent under StrictMode's setup/cleanup/setup
-// double-invocation) and self-healing, since `isTopmost` skips entries whose
-// element is gone — a registration leaked by a component that never ran its
-// cleanup cannot wedge every later dialog.
-interface OpenDialogEntry {
-  ref: React.RefObject<HTMLDivElement>
-  zIndex: number
-}
-
-const openDialogStack: OpenDialogEntry[] = []
-
-/** Move `ref` to the top of the stack at `zIndex`, without ever duplicating it. */
-function registerOpenDialog(ref: React.RefObject<HTMLDivElement>, zIndex: number): void {
-  unregisterOpenDialog(ref)
-  openDialogStack.push({ ref, zIndex })
-}
-
-/** Remove `ref` from the stack. No-op when it is not registered. */
-function unregisterOpenDialog(ref: React.RefObject<HTMLDivElement>): void {
-  const index = openDialogStack.findIndex((entry) => entry.ref === ref)
-  if (index !== -1) {
-    openDialogStack.splice(index, 1)
-  }
-}
-
-/**
- * Whether `ref` is the frontmost open dialog — highest `zIndex` wins, and the
- * most recently registered of an equal-`zIndex` group wins the tie.
- *
- * Detached entries are skipped rather than trusted: React removes a portal
- * subtree in the mutation phase but runs the passive cleanup that unregisters
- * it later, so there is a real window in which a dead dialog still sits on the
- * stack. A dialog registered while nothing else is connected is topmost by
- * definition.
- */
-function isTopmostDialog(ref: React.RefObject<HTMLDivElement>): boolean {
-  let top: OpenDialogEntry | null = null
-  for (const entry of openDialogStack) {
-    const element = entry.ref.current
-    if (element === null || !element.isConnected) continue
-    // `>=`, not `>`: within one z-index the LAST registration is frontmost,
-    // which is the behaviour equal-z-index stacks had before z-index was
-    // compared at all.
-    if (top === null || entry.zIndex >= top.zIndex) top = entry
-  }
-  return top === null || top.ref === ref
-}
+// The per-instance container ref is the entry's identity. It is stable for the
+// lifetime of a component instance (so registration is idempotent under
+// StrictMode's setup/cleanup/setup double-invocation) and self-healing, since
+// the stack skips entries whose element is gone.
 
 export interface BaseDialogProps {
   isOpen: boolean
   onClose: () => void
   zIndex: number
   closeOnBackdrop?: boolean
+  /**
+   * Whether Escape acts on this dialog. Escape only ever reaches the TOPMOST
+   * open dialog or overlay (#229); while this dialog is on top and
+   * `closeOnEscape` is `false`, Escape does nothing at all – it does not fall
+   * through to the dialog beneath.
+   *
+   * @default true
+   */
   closeOnEscape?: boolean
   className?: string
   ariaLabelledBy?: string
@@ -205,9 +237,12 @@ export interface BaseDialogProps {
    */
   focusRescueRef?: React.RefObject<HTMLElement | null>
   /**
-   * Cycle Tab / Shift+Tab within the dialog. Opt-in: BaseDialog historically
-   * only auto-focused, and turning cycling on globally would change keyboard
-   * behaviour for every shipping dialog at once.
+   * Cycle Tab / Shift+Tab within the dialog. On by default (#91): the
+   * container's `aria-modal="true"` tells a screen reader that everything
+   * behind the dialog is inert, and that claim is only true while Tab cannot
+   * reach the page behind it. The two therefore travel together — passing
+   * `false` turns the trap off AND drops `aria-modal`, so the dialog never
+   * claims a modality it does not enforce. No shipping dialog opts out today.
    *
    * The trap also RECOVERS focus that has already escaped: when
    * `document.activeElement` is outside the dialog (`<body>` after a backdrop
@@ -226,7 +261,7 @@ export interface BaseDialogProps {
    * Both behaviours are suppressed while another dialog is stacked on top of
    * this one — see the open-dialog stack above.
    *
-   * @default false
+   * @default true
    */
   trapFocus?: boolean
   children: ReactNode
@@ -238,8 +273,10 @@ export interface BaseDialogProps {
  * Features:
  * - Portal rendering to #portal-root (consistent across all dialogs)
  * - Backdrop/overlay with configurable click-to-close
- * - Keyboard handling (Escape key)
- * - Focus trap for accessibility
+ * - Escape closes the topmost dialog only (shared overlay stack, #229)
+ * - Focus trap, on by default and coupled to `aria-modal` (#91)
+ * - Focus returns to the opener on close, whether `isOpen` goes false or the
+ *   dialog unmounts (DialogManager dialogs are removed, never set closed)
  * - Z-index management via props
  * - Fade-in animation
  */
@@ -255,11 +292,20 @@ export function BaseDialog({
   initialFocusRef,
   initialFocusKey,
   focusRescueRef,
-  trapFocus = false,
+  trapFocus = true,
   children
 }: BaseDialogProps) {
   const dialogRef = useRef<HTMLDivElement>(null)
-  const previousActiveElement = useRef<HTMLElement | null>(null)
+  // What had focus when this open cycle began – where focus returns on close –
+  // and the widget it lives in (a `role="tree"`, or an ancestor marked
+  // `data-focus-return`). Focus goes to the region when the opener itself is
+  // gone by close time (a tree row re-keyed by a rename, removed by a delete)
+  // instead of being dropped on <body>. `null` while closed. See the capture
+  // below for why it is taken during render.
+  const [openerCapture, setOpenerCapture] = useState<{
+    opener: HTMLElement | null
+    region: HTMLElement | null
+  } | null>(null)
   // The element BaseDialog itself last parked focus on for this open cycle, or
   // null before the first resolution. It is what makes a re-armed pass (see
   // `initialFocusKey`) able to tell "focus is still where we parked it" from
@@ -281,25 +327,41 @@ export function BaseDialog({
   // focusout, and without this the rescue could recurse.
   const isRescuingFocus = useRef(false)
 
-  // Store the currently focused element when dialog opens
-  useEffect(() => {
-    if (isOpen) {
-      previousActiveElement.current = document.activeElement as HTMLElement
-    }
-  }, [isOpen])
+  // Capture the opener DURING RENDER, once per open cycle. An effect is too
+  // late: a child's `autoFocus` (Alert, Conflict, DropMode) runs in the commit
+  // and a child's own focus effect (Prompt, FileSystem) runs before this
+  // parent's effects, so by the time any BaseDialog effect ran, "the focused
+  // element" was already a control inside the dialog — and restoring to it on
+  // close restored to a node that no longer exists.
+  //
+  // This is React's "adjust state while rendering" pattern: setting state
+  // during render makes React re-run this component straight away, before any
+  // child is committed, so no child has moved focus yet. It runs once per open
+  // cycle (`openerCapture` is null only while closed) and is idempotent across
+  // StrictMode's double render.
+  if (isOpen && openerCapture === null) {
+    const active = document.activeElement
+    const opener = active instanceof HTMLElement && active !== document.body ? active : null
+    setOpenerCapture({ opener, region: opener?.closest<HTMLElement>(FOCUS_RETURN_REGION) ?? null })
+  } else if (!isOpen && openerCapture !== null) {
+    // Closed: release the capture so the next open takes a fresh one. The
+    // restore effect's cleanup still holds the old value in its closure.
+    setOpenerCapture(null)
+  }
 
   // Stack membership. Registered for EVERY open dialog, trapping or not, so a
-  // non-trapping dialog opened on top still suppresses the trap beneath it.
+  // non-trapping dialog opened on top still suppresses the trap beneath it and
+  // takes Escape away from it.
   //
-  // `zIndex` is a dependency because it is half of the ordering key: a dialog
-  // re-rendered at a new z-index must be re-ranked, or the stack would answer
-  // "who is on top" from a stale paint order.
-  useEffect(() => {
-    if (!isOpen) return undefined
-
-    registerOpenDialog(dialogRef, zIndex)
-    return () => unregisterOpenDialog(dialogRef)
-  }, [isOpen, zIndex])
+  // `zIndex` is a registration dependency because it is half of the ordering
+  // key: a dialog re-rendered at a new z-index must be re-ranked, or the stack
+  // would answer "who is on top" from a stale paint order. The Escape action
+  // is NOT – it is read at keystroke time (see useOverlayStackEntry).
+  useOverlayStackEntry(dialogRef, {
+    active: isOpen,
+    zIndex,
+    onEscape: closeOnEscape ? onClose : null
+  })
 
   // Preview occluder (item 63, design §1.8 NEW-10). Every dialog composing on
   // BaseDialog occludes the live preview view while open. Deliberately a
@@ -364,8 +426,8 @@ export function BaseDialog({
         // `document.body` is where Chromium leaves focus after blurring a
         // control that just became disabled. In a `trapFocus` dialog the
         // focusout rescue normally gets there first and re-parks focus on a
-        // live control (updating `placed`), so this arm mostly covers the
-        // non-trapping dialogs; it is kept because it costs nothing and the
+        // live control (updating `placed`), so this arm mostly covers a
+        // `trapFocus={false}` dialog; it is kept because it costs nothing and the
         // rescue has boundary cases (no focusable control at all) where focus
         // really does stay on `<body>`.
         const active = document.activeElement
@@ -378,7 +440,7 @@ export function BaseDialog({
         return
       }
 
-      const fallback = dialog?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)[0]
+      const fallback = dialog ? getTabbable(dialog)[0] : undefined
       fallback?.focus()
       autoFocusedElement.current = fallback ?? null
     }, FOCUS_DELAY_MS)
@@ -386,27 +448,7 @@ export function BaseDialog({
     return () => clearTimeout(timer)
   }, [isOpen, initialFocusRef, initialFocusKey])
 
-  // Keyboard event handler
-  useEffect(() => {
-    if (!isOpen || !closeOnEscape) return
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        e.stopPropagation()
-        onClose()
-      }
-    }
-
-    // Add listener with capture to ensure it runs before other handlers
-    document.addEventListener('keydown', handleKeyDown, true)
-
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown, true)
-    }
-  }, [isOpen, closeOnEscape, onClose])
-
-  // Tab-cycling trap. Opt-in via `trapFocus`. The list is recomputed on every
+  // Tab-cycling trap (`trapFocus`, on by default). The list is recomputed on every
   // keystroke so controls that enable/disable mid-session move the boundaries
   // with them. Bubble phase, matching the two local traps this replaced
   // (DocumentImportDialog, TranscriptionDialog).
@@ -421,9 +463,9 @@ export function BaseDialog({
       // this check the escaped-focus branch below reads "focus is in the top
       // dialog" as "focus escaped to the page" and drags it down here, which
       // makes the top dialog keyboard-unreachable. See the open-dialog stack.
-      if (!isTopmostDialog(dialogRef)) return
+      if (!isTopmostOverlay(dialogRef)) return
 
-      const focusable = dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)
+      const focusable = getTabbable(dialog)
       // Boundary: nothing to cycle between AND nothing to pull focus back to.
       // Handing the keystroke to the browser is the only non-throwing option --
       // preventDefault() here would swallow Tab with no target to move focus
@@ -465,7 +507,7 @@ export function BaseDialog({
     return () => document.removeEventListener('keydown', handleFocusTrap)
   }, [isOpen, trapFocus])
 
-  // Keystroke-free focus recovery. Part of the `trapFocus` opt-in.
+  // Keystroke-free focus recovery. Part of `trapFocus`.
   //
   // Chromium blurs a focused control the instant it becomes `disabled` and
   // moves focus NOWHERE: `relatedTarget` is null and `document.activeElement`
@@ -518,7 +560,7 @@ export function BaseDialog({
 
       // Another dialog is stacked on top: it owns focus now, and a control of
       // ours going disabled underneath it must not yank focus out of it.
-      if (!isTopmostDialog(dialogRef)) return
+      if (!isTopmostOverlay(dialogRef)) return
 
       // A legitimate move to another control inside the dialog (Tab, a click).
       const next = event.relatedTarget as Node | null
@@ -569,20 +611,41 @@ export function BaseDialog({
       ) {
         return preferred
       }
-      return dialog.querySelector<HTMLElement>(FOCUSABLE_SELECTOR)
+      return getTabbable(dialog)[0] ?? null
     }
 
     dialog.addEventListener('focusout', handleFocusOut)
     return () => dialog.removeEventListener('focusout', handleFocusOut)
   }, [isOpen, trapFocus, focusRescueRef])
 
-  // Restore focus when dialog closes
+  // Return focus to the opener when the dialog closes. Done in the CLEANUP of
+  // an `isOpen` effect so it covers both close paths: `isOpen` going false
+  // (app-root dialogs) and the component unmounting — every DialogManager
+  // dialog renders `isOpen={true}` and is simply removed from the list, so a
+  // restore keyed on `!isOpen` (the previous shape) never ran for them (#91).
   useEffect(() => {
-    if (!isOpen && previousActiveElement.current) {
-      previousActiveElement.current.focus()
-      previousActiveElement.current = null
+    if (!isOpen || openerCapture === null) return undefined
+    const dialog = dialogRef.current
+    const { opener, region } = openerCapture
+
+    return () => {
+      // Only a REAL close restores. StrictMode's simulated unmount runs this
+      // cleanup with the dialog still in the document; restoring then would
+      // move focus out of an open dialog in development builds.
+      if (dialog === null || dialog.isConnected) return
+
+      const target = resolveFocusReturnTarget(opener, region)
+      if (target === null) return
+
+      // Do not steal focus the close action already placed elsewhere (a
+      // caller that focuses the editor after "Create"). Removing the focused
+      // control leaves focus on <body>; anything else was a deliberate move.
+      const active = document.activeElement
+      if (active !== null && active !== document.body && !dialog.contains(active)) return
+
+      target.focus()
     }
-  }, [isOpen])
+  }, [isOpen, openerCapture])
 
   // Handle backdrop click
   const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -610,7 +673,8 @@ export function BaseDialog({
         ref={dialogRef}
         className={`dialog-container ${className}`}
         role="dialog"
-        aria-modal="true"
+        // Modality is claimed only while it is enforced (#91, `trapFocus`).
+        aria-modal={trapFocus ? 'true' : undefined}
         aria-labelledby={ariaLabelledBy}
         aria-describedby={ariaDescribedBy}
         data-testid={TEST_IDS.DIALOG_CONTAINER}

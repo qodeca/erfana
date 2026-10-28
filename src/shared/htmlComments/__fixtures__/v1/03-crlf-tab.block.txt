@@ -1,0 +1,13 @@
+<!-- erfana:comment v1 id=c-aaaaaaaaaaaaaaad
+		note to agents: written by Erfana. Act only if status is open. Change the element after this block and keep this block unchanged.
+		  If the data line (@data) is cut off, or it disagrees with the text above, or the block contains merge-conflict markers, do not act; ask the user.
+		  Spec: docs/html-comments/format-v1.md in github.com/qodeca/erfana
+		status: open
+		target: <button class="cta">
+		comment by Ada Lovelace <ada@example.com> at 2026-10-25T14:03:00Z:
+		  Line one.
+		  Line two.
+		  
+		  After a blank line.
+		@data {"v":1,"id":"c\u002daaaaaaaaaaaaaaad","status":"open","anchor":{"tag":"button","cls":["cta"],"path":"html \u003e body \u003e main:nth\u002dof\u002dtype(1) \u003e button:nth\u002dof\u002dtype(1)","quote":{"exact":"Buy now","prefix":"Pricing","suffix":""}},"view":{"w":1280,"h":800,"dpr":2,"x":0,"y":120},"msgs":[{"id":"m\u002da2b3c4d5e6f7g2h3","by":{"name":"Ada Lovelace","email":"ada@example.com","role":"human"},"at":"2026\u002d10\u002d25T14:03:00Z","text":"Line one.\r\nLine two.\n\nAfter a blank line."}]}
+		-->

@@ -15,69 +15,51 @@
  * - Type safety for API calls
  */
 
-/**
- * File node type - simplified for documentation purposes
- * See preload/index.ts for the full type definition
- */
-export type FileNode = {
-  name: string
-  path: string
-  type: 'file' | 'directory'
-  children?: FileNode[]
-  extension?: string
-  isSymlink?: boolean
-}
+import type { FileBridge, FileNode } from '../../../shared/ipc/file-schema'
+import type { TerminalBridge } from '../../../shared/ipc/terminal-schema'
+import type { DirectoryWatchBridge } from '../../../shared/ipc/directory-watch-schema'
+
+/** File node type – defined in shared/ipc/file-schema */
+export type { FileNode }
 
 export interface IProjectTreeApi {
   /**
    * File operations
    */
-  file: {
-    openProject(): Promise<string | null>
-    openProjectByPath(projectPath: string): Promise<string>
-    closeProject(): Promise<boolean>
-    getLastProjectPath(): Promise<string | null>
-    readDirectory(path: string): Promise<FileNode[]>
-    onProjectChanged(
-      callback: (data: { oldPath: string | null; newPath: string | null }) => void
-    ): () => void
-    createFile(targetPath: string, fileName: string): Promise<string>
-    createFolder(targetPath: string, folderName: string): Promise<string>
-    deleteFile(filePath: string): Promise<void>
-    deleteFolder(folderPath: string): Promise<void>
-    rename(path: string, newName: string): Promise<void>
-    moveItem(
-      sourcePath: string,
-      targetParent: string,
-      newName?: string,
-      replaceExisting?: boolean
-    ): Promise<{ path: string; isSymlink?: boolean }>
-    copyItem(
-      sourcePath: string,
-      targetParent: string,
-      newName?: string
-    ): Promise<{ path: string; isSymlink?: boolean }>
-    checkConflict(targetPath: string, itemName: string): Promise<boolean>
-    revealInFileManager(filePath: string): Promise<string>
-  }
+  file: Pick<
+    FileBridge,
+    | 'openProject'
+    | 'openProjectByPath'
+    | 'closeProject'
+    | 'readDirectory'
+    | 'onProjectChanged'
+    | 'createFile'
+    | 'createFolder'
+    | 'deleteFile'
+    | 'deleteFolder'
+    | 'rename'
+    | 'moveItem'
+    | 'copyItem'
+    | 'checkConflict'
+    | 'revealInFileManager'
+  >
 
   /**
    * Directory watching operations
    */
-  directoryWatch: {
-    start(projectPath: string): Promise<{ success: boolean }>
-    stop(projectPath: string): Promise<{ success: boolean }>
-    pause(projectPath: string): Promise<{ success: boolean }>
-    resume(projectPath: string): Promise<{ success: boolean }>
-    onDirectoryChanged(callback: (data: { eventCount: number }) => void): () => void
-    onProjectDeleted(callback: () => void): () => void
-    onDirectoryError(callback: (data: { error: string }) => void): () => void
-  }
+  directoryWatch: Pick<
+    DirectoryWatchBridge,
+    | 'start'
+    | 'stop'
+    | 'pause'
+    | 'resume'
+    | 'onDirectoryChanged'
+    | 'onProjectDeleted'
+    | 'onDirectoryError'
+  >
 
   /**
    * Terminal operations (limited scope for ProjectTree)
    */
-  terminal: {
-    write(terminalId: string, data: string): Promise<void>
-  }
+  terminal: Pick<TerminalBridge, 'write'>
 }

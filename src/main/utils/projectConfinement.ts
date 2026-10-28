@@ -27,12 +27,26 @@
  */
 import path from 'path'
 import { realpath } from 'fs/promises'
+import { isInsideRoot } from './pathCompare'
 
-/** Refusal message for a path that leaves the project. */
-export const OUTSIDE_PROJECT_MESSAGE = 'Cannot read files outside the project directory'
+// The refusal messages are shared with the IPC path checker, so a toast reads the same from either
+import {
+  OUTSIDE_PROJECT_MESSAGE,
+  UNVERIFIABLE_PATH_MESSAGE
+} from '../ipc/confinement/ConfinementError'
 
-/** Refusal message for a path whose confinement could not be established. */
-export const UNVERIFIABLE_PATH_MESSAGE = 'Cannot verify this path is inside the project directory'
+export { OUTSIDE_PROJECT_MESSAGE, UNVERIFIABLE_PATH_MESSAGE }
+
+/**
+ * These helpers carry no session, so they have no case rule: they compare
+ * exactly, as they always did. The case-aware check is `ipc/confinement`.
+ *
+ * On macOS `isInsideRoot` also folds Unicode normalisation (NFC), as APFS and HFS+ do. On a
+ * volume that does not (SMB shares, exFAT), two names that differ only in normalisation are
+ * different folders there but read as one here; the check then errs towards "inside" for a
+ * name the user would have to have created on purpose.
+ */
+const LEGACY_CASE_SENSITIVE = true
 
 /**
  * What a confinement check concluded.
@@ -51,13 +65,19 @@ export type ConfinementVerdict = 'inside' | 'outside' | 'missing' | 'unverifiabl
  * caller may stat or reveal the project folder.
  */
 export function isLexicallyInside(filePath: string, projectPath: string): boolean {
-  const resolved = path.resolve(filePath)
-  const resolvedRoot = path.resolve(projectPath)
-  return resolved === resolvedRoot || resolved.startsWith(resolvedRoot + path.sep)
+  return isInsideRoot(path.resolve(filePath), path.resolve(projectPath), LEGACY_CASE_SENSITIVE)
 }
 
 /**
- * Run both stages and report what they concluded.
+ * What {@link resolveInsideProject} concluded: the verdict, plus the canonical
+ * path when – and only when – the target is inside.
+ */
+export type ConfinementResolution =
+  | { verdict: 'inside'; realPath: string }
+  | { verdict: Exclude<ConfinementVerdict, 'inside'> }
+
+/**
+ * Run both stages, and hand back the canonical path of a target that is inside.
  *
  * The canonical stage runs even when the lexical one already said "outside":
  * `/tmp` and `/private/tmp` name the same macOS directory, so a root and a file
@@ -66,11 +86,15 @@ export function isLexicallyInside(filePath: string, projectPath: string): boolea
  * lexically it is `missing`/`unverifiable` (the caller's own ENOENT is the
  * honest error), outside lexically it stays `outside`, so this never becomes an
  * existence oracle for arbitrary filesystem paths.
+ *
+ * A caller that acts on the file should act on `realPath`, the path that was
+ * checked, rather than on the requested one, so a link repointed after the
+ * check does not decide what is opened (`browser:openFile`, issue #124).
  */
-export async function classifyConfinement(
+export async function resolveInsideProject(
   filePath: string,
   projectPath: string
-): Promise<ConfinementVerdict> {
+): Promise<ConfinementResolution> {
   const lexicallyInside = isLexicallyInside(filePath, projectPath)
 
   let realRoot: string
@@ -80,14 +104,26 @@ export async function classifyConfinement(
     realTarget = await realpath(path.resolve(filePath))
   } catch (error) {
     if (!lexicallyInside) {
-      return 'outside'
+      return { verdict: 'outside' }
     }
-    return (error as NodeJS.ErrnoException).code === 'ENOENT' ? 'missing' : 'unverifiable'
+    const code = (error as NodeJS.ErrnoException).code
+    return { verdict: code === 'ENOENT' ? 'missing' : 'unverifiable' }
   }
 
-  return realTarget === realRoot || realTarget.startsWith(realRoot + path.sep)
-    ? 'inside'
-    : 'outside'
+  return isInsideRoot(realTarget, realRoot, LEGACY_CASE_SENSITIVE)
+    ? { verdict: 'inside', realPath: realTarget }
+    : { verdict: 'outside' }
+}
+
+/**
+ * Run both stages and report the verdict only (see {@link resolveInsideProject}
+ * for how each one is reached).
+ */
+export async function classifyConfinement(
+  filePath: string,
+  projectPath: string
+): Promise<ConfinementVerdict> {
+  return (await resolveInsideProject(filePath, projectPath)).verdict
 }
 
 /**

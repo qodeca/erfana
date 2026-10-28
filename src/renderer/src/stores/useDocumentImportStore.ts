@@ -17,8 +17,12 @@
 import { create } from 'zustand'
 import type {
   DocumentImportProgress,
-  DocumentImportResult
+  DocumentImportResult,
+  ToolState,
+  UnsafeTool
 } from '../../../shared/ipc/import-schema'
+import { importGateway } from '../services/importGateway'
+import { hasBridgeMethod } from '../services/bridgePresence'
 
 /**
  * State and actions for the document import workflow.
@@ -65,8 +69,16 @@ interface DocumentImportState {
   // Dependency status (set by DependencyReadyEvent)
   /** Whether LibreOffice (soffice) is available for Office document conversion */
   hasLibreOffice: boolean
-  /** Whether ImageMagick is available for image conversion */
-  hasImageMagick: boolean
+  /** What LibreOffice detection found (#250); null until a result arrives */
+  libreOfficeState: ToolState | null
+  /** For an `unsafe` LibreOffice: which program and why (never a path); null otherwise */
+  libreOfficeUnsafe: UnsafeTool
+  /** Whether a detection result has arrived yet (until then, the two fields above are only defaults) */
+  toolStatusKnown: boolean
+  /** Whether a status read or "Check again" is in flight (#250) */
+  isCheckingTools: boolean
+  /** Outcome of the last read or "Check again", for the Settings live region (#250) */
+  toolCheckOutcome: 'idle' | 'checked' | 'throttled' | 'failed'
 
   // Actions
   /** Open the import dialog for a specific document file */
@@ -89,6 +101,12 @@ interface DocumentImportState {
   fetchExtensions: () => Promise<void>
   /** Subscribe to dependency-ready events; returns cleanup function */
   initDependencyListener: () => () => void
+  /**
+   * Read the optional import tools' status from main (#250). `recheck: true`
+   * is "Check again": main clears its per-session cache and probes again
+   * (rate-limited). A call while one is in flight is ignored.
+   */
+  loadToolStatus: (recheck: boolean) => Promise<void>
 
   // Internal – progress event handler (exposed for testing)
   /** Handle incoming progress events from the main process */
@@ -137,7 +155,11 @@ export const useDocumentImportStore = create<DocumentImportState>((set, get) => 
   documentExtensions: [],
 
   hasLibreOffice: false,
-  hasImageMagick: false,
+  libreOfficeState: null,
+  libreOfficeUnsafe: null,
+  toolStatusKnown: false,
+  isCheckingTools: false,
+  toolCheckOutcome: 'idle',
 
   openDialog: (filePath: string, fileName: string, fileSize: number, fileType: string) => {
     // Reject if an import is currently running
@@ -193,7 +215,7 @@ export const useDocumentImportStore = create<DocumentImportState>((set, get) => 
     })
 
     // Subscribe to progress events from the main process
-    progressCleanup = window.api.import.onDocumentProgress((progress) => {
+    progressCleanup = importGateway.onDocumentProgress((progress) => {
       get()._handleProgress(progress)
     })
 
@@ -208,7 +230,7 @@ export const useDocumentImportStore = create<DocumentImportState>((set, get) => 
         }
       }
 
-      const result = await window.api.import.documentImport(request)
+      const result = await importGateway.documentImport(request)
 
       // Unsubscribe from progress events after completion
       if (progressCleanup) {
@@ -253,7 +275,7 @@ export const useDocumentImportStore = create<DocumentImportState>((set, get) => 
     }
 
     try {
-      await window.api.import.cancelDocument()
+      await importGateway.cancelDocument()
     } catch {
       // Cancel is best-effort; the import may have already completed
     }
@@ -285,7 +307,7 @@ export const useDocumentImportStore = create<DocumentImportState>((set, get) => 
 
   fetchExtensions: async () => {
     try {
-      const extensions = await window.api.import.getDocumentExtensions()
+      const extensions = await importGateway.getDocumentExtensions()
       set({ documentExtensions: extensions })
     } catch {
       // Silently fail – extensions will remain empty until next fetch
@@ -293,17 +315,45 @@ export const useDocumentImportStore = create<DocumentImportState>((set, get) => 
   },
 
   initDependencyListener: () => {
-    if (!window.api?.import?.onDependenciesReady) {
+    if (!hasBridgeMethod('import', 'onDependenciesReady')) {
       return () => {}
     }
-    const cleanup = window.api.import.onDependenciesReady((event) => {
+    const cleanup = importGateway.onDependenciesReady((event) => {
       set({
         documentExtensions: event.extensions,
-        hasLibreOffice: event.libreOffice,
-        hasImageMagick: event.imageMagick
+        hasLibreOffice: event.libreOffice === 'found',
+        libreOfficeState: event.libreOffice,
+        libreOfficeUnsafe: event.libreOffice === 'unsafe' ? (event.unsafe ?? null) : null,
+        toolStatusKnown: true
       })
     })
     return cleanup
+  },
+
+  loadToolStatus: async (recheck: boolean) => {
+    if (get().isCheckingTools) return
+    if (!hasBridgeMethod('import', 'toolStatus')) return
+    set({ isCheckingTools: true })
+    try {
+      const response = await importGateway.toolStatus({ recheck })
+      if (response.success) {
+        set({
+          documentExtensions: response.extensions,
+          hasLibreOffice: response.libreOffice === 'found',
+          libreOfficeState: response.libreOffice,
+          libreOfficeUnsafe: response.libreOffice === 'unsafe' ? (response.unsafe ?? null) : null,
+          toolStatusKnown: true,
+          isCheckingTools: false,
+          // Only "Check again" reports an outcome; the silent read on open
+          // resets it, so a reopened Settings never shows a stale message.
+          toolCheckOutcome: recheck ? (response.throttled ? 'throttled' : 'checked') : 'idle'
+        })
+      } else {
+        set({ isCheckingTools: false, toolCheckOutcome: 'failed' })
+      }
+    } catch {
+      set({ isCheckingTools: false, toolCheckOutcome: 'failed' })
+    }
   },
 
   _handleProgress: (progress: DocumentImportProgress) => {

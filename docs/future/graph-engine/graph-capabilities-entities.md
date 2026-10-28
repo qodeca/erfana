@@ -463,4 +463,4 @@ ORDER BY depth, name;
 - [Architecture](./architecture-overview.md) – Graph store integration with graphology
 - [Data Model](./data-model.md) – Entities, edges, mentions schema
 - [Hybrid Search](./hybrid-search-fundamentals.md) – Graph-aware boosts
-- [Implementation Guide](./implementation-guide.md) – M3/M4 milestones
+- [Implementation Guide](./implementation-guide/README.md) – M3/M4 milestones

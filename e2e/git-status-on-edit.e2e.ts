@@ -37,6 +37,8 @@ import {
   ProjectTreePage,
   byTestId
 } from './utils/helpers'
+import { expectToStayVisible } from './utils/wait-helpers'
+import { E2E_CHROMIUM_ARGS } from './fixtures/isolation'
 
 const execFileAsync = promisify(execFile)
 
@@ -111,7 +113,7 @@ test.describe('Git status badge auto-refresh on editor save', () => {
 
     try {
       electronApp = await electron.launch({
-        args: [path.join(__dirname, '..'), `--user-data-dir=${userDataDir}`],
+        args: [path.join(__dirname, '..'), `--user-data-dir=${userDataDir}`, ...E2E_CHROMIUM_ARGS],
         env: {
           ...process.env,
           NODE_ENV: 'development',
@@ -167,8 +169,7 @@ test.describe('Git status badge auto-refresh on editor save', () => {
       // Catches a regression where status flips back to "clean" after a
       // brief flash (cooldown race, stale store update overwriting fresh
       // state) — a fleeting render would otherwise satisfy toBeVisible.
-      await window.waitForTimeout(500)
-      await expect(modifiedBadge).toBeVisible()
+      await expectToStayVisible(modifiedBadge, 500)
 
       // Assert the badge content — a regression that changes the status
       // letter to 'A' (added), 'U' (untracked), or '!' (conflicted) would

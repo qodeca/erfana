@@ -2,7 +2,8 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react'
 import { subscribeGlobalToasts } from './toastService'
-import { useOccluder } from '../../hooks/useOccluder'
+import { resolveToastDuration } from './toastDwell'
+import { addToStack, focusedToastId } from './toastStack'
 
 /**
  * An optional actionable button rendered inside a toast (design §5(c), item 64).
@@ -24,9 +25,20 @@ export interface Toast {
   title: string
   message: string
   type: 'info' | 'success' | 'error' | 'warning'
+  /**
+   * Requested dwell in ms; `0` means "until dismissed". A request, not a
+   * command: errors always persist and warnings are floored – see
+   * `resolveToastDuration` in `toastDwell.ts`. On a stored toast this holds the
+   * resolved value.
+   */
   duration?: number
   /** Optional action button; presence forces `duration: 0` (manual dismiss). */
   action?: ToastAction
+  /**
+   * How many times this same toast was raised while it was on screen
+   * (shown as "×3"); absent or 1 for a single occurrence. See `toastStack.ts`.
+   */
+  count?: number
 }
 
 interface ToastContextType {
@@ -48,30 +60,30 @@ export function useToast() {
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([])
 
-  // Occlude the live preview view while any toast is shown (item 64): toasts
-  // paint above the preview at a modal z-index, so the WebContentsView must
-  // hide behind its still frame until the stack clears.
-  useOccluder('toast', toasts.length > 0)
+  // The 'toast' occluder is registered by `ToastNotification`, NOT here: it is
+  // conditional on the stack failing to find a position clear of the live
+  // preview, and only the renderer knows the geometry. Registering it here for
+  // every toast is what used to hide a preview the toast never covered.
 
   const showToast = useCallback((toast: Omit<Toast, 'id'>) => {
     const id = `toast-${Date.now()}-${Math.random()}`
     const newToast: Toast = {
       ...toast,
       id,
-      // An actionable toast is manual-dismiss only: force `duration: 0` so the
-      // auto-dismiss timer below never fires and the user has unbounded time to
-      // read the host and click the action (design §5(c), item 64).
-      duration: toast.action ? 0 : (toast.duration ?? 3000)
+      // Severity decides the floor (errors and actionable toasts persist,
+      // warnings get longer), so a caller cannot reintroduce a 3 s error.
+      duration: resolveToastDuration(toast)
     }
 
-    setToasts((prev) => [...prev, newToast])
-
-    // Auto-remove after duration - use setToasts directly to avoid stale closure
-    if (newToast.duration && newToast.duration > 0) {
-      setTimeout(() => {
-        setToasts((prev) => prev.filter((t) => t.id !== id))
-      }, newToast.duration)
-    }
+    // The countdown itself lives in `ToastItem` (`useToastDwellTimer`), not
+    // here: only the rendered toast knows whether the pointer or focus is on
+    // it, and the timer must pause while it is.
+    //
+    // Errors stay until closed, so repeats merge into one toast with a count
+    // and sticky toasts are capped, never dropping the focused one
+    // (`toastStack.ts`).
+    const focused = focusedToastId()
+    setToasts((prev) => addToStack(prev, newToast, focused))
   }, [])
 
   const removeToast = useCallback((id: string) => {

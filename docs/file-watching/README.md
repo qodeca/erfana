@@ -7,9 +7,9 @@ Erfana automatically detects and responds to external file system changes using 
 **FileWatcherService**: Watches individual open files for content changes, surfaces editor reload/conflict UI
 **DirectoryWatcherService**: Watches entire project directory for both structural changes (create/delete/rename) **and** in-place content changes (`fs.writeFile` in place), broadcasts `directory-watch:changed` for both
 
-Both use [Chokidar](https://github.com/paulmillr/chokidar) for cross-platform file system monitoring with intelligent debouncing and race condition prevention.
+FileWatcherService uses [Chokidar](https://github.com/paulmillr/chokidar) on every platform. DirectoryWatcherService uses chokidar on Linux, and on Windows and macOS a native recursive watcher built on Node's own `fs.watch` ([#211](https://github.com/qodeca/erfana/issues/211)) – see [Watch backends](#watch-backends-211). Both share the debouncing and race-condition guards described below.
 
-> **Chokidar is pinned to exact `3.6.0` (v3 line; do not upgrade to v4).** v3 uses a single macOS FSEvents stream (~0 file descriptors per watched file); v4 dropped FSEvents and watches each file via kqueue (one FD per file), which exhausts the process FD table on large projects and breaks spawning child processes – PDF export's hidden render window crashed with `Failed to initialize sandbox` on a 20k-file folder (commit `68cfab8`, shipped in v0.12.0). The rationale is also in `DirectoryWatcherService.ts:202-206`.
+> **Chokidar is pinned to exact `5.0.0`.** chokidar 3 pulled `braces` (GHSA-vfj7-8cjw-p6xm, no patched release) into the production tree. chokidar 4+ has no globbing (a name such as `[draft] {v2}.md` is literal) and no macOS FSEvents: it watches each file via kqueue / `fs.watch` (one FD per file), which exhausts the process FD table on large projects and breaks spawning child processes – PDF export's hidden render window crashed with `Failed to initialize sandbox` on a 20k-file folder (the reason for the earlier 3.6.0 pin, commit `68cfab8` – pre-migration; no longer resolvable, that history was rewritten at the 2026-06 migration – shipped in v0.12.0). That is why the project directory watcher on macOS runs on the native backend instead; single-file watches stay on chokidar. The rationale is also in the comment in the `chokidar.watch(...)` options of `createChokidarWatcher` (`src/main/services/watcher/directoryWatchBuilders.ts`).
 
 ---
 
@@ -25,7 +25,7 @@ Monitors open files for external content modifications.
 - **Scope**: Per-file watching (on-demand when file is opened)
 - **Limit**: 100 files maximum, app-wide (security). The cap governs **new** map entries only — joining a path that is already watched can never fail on it (#70)
 - **Symlinks**: `followSymlinks: false` — the watch is on the path itself, never on what a link at that path points at (#70)
-- **Consumers**: two renderer hooks — `useFileWatcher` (Markdown editor, read/write) and `useFileChangeSubscription` (read-only surfaces, #70). Both hold a `fileWatchSlot`
+- **Consumers**: two renderer hooks – `useFileWatcher` (Markdown editor, read/write) and `useFileChangeSubscription` (read-only surfaces, #70). Both hold a `fileWatchSlot`. Separately, the HTML preview keeps its own main-process pool, `src/main/services/preview/PreviewWatchPool.ts`, built on the same `createSingleFileWatcher` factory with a shorter write-finish wait and capped at 16 files per preview on top of the app-wide cap – see [HTML preview § Auto-refresh](../html-preview/README.md#auto-refresh)
 
 ### Use Cases
 
@@ -34,8 +34,14 @@ Monitors open files for external content modifications.
 | File modified externally, no local changes | Auto-reload silently, show "Reloaded from disk" in toolbar (1s) |
 | File modified externally, has unsaved changes | Show orange conflict bar with options |
 | File replaced atomically (write temp + rename) | Surfaces as `file-watch:changed`, not a delete — see [Single-file watch internals](#single-file-watch-internals-70) |
+| Erfana's own save of a document or of `~/.erfana/settings.json` | Crash-safe: `atomicWriteText` / `atomicWriteJSON` (`src/main/utils/atomicWrite.ts`) write a same-folder temp file named `.erfana-tmp-<uuid>` (settings use `.<uuid>.tmp`), fsync it, then rename it over the target – so the editor's own save is the atomic-replace row above. Symlinked, hard-linked, read-only, foreign-owned files and mounts that cannot rename are written in place instead. `.erfana-tmp-*` is dropped by `shouldDropRel` in `watcher/DirectoryWatcherCore.ts` (both backends) and skipped by the tree walk, so it never shows in the tree or triggers a reload; temp files older than 10 minutes left by a crash are swept in the background when a project opens (`atomicTempSweep.ts`) |
 | File deleted externally | Show red warning banner, keep editor state |
-| Watch dies for any other reason | `file-watch:error` — the consumer shows a degraded state instead of silently going stale (#70) |
+| Parent folder renamed, moved or deleted externally | Same as a delete: banner, `(deleted)` in the tab. A single-file chokidar watch hears nothing when its parent folder is renamed, so the project watcher's removals are forwarded to `FileWatcherService.handleAncestorRemovals` (both backends), which runs the affected watch through the normal unlink branch, existence re-check included. A removal that lands while the project watch is paused for one of the app's own operations is forwarded when the pause ends (`PauseEpisode.externalRemovals`, kept as the top-most removed folder). The operation's own removals are left out when it noted them (`noteInternalChange`, usually after their events arrived). Past 256 remembered removals the deepest are folded into their folder, and the open files under that folder are checked on disk instead of being reported; after a resync, or past the internal-change cap, the same check covers the whole watch (`checkWatchedFilesUnder`, which skips the paths the operation removed itself) (#252) |
+| Folder above an open file renamed or deleted where the project watcher cannot see | Same banner. The project watcher never reports an excluded, hidden or ignored folder (`dist`, `node_modules`, a `files.exclude` entry), so `FileWatcherService` re-checks the files `DirectoryWatcherService.reportsRemovalsAbove` cannot speak for (`watcher/unseenWatchProbe.ts`, #252): only this session's files inside the project, one `stat` at a time with a 1 s time box (a timeout counts as present), every 2 s plus the last round's duration, and only while some open file is unseen. A file is reported after two rounds in a row found it gone, and never while the app's own operation is removing it. Here only ENOENT/ENOTDIR count as gone, and a locked or unreadable file (EBUSY, EPERM, EACCES, EIO) is still there (`watcher/pathPresence.ts`) |
+| An open file that cannot be read when its unlink arrives | It counts as still there and the watch is re-armed, as with the probe. The exception is Windows: a file deleted while another process holds it open answers EPERM or EBUSY until the last handle closes ("delete pending"). On win32 only, the unlink branch asks such a file again after 250 ms (`isPresentAfterSettle`): one that clears is re-armed, one that answers EPERM or EBUSY again ends as **deleted** – keeping a watch on it would stop its folder being deleted. A replacement that cannot be resolved because it is gone is also a delete, never `WATCH_DEAD_OUTSIDE_PROJECT` (#252) |
+| Save fails (any reason) | One error toast with the reason (wording from `formatSaveError` in `utils/errorUtils.ts`); the tab stays dirty and the buffer keeps the edit. A failing autosave repeats the toast only when the reason changes (reset when the panel switches file). A save by id through `editorSaveRegistry` shows no panel toast – its caller toasts on `false` |
+| "Save to restore it" when the folder is gone | Only the tab's own **Cmd/Ctrl+S** of a tab already in the deleted state passes `createParentDirs`, so main recreates the missing folders (inside the project only, nearest existing ancestor checked canonically like `resolveInsideProject` – `file/restoreParentDirectory.ts`) and writes the file back at its original path. An autosave or a save by id (e.g. the preview-move unsaved-changes prompt) never recreates a folder; it fails with the toast instead. If the project folder itself is gone the reason says so. Any save or reload that clears the deleted state also starts a new watch – main ended the old one, every count with it, on the delete, so the renderer's slot forgets its hold then (`forgetFileWatch`) and sends no `stop` that could take another tab's count for the same file – so later outside edits reach the tab without reopening it (#252) |
+| Watch dies for any other reason | `file-watch:error` — the consumer shows a degraded state instead of silently going stale (#70). A watch the main process ended carries `ended: true`, and the renderer slot forgets its hold, as on a delete, so no later `stop` takes another tab's count (#252). The Markdown editor has no degraded state for it yet and only logs it |
 | Rapid changes (git operations) | Debounced to single reload |
 
 ### IPC Channels
@@ -50,7 +56,7 @@ Monitors open files for external content modifications.
 | `file-watch:stats` | Renderer → Main | Watcher diagnostics |
 | `file-watch:changed` | Main → Renderer | Event: File content changed externally (**including** an atomic replace, #70) |
 | `file-watch:deleted` | Main → Renderer | Event: File genuinely deleted externally |
-| `file-watch:error` | Main → Renderer | Event: chokidar error, **or** the watch died and cannot be re-armed (#70) |
+| `file-watch:error` | Main → Renderer | Event: chokidar error, **or** the watch died and cannot be re-armed (#70) – then with `ended: true` (#252) |
 
 ### Implementation Location
 
@@ -67,7 +73,7 @@ Monitors open files for external content modifications.
 - **Integration**: `src/renderer/src/components/Panels/MarkdownEditorPanel.tsx`, `src/renderer/src/components/Panels/ImageViewerPanel/`
 - **UI Component**: `src/renderer/src/components/FileConflictNotification/`
 
-### Self-Save Echo Detection (v0.9.1, #124)
+### Self-Save Echo Detection (v0.9.1)
 
 The `useFileWatcher` hook prevents autosave-triggered file change events from being treated as external modifications. Three-layer defense:
 
@@ -79,6 +85,9 @@ The `MarkdownEditorPanel` coordinates via:
 - Reading content from Monaco editor model (not React state) to avoid stale closure overwrites
 - Calling `notifySaveComplete(savedContent)` after a successful write, which adds the content to `pendingSavedContentsRef`
 - Post-save dirty re-detection: checks if Monaco buffer diverged from saved content during the save, re-marks as modified if so
+- The editor is uncontrolled (`MonacoMarkdownEditor` mounts with `defaultValue`, never `value`): it owns its buffer, and a new `content` reaches it only as an outside change – a reload, an accepted external change, the conflict bar's "Reload from Disk". `utils/monacoValueSync.ts` tells those apart from the editor's own `onChange` echo (which can lag the buffer by a few keys under load and must never be written back) and applies them as one minimal `pushEditOperations` edit, so the cursor and the undo stack survive and no `onChange` fires. Taking the disk's text also clears the tab's dirty dot (`setEditorDirty(panelId, false)` in `handleContentUpdateFromWatcher`)
+- **Undo after "Reload from Disk" brings the discarded edit back.** The reload is its own undo step, so Cmd+Z right after it restores the local text the user chose to discard – the same as a revert in VS Code. That undo is an ordinary user edit: the tab turns dirty again and autosave writes the restored text over the reloaded file about two seconds later
+- Save by panel id (#124): the panel registers its save, its conflict flag and an autosave hold in `services/editorSaveRegistry.ts` through `useEditorSaveRegistration`, so the HTML preview's tab move can save another tab when the user answers Save in the unsaved-changes prompt. The save is the panel's own `handleSave`, so every guard above still applies. While the prompt is open the move holds the tab's autosave (`cancelAutoSave`, re-armed by `signalChange` on release). It fails safe: a panel id with no entry, or a save that throws, answers `false`, and the move is abandoned with the edits kept in their tab
 
 ### Conflict Resolution UI
 
@@ -87,6 +96,18 @@ When a file has both external changes and unsaved local changes, an orange confl
 - **Reload from Disk**: Discard local changes, load external version
 - **Keep My Version**: Ignore external changes, keep local edits
 - **Dismiss**: Acknowledge conflict, decide later
+
+**Wrap `reloadFromDisk`, never pass it as a bare `onClick` reference.** Its
+signature is `reloadFromDisk(prefetchedContent?: string)`, so React hands a
+click handler its synthetic mouse event as that first argument. Wiring
+`onClick={onReload}` therefore adopted the event as the file's new content and
+crashed the editor panel on the next render (`content.split is not a
+function`). Write `onClick={() => onReload()}`.
+
+TypeScript cannot catch a recurrence: a zero-argument signature is assignable
+to a one-argument DOM handler. `reloadFromDisk` now also ignores any argument
+that is not a string and re-reads from disk instead, but that guard is the
+second line of defence, not a licence to skip the wrapper.
 
 ---
 
@@ -117,6 +138,7 @@ follows the detector's verdict lives in `watcher/atomicRearm.ts`:
 | Session token bumped inside the window | `file-watch:error` (`WATCH_DEAD_SESSION_ENDED`), then drop — never a silent drop |
 | Path no longer resolves inside the project | `file-watch:error` (`WATCH_DEAD_OUTSIDE_PROJECT`), then drop |
 | `chokidar.watch()` throws on the replacement | `file-watch:error` (`WATCH_DEAD_REARM_FAILED`), then drop |
+| The watch is stopped, replaced or the service disposed while a check waits on the disk (on Windows the check can wait 250 ms for a second look) | Nothing. The detector keeps each pending check until its verdict is delivered, so `cancelPending`, `stopAll` and `dispose` also stop one already running, and the re-arm re-checks that its entry is still the watched one. A late verdict never reaches, re-arms or drops a newer watch on the same path (#252) |
 | Path vanishes between the existence check and `chokidar.watch()` | `file-watch:deleted` + drop, so no zombie entry holds a `MAX_WATCHED_FILES` slot |
 
 Two design points that are easy to undo by accident:
@@ -134,7 +156,10 @@ Two design points that are easy to undo by accident:
 
 **Platform split — measured, not assumed.** On **macOS** (fsevents,
 `usePolling: false`) chokidar v3 reports `mv tmp target` over a watched path as
-**`change`**, not `unlink`, and the watch keeps working afterwards. The re-arm
+**`change`**, not `unlink`, and the watch keeps working afterwards. That was
+measured on chokidar 3 with fsevents; on chokidar 5 a macOS single-file watch
+runs on `fs.watch`, so the answer may differ – the test below asserts the
+disjunction either way. The re-arm
 branch is therefore **dormant on macOS**, and the ordinary debounced change path
 is what carries the fix there. The branch matters on platforms that do report
 `unlink`. This is pinned by
@@ -176,7 +201,7 @@ still released on unmount would decrement a count it never incremented.
 - **`hooks/useFileChangeSubscription.ts`** — a read-only subscription for
   surfaces that only *display* a file. Deliberately **not** an option on
   `useFileWatcher`: that hook is structurally text-coupled (it reads the file as
-  UTF-8 and hands a `string` to `onContentUpdate`), and its #124 echo/conflict
+  UTF-8 and hands a `string` to `onContentUpdate`), and its v0.9.1 echo/conflict
   machinery is dead weight for a surface that never writes. It returns
   `{ isReloading, isFileDeleted, isWatchUnavailable, unavailableReason,
   markReloaded, recover }`, depends on `[filePath]` only (callbacks live in
@@ -204,38 +229,47 @@ Monitors entire project folder for structural changes (files/folders created, de
 
 ### Architecture
 
-- **Library**: Chokidar (recursive watching)
-- **Event Pipeline**: VS Code-inspired ThrottledWorker + EventCoalescer
+- **Backend**: chokidar 5.0.0 on Linux; one `NativeRecursiveWatcher` per project on Windows (#211) and macOS – see [Watch backends](#watch-backends-211)
+- **Event Pipeline**: VS Code-inspired ThrottledWorker + EventCoalescer, the same for both backends
   - 75ms collection window for batching events
   - 200ms throttle between processing rounds
-  - AtomicSaveDetector (100ms) for unlink events
+  - AtomicSaveDetector (100ms) for unlink events – chokidar only; the native backend has already confirmed a removal with `lstat`
 - **Events**: `add`, `addDir`, `unlink`, `unlinkDir`, `change`
-- **Scope**: Entire project directory (recursive)
+- **Scope**: Entire project directory (recursive), minus every excluded, hidden or ignored path – see [Watched files](#watched-files)
+- **Start**: only after the project's first tree read settles (#211) – see [The watcher starts after the first tree read](#the-watcher-starts-after-the-first-tree-read-211)
 - **Cleanup**: Automatic on window close and app quit
 
 > The `change` event covers in-place file content modifications from any source – Monaco autosave, terminal commands (`sed`, `echo >>`), external editors, format-on-save scripts. It is what wakes `useGitStatus.debouncedRefresh()` so the Project Tree's git badges update after an edit without a manual refresh. Prior to this, only structural changes broadcast on this channel, so badges only updated after create/delete/rename – not after editing an existing file.
 
 ### Watched Files
 
-Uses a **selective blacklist** approach (same as VS Code) with function-based ignore for reliability.
+Uses a **selective blacklist** approach (same as VS Code). Since #211 one project path filter, `ProjectPathFilter` (`src/main/utils/projectPathFilter.ts`), answers "is this path dropped?" for the tree walk and for both watcher backends, always on the **project-relative** path. A path is dropped when it is:
+
+- **excluded** – matched by the `files.exclude` list (global plus project; merge and syntax: [Settings § Exclude list](../settings.md#exclude-list-filesexclude)). The tree does not show or read it and neither backend watches it;
+- **hidden** – any path segment equals a `tree.hiddenPatterns` name (the tree's own rule; default `node_modules` and `.git`). Neither backend watches it;
+- **ignored** – `/` + the relative path contains `/` + a `watcher.ignoreList` entry (default `DEFAULT_WATCHER_IGNORE_PATTERNS` in `src/shared/constants.ts`). The tree still shows it; neither backend watches it. A folder that matches an entry on whole segments (`dist`, `src/dist`, `.yarn/cache` – not `outline` for `out`) is a **lazy** row: the walk does not read it, and the tree reads one level of it when it is expanded (see [the lazy tree walk note](../performance/2026-10-22-lazy-tree-walk.md));
+- **outside the project** – dropped, fail closed. The project root itself is never dropped.
+
+Because the test runs on the project-relative path, a project that itself lives under a folder named `build`, `out` or `dist` is watched normally; before #211 the substring test ran on the absolute path and such a project was not watched at all. The ignore rule is still a substring test, so `out` also matches `outline` (a known limit).
 
 **What IS watched:**
 - Dotfolders: `.claude/`, `.github/`, `.vscode/`, `.idea/`
 - Dotfiles: `.env`, `.gitignore`, `.npmrc`, etc.
-- Git state: `.git/HEAD`, `.git/config`, `.git/refs/`
-- Build outputs: `out/`, `dist/`, `build/`
 
 This ensures AI agent file changes (e.g., Claude Code creating `.claude/commands/`) are immediately detected.
 
 **What is NOT watched (performance):**
+- `.git/` as a whole – it is a default hidden name, so since #211 chokidar no longer watches it either; `GitWatcherService` owns git state
 - `node_modules/`, `.pnpm/`, `.yarn/cache/`, `bower_components/` - JS package managers
 - `.venv/`, `venv/`, `.virtualenv/`, `.conda/` - Python virtual environments
-- `.git/objects/`, `.git/subtree-cache/`, `.git/lfs/` - Git internals
 - `dist/`, `build/`, `out/`, `.output/` - Build outputs
 - `.next/`, `.nuxt/`, `.cache/`, `.parcel-cache/`, `.turbo/`, `.vite/` - Framework caches
 - `coverage/`, `__pycache__/`, `.pytest_cache/`, `target/` - Test/build artifacts
+- Anything in the project's `files.exclude` list
 
-This approach provides full dotfolder visibility while maintaining performance on large projects.
+**Filter order.** On chokidar the drop test is the function-based `ignored` option, so a dropped folder is never scanned. On the native backend (Windows, macOS) it runs in the native watcher's callback before any `lstat`. Both backends then pass through the same backstop in `DirectoryWatcherService.queueEvent`, right after the session guard and **before** pause accounting and metrics: a dropped path is never counted as a missed change while paused, never counted as received (`eventsFiltered` counts it instead), and never broadcast. A burst of only dropped paths therefore sends nothing to the renderer, so it starts neither a tree re-read nor a git refresh.
+
+`setPathFilter(filter)` replaces the filter; `ProjectService` builds a fresh one on every project open and hands the **same** instance to `FileService` and `DirectoryWatcherService`. Until then the default hidden and ignore lists apply, with no exclude list.
 
 ### Watch Depth (Performance)
 
@@ -245,11 +279,45 @@ The directory watcher supports an optional recursive depth cap to reduce load on
 - No UI control at the moment. Configure via preload settings API, e.g. in DevTools:
   - `await window.api.settings.setDirectoryWatchDepth(2)`
   - `await window.api.settings.setDirectoryWatchDepth(null)` for Unlimited
-- Behavior: Applies to chokidar `depth` option; the watcher will use the new setting on the next start
+- Behavior: on chokidar it is the `depth` option. On the native backend (Windows, macOS) the handles stay recursive and deeper events are dropped by the filter, with chokidar's rule (a path of *n* segments is dropped when *n* − 1 > depth). The watcher uses the new setting on the next start
 
 Recommended:
 - Start with "Unlimited"
 - Use smaller depths when the tree is very large and deep
+
+### Watch backends (#211)
+
+`selectDirectoryWatchBackend(platform, env)` (`src/main/services/watcher/directoryWatchBackend.ts`) picks the backend: `native-recursive` on `win32` and `darwin`, `chokidar` on Linux. `DirectoryWatcherService` reads it once, in its constructor (the optional `{ backend }` option overrides it, which the native wiring suite uses), and logs `Directory watcher backend selected` at the first watch. Both backends satisfy the same `DirectoryWatchHandle` seam (`on(...)`, `close(): Promise<void>`), so everything after the watcher – `queueEvent`, the throttle, the coalescer, pause, catch-up – is shared.
+
+**Escape hatch.** `ERFANA_DIRECTORY_WATCHER=chokidar` in the environment Erfana starts with forces chokidar on every platform. It exists for support and diagnosis only: there is no setting and no UI. Only that exact value counts; any other non-empty value is ignored and logged as `Directory watcher override ignored: unknown value` (the value itself is not logged).
+
+**Why Windows changed.** chokidar 3 on Windows opens one `fs.watch` handle per folder and scans the whole project while the first tree read runs. On a project of about 222,000 entries that meant tens of thousands of handles, and the scan competed with the tree walk for libuv's four-thread pool. The native backend holds a small, bounded set of handles instead, and none at all for excluded, hidden or ignored folders it knows about.
+
+**Why macOS changed.** chokidar 4+ dropped FSEvents and opens one file descriptor per watched file, which on a large project exhausts the FD table and breaks child-process spawns such as PDF export's render window. Node's recursive `fs.watch` is served by FSEvents on macOS (~0 FDs per file), so the project watcher uses the native backend there too, with the same plan below. **Not yet verified on a real Mac:** macOS behaviour is covered by unit tests with a fake file system and the Linux CI run only.
+
+**Path rules per platform.** `NativeRecursiveWatcher` takes a `platform` option (default `process.platform`). On `win32` a backslash in a reported name is a separator and a `\\?\` / `\\?\UNC\` prefix is stripped; elsewhere only `/` separates and a backslash is an ordinary file-name character.
+
+**The Windows plan** (`src/main/services/watcher/NativeRecursiveWatcher.ts`):
+
+- The root is watched **non-recursively**. Every direct child folder of a *split folder* gets **one recursive** watch, unless it is itself a split folder, where the rule repeats one level down. A dropped child gets no handle at all, so its churn never fills a Windows change buffer.
+- *Split folders* are the root plus every ancestor of a *split path*. Split paths are the **path entries** of the exclude list (`filter.splitPaths()`) and the **walk hints**: the dropped folders at two or more segments deep that the last completed root tree walk met – `packages/a/node_modules`, `src/dist`, `a/b/test-tmp` from `**/test-tmp`. The walk visits every folder anyway, so a hint costs no I/O. Hints are read when the watcher plans (start or restart).
+- **Caps:** 64 path-entry split paths and 64 walk hints, each at most 16 segments deep, and at most **512 handles** per project. Past a cap a folder keeps one recursive watch (its events are still dropped by the filter), and the `Native directory watcher ready` line logs `planCapped: true`. A plan pass opens every direct child before it expands any split one, so the handle cap collapses a deeper folder, never a later sibling. A split folder whose listing fails (other than as gone) also keeps one recursive watch.
+- **Links are never watched.** Junctions, directory symlinks and file symlinks are leaves: never split, never given a handle. An entry that `readdir` does not type as a plain file or folder is confirmed with `lstat`.
+- Every handle is opened under `fs.realpathSync.native(root)`, never the 8.3 short form, which guards against a libuv 1.52.x abort on a short-name watch. Electron 44 ships libuv 1.52.1, which is affected, so this guard is load-bearing (Electron 39 shipped 1.51.0, which was not). Emitted paths are joined onto the caller's root string.
+- Keys are folded to lower case (Windows is case-insensitive), so a case-only rename re-lists a folder instead of opening a second watch.
+
+**Events.** `fs.watch` reports only `rename` or `change` plus a name. A raw event is dropped by the filter first; a surviving one is classified by one `lstat` in `NativeEventClassifier` (at most 2 in flight, a 10,000-path backlog) and emitted as `add`, `addDir`, `unlink`, `unlinkDir` or `change`. A new direct child folder of a split folder is reported (`addDir`) only once its own watch is open. Details, the mapping table and the deleted- and renamed-folder handling: [Technical details § The Windows native watcher](./technical-details.md#the-windows-native-watcher-211).
+
+**Lost events → one debounced re-read.** Windows reports a full change buffer as a `null` filename. On a split folder's own (non-recursive) watch the folder is re-listed and only the differences are emitted. On a recursive watch, or when the classifier backlog trips, the watcher asks for a **resync**, debounced to 1 s of quiet and at most 5 s of waiting, so one burst costs one re-read. `DirectoryWatcherService.handleResync` answers it with one `catchUp: true` refresh – or, while paused, records it as one unknown drop in the pause episode, which the pausing window's next completed read covers (#210). The watch keeps working after an overflow; it is not re-opened.
+
+### The watcher starts after the first tree read (#211)
+
+`useProjectManagement` keeps a `firstReadPending` state, and `initialLoadComplete` – what `useDirectoryWatcher` waits for – is now `projectPath !== null && !firstReadPending`. The `project:changed` listener sets it in the same synchronous block as `setProjectPath`, so the render that remounts the tree never starts a watcher early. It is cleared when that first read settles, **success or failure** (a failed first read can still self-heal through the watcher), when a superseding reload settles, on close, and on main's no-op re-open. Before #211 the flag was `true` from mount, so chokidar's initial scan (or the new backend's plan) competed with the first tree read. Git status still starts at once. Neither the tree read nor git status ever waits for the watcher's `ready`.
+
+**Closing the start gap.** A change made during the first read in a folder the walk has already passed, or before the watcher's plan has opened that folder's watch, is in no tree read and in no event: the watch that would report it did not exist yet. Until 2026-10-27 such a file showed only with the next change or a manual Refresh – collapsing and re-opening its folder served the same listing (design #211 risk R4, seen as the `html-preview-comments` E-004 e2e failure, see the [flake register](../windows/known-flakes.md)). Two fixes close it:
+
+- **A catch-up refresh at `ready`.** When the backend reports `ready` – every watch of the plan is open – `DirectoryWatcherEvents.handleWatchReady` sends one `directory-watch:changed` with `catchUp: true`, so the tree is read once more with the watch in place; while paused it records one unknown drop instead, like a resync. A restart's new watcher ends there too. A `ready` from a watcher that was replaced, or from an earlier session, is ignored. The cost is one extra tree read per watch start.
+- **Opening a folder checks it against the disk.** When the user opens one folder (click, key or drag hover), `useExpandReconcile` lists that folder once more – one shallow `file:readDirectory`, one level – and refreshes the whole tree only when the names or kinds on disk differ from what the tree shows. Not for the root row, a lazy folder (read on expand anyway) or several folders opened at once. So collapsing and re-opening a folder is a cheap recovery for any change a watcher missed, not only this one.
 
 ### Use Cases
 
@@ -260,9 +328,25 @@ Recommended:
 | Edit file content (Monaco autosave or external edit) | Git status badge refreshes after autosave settles (~2.5–3 s total) |
 | Git checkout (bulk changes) | Debounced to single refresh after changes settle |
 | Internal CRUD (create/delete/rename) | Watcher paused, no double refresh |
+| Another program (e.g. an agent in the terminal) adds or removes items while an internal CRUD runs | One catch-up refresh at resume; none when nothing outside changed or the operation's own refresh already showed it (#210) |
 | Expand folders, make external changes | Folders remain expanded after refresh |
+| A file is created right after the project opens, before the watcher is ready | One catch-up refresh when the watch is ready shows it |
+| Collapse a folder and open it again | Its listing is checked against the disk; a difference refreshes the tree |
+| Very large project keeps changing while the tree is being read | Changes are picked up by one follow-up read after the running one; reads never overlap and the tree never shows an older state (#208) |
+| Something keeps writing inside an excluded, hidden or ignored folder | Nothing reaches the renderer: no tree re-read, no git refresh (#211) |
+| A burst overflows a Windows change buffer | One debounced catch-up re-read about 1 s after the burst ends, at most every 5 s while it lasts (#211) |
+| A file a Markdown preview links to is created, deleted or moved | The preview forgets its remembered link checks and re-checks, so broken-link styling follows. Triggered by an event with any type but `change`, by a `catchUp` event, or – because the watcher is paused for those – by one of Erfana's own file operations, which `fileGateway` reports through `services/fileStructureSignal.ts`. The re-check waits for a burst to settle (400 ms, at most 2 s) and for a hidden tab to be shown; a change no event reports shows up within about 30 s, when the remembered answer expires ([deferred Markdown preview](../performance/deferred-markdown-preview.md)) |
 
-**Auto-resume safety timeout (v0.7.2, #103):** The PauseController includes a 10-second safety timeout. If `resume()` is not called within 10 s of `pause()` – for example due to a lost IPC message – the controller auto-resumes, logs a warning, and triggers a compensating refresh to keep the tree in sync. This prevents the watcher from being permanently paused.
+**Tree refresh is coalesced (#208):** the tree refresh that a watcher event (or a file operation) triggers is single-flight. In the renderer, `refreshFiles` allows one read per project scope; in main, `FileService.readDirectory` allows one walk per path. Calls made while a read runs share one follow-up read that starts after it, so a burst costs at most two reads, and a result that is older than the tree on screen – or belongs to a project that is no longer open – is dropped. One consequence: a read that never finishes (an unreachable network drive) holds up every later read of that folder, and is logged as `readDirectory still running` after 60 s. See [Technical Details § Tree refresh is single-flight](./technical-details.md#tree-refresh-is-single-flight-208).
+
+**Auto-resume safety timeout (v0.7.2, #103):** The PauseController includes a 10-second safety timeout. If `resume()` is not called within 10 s of `pause()` – for example due to a lost IPC message – the controller auto-resumes, logs a warning, discards the pause episode (below) and sends one compensating refresh, flagged `catchUp: true` (#210), to keep the tree in sync. This prevents the watcher from being permanently paused.
+
+**Catch-up after a pause ([#210](https://github.com/qodeca/erfana/issues/210)):** a pause drops every event, so a change another program made after the operation's own tree read began, and before resume, used to stay invisible until the next unrelated refresh. The first pause now opens a pause episode (`watcher/PauseEpisode.ts`, pure) that lives until the full resume:
+
+- Only structural drops count (`add`, `addDir`, `unlink`, `unlinkDir`); `change` never does – content edits do not alter the tree, and the operations refresh git status separately.
+- The operation's own changes are filtered by kind: after success each mutation handler in `file-handlers.ts` reports what it changed through `noteInternalChange`. An `added` record filters only `add` / `addDir`, a `removed` one only `unlink` / `unlinkDir`, so a deletion inside a just-made copy still counts. Residual case: if Erfana copies, moves or renames a folder and another program adds a file inside that same folder after the refresh read began, that `add` is filtered as Erfana's own change and can still be missed until the next change or a manual refresh. Past 256 records the episode stops filtering and forces a catch-up.
+- A successful read of the paused root by the window that paused covers every drop seen before that read began (`file:readDirectory` calls `beginTreeRead` first and commits only after the read resolves). A failed read, a subfolder read or another window's read covers nothing.
+- At the full resume, one `directory-watch:changed` with `catchUp: true` goes out if any drop is left uncovered. Nested pauses share one episode, so they catch up once. The renderer lets a `catchUp` event through even when the next operation has already set its internal-operation flag, and `withWatcherPause` now clears that flag before resume on the error path too.
 
 ### IPC Channels
 
@@ -272,17 +356,29 @@ Recommended:
 | `directory-watch:stop` | Renderer → Main | Stop watching directory |
 | `directory-watch:pause` | Renderer → Main | Pause watching during internal CRUD |
 | `directory-watch:resume` | Renderer → Main | Resume watching after CRUD completes |
+| `directory-watch:stop-all` | Renderer → Main | Stop every directory watch held by the calling window (cleanup) |
+| `directory-watch:get-stats` | Renderer → Main | Watcher statistics (debugging) |
 | `directory-watch:changed` | Main → Renderer | Event: Directory structure changed |
 | `directory-watch:project-deleted` | Main → Renderer | Event: Project folder deleted |
 | `directory-watch:error` | Main → Renderer | Event: Watcher error (transient/permanent) |
 
 ### Implementation Location
 
-- **Service**: `src/main/services/DirectoryWatcherService.ts`
+- **Service**: `src/main/services/DirectoryWatcherService.ts` – the public lifecycle (`watchDirectory`, `stopAll`, `setPathFilter`, `reportsRemovalsAbove`). Since v0.22.0 it is split into layers, each a class the next one extends (lens review finding [65]); the public API, IPC channels and log lines did not change:
+  - `watcher/DirectoryWatcherCore.ts` – shared state, the path rules (`shouldDropRel`) and how a notice reaches the watching windows
+  - `watcher/DirectoryWatcherRecovery.ts` – error classification, EMFILE teardown, restarts with back-off (`handleWatcherError`, `scheduleRestart`)
+  - `watcher/DirectoryWatcherEvents.ts` – the event pipeline and the pause API (`queueEvent`, `handleResync`, `handleWatchReady`, `pauseWatch`, `resumeWatch`)
+  - helpers: `watcher/directoryWatchBuilders.ts` (builds the chokidar or native backend), `watcher/directoryWatchTypes.ts` (shapes and batch rules such as `isStructuralBatch`), `watcher/DirectoryWatchListeners.ts` (removal and coverage listeners, #252)
 - **IPC Handlers**: `src/main/ipc/directory-watcher-handlers.ts`
 - **Renderer Hook**: `src/renderer/src/hooks/useDirectoryWatcher.ts` (lifecycle, event handling, AC-010 guard)
 - **Pure Logic**: `src/renderer/src/hooks/useDirectoryWatcher.logic.ts` (state guards, message creation)
 - **Pause Utility**: `src/renderer/src/components/ProjectTree/withWatcherPause.ts` (pause/resume wrapper)
+- **Folder check on open**: `src/renderer/src/components/ProjectTree/useExpandReconcile.ts` (one shallow read of the folder the user opens; a difference refreshes the tree), called from `useLazyFolderChildren`
+- **Pause episode (#210)**: `src/main/services/watcher/PauseEpisode.ts` (drop counting, own-change filter, read coverage; `recordUnknownDrop()` for a resync during a pause, #211); hooks in `src/main/ipc/file-handlers.ts`
+- **Path filter and exclude list (#211)**: `src/main/utils/projectPathFilter.ts` (`ProjectPathFilter`, `toRootRelative`, split paths and walk hints), `src/main/utils/excludeMatcher.ts` (the `files.exclude` matcher), `src/shared/ipc/files-exclude-schema.ts` (lenient schema); merged by `ProjectSettingsService`, applied by `ProjectService`
+- **Backends (#211)**: `src/main/services/watcher/directoryWatchBackend.ts` (selector and `DirectoryWatchHandle` seam), `NativeRecursiveWatcher.ts` (Windows plan, lost events, self-events), `NativeEventClassifier.ts` (the `lstat` queue)
+- **Watcher gate (#211)**: `firstReadPending` in `src/renderer/src/hooks/useProjectManagement.ts`
+- **Tree refresh (single-flight, #208)**: `src/shared/coalescingRunner.ts`, used by `FileService.readDirectory` (`src/main/services/FileService.ts`) and `refreshFiles` in `src/renderer/src/hooks/useProjectManagement.ts`
 - **Integration**: `src/renderer/src/components/ProjectTree/ProjectTree.tsx`
 - **Component**: `src/renderer/src/components/ProjectTree/ProjectTreeNode.tsx` (controlled pattern)
 - **Spec**: `specs/archived/spec-t3-016-project-tree-refresh/` (behavioral contract, archived)
@@ -322,11 +418,13 @@ The DirectoryWatcherService automatically recovers from transient filesystem err
 - Sequence: 800ms → 1600ms → 3200ms
 - Max attempts: 3
 
-After 3 failed restart attempts, the service notifies the user and stops retrying. Restart statistics are tracked in `WatcherMetrics` for debugging.
+After 3 failed restart attempts the service stops retrying and sends `directory-watch:restart-failed` – or `directory-watch:project-deleted` when the root is still missing (`ENOENT`). Since #211 both go to the windows captured when the restart was scheduled (`notifyIds`); before, the watch's map entry was already gone, so `restart-failed` was never delivered. The preload bridge still exposes no listener for `restart-failed` (see [API services](../api-services.md#directory-watchrecovered-and-directory-watchrestart-failed)). Restart statistics are tracked in `WatcherMetrics` for debugging.
+
+**A watch that cannot start (#211):** the Windows backend watches the root synchronously in its constructor, so a missing root throws `ENOENT` at once (an `EPERM` on the root is reported as `ENOENT`). `watchDirectory` then schedules a restart before rethrowing, so a root that was briefly unavailable recovers and a deleted one ends in `directory-watch:project-deleted` once the attempts run out. A restart overtaken by `stopAll` (a project switch) sends nothing.
 
 **EMFILE log deduplication**: Uses `RateLimitedLogger` (10s cooldown) to prevent EMFILE error log spam during cascading FD exhaustion. See `src/main/utils/RateLimitedLogger.ts`.
 
-**Implementation:** `DirectoryWatcherService.ts`, `WatcherMetrics.ts`, `RateLimitedLogger.ts`
+**Implementation:** `watcher/DirectoryWatcherRecovery.ts` (the restart layer of `DirectoryWatcherService`), `WatcherMetrics.ts`, `RateLimitedLogger.ts`
 
 ---
 
@@ -373,6 +471,7 @@ Monitors git repository state files for real-time status updates in the Project 
 |---------|-----------|---------|
 | `git-watcher:start` | Renderer → Main | Start watching git state files |
 | `git-watcher:stop` | Renderer → Main | Stop git watching |
+| `git-watcher:status` | Renderer → Main | Get current watcher status |
 | `git:state-changed` | Main → Renderer | Event: Git state changed |
 
 ### Implementation Location
@@ -434,8 +533,9 @@ Users can configure polling via Settings overlay:
 |---------|-----------|---------|
 | `git-polling:start` | Renderer → Main | Start polling |
 | `git-polling:stop` | Renderer → Main | Stop polling |
+| `git-polling:set-interval` | Renderer → Main | Update the polling interval at runtime |
 | `git-polling:set-enabled` | Renderer → Main | Enable/disable at runtime |
-| `git-polling:git-poll-triggered` | Main → Renderer | Event: Poll detected changes |
+| `git:poll-triggered` | Main → Renderer | Event: Poll detected changes (`GIT_EVENT_CHANNELS.POLL_TRIGGERED` in `src/shared/ipc/git-watcher-channels.ts`) |
 
 ### Implementation Location
 
@@ -519,32 +619,34 @@ The service integrates these components:
 
 - `src/main/services/watcher/` - All watcher optimization modules
 - Watcher unit tests in `src/main/services/watcher/*.test.ts`
-- Directory pipeline integration tests in `src/main/services/DirectoryWatcherService.pipeline.test.ts` (17 tests)
+- Directory pipeline integration tests in `src/main/services/DirectoryWatcherService.pipeline.test.ts` (26 tests, 9 of them the #210 catch-up)
 - Git pipeline integration tests in `src/main/services/GitWatcherService.pipeline.test.ts` (22 tests, #99)
   - Covers AC-004 (git add), AC-005 (git commit), AC-006 (git checkout), AC-018 (coalescer dedup)
   - Additional: all 5 event types, correlation ID, WatcherMetrics, disposal guards, circuit breaker
 - Watcher resilience tests in `src/main/services/WatcherResilience.test.ts` (14 tests, #100)
   - AC-011 (polling fallback), AC-015 (redundant polling suppression), AC-016 (exponential backoff restart)
-- Window visibility gating tests in `src/renderer/src/hooks/useGitStatus.test.ts` – 5 of the file's 38 tests cover the visibility-gating case (#102)
+- Window visibility gating tests in `src/renderer/src/hooks/useGitStatus.test.ts` – 5 of the file's 39 tests (counted 2026-10-25) cover the visibility-gating case (#102)
   - AC-012: git status refreshes dropped while hidden, single catch-up on restore, cooldown respected
 - Event buffer overflow tests in `src/main/services/watcher/ThrottledWorker.test.ts` (24 tests, #102 + #173)
   - AC-017: 30,000-event cap, FIFO eviction, no crash/hang, post-burst recovery
   - Offset-deque coverage: 60 k-event stress burst runs in <1 s cross-platform after the refactor
 - 016-NFR-001 main-process latency integration tests in `DirectoryWatcherService.pipeline.test.ts`
   - Isolates chokidar + Defender noise via fake timers; asserts <200 ms virtual latency for single add + atomic-save flows
-- Hook tests in `src/renderer/src/hooks/useDirectoryWatcher.test.ts` (13 tests)
-- Pause/resume tests in `src/renderer/src/components/ProjectTree/withWatcherPause.test.ts` (17 tests)
-- Project switching tests in `src/main/services/ProjectService.switching.test.ts` (20 tests, #101)
+- Hook tests in `src/renderer/src/hooks/useDirectoryWatcher.test.ts`
+- Pause/resume tests in `src/renderer/src/components/ProjectTree/withWatcherPause.test.ts` (18 tests)
+- Project switching tests in `src/main/services/ProjectService.switching.test.ts` (#101)
   - Session token guards, step ordering, in-flight event handling during project switches
 - Renderer switching tests in `src/renderer/src/components/ProjectTree/ProjectTree.switching.test.tsx` (11 tests, #101)
   - Tree clearing, new project loading, stale event rejection, git status updates
+- Exclude list, path filter, Windows backend and watcher gate (#211): see [Patterns & Testing § Large projects on Windows](./patterns-and-testing.md#large-projects-on-windows-211)
 
 ---
 
 ## Symlinks
 
 - Watchers do not follow symlinks (security)
-- **Single-file watches set `followSymlinks: false` explicitly** (`watcher/singleFileWatch.ts`, added in #70). chokidar v3 defaults this to `true`, so a link planted inside the project would otherwise make the watcher — and the automatic re-read behind it — track an out-of-project target
+- **The Windows directory watcher never opens a handle on a link** (#211): junctions, directory symlinks and file symlinks are leaves in its plan, and a recursive `fs.watch` does not report inside them (measured in the [W0 spike](../spikes/211-windows-fs-watch.md))
+- **Single-file watches set `followSymlinks: false` explicitly** (`watcher/singleFileWatch.ts`, added in #70). chokidar (5.0.0 included) defaults this to `true`, so a link planted inside the project would otherwise make the watcher — and the automatic re-read behind it — track an out-of-project target
 - Symlinked entries are flagged in the Project Tree with a small chain icon and tooltip
 - Operations on symlink targets remain subject to project boundary checks. Since #70 the read handlers enforce that with `fs.realpath` on both ends rather than by comparing path text — see [API Services § Path confinement](../api-services.md#path-confinement-for-the-file-read-ipc-handlers)
 

@@ -7,33 +7,61 @@
  * preview panel, and surfaces the two refusal/failure signals the panel body
  * renders around:
  *
- * - **limit-reached** — a second `open` with a different panel id is refused
- *   with `PREVIEW_VIEW_LIMIT_REACHED` and a `holderPanelId`, which the panel
- *   turns into "a preview is already open — Open as source" (design §1.4 X20).
+ * - **limit-reached** — this file is already previewed in ANOTHER WINDOW.
+ *   Panel ids are path-derived, so both windows mint the same id; main refuses
+ *   with `PREVIEW_VIEW_LIMIT_REACHED` rather than destroying the other window's
+ *   running view, and the panel offers "Open as source" (sd-074b §4.2).
+ *   Independent previews in the SAME window are no longer refused.
  * - **open-failed** — any other `open` failure (eligibility flip, session build
  *   error) collapses the panel to the failed banner, since no view was created.
  *
  * The successful path is silent here: once main accepts the open, load state,
  * failures and still frames flow through {@link usePreviewEvents} into the store.
  *
+ * The hook also RESUMES a suspended preview. Beyond `PREVIEW.MAX_LIVE_VIEWS`,
+ * main tears the least recently active view down to its still frame and emits
+ * `suspended`; when such a panel becomes the visible tab again, this hook
+ * re-opens it (sd-074b §4.3). That round trip is what makes the sleep policy
+ * invisible to the user.
+ *
+ * KEYED BY PANEL ID ONLY (issue #124, part 3 §3.4). A tab can move to another
+ * page in the same native view; `params.filePath` then changes, and so does the
+ * `filePath` this hook receives. Closing and re-opening on that change would
+ * tear down the view and lose the tab's history. So the open/close effect runs
+ * once per panel id, and `filePath` is read at the moment of each `open` – which
+ * is what makes a crash retry and a resume open the page the tab shows NOW.
+ *
  * @module usePreviewLifecycle
  * @see Issue #74 - HTML preview with CSS and JavaScript execution
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { ErrorCode } from '../../../../../../shared/errors'
 import { usePreviewStore } from '../../../../stores/usePreviewStore'
 import { deriveBounds } from '../htmlPreview.logic'
 import { logger } from '../../../../utils/logger'
+import { getBasename, stablePathDigest } from '../../../../utils/fileUtils'
+import { previewGateway } from '../../../../services/previewGateway'
+import { useLatestRef } from '../../../../hooks/useLatestRef'
 
 /** Options for {@link usePreviewLifecycle}. */
 export interface UsePreviewLifecycleOptions {
   /** The preview panel id. */
   panelId: string
-  /** Absolute path of the `.html` file to preview. */
+  /**
+   * The page the tab shows now (`params.filePath`). Read when an `open` is
+   * sent, never a reason to close and re-open: after a same-tab move it
+   * changes while the view stays.
+   */
   filePath: string
   /** Ref to the placeholder, read once to seed the initial `open` bounds. */
   placeholderRef: React.RefObject<HTMLElement>
+  /**
+   * Whether this panel is the visible tab. A suspended preview re-opens only
+   * when it becomes visible, so a background tab never resurrects itself and
+   * re-evicts the tab the user is actually looking at.
+   */
+  isVisible?: boolean
 }
 
 /** Result of {@link usePreviewLifecycle}. */
@@ -70,31 +98,56 @@ function initialBounds(el: HTMLElement | null): { x: number; y: number; width: n
  * })
  * ```
  */
+/**
+ * How many times a superseded RESUME re-arms itself before giving up.
+ *
+ * Small on purpose. Each retry is a full `preview:open` round trip, and the
+ * thing that superseded us may keep winning, so this bounds a loop rather than
+ * guaranteeing success. Giving up leaves the still frame on screen, which is
+ * what the panel already shows while suspended.
+ */
+const RESUME_RETRY_LIMIT = 3
+
 export function usePreviewLifecycle(
   options: UsePreviewLifecycleOptions
 ): UsePreviewLifecycleResult {
-  const { panelId, filePath, placeholderRef } = options
+  const { panelId, filePath, placeholderRef, isVisible = true } = options
 
   const [limitReached, setLimitReached] = useState(false)
   const [holderPanelId, setHolderPanelId] = useState<string | null>(null)
   const [openFailed, setOpenFailed] = useState(false)
 
   // `placeholderRef` is read once at open time only; excluding it from deps
-  // keeps the open/close to exactly one run per (panelId, filePath).
-  const placeholderRefStable = useRef(placeholderRef)
-  placeholderRefStable.current = placeholderRef
+  // keeps the open/close to exactly one run per panel id.
+  const placeholderRefStable = useLatestRef(placeholderRef)
 
-  useEffect(() => {
-    let cancelled = false
+  // The same for the page: a same-tab move changes `filePath` under a live
+  // view, and an open/close keyed on it would destroy that view and its
+  // history. Main is authoritative for the page of a live view; the renderer's
+  // value matters only when an `open` is sent (first open, crash retry, resume).
+  const filePathRef = useLatestRef(filePath)
 
-    void (async () => {
+  /**
+   * Ask main to open this preview. Shared by the mount effect and the resume
+   * effect, so an initial open and a wake-from-suspended take the identical
+   * path — including the refusal handling.
+   */
+  const requestOpen = useCallback(
+    async (isCancelled: () => boolean, onSuperseded?: () => void): Promise<void> => {
+      // Clear whatever the LAST attempt concluded. Without this there is no
+      // path back out of either banner: a panel that once failed keeps saying so
+      // for the rest of its mount even after a later open succeeds (F27).
+      setOpenFailed(false)
+      setLimitReached(false)
+
+      const filePath = filePathRef.current
       try {
-        const result = await window.api.preview.open({
+        const result = await previewGateway.open({
           panelId,
           filePath,
           bounds: initialBounds(placeholderRefStable.current.current)
         })
-        if (cancelled) return
+        if (isCancelled()) return
 
         if (result.ok) return
 
@@ -107,29 +160,108 @@ export function usePreviewLifecycle(
           return
         }
 
+        if (result.errorCode === ErrorCode.PREVIEW_OPEN_SUPERSEDED) {
+          // Tell the caller, so a RESUME can re-arm. The initial open needs no
+          // such thing — whoever superseded it owns the panel from then on —
+          // but a resume has nowhere else to come from: `loadState` stays
+          // 'suspended' and no dependency changes, so without this the tab sits
+          // on a frozen still frame with no live view and no banner.
+          onSuperseded?.()
+          // Not a failure. Something newer overtook this open — a project
+          // switch, a close, a suspend, or another open for the same panel — so
+          // the staleness guard did exactly its job. Whoever superseded us owns
+          // what happens next; showing a banner here would be wrong, and used to
+          // be permanent because nothing ever cleared it.
+          //
+          // `isCancelled()` covers only supersession started by THIS effect, so
+          // it does not catch the suspend/evict case, which is why the code
+          // exists at all.
+          //
+          // But say so somewhere. Returning in total silence is what made an
+          // invisible preview so slow to find: a genuinely failed open painted a
+          // black rectangle and reported nothing anywhere. Basename only — the
+          // absolute path carries the user's home directory.
+          logger.debug('Preview open superseded', {
+            panelId: stablePathDigest(panelId),
+            file: getBasename(filePath)
+          })
+          return
+        }
+
         // Any other refusal: no view exists, so show the failed banner.
         setOpenFailed(true)
-        logger.warn('Preview open failed', { panelId, filePath, errorCode: result.errorCode })
+        logger.warn('Preview open failed', {
+          panelId: stablePathDigest(panelId),
+          errorCode: result.errorCode
+        })
       } catch (error) {
-        if (cancelled) return
+        if (isCancelled()) return
         setOpenFailed(true)
-        logger.error(
-          'Preview open threw',
-          error instanceof Error ? error : undefined,
-          { panelId, filePath }
-        )
+        logger.error('Preview open threw', error instanceof Error ? error : undefined, {
+          panelId: stablePathDigest(panelId)
+        })
       }
-    })()
+    },
+    [panelId, filePathRef, placeholderRefStable]
+  )
+
+  useEffect(() => {
+    let cancelled = false
+
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sending the open is the effect's job; requestOpen clears the last attempt's banners before its first await
+    void requestOpen(() => cancelled)
 
     return () => {
       cancelled = true
       // Bounded destroy main-side; idempotent (design §5(f)).
-      void window.api.preview.close(panelId).catch(() => {})
+      void previewGateway.close(panelId).catch(() => {})
       const store = usePreviewStore.getState()
       store.removePanel(panelId)
       if (store.holderPanelId === panelId) store.clearHolder()
     }
-  }, [panelId, filePath])
+  }, [panelId, requestOpen])
+
+  // Resume a suspended preview when its tab becomes visible again. Main emits
+  // `suspended` after evicting the least recently active view; the still frame
+  // stays on screen until this re-open lands, so the tab is never blank.
+  const loadState = usePreviewStore((state) => state.getLoadState(panelId))
+  const [resumeAttempt, setResumeAttempt] = useState(0)
+
+  // Reset the budget once the panel is live again, so a later suspend/resume
+  // cycle does not inherit a spent one. During render, not in an effect: the
+  // resume effect below acts only while suspended, so it never sees the gap.
+  if (loadState !== 'suspended' && resumeAttempt !== 0) setResumeAttempt(0)
+
+  useEffect(() => {
+    // The one line that would have found the Windows eviction fault in a
+    // minute: it showed `loadState` never leaving 'ready', which pointed at
+    // main never emitting 'suspended' rather than at this gate.
+    logger.debug('Preview resume gate', {
+      panelId: stablePathDigest(panelId),
+      isVisible,
+      loadState,
+      resumeAttempt
+    })
+    if (!isVisible || loadState !== 'suspended') return
+
+    let cancelled = false
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the re-open is the effect's job; requestOpen clears the last attempt's banners before its first await
+    void requestOpen(
+      () => cancelled,
+      () => {
+        // Bounded: a supersession can repeat — another panel's open keeps
+        // winning — and an unbounded re-arm would spin reopening for as long as
+        // the tab is visible.
+        if (cancelled) return
+        setResumeAttempt((attempt) =>
+          attempt < RESUME_RETRY_LIMIT ? attempt + 1 : attempt
+        )
+      }
+    )
+    return () => {
+      cancelled = true
+    }
+  }, [isVisible, loadState, panelId, requestOpen, resumeAttempt])
 
   return { limitReached, holderPanelId, openFailed }
 }

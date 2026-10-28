@@ -12,6 +12,8 @@ import { describe, it, expect } from 'vitest'
 import {
   DocumentImportOptionsSchema,
   DocumentImportRequestSchema,
+  ImportToolStatusRequestSchema,
+  ImportToolStatusSchema,
   type DocumentImportOptions,
   type DocumentImportRequest,
   type DocumentImportProgress,
@@ -314,22 +316,78 @@ describe('DocumentImportResult interface', () => {
 describe('DependencyReadyEvent interface', () => {
   it('allows event with all dependencies available', () => {
     const event: DependencyReadyEvent = {
-      libreOffice: true,
-      imageMagick: true,
+      libreOffice: 'found',
+      unsafe: null,
       extensions: ['pdf', 'docx', 'jpg']
     }
-    expect(event.libreOffice).toBe(true)
+    expect(event.libreOffice).toBe('found')
     expect(event.extensions).toContain('pdf')
   })
 
   it('allows event with no optional dependencies', () => {
     const event: DependencyReadyEvent = {
-      libreOffice: false,
-      imageMagick: false,
-      extensions: ['pdf']
+      libreOffice: 'missing',
+      unsafe: null,
+      extensions: ['pdf', 'png']
     }
-    expect(event.libreOffice).toBe(false)
-    expect(event.imageMagick).toBe(false)
-    expect(event.extensions).toEqual(['pdf'])
+    expect(event.libreOffice).toBe('missing')
+    expect(event.extensions).toEqual(['pdf', 'png'])
+  })
+})
+
+describe('ImportToolStatusRequestSchema (#250)', () => {
+  it.each([{ recheck: true }, { recheck: false }])('accepts %o', (payload) => {
+    expect(ImportToolStatusRequestSchema.safeParse(payload).success).toBe(true)
+  })
+
+  it.each([
+    ['undefined', undefined],
+    ['an empty object', {}],
+    ['a non-boolean flag', { recheck: 1 }],
+    ['an extra key (strict)', { recheck: true, binary: 'soffice' }]
+  ])('rejects %s', (_name, payload) => {
+    expect(ImportToolStatusRequestSchema.safeParse(payload).success).toBe(false)
+  })
+})
+
+describe('ImportToolStatusSchema (#250)', () => {
+  it.each(['project', 'temp', 'network', 'relative', 'unresolvable', 'ambiguous'] as const)(
+    'accepts an unsafe status with reason %s',
+    (reason) => {
+      const status = { libreOffice: 'unsafe' as const, unsafe: { tool: 'soffice' as const, reason }, extensions: ['pdf'], throttled: false }
+      expect(ImportToolStatusSchema.parse(status)).toEqual(status)
+    }
+  )
+
+  it('accepts a status without unsafe details', () => {
+    const status = { libreOffice: 'found' as const, unsafe: null, extensions: ['pdf'], throttled: false }
+    expect(ImportToolStatusSchema.parse(status)).toEqual(status)
+  })
+
+  it.each([true, 'available', undefined])('rejects a libreOffice state of %o', (state) => {
+    expect(ImportToolStatusSchema.safeParse({ libreOffice: state, unsafe: null, extensions: [], throttled: false }).success).toBe(false)
+  })
+
+  it.each([
+    ['an unknown reason', { tool: 'soffice', reason: 'cursed' }],
+    ['an unknown tool', { tool: 'evil.exe', reason: 'project' }],
+    ['a path riding along (strict)', { tool: 'soffice', reason: 'project', path: 'C:\\Repo\\soffice.exe' }],
+    ['a missing field', undefined]
+  ])('rejects unsafe details with %s', (_name, unsafe) => {
+    expect(
+      ImportToolStatusSchema.safeParse({ libreOffice: 'unsafe', unsafe, extensions: [], throttled: false }).success
+    ).toBe(false)
+  })
+
+  it('rejects an unknown key (strict)', () => {
+    expect(
+      ImportToolStatusSchema.safeParse({
+        libreOffice: 'found',
+        unsafe: null,
+        extensions: [],
+        throttled: false,
+        path: '/usr/bin/soffice'
+      }).success
+    ).toBe(false)
   })
 })

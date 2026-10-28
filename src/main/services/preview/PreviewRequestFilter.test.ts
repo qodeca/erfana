@@ -11,69 +11,26 @@
  * badge suppression after the cancel decision; an allowed request that completes
  * produces NO timeout entry; and a genuinely stuck request badged once as a
  * `network-timeout` with no toast (`approvable: false`).
+ *
+ * Issue #124 WI-12: every preview-scheme request the filter lets through is
+ * noted in the session's request-kind ledger (design part 2 §2.2). Split by
+ * topic (docs/windows/contributing.md § "Test-file split policy"): frames are in
+ * `PreviewRequestFilter.frames.test.ts`, the shared fakes in
+ * `__test-helpers__/previewRequestFilterMocks.ts`.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { PreviewFailureType } from '../../../shared/ipc/preview-types'
-import { attach, type PreviewFilterContext } from './PreviewRequestFilter'
-
-type OnBeforeListener = (
-  details: { id: number; url: string; resourceType: string },
-  callback: (response: { cancel?: boolean }) => void
-) => void
-type SettleListener = (details: { id: number }) => void
-
-/** A fake session whose `webRequest` methods capture their listeners. */
-function makeSession(): {
-  session: Parameters<typeof attach>[0]
-  onBeforeRequest: ReturnType<typeof vi.fn>
-  onCompleted: ReturnType<typeof vi.fn>
-  onErrorOccurred: ReturnType<typeof vi.fn>
-} {
-  const onBeforeRequest = vi.fn<(...args: unknown[]) => void>()
-  const onCompleted = vi.fn<(...args: unknown[]) => void>()
-  const onErrorOccurred = vi.fn<(...args: unknown[]) => void>()
-  const session = {
-    webRequest: { onBeforeRequest, onCompleted, onErrorOccurred }
-  }
-  return {
-    session: session as unknown as Parameters<typeof attach>[0],
-    onBeforeRequest,
-    onCompleted,
-    onErrorOccurred
-  }
-}
-
-function makeContext(allowed: string[]): {
-  ctx: PreviewFilterContext
-  onBlocked: ReturnType<typeof vi.fn>
-  onRequestStarted: ReturnType<typeof vi.fn>
-  onRequestSettled: ReturnType<typeof vi.fn>
-} {
-  const set = new Set(allowed)
-  const onBlocked =
-    vi.fn<(kind: PreviewFailureType, host: string, url: string, approvable: boolean) => void>()
-  const onRequestStarted = vi.fn<(id: number) => void>()
-  const onRequestSettled = vi.fn<(id: number) => void>()
-  return {
-    ctx: { getAllowedHosts: () => set, onBlocked, onRequestStarted, onRequestSettled },
-    onBlocked,
-    onRequestStarted,
-    onRequestSettled
-  }
-}
-
-function details(id: number, url: string, resourceType = 'xhr'): {
-  id: number
-  url: string
-  resourceType: string
-} {
-  return { id, url, resourceType }
-}
-
-const REQUEST_TIMEOUT_MS = 1000
-const TIMEOUT_SWEEP_MS = 100
-const FILTER_DEPS = { requestTimeoutMs: REQUEST_TIMEOUT_MS, timeoutSweepMs: TIMEOUT_SWEEP_MS }
+import { attach } from './PreviewRequestFilter'
+import {
+  FILTER_DEPS,
+  REQUEST_TIMEOUT_MS,
+  TIMEOUT_SWEEP_MS,
+  details,
+  makeContext,
+  makeSession,
+  type OnBeforeListener,
+  type SettleListener
+} from './__test-helpers__/previewRequestFilterMocks'
 
 beforeEach(() => {
   vi.useFakeTimers()
@@ -96,7 +53,7 @@ describe('PreviewRequestFilter registration', () => {
 
   it('detach removes all listeners and stops the sweep', () => {
     const s = makeSession()
-    const { ctx, onBlocked } = makeContext(['cdn.example'])
+    const { ctx, onBlocked } = makeContext(['https://cdn.example'])
     const detach = attach(s.session, ctx, FILTER_DEPS)
 
     const listener = s.onBeforeRequest.mock.calls[0][0] as OnBeforeListener
@@ -117,7 +74,7 @@ describe('PreviewRequestFilter registration', () => {
 describe('PreviewRequestFilter gating', () => {
   it('cancels a request to an unapproved host and badges it', () => {
     const s = makeSession()
-    const { ctx, onBlocked, onRequestStarted } = makeContext(['cdn.jsdelivr.net'])
+    const { ctx, onBlocked, onRequestStarted } = makeContext(['https://cdn.jsdelivr.net'])
     attach(s.session, ctx, FILTER_DEPS)
     const listener = s.onBeforeRequest.mock.calls[0][0] as OnBeforeListener
 
@@ -128,15 +85,20 @@ describe('PreviewRequestFilter gating', () => {
     expect(onRequestStarted).not.toHaveBeenCalled()
     expect(onBlocked).toHaveBeenCalledWith(
       'blocked-host',
-      'evil.example',
+      // The blocked IDENTITY is the ORIGIN, so the row the reader is offered is
+      // the thing that was actually refused — port included.
+      'https://evil.example',
       'https://evil.example/collect',
-      true
+      true,
+      // The default `resourceType` in this harness is `xhr`, which maps to
+      // `connect` — what the consent row will say the host wanted to do.
+      'connect'
     )
   })
 
   it('allows an approved host and marks it started (no badge)', () => {
     const s = makeSession()
-    const { ctx, onBlocked, onRequestStarted } = makeContext(['cdn.jsdelivr.net'])
+    const { ctx, onBlocked, onRequestStarted } = makeContext(['https://cdn.jsdelivr.net'])
     attach(s.session, ctx, FILTER_DEPS)
     const listener = s.onBeforeRequest.mock.calls[0][0] as OnBeforeListener
 
@@ -150,7 +112,7 @@ describe('PreviewRequestFilter gating', () => {
 
   it('cancels a redirect hop to a non-allowlisted host', () => {
     const s = makeSession()
-    const { ctx, onBlocked } = makeContext(['cdn.jsdelivr.net'])
+    const { ctx, onBlocked } = makeContext(['https://cdn.jsdelivr.net'])
     attach(s.session, ctx, FILTER_DEPS)
     const listener = s.onBeforeRequest.mock.calls[0][0] as OnBeforeListener
 
@@ -165,9 +127,10 @@ describe('PreviewRequestFilter gating', () => {
     expect(cb2).toHaveBeenCalledWith({ cancel: true })
     expect(onBlocked).toHaveBeenCalledWith(
       'blocked-host',
-      'tracker.example',
+      'https://tracker.example',
       'https://tracker.example/beacon',
-      true
+      true,
+      'connect'
     )
   })
 
@@ -178,7 +141,7 @@ describe('PreviewRequestFilter gating', () => {
     // passes the request through to that handler rather than blanket-cancelling
     // the whole local scheme (which broke the entry page and every subresource).
     const s = makeSession()
-    const { ctx, onBlocked, onRequestStarted } = makeContext(['cdn.jsdelivr.net'])
+    const { ctx, onBlocked, onRequestStarted } = makeContext(['https://cdn.jsdelivr.net'])
     attach(s.session, ctx, FILTER_DEPS)
     const listener = s.onBeforeRequest.mock.calls[0][0] as OnBeforeListener
 
@@ -199,7 +162,9 @@ describe('PreviewRequestFilter gating', () => {
     'allows a local erfana-preview request — %s — so the confining protocol handler serves it',
     (_label, resourceType, url) => {
       const s = makeSession()
-      const { ctx, onBlocked, onRequestStarted } = makeContext(['cdn.jsdelivr.net'])
+      const { ctx, onBlocked, onRequestStarted, ledger } = makeContext([
+        'https://cdn.jsdelivr.net'
+      ])
       attach(s.session, ctx, FILTER_DEPS)
       const listener = s.onBeforeRequest.mock.calls[0][0] as OnBeforeListener
 
@@ -212,12 +177,14 @@ describe('PreviewRequestFilter gating', () => {
       expect(callback).toHaveBeenCalledWith({ cancel: false })
       expect(onRequestStarted).toHaveBeenCalledWith(7)
       expect(onBlocked).not.toHaveBeenCalled()
+      // Noted for the protocol handler, which cannot see the kind itself (S1).
+      expect(ledger.take(url)).toBe(resourceType)
     }
   )
 
   it('still refuses a remote https request to a non-approved host (egress gate intact)', () => {
     const s = makeSession()
-    const { ctx, onBlocked, onRequestStarted } = makeContext(['cdn.jsdelivr.net'])
+    const { ctx, onBlocked, onRequestStarted } = makeContext(['https://cdn.jsdelivr.net'])
     attach(s.session, ctx, FILTER_DEPS)
     const listener = s.onBeforeRequest.mock.calls[0][0] as OnBeforeListener
 
@@ -228,15 +195,20 @@ describe('PreviewRequestFilter gating', () => {
     expect(onRequestStarted).not.toHaveBeenCalled()
     expect(onBlocked).toHaveBeenCalledWith(
       'blocked-host',
-      'tracker.example',
+      'https://tracker.example',
       'https://tracker.example/beacon',
-      true
+      true,
+      // This case passes `script` as the resource type, so it proves the kind
+      // is read from the REQUEST rather than defaulted — the difference
+      // between a consent row saying "wants to run a script" and one saying
+      // "something", which is the difference the reader decides on.
+      'script'
     )
   })
 
   it('cancels but does NOT badge a cspReport/ping to an unapproved host', () => {
     const s = makeSession()
-    const { ctx, onBlocked } = makeContext(['cdn.jsdelivr.net'])
+    const { ctx, onBlocked } = makeContext(['https://cdn.jsdelivr.net'])
     attach(s.session, ctx, FILTER_DEPS)
     const listener = s.onBeforeRequest.mock.calls[0][0] as OnBeforeListener
 
@@ -255,7 +227,7 @@ describe('PreviewRequestFilter gating', () => {
 describe('PreviewRequestFilter timeout accounting', () => {
   it('produces no timeout entry for an allowed request that completes', () => {
     const s = makeSession()
-    const { ctx, onBlocked, onRequestSettled } = makeContext(['cdn.jsdelivr.net'])
+    const { ctx, onBlocked, onRequestSettled } = makeContext(['https://cdn.jsdelivr.net'])
     attach(s.session, ctx, FILTER_DEPS)
 
     const before = s.onBeforeRequest.mock.calls[0][0] as OnBeforeListener
@@ -272,7 +244,7 @@ describe('PreviewRequestFilter timeout accounting', () => {
 
   it('settles an errored request so it is not swept as a timeout', () => {
     const s = makeSession()
-    const { ctx, onBlocked, onRequestSettled } = makeContext(['cdn.jsdelivr.net'])
+    const { ctx, onBlocked, onRequestSettled } = makeContext(['https://cdn.jsdelivr.net'])
     attach(s.session, ctx, FILTER_DEPS)
 
     const before = s.onBeforeRequest.mock.calls[0][0] as OnBeforeListener
@@ -288,7 +260,7 @@ describe('PreviewRequestFilter timeout accounting', () => {
 
   it('badges a genuinely stuck request once as a network-timeout with no toast', () => {
     const s = makeSession()
-    const { ctx, onBlocked, onRequestSettled } = makeContext(['cdn.jsdelivr.net'])
+    const { ctx, onBlocked, onRequestSettled } = makeContext(['https://cdn.jsdelivr.net'])
     attach(s.session, ctx, FILTER_DEPS)
 
     const before = s.onBeforeRequest.mock.calls[0][0] as OnBeforeListener

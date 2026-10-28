@@ -31,6 +31,7 @@ import {
   createTempUserDataDir
 } from './utils/helpers'
 import { IMPORT } from '../src/shared/constants'
+import { E2E_CHROMIUM_ARGS } from './fixtures/isolation'
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -72,7 +73,7 @@ test.describe('Document import', () => {
     )
 
     const electronApp = await electron.launch({
-      args: [path.join(__dirname, '..'), `--user-data-dir=${userDataDir}`],
+      args: [path.join(__dirname, '..'), `--user-data-dir=${userDataDir}`, ...E2E_CHROMIUM_ARGS],
       env: {
         ...process.env,
         NODE_ENV: 'development'

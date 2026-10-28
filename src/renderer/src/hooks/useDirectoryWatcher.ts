@@ -28,12 +28,18 @@ import { useEffect, useRef } from 'react'
 import {
   shouldStartWatcher,
   shouldHandleDirectoryChange,
+  isStructuralDirectoryChange,
+  getRefreshDelay,
+  getMaxWait,
   createDirectoryChangeMessage,
   createWatcherErrorMessage,
   createDirectoryErrorMessage
 } from './useDirectoryWatcher.logic'
 import { DIRECTORY_WATCHER } from '../components/ProjectTree/constants'
 import { logger } from '../utils/logger'
+import { getTreeReadMs, resetTreeReadTiming } from '../utils/treeReadTiming'
+import { directoryWatchGateway } from '../services/directoryWatchGateway'
+import { useLatestRef } from './useLatestRef'
 
 interface UseDirectoryWatcherOptions {
   projectPath: string | null
@@ -54,19 +60,18 @@ export function useDirectoryWatcher({
 }: UseDirectoryWatcherOptions): void {
   // Store callbacks in refs to avoid effect re-runs on reference changes.
   // This prevents Chokidar watcher stop/start cycling on every render.
-  const onRefreshRef = useRef(onRefresh)
-  const onProjectDeletedRef = useRef(onProjectDeleted)
-  const onErrorRef = useRef(onError)
-
-  // Keep refs up to date with latest callbacks
-  onRefreshRef.current = onRefresh
-  onProjectDeletedRef.current = onProjectDeleted
-  onErrorRef.current = onError
+  // The refs are kept current after each commit, never during render.
+  const onRefreshRef = useLatestRef(onRefresh)
+  const onProjectDeletedRef = useLatestRef(onProjectDeleted)
+  const onErrorRef = useLatestRef(onError)
 
   // Debounce timer for refresh callbacks – consumer-side throttle for
   // bursts of 'directory-watch:changed' broadcasts (multi-file edits, save
-  // storms, formatters). Mirrors the useGitStatus.debouncedRefresh pattern.
+  // storms, formatters). Mirrors the useGitStatus.debouncedRefresh pattern,
+  // plus a max wait so a steady stream still refreshes: about once a second,
+  // or every two read-lengths (at most 10 s) on a project whose read is slow.
   const refreshTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const burstStartedAtRef = useRef(0)
 
   useEffect(() => {
     // Guard: Should we start the watcher?
@@ -74,8 +79,11 @@ export function useDirectoryWatcher({
       return
     }
 
+    // A new project: its reads have not been timed yet
+    resetTreeReadTiming()
+
     // Start watching the project directory
-    window.api.directoryWatch.start(projectPath as string).catch((err) => {
+    directoryWatchGateway.start(projectPath as string).catch((err) => {
       logger.error(createWatcherErrorMessage(), err instanceof Error ? err : undefined)
     })
 
@@ -83,37 +91,53 @@ export function useDirectoryWatcher({
     // broadcasts (one editor save + one external tool write + one git op,
     // or N files rewritten by a formatter) collapses to a single tree
     // re-list. Without this, every broadcast triggered a recursive IPC
-    // walk of the project directory.
-    const unsubscribeChanged = window.api.directoryWatch.onDirectoryChanged((data) => {
-      // Only refresh if not during our own internal operations
-      if (!shouldHandleDirectoryChange(isInternalOperationRef.current)) {
+    // walk of the project directory. A content-only batch (`structural:
+    // false`) leaves names and folders as they were: useGitStatus refreshes
+    // the badges for it, the tree is not re-read.
+    const unsubscribeChanged = directoryWatchGateway.onDirectoryChanged((data) => {
+      // Only refresh if not during our own internal operations – a catch-up
+      // refresh (changes dropped during a pause, #210) always goes through
+      if (!shouldHandleDirectoryChange(isInternalOperationRef.current, data.catchUp === true)) {
         logger.debug('[RENDERER] Directory change skipped (internal operation)')
         return
       }
+      if (!isStructuralDirectoryChange(data)) {
+        logger.debug('[RENDERER] Content-only directory change – tree not re-read')
+        return
+      }
       logger.info(createDirectoryChangeMessage(data.eventCount))
+      const now = Date.now()
       if (refreshTimerRef.current) {
         clearTimeout(refreshTimerRef.current)
+      } else {
+        burstStartedAtRef.current = now
       }
+      const delay = getRefreshDelay(
+        burstStartedAtRef.current,
+        now,
+        DIRECTORY_WATCHER.DEBOUNCE_DELAY,
+        getMaxWait(DIRECTORY_WATCHER.MAX_WAIT, getTreeReadMs(), DIRECTORY_WATCHER.MAX_WAIT_CEILING)
+      )
       refreshTimerRef.current = setTimeout(() => {
         refreshTimerRef.current = null
         onRefreshRef.current()
-      }, DIRECTORY_WATCHER.DEBOUNCE_DELAY)
+      }, delay)
     })
 
     // Listen for project deletion
-    const unsubscribeDeleted = window.api.directoryWatch.onProjectDeleted(() => {
+    const unsubscribeDeleted = directoryWatchGateway.onProjectDeleted(() => {
       onProjectDeletedRef.current()
     })
 
     // Listen for errors
-    const unsubscribeError = window.api.directoryWatch.onDirectoryError((data) => {
+    const unsubscribeError = directoryWatchGateway.onDirectoryError((data) => {
       logger.error(createDirectoryErrorMessage(), undefined, { error: data.error })
       onErrorRef.current(data.error)
     })
 
     // Cleanup on unmount or when project changes
     return () => {
-      window.api.directoryWatch.stop(projectPath as string)
+      directoryWatchGateway.stop(projectPath as string)
       unsubscribeChanged()
       unsubscribeDeleted()
       unsubscribeError()
@@ -122,5 +146,5 @@ export function useDirectoryWatcher({
         refreshTimerRef.current = null
       }
     }
-  }, [projectPath, initialLoadComplete, isInternalOperationRef])
+  }, [projectPath, initialLoadComplete, isInternalOperationRef, onRefreshRef, onProjectDeletedRef, onErrorRef])
 }

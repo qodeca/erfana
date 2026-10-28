@@ -1,0 +1,21 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>-HPC-FRAMES-</title>
+  <style>
+    body { font: 16px/1.5 sans-serif; margin: 16px; background: #fff; color: #111; }
+    iframe { display: block; border: 2px solid #999; margin: 0 0 16px; background: #fff; }
+  </style>
+</head>
+<body>
+  <h1 id="host-title">Frame host</h1>
+  <iframe id="child" src="child.html" width="520" height="300"></iframe>
+  <iframe id="ignored" src="ignored/page.html" width="520" height="90"></iframe>
+  <iframe id="inline" srcdoc="&lt;p id=&quot;in-srcdoc&quot;&gt;Inline frame&lt;/p&gt;" width="520" height="70"></iframe>
+  <iframe id="blank" src="about:blank" width="520" height="70"></iframe>
+  <iframe id="remote" src="https://remote.example.invalid/frame.html" width="520" height="70"></iframe>
+</body>
+</html>

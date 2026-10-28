@@ -1,0 +1,43 @@
+# A spike run answers one open technical question by trying, and writes the answer down. The
+# prototype stays in the run's scratch folder and is never committed; the one thing that lands is a
+# findings page under paths.spikes. The gates still run because the page lands in the repository
+# like any other document.
+name: spike
+description: "Answer one open technical question with a throwaway prototype – kept in scratch, never committed – and a findings page under paths.spikes: the answer, how to repeat it, what was not tested, what it means for the decision. Then gates and a draft PR."
+steps:
+  - id: kit
+    name: Snapshot the local project kit
+    command: 'bash "$(git rev-parse --path-format=absolute --git-common-dir)/../.xezar/checks/bootstrap.sh"'
+    resultScope: routine
+  - id: preflight
+    name: Verify worktree isolation
+    command: ".xezar/checks/worktree-preflight.sh"
+    resultScope: routine
+  - id: setup
+    name: Prepare the worktree
+    command: ".xezar/checks/worktree-setup.sh"
+    resultScope: routine
+  - id: explore
+    name: Answer the question
+    prompt: "Spike: {{task}}. Follow xezar-spike instructions: state the one question, what counts as yes and no, and the time it is worth, before anything else; if there is no such question, ask for it. Build the least that answers it under this run's folder in .local/xezar/scratch/, confirm that folder is git-ignored, and commit none of it. Never touch production, real user data or a real credential. Commit only the findings page under paths.spikes in .xezar/pipeline/config.json: the answer, how to repeat it, the numbers, what you did not test, the options and your recommendation. Stop when the question is answered or the time is spent. Finish focused checks and commits before the existing readiness, gates, evidence and PR handoff stages."
+    skill: xezar-spike
+    timeout: 1h
+  - id: readiness
+    name: Confirm the phase record is complete and nothing blocks
+    command: ".xezar/checks/worktree-preflight.sh --readiness"
+    resultScope: stage
+  - id: gates
+    name: Quality gates
+    command: ".xezar/checks/repo-gates.sh --fast --producer gates"
+    resultScope: stage
+    onFail:
+      retry: explore
+      max: 2
+  - id: evidence
+    name: Seal the gate evidence
+    command: ".xezar/checks/worktree-preflight.sh --record-gate-evidence"
+    resultScope: stage
+  - id: handoff
+    name: Draft PR into the base branch
+    prompt: "Hand off the spike for: {{task}}. Verify the sealed head and open the draft PR; make no content changes here. The body leads with the question and its one-sentence answer, then what was not tested and what the owner now has to decide. The PR holds a findings page and no product code; if it holds anything else, say so and stop."
+    skill: xezar-handoff-draft-pr

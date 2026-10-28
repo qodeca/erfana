@@ -126,7 +126,7 @@ export interface UseScrollAnomalyRecoveryReturn {
  *   }
  * })
  *
- * const unsubscribe = window.api.terminal.onData(wrappedHandler)
+ * const unsubscribe = terminalGateway.onData(wrappedHandler)
  * ```
  */
 export function useScrollAnomalyRecovery(
@@ -221,7 +221,7 @@ export function useScrollAnomalyRecovery(
       container.removeEventListener('touchmove', handleUserScroll)
       container.removeEventListener('keydown', handleKeyScroll)
     }
-  }, [enabled, terminalRef])
+  }, [enabled, terminalRef, lastUserScrollTsRef])
 
   // Issue #22 Enhanced: Perform recovery with smart target positioning
   // This is called by both the interval and immediate recovery paths
@@ -310,12 +310,13 @@ export function useScrollAnomalyRecovery(
         rafIdRef.current = null
       }
     }
-  }, [enabled, config.recoveryIntervalMs, performRecovery])
+  }, [enabled, config.recoveryIntervalMs, performRecovery, parserHandledRef])
 
   // Wrapper for onData handler that adds anomaly detection
-  // Note: Refs (lastUserScrollTsRef, lastDataTsRef, rafIdRef, anomalyCountRef) are intentionally
-  // excluded from deps - their .current values are accessed at call time, not capture time,
-  // and ref identity is stable across re-renders
+  // Note: the hook's own refs (lastDataTsRef, rafIdRef, anomalyCountRef) are left out of the
+  // deps - their .current values are read at call time and their identity never changes.
+  // lastUserScrollTsRef is listed because it may be injected; callers pass a stable useRef,
+  // so listing it never re-creates the wrapper (and never re-subscribes terminal data).
   const wrapOnDataHandler = useCallback(
     <T extends { terminalId: string; data: string }>(
       originalHandler: (data: T) => void
@@ -430,7 +431,7 @@ export function useScrollAnomalyRecovery(
         })
       }
     },
-    [enabled, xtermRef]
+    [enabled, xtermRef, lastUserScrollTsRef]
   )
 
   // Issue #22: Clear the anomaly queue when scroll lock engages
@@ -441,6 +442,7 @@ export function useScrollAnomalyRecovery(
 
   // Issue #22 Enhanced: Reset all tracking state (call on terminal/project change)
   // Note: zeroes the shared lastUserScrollTsRef, affecting both this hook and parser hooks
+  /* eslint-disable react-hooks/immutability -- zeroing the injected, shared ref is this function's documented job (see above); the compiler treats an option value as frozen */
   const resetAll = useCallback(() => {
     anomalyCountRef.current = 0
     immediateRecoveryRef.current = false
@@ -449,7 +451,8 @@ export function useScrollAnomalyRecovery(
     lastBaseYRef.current = 0
     lastUserScrollTsRef.current = 0
     lastDataTsRef.current = 0
-  }, [])
+  }, [lastUserScrollTsRef])
+  /* eslint-enable react-hooks/immutability */
 
   return { wrapOnDataHandler, resetQueue, resetAll, lastUserScrollTsRef }
 }

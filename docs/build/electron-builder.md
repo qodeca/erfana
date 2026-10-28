@@ -1,6 +1,6 @@
 # Electron Builder configuration
 
-**Last updated**: August 2026 (v0.17.2)
+**Last updated**: October 2026 (electron-builder 26.18.0, PR #325)
 
 This document explains the electron-builder version choice, the `aproba` build-time shim, and the parts of `electron-builder.yml` that are easy to get wrong.
 
@@ -12,7 +12,7 @@ This document explains the electron-builder version choice, the `aproba` build-t
 
 ```json
 // package.json → devDependencies
-"electron-builder": "26.8.1"
+"electron-builder": "26.18.0"
 ```
 
 The version is pinned **exactly** — no caret. electron-builder minors have repeatedly changed schema shape (the `win.signtoolOptions` nesting below is one example), and a release build is not the place to discover that. Bumps are deliberate.
@@ -20,7 +20,7 @@ The version is pinned **exactly** — no caret. electron-builder minors have rep
 ### Why version 26?
 
 - Current major, with the newest features and security fixes
-- Supports the Electron the app builds against (`electron: ^39.2.4` in `package.json`; `39.8.9` installed at the time of writing)
+- Supports the Electron the app builds against (`electron: ^44.9.0` in `package.json`; `44.9.0` installed at the time of writing)
 - Correctly applies fuses via the `afterPack` hook
 - Ships the Azure Artifact Signing integration the Windows leg depends on
 
@@ -119,12 +119,14 @@ See [Fuses](./fuses.md) for the fuse configuration and the test-build carve-out,
 ### Packaging switches
 
 ```yaml
-asar: false        # see asar.md — isomorphic-git's dynamic require() tree
+asar:
+  smartUnpack: false  # see asar.md — file-level asarUnpack keeps all JS in the archive
+asarUnpack: [...]     # native addons and executables only
 npmRebuild: false  # dependencies are rebuilt by `postinstall`, not by the packager
 publish: null      # no auto-updater metadata
 ```
 
-- **`asar: false`** — ASAR is off, so `asarUnpack` is not applicable and native modules load straight from `app/node_modules/`. Full rationale in [asar.md](./asar.md).
+- **`asar` / `asarUnpack`** — the app ships in `app.asar`, integrity-checked at start-up; only native addons and executables are unpacked, file by file. Full rationale in [asar.md](./asar.md).
 - **`npmRebuild: false`** — the packager does not re-run `node-gyp`. This is why `afterPack` has to restore the `spawn-helper` execute bit by hand; see [fuses.md](./fuses.md#afterpack-also-chmods-node-pty-spawn-helper).
 - **`publish: null`** — deliberately `null`, not `provider: github`, so electron-builder emits no `latest*.yml` auto-update feed. The release workflow's `finalize` job also deletes any such file that leaks into the draft.
 

@@ -19,6 +19,7 @@ import { useProjectStore } from '../../stores/useProjectStore'
 import { getPanelById } from '../ActivityBar/activityBarConfig'
 import { useProjectManagementContext } from '../../context/ProjectManagementContext'
 import { useAutoOpenTerminal } from '../../hooks/useAutoOpenTerminal'
+import { useSplitterDragFreeze } from '../../hooks/useSplitterDragFreeze'
 import { logger } from '../../utils/logger'
 import { isMacOS } from '../../utils/platform'
 import { EditorAreaSplitPanel } from './components'
@@ -27,6 +28,7 @@ import {
   shouldPersistTerminalWidth,
   resolvePreExpandWidth
 } from './terminalExpand'
+import { fileGateway } from '../../services/fileGateway'
 
 // ============================================================================
 // LEFT SIDEBAR PANEL - Project Panel
@@ -71,6 +73,10 @@ export function AppDockLayout() {
   // Auto-open terminal when project loads (Issue #55)
   useAutoOpenTerminal()
 
+  // Any splitter here can move a live HTML preview: hide the page behind its
+  // still picture while one is dragged (issue #124, part 1 §1.5).
+  useSplitterDragFreeze()
+
   // Use Zustand store for activity bar state — per-slice selectors so this component
   // only re-renders on the slices it consumes (not on every store change).
   const leftActivePanel = useActivityBarStore((s) => s.leftActivePanel)
@@ -83,7 +89,6 @@ export function AppDockLayout() {
   const terminalExpanded = useActivityBarStore((s) => s.terminalExpanded)
   const togglePanel = useActivityBarStore((s) => s.togglePanel)
   const setSidebarWidth = useActivityBarStore((s) => s.setSidebarWidth)
-  const setActivePanel = useActivityBarStore((s) => s.setActivePanel)
 
   // Get project path from context to control terminal availability
   const { projectPath } = useProjectManagementContext()
@@ -311,6 +316,7 @@ export function AppDockLayout() {
           '[data-testid="terminal-instance"] textarea'
         ) as HTMLElement | null
         termInput?.focus()
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- announces the imperative dockview layout change this effect just made (both branches); there is no render-time value to derive it from
         setA11yAnnouncement('Terminal maximized')
       } else {
         dockviewApiRef.current?.activePanel?.focus()
@@ -321,16 +327,19 @@ export function AppDockLayout() {
   }, [terminalExpanded, rightActivePanel, isSplitviewReady, projectPath])
 
   // Sanitize persisted state: remove legacy 'git'/'claude' active panel if present
+  // Runs once on mount: the store is read directly rather than through the
+  // subscribed values, so a later panel change never re-runs the check.
   useEffect(() => {
-    if (rightActivePanel === 'git' || rightActivePanel === 'claude') {
-      setActivePanel(null, 'right')
+    const { rightActivePanel: persisted, setActivePanel: resetPanel } =
+      useActivityBarStore.getState()
+    if (persisted === 'git' || persisted === 'claude') {
+      resetPanel(null, 'right')
     }
-    // run once on mount
   }, [])
 
   // Listen for project change events to clear editor tabs
   useEffect(() => {
-    const unsubscribe = window.api.file.onProjectChanged(() => {
+    const unsubscribe = fileGateway.onProjectChanged(() => {
       // Close all opened editor tabs
       useProjectStore.getState().clearAllEditorTabs()
       // A fresh project always starts collapsed (no persistence of expand state).

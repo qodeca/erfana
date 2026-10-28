@@ -41,6 +41,21 @@ vi.mock('../../stores/useProjectStore', () => ({
   }
 }))
 
+type ProjectStoreState = ReturnType<typeof import('../../stores/useProjectStore').useProjectStore.getState>
+
+/**
+ * The store state as `tabOperations` reads it: the typed slice it touches,
+ * widened to the full state `getState` returns.
+ */
+function storeState(dockviewApi: DockviewApi | null): ProjectStoreState {
+  const slice: Pick<ProjectStoreState, 'dirtyPanelIds' | 'setEditorDirty' | 'dockviewApi'> = {
+    dirtyPanelIds: mockDirtyPanelIds,
+    setEditorDirty: mockSetEditorDirty,
+    dockviewApi
+  }
+  return slice as ProjectStoreState
+}
+
 // Helper to create mock DockviewApi
 function createMockDockviewApi(panels: Array<{ id: string; params?: { filePath?: string } }>): DockviewApi {
   const panelMap = new Map<string, { id: string; params?: { filePath?: string }; api: { close: () => void } }>()
@@ -288,11 +303,7 @@ describe('tabOperations', () => {
         { id: 'editor-test', params: { filePath: '/path/to/document.md' } }
       ])
 
-      vi.mocked(useProjectStore.getState).mockReturnValue({
-        dirtyPanelIds: mockDirtyPanelIds,
-        setEditorDirty: mockSetEditorDirty,
-        dockviewApi: mockApi
-      } as ReturnType<typeof useProjectStore.getState>)
+      vi.mocked(useProjectStore.getState).mockReturnValue(storeState(mockApi))
 
       const result = getFilenameFromPanelId('editor-test')
 
@@ -305,11 +316,7 @@ describe('tabOperations', () => {
         { id: 'editor-test', params: { filePath: '/very/deep/nested/path/to/file.ts' } }
       ])
 
-      vi.mocked(useProjectStore.getState).mockReturnValue({
-        dirtyPanelIds: mockDirtyPanelIds,
-        setEditorDirty: mockSetEditorDirty,
-        dockviewApi: mockApi
-      } as ReturnType<typeof useProjectStore.getState>)
+      vi.mocked(useProjectStore.getState).mockReturnValue(storeState(mockApi))
 
       const result = getFilenameFromPanelId('editor-test')
 
@@ -320,11 +327,7 @@ describe('tabOperations', () => {
       const { useProjectStore } = await import('../../stores/useProjectStore')
       const mockApi = createMockDockviewApi([{ id: 'editor-test-file' }])
 
-      vi.mocked(useProjectStore.getState).mockReturnValue({
-        dirtyPanelIds: mockDirtyPanelIds,
-        setEditorDirty: mockSetEditorDirty,
-        dockviewApi: mockApi
-      } as ReturnType<typeof useProjectStore.getState>)
+      vi.mocked(useProjectStore.getState).mockReturnValue(storeState(mockApi))
 
       const result = getFilenameFromPanelId('editor-test-file')
 
@@ -334,11 +337,7 @@ describe('tabOperations', () => {
     it('should fallback when dockviewApi is null', async () => {
       const { useProjectStore } = await import('../../stores/useProjectStore')
 
-      vi.mocked(useProjectStore.getState).mockReturnValue({
-        dirtyPanelIds: mockDirtyPanelIds,
-        setEditorDirty: mockSetEditorDirty,
-        dockviewApi: null
-      } as ReturnType<typeof useProjectStore.getState>)
+      vi.mocked(useProjectStore.getState).mockReturnValue(storeState(null))
 
       const result = getFilenameFromPanelId('editor-test-file')
 
@@ -348,15 +347,32 @@ describe('tabOperations', () => {
     it('should return "Untitled" for non-editor panel IDs', async () => {
       const { useProjectStore } = await import('../../stores/useProjectStore')
 
-      vi.mocked(useProjectStore.getState).mockReturnValue({
-        dirtyPanelIds: mockDirtyPanelIds,
-        setEditorDirty: mockSetEditorDirty,
-        dockviewApi: null
-      } as ReturnType<typeof useProjectStore.getState>)
+      vi.mocked(useProjectStore.getState).mockReturnValue(storeState(null))
 
       const result = getFilenameFromPanelId('some-other-panel')
 
       expect(result).toBe('Untitled')
+    })
+
+    it("names a moved preview tab after the page it shows, not the file its id names (issue #124)", async () => {
+      // A same-tab move keeps the panel id minted for a.html and writes b.html
+      // into params.filePath. The dirty-close prompt must say b.html.
+      const { useProjectStore } = await import('../../stores/useProjectStore')
+      const mockApi = createMockDockviewApi([
+        { id: 'preview-proj-a-html', params: { filePath: '/proj/b.html' } }
+      ])
+
+      vi.mocked(useProjectStore.getState).mockReturnValue(storeState(mockApi))
+
+      expect(getFilenameFromPanelId('preview-proj-a-html')).toBe('b.html')
+    })
+
+    it('never reads a file name out of a preview id', async () => {
+      const { useProjectStore } = await import('../../stores/useProjectStore')
+
+      vi.mocked(useProjectStore.getState).mockReturnValue(storeState(null))
+
+      expect(getFilenameFromPanelId('preview-proj-a-html')).toBe('Untitled')
     })
 
     it('should return "Untitled" for empty filePath', async () => {
@@ -365,11 +381,7 @@ describe('tabOperations', () => {
         { id: 'editor-test', params: { filePath: '' } }
       ])
 
-      vi.mocked(useProjectStore.getState).mockReturnValue({
-        dirtyPanelIds: mockDirtyPanelIds,
-        setEditorDirty: mockSetEditorDirty,
-        dockviewApi: mockApi
-      } as ReturnType<typeof useProjectStore.getState>)
+      vi.mocked(useProjectStore.getState).mockReturnValue(storeState(mockApi))
 
       const result = getFilenameFromPanelId('editor-test')
 
@@ -383,11 +395,7 @@ describe('tabOperations', () => {
     beforeEach(async () => {
       // Reset mock to return null dockviewApi for deterministic fallback behavior
       const { useProjectStore } = await import('../../stores/useProjectStore')
-      vi.mocked(useProjectStore.getState).mockReturnValue({
-        dirtyPanelIds: mockDirtyPanelIds,
-        setEditorDirty: mockSetEditorDirty,
-        dockviewApi: null
-      } as ReturnType<typeof useProjectStore.getState>)
+      vi.mocked(useProjectStore.getState).mockReturnValue(storeState(null))
     })
 
     it('should return empty string when no dirty files', () => {
@@ -421,11 +429,7 @@ describe('tabOperations', () => {
         { id: 'editor-2', params: { filePath: '/project/index.ts' } }
       ])
 
-      vi.mocked(useProjectStore.getState).mockReturnValue({
-        dirtyPanelIds: mockDirtyPanelIds,
-        setEditorDirty: mockSetEditorDirty,
-        dockviewApi: mockApi
-      } as ReturnType<typeof useProjectStore.getState>)
+      vi.mocked(useProjectStore.getState).mockReturnValue(storeState(mockApi))
 
       const result = buildDirtyFilesMessage(['editor-1', 'editor-2'])
 

@@ -21,7 +21,10 @@ function settingsWith(enabled: boolean): GlobalSettings {
     editor: { preserveLineBreaks: false },
     gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
     transcription: { backend: 'openai', openaiApiKeyStored: false, whisperModel: 'base' },
-    htmlPreview: { enabled }
+    htmlPreview: { enabled },
+    files: { exclude: [] },
+    terminal: { screenReaderMode: 'auto' },
+    comments: { identityNoticeSeen: false }
   }
 }
 

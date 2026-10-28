@@ -9,13 +9,14 @@
  *
  * What this file can and cannot prove: it verifies "given an unlink and a file
  * that is back on disk, the watch is re-armed and the change is debounced". It
- * CANNOT verify that chokidar v3 actually emits `unlink` for `mv tmp target` -
+ * CANNOT verify that chokidar actually emits `unlink` for `mv tmp target` -
  * that premise is pinned by the real-chokidar test in
  * `watcher/singleFileWatch.rename.integration.test.ts` (finding M-7).
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
 import { FileWatcherService } from './FileWatcherService'
 import { WATCH_DEAD_OUTSIDE_PROJECT, WATCH_DEAD_SESSION_ENDED } from './watcher/atomicRearm'
+import { UNREADABLE_RECHECK_MS } from './watcher/pathPresence'
 
 const DETECTOR_WINDOW_MS = 100
 const DEBOUNCE_MS = 300
@@ -23,7 +24,7 @@ const DEBOUNCE_MS = 300
 interface FakeWatcher {
   path: string
   handlers: Record<string, (arg?: unknown) => void>
-  close: ReturnType<typeof vi.fn>
+  close: Mock
   on: (event: string, handler: (arg?: unknown) => void) => FakeWatcher
 }
 
@@ -50,6 +51,7 @@ const {
   isFixtureDir,
   sends,
   filesOnDisk,
+  failingPaths,
   canonicalPaths,
   createdWatchers,
   watchHooks
@@ -78,6 +80,8 @@ const {
       key === FIXTURE_ROOT || key === PROJECT || key === OTHER_PROJECT,
     sends: [] as Array<{ id: number; channel: string; payload: Record<string, unknown> }>,
     filesOnDisk: new Set<string>(),
+    /** Path -> the errno code `stat` fails with for it, whatever `filesOnDisk` says. */
+    failingPaths: new Map<string, string>(),
     /** Path -> what `realpath` resolves it to, i.e. the fixture's symlinks. */
     canonicalPaths: new Map<string, string>(),
     createdWatchers: [] as FakeWatcher[],
@@ -133,6 +137,10 @@ vi.mock('fs/promises', async importOriginal => {
       if (!isFixturePath(key)) {
         return (actual.stat as (...args: unknown[]) => Promise<unknown>)(target, ...rest)
       }
+      const failure = failingPaths.get(key)
+      if (failure) {
+        throw Object.assign(new Error(`${failure}: ${key}`), { code: failure })
+      }
       if (!filesOnDisk.has(key)) {
         throw missing(key)
       }
@@ -176,11 +184,19 @@ async function flushDebounce(): Promise<void> {
 
 const channels = (): string[] => sends.map(s => s.channel)
 
+const HOST_PLATFORM = process.platform
+
+/** Play Windows, where an EPERM just after an unlink earns a second look (#252). */
+function playWindows(): void {
+  Object.defineProperty(process, 'platform', { value: 'win32', configurable: true })
+}
+
 beforeEach(() => {
   vi.useFakeTimers()
   sends.length = 0
   createdWatchers.length = 0
   filesOnDisk.clear()
+  failingPaths.clear()
   canonicalPaths.clear()
   watchHooks.onCreate = null
   service = new FileWatcherService()
@@ -191,6 +207,7 @@ beforeEach(() => {
 afterEach(async () => {
   watchHooks.onCreate = null
   await service.dispose()
+  Object.defineProperty(process, 'platform', { value: HOST_PLATFORM, configurable: true })
   vi.useRealTimers()
 })
 
@@ -328,7 +345,8 @@ describe('FileWatcherService re-arm bail-outs', () => {
       {
         id: 1,
         channel: 'file-watch:error',
-        payload: { filePath: FILE, error: WATCH_DEAD_SESSION_ENDED }
+        // `ended`: the renderer slot forgets its hold, as on a delete (#252)
+        payload: { filePath: FILE, error: WATCH_DEAD_SESSION_ENDED, ended: true }
       }
     ])
     expect(internals.watchedFiles.has(FILE)).toBe(false)
@@ -379,7 +397,7 @@ describe('FileWatcherService re-arm confinement', () => {
       {
         id: 1,
         channel: 'file-watch:error',
-        payload: { filePath: FILE, error: WATCH_DEAD_OUTSIDE_PROJECT }
+        payload: { filePath: FILE, error: WATCH_DEAD_OUTSIDE_PROJECT, ended: true }
       }
     ])
     expect(internals.watchedFiles.has(FILE)).toBe(false)
@@ -473,5 +491,85 @@ describe('FileWatcherService detector disposal', () => {
     // The detector is disposed for good, so late unlinks register nothing
     internals.atomicSaveDetector.registerDelete(FILE, () => {})
     expect(internals.atomicSaveDetector.getPendingCount()).toBe(0)
+  })
+})
+
+// On Windows an EPERM just after an unlink earns a second look 250 ms later.
+// Whatever happens to the watch in that time must win over the late answer:
+// a stale verdict would reach, re-arm or tear down a newer watch on the same
+// path (#252 review)
+describe('FileWatcherService – a newer watch on the path while a second look waits', () => {
+  beforeEach(() => playWindows())
+
+  it('leaves the newer watch alone when the re-arm’s second look ends after a reopen', async () => {
+    const first = await startWatch()
+    // The replacement is bound, then the file answers as one Windows is deleting
+    watchHooks.onCreate = () => {
+      watchHooks.onCreate = null
+      failingPaths.set(FILE, 'EPERM')
+    }
+    first.handlers.unlink()
+    await closeDetectorWindow()
+    expect(createdWatchers).toHaveLength(2)
+
+    // The tab is closed and reopened while the stat waits, then the file is gone
+    failingPaths.delete(FILE)
+    await service.unwatchFile(FILE, { id: 1 } as never)
+    const newer = await startWatch()
+    filesOnDisk.delete(FILE)
+    sends.length = 0
+
+    await vi.advanceTimersByTimeAsync(UNREADABLE_RECHECK_MS)
+    await flushDebounce()
+
+    // The reopened tab hears no stale "deleted", and its watch is neither dropped nor closed
+    expect(sends).toHaveLength(0)
+    expect(internals.watchedFiles.get(FILE)?.watcher).toBe(newer)
+    expect(newer.close).not.toHaveBeenCalled()
+  })
+
+  it('drops the old session’s check when the project is reopened while it waits', async () => {
+    const first = await startWatch()
+    // The unlink's check finds a possible delete pending and waits
+    failingPaths.set(FILE, 'EPERM')
+    first.handlers.unlink()
+    await closeDetectorWindow()
+    expect(internals.atomicSaveDetector.hasPending(FILE)).toBe(true)
+
+    // The same project is reopened, and the file is back
+    failingPaths.delete(FILE)
+    await service.stopAll()
+    service.setProjectPath(PROJECT)
+    const newer = await startWatch()
+    sends.length = 0
+
+    await vi.advanceTimersByTimeAsync(UNREADABLE_RECHECK_MS)
+    await flushDebounce()
+
+    // The old "atomic save" verdict neither re-arms the new watch nor reports a change
+    expect(sends).toHaveLength(0)
+    expect(createdWatchers).toHaveLength(2)
+    expect(newer.close).not.toHaveBeenCalled()
+    expect(internals.watchedFiles.get(FILE)?.watcher).toBe(newer)
+  })
+
+  it('lets a consumer joining during the second look re-arm at once, and only once', async () => {
+    const first = await startWatch()
+    failingPaths.set(FILE, 'EPERM')
+    first.handlers.unlink()
+    await closeDetectorWindow()
+
+    // The replacement has landed by the time a second tab opens the file
+    failingPaths.delete(FILE)
+    await service.watchFile(FILE, { id: 2 } as never)
+    expect(createdWatchers).toHaveLength(2)
+
+    await vi.advanceTimersByTimeAsync(UNREADABLE_RECHECK_MS)
+    await flushDebounce()
+
+    // The cancelled check adds no second re-arm
+    expect(createdWatchers).toHaveLength(2)
+    expect(internals.watchedFiles.get(FILE).subscribers.size).toBe(2)
+    expect(channels()).toEqual(['file-watch:changed', 'file-watch:changed'])
   })
 })

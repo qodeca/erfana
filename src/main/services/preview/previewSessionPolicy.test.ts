@@ -3,7 +3,9 @@
 import type { Session, WebContents } from 'electron'
 import { describe, expect, it, vi } from 'vitest'
 import {
+  PREVIEW_COMMENTS_ARGUMENT,
   PREVIEW_WEB_PREFERENCES,
+  PREVIEW_WEB_PREFERENCES_WITH_COMMENTS,
   buildPreviewWebPreferences,
   hardenPreviewSession,
   nextPartitionName
@@ -23,8 +25,8 @@ interface SessionMock {
   setPermissionCheckHandler: ReturnType<typeof vi.fn<(h: PermCheckHandler) => void>>
   on: ReturnType<typeof vi.fn<(event: string, listener: WillDownloadListener) => void>>
   removeListener: ReturnType<typeof vi.fn<(event: string, listener: WillDownloadListener) => void>>
-  onHeadersReceived: ReturnType<typeof vi.fn>
-  onBeforeSendHeaders: ReturnType<typeof vi.fn>
+  /** Every `webRequest.<hook>` property production READ, by name -- whatever it is called. */
+  webRequestHooksTouched: string[]
 }
 
 function makeSessionMock(): SessionMock {
@@ -32,15 +34,27 @@ function makeSessionMock(): SessionMock {
   const setPermissionCheckHandler = vi.fn<(h: PermCheckHandler) => void>()
   const on = vi.fn<(event: string, listener: WillDownloadListener) => void>()
   const removeListener = vi.fn<(event: string, listener: WillDownloadListener) => void>()
-  const onHeadersReceived = vi.fn()
-  const onBeforeSendHeaders = vi.fn()
+  // A Proxy rather than two hand-named spies: a spy named `onHeadersReceived`
+  // only notices a call to a hook the mock's author thought of, so production
+  // reaching for any other hook (`onSendHeaders`, `onResponseStarted`) -- or a
+  // mock whose name differs from production's -- left the test green.
+  const webRequestHooksTouched: string[] = []
+  const webRequest = new Proxy(
+    {},
+    {
+      get(_target, property) {
+        webRequestHooksTouched.push(String(property))
+        return vi.fn()
+      }
+    }
+  )
 
   const session = {
     setPermissionRequestHandler,
     setPermissionCheckHandler,
     on,
     removeListener,
-    webRequest: { onHeadersReceived, onBeforeSendHeaders }
+    webRequest
   } as unknown as Session
 
   return {
@@ -49,8 +63,7 @@ function makeSessionMock(): SessionMock {
     setPermissionCheckHandler,
     on,
     removeListener,
-    onHeadersReceived,
-    onBeforeSendHeaders
+    webRequestHooksTouched
   }
 }
 
@@ -73,10 +86,31 @@ describe('buildPreviewWebPreferences', () => {
     expect(withoutSession).toStrictEqual(PREVIEW_WEB_PREFERENCES)
   })
 
-  it('adds `session` as the sole runtime addition', () => {
+  it('adds `session` as the sole runtime addition when no preload is supplied', () => {
     const session = { marker: true } as unknown as Session
     const prefs = buildPreviewWebPreferences(session)
     expect(prefs.session).toBe(session)
+    expect(Object.prototype.hasOwnProperty.call(prefs, 'preload')).toBe(false)
+  })
+
+  it('adds the preview-page preload when the composition root supplies one', () => {
+    // sd-074b §5.1: the sealed page gains a ONE-WAY reporter, wired at the
+    // composition root because the path is environment-dependent.
+    const session = { marker: true } as unknown as Session
+    const prefs = buildPreviewWebPreferences(session, '/out/preload/previewPage.js')
+    expect(prefs.preload).toBe('/out/preload/previewPage.js')
+    // Everything else stays pinned.
+    expect(prefs.sandbox).toBe(true)
+    expect(prefs.contextIsolation).toBe(true)
+    expect(prefs.nodeIntegration).toBe(false)
+  })
+
+  it('omits the preload when the bundle was not found', () => {
+    // Missing bundle degrades to inert links, never to a preview that fails.
+    const session = { marker: true } as unknown as Session
+    expect(
+      Object.prototype.hasOwnProperty.call(buildPreviewWebPreferences(session, null), 'preload')
+    ).toBe(false)
   })
 
   it('pins the security-critical prefs and omits `preload`', () => {
@@ -89,12 +123,56 @@ describe('buildPreviewWebPreferences', () => {
     expect(PREVIEW_WEB_PREFERENCES.webviewTag).toBe(false)
     expect(PREVIEW_WEB_PREFERENCES.experimentalFeatures).toBe(false)
     expect(PREVIEW_WEB_PREFERENCES.devTools).toBe(false)
-    // `preload` is asserted by KEY absence, not by value.
+    // `preload` is still absent from the FROZEN LITERAL: it is environment
+    // dependent, so it is supplied per call instead (sd-074b §5.2).
     expect(Object.prototype.hasOwnProperty.call(PREVIEW_WEB_PREFERENCES, 'preload')).toBe(false)
   })
 
   it('freezes the literal so it cannot be mutated at runtime', () => {
     expect(Object.isFrozen(PREVIEW_WEB_PREFERENCES)).toBe(true)
+  })
+})
+
+describe('buildPreviewWebPreferences with HTML Preview comments (SEC-22)', () => {
+  // ADR 0005: the comment overlay needs the preload in every frame. Under
+  // `sandbox: true`, `nodeIntegrationInSubFrames` gives frames no Node – it
+  // only runs the sandboxed, isolated preload there. The renderer argument is
+  // the preload's only signal to install the overlay (the kill switch). Those
+  // are the TWO keys the flag may change.
+  it('SEC-22 differs from the frozen literal in nodeIntegrationInSubFrames and the comments argument only', () => {
+    const { nodeIntegrationInSubFrames, additionalArguments, ...rest } = PREVIEW_WEB_PREFERENCES_WITH_COMMENTS
+    const { nodeIntegrationInSubFrames: off, ...pinned } = PREVIEW_WEB_PREFERENCES
+    expect(nodeIntegrationInSubFrames).toBe(true)
+    expect(additionalArguments).toStrictEqual(['--erfana-hpc'])
+    expect(PREVIEW_COMMENTS_ARGUMENT).toBe('--erfana-hpc')
+    expect(Object.isFrozen(additionalArguments)).toBe(true)
+    expect(off).toBe(false)
+    expect(Object.prototype.hasOwnProperty.call(PREVIEW_WEB_PREFERENCES, 'additionalArguments')).toBe(false)
+    expect(rest).toStrictEqual(pinned)
+    expect(rest.sandbox).toBe(true)
+    expect(rest.contextIsolation).toBe(true)
+    expect(rest.nodeIntegration).toBe(false)
+    expect(Object.isFrozen(PREVIEW_WEB_PREFERENCES_WITH_COMMENTS)).toBe(true)
+    expect(Object.prototype.hasOwnProperty.call(PREVIEW_WEB_PREFERENCES_WITH_COMMENTS, 'preload')).toBe(false)
+  })
+
+  it('SEC-22 builds the comments variant only when the flag is on', () => {
+    const session = { marker: true } as unknown as Session
+    const on = buildPreviewWebPreferences(session, '/out/preload/previewPage.js', { comments: true })
+    const { session: _on, preload, ...onRest } = on
+    void _on
+    expect(preload).toBe('/out/preload/previewPage.js')
+    expect(onRest).toStrictEqual(PREVIEW_WEB_PREFERENCES_WITH_COMMENTS)
+    // Electron gets its own array, never the frozen literal's.
+    expect(onRest.additionalArguments).not.toBe(PREVIEW_WEB_PREFERENCES_WITH_COMMENTS.additionalArguments)
+
+    for (const options of [undefined, {}, { comments: false }]) {
+      const { session: _off, ...offRest } = buildPreviewWebPreferences(session, null, options)
+      void _off
+      expect(offRest).toStrictEqual(PREVIEW_WEB_PREFERENCES)
+      // Flag off: no renderer argument, so the preload installs no overlay.
+      expect(Object.prototype.hasOwnProperty.call(offRest, 'additionalArguments')).toBe(false)
+    }
   })
 })
 
@@ -165,14 +243,23 @@ describe('hardenPreviewSession', () => {
     expect(wc.setWebRTCIPHandlingPolicy).toHaveBeenCalledWith('disable_non_proxied_udp')
   })
 
-  it('does NOT touch response headers (CSP has a single owner)', () => {
+  it('records a webRequest hook read by name, so the next test can fail', () => {
+    // POSITIVE CONTROL for the recorder: a read of the response-headers hook must
+    // show up in the list, or an empty list below would prove nothing.
+    const mock = makeSessionMock()
+
+    void mock.session.webRequest.onHeadersReceived
+
+    expect(mock.webRequestHooksTouched).toEqual(['onHeadersReceived'])
+  })
+
+  it('reads no webRequest hook at all (CSP has a single owner of response headers)', () => {
     const mock = makeSessionMock()
     const { webContents } = makeWebContentsMock()
 
     hardenPreviewSession(mock.session, webContents)
 
-    expect(mock.onHeadersReceived).not.toHaveBeenCalled()
-    expect(mock.onBeforeSendHeaders).not.toHaveBeenCalled()
+    expect(mock.webRequestHooksTouched).toEqual([])
   })
 
   it('the disposer resets the handlers and removes the download listener', () => {

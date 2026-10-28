@@ -36,6 +36,11 @@ export interface FilePickerDialogProps {
   query: string
   /** Project root for displaying relative paths */
   projectRoot: string | null
+  /**
+   * The list comes from an incomplete project tree (#320): other files of this
+   * name may exist, and the dialog says so.
+   */
+  incomplete?: boolean
   /** Z-index for stacking */
   zIndex?: number
 }
@@ -55,15 +60,20 @@ export function FilePickerDialog({
   candidates,
   query,
   projectRoot,
+  incomplete = false,
   zIndex = 1000
 }: FilePickerDialogProps) {
   const [selectedIndex, setSelectedIndex] = useState(0)
   const listRef = useRef<HTMLUListElement>(null)
 
-  // Reset selection when candidates change
-  useEffect(() => {
+  // Reset selection when candidates change. Adjusted during render (React's
+  // "storing information from previous renders" pattern) rather than in an
+  // effect, so a new list is never painted with the old index highlighted.
+  const [prevCandidates, setPrevCandidates] = useState(candidates)
+  if (candidates !== prevCandidates) {
+    setPrevCandidates(candidates)
     setSelectedIndex(0)
-  }, [candidates])
+  }
 
   // Scroll selected item into view
   useEffect(() => {
@@ -144,10 +154,15 @@ export function FilePickerDialog({
     >
       <div className="dialog-content" onKeyDown={handleKeyDown} tabIndex={-1} data-testid={TEST_IDS.FILE_PICKER}>
         <h2 id="file-picker-title" className="dialog-title" data-testid={TEST_IDS.DIALOG_TITLE}>
-          Multiple files match &quot;{getFilename(query)}&quot;
+          {candidates.length === 1 ? 'A file matches' : 'Multiple files match'} &quot;{getFilename(query)}&quot;
         </h2>
 
         <p className="dialog-subtitle">Select the file you want to open:</p>
+        {incomplete && (
+          <p className="dialog-subtitle" data-testid={TEST_IDS.FILE_PICKER_INCOMPLETE}>
+            This project is too large to list in full, so other files of this name may be missing.
+          </p>
+        )}
 
         <ul ref={listRef} className="file-picker-list" role="listbox" aria-activedescendant={`file-item-${selectedIndex}`} data-testid={TEST_IDS.FILE_PICKER_LIST}>
           {candidates.map((candidate, index) => {

@@ -1,11 +1,18 @@
-# Getting Started
+<!--
+SPDX-License-Identifier: GPL-3.0-only
+SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+-->
+
+# Getting started (developers)
+
+For using Erfana, read the [user guide](./user-guide/README.md).
 
 Quick onboarding guide for new developers working on Erfana.
 
 ## Prerequisites
 
-- **Node.js**: 24+ (Electron 39.8.9 bundles Node.js 22.22.1)
-- **Python**: 3.12 (node-pty fails on 3.13)
+- **Node.js**: 24+ — pinned in [`.nvmrc`](../.nvmrc), so `nvm use` in the repo root selects it (Electron 44.9.3 bundles Node.js 24.22.0)
+- **Python**: 3.12, or 3.14.x (3.14.3 verified) – node-pty fails to build on 3.13
 - **Git**: For version control
 - **On Windows**: VS 2022 Build Tools, Developer Mode enabled, Win32 long paths enabled. Skipping these breaks `node-pty` build + `npm run build:win`. Full setup: [`docs/build/windows.md`](./build/windows.md).
 
@@ -16,7 +23,7 @@ Quick onboarding guide for new developers working on Erfana.
 ```bash
 git clone https://github.com/qodeca/erfana.git
 cd erfana
-npm install
+npm ci   # not `npm install` — see CONTRIBUTING.md § Local setup
 ```
 
 ### 2. Verify setup
@@ -34,7 +41,7 @@ Read these docs in order:
 
 1. [Architecture](./architecture.md) - System design patterns
 2. [IPC Patterns](./ipc-patterns.md) - Main ↔ Renderer communication
-3. [UI Style Guide](./ui-style-guide.md) - Design tokens (MANDATORY for UI changes)
+3. [Design system](design-system/index.html) - the cards that decide every visual rule (MANDATORY for UI changes)
 
 ### 4. Familiarize with project structure
 
@@ -48,7 +55,7 @@ src/
 └── renderer/src/       # React UI
     ├── components/     # UI components
     ├── stores/         # Zustand state management
-    └── prompts/        # AI prompt templates
+    └── prompts/        # prompt templates sent to the CLI agent
 ```
 
 ## Common Workflows
@@ -63,7 +70,7 @@ src/
    - Preload bridge: `src/preload/`
    - UI component: `src/renderer/src/components/`
 4. Add tests
-5. Run quality gates: `npm run typecheck && npm run lint && npm run test`
+5. Run quality gates: `npm run typecheck && npm run lint && npm run lint:css && npm run test`
 
 ### Fixing a bug
 
@@ -75,36 +82,16 @@ src/
 
 ### Making UI changes
 
-**MANDATORY**: Read [UI Style Guide](./ui-style-guide.md) before any UI work.
+**MANDATORY**: Open the [design system](design-system/index.html) before any UI work. `npm run lint:css` enforces the token rules in CI.
 
 - Use design tokens from `src/renderer/src/styles/design-tokens.css`
 - No hardcoded colors, spacing, or fonts
 - No rounded corners (`border-radius: 0`)
 - Test focus states for accessibility
 
-## Key Commands
+## Commands and file locations
 
-| Command | Purpose |
-|---------|---------|
-| `npm run dev` | Development server with hot reload |
-| `npm run build` | Production build |
-| `npm run build:mac` | macOS package |
-| `npm run test` | Run all tests (Vitest) |
-| `npm run test:renderer` | Renderer tests only |
-| `npm run test:main` | Main process tests only |
-| `npm run test:e2e` | Playwright E2E tests |
-| `npm run test:cov` | Coverage report |
-| `npm run typecheck` | TypeScript check |
-| `npm run lint` | ESLint |
-
-## Quick Reference
-
-- **Design tokens**: `src/renderer/src/styles/design-tokens.css`
-- **IPC schemas**: `src/shared/ipc/*.ts`
-- **Main services**: `src/main/services/`
-- **React components**: `src/renderer/src/components/`
-- **Zustand stores**: `src/renderer/src/stores/`
-- **Test files**: `*.test.ts` or `*.test.tsx` alongside source
+The npm scripts, keyboard shortcuts and key source locations are in [Quick Reference](./quick-reference.md).
 
 ## Documentation Index
 
@@ -113,7 +100,8 @@ src/
 | Architecture | [docs/architecture.md](./architecture.md) |
 | Build system | [docs/build/README.md](./build/README.md) |
 | Testing | [docs/testing/README.md](./testing/README.md) |
-| UI Style Guide | [docs/ui-style-guide.md](./ui-style-guide.md) |
+| Design system | [docs/design-system/index.html](design-system/index.html) |
+| UI Style Guide (text-selection policy) | [docs/ui-style-guide.md](./ui-style-guide.md) |
 | Keyboard shortcuts | [docs/keyboard-shortcuts.md](./keyboard-shortcuts.md) |
 | Known issues | [docs/known-issues.md](./known-issues.md) |
 | Changelog | [docs/CHANGELOG.md](./CHANGELOG.md) |

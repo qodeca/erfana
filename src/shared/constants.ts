@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+import { MODEL_PINS } from './whisper-model-pins'
+
 /**
  * Shared Application Constants
  *
@@ -7,6 +9,16 @@
  *
  * Centralizes configuration values that are used across multiple files.
  */
+
+/**
+ * Application ID. Single source of truth for the Windows AppUserModelID.
+ *
+ * Must equal `appId` in `electron-builder.yml`: the NSIS installer stamps that value on the
+ * Start menu and desktop shortcuts, and the running app must report the same one so the taskbar
+ * groups it with the pinned shortcut and toast notifications resolve the app name and icon.
+ * `appId.test.ts` enforces the match.
+ */
+export const APP_ID = 'com.erfana.app'
 
 /** Maximum number of recent projects to track */
 export const MAX_RECENT_PROJECTS = 5
@@ -40,11 +52,29 @@ export const LOGS_DIR_RELATIVE = '.erfana/logs'
  */
 export const FORCE_CRASH_ARG = '--erfana-force-crash'
 
-/** Toast notification durations in milliseconds */
+/**
+ * Renderer launch argument that switches the e2e test hooks on
+ * (`window.__erfanaTest`). Appended by the main process only when the app is
+ * unpackaged AND `ERFANA_E2E_TEST_HOOKS=1`; the preload reads it back off
+ * `process.argv` and exposes `window.api.testHooks.enabled`.
+ *
+ * @see src/main/index.ts - buildAdditionalArguments()
+ * @see src/preload/index.ts - api.testHooks
+ */
+export const TEST_HOOKS_ARG = '--erfana-test-hooks'
+
+/**
+ * Toast notification durations in milliseconds; `0` means "until dismissed".
+ *
+ * These are the defaults the `toastHelpers` request. The renderer's
+ * `resolveToastDuration` (`components/Toast/toastDwell.ts`) has the last word:
+ * an error always persists and a warning is never shown for less than 8 s,
+ * whatever a caller asks for (WCAG 2.2.1).
+ */
 export const TOAST_DURATION = {
-  ERROR: 5000,
+  ERROR: 0,
   SUCCESS: 3000,
-  WARNING: 3000,
+  WARNING: 8000,
   INFO: 3000
 } as const
 
@@ -110,7 +140,7 @@ export const TEXT_INPUT_LIMITS = {
 
 /**
  * Default watcher ignore patterns (performance optimization)
- * These directories cause chokidar performance issues (50K+ files)
+ * These directories cause directory-watcher performance issues (50K+ files)
  *
  * @see DirectoryWatcherService.ts - uses these patterns
  * @see Issue #63 - project-level settings
@@ -128,7 +158,7 @@ export const DEFAULT_WATCHER_IGNORE_PATTERNS = [
   '.virtualenv',
   'virtualenv',
   '.conda',
-  // Git internals (keeps .git/HEAD, .git/config, .git/refs watched)
+  // Git internals. By default the directory watcher drops all of .git (a tree-hidden name, #211); these apply when a project's tree.hiddenPatterns replaces the defaults without .git. Git state reaches the renderer via GitWatcherService.
   '.git/objects',
   '.git/subtree-cache',
   '.git/lfs',
@@ -176,6 +206,12 @@ export const PDF_EXPORT = {
   CONTENT_READY_TIMEOUT: 5000,
   /** Polling interval for readiness check in ms */
   READY_CHECK_INTERVAL: 100,
+  /** Time box for loading the temp page in ms */
+  LOAD_TIMEOUT: 15000,
+  /** Time box for one readiness probe in ms */
+  READY_PROBE_TIMEOUT: 2000,
+  /** Time box for printToPDF in ms */
+  PRINT_TIMEOUT: 60000,
   /** Hidden window dimensions (A4 at 96 DPI) */
   WINDOW_WIDTH: 794,
   WINDOW_HEIGHT: 1123,
@@ -349,13 +385,13 @@ export const LOCAL_WHISPER = {
   WHISPER_DIR: 'whisper',
   /** Supported model sizes */
   SUPPORTED_MODELS: ['tiny', 'base', 'small', 'medium', 'large'] as const,
-  /** Approximate download sizes in bytes per model */
+  /** Exact download sizes in bytes per model (from the pinned model list) */
   MODEL_SIZES: {
-    tiny: 75_000_000,
-    base: 142_000_000,
-    small: 466_000_000,
-    medium: 1_500_000_000,
-    large: 2_900_000_000
+    tiny: MODEL_PINS.tiny.sizeBytes,
+    base: MODEL_PINS.base.sizeBytes,
+    small: MODEL_PINS.small.sizeBytes,
+    medium: MODEL_PINS.medium.sizeBytes,
+    large: MODEL_PINS.large.sizeBytes
   },
   /** Download timeout in ms (10 minutes – large models) */
   DOWNLOAD_TIMEOUT: 600_000,
@@ -401,8 +437,16 @@ export const DOCUMENT_IMPORT = {
     'ppt', 'pptx', 'pptm', 'odp',
     'xls', 'xlsx', 'xlsm', 'ods'
   ] as const,
-  /** Image extensions that require ImageMagick for conversion */
-  IMAGEMAGICK_EXTENSIONS: ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'tiff', 'tif', 'webp'] as const
+  /** Image extensions LiteParse reads natively (OCR) – no external tool needed (#250) */
+  IMAGE_EXTENSIONS: ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'tiff', 'tif', 'webp'] as const,
+  /**
+   * Shortest gap between two "Check again" probes of the import tools (#250).
+   * A recheck inside the window returns the current result without spawning
+   * anything, so a held key or a scripted loop cannot fork probes repeatedly.
+   */
+  TOOL_RECHECK_MIN_INTERVAL_MS: 3000,
+  /** Official download page, opened through the `shell:openExternal` allowlist (#250) */
+  LIBREOFFICE_DOWNLOAD_URL: 'https://www.libreoffice.org/download/'
 } as const
 
 /**
@@ -461,8 +505,8 @@ export const PREVIEW = {
   MAX_ASSET_BYTES: 25 * 1024 * 1024,
   /**
    * Max bytes of the entry HTML read for static-link discovery. Bounds both the
-   * read and the synchronous parse5 parse that runs on the main thread, so a
-   * large or generated entry file cannot freeze the UI on every reload. Links
+   * read and its scan in the link scan worker (#124 audit), so a large or
+   * generated entry file cannot keep auto-refresh busy on every reload. Links
    * live near the top of a document, so a truncated head still finds them.
    */
   MAX_ENTRY_HTML_BYTES: 4 * 1024 * 1024,
@@ -472,8 +516,47 @@ export const PREVIEW = {
    * page can force by fetching many large in-repo assets at once.
    */
   MAX_CONCURRENT_ASSET_READS: 8,
+  /**
+   * How many asset reads may WAIT for a slot before the protocol handler starts
+   * shedding them with 503.
+   *
+   * The limiter is process-wide (sd-074b §4.7), so without a queue bound one
+   * hostile page could park an unbounded number of Chromium URLLoaders and
+   * starve every other preview — a hang with no error and no failure entry.
+   * Shedding instead is visible: the badge records it.
+   */
+  MAX_QUEUED_ASSET_READS: 64,
+  /**
+   * How many previews stay LIVE at once (sd-074b D5). Beyond this the least
+   * recently active preview is torn down to its still frame and re-opens by
+   * itself when its tab is activated again — the "exit state" whose absence
+   * killed the original LRU proposal (sd-074 §10).
+   *
+   * Each live preview is a separate renderer process with its own session, so
+   * this is the cap that actually bounds CPU and RSS; the byte and descriptor
+   * budgets below are derived from it.
+   */
+  MAX_LIVE_VIEWS: 3,
+  /**
+   * Bounds on the previewed page's own zoom level (Chromium scale, 0 = 100%).
+   *
+   * ±5 covers roughly 30% to 300%, which clears WCAG 2.2 SC 1.4.4's 200%
+   * requirement in both directions while stopping a runaway key-repeat at a
+   * level the page can still be laid out at.
+   */
+  MIN_ZOOM_LEVEL: -5,
+  MAX_ZOOM_LEVEL: 5,
   /** Per-panel watch cap (bounds EMFILE exposure, #146–#151) */
   MAX_WATCHED_FILES: 16,
+  /**
+   * Ceiling on watch acquisitions across ALL previews. Derived from
+   * `MAX_LIVE_VIEWS × MAX_WATCHED_FILES` plus headroom for a view that is mid
+   * teardown while another opens — pools are per view, so this counts
+   * acquisitions rather than distinct descriptors. Over budget degrades
+   * auto-refresh for the newest view and records a failure entry; it never
+   * silently stops watching (sd-074b §4.6).
+   */
+  MAX_WATCHED_FILES_GLOBAL: 64,
   /** Coalesce window for pool change events before a reload/swap (ms) */
   WATCH_COALESCE_MS: 30,
   /** chokidar awaitWriteFinish.stabilityThreshold for preview watches (ms) */
@@ -488,8 +571,132 @@ export const PREVIEW = {
   CLOSE_TIMEOUT_MS: 1000,
   /** CSS swap race timeout; any non-`true` outcome falls back to reload (ms) */
   SWAP_TIMEOUT_MS: 1000,
-  /** Max host-block toasts surfaced per project before suppression */
-  MAX_HOST_TOASTS: 3,
+  /**
+   * Bound on the session purge inside an approval (ms). The purge is
+   * belt-and-braces — the opaque origin is the seal and the reload that
+   * follows bypasses the cache — so one that hangs is logged and skipped
+   * rather than allowed to hold the grant hostage (the Allow freeze seen on
+   * Windows, 2026-09-03).
+   */
+  PURGE_TIMEOUT_MS: 2000,
+  /** Bound on the post-write re-read of the allowlist file (ms); same reasoning. */
+  ALLOWLIST_VERIFY_TIMEOUT_MS: 2000,
+  /**
+   * Bound on the whole "apply the grant to the live views" step inside the
+   * `preview:approveHost` invoke (ms). The grant is persisted and the CSP is
+   * rebuilt before the first await, so on timeout the invoke still answers
+   * `ok: true`; only the reload is late.
+   */
+  APPROVE_TIMEOUT_MS: 5000,
+  /**
+   * The renderer's own deadline on that invoke (ms). Defence in depth: however
+   * main misbehaves, the band must leave "Saving…" and give Cancel back. Longer
+   * than `APPROVE_TIMEOUT_MS` so a healthy main always answers first.
+   */
+  APPROVE_UI_DEADLINE_MS: 10000,
+  /**
+   * Bound on one still-frame `capturePage` (ms). A capture that never comes
+   * back must not block every later capture of that panel; the previous frame
+   * is kept.
+   */
+  CAPTURE_TIMEOUT_MS: 1500,
+  /**
+   * Pause before the one retry of a capture that came back EMPTY (ms). Measured
+   * on Windows: the capture taken at `'ready'` was empty for a page that had
+   * only just painted, and the retry a moment later was not.
+   */
+  CAPTURE_RETRY_DELAY_MS: 250,
+  /**
+   * How long eviction waits for an in-flight capture before destroying the
+   * page anyway (ms). The wait exists so a suspended tab wakes with a picture;
+   * it must not be able to stop the tab from being suspended at all.
+   */
+  CAPTURE_SETTLE_TIMEOUT_MS: 1500,
+  /**
+   * Bound on each async step of a view's teardown (ms). On Windows the session
+   * purge inside teardown never settled (2026-09-03): eviction hung, the old
+   * renderer process was never destroyed, and the tab never heard `suspended`.
+   * A step that overruns is logged and skipped; the destroy still happens.
+   */
+  TEARDOWN_STEP_TIMEOUT_MS: 2000,
+  /**
+   * How long the previewed page gets to prove it repainted below newly revealed
+   * chrome (ms). ONE number for both sides: the renderer's absolute deadline
+   * for the permission band, and main's life for one confirmation script, which
+   * a page that never runs its frames (hidden, frozen) would otherwise hold
+   * for ever.
+   *
+   * Measured on Electron 39: ~17 ms for an idle page, ~130 ms for a heavy one,
+   * and NEVER for a page that refuses to yield.
+   */
+  BOUNDS_ACK_TIMEOUT_MS: 300,
+  /**
+   * Bound on the purge that runs when a partition is handed back for reuse
+   * and again before it is handed out (ms). Fail-closed: a purge that fails or
+   * overruns on either side drops the name and a fresh partition is minted.
+   */
+  PARTITION_PURGE_TIMEOUT_MS: 2000,
+  /**
+   * How many purged partition names are kept for reuse. Electron cannot destroy
+   * a session, so every NEW name costs handles for the life of the process
+   * (measured on Windows: ~16 per partition, +0 for re-minting a name). One
+   * per live view plus two in flight around an eviction is enough; more would
+   * only hold storage nobody needs. A project switch forgets the whole list on
+   * purpose (a partition never carries across projects), which costs up to
+   * this many fresh names — ~80 handles — per switch; the "no growth"
+   * measurement in 41dfee95 covers open/close within one project only.
+   */
+  MAX_RECYCLED_PARTITIONS: 5,
+  /**
+   * Smallest still frame worth taking (px, either edge). `preview:open` seeds
+   * the view at 1×1 before the placeholder is laid out; a frame captured then is
+   * one pixel stretched over the whole panel. 16 rather than 32 because
+   * `lastBounds` is the zoom-converted rect and a narrow split pane at 200%
+   * scaling is legitimately small.
+   */
+  MIN_STILL_FRAME_PX: 16,
+  /**
+   * Max DISTINCT blocked hosts reported to the renderer per view.
+   *
+   * This replaced `MAX_HOST_TOASTS: 3`, which bounded toasts and not the list —
+   * so when the emit became unconditional the list had no bound at all:
+   * `PreviewRequestFilter` calls `onBlocked` per blocked REQUEST, with no
+   * per-host de-duplication of its own.
+   *
+   * 50 matches `MAX_ORIGINS_PER_VIEW` in `previewCspViolationBridge.ts`, which
+   * bounds the other of the two paths that feed this. Keep the two equal: a page
+   * should not be able to report more hosts through one path than the other.
+   *
+   * The entry it counts is an ORIGIN now, not a hostname — see
+   * `MAX_BLOCKED_ORIGINS_PER_HOST` below, which is what stops that change from
+   * turning this global budget into something one hostname can eat by itself.
+   */
+  MAX_BLOCKED_HOSTS_PER_VIEW: 50,
+  /**
+   * Max DISTINCT origins ONE hostname may contribute to the blocked list.
+   *
+   * A sub-cap underneath `MAX_BLOCKED_HOSTS_PER_VIEW`, applied at both places a
+   * blocked entry is recorded main-side — `PreviewViewService.onBlocked` (the
+   * network-filter path) and `previewCspViolationBridge` (the CSP path).
+   *
+   * WHY IT HAD TO EXIST THE MOMENT THE UNIT BECAME AN ORIGIN. Keyed on a
+   * hostname, the global cap was self-limiting: a page hitting one host on fifty
+   * ports collapsed into ONE entry. Keyed on an origin it does not. A page
+   * fetching `http://localhost:1` … `http://localhost:50` fills all fifty slots
+   * before main ever records the real blocked CDN — and that entry is not buried
+   * below the fold, it is dropped and never sent, so the reader cannot approve
+   * the one host they actually needed. Renderer-side trimming cannot repair
+   * that: the event was never emitted.
+   *
+   * WHY 5. One hostname legitimately serves one origin, occasionally two (443
+   * plus an alternate port a dev server is on). Five is generous for the honest
+   * case and cheap against the hostile one: at a tenth of the global budget, at
+   * least ten distinct hostnames always fit, so no single noisy host can make a
+   * different host invisible. The first origin for a hostname is therefore
+   * always reported, which is the property that matters — a host must never be
+   * missing from the list because some other host was loud.
+   */
+  MAX_BLOCKED_ORIGINS_PER_HOST: 5,
   /** At most one full post-load pipeline per this interval (ms) */
   RELOAD_MIN_INTERVAL_MS: 750,
   /** Still-frame downscale: longest edge in px before toDataURL */

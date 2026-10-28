@@ -1,0 +1,42 @@
+# An observability run adds what lets somebody who was not there work out what happened: logs,
+# metrics, traces, alerts and a runbook page per alert. It changes no behaviour. New log lines name
+# their fields one by one, and a redaction test proves no secret and no personal data comes out.
+name: observability
+description: "Make a part of the system observable – structured logs on a field allowlist with a redaction test proven red, bounded metrics, alerts with an owner and a runbook page under paths.runbooks – then gates and a draft PR. No behaviour change."
+steps:
+  - id: kit
+    name: Snapshot the local project kit
+    command: 'bash "$(git rev-parse --path-format=absolute --git-common-dir)/../.xezar/checks/bootstrap.sh"'
+    resultScope: routine
+  - id: preflight
+    name: Verify worktree isolation
+    command: ".xezar/checks/worktree-preflight.sh"
+    resultScope: routine
+  - id: setup
+    name: Prepare the worktree
+    command: ".xezar/checks/worktree-setup.sh"
+    resultScope: routine
+  - id: instrument
+    name: Instrument the surface
+    prompt: "Make observable: {{task}}. Follow xezar-observability instructions: start from the question somebody asks at the worst moment. New log statements name their fields one by one – never a whole object, body, header set or environment – and one redaction test, watched failing first, proves no secret and no personal data comes out; say in the handoff text that a security review is required, and which statement, when a log touches authentication or user data. Keep metric labels bounded. Every alert has an owner, a symptom-based condition and a runbook page under paths.runbooks. Use the telemetry this project already has; a new vendor is the owner's decision. Change no behaviour. Finish focused checks and commits before the existing readiness, gates, evidence and PR handoff stages."
+    skill: xezar-observability
+    timeout: 2h
+  - id: readiness
+    name: Confirm the phase record is complete and nothing blocks
+    command: ".xezar/checks/worktree-preflight.sh --readiness"
+    resultScope: stage
+  - id: gates
+    name: Quality gates
+    command: ".xezar/checks/repo-gates.sh --fast --producer gates"
+    resultScope: stage
+    onFail:
+      retry: instrument
+      max: 2
+  - id: evidence
+    name: Seal the gate evidence
+    command: ".xezar/checks/worktree-preflight.sh --record-gate-evidence"
+    resultScope: stage
+  - id: handoff
+    name: Draft PR into the base branch
+    prompt: "Hand off the observability work for: {{task}}. Verify the sealed head and open the draft PR; make no content changes here. The body names the questions that can now be answered, the alerts with owner and threshold, the runbook pages, and the redaction proof."
+    skill: xezar-handoff-draft-pr

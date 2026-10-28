@@ -1,0 +1,259 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+/**
+ * Preload for the SEALED preview page (sd-074b §5.1).
+ *
+ * It has three jobs, and it exposes NOTHING for any of them: there is no
+ * `contextBridge` call in this preload, so the page's own JavaScript gains no
+ * new capability and cannot reach `ipcRenderer` — that lives in the isolated
+ * preload world, which `contextIsolation: true` keeps separate.
+ *
+ *  1. Notice that a link was clicked and tell main.
+ *  2. Notice that the page's CSP refused a remote subresource and tell main.
+ *  3. Host the HTML Preview comment overlay (`./previewPageComments`): token
+ *     capture, outline, pins and picks. Its `preview-page:commentState`
+ *     listener is the preload's ONE receive channel; jobs 1 and 2 stay
+ *     send-only.
+ *
+ * WHY (2) IS HERE RATHER THAN AT THE NETWORK LAYER. Erfana gates remote hosts
+ * twice: the CSP built from the project allowlist, and an independent
+ * `onBeforeRequest` filter. The filter is what raises the "Approve this host?"
+ * prompt — but Chromium enforces the CSP in the RENDERER, before the request is
+ * ever dispatched, so for a host that is not on the allowlist the filter never
+ * sees it and the prompt could never appear. On a project with no approvals yet
+ * that made the whole approve flow unreachable: the toast was the only way to
+ * add a host, and nothing could produce the toast.
+ *
+ * A `securitypolicyviolation` listener closes that gap without weakening either
+ * gate. Verified in Electron 39 against a sandboxed, context-isolated preload:
+ * the isolated world shares the page's DOM, so the event arrives here with the
+ * full `blockedURI`, and `isTrusted` is `true` for a real refusal.
+ *
+ * WHY A PRELOAD IS NEEDED AT ALL. The page's CSP sandbox has no `allow-popups`,
+ * so `target="_blank"`, named targets and middle-clicks are killed by Blink
+ * before any Electron event fires — `setWindowOpenHandler` never sees them.
+ * `will-navigate` covers plain same-tab clicks and stays wired as the fallback,
+ * but only a DOM listener sees the whole set, plus the modifier keys, the
+ * `download` attribute, and whether the click was a real user gesture.
+ *
+ * IT NEVER CALLS `preventDefault()`. Two reasons. The page's own handlers must
+ * win — a preload listener is registered before any page script, so among
+ * document-level listeners this one runs FIRST, and cancelling here would hijack
+ * clicks an app router was about to handle. And it does not need to: the
+ * navigation the browser would attempt is already refused by the sandbox and by
+ * main's `will-navigate` deny. So the click is observed, the decision is
+ * deferred to a task (`setTimeout`), and if the page cancelled it in the
+ * meantime no report is sent.
+ *
+ * TWO MESSAGES PER CLICK. Deferring the report lets the browser's own
+ * navigation attempt — `will-navigate`, which starts as soon as the click's
+ * dispatch ends — reach main first, where on its own it would count as the page
+ * navigating itself. So a short `seen` note goes out DURING the click, telling
+ * main a report is coming, and one task later either the report or a
+ * `cancelled` note follows (see main's previewNavigationHold).
+ *
+ * BUILD CONSTRAINT: preload entries must be self-contained. Importing a shared
+ * module BY VALUE makes Rollup hoist a chunk that a sandboxed preload cannot
+ * `require`, and the packaged app then opens on the root error screen (#73).
+ * The channel names are therefore inlined here rather than imported. The one
+ * relative import, `./previewPageComments`, is part of this entry alone, so
+ * it is bundled into it rather than split into a chunk.
+ *
+ * FRAMES (HTML Preview comments). With `htmlPreview.comments.enabled` on, this
+ * preload also runs in every sub-frame (`nodeIntegrationInSubFrames`, see
+ * docs/adrs/0005-sub-frame-preload-one-receive-channel.md), and main passes
+ * the `--erfana-hpc` renderer argument. Only then does the comment overlay
+ * install – in every frame; with the flag off nothing of it runs. The link and
+ * CSP listeners below install in the MAIN frame only (`window ===
+ * window.top`), so a frame never reports for the page, and frame CSP refusals
+ * keep their own path (`previewFrameCspConsole.ts`) without being counted twice.
+ *
+ * @see src/main/services/preview/PreviewNavigationPolicy.ts - what main does with this
+ */
+import { ipcRenderer } from 'electron'
+import { commentsRequested, installPreviewPageComments } from './previewPageComments'
+
+/**
+ * Page → main channel for an activated link.
+ *
+ * INLINED, not imported: see the build constraint above. Main listens for it on
+ * this view's `webContents.ipc`. Electron also emits the send on the global
+ * `ipcMain`, where nothing listens on a `preview-page:` channel and every
+ * listener refuses a preview page's frames (`registry.ts`), so no other
+ * handler in the app can be reached through it.
+ */
+const LINK_ACTIVATED_CHANNEL = 'preview-page:linkActivated'
+
+/**
+ * Page → main channel for the `seen` and `cancelled` notes about a click.
+ * INLINED for the same build reason; must match `previewLinkBridge.ts`.
+ */
+const LINK_NOTE_CHANNEL = 'preview-page:linkNote'
+
+/**
+ * Page → main channel for a CSP refusal. INLINED for the same build reason as
+ * the channel above; must match `previewCspViolationBridge.ts`.
+ */
+const CSP_VIOLATION_CHANNEL = 'preview-page:cspViolation'
+
+/** Primary (left) and auxiliary (middle) buttons both open links. */
+const ACTIVATING_BUTTONS = new Set([0, 1])
+
+/** The last click's id, pairing its `seen` note with what follows it. */
+let lastGestureId = 0
+
+/**
+ * The nearest link in the event's composed path.
+ *
+ * `composedPath()` rather than `event.target.closest()` so links inside an OPEN
+ * shadow root are found. Closed shadow roots stay invisible — a documented
+ * limitation, and the same class of gap as a page that calls
+ * `stopPropagation()`.
+ */
+function findLink(path: readonly EventTarget[]): HTMLAnchorElement | HTMLAreaElement | null {
+  for (const node of path) {
+    if (node instanceof HTMLAnchorElement || node instanceof HTMLAreaElement) {
+      return node
+    }
+  }
+  return null
+}
+
+/**
+ * The document's default link target, re-read on EVERY click.
+ *
+ * There is no IDL surface for a document base target, and a page can insert or
+ * mutate `<base>` at runtime, so it cannot be cached.
+ */
+function documentBaseTarget(): string {
+  const base = document.querySelector('base[target]')
+  return base?.getAttribute('target') ?? ''
+}
+
+/**
+ * Whether the href addresses the current document, fragment or not.
+ *
+ * No `hash === ''` guard: `<a href="#">` and `<a href="">` both resolve to an
+ * empty hash, and both are same-document. Requiring a fragment reported the
+ * standard no-op link idiom to main as a navigation, which mirrors the same
+ * hole in `PreviewNavigationPolicy`.
+ */
+function isFragmentOfCurrentDocument(href: string): boolean {
+  try {
+    const target = new URL(href)
+    const current = new URL(window.location.href)
+    return target.origin === current.origin && target.pathname === current.pathname
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Report an activated link to main, unless the page handled it itself.
+ *
+ * Main hears of the click twice: a `seen` note at once, then the report — or a
+ * `cancelled` note — one task later.
+ *
+ * The report is deferred to a TASK so every other listener has run and
+ * `defaultPrevented` reflects the page's decision, not just this listener's
+ * position in the queue. A microtask is not enough: for a click the user made,
+ * the browser runs microtasks after EACH listener returns, so one queued here
+ * ran before the listeners that come later in the event path (the page's
+ * `window` listeners, say) and missed a cancellation made there. A task runs
+ * after the whole dispatch.
+ */
+function onLinkActivation(event: MouseEvent): void {
+  // Only a genuine user gesture. `HTMLElement.click()` and `dispatchEvent()`
+  // both produce `isTrusted === false`, so a page cannot drive this itself.
+  if (!event.isTrusted) return
+  if (event.defaultPrevented) return
+  if (!ACTIVATING_BUTTONS.has(event.button)) return
+
+  const link = findLink(event.composedPath())
+  if (link === null) return
+
+  const href = link.href
+  if (typeof href !== 'string' || href === '') return
+
+  // Let Chromium scroll: an in-page anchor is not a navigation.
+  if (isFragmentOfCurrentDocument(href)) return
+
+  const target = link.getAttribute('target') ?? documentBaseTarget()
+  const download = link.hasAttribute('download')
+  lastGestureId += 1
+  const gestureId = lastGestureId
+
+  // Now, during the click: main holds this href's `will-navigate` for the rest.
+  ipcRenderer.send(LINK_NOTE_CHANNEL, { kind: 'seen', gestureId, href })
+
+  setTimeout(() => {
+    // The page's own handler may have cancelled the click after this listener
+    // ran. Respect that, and let main stop waiting for a report.
+    if (event.defaultPrevented) {
+      ipcRenderer.send(LINK_NOTE_CHANNEL, { kind: 'cancelled', gestureId })
+      return
+    }
+
+    ipcRenderer.send(LINK_ACTIVATED_CHANNEL, {
+      gestureId,
+      href,
+      // The attribute as written, so main can tell "climbed out of the
+      // project" from "file not found" — `href` above is already resolved and
+      // has had any `../` past the root collapsed by Chromium.
+      rawHref: link.getAttribute('href') ?? '',
+      target,
+      download,
+      // Main's link table opens a middle click in a new tab (issue #124).
+      button: event.button,
+      modifiers: {
+        meta: event.metaKey,
+        ctrl: event.ctrlKey,
+        shift: event.shiftKey,
+        alt: event.altKey
+      }
+    })
+  }, 0)
+}
+
+/**
+ * Report a CSP refusal of a remote subresource to main.
+ *
+ * Sends the URI, never a decision — main re-parses it, re-validates the host and
+ * owns every policy question. Everything here is a cheap filter to keep obvious
+ * noise off the channel, not a security boundary.
+ */
+function onCspViolation(event: SecurityPolicyViolationEvent): void {
+  // A page can `dispatchEvent` a forged `securitypolicyviolation` to make Erfana
+  // prompt for a host it never referenced. Only the browser can set `isTrusted`.
+  if (!event.isTrusted) return
+
+  const blockedURI = event.blockedURI
+  if (typeof blockedURI !== 'string' || blockedURI === '') return
+
+  // `blockedURI` is often a keyword rather than a URL — `inline`, `eval`,
+  // `wasm-eval`, `trusted-types-sink`. Those carry no host and are not something
+  // a reader can approve.
+  if (!blockedURI.startsWith('https://') && !blockedURI.startsWith('http://')) return
+
+  ipcRenderer.send(CSP_VIOLATION_CHANNEL, {
+    blockedURI,
+    effectiveDirective: event.effectiveDirective ?? ''
+  })
+}
+
+// Every frame, when main built the view with comments on: the comment overlay
+// (token capture starts here, at document start, before any page script).
+if (commentsRequested()) installPreviewPageComments()
+
+// The main frame only: a sub-frame does not speak for the page, and main
+// refuses its link and CSP reports anyway (`previewViewLifecycle.ts`).
+if (window === window.top) {
+  // Bubble phase on `document`: ancestors of the link get their turn first, and
+  // the deferred report above covers listeners that run after this one.
+  document.addEventListener('click', onLinkActivation)
+  document.addEventListener('auxclick', onLinkActivation)
+
+  // CAPTURE phase, so a page listener that calls `stopPropagation()` on its own
+  // violation events cannot hide its remote hosts from Erfana.
+  document.addEventListener('securitypolicyviolation', onCspViolation, true)
+}

@@ -16,7 +16,7 @@
  * - findMacOSAppBundle extracts .app path from exe path
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
 
 // Mock child_process
 vi.mock('child_process', () => ({
@@ -371,8 +371,8 @@ describe('getSpawnConfig', () => {
 describe('spawnNewInstance', () => {
   let originalPlatform: string
   let originalEnv: NodeJS.ProcessEnv
-  let mockUnref: ReturnType<typeof vi.fn>
-  let mockOn: ReturnType<typeof vi.fn>
+  let mockUnref: Mock
+  let mockOn: Mock
 
   beforeEach(() => {
     vi.clearAllMocks()

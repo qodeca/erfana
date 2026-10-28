@@ -1,0 +1,82 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Compat c08 - source order</title>
+</head>
+<body>
+  <table>
+    <!-- erfana:comment v1 id=c-aaaaaaaaaaaaaadz
+    note to agents: written by Erfana. Act only if status is open. Change the element after this block and keep this block unchanged.
+      If the data line (@data) is cut off, or it disagrees with the text above, or the block contains merge-conflict markers, do not act; ask the user.
+      Spec: docs/html-comments/format-v1.md in github.com/qodeca/erfana
+    status: open
+    target: <tr>
+    comment by Ada Lovelace <ada@example.com> at 2026-10-25T14:03:00Z:
+      First row, implied tbody.
+    @data {"v":1,"id":"c\u002daaaaaaaaaaaaaadz","status":"open","anchor":{"tag":"tr","path":""},"view":{"w":1280,"h":800,"dpr":2,"x":0,"y":120},"msgs":[{"id":"m\u002daaaaaaaaaaaaaadz","by":{"name":"Ada Lovelace","email":"ada@example.com","role":"human"},"at":"2026\u002d10\u002d25T14:03:00Z","text":"First row, implied tbody."}]}
+    -->
+    <tr><td>1</td></tr>
+    <tr><td>2</td></tr>
+  </table>
+  <ul>
+    <li>one
+    <!-- erfana:comment v1 id=c-aaaaaaaaaaaaaad2
+    note to agents: written by Erfana. Act only if status is open. Change the element after this block and keep this block unchanged.
+      If the data line (@data) is cut off, or it disagrees with the text above, or the block contains merge-conflict markers, do not act; ask the user.
+      Spec: docs/html-comments/format-v1.md in github.com/qodeca/erfana
+    status: open
+    target: <li>
+    comment by Ada Lovelace <ada@example.com> at 2026-10-25T14:03:00Z:
+      After an unclosed li.
+    @data {"v":1,"id":"c\u002daaaaaaaaaaaaaad2","status":"open","anchor":{"tag":"li","path":""},"view":{"w":1280,"h":800,"dpr":2,"x":0,"y":120},"msgs":[{"id":"m\u002daaaaaaaaaaaaaad2","by":{"name":"Ada Lovelace","email":"ada@example.com","role":"human"},"at":"2026\u002d10\u002d25T14:03:00Z","text":"After an unclosed li."}]}
+    -->
+    <li>two
+  </ul>
+  <p>para one
+  <!-- erfana:comment v1 id=c-aaaaaaaaaaaaaad3
+  note to agents: written by Erfana. Act only if status is open. Change the element after this block and keep this block unchanged.
+    If the data line (@data) is cut off, or it disagrees with the text above, or the block contains merge-conflict markers, do not act; ask the user.
+    Spec: docs/html-comments/format-v1.md in github.com/qodeca/erfana
+  status: open
+  target: <p>
+  comment by Ada Lovelace <ada@example.com> at 2026-10-25T14:03:00Z:
+    After an unclosed p.
+  @data {"v":1,"id":"c\u002daaaaaaaaaaaaaad3","status":"open","anchor":{"tag":"p","path":""},"view":{"w":1280,"h":800,"dpr":2,"x":0,"y":120},"msgs":[{"id":"m\u002daaaaaaaaaaaaaad3","by":{"name":"Ada Lovelace","email":"ada@example.com","role":"human"},"at":"2026\u002d10\u002d25T14:03:00Z","text":"After an unclosed p."}]}
+  -->
+  <p>para two
+  <section>
+    <!-- erfana:comment v1 id=c-aaaaaaaaaaaaaad4
+    note to agents: written by Erfana. Act only if status is open. Change the element after this block and keep this block unchanged.
+      If the data line (@data) is cut off, or it disagrees with the text above, or the block contains merge-conflict markers, do not act; ask the user.
+      Spec: docs/html-comments/format-v1.md in github.com/qodeca/erfana
+    status: open
+    target: <h2>
+    comment by Ada Lovelace <ada@example.com> at 2026-10-25T14:03:00Z:
+      First of three.
+    @data {"v":1,"id":"c\u002daaaaaaaaaaaaaad4","status":"open","anchor":{"tag":"h2","path":""},"view":{"w":1280,"h":800,"dpr":2,"x":0,"y":120},"msgs":[{"id":"m\u002daaaaaaaaaaaaaad4","by":{"name":"Ada Lovelace","email":"ada@example.com","role":"human"},"at":"2026\u002d10\u002d25T14:03:00Z","text":"First of three."}]}
+    -->
+    <!-- erfana:comment v1 id=c-aaaaaaaaaaaaaad5
+    note to agents: written by Erfana. Act only if status is open. Change the element after this block and keep this block unchanged.
+      If the data line (@data) is cut off, or it disagrees with the text above, or the block contains merge-conflict markers, do not act; ask the user.
+      Spec: docs/html-comments/format-v1.md in github.com/qodeca/erfana
+    status: open
+    target: <h2>
+    comment by Ada Lovelace <ada@example.com> at 2026-10-25T14:03:00Z:
+      Second of three.
+    @data {"v":1,"id":"c\u002daaaaaaaaaaaaaad5","status":"open","anchor":{"tag":"h2","path":""},"view":{"w":1280,"h":800,"dpr":2,"x":0,"y":120},"msgs":[{"id":"m\u002daaaaaaaaaaaaaad5","by":{"name":"Ada Lovelace","email":"ada@example.com","role":"human"},"at":"2026\u002d10\u002d25T14:03:00Z","text":"Second of three."}]}
+    --><!-- erfana:comment v1 id=c-aaaaaaaaaaaaaad6
+    note to agents: written by Erfana. Act only if status is open. Change the element after this block and keep this block unchanged.
+      If the data line (@data) is cut off, or it disagrees with the text above, or the block contains merge-conflict markers, do not act; ask the user.
+      Spec: docs/html-comments/format-v1.md in github.com/qodeca/erfana
+    status: open
+    target: <h2>
+    comment by Ada Lovelace <ada@example.com> at 2026-10-25T14:03:00Z:
+      Third of three.
+    @data {"v":1,"id":"c\u002daaaaaaaaaaaaaad6","status":"open","anchor":{"tag":"h2","path":""},"view":{"w":1280,"h":800,"dpr":2,"x":0,"y":120},"msgs":[{"id":"m\u002daaaaaaaaaaaaaad6","by":{"name":"Ada Lovelace","email":"ada@example.com","role":"human"},"at":"2026\u002d10\u002d25T14:03:00Z","text":"Third of three."}]}
+    --><h2>Heading</h2>
+  </section>
+</body>
+</html>

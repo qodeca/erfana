@@ -37,17 +37,19 @@ at console.log (node:internal/console/constructor:378:26)
 
 **Implementation**:
 ```typescript
-function safeConsoleWrite(method: ConsoleMethod, ...args: any[]): void {
+function safeConsoleWrite(method: ConsoleMethod, ...args: unknown[]): void {
   try {
     console[method](...args)
-  } catch (error: any) {
-    if (error?.code === 'EPIPE') {
+  } catch (error) {
+    const code = (error as { code?: unknown }).code
+    if (code === 'EPIPE') {
       // Silently suppress - expected during shutdown
       return
     }
     // Attempt stderr fallback for other errors
     try {
-      process.stderr?.write(`[Console Error] ${error?.message || error}\n`)
+      const message = error instanceof Error ? error.message : String(error)
+      process.stderr?.write(`[Console Error] ${message}\n`)
     } catch {
       // Fail silently if stderr unavailable
     }
@@ -55,37 +57,38 @@ function safeConsoleWrite(method: ConsoleMethod, ...args: any[]): void {
 }
 ```
 
-**Installation**: Called early in `src/main/index.ts` before any other code
+**Installation**: Called early in `src/main/index.ts`, before the services start
 ```typescript
 import { installSafeConsole } from './utils/safeConsole'
 installSafeConsole()
 ```
 
-### 2. PTY Stream Protection
+> **Known gap (found 2026-10-25).** `installSafeConsole()` replaces `console.log` (and `error`, `warn`, `info`, `debug`) with wrappers that call `console[method]` – which by then is the wrapper itself. Each call recurses until the stack overflows, the overflow is caught, and nothing is printed: in the main process, console output after installation is silently dropped rather than EPIPE-guarded. Running the module on its own under Node 24 reproduces it (`console.log` after `installSafeConsole()` prints nothing). It does not affect the log files, which `LoggingService` writes through electron-log's file transport. The fix belongs in `src/main/utils/safeConsole.ts` (keep the original methods and call those).
+
+### 2. TerminalService PTY protection
 
 **Location**: `src/main/services/TerminalService.ts`
 
 Protects against EPIPE when writing to a terminal PTY that has closed.
 
-### 3. TerminalService PTY Protection
-
-**Location**: `src/main/services/TerminalService.ts`
-
 **Methods Enhanced**:
 - `write()`: Suppress EPIPE, emit exit event, clean up terminal
-- `killTerminal()`: Suppress EPIPE and ESRCH (process not found)
-- `dispose()`: Suppress EPIPE and ESRCH during bulk cleanup
+- `killTerminal()`: Suppress EPIPE and ESRCH (process not found); the entry is dropped and the call answers `true`
+- `dispose()`, and on Windows the window-close cleanup (`cleanupForWebContentsId`): end shells through `ptyKillQuietly()`, which suppresses EPIPE and ESRCH (elsewhere the window-close cleanup calls `killTerminal()`). `dispose()` then waits up to `TERMINAL_EXIT_WAIT_MS` (1.5 s) for the shells to report their exit, so a late exit report cannot arrive while the app shuts down (#214)
 
 **Code Pattern**:
 ```typescript
 try {
   terminal.ptyProcess.write(data)
   return true
-} catch (error: any) {
-  if (error.code === 'EPIPE') {
-    console.log(`ℹ️ Terminal ${terminalId} PTY closed (terminal likely exited)`)
+} catch (error) {
+  const code = (error as { code?: unknown }).code
+  if (code === 'EPIPE') {
+    logger.info(`ℹ️ Terminal ${terminalId} PTY closed (terminal likely exited)`)
+    this.clearHandshakeTimers(terminal)
     this.terminals.delete(terminalId)
-    this.emit('exit', { terminalId, exitCode: 0 })
+    terminal.output.dispose()
+    this.emit('exit', { terminalId, exitCode: 0, webContentsId: terminal.webContentsId })
     return false
   }
   // Handle other errors
@@ -146,46 +149,10 @@ try {
 - Force-close processes
 - Verify no crashes in logs
 
-## Benefits
-
-### Stability Improvements
-
-1. **Crash Prevention**: Eliminates EPIPE crashes during normal operations
-2. **Graceful Degradation**: Failed writes become logged info, not errors
-3. **Cleanup Reliability**: Services dispose successfully even with dead child processes
-
-### User Experience
-
-1. **No Data Loss**: Application closes cleanly without crashes
-2. **Transparent**: Users unaware of suppressed EPIPE errors
-3. **Better Logging**: Clear distinction between expected shutdown and real errors
-
-### Development Experience
-
-1. **Clear Patterns**: Consistent error handling across services
-2. **Easy Debugging**: EPIPE suppression logged with context
-3. **Maintainable**: Centralized console safety in single utility
-
-## Future Enhancements
-
-### Potential Improvements
-
-1. **Stream State Tracking**: Track stdin/stdout state to avoid write attempts
-2. **Graceful Write Queue**: Buffer writes and drain on stream availability
-3. **Health Checks**: Periodic stream availability checks before writes
-4. **Metrics**: Track EPIPE occurrences for monitoring
-
-### Error Recovery
-
-Current implementation suppresses EPIPE but could be enhanced with:
-- Automatic session restart detection
-- User notification for unexpected terminations
-- Retry logic for transient stream issues
-
 ## Related Issues
 
 - **Known Issues**: See [docs/known-issues.md](known-issues.md)
-- **Architecture**: See [docs/architecture.md](architecture.md#service-layer)
+- **Service reference**: See [docs/api-services.md](api-services.md) (TerminalService) – `architecture.md` has no service-layer section
 - **Testing**: See [docs/testing/README.md](testing/README.md)
 
 ## References

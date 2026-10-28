@@ -15,6 +15,7 @@ import { useTerminalPortalOptional } from '../../context/TerminalPortalContext'
 import { scheduleScrollIfNeeded } from '../../utils/promptScrollScheduler.logic'
 import { logger } from '../../utils/logger'
 import { textClipboard } from '../../services/textClipboard'
+import { fileGateway } from '../../services/fileGateway'
 
 /**
  * Maps prompt IDs to their corresponding test IDs.
@@ -53,7 +54,7 @@ async function readSourceLines(
   endLine: number
 ): Promise<string | null> {
   try {
-    const content = await window.api.file.readFile(filePath)
+    const content = await fileGateway.readFile({ filePath })
     const lines = content.split('\n')
     // Line numbers are 1-indexed in markdown AST, but arrays are 0-indexed
     const selectedLines = lines.slice(startLine - 1, endLine)

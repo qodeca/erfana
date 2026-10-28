@@ -4,12 +4,18 @@
  * HtmlPreviewPanel Styles (Issue #74, work item 71).
  *
  * Plain co-located global CSS (not a CSS module, per design §1.8). All values
- * come from design tokens (docs/ui-style-guide.md); no rounded corners.
+ * come from design tokens; no rounded corners. Governed by
+ * docs/design-system/system/foundations/surfaces.html.
  *
- * The placeholder's background is `var(--color-brand-black)` on purpose — it is
- * the same value main encodes as `setBackgroundColor('#FF161312')`, so the seam
- * between the DOM placeholder and the native view never flashes a different
- * colour (design §1.8).
+ * The placeholder's background is the STARTING half of a two-value invariant:
+ * the DOM placeholder and the native view's backdrop always carry the same
+ * colour, so the seam between them never flashes (design §1.8). The value here
+ * is only the chrome phase — `var(--color-brand-black)`, matching main's
+ * `setBackgroundColor('#FF161312')` in the constructor. Once the page settles,
+ * main resolves the page's own paper colour and emits `preview:backdropChanged`;
+ * `HtmlPreviewPanel.tsx` then writes it as an inline `background` on the
+ * placeholder, overriding the rule below. Both halves move together or the
+ * invariant is broken — see `src/main/services/preview/previewBackdrop.ts`.
  *
  * @see HtmlPreviewPanel.tsx for the component
  */
@@ -33,14 +39,56 @@
  * ============================================ */
 
 .html-preview-surface {
+  /* A COLUMN, so the chrome strip's height is subtracted from the page area by
+     layout instead of being re-stated as a number in TypeScript. The strip used
+     to be `position: absolute` over the page area, which is why its height had to
+     be duplicated as PREVIEW_CHROME_INSET_PX and added back on when the native
+     view's bounds were computed — two literals that only comments kept in step.
+     In flow there is no literal to duplicate, and a strip whose height changes
+     (the permission band opening its list) needs no code change at all. */
+  display: flex;
+  flex-direction: column;
   position: relative;
   flex: 1;
   min-height: 0;
 }
 
 /*
- * The sized target the native WebContentsView paints over. Brand black so the
- * seam with the native view is invisible; never left transparent/white.
+ * The page area: everything below the strip. This is the positioning context for
+ * the find bar, so the bar's `top` offset measures from BELOW the strip and it
+ * cannot land on top of the strip's own controls when the strip grows.
+ */
+.html-preview-page-area {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/*
+ * `.html-preview-chrome-strip` used to live here: a 22px always-DOM strip
+ * reading "Preview – content below is not Erfana", with a 2px accent seam under
+ * it. `PreviewChromeBand` replaced the element long ago and this rule has
+ * rendered nowhere since; it is deleted now rather than left as a second,
+ * divergent description of a bar that is no longer even shaped like this.
+ *
+ * The strip's two security properties did not move with it. The wording and the
+ * accent seam were both withdrawn by owner decision when the band became a
+ * toolbar — see PreviewChromeBand.css and `docs/security.md` residual risk 8.
+ * What survives is placement: the band is a flow sibling ABOVE
+ * `.html-preview-page-area`, so the untrusted page cannot paint over it.
+ */
+
+/*
+ * The sized target the native WebContentsView paints over. Carries whatever
+ * colour main reports painting behind the page (see the `backdrop` inline style
+ * in HtmlPreviewPanel.tsx), so the DOM and the native view never disagree at a
+ * seam; the token below is the pre-first-report default and matches main's
+ * `CHROME_BACKDROP`.
+ */
+/*
+ * Chrome-phase backdrop only. `HtmlPreviewPanel.tsx` replaces this with an
+ * inline `background` once main reports the loaded page's own paper colour, so
+ * this value must stay equal to `CHROME_BACKDROP` in previewBackdrop.ts.
  */
 .html-preview-placeholder {
   position: absolute;
@@ -49,17 +97,107 @@
   overflow: hidden;
 }
 
-/* Still frame shown while the native view is hidden (fills the placeholder). */
+/*
+ * The comments drawer is open (HTML Preview comments, §10.6): the page area
+ * becomes a row and the placeholder a flex item beside the drawer, so the
+ * bounds loop measures a narrower placeholder and the native page shrinks –
+ * the drawer is a flow sibling, never drawn over the page.
+ */
+.html-preview-page-area--drawer {
+  display: flex;
+}
+
+.html-preview-page-area--drawer > .html-preview-placeholder {
+  position: relative;
+  inset: auto;
+  flex: 1 1 auto;
+  min-inline-size: 0;
+}
+
+/*
+ * THE PAGE'S FOCUS RING IS DRAWN OUTSIDE THE PLACEHOLDER — the only place it can
+ * be seen at all.
+ *
+ * While the page can be entered from the keyboard the placeholder is a focusable
+ * button (issue #124, QG-8 U1). But the native view is laid over exactly this
+ * box and paints above every DOM pixel in it, so an ordinary or inset ring is
+ * drawn underneath a running page: focus would land on a control with no visible
+ * indicator (SC 2.4.7).
+ *
+ * Outward, at offset 0, so the ring starts where the native view ends. HONESTLY,
+ * ONLY ITS TOP EDGE SURVIVES in the normal layout. The page area is flush with
+ * the panel's left, right and bottom edges and `.html-preview-panel` clips with
+ * `overflow: hidden`, so those three sides are cut off; there is no gutter to
+ * draw them in. The top edge lies over the band's bottom rule — the 1px rule
+ * plus 1px of the bar's 6px padding, never a control — and reads as that rule
+ * turning focus-coloured, right under the toolbar. It measures against the band
+ * background, `contrast-focus-ring-on-band` in docs/design-system/claims.json.
+ *
+ * Do not make this inset, and do not add `overflow: hidden` or a stacking
+ * context to `.html-preview-page-area` or `.html-preview-surface`: any of those
+ * hides the last visible edge. The placeholder paints over the band only because
+ * it is positioned and the band is not.
+ */
+/* deviates: docs/design-system/system/foundations/focus.html — outward ring at offset 0, top edge only; the native view covers the box (see the card's Exceptions) */
+.html-preview-placeholder:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: 0;
+}
+
+/*
+ * Still frame shown while the native view is hidden.
+ *
+ * Drawn at the CSS size the view had when it was captured (issue #124, part 1
+ * §1.5): the `--sized` rule below, with the size itself set inline from the
+ * frame, because it is per-capture data. Anchored top-left and never scaled – a
+ * narrower panel crops it (the placeholder is `overflow: hidden`), a wider one
+ * shows the placeholder's backdrop in the new space. Scaling it to fill read as
+ * the page zooming while a splitter moved.
+ */
 .html-preview-still-frame {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  object-position: top left;
-  background: var(--color-brand-black);
+  top: 0;
+  left: 0;
+  /*
+   * TRANSPARENT, so the placeholder's own backdrop shows through.
+   *
+   * `capturePage` returns a PNG WITH ALPHA, and a page that sets no background
+   * on its body paints none — so those pixels come back transparent. Against a
+   * hardcoded brand black they rendered as a dark page with dark text on it,
+   * which is what a reader saw: the words there, the paper gone.
+   *
+   * The placeholder underneath already carries the right colour. It is painted
+   * with the backdrop main reports (`backdropChanged`), which resolves to the
+   * page's own paper once the load settles — so compositing the frame onto it is
+   * correct even when the capture ran before that colour was known, and it stays
+   * correct if the paper changes later.
+   */
+  background: transparent;
   user-select: none;
   pointer-events: none;
+}
+
+/* At its captured CSS size (set inline), whatever the panel's size is now. */
+.html-preview-still-frame--sized {
+  max-width: none;
+  max-height: none;
+}
+
+/*
+ * A frame captured before its CSS size was recorded has none to draw at, so it
+ * fills the placeholder as it always did.
+ *
+ * `cover`, NOT `contain`. The frame is captured at the view's aspect at hide
+ * time, and the box it lands in is a different shape whenever the band grew to
+ * cause the hide. `contain` letterboxes that difference, and the bars read as a
+ * broken panel rather than as a frozen page. `cover` fills, anchored top-left so
+ * the page's own top-left stays put.
+ */
+.html-preview-still-frame--fill {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top left;
 }
 
 /* ============================================
@@ -107,10 +245,42 @@
 
 .html-preview-banner-button:focus-visible {
   outline: var(--border-width-thick) solid var(--color-border-focus);
-  outline-offset: 1px;
+  outline-offset: var(--space-1);
 }
 
 .html-preview-banner-button:disabled {
   opacity: var(--opacity-disabled);
   cursor: not-allowed;
+}
+
+/* Busy (a return move in flight) is aria-disabled, not disabled, so the button
+   keeps focus. It looks like :disabled, but hover and press add no fill. */
+.html-preview-banner-button[aria-disabled='true'],
+.html-preview-banner-button[aria-disabled='true']:hover,
+.html-preview-banner-button[aria-disabled='true']:active {
+  background: var(--color-btn-secondary-bg);
+  cursor: default;
+}
+
+/*
+ * THE DIM GOES ON THE LABEL, NEVER ON THE BUTTON.
+ *
+ * `opacity` on the button makes a group that the button's own focus OUTLINE is
+ * inside. The ring is `--color-border-focus`, 8.4:1 against this panel's
+ * backdrop and about 2.3:1 once composited at `--opacity-disabled`: under the
+ * 3:1 SC 1.4.11 requires of a focus indicator, and under "visible" (SC 2.4.7).
+ * No ring colour repairs it, because the dim is applied after the colour. Busy
+ * is not an inactive component either, so the disabled-state exception does not
+ * cover it — and this is a focus target by design: the failed banner's return
+ * button takes focus on mount, so the ring was dimmed exactly where a keyboard
+ * reader is standing.
+ *
+ * `PreviewBanner.tsx` wraps the label in a span for this rule to have something
+ * to select. That span is the whole content, so the button reads as busy while
+ * focused, and its accessible name is unchanged. The band's icon tools use the
+ * same shape. `:disabled` above keeps the plain element dim: a disabled button
+ * cannot be focused, so no ring is inside that group.
+ */
+.html-preview-banner-button[aria-disabled='true'] > * {
+  opacity: var(--opacity-disabled);
 }

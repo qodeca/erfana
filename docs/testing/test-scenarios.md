@@ -8,6 +8,11 @@ Pre-defined test scenarios for Erfana using Circuit Electron MCP. For full MCP A
 2. Verify: `ls -la out/main/index.js`
 3. Circuit Electron MCP configured
 
+> **Seven of these ten are now covered end-to-end.** Each heading below names
+> its owning spec where one exists. Run the manual version when you want a human
+> look at the surface; the spec is what actually gates a regression. Scenarios 1,
+> 2 and 10 have no owning spec and remain genuinely manual.
+
 ## UI Scenarios
 
 ### 1. Application Launch
@@ -37,6 +42,8 @@ Pre-defined test scenarios for Erfana using Circuit Electron MCP. For full MCP A
 
 ### 3. Markdown Formatting Toolbar
 
+*Automated: `e2e/markdown-toolbar.e2e.ts`*
+
 **Goal**: Verify toolbar buttons insert correct markdown
 
 **Verify**:
@@ -50,6 +57,8 @@ Pre-defined test scenarios for Erfana using Circuit Electron MCP. For full MCP A
 
 ### 4. View Mode Switching
 
+*Automated: `e2e/markdown-toolbar.e2e.ts`*
+
 **Goal**: Test Editor/Split/Preview mode toggling
 
 **Verify**:
@@ -62,11 +71,13 @@ Pre-defined test scenarios for Erfana using Circuit Electron MCP. For full MCP A
 
 ### 5. Auto-Save
 
+*Automated: `e2e/editor-save.e2e.ts` (asserts the write against real disk)*
+
 **Goal**: Verify auto-save with dirty indicator
 
 **Verify**:
 - Edit triggers dirty indicator
-- Auto-save after 500ms
+- Auto-save after 2000 ms (the `useAutoSave` debounce; see `docs/editor/README.md`)
 - Indicator clears
 - File persisted on disk
 
@@ -75,6 +86,8 @@ Pre-defined test scenarios for Erfana using Circuit Electron MCP. For full MCP A
 ## Interaction Scenarios
 
 ### 6. Keyboard Shortcuts
+
+*Automated: `e2e/workspace-layout.e2e.ts` (panel toggles) and `e2e/tab-lifecycle.e2e.ts` (close)*
 
 **Goal**: Test global shortcuts (Cmd/Ctrl+B, Cmd/Ctrl+J)
 
@@ -86,6 +99,8 @@ Pre-defined test scenarios for Erfana using Circuit Electron MCP. For full MCP A
 **MCP**: `app_launch` → `keyboard_press('b', ['ControlOrMeta'])` → `screenshot` → `evaluate` visibility
 
 ### 7. Context Menu Operations
+
+*Automated: `e2e/file-operations.e2e.ts`*
 
 **Goal**: Test file/folder operations via context menu
 
@@ -99,6 +114,8 @@ Pre-defined test scenarios for Erfana using Circuit Electron MCP. For full MCP A
 
 ### 8. Multi-File Tabs
 
+*Automated: `e2e/tab-lifecycle.e2e.ts`*
+
 **Goal**: Test tab management
 
 **Verify**:
@@ -110,6 +127,8 @@ Pre-defined test scenarios for Erfana using Circuit Electron MCP. For full MCP A
 **MCP**: `app_launch` → open 3 files → `click` tabs → `evaluate` active panel → `click` close buttons
 
 ### 9. Document Statistics
+
+*Automated: `e2e/markdown-toolbar.e2e.ts`*
 
 **Goal**: Verify stats in header (word/char count)
 

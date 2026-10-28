@@ -24,10 +24,13 @@ import { INDICATOR_DURATION_MS } from '../constants/fileWatch'
 import {
   acquireFileWatch,
   createFileWatchSlot,
+  forgetFileWatch,
   releaseFileWatch,
   type FileWatchSlot
 } from './fileWatchSlot'
 import { logger } from '../utils/logger'
+import { fileGateway } from '../services/fileGateway'
+import { fileWatchGateway } from '../services/fileWatchGateway'
 
 /**
  * Why auto-refresh stopped working for a path.
@@ -125,8 +128,10 @@ export interface UseFileChangeSubscriptionResult {
  *    two with explicit precedence rather than relying on that.
  * 5. **Exactly one subscription is held at a time.** `fileWatch.start` is a
  *    counting acquire main-side, so `recover()` releases before it re-starts
- *    and teardown only releases what was actually acquired. See
- *    {@link FileWatchSlot} for what each imbalance costs.
+ *    and teardown only releases what was actually acquired. A `deleted` event
+ *    means the main process already dropped the watch, so the slot forgets
+ *    its hold without a `stop`. See {@link FileWatchSlot} for what each
+ *    imbalance costs.
  *
  * @param filePath - Absolute path to watch. An empty string subscribes to nothing.
  * @param options - Change callback
@@ -160,9 +165,7 @@ export function useFileChangeSubscription(
 
   // This consumer's single hold on the main-process watch. One slot per hook
   // instance, created lazily so every mount starts from "holds nothing".
-  const slotRef = useRef<FileWatchSlot | null>(null)
-  if (slotRef.current === null) slotRef.current = createFileWatchSlot()
-  const slot = slotRef.current
+  const [slot] = useState<FileWatchSlot>(createFileWatchSlot)
 
   useEffect(() => {
     isMountedRef.current = true
@@ -211,21 +214,22 @@ export function useFileChangeSubscription(
     if (!filePath) return false
 
     try {
-      await window.api.file.getStats(filePath)
+      await fileGateway.getStats({ filePath })
     } catch {
       // Still gone – keep the deleted banner up rather than claiming recovery.
       if (isMountedRef.current) setIsFileDeleted(true)
       return false
     }
 
-    // Release before re-acquiring, rather than starting a second subscription.
-    // `start` increments a per-window subscriber count, so a bare re-`start`
-    // would leave this consumer holding two counts against one teardown `stop`,
-    // and the watcher would outlive the panel (see {@link FileWatchSlot}).
-    // Releasing first is also what makes Reload work after a *genuine* delete,
-    // where the main process dropped the whole entry and the count has to be
-    // rebuilt from zero – skipping the start on a still-held slot would leave
-    // the user with a Reload button that never restores auto-refresh.
+    // After a delete, or an error that ended the watch, the slot already forgot
+    // its hold (the main process dropped the whole entry), so this release
+    // sends nothing and only the acquire below talks to the main process: a
+    // `stop` here could take the count of another consumer of the same file
+    // and deafen it (#252). With a live watch – a recover after a plain
+    // chokidar error – the release is what keeps this consumer at one count:
+    // `start` increments a per-window count, so a bare re-`start` would hold
+    // two against one teardown `stop`, and the watcher would outlive the panel
+    // (see {@link FileWatchSlot}).
     await releaseFileWatch(slot, filePath)
     const { started, error, cause } = await acquireFileWatch(slot, filePath)
 
@@ -253,14 +257,22 @@ export function useFileChangeSubscription(
     recoverRef.current = recover
   }, [recover])
 
+  // A new path starts with neither degraded state. Reset during render, when
+  // the path changes, rather than in the subscription effect below.
+  const [seenFilePath, setSeenFilePath] = useState(filePath)
+  if (seenFilePath !== filePath) {
+    setSeenFilePath(filePath)
+    if (filePath) {
+      setIsFileDeleted(false)
+      setUnavailableReason(null)
+    }
+  }
+
   // Subscription. [filePath] only – see invariant 2.
   useEffect(() => {
     if (!filePath) return
 
     let isActive = true
-
-    setIsFileDeleted(false)
-    setUnavailableReason(null)
 
     void acquireFileWatch(slot, filePath).then(({ started, error, cause }) => {
       if (!isActive || started) return
@@ -270,19 +282,23 @@ export function useFileChangeSubscription(
       setUnavailableReason(classifyWatchStartFailure(error))
     })
 
-    const unsubscribeChanged = window.api.fileWatch.onFileChanged((data) => {
+    const unsubscribeChanged = fileWatchGateway.onFileChanged((data) => {
       if (!isActive || data.filePath !== filePath) return
       // A change proves the file is back; clear a stale deleted banner.
       setIsFileDeleted(false)
       onExternalChangeRef.current()
     })
 
-    const unsubscribeDeleted = window.api.fileWatch.onFileDeleted((data) => {
+    const unsubscribeDeleted = fileWatchGateway.onFileDeleted((data) => {
       if (!isActive || data.filePath !== filePath) return
 
+      // Whatever the disk says, the main process dropped the watch before
+      // sending this: the slot holds nothing now (#252, invariant 5).
+      forgetFileWatch(slot)
+
       // Invariant 3: never believe a delete without re-checking the disk.
-      window.api.file
-        .getStats(filePath)
+      fileGateway
+        .getStats({ filePath })
         .then(async () => {
           if (!isActive) return
           logger.info('Delete event for a file that still exists; recovering the watch', {
@@ -298,11 +314,15 @@ export function useFileChangeSubscription(
         })
     })
 
-    const unsubscribeError = window.api.fileWatch.onFileError((data) => {
+    const unsubscribeError = fileWatchGateway.onFileError((data) => {
       if (!isActive || data.filePath !== filePath) return
+      // The main process ended the watch: forget the hold, as on a delete,
+      // so Reload restarts it without a `stop` (#252, invariant 5)
+      if (data.ended) forgetFileWatch(slot)
       logger.error('Read-only file watch error', undefined, {
         filePath,
-        error: data.error
+        error: data.error,
+        ended: data.ended === true
       })
       setUnavailableReason('watcher-error')
     })

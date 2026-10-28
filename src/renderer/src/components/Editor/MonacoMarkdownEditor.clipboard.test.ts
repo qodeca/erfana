@@ -15,7 +15,7 @@
  * matching pure clipboard command.
  *
  * @see Issue #203 - Central text-clipboard service
- * @see docs/design/issue-203-clipboard-service.md §5
+ * @see docs/designs/issue-203-clipboard-service.md §5
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'

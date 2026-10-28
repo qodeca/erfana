@@ -8,7 +8,7 @@ Integrated terminal emulator with xterm.js and node-pty for native shell access 
 
 The Terminal Panel provides a full-featured terminal emulator using:
 - **xterm.js v6.0.0** - Modern terminal emulator for web
-- **node-pty v1.0.0** - Native pseudo-terminal (PTY) backend
+- **node-pty v1.1.0** (`^1.0.0` in `package.json`, 1.1.0 in the lock file) - Native pseudo-terminal (PTY) backend
 - **WebGL rendering** - Hardware-accelerated rendering for performance
 
 ## Quick Access
@@ -18,7 +18,7 @@ The Terminal Panel provides a full-featured terminal emulator using:
 - **Maximize**: ⛶ button in panel header / `Cmd/Ctrl+Shift+M` - Expand the terminal over the editor
 - **Scroll to Bottom**: ⬇️ button in panel header - Jump to latest output
 - **Scroll Lock**: 🔒 button in panel header - Lock scroll to always stay at bottom
-- **Restart**: 🔄 button in panel header - Kill and restart terminal session
+- **Restart**: 🔄 button in panel header - Kill and restart terminal session (asks first while the terminal is busy – see [Restart confirmation](#restart-confirmation))
 
 ## Features
 
@@ -50,12 +50,14 @@ A thin status bar pinned to the bottom of a terminal panel — its height matche
 
 **Behavior**:
 - Data is read **non-invasively** (read-only) from Claude Code's own transcript JSONL under `~/.claude/projects/<encoded-cwd>/*.jsonl` — Erfana never writes the user's Claude Code config
+- The transcript folder is watched with **one non-recursive `fs.watch` per folder**, shared by every panel that needs it (`claudeStatus/ClaudeTranscriptWatcher.ts`, v0.22.0). Before, chokidar watched each transcript on its own, so on macOS a long-lived project with hundreds of sessions held hundreds of file handles. A folder that does not exist yet (Claude creates it after the terminal opened), or whose watch died, is tried again on the next refresh and after a back-off of 5 s doubling to 60 s; a watch that comes back reports one change. Events under `subagents/` and non-`.jsonl` names are ignored
 - Per-panel detection inspects the panel's own PTY child-process tree for a `claude` process (macOS `ps`/`lsof`; Windows a single static `powershell.exe` `Get-CimInstance Win32_Process` snapshot, BFS over the tree) and uses that process's cwd to locate the transcript (Windows v1 falls back to the panel's spawn cwd rather than Claude's live cwd)
 - Window size resolves through one shared model-id parser + exact-id capability registry (`claudeStatus/modelId.ts`, [#41](https://github.com/qodeca/erfana/issues/41); table verified 2026-08-07 against platform.claude.com + code.claude.com): **1M** for `claude-opus-5` / `4-8` / `4-7`, `claude-sonnet-5`, `claude-fable-5` and Mythos; **200k** for `claude-opus-4-6` and older Opus, `claude-sonnet-4-6` and older Sonnet, and all Haiku. The two 4.6 rows are **plan-conditional defaults, not ceilings** — Opus 4.6 runs at 1M where the plan includes extended context (auto-granted on Max/Team/Enterprise) and Sonnet 4.6 runs at 1M with usage credits, which no plan includes by default, Max included. 200k is the metered default in both cases, and an entitled session self-corrects via R2 once observed usage crosses 200k
 - Extrapolation for an unrecognised id is **per major generation, not family-wide** (design §7.2.1). `newestByMajor` is consulted first and, when the id's major is known, it *decides*: the id inherits **that major's** newest known window within `MAX_MINOR_LOOKAHEAD` (4) minor releases, and the family-wide value is never reached. So `claude-sonnet-4-7` reports **200k**, inheriting Sonnet 4.6, even though the family's newest known entry `claude-sonnet-5` is 1M. Only an **unknown** major inherits the family's newest window, and only `MAX_MAJOR_LOOKAHEAD` (1) generation ahead. Unknown families and bare aliases (`opus`) get no opinion and default to 200k
 - The window is **not** purely a property of the model id — plan and provider decide it too (Bedrock / Google Cloud / Foundry cap Opus at 200k). Sizing is therefore a **strict first-match chain, not a set of independent overrides** (`detectWindowDetail`, design §8): **R2** observed usage > 200k → **R0** explicit `/model …[1m]` → **R0'** explicit `/model <id>` with no marker (forces 200k) → **R1m** a `[1m]` marker on the id itself → **R1** the capability registry → **R3** a `settings.json` `[1m]` model → **R4** default 200k. R2 leads because a 200k window physically cannot hold 250k tokens. R1 precedes R3 deliberately: only a registry **1M** short-circuits, so a registry 200k falls through and a settings marker can still upgrade it
 - The **environment rule is gone**. An earlier `R_ENV` forced 200k from a spawn-env signal; it was withdrawn because three of its four signals were unreachable by construction (`TerminalService.cleanEnvironment` strips `CLAUDE_CODE_*` from the merged spawn env), the survivor (`ANTHROPIC_BASE_URL`) is a routing fact rather than a capacity fact, and the rule outranked explicit user configuration. A narrowed, settings-based replacement is tracked as [#48](https://github.com/qodeca/erfana/issues/48)
-- Only the R1 answer is **provisional**: the tooltip marks it `(inferred)`, the meter's `aria-valuetext` appends the same marker after the token counts, it is recomputed on every refresh, and the sticky-window bit never latches it — only a corroborated 1M (R2 observed usage, R0 `/model …[1m]`, R1m a `[1m]` on the id, R3 `settings.json` `[1m]`) latches
+- **Cloud-platform model ids** (v0.22.0, [#49](https://github.com/qodeca/erfana/issues/49)): before parsing, `normaliseProviderId` (`claudeStatus/modelId.ts`) reduces a Bedrock id (`us.anthropic.claude-opus-4-8`, with the `us`, `eu`, `apac`, `jp`, `au`, `global` or `us-gov` prefix), a Bedrock ARN (`arn:aws…:bedrock:…:inference-profile/…` or `…:foundation-model/…`) or a Google Cloud pinned snapshot (`claude-haiku-4-5@20251001`) to the bare Claude name, so it gets the same window size and friendly name, and a `/model` choice that uses one is honoured. A Bedrock ARN no longer shows the AWS account number in the model label
+- Only the R1 answer and the default for an id the parser cannot read are **provisional**. An unrecognised id – including plain names outside the grammar such as `claude-3-7-sonnet-20250219`, or a bare alias such as `opus` – gets 200k marked `(inferred)` (v0.22.0, #49), and is logged once per id. The R1 answer: the tooltip marks it `(inferred)`, the meter's `aria-valuetext` appends the same marker after the token counts, it is recomputed on every refresh, and the sticky-window bit never latches it — only a corroborated 1M (R2 observed usage, R0 `/model …[1m]`, R1m a `[1m]` on the id, R3 `settings.json` `[1m]`) latches
 - Colour bands track usage against the active window: a true green safe band (`--color-context-safe` #3fb950, distinct from the Qodeca-lime brand colour) below 30%, orange at 30–60%, red at ≥60% (on a 1M window that's 300k / 600k tokens; on 200k it's 60k / 120k)
 - On any detection/parse failure the bar hides gracefully — no error, no stale data
 - macOS and Windows are both supported (Windows support was cut for 0.16.0, which was never tagged; it first reached users in v0.16.3 — pre-migration issue #217); on Linux the process detector is a no-op so the bar never appears there
@@ -90,13 +92,13 @@ Full copy/paste operations with keyboard shortcuts and context menu.
 - **Ctrl+Shift+C / Ctrl+Shift+V**: Explicit copy/paste (Windows/Linux style)
 
 **Context Menu**:
-- Right-click opens context menu with Copy and Paste options
+- Right-click (or Shift+F10 / the Menu key, #90) opens context menu with Copy and Paste options
 - Copy is disabled when no text is selected
 - Platform-specific shortcut display (⌘C/⌘V on macOS, Ctrl+C/Ctrl+V on Windows)
 
 **Behavior**:
 - Selection preserved after copy (VS Code behavior)
-- Toast notification on copy success
+- No success toast on copy; a transport failure surfaces one debounced, persistent error toast via the shared `textClipboard` service (#203)
 - Pure logic extraction pattern: `terminalClipboard.logic.ts` for testability
 
 **Central clipboard service (#203)**: terminal copy/paste now reads and writes through the shared renderer `textClipboard` service (`src/renderer/src/services/textClipboard.ts` → main-process `clipboard` module over IPC), the single transport-error chokepoint for all text surfaces. The SIGINT-vs-copy decision table in `terminalClipboard.logic.ts` (#28/#122) is **unchanged** — only the underlying read/write transport moved. See [API Services § Clipboard service](../api-services.md#clipboard-service-203).
@@ -170,10 +172,10 @@ Drag files or folders from project tree or Finder to insert shell-escaped paths 
 - Folders: Inserts folder path (not contents)
 - Visual feedback: Drop target indicator appears on terminal panel
 
-**Path Escaping** (POSIX shell-safe):
-- Single-quote wrapping for all paths
+**Path Escaping** (per terminal shell, `escapePathForShell(path, shellKind)`):
+- The quoting follows the shell of the terminal the paths go to (`shellKind` from the `terminal:create` response): `posix` (macOS, Linux, Git Bash) wraps in single quotes with `'\''` for an inner `'`; `cmd` wraps in double quotes; `powershell` wraps in single quotes and doubles every single-quote character, including the typographic `‘ ’ ‚ ‛` (`quotePowerShellLiteral` in `src/shared/powershellQuote.ts`). Before v0.22.0 drops, tree drags and camera photos always used POSIX quoting
+- With no active terminal yet, `platformDefaultShellKind()` picks `powershell` on Windows and `posix` elsewhere
 - Null byte sanitization
-- Special characters properly escaped
 
 **Example**:
 ```bash
@@ -219,7 +221,7 @@ When a macOS capture returns `SCREENSHOT_PERMISSION_DENIED`, the renderer shows 
 
 - **Never gated by a pre-check.** The capture is always attempted first; the dialog appears only after the OS itself denies it. A stale permission read must never block a user who has actually been granted access – `status` from `screenshot:getScreenPermission` only tailors the wording.
 - **Silent-denial reclassification (the case users actually hit).** On modern macOS a *denied* `/usr/sbin/screencapture` exits 0 and simply writes no file – indistinguishable from a user pressing Escape. `MacScreenshotCapturer` therefore re-classifies "process succeeded but produced no file" from `SCREENSHOT_CANCELLED` to `SCREENSHOT_PERMISSION_DENIED` when `systemPreferences.getMediaAccessStatus('screen')` reads `'denied'`. That reclassification is what opens this dialog – without it the denial would surface as a silent no-op.
-- **Two actions**, both backed by `system:*` IPC: *Open settings* (`system:openScreenRecordingSettings`) opens the Screen Recording privacy pane, and *Relaunch* (`system:relaunchApp`) restarts Erfana – macOS applies a fresh Screen Recording grant only to a newly-launched process, so a relaunch is genuinely required, not a convenience.
+- **Three buttons**, all backed by `system:*` IPC or the dialog itself: *Open Screen Recording settings* (`system:openScreenRecordingSettings`) opens the Screen Recording privacy pane, *Relaunch Erfana* (`system:relaunchApp`) restarts Erfana, and *Close* dismisses the dialog – macOS applies a fresh Screen Recording grant only to a newly-launched process, so a relaunch is genuinely required, not a convenience.
 - Dismissable by Close, Escape, or backdrop click.
 
 > A repeated "asks every time" prompt despite a granted permission is usually a stale TCC record on the machine, not an app bug. Reset it with `tccutil reset ScreenCapture com.erfana.app` and reboot.
@@ -304,6 +306,18 @@ Capture photos from connected cameras directly from the terminal toolbar.
 **Related issues**:
 - #93 - Camera photo capture from terminal toolbar
 - #42 - Un-mirrored preview by default, per-camera mirror toggle, full-frame preview
+
+### Restart confirmation
+
+Restart ends everything running in the terminal, so `getRestartRisk()` (`TerminalPanel/restartGuard.ts`, lens review [25]) asks first when any one of three signals says the terminal is busy:
+
+| Signal | Source | Message |
+|---|---|---|
+| Claude Code is running | the Claude status store holds a snapshot for this terminal | "Claude Code is running in this terminal. …" |
+| Used moments ago | the user (or the app, through `sendToTerminal`) gave it input and it was active within `TERMINAL.RECENT_ACTIVITY_WINDOW` – the same window the quit prompt uses | "This terminal was in use moments ago. …" |
+| A program is running | `terminal:getActivity` reports a foreground process other than the shell (node-pty `IPty.process`) | "A program is running in this terminal. …" |
+
+The prompt is a danger `ConfirmDialog` ("Restart terminal?", Restart / Cancel) that opens with focus on Cancel. The third signal works on macOS and Linux only: on Windows node-pty reports the shell's own name for the life of the terminal, so `getActivity` answers `{ busy: false, known: false }` and only the first two signals apply. A failed lookup counts as "not busy", so a broken call never blocks a restart. A terminal with none of the three signals restarts straight away.
 
 ### Scroll Lock Toggle (v0.6.0)
 
@@ -390,8 +404,8 @@ See [Scroll Fixes](./scroll-fixes.md) for related scroll preservation features.
 
 - **Font**: **Cascadia Mono**, 12px, bold support — bundled with the app (`src/renderer/src/assets/fonts/`, declared in `src/renderer/src/styles/fonts.css`, SIL OFL 1.1) so the terminal renders identically on every platform. SF Mono / Monaco / Consolas remain as fallbacks. Apple's SF Mono cannot be redistributed, so Cascadia Mono is the closest freely-licensable match. The font is awaited via the CSS Font Loading API (`ensureTerminalFontLoaded`) **before** `xterm.open()` — xterm measures glyph metrics on a canvas at open time, so a not-yet-loaded web font would cache fallback metrics and misalign the grid.
 - **Theme**: High contrast – black background (`#000000`), white foreground (`#ffffff`), cyan cursor (`#4fc1ff`)
-- **Scrollbar**: 16px wide, dark gray thumb (`#555555`) on `#1e1e1e` track, custom WebKit styling
-- **Container**: `padding: 0` on container, `padding: 8px` on `.xterm`
+- **Scrollbar**: xterm v6 uses VS Code's `DomScrollableElement` widget; the native `.xterm-viewport` scrollbar is hidden and the `.xterm-scrollable-element > .scrollbar > .slider` thumb is styled with `var(--color-gray-700)` (hover `--color-gray-600`, active `--color-gray-500`) in `TerminalPanel.css`
+- **Container**: `padding: 0` on container, `padding: var(--space-4)` on `.xterm`
 
 ### Shell Configuration
 
@@ -401,19 +415,21 @@ See [Scroll Fixes](./scroll-fixes.md) for related scroll preservation features.
 
 **Environment Variables**:
 - `PS1='%n %~ $ '` - Traditional zsh prompt
-- `PROMPT='%n %~ $ '` - Zsh synonym for PS1
+- `PROMPT='%n %~ $ '` - Zsh synonym for PS1 (not set for cmd.exe, which reads `PROMPT` too and would show the codes literally)
 - `SHELL_SESSIONS_DISABLE='1'` - Disables macOS "Restored session" messages
 - `TERM='xterm-256color'` - 256-color support
 - `COLORTERM='truecolor'` - True color support
 
 **Shell Arguments** (Platform-Specific):
 - **macOS/Linux**: `-l` (login shell) - Sources RC files (.zprofile, .bash_profile) to load environment, Homebrew paths, and user configuration
-- **Windows (PowerShell)**: `-NoProfile` - Loads full environment profile
-- **Windows (cmd.exe)**: No arguments - Uses default environment
+- **Windows (PowerShell)**: `-NoLogo -NoProfile -NoExit` - One process: the bootstrap script sets the cwd, then dot-sources the user's profiles itself, and `-NoExit` keeps the same shell interactive (see [Bootstrap Pattern](./bootstrap-pattern.md))
+- **Windows (cmd.exe)**: `/D /S /K "…"`, passed as one ready-made command line rather than an argument array (v0.22.0 – the quoted array form left Command Prompt terminals blank). The shell starts in the validated project folder; see [Bootstrap Pattern § cmd.exe](./bootstrap-pattern.md#cmdexe)
 
 ### Terminal Initialization
 
 **Clean Start Behavior**: Terminal uses a non-interactive bootstrap pattern to eliminate initialization artifacts and provide a clean user experience.
+
+If a shell's start-up never reports in (the marker never arrives), the terminal shows whatever the shell printed after 10 seconds instead of staying blank. A prompt the shell draws in the same chunk as the marker is kept and shown (#302).
 
 See [Bootstrap Pattern](./bootstrap-pattern.md) for detailed initialization documentation.
 
@@ -421,24 +437,30 @@ See [Bootstrap Pattern](./bootstrap-pattern.md) for detailed initialization docu
 
 ### Service Layer
 
-**File**: `src/main/services/TerminalService.ts` (~700 lines)
+**File**: `src/main/services/TerminalService.ts` (about 1,400 lines as of v0.22.0; output batching lives in `terminalOutputFlow.ts`, foreground-process matching in `terminalForeground.ts`, the Windows tree kill in `terminalTreeKill.ts`)
 
 ```typescript
 class TerminalService extends EventEmitter {
   private terminals: Map<string, TerminalInstance>
 
   // Lifecycle
-  createTerminal(config: TerminalConfig): string | null
+  createTerminal(config?: TerminalConfig, webContentsId?: number): Promise<{ terminalId: string; shellKind: ShellKind } | { error: string }>  // never null; the IPC handler passes `error` through verbatim
   killTerminal(terminalId: string): boolean
   dispose(): Promise<void>
 
   // Operations
-  write(terminalId: string, data: string): Promise<boolean>  // v0.3.3: Promise-based with completion callback
+  write(terminalId: string, data: string): boolean  // synchronous; true if the PTY write was initiated
   resize(terminalId: string, cols: number, rows: number): boolean
 
   // Info
   getTerminalInfo(terminalId: string): {...} | null
   listTerminals(): Array<{id: string; title: string}>
+  getActivity(terminalId: string): { busy: boolean; known: boolean } | null  // known: false on Windows
+  getOwner(terminalId: string): number | undefined  // owning webContents id
+
+  // Flow control and start-up handshake
+  ackOutput(terminalId: string, chars: number): void
+  markInitializationComplete(terminalId: string): void
 }
 
 export const terminalService = new TerminalService()
@@ -446,35 +468,60 @@ export const terminalService = new TerminalService()
 
 **Pattern**: OOP service with singleton instance (follows FileService pattern)
 
-**v0.3.3 Enhancement**: The `write()` method now returns a Promise that resolves when the write operation completes. This enables reliable autoExecute behavior for prompt templates, preventing race conditions between text write and Enter key. See [AutoExecute Reference](../prompts/autoexecute-reference.md) for details.
+**History note**: v0.3.3 made `write()` Promise-based with a completion callback to support autoExecute for prompt templates. That change was later reverted – `write()` is a plain synchronous boolean today, and autoExecute reliability comes from the renderer's fixed 200 ms delay before sending Enter (`useTerminalStore.sendToTerminal`). The renderer-facing `window.api.terminal.write()` still returns a Promise because it is an `ipcRenderer.invoke` round-trip. See [AutoExecute Reference](../prompts/autoexecute-reference.md).
 
 ### IPC Handlers
 
-**File**: `src/main/ipc/terminal-handlers.ts` (~120 lines)
+**File**: `src/main/ipc/terminal-handlers.ts`
 
 **Exposed via contextBridge**:
 ```typescript
 window.api.terminal = {
   isAvailable: (terminalId?) => Promise<{success, available, initialized?}>
-  create: (config) => Promise<{success, terminalId?, error?}>
-  write: (terminalId, data) => Promise<{success, error?}>  // v0.3.3: Promise-based
+  create: ({ cwd?, cols, rows }) => Promise<{success, terminalId?, shellKind?, error?}>  // shellKind: 'posix' | 'cmd' | 'powershell' (#164)
+  write: (terminalId, data) => Promise<{success, error?}>  // invoke round-trip; main-side write() is synchronous
   resize: (terminalId, cols, rows) => void
-  kill: (terminalId) => void
+  kill: (terminalId) => Promise<{success, error?}>
+  getInfo: (terminalId) => Promise<{success, info?: {id, cwd, title}, error?}>
+  list: () => Promise<{success, terminals?: Array<{id, title}>, error?}>
+  getActivity: (terminalId) => Promise<{success, busy?, known?, error?}>  // restart guard
+
+  // Screen-reader support reported by the OS (macOS, Windows)
+  getScreenReaderSupport: () => Promise<ScreenReaderSupport>  // sender-gated, payload-free
+  onScreenReaderSupportChanged: (callback) => unsubscribe
 
   // Events
   onData: (callback) => unsubscribe
   onExit: (callback) => unsubscribe
   onError: (callback) => unsubscribe
+
+  // Bootstrap clear handshake (see bootstrap-pattern.md)
+  onClear: (callback) => unsubscribe
+  markClearComplete: (terminalId) => void
+
+  // Flow control: report output xterm has parsed (UTF-16 code units)
+  ackOutput: (terminalId, chars) => void
 }
 ```
 
+**Request contract** (`src/main/ipc/terminal-handlers.ts`, `src/shared/ipc/terminal-schema.ts`):
+- Every request is parsed against its schema first; oversized or malformed requests are refused with an error.
+- `terminal:create` takes `{ cwd?, cols, rows }` only. The renderer cannot choose the shell or its environment. `cwd` goes through the confinement wrapper (`registerConfinedHandle`): it must be an existing folder inside the open project. With no `cwd`, the terminal opens in the project root, or in the home folder when no project is open.
+- A window may own at most `TERMINAL_MAX_PER_WINDOW` (32) terminals; past that `create` answers "Too many terminals are open (the limit is 32). Close one and try again."
+- A terminal belongs to the window that created it. `write`, `resize`, `kill`, `getInfo`, `getActivity` and `clearComplete` from another window answer like an unknown id, `list` shows a window only its own terminals, and data, exit, error and clear events go to the owning window only.
+- `TerminalService` builds the spawn environment from the merged environment and then removes development variables and the Claude Code session markers (`CLAUDECODE`, `CLAUDE_CODE_*`), so a `claude` started in the terminal is a clean top-level session. Terminal output is never written to the log – only its length.
+
+Output reaches `onData` in batches (every 8 ms or at 64 KiB per terminal, in order, always before that terminal's exit). The panel acknowledges parsed output with `ackOutput` once per 32 KiB, and on macOS and Linux main pauses the PTY while more than 512 KiB is unacknowledged; a hidden window acknowledges on receipt, so background work is never held back, and Windows terminals are batched only. Design and measurements: [docs/performance/terminal-output-batching.md](../performance/terminal-output-batching.md).
+
 ### UI Component (Modular Architecture, v0.6.5)
 
-**Main Component**: `src/renderer/src/components/Panels/TerminalPanel.tsx` (~250 lines)
+**Main Component**: `src/renderer/src/components/Panels/TerminalPanel.tsx`
 
 **Extracted Hooks** (`src/renderer/src/components/Panels/TerminalPanel/hooks/`):
-- `useTerminalDragDrop.ts` - External file drag-drop handling
-- `useScreenshotCapture.ts` - macOS screenshot capture workflow
+- `useXtermSession.ts` - One terminal session: creates xterm, attaches it to a PTY (clear handshake, `terminal:create`, input) and owns `teardownTerminal()`, the single teardown every exit path (unmount, project switch, restart) uses. Every timer id and unsubscribe function is held in a ref so the teardown reaches all of them
+- `useTerminalFileDrop.ts` - External file drops onto the panel (document-level capture listeners, attached and detached by the session)
+- `useTerminalDragDrop.ts` - Deprecated, not used by the panel; use `useTerminalFileDrop`
+- `useScreenshotCapture.ts` - Cross-platform screenshot capture workflow (full-screen, window and area modes; #164)
 - `useTerminalResize.ts` - ResizeObserver-based terminal resize
 - `useTerminalPortal.ts` - DOM portal management for xterm
 
@@ -485,8 +532,12 @@ window.api.terminal = {
 **Supporting Files**:
 - `types.ts` - TerminalState, ScreenshotCaptureMode types
 - `terminalPanel.logic.ts` - Pure functions and constants
+- `restartGuard.ts` - Decides whether Restart must ask first (see [Restart confirmation](#restart-confirmation))
+- `outputAck.ts` - Renderer half of flow control: adds up parsed output and sends `terminal:ackOutput` once per 32 KiB; acks on receipt while the window is hidden
+- `terminalMenuKey.ts` - Shift+F10 and the Menu key open the terminal's context menu at the cursor (#90). A program in the terminal no longer receives Shift+F10
+- `nameNotFoundToast.ts` - The toast for a clicked file name the project search did not find; says "Search not finished" instead of "File not found" when the search was cut short (#320)
 
-See [Terminal Architecture Review](../architecture-reviews/reviews/terminal-panel-architecture-review.md) for detailed refactoring documentation.
+See [Terminal Architecture Review](https://github.com/qodeca/erfana/blob/1d814e05d98b3005e5c13c0624b09653708136f7/docs/architecture-reviews/reviews/terminal-panel-architecture-review.md) for detailed refactoring documentation.
 
 **Key Features**:
 - Visibility check before xterm initialization (prevents rendering issues)
@@ -495,7 +546,17 @@ See [Terminal Architecture Review](../architecture-reviews/reviews/terminal-pane
 - useRef pattern to avoid useEffect cleanup issues
 - Clean screen on mount (`\x1b[2J\x1b[H`)
 
-**Critical Implementation Detail**: Terminal cleanup uses `useRef` for `terminalId` instead of including it in `useEffect` dependencies. Including `terminalId` in deps causes cleanup to run on ID change, disposing xterm before it can render. The cleanup effect depends only on `isAvailable`.
+**Critical Implementation Detail**: Terminal cleanup uses `useRef` for `terminalId` instead of including it in `useEffect` dependencies. Including `terminalId` in deps causes cleanup to run on ID change, disposing xterm before it can render. The cleanup effect depends only on `isAvailable` (and the session's stable `start` / `teardownTerminal`).
+
+**Teardown order** (`teardownTerminal`, fixed): clear the session's id refs; clear the Claude-nudge timer; stop a start that is waiting for visibility; remove the start-up clear listener, the test-hook registration and the file-drop listeners; clear the active terminal and Claude tracking; release the instance (`releaseInstance`: its fit and WebGL-recovery timers, context-menu and input listeners and parser hooks, then dispose xterm and null its refs); then kill the PTY. A start that fails after its instance reached the refs goes through the same `releaseInstance`. Every step runs even when an earlier one throws, and `releaseInstance` empties its refs before disposing and guards each dispose, so xterm is always disposed and the PTY always killed. A step that throws is logged (`Terminal teardown step failed`) and the teardown still resolves: its callers – effect cleanups, project switch, restart – do not catch, so a throw would reach the root error boundary or skip the next start. Restart and project switch await the kill before starting the next session.
+
+**Screen-reader mode** (lens review [23]): `useXtermSession` takes `screenReaderMode` from `useTerminalScreenReaderMode` (Settings > Terminal: Auto / On / Off, Auto following the OS through `terminal:getScreenReaderSupport` and `terminal:screenReaderSupportChanged`). It is passed to the `Terminal` constructor and set live on `xterm.options`, so xterm adds or removes its accessibility tree without a restart. Details: [settings.md § Terminal screen-reader mode](../settings.md#terminal-screen-reader-mode-terminalscreenreadermode).
+
+**Start-up guard** (lens review [18]): every teardown bumps a generation counter, and a start checks it after each await (font load, WebGL import, `terminal:create`). A start that finds it changed gives up – disposing its xterm if it was never stored, and killing a PTY main created for it in the meantime – so its id is never set and its output never reaches the terminal that replaced it. Only one start runs per generation: a second `start()` joins the one in flight, and a `start()` while a session is live does nothing.
+
+**Failed start**: a start that fails for the current generation (font load, `open()`, or `terminal:create` answering with an error) disposes its own xterm instance and, if it was already stored, releases what it attached and clears `xtermRef` / `fitAddonRef`. Otherwise the stale instance would block every later start, and "Recheck" could never create a terminal again.
+
+The terminal container is rendered only while the panel is available and shows no error, so a start asked for while the error box is up (a project switch after a failed create) finds no container and returns. Such a start records that it was missed, and `TerminalPanel` calls `startIfMissed()` when the container comes back, which retries only that start. A teardown clears the record, so an error cleared by closing the project, or by a switch still waiting for the old PTY's kill, never starts a shell from there.
 
 ### State Management
 
@@ -511,7 +572,7 @@ interface TerminalStore {
 
 **Purpose**: Cross-component communication (PreviewContextMenu → Terminal Panel)
 
-**v0.3.3 Enhancement**: `sendToTerminal()` now supports `autoExecute` parameter to automatically send Enter key after text. Includes initialization polling (5s timeout, 50ms intervals) to prevent race conditions. See [AutoExecute Reference](../prompts/autoexecute-reference.md).
+**v0.3.3 Enhancement**: `sendToTerminal()` supports an `autoExecute` parameter to send the Enter key 200 ms after the text. The store itself does no readiness polling; the readiness helper is `waitForTerminalReady()` in `src/renderer/src/utils/panelUtils.ts` (event-based via `waitForReady` when available, otherwise polling with a 5 s timeout and 50 ms interval). See [AutoExecute Reference](../prompts/autoexecute-reference.md).
 
 ### Bracketed Paste Mode (v0.7.2+, #108)
 

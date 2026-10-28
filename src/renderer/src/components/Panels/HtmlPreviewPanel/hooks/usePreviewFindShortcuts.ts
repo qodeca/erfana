@@ -5,14 +5,18 @@
  *
  * When the preview is the active tab its native `WebContentsView` sits on top
  * and receives keystrokes, so a renderer-level Cmd/Ctrl+F never fires. Main's
- * `before-input-event` forwarding sends the four enumerated accelerators
- * (design §1.9) back as `preview:forwardedShortcut`; this hook routes each one
- * to a panel-supplied action:
+ * `before-input-event` forwarding sends the enumerated keys (design §1.9, and
+ * issue #124 part 3 §3.7) back as `preview:forwardedShortcut`; this hook routes
+ * each one to a panel-supplied action:
  *
  * - **Cmd/Ctrl+F** → open the find bar.
  * - **Cmd/Ctrl+S** → export the preview to PDF (UX-003).
  * - **Cmd/Ctrl+W** → close the panel (UX-006).
  * - **Escape** → close the find bar with full cleanup (UX-007).
+ * - **Back / Forward** (Cmd+[ / Cmd+] on macOS, Alt+Left / Alt+Right elsewhere)
+ *   → step the tab's history. Routed on `payload.key` ALONE: main matched them
+ *   through the shared `previewNavKeys` table, whose modifier is Alt on Windows
+ *   and Linux, so `accel` is `false` for both on every platform.
  *
  * The panel owns the actions because the find close must run the *provider's*
  * `clearHighlights()` and restore focus — exactly like `SearchBar.handleClose`,
@@ -24,12 +28,16 @@
  * @see Issue #74 - HTML preview with CSS and JavaScript execution
  */
 
-import { useEffect, useRef } from 'react'
+import { useEffect } from 'react'
+import { previewGateway } from '../../../../services/previewGateway'
+import { useLatestRef } from '../../../../hooks/useLatestRef'
 
 /** The panel actions the forwarded accelerators drive. */
 export interface PreviewShortcutActions {
   /** Open the find bar (forwarded Cmd/Ctrl+F). */
   openSearch: () => void
+  /** Whether the find bar is currently open — decides what Escape means. */
+  isSearchOpen: () => boolean
   /**
    * Close the find bar with full cleanup — clear the provider's highlights and
    * restore focus, matching `SearchBar.handleClose` (forwarded Escape, UX-007).
@@ -40,6 +48,20 @@ export interface PreviewShortcutActions {
   exportPdf: () => void
   /** Close the preview panel (forwarded Cmd/Ctrl+W, UX-006). */
   closePanel: () => void
+  /**
+   * Return focus from the previewed page to Erfana's own chrome.
+   *
+   * A preview is a keyboard trap without this: focus goes into a native view
+   * that swallows every key, and there is no documented way back out. WCAG SC
+   * 2.1.2 asks for an exit that is STATED, not merely present — so this pairs
+   * with the band chip's accessible name, which says "Press Escape in the
+   * previewed page to return here".
+   */
+  focusChrome: () => void
+  /** Step the tab back (a forwarded Back key, focus in the page). */
+  goBack: () => void
+  /** Step the tab forward (a forwarded Forward key, focus in the page). */
+  goForward: () => void
 }
 
 /**
@@ -52,10 +74,13 @@ export interface PreviewShortcutActions {
  * @example
  * ```tsx
  * usePreviewFindShortcuts(panelId, {
- *   openSearch, closeSearch, exportPdf, closePanel
+ *   openSearch, isSearchOpen, closeSearch, exportPdf, closePanel, focusChrome,
+ *   goBack: () => void step('back', 'page'),
+ *   goForward: () => void step('forward', 'page')
  * })
  * ```
  */
+
 export function usePreviewFindShortcuts(
   panelId: string,
   actions: PreviewShortcutActions
@@ -63,11 +88,10 @@ export function usePreviewFindShortcuts(
   // Read the latest actions from the stable subscription without resubscribing
   // on every render (the actions are memoised in the panel but their identity
   // can still change).
-  const actionsRef = useRef(actions)
-  actionsRef.current = actions
+  const actionsRef = useLatestRef(actions)
 
   useEffect(() => {
-    const unsubscribe = window.api.preview.onForwardedShortcut((payload) => {
+    const unsubscribe = previewGateway.onForwardedShortcut((payload) => {
       if (payload.panelId !== panelId) return
 
       const current = actionsRef.current
@@ -78,11 +102,27 @@ export function usePreviewFindShortcuts(
         current.exportPdf()
       } else if (payload.key === 'w' && payload.accel) {
         current.closePanel()
+      } else if (payload.key === 'back') {
+        current.goBack()
+      } else if (payload.key === 'forward') {
+        current.goForward()
       } else if (payload.key === 'Escape') {
-        current.closeSearch()
+        // Escape does ONE thing at a time, innermost first. With the find bar
+        // open it closes the find bar; with the bar closed it is the way out of
+        // the previewed page. Doing both at once would make a single keypress
+        // dismiss a control the reader could not see.
+        if (current.isSearchOpen()) {
+          current.closeSearch()
+        } else {
+          current.focusChrome()
+        }
       }
+      // No zoom branch: Cmd/Ctrl +/-/0 reach a focused preview through the View
+      // menu (`menu.ts` -> `zoomFocused`), not through this channel. The branch
+      // that used to live here was unreachable — the IPC schema never carried
+      // those keys — and reviving it would have doubled every zoom step.
     })
 
     return unsubscribe
-  }, [panelId])
+  }, [panelId, actionsRef])
 }

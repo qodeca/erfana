@@ -3,7 +3,7 @@
 import { readFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 
-const EXTS = ['.ts', '.tsx', '.js', '.mjs', '.cjs', '.css']
+const EXTS = ['.ts', '.tsx', '.js', '.mjs', '.cjs', '.css', '.html']
 // REUSE-IgnoreStart
 const TOKEN = 'SPDX-License-Identifier: GPL-3.0-only'
 // REUSE-IgnoreEnd
@@ -14,6 +14,8 @@ const files = execFileSync('git', ['ls-files'], { encoding: 'utf8' })
   .filter(Boolean)
   .filter((f) => EXTS.some((e) => f.endsWith(e)))
   .filter((f) => !f.startsWith('node_modules/') && !f.startsWith('dist/') && !f.startsWith('out/'))
+  // The Xezar pipeline kit keeps its own MIT licence (REUSE.toml), so it carries no GPL header.
+  .filter((f) => !f.startsWith('.xezar/'))
 
 const missing = files.filter((f) => !readFileSync(f, 'utf8').slice(0, 512).includes(TOKEN))
 

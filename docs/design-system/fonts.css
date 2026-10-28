@@ -1,0 +1,30 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/* Cascadia Mono — the ONE face Erfana actually ships.
+ *
+ * Vendored in the app at src/renderer/src/assets/fonts/ and redistributable
+ * under SIL OFL 1.1, so the same files are uploaded here. Every mono sample in
+ * this design system therefore renders in the real face, not a substitute.
+ *
+ * --font-sans and --font-serif are deliberately SYSTEM STACKS, not brand fonts:
+ * the app takes whatever the operating system provides (San Francisco on macOS,
+ * Segoe UI on Windows) and Charter/Georgia for prose. "Oxygen" and "Charter"
+ * are entries partway down those fallback lists, not faces Erfana licenses or
+ * bundles — there is nothing to upload for them, by design.
+ */
+
+@font-face {
+  font-family: 'Cascadia Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url('./fonts/CascadiaMono-Regular.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Cascadia Mono';
+  font-style: normal;
+  font-weight: 700;
+  font-display: block;
+  src: url('./fonts/CascadiaMono-Bold.woff2') format('woff2');
+}

@@ -10,7 +10,7 @@
   --dialog-base-zindex: var(--z-dialog);
   --dialog-text-primary: var(--color-text-emphasis);
   --dialog-text-secondary: var(--color-gray-200);
-  --dialog-text-muted: var(--color-text-muted);
+  --dialog-text-muted: var(--color-text-tertiary);
   --dialog-btn-primary-bg: var(--color-btn-primary-bg);
   --dialog-btn-primary-hover: var(--color-btn-primary-hover);
   --dialog-btn-danger-bg: var(--color-btn-danger-bg);
@@ -21,7 +21,6 @@
   --dialog-tooltip-min-width: 100px;
   --dialog-icon-size: var(--icon-size-xl);
   --dialog-icon-gap: var(--space-6);
-  --dialog-icon-radius: var(--border-radius);
   --dialog-header-margin: var(--space-8);
 }
 
@@ -128,14 +127,29 @@
   letter-spacing: 0.2px;
 }
 
-.dialog-btn:focus {
-  outline: 2px solid var(--dialog-btn-primary-bg);
+/* The one focus ring, per docs/design-system/system/foundations/focus.html.
+ *
+ * Three things changed here and none of them is visible today:
+ *   :focus -> :focus-visible   a bare :focus paints the ring after a MOUSE click
+ *                              too, which looks broken, which is why people
+ *                              delete focus rings.
+ *   2px -> --border-width-thick  the width is a token, not a literal.
+ *   --dialog-btn-primary-bg -> --color-border-focus
+ *                              both resolve to --color-brand-violet, so this is
+ *                              identical on screen - but one of them MEANS
+ *                              "focus" and the other means "the primary button
+ *                              is violet". Repoint the button colour and the old
+ *                              rule would have silently moved the focus ring. */
+.dialog-btn:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
   outline-offset: var(--space-1);
 }
 
 /* Primary button (confirm, submit).
  *
- * Foreground is --color-brand-black, NOT --color-white: the brand violet
+ * Foreground is --color-btn-primary-text (brand black), NOT --color-white,
+ * and every other violet fill in the app now uses the same token
+ * (accentFill.contrast.test.ts guards them all): the brand violet
  * (#A0A8FF) is a light tint, so white-on-violet measures 2.2:1 and fails
  * WCAG 1.4.3 (4.5:1 required for normal-size text). #161312 on the same violet
  * measures 8.4:1. This follows the precedent already in the repo —
@@ -147,7 +161,7 @@
  * is current — in practice the hover one, i.e. the same 6.85:1. Both pass. */
 .dialog-btn-primary {
   background-color: var(--dialog-btn-primary-bg);
-  color: var(--color-brand-black);
+  color: var(--color-btn-primary-text);
   box-shadow: var(--shadow-sm);
 }
 
@@ -218,7 +232,9 @@
   width: 100%;
   padding: var(--space-6);
   background-color: var(--color-bg-input);
-  border: var(--border-width) solid var(--dialog-border);
+  /* --color-border-input, not a divider token: this boundary is the only thing
+     identifying the control (its fill matches the panel). SC 1.4.11 needs 3:1. */
+  border: var(--border-width) solid var(--color-border-input);
   border-radius: var(--border-radius);
   color: var(--dialog-text-secondary);
   font-size: var(--text-md);
@@ -229,11 +245,9 @@
   transition: all var(--transition-slow);
 }
 
-.dialog-input:focus {
-  outline: none;
-  border-color: var(--dialog-btn-primary-bg);
-  background-color: var(--color-bg-tertiary);
-  box-shadow: var(--shadow-focus);
+.dialog-input:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
 }
 
 .dialog-input::placeholder {
@@ -323,7 +337,7 @@
 
 .dialog-selected-text-label {
   font-size: var(--text-sm);
-  color: var(--color-text-muted);
+  color: var(--color-text-tertiary);
   text-transform: uppercase;
   letter-spacing: 0.8px;
   font-weight: var(--font-semibold);
@@ -359,8 +373,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
+  /* A 24 x 24 target (WCAG 2.2 SC 2.5.8, #96) with the 16px glyph centred in it:
+     the standard pairing on docs/design-system/system/components/icon. */
+  width: var(--btn-height-sm);
+  height: var(--btn-height-sm);
   color: var(--color-text-secondary);
   cursor: help;
   transition: color var(--transition-slow);
@@ -377,7 +393,7 @@
 }
 
 .dialog-info-icon:focus-visible {
-  outline: 2px solid var(--color-border-focus);
+  outline: var(--border-width-thick) solid var(--color-border-focus);
   outline-offset: var(--space-1);
 }
 
@@ -457,7 +473,7 @@
   justify-content: center;
   width: var(--dialog-icon-size);
   height: var(--dialog-icon-size);
-  border-radius: var(--dialog-icon-radius);
+  border-radius: var(--border-radius);
   background-color: var(--color-bg-hover);
   color: var(--dialog-text-secondary);
 }
@@ -494,7 +510,9 @@
   width: 100%;
   padding: var(--space-5) var(--space-6);
   background-color: var(--color-bg-input);
-  border: var(--border-width) solid var(--dialog-border);
+  /* --color-border-input, not a divider token: this boundary is the only thing
+     identifying the control (its fill matches the panel). SC 1.4.11 needs 3:1. */
+  border: var(--border-width) solid var(--color-border-input);
   border-radius: var(--border-radius);
   color: var(--dialog-text-secondary);
   font-size: var(--text-md);
@@ -502,11 +520,9 @@
   transition: all var(--transition-slow);
 }
 
-.dialog-rename-input:focus {
-  outline: none;
-  border-color: var(--dialog-btn-primary-bg);
-  background-color: var(--color-bg-tertiary);
-  box-shadow: var(--shadow-focus);
+.dialog-rename-input:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
 }
 
 .dialog-rename-input.error {
@@ -535,7 +551,9 @@
   padding: var(--space-5) var(--space-6);
   padding-right: var(--space-12); /* Extra space for custom arrow */
   background-color: var(--color-bg-input);
-  border: var(--border-width) solid var(--dialog-border);
+  /* --color-border-input, not a divider token: this boundary is the only thing
+     identifying the control (its fill matches the panel). SC 1.4.11 needs 3:1. */
+  border: var(--border-width) solid var(--color-border-input);
   border-radius: 0; /* UI Style Guide: no rounded corners */
   color: var(--color-text-primary);
   font-size: var(--text-md);
@@ -560,11 +578,9 @@
   background-color: var(--color-bg-tertiary);
 }
 
-.dialog-select:focus {
-  outline: none;
-  border-color: var(--color-border-focus);
-  background-color: var(--color-bg-tertiary);
-  box-shadow: var(--shadow-focus);
+.dialog-select:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
 }
 
 /* Style dropdown options */
@@ -623,10 +639,9 @@
   border-color: var(--color-border-default);
 }
 
-.dialog-drop-mode-btn:focus {
-  outline: none;
-  border-color: var(--color-border-focus);
-  box-shadow: var(--shadow-focus);
+.dialog-drop-mode-btn:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
 }
 
 /* Icon positioning in mode button */

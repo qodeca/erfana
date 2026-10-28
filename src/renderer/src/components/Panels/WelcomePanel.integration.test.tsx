@@ -189,11 +189,11 @@ describe('Recent Projects Integration', () => {
       render(<WelcomePanel {...mockDockviewProps} />)
 
       await waitFor(() => {
-        expect(screen.getAllByRole('button', { name: 'Remove from recent projects' })).toHaveLength(2)
+        expect(screen.getAllByRole('button', { name: /^Remove .+ from recent projects$/ })).toHaveLength(2)
       })
 
       // Remove first project
-      const removeButtons = screen.getAllByRole('button', { name: 'Remove from recent projects' })
+      const removeButtons = screen.getAllByRole('button', { name: /^Remove .+ from recent projects$/ })
       await user.click(removeButtons[0])
 
       await waitFor(() => {

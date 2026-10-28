@@ -6,7 +6,7 @@
  * mocked so the message contract, result handling, and the kill-on-timeout path
  * (the reason for isolation) are exercised without a real child.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
 import { DOCX_EXPORT } from '../../../shared/constants'
 
 const instances = vi.hoisted(() => {
@@ -34,8 +34,8 @@ vi.mock('../LoggingService', () => ({
 import { DocxConvertProcessAdapter } from './DocxConvertProcessAdapter'
 
 type MockChildInstance = {
-  postMessage: ReturnType<typeof vi.fn>
-  kill: ReturnType<typeof vi.fn>
+  postMessage: Mock
+  kill: Mock
   emit: (event: string, ...args: unknown[]) => boolean
 }
 

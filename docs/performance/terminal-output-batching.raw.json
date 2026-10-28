@@ -1,0 +1,218 @@
+[
+  {
+    "label": "after-r1",
+    "run": 1,
+    "bytes": 50000000,
+    "host": {
+      "platform": "darwin",
+      "arch": "arm64"
+    },
+    "ipcMessages": 1497,
+    "ipcChars": 75000011,
+    "meanCharsPerMessage": 50100,
+    "markerReceivedMs": 11977,
+    "markerParsedMs": 11981,
+    "longTasks": 0,
+    "longestTaskMs": 0,
+    "totalBlockingMs": 0,
+    "peakHeapMb": 58
+  },
+  {
+    "label": "after-r1",
+    "run": 2,
+    "bytes": 50000000,
+    "host": {
+      "platform": "darwin",
+      "arch": "arm64"
+    },
+    "ipcMessages": 1463,
+    "ipcChars": 75000018,
+    "meanCharsPerMessage": 51265,
+    "markerReceivedMs": 11707,
+    "markerParsedMs": 11773,
+    "longTasks": 0,
+    "longestTaskMs": 0,
+    "totalBlockingMs": 0,
+    "peakHeapMb": 48
+  },
+  {
+    "label": "after-r1",
+    "run": 3,
+    "bytes": 50000000,
+    "host": {
+      "platform": "darwin",
+      "arch": "arm64"
+    },
+    "ipcMessages": 1458,
+    "ipcChars": 75000019,
+    "meanCharsPerMessage": 51440,
+    "markerReceivedMs": 11666,
+    "markerParsedMs": 11755,
+    "longTasks": 0,
+    "longestTaskMs": 0,
+    "totalBlockingMs": 0,
+    "peakHeapMb": 58
+  },
+  {
+    "label": "after-r2",
+    "run": 1,
+    "bytes": 50000000,
+    "host": {
+      "platform": "darwin",
+      "arch": "arm64"
+    },
+    "ipcMessages": 1453,
+    "ipcChars": 75000019,
+    "meanCharsPerMessage": 51617,
+    "markerReceivedMs": 11617,
+    "markerParsedMs": 11661,
+    "longTasks": 0,
+    "longestTaskMs": 0,
+    "totalBlockingMs": 0,
+    "peakHeapMb": 58
+  },
+  {
+    "label": "after-r2",
+    "run": 2,
+    "bytes": 50000000,
+    "host": {
+      "platform": "darwin",
+      "arch": "arm64"
+    },
+    "ipcMessages": 1423,
+    "ipcChars": 75000019,
+    "meanCharsPerMessage": 52706,
+    "markerReceivedMs": 11386,
+    "markerParsedMs": 11453,
+    "longTasks": 0,
+    "longestTaskMs": 0,
+    "totalBlockingMs": 0,
+    "peakHeapMb": 58
+  },
+  {
+    "label": "after-r2",
+    "run": 3,
+    "bytes": 50000000,
+    "host": {
+      "platform": "darwin",
+      "arch": "arm64"
+    },
+    "ipcMessages": 1467,
+    "ipcChars": 75000019,
+    "meanCharsPerMessage": 51125,
+    "markerReceivedMs": 11737,
+    "markerParsedMs": 11756,
+    "longTasks": 0,
+    "longestTaskMs": 0,
+    "totalBlockingMs": 0,
+    "peakHeapMb": 51
+  },
+  {
+    "label": "before-r1",
+    "run": 1,
+    "bytes": 50000000,
+    "host": {
+      "platform": "darwin",
+      "arch": "arm64"
+    },
+    "ipcMessages": 568645,
+    "ipcChars": 75000019,
+    "meanCharsPerMessage": 132,
+    "markerReceivedMs": 13249,
+    "markerParsedMs": 13337,
+    "longTasks": 0,
+    "longestTaskMs": 0,
+    "totalBlockingMs": 0,
+    "peakHeapMb": 54
+  },
+  {
+    "label": "before-r1",
+    "run": 2,
+    "bytes": 50000000,
+    "host": {
+      "platform": "darwin",
+      "arch": "arm64"
+    },
+    "ipcMessages": 561214,
+    "ipcChars": 75000018,
+    "meanCharsPerMessage": 134,
+    "markerReceivedMs": 13177,
+    "markerParsedMs": 13233,
+    "longTasks": 0,
+    "longestTaskMs": 0,
+    "totalBlockingMs": 0,
+    "peakHeapMb": 61
+  },
+  {
+    "label": "before-r1",
+    "run": 3,
+    "bytes": 50000000,
+    "host": {
+      "platform": "darwin",
+      "arch": "arm64"
+    },
+    "ipcMessages": 561454,
+    "ipcChars": 75000020,
+    "meanCharsPerMessage": 134,
+    "markerReceivedMs": 12907,
+    "markerParsedMs": 12985,
+    "longTasks": 0,
+    "longestTaskMs": 0,
+    "totalBlockingMs": 0,
+    "peakHeapMb": 54
+  },
+  {
+    "label": "before-r2",
+    "run": 1,
+    "bytes": 50000000,
+    "host": {
+      "platform": "darwin",
+      "arch": "arm64"
+    },
+    "ipcMessages": 559287,
+    "ipcChars": 75000018,
+    "meanCharsPerMessage": 134,
+    "markerReceivedMs": 12303,
+    "markerParsedMs": 12372,
+    "longTasks": 0,
+    "longestTaskMs": 0,
+    "totalBlockingMs": 0,
+    "peakHeapMb": 61
+  },
+  {
+    "label": "before-r2",
+    "run": 2,
+    "bytes": 50000000,
+    "host": {
+      "platform": "darwin",
+      "arch": "arm64"
+    },
+    "ipcMessages": 553403,
+    "ipcChars": 75000018,
+    "meanCharsPerMessage": 136,
+    "markerReceivedMs": 12287,
+    "markerParsedMs": 12386,
+    "longTasks": 0,
+    "longestTaskMs": 0,
+    "totalBlockingMs": 0,
+    "peakHeapMb": 58
+  },
+  {
+    "label": "before-r2",
+    "run": 3,
+    "bytes": 50000000,
+    "host": {
+      "platform": "darwin",
+      "arch": "arm64"
+    },
+    "ipcMessages": 551407,
+    "ipcChars": 75000018,
+    "meanCharsPerMessage": 136,
+    "markerReceivedMs": 12331,
+    "markerParsedMs": 12368,
+    "longTasks": 0,
+    "longestTaskMs": 0,
+    "totalBlockingMs": 0,
+    "peakHeapMb": 61
+  }
+]

@@ -13,7 +13,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-import { acquireFileWatch, createFileWatchSlot, releaseFileWatch } from './fileWatchSlot'
+import { acquireFileWatch, createFileWatchSlot, forgetFileWatch, releaseFileWatch } from './fileWatchSlot'
 
 const PATH = '/proj/icon.png'
 
@@ -137,6 +137,39 @@ describe('fileWatchSlot', () => {
 
       expect(second.started).toBe(true)
       expect(start).toHaveBeenCalledTimes(2)
+    })
+  })
+
+  // The main process ends a watch itself when it reports the file deleted (#252)
+  describe('forgetFileWatch', () => {
+    it('lets go of the hold without a stop, so the next acquire starts afresh', async () => {
+      const slot = createFileWatchSlot()
+      await acquireFileWatch(slot, PATH)
+
+      forgetFileWatch(slot)
+      await releaseFileWatch(slot, PATH)
+      const again = await acquireFileWatch(slot, PATH)
+
+      expect(stop).not.toHaveBeenCalled()
+      expect(again.started).toBe(true)
+      expect(start).toHaveBeenCalledTimes(2)
+    })
+
+    it('lets an acquire still in flight keep the new count it gets', async () => {
+      // Forgetting records what main did when it sent the delete; a start it
+      // answers afterwards made a fresh entry, which this slot then holds
+      let answerStart: (value: { success: boolean }) => void = () => {}
+      start.mockImplementationOnce(() => new Promise((resolve) => (answerStart = resolve)))
+      const slot = createFileWatchSlot()
+      const acquired = acquireFileWatch(slot, PATH)
+      await vi.waitFor(() => expect(start).toHaveBeenCalledTimes(1))
+
+      forgetFileWatch(slot)
+      answerStart({ success: true })
+      await acquired
+      await releaseFileWatch(slot, PATH)
+
+      expect(stop).toHaveBeenCalledTimes(1)
     })
   })
 })

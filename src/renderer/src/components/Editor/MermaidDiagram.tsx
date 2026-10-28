@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { useEffect, useRef, useState } from 'react'
+import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import mermaid from 'mermaid'
 import { Bug } from 'lucide-react'
 import { executePromptTemplate } from '../../utils/panelUtils'
@@ -11,6 +11,17 @@ import { useDiagramViewerStore, buildDiagramId, hashDiagramContent } from '../..
 import { useTerminalPortalOptional } from '../../context/TerminalPortalContext'
 import { scheduleScrollIfNeeded } from '../../utils/promptScrollScheduler.logic'
 import { logger } from '../../utils/logger'
+import { useIdleDebouncedValue } from '../../hooks/useIdleDebouncedValue'
+import { useLatestRef } from '../../hooks/useLatestRef'
+import { PreviewWorkContext } from './previewWork'
+
+/**
+ * Quiet period (ms) after the diagram source last changed before it is redrawn.
+ * `mermaid.render` costs tens of milliseconds per diagram, and a diagram being
+ * typed is invalid most of the time, so redrawing per keystroke both stalls
+ * typing and flashes the error panel. The first draw is never delayed.
+ */
+export const MERMAID_IDLE_DELAY_MS = 300
 
 interface MermaidDiagramProps {
   code: string
@@ -20,11 +31,48 @@ interface MermaidDiagramProps {
   endLine?: number
 }
 
-export function MermaidDiagram({ code, className = '', filePath, startLine, endLine }: MermaidDiagramProps) {
+export function MermaidDiagram({
+  code: sourceCode,
+  className = '',
+  filePath,
+  startLine: sourceStartLine,
+  endLine: sourceEndLine
+}: MermaidDiagramProps) {
+  // Everything below – the drawing, the viewer identity, bug reports – works on
+  // the debounced source. Code and line range are debounced as ONE value, so the
+  // SVG, the code it is reported with and the lines it claims always match.
+  const source = useMemo(
+    () => ({ code: sourceCode, startLine: sourceStartLine, endLine: sourceEndLine }),
+    [sourceCode, sourceStartLine, sourceEndLine]
+  )
+  const { value: released, flush } = useIdleDebouncedValue(source, { delayMs: MERMAID_IDLE_DELAY_MS })
+  const { code, startLine, endLine } = released
+  const { tracker, flushEpoch } = useContext(PreviewWorkContext)
+
+  // The source this diagram last finished drawing (or failing to draw); null
+  // before the first draw. While it differs from the live source the diagram
+  // is "busy" – the preview's flush() waits for that (PDF / DOCX export).
+  const [drawnCode, setDrawnCode] = useState<string | null>(null)
+  const isBusy = drawnCode !== sourceCode
+  // Layout effect: registered before the preview body's own commit callback
+  // runs, so a flush waiting on that commit already sees this diagram as busy.
+  useLayoutEffect(() => {
+    if (!isBusy || !tracker) return
+    return tracker.begin()
+  }, [isBusy, tracker])
+
+  // A preview flush releases a held-back redraw at once.
+  useEffect(() => {
+    if (flushEpoch > 0) flush()
+  }, [flushEpoch, flush])
+
+  // Each draw takes a token; an async draw that finishes after a newer one
+  // started must not overwrite it.
+  const drawTokenRef = useRef(0)
+
   const containerRef = useRef<HTMLDivElement>(null)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [initialized, setInitialized] = useState(false)
   const [svgContent, setSvgContent] = useState<string>('')
 
   // Store for persisting viewer state across component remounts
@@ -71,6 +119,11 @@ export function MermaidDiagram({ code, className = '', filePath, startLine, endL
   })()
 
   // Handle bug report button click
+  const openMermaidDocs = (e: React.MouseEvent): void => {
+    e.preventDefault()
+    window.electron.shell.openExternal('https://mermaid.js.org/')
+  }
+
   const handleBugReport = async () => {
     if (!error || !filePath) return
 
@@ -113,18 +166,26 @@ export function MermaidDiagram({ code, className = '', filePath, startLine, endL
     }
   }
 
-  // Initialize mermaid with built-in theme
+  // Initialize mermaid with built-in theme. Declared before the draw effect on
+  // purpose: a component's effects run in declaration order, so the first draw
+  // (same commit) always follows this call – no "initialized" flag needed.
   useEffect(() => {
     const config = getMermaidConfig(true) // isDarkMode param ignored, uses ACTIVE_THEME
     mermaid.initialize(config)
-    setInitialized(true)
   }, [])
 
   // Render diagram whenever code changes
+  // The line range only labels the 'mermaid:rendered' event: read it through a
+  // ref so a range shift (an edit above the diagram) does not redraw it.
+  const lineRangeRef = useLatestRef({ startLine, endLine })
   useEffect(() => {
-    if (!initialized || !containerRef.current) {
+    if (!containerRef.current) {
       return
     }
+    const { startLine: drawStartLine, endLine: drawEndLine } = lineRangeRef.current
+
+    const token = ++drawTokenRef.current
+    const isCurrent = (): boolean => token === drawTokenRef.current
 
     const renderDiagram = async () => {
       try {
@@ -136,6 +197,7 @@ export function MermaidDiagram({ code, className = '', filePath, startLine, endL
 
         // Render diagram using mermaid v11 API
         const { svg } = await mermaid.render(id, code)
+        if (!isCurrent()) return
 
         if (containerRef.current) {
           // ⚠️  DO NOT ADD SVG SANITIZATION HERE (e.g., DOMPurify)
@@ -160,6 +222,7 @@ export function MermaidDiagram({ code, className = '', filePath, startLine, endL
         }
 
         setIsLoading(false)
+        setDrawnCode(code)
 
         // Dispatch a custom event to inform preview that mermaid finished rendering
         // Bubble so listeners on preview container can catch it
@@ -167,11 +230,13 @@ export function MermaidDiagram({ code, className = '', filePath, startLine, endL
         if (target) {
           const event = new CustomEvent('mermaid:rendered', {
             bubbles: true,
-            detail: { startLine, endLine, ok: true }
+            detail: { startLine: drawStartLine, endLine: drawEndLine, ok: true }
           })
           target.dispatchEvent(event)
         }
       } catch (err) {
+        // A newer draw has started; its outcome is the one to show.
+        if (!isCurrent()) return
         logger.error('Mermaid rendering error', err instanceof Error ? err : undefined)
         const errorMessage = err instanceof Error ? err.message : 'Failed to render diagram'
         // Clean up error message - remove technical details
@@ -181,12 +246,13 @@ export function MermaidDiagram({ code, className = '', filePath, startLine, endL
           .trim()
         setError(cleanMessage)
         setIsLoading(false)
+        setDrawnCode(code)
 
         // Notify listeners even on error so scroll map can stabilize
         if (containerRef.current) {
           const event = new CustomEvent('mermaid:rendered', {
             bubbles: true,
-            detail: { startLine, endLine, ok: false }
+            detail: { startLine: drawStartLine, endLine: drawEndLine, ok: false }
           })
           containerRef.current.dispatchEvent(event)
         }
@@ -194,7 +260,7 @@ export function MermaidDiagram({ code, className = '', filePath, startLine, endL
     }
 
     renderDiagram()
-  }, [code, initialized])
+  }, [code, lineRangeRef])
 
   const handleExpandClick = () => {
     if (svgContent && filePath) {
@@ -244,9 +310,9 @@ export function MermaidDiagram({ code, className = '', filePath, startLine, endL
             Check your diagram syntax. See{' '}
             <a
               href="https://mermaid.js.org/"
-              onClick={(e) => {
-                e.preventDefault()
-                window.electron.shell.openExternal('https://mermaid.js.org/')
+              onClick={openMermaidDocs}
+              onAuxClick={(e) => {
+                if (e.button === 1) openMermaidDocs(e)
               }}
             >
               Mermaid documentation

@@ -1,187 +1,42 @@
 # UI Style Guide - Reference
 
 > **Part of**: [UI Style Guide](./ui-style-guide.md)
-> **Contents**: Component patterns, z-index scale, transitions, migration guide
+> **Contents**: Component patterns, z-index scale, transitions, token gotchas
+
+> **The patterns have moved to [`docs/design-system/`](design-system/index.html).** Component
+> patterns, the z-index scale and the transition scale are now decided by cards
+> that render them live. The sections below are stubs that keep their headings so
+> existing links resolve.
+>
+> What is left is a short list of **token gotchas** from the v0.5.3 token
+> migration.
 
 ---
 
 ## Component Patterns
 
-### Buttons
-
-```css
-/* Base button */
-.btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: var(--btn-height-md);           /* 32px */
-  padding: 0 var(--space-12);             /* 0 24px */
-  font-size: var(--text-md);              /* 14px */
-  font-weight: var(--font-semibold);      /* 600 */
-  border: none;
-  border-radius: var(--border-radius);    /* 0 */
-  cursor: pointer;
-  transition: var(--transition-normal);   /* 0.15s ease */
-}
-
-/* Primary button.
- * Foreground is the brand black, NOT white: the brand violet is a light tint,
- * so white-on-violet measures 2.2:1 and fails WCAG 1.4.3 (4.5:1 needed).
- * #161312 on the same violet measures 8.4:1. Matches `.dialog-btn-primary`. */
-.btn-primary {
-  background: var(--color-btn-primary-bg);
-  color: var(--color-brand-black);
-  box-shadow: var(--shadow-sm);
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: var(--color-btn-primary-hover);
-}
-
-/* Secondary button */
-.btn-secondary {
-  background: transparent;
-  color: var(--color-text-secondary);
-  border: var(--border-width) solid var(--color-border-default);
-}
-
-.btn-secondary:hover:not(:disabled) {
-  background: var(--color-btn-secondary-bg);
-}
-```
-
-### Inputs
-
-```css
-.input {
-  width: 100%;
-  height: var(--input-height-md);         /* 36px */
-  padding: 0 var(--space-6);              /* 0 12px */
-  font-size: var(--text-md);              /* 14px */
-  font-family: var(--font-sans);
-  color: var(--color-text-primary);
-  background: var(--color-bg-input);
-  border: var(--border-width) solid var(--color-border-default);
-  border-radius: var(--border-radius);    /* 0 */
-  transition: var(--transition-normal);
-}
-
-.input:focus {
-  outline: none;
-  border-color: var(--color-border-focus);
-  box-shadow: var(--shadow-focus);
-}
-
-.input::placeholder {
-  color: var(--color-text-placeholder);
-}
-```
-
-### Dialogs
-
-```css
-.dialog-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.75);
-  z-index: var(--z-dialog);
-}
-
-.dialog {
-  background: var(--color-bg-primary);
-  border: var(--border-width) solid var(--color-border-default);
-  border-radius: var(--border-radius);    /* 0 */
-  padding: var(--space-14);               /* 28px */
-  min-width: var(--dialog-min-width);     /* 400px */
-  max-width: var(--dialog-max-width);     /* 800px */
-  box-shadow: var(--shadow-dialog);
-}
-```
-
-### Tooltips
-
-```css
-.tooltip {
-  padding: var(--space-4) var(--space-6);  /* 8px 12px */
-  font-size: var(--text-sm);               /* 11px */
-  background: var(--color-bg-elevated);
-  border: var(--border-width) solid var(--color-border-default);
-  border-radius: var(--border-radius);     /* 0 */
-  box-shadow: var(--shadow-md);
-  z-index: var(--z-tooltip);
-}
-```
-
----
+> **Decided by [`docs/design-system/system/components/button/index.html`](design-system/system/components/button/index.html).** Buttons, inputs and dialogs, each rendered live with every state. See also the Form controls and Permission band cards.
+>
+> This section is a stub. It keeps its heading so existing links still
+> resolve, and it holds no rule, so it cannot contradict the card.
 
 ## Z-Index Scale
 
-Use these tokens for proper layer stacking:
-
-| Token | Value | Usage |
-|-------|-------|-------|
-| `--z-base` | 0 | Default layer |
-| `--z-dropdown` | 100 | Dropdown menus |
-| `--z-sticky` | 200 | Sticky headers |
-| `--z-fixed` | 500 | Fixed elements |
-| `--z-modal-backdrop` | 900 | Modal backdrops |
-| `--z-modal` | 1000 | Modals, overlays |
-| `--z-popover` | 2000 | Popovers |
-| `--z-tooltip` | 3000 | Tooltips |
-| `--z-toast` | 9000 | Toast notifications |
-| `--z-blocker` | 9999 | UI blockers |
-| `--z-dialog` | 10000 | Top-level dialogs |
-| `--z-context-menu` | 100000 | Context menus (above dialogs) |
-
----
+> **Decided by [`docs/design-system/system/foundations/layering.html`](design-system/system/foundations/layering.html).** The ladder, plus the rung above it that no z-index can reach - the native preview view.
+>
+> This section is a stub. It keeps its heading so existing links still
+> resolve, and it holds no rule, so it cannot contradict the card.
 
 ## Transitions & Animations
 
-**Always use `--transition-normal` (0.15s ease)** unless there's a specific reason.
-
-| Token | Duration | Usage |
-|-------|----------|-------|
-| `--transition-fast` | 0.1s ease | Quick feedback (hover colors) |
-| `--transition-normal` | **0.15s ease** | Default for everything |
-| `--transition-slow` | 0.2s ease | Larger elements, dialogs |
-| `--transition-slower` | 0.3s ease | Complex animations |
-
-```css
-/* Good - uses token */
-transition: var(--transition-normal);
-
-/* Also good - specific properties */
-transition: background-color var(--transition-normal),
-            color var(--transition-normal);
-
-/* Bad - hardcoded */
-transition: all 0.2s ease-in-out;
-```
-
----
+> **Decided by [`docs/design-system/system/foundations/motion.html`](design-system/system/foundations/motion.html).** The duration scale, the missing easing scale, one spinner, and the reduced-motion contract.
+>
+> This section is a stub. It keeps its heading so existing links still
+> resolve, and it holds no rule, so it cannot contradict the card.
 
 ## Migration Guide
 
-As of v0.5.3, **all CSS files have been migrated** to use design tokens.
-
-### Find-Replace Patterns
-
-| Old Value | New Token | Context |
-|-----------|-----------|---------|
-| `#cccccc` | `var(--color-text-primary)` | Text color |
-| `#858585` | `var(--color-text-secondary)` | Muted text |
-| `#1e1e1e` | `var(--color-bg-primary)` | Main background (now Smoky Black) |
-| `#2d2d30` | `var(--color-bg-secondary)` | Panel background |
-| `#252526` | `var(--color-bg-tertiary)` | Sidebar background |
-| `#3c3c3c` | `var(--color-border-default)` | Standard borders |
-| `#454545` | `var(--color-border-subtle)` | Subtle borders |
-| `#007fd4` | `var(--color-accent-primary)` | Old VS Code blue → now Qodeca Violet |
-| `#A0A8FF` | `var(--color-accent-primary)` | Qodeca Violet (current) |
-| `#E3E829` | `var(--color-accent-secondary)` | Qodeca Lime |
-| `#0e639c` | `var(--color-btn-primary-bg)` | Primary button (now Qodeca Violet) |
-| `0.15s ease` | `var(--transition-normal)` | Transitions |
-| `border-radius: 4px` | `border-radius: var(--border-radius)` | Remove rounding |
+As of v0.5.3, all CSS files use design tokens. The find-and-replace table from that migration was removed as a record of finished work; the gotchas below still apply.
 
 ### Common Gotchas
 

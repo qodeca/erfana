@@ -20,23 +20,13 @@ import {
   showSuccessToast,
   showInfoToast
 } from '../../../../utils/toastHelpers'
-import { escapePathForShell, type ShellKind } from '../../../../utils/shellPathEscape'
+import { escapePathForShell, platformDefaultShellKind, type ShellKind } from '../../../../utils/shellPathEscape'
 import { getBasename } from '../../../../utils/fileUtils'
 import { isMacOS } from '../../../../utils/platform'
 import { logger } from '../../../../utils/logger'
 import type { ScreenRecordingPermission } from '../../../../../../shared/ipc/screenshot-schema'
 import type { ScreenshotCaptureMode, DisplayInfo, WindowSource } from '../types'
-
-/**
- * Platform default quoting flavour, used when no terminal is active yet or
- * when the shellKind ref hasn't been populated. Windows defaults to
- * `'powershell'` because PowerShell is the modern default shell on Windows
- * 10+ (#164 round-2 F#30 — pre-round-2 this defaulted to `'cmd'` which
- * mis-quotes paths for the dominant shell).
- */
-function platformDefaultShellKind(): ShellKind {
-  return window.api.utils.getPlatform() === 'win32' ? 'powershell' : 'posix'
-}
+import { terminalGateway } from '../../../../services/terminalGateway'
 
 /**
  * Configuration options for the useScreenshotCapture hook.
@@ -296,7 +286,7 @@ export function useScreenshotCapture(
         // mid-restart race) fall back to the platform default.
         const shellKind = shellKindRef.current ?? platformDefaultShellKind()
         const quotedPath = escapePathForShell(result.filePath, shellKind)
-        await window.api.terminal.write(currentTerminalId, quotedPath)
+        await terminalGateway.write(currentTerminalId, quotedPath)
 
         const filename = getBasename(result.filePath) || 'screenshot.png'
         showSuccessToast('Screenshot captured', filename)

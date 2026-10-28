@@ -7,6 +7,7 @@ import { PreviewContextMenu } from './PreviewContextMenu'
 import { DialogProvider } from '../Dialog'
 import * as panelUtils from '../../utils/panelUtils'
 import * as DialogModule from '../Dialog'
+import type { DialogContextType } from '../Dialog/types'
 
 // Mock logger
 const { mockLogger } = vi.hoisted(() => ({
@@ -76,11 +77,12 @@ describe('PreviewContextMenu Component', () => {
     vi.spyOn(panelUtils, 'executePromptTemplate').mockResolvedValue({ success: true })
 
     // Mock useDialog hook
+    // The menu reaches only these three; the rest of the context is never called.
     vi.spyOn(DialogModule, 'useDialog').mockReturnValue({
       showConfirm: vi.fn(),
       showPrompt: mockShowPrompt,
       showAlert: vi.fn()
-    })
+    } as Partial<DialogContextType> as DialogContextType)
 
     // Create portal-root div for ContextMenu (uses createPortal)
     const portalRoot = document.createElement('div')
@@ -226,7 +228,7 @@ describe('PreviewContextMenu Component', () => {
       await user.click(askBtn)
 
       await waitFor(() => {
-        expect(mockReadFile).toHaveBeenCalledWith('/test/document.md')
+        expect(mockReadFile).toHaveBeenCalledWith({ filePath: '/test/document.md' })
       })
 
       // showPrompt should receive source lines in selectedText (2-4)

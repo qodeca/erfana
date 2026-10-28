@@ -1,19 +1,19 @@
 # Prompt Templates
 
-Dynamic, extensible AI prompts for context menu actions using YAML frontmatter + XML-structured content with Handlebars interpolation.
+Dynamic, extensible prompt templates for the CLI agent in the terminal, sent from context menu actions, using YAML frontmatter + XML-structured content with Handlebars interpolation.
 
 ## Overview
 
 **Location:** `src/renderer/src/prompts/`
 
-The template system enables AI-powered text operations through right-click context menus in markdown preview and editor.
+Prompt templates send the selected text, with instructions, to the CLI agent running in the terminal, from right-click context menus in the markdown preview and editor.
 
 ## Quick Start
 
 1. Right-click selected text in preview or editor
 2. Choose action: **Explain**, **Modify**, **Ask**, **Visualize**, or custom template
 3. Prompt sent to Terminal panel
-4. Review/edit before execution (unless auto-execute enabled)
+4. The prompt runs immediately: every shipped template sets `autoExecute: true`, so Erfana pastes it into the terminal and presses Enter
 
 Templates split into two categories: **read-only** prompts (Explain, Ask, Prompt) produce a terminal response and leave the document untouched, and **mutation** prompts (Modify, Visualize, the three Mermaid templates) edit the file in place via the CLI agent's Edit tool — see [Mutation prompts and the apply-to-document footer](#mutation-prompts-and-the-apply-to-document-footer) (v0.10.0).
 
@@ -40,6 +40,9 @@ prompts/
 ├── helpers.ts       # Template helpers
 ├── applyFooter.ts   # Canonical apply-to-document footer (v0.10.0)
 ├── validation.ts    # Per-template variable requirements
+├── executionQueue.ts # FIFO execution queue – serialises concurrent prompt runs
+├── observability.ts # Optional execution tracing (timing, success/failure logs)
+├── variableFactory.ts # Builds PromptVariables with consistent defaults and computed fields
 └── types.ts         # TypeScript types
 ```
 
@@ -101,29 +104,38 @@ Templates can include thinking triggers for Claude Code to enable deeper analysi
 | "ultrathink" | ~32,000 | Very complex problems |
 
 **Applied in templates:**
-- `explain.md`: "Think about the content..."
-- `ask.md`: "Think about the question..."
-- `visualize.md`: "Think hard about how to best represent..."
+- `ask.md` and `editor-ask.md`: "Think about the question..."
+- `visualize.md` and `editor-visualize.md`: "Think hard about how to best represent..."
 
 ## Available Templates
 
 A `Mutates?` column flags templates that set `mutatesDocument: true` and apply their result to the file in place. Read-only templates produce a terminal response only.
 
-### Preview context menu (area: markdown-preview)
+### Markdown preview (area: markdown-preview)
+
+| Template | Sub-area | Registry id | Purpose | Input Required | Mutates? |
+|----------|----------|-------------|---------|----------------|----------|
+| `explain.md` | `context-menu` | `explain` | Explain selected text | No | No |
+| `modify.md` | `context-menu` | `modify` | Apply modifications | Yes (instruction) | Yes – replace selection |
+| `ask.md` | `context-menu` | `ask` | Answer questions | Yes (question) | No |
+| `visualize.md` | `context-menu` | `visualize` | Generate Mermaid diagrams | Yes (diagram type dropdown) | Yes – insert after selection |
+| `prompt.md` | `context-menu` | `prompt` | Generic prompt | Yes (instruction) | No |
+| `mermaid-bug-report.md` | `mermaid-error` | `mermaid-bug-report` | Fix syntax errors | No | Yes – edit diagram in place |
+| `mermaid-change-direction.md` | `mermaid-direction` | `change-mermaid-direction` | Change diagram direction | No | Yes – replace direction keyword |
+
+### Diagram viewer (area: diagram-viewer)
+
+| Template | Sub-area | Registry id | Purpose | Input Required | Mutates? |
+|----------|----------|-------------|---------|----------------|----------|
+| `mermaid-chat.md` | `chat` | `diagram-chat` | Modify diagrams | Yes (instruction) | Yes – edit diagram in place |
+
+### Global (area: global)
 
 | Template | Registry id | Purpose | Input Required | Mutates? |
 |----------|-------------|---------|----------------|----------|
-| `explain.md` | `explain` | Explain selected text | No | No |
-| `modify.md` | `modify` | Apply modifications | Yes (instruction) | Yes — replace selection |
-| `ask.md` | `ask` | Answer questions | Yes (question) | No |
-| `visualize.md` | `visualize` | Generate Mermaid diagrams | Yes (diagram type dropdown) | Yes — insert after selection |
-| `prompt.md` | `prompt` | Generic prompt | Yes (instruction) | No |
-| `mermaid-chat.md` | `diagram-chat` | Modify diagrams | Yes (instruction) | Yes — edit diagram in place |
-| `mermaid-bug-report.md` | `mermaid-bug-report` | Fix syntax errors | No | Yes — edit diagram in place |
-| `mermaid-change-direction.md` | `change-mermaid-direction` | Change diagram direction | No | Yes — replace direction keyword |
 | `organize-import.md` | `organize-import` | Organize imported files | No | No (interactive move/rename) |
 
-> The id is derived from `frontmatter.id || slugify(name)` in `parser.ts:72`. Filenames are not the IDs — `mermaid-chat.md` registers as `diagram-chat`, `mermaid-change-direction.md` as `change-mermaid-direction`. Call sites and tests must key off the IDs.
+> The id is derived from `frontmatter.id || slugify(name)` in `parser.ts` (`parseTemplate`). Filenames are not the IDs – `mermaid-chat.md` registers as `diagram-chat`, `mermaid-change-direction.md` as `change-mermaid-direction`. Call sites and tests must key off the IDs.
 
 ### Editor context menu (area: code-editor) - v0.6.4-beta
 
@@ -191,8 +203,8 @@ Introduced in v0.10.0. Mutation templates set `mutatesDocument: true` in their f
 ## Target Behavior
 
 All templates target Terminal panel:
-- `sendDirectly: false` - User can edit before running
-- `autoExecute: true` - Auto-press Enter after paste
+- `sendDirectly: false` (the default in every template; the terminal path does not act on it)
+- `autoExecute: true` - the prompt is pasted and Enter is pressed after 200 ms
 - `mutatesDocument: false` (default) — read-only prompt; **true** composes the apply-footer (v0.10.0)
 - **Auto-scroll (v0.5.4)** - Terminal scrolls to bottom 1 second after execution
 

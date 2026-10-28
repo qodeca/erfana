@@ -12,29 +12,41 @@
  *
  * `setBounds` / `setVisibility` are high-frequency fire-and-forget `send`s
  * (`ipcMain.on`); the rest are `invoke` round-trips (`ipcMain.handle`).
+ * `setBounds` runs once per frame while a panel moves, so its three drops go
+ * through one rate-capped drop reporter rather than one line each (issue #124,
+ * M1–M3, part 1 §1.2).
  *
  * Trust model: the project path is resolved main-side (`getProjectPath`); the
  * host `BrowserWindow` comes from the trusted sender, never from the payload.
  *
  * @see docs/designs/sd-074-html-preview.md §4.3, §5(a)
  */
-import { ipcMain, BrowserWindow, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron'
+import { BrowserWindow, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron'
 import {
+  PanelIdSchema,
   PreviewCheckEligibilityRequestSchema,
   PreviewOpenRequestSchema,
   PreviewPanelRequestSchema,
   PreviewSetBoundsSchema,
   PreviewSetVisibilitySchema,
   PreviewReloadRequestSchema,
-  type PreviewCheckEligibilityResponse
+  type PreviewCheckEligibilityResponse,
+  type PreviewSetBounds
 } from '../../../shared/ipc/preview-schema'
+import type { BoundsDrop } from '../../../shared/dropReporter'
 import { PreviewChannels } from '../../../shared/ipc/preview-channels'
 import { ErrorCode } from '../../../shared/errors'
 import type { PreviewOpenResult } from '../../../shared/ipc/preview-types'
 import type { IPreviewViewService, PreviewOpenRequest } from '../../services/preview/PreviewViewService'
 import type { PreviewWindowLike } from '../../services/preview/PreviewViewService'
 import type { IPreviewEligibilityService } from '../../services/preview/PreviewEligibilityService'
+import {
+  SET_BOUNDS_DROP_REASON,
+  createMainDropReporter
+} from '../../services/preview/previewBoundsDropLog'
 import { logger } from '../../services/LoggingService'
+import { redactedLogError } from '../../utils/redactUserInput'
+import { registerHandle, registerOn, unregisterHandle, unregisterOn } from '../registry'
 
 /** The lifecycle service surface (a slice of {@link IPreviewViewService}). */
 export type PreviewLifecycleService = Pick<
@@ -51,6 +63,17 @@ export interface PreviewLifecycleHandlerDeps {
   readonly isTrustedSender: (event: IpcMainInvokeEvent | IpcMainEvent) => boolean
   /** Resolve the host window from the sender; defaults to `BrowserWindow.fromWebContents`. */
   readonly resolveWindow?: (event: IpcMainInvokeEvent) => PreviewWindowLike | null
+  /** Milliseconds for the setBounds drop log's rate cap; defaults to a monotonic clock. */
+  readonly now?: () => number
+}
+
+/** The push's panel id when that one field is valid, so a malformed push still names its panel. */
+function validPanelId(arg: unknown): string | undefined {
+  if (typeof arg !== 'object' || arg === null) {
+    return undefined
+  }
+  const parsed = PanelIdSchema.safeParse((arg as { panelId?: unknown }).panelId)
+  return parsed.success ? parsed.data : undefined
 }
 
 /**
@@ -71,11 +94,12 @@ export function registerPreviewLifecycleHandlers(
     if (isTrustedSender(event)) {
       return false
     }
-    logger.warn(`Rejected ${channel} from untrusted sender`, { url: event.senderFrame?.url })
+    // No sender URL in the line: main's drop lines carry fixed fields only.
+    logger.warn(`Rejected ${channel} from untrusted sender`)
     return true
   }
 
-  ipcMain.handle(
+  registerHandle(
     PreviewChannels.CHECK_ELIGIBILITY,
     async (event, arg: unknown): Promise<PreviewCheckEligibilityResponse> => {
       if (rejectUntrusted(PreviewChannels.CHECK_ELIGIBILITY, event)) {
@@ -96,16 +120,13 @@ export function registerPreviewLifecycleHandlers(
         const verdict = await eligibility.check(parsed.data.filePath, projectPath)
         return verdict.eligible ? { eligible: true } : { eligible: false, reason: verdict.reason }
       } catch (error) {
-        logger.error(
-          'preview:checkEligibility failed',
-          error instanceof Error ? error : undefined
-        )
+        logger.error('preview:checkEligibility failed', redactedLogError(error))
         return { eligible: false, reason: 'not-html' }
       }
     }
   )
 
-  ipcMain.handle(
+  registerHandle(
     PreviewChannels.OPEN,
     async (event, arg: unknown): Promise<PreviewOpenResult> => {
       if (rejectUntrusted(PreviewChannels.OPEN, event)) {
@@ -117,7 +138,7 @@ export function registerPreviewLifecycleHandlers(
           logger.warn('Rejected preview:open with invalid payload', {
             error: parsed.error.message
           })
-          return { ok: false, errorCode: ErrorCode.UNKNOWN_ERROR }
+          return { ok: false, errorCode: ErrorCode.PREVIEW_OPEN_INVALID_REQUEST }
         }
         const window = resolveWindow(event)
         if (window === null) {
@@ -130,13 +151,13 @@ export function registerPreviewLifecycleHandlers(
         }
         return await service.open(req, window)
       } catch (error) {
-        logger.error('preview:open failed', error instanceof Error ? error : undefined)
+        logger.error('preview:open failed', redactedLogError(error))
         return { ok: false, errorCode: ErrorCode.UNKNOWN_ERROR }
       }
     }
   )
 
-  ipcMain.handle(PreviewChannels.CLOSE, async (event, arg: unknown): Promise<void> => {
+  registerHandle(PreviewChannels.CLOSE, async (event, arg: unknown): Promise<void> => {
     if (rejectUntrusted(PreviewChannels.CLOSE, event)) {
       return
     }
@@ -150,11 +171,11 @@ export function registerPreviewLifecycleHandlers(
       }
       await service.close(parsed.data.panelId)
     } catch (error) {
-      logger.error('preview:close failed', error instanceof Error ? error : undefined)
+      logger.error('preview:close failed', redactedLogError(error))
     }
   })
 
-  ipcMain.handle(PreviewChannels.RELOAD, async (event, arg: unknown): Promise<void> => {
+  registerHandle(PreviewChannels.RELOAD, async (event, arg: unknown): Promise<void> => {
     if (rejectUntrusted(PreviewChannels.RELOAD, event)) {
       return
     }
@@ -168,25 +189,54 @@ export function registerPreviewLifecycleHandlers(
       }
       await service.reload(parsed.data.panelId, { ignoreCache: parsed.data.ignoreCache })
     } catch (error) {
-      logger.error('preview:reload failed', error instanceof Error ? error : undefined)
+      logger.error('preview:reload failed', redactedLogError(error))
     }
   })
 
+  // One reporter per registration: the channel is one scope (M1–M3).
+  let thrown: Error | undefined
+  const boundsDrops = createMainDropReporter({ now: deps.now, errorOf: () => thrown })
+  const reportBoundsDrop = (drop: BoundsDrop, error?: unknown): void => {
+    // A Node error quotes the path it failed on; the logged copy has it cut.
+    thrown = redactedLogError(error)
+    try {
+      boundsDrops.report(drop)
+    } finally {
+      thrown = undefined
+    }
+  }
+
   const onSetBounds = (event: IpcMainEvent, arg: unknown): void => {
-    if (rejectUntrusted(PreviewChannels.SET_BOUNDS, event)) {
+    if (!isTrustedSender(event)) {
+      reportBoundsDrop({ reason: SET_BOUNDS_DROP_REASON.untrustedSender, level: 'warn' })
       return
     }
+    let push: PreviewSetBounds | undefined
     try {
       const parsed = PreviewSetBoundsSchema.safeParse(arg)
       if (!parsed.success) {
-        logger.warn('Rejected preview:setBounds with invalid payload', {
-          error: parsed.error.message
+        reportBoundsDrop({
+          reason: SET_BOUNDS_DROP_REASON.invalidPayload,
+          level: 'warn',
+          panelId: validPanelId(arg)
         })
         return
       }
-      service.setBounds(parsed.data.panelId, parsed.data.bounds, parsed.data.seq)
+      push = parsed.data
+      // `settled` marks the forced push that ends a window-edge resize hold
+      // (issue #124): the same call, so it is applied and dropped like any other.
+      service.setBounds(push.panelId, push.bounds, push.seq, push.ack, push.settled)
     } catch (error) {
-      logger.error('preview:setBounds failed', error instanceof Error ? error : undefined)
+      reportBoundsDrop(
+        {
+          reason: SET_BOUNDS_DROP_REASON.handlerThrew,
+          level: 'error',
+          panelId: push?.panelId,
+          seq: push?.seq,
+          rect: push?.bounds
+        },
+        error
+      )
     }
   }
 
@@ -202,21 +252,30 @@ export function registerPreviewLifecycleHandlers(
         })
         return
       }
-      void service.setVisibility(parsed.data.panelId, parsed.data.visible, parsed.data.reason)
+      // The `catch` below cannot see this one. `setVisibility` is `async`, so a
+      // throw inside it — `addChildView` against a window destroyed in the gap
+      // before `drainWindow` runs — becomes a REJECTED PROMISE, not a synchronous
+      // throw, and `void` would drop it into the process-level handler. This file
+      // promises no handler ever throws; that promise needs both halves.
+      void service
+        .setVisibility(parsed.data.panelId, parsed.data.visible, parsed.data.reason)
+        .catch((error: unknown) => {
+          logger.error('preview:setVisibility failed', redactedLogError(error))
+        })
     } catch (error) {
-      logger.error('preview:setVisibility failed', error instanceof Error ? error : undefined)
+      logger.error('preview:setVisibility failed', redactedLogError(error))
     }
   }
 
-  ipcMain.on(PreviewChannels.SET_BOUNDS, onSetBounds)
-  ipcMain.on(PreviewChannels.SET_VISIBILITY, onSetVisibility)
+  registerOn(PreviewChannels.SET_BOUNDS, onSetBounds)
+  registerOn(PreviewChannels.SET_VISIBILITY, onSetVisibility)
 
   return () => {
-    ipcMain.removeHandler(PreviewChannels.CHECK_ELIGIBILITY)
-    ipcMain.removeHandler(PreviewChannels.OPEN)
-    ipcMain.removeHandler(PreviewChannels.CLOSE)
-    ipcMain.removeHandler(PreviewChannels.RELOAD)
-    ipcMain.removeListener(PreviewChannels.SET_BOUNDS, onSetBounds)
-    ipcMain.removeListener(PreviewChannels.SET_VISIBILITY, onSetVisibility)
+    unregisterHandle(PreviewChannels.CHECK_ELIGIBILITY)
+    unregisterHandle(PreviewChannels.OPEN)
+    unregisterHandle(PreviewChannels.CLOSE)
+    unregisterHandle(PreviewChannels.RELOAD)
+    unregisterOn(PreviewChannels.SET_BOUNDS, onSetBounds)
+    unregisterOn(PreviewChannels.SET_VISIBILITY, onSetVisibility)
   }
 }

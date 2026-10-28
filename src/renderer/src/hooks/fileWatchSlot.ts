@@ -3,7 +3,7 @@
 /**
  * One consumer's hold on a main-process file watch.
  *
- * `window.api.fileWatch.start` is **not** idempotent: main-side it increments a
+ * `fileWatchGateway.start` is **not** idempotent: main-side it increments a
  * per-window subscriber count, and `stop` decrements it. The watcher (one of
  * only `MAX_WATCHED_FILES = 100` app-wide) is closed when the count reaches
  * zero. So every renderer consumer must send exactly as many `stop`s as it sent
@@ -27,6 +27,8 @@
  * @module fileWatchSlot
  * @see Issue #70 - preview tabs show stale content when the file changes
  */
+import { fileWatchGateway } from '../services/fileWatchGateway'
+
 
 /**
  * A single consumer's watch subscription.
@@ -112,7 +114,7 @@ export function acquireFileWatch(
     if (slot.isHeld) return { started: true }
 
     try {
-      const result = await window.api.fileWatch.start(filePath)
+      const result = await fileWatchGateway.start(filePath)
       if (!result?.success) {
         return { started: false, error: result?.error }
       }
@@ -151,9 +153,34 @@ export function releaseFileWatch(slot: FileWatchSlot, filePath: string): Promise
     // may no longer have, or the next acquire would skip its `start`.
     slot.isHeld = false
     try {
-      await window.api.fileWatch.stop(filePath)
+      await fileWatchGateway.stop(filePath)
     } catch {
       // The watch is gone either way; the caller has nothing to do about it.
     }
   })
+}
+
+/**
+ * Marks the slot as holding nothing, **without** telling the main process.
+ *
+ * For a watch the main process has already ended on its own: it drops the
+ * whole entry, every count with it, when it reports `file-watch:deleted`. A
+ * `stop` sent after that would decrement whatever count another consumer has
+ * since built for the same file and deafen it – the "one stop too many" case
+ * above. After a forget, the next acquire starts a fresh watch and a release
+ * sends nothing (#252).
+ *
+ * Synchronous, not queued: it records what the main process did when the
+ * event was sent. An acquire still in flight that succeeds afterwards holds a
+ * new count and may keep it.
+ *
+ * @param slot - The consumer's slot
+ *
+ * @example
+ * ```ts
+ * window.api.fileWatch.onFileDeleted(() => forgetFileWatch(slot))
+ * ```
+ */
+export function forgetFileWatch(slot: FileWatchSlot): void {
+  slot.isHeld = false
 }

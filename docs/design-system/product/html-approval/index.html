@@ -1,0 +1,339 @@
+<!-- @card group="HTML preview" name="Approving a remote host" subtitle="The whole journey — nine states, from a clean page to a page that will not yield" status="proposed" reviewed="2026-09-01" -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Erfana — approving a remote host</title>
+<link rel="stylesheet" href="../../tokens.css">
+<link rel="stylesheet" href="../../ds.css">
+<link rel="stylesheet" href="../../system/components/row/row.css">
+<link rel="stylesheet" href="../../system/components/permission-band/band.css">
+<style>
+  .step { display: grid; grid-template-columns: minmax(0, 560px) minmax(0, 1fr);
+          gap: var(--space-16); align-items: start; margin-bottom: var(--space-24); }
+
+  .step__no { font-family: var(--font-mono); font-size: var(--text-sm);
+              color: var(--color-accent-primary); letter-spacing: 0.1em; margin: 0 0 var(--space-2); }
+  .step__title { margin: 0 0 var(--space-6); font-size: var(--text-lg);
+                 font-weight: var(--font-semibold); color: var(--color-text-emphasis); }
+  .step__text { margin: 0 0 var(--space-6); max-width: 56ch; color: var(--color-text-tertiary); }
+  .step__text:last-child { margin-bottom: 0; }
+  .step__text strong { color: var(--color-text-bright); }
+
+  /* A preview panel, drawn to scale. The white block is the previewed page. */
+  .panel { border: var(--border-width) solid var(--color-border-subtle);
+           background: var(--color-bg-primary); display: flex; flex-direction: column;
+           height: 280px; overflow: hidden; }
+  /* stylelint-disable color-no-hex --
+     These are the PREVIEWED PAGE, not Erfana. It is arbitrary third-party HTML
+     rendered in a native view; using Erfana tokens here would make the demo lie
+     about the one thing this card exists to show - where Erfana stops and
+     untrusted content begins. */
+  .page { flex: 1 1 auto; background: #ffffff; padding: 16px 20px; overflow: hidden; }
+  .page h4 { margin: 0 0 10px; font: 600 15px/1.3 Georgia, serif; color: #1a1a1a; }
+  .page p  { margin: 0 0 8px; font: 12px/1.55 Georgia, serif; color: #4a4a4a; }
+  .page .missing { display: inline-block; width: 120px; height: 34px; background: #ececec;
+                   border: 1px dashed #c4c4c4; font: 10px/34px system-ui; color: #999;
+                   text-align: center; }
+  .page--hidden { visibility: hidden; }
+
+  .rule { border: 0; border-top: var(--border-width) solid var(--color-border-default);
+          margin: var(--space-24) 0; }
+</style>
+</head>
+<body>
+
+<h1>Approving a remote host</h1>
+<p class="ds-lede">
+  A previewed HTML page asks for a font, a script, an image from somewhere on the internet. Erfana
+  blocks it and asks you. <strong>This is how that conversation should go.</strong>
+</p>
+
+<div class="ds-note">
+  <strong>What this replaces.</strong> Each blocked host used to raise its own pop-up, capped at three.
+  A page reaching four hosts produces three stacked walls of identical text over your file tree — and
+  the fourth host cannot be approved at all, because the app ran out of pop-ups. That cap was the only
+  thing bounding the list, so it was load-bearing by accident.
+</div>
+
+<h2>Four rules this design follows</h2>
+
+<div class="ds-note">
+  <strong>1 · The question lives on the thing it is about.</strong> A permission decision outlives the
+  message that raised it, so it belongs on the preview's own chrome — not floating over an unrelated
+  part of the app that happens to be free.
+  <br><br>
+  <strong>2 · One decision at a time, and never by accident.</strong> Allow only opens the question.
+  Confirm answers it, and is deliberately not focused, so pressing Return twice cannot grant anything.
+  <br><br>
+  <strong>3 · Say what is actually being granted.</strong> Erfana cannot limit a host to the one thing
+  it was blocked for. Approving lets that host serve code and receive data, in every preview in the
+  project, for anyone who clones it. The confirm step says so in those words.
+  <br><br>
+  <strong>4 · Never draw a button a page could be sitting on top of.</strong> The previewed page is a
+  native layer above all of Erfana's own interface. Buttons appear only once the page has proved it
+  moved out of the way — see step 8.
+</div>
+
+<hr class="rule">
+
+<div id="flow"></div>
+
+<hr class="rule">
+
+<h2>The keyboard route</h2>
+
+<div class="ds-note">
+  A preview is a trap without this: focus goes into the page and there is no documented way out.
+  <br><br>
+  <strong>Escape leaves the page.</strong> When the find bar is closed, a forwarded Escape returns
+  focus from the previewed page to the band's chip. No new shortcut is invented, and the chip's name
+  says so out loud — which is what WCAG 2.1.2 asks for: not just an exit, but a stated one.
+  <br><br>
+  <strong>The chip is an ordinary Tab stop</strong> in the panel's chrome. From there:
+  <code>Enter</code> opens the list, <code>↑ ↓</code> move between hosts, <code>Enter</code> on a row
+  starts the approval, <code>Escape</code> steps back one level at a time — confirm, then list, then
+  page. Opening the list with the keyboard moves focus to the first Allow; opening it with the mouse
+  does not, because the pointer already knows where it is.
+</div>
+
+<h2>What it deliberately does not do</h2>
+
+<table>
+  <thead><tr><th>Not this</th><th>Why</th></tr></thead>
+  <tbody>
+    <tr><td>Approve everything at once</td><td>A single click granting four hosts is not a decision, it is a dismissal. The list stays a list.</td></tr>
+    <tr><td>Remember "always allow this host everywhere"</td><td>The grant is per project on purpose. A global allowlist would follow you into repositories you did not write.</td></tr>
+    <tr><td>Animate open</td><td>An eased height races the native page, which moves in one step, and exposes page pixels underneath the buttons mid-animation.</td></tr>
+    <tr><td>Revoke</td><td>Not built yet — <a href="https://github.com/qodeca/erfana/issues/86" style="color: var(--color-link)">issue #86</a>. This design delivers the <em>seeing</em> half, which is why the allowed list is read-only here.</td></tr>
+    <tr><td>Colour-code the risk</td><td>Every host in the blocked list carries the same risk once approved. Tinting some of them green would be a lie.</td></tr>
+  </tbody>
+</table>
+
+<script>
+/* Each step renders a real band above a real page, using band.css unmodified. */
+const STEPS = [
+  {
+    title: 'Nothing was asked for',
+    text: ['A page with no remote content still gets the band. <strong>It is always present</strong> '
+         + '— a control that appears only when something is wrong is not one you can trust, and its '
+         + 'placement above the page is now the only thing separating Erfana from the page.',
+           'The counts are always shown, including the two zeroes. Silence is the one state a '
+         + 'permission control must never have.',
+           'It used to carry the words “Preview — content below is not Erfana”. Those were removed '
+         + 'by owner decision when the bar became a toolbar; see the Permission band card.'],
+    counts: '0 blocked · 0 allowed', open: false, page: 'clean'
+  },
+  {
+    title: 'Four hosts were blocked',
+    text: ['The count changes. <strong>Nothing pops up.</strong> The page keeps rendering everything it '
+         + 'can, and the parts that could not load are visibly missing — which is a truer signal than a '
+         + 'notification that the reader has already dismissed.',
+           'Four is the case that broke the old design. Here it is just a number.'],
+    counts: '4 blocked · 0 allowed', open: false, page: 'gaps'
+  },
+  {
+    title: 'You open the list',
+    text: ['The page moves <strong>down</strong>, not behind. It stays live and scrollable — you can '
+         + 'still see what the page looks like while you decide whether to complete it.',
+           'Each row says what the host was blocked <em>for</em>. That is a fact about what happened, '
+         + 'not a description of what you would be granting.'],
+    counts: '4 blocked · 0 allowed', open: true, page: 'gaps'
+  },
+  {
+    title: 'You choose one host',
+    text: ['The other rows step aside. One question, on screen in full, with no scrolling to reach the '
+         + 'buttons.',
+           '<strong>This is the honest sentence.</strong> It is the same text that made the old pop-up '
+         + 'three paragraphs tall — but read once, on the row you picked, instead of four times over '
+         + 'your file tree.'],
+    counts: '4 blocked · 0 allowed', open: true, confirm: 'placehold.co', page: 'gaps'
+  },
+  {
+    title: 'It worked',
+    text: ['The preview reloads with the new permission, the row moves to <em>Allowed</em>, and the '
+         + 'remaining three stay listed. You are not returned to the start.',
+           'A hidden live region announces the change, so it is not only visible.'],
+    counts: '3 blocked · 1 allowed', open: true, approved: 'https://placehold.co', page: 'partial'
+  },
+  {
+    title: 'It failed',
+    text: ['Approving can fail — the allowlist is full, the settings file will not write, the project '
+         + 'moved. <strong>Today the result is thrown away</strong>, so the reader sees the prompt '
+         + 'disappear and assumes it worked.',
+           'The row comes back with its Allow button and says why. The chip carries the failure too, so '
+         + 'closing the list does not hide it.'],
+    counts: '4 blocked · 0 allowed', open: true, failed: 'https://placehold.co', page: 'gaps'
+  },
+  {
+    title: 'You open the project tomorrow',
+    text: ['The hosts are already approved, so nothing is blocked and nothing asks. <strong>You can '
+         + 'still see what was granted.</strong>',
+           'This matters most for a repository you cloned: it can arrive with hosts already approved by '
+         + 'someone else, and today nothing anywhere shows you that.'],
+    counts: '0 blocked · 4 allowed', open: true, allowedOnly: true, page: 'clean'
+  },
+  {
+    title: 'The page will not get out of the way',
+    text: ['The page is asked to move and given 300ms to confirm it did. A page stuck in a loop never '
+         + 'answers — and silence has to mean <em>assume it is still covering you</em>.',
+           '<strong>So the page is hidden rather than trusted</strong>, and the band says why in plain '
+         + 'words. Anything else risks drawing an approval button on top of a page that could be '
+         + 'imitating one.'],
+    counts: '4 blocked · 0 allowed', open: true, paused: true, page: 'gaps'
+  },
+  {
+    title: 'The panel is too small to share',
+    text: ['Below roughly 320px of panel height, splitting the space leaves a strip of page too thin to '
+         + 'be a preview. The same fail-safe applies: hide the page, show the list.',
+           'One rule covering two situations, rather than a second special case to keep in sync.'],
+    counts: '4 blocked · 0 allowed', open: true, paused: true, page: 'gaps', short: true
+  }
+];
+
+const PAGES = {
+  clean: `<h4>Quarterly report</h4><p>Revenue held steady across the period, with the strongest
+          movement in the second half.</p><p>Costs tracked below forecast throughout.</p>`,
+  gaps:  `<h4>Quarterly report</h4><p>Revenue held steady across the period.</p>
+          <p><span class="missing">chart</span> &nbsp; <span class="missing">logo</span></p>
+          <p>Two images and a script could not load.</p>`,
+  partial: `<h4>Quarterly report</h4><p>Revenue held steady across the period.</p>
+          <p><span class="missing" style="background:#dfe4ff;border-color:#a0a8ff;color:#5a63c0">chart loaded</span>
+          &nbsp; <span class="missing">logo</span></p><p>One of three now loads.</p>`
+};
+
+function band(step) {
+  const rows = [];
+
+  if (step.confirm) {
+    rows.push(section('Approving'));
+    rows.push(row('https://placehold.co', 'allow'));
+    rows.push(`<div class="erf-band__confirm">
+      <p class="erf-band__confirm-title">Let this page load from https://placehold.co?</p>
+      <p class="erf-band__confirm-body">It was blocked for an image, but Erfana cannot limit it to
+        that — the host will also be able to run code and send data to it.</p>
+      <p class="erf-band__confirm-body">Saved in this project's .erfana/settings.json, so it applies
+        to every preview here, survives restarts, and travels to anyone who clones the repository.
+        Erfana cannot undo it.</p>
+      <div class="erf-band__confirm-actions">
+        <button class="erf-band__allow">Cancel</button>
+        <button class="erf-band__allow" style="background: var(--color-accent-primary);
+          color: var(--color-brand-black); font-weight: var(--font-semibold)">Confirm</button>
+      </div></div>`);
+  } else if (step.allowedOnly) {
+    rows.push(section('Allowed in this project'));
+    for (const h of ['https://fonts.googleapis.com', 'https://cdn.jsdelivr.net',
+                     'https://cdnjs.cloudflare.com', 'https://placehold.co'])
+      rows.push(row(h, 'allowed'));
+  } else {
+    // Hosts only. The kinds these were refused for are not shown on a row —
+    // they belong in the confirm box, and nowhere else.
+    const blocked = ['https://fonts.googleapis.com', 'https://cdn.jsdelivr.net',
+                     'https://cdnjs.cloudflare.com', 'https://placehold.co']
+      .filter(h => h !== step.approved);
+    if (blocked.length) {
+      rows.push(section('Blocked on load'));
+      for (const h of blocked)
+        rows.push(row(h, step.failed === h ? 'failed' : 'allow'));
+    }
+    if (step.approved) {
+      rows.push(section('Allowed in this project'));
+      rows.push(row(step.approved, 'allowed'));
+    }
+  }
+
+  return `<div class="erf-band">
+    <div class="erf-band__bar" role="toolbar" aria-label="Preview">
+      <button class="erf-band__tool" type="button" aria-label="Find" title="Find (Cmd/Ctrl+F)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path>
+        </svg>
+      </button>
+      <span class="erf-band__spacer"></span>
+      <button class="erf-band__chip${step.failed ? ' erf-band__chip--failed' : ''}">
+        <span>${step.counts}</span>
+        <span class="erf-band__chip-caret" aria-hidden="true">${step.open ? '▾' : '▸'}</span>
+      </button>
+      <span class="erf-band__separator" aria-hidden="true"></span>
+      <button class="erf-band__tool" type="button" aria-label="Export to PDF" title="Export to PDF">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path>
+          <path d="M14 2v4a2 2 0 0 0 2 2h4"></path>
+          <path d="M12 18v-6"></path><path d="m9 15 3 3 3-3"></path>
+        </svg>
+      </button>
+    </div>
+    ${step.paused ? `<div class="erf-band__paused"><span aria-hidden="true">⚠</span>
+      <span>Paused the page so this list cannot be covered.</span></div>` : ''}
+    ${step.open ? `<div class="erf-band__list"><div class="erf-band__scroll">
+      ${rows.join('')}</div></div>` : ''}
+  </div>`;
+}
+
+const section = (t) => `<div class="erf-band__section">${t}</div>`;
+
+/* `.erf-host` from ../../system/components/row/row.css — the real primitive, one
+   definition. These rows used to carry a `.erf-band__host` class that exists in
+   no stylesheet, so they had no host treatment at all; the card was drawing a
+   control it did not have. The <wbr>s make label boundaries the preferred break
+   points, and the accessible name carries the raw host. */
+/* A row grants an ORIGIN — scheme, host and port. The scheme and the port are
+   drawn only when they are not the default, so an ordinary https row is exactly
+   what it always was and anything unusual is visible because it is unusual. The
+   accessible name carries the whole origin either way. See the Permission band
+   and Rows cards, which decide this. */
+function hostCell(origin) {
+  const url = new URL(origin);
+  const esc = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  const scheme = url.protocol === 'https:'
+    ? ''
+    : `<span class="erf-host__scheme">${esc(url.protocol)}//</span>`;
+  const host = esc(url.hostname).replace(/\./g, '.<wbr>');
+  const port = url.port === '' ? '' : `<span class="erf-host__port">:${esc(url.port)}</span>`;
+  return `<span class="erf-host" dir="ltr" aria-label="${esc(origin)}">${scheme}${host}${port}</span>`;
+}
+
+function row(host, state) {
+  const right =
+    state === 'allowed' ? '<span class="erf-band__state">Allowed ✓</span>'
+  : `<button class="erf-band__allow" aria-label="Allow ${host}">Allow</button>`;
+  /*
+   * The middle cell carries ONE message — a failed approval — and is otherwise
+   * empty, on a blocked row and an allowed row alike.
+   *
+   * There is no `kind` parameter any more, and its absence is the decision.
+   * Beside a host and an Allow button, "style" or "script" names a scope for
+   * the block and for the grant, and neither is scoped. The word survives in
+   * the confirm box in step 4, where the next clause takes the limit back. See
+   * the Permission band card.
+   */
+  const mid = state === 'failed'
+    ? '<span class="erf-band__state erf-band__state--failed">Not saved</span>'
+    : '<span class="erf-band__kind"></span>';
+  return `<div class="erf-band__row">${hostCell(host)}${mid}${right}</div>`;
+}
+
+const host = document.getElementById('flow');
+STEPS.forEach((step, i) => {
+  const el = document.createElement('div');
+  el.className = 'step';
+  el.innerHTML = `
+    <div class="panel" ${step.short ? 'style="height: 260px"' : ''}>
+      ${band(step)}
+      <div class="page${step.paused ? ' page--hidden' : ''}">${PAGES[step.page]}</div>
+    </div>
+    <div>
+      <p class="step__no">STEP ${String(i + 1).padStart(2, '0')}</p>
+      <h3 class="step__title">${step.title}</h3>
+      ${step.text.map((t) => `<p class="step__text">${t}</p>`).join('')}
+    </div>`;
+  host.appendChild(el);
+});
+</script>
+</body>
+</html>

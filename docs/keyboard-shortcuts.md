@@ -1,214 +1,77 @@
-# Keyboard Shortcuts
+<!--
+SPDX-License-Identifier: GPL-3.0-only
+SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+-->
 
-## Global App Shortcuts
+# Keyboard shortcuts – implementation notes
 
-Work anywhere, override editor shortcuts:
+The complete user list is the [keyboard shortcuts reference](./user-guide/reference/keyboard-shortcuts.md).
 
-| Shortcut | Action |
-|----------|--------|
-| `Cmd/Ctrl+B` | Toggle left sidebar (Project) |
-| `Cmd/Ctrl+J` | Toggle terminal panel |
-| `Cmd/Ctrl+Shift+M` | Maximize terminal over the editor (opens it if closed; opening a file restores the editor) |
-| `Cmd/Ctrl+Alt+R` | Refresh the project tree (see [Project Panel](#project-panel)) |
+## Monaco editor
 
-**Settings has no keyboard shortcut.** Open it with the gear icon at the bottom of the left activity bar; `Esc` closes it.
+`MonacoMarkdownEditor.tsx` owns Bold, Italic and Insert Link keybindings. It registers `Cmd/Ctrl+F` as a no-op so `useSearchKeyboard` opens Erfana's find bar, and redirects `Cmd/Ctrl+G` and `Cmd/Ctrl+Shift+G` to the shared search store. Monaco's own find widget is not the user-facing search path.
 
-## Application Menu
+`registerClipboardActions` in `monacoClipboardCommands.ts` re-registers Copy, Cut and Paste as Monaco actions backed by `textClipboard`, which reaches Electron's main-process clipboard under the renderer sandbox. `Cmd/Ctrl+S` and `Cmd/Ctrl+W` are panel shortcuts from `useKeyboardShortcuts`, with the [active-panel gate](#active-panel-gate) below.
 
-| Shortcut | Action |
-|----------|--------|
-| `Cmd/Ctrl+Shift+N` | New Window (File menu, `src/main/menu.ts`) |
+## Find bar
 
-Everything else in the menu uses Electron's standard roles (undo/redo, cut/copy/paste/select-all, reload, DevTools, zoom, fullscreen, minimize/zoom, and quit/close), so those accelerators are whatever the platform assigns.
+`SearchBar.tsx` handles its option chords on the find-bar input. The handler matches physical `KeyC` and `KeyW`, consumes key repeats, and leaves `AltGr` text entry alone on Windows. The [user shortcut table](./user-guide/reference/keyboard-shortcuts.md#editor-and-markdown-preview) records the macOS `Cmd+Option+C/W` and Windows `Alt+C/W` bindings; Whole word does nothing where a view does not support it.
 
-## Monaco Editor
+## Application menu
 
-When editor is focused. Full Monaco shortcuts: [Monaco Editor Docs](https://code.visualstudio.com/docs/getstarted/keybindings)
+The three zoom items are explicit accelerators, not Electron zoom roles: `menu.ts` builds them with `zoomItem()` and routes each through `setPreviewZoomHandler` – a focused HTML preview takes the step first, otherwise the focused window's own web contents is zoomed (the header comment in `menu.ts` explains why `role: 'zoomIn'` cannot be used). Everything else in the menu uses Electron's standard roles (undo/redo, cut/copy/paste/select-all, reload/force-reload, `toggleDevTools`, fullscreen, minimize, the Window-menu `zoom` role, and quit/close), so those accelerators are whatever the platform assigns.
 
-### Essential Shortcuts
 
-| Shortcut | Action |
-|----------|--------|
-| `Cmd/Ctrl+S` | Save |
-| `Cmd/Ctrl+W` | Close the editor tab (confirmation dialog if unsaved) |
-| `Cmd/Ctrl+F` | Open the app search bar |
-| `Cmd/Ctrl+G` | Next search match |
-| `Cmd/Ctrl+Shift+G` | Previous search match |
-| `Cmd/Ctrl+K` | Insert link |
-| `Cmd/Ctrl+Z` / `Shift+Z` | Undo/Redo |
-| `Cmd/Ctrl+/` | Toggle comment |
-| `Alt+↑/↓` | Move line |
-| `Cmd/Ctrl+D` | Add selection to next match |
-| `Alt+Click` | Add cursor |
-| `F1` | Command palette |
+## Active-panel gate
 
-**Find is not Monaco's find.** `MonacoMarkdownEditor.tsx` registers `CtrlCmd|KeyF` as an explicit no-op so the window-level capture handler (`useSearchKeyboard`) can open Erfana's unified search bar instead; `CtrlCmd|KeyG` and `CtrlCmd|Shift|KeyG` are likewise re-pointed at that search store. Monaco's own find widget is therefore not reachable by keyboard.
+**Only the foreground tab acts.** The hook registers its listener on `window`,
+and dockview keeps every opened panel mounted - so with N tabs open, one
+keypress reaches N copies of the hook. Until this was fixed, a single
+`Cmd/Ctrl+W` closed *every* tab and a single `Cmd/Ctrl+S` wrote *every* open
+buffer to disk, including files the user had not chosen to save. The hook
+therefore takes an `enabled` flag, and `MarkdownEditorPanel` wires it to the
+panel's dockview active state (`props.api.isActive`, kept in step via
+`onDidActiveChange`). Any future panel-level shortcut needs the same gate. The `Cmd+W` entry under [window management](./user-guide/reference/keyboard-shortcuts.md#app-and-windows) is the OS window-close role – a different binding on a different surface.
 
-**There is no Replace shortcut in Erfana.** No replace keybinding is registered anywhere in `src/`. Monaco's built-in replace default is `Ctrl+H` on Windows and `Cmd+Alt+F` on macOS – on macOS `Cmd+H` is the OS Hide role registered in `src/main/menu.ts`, so it never reaches the editor.
 
-`Cmd/Ctrl+S` and `Cmd/Ctrl+W` come from `useKeyboardShortcuts.ts`, mounted by `MarkdownEditorPanel`. The `Cmd+W` entry under [Window Management](#window-management) is the OS window-close role – a different binding on a different surface.
+## HTML preview
 
-## Markdown Formatting Toolbar
+The running page is a native view that swallows every key, so the preview's shortcuts reach Erfana two ways: main forwards a closed list from inside the page (`PREVIEW_FORWARDED_SHORTCUTS` in `src/main/services/preview/previewInputForward.ts`, sent as `preview:forwardedShortcut` and routed by `usePreviewFindShortcuts`), and the panel root handles the Back and Forward keys while focus is in the panel's own chrome – its toolbar, find bar or banner (`usePreviewNavigation`).
 
-Alternative to shortcuts - toolbar buttons in Editor/Split View modes:
 
-**B** (Bold) | *I* (Italic) | ~~S~~ (Strike) | `</>` (Code) | `{}` (Block) | 🔗 (Link) | 🖼️ (Image) | H1 (Heading) | • (Bullet) | 1. (Number)
+### Focus transfer
 
-## Preview Context Menu
+`usePreviewPageEntry` follows the panel's dockview active state (`api.isActive`, via `onDidActiveChange`), so an inactive tab's placeholder – dockview keeps it mounted – is never in the tab order. The placeholder's accessible name says both ways: "HTML preview of page.html – press Enter to enter the page, Escape to come back". Focus moves only on that key press, never on a load.
 
-Right-click selected text. The prompt entries are built from `getPromptsForArea('markdown-preview', 'context-menu')`, sorted by each template's `order`:
 
-- **Explain** – explain the selection → Terminal (`explain.md`)
-- **Modify** – asks how to modify, then rewrites → Terminal (`modify.md`)
-- **Ask** – asks a question about the selection → Terminal (`ask.md`)
-- **Visualize** – generates a diagram from the selection → Terminal (`visualize.md`)
-- **Prompt** – free-form prompt over the selection → Terminal (`prompt.md`)
-- **Copy selection** – copy text to clipboard
+### Navigation forwarding
 
-There is no Improve, Simplify, Rewrite or "Send to Terminal" entry.
+**Back and Forward** come from one table for both processes, `src/shared/previewNavKeys.ts`, so main and the panel cannot disagree about which key is Back. They match the **physical** key (`KeyboardEvent.code`), not the typed character, so the key right of P is Back on every keyboard layout, and no other modifier may be down. They act only with focus inside the page or inside the panel's chrome: the panel root's `onKeyDown` is not a `window` listener, which meets the active-panel gate by construction – Monaco's `Cmd+[` and the terminal's `Alt+arrows` never reach it. The toolbar has a Back button but no Forward button (settled design): Back's tooltip names both keys, and its `aria-keyshortcuts` carries the Back key.
 
-| Shortcut | Action |
-|----------|--------|
-| `Cmd/Ctrl+C` | Copy selected text to clipboard |
+**Zoom is not forwarded.** `Cmd/Ctrl+Plus`, `-` and `0` reach a focused preview through the View menu (see [Application Menu](#application-menu)).
 
-See: [Prompt Templates](./prompts/README.md)
-
-## Project Panel
-
-### Navigation
-
-| Shortcut | Action |
-|----------|--------|
-| `↑/↓` | Navigate |
-| `→/←` | Expand/collapse folder |
-| `Enter` | Open file |
-| `Space` | Preview |
-
-`Cmd/Ctrl+Alt+R` refreshes the tree. It is registered by `ProjectTree.tsx` as a `window` listener, so it fires from anywhere in the app, but it is ignored while a refresh is already running or while focus sits in an input, textarea, or contenteditable.
-
-### File Operations
-
-| Shortcut | Action |
-|----------|--------|
-| `Cmd/Ctrl+X` | Cut (dimmed with dashed underline) |
-| `Cmd/Ctrl+C` | Copy (repeatable paste) |
-| `Cmd/Ctrl+V` | Paste into folder |
-
-**Context Menu**: Right-click → New File, New Folder, Rename, Delete, Cut, Copy, Paste
-
-**Drag-Drop**: Drag files into folders to move. Visual drop indicators during drag.
-
-## Terminal
-
-Standard terminal shortcuts when focused:
-
-| Shortcut | Action |
-|----------|--------|
-| `Ctrl+C` | Interrupt (SIGINT) / Copy if text selected |
-| `Ctrl+D` | EOF (exit) |
-| `Ctrl+L` | Clear screen |
-| `Ctrl+A/E` | Start/end of line |
-| `Ctrl+U/K` | Clear before/after cursor |
-| `↑/↓` | History |
-| `Tab` | Auto-complete |
-| `Cmd/Ctrl+C` | Copy selected text (macOS: Cmd, Windows: Ctrl) |
-| `Cmd/Ctrl+V` | Paste from clipboard |
-| `Ctrl+Shift+C/V` | Explicit copy/paste (all platforms) |
-
-**Context Menu**: Right-click → Copy, Paste
-
-Shell-specific (zsh): See zsh docs
-
-## View Modes
-
-Click toolbar buttons (no keyboard shortcut):
-
-**Editor Only** | **Split Horizontal** (preview on top) | **Split Vertical** (side by side, with scroll sync) | **Preview Only**
-
-## Dialog Shortcuts
-
-All dialogs (Confirm, File Creation, Camera, Document import, Transcription, Settings):
-
-| Shortcut | Action |
-|----------|--------|
-| `Enter` | Activates the **focused** button — not always the primary one. Pressing Enter while Cancel has focus cancels |
-| `Esc` | Cancel/Close |
-| `Tab` | Navigate fields; cycles within the dialog when `trapFocus` is set |
-| `Space` | Toggle checkboxes, activate the focused button |
-
-The Enter rule changed in v0.17.0: dialogs previously bound Enter to their primary action unconditionally, so Enter on Cancel still fired the primary action. `CameraDialog` keeps a shutter-on-Enter shortcut but bails out before `preventDefault()` when focus is inside a `button`, `select` or `input`, so the focused control wins. `PromptDialog` submits on Cmd/Ctrl+Enter rather than Enter, because its textarea needs newlines.
-
-### Text Input Dialogs (PromptDialog, FileSystemDialog)
-
-| Shortcut | Action |
-|----------|--------|
-| `Cmd/Ctrl+C` | Copy selected text |
-| `Cmd/Ctrl+X` | Cut selected text |
-| `Cmd/Ctrl+V` | Paste from clipboard |
-| `Cmd/Ctrl+Enter` | Submit (PromptDialog only) |
-
-**Context Menu**: Right-click → Cut, Copy, Paste
-
-### ChatBubble (DiagramViewer)
-
-| Shortcut | Action |
-|----------|--------|
-| `Cmd/Ctrl+C` | Copy selected text (native) |
-| `Cmd/Ctrl+X` | Cut selected text (native) |
-| `Cmd/Ctrl+V` | Paste from clipboard (native) |
-| `Cmd/Ctrl+Enter` | Send message |
-| `Esc` | Collapse panel |
-
-**Context Menu**: Right-click → Cut, Copy, Paste
-
-Note: Clipboard shortcuts use native browser behavior for better undo/redo integration.
-
-### FilePickerDialog
-
-| Shortcut | Action |
-|----------|--------|
-| `↑/↓` | Navigate files |
-| `Enter` | Select file |
-| `Esc` | Cancel |
-| `Cmd/Ctrl+C` | Copy selected file path |
-
-## Platform
-
-Erfana ships for macOS and Windows only – there is no Linux build.
-
-**macOS**: `Cmd` for shortcuts, `Option` = Alt
-**Windows**: `Ctrl` for shortcuts
-
-### Window Management
-
-**macOS**: `Cmd+M` (Minimize), `Cmd+Q` (Quit), `Cmd+W` (Close), `Cmd+H` (Hide)
-**Windows**: `Alt+F4` (Close/Quit), `F11` (Fullscreen)
 
 ## Image Viewer
 
-When image viewer panel is focused:
+The image panel handles its own keys in `imageViewer.logic.ts`; the [user-facing bindings](./user-guide/reference/keyboard-shortcuts.md#image-and-diagram-viewers) live in the guide. The implementation uses `0` for 100% and `F` for Fit. Full-screen exit is handled by Escape.
 
-| Shortcut | Action |
-|----------|--------|
-| `+` / `=` | Zoom in |
-| `-` | Zoom out |
-| `0` / `Home` | Reset to 100% |
-| `F` | Fit to view |
-| `Arrow Keys` | Pan image |
-| `Esc` | Exit fullscreen |
-| `Double-click` | Toggle between fit and 100% |
+## Dialog shortcuts
 
-**Mouse Controls**:
-- **Scroll wheel**: Zoom (cursor-centered)
-- **Click + Drag**: Pan image
+`BaseDialog` owns Escape and focus trapping where enabled. Native focus determines what Enter activates, so a focused Cancel button cancels. `CameraDialog` keeps shutter-on-Enter only when focus is outside a button, select or input; it checks that target before calling `preventDefault()`. `PromptDialog` submits on `Cmd/Ctrl+Enter`, leaving plain Enter for textarea newlines. `FilePickerDialog` handles arrows, Enter, Escape and copying the selected path; `ChatBubble` uses `Cmd/Ctrl+Enter` to send. User bindings are in the [dialog shortcut reference](./user-guide/reference/keyboard-shortcuts.md#dialogs-and-file-picker).
+
+## Context menus
+
+Every context menu is the shared `ContextMenu` (`components/ContextMenu/ContextMenu.tsx`), which implements the decided [Menu card](design-system/system/components/menu/index.html): focus moves to the first item on open, roving tabindex, ↑ ↓ with wrap, Home / End, Enter / Space, typeahead, and Escape or Tab close it and return focus to the opener (#90). **Shift+F10** and the **Menu key** open the menu of the focused project-tree row (`ProjectTree/treeKeyboard.ts`), dock tab (`Tabs/useTabMenuKey.ts`, on dockview's `.dv-tab`), editor (Monaco commands, under the caret), terminal (`TerminalPanel/terminalMenuKey.ts`, at the cursor – the shell no longer receives Shift+F10) and the dialog and diagram-chat text fields (`onKeyDownCapture`). Windows also sends a native `contextmenu` after the Menu key; `contextMenuKey.ts` drops that echo so the menu does not open twice.
 
 ## DevTools
 
 | Shortcut | Action |
 |----------|--------|
-| `F12` or `Cmd/Ctrl+Shift+I` | Toggle DevTools |
-| `Cmd/Ctrl+Shift+C` | Inspect element |
-| `Cmd/Ctrl+R` | Reload |
+| platform default for `toggleDevTools` | Toggle DevTools – Electron's `toggleDevTools` role in the View menu (`src/main/menu.ts`) |
+| `F12` (development builds only) | Toggle DevTools (undocked) – `optimizer.watchWindowShortcuts` from `@electron-toolkit/utils`, attached to every window in `src/main/index.ts`. In a packaged build the same helper binds no `F12` and blocks `Cmd/Ctrl+R` |
+| platform default for `reload` / `forceReload` | Reload – Electron's `reload` and `forceReload` roles |
+
+There is no `Cmd/Ctrl+Shift+I` DevTools binding and no `Cmd/Ctrl+Shift+C` inspect-element binding in `src/`. `Cmd/Ctrl+Shift+I` is the Project Panel's external-file import shortcut (see [project tree shortcuts](./user-guide/reference/keyboard-shortcuts.md#project-tree)).
 
 ## Conflicts
 
@@ -220,21 +83,9 @@ Both handlers are really registered. Monaco keybindings normally consume the eve
 
 **Workaround if Bold does not fire**: use the toolbar button or the command palette (F1 → "Bold").
 
-## Quick Reference
-
-| Action | Shortcut |
-|--------|----------|
-| Save | `Cmd/Ctrl+S` |
-| Search | `Cmd/Ctrl+F` |
-| Palette | `F1` |
-| Sidebar | `Cmd/Ctrl+B` |
-| Terminal | `Cmd/Ctrl+J` |
-| Maximize terminal | `Cmd/Ctrl+Shift+M` |
-| Comment | `Cmd/Ctrl+/` |
-| Multi-cursor | `Alt+Click` |
 
 ## Related
 
-- [UI Components](./ui-components.md) - Implementation details
-- [Editor](./editor/README.md) - Editor features
-- [Terminal](./terminal/README.md) - Terminal usage
+- [UI Components](./ui-components.md)
+- [Editor](./editor/README.md)
+- [Terminal](./terminal/README.md)

@@ -17,11 +17,18 @@
  *      WebRTC policy call
  *   6. `hardenPreviewSession(session, view.webContents)` — permissions/downloads/WebRTC
  *   7. `protocolHandler.attach(session, ctx)` — the ONLY `erfana-preview://` site,
- *      resolving the token through the registry and recording failures to the caller
+ *      resolving the token through the registry and recording failures into the
+ *      view's page scopes
  *   8. `requestFilter.attach(session, ctx)` — the unfiltered network gate, reading
- *      the live allowed-host set from the store
+ *      the live allowed-host set from the store and refusing a frame on any
+ *      token but this session's
  *   9. `assertSealed(session)` — a wiring tripwire: a persistent partition throws
  *      here, and the factory tears down everything it built and rethrows (⇒ no view)
+ *
+ * The two contexts of steps 7 and 8 are built afresh in every `create`, with the
+ * session's token and one shared request-kind ledger, in
+ * `previewSessionFilterContext.ts` (issue #124, WI-12): partition names are
+ * recycled, so the previous view's token must fail closed (RX9).
  *
  * Every electron surface is injected through narrow structural interfaces so the
  * factory is testable without a real `Session`/`WebContentsView`; the defaults at
@@ -35,11 +42,11 @@
  */
 
 import { WebContentsView, session as electronSession, type Session, type WebContents } from 'electron'
-import type {
-  PreviewBounds,
-  PreviewFailureInput,
-  PreviewFailureType
-} from '../../../shared/ipc/preview-types'
+import { PREVIEW } from '../../../shared/constants'
+import { logger } from '../LoggingService'
+import { withTimeout } from '../../utils/withTimeout'
+import type { PreviewBounds, PreviewFailureType } from '../../../shared/ipc/preview-types'
+import type { PreviewBlockedKind } from '../../../shared/ipc/previewBlockedKind'
 import type { IPreviewAllowlistStore } from './PreviewAllowlistStore'
 import type { IPreviewRootRegistry } from './PreviewRootRegistry'
 import type { PreviewNativeImage } from './PreviewStillFrameCache'
@@ -49,10 +56,31 @@ import { attach as attachProtocolHandler } from './PreviewProtocolHandler'
 import { attach as attachRequestFilter } from './PreviewRequestFilter'
 import {
   buildPreviewWebPreferences,
+  commentsFlagOf,
   hardenPreviewSession,
   nextPartitionName
 } from './previewSessionPolicy'
-import { assertSealed } from './PreviewStorageSeal'
+import { assertSealed, purge as purgePreviewSession } from './PreviewStorageSeal'
+import {
+  buildPreviewSessionContexts,
+  type PreviewSessionCommentDeps,
+  type PreviewSessionContexts,
+  type PreviewSessionPageScopes
+} from './previewSessionFilterContext'
+
+export type { PreviewSessionPageScopes } from './previewSessionFilterContext'
+
+/**
+ * An error as a log line carries it: its name, plus `code` when it has one.
+ * Never the message, which can quote a path or a preview URL (QG-7 S3).
+ */
+function errorFieldsOf(error: unknown): { error: string; code?: string } {
+  if (!(error instanceof Error)) {
+    return { error: typeof error }
+  }
+  const { code } = error as NodeJS.ErrnoException
+  return typeof code === 'string' ? { error: error.name, code } : { error: error.name }
+}
 
 /**
  * The slice of an electron `Session` the preview needs. Structural so tests
@@ -71,6 +99,20 @@ export interface PreviewSessionLike {
  * controllers and the input-forwarding target, so one handle flows to them all.
  */
 export interface PreviewWebContentsHandle {
+  /**
+   * WebContents-scoped IPC (sd-074b §5.3). Optional so existing test doubles
+   * stay valid; absent simply means no link channel for that fake.
+   *
+   * Deliberately NOT `mainFrame.ipc`: a `WebFrameMain` is replaced when a
+   * navigated page replaces it, which would silently drop the listener.
+   */
+  readonly ipc?: {
+    on(channel: string, listener: (...args: never[]) => void): void
+    removeListener(channel: string, listener: (...args: never[]) => void): void
+  }
+  /** The top-level frame, used to reject sub-frame senders on that channel. */
+  readonly mainFrame?: unknown
+
   loadURL(url: string): Promise<void>
   reload(): void
   reloadIgnoringCache(): void
@@ -87,6 +129,13 @@ export interface PreviewWebContentsHandle {
     options: { forward: boolean; findNext: boolean; matchCase: boolean }
   ): number
   stopFindInPage(action: 'clearSelection' | 'keepSelection' | 'activateSelection'): void
+  /** Chromium zoom level; 0 is 100%, each step is a ~20% change. */
+  setZoomLevel(level: number): void
+  getZoomLevel(): number
+  /** Whether this web contents currently has keyboard focus. */
+  isFocused(): boolean
+  /** Take keyboard focus (#124, QG-8 U1). Optional like `ipc`: test doubles stay valid. */
+  focus?(): void
   // Event surface: `on`, `once` and `removeListener` are intentionally loose
   // because the wired events (`render-process-gone`, `unresponsive`,
   // `will-navigate`, `did-finish-load`, `destroyed`, `before-input-event`) carry
@@ -108,14 +157,15 @@ export interface PreviewViewHandle {
 export interface PreviewSessionCreateContext {
   /** The project path, resolved main-side (NEVER a renderer parameter, NEW-8). */
   readonly projectPath: string
-  /** Sink for a protocol-layer diagnostic (`csp-missing`, `unsupported-asset-type`). */
-  readonly recordFailure: (input: PreviewFailureInput) => void
+  /** The view's page scopes, asked at every write (`PreviewSessionPageScopes`). */
+  readonly pageScopes: () => PreviewSessionPageScopes
   /** Sink for a network-layer refusal (`blocked-host`, `network-timeout`, …). */
   readonly onBlocked: (
     kind: PreviewFailureType,
     host: string,
     url: string,
-    approvable: boolean
+    approvable: boolean,
+    resourceKind: PreviewBlockedKind
   ) => void
 }
 
@@ -125,17 +175,30 @@ export interface PreviewSession {
   readonly view: PreviewViewHandle
   /** The in-memory partition session. */
   readonly session: PreviewSessionLike
+  /** The partition name, for the recycle ledger. */
+  readonly partition: string
+  /**
+   * Hand the partition back for reuse — ONLY once the page is destroyed, or
+   * the next open attaches its handler and filter to a session whose previous
+   * page is still running `close()`. Purges first, bounded; a purge that fails
+   * or overruns drops the name instead. Never rejects.
+   */
+  readonly release: () => Promise<void>
   /** The opaque root token (the `erfana-preview://` URL host). */
   readonly token: string
   /** The realpath of the project root — the URL-building + confinement anchor. */
   readonly realRoot: string
   /** Detach the protocol handler, the request filter and the session hardening. */
   readonly teardown: () => void
+  /** The view's comment serving, when the view was built with comments on (html-preview-comments.md §4.2). */
+  readonly comments?: PreviewSessionContexts['comments']
 }
 
 export interface IPreviewSessionFactory {
   /** Build one sealed session + view for `ctx.projectPath`. Throws ⇒ no view. */
   create(ctx: PreviewSessionCreateContext): Promise<PreviewSession>
+  /** Drop every recycled partition name (a project switch: nothing carries across). */
+  forgetRecycled(): void
 }
 
 /**
@@ -153,8 +216,19 @@ export interface PreviewSessionFactoryDeps {
   readonly createView?: (webPreferences: unknown) => PreviewViewHandle
   /** Build the frozen web prefs; defaults to `buildPreviewWebPreferences`. */
   readonly buildWebPreferences?: (session: PreviewSessionLike) => unknown
+  /**
+   * Absolute path to the built `previewPage.js` preload (sd-074b §5.2).
+   *
+   * Resolved and existence-checked by the composition root, never by this
+   * factory: a path baked in here would be wrong under Vitest and in a packaged
+   * build. `null` means no preload — links stay inert, which is the deliberate
+   * degradation when the bundle is missing rather than a failure to open.
+   */
+  readonly previewPagePreloadPath?: string | null
   /** A fresh partition name; defaults to `nextPartitionName`. */
   readonly nextPartitionName?: () => string
+  /** Purge a partition before reuse and after use; defaults to `PreviewStorageSeal.purge`. */
+  readonly purge?: (session: PreviewSessionLike) => Promise<void>
   /** Harden permissions/downloads/WebRTC; defaults to `hardenPreviewSession`. */
   readonly hardenSession?: (
     session: PreviewSessionLike,
@@ -166,24 +240,33 @@ export interface PreviewSessionFactoryDeps {
   readonly attachFilter?: (session: PreviewSessionLike, ctx: PreviewFilterContext) => () => void
   /** Assert the session is in-memory; defaults to the item-22 `assertSealed`. */
   readonly assertSealed?: (session: PreviewSessionLike) => void
+  /** HTML Preview comments (html-preview-comments.md §4.2); absent, pages are served raw. */
+  readonly comments?: PreviewSessionCommentDeps
 }
 
 export class PreviewSessionFactory implements IPreviewSessionFactory {
   private readonly deps: Required<
-    Omit<PreviewSessionFactoryDeps, 'registry' | 'allowlistStore'>
+    Omit<PreviewSessionFactoryDeps, 'registry' | 'allowlistStore' | 'comments'>
   > &
-    Pick<PreviewSessionFactoryDeps, 'registry' | 'allowlistStore'>
+    Pick<PreviewSessionFactoryDeps, 'registry' | 'allowlistStore' | 'comments'>
 
   constructor(deps: PreviewSessionFactoryDeps) {
     this.deps = {
       registry: deps.registry,
       allowlistStore: deps.allowlistStore,
+      comments: deps.comments,
       createSession: deps.createSession ?? defaultCreateSession,
       createView: deps.createView ?? defaultCreateView,
+      previewPagePreloadPath: deps.previewPagePreloadPath ?? null,
       buildWebPreferences:
         deps.buildWebPreferences ??
-        ((session) => buildPreviewWebPreferences(session as unknown as Session)),
+        ((session) =>
+          buildPreviewWebPreferences(session as unknown as Session, deps.previewPagePreloadPath ?? null, {
+            // Read per view: a view keeps its policy for life (html-preview-comments.md §3).
+            comments: commentsFlagOf(deps.comments)
+          })),
       nextPartitionName: deps.nextPartitionName ?? nextPartitionName,
+      purge: deps.purge ?? ((session) => purgePreviewSession(session as unknown as Session)),
       hardenSession:
         deps.hardenSession ??
         ((session, wc) =>
@@ -196,63 +279,199 @@ export class PreviewSessionFactory implements IPreviewSessionFactory {
     }
   }
 
+  /**
+   * Purged partition names waiting to be reused. Electron cannot destroy a
+   * session, so every NEW name costs handles for the life of the process
+   * (measured on Windows: ~16 per partition, +0 for re-minting a name) — the
+   * last third of the per-preview handle leak once teardown was bounded.
+   */
+  private readonly freePartitions: string[] = []
+
+  /**
+   * Bumped by `forgetRecycled()`. A session acquired under an older epoch is
+   * dropped on release instead of pushed: `onProjectChanged` forgets the list
+   * only after the whole drain, and an open for the NEW project can arrive
+   * between two of those releases and pop a name the old project just used.
+   */
+  private switchEpoch = 0
+
+  forgetRecycled(): void {
+    this.switchEpoch += 1
+    this.freePartitions.length = 0
+  }
+
+  /**
+   * A purged recycled partition, or a fresh one. Fail-closed: a recycled name
+   * whose purge fails or overruns is dropped, never handed out un-purged.
+   */
+  private async acquirePartition(): Promise<{ partition: string; session: PreviewSessionLike }> {
+    while (this.freePartitions.length > 0) {
+      const partition = this.freePartitions.pop() as string
+      const session = this.deps.createSession(partition)
+      try {
+        await withTimeout(
+          this.deps.purge(session),
+          PREVIEW.PARTITION_PURGE_TIMEOUT_MS,
+          'Preview partition purge before reuse'
+        )
+        return { partition, session }
+      } catch (error) {
+        logger.warn('Preview partition: purge before reuse failed; minting a fresh one', {
+          ...errorFieldsOf(error)
+        })
+      }
+    }
+    const partition = this.deps.nextPartitionName()
+    return { partition, session: this.deps.createSession(partition) }
+  }
+
+  /** The `release` handed out with every session; see `PreviewSession.release`. */
+  private async releasePartition(
+    partition: string,
+    session: PreviewSessionLike,
+    epoch: number
+  ): Promise<void> {
+    if (epoch !== this.switchEpoch) {
+      // Acquired before a project switch: never carry it into the new project.
+      return
+    }
+    try {
+      await withTimeout(
+        this.deps.purge(session),
+        PREVIEW.PARTITION_PURGE_TIMEOUT_MS,
+        'Preview partition purge after use'
+      )
+    } catch (error) {
+      logger.warn('Preview partition: purge after use failed; not reusing it', {
+        ...errorFieldsOf(error)
+      })
+      return
+    }
+    if (
+      this.freePartitions.length < PREVIEW.MAX_RECYCLED_PARTITIONS &&
+      !this.freePartitions.includes(partition)
+    ) {
+      this.freePartitions.push(partition)
+    }
+  }
+
   async create(ctx: PreviewSessionCreateContext): Promise<PreviewSession> {
     const { registry, allowlistStore } = this.deps
 
     // 1–2: load the allowlist, then let the registry mint the token + build the CSP.
-    const state = await allowlistStore.load()
-    const token = await registry.issue(ctx.projectPath, state.hosts)
+    //
+    // The CSP is built from `getOrigins()`, the SAME accessor the network filter
+    // reads below — not from the `load()` return value. Two readers of one store
+    // through two different shapes is how the two chokepoints came to disagree
+    // about ports in the first place; there is one shape now.
+    await allowlistStore.load()
+    // A malformed allowlist block used to look exactly like an empty one from
+    // the panel: the store logged its badge process-wide and nothing reached
+    // the tab. The factory is the first place that has the panel's log (#115).
+    // The badge is the view's, not a page's, so a reload keeps it.
+    for (const badge of allowlistStore.drainBadges()) {
+      ctx.pageScopes().recordViewFailure(badge)
+    }
+    const token = await registry.issue(ctx.projectPath, [...allowlistStore.getOrigins()])
     const entry = registry.resolve(token)
     if (entry === undefined) {
       // The registry just issued this token; an absence here is a wiring fault.
       throw new Error('Preview registry lost the token it just issued')
     }
-
-    // 3–5: fresh in-memory partition, web prefs, then the view (before hardening).
-    const session = this.deps.createSession(this.deps.nextPartitionName())
-    const webPreferences = this.deps.buildWebPreferences(session)
-    const view = this.deps.createView(webPreferences)
-
-    // 6: harden — needs the view's webContents for the WebRTC policy.
-    const disposeHarden = this.deps.hardenSession(session, view.webContents)
-
-    // 7: the single `erfana-preview://` application site.
-    const detachProtocol = this.deps.attachProtocol(session, {
+    // Built afresh for this session, with its own token and ledger (WI-12,
+    // RX9). Every write in them asks the page scopes when it is made (WI-29).
+    const contexts = buildPreviewSessionContexts({
+      token,
       resolve: (t) => registry.resolve(t) ?? null,
-      recordFailure: ctx.recordFailure
-    })
-
-    // 8: the unfiltered network gate, reading the LIVE allowed-host set so an
-    // approve does not need the filter re-attached.
-    const detachFilter = this.deps.attachFilter(session, {
-      getAllowedHosts: () => allowlistStore.getHosts(),
+      getAllowedHosts: () => allowlistStore.getOrigins(),
+      pageScopes: ctx.pageScopes,
       onBlocked: ctx.onBlocked,
-      onRequestStarted: () => {},
-      onRequestSettled: () => {}
+      comments: this.deps.comments
     })
 
-    const teardown = (): void => {
-      detachFilter()
-      detachProtocol()
-      disposeHarden()
+    // Steps 3–9 run AFTER the token is live, and each can throw. A throw in
+    // `attachFilter` once left the token resolvable and the handler serving
+    // confined reads for the life of the process (lens review F9), so the cleanup
+    // list is built incrementally: a failure at ANY step unwinds what came before.
+    const unwind: Array<() => void> = [() => registry.revoke(token)]
+    const rollback = (): void => {
+      // Last built, first undone. Each step is independently guarded: one
+      // failing disposer must not strand the rest.
+      for (const undo of unwind.reverse()) {
+        try {
+          undo()
+        } catch {
+          // Nothing useful to do while already unwinding a failed build.
+        }
+      }
     }
 
-    // 9: the seal tripwire. A persistent partition throws — tear down everything
-    // built above, revoke the token and rethrow so no half-wired view leaks.
     try {
-      this.deps.assertSealed(session)
-    } catch (error) {
-      teardown()
-      // `teardown` only detaches the session wiring; destroy the view built at
-      // step 5 too, or the half-built WebContentsView leaks on a seal failure.
-      if (!view.webContents.isDestroyed()) {
-        view.webContents.destroy()
+      // 3–5: a purged recycled partition (or a fresh one), web prefs, then the
+      // view (before hardening).
+      const { partition, session } = await this.acquirePartition()
+      const epoch = this.switchEpoch
+      // Latched: `fromPartition(name)` returns the SAME object for a name, so a
+      // second release of a name already reissued would purge the successor's
+      // live storage and push the name back while a preview is using it.
+      let released = false
+      const release = async (): Promise<void> => {
+        if (released) return
+        released = true
+        await this.releasePartition(partition, session, epoch)
       }
-      registry.revoke(token)
+      // A throw from any later step used to lose the name for good (review):
+      // the ~16-handle cost of a fresh partition, on the path most likely to
+      // repeat. Nothing is attached yet, so the hand-back is safe here.
+      unwind.push(() => {
+        void release()
+      })
+      // Read as the web prefs are built, so the frame preload and the service agree.
+      const commentsOn = commentsFlagOf(this.deps.comments)
+      const webPreferences = this.deps.buildWebPreferences(session)
+      const view = this.deps.createView(webPreferences)
+      unwind.push(() => {
+        if (!view.webContents.isDestroyed()) {
+          view.webContents.destroy()
+        }
+      })
+
+      // 6: harden — needs the view's webContents for the WebRTC policy.
+      const disposeHarden = this.deps.hardenSession(session, view.webContents)
+      unwind.push(disposeHarden)
+
+      // 7: the single `erfana-preview://` application site.
+      const detachProtocol = this.deps.attachProtocol(session, contexts.protocol)
+      unwind.push(detachProtocol)
+
+      // 8: the unfiltered network gate, reading the LIVE allowed-host set so an
+      // approve does not need the filter re-attached.
+      const detachFilter = this.deps.attachFilter(session, contexts.filter)
+      unwind.push(detachFilter)
+
+      // 9: the seal tripwire. A persistent partition throws.
+      this.deps.assertSealed(session)
+
+      const teardown = (): void => {
+        detachFilter()
+        detachProtocol()
+        disposeHarden()
+      }
+
+      return {
+        view,
+        session,
+        token,
+        realRoot: entry.realRoot,
+        partition,
+        teardown,
+        release,
+        ...(commentsOn && contexts.comments !== undefined ? { comments: contexts.comments } : {})
+      }
+    } catch (error) {
+      rollback()
       throw error
     }
-
-    return { view, session, token, realRoot: entry.realRoot, teardown }
   }
 }
 

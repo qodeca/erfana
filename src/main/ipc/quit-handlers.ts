@@ -9,9 +9,9 @@
  * @see Issue #64 - quit confirmation feature
  */
 
-import { ipcMain } from 'electron'
 import { QuitConfirmResponseSchema } from '../../shared/ipc/quit-schema'
 import { logger } from '../services/LoggingService'
+import { registerOn } from './registry'
 
 /**
  * Register quit confirmation IPC handlers
@@ -23,7 +23,7 @@ export function registerQuitHandlers(onResponse: (proceed: boolean) => void): vo
    * Receive quit confirmation response from renderer
    * One-way channel from renderer
    */
-  ipcMain.on('quit:confirmResponse', (_event, payload: unknown) => {
+  registerOn('quit:confirmResponse', (_event, payload: unknown) => {
     // Validate response payload
     const result = QuitConfirmResponseSchema.safeParse(payload)
     if (!result.success) {

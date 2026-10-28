@@ -7,7 +7,7 @@
  * Accept either signature — primary OR rotation — to enable key rotation
  * without bricking existing installs.
  *
- * **Primary key**: lives in CI as `MANIFEST_SIGNING_KEY` secret under the
+ * **Primary key**: lives in CI as `MINISIGN_SECRET_KEY_BASE64` secret under the
  * `production-signing` GitHub Environment. Signs every normal
  * `whisper-build-*` release manifest. Key ID `4AEBCE8499845646`.
  *

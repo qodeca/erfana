@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+import { ERROR_CODE_MARKER_PATTERN, cleanErrorMessage } from './errorCodeMarker'
 /**
  * Standardized Error Codes and Types
  *
  * todo021: Unified error handling across all application layers
  * Provides type-safe error codes and structured error class
  */
+
+import type { UnsafeToolReason } from './unsafeTool'
 
 /**
  * Sentinel phrase embedded in `AppError` messages thrown by
@@ -85,6 +88,8 @@ export enum ErrorCode {
   IMPORT_PAGE_LIMIT_EXCEEDED = 'IMPORT_PAGE_LIMIT_EXCEEDED',
   IMPORT_TIMEOUT = 'IMPORT_TIMEOUT',
   IMPORT_BUSY = 'IMPORT_BUSY',
+  // The tool a conversion would run resolves into the project or a temp folder (#250)
+  IMPORT_UNTRUSTED_TOOL = 'IMPORT_UNTRUSTED_TOOL',
 
   // Prompt execution errors
   PROMPT_NOT_FOUND = 'PROMPT_NOT_FOUND',
@@ -136,6 +141,14 @@ export enum ErrorCode {
   /** Catch-all, including harness timeout and hidden-window load failure. */
   IMAGE_EXPORT_FAILED = 'IMAGE_EXPORT_FAILED',
 
+  // Open in default browser errors (Issue #124) – `browser:openFile` refusals
+  OPEN_IN_BROWSER_INVALID_REQUEST = 'OPEN_IN_BROWSER_INVALID_REQUEST',
+  OPEN_IN_BROWSER_NO_PROJECT = 'OPEN_IN_BROWSER_NO_PROJECT',
+  OPEN_IN_BROWSER_OUTSIDE_PROJECT = 'OPEN_IN_BROWSER_OUTSIDE_PROJECT',
+  OPEN_IN_BROWSER_NOT_HTML = 'OPEN_IN_BROWSER_NOT_HTML',
+  OPEN_IN_BROWSER_MISSING = 'OPEN_IN_BROWSER_MISSING',
+  OPEN_IN_BROWSER_LAUNCH_FAILED = 'OPEN_IN_BROWSER_LAUNCH_FAILED',
+
   // Screenshot capture errors
   SCREENSHOT_PERMISSION_DENIED = 'SCREENSHOT_PERMISSION_DENIED',
   SCREENSHOT_TIMEOUT = 'SCREENSHOT_TIMEOUT',
@@ -166,6 +179,13 @@ export enum ErrorCode {
   EXTERNAL_FILE_COPY_FAILED = 'EXTERNAL_FILE_COPY_FAILED',
   EXTERNAL_FILE_MOVE_FAILED = 'EXTERNAL_FILE_MOVE_FAILED',
   EXTERNAL_FILE_SOURCE_DELETED = 'EXTERNAL_FILE_SOURCE_DELETED',
+  EXTERNAL_FILE_MOVE_NOT_GRANTED = 'EXTERNAL_FILE_MOVE_NOT_GRANTED',
+  EXTERNAL_FILE_MOVE_CANCELLED = 'EXTERNAL_FILE_MOVE_CANCELLED',
+  EXTERNAL_FILE_MOVE_CHANGED = 'EXTERNAL_FILE_MOVE_CHANGED',
+  EXTERNAL_FILE_SAME_FILE = 'EXTERNAL_FILE_SAME_FILE',
+  EXTERNAL_FILE_MOVE_SYMLINK = 'EXTERNAL_FILE_MOVE_SYMLINK',
+  EXTERNAL_FILE_SOURCE_CHANGED = 'EXTERNAL_FILE_SOURCE_CHANGED',
+  EXTERNAL_FILE_IN_PROJECT = 'EXTERNAL_FILE_IN_PROJECT',
 
   // Transcription errors (Issue #75)
   TRANSCRIPTION_NO_API_KEY = 'TRANSCRIPTION_NO_API_KEY',
@@ -183,6 +203,8 @@ export enum ErrorCode {
   WHISPER_BINARY_NOT_FOUND = 'WHISPER_BINARY_NOT_FOUND',
   WHISPER_BINARY_DOWNLOAD_FAILED = 'WHISPER_BINARY_DOWNLOAD_FAILED',
   WHISPER_MODEL_NOT_FOUND = 'WHISPER_MODEL_NOT_FOUND',
+  WHISPER_MODEL_INTEGRITY_FAILED = 'WHISPER_MODEL_INTEGRITY_FAILED',
+  WHISPER_MODEL_CHANGED_DURING_CHECK = 'WHISPER_MODEL_CHANGED_DURING_CHECK',
   WHISPER_MODEL_DOWNLOAD_FAILED = 'WHISPER_MODEL_DOWNLOAD_FAILED',
   WHISPER_PROCESS_FAILED = 'WHISPER_PROCESS_FAILED',
   WHISPER_PROCESS_TIMEOUT = 'WHISPER_PROCESS_TIMEOUT',
@@ -224,6 +246,60 @@ export enum ErrorCode {
   PREVIEW_LOCAL_FILE_MISSING = 'PREVIEW_LOCAL_FILE_MISSING',
   PREVIEW_VIEW_LIMIT_REACHED = 'PREVIEW_VIEW_LIMIT_REACHED',
   PREVIEW_ALLOWLIST_FULL = 'PREVIEW_ALLOWLIST_FULL',
+  PREVIEW_READ_BUDGET_EXCEEDED = 'PREVIEW_READ_BUDGET_EXCEEDED',
+  PREVIEW_LINK_BLOCKED = 'PREVIEW_LINK_BLOCKED',
+  /**
+   * `preview:open` refused the request before it reached the service: the
+   * payload failed `PreviewOpenRequestSchema`. Named, rather than folded into
+   * UNKNOWN_ERROR, so the renderer's log line says why — a 249-char path used
+   * to fail here on Windows with nothing on screen (ids are bounded in the
+   * renderer since v0.19.0, so length is no longer a cause).
+   */
+  PREVIEW_OPEN_INVALID_REQUEST = 'PREVIEW_OPEN_INVALID_REQUEST',
+  /**
+   * The band's own deadline on `preview:approveHost` passed without an answer.
+   * NOT a refusal: the grant is written before the first await main makes, so
+   * it is saved and takes effect on the next load; only the confirmation and
+   * the automatic reload are missing.
+   */
+  PREVIEW_APPROVE_TIMED_OUT = 'PREVIEW_APPROVE_TIMED_OUT',
+  /**
+   * An open was abandoned because something newer overtook it — a project
+   * switch, a close, a suspend, or another open for the same panel.
+   *
+   * Distinct from `PROJECT_NOT_FOUND`, which previously carried this meaning as
+   * well as its own. The renderer could not tell "there is no project" from
+   * "your open was superseded", so a benign race — the exact outcome the
+   * staleness guard exists to produce — latched the panel into a failure banner
+   * for the rest of its mount (lens review F27). This is a no-op for the
+   * renderer, not a failure.
+   */
+  PREVIEW_OPEN_SUPERSEDED = 'PREVIEW_OPEN_SUPERSEDED',
+  // `preview:navigate` refusals (Issue #124): target gone; target refused (outside,
+  // not HTML, opens as source); no view here or suspended; stale or already pending
+  PREVIEW_NAV_TARGET_MISSING = 'PREVIEW_NAV_TARGET_MISSING',
+  PREVIEW_NAV_TARGET_REFUSED = 'PREVIEW_NAV_TARGET_REFUSED',
+  PREVIEW_NAV_UNAVAILABLE = 'PREVIEW_NAV_UNAVAILABLE',
+  PREVIEW_NAV_SKIPPED = 'PREVIEW_NAV_SKIPPED',
+
+  // HTML Preview comments (design §8); meanings in main/services/preview/comments/commentRefusals.ts
+  COMMENT_TARGET_MOVED = 'COMMENT_TARGET_MOVED',
+  COMMENT_BLOCK_CHANGED = 'COMMENT_BLOCK_CHANGED',
+  COMMENT_ENCODING_UNSUPPORTED = 'COMMENT_ENCODING_UNSUPPORTED',
+  COMMENT_FILE_CONFLICTED = 'COMMENT_FILE_CONFLICTED',
+  COMMENT_DRAFT_EXPIRED = 'COMMENT_DRAFT_EXPIRED',
+  COMMENT_KEY_INVALID = 'COMMENT_KEY_INVALID',
+  COMMENT_IDENTITY_REQUIRED = 'COMMENT_IDENTITY_REQUIRED',
+  COMMENT_LIMIT = 'COMMENT_LIMIT',
+  COMMENT_FILE_TOO_LARGE = 'COMMENT_FILE_TOO_LARGE',
+  COMMENT_WRITE_REFUSED_LINK = 'COMMENT_WRITE_REFUSED_LINK',
+  COMMENT_WRITE_UNSUPPORTED_FS = 'COMMENT_WRITE_UNSUPPORTED_FS',
+  COMMENT_UNSAVED_SOURCE = 'COMMENT_UNSAVED_SOURCE',
+  COMMENT_FILE_GONE = 'COMMENT_FILE_GONE',
+  COMMENT_PATH_REFUSED = 'COMMENT_PATH_REFUSED',
+  COMMENT_FILE_READ_ONLY = 'COMMENT_FILE_READ_ONLY',
+  COMMENT_WRITE_FAILED = 'COMMENT_WRITE_FAILED',
+  COMMENT_SAVE_PENDING = 'COMMENT_SAVE_PENDING',
 
   // Generic errors
   UNKNOWN_ERROR = 'UNKNOWN_ERROR'
@@ -283,6 +359,45 @@ export class AppError extends Error {
  * User-friendly error messages for display
  * todo023: Error message translator
  */
+export {
+  UNSAFE_TOOL_REASONS,
+  UNSAFE_TOOL_NAMES,
+  type UnsafeToolReason,
+  type UnsafeToolName,
+  type UnsafeToolInfo
+} from './unsafeTool'
+
+const UNSAFE_REASON_TEXT: Record<UnsafeToolReason, { what: string; fix: string }> = {
+  project: { what: 'is in the open project', fix: 'Remove that folder from PATH, then try again.' },
+  temp: { what: 'is in a temporary folder', fix: 'Remove that folder from PATH, then try again.' },
+  network: {
+    what: 'would be looked up on a network share listed in PATH',
+    fix: 'Remove the network share from PATH, or move it after the local folder, then try again.'
+  },
+  relative: { what: 'comes from a relative PATH entry', fix: 'Remove that entry from PATH, then try again.' },
+  unresolvable: {
+    what: 'could not be checked, because its real location cannot be resolved',
+    fix: 'Reinstall it in its default folder, then try again.'
+  },
+  ambiguous: {
+    what: 'has copies in more than one PATH folder, and Erfana cannot tell which one would run',
+    fix: 'Remove the extra copy from PATH, then try again.'
+  }
+}
+
+/**
+ * Why Erfana will not run LibreOffice (#250), naming the tool or the helper
+ * (`which`, `powershell`) at fault, the reason and its fix. Never carries the
+ * path. The single wording source: the conversion refusal in main, the
+ * Settings → Import tools hint and the import refusal dialog all use it, so
+ * they cannot disagree.
+ */
+export function untrustedToolMessage(tool: string, reason: UnsafeToolReason): string {
+  const who = tool === 'which' || tool === 'powershell' ? `the ${tool} program LiteParse uses to find LibreOffice` : tool
+  const { what, fix } = UNSAFE_REASON_TEXT[reason]
+  return `Erfana will not run LibreOffice: ${who} ${what}. ${fix}`
+}
+
 export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   // Path validation errors
   [ErrorCode.PATH_INVALID]: 'The selected path is invalid',
@@ -341,6 +456,8 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.IMPORT_PAGE_LIMIT_EXCEEDED]: 'Document exceeds the maximum page limit',
   [ErrorCode.IMPORT_TIMEOUT]: 'Document conversion timed out',
   [ErrorCode.IMPORT_BUSY]: 'A document import is already in progress',
+  [ErrorCode.IMPORT_UNTRUSTED_TOOL]:
+    'Erfana did not run LibreOffice: the copy it would use is in the open project, a temporary folder or a network share, or comes from a relative PATH entry. Remove that folder from PATH, then try again.',
 
   // Prompt execution errors
   [ErrorCode.PROMPT_NOT_FOUND]: 'Prompt template not found',
@@ -377,6 +494,14 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.IMAGE_EXPORT_CLIPBOARD_FAILED]: 'The clipboard rejected the image',
   [ErrorCode.IMAGE_EXPORT_FAILED]: 'Image export failed',
 
+  // Open in default browser (Issue #124); the renderer's toasts add the file name
+  [ErrorCode.OPEN_IN_BROWSER_INVALID_REQUEST]: 'The request to open this file in a browser was rejected.',
+  [ErrorCode.OPEN_IN_BROWSER_NO_PROJECT]: 'Open a project first – only its files open in a browser.',
+  [ErrorCode.OPEN_IN_BROWSER_OUTSIDE_PROJECT]: 'This file leads outside the open project, so Erfana will not open it in a browser.',
+  [ErrorCode.OPEN_IN_BROWSER_NOT_HTML]: 'This is not an HTML page. Only .html and .htm files can be opened in a browser.',
+  [ErrorCode.OPEN_IN_BROWSER_MISSING]: 'This file is no longer there – it may have been moved or deleted.',
+  [ErrorCode.OPEN_IN_BROWSER_LAUNCH_FAILED]: 'Your browser did not start. Try again, or reveal the file and open it yourself.',
+
   // Screenshot capture errors
   [ErrorCode.SCREENSHOT_PERMISSION_DENIED]: 'Screen recording permission required. Grant access in System Settings > Privacy & Security.',
   [ErrorCode.SCREENSHOT_TIMEOUT]: 'Screenshot capture timed out',
@@ -407,6 +532,15 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.EXTERNAL_FILE_COPY_FAILED]: 'Failed to copy external file',
   [ErrorCode.EXTERNAL_FILE_MOVE_FAILED]: 'Failed to move external file',
   [ErrorCode.EXTERNAL_FILE_SOURCE_DELETED]: 'Source file was deleted during operation',
+  [ErrorCode.EXTERNAL_FILE_MOVE_NOT_GRANTED]:
+    'Moving needs a file chosen with the Add files dialog; copy the file instead',
+  [ErrorCode.EXTERNAL_FILE_MOVE_CANCELLED]: 'Move cancelled',
+  [ErrorCode.EXTERNAL_FILE_MOVE_CHANGED]: 'The files changed while waiting; nothing was moved',
+  [ErrorCode.EXTERNAL_FILE_SAME_FILE]: 'The file is already there',
+  [ErrorCode.EXTERNAL_FILE_MOVE_SYMLINK]: 'A link can be copied but not moved; copy it instead',
+  [ErrorCode.EXTERNAL_FILE_SOURCE_CHANGED]:
+    'The original changed during the move, so it was left in place; the copy was kept',
+  [ErrorCode.EXTERNAL_FILE_IN_PROJECT]: 'This file is already in the project; move it from the project tree',
 
   // Transcription errors (Issue #75)
   [ErrorCode.TRANSCRIPTION_NO_API_KEY]: 'No API key configured. Add your OpenAI API key in Settings.',
@@ -424,6 +558,8 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.WHISPER_BINARY_NOT_FOUND]: 'Whisper binary not found. Please download it from Settings.',
   [ErrorCode.WHISPER_BINARY_DOWNLOAD_FAILED]: 'Failed to download whisper binary. Please check your connection and try again.',
   [ErrorCode.WHISPER_MODEL_NOT_FOUND]: 'Whisper model not found. Please download it from Settings.',
+  [ErrorCode.WHISPER_MODEL_CHANGED_DURING_CHECK]: 'The whisper model file changed while it was being checked. Please try again.',
+  [ErrorCode.WHISPER_MODEL_INTEGRITY_FAILED]: 'The whisper model failed its integrity check and was removed. Please download it again from Settings.',
   [ErrorCode.WHISPER_MODEL_DOWNLOAD_FAILED]: 'Failed to download whisper model. Please check your connection and try again.',
   [ErrorCode.WHISPER_PROCESS_FAILED]: 'Local transcription failed. Please try again or switch to OpenAI backend.',
   [ErrorCode.WHISPER_PROCESS_TIMEOUT]: 'Local transcription timed out. Try a smaller model or shorter file.',
@@ -449,6 +585,36 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.PREVIEW_LOCAL_FILE_MISSING]: '"<path>" could not be read',
   [ErrorCode.PREVIEW_VIEW_LIMIT_REACHED]: 'A preview is already open.',
   [ErrorCode.PREVIEW_ALLOWLIST_FULL]: 'The preview host allowlist is full.',
+  [ErrorCode.PREVIEW_READ_BUDGET_EXCEEDED]:
+    'The preview asked for too many files at once; some were not loaded.',
+  [ErrorCode.PREVIEW_LINK_BLOCKED]: 'That link was blocked.',
+  [ErrorCode.PREVIEW_OPEN_INVALID_REQUEST]: 'The preview request was rejected.',
+  [ErrorCode.PREVIEW_APPROVE_TIMED_OUT]: 'Saved, but the preview did not confirm. Reload it.',
+  [ErrorCode.PREVIEW_OPEN_SUPERSEDED]: 'The preview was replaced before it finished opening.',
+  // Same-tab navigation (Issue #124); the renderer's toasts add the file names
+  [ErrorCode.PREVIEW_NAV_TARGET_MISSING]: 'That page is no longer there – it may have been moved or deleted.',
+  [ErrorCode.PREVIEW_NAV_TARGET_REFUSED]: 'That page cannot be shown as a preview here.',
+  [ErrorCode.PREVIEW_NAV_UNAVAILABLE]: 'This preview is not ready. Try again in a moment.',
+  [ErrorCode.PREVIEW_NAV_SKIPPED]: 'This tab was still loading another page.',
+
+  // HTML Preview comments, as §10.10 words them; `{file}` is the file's name, filled by the comment window
+  [ErrorCode.COMMENT_TARGET_MOVED]: 'This element changed in the file since you picked it. Close and pick it again – your text will be restored.',
+  [ErrorCode.COMMENT_BLOCK_CHANGED]: 'This block changed on disk. Reopen it and try again.',
+  [ErrorCode.COMMENT_ENCODING_UNSUPPORTED]: 'Erfana can only add comments to UTF-8 files.',
+  [ErrorCode.COMMENT_FILE_CONFLICTED]: '{file} has unresolved git conflicts. Resolve them first.',
+  [ErrorCode.COMMENT_DRAFT_EXPIRED]: 'This comment window was open too long. Pick the element again – your text is kept.',
+  [ErrorCode.COMMENT_KEY_INVALID]: 'This comment is no longer open here. Reopen it and try again.',
+  [ErrorCode.COMMENT_IDENTITY_REQUIRED]: 'Enter a name to add comments.',
+  [ErrorCode.COMMENT_LIMIT]: 'This would go over a comment size limit, so nothing was saved.',
+  [ErrorCode.COMMENT_FILE_TOO_LARGE]: 'Erfana adds comments only to files of up to 25 MB and 640,000 elements.',
+  [ErrorCode.COMMENT_WRITE_REFUSED_LINK]: "{file} is a link to another file, so Erfana won't write to it.",
+  [ErrorCode.COMMENT_WRITE_UNSUPPORTED_FS]: "Erfana can't write to {file} on this drive.",
+  [ErrorCode.COMMENT_UNSAVED_SOURCE]: "{file} has unsaved changes in another tab. Save them first so your edits and this comment don't overwrite each other.",
+  [ErrorCode.COMMENT_FILE_GONE]: '{file} no longer exists. Copy your text before closing.',
+  [ErrorCode.COMMENT_PATH_REFUSED]: "Erfana doesn't write comments to this file.",
+  [ErrorCode.COMMENT_FILE_READ_ONLY]: "Couldn't save: {file} is read-only. Your text is still here.",
+  [ErrorCode.COMMENT_WRITE_FAILED]: "Couldn't save the comment. Your text is still here – try again.",
+  [ErrorCode.COMMENT_SAVE_PENDING]: 'Still saving to {file}. Your comment appears here once it is written – no need to save again.',
 
   // Generic errors
   [ErrorCode.UNKNOWN_ERROR]: 'An unexpected error occurred'
@@ -474,9 +640,39 @@ export function getUserFriendlyMessage(error: unknown): string {
     return ERROR_MESSAGES[error.code] || ERROR_MESSAGES[ErrorCode.UNKNOWN_ERROR]
   }
 
+  // An error that crossed IPC is a plain Error; main marks the code on the end of its message
+  const carried = errorCodeInMessage(error)
+  if (carried) {
+    return ERROR_MESSAGES[carried]
+  }
+
   // Security: Don't expose raw error messages - return generic message
   // Internal details are logged separately, not sent to renderer
   return ERROR_MESSAGES[ErrorCode.UNKNOWN_ERROR]
+}
+
+/**
+ * What to show a person for a failed operation, in a toast or inline: the
+ * friendly text of the error's code when it has one (an `AppError`, or an error
+ * that crossed IPC with its code marked), otherwise its message without the
+ * Electron prefix and code marker.
+ */
+export function getDisplayMessage(error: unknown): string {
+  const code = error instanceof AppError ? error.code : errorCodeInMessage(error)
+  if (code && ERROR_MESSAGES[code]) {
+    return ERROR_MESSAGES[code]
+  }
+  if (error instanceof Error) return cleanErrorMessage(error.message)
+  if (typeof error === 'string') return cleanErrorMessage(error)
+  return String(error)
+}
+
+/** The code main marked on the end of an error's message (see errorCodeMarker.ts), if any. */
+export function errorCodeInMessage(error: unknown): ErrorCode | null {
+  if (!(error instanceof Error)) return null
+  const match = ERROR_CODE_MARKER_PATTERN.exec(error.message)
+  if (!match) return null
+  return (Object.values(ErrorCode) as string[]).includes(match[1]) ? (match[1] as ErrorCode) : null
 }
 
 /**

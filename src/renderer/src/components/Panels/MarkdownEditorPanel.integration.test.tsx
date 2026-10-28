@@ -19,6 +19,8 @@
  */
 
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 
 describe('MarkdownEditorPanel Integration', () => {
   describe('Component Orchestration', () => {
@@ -293,6 +295,224 @@ describe('MarkdownEditorPanel Integration', () => {
 
       expect(isSplitMode('editor')).toBe(false)
       expect(isSplitMode('preview')).toBe(false)
+    })
+  })
+
+  describe('Save by id (issue #124, part 3 §3.6)', () => {
+    // Rendering the panel needs monaco-editor, which does not resolve in this
+    // environment, so – like the rest of this suite – the wiring is pinned
+    // without a render: on the panel's source. The registry's behaviour is
+    // covered in editorSaveRegistry.test.ts.
+    // Vitest runs from the repository root; jsdom's import.meta.url is not a file URL.
+    // Normalise the line endings: `.gitattributes` carries `* text=auto`, so this
+    // file is CRLF on a Windows checkout while the needles below are written with
+    // `\n`. Without this, the multi-line `toContain` assertions can never match.
+    const source = readFileSync(
+      join(process.cwd(), 'src/renderer/src/components/Panels/MarkdownEditorPanel.tsx'),
+      'utf8'
+    ).replace(/\r\n/g, '\n')
+    const handleSave = source.slice(
+      source.indexOf('const handleSave = useCallback'),
+      source.indexOf('}, [currentFile, isFileDeleted, dismissConflict')
+    )
+
+    it('useEditorSaveRegistration hook is imported correctly', async () => {
+      const { useEditorSaveRegistration } = await import('../../hooks/useEditorSaveRegistration')
+      expect(typeof useEditorSaveRegistration).toBe('function')
+    })
+
+    it('registers the tab once: a manual save, the conflict flag, and an autosave hold', () => {
+      const calls = source.match(/useEditorSaveRegistration\(/g) ?? []
+      expect(calls).toHaveLength(1)
+      expect(source).toContain(
+        "useEditorSaveRegistration(panelId, () => handleSave('registry'), externalChangeDetected, () => {\n" +
+          '    // A hold stops autosave for real (no re-arming by typing or the modified\n' +
+          '    // effect) and makes the editor read-only, so nothing new can be typed\n' +
+          '    // between a flush and the end of the hold.\n' +
+          '    const releaseAutoSave = holdAutoSave()\n'
+      )
+      expect(source).toContain('}, () => saveInFlightRef.current ?? Promise.resolve())')
+      // Registered below useAutoSave, whose holdAutoSave it uses.
+      expect(source.indexOf('useEditorSaveRegistration(panelId,')).toBeGreaterThan(source.indexOf('= useAutoSave('))
+    })
+
+    it('handleSave answers true after a write and false with no file or a failed write', () => {
+      expect(handleSave).toContain("async (trigger: SaveTrigger = 'user'): Promise<boolean> =>")
+      expect(handleSave).toContain('if (!currentFile) return false')
+      expect(handleSave.match(/return true/g)).toHaveLength(1)
+      expect(handleSave).toMatch(/catch \(error\) \{[\s\S]*return false\s*\} finally/)
+    })
+
+    it('keeps the autosave guard order unchanged', () => {
+      const order = [
+        'markSaving()',
+        'pauseWatch()',
+        'getValue()',
+        'writeFile(',
+        'notifySaveComplete(contentToSave)',
+        'settleSavedFile(prev, contentToSave, bufferNow)',
+        'resumeWatch()',
+        'unmarkSaving()'
+      ].map((step) => handleSave.indexOf(step))
+
+      expect(order.every((index) => index >= 0)).toBe(true)
+      expect([...order].sort((a, b) => a - b)).toEqual(order)
+    })
+  })
+
+  describe('Save after a folder rename (v0.21.0 validation)', () => {
+    // Pinned on the source for the same reason as the block above: rendering
+    // the panel needs monaco-editor. The message and dedupe rules themselves
+    // are unit-tested in markdownEditorPanel.logic.test.ts.
+    const source = readFileSync(
+      join(process.cwd(), 'src/renderer/src/components/Panels/MarkdownEditorPanel.tsx'),
+      'utf8'
+    ).replace(/\r\n/g, '\n')
+    const handleSave = source.slice(
+      source.indexOf('const handleSave = useCallback'),
+      source.indexOf('}, [currentFile, isFileDeleted, dismissConflict')
+    )
+    const catchBlock = handleSave.slice(handleSave.indexOf('} catch (error) {'), handleSave.indexOf('} finally {'))
+
+    it('the slice under test exists', () => {
+      expect(handleSave.length).toBeGreaterThan(0)
+      expect(catchBlock.length).toBeGreaterThan(0)
+    })
+
+    it('a failed save shows an error toast with the reason and still answers false', () => {
+      expect(catchBlock).toContain('formatSaveError(error, extractFileName(currentFile.path))')
+      expect(catchBlock).toContain('shouldToastSaveError(trigger, message, lastSaveErrorRef.current)')
+      expect(catchBlock).toMatch(/showToast\(\{ title: 'Save failed', message, type: 'error'/)
+      expect(catchBlock).toContain('return false')
+      // The log line drops the absolute path the errno message quotes; the toast keeps it
+      expect(catchBlock).toContain("logger.error('Error saving file', loggableError(error))")
+      // The tab is marked clean only after a write that succeeded
+      expect(catchBlock).not.toContain('setEditorDirty(panelId, false)')
+    })
+
+    it('one failure, one toast: a save by id leaves the toast to the registry caller', () => {
+      // previewTabMove toasts on `false` (editorSaveRegistry contract), so the
+      // panel's own toast is skipped for the registry trigger
+      expect(catchBlock).toMatch(/if \(trigger !== 'registry'\) \{[\s\S]*showToast\(/)
+      expect(catchBlock.indexOf("if (trigger !== 'registry')")).toBeLessThan(catchBlock.indexOf('showToast('))
+    })
+
+    it('wires each caller to its trigger: Cmd+S is user, autosave is autosave, the registry is registry', () => {
+      expect(source).toContain("onSave: () => handleSave('user'),")
+      // useAutoSave is called before handleSave exists, so it reaches it through
+      // a ref that a layout effect keeps on the latest handleSave
+      expect(source).toContain("return handleSaveRef.current('autosave')")
+      expect(source).toContain('handleSaveRef.current = handleSave')
+      // an autosave never overwrites a file that changed on disk
+      expect(source.indexOf('if (externalChangeDetected) return')).toBeLessThan(
+        source.indexOf("return handleSaveRef.current('autosave')")
+      )
+      expect(source).toContain("() => handleSave('registry'), externalChangeDetected")
+      expect(source.match(/handleSave(?:Ref\.current)?\(/g)).toHaveLength(3)
+    })
+
+    it('only the tab’s own Cmd+S of a deleted tab may recreate the missing folder', () => {
+      expect(handleSave).toContain('if (shouldRecreateParentDirs(trigger, isFileDeleted)) {')
+      expect(handleSave).toContain('createParentDirs: true,')
+      expect(handleSave.match(/createParentDirs: true/g)).toHaveLength(1)
+    })
+
+    it('names the project the file was opened under on every write', () => {
+      expect(handleSave).toContain('const generation = openedGenerationRef.current')
+      const writes = handleSave.match(/await fileGateway\.writeFile\(\{[^}]*\}\)/g) ?? []
+      expect(writes).toHaveLength(2)
+      for (const write of writes) expect(write).toContain('generation')
+    })
+
+    it('settles a finished save in one update, from the buffer as it is after the write', () => {
+      // Two updates (written text, then the newer buffer) let React render the
+      // older text as current for a moment; the rules are in settleSavedFile
+      expect(handleSave.match(/setCurrentFile\(/g)).toHaveLength(1)
+      expect(handleSave).toContain('const bufferNow = editorRef.current?.getEditor()?.getValue()')
+      expect(handleSave).toContain(
+        'bufferNow !== undefined && bufferNow !== contentToSave'
+      )
+    })
+
+    it('clears the tab’s dirty dot when the buffer takes the disk’s text (Reload from Disk)', () => {
+      const watcherUpdate = source.slice(
+        source.indexOf('const handleContentUpdateFromWatcher = useCallback'),
+        source.indexOf('const {\n    externalChangeDetected')
+      )
+      expect(watcherUpdate).toContain('modified: false')
+      expect(watcherUpdate).toContain('setEditorDirty(panelId, false)')
+    })
+
+    it('keeps a remounted editor read-only while an autosave hold is active', () => {
+      expect(source).toContain('const releaseReadOnly = readOnlyHold.hold()')
+      const onMount = source.slice(
+        source.indexOf('const handleEditorMount = useCallback'),
+        source.indexOf('}, [viewMode, setIsEditorReady, readOnlyHold])')
+      )
+      expect(onMount).toContain('readOnlyHold.applyToMountedEditor(editor)')
+      // The hook's behaviour is covered in useEditorReadOnlyHold.test.ts
+    })
+
+    it('forgets the last failure reason when the panel switches file', () => {
+      expect(source).toMatch(
+        /useEffect\(\(\) => \{\n\s*lastSaveErrorRef\.current = null\n\s*\}, \[currentFile\?\.path\]\)/
+      )
+    })
+  })
+  describe('File load wiring (review finding 49) and the autosave indicator timer (finding 52)', () => {
+    // Only the wiring is pinned here, on the source, for the same reason as
+    // the blocks above. The behaviour (latest read wins, failures reported,
+    // nothing sensitive logged, StrictMode) is tested with renderHook in
+    // useLatestFileLoad.test.ts, the error state in EditorLoadError.test.tsx.
+    const source = readFileSync(
+      join(process.cwd(), 'src/renderer/src/components/Panels/MarkdownEditorPanel.tsx'),
+      'utf8'
+    ).replace(/\r\n/g, '\n')
+    /** The text between two markers; throws if either is missing, so a rename cannot empty a slice silently. */
+    const between = (from: string, to: string): string => {
+      const start = source.indexOf(from)
+      const end = source.indexOf(to, start)
+      expect(start, from).toBeGreaterThan(-1)
+      expect(end, to).toBeGreaterThan(-1)
+      return source.slice(start, end)
+    }
+
+    it('loads through useLatestFileLoad, once, with a toast on failure', () => {
+      const load = between('= useLatestFileLoad(props.params?.filePath, {', '\n  })\n')
+      expect(source.match(/useLatestFileLoad\(/g)).toHaveLength(1)
+      expect(load).toContain('openedGenerationRef.current = generation')
+      expect(load).toContain("showToast({ title: 'Could not open file', message, type: 'error'")
+      // no second, unguarded read anywhere in the panel
+      expect(source.match(/fileGateway\.readFile\(/g)).toHaveLength(1)
+      expect(load).toContain('fileGateway.readFile({ filePath })')
+    })
+
+    it('renders the error state with its retry before the empty state', () => {
+      const errorState = source.indexOf('<EditorLoadError message={loadError} onRetry={retryLoad} />')
+      const emptyState = source.indexOf('<p>No file open</p>')
+      expect(errorState).toBeGreaterThan(-1)
+      expect(emptyState).toBeGreaterThan(-1)
+      expect(errorState).toBeLessThan(emptyState)
+      expect(source).toContain(') : loadError ? (')
+    })
+
+    it('hands autosave the save result, so a failed write backs off', () => {
+      expect(source).toContain("return handleSaveRef.current('autosave')")
+    })
+
+    it('keeps one pending indicator reset, cleared when an autosave starts and on unmount', () => {
+      const handleSave = between('const handleSave = useCallback', '}, [currentFile, isFileDeleted, dismissConflict')
+      const unmountCleanup = between('// Cleanup: ensure panel is not marked dirty on unmount', '// Debug logging')
+      // no fire-and-forget timer is left in the save path
+      expect(handleSave).not.toMatch(/\n\s*setTimeout\(/)
+      const start = handleSave.indexOf('if (isAutoSave) {')
+      const clear = handleSave.indexOf('clearTimeout(autoSaveIndicatorTimerRef.current)')
+      const indicatorOn = handleSave.indexOf('setIsAutoSaving(true)')
+      expect(start).toBeGreaterThan(-1)
+      expect(clear).toBeGreaterThan(start)
+      expect(clear).toBeLessThan(indicatorOn)
+      expect(handleSave).toContain('autoSaveIndicatorTimerRef.current = setTimeout(() => {')
+      expect(unmountCleanup).toContain('clearTimeout(autoSaveIndicatorTimerRef.current)')
     })
   })
 })

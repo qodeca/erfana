@@ -12,11 +12,14 @@
  * @see Issue #216 - Per-terminal Claude Code context status bar
  * @see docs/designs/216-claude-status-bar.md §8, §10
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import { join } from 'path'
 import { pathToFileURL } from 'url'
 import type { IpcMainInvokeEvent } from 'electron'
 import { ClaudeStatusChannels } from '../../shared/ipc/claude-status-channels'
+
+// electron-vite declares ELECTRON_RENDERER_URL read-only; this file sets and clears it.
+const writableEnv: Record<string, string | undefined> = process.env
 
 // =============================================================================
 // Capture registered handlers via a mocked ipcMain
@@ -80,10 +83,10 @@ function makeEvent(
 
 /** Fake ClaudeStatusService recording delegated calls. */
 function makeFakeService(): {
-  registerPanel: ReturnType<typeof vi.fn>
-  unregisterPanel: ReturnType<typeof vi.fn>
-  nudge: ReturnType<typeof vi.fn>
-  dispose: ReturnType<typeof vi.fn>
+  registerPanel: Mock
+  unregisterPanel: Mock
+  nudge: Mock
+  dispose: Mock
 } {
   return {
     registerPanel: vi.fn(),
@@ -97,8 +100,8 @@ function makeFakeService(): {
 function makeFakeTerminalService(
   records: Record<string, { cwd: string; pid?: number }>
 ): {
-  getTerminalInfo: ReturnType<typeof vi.fn>
-  getPid: ReturnType<typeof vi.fn>
+  getTerminalInfo: Mock
+  getPid: Mock
 } {
   return {
     getTerminalInfo: vi.fn((id: string) =>
@@ -127,7 +130,7 @@ describe('claude-status-handlers', () => {
     for (const k of Object.keys(handlers)) delete handlers[k]
     removedHandlers.length = 0
     mockIs.dev = false
-    delete process.env['ELECTRON_RENDERER_URL']
+    delete writableEnv.ELECTRON_RENDERER_URL
     mockGetAllWindows.mockReturnValue([])
   })
 

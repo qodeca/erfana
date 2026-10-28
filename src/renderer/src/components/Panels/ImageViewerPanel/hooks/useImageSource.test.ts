@@ -13,7 +13,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { act, renderHook, waitFor } from '@testing-library/react'
 
-import type { ImageReadResponse } from '../../../../../../shared/ipc/file-image-schema'
+import type { ImageReadRequest, ImageReadResponse } from '../../../../../../shared/ipc/file-image-schema'
 import { useImageSource } from './useImageSource'
 
 const PATH = '/proj/icon.png'
@@ -28,8 +28,8 @@ let mockNaturalSize = { width: 800, height: 600 }
 const mockReadBytes = vi.fn<(path: string) => Promise<string>>()
 /** Fake `window.api.file.readImage` – the bridge the hook calls. */
 const mockReadImage =
-  vi.fn<(path: string, knownVersion?: string) => Promise<ImageReadResponse>>()
-const mockGetStats = vi.fn<(path: string) => Promise<{ size: number }>>()
+  vi.fn<(request: ImageReadRequest) => Promise<ImageReadResponse>>()
+const mockGetStats = vi.fn<(request: { filePath: string }) => Promise<{ size: number }>>()
 
 /** Version counter behind the fake disk. */
 let versionSeq = 0
@@ -42,8 +42,8 @@ let servedVersion = 'v0'
  * Each answer carries a new version, which is what a real watcher event means –
  * the file changed. Tests that need the skip path override `mockReadImage`.
  */
-const alwaysChanged = async (path: string): Promise<ImageReadResponse> => {
-  const dataUrl = await mockReadBytes(path)
+const alwaysChanged = async ({ filePath }: ImageReadRequest): Promise<ImageReadResponse> => {
+  const dataUrl = await mockReadBytes(filePath)
   versionSeq += 1
   servedVersion = `v${versionSeq}`
   return { status: 'ok', dataUrl, version: servedVersion }
@@ -53,13 +53,10 @@ const alwaysChanged = async (path: string): Promise<ImageReadResponse> => {
  * Answers `unchanged` when the caller echoes back the version the fake disk
  * last handed out, and does a full read otherwise – the real main-process rule.
  */
-const compareVersions = async (
-  path: string,
-  knownVersion?: string
-): Promise<ImageReadResponse> =>
-  knownVersion === servedVersion
+const compareVersions = async (request: ImageReadRequest): Promise<ImageReadResponse> =>
+  request.knownVersion === servedVersion
     ? { status: 'unchanged', version: servedVersion }
-    : alwaysChanged(path)
+    : alwaysChanged(request)
 
 beforeEach(() => {
   mockNaturalSize = { width: 800, height: 600 }
@@ -214,6 +211,9 @@ describe('useImageSource', () => {
       act(() => result.current.refresh())
 
       await waitFor(() => expect(mockReadBytes).toHaveBeenCalledTimes(2))
+      // The read resolving is not the end of the refresh: the failed decode lands a
+      // tick later, so wait for its flag before checking the rest.
+      await waitFor(() => expect(result.current.isStale).toBe(true))
       expect(result.current.source?.url).toBe('data:image/png;base64,AAAA')
       expect(result.current.error).toBeNull()
       // ...but it reports that the pixels are behind the file (QG-11a H2).
@@ -314,7 +314,7 @@ describe('useImageSource', () => {
 
       // Nothing is held yet, so there is nothing to compare against - asking
       // the main process to skip here could only skip a read we need.
-      expect(mockReadImage).toHaveBeenCalledWith(PATH, undefined)
+      expect(mockReadImage).toHaveBeenCalledWith({ filePath: PATH, knownVersion: undefined })
     })
 
     it('echoes the version it is displaying on a refresh', async () => {
@@ -323,7 +323,7 @@ describe('useImageSource', () => {
 
       act(() => result.current.refresh())
 
-      await waitFor(() => expect(mockReadImage).toHaveBeenLastCalledWith(PATH, 'v1'))
+      await waitFor(() => expect(mockReadImage).toHaveBeenLastCalledWith({ filePath: PATH, knownVersion: 'v1' }))
     })
 
     it('sends no version when the panel is repointed at another file', async () => {
@@ -339,7 +339,7 @@ describe('useImageSource', () => {
       rerender({ path: '/proj/other.png' })
 
       await waitFor(() => expect(result.current.source?.url).toBe('data:image/png;base64,BBBB'))
-      expect(mockReadImage).toHaveBeenLastCalledWith('/proj/other.png', undefined)
+      expect(mockReadImage).toHaveBeenLastCalledWith({ filePath: '/proj/other.png', knownVersion: undefined })
     })
 
     it('does nothing at all when the file has not changed', async () => {
@@ -407,7 +407,7 @@ describe('useImageSource', () => {
 
       act(() => result.current.refresh())
 
-      await waitFor(() => expect(mockReadImage).toHaveBeenLastCalledWith(PATH, 'v1'))
+      await waitFor(() => expect(mockReadImage).toHaveBeenLastCalledWith({ filePath: PATH, knownVersion: 'v1' }))
     })
   })
 

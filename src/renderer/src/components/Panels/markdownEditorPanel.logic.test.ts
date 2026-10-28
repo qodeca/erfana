@@ -28,10 +28,14 @@ import {
   interpolateScrollPosition,
   // Utility Functions
   isSplitMode,
+  shouldRecreateParentDirs,
+  shouldToastSaveError,
   extractFileName,
   extractBaseFileName,
   isMarkdownFile,
-  getDefaultViewMode
+  getDefaultViewMode,
+  trackSaveInFlight,
+  settleSavedFile
 } from './markdownEditorPanel.logic'
 
 // ============================================================================
@@ -807,5 +811,87 @@ describe('Integration: Document stats for various content types', () => {
 
     expect(stats.words).toBe(4)
     expect(stats.characters).toBeGreaterThan(0)
+  })
+})
+
+describe('shouldRecreateParentDirs', () => {
+  it('only the tab’s own Cmd+S of a deleted-state tab may recreate the folder', () => {
+    expect(shouldRecreateParentDirs('user', true)).toBe(true)
+  })
+
+  it('never for an autosave, a save by id (preview move prompt), or a tab that is not deleted', () => {
+    expect(shouldRecreateParentDirs('autosave', true)).toBe(false)
+    expect(shouldRecreateParentDirs('registry', true)).toBe(false)
+    expect(shouldRecreateParentDirs('user', false)).toBe(false)
+  })
+})
+
+describe('shouldToastSaveError', () => {
+  it('always shows a Cmd+S failure, even one already shown', () => {
+    expect(shouldToastSaveError('user', 'm', 'm')).toBe(true)
+    expect(shouldToastSaveError('user', 'm', null)).toBe(true)
+  })
+
+  it('shows an autosave failure once per distinct reason', () => {
+    expect(shouldToastSaveError('autosave', 'm', null)).toBe(true)
+    expect(shouldToastSaveError('autosave', 'm', 'm')).toBe(false)
+    expect(shouldToastSaveError('autosave', 'other', 'm')).toBe(true)
+  })
+
+  it('never shows one for a save by id: the registry caller toasts on false (one failure, one toast)', () => {
+    expect(shouldToastSaveError('registry', 'm', null)).toBe(false)
+  })
+})
+
+describe('trackSaveInFlight', () => {
+  it('publishes a promise that settles when the save finishes, then clears the ref', async () => {
+    const ref: { current: Promise<void> | null } = { current: null }
+    const finish = trackSaveInFlight(ref)
+    const inFlight = ref.current
+    expect(inFlight).not.toBeNull()
+
+    finish()
+    await inFlight
+
+    expect(ref.current).toBeNull()
+  })
+
+  it('leaves a newer save in the ref when an older one finishes', async () => {
+    const ref: { current: Promise<void> | null } = { current: null }
+    const finishOlder = trackSaveInFlight(ref)
+    const finishNewer = trackSaveInFlight(ref)
+    const newer = ref.current
+
+    finishOlder()
+    expect(ref.current).toBe(newer)
+
+    finishNewer()
+    expect(ref.current).toBeNull()
+  })
+})
+
+describe('settleSavedFile', () => {
+  const file = { path: '/p/a.md', content: 'old', modified: true }
+
+  it('marks the file clean when the buffer still equals what was written', () => {
+    expect(settleSavedFile(file, 'saved', 'saved')).toEqual({ path: '/p/a.md', content: 'saved', modified: false })
+  })
+
+  it('keeps the newer buffer and stays modified when the user typed during the write', () => {
+    // One update, never the written (older) text: the editor must not be
+    // handed a value that is behind its buffer
+    expect(settleSavedFile(file, 'saved', 'saved plus typing')).toEqual({
+      path: '/p/a.md',
+      content: 'saved plus typing',
+      modified: true
+    })
+  })
+
+  it('takes the written text when no editor is mounted', () => {
+    expect(settleSavedFile(file, 'saved', undefined)).toEqual({ path: '/p/a.md', content: 'saved', modified: false })
+  })
+
+  it('leaves a closed file closed', () => {
+    expect(settleSavedFile(null, 'saved', 'saved')).toBeNull()
   })
 })

@@ -19,7 +19,7 @@
  * @see Spec #009 - Media import with transcription specification
  */
 
-import { useState, useEffect, useId } from 'react'
+import { useState, useId } from 'react'
 import { FileAudio, FileVideo } from 'lucide-react'
 import { VIDEO_IMPORT } from '../../../../shared/constants'
 import { useTranscriptionStore } from '../../stores/useTranscriptionStore'
@@ -134,32 +134,24 @@ export function TranscriptionDialog(): JSX.Element | null {
 
   const [selectedLanguage, setSelectedLanguage] = useState<TranscriptionLanguage>('auto')
 
-  // Initialize language selection from last used language when dialog opens
-  useEffect(() => {
-    if (isDialogOpen) {
-      setSelectedLanguage(lastLanguage)
-    }
-  }, [isDialogOpen, filePath, lastLanguage])
-
-  // Escape key handler (custom cancel-vs-close logic)
-  useEffect(() => {
-    if (!isDialogOpen) return undefined
-
-    const handleKeyDown = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        e.stopPropagation()
-        if (isTranscribing) {
-          cancelTranscription()
-        } else {
-          closeDialog()
-        }
-      }
-    }
-
-    document.addEventListener('keydown', handleKeyDown, true)
-    return () => document.removeEventListener('keydown', handleKeyDown, true)
-  }, [isDialogOpen, isTranscribing, cancelTranscription, closeDialog])
+  // Initialize language selection from last used language when the dialog
+  // opens, its file changes or the stored language changes. Adjusted during
+  // render (React's "storing information from previous renders" pattern)
+  // rather than in an effect; the user can still change the choice after.
+  const [seededFor, setSeededFor] = useState<{
+    isDialogOpen: boolean
+    filePath: typeof filePath
+    lastLanguage: TranscriptionLanguage
+  } | null>(null)
+  if (
+    seededFor === null ||
+    seededFor.isDialogOpen !== isDialogOpen ||
+    seededFor.filePath !== filePath ||
+    seededFor.lastLanguage !== lastLanguage
+  ) {
+    setSeededFor({ isDialogOpen, filePath, lastLanguage })
+    if (isDialogOpen) setSelectedLanguage(lastLanguage)
+  }
 
   if (!isDialogOpen) return null
 
@@ -245,7 +237,11 @@ export function TranscriptionDialog(): JSX.Element | null {
       onClose={handleClose}
       zIndex={10000}
       closeOnBackdrop={false}
-      closeOnEscape={false}
+      // Escape runs `handleClose` (cancel the running job, otherwise close)
+      // through BaseDialog's default `closeOnEscape`, so it reaches this
+      // dialog only while it is topmost. A private document listener used to
+      // fire under the Cmd+Q quit prompt too and cancel the job when the user
+      // only meant to dismiss the prompt (#229).
       trapFocus
       className="transcription-dialog"
       ariaLabelledBy={titleId}

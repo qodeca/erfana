@@ -18,6 +18,7 @@ import { GIT_STATUS } from '../components/ProjectTree/constants'
 import { useGitStatus } from './useGitStatus'
 import { useGitStore } from '../stores/useGitStore'
 import { useGlobalSettingsStore } from '../stores/useGlobalSettingsStore'
+import { globalSettings } from '../test-utils/globalSettings'
 
 // Test the constants that control timing behavior
 describe('useGitStatus constants', () => {
@@ -279,11 +280,11 @@ describe('useGitStatus behavioral tests', () => {
     })
 
     useGlobalSettingsStore.setState({
-      settings: {
+      settings: globalSettings({
         logging: { level: 'info' },
         editor: { preserveLineBreaks: false },
         gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-      },
+      }),
       isLoading: false,
       error: null,
       isInitialized: true,
@@ -656,6 +657,28 @@ describe('useGitStatus behavioral tests', () => {
 
       // Should NOT have called getStatus (0 calls)
       expect(mockGetStatus).toHaveBeenCalledTimes(0)
+    })
+
+    it('refreshes git status for a content-only directory change', async () => {
+      // The tree skips a `structural: false` batch; the badges must not
+      renderHook(() =>
+        useGitStatus({ projectPath: '/test/project', enabled: true })
+      )
+      await act(async () => {
+        await vi.runAllTimersAsync()
+      })
+      mockGetStatus.mockClear()
+
+      await act(async () => {
+        ;(directoryChangeCallback as (data: unknown) => void)({
+          eventCount: 1,
+          summary: { change: 1 },
+          structural: false
+        })
+        await vi.runAllTimersAsync()
+      })
+
+      expect(mockGetStatus).toHaveBeenCalledTimes(1)
     })
 
     // Note: this tests that git status refreshes triggered by directory changes

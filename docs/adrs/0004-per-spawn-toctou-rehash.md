@@ -97,8 +97,8 @@ A performance-minded contributor will eventually ask "why re-hash 2.3 MB on ever
 
 ## References
 
-- `src/main/services/LocalWhisperService.ts:738-768` — the `verifyInstalledBinary()` call and spawn log
-- `src/main/services/WhisperModelManager.ts:478-486` — `verifyInstalledBinary()` implementation returning `VerifiedBinary`
-- `src/main/services/WhisperModelManager.ts:601-629` — streaming SHA verify via `createReadStream.pipe(createHash)`
-- `docs/windows/deferred-work.md` §D9 — correlation-ID grouping as future work
+- `src/main/services/LocalWhisperService.ts` — `runWhisper()`: the `verifyInstalledBinary()` call and the `'Whisper spawn'` forensic log
+- `src/main/services/WhisperModelManager.ts` — `verifyInstalledBinary()` implementation returning `VerifiedBinary`
+- `src/main/services/WhisperModelManager.ts` — `verifyAllFiles()`: streaming SHA verify (`createReadStream` fed into `createHash('sha256')`)
+- `docs/windows/deferred-work-phase4.md` §D9 — correlation-ID grouping as future work
 - `docs/CHANGELOG.md` §0.9.4 — user-facing summary of the trust chain

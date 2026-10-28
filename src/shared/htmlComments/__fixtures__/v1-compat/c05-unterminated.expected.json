@@ -1,0 +1,67 @@
+{
+  "writable": false,
+  "readOnlyReason": "unterminated-block",
+  "blocks": [
+    {
+      "kind": "ok",
+      "range": [
+        152,
+        1008
+      ],
+      "nodeRange": [
+        152,
+        1003
+      ],
+      "rawHash": "efc0b95cbfe2d112fe9556349999a12b71f1b8e6d7776ef50913ca980979898e",
+      "target": {
+        "state": "attached",
+        "startOffset": 1008,
+        "via": "position",
+        "tag": "p"
+      },
+      "data": {
+        "v": 1,
+        "id": "c-aaaaaaaaaaaaaadw",
+        "status": "open",
+        "anchor": {
+          "tag": "p",
+          "path": "",
+          "id": "a"
+        },
+        "view": {
+          "w": 1280,
+          "h": 800,
+          "dpr": 2,
+          "x": 0,
+          "y": 120
+        },
+        "msgs": [
+          {
+            "id": "m-aaaaaaaaaaaaaadw",
+            "by": {
+              "name": "Ada Lovelace",
+              "email": "ada@example.com",
+              "role": "human"
+            },
+            "at": "2026-10-25T14:03:00Z",
+            "text": "Fine."
+          }
+        ]
+      }
+    },
+    {
+      "kind": "damaged",
+      "range": [
+        1028,
+        1924
+      ],
+      "nodeRange": [
+        1028,
+        1924
+      ],
+      "rawHash": "74a2442f61640e72b3b3a056f54d32632fe78dffdd1c9ba46d1ccd6c06c15a7d",
+      "reason": "unterminated",
+      "headerId": "c-aaaaaaaaaaaaaadx"
+    }
+  ]
+}

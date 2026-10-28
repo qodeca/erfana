@@ -1,0 +1,309 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+/**
+ * ExternalMoveConfirmer - asks the user before an external file is removed.
+ *
+ * Every move out of a folder outside the project passes through here: the
+ * original is deleted only after the user answers "Move" in a native box that is
+ * modal to the window owning the project. The box names each file and its
+ * folder (home-relative), never a full path. Moves that arrive together, and the
+ * files of one dialog pick, share a box; a box lists at most
+ * {@link MAX_FILES_PER_BOX} files, and a larger batch gets further boxes. The
+ * boxes of one batch are one decision: its files move only if every box answers
+ * Move; Cancel, or a box that cannot be shown, moves none of them.
+ */
+import { lstat } from 'fs/promises'
+import { homedir } from 'os'
+import nodePath, { type PlatformPath } from 'path'
+import { SenderRateCap } from '../utils/SenderRateCap'
+import { BIDI_OVERRIDES, CONTROL_CHARS } from '../utils/validateFilename'
+
+/** How long moves arriving one after another still count as one batch */
+export const COALESCE_MS = 150
+
+/** Files named in one box */
+export const MAX_FILES_PER_BOX = 10
+
+/** Longest name or folder shown, in characters */
+const MAX_SHOWN_CHARS = 80
+
+/** Files one window may have waiting for a box; the rest are answered "unavailable" */
+export const MAX_WAITING_PER_WINDOW = 100
+
+/** Boxes one window may open per rate window */
+const MAX_BOXES_PER_WINDOW = 10
+const RATE_WINDOW_MS = 60_000
+
+/** How long the files of an answered batch stay approved for their own moves */
+export const APPROVAL_TTL_MS = 60_000
+
+export type MoveAnswer = 'move' | 'cancel' | 'unavailable'
+
+export interface MoveBoxOptions {
+  type: 'question'
+  buttons: string[]
+  defaultId: number
+  cancelId: number
+  message: string
+  detail: string
+}
+
+export interface MoveConfirmerDeps {
+  /** Shows the box, modal to `owner`; resolves with the index of the button pressed */
+  showBox: (owner: unknown, options: MoveBoxOptions) => Promise<{ response: number }>
+  /** The window that owns the project and called, or null when there is none */
+  resolveOwner: (senderId: number) => unknown | null
+  /** False when the window cannot show a box now (minimised, hidden) */
+  canShow?: (owner: unknown) => boolean
+  coalesceMs?: number
+  /** Runs `ask` once the batch window closes; tests replace it to control when that is */
+  schedule?: (ask: () => void) => void
+  homeDir?: string
+  path?: PlatformPath
+  now?: () => number
+  rateCap?: Pick<SenderRateCap, 'allow'>
+  /** Identity (device:inode) of a path, or null; an approval holds only for the same file */
+  identityOf?: (path: string) => Promise<string | null>
+}
+
+export interface MoveConfirmer {
+  /**
+   * @param batch - The other files that came with this one (a dialog pick); they
+   *                are named in the same box and approved by the same answer
+   */
+  confirm(
+    senderId: number | null,
+    sourcePath: string,
+    batch?: readonly string[]
+  ): Promise<MoveAnswer>
+  /** Forget the approvals of one window, or of all when no id is given. */
+  clear?(senderId?: number): void
+}
+
+interface Waiting {
+  sourcePath: string
+  batch: readonly string[] | undefined
+  resolve: (answer: MoveAnswer) => void
+}
+
+// Control, bidi and line-separator characters change how a name reads or lays out
+const UNSAFE_TEXT = new RegExp(
+  `${CONTROL_CHARS.source.slice(0, -1)}\\x7f-\\x9f\\u2028\\u2029\\u061C\\u200B-\\u200D\\uFEFF]|${BIDI_OVERRIDES.source}`,
+  'gu'
+)
+
+/** A name or folder as it may be shown: no hidden characters, cut at whole characters. */
+function cleanText(text: string): string {
+  return text.replace(UNSAFE_TEXT, '\uFFFD')
+}
+
+export function safeShown(text: string): string {
+  const cleaned = cleanText(text)
+  const chars = Array.from(cleaned)
+  return chars.length > MAX_SHOWN_CHARS ? `${chars.slice(0, MAX_SHOWN_CHARS - 1).join('')}…` : cleaned
+}
+
+/** A long folder keeps its start and its last part: the middle goes. */
+function shortenMiddle(text: string): string {
+  const chars = Array.from(text)
+  if (chars.length <= MAX_SHOWN_CHARS) return text
+  const head = Math.floor(MAX_SHOWN_CHARS / 4)
+  const tail = MAX_SHOWN_CHARS - head - 1
+  return `${chars.slice(0, head).join('')}…${chars.slice(chars.length - tail).join('')}`
+}
+
+function folderShown(dir: string, home: string, path: PlatformPath): string {
+  const relative = path.relative(home, dir)
+  const inHome = relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative))
+  const shown = inHome ? (relative === '' ? '~' : `~${path.sep}${relative}`) : dir
+  return shortenMiddle(cleanText(shown))
+}
+
+/** Wording of the box for the files of one chunk. */
+export function describeMove(
+  sourcePaths: readonly string[],
+  home: string = homedir(),
+  path: PlatformPath = nodePath
+): MoveBoxOptions {
+  const lines = sourcePaths.map(
+    (p) => `${safeShown(path.basename(p))} – ${folderShown(path.dirname(p), home, path)}`
+  )
+  if (lines.length === 1) {
+    return {
+      type: 'question',
+      buttons: ['Move', 'Cancel'],
+      defaultId: 1,
+      cancelId: 1,
+      message: `Move "${safeShown(path.basename(sourcePaths[0]))}" into the project?`,
+      detail: `From ${folderShown(path.dirname(sourcePaths[0]), home, path)}\nThe original file will be removed from its current folder.`
+    }
+  }
+  return {
+    type: 'question',
+    buttons: ['Move', 'Cancel'],
+    defaultId: 1,
+    cancelId: 1,
+    message: `Move ${lines.length} files into the project?`,
+    detail: `${lines.join('\n')}\n\nThe original files will be removed from their current folders.`
+  }
+}
+
+async function defaultIdentityOf(target: string): Promise<string | null> {
+  try {
+    const { dev, ino } = await lstat(target, { bigint: true })
+    return `${dev}:${ino}`
+  } catch {
+    return null
+  }
+}
+
+export class ExternalMoveConfirmerImpl implements MoveConfirmer {
+  private readonly waiting = new Map<number, Waiting[]>()
+  private readonly open = new Set<number>()
+  private readonly approved = new Map<number, Map<string, { expires: number; identity: string | null }>>()
+  // Bumped by clear(); an answer given before a clear approves nothing
+  private epoch = 0
+  private readonly identityOf: (path: string) => Promise<string | null>
+  private readonly coalesceMs: number
+  private readonly home: string
+  private readonly path: PlatformPath
+  private readonly now: () => number
+  private readonly rateCap: Pick<SenderRateCap, 'allow'>
+
+  constructor(private readonly deps: MoveConfirmerDeps) {
+    this.coalesceMs = deps.coalesceMs ?? COALESCE_MS
+    this.home = deps.homeDir ?? homedir()
+    this.path = deps.path ?? nodePath
+    this.now = deps.now ?? ((): number => Date.now())
+    this.identityOf = deps.identityOf ?? defaultIdentityOf
+    this.rateCap =
+      deps.rateCap ??
+      new SenderRateCap(
+        { maxRecords: MAX_BOXES_PER_WINDOW, maxBytes: Number.MAX_SAFE_INTEGER },
+        { maxRecords: MAX_BOXES_PER_WINDOW, maxBytes: Number.MAX_SAFE_INTEGER },
+        RATE_WINDOW_MS,
+        () => {}
+      )
+  }
+
+  clear(senderId?: number): void {
+    this.epoch++
+    if (senderId === undefined) this.approved.clear()
+    else this.approved.delete(senderId)
+  }
+
+  async confirm(
+    senderId: number | null,
+    sourcePath: string,
+    batch?: readonly string[]
+  ): Promise<MoveAnswer> {
+    if (senderId === null) return 'unavailable'
+    if (await this.takeApproval(senderId, sourcePath)) return 'move'
+    return new Promise<MoveAnswer>((resolve) => {
+      const queue = this.waiting.get(senderId)
+      if (queue) {
+        if (queue.length >= MAX_WAITING_PER_WINDOW) {
+          resolve('unavailable')
+          return
+        }
+        queue.push({ sourcePath, batch, resolve })
+        return
+      }
+      this.waiting.set(senderId, [{ sourcePath, batch, resolve }])
+      // While a box is open the next one waits for it
+      if (!this.open.has(senderId)) this.schedule(senderId)
+    })
+  }
+
+  private schedule(senderId: number): void {
+    const ask = (): void => void this.ask(senderId)
+    if (this.deps.schedule) this.deps.schedule(ask)
+    else setTimeout(ask, this.coalesceMs)
+  }
+
+  /** True once, and only for the file that was approved (same device and inode). */
+  private async takeApproval(senderId: number, sourcePath: string): Promise<boolean> {
+    const entries = this.approved.get(senderId)
+    const approval = entries?.get(sourcePath)
+    if (!approval) return false
+    entries?.delete(sourcePath)
+    if (approval.expires <= this.now()) return false
+    return approval.identity !== null && (await this.identityOf(sourcePath)) === approval.identity
+  }
+
+  private async approve(senderId: number, paths: readonly string[]): Promise<void> {
+    const identities = await Promise.all(paths.map((p) => this.identityOf(p)))
+    let entries = this.approved.get(senderId)
+    if (!entries) {
+      entries = new Map()
+      this.approved.set(senderId, entries)
+    }
+    const now = this.now()
+    for (const [key, approval] of entries) {
+      if (approval.expires <= now) entries.delete(key)
+    }
+    paths.forEach((p, i) => entries.set(p, { expires: now + APPROVAL_TTL_MS, identity: identities[i] }))
+  }
+
+  private async ask(senderId: number): Promise<void> {
+    const entries = this.waiting.get(senderId) ?? []
+    this.waiting.delete(senderId)
+    this.open.add(senderId)
+    const epoch = this.epoch
+    try {
+      // The files to name: the waiting ones, then the rest of any dialog pick
+      const waitingPaths = new Set(entries.map((entry) => entry.sourcePath))
+      const namedSet = new Set(waitingPaths)
+      for (const entry of entries) {
+        for (const p of entry.batch ?? []) namedSet.add(p)
+      }
+      const named = [...namedSet]
+      const answers = new Map<string, MoveAnswer>()
+      const approvedHere: string[] = []
+      // The batch is one decision: it moves only if EVERY box answers Move
+      let stopped: Exclude<MoveAnswer, 'move'> | null = null
+      for (let i = 0; i < named.length; i += MAX_FILES_PER_BOX) {
+        const chunk = named.slice(i, i + MAX_FILES_PER_BOX)
+        const answer = await this.askChunk(senderId, chunk)
+        if (answer !== 'move') {
+          // Cancel, or a box that could not be shown (hidden window, box limit
+          // used up), ends the batch: no further box is shown ...
+          stopped = answer
+          break
+        }
+        for (const p of chunk) answers.set(p, answer)
+        if (epoch === this.epoch) {
+          const extra = chunk.filter((p) => !waitingPaths.has(p))
+          await this.approve(senderId, extra)
+          approvedHere.push(...extra)
+        }
+      }
+      if (stopped) {
+        // ... and nothing the earlier boxes said Move to is moved either
+        const entries = this.approved.get(senderId)
+        for (const p of approvedHere) entries?.delete(p)
+      }
+      for (const entry of entries) {
+        entry.resolve(stopped ?? answers.get(entry.sourcePath) ?? 'cancel')
+      }
+    } finally {
+      this.open.delete(senderId)
+      if (this.waiting.has(senderId)) this.schedule(senderId)
+    }
+  }
+
+  private async askChunk(senderId: number, chunk: readonly string[]): Promise<MoveAnswer> {
+    try {
+      const owner = this.deps.resolveOwner(senderId)
+      if (owner === null || (this.deps.canShow && !this.deps.canShow(owner))) return 'unavailable'
+      if (!this.rateCap.allow(senderId, 1, false)) return 'unavailable'
+      const { response } = await this.deps.showBox(
+        owner,
+        describeMove(chunk, this.home, this.path)
+      )
+      return response === 0 ? 'move' : 'cancel'
+    } catch {
+      return 'cancel'
+    }
+  }
+}

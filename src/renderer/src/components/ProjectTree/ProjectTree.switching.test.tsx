@@ -15,19 +15,22 @@
  * full integration of project switching in the rendered component.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import { render, screen, waitFor, act } from '@testing-library/react'
-import React from 'react'
 import { ProjectTree } from './ProjectTree'
 import { DialogProvider } from '../Dialog'
 import { ProjectManagementProvider } from '../../context/ProjectManagementContext'
 import type { FileNode } from '../../../../preload/index'
+import { installTreeViewport } from '../../test-utils/treeViewport'
+import type { FileBridge } from '../../../../shared/ipc/file-schema'
+import type { DirectoryWatchBridge } from '../../../../shared/ipc/directory-watch-schema'
+import { gatewayBridgeMock, type BridgeMock } from '../../test-utils/gatewayBridgeMock'
 
-declare global {
-  interface Window {
-    api: any
-  }
-}
+const fileMock = (): BridgeMock<FileBridge> => gatewayBridgeMock('file')
+const directoryWatchMock = (): BridgeMock<DirectoryWatchBridge> => gatewayBridgeMock('directoryWatch')
+
+// The tree is virtualised; give it a viewport so every fixture row is mounted.
+installTreeViewport()
 
 // ---------------------------------------------------------------------------
 // Shared test data
@@ -59,9 +62,9 @@ const projCFiles: FileNode[] = [
  * (e.g. AC-009d needs path-dependent git repo detection).
  */
 function setupMockApi(
-  getStatusOverride?: ReturnType<typeof vi.fn>
+  getStatusOverride?: Mock
 ) {
-  const readDirectory = vi.fn(async (path: string) => {
+  const readDirectory = vi.fn(async ({ dirPath: path }: { dirPath: string }) => {
     if (path === '/projA') return projAFiles
     if (path === '/projB') return projBFiles
     if (path === '/projC') return projCFiles
@@ -79,7 +82,6 @@ function setupMockApi(
 
   ;(window as any).api = {
     file: {
-      getLastProjectPath: vi.fn(async () => null),
       readDirectory,
       onProjectChanged: (cb: any) => {
         onProjectChangedCallback = cb
@@ -170,7 +172,7 @@ describe('ProjectTree project switching (AC-009)', () => {
 
       // Wait for project B to load
       await waitFor(() => {
-        expect(readDirectory).toHaveBeenCalledWith('/projB')
+        expect(readDirectory).toHaveBeenCalledWith({ dirPath: '/projB' })
       })
     })
 
@@ -191,14 +193,14 @@ describe('ProjectTree project switching (AC-009)', () => {
       })
 
       // Create a delayed readDirectory to observe the transition state
-      const originalReadDirectory = window.api.file.readDirectory
+      const originalReadDirectory = fileMock().readDirectory
       let resolveReadDirectory: (files: FileNode[]) => void
       const delayedReadDirectory = vi.fn(() => {
         return new Promise<FileNode[]>((resolve) => {
           resolveReadDirectory = resolve
         })
       })
-      window.api.file.readDirectory = delayedReadDirectory
+      fileMock().readDirectory = delayedReadDirectory
 
       // Switch to project B
       await act(async () => {
@@ -220,7 +222,7 @@ describe('ProjectTree project switching (AC-009)', () => {
       })
 
       // Restore original mock
-      window.api.file.readDirectory = originalReadDirectory
+      fileMock().readDirectory = originalReadDirectory
     })
   })
 
@@ -238,7 +240,7 @@ describe('ProjectTree project switching (AC-009)', () => {
       })
 
       await waitFor(() => {
-        expect(readDirectory).toHaveBeenCalledWith('/projA')
+        expect(readDirectory).toHaveBeenCalledWith({ dirPath: '/projA' })
       })
 
       readDirectory.mockClear()
@@ -250,7 +252,7 @@ describe('ProjectTree project switching (AC-009)', () => {
 
       // Should call readDirectory for new project
       await waitFor(() => {
-        expect(readDirectory).toHaveBeenCalledWith('/projB')
+        expect(readDirectory).toHaveBeenCalledWith({ dirPath: '/projB' })
       })
     })
 
@@ -288,7 +290,7 @@ describe('ProjectTree project switching (AC-009)', () => {
   describe('AC-009c: No stale events from old project (5s observation)', () => {
     it('directory watcher stops for old project after switch', async () => {
       const { readDirectory } = setupMockApi()
-      const stopWatcher = window.api.directoryWatch.stop
+      const stopWatcher = directoryWatchMock().stop
 
       renderProjectTree()
 
@@ -300,11 +302,13 @@ describe('ProjectTree project switching (AC-009)', () => {
       })
 
       await waitFor(() => {
-        expect(readDirectory).toHaveBeenCalledWith('/projA')
+        expect(readDirectory).toHaveBeenCalledWith({ dirPath: '/projA' })
       })
 
-      // Verify watcher was started for project A
-      expect(window.api.directoryWatch.start).toHaveBeenCalledWith('/projA')
+      // The watcher starts once the first read has been applied (#211, D12)
+      await waitFor(() => {
+        expect(directoryWatchMock().start).toHaveBeenCalledWith('/projA')
+      })
 
       // Switch to project B
       await act(async () => {
@@ -312,14 +316,16 @@ describe('ProjectTree project switching (AC-009)', () => {
       })
 
       await waitFor(() => {
-        expect(readDirectory).toHaveBeenCalledWith('/projB')
+        expect(readDirectory).toHaveBeenCalledWith({ dirPath: '/projB' })
       })
 
       // Watcher should be stopped for old project A (cleanup in useDirectoryWatcher effect)
       expect(stopWatcher).toHaveBeenCalledWith('/projA')
 
-      // Watcher should be started for new project B
-      expect(window.api.directoryWatch.start).toHaveBeenCalledWith('/projB')
+      // Watcher should be started for new project B, after its first read
+      await waitFor(() => {
+        expect(directoryWatchMock().start).toHaveBeenCalledWith('/projB')
+      })
     })
 
     it('useDirectoryWatcher effect cleanup prevents stale callbacks', async () => {
@@ -332,7 +338,7 @@ describe('ProjectTree project switching (AC-009)', () => {
 
       // Track unsubscribe calls
       let unsubscribeCallCount = 0
-      window.api.directoryWatch.onDirectoryChanged = vi.fn((_cb: any) => {
+      directoryWatchMock().onDirectoryChanged = vi.fn((_cb: any) => {
         const unsubscribe = () => {
           unsubscribeCallCount++
         }
@@ -349,11 +355,11 @@ describe('ProjectTree project switching (AC-009)', () => {
       })
 
       await waitFor(() => {
-        expect(readDirectory).toHaveBeenCalledWith('/projA')
+        expect(readDirectory).toHaveBeenCalledWith({ dirPath: '/projA' })
       })
 
       // Directory watcher should be subscribed
-      expect(window.api.directoryWatch.onDirectoryChanged).toHaveBeenCalled()
+      expect(directoryWatchMock().onDirectoryChanged).toHaveBeenCalled()
       const initialUnsubscribeCount = unsubscribeCallCount
 
       // Switch to project B
@@ -362,7 +368,7 @@ describe('ProjectTree project switching (AC-009)', () => {
       })
 
       await waitFor(() => {
-        expect(readDirectory).toHaveBeenCalledWith('/projB')
+        expect(readDirectory).toHaveBeenCalledWith({ dirPath: '/projB' })
       })
 
       // Unsubscribe should have been called during cleanup (old watcher removed)
@@ -433,7 +439,7 @@ describe('AC-014: In-flight event from project A silently dropped', () => {
     const callbacks: Array<(data: any) => void> = []
     let unsubscribeCallCount = 0
 
-    window.api.directoryWatch.onDirectoryChanged = vi.fn((cb: any) => {
+    directoryWatchMock().onDirectoryChanged = vi.fn((cb: any) => {
       callbacks.push(cb)
       return () => {
         unsubscribeCallCount++
@@ -578,8 +584,8 @@ describe('Edge cases', () => {
 
     // Verify readDirectory was called for all three projects
     // (useProjectManagement calls readDirectory for each project change)
-    expect(readDirectory).toHaveBeenCalledWith('/projA')
-    expect(readDirectory).toHaveBeenCalledWith('/projB')
-    expect(readDirectory).toHaveBeenCalledWith('/projC')
+    expect(readDirectory).toHaveBeenCalledWith({ dirPath: '/projA' })
+    expect(readDirectory).toHaveBeenCalledWith({ dirPath: '/projB' })
+    expect(readDirectory).toHaveBeenCalledWith({ dirPath: '/projC' })
   })
 })

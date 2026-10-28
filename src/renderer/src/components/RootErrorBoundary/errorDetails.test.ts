@@ -6,7 +6,7 @@
  * These run on the one path where nothing else can be trusted, so the bar is
  * "never throws, for any input" rather than "produces pretty output".
  *
- * @see docs/design/design-issue-60.md §5 (`errorDetails.ts` row)
+ * @see docs/designs/design-issue-60.md §5 (`errorDetails.ts` row)
  */
 
 import { describe, expect, it } from 'vitest'
@@ -33,7 +33,7 @@ function stackWithLines(count: number): string {
 }
 
 describe('APP_VERSION', () => {
-  it('resolves the build-time define (mirrored in vitest.renderer.ts)', () => {
+  it('resolves the build-time define (mirrored in vitest.renderer.config.ts)', () => {
     expect(APP_VERSION).toBe('0.0.0-test')
   })
 })

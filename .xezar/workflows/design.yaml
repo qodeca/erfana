@@ -1,0 +1,45 @@
+# A design run produces a mockup in <designs>/<feature>/ (paths.designs) – static HTML on
+# the design system's stylesheet plus a README.md handoff – commits it and drafts a PR.
+# It writes no application code. The gates still run because this project's test
+# command may carry a design-system drift test and a designs handoff lint, and a mockup that
+# breaks either is not ready for review.
+name: design
+description: "Design a user-facing surface – mockup in the folder paths.designs names, on the design system, README handoff, every state – then gates and a draft PR into the base branch. No application code."
+steps:
+  - id: kit
+    name: Snapshot the local project kit
+    command: 'bash "$(git rev-parse --path-format=absolute --git-common-dir)/../.xezar/checks/bootstrap.sh"'
+    resultScope: routine
+  - id: preflight
+    name: Verify worktree isolation
+    command: ".xezar/checks/worktree-preflight.sh"
+    resultScope: routine
+  - id: setup
+    name: Prepare the worktree
+    command: ".xezar/checks/worktree-setup.sh"
+    resultScope: routine
+  - id: design
+    name: Design the surface
+    prompt: "Author the design for: {{task}}. Follow xezar-ux-design authoring instructions and the design system named by paths.designSystem in .xezar/pipeline/config.json: usage for scope, recipes for composition, verification for evidence, lifecycle for ownership and storage for artifacts. Own the static mockup and developer README handoff; finish focused checks and commits before the existing readiness, gates, evidence and PR handoff stages."
+    skill: xezar-ux-design
+    allowedTools: [Read, Edit, Write, Grep, Glob, Bash, mcp__chrome-devtools__navigate_page, mcp__chrome-devtools__new_page, mcp__chrome-devtools__list_pages, mcp__chrome-devtools__select_page, mcp__chrome-devtools__close_page, mcp__chrome-devtools__take_snapshot, mcp__chrome-devtools__take_screenshot, mcp__chrome-devtools__list_console_messages, mcp__chrome-devtools__get_console_message, mcp__chrome-devtools__list_network_requests, mcp__chrome-devtools__get_network_request, mcp__chrome-devtools__click, mcp__chrome-devtools__fill, mcp__chrome-devtools__fill_form, mcp__chrome-devtools__hover, mcp__chrome-devtools__press_key, mcp__chrome-devtools__type_text, mcp__chrome-devtools__wait_for, mcp__chrome-devtools__handle_dialog, mcp__chrome-devtools__resize_page, mcp__chrome-devtools__get_css_styles]
+    timeout: 2h
+  - id: readiness
+    name: Confirm the phase record is complete and nothing blocks
+    command: ".xezar/checks/worktree-preflight.sh --readiness"
+    resultScope: stage
+  - id: gates
+    name: Quality gates
+    command: ".xezar/checks/repo-gates.sh --fast --producer gates"
+    resultScope: stage
+    onFail:
+      retry: design
+      max: 2
+  - id: evidence
+    name: Seal the gate evidence
+    command: ".xezar/checks/worktree-preflight.sh --record-gate-evidence"
+    resultScope: stage
+  - id: handoff
+    name: Draft PR into the base branch
+    prompt: "Hand off the design of: {{task}}. Follow the design system's lifecycle and storage pages for ownership and evidence; verify the sealed head and open the draft PR with needs-design. The author already owns the mockup and README handoff; make no content changes here. Independent design review remains pending."
+    skill: xezar-handoff-draft-pr

@@ -295,4 +295,4 @@ Claude Code:
 - [User guide – UI, Claude Code, and troubleshooting](./user-guide-ui-troubleshooting.md) – UI components, Claude Code integration details, best practices, troubleshooting
 - [Data Ingestion](./data-ingestion-discovery.md) – How files are indexed
 - [MCP Server](./mcp-server-tools.md) – Technical details on Claude Code integration
-- [Implementation Guide](./implementation-guide.md) – For developers building the system
+- [Implementation Guide](./implementation-guide/README.md) – For developers building the system

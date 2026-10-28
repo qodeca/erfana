@@ -1,0 +1,24 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<!--
+  Part 2 corpus (P2-AC4, user answer 9): srcdoc frames at levels 1 to 3; at
+  level 4 a srcdoc frame and a src frame (chain-4.html). A srcdoc frame cannot be
+  stopped, so the srcdoc 4th level is shown anyway (-SRCDOC-4-) and listed once
+  ("srcdoc frame – shown anyway; the depth limit covers src frames only"); the
+  src 4th level stays empty and is listed as /frames/chain-4.html.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>srcdoc chain -SRCDOC-0-</title>
+  </head>
+  <body>
+    <h1>srcdoc chain</h1>
+    <iframe title="srcdoc level 1" width="580" height="340" srcdoc="<!DOCTYPE html><title>srcdoc level 1 -SRCDOC-1-</title><p>srcdoc level 1</p>
+    <iframe title='srcdoc level 2' width='540' height='270' srcdoc=&quot;<!DOCTYPE html><title>srcdoc level 2 -SRCDOC-2-</title><p>srcdoc level 2</p>
+    <iframe title='srcdoc level 3' width='500' height='200' srcdoc=&amp;quot;<!DOCTYPE html><title>srcdoc level 3 -SRCDOC-3-</title><p>srcdoc level 3</p>
+    <iframe title='srcdoc level 4' width='220' height='90' srcdoc=&amp;amp;quot;<!DOCTYPE html><title>srcdoc level 4 -SRCDOC-4-</title><p>srcdoc level 4 – shown anyway</p>&amp;amp;quot;></iframe>
+    <iframe title='src level 4' width='220' height='90' src='chain-4.html'></iframe>&amp;quot;></iframe>&quot;></iframe>"></iframe>
+  </body>
+</html>

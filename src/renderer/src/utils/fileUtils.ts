@@ -5,6 +5,12 @@
  * Shared utilities for file operations in the renderer process
  */
 
+import { getRendererPlatform, isWindows } from './platform'
+
+// Moved to src/shared/ so main computes the same digest for its log lines
+// (issue #124, QG-7 S3); re-exported so renderer imports keep this path.
+export { stablePathDigest } from '../../../shared/stablePathDigest'
+
 /**
  * Sanitize file path for use as a panel ID
  * Converts: /Users/name/docs/notes.md → users-name-docs-notes-md
@@ -101,6 +107,46 @@ export function isStrictDescendant(parentPath: string, childPath: string): boole
 }
 
 /**
+ * Whether two paths name the same file, as far as the renderer can tell
+ * without touching the disk (issue #124, part 3 §3.4).
+ *
+ * Separators are normalised – `/` and `\\` both count, runs collapse, a
+ * trailing one is ignored – and on Windows only the case is folded, because
+ * `B.html` and `b.html` are one file there. POSIX paths compare
+ * case-sensitively, the rule panel ids already follow.
+ *
+ * Both sides must come from the same path space. Main reports every page as a
+ * project-space path, the space the project tree uses, so a tree path and a
+ * reported page compare equal even when the project is reached through a
+ * symlink. Nothing is resolved here – no `realpath`, no `..` – so a file opened
+ * through a symlink alias is NOT matched (recorded as technical debt, RS12).
+ *
+ * Display/parse-only — not for security confinement.
+ *
+ * @param a - First path; `null`, `undefined` or `''` never matches
+ * @param b - Second path; `null`, `undefined` or `''` never matches
+ * @param platform - Whose case rule applies; defaults to the renderer's own
+ * @returns `true` when both paths are non-empty and name the same file
+ *
+ * @example
+ * ```ts
+ * pathsEqual('/proj/site/a.html', '/proj//site/a.html/')      // true
+ * pathsEqual('C:\\proj\\B.html', 'c:/proj/b.html', 'win32')  // true
+ * pathsEqual('/proj/B.html', '/proj/b.html', 'darwin')        // false
+ * ```
+ */
+export function pathsEqual(
+  a: string | null | undefined,
+  b: string | null | undefined,
+  platform: NodeJS.Platform = getRendererPlatform()
+): boolean {
+  if (!a || !b) return false
+  const left = normalizePathForCompare(a)
+  const right = normalizePathForCompare(b)
+  return isWindows(platform) ? left.toLowerCase() === right.toLowerCase() : left === right
+}
+
+/**
  * Maximum length of a filename rendered into the accessibility tree.
  *
  * Defence in depth: a filename can legally be 255 bytes, and a longer one
@@ -164,7 +210,7 @@ export function isMarkdownFile(fileName: string): boolean {
  * only – it decides whether a path is a candidate for the running preview and
  * for the "Open as source" affordance. It is NOT an eligibility check: whether
  * the file may actually run as a preview is decided main-side by
- * `window.api.preview.checkEligibility` (design §1.5), which `resolvePanelKind`
+ * `previewGateway.checkEligibility` (design §1.5), which `resolvePanelKind`
  * calls after this cheap extension gate passes.
  *
  * @param fileName - File name or full path to check.

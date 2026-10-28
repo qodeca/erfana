@@ -10,8 +10,9 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, act } from '@testing-library/react'
 import { TranscriptionDialog } from './TranscriptionDialog'
+import { BaseDialog } from '../Dialog/BaseDialog'
 import { useTranscriptionStore } from '../../stores/useTranscriptionStore'
 import { useProjectStore } from '../../stores/useProjectStore'
 import { TEST_IDS } from '../../constants/testids'
@@ -168,6 +169,28 @@ describe('TranscriptionDialog', () => {
       render(<TranscriptionDialog />)
       const select = screen.getByTestId(TEST_IDS.TRANSCRIPTION_LANGUAGE_SELECT) as HTMLSelectElement
       expect(select.value).toBe('auto')
+    })
+
+    // The seed moved from an effect into render (plan item 19)
+    it('starts from the last used language on each open, after a change in between', () => {
+      useTranscriptionStore.setState({
+        isDialogOpen: true,
+        filePath: '/path/to/audio.mp3',
+        fileName: 'audio.mp3',
+        lastLanguage: 'de'
+      })
+      render(<TranscriptionDialog />)
+      const select = (): HTMLSelectElement =>
+        screen.getByTestId(TEST_IDS.TRANSCRIPTION_LANGUAGE_SELECT) as HTMLSelectElement
+      expect(select().value).toBe('de')
+
+      fireEvent.change(select(), { target: { value: 'fr' } })
+      expect(select().value).toBe('fr')
+
+      // Close and reopen: the choice goes back to the stored language
+      act(() => useTranscriptionStore.setState({ isDialogOpen: false }))
+      act(() => useTranscriptionStore.setState({ isDialogOpen: true }))
+      expect(select().value).toBe('de')
     })
 
     it('allows language selection change', () => {
@@ -666,6 +689,34 @@ describe('TranscriptionDialog', () => {
   })
 
   describe('Keyboard interaction', () => {
+    it('leaves a running transcription alone when Escape closes a dialog stacked on top (#229)', () => {
+      // The shipping case: Cmd+Q mid-transcription stacks the quit
+      // ConfirmDialog (DialogManager, zIndex 10001+) over this one (10000).
+      const cancelSpy = vi.fn().mockResolvedValue(undefined)
+      const quitPromptClose = vi.fn()
+      useTranscriptionStore.setState({
+        isDialogOpen: true,
+        filePath: '/path/to/audio.mp3',
+        fileName: 'audio.mp3',
+        isTranscribing: true,
+        progress: { percent: 50, phase: 'Transcribing' },
+        cancelTranscription: cancelSpy
+      })
+
+      render(
+        <>
+          <TranscriptionDialog />
+          <BaseDialog isOpen onClose={quitPromptClose} zIndex={10001}>
+            <button>Cancel</button>
+          </BaseDialog>
+        </>
+      )
+      fireEvent.keyDown(document, { key: 'Escape' })
+
+      expect(quitPromptClose).toHaveBeenCalledOnce()
+      expect(cancelSpy).not.toHaveBeenCalled()
+    })
+
     it('closes dialog on Escape when not transcribing', () => {
       const closeDialogSpy = vi.fn()
       useTranscriptionStore.setState({

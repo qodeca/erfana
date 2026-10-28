@@ -19,6 +19,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useImport, type ImportFileInfo, type ProcessFilesResult } from './useImport'
 import { IMPORT } from '../../../shared/constants'
+import { untrustedToolMessage } from '../../../shared/errors'
 
 // Mock the dialog context
 const mockShowConfirm = vi.fn()
@@ -1314,7 +1315,7 @@ describe('useImport', () => {
         ...mockGetState(),
         documentExtensions: [],
         hasLibreOffice: false,
-        hasImageMagick: true,
+        libreOfficeState: 'missing',
         openDialog: mockDocImportOpenDialog,
         fetchExtensions: mockFetchExtensions,
         initDependencyListener: mockInitDependencyListener
@@ -1332,23 +1333,79 @@ describe('useImport', () => {
         await result.current.importFile()
       })
 
-      expect(mockShowAlert).toHaveBeenCalledWith(
+      // #250: the refusal offers to open Settings → Import tools
+      expect(mockShowConfirm).toHaveBeenCalledWith(
         expect.objectContaining({
-          title: 'LibreOffice required'
+          title: 'LibreOffice required',
+          message: expect.stringContaining('Import tools in Settings'),
+          confirmLabel: 'Open import tools',
+          cancelLabel: 'Close',
+          danger: false
         })
       )
+      const { useSettingsStore } = await import('../stores/useSettingsStore')
+      expect(useSettingsStore.getState()).toMatchObject({ isOpen: true, focusSection: 'import-tools' })
+      useSettingsStore.getState().closeSettings()
       expect(mockDocImportOpenDialog).not.toHaveBeenCalled()
       expect(mockProcessImport).not.toHaveBeenCalled()
     })
 
-    it('should show ImageMagick required alert for image files when missing', async () => {
+    it('should name the unsafe location when LibreOffice was found somewhere Erfana will not run it', async () => {
       const { useDocumentImportStore } = await import('../stores/useDocumentImportStore')
       const mockGetState = vi.mocked(useDocumentImportStore.getState)
       mockGetState.mockReturnValue({
         ...mockGetState(),
         documentExtensions: [],
-        hasLibreOffice: true,
-        hasImageMagick: false,
+        hasLibreOffice: false,
+        libreOfficeState: 'unsafe',
+        libreOfficeUnsafe: { tool: 'soffice', reason: 'ambiguous' },
+        openDialog: mockDocImportOpenDialog,
+        fetchExtensions: mockFetchExtensions,
+        initDependencyListener: mockInitDependencyListener
+      } as any)
+
+      mockSelectFile.mockResolvedValueOnce({
+        path: '/test/report.docx',
+        name: 'report.docx',
+        sizeInMB: 2.0,
+        extension: 'docx'
+      })
+
+      mockShowConfirm.mockResolvedValueOnce(false) // Close
+      const { result } = renderHook(() => useImport())
+      await act(async () => {
+        await result.current.importFile()
+      })
+
+      expect(mockShowConfirm).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'LibreOffice in an unsafe location',
+          message: expect.stringContaining(untrustedToolMessage('soffice', 'ambiguous'))
+        })
+      )
+      const { useSettingsStore } = await import('../stores/useSettingsStore')
+      expect(useSettingsStore.getState().isOpen).toBe(false)
+      expect(mockDocImportOpenDialog).not.toHaveBeenCalled()
+    })
+
+    it('missingToolMessage names the specific reason when it is known, and falls back otherwise', async () => {
+      const { missingToolMessage } = await import('./useImport')
+      for (const reason of ['project', 'temp', 'network', 'relative', 'unresolvable', 'ambiguous'] as const) {
+        const message = missingToolMessage('docx', 'unsafe', { tool: 'soffice', reason })
+        expect(message).toContain(untrustedToolMessage('soffice', reason))
+        expect(message).toContain('Import tools in Settings')
+      }
+      expect(missingToolMessage('docx', 'unsafe', null)).toContain('will not run it')
+    })
+
+    it('should import images without any external tool (LiteParse reads them natively)', async () => {
+      const { useDocumentImportStore } = await import('../stores/useDocumentImportStore')
+      const mockGetState = vi.mocked(useDocumentImportStore.getState)
+      mockGetState.mockReturnValue({
+        ...mockGetState(),
+        documentExtensions: ['pdf', 'tiff'],
+        hasLibreOffice: false,
+        libreOfficeState: 'missing',
         openDialog: mockDocImportOpenDialog,
         fetchExtensions: mockFetchExtensions,
         initDependencyListener: mockInitDependencyListener
@@ -1366,11 +1423,8 @@ describe('useImport', () => {
         await result.current.importFile()
       })
 
-      expect(mockShowAlert).toHaveBeenCalledWith(
-        expect.objectContaining({
-          title: 'ImageMagick required'
-        })
-      )
+      expect(mockShowConfirm).not.toHaveBeenCalled()
+      expect(mockDocImportOpenDialog).toHaveBeenCalledWith('/test/scan.tiff', 'scan.tiff', 5.0, 'tiff')
     })
 
     it('should filter document files from batch with warning toast', async () => {

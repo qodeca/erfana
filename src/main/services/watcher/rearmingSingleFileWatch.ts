@@ -22,7 +22,7 @@
  *
  * A watched path is DATA: its confinement is re-verified, never followed.
  */
-import type { FSWatcher, WatchOptions } from 'chokidar'
+import type { FSWatcher, ChokidarOptions } from 'chokidar'
 import { AtomicSaveDetector, createAtomicSaveDetector } from './AtomicSaveDetector'
 import { createSingleFileWatcher } from './singleFileWatch'
 import { AtomicRearmDeps, RearmableWatch, resolveDeletedWatch } from './atomicRearm'
@@ -37,14 +37,24 @@ export interface RearmingSingleFileWatchHandlers {
   onError(error: unknown): void
   /** The watch could not be re-armed and has ended (rare). */
   onWatchDead?(reason: string): void
+  /**
+   * The first watcher is listening: a change from now on is reported. Once
+   * only – a re-arm reports its own change instead.
+   */
+  onReady?(): void
 }
 
 export interface RearmingSingleFileWatchDeps {
   /** The low-level chokidar factory; defaults to `createSingleFileWatcher`. */
   readonly createWatcher?: (
     filePath: string,
-    handlers: { onChange: () => void; onUnlink: () => void; onError: (error: unknown) => void },
-    overrides?: Partial<WatchOptions>
+    handlers: {
+      onChange: () => void
+      onUnlink: () => void
+      onError: (error: unknown) => void
+      onReady?: () => void
+    },
+    overrides?: Partial<ChokidarOptions>
   ) => FSWatcher
   /**
    * Re-check that the path still resolves inside its boundary before re-arming,
@@ -55,7 +65,7 @@ export interface RearmingSingleFileWatchDeps {
   /** The atomic-save detector; defaults to a fresh `createAtomicSaveDetector`. */
   readonly createDetector?: () => AtomicSaveDetector
   /** chokidar options forwarded to the low-level factory. */
-  readonly overrides?: Partial<WatchOptions>
+  readonly overrides?: Partial<ChokidarOptions>
 }
 
 /** The disposable a caller holds; matches `PreviewFileWatcherHandle`. */
@@ -96,7 +106,7 @@ export function createRearmingSingleFileWatcher(
     })
   }
 
-  const createWatcher = (): FSWatcher =>
+  const createWatcher = (onReady?: () => void): FSWatcher =>
     build(
       filePath,
       {
@@ -106,7 +116,8 @@ export function createRearmingSingleFileWatcher(
         onUnlink,
         onError: (error) => {
           if (!disposed) handlers.onError(error)
-        }
+        },
+        ...(onReady === undefined ? {} : { onReady })
       },
       deps.overrides
     )
@@ -141,7 +152,13 @@ export function createRearmingSingleFileWatcher(
     log: () => {}
   }
 
-  slot.watcher = createWatcher()
+  slot.watcher = createWatcher(
+    handlers.onReady === undefined
+      ? undefined
+      : () => {
+          if (!disposed) handlers.onReady?.()
+        }
+  )
 
   return {
     async close(): Promise<void> {

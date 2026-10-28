@@ -1,0 +1,117 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/* Import tools section (#250) – builds on the shared settings-* classes.
+ *
+ * Secondary text here uses --color-text-tertiary (6.33:1 on --color-bg-secondary),
+ * not .settings-description's --color-text-secondary (3.72:1, fails AA), per
+ * docs/design-system/system/foundations/colors.html. */
+
+.import-tools-title:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
+}
+
+.import-tools-intro,
+.import-tools-note,
+.import-tools-hint__text,
+.import-tools-extensions,
+.import-tools-live {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  color: var(--color-text-tertiary);
+}
+
+.import-tools-intro {
+  margin-bottom: var(--space-4);
+}
+
+.import-tools-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.import-tools-row + .import-tools-row {
+  border-top: var(--border-width) solid var(--color-border-default);
+}
+
+.import-tools-extensions {
+  font-family: var(--font-mono);
+  /* A long extension list wraps between entries, never mid-entry. */
+  word-spacing: var(--space-1);
+}
+
+/* Words plus an icon, so the state never rests on colour alone (docs/design-system/system/components/feedback). */
+.import-tools-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--color-text-tertiary);
+}
+
+.import-tools-status--ready {
+  color: var(--color-success);
+}
+
+.import-tools-status--missing,
+.import-tools-status--unsafe {
+  color: var(--color-warning);
+}
+
+.import-tools-hint {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-6);
+}
+
+.import-tools-hint--action {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+
+.import-tools-hint__command {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.import-tools-command {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+  background: var(--color-bg-tertiary);
+  padding: var(--space-1) var(--space-2);
+  /* Selectable for copying via `.settings-content` in utilities.css. */
+}
+
+/* At least a 24px target (WCAG 2.5.8), whatever the label length. */
+.import-tools-btn {
+  min-height: var(--btn-height-sm);
+  flex-shrink: 0;
+}
+
+.import-tools-btn--icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--btn-height-sm);
+  padding: 0 var(--space-2);
+}
+
+/* aria-disabled keeps the button focusable while a check runs. */
+.import-tools-btn[aria-disabled='true'] {
+  opacity: var(--opacity-disabled);
+  cursor: progress;
+}
+
+/* Reserve one line so the announcement does not push the row down (docs/design-system/system/components/feedback). */
+.import-tools-live {
+  min-height: calc(var(--text-sm) * var(--leading-normal));
+}

@@ -17,11 +17,11 @@
  * - transcription:whisperEnsureModel   - Download whisper model
  * - transcription:whisperListModels    - List installed models
  * - transcription:whisperDeleteModel   - Delete a model
+ * - transcription:whisperCancelDownload - Cancel the running binary or model download
  *
  * @see Issue #75 - Media import with transcription
  * @see Issue #111 - Local Whisper transcription backend
  */
-import { ipcMain } from 'electron'
 import { writeFile, mkdir } from 'fs/promises'
 import { join, basename, extname, isAbsolute, normalize } from 'path'
 import { TRANSCRIPTION_CHANNELS } from '../../shared/ipc/transcription-channels'
@@ -34,7 +34,7 @@ import {
   type WhisperModel,
   WhisperModelSchema
 } from '../../shared/ipc/transcription-schema'
-import { ErrorCode, getUserFriendlyMessage } from '../../shared/errors'
+import { AppError, ErrorCode, getUserFriendlyMessage } from '../../shared/errors'
 import { IMPORT, VIDEO_IMPORT, TRANSCRIPTION } from '../../shared/constants'
 import { transcriptionService } from '../services/TranscriptionService'
 import { localWhisperService } from '../services/LocalWhisperService'
@@ -44,14 +44,74 @@ import { audioMetadataService } from '../services/AudioMetadataService'
 import { audioExtractionService } from '../services/AudioExtractionService'
 import type { SegmentedExtractionResult } from '../services/AudioExtractionService'
 import { apiKeyService } from '../services/ApiKeyService'
+import { ApiKeyEncryptionUnavailableError } from '../services/apiKeyErrors'
 import { globalSettingsService } from '../services/GlobalSettingsService'
 import { fileService } from '../services/FileService'
 import { logger } from '../services/LoggingService'
 import { changeExtension, sanitizeFileName, findAvailableFileName, formatDuration } from '../utils/fileUtils'
 import { isVideoExtension } from '../services/import/extensions'
+import { isAbortError } from '../utils/isAbortError'
+import { redactedLogError } from '../utils/redactUserInput'
+import { registerHandle } from './registry'
 
 /** Active AbortController for current transcription */
 let activeController: AbortController | null = null
+
+/** A whisper ensure request still running; `controller` feeds the manager's signal. */
+interface DownloadRequest {
+  cancelled: boolean
+  controller: AbortController
+}
+
+/**
+ * Whisper ensure requests still running. Cancel marks each one, so its abort
+ * is reported as cancelled, and aborts its controller. The signal is handed to
+ * the manager, so it also stops a download the manager has not registered yet
+ * (while it checks the install and prepares its folders), which
+ * `whisperModelManager.cancelDownloads()` cannot reach. The manager deletes
+ * the partials either way.
+ *
+ * No sender is recorded: cancel is app-wide by design, because there is one
+ * model store per app, so Cancel in any window stops every running download.
+ */
+const runningDownloads = new Set<DownloadRequest>()
+
+/** Result of a whisper download; `cancelled` marks a user cancel, not an error to show */
+type WhisperDownloadResult = { success: boolean; path?: string; error?: string; cancelled?: boolean }
+const DOWNLOAD_CANCELLED: WhisperDownloadResult = { success: false, cancelled: true, error: 'Download cancelled' }
+
+/** Start tracking a whisper ensure request; `release` stops tracking it. */
+function trackDownload(): { request: DownloadRequest; release: () => void } {
+  const request: DownloadRequest = { cancelled: false, controller: new AbortController() }
+  runningDownloads.add(request)
+  return { request, release: () => runningDownloads.delete(request) }
+}
+
+/** The manager reports an abort as an `AppError` whose cause is the AbortError. */
+function isDownloadAbort(error: unknown): boolean {
+  return isAbortError(error instanceof AppError ? error.originalError : error)
+}
+
+/**
+ * The IPC result for a failed whisper ensure call. Only an abort after Cancel
+ * is reported as cancelled: an error that lands after Cancel (an integrity
+ * failure, say) stays an error. Both are logged, the abort at debug level.
+ */
+function downloadFailure(
+  error: unknown,
+  request: DownloadRequest,
+  artifact: 'binary' | 'model'
+): WhisperDownloadResult {
+  if (request.cancelled && isDownloadAbort(error)) {
+    logger.debug(`Whisper ${artifact} download cancelled`, { error: redactedLogError(error)?.message })
+    return DOWNLOAD_CANCELLED
+  }
+  logger.error(`Failed to ensure whisper ${artifact}`, redactedLogError(error))
+  return {
+    success: false,
+    error: error instanceof Error ? error.message : `Failed to download whisper ${artifact}`
+  }
+}
 
 /**
  * Route a transcription call to the appropriate backend
@@ -92,7 +152,7 @@ export function registerTranscriptionHandlers(): void {
    * 7. Writes markdown to import/ directory
    * 8. Returns result
    */
-  ipcMain.handle(
+  registerHandle(
     TRANSCRIPTION_CHANNELS.IMPORT,
     async (event, request: unknown): Promise<TranscriptionImportResult> => {
       // Validate request schema
@@ -436,7 +496,7 @@ export function registerTranscriptionHandlers(): void {
   /**
    * Cancel active transcription
    */
-  ipcMain.handle(
+  registerHandle(
     TRANSCRIPTION_CHANNELS.CANCEL,
     async (): Promise<{ success: boolean; error?: string }> => {
       if (activeController) {
@@ -452,7 +512,7 @@ export function registerTranscriptionHandlers(): void {
   /**
    * Quick validation of audio file
    */
-  ipcMain.handle(
+  registerHandle(
     TRANSCRIPTION_CHANNELS.VALIDATE,
     async (
       _event,
@@ -494,7 +554,7 @@ export function registerTranscriptionHandlers(): void {
   /**
    * Store API key in safeStorage
    */
-  ipcMain.handle(
+  registerHandle(
     TRANSCRIPTION_CHANNELS.SET_API_KEY,
     async (_event, apiKey: string): Promise<{ success: boolean; error?: string }> => {
       if (!apiKey || typeof apiKey !== 'string' || apiKey.trim().length === 0) {
@@ -513,6 +573,9 @@ export function registerTranscriptionHandlers(): void {
 
         return { success: true }
       } catch (error) {
+        if (error instanceof ApiKeyEncryptionUnavailableError) {
+          return { success: false, error: error.message }
+        }
         logger.error('Failed to store API key', error instanceof Error ? error : undefined)
         return {
           success: false,
@@ -525,7 +588,7 @@ export function registerTranscriptionHandlers(): void {
   /**
    * Check if API key exists
    */
-  ipcMain.handle(
+  registerHandle(
     TRANSCRIPTION_CHANNELS.HAS_API_KEY,
     async (): Promise<boolean> => {
       try {
@@ -540,7 +603,7 @@ export function registerTranscriptionHandlers(): void {
   /**
    * Remove stored API key
    */
-  ipcMain.handle(
+  registerHandle(
     TRANSCRIPTION_CHANNELS.CLEAR_API_KEY,
     async (): Promise<{ success: boolean; error?: string }> => {
       try {
@@ -569,9 +632,9 @@ export function registerTranscriptionHandlers(): void {
    *
    * Streams download progress to renderer via WHISPER_DOWNLOAD_PROGRESS channel.
    */
-  ipcMain.handle(
+  registerHandle(
     TRANSCRIPTION_CHANNELS.WHISPER_ENSURE_BINARY,
-    async (event): Promise<{ success: boolean; path?: string; error?: string }> => {
+    async (event): Promise<WhisperDownloadResult> => {
       const webContents = event.sender
 
       const onProgress: ProgressCallback = (progressData) => {
@@ -584,15 +647,17 @@ export function registerTranscriptionHandlers(): void {
         }
       }
 
+      const download = trackDownload()
       try {
-        const path = await whisperModelManager.ensureBinary({ onProgress })
+        const path = await whisperModelManager.ensureBinary({
+          onProgress,
+          signal: download.request.controller.signal
+        })
         return { success: true, path }
       } catch (error) {
-        logger.error('Failed to ensure whisper binary', error instanceof Error ? error : undefined)
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Failed to download whisper binary'
-        }
+        return downloadFailure(error, download.request, 'binary')
+      } finally {
+        download.release()
       }
     }
   )
@@ -602,12 +667,12 @@ export function registerTranscriptionHandlers(): void {
    *
    * Streams download progress to renderer via WHISPER_DOWNLOAD_PROGRESS channel.
    */
-  ipcMain.handle(
+  registerHandle(
     TRANSCRIPTION_CHANNELS.WHISPER_ENSURE_MODEL,
     async (
       event,
       model: string
-    ): Promise<{ success: boolean; path?: string; error?: string }> => {
+    ): Promise<WhisperDownloadResult> => {
       const webContents = event.sender
 
       const onProgress: ProgressCallback = (progressData) => {
@@ -620,28 +685,57 @@ export function registerTranscriptionHandlers(): void {
         }
       }
 
-      try {
-        const parsed = WhisperModelSchema.safeParse(model)
-        if (!parsed.success) {
-          return { success: false, error: `Invalid whisper model: ${model}` }
-        }
+      const parsed = WhisperModelSchema.safeParse(model)
+      if (!parsed.success) {
+        return { success: false, error: `Invalid whisper model: ${model}` }
+      }
 
-        const path = await whisperModelManager.ensureModel(parsed.data, { onProgress })
+      const download = trackDownload()
+      try {
+        const path = await whisperModelManager.ensureModel(parsed.data, {
+          onProgress,
+          signal: download.request.controller.signal
+        })
         return { success: true, path }
       } catch (error) {
-        logger.error('Failed to ensure whisper model', error instanceof Error ? error : undefined)
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Failed to download whisper model'
-        }
+        return downloadFailure(error, download.request, 'model')
+      } finally {
+        download.release()
       }
+    }
+  )
+
+  /**
+   * Cancel the running whisper binary or model download.
+   *
+   * The pending ensure call then resolves with `cancelled: true`; the manager
+   * has deleted the partial file by then. Cancel is app-wide by design (one
+   * model store per app): it stops the download of every window, not only the
+   * sender's.
+   */
+  registerHandle(
+    TRANSCRIPTION_CHANNELS.WHISPER_CANCEL_DOWNLOAD,
+    async (): Promise<{ success: boolean; error?: string }> => {
+      if (runningDownloads.size === 0) {
+        return { success: false, error: 'No active download' }
+      }
+      for (const request of runningDownloads) {
+        request.cancelled = true
+        // Reaches the download even before the manager has registered it
+        request.controller.abort()
+      }
+      // How many downloads the manager had registered: 0 means Cancel came
+      // while it was still preparing, and only the signals above stop them
+      const aborted = whisperModelManager.cancelDownloads()
+      logger.info('Whisper download cancelled by user', { aborted })
+      return { success: true }
     }
   )
 
   /**
    * List installed whisper models with info
    */
-  ipcMain.handle(
+  registerHandle(
     TRANSCRIPTION_CHANNELS.WHISPER_LIST_MODELS,
     async (): Promise<{
       success: boolean
@@ -667,7 +761,7 @@ export function registerTranscriptionHandlers(): void {
   /**
    * Delete an installed whisper model
    */
-  ipcMain.handle(
+  registerHandle(
     TRANSCRIPTION_CHANNELS.WHISPER_DELETE_MODEL,
     async (
       _event,

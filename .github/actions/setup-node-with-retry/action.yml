@@ -64,10 +64,14 @@ runs:
         # stale/orphaned patch (e.g. after a node-pty bump) fail the step loudly
         # instead of relying on CI auto-detection.
         npx --no-install patch-package --error-on-fail
+        # Electron 42+ has no install script: its binary is fetched by the
+        # package's own `install-electron` bin (or lazily on first require).
+        # Fetch it explicitly so later steps never depend on that lazy path.
+        npx --no-install install-electron
         # Only rebuild native modules we explicitly trust. Any other package
         # with a postinstall script was blocked by --ignore-scripts above and
         # stays blocked.
-        for pkg in electron node-pty node-addon-api; do
+        for pkg in node-pty node-addon-api; do
           if [ -d "node_modules/$pkg" ]; then
             echo "Rebuilding $pkg"
             npm rebuild "$pkg"

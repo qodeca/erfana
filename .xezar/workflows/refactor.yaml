@@ -1,0 +1,42 @@
+# A refactor run changes how code is built and nothing about what it does. The proof is the
+# existing tests passing before and after, unchanged; where there are none, characterisation tests
+# come first in their own commit. A needed behaviour change is a different workflow.
+name: refactor
+description: "Restructure code with no behaviour change – proved by the unchanged tests passing before and after, characterisation tests first where none exist, public surfaces left where they are – then gates and a draft PR."
+steps:
+  - id: kit
+    name: Snapshot the local project kit
+    command: 'bash "$(git rev-parse --path-format=absolute --git-common-dir)/../.xezar/checks/bootstrap.sh"'
+    resultScope: routine
+  - id: preflight
+    name: Verify worktree isolation
+    command: ".xezar/checks/worktree-preflight.sh"
+    resultScope: routine
+  - id: setup
+    name: Prepare the worktree
+    command: ".xezar/checks/worktree-setup.sh"
+    resultScope: routine
+  - id: restructure
+    name: Restructure, behaviour unchanged
+    prompt: "Refactor: {{task}}. Follow xezar-refactor instructions: run the tests first and keep the result; where the code has none, pin today's behaviour with characterisation tests in their own commit before you move anything. The same tests pass after, unchanged – list every mechanical edit a move forced. One kind of change per commit, each green. Move no public surface named in BACKWARD_COMPATIBILITY.md, fix no bug on the way, add no feature. If the request needs a behaviour change, say so and stop. Finish focused checks and commits before the existing readiness, gates, evidence and PR handoff stages."
+    skill: xezar-refactor
+    timeout: 2h
+  - id: readiness
+    name: Confirm the phase record is complete and nothing blocks
+    command: ".xezar/checks/worktree-preflight.sh --readiness"
+    resultScope: stage
+  - id: gates
+    name: Quality gates
+    command: ".xezar/checks/repo-gates.sh --fast --producer gates"
+    resultScope: stage
+    onFail:
+      retry: restructure
+      max: 2
+  - id: evidence
+    name: Seal the gate evidence
+    command: ".xezar/checks/worktree-preflight.sh --record-gate-evidence"
+    resultScope: stage
+  - id: handoff
+    name: Draft PR into the base branch
+    prompt: "Hand off the refactor for: {{task}}. Verify the sealed head and open the draft PR; make no content changes here. The body states that behaviour is unchanged and how that was proved – test results before and after, every mechanical test edit – and lists the bugs found and deliberately left alone."
+    skill: xezar-handoff-draft-pr

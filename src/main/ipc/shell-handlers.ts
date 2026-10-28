@@ -1,41 +1,29 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { ipcMain, shell } from 'electron'
 import { logger } from '../services/LoggingService'
+import { openExternalSafe } from '../utils/openExternalSafe'
+import { registerHandle } from './registry'
 
 /**
  * Shell IPC Handlers
  *
- * Handles shell operations that require main process privileges.
- * Used for opening external URLs, files, and folders in the system's default application.
+ * Opens external URLs in the system's default application.
  *
- * Security: All URLs are validated by Electron's shell.openExternal before opening.
+ * The check itself (`parseExternalUrl`: parse, protocol allowlist from
+ * `EXTERNAL_PROTOCOLS`, no credentials, no share-looking input, length bound)
+ * and the open live in `../utils/openExternalSafe`, shared with the window-open
+ * handler so every route to the OS goes through one path. The process-wide
+ * sender gate in `registry.ts` still applies first.
  */
-
 export function registerShellHandlers(): void {
   /**
-   * Open a URL in the system's default browser
+   * Open a URL in the system's default application.
    *
-   * @param url - URL to open (http://, https://, mailto:, tel:, etc.)
-   * @returns Promise<void> - Resolves when the URL is opened
-   *
-   * Security Notes:
-   * - Electron's shell.openExternal validates the URL protocol
-   * - Dangerous protocols (javascript:, data:, vbscript:) should be blocked in renderer
-   * - The renderer must validate URLs before calling this IPC handler
+   * @param url - the URL to open
+   * @throws when the URL is refused by the external-open check
    */
-  ipcMain.handle('shell:openExternal', async (_event, url: string) => {
-    logger.debug('Opening external URL', { url })
-
-    try {
-      await shell.openExternal(url)
-      logger.info('External URL opened successfully', { url })
-    } catch (error) {
-      logger.error('Failed to open external URL', error instanceof Error ? error : undefined, {
-        url
-      })
-      throw error
-    }
+  registerHandle('shell:openExternal', async (_event, url: unknown) => {
+    await openExternalSafe(url)
   })
 
   logger.info('✅ Shell IPC handlers registered')

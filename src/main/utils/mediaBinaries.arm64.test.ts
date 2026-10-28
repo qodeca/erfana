@@ -10,8 +10,8 @@
  * without depending on the real host platform/arch, since CI runs on
  * ubuntu-latest / macos-latest / windows-latest (x64), never win32-arm64.
  *
- * Split into its own file (rather than living in mediaBinaries.test.ts,
- * which doesn't exist yet either) because the module under test resolves
+ * Split into its own file (rather than living in mediaBinaries.test.ts)
+ * because the module under test resolves
  * its exports at import time, so every case needs vi.resetModules() +
  * a fresh dynamic import under mocked process.platform/process.arch —
  * mirrors the module-reset pattern used by src/main/menu.test.ts.
@@ -24,6 +24,8 @@ import { dirname, join } from 'node:path'
 // files which build to CJS — createRequire is the correct way to resolve a
 // package path here (see mediaBinaries.ts's own doc comment for why the
 // *source* uses bare require.resolve instead).
+vi.mock('electron', () => ({ app: { isPackaged: false } }))
+
 const nodeRequire = createRequire(import.meta.url)
 const REAL_FFMPEG_STATIC_DIR = dirname(nodeRequire.resolve('ffmpeg-static/package.json'))
 

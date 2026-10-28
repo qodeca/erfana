@@ -14,7 +14,7 @@
  * Covers #160 (Windows git allowlist + F_OK + `git --version` liveness).
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
 
 // ---------------------------------------------------------------------------
 // Platform stub state
@@ -22,6 +22,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 const originalPlatform = process.platform
 const originalUserProfile = process.env.USERPROFILE
+
+// The finder is run by absolute path (`%SystemRoot%\System32\where.exe`).
+const WHERE_EXE = /where\.exe$/
 
 function stubPlatform(value: NodeJS.Platform): void {
   Object.defineProperty(process, 'platform', { value, configurable: true })
@@ -44,7 +47,7 @@ const hoisted = vi.hoisted(() => {
   return {
     mockParentPort: new FakePort(),
     mockAccess: vi.fn(),
-    mockRun: vi.fn() as ReturnType<typeof vi.fn>,
+    mockRun: vi.fn() as Mock,
   }
 })
 const { mockParentPort, mockAccess, mockRun } = hoisted
@@ -134,16 +137,16 @@ describe('git-resolver – #160 Windows git allowlist', () => {
         if (cmd === BAD_CANDIDATE && args[0] === '--version') {
           throw new Error('not a valid Win32 application')
         }
-        if (cmd === 'where' && args[0] === 'git') return 'C:\\Tools\\git.exe\n'
+        if (WHERE_EXE.test(cmd) && args[0] === 'git') return 'C:\\Tools\\git.exe\n'
         throw new Error('unexpected')
       })
 
       const { resolveGitPath } = await freshResolver()
       const resolved = await resolveGitPath()
 
-      // Liveness probe ran on candidate, then fell through to `where git`.
+      // Liveness probe ran on candidate, then fell through to the absolute `where.exe`.
       expect(mockRun).toHaveBeenCalledWith(BAD_CANDIDATE, ['--version'])
-      expect(mockRun).toHaveBeenCalledWith('where', ['git'])
+      expect(mockRun).toHaveBeenCalledWith(expect.stringMatching(WHERE_EXE), ['git'])
       expect(resolved).toBe('C:\\Tools\\git.exe')
     })
 
@@ -168,21 +171,21 @@ describe('git-resolver – #160 Windows git allowlist', () => {
     it('falls back to `where git` when every allowlist entry misses', async () => {
       mockAccess.mockRejectedValue(new Error('ENOENT'))
       mockRun.mockImplementation(async (cmd: string, args: string[]) => {
-        if (cmd === 'where' && args[0] === 'git') return 'C:\\Tools\\Git\\git.exe\n'
+        if (WHERE_EXE.test(cmd) && args[0] === 'git') return 'C:\\Tools\\Git\\git.exe\n'
         throw new Error('unexpected')
       })
 
       const { resolveGitPath } = await freshResolver()
       const resolved = await resolveGitPath()
 
-      expect(mockRun).toHaveBeenCalledWith('where', ['git'])
+      expect(mockRun).toHaveBeenCalledWith(expect.stringMatching(WHERE_EXE), ['git'])
       expect(resolved).toBe('C:\\Tools\\Git\\git.exe')
     })
 
     it('probes all Program Files entries in priority order', async () => {
       mockAccess.mockRejectedValue(new Error('ENOENT')) // none exist
       mockRun.mockImplementation(async (cmd: string, args: string[]) => {
-        if (cmd === 'where' && args[0] === 'git') return ''
+        if (WHERE_EXE.test(cmd) && args[0] === 'git') return ''
         throw new Error('unexpected')
       })
 
@@ -233,18 +236,18 @@ describe('git-resolver – #160 Windows git allowlist', () => {
       expect(mockRun).not.toHaveBeenCalledWith('/usr/bin/git', ['--version'])
     })
 
-    it('falls back to `which git` (not `where git`) on POSIX', async () => {
+    it('falls back to the absolute `/usr/bin/which` (not `where.exe`) on POSIX', async () => {
       mockAccess.mockRejectedValue(new Error('ENOENT'))
       mockRun.mockImplementation(async (cmd: string, args: string[]) => {
-        if (cmd === 'which' && args[0] === 'git') return '/opt/local/bin/git\n'
+        if (cmd === '/usr/bin/which' && args[0] === 'git') return '/opt/local/bin/git\n'
         throw new Error('unexpected')
       })
 
       const { resolveGitPath } = await freshResolver()
       const resolved = await resolveGitPath()
 
-      expect(mockRun).toHaveBeenCalledWith('which', ['git'])
-      expect(mockRun).not.toHaveBeenCalledWith('where', ['git'])
+      expect(mockRun).toHaveBeenCalledWith('/usr/bin/which', ['git'])
+      expect(mockRun).not.toHaveBeenCalledWith(expect.stringMatching(WHERE_EXE), ['git'])
       expect(resolved).toBe('/opt/local/bin/git')
     })
   })

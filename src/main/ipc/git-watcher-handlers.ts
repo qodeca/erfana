@@ -19,13 +19,13 @@
  * @see Issue #74 - Real-time git status refresh
  * @see Spec #003 - Real-time git status refresh specification
  */
-import { ipcMain } from 'electron'
 import { gitWatcherService } from '../services/GitWatcherService'
 import { gitPollingService } from '../services/GitPollingService'
 import { logger } from '../services/LoggingService'
 import { GitWatcherStatusSchema, type GitWatcherStatus } from '../../shared/ipc/git-watcher-schema'
 import { validateProjectPath } from '../utils/pathSecurity'
 import { getUserFriendlyMessage } from '../../shared/errors'
+import { registerHandle } from './registry'
 
 /**
  * Register all git watcher IPC handlers
@@ -41,7 +41,7 @@ export function registerGitWatcherHandlers(): void {
    * @param projectPath - Absolute path to project root
    * @returns { success: boolean, error?: string }
    */
-  ipcMain.handle('git-watcher:start', async (_event, projectPath: string) => {
+  registerHandle('git-watcher:start', async (_event, projectPath: string) => {
     const startTime = Date.now() // Timing (ADR-Spec003-002)
     try {
       // Validate input
@@ -91,7 +91,7 @@ export function registerGitWatcherHandlers(): void {
    *
    * @returns { success: boolean, error?: string }
    */
-  ipcMain.handle('git-watcher:stop', async () => {
+  registerHandle('git-watcher:stop', async () => {
     const startTime = Date.now() // Timing (ADR-Spec003-002)
     logger.trace('git-watcher:stop invoked')
     try {
@@ -117,7 +117,7 @@ export function registerGitWatcherHandlers(): void {
    *
    * @returns GitWatcherStatus - Current state, watched path, last event, error
    */
-  ipcMain.handle('git-watcher:status', async () => {
+  registerHandle('git-watcher:status', async () => {
     const startTime = Date.now() // Timing (ADR-Spec003-002)
     logger.trace('git-watcher:status invoked')
     try {
@@ -159,7 +159,7 @@ export function registerGitWatcherHandlers(): void {
    * @param projectPath - Absolute path to project root
    * @returns { success: boolean, error?: string }
    */
-  ipcMain.handle('git-polling:start', async (_event, projectPath: string) => {
+  registerHandle('git-polling:start', async (_event, projectPath: string) => {
     const startTime = Date.now() // Timing (ADR-Spec003-002)
     try {
       // Validate input
@@ -207,7 +207,7 @@ export function registerGitWatcherHandlers(): void {
    *
    * @returns { success: boolean, error?: string }
    */
-  ipcMain.handle('git-polling:stop', async () => {
+  registerHandle('git-polling:stop', async () => {
     const startTime = Date.now() // Timing (ADR-Spec003-002)
     logger.trace('git-polling:stop invoked')
     try {
@@ -232,7 +232,7 @@ export function registerGitWatcherHandlers(): void {
    * @param intervalMs - Interval in milliseconds (clamped to 1-60 seconds)
    * @returns { success: boolean, interval?: number, clamped?: boolean, error?: string }
    */
-  ipcMain.handle('git-polling:set-interval', async (_event, intervalMs: number) => {
+  registerHandle('git-polling:set-interval', async (_event, intervalMs: number) => {
     const startTime = Date.now() // Timing (ADR-Spec003-002)
     logger.trace('git-polling:set-interval invoked', { requestedIntervalMs: intervalMs })
     try {
@@ -272,7 +272,7 @@ export function registerGitWatcherHandlers(): void {
    * @param enabled - Whether polling should be enabled
    * @returns { success: boolean, error?: string }
    */
-  ipcMain.handle('git-polling:set-enabled', async (_event, enabled: boolean) => {
+  registerHandle('git-polling:set-enabled', async (_event, enabled: boolean) => {
     const startTime = Date.now() // Timing (ADR-Spec003-002)
     logger.trace('git-polling:set-enabled invoked', { enabled })
     try {

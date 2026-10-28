@@ -45,7 +45,7 @@ Activate only when the working copy can reasonably be released.
 |-----------|---------|-------|
 | `git` | Signed tag, push | `git --version` |
 | `node` (≥24) | Read package.json, run git-cliff if installed via npx | `node --version` |
-| `gh` ≥ 2.55.0 | Release polling, asset download, draft publish | `gh --version` (verified with 2.91.0; older versions may be missing JSON fields used in Phases 3–5 — fall back to `gh api` if needed) |
+| `gh` ≥ 2.55.0 | Release polling, asset download, draft publish | `gh --version` (verified with 2.91.0. Not every field name in this skill's history exists on `gh release view` — `isLatest` never did; fall back to `gh api` for those, see `phases/phase-4-verify.md` § 4.6) |
 | `git cliff` | Technical section for release notes | `git cliff --version` (skill will fall back to `npx git-cliff` if needed) |
 | `minisign` | Verify `SHA256SUMS.minisig` | `minisign -v` |
 | `sha256sum` | Recompute asset hashes locally | `command -v sha256sum` |
@@ -68,7 +68,7 @@ These values appear in multiple places. Update here first, then update `EXPECTED
 
 | Agent | Purpose | Source | Used in |
 |-------|---------|--------|---------|
-| `release-quality-runner` | Enforce Phase 0 pre-flight checklist (branch, tree, version, CHANGELOG, tools, green `checks.yml`, secrets, workflow lint, electron-builder schema, Windows status snapshot) | shared (project override) | Phase 0 |
+| `release-quality-runner` | Enforce Phase 0 pre-flight checklist (branch, tree, version, CHANGELOG, tools, green `checks.yml`, secrets, workflow lint, electron-builder schema, Windows status snapshot, documented versions) | shared (project override) | Phase 0 |
 | `release-notes-drafter` | Emit two-tier release-notes markdown via `git cliff` + operator summary | shared (project override) | Phase 1 |
 | `release-failure-analyzer` | On Phase 3 CI failure: identify failed leg, match log against the troubleshooting cookbook, write structured incident memo to `docs/release-incidents/` | project-local | Phase 3 (failure path) |
 
@@ -145,6 +145,8 @@ git status --porcelain
 
 ### 0.3 Version + CHANGELOG gate
 
+**Pre-skill checklist**, in the version-bump commit before the skill is invoked: fold the `changelog.d/` fragments below `## [Unreleased]`, bump the CLAUDE.md banner, run `npm run check:version-drift`.
+
 Ask the operator (AskUserQuestion) for the **bump type** (patch / minor / major). The skill computes the proposed version from `package.json`. Then:
 
 ```bash
@@ -159,9 +161,16 @@ grep -q "^## $VERSION" docs/CHANGELOG.md || {
   echo "FAIL: docs/CHANGELOG.md is missing a '## $VERSION' section"
   exit 1
 }
+LOCK_VERSION=$(node -p "JSON.parse(require('fs').readFileSync('package-lock.json','utf8')).version")
+if [ "$LOCK_VERSION" != "$VERSION" ]; then
+  echo "FAIL: package-lock.json says '$LOCK_VERSION', package.json says '$VERSION'"
+  echo "Remediation: npm install --package-lock-only --ignore-scripts, then commit the lock."
+  exit 1
+fi
 ```
 
 - [ ] `package.json` version is strict semver
+- [ ] `package-lock.json` version matches `package.json` (both copies are rewritten by `npm install`)
 - [ ] `docs/CHANGELOG.md` contains `## {version}` heading
 - [ ] Proposed version > last tag
 
@@ -239,6 +248,8 @@ No options — exit cleanly. Re-running the skill on a published tag means the o
 
 The skill assumes a solo-developer direct-push workflow. If branch protection on `main` requires PRs, `git push origin main` (Phase 1.5) will be rejected and the skill cannot proceed. Detect this at Phase 0 rather than at tag-time.
 
+**Direct push is not the same as unconditional push.** `main` also carries required status checks, and GitHub enforces them on *push*, not only on merge: a commit whose checks have not yet **completed successfully for that SHA** is rejected with `GH006 … 7 of 7 required status checks have not succeeded`. That is a timing condition, not a misconfiguration, and §1.5 handles it with the develop-first sequence. This gate only asserts the PR rule.
+
 ```bash
 PROT=$(gh api repos/qodeca/erfana/branches/main/protection 2>/dev/null || echo '{}')
 PR_REQ=$(printf '%s' "$PROT" | jq -r '.required_pull_request_reviews // {} | keys | length')
@@ -257,6 +268,10 @@ fi
 ### 0.4.6 Windows status snapshot is current
 
 `docs/windows/implementation-plan.md` must be re-anchored on v{version} before tagging — script, semantics and traps in [`./guides/pre-flight-checks.md`](./guides/pre-flight-checks.md); also enforced as the agent's `windows_snapshot` gate.
+
+### 0.4.7 Documented versions match package.json
+
+The app version in the root `CLAUDE.md` and the Electron version that `SDLC.md`, `CONTRIBUTING.md` and the docs state as current must equal `package.json` — `npm run check:version-drift`; semantics and remediation in [`./guides/pre-flight-checks.md`](./guides/pre-flight-checks.md#047-documented-versions-match-packagejson); enforced as the agent's `version_drift` gate.
 
 ### 0.5 Delegate the rest of the checklist to `release-quality-runner`
 
@@ -342,9 +357,22 @@ Present the generated `docs/release-notes/v${VERSION}.md` and ask whether to acc
 Pre-flight check before §1.5 commit bundle: see [`./guides/git-signing.md`](./guides/git-signing.md) (added per #174 reviewer finding — verifies `user.signingkey` and `gpg.format`; soft-warns on missing `gpg.ssh.allowedSignersFile`).
 
 ```bash
+# The version lives in TWO files. `package-lock.json` carries its own copy of
+# `version` (twice: root and the "" package entry), and editing package.json alone
+# leaves it behind — v0.19.0 shipped with the lock still reading 0.18.0. The field
+# is metadata and changes no dependency resolution, so nothing fails; it just
+# rewrites itself under the next person who runs `npm install`, as a stray diff
+# they did not ask for. `--package-lock-only` touches no node_modules.
+npm install --package-lock-only --ignore-scripts
+
 # One commit bundles: package.json bump (already done pre-skill or done here),
-# CHANGELOG append (pre-skill), release notes file.
-git add package.json docs/CHANGELOG.md "docs/release-notes/v${VERSION}.md"
+# the lockfile's copy of it, CHANGELOG append (pre-skill), release notes file,
+# and the root CLAUDE.md "Current version" banner, a third copy of the version.
+# The banner is already bumped by now: the pre-skill checklist (§0.3) bumps it
+# and §0.4.7 fails if it was not, so CLAUDE.md is normally unchanged here.
+# `git add` tolerates an unchanged path, so listing it is safe.
+git add package.json package-lock.json docs/CHANGELOG.md \
+  "docs/release-notes/v${VERSION}.md" CLAUDE.md
 
 # Pick the commit message based on what is actually staged. If the bump
 # already shipped earlier (e.g., develop→main merge), this commit only
@@ -356,6 +384,23 @@ else
   COMMIT_MSG="docs(release): add release notes for v${VERSION}"
 fi
 git commit -S -m "$COMMIT_MSG"
+
+# Develop-first, then main. A push of this brand-new SHA straight to `main` is
+# rejected — `GH006 … 7 of 7 required status checks have not succeeded` — because
+# required checks are enforced on push and none has run for the SHA yet. Landing
+# the same commit on `develop` first produces that SHA's checks.yml run; once it
+# is green, the identical SHA is accepted on `main` immediately. Observed twice
+# on the v0.20.0 release; see docs/build/release.md § Branch protection.
+git push origin main:develop
+TIP_SHA=$(git rev-parse HEAD)
+# Poll until BOTH runs for this SHA read completed/success (≈4 min; 20 s interval).
+# Wait on the runs, not on the seven check contexts: the advisory Windows job
+# keeps the run in_progress for ~3 min after the contexts go green, and `prepare`
+# asserts the *run*. On failure: abort, fix, re-enter Phase 0.
+gh run list --branch develop --limit 10 \
+  --json name,status,conclusion,headSha \
+  --jq "[.[] | select(.headSha==\"$TIP_SHA\")] | .[] | \"\(.name): \(.status) \(.conclusion)\""
+
 git push origin main
 ```
 
@@ -364,16 +409,8 @@ If `main` has new commits on `origin` (raced), re-fetch and confirm with operato
 ### Checkpoint 1.A
 
 - [ ] Commit is on `origin/main` (`chore(release): bump version to {version}` if `package.json` was in the staged diff, else `docs(release): add release notes for v{version}`)
-- [ ] `checks.yml` has been triggered for this commit (skill prints the URL)
-
-The release workflow's `prepare` job asserts a green `checks.yml` for the tagged commit, so we must wait for `checks.yml` to turn green before tagging.
-
-```bash
-TIP_SHA=$(git rev-parse HEAD)
-gh run list --workflow=checks.yml --branch=main --commit="$TIP_SHA" --limit=1
-# Poll until conclusion = success (max 10 min, 15 s interval). If failure:
-# abort, direct operator to fix the failure before re-running.
-```
+- [ ] The same SHA is on `origin/develop`, so the two integration branches do not diverge over release-prep commits
+- [ ] Both `checks.yml` and `secret-scan.yml` runs for this SHA reached `completed`/`success` **before** the push to `main` (the push cannot succeed otherwise) and therefore before tagging, which is what the release workflow's `prepare` job asserts
 
 ---
 
@@ -488,7 +525,7 @@ See [`./guides/anti-patterns.md`](./guides/anti-patterns.md) for the full Don't/
 - [`guides/anti-patterns.md`](guides/anti-patterns.md) — Don't/Do table for release-day patterns
 - [`guides/examples.md`](guides/examples.md) — Worked examples (success, lockfile-drift, hash-mismatch)
 - [`guides/git-signing.md`](guides/git-signing.md) — Pre-flight git signing check (Phase 1.5)
-- [`guides/pre-flight-checks.md`](guides/pre-flight-checks.md) — Phase 0.4.6 Windows status-snapshot gate
+- [`guides/pre-flight-checks.md`](guides/pre-flight-checks.md) — Phase 0.4.6 Windows status-snapshot gate and Phase 0.4.7 version-drift gate
 - [`guides/troubleshooting.md`](guides/troubleshooting.md) — failure recovery and rollback procedures
 - [`templates/release-notes.md`](templates/release-notes.md) — two-tier release-notes template
 - [`docs/build/release.md`](../../../docs/build/release.md) — full operator reference (matrix, secrets, incident response)

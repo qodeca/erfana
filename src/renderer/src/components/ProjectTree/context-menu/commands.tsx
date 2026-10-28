@@ -16,7 +16,7 @@
  * All commands are testable via dependency injection (MenuContext).
  */
 
-import { Copy, Scissors, Clipboard as ClipboardIcon, Edit, Trash, FilePlus, FolderPlus, FileUp, FolderOpen, FileCode } from 'lucide-react'
+import { Copy, Scissors, Clipboard as ClipboardIcon, Edit, Trash, FilePlus, FolderPlus, FileUp, FolderOpen, FileCode, ExternalLink } from 'lucide-react'
 import type { IMenuItem, MenuContext, FileNode, FileNodeDirectory, FileNodeFile } from './types'
 import { isMacOS, isWindows } from '../../../utils/platform'
 import { getDirname } from '../../../utils/fileUtils'
@@ -103,7 +103,7 @@ export class PasteIntoDirectoryCommand extends CommandBase {
 
     if (sourceItemName && clipboard.getOperation() === 'cut') {
       try {
-        const hasConflict = await this.ctx.api.checkConflict(targetPath, sourceItemName)
+        const hasConflict = await this.ctx.api.checkConflict({ targetParentPath: targetPath, itemName: sourceItemName })
         if (hasConflict) {
           const itemTypeLabel = sourceItemType === 'directory' ? 'folder' : 'file'
           const confirmed = await dialogs.showConfirm({
@@ -187,6 +187,22 @@ export class OpenAsSourceCommand extends CommandBase {
   }
 }
 
+/**
+ * Open-in-default-browser command – hands an `.html`/`.htm` file to the system
+ * browser (issue #124, part 4). No confirmation: it acts at once, so no ellipsis.
+ * Routes through {@link MenuContext.openInBrowser}, the same action the preview
+ * toolbar calls, so both raise the same toasts; the promise is returned so the
+ * menu can await it. Main confines the path – nothing here is a check.
+ */
+export class OpenInBrowserCommand extends CommandBase {
+  label = 'Open in default browser'
+  icon = <ExternalLink size={14} strokeWidth={2} />
+
+  execute(): Promise<void> | void {
+    return this.ctx.openInBrowser?.(this.node.path)
+  }
+}
+
 /* ========== Rename Commands ========== */
 
 /**
@@ -220,7 +236,7 @@ abstract class RenameCommandBase<T extends FileNodeFile | FileNodeDirectory> ext
 
     try {
       await this.ctx.withWatcherPause(async () => {
-        await this.ctx.api.rename(node.path, newName)
+        await this.ctx.api.rename({ oldPath: node.path, newName })
         await this.ctx.refreshProjectTree()
       })
       this.ctx.onGitRefresh?.()
@@ -298,7 +314,7 @@ export class DeleteFileCommand extends DeleteCommandBase<FileNodeFile> {
     `Are you sure you want to delete "${name}"? This action cannot be undone.`
 
   protected async doDelete(node: FileNodeFile): Promise<void> {
-    await this.ctx.api.deleteFile(node.path)
+    await this.ctx.api.deleteFile({ filePath: node.path })
   }
 }
 
@@ -312,7 +328,7 @@ export class DeleteDirectoryCommand extends DeleteCommandBase<FileNodeDirectory>
     `Are you sure you want to delete "${name}" and all its contents? This action cannot be undone.`
 
   protected async doDelete(node: FileNodeDirectory): Promise<void> {
-    await this.ctx.api.deleteFolder(node.path)
+    await this.ctx.api.deleteFolder({ filePath: node.path })
   }
 }
 
@@ -346,7 +362,7 @@ export class NewFileInDirectoryCommand extends CommandBase {
 
     try {
       await this.ctx.withWatcherPause(async () => {
-        await this.ctx.api.createFile(parentPath, name)
+        await this.ctx.api.createFile({ dirPath: parentPath, name })
         await this.ctx.refreshProjectTree()
       })
       this.ctx.onGitRefresh?.()
@@ -385,7 +401,7 @@ export class NewFolderInDirectoryCommand extends CommandBase {
 
     try {
       await this.ctx.withWatcherPause(async () => {
-        await this.ctx.api.createFolder(parentPath, name)
+        await this.ctx.api.createFolder({ dirPath: parentPath, name })
         await this.ctx.refreshProjectTree()
       })
       this.ctx.onGitRefresh?.()
@@ -442,7 +458,7 @@ export class RevealInFileManagerCommand extends CommandBase {
   icon = <FolderOpen size={14} strokeWidth={2} />
 
   async execute(): Promise<void> {
-    const error = await this.ctx.api.revealInFileManager(this.node.path)
+    const error = await this.ctx.api.revealInFileManager({ filePath: this.node.path })
     if (error) {
       this.ctx.toast({ type: 'error', title: 'Reveal failed', message: error })
     }

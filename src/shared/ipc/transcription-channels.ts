@@ -40,6 +40,8 @@ export const TRANSCRIPTION_CHANNELS = {
   WHISPER_LIST_MODELS: 'transcription:whisperListModels',
   /** Delete a whisper model (ipcMain.handle) */
   WHISPER_DELETE_MODEL: 'transcription:whisperDeleteModel',
+  /** Cancel the running binary or model download (ipcMain.handle) */
+  WHISPER_CANCEL_DOWNLOAD: 'transcription:whisperCancelDownload',
   /** Download progress event streamed to renderer (webContents.send) */
   WHISPER_DOWNLOAD_PROGRESS: 'transcription:whisperDownloadProgress'
 } as const

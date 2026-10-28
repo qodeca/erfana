@@ -9,7 +9,7 @@
  * @see Issue #110 - Video file import with audio extraction
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import { tmpdir } from 'os'
 
 // =============================================================================
@@ -882,7 +882,7 @@ describe('AudioExtractionService', () => {
 
         // Ensure all chainable methods return this instance
         for (const method of ['noVideo', 'audioCodec', 'audioBitrate', 'audioFrequency', 'audioChannels', 'format', 'save', 'setStartTime', 'duration'] as const) {
-          (instance as Record<string, ReturnType<typeof vi.fn>>)[method] = vi.fn().mockReturnValue(instance)
+          (instance as Record<string, Mock>)[method] = vi.fn().mockReturnValue(instance)
         }
         instance.kill = vi.fn()
 

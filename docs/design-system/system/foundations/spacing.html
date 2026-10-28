@@ -1,0 +1,63 @@
+<!-- @card group="Foundations" name="Spacing" subtitle="The 2px-per-step scale, drawn to size — the token number is NOT the pixel count" status="proposed" reviewed="2026-08-31" -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Erfana — spacing</title>
+<link rel="stylesheet" href="../../tokens.css">
+<link rel="stylesheet" href="../../ds.css">
+<style>
+  .sp-row { display: grid; grid-template-columns: 120px 64px 1fr; gap: var(--space-8);
+            align-items: center; padding: var(--space-3) 0;
+            border-bottom: var(--border-width) solid var(--color-border-default); }
+  .sp-token { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-text-tertiary); }
+  .sp-px { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-text-secondary); }
+  .sp-bar { height: 16px; background: var(--color-accent-primary); }
+</style>
+</head>
+<body>
+
+<h1>Spacing</h1>
+<p class="ds-lede">A 2px grid. Bars below are drawn at their true width.</p>
+
+<div class="ds-note">
+  <strong>Read this before you use a space token.</strong>
+  The number in the name is <em>half</em> the pixel value.
+  <code>--space-4</code> is <strong>8px</strong>, not 4px.
+  The 4px value is <code>--space-2</code>.
+  This trips people up constantly, so the bars are drawn to scale — trust the bar, not the name.
+</div>
+
+<div id="scale"></div>
+
+<script>
+const STEPS = ['--space-0', '--space-1', '--space-2', '--space-3', '--space-4', '--space-5',
+               '--space-6', '--space-7', '--space-8', '--space-10', '--space-12', '--space-14',
+               '--space-16', '--space-20', '--space-24'];
+
+function resolved(token) {
+  const probe = document.createElement('span');
+  probe.style.setProperty('--probe', `var(${token})`);
+  document.body.appendChild(probe);
+  const value = getComputedStyle(probe).getPropertyValue('--probe').trim();
+  probe.remove();
+  return value;
+}
+
+const host = document.getElementById('scale');
+for (const token of STEPS) {
+  const px = resolved(token);
+  const row = document.createElement('div');
+  row.className = 'sp-row';
+  row.innerHTML = '<div class="sp-token"></div><div class="sp-px"></div><div><div class="sp-bar"></div></div>';
+  row.children[0].textContent = token;
+  row.children[1].textContent = px === '0' ? '0' : px;
+  row.children[2].firstElementChild.style.width = `var(${token})`;
+  host.appendChild(row);
+}
+</script>
+</body>
+</html>

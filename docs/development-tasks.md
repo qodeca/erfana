@@ -2,44 +2,81 @@
 
 ## Adding New IPC Channel
 
-1. Define in `src/preload/index.ts`:
+Never import `ipcMain` in a handler module: ESLint (`no-restricted-imports` in `eslint.config.mjs`) allows it only in `src/main/ipc/registry.ts`, whose `registerHandle` / `registerOn` wrappers reject any sender that is not the app's own top-level renderer. The newest complete example is `browser:openFile` (#124) – copy its shape.
+
+1. Name the channel in `src/shared/ipc/<domain>-channels.ts`:
    ```typescript
-   const api = {
-     myFeature: {
-       doSomething: (arg: string) => ipcRenderer.invoke('my:action', arg)
-     }
+   export const MY_CHANNELS = {
+     /** renderer → main, `ipcMain.handle` → `MyResponse`. */
+     DO_SOMETHING: 'my:doSomething'
+   } as const
+   ```
+   (Model: `src/shared/ipc/browser-channels.ts`.)
+
+2. Define the payloads with Zod in `src/shared/ipc/<domain>-schema.ts` – `.strict()` so extra keys are rejected, plus the bridge interface the preload will expose:
+   ```typescript
+   export const MyRequestSchema = z.object({ filePath: z.string().min(1).max(4096) }).strict()
+
+   export type MyResponse =
+     | { success: true }
+     | { success: false; errorCode: MyErrorCode; error: string }
+
+   export interface MyBridge {
+     doSomething(filePath: string): Promise<MyResponse>
    }
    ```
+   (Model: `src/shared/ipc/browser-schema.ts` – request schema, a closed list of error codes, a `.strict()` response union and `BrowserBridge`.)
 
-2. Add handler in `src/main/ipc/my-handlers.ts`:
+3. Add the handler in `src/main/ipc/<domain>-handlers.ts`. Gate the sender **before** parsing the payload, validate with `safeParse`, and return a code plus its `ERROR_MESSAGES` text – never a raw error, which may carry a path:
    ```typescript
-   export function registerMyHandlers() {
-     ipcMain.handle('my:action', async (_event, arg: string) => {
-       // Validate arg
-       return result
+   import { registerHandle } from './registry'
+   import { isTrustedSender } from './senderValidation'
+
+   function refuse(code: MyErrorCode): MyResponse {
+     return { success: false, errorCode: code, error: ERROR_MESSAGES[code] }
+   }
+
+   export function registerMyHandlers(): void {
+     registerHandle(MY_CHANNELS.DO_SOMETHING, async (event, request: unknown): Promise<MyResponse> => {
+       if (!isTrustedSender(event)) return refuse(ErrorCode.MY_INVALID_REQUEST)
+
+       const parsed = MyRequestSchema.safeParse(request)
+       if (!parsed.success) return refuse(ErrorCode.MY_INVALID_REQUEST)
+
+       try {
+         return await myService.doSomething(parsed.data.filePath)
+       } catch (error) {
+         logger.error('My handler error', redactedLogError(error))
+         return refuse(ErrorCode.MY_FAILED)
+       }
      })
    }
    ```
+   `registerHandle` already applies the process-wide app-sender gate; `isTrustedSender` (`senderValidation.ts`) adds the exact renderer URL, top-level frame only. Use `registerOn` for fire-and-forget `send` channels. (Model: `src/main/ipc/browser-handlers.ts`.)
 
-3. Register in `src/main/index.ts`:
+4. Call the register function once at startup in `src/main/index.ts`, beside the others (`registerBrowserHandlers()` is there).
+
+5. Give the bridge a `MyBridge` contract in the schema file, and expose it from a preload module `src/preload/myBridge.ts` typed as that contract, sending the channel constant:
    ```typescript
-   import { registerMyHandlers } from './ipc/my-handlers'
-
-   app.whenReady().then(() => {
-     registerMyHandlers()
-   })
+   export const myBridge: MyBridge = {
+     doSomething: (filePath) => ipcRenderer.invoke(MY_CHANNELS.DO_SOMETHING, { filePath })
+   }
    ```
+   and reference it from the `api` object in `src/preload/index.ts` (`my: myBridge`). `Api = typeof api` is exported from there, so there is no second declaration to keep in step (`fileBridge.ts`, `terminalBridge.ts` are the model).
 
-4. Call from renderer:
+6. Add a gateway, `src/renderer/src/services/myGateway.ts`, typed as the same contract (`fileGateway.ts` is the model), list it in `RENDERER_GATEWAY_FILES` in `eslint.config.mjs`, and call it from the renderer:
    ```typescript
-   await window.api.myFeature.doSomething('value')
+   const result = await myGateway.doSomething(filePath)
    ```
+   Renderer code never reads `window.api` itself: its type does not list the bridges, and ESLint rejects any read outside the gateways – see [IPC patterns § Renderer gateways](./ipc-patterns.md#renderer-gateways).
+
+7. Add the channel to the index in [IPC patterns](./ipc-patterns.md) and any new codes to [Error codes](./error-codes.md).
 
 ## Adding Panels
 
 ### Adding Splitview Panel (Sidebar)
 
-For fixed sidebars (Project, Git, Terminal) that don't need tabbing:
+For fixed sidebars (Project, Terminal) that don't need tabbing:
 
 **Wrapper Pattern** (recommended for panels with headers/controls):
 
@@ -105,6 +142,8 @@ For editor tabs that should appear in the center area:
 
    > Note: dockview panels are **not** contained by default – a throw here escalates straight to the root error boundary and replaces the whole window with the recovery screen. Wrap the panel's content in `PanelErrorBoundary` as above, keyed by whatever scopes it (the file path for a document panel), so the failure degrades to that one tab; without the key a tab that failed on file A still reads "unavailable" after the user opens file B in it. Same rule and rationale as the Splitview path above (#60) – see [UI Components – Error containment](./ui-components.md#error-containment).
 
+   > **Content that must keep its mount** when its scope changes keys the boundary by its own identity and passes the scope as `resetKey` instead. The HTML preview tab is the case (#124): a tab moves to another page inside the same native view, so a key on the file would remount it and destroy the view and its history. `EditorAreaSplitPanel.tsx` therefore renders `<PanelErrorBoundary key={props.params?.panelId || props.api.id} resetKey={props.params?.filePath ?? null} …>`. A changed `resetKey` clears a stuck fallback without a remount, a focus move or a counted retry.
+
    > Note: panel content is non-selectable by default – dockview applies `user-select: none` to panel chrome and the rule cascades into your component. To make a data-bearing surface inside your panel selectable, add its selector to the grouped rule in `src/renderer/src/styles/utilities.css` and add a row to `src/renderer/src/styles/userSelect.audit.test.ts`. See [Text selection policy](./ui-style-guide.md#text-selection-policy) for the decision rules and the CSS-module exception (`.metadataItem` / `.errorMessage` in `ImageViewerPanel.module.css` stay in-place because build-time class-name hashing prevents the central selector from matching them).
 
 2. Register in `editorComponents` inside `EditorAreaSplitPanel`
@@ -135,6 +174,17 @@ For editor tabs that should appear in the center area:
    ordinary file panels are derived, not hard-coded: see
    `src/renderer/src/utils/openFileInPanel.ts`.
 
+5. If your panel holds a **savable buffer**, register it with
+   `useEditorSaveRegistration(panelId, save, hasConflict, holdAutosave)`
+   (`src/renderer/src/hooks/useEditorSaveRegistration.ts`), as
+   `MarkdownEditorPanel` does. The preview move coordinator saves other tabs by
+   panel id through `editorSaveRegistry`
+   (`src/renderer/src/services/editorSaveRegistry.ts`) when the user answers
+   **Save** in the `UnsavedChangesDialog`. The registry is fail-safe: an
+   unregistered id saves nothing and answers `false`, so the move is abandoned
+   and the edits stay in their tab – a same-tab page move can never complete
+   past an unregistered dirty editor.
+
 **Note**: The center `EditorAreaSplitPanel` contains the DockviewReact instance. File opening happens via `dockviewApi` passed through params.
 
 See: [Architecture](./architecture.md#hybrid-layout-architecture) | [UI Components](./ui-components.md#panel-communication)
@@ -149,7 +199,9 @@ The import pipeline uses `ConverterRegistry` to match file extensions to convert
 
 **Configurable converters**: If your converter needs per-import options, implement `IConfigurableConverter` and the `createConfigured(options)` method. `ImportService` detects this via the `isConfigurableConverter()` type guard – no `instanceof` checks needed.
 
-**Dynamic extensions**: If extensions depend on runtime tool availability, use `ConverterRegistry.updateConverterExtensions(category, extensions)` after detection completes (see `DependencyDetector` pattern).
+**Dynamic extensions**: If extensions depend on runtime tool availability, use `ConverterRegistry.updateConverterExtensions(category, extensions)` after detection completes, and `removeConverterExtensions` when the tool is gone. `ImportToolStatusService` (`src/main/services/import/ImportToolStatusService.ts`, #250) is the model: it wraps `DependencyDetector`, keeps the registry in step with what was found, and re-runs the probe when **Settings > Import tools > Check again** asks, so a tool installed after launch is picked up without a restart.
+
+**External programs**: a converter that hands work to an outside program must not run one found in the open project, a temporary folder, a network path or a relative `PATH` entry. `conversionToolGuard.ts` does this for LibreOffice: `LiteParseConverter` calls `findUntrustedConversionTool` before each Office conversion and refuses when the answer is unsafe. Follow the same pattern for a new tool.
 
 **Example**: See `LiteParseConverter.ts` (document import with OCR) or `AudioConverter.ts` (transcription).
 
@@ -179,94 +231,67 @@ SettingsService provides persistent storage using electron-store.
 **Pattern**: All methods are async due to dynamic ES Module import.
 
 ```typescript
-// In IPC handler
 import { settingsService } from '../services/SettingsService'
 
-ipcMain.handle('file:openProject', async () => {
-  const projectPath = result.filePaths[0]
-
-  // Save to settings (async)
-  await settingsService.setLastProjectPath(projectPath)
-
-  return projectPath
-})
-
-ipcMain.handle('file:getLastProjectPath', async () => {
-  // Retrieve from settings (async)
-  const lastPath = await settingsService.getLastProjectPath()
-
-  if (lastPath) {
-    // Verify folder still exists
-    const stats = await stat(lastPath)
-    if (stats.isDirectory()) {
-      return lastPath
-    } else {
-      // Clean up invalid path
-      await settingsService.clearLastProjectPath()
-    }
-  }
-
-  return null
-})
+const recent = await settingsService.getRecentProjects()
 ```
 
-**Why Dynamic Import**: electron-store v11+ is an ES Module. See [Known Issues](./known-issues.md#electron-store-es-module-import).
+Writing the last project path is not done in a handler: `ProjectService` calls `settingsService.setLastProjectPath(newPath)` when a project opens (`src/main/services/ProjectService.ts`).
+
+**Why Dynamic Import**: electron-store v11+ is an ES Module. See [Troubleshooting – electron-store import error](./troubleshooting.md#electron-store-import-error).
 
 ## Working with Panel State
+
+Sidebar state lives in `useActivityBarStore` (`src/renderer/src/stores/useActivityBarStore.ts`), a Zustand store with the `persist` middleware. The localStorage key is `erfana-activity-bar-state`; `partialize` persists only `leftActivePanel`, `rightActivePanel`, `leftWidth` and `rightWidth` (`null` for an active panel means that sidebar is hidden). `terminalUserClosed` and `terminalExpanded` are ephemeral and never written.
 
 ### Reading Panel State
 
 ```typescript
-// Get current state from localStorage
-const state = localStorage.getItem('erfana-sidebar-state')
-const parsed = JSON.parse(state)
+// Inside a component – subscribe to the store
+const leftActivePanel = useActivityBarStore((s) => s.leftActivePanel) // 'project' | null
+const leftWidth = useActivityBarStore((s) => s.leftWidth)             // number (px)
 
-console.log(parsed.leftSidebar.visible)  // boolean
-console.log(parsed.leftSidebar.width)    // number (px)
+// Outside React (tests, devtools) – read the persisted slice directly
+const raw = localStorage.getItem('erfana-activity-bar-state')
+const { state } = JSON.parse(raw) // zustand/persist wraps the slice in { state, version }
+console.log(state.rightActivePanel) // 'terminal' | null
+console.log(state.rightWidth)       // number (px)
 ```
 
 ### Updating Panel State
 
 ```typescript
-// Update state programmatically
-const updateSidebarState = (sidebarId: string, updates: any) => {
-  setSidebarStates((prev) => {
-    const newState = {
-      ...prev,
-      [sidebarId]: { ...prev[sidebarId], ...updates }
-    }
-    localStorage.setItem('erfana-sidebar-state', JSON.stringify(newState))
-    return newState
-  })
-}
+// Use the store actions – they persist automatically
+const { togglePanel, setActivePanel, setSidebarWidth } = useActivityBarStore.getState()
+
+togglePanel('project', 'left')        // open/close the left sidebar
+setActivePanel('terminal', 'right')   // open the terminal on the right
+setSidebarWidth(360, 'left')          // width in px (no-op when unchanged)
 ```
+
+`AppDockLayout` mirrors the store into the splitview: it calls `panel.api.setVisible(...)` on the `left-sidebar` / `terminal-panel` splitview panels when an activity-bar button is clicked, and writes resize events back with `setSidebarWidth`.
 
 ### Resetting Panel State
 
 ```typescript
 // Clear state to force defaults on next load
-localStorage.removeItem('erfana-sidebar-state')
+// (left: 'project' open at 300px; right: hidden at 300px)
+localStorage.removeItem('erfana-activity-bar-state')
 ```
 
 ### Adding New Protected Panel
 
-1. Add panel ID to `protectedPanels` array:
-   ```typescript
-   const protectedPanels = ['project', 'terminal', 'git', 'myNewPanel']
-   ```
+There is no `protectedPanels` / `protectedTitles` list any more. A sidebar panel is "protected" by being driven from the activity bar instead of a dockview tab:
 
-2. Add panel title to `protectedTitles` array:
-   ```typescript
-   const protectedTitles = ['Project', 'Terminal', 'Git', 'My New Panel']
-   ```
-
-Protection is automatic - click interception and auto-restore work immediately.
+1. Add an entry to `activityBarPanels` in `src/renderer/src/components/ActivityBar/activityBarConfig.ts` (`id`, `icon`, `label`, `side`, `dockviewPanelId`, `order`, optional `keyboardShortcut`, `requiresProject`, `badge`).
+2. Register the matching splitview panel in `AppDockLayout` and extend `handleActivityBarClick` so the new `side`/`id` pair toggles it with `panel.api.setVisible(...)` and `togglePanel(id, side)`.
+3. Persistence and keyboard toggling then come from the store and the activity bar for free.
 
 See: [UI Components](./ui-components.md#panel-toggle-system)
 
 ## Creating Prompt Templates
 
-Add new AI-powered prompts for markdown preview context menu.
+Add prompt templates to the markdown preview context menu. A template renders text and sends it to the CLI agent running in the terminal; Erfana itself adds no AI.
 
 ### 1. Create Template File
 
@@ -293,12 +318,15 @@ sendDirectly: false
 ### 2. Validate Schema
 
 Template automatically validates against Zod schema:
-- `area` (required): Context area (e.g., "markdown-preview")
-- `subArea` (required): Specific location (e.g., "context-menu")
+- `area` (required): one of `markdown-preview`, `code-editor`, `global`, `diagram-viewer`
+- `subArea` (optional): specific location – `context-menu`, `toolbar`, `command-palette`, `mermaid-error`, `mermaid-direction` or `chat`
+- `id` (optional): stable identifier; without it the id is slugified from `name` (see [Known issues – Template ID system](./known-issues.md#template-id-system))
 - `name` (required): Display name in UI
 - `icon` (required): Lucide icon name (e.g., "list", "sparkles", "maximize2")
 - `targetPanel` (optional): "terminal" (default: "terminal")
 - `sendDirectly` (optional): Send immediately without review (default: false)
+- `autoExecute` (optional): press Enter after pasting into the terminal (default: false)
+- `requiresInput` (optional): ask the user for input before rendering (default: false); `inputLabel` and `inputPlaceholder` label the field
 - `mutatesDocument` (optional, v0.10.0): Set to `true` if the template edits the source file in place; otherwise omit. When `true`, the canonical apply-to-document footer is composed onto the rendered prompt at the render funnel (`panelUtils.executePromptTemplate` → `withApplyFooter` from `prompts/applyFooter.ts`) — the body must NOT also say "return only the code block" / "no commentary" / "no explanation" or the competing instruction will re-introduce the non-determinism the footer exists to prevent. Also add `'filePath'` to the template's entry in `PROMPT_REQUIREMENTS` (`prompts/validation.ts`) so the footer's `{{fileRef}}` can never render empty. See [docs/prompts/README.md § Mutation prompts and the apply-to-document footer](./prompts/README.md#mutation-prompts-and-the-apply-to-document-footer).
 
 ### 3. Use Template Variables
@@ -412,7 +440,7 @@ Get template IDs dynamically:
 import { getAllPromptIds, getPromptsForArea } from '../prompts/registry'
 
 // All templates
-const allIds = getAllPromptIds()  // ['explain', 'modify', 'mermaid-bug-report']
+const allIds = getAllPromptIds()  // e.g. ['editor-explain', 'editor-modify', 'mermaid-bug-report', …]
 
 // Templates for specific area
 const contextMenuPrompts = getPromptsForArea('markdown-preview', 'context-menu')
@@ -443,12 +471,13 @@ See: [Testing Index](./testing/README.md) | [Test Scenarios](./testing/test-scen
 
 ## Testing Auto-Refresh
 
-File and directory watching with chokidar provides automatic refresh on external changes.
+File and directory watching provides automatic refresh on external changes: single files are watched with chokidar on every platform; the project tree is watched by a native recursive watcher on macOS and Windows and by chokidar on Linux ([File Watching § Watch backends](./file-watching/README.md#watch-backends-211)).
 
 **Test Scenarios:**
 - File content reload (300ms debounce) - modify file externally, expect auto-reload
 - Conflict detection - unsaved changes + external modification shows conflict UI
-- Directory tree refresh (75 ms collect + 200 ms throttle main side, 250 ms renderer debounce) - external file/folder create/delete/rename and in-place edits appear automatically; git badges update on edits via the chokidar `change` listener (#241)
+- Directory tree refresh (75 ms collect + 200 ms throttle main side, 250 ms renderer debounce) - external file/folder create/delete/rename appear automatically; under a steady stream the refresh is held back at most max(1 s, twice a tree read), capped at 10 s (`DIRECTORY_WATCHER` in `src/renderer/src/components/ProjectTree/constants.ts`)
+- Content-only edits (v0.22.0) - an in-place save, or a temp file renamed over the target, arrives as a `structural: false` batch: git badges update, the tree is **not** re-read ([measurement](./performance/watcher-structural-refresh.md))
 - Pause/resume pattern - internal CRUD operations don't trigger duplicate refreshes
 
 See: [File Watching](./file-watching/README.md) for detailed testing instructions

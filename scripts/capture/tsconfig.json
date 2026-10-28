@@ -1,0 +1,11 @@
+{
+  "extends": "@electron-toolkit/tsconfig/tsconfig.node.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "allowJs": true,
+    "checkJs": false,
+    "moduleResolution": "bundler",
+    "types": ["node"]
+  },
+  "include": ["playwright.capture.config.ts", "lib/**/*.ts", "scenes/**/*.ts", "*.mjs", "../../src/renderer/src/constants/testids.ts"]
+}

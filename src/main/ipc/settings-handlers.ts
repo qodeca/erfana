@@ -7,9 +7,9 @@
  * Manages approved tools list and other persistent settings.
  */
 
-import { ipcMain } from 'electron'
 import { settingsService } from '../services/SettingsService'
 import { logger } from '../services/LoggingService'
+import { registerHandle } from './registry'
 
 /**
  * Register all settings-related IPC handlers
@@ -18,7 +18,7 @@ export function registerSettingsHandlers(): void {
   // Approved tools removed with Copilot
 
   // Get project filter mode
-  ipcMain.handle('settings:getProjectFilterMode', async () => {
+  registerHandle('settings:getProjectFilterMode', async () => {
     try {
       const mode = await settingsService.getProjectFilterMode()
       return { success: true, mode }
@@ -30,7 +30,7 @@ export function registerSettingsHandlers(): void {
   })
 
   // Set project filter mode
-  ipcMain.handle('settings:setProjectFilterMode', async (_event, mode: string) => {
+  registerHandle('settings:setProjectFilterMode', async (_event, mode: string) => {
     try {
       await settingsService.setProjectFilterMode(mode)
       return { success: true }
@@ -42,7 +42,7 @@ export function registerSettingsHandlers(): void {
   })
 
   // Get directory watcher depth
-  ipcMain.handle('settings:getDirectoryWatchDepth', async () => {
+  registerHandle('settings:getDirectoryWatchDepth', async () => {
     try {
       const depth = await settingsService.getDirectoryWatchDepth()
       return { success: true, depth }
@@ -54,7 +54,7 @@ export function registerSettingsHandlers(): void {
   })
 
   // Set directory watcher depth
-  ipcMain.handle('settings:setDirectoryWatchDepth', async (_event, depth: number | null) => {
+  registerHandle('settings:setDirectoryWatchDepth', async (_event, depth: number | null) => {
     try {
       await settingsService.setDirectoryWatchDepth(depth)
       return { success: true }
@@ -66,7 +66,7 @@ export function registerSettingsHandlers(): void {
   })
 
   // Get recent projects
-  ipcMain.handle('settings:getRecentProjects', async () => {
+  registerHandle('settings:getRecentProjects', async () => {
     try {
       const projects = await settingsService.getRecentProjects()
       return { success: true, projects }
@@ -78,7 +78,7 @@ export function registerSettingsHandlers(): void {
   })
 
   // Add recent project
-  ipcMain.handle('settings:addRecentProject', async (_event, path: string, name: string) => {
+  registerHandle('settings:addRecentProject', async (_event, path: string, name: string) => {
     try {
       await settingsService.addRecentProject(path, name)
       return { success: true }
@@ -90,7 +90,7 @@ export function registerSettingsHandlers(): void {
   })
 
   // Remove recent project
-  ipcMain.handle('settings:removeRecentProject', async (_event, path: string) => {
+  registerHandle('settings:removeRecentProject', async (_event, path: string) => {
     try {
       await settingsService.removeRecentProject(path)
       return { success: true }

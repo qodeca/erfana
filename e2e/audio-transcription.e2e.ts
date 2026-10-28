@@ -18,6 +18,7 @@
 
 import { test, expect, _electron as electron } from '@playwright/test'
 import * as path from 'path'
+import type { Api } from '../src/preload/index'
 import * as fs from 'fs'
 import { stubDialog } from 'electron-playwright-helpers'
 import {
@@ -32,6 +33,7 @@ import {
   createTempUserDataDir
 } from './utils/helpers'
 import { IMPORT } from '../src/shared/constants'
+import { buildAppEnv, E2E_CHROMIUM_ARGS } from './fixtures/isolation'
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -94,11 +96,11 @@ test.describe('Audio transcription', () => {
     )
 
     const electronApp = await electron.launch({
-      args: [path.join(__dirname, '..'), `--user-data-dir=${userDataDir}`],
-      env: {
-        ...process.env,
-        NODE_ENV: 'development'
-      }
+      args: [path.join(__dirname, '..'), `--user-data-dir=${userDataDir}`, ...E2E_CHROMIUM_ARGS],
+      // The one spec that is meant to see the key (it is set via IPC below, but
+      // the transcription project owns it); everything else comes from the
+      // allowlist.
+      env: buildAppEnv({ extra: { OPENAI_API_KEY: OPENAI_API_KEY as string } })
     })
 
     let window: Awaited<ReturnType<typeof electronApp.firstWindow>> | undefined
@@ -115,7 +117,8 @@ test.describe('Audio transcription', () => {
       // Safe cast: OPENAI_API_KEY is guaranteed non-null by test.skip guard above
       const apiKey = OPENAI_API_KEY as string
       const setKeyResult = await window.evaluate(
-        (key: string) => window.api.transcription.setApiKey(key),
+        // `globalThis.window`: this runs in the page, where the outer `window` (a Page) does not exist.
+        (key: string) => (globalThis.window.api as Api).transcription.setApiKey(key),
         apiKey
       )
       expect(setKeyResult).toHaveProperty('success', true)

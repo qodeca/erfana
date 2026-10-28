@@ -6,7 +6,7 @@
  * Covers the `finalUpdate`-only forwarding of design §1.4, the exact
  * findInPage options shape, and the zero-count-before-stopFindInPage ordering.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 
 import {
   createPreviewFindController,
@@ -16,15 +16,15 @@ import {
 } from './PreviewFindController'
 
 interface WcMock extends PreviewFindContents {
-  findInPage: ReturnType<typeof vi.fn>
-  stopFindInPage: ReturnType<typeof vi.fn>
-  on: ReturnType<typeof vi.fn>
-  off: ReturnType<typeof vi.fn>
+  findInPage: Mock
+  stopFindInPage: Mock
+  on: Mock
+  off: Mock
 }
 
 function makeHarness(): {
   wc: WcMock
-  onCount: ReturnType<typeof vi.fn>
+  onCount: Mock
   emit: (result: FoundInPageResult) => void
 } {
   let listener: ((event: unknown, result: FoundInPageResult) => void) | undefined
@@ -77,7 +77,37 @@ describe('PreviewFindController', () => {
     const [text, options] = wc.findInPage.mock.calls[0]
     expect(text).toBe('needle')
     expect(Object.keys(options as object).sort()).toEqual(['findNext', 'forward', 'matchCase'])
-    expect(options).toEqual({ forward: true, findNext: false, matchCase: true })
+  })
+
+  // Electron's `findNext` means "begin a new find session" (`FindInPageOptions`):
+  // true for a query's first request, false for a step to the next match. Ours
+  // means "step within the current session", so it is inverted at this
+  // boundary. Passed through unchanged, a fresh query was a step in a session
+  // that did not exist, and Chromium reported no matches (#124, WI-25).
+  it('starts a new Chromium find session for a fresh query', () => {
+    const { wc, onCount } = harness
+    const controller = createPreviewFindController(wc, onCount)
+
+    controller.find('needle', { forward: true, findNext: false, matchCase: true })
+
+    expect(wc.findInPage).toHaveBeenCalledWith('needle', {
+      forward: true,
+      findNext: true,
+      matchCase: true
+    })
+  })
+
+  it('steps within the current Chromium find session for next and previous', () => {
+    const { wc, onCount } = harness
+    const controller = createPreviewFindController(wc, onCount)
+
+    controller.find('needle', { forward: false, findNext: true, matchCase: false })
+
+    expect(wc.findInPage).toHaveBeenCalledWith('needle', {
+      forward: false,
+      findNext: false,
+      matchCase: false
+    })
   })
 
   it('clearHighlights pushes a zero count BEFORE stopFindInPage(clearSelection)', () => {

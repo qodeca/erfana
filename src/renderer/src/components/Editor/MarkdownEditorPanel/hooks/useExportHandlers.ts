@@ -18,6 +18,7 @@ import { getBasename } from '../../../../utils/fileUtils'
 import { logger } from '../../../../utils/logger'
 import type { MarkdownPreviewHandle } from '../../MarkdownPreview'
 import type { EditorFile } from '../types'
+import { pdfGateway, docxGateway } from '../../../../services/documentExportGateway'
 
 // Re-export EditorFile for consumers who import from this module
 export type { EditorFile } from '../types'
@@ -164,8 +165,7 @@ export function useExportHandlers(
     }
 
     // Check if we have preview element and current file
-    const previewElement = previewHandleRef.current?.element
-    if (!previewElement || !currentFile) {
+    if (!previewHandleRef.current?.element || !currentFile) {
       showToast({
         title: 'Export failed',
         message: 'No content to export',
@@ -175,16 +175,23 @@ export function useExportHandlers(
       return
     }
 
-    // Get the inner content (the rendered markdown)
-    const contentElement = previewElement.querySelector('.markdown-preview-content')
-    const html = contentElement?.innerHTML || previewElement.innerHTML
-
     // Get filename from current file path (without .md extension)
     const fileName = extractBaseFileName(currentFile.path)
 
     setIsExportingPdf(true)
     try {
-      const result = await window.api.pdf.exportToPdf({ html, fileName })
+      // The preview renders behind typing (deferred, debounced for large
+      // files, diagrams redrawn after a pause): bring it up to date first so
+      // the PDF matches the editor, not the preview of a moment ago.
+      await previewHandleRef.current?.flush?.()
+      const previewElement = previewHandleRef.current?.element
+      if (!previewElement) throw new Error('The preview closed before export')
+
+      // Get the inner content (the rendered markdown)
+      const contentElement = previewElement.querySelector('.markdown-preview-content')
+      const html = contentElement?.innerHTML || previewElement.innerHTML
+
+      const result = await pdfGateway.exportToPdf({ html, fileName })
 
       if (result.success && result.filePath) {
         // Show success with just the filename
@@ -234,23 +241,10 @@ export function useExportHandlers(
     }
 
     // Check if we have preview element and current file
-    const previewElement = previewHandleRef.current?.element
-    if (!previewElement || !currentFile) {
+    if (!previewHandleRef.current?.element || !currentFile) {
       showToast({
         title: 'Export failed',
         message: 'No content to export',
-        type: 'error',
-        duration: 3000
-      })
-      return
-    }
-
-    // Get the inner content (the rendered markdown)
-    const contentElement = previewElement.querySelector('.markdown-preview-content')
-    if (!contentElement) {
-      showToast({
-        title: 'Export failed',
-        message: 'No preview content available',
         type: 'error',
         duration: 3000
       })
@@ -262,6 +256,22 @@ export function useExportHandlers(
 
     setIsExportingDocx(true)
     try {
+      // Bring the preview up to date first (see handleExportPdf), including
+      // diagrams, which are converted to images below.
+      await previewHandleRef.current?.flush?.()
+
+      // Get the inner content (the rendered markdown)
+      const contentElement = previewHandleRef.current?.element?.querySelector('.markdown-preview-content')
+      if (!contentElement) {
+        showToast({
+          title: 'Export failed',
+          message: 'No preview content available',
+          type: 'error',
+          duration: 3000
+        })
+        return
+      }
+
       // Convert Mermaid diagrams to PNG images before sending to main process.
       // This avoids jsdom/canvas dependency issues in the main process.
       // The conversion happens in the renderer where DOM/canvas APIs are available.
@@ -277,7 +287,7 @@ export function useExportHandlers(
         })
       }
 
-      const result = await window.api.docx.exportToDocx({
+      const result = await docxGateway.exportToDocx({
         html: conversionResult.html,
         fileName
       })

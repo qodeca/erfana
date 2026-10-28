@@ -79,7 +79,13 @@ while [ "$POLL_BUDGET" -gt 0 ]; do
         # AskUserQuestion (orchestrator), on the first observation only:
         # approve now, approve in the GitHub UI yourself, or cancel the run.
         # Approving releases the signing credentials to the build jobs, so it
-        # is the operator's call.
+        # is the operator's call. On "approve now", the working invocation is
+        # (the -f/-F form returns 422 "not an integer" — environment_ids is a
+        # JSON array of integers, so the body must be JSON):
+        #   ENV_ID=$(gh api "repos/qodeca/erfana/actions/runs/$RUN_ID/pending_deployments" \
+        #     --jq '.[0].environment.id')
+        #   printf '{"environment_ids":[%s],"state":"approved","comment":"release approved"}' "$ENV_ID" \
+        #     | gh api -X POST "repos/qodeca/erfana/actions/runs/$RUN_ID/pending_deployments" --input -
         APPROVAL_PROMPTED=1
       fi
       sleep 240
@@ -205,11 +211,9 @@ Phase 3 depends on these `gh` JSON fields being supported by the operator's `gh`
 | `gh run list --json databaseId` | `databaseId` |
 | `gh run view --json status,conclusion,jobs` | `status`, `conclusion`, `jobs[].name`, `jobs[].status`, `jobs[].conclusion` |
 
-Confirmed working with `gh` 2.91.0 (the version used during the v0.9.5 release). The Prerequisites table in `SKILL.md` pins `gh ≥ 2.55.0`. If `gh release view --json isLatest` returns "Unknown JSON field" (older `gh` versions are missing the field), fall back to:
+Confirmed working with `gh` 2.91.0 (the version used during the v0.9.5 release). The Prerequisites table in `SKILL.md` pins `gh ≥ 2.55.0`.
 
-```bash
-gh api repos/qodeca/erfana/releases/latest --jq '.draft, .prerelease, .html_url'
-```
+The `isLatest` quirk that used to be documented here belongs to the Phase 4.6 publish step, not to Phase 3 — see [`phase-4-verify.md`](phase-4-verify.md) § 4.6.
 
 ## Checkpoint 3.A
 

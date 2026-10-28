@@ -7,8 +7,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, cleanup } from '@testing-library/react'
-import type { IDockviewPanelHeaderProps } from 'dockview'
+import { render, screen, fireEvent, cleanup, act } from '@testing-library/react'
+import { DockviewReact, type DockviewApi, type IDockviewPanelHeaderProps } from 'dockview'
 
 import { HtmlPreviewTab } from './HtmlPreviewTab'
 import { usePreviewStore } from '../../stores/usePreviewStore'
@@ -91,6 +91,19 @@ describe('HtmlPreviewTab', () => {
     expect(props.api.close).toHaveBeenCalledTimes(1)
   })
 
+  it('offers no export in its context menu — that lives on the preview toolbar', () => {
+    // It used to be prepended here, because the panel surface is painted over by
+    // the native view and the tab was the only chrome that survived (UX-003).
+    // The preview has its own toolbar above the view now, which is where the
+    // markdown editor has always kept its export button. An export hidden behind
+    // a right-click on a tab handle is an export nobody finds.
+    render(<HtmlPreviewTab {...props} />)
+    fireEvent.contextMenu(screen.getByText('index.html').closest('.html-preview-tab')!)
+
+    expect(screen.queryByText('Export as PDF')).toBeNull()
+    expect(screen.queryByText('Export to PDF')).toBeNull()
+  })
+
   it('shows the failure indicator reflecting the store count for its panelId (AC20)', () => {
     const panelId = props.params!.panelId!
     usePreviewStore.getState().pushFailures(panelId, [blockedHost('cdn.example')])
@@ -126,5 +139,58 @@ describe('HtmlPreviewTab', () => {
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(screen.queryByText('cdn.example')).toBeNull()
     expect(useOverlayOccluderStore.getState().isOccluded()).toBe(false)
+  })
+
+  describe('after a same-tab move (issue #124, part 3 §3.4)', () => {
+    it('follows params.filePath: label, tooltip and close label name the new page', () => {
+      const { rerender } = render(<HtmlPreviewTab {...props} />)
+
+      rerender(
+        <HtmlPreviewTab
+          {...props}
+          params={{ ...props.params, filePath: '/proj/pages/pricing.html' }}
+        />
+      )
+
+      const tab = screen.getByText('pricing.html').closest('.html-preview-tab')
+      expect(tab).toHaveAttribute('title', 'pricing.html\npages/pricing.html')
+      expect(screen.getByRole('button', { name: 'Close pricing.html' })).toBeInTheDocument()
+      expect(screen.queryByText('index.html')).toBeNull()
+    })
+
+    it('is re-rendered by dockview itself when the panel calls updateParameters', async () => {
+      // Pins the dockview contract the design leans on: `updateParameters`
+      // reaches the TAB component too (panelApi → DockviewPanel.update →
+      // DockviewPanelModel.update → the React header part). Were it ever to stop,
+      // the tab would keep naming the old page after a move, and HtmlPreviewTab
+      // would have to subscribe to `api.onDidParametersChange` itself.
+      let dockApi: DockviewApi | undefined
+      render(
+        <DockviewReact
+          components={{ htmlPreview: () => null }}
+          tabComponents={{ htmlPreviewTab: HtmlPreviewTab }}
+          onReady={(event) => {
+            dockApi = event.api
+          }}
+        />
+      )
+      act(() => {
+        dockApi?.addPanel({
+          id: 'preview-a',
+          component: 'htmlPreview',
+          tabComponent: 'htmlPreviewTab',
+          title: 'a.html',
+          params: { filePath: '/proj/a.html', panelId: 'preview-a' }
+        })
+      })
+      expect(await screen.findByRole('button', { name: 'Close a.html' })).toBeInTheDocument()
+
+      act(() => {
+        dockApi?.getPanel('preview-a')?.api.updateParameters({ filePath: '/proj/b.html' })
+      })
+
+      expect(await screen.findByRole('button', { name: 'Close b.html' })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Close a.html' })).toBeNull()
+    })
   })
 })

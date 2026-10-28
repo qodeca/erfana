@@ -17,6 +17,7 @@
 
 import { test, expect, _electron as electron } from '@playwright/test'
 import * as path from 'path'
+import { E2E_CHROMIUM_ARGS } from './fixtures/isolation'
 import {
   TEST_IDS,
   byTestId,
@@ -52,7 +53,7 @@ test.describe('Third-Party Components E2E', () => {
 
     // Launch Electron app with isolated user data directory
     const electronApp = await electron.launch({
-      args: [path.join(__dirname, '..'), `--user-data-dir=${userDataDir}`],
+      args: [path.join(__dirname, '..'), `--user-data-dir=${userDataDir}`, ...E2E_CHROMIUM_ARGS],
       env: {
         ...process.env,
         NODE_ENV: 'development'
@@ -125,7 +126,7 @@ test.describe('Third-Party Components E2E', () => {
     )
 
     const electronApp = await electron.launch({
-      args: [path.join(__dirname, '..'), `--user-data-dir=${userDataDir}`],
+      args: [path.join(__dirname, '..'), `--user-data-dir=${userDataDir}`, ...E2E_CHROMIUM_ARGS],
       env: {
         ...process.env,
         NODE_ENV: 'development'
@@ -152,13 +153,10 @@ test.describe('Third-Party Components E2E', () => {
       const terminalInstance = byTestId(window, TEST_IDS.TERMINAL_INSTANCE)
       await expect(terminalInstance).toBeVisible({ timeout: 5000 })
 
-      // Send a command using terminal helper
+      // Send a command and check the line it prints (read from xterm's buffer;
+      // the echoed command line alone would not match the whole-line check)
       await terminal.sendCommand(window, 'echo "E2E Terminal Test"')
-
-      // KNOWN_WAIT: xterm.js WebGL renderer doesn't expose text to the DOM,
-      // so toContainText/waitForOutput cannot verify command output.
-      // Wait briefly for command execution, then verify terminal didn't crash.
-      await window.waitForTimeout(1000)
+      await terminal.waitForOutputLine(window, 'E2E Terminal Test')
 
       // Verify terminal is still visible (didn't crash after command)
       await expect(terminalInstance).toBeVisible()
@@ -178,7 +176,7 @@ test.describe('Third-Party Components E2E', () => {
     )
 
     const electronApp = await electron.launch({
-      args: [path.join(__dirname, '..'), `--user-data-dir=${userDataDir}`],
+      args: [path.join(__dirname, '..'), `--user-data-dir=${userDataDir}`, ...E2E_CHROMIUM_ARGS],
       env: {
         ...process.env,
         NODE_ENV: 'development'

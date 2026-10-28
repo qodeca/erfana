@@ -12,12 +12,13 @@
  * - Navigation controls (6 tests)
  * - Options toggles (7 tests) - includes regression test for stale closure fix
  * - Keyboard interactions (6 tests)
+ * - Option shortcuts (11 tests)
  * - Focus management (3 tests)
  * - Match count display (4 tests)
  * - Provider integration (4 tests)
  * - Accessibility (6 tests)
  *
- * Total: 53 tests
+ * Total: 70 tests
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
@@ -28,6 +29,17 @@ import { useSearchStore } from '../../stores/useSearchStore'
 import type { SearchProvider } from '../../providers/search'
 import type { SearchMatch } from '../../stores/useSearchStore'
 import { TEST_IDS } from '../../constants/testids'
+import { isMacOS } from '../../utils/platform'
+
+// Platform detection is resolved via the preload bridge (utils/platform).
+// Mock it so tests drive the macOS-vs-Windows shortcut binding directly.
+vi.mock('../../utils/platform', () => ({
+  getRendererPlatform: vi.fn(() => 'linux'),
+  isMacOS: vi.fn(() => false),
+  isWindows: vi.fn(() => false)
+}))
+
+const mockIsMacOS = vi.mocked(isMacOS)
 
 // Mock full-match provider (Monaco/preview-DOM shape): random access + match list.
 const createMockProvider = (): SearchProvider => ({
@@ -643,6 +655,191 @@ describe('SearchBar', () => {
       // No wrap to the close button, and no preventDefault — focus is not trapped.
       expect(closeButton).not.toHaveFocus()
       expect(shiftTabEvent.defaultPrevented).toBe(false)
+    })
+  })
+
+  describe('Option shortcuts (platform-specific)', () => {
+    beforeEach(() => {
+      useSearchStore.setState({ isOpen: true })
+      // Default to the Windows/Linux binding; macOS tests opt in explicitly.
+      mockIsMacOS.mockReturnValue(false)
+    })
+
+    // The keys match the physical key (`event.code`), not `event.key`. On macOS
+    // the binding takes the Cmd chord so a bare Option+C stays available to the
+    // keyboard layout (a Polish user types ć with it).
+
+    it('toggles case sensitive on Alt+C while the input is focused', () => {
+      render(<SearchBar provider={mockProvider} />)
+
+      const input = screen.getByPlaceholderText('Search...')
+      input.focus()
+
+      fireEvent.keyDown(input, { key: 'c', code: 'KeyC', altKey: true })
+
+      expect(useSearchStore.getState().options.caseSensitive).toBe(true)
+    })
+
+    it('toggles whole word on Alt+W while the input is focused', () => {
+      render(<SearchBar provider={mockProvider} />)
+
+      const input = screen.getByPlaceholderText('Search...')
+      input.focus()
+
+      fireEvent.keyDown(input, { key: 'w', code: 'KeyW', altKey: true })
+
+      expect(useSearchStore.getState().options.wholeWord).toBe(true)
+    })
+
+    it('does nothing on Alt+C when Cmd is held', () => {
+      render(<SearchBar provider={mockProvider} />)
+
+      const input = screen.getByPlaceholderText('Search...')
+      input.focus()
+
+      fireEvent.keyDown(input, { key: 'c', code: 'KeyC', altKey: true, metaKey: true })
+
+      expect(useSearchStore.getState().options.caseSensitive).toBe(false)
+    })
+
+    it('consumes Alt+W but does not toggle when the view does not support whole word', async () => {
+      const { provider } = createMockCountProvider()
+      render(<SearchBar provider={provider} />)
+
+      // The provider's capabilities reach the store on mount; the whole-word
+      // button is disabled from then on, and the shortcut must match it.
+      await waitFor(() => expect(useSearchStore.getState().capabilities.wholeWord).toBe(false))
+
+      const input = screen.getByPlaceholderText('Search...')
+      input.focus()
+
+      const event = new KeyboardEvent('keydown', {
+        key: 'w',
+        code: 'KeyW',
+        altKey: true,
+        bubbles: true,
+        cancelable: true
+      })
+      const preventDefaultSpy = vi.spyOn(event, 'preventDefault')
+
+      act(() => {
+        input.dispatchEvent(event)
+      })
+
+      expect(preventDefaultSpy).toHaveBeenCalled()
+      expect(useSearchStore.getState().options.wholeWord).toBe(false)
+    })
+
+    it('toggles the option exactly once when a toggle button has focus (container path)', () => {
+      render(<SearchBar provider={mockProvider} />)
+
+      const caseButton = screen.getByTestId(TEST_IDS.SEARCH_BAR_TOGGLE_CASE)
+      caseButton.focus()
+
+      // The button's own handler only answers Enter, so this bubbles to the
+      // container's onKeyDown. Toggling twice would leave the option false.
+      fireEvent.keyDown(caseButton, { key: 'c', code: 'KeyC', altKey: true })
+
+      expect(useSearchStore.getState().options.caseSensitive).toBe(true)
+    })
+
+    it('ignores a key repeat but still prevents the default', () => {
+      render(<SearchBar provider={mockProvider} />)
+
+      const input = screen.getByPlaceholderText('Search...')
+      input.focus()
+
+      const event = new KeyboardEvent('keydown', {
+        key: 'c',
+        code: 'KeyC',
+        altKey: true,
+        repeat: true,
+        bubbles: true,
+        cancelable: true
+      })
+      const preventDefaultSpy = vi.spyOn(event, 'preventDefault')
+
+      act(() => {
+        input.dispatchEvent(event)
+      })
+
+      expect(preventDefaultSpy).toHaveBeenCalled()
+      expect(useSearchStore.getState().options.caseSensitive).toBe(false)
+    })
+
+    it('toggles case sensitive on Cmd+Option+C on macOS', () => {
+      mockIsMacOS.mockReturnValue(true)
+      render(<SearchBar provider={mockProvider} />)
+
+      const input = screen.getByPlaceholderText('Search...')
+      input.focus()
+
+      fireEvent.keyDown(input, { key: 'ç', code: 'KeyC', altKey: true, metaKey: true })
+
+      expect(useSearchStore.getState().options.caseSensitive).toBe(true)
+    })
+
+    it('toggles whole word on Cmd+Option+W on macOS', () => {
+      mockIsMacOS.mockReturnValue(true)
+      render(<SearchBar provider={mockProvider} />)
+
+      const input = screen.getByPlaceholderText('Search...')
+      input.focus()
+
+      fireEvent.keyDown(input, { key: '∑', code: 'KeyW', altKey: true, metaKey: true })
+
+      expect(useSearchStore.getState().options.wholeWord).toBe(true)
+    })
+
+    it('leaves a plain Option+C on macOS alone, so ć can still be typed', () => {
+      mockIsMacOS.mockReturnValue(true)
+      render(<SearchBar provider={mockProvider} />)
+
+      const input = screen.getByPlaceholderText('Search...')
+      input.focus()
+
+      const event = new KeyboardEvent('keydown', {
+        key: 'ç',
+        code: 'KeyC',
+        altKey: true,
+        bubbles: true,
+        cancelable: true
+      })
+      const preventDefaultSpy = vi.spyOn(event, 'preventDefault')
+
+      act(() => {
+        input.dispatchEvent(event)
+      })
+
+      expect(preventDefaultSpy).not.toHaveBeenCalled()
+      expect(useSearchStore.getState().options.caseSensitive).toBe(false)
+    })
+
+    it('names the macOS chords in the option tooltips on macOS', () => {
+      mockIsMacOS.mockReturnValue(true)
+      render(<SearchBar provider={mockProvider} />)
+
+      expect(screen.getByTestId(TEST_IDS.SEARCH_BAR_TOGGLE_CASE)).toHaveAttribute(
+        'title',
+        'Case sensitive (⌥⌘C)'
+      )
+      expect(screen.getByTestId(TEST_IDS.SEARCH_BAR_TOGGLE_WORD)).toHaveAttribute(
+        'title',
+        'Whole word (⌥⌘W)'
+      )
+    })
+
+    it('names the Alt chords in the option tooltips elsewhere', () => {
+      render(<SearchBar provider={mockProvider} />)
+
+      expect(screen.getByTestId(TEST_IDS.SEARCH_BAR_TOGGLE_CASE)).toHaveAttribute(
+        'title',
+        'Case sensitive (Alt+C)'
+      )
+      expect(screen.getByTestId(TEST_IDS.SEARCH_BAR_TOGGLE_WORD)).toHaveAttribute(
+        'title',
+        'Whole word (Alt+W)'
+      )
     })
   })
 

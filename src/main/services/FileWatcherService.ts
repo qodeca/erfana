@@ -4,12 +4,14 @@ import { FSWatcher } from 'chokidar'
 import { WebContents } from 'electron'
 import { stat } from 'fs/promises'
 import { logger } from './LoggingService'
-import { classifyConfinement } from '../utils/projectConfinement'
+import { classifyConfinement, isLexicallyInside } from '../utils/projectConfinement'
 import { createAtomicSaveDetector } from './watcher/AtomicSaveDetector'
 import { SubscriberCounter } from './watcher/SubscriberCounter'
 import { createSingleFileWatcher } from './watcher/singleFileWatch'
 import { sendToSubscribers } from './watcher/watchNotifier'
 import { AtomicRearmDeps, RearmableWatch, resolveDeletedWatch } from './watcher/atomicRearm'
+import { watchedUnderRemovedFolders } from './watcher/ancestorRemoval'
+import { UnseenWatchProbe, type RemovalCoverage } from './watcher/unseenWatchProbe'
 
 interface WatchedFile {
   filePath: string
@@ -42,6 +44,12 @@ export class FileWatcherService {
    */
   private readonly atomicSaveDetector = createAtomicSaveDetector()
 
+  /** Re-checks the files the project watcher cannot see (#252); see {@link watchUnseenFiles}. */
+  private readonly unseenProbe = new UnseenWatchProbe({
+    probeablePaths: () => this.probeablePaths(),
+    onMissing: filePath => this.handleFileDeleted(filePath)
+  })
+
   /**
    * The seam the atomic re-arm branch talks to this service through.
    *
@@ -72,6 +80,9 @@ export class FileWatcherService {
    */
   async stopAll(): Promise<void> {
     this.safeLog('👁️  Stopping all file watchers...')
+    // First, before the closes below can be overtaken: a check still waiting on
+    // the old project's disk stops at its next file and reports nothing (#252)
+    this.unseenProbe.reset()
     for (const [filePath, watched] of this.watchedFiles.entries()) {
       this.atomicSaveDetector.cancelPending(filePath)
       if (watched.debounceTimer) {
@@ -109,6 +120,9 @@ export class FileWatcherService {
    */
   async watchFile(filePath: string, webContents: WebContents): Promise<void> {
     // Security: Prevent watching files outside project
+    // The watch channels move onto the confined-path wrapper in a follow-up
+    // (docs/technical-debt.md #24); until then this prefix test stays as it was.
+    // eslint-disable-next-line no-restricted-syntax
     if (this.projectPath && !filePath.startsWith(this.projectPath)) {
       throw new Error('Cannot watch files outside the project directory')
     }
@@ -172,14 +186,15 @@ export class FileWatcherService {
     }
 
     this.watchedFiles.set(filePath, watched)
+    this.unseenProbe.pathChanged(filePath)
   }
 
   /**
    * Create a chokidar watcher for one path with this service's handlers.
    *
    * Shared by the initial watch and by the atomic re-arm so the production
-   * option object - including the load-bearing `disableGlobbing: true` v3 pin -
-   * and the three handler registrations exist exactly once (issue #70, M3).
+   * option object and the three handler registrations exist exactly once
+   * (issue #70, M3).
    */
   private createWatcher(filePath: string): FSWatcher {
     return createSingleFileWatcher(filePath, {
@@ -319,6 +334,7 @@ export class FileWatcherService {
     this.cancelPendingWork(filePath, watched)
     await watched.watcher.close()
     this.watchedFiles.delete(filePath)
+    this.unseenProbe.pathChanged(filePath)
   }
 
   /**
@@ -326,10 +342,7 @@ export class FileWatcherService {
    */
   private cancelPendingWork(filePath: string, watched: RearmableWatch): void {
     this.atomicSaveDetector.cancelPending(filePath)
-    if (watched.debounceTimer) {
-      clearTimeout(watched.debounceTimer)
-      watched.debounceTimer = null
-    }
+    clearDebounce(watched)
   }
 
   /**
@@ -410,13 +423,72 @@ export class FileWatcherService {
   }
 
   /**
+   * The project watcher removed these paths: a watched file under a removed
+   * folder vanished unheard (see `watcher/ancestorRemoval`), so it takes the
+   * normal unlink branch, whose existence re-check guards a false banner.
+   */
+  handleAncestorRemovals(removedPaths: readonly string[]): void {
+    if (this.isDisposing) return
+    const affected = watchedUnderRemovedFolders(this.watchedFiles.keys(), removedPaths)
+    for (const filePath of affected) this.handleFileDeleted(filePath)
+  }
+
+  /**
+   * Re-check, on a slow timer, the watched files whose folders the project
+   * watcher cannot report on: excluded, hidden or ignored ones
+   * (`watcher/unseenWatchProbe`, #252). `coverage` says which those are.
+   */
+  watchUnseenFiles(coverage: RemovalCoverage): void {
+    this.unseenProbe.setCoverage(coverage)
+  }
+
+  /**
+   * A paused project watch lost removals under `root` without their paths:
+   * check the watched files there on disk, in the probe's one-`stat`-at-a-time
+   * queue, and take each missing one down the unlink branch – except the ones
+   * the pausing operation removed itself (#252).
+   */
+  async checkWatchedFilesUnder(
+    root: string,
+    isOwnRemoval: (filePath: string) => boolean = () => false
+  ): Promise<void> {
+    if (this.isDisposing) return
+    const under = this.probeablePaths().filter(filePath => isLexicallyInside(filePath, root))
+    await this.unseenProbe.checkNow(under, isOwnRemoval)
+  }
+
+  /**
+   * The watched paths the probe may `stat`: this session's, lexically inside
+   * the project. Nothing without a project, so no probe reaches outside it.
+   */
+  private probeablePaths(): string[] {
+    const root = this.projectPath
+    if (!root) return []
+    const paths: string[] = []
+    for (const watched of this.watchedFiles.values()) {
+      if (watched.version === this.switchVersion && isLexicallyInside(watched.filePath, root)) {
+        paths.push(watched.filePath)
+      }
+    }
+    return paths
+  }
+
+  /**
    * Fire-and-forget teardown, used from the async unlink branch where there is
    * nobody left to await the close
    */
   private discardWatch(filePath: string, watched: RearmableWatch): void {
-    this.cancelPendingWork(filePath, watched)
     void watched.watcher.close().catch(() => {})
+    // A newer watch may own the path by now (it was reopened while this one's
+    // check awaited the disk): its entry and its pending check stay, and only
+    // this entry's own timer goes (#252 review)
+    if (this.watchedFiles.get(filePath) !== watched) {
+      clearDebounce(watched)
+      return
+    }
+    this.cancelPendingWork(filePath, watched)
     this.watchedFiles.delete(filePath)
+    this.unseenProbe.pathChanged(filePath)
   }
 
   /**
@@ -451,7 +523,9 @@ export class FileWatcherService {
     const watched = this.watchedFiles.get(filePath)
     if (!watched) return
 
-    this.send(watched, 'file-watch:error', { filePath, error: reason })
+    // `ended`: the entry and every count go with it, so a renderer slot must
+    // forget its hold rather than send a `stop` for it later (#252)
+    this.send(watched, 'file-watch:error', { filePath, error: reason, ended: true })
   }
 
   /** Hand one event to the subscribing windows (see `watcher/watchNotifier`) */
@@ -479,6 +553,7 @@ export class FileWatcherService {
     this.isDisposing = true // Set flag FIRST to stop all event processing
     this.safeLog('👁️  Disposing all file watchers...')
     this.atomicSaveDetector.dispose()
+    this.unseenProbe.dispose()
 
     for (const [, watched] of this.watchedFiles.entries()) {
       if (watched.debounceTimer) {
@@ -491,6 +566,14 @@ export class FileWatcherService {
       }
     }
     this.watchedFiles.clear()
+  }
+}
+
+/** Stop a watch's pending change notification, if it has one */
+function clearDebounce(watched: RearmableWatch): void {
+  if (watched.debounceTimer) {
+    clearTimeout(watched.debounceTimer)
+    watched.debounceTimer = null
   }
 }
 

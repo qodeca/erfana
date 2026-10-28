@@ -5,20 +5,23 @@
  *
  * Covers design §1.7: printToPDF with printBackground:true, its own save
  * dialog + writeFile, `deriveSafeFilename` applied to the suggested name, and
- * a cancelled dialog writing nothing.
+ * a cancelled dialog writing nothing. Also the name a page suggests (#124).
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { join } from 'node:path'
+
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 
 import { ErrorCode } from '../../../shared/errors'
 import {
   createPreviewExportController,
+  exportNameForPage,
   type PreviewExportControllerDeps,
   type PreviewPrintContents,
   type PreviewSaveDialogResult
 } from './PreviewExportController'
 
 interface WcMock extends PreviewPrintContents {
-  printToPDF: ReturnType<typeof vi.fn>
+  printToPDF: Mock
 }
 
 function makeWc(): WcMock {
@@ -28,14 +31,14 @@ function makeWc(): WcMock {
 function makeController(overrides: {
   dialogResult?: PreviewSaveDialogResult
   showSaveDialog?: PreviewExportControllerDeps['showSaveDialog']
-  writeFile?: ReturnType<typeof vi.fn>
+  writeFile?: Mock
 }): {
   controller: ReturnType<typeof createPreviewExportController>
-  showSaveDialog: ReturnType<typeof vi.fn>
-  writeFile: ReturnType<typeof vi.fn>
+  showSaveDialog: Mock
+  writeFile: Mock
 } {
   const showSaveDialog =
-    (overrides.showSaveDialog as ReturnType<typeof vi.fn>) ??
+    (overrides.showSaveDialog as Mock) ??
     vi.fn(async () => overrides.dialogResult ?? { canceled: false, filePath: '/out/file.pdf' })
   const writeFile = overrides.writeFile ?? vi.fn(async () => undefined)
   const controller = createPreviewExportController({ showSaveDialog, writeFile })
@@ -58,6 +61,20 @@ describe('PreviewExportController', () => {
     expect(wc.printToPDF).toHaveBeenCalledWith({ printBackground: true })
     expect(writeFile).toHaveBeenCalledWith('/out/report.pdf', expect.any(Buffer))
     expect(result).toEqual({ ok: true, path: '/out/report.pdf' })
+  })
+
+  it('hands the asking window id to the save dialog so it is parented', async () => {
+    const wc = makeWc()
+    const { controller, showSaveDialog } = makeController({
+      dialogResult: { canceled: true }
+    })
+
+    await controller.exportToPdf(wc, 'report', 7)
+
+    expect(showSaveDialog).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Export preview to PDF' }),
+      7
+    )
   })
 
   it('does NOT write when the save dialog is cancelled', async () => {
@@ -120,5 +137,16 @@ describe('PreviewExportController', () => {
 
     expect(writeFile).not.toHaveBeenCalled()
     expect(result).toEqual({ ok: false, errorCode: ErrorCode.PDF_EXPORT_FAILED })
+  })
+})
+
+describe('exportNameForPage', () => {
+  it("is the page's file name without its extension", () => {
+    expect(exportNameForPage(join('proj', 'design-set', 'pricing.html'), 'preview')).toBe('pricing')
+  })
+
+  it('is the fallback when there is no page', () => {
+    expect(exportNameForPage(null, 'preview')).toBe('preview')
+    expect(exportNameForPage('', 'preview')).toBe('preview')
   })
 })

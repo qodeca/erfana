@@ -417,4 +417,4 @@ export class RateLimiter {
 - [MCP server – overview and tools](./mcp-server-tools.md) – overview, architecture, tool definitions
 - [User Guide](./user-guide-features.md) – Claude Code integration workflows
 - [Architecture](./architecture-overview.md) – MCP server in system design
-- [Implementation Guide](./implementation-guide.md) – M1 MCP server tasks
+- [Implementation Guide](./implementation-guide/README.md) – M1 MCP server tasks

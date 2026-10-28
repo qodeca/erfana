@@ -23,10 +23,47 @@ export {
   type CoalesceResult
 } from './EventCoalescer'
 export {
+  KnownEntries,
+  MAX_KNOWN_ENTRIES,
+  type JudgedEvent,
+  type KnownEntriesRead,
+  type KnownEntryKind
+} from './KnownEntries'
+export {
   AtomicSaveDetector,
   createAtomicSaveDetector,
   type AtomicSaveCallback
 } from './AtomicSaveDetector'
+export {
+  PauseEpisode,
+  MAX_INTERNAL_CHANGES,
+  type InternalChange,
+  type InternalChangeKind
+} from './PauseEpisode'
+export {
+  selectDirectoryWatchBackend,
+  type DirectoryWatchBackend,
+  type DirectoryWatchHandle,
+  type DirectoryWatchResyncReason
+} from './directoryWatchBackend'
+export {
+  NativeEventClassifier,
+  type NativeClassifiedEvent,
+  type NativeClassifiedType,
+  type NativeEventClassifierOptions,
+  type NativeLstatResult,
+  type NativeRawEventKind
+} from './NativeEventClassifier'
+export {
+  NativeRecursiveWatcher,
+  type NativeDirEntry,
+  type NativeFsWatch,
+  type NativeRecursiveWatcherOptions,
+  type NativeWatchCaps,
+  type NativeWatchHandle,
+  type NativeWatchListener,
+  type NativeWatchPlanStats
+} from './NativeRecursiveWatcher'
 export {
   ThrottledWorker,
   createThrottledWorker,

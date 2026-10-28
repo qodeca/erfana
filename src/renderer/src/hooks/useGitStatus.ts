@@ -16,13 +16,15 @@
  * @see Issue #74 - real-time git status refresh
  */
 
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useLayoutEffect, useRef, useCallback } from 'react'
 import { useGitStore } from '../stores/useGitStore'
 import { useGlobalSettingsStore } from '../stores/useGlobalSettingsStore'
 import { GIT_STATUS } from '../components/ProjectTree/constants'
 import type { GitStatusCounts, GitDisplayStatus } from '../../../shared/ipc/git-schema'
 import type { GitStateChangeEvent, GitPollTriggeredEvent } from '../../../shared/ipc/git-watcher-schema'
 import { logger } from '../utils/logger'
+import { directoryWatchGateway } from '../services/directoryWatchGateway'
+import { gitGateway, gitWatcherGateway, gitPollingGateway } from '../services/gitGateway'
 
 // Use centralized constants
 const { DEBOUNCE_DELAY, COOLDOWN_DURATION } = GIT_STATUS
@@ -152,7 +154,7 @@ export function useGitStatus({
       try {
         setRefreshing(true)
         const startTime = performance.now() // Timing (ADR-Spec003-002)
-        const response = await window.api.git.getStatus(requestProjectPath)
+        const response = await gitGateway.getStatus(requestProjectPath)
 
         // CRITICAL: Ignore response if project changed during request
         if (currentProjectRef.current !== requestProjectPath) {
@@ -201,8 +203,12 @@ export function useGitStatus({
     [projectPath, enabled, setRefreshing, setStatus]
   )
 
-  // Keep ref updated with latest executeRefresh (Issue #74 review fix)
-  executeRefreshRef.current = executeRefresh
+  // Keep ref updated with latest executeRefresh (Issue #74 review fix). In a
+  // layout effect, not during render, so it is current before any passive
+  // effect of the same commit reads it.
+  useLayoutEffect(() => {
+    executeRefreshRef.current = executeRefresh
+  }, [executeRefresh])
 
   /**
    * Debounced refresh for file watcher events
@@ -249,7 +255,7 @@ export function useGitStatus({
   useEffect(() => {
     if (!projectPath || !enabled) return
 
-    const unsubscribe = window.api.directoryWatch.onDirectoryChanged(() => {
+    const unsubscribe = directoryWatchGateway.onDirectoryChanged(() => {
       // Only refresh if window is visible
       if (isWindowVisibleRef.current) {
         debouncedRefresh()
@@ -278,12 +284,12 @@ export function useGitStatus({
 
     // Start watching .git directory for all git-related changes
     logger.info('[useGitStatus] Git watcher start requested', { projectPath })
-    window.api.gitWatcher.start(projectPath).catch(err => {
+    gitWatcherGateway.start(projectPath).catch(err => {
       logger.warn('[useGitStatus] Failed to start git watcher', { error: err })
     })
 
     // Listen for git state changes
-    const unsubscribeWatcher = window.api.gitWatcher.onStateChanged((event: GitStateChangeEvent) => {
+    const unsubscribeWatcher = gitWatcherGateway.onStateChanged((event: GitStateChangeEvent) => {
       // Only refresh if window is visible to avoid unnecessary work
       if (isWindowVisibleRef.current) {
         // Log with correlation ID for tracing (ADR-Spec003-002)
@@ -304,7 +310,7 @@ export function useGitStatus({
     return () => {
       unsubscribeWatcher()
       // Stop watching .git directory
-      window.api.gitWatcher.stop().catch(err => {
+      gitWatcherGateway.stop().catch(err => {
         logger.warn('[useGitStatus] Failed to stop git watcher', { error: err })
       })
     }
@@ -316,12 +322,12 @@ export function useGitStatus({
     if (!projectPath || !enabled) return
 
     // Start polling for git status updates
-    window.api.gitPolling.start(projectPath).catch(err => {
+    gitPollingGateway.start(projectPath).catch(err => {
       logger.warn('[useGitStatus] Failed to start git polling', { error: err })
     })
 
     // Listen for poll-triggered events
-    const unsubscribePolling = window.api.gitPolling.onPollTriggered((event: GitPollTriggeredEvent) => {
+    const unsubscribePolling = gitPollingGateway.onPollTriggered((event: GitPollTriggeredEvent) => {
       // Only refresh if window is visible
       if (isWindowVisibleRef.current) {
         // Debug log with reason for tracing (ADR-Spec003-002)
@@ -341,7 +347,7 @@ export function useGitStatus({
     return () => {
       unsubscribePolling()
       // Stop polling
-      window.api.gitPolling.stop().catch(err => {
+      gitPollingGateway.stop().catch(err => {
         logger.warn('[useGitStatus] Failed to stop git polling', { error: err })
       })
     }
@@ -372,13 +378,13 @@ export function useGitStatus({
 
       // Apply changes to polling service
       if (pollingEnabledChanged) {
-        window.api.gitPolling.setEnabled(gitStatus.pollingEnabled).catch((err) => {
+        gitPollingGateway.setEnabled(gitStatus.pollingEnabled).catch((err) => {
           logger.warn('[useGitStatus] Failed to update polling enabled state', { error: err })
         })
       }
 
       if (pollingIntervalChanged) {
-        window.api.gitPolling.setInterval(gitStatus.pollingInterval).catch((err) => {
+        gitPollingGateway.setInterval(gitStatus.pollingInterval).catch((err) => {
           logger.warn('[useGitStatus] Failed to update polling interval', { error: err })
         })
       }

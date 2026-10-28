@@ -1,0 +1,7 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/* Shared by every design-set page. `--page-mark` is read by the e2e to prove an in-place swap. */
+:root { --page-mark: initial; }
+body { font: 16px/1.5 sans-serif; margin: 24px; color: #1a202c; background: #f7fafc; }
+.spacer { height: 2400px; }
+.phone iframe { border: 1px solid #a0aec0; }

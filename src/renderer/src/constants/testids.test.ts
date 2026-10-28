@@ -14,6 +14,8 @@ async function getTestIds() {
   return import('./testids')
 }
 
+type TestIdsModule = Awaited<ReturnType<typeof getTestIds>>
+
 describe('TEST_IDS', () => {
   describe('structure', () => {
     it('should have all expected component sections', async () => {
@@ -78,10 +80,10 @@ describe('TEST_IDS', () => {
       expect(activityBarIds).toHaveLength(4)
     })
 
-    it('should have 16 Project Tree IDs', async () => {
+    it('should have 17 Project Tree IDs', async () => {
       const { TEST_IDS } = await getTestIds()
       const projectTreeIds = Object.keys(TEST_IDS).filter((k) => k.startsWith('PROJECT_TREE'))
-      expect(projectTreeIds).toHaveLength(16)
+      expect(projectTreeIds).toHaveLength(17)
     })
 
     it('should have 14 Terminal Panel IDs', async () => {
@@ -120,10 +122,10 @@ describe('TEST_IDS', () => {
       expect(gitIds).toHaveLength(4)
     })
 
-    it('should have 22 Settings Overlay IDs', async () => {
+    it('should have 33 Settings Overlay IDs', async () => {
       const { TEST_IDS } = await getTestIds()
       const settingsIds = Object.keys(TEST_IDS).filter((k) => k.startsWith('SETTINGS_'))
-      expect(settingsIds).toHaveLength(22)
+      expect(settingsIds).toHaveLength(33)
     })
 
     it('should have 10 Transcription Dialog IDs', async () => {
@@ -190,10 +192,10 @@ describe('TEST_IDS', () => {
       expect(fileConflictIds).toHaveLength(4)
     })
 
-    it('should have 5 Welcome Panel IDs', async () => {
+    it('should have 6 Welcome Panel IDs', async () => {
       const { TEST_IDS } = await getTestIds()
       const welcomeIds = Object.keys(TEST_IDS).filter((k) => k.startsWith('WELCOME_'))
-      expect(welcomeIds).toHaveLength(5)
+      expect(welcomeIds).toHaveLength(6)
     })
 
     it('should have 2 Context Menu base IDs', async () => {
@@ -276,10 +278,10 @@ describe('TEST_IDS', () => {
       expect(ids).toHaveLength(4)
     })
 
-    it('should have 5 File picker IDs', async () => {
+    it('should have 6 File picker IDs', async () => {
       const { TEST_IDS } = await getTestIds()
       const ids = Object.keys(TEST_IDS).filter((k) => k.startsWith('FILE_PICKER'))
-      expect(ids).toHaveLength(5)
+      expect(ids).toHaveLength(6)
     })
 
     it('should have 5 Diagram Viewer IDs', async () => {
@@ -318,10 +320,10 @@ describe('TEST_IDS', () => {
       expect(ids).toHaveLength(8)
     })
 
-    it('should have 7 Toast Notification IDs', async () => {
+    it('should have 8 Toast Notification IDs', async () => {
       const { TEST_IDS } = await getTestIds()
       const ids = Object.keys(TEST_IDS).filter((k) => k.startsWith('TOAST'))
-      expect(ids).toHaveLength(7)
+      expect(ids).toHaveLength(8)
     })
 
     it('should have 6 Editor Content Layout IDs', async () => {
@@ -336,6 +338,12 @@ describe('TEST_IDS', () => {
           k === 'EDITOR_PREVIEW'
       )
       expect(ids).toHaveLength(6)
+    })
+
+    it('should have 77 HTML Preview Comments IDs', async () => {
+      const { TEST_IDS } = await getTestIds()
+      const ids = Object.keys(TEST_IDS).filter((k) => k.startsWith('COMMENT_'))
+      expect(ids).toHaveLength(77)
     })
 
     it('should have 20 Markdown Toolbar IDs', async () => {
@@ -441,8 +449,8 @@ describe('getPathHash', () => {
 
 describe('getDynamicTestId', () => {
    
-  let getDynamicTestId: (prefix: string, path: string) => string
-  let TEST_IDS: Record<string, string>
+  let getDynamicTestId: TestIdsModule['getDynamicTestId']
+  let TEST_IDS: TestIdsModule['TEST_IDS']
 
   beforeEach(async () => {
     const module = await getTestIds()

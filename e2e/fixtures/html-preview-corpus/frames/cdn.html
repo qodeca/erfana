@@ -1,0 +1,32 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<!--
+  Part 2 corpus (P2-AC2): the CDN host is used only inside the frame
+  (cdn-child.html, depth 1). Unapproved, the frame's script is refused and the
+  permission band lists the host; after Allow and Confirm the page reloads, the
+  script runs inside the frame and the title gains -FRAMES-CDN-LOADED-.
+  The frame also makes one fetch (listed in the band as a network request) and
+  prints a look-alike of Chromium's CSP console line with its own console.log,
+  which must never reach the band. This page itself loads nothing remote.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>CDN in a frame -FRAMES-CDN-</title>
+    <link rel="stylesheet" href="page.css" />
+    <script>
+      window.addEventListener('message', (event) => {
+        const frame = document.getElementById('cdn-frame')
+        const data = event.data
+        if (!frame || frame.contentWindow !== event.source || !data || data.kind !== 'remote') return
+        document.body.dataset.remote = data.state
+        if (data.state === 'loaded') document.title = 'CDN in a frame -FRAMES-CDN-LOADED-'
+      })
+    </script>
+  </head>
+  <body data-remote="pending">
+    <h1>CDN in a frame</h1>
+    <iframe id="cdn-frame" title="cdn frame" src="cdn-child.html" width="480" height="160"></iframe>
+  </body>
+</html>

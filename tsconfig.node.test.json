@@ -1,0 +1,25 @@
+{
+  "extends": "./tsconfig.node.json",
+  "include": [
+    "electron.vite.config.*",
+    "electron.vite.monaco-dompurify.ts",
+    "src/main/**/*",
+    "src/preload/**/*",
+    "src/shared/**/*",
+    "tests/setup/setupTests.main.ts",
+    "tests/setup/setupTests.preload.ts",
+    "tests/setup/flakeGuard.ts",
+    "vitest.*.ts"
+  ],
+  "exclude": [],
+  "compilerOptions": {
+    "composite": false,
+    "noEmit": true,
+    "types": ["electron-vite/node", "vitest/globals"],
+    "paths": {
+      "@main/*": ["./src/main/*"],
+      "@preload/*": ["./src/preload/*"],
+      "@shared/*": ["./src/shared/*"]
+    }
+  }
+}

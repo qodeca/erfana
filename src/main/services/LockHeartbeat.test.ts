@@ -19,7 +19,7 @@
  * - isDisposing re-check before write (dispose-race guard)
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
 import { EventEmitter } from 'node:events'
 import type { LockInfo } from '../../shared/ipc/project-lock-schema'
 import type { Clock } from '../utils/Clock'
@@ -74,18 +74,18 @@ function makeDefaultLockInfo(overrides: Partial<LockInfo> = {}): LockInfo {
 interface TestBed {
   clock: ReturnType<typeof makeFakeClock>
   powerMonitor: EventEmitter
-  readLockFile: ReturnType<typeof vi.fn>
-  onOwnershipLost: ReturnType<typeof vi.fn>
-  onFocusRequest: ReturnType<typeof vi.fn>
+  readLockFile: Mock
+  onOwnershipLost: Mock
+  onFocusRequest: Mock
   deps: LockHeartbeatDeps
 }
 
 function makeBed(): TestBed {
   const clock = makeFakeClock()
   const powerMonitor = new EventEmitter()
-  const readLockFile = vi.fn<[string], Promise<LockInfo | null>>()
-  const onOwnershipLost = vi.fn<[string], void>()
-  const onFocusRequest = vi.fn<[LockInfo, string], Promise<void>>().mockResolvedValue(undefined)
+  const readLockFile = vi.fn<(...args: [string]) => Promise<LockInfo | null>>()
+  const onOwnershipLost = vi.fn<(...args: [string]) => void>()
+  const onFocusRequest = vi.fn<(...args: [LockInfo, string]) => Promise<void>>().mockResolvedValue(undefined)
   const deps: LockHeartbeatDeps = {
     clock,
     powerMonitor,
@@ -250,7 +250,7 @@ describe('LockHeartbeat', () => {
     })
 
     it('refreshAll covers multiple active locks', async () => {
-      const readLockFile = vi.fn<[string], Promise<LockInfo | null>>()
+      const readLockFile = vi.fn<(...args: [string]) => Promise<LockInfo | null>>()
       const deps: LockHeartbeatDeps = {
         clock: makeFakeClock(),
         powerMonitor: new EventEmitter(),
@@ -344,7 +344,7 @@ describe('LockHeartbeat', () => {
     })
 
     it('does not call onFocusRequest when it is not provided', async () => {
-      const readLockFile = vi.fn<[string], Promise<LockInfo | null>>()
+      const readLockFile = vi.fn<(...args: [string]) => Promise<LockInfo | null>>()
       const deps: LockHeartbeatDeps = {
         clock: makeFakeClock(),
         powerMonitor: new EventEmitter(),

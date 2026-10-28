@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { ipcMain } from 'electron'
 import type { IpcMainInvokeEvent } from 'electron'
 import { join } from 'path'
 import { pathToFileURL } from 'url'
@@ -17,6 +16,7 @@ import {
   type ScreenRecordingPermission
 } from '../../shared/ipc/screenshot-schema'
 import { logger } from '../services/LoggingService'
+import { registerHandle } from './registry'
 
 /**
  * Canonical `file://` URL of the bundled renderer entry point — mirrors the
@@ -73,7 +73,7 @@ function validateMainRendererSender(event: IpcMainInvokeEvent): boolean {
 export function registerScreenshotHandlers(
   service: IScreenshotService = createScreenshotService()
 ): void {
-  ipcMain.handle(SCREENSHOT_CHANNELS.GET_DISPLAYS, async (event): Promise<GetDisplaysResponse> => {
+  registerHandle(SCREENSHOT_CHANNELS.GET_DISPLAYS, async (event): Promise<GetDisplaysResponse> => {
     if (!validateMainRendererSender(event)) {
       logger.warn('Rejected screenshot:getDisplays from untrusted sender', {
         url: event.senderFrame?.url
@@ -88,7 +88,7 @@ export function registerScreenshotHandlers(
     }
   })
 
-  ipcMain.handle(
+  registerHandle(
     SCREENSHOT_CHANNELS.GET_CAPABILITIES,
     async (event): Promise<ScreenshotCapabilities> => {
       if (!validateMainRendererSender(event)) {
@@ -108,7 +108,7 @@ export function registerScreenshotHandlers(
     }
   )
 
-  ipcMain.handle(
+  registerHandle(
     SCREENSHOT_CHANNELS.GET_SCREEN_PERMISSION,
     async (event): Promise<ScreenRecordingPermission> => {
       if (!validateMainRendererSender(event)) {
@@ -129,7 +129,7 @@ export function registerScreenshotHandlers(
     }
   )
 
-  ipcMain.handle(
+  registerHandle(
     SCREENSHOT_CHANNELS.ENUMERATE_WINDOWS,
     async (event, request: unknown): Promise<EnumerateWindowsResponse> => {
       if (!validateMainRendererSender(event)) {
@@ -163,7 +163,7 @@ export function registerScreenshotHandlers(
     }
   )
 
-  ipcMain.handle(
+  registerHandle(
     SCREENSHOT_CHANNELS.CAPTURE,
     async (event, request: unknown): Promise<ScreenshotCaptureResponse> => {
       if (!validateMainRendererSender(event)) {

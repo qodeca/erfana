@@ -1,0 +1,1573 @@
+{
+  "$schema": "./routing.schema.json",
+  "$comment": "Which lane the leader dispatches for each kind of work. A lane is a runner plus a model. Read it through the route script, never by hand. Changed only through a pull request.",
+  "schemaVersion": 1,
+  "defaults": {
+    "source": "xezar-skills",
+    "version": 3
+  },
+  "leader": {
+    "tool": "claude",
+    "login": "default",
+    "rule": "The leader's own login runs no tasks and is never in a rotation."
+  },
+  "tools": {
+    "claude": {
+      "usesLogins": true,
+      "rotation": [
+        "qodeca",
+        "gmail",
+        "eqamana",
+        "westagilelabs"
+      ]
+    },
+    "codex": {
+      "usesLogins": true,
+      "rotation": [
+        "default",
+        "qodeca-2"
+      ]
+    },
+    "pi": {
+      "usesLogins": false
+    }
+  },
+  "lanes": {
+    "claude/opus": {
+      "tool": "claude",
+      "model": "opus",
+      "vendor": "anthropic",
+      "tier": "very-strong",
+      "vision": true,
+      "imageGeneration": false,
+      "local": false,
+      "enforcesToolLimits": true,
+      "advisoryOnly": false,
+      "engineModel": "opus[1m]",
+      "notes": [
+        "Opus 5.5 can end an unattended turn with a progress note and no result; when a run stops that way, send \"continue\" on the same thread before you count it as done."
+      ]
+    },
+    "claude/sonnet": {
+      "tool": "claude",
+      "model": "sonnet",
+      "vendor": "anthropic",
+      "tier": "mid",
+      "vision": true,
+      "imageGeneration": false,
+      "local": false,
+      "enforcesToolLimits": true,
+      "advisoryOnly": false
+    },
+    "claude/haiku": {
+      "tool": "claude",
+      "model": "haiku",
+      "vendor": "anthropic",
+      "tier": "cheap",
+      "vision": true,
+      "imageGeneration": false,
+      "local": false,
+      "enforcesToolLimits": true,
+      "advisoryOnly": false
+    },
+    "codex/gpt-6-astra": {
+      "tool": "codex",
+      "model": "gpt-6-astra",
+      "vendor": "openai",
+      "tier": "very-strong",
+      "vision": true,
+      "imageGeneration": true,
+      "local": false,
+      "enforcesToolLimits": true,
+      "advisoryOnly": false
+    },
+    "codex/gpt-6-sol": {
+      "tool": "codex",
+      "model": "gpt-6-sol",
+      "vendor": "openai",
+      "tier": "strong",
+      "vision": true,
+      "imageGeneration": true,
+      "local": false,
+      "enforcesToolLimits": false,
+      "advisoryOnly": false
+    },
+    "codex/gpt-6-luna": {
+      "tool": "codex",
+      "model": "gpt-6-luna",
+      "vendor": "openai",
+      "tier": "cheap",
+      "vision": true,
+      "imageGeneration": true,
+      "local": false,
+      "enforcesToolLimits": false,
+      "advisoryOnly": false
+    },
+    "codex/gpt-5.6-sol": {
+      "tool": "codex",
+      "model": "gpt-5.6-sol",
+      "vendor": "openai",
+      "tier": "strong",
+      "vision": true,
+      "imageGeneration": true,
+      "local": false,
+      "enforcesToolLimits": false,
+      "advisoryOnly": false
+    },
+    "codex/gpt-5.6-terra": {
+      "tool": "codex",
+      "model": "gpt-5.6-terra",
+      "vendor": "openai",
+      "tier": "mid",
+      "vision": true,
+      "imageGeneration": true,
+      "local": false,
+      "enforcesToolLimits": false,
+      "advisoryOnly": false,
+      "notes": [
+        "Give Terra explicit allowed actions, never conditions."
+      ]
+    },
+    "codex/gpt-5.6-luna": {
+      "tool": "codex",
+      "model": "gpt-5.6-luna",
+      "vendor": "openai",
+      "tier": "cheap",
+      "vision": true,
+      "imageGeneration": true,
+      "local": false,
+      "enforcesToolLimits": false,
+      "advisoryOnly": false
+    },
+    "pi/deepseek-api/deepseek-flash": {
+      "tool": "pi",
+      "model": "deepseek-api/deepseek-flash",
+      "vendor": "deepseek",
+      "tier": "cheap",
+      "vision": true,
+      "imageGeneration": false,
+      "local": false,
+      "enforcesToolLimits": false,
+      "advisoryOnly": false
+    },
+    "pi/dgx-spark/deepseek-v4-flash-vision": {
+      "tool": "pi",
+      "model": "dgx-spark/deepseek-v4-flash-vision",
+      "vendor": "deepseek",
+      "tier": "cheap",
+      "vision": true,
+      "imageGeneration": false,
+      "local": true,
+      "enforcesToolLimits": false,
+      "advisoryOnly": true
+    },
+    "pi/mac-m4/qwen38-flash-next-mlx-mixed-4-8bit": {
+      "tool": "pi",
+      "model": "mac-m4/qwen38-flash-next-mlx-mixed-4-8bit",
+      "vendor": "alibaba",
+      "tier": "cheap",
+      "vision": false,
+      "imageGeneration": false,
+      "local": true,
+      "enforcesToolLimits": false,
+      "advisoryOnly": true
+    },
+    "claude/claude-fable-5-1": {
+      "tool": "claude",
+      "model": "claude-fable-5-1",
+      "vendor": "anthropic",
+      "tier": "very-strong",
+      "vision": true,
+      "imageGeneration": false,
+      "local": false,
+      "enforcesToolLimits": true,
+      "advisoryOnly": false
+    }
+  },
+  "reservedLanes": {
+    "codex/gpt-6-astra": {
+      "escalation": true,
+      "rows": [
+        "generated-images",
+        "diagrams",
+        "security-review"
+      ]
+    },
+    "claude/claude-fable-5-1": {
+      "escalation": true,
+      "rows": []
+    }
+  },
+  "globalBans": [
+    {
+      "id": "no-self-review",
+      "checkedAt": "dispatch",
+      "rule": "A review, re-check or QA runs on a different model from the one that wrote the work."
+    },
+    {
+      "id": "local-never-writes",
+      "checkedAt": "file",
+      "rule": "A lane with local: true is in no row with writes: true."
+    },
+    {
+      "id": "pi-write-claude-review",
+      "checkedAt": "merge",
+      "rule": "What a pi lane wrote merges only after a review on a Claude lane."
+    },
+    {
+      "id": "high-risk-other-vendor",
+      "checkedAt": "dispatch",
+      "rule": "A risk-high change is reviewed by a different vendor from its author when a lane of one has budget, and never on the author's login."
+    },
+    {
+      "id": "tool-limits",
+      "checkedAt": "file",
+      "rule": "A lane with enforcesToolLimits: false is in no reading row (writes: false and not runsCode) and in no security-and-release row."
+    }
+  ],
+  "tieRule": "When two rows match, a row that narrows the other wins. Otherwise the lookAlike rule for the pair decides. When no rule decides, follow noMatch.",
+  "noMatch": {
+    "attended": "ask-owner",
+    "unattended": "park",
+    "rule": "When no row matches, ask the owner. When unattended, park the task in parked.md and dispatch nothing."
+  },
+  "lookAlikes": [
+    {
+      "rows": [
+        "scoped-recheck",
+        "review-response-one"
+      ],
+      "rule": "scoped-recheck judges whether a finding is fixed; review-response-one changes code to answer a verdict."
+    },
+    {
+      "rows": [
+        "conflict-repair",
+        "merge-chain"
+      ],
+      "rule": "A PR that conflicts with its base is conflict-repair until the resolution is pushed to its branch; landing it afterwards is merge-chain.",
+      "test": "A merge chain stopped on a conflict in two files hands that PR to conflict-repair, which pushes the resolution to the PR branch; merge-chain then lands it."
+    },
+    {
+      "rows": [
+        "generated-images",
+        "diagrams"
+      ],
+      "rule": "A picture that must be invented is generated-images; a figure that must be correct is diagrams."
+    },
+    {
+      "rows": [
+        "ux-design",
+        "ui-design",
+        "design-system"
+      ],
+      "rule": "ux-design decides how a surface is used and comes first; ui-design decides how it looks, on a landed flow; design-system changes what every design is built from. A new component inside a feature is two tasks: design-system, then ui-design."
+    },
+    {
+      "rows": [
+        "refactor",
+        "kit-refactor"
+      ],
+      "rule": "refactor restructures product code with no behaviour change; kit-refactor changes the pipeline's own tooling."
+    },
+    {
+      "rows": [
+        "evidence-pass",
+        "ui-tests",
+        "browser-qa"
+      ],
+      "rule": "ui-tests writes a suite that runs again tomorrow; browser-qa runs this change once and judges it; evidence-pass collects what already happened.",
+      "test": "\"Test the UI\" is browser-qa when it means this change, and ui-tests when it means from now on."
+    },
+    {
+      "rows": [
+        "design-review",
+        "browser-qa"
+      ],
+      "rule": "design-review judges a screen against the design; browser-qa judges whether the change works."
+    },
+    {
+      "rows": [
+        "ui-design",
+        "ui-implementation"
+      ],
+      "rule": "ui-design writes design files and no product code; ui-implementation writes the product code that matches them.",
+      "test": "\"Make it look right\" is ui-design when no design says what right is, and ui-implementation when one does."
+    },
+    {
+      "rows": [
+        "ui-implementation",
+        "localisation"
+      ],
+      "rule": "Changing what a screen says in its current language is ui-implementation; making text translatable or adding a listed language is localisation."
+    },
+    {
+      "rows": [
+        "browser-qa",
+        "acceptance-verification"
+      ],
+      "rule": "browser-qa asks whether the change works and broke nothing; acceptance-verification checks each accepted criterion of the issue."
+    },
+    {
+      "rows": [
+        "analysis-specs-research",
+        "architecture-decision",
+        "spike"
+      ],
+      "rule": "analysis plans one feature; architecture-decision binds the next ten; spike is for when nobody can decide yet, because nobody knows."
+    },
+    {
+      "rows": [
+        "release",
+        "deploy",
+        "rollback"
+      ],
+      "rule": "Each needs its own go from the owner; none implies another."
+    },
+    {
+      "rows": [
+        "diagnose-bug",
+        "bounded-bug-fix",
+        "hotfix"
+      ],
+      "rule": "bounded-bug-fix when the failing test and the file are known; diagnose-bug when the cause still has to be found; hotfix when people hit the fault right now.",
+      "test": "\"Fix this crash\" is diagnose-bug until someone can name the file and write a failing test."
+    },
+    {
+      "rows": [
+        "unit-tests",
+        "integration-tests",
+        "regression-suite"
+      ],
+      "rule": "unit-tests prove one part alone with fakes; integration-tests prove two real parts together; regression-suite curates the tests that pin past bugs.",
+      "test": "\"Add tests for the parser\" is unit-tests; \"test the parser against the real files on disk\" is integration-tests."
+    }
+  ],
+  "rows": [
+    {
+      "id": "tracker-only",
+      "title": "Tracker only: labels and comments from a file",
+      "workflows": [
+        "issue-triage.yaml"
+      ],
+      "class": "mechanical",
+      "writes": false,
+      "trigger": "The whole change is tracker state; no file in the repository changes.",
+      "lanes": [
+        "claude/sonnet"
+      ],
+      "never": [
+        {
+          "tier": "strong",
+          "why": "This work cannot justify the strongest lanes."
+        },
+        {
+          "tier": "very-strong",
+          "why": "This work cannot justify the strongest lanes."
+        }
+      ],
+      "notes": [
+        "pi lanes return to this row when the engine honours a bash allowlist on pi (qodeca/xezar#856).",
+        "Codex and pi lanes leave this row until their runner blocks writes in a reading step; the engine confines Codex and drops the pi shell."
+      ]
+    },
+    {
+      "id": "issue-filing",
+      "title": "Filing one new issue",
+      "workflows": [
+        "issue-filing.yaml"
+      ],
+      "class": "mechanical",
+      "writes": false,
+      "trigger": "A problem or a proposal has no issue yet, and a brief names what to file; nothing in the repository changes.",
+      "lanes": [
+        "claude/sonnet"
+      ],
+      "never": [
+        {
+          "tier": "strong",
+          "why": "This work cannot justify the strongest lanes."
+        },
+        {
+          "tier": "very-strong",
+          "why": "This work cannot justify the strongest lanes."
+        }
+      ]
+    },
+    {
+      "id": "record-recheck",
+      "title": "Re-check of one record against one comment",
+      "workflows": [
+        "issue-triage.yaml"
+      ],
+      "class": "mechanical",
+      "writes": false,
+      "trigger": "A single comment claims one record is wrong, and the check is reading two things and comparing them.",
+      "lanes": [
+        "claude/sonnet"
+      ],
+      "never": [
+        {
+          "tier": "strong",
+          "why": "This work cannot justify the strongest lanes."
+        },
+        {
+          "tier": "very-strong",
+          "why": "This work cannot justify the strongest lanes."
+        }
+      ],
+      "notes": [
+        "pi lanes return to this row when the engine honours a bash allowlist on pi (qodeca/xezar#856).",
+        "Codex and pi lanes leave this row until their runner blocks writes in a reading step; the engine confines Codex and drops the pi shell."
+      ]
+    },
+    {
+      "id": "evidence-pass",
+      "title": "Evidence pass: gate evidence, phase record, close-out audit",
+      "workflows": [
+        "testing-and-verification.yaml"
+      ],
+      "class": "mechanical",
+      "writes": true,
+      "trigger": "The work is collecting what already happened into a record; nothing new is decided.",
+      "lanes": [
+        "pi/deepseek-api/deepseek-flash",
+        "codex/gpt-6-luna",
+        "claude/sonnet"
+      ],
+      "never": [
+        {
+          "tier": "strong"
+        },
+        {
+          "tier": "very-strong"
+        }
+      ]
+    },
+    {
+      "id": "mechanical-docs",
+      "title": "Mechanical docs edits",
+      "workflows": [
+        "docs-maintenance.yaml"
+      ],
+      "class": "mechanical",
+      "writes": true,
+      "trigger": "Paths, counts, renames, link fixes: no sentence has to be composed.",
+      "lanes": [
+        "pi/deepseek-api/deepseek-flash",
+        "codex/gpt-6-luna",
+        "codex/gpt-5.6-terra",
+        "claude/sonnet"
+      ],
+      "never": [
+        {
+          "tier": "very-strong",
+          "why": "No sentence is composed, so the reserved lanes are waste."
+        }
+      ]
+    },
+    {
+      "id": "root-sync",
+      "title": "Root-sync (fast-forward only)",
+      "workflows": [
+        "root-sync.yaml"
+      ],
+      "class": "mechanical",
+      "writes": false,
+      "trigger": "The base branch moved and the checkout only has to catch up.",
+      "handledBy": "leader",
+      "lanes": [],
+      "notes": [
+        "The leader fast-forwards the checkout itself; no task is dispatched."
+      ]
+    },
+    {
+      "id": "docs-writing",
+      "title": "Docs PR with real writing",
+      "workflows": [
+        "docs-maintenance.yaml"
+      ],
+      "class": "writing",
+      "writes": true,
+      "trigger": "Someone has to decide what the paragraph says, not just where it points.",
+      "lanes": [
+        "codex/gpt-5.6-terra",
+        "codex/gpt-6-sol",
+        "claude/opus",
+        "pi/deepseek-api/deepseek-flash"
+      ],
+      "notes": [
+        "Sonnet is left out: it slipped twice on docs writing.",
+        "A pi write opens a draft PR that needs a full Claude review."
+      ]
+    },
+    {
+      "id": "analysis-specs-research",
+      "title": "Analysis, specs, research",
+      "workflows": [
+        "research.yaml",
+        "plan-and-spec.yaml"
+      ],
+      "class": "writing",
+      "writes": true,
+      "trigger": "The output is a judgement or a design, and the work is larger than one file.",
+      "lanes": [
+        "claude/opus",
+        "codex/gpt-6-sol"
+      ],
+      "never": [
+        {
+          "tier": "cheap"
+        },
+        {
+          "lane": "codex/gpt-6-luna",
+          "why": "owner's preference"
+        }
+      ],
+      "secondOpinion": {
+        "lanes": [
+          "pi/deepseek-api/deepseek-flash"
+        ],
+        "when": "always"
+      },
+      "notes": [
+        "Work larger than one sitting may escalate to codex/gpt-6-astra."
+      ]
+    },
+    {
+      "id": "business-analysis",
+      "title": "Business analysis",
+      "workflows": [
+        "business-analysis.yaml"
+      ],
+      "class": "writing",
+      "writes": false,
+      "trigger": "The question is about what to build or why, not how.",
+      "lanes": [
+        "claude/opus"
+      ],
+      "never": [
+        {
+          "tier": "cheap"
+        }
+      ],
+      "notes": [
+        "Codex and pi lanes leave this row until their runner blocks writes in a reading step; the engine confines Codex and drops the pi shell."
+      ]
+    },
+    {
+      "id": "architecture-decision",
+      "title": "Architecture decision: something that outlives a feature",
+      "workflows": [
+        "architecture.yaml"
+      ],
+      "class": "writing",
+      "writes": true,
+      "trigger": "The question is how the system is cut, what owns what, or a quality the whole must hold, and the answer will bind work beyond this one feature.",
+      "lanes": [
+        "claude/opus",
+        "codex/gpt-6-sol"
+      ],
+      "never": [
+        {
+          "tier": "cheap"
+        }
+      ],
+      "notes": [
+        "May escalate to codex/gpt-6-astra."
+      ]
+    },
+    {
+      "id": "spike",
+      "title": "Spike: one open technical question, answered by trying",
+      "workflows": [
+        "spike.yaml"
+      ],
+      "class": "writing",
+      "writes": true,
+      "trigger": "Somebody cannot decide until they know whether something is possible, how hard it is or how it behaves, and the way to find out is to try it.",
+      "lanes": [
+        "claude/opus",
+        "codex/gpt-6-sol"
+      ],
+      "never": [
+        {
+          "tier": "cheap"
+        }
+      ]
+    },
+    {
+      "id": "deprecation-plan",
+      "title": "Deprecation plan",
+      "workflows": [
+        "deprecation-plan.yaml"
+      ],
+      "class": "writing",
+      "writes": true,
+      "trigger": "Something people depend on has to be retired, and nothing may be removed until who is affected, the replacement and the dates are written down.",
+      "lanes": [
+        "claude/opus",
+        "codex/gpt-6-sol"
+      ],
+      "never": [
+        {
+          "tier": "cheap"
+        }
+      ]
+    },
+    {
+      "id": "ux-design",
+      "title": "UX / UI design: a surface proposed, with every state",
+      "workflows": [
+        "design.yaml"
+      ],
+      "class": "design",
+      "writes": true,
+      "trigger": "A surface has to be designed before anything is implemented: the flow, what is seen first, every state.",
+      "lanes": [
+        "claude/opus",
+        "codex/gpt-6-sol"
+      ],
+      "never": [
+        {
+          "vision": false
+        },
+        {
+          "local": true
+        },
+        {
+          "lane": "pi/deepseek-api/deepseek-flash",
+          "why": "owner's preference"
+        }
+      ]
+    },
+    {
+      "id": "design-review",
+      "title": "Design review: judging screens and pictures",
+      "workflows": [
+        "design-review.yaml"
+      ],
+      "class": "design",
+      "writes": false,
+      "runsCode": true,
+      "trigger": "The verdict depends on looking at a rendered screen or a mockup.",
+      "lanes": [
+        "claude/opus",
+        "codex/gpt-6-sol"
+      ],
+      "never": [
+        {
+          "vision": false
+        },
+        {
+          "local": true
+        },
+        {
+          "lane": "codex/gpt-6-luna",
+          "why": "owner's preference"
+        },
+        {
+          "lane": "pi/deepseek-api/deepseek-flash",
+          "why": "owner's preference"
+        }
+      ],
+      "neverAuthor": true
+    },
+    {
+      "id": "design-system",
+      "title": "Design system: created, extended or corrected",
+      "workflows": [
+        "design-system.yaml"
+      ],
+      "class": "design",
+      "writes": true,
+      "trigger": "The change is to what every design is built from (a token, a component, a page of the system), not to one feature.",
+      "lanes": [
+        "claude/opus",
+        "codex/gpt-6-sol"
+      ],
+      "never": [
+        {
+          "vision": false
+        },
+        {
+          "local": true
+        },
+        {
+          "lane": "pi/deepseek-api/deepseek-flash",
+          "why": "owner's preference"
+        }
+      ]
+    },
+    {
+      "id": "ui-design",
+      "title": "UI design: the visual layer of a designed surface",
+      "workflows": [
+        "ui-design.yaml"
+      ],
+      "class": "design",
+      "writes": true,
+      "trigger": "The flow has already landed and the surface now needs its look: components, tokens, layout, every state in both themes.",
+      "lanes": [
+        "claude/opus",
+        "codex/gpt-6-sol"
+      ],
+      "never": [
+        {
+          "vision": false
+        },
+        {
+          "local": true
+        },
+        {
+          "lane": "pi/deepseek-api/deepseek-flash",
+          "why": "owner's preference"
+        }
+      ]
+    },
+    {
+      "id": "generated-images",
+      "title": "Generated images, illustrations and icons",
+      "workflows": [
+        "visual-asset.yaml"
+      ],
+      "class": "visuals",
+      "writes": true,
+      "trigger": "Documentation or a design needs a picture that does not exist yet and has to be invented. A deterministic screenshot capture is tooling, not this row.",
+      "lanes": [
+        "codex/gpt-6-astra"
+      ],
+      "never": [
+        {
+          "imageGeneration": false,
+          "why": "The picture has to be invented."
+        },
+        {
+          "tier": "strong",
+          "why": "Astra alone draws invented pictures; owner's preference."
+        },
+        {
+          "tier": "mid",
+          "why": "Astra alone draws invented pictures; owner's preference."
+        },
+        {
+          "tier": "cheap",
+          "why": "Astra alone draws invented pictures; owner's preference."
+        }
+      ]
+    },
+    {
+      "id": "diagrams",
+      "title": "Diagrams and charts",
+      "workflows": [
+        "visual-asset.yaml"
+      ],
+      "class": "visuals",
+      "writes": true,
+      "trigger": "Structure or data has to be drawn (an architecture diagram, a sequence, a chart from real numbers), usually as text such as Mermaid, SVG or a plotting script, and the figure has to be correct before it is handsome.",
+      "lanes": [
+        "codex/gpt-6-astra",
+        "codex/gpt-6-sol",
+        "claude/opus",
+        "codex/gpt-5.6-terra",
+        "claude/sonnet"
+      ],
+      "never": [
+        {
+          "local": true
+        }
+      ],
+      "notes": [
+        "Never a lane that cannot read the data it is charting."
+      ]
+    },
+    {
+      "id": "bounded-bug-fix",
+      "title": "Bounded bug fix: one file, tests named",
+      "workflows": [
+        "bug-fix.yaml"
+      ],
+      "class": "implementation",
+      "writes": true,
+      "trigger": "The failing test and the file are both already known.",
+      "lanes": [
+        "pi/deepseek-api/deepseek-flash",
+        "codex/gpt-5.6-terra",
+        "codex/gpt-6-sol",
+        "claude/sonnet"
+      ],
+      "never": [
+        {
+          "local": true
+        }
+      ],
+      "notes": [
+        "A test-only fix may go to codex/gpt-6-luna.",
+        "A pi write opens a draft PR that needs a full Claude review."
+      ]
+    },
+    {
+      "id": "diagnose-bug",
+      "title": "Bug fix whose cause is not known yet",
+      "workflows": [
+        "bug-fix.yaml"
+      ],
+      "class": "implementation",
+      "writes": true,
+      "trigger": "Something is broken and nobody can yet name the file or write the failing test: the cause has to be found and proved before it is fixed.",
+      "lanes": [
+        "claude/opus",
+        "codex/gpt-6-sol",
+        "claude/sonnet"
+      ],
+      "never": [
+        {
+          "local": true
+        },
+        {
+          "tier": "cheap",
+          "why": "cheap models have stopped after the diagnosis and fixed nothing"
+        }
+      ],
+      "notes": [
+        "Once the cause is named and a failing test exists, a follow-up is bounded-bug-fix."
+      ]
+    },
+    {
+      "id": "multi-file-implementation",
+      "title": "Multi-file implementation, not UI",
+      "workflows": [
+        "feature-implementation.yaml"
+      ],
+      "class": "implementation",
+      "writes": true,
+      "trigger": "The change spans files and the design is settled.",
+      "lanes": [
+        "claude/opus",
+        "codex/gpt-6-sol",
+        "pi/deepseek-api/deepseek-flash"
+      ],
+      "never": [
+        {
+          "local": true
+        }
+      ],
+      "notes": [
+        "Never codex/gpt-5.6-terra alone with no review.",
+        "A pi write opens a draft PR with a red proof and needs a full Claude review."
+      ]
+    },
+    {
+      "id": "ui-implementation",
+      "title": "UI implementation",
+      "workflows": [
+        "feature-implementation.yaml"
+      ],
+      "class": "implementation",
+      "writes": true,
+      "trigger": "The change alters what a person sees on a screen.",
+      "lanes": [
+        "claude/opus",
+        "codex/gpt-6-sol"
+      ],
+      "never": [
+        {
+          "vision": false
+        },
+        {
+          "local": true
+        },
+        {
+          "lane": "codex/gpt-6-luna",
+          "why": "owner's preference"
+        },
+        {
+          "lane": "pi/deepseek-api/deepseek-flash",
+          "why": "owner's preference"
+        }
+      ]
+    },
+    {
+      "id": "kit-refactor",
+      "title": "Kit / checks refactor",
+      "workflows": [
+        "feature-implementation.yaml"
+      ],
+      "class": "implementation",
+      "writes": true,
+      "trigger": "The change is to the pipeline's own tooling rather than the product.",
+      "lanes": [
+        "claude/opus",
+        "codex/gpt-6-sol"
+      ],
+      "never": [
+        {
+          "local": true
+        }
+      ]
+    },
+    {
+      "id": "conflict-repair",
+      "title": "Conflict repair",
+      "workflows": [
+        "address-review-findings.yaml"
+      ],
+      "class": "implementation",
+      "writes": true,
+      "trigger": "A PR conflicts with its base and the resolution needs judgement. The fix is pushed to the PR branch; merging stays with merge-chain.",
+      "lanes": [
+        "codex/gpt-5.6-terra",
+        "codex/gpt-6-sol",
+        "claude/sonnet",
+        "pi/deepseek-api/deepseek-flash",
+        "claude/opus"
+      ],
+      "never": [
+        {
+          "local": true
+        },
+        {
+          "lane": "codex/gpt-6-astra",
+          "why": "owner's preference"
+        }
+      ],
+      "notes": [
+        "A conflict in UI files goes to claude/opus first, and never to a pi lane."
+      ]
+    },
+    {
+      "id": "merge-chain",
+      "title": "Merge chain (integration)",
+      "workflows": [
+        "integration.yaml"
+      ],
+      "class": "implementation",
+      "writes": true,
+      "trigger": "Several approved PRs must land in order.",
+      "lanes": [
+        "pi/deepseek-api/deepseek-flash",
+        "codex/gpt-5.6-terra",
+        "codex/gpt-6-sol",
+        "claude/sonnet",
+        "claude/haiku"
+      ],
+      "never": [
+        {
+          "local": true
+        },
+        {
+          "lane": "codex/gpt-6-astra",
+          "why": "owner's preference"
+        },
+        {
+          "lane": "claude/opus",
+          "why": "owner's preference"
+        }
+      ],
+      "notes": [
+        "Give codex/gpt-5.6-terra explicit allowed actions, never conditions."
+      ]
+    },
+    {
+      "id": "dependency-maintenance",
+      "title": "Dependency maintenance",
+      "workflows": [
+        "dependency-maintenance.yaml"
+      ],
+      "class": "implementation",
+      "writes": true,
+      "trigger": "A dependency bump, with the gate as the judge.",
+      "lanes": [
+        "pi/deepseek-api/deepseek-flash",
+        "codex/gpt-5.6-terra",
+        "claude/sonnet"
+      ],
+      "never": [
+        {
+          "local": true
+        }
+      ]
+    },
+    {
+      "id": "hotfix",
+      "title": "Hotfix: a live fault, the narrowest fix now",
+      "workflows": [
+        "hotfix.yaml"
+      ],
+      "class": "implementation",
+      "writes": true,
+      "trigger": "People are hitting the fault right now, and waiting for the full fix costs more than shipping a narrow one and following up.",
+      "narrows": "bounded-bug-fix",
+      "lanes": [
+        "claude/opus",
+        "codex/gpt-6-sol",
+        "codex/gpt-5.6-terra",
+        "claude/sonnet"
+      ],
+      "never": [
+        {
+          "local": true
+        }
+      ]
+    },
+    {
+      "id": "refactor",
+      "title": "Refactor: structure changes, behaviour does not",
+      "workflows": [
+        "refactor.yaml"
+      ],
+      "class": "implementation",
+      "writes": true,
+      "trigger": "The product's code has to be restructured and nothing a user or a caller can observe may change.",
+      "lanes": [
+        "claude/opus",
+        "codex/gpt-6-sol"
+      ],
+      "never": [
+        {
+          "local": true
+        }
+      ],
+      "notes": [
+        "Never a single mid lane with no review."
+      ]
+    },
+    {
+      "id": "migration",
+      "title": "Migration: data, a schema or a format changes shape",
+      "workflows": [
+        "migration.yaml"
+      ],
+      "class": "implementation",
+      "writes": true,
+      "trigger": "Something that already exists outside the code (rows, files, a config people wrote by hand) has to move to a new shape.",
+      "lanes": [
+        "claude/opus",
+        "codex/gpt-6-sol"
+      ],
+      "never": [
+        {
+          "local": true
+        },
+        {
+          "tier": "cheap"
+        }
+      ]
+    },
+    {
+      "id": "observability",
+      "title": "Observability: logs, metrics, alerts, runbooks",
+      "workflows": [
+        "observability.yaml"
+      ],
+      "class": "implementation",
+      "writes": true,
+      "trigger": "People cannot tell what a part of the system is doing, and the change adds signals and changes no behaviour.",
+      "lanes": [
+        "codex/gpt-5.6-terra",
+        "codex/gpt-6-sol",
+        "claude/sonnet",
+        "claude/opus"
+      ],
+      "never": [
+        {
+          "local": true
+        }
+      ]
+    },
+    {
+      "id": "localisation",
+      "title": "Localisation: translatable text, a listed locale",
+      "workflows": [
+        "localisation.yaml"
+      ],
+      "class": "implementation",
+      "writes": true,
+      "trigger": "Text has to become translatable, or a language the owner has listed has to be added or brought up to date.",
+      "lanes": [
+        "codex/gpt-5.6-terra",
+        "codex/gpt-6-sol",
+        "claude/sonnet"
+      ],
+      "never": [
+        {
+          "vision": false
+        },
+        {
+          "local": true
+        },
+        {
+          "lane": "pi/deepseek-api/deepseek-flash",
+          "why": "owner's preference"
+        }
+      ]
+    },
+    {
+      "id": "ui-tests",
+      "title": "Automated UI tests: built or maintained",
+      "workflows": [
+        "ui-tests.yaml"
+      ],
+      "class": "testing",
+      "writes": true,
+      "trigger": "A user-visible behaviour has to be protected by a test that drives the real interface in a browser, again and again, with nobody watching.",
+      "lanes": [
+        "claude/opus",
+        "codex/gpt-6-sol",
+        "claude/sonnet"
+      ],
+      "never": [
+        {
+          "vision": false
+        },
+        {
+          "local": true
+        },
+        {
+          "lane": "pi/deepseek-api/deepseek-flash",
+          "why": "owner's preference"
+        }
+      ]
+    },
+    {
+      "id": "unit-tests",
+      "title": "Unit tests for one part on its own",
+      "workflows": [
+        "feature-implementation.yaml"
+      ],
+      "class": "testing",
+      "writes": true,
+      "trigger": "The job is tests for one function, module or class with its collaborators faked, and no product behaviour changes.",
+      "lanes": [
+        "codex/gpt-5.6-terra",
+        "pi/deepseek-api/deepseek-flash",
+        "codex/gpt-6-sol",
+        "claude/sonnet"
+      ],
+      "never": [
+        {
+          "local": true
+        }
+      ],
+      "notes": [
+        "A pi write opens a draft PR that needs a full Claude review."
+      ]
+    },
+    {
+      "id": "integration-tests",
+      "title": "Integration tests: two real parts across a boundary",
+      "workflows": [
+        "integration-tests.yaml"
+      ],
+      "class": "testing",
+      "writes": true,
+      "trigger": "The thing to prove is that two parts work together (a handler and its database, a client and an API, a command and the file system), not that one part works alone.",
+      "lanes": [
+        "claude/opus",
+        "codex/gpt-6-sol",
+        "codex/gpt-5.6-terra",
+        "claude/sonnet"
+      ],
+      "never": [
+        {
+          "local": true
+        }
+      ]
+    },
+    {
+      "id": "regression-suite",
+      "title": "Regression suite: curated",
+      "workflows": [
+        "regression-suite.yaml"
+      ],
+      "class": "testing",
+      "writes": true,
+      "trigger": "The job is the suite that pins past bugs: fixes with no test that fails without them, tests that guard nothing, or a test to retire.",
+      "lanes": [
+        "claude/opus",
+        "codex/gpt-6-sol"
+      ],
+      "never": [
+        {
+          "tier": "cheap"
+        }
+      ]
+    },
+    {
+      "id": "performance",
+      "title": "Performance and load: measured against a budget",
+      "workflows": [
+        "performance.yaml"
+      ],
+      "class": "testing",
+      "writes": true,
+      "trigger": "The question is whether something is fast enough, and the owner has stated the budget it answers to.",
+      "lanes": [
+        "claude/opus",
+        "codex/gpt-6-sol"
+      ],
+      "never": [
+        {
+          "local": true
+        }
+      ],
+      "notes": [
+        "Never on a shared or noisy machine. A load claim is verified only by running two specs in one suite invocation, never by a synthetic busy loop."
+      ]
+    },
+    {
+      "id": "scoped-recheck",
+      "title": "Scoped code re-check",
+      "workflows": [
+        "code-review.yaml"
+      ],
+      "class": "review",
+      "writes": false,
+      "trigger": "One earlier finding is being re-checked, not the whole diff.",
+      "lanes": [
+        "claude/sonnet",
+        "claude/opus"
+      ],
+      "never": [
+        {
+          "lane": "claude/haiku",
+          "why": "owner's preference"
+        },
+        {
+          "lane": "codex/gpt-6-luna",
+          "why": "owner's preference"
+        }
+      ],
+      "neverAuthor": true,
+      "notes": [
+        "pi lanes return to this row when the engine honours a bash allowlist on pi (qodeca/xezar#856).",
+        "Codex and pi lanes leave this row until their runner blocks writes in a reading step; the engine confines Codex and drops the pi shell."
+      ]
+    },
+    {
+      "id": "full-cold-review",
+      "title": "Full cold code review",
+      "workflows": [
+        "code-review.yaml"
+      ],
+      "class": "review",
+      "writes": false,
+      "trigger": "The reviewer opens the diff with no prior context.",
+      "lanes": [
+        "claude/opus",
+        "claude/sonnet"
+      ],
+      "never": [
+        {
+          "tier": "cheap"
+        },
+        {
+          "local": true
+        }
+      ],
+      "neverAuthor": true,
+      "notes": [
+        "A very large diff may escalate to codex/gpt-6-astra.",
+        "Sonnet is never the only reviewer of risk-high work.",
+        "A pi second opinion returns when the engine honours a bash allowlist on pi (qodeca/xezar#856).",
+        "Codex and pi lanes leave this row until their runner blocks writes in a reading step; the engine confines Codex and drops the pi shell."
+      ]
+    },
+    {
+      "id": "review-response-one",
+      "title": "Review response, one verdict",
+      "workflows": [
+        "address-review-findings.yaml"
+      ],
+      "class": "review",
+      "writes": true,
+      "trigger": "One verdict has to be answered or fixed.",
+      "lanes": [
+        "pi/deepseek-api/deepseek-flash",
+        "codex/gpt-6-sol",
+        "codex/gpt-5.6-terra",
+        "claude/sonnet"
+      ],
+      "never": [
+        {
+          "local": true
+        }
+      ],
+      "notes": [
+        "A docs-only response goes to codex/gpt-5.6-terra first."
+      ]
+    },
+    {
+      "id": "review-response-several",
+      "title": "Review response folding several verdicts",
+      "workflows": [
+        "address-review-findings.yaml"
+      ],
+      "class": "review",
+      "writes": true,
+      "trigger": "Several verdicts disagree, or they interact.",
+      "lanes": [
+        "claude/opus",
+        "codex/gpt-6-sol"
+      ],
+      "never": [
+        {
+          "tier": "cheap"
+        },
+        {
+          "local": true
+        },
+        {
+          "lane": "codex/gpt-5.6-terra",
+          "why": "owner's preference"
+        }
+      ]
+    },
+    {
+      "id": "browser-qa",
+      "title": "Browser / manual QA",
+      "workflows": [
+        "qa.yaml"
+      ],
+      "class": "review",
+      "writes": false,
+      "runsCode": true,
+      "trigger": "The check needs a live multi-step run in a browser.",
+      "lanes": [
+        "claude/sonnet",
+        "codex/gpt-5.6-terra"
+      ],
+      "never": [
+        {
+          "vision": false
+        },
+        {
+          "local": true
+        }
+      ],
+      "neverAuthor": true,
+      "notes": [
+        "A live multi-step harness may escalate to codex/gpt-6-astra."
+      ]
+    },
+    {
+      "id": "architecture-review",
+      "title": "Architecture review",
+      "workflows": [
+        "architecture-review.yaml"
+      ],
+      "class": "review",
+      "writes": false,
+      "trigger": "A plan, a spec or a diff has to be judged against the recorded architecture decisions.",
+      "lanes": [
+        "claude/opus"
+      ],
+      "never": [
+        {
+          "tier": "cheap"
+        }
+      ],
+      "neverAuthor": true,
+      "notes": [
+        "Codex and pi lanes leave this row until their runner blocks writes in a reading step; the engine confines Codex and drops the pi shell."
+      ]
+    },
+    {
+      "id": "acceptance-verification",
+      "title": "Acceptance verification",
+      "workflows": [
+        "acceptance-verification.yaml"
+      ],
+      "class": "review",
+      "writes": false,
+      "runsCode": true,
+      "trigger": "A finished change has to be checked against each accepted criterion of its issue, one by one, by running it.",
+      "lanes": [
+        "claude/opus",
+        "codex/gpt-6-sol",
+        "codex/gpt-5.6-terra",
+        "claude/sonnet"
+      ],
+      "never": [
+        {
+          "tier": "cheap"
+        }
+      ],
+      "neverAuthor": true
+    },
+    {
+      "id": "security-review",
+      "title": "Security-sensitive review",
+      "workflows": [
+        "security-review.yaml"
+      ],
+      "class": "security-and-release",
+      "writes": false,
+      "trigger": "The diff touches auth, secrets, permissions, anything reachable from outside, or what the pipeline trusts: a deploy target, the base branch, CI, .xezar/workflows, checks, docs or skills, .xezar/routing*.json or loops.json, .claude/settings*.json, .codex/, .mcp.json or .xezar/pipeline/config.json.",
+      "lanes": [
+        "claude/opus",
+        "codex/gpt-6-astra"
+      ],
+      "never": [
+        {
+          "local": true
+        },
+        {
+          "advisoryOnly": true
+        },
+        {
+          "tool": "pi",
+          "why": "owner's preference"
+        },
+        {
+          "lane": "codex/gpt-5.6-terra",
+          "why": "owner's preference"
+        },
+        {
+          "lane": "codex/gpt-6-luna",
+          "why": "owner's preference"
+        },
+        {
+          "tier": "cheap",
+          "why": "Security and release work is never given to a cheap lane."
+        }
+      ],
+      "neverAuthor": true,
+      "alsoDispatch": [
+        "full-cold-review"
+      ],
+      "notes": [
+        "Anthropic re-routes most cyber-security work on Opus 5.5 to an older Opus; when the run reports a re-route or a refusal, re-dispatch the same brief on codex/gpt-6-astra.",
+        "pi lanes leave this row until their runner's read-only lock is proven live; codex/gpt-6-astra is the one Codex lane here."
+      ]
+    },
+    {
+      "id": "verify-strong-claim",
+      "title": "Verifying a strong claim from a weaker lane",
+      "workflows": [
+        "code-review.yaml"
+      ],
+      "class": "security-and-release",
+      "writes": false,
+      "trigger": "A cheaper lane reported something serious (a Major or a Blocker) and nothing has confirmed it.",
+      "narrows": "full-cold-review",
+      "lanes": [
+        "claude/opus"
+      ],
+      "never": [
+        {
+          "tool": "pi",
+          "why": "owner's preference"
+        },
+        {
+          "tier": "cheap",
+          "why": "Security and release work is never given to a cheap lane."
+        },
+        {
+          "local": true,
+          "why": "A local lane never judges or ships security and release work."
+        },
+        {
+          "advisoryOnly": true,
+          "why": "An advisory-only lane cannot give a verdict."
+        }
+      ],
+      "neverAuthor": true,
+      "neverClaimant": true,
+      "notes": [
+        "A merge-blocking claim is re-proven on the base branch with a throwaway test.",
+        "Codex and pi lanes leave this row until their runner blocks writes in a reading step; the engine confines Codex and drops the pi shell."
+      ]
+    },
+    {
+      "id": "release",
+      "title": "Release role",
+      "workflows": [
+        "release.yaml",
+        "release-prep.yaml"
+      ],
+      "class": "security-and-release",
+      "writes": true,
+      "trigger": "The owner gave the release go, quoting the commit.",
+      "lanes": [
+        "claude/sonnet"
+      ],
+      "never": [
+        {
+          "local": true
+        },
+        {
+          "tier": "cheap",
+          "why": "Security and release work is never given to a cheap lane."
+        },
+        {
+          "advisoryOnly": true,
+          "why": "An advisory-only lane cannot give a verdict."
+        }
+      ],
+      "neverAuthor": true,
+      "notes": [
+        "Starts only on the owner's word, quoting the commit.",
+        "Security, design and Major-claim verdicts inside a release still go to their own rows.",
+        "Codex and pi lanes leave this row until their runner blocks writes in a reading step; the engine confines Codex and drops the pi shell."
+      ]
+    },
+    {
+      "id": "deploy",
+      "title": "Deploy: a sealed commit to a named environment",
+      "workflows": [
+        "deploy.yaml"
+      ],
+      "class": "security-and-release",
+      "writes": true,
+      "trigger": "The owner gave the go to deploy, naming the environment and quoting the full commit SHA. The leader copies those words into the launch text.",
+      "lanes": [
+        "claude/opus"
+      ],
+      "never": [
+        {
+          "local": true
+        },
+        {
+          "advisoryOnly": true
+        },
+        {
+          "tier": "cheap",
+          "why": "Security and release work is never given to a cheap lane."
+        }
+      ],
+      "neverAuthor": true,
+      "notes": [
+        "Codex and pi lanes leave this row until their runner blocks writes in a reading step; the engine confines Codex and drops the pi shell."
+      ]
+    },
+    {
+      "id": "rollback",
+      "title": "Rollback: a named environment back to a named revision",
+      "workflows": [
+        "deploy.yaml"
+      ],
+      "class": "security-and-release",
+      "writes": true,
+      "trigger": "The owner gave the go to roll back, naming the environment and the full SHA to return to, and, in their own words, any one-way migration they accept crossing. The leader copies those words into the launch text.",
+      "lanes": [
+        "claude/opus"
+      ],
+      "never": [
+        {
+          "local": true
+        },
+        {
+          "advisoryOnly": true
+        },
+        {
+          "tier": "cheap",
+          "why": "Security and release work is never given to a cheap lane."
+        }
+      ],
+      "neverAuthor": true,
+      "notes": [
+        "Codex and pi lanes leave this row until their runner blocks writes in a reading step; the engine confines Codex and drops the pi shell."
+      ]
+    }
+  ]
+}

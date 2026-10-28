@@ -75,7 +75,7 @@
 .view-mode-btn.active {
   background-color: var(--color-btn-primary-bg);
   border-color: var(--color-btn-primary-bg);
-  color: var(--color-white);
+  color: var(--color-btn-primary-text);
 }
 
 .toolbar-separator {
@@ -92,7 +92,7 @@
   padding: var(--space-3) var(--space-6);
   background-color: var(--color-btn-primary-bg);
   border: none;
-  color: var(--color-white);
+  color: var(--color-btn-primary-text);
   cursor: pointer;
   border-radius: 0;
   font-size: var(--text-base);
@@ -154,7 +154,7 @@
 .markdown-toolbar .view-mode-btn.active {
   background-color: var(--color-btn-primary-bg);
   border-color: var(--color-btn-primary-bg);
-  color: var(--color-white);
+  color: var(--color-btn-primary-text);
 }
 
 .toolbar-btn {
@@ -263,7 +263,7 @@
 
 .editor-empty .hint {
   font-size: var(--text-sm);
-  color: var(--color-text-muted);
+  color: var(--color-text-tertiary);
 }
 
 .document-stats {

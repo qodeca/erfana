@@ -8,16 +8,19 @@
  * the same split the image viewer uses (`imageViewer.logic.ts`). No React, no
  * `window.api`, no store.
  *
- * The four decisions this module owns:
+ * The five decisions this module owns:
  * - {@link deriveBounds} — placeholder rect → the `PreviewBounds` pushed to main.
  * - {@link selectPanelView} — limit-reached vs failed vs normal top-level state.
  * - {@link selectFallback} — still-frame `<img>` vs placeholder colour.
  * - {@link summarizeFailures} — failure list → badge count + grouped popover data.
+ * - {@link previewPlaceholderLabel} — the placeholder's accessible name, which
+ *   states the keyboard way into the page and back out of it (QG-8 U1).
  *
  * @module htmlPreview.logic
  * @see Issue #74 - HTML preview with CSS and JavaScript execution
  */
 
+import { PREVIEW } from '../../../../../shared/constants'
 import type { PreviewFailure } from '../../../../../shared/ipc/preview-schema'
 import type { PreviewBounds, PreviewFailureType } from '../../../../../shared/ipc/preview-types'
 import type { PreviewLoadState } from '../../../stores/usePreviewStore'
@@ -153,9 +156,13 @@ export interface SelectFallbackInput {
  * The still frame is only meaningful while the native view is hidden — when the
  * view is visible it paints over the placeholder, so the fallback stays behind
  * it and the placeholder colour is enough. When hidden with no cached frame the
- * placeholder colour (`var(--color-brand-black)`, matching main's
- * `setBackgroundColor('#FF161312')`) is shown — never a blank rectangle
- * (design §1.4).
+ * placeholder's backdrop is shown — never a blank rectangle (design §1.4).
+ *
+ * That backdrop is no longer one fixed colour. It tracks the native view's own
+ * backdrop: brand black before the page has painted, and the page's resolved
+ * paper colour afterwards, pushed over `preview:backdropChanged`. The two
+ * always agree, which is what keeps the seam invisible
+ * (`src/main/services/preview/previewBackdrop.ts`).
  *
  * @param input - Whether a frame is cached and whether the view is hidden.
  * @returns `'frame'` to show the cached `<img>`, else `'placeholder'`.
@@ -178,6 +185,7 @@ export function selectFallback(input: SelectFallbackInput): PreviewFallbackKind 
 /** Human-readable labels for each failure type, shown in the popover. */
 export const FAILURE_TYPE_LABELS: Readonly<Record<PreviewFailureType, string>> = {
   'blocked-host': 'Blocked host',
+  'blocked-link': 'Blocked link',
   'insecure-scheme': 'Insecure scheme',
   'missing-local-file': 'Missing local file',
   'path-escape': 'Path escaped the project',
@@ -191,7 +199,14 @@ export const FAILURE_TYPE_LABELS: Readonly<Record<PreviewFailureType, string>> =
   'render-crash': 'Preview crashed',
   'unresolved-specifier': 'Unresolved import',
   'allowlist-invalid': 'Invalid allowlist host',
-  'allowlist-unsupported-version': 'Unsupported allowlist version'
+  'allowlist-unsupported-version': 'Unsupported allowlist version',
+  // Frame refusals (issue #124, part 2 §2.12)
+  'frame-remote': 'Blocked remote frame',
+  'frame-escape': 'Frame escaped the project',
+  'frame-excluded': 'Excluded frame',
+  'frame-too-deep': 'Frame nested too deep',
+  'frame-over-limit': 'Too many frames',
+  'frame-link-blocked': 'Blocked link in frame'
 }
 
 /** One grouped bucket of failures sharing a type, in first-seen order. */
@@ -260,4 +275,65 @@ export function summarizeFailures(failures: readonly PreviewFailure[]): FailureS
     groups: Array.from(groupsByType.values()),
     blockedHosts
   }
+}
+
+/**
+ * The placeholder's accessible name (issue #124, QG-8 U1).
+ *
+ * While the page cannot be entered this is what it always was – the panel's
+ * identity, and the prefix the e2e locators find a preview by. While it CAN be
+ * entered the name also carries the way in and the way back out, because the
+ * name is the only place a keyboard reader is told either: the target is a
+ * region the native view paints over, with no visible words of its own (WCAG SC
+ * 2.1.1, with SC 2.1.2's stated exit – the same exit the band chip names).
+ *
+ * @param pageName - The page's file name, or `page` when there is none.
+ * @param enterable - Whether the placeholder is a keyboard target right now.
+ * @returns The `aria-label` for the placeholder.
+ */
+export function previewPlaceholderLabel(pageName: string, enterable: boolean): string {
+  const identity = `HTML preview of ${pageName}`
+  return enterable
+    ? `${identity} – press Enter to enter the page, Escape to come back`
+    : identity
+}
+
+/**
+ * How long the previewed page gets to prove it repainted below newly revealed
+ * chrome, in milliseconds.
+ *
+ * Measured on Electron 39 and recorded in `PreviewSetBoundsSchema`: ~17 ms for
+ * an idle page, ~130 ms for a heavy one, and NEVER for a page that refuses to
+ * yield. 300 clears the heavy case with room to spare while staying short enough
+ * that a stuck page does not leave the reader looking at nothing for long.
+ */
+export const PREVIEW_BOUNDS_ACK_TIMEOUT_MS = PREVIEW.BOUNDS_ACK_TIMEOUT_MS
+
+/**
+ * Below this panel height, the page and an open host list cannot share the space.
+ *
+ * A 64px sliver of page is not a preview, and splitting the panel anyway would
+ * put the list's buttons within a few pixels of an untrusted page's edge.
+ */
+export const PREVIEW_MIN_SPLIT_HEIGHT_PX = 320
+
+/**
+ * Release height for the same rule.
+ *
+ * Hysteresis, not a second opinion: releasing at the same 320 would re-arm a
+ * whole proof cycle on every frame of a drag that hovers on the boundary.
+ */
+export const PREVIEW_MIN_SPLIT_RELEASE_PX = 352
+
+/**
+ * Whether a bounds push has to be proved before Erfana draws controls in it.
+ *
+ * Only GROWTH needs proof. Shrinking is free: the page's stale texture is
+ * strictly inside space it is still allowed to occupy, so nothing Erfana draws
+ * can end up underneath it. That asymmetry is why a window resize, a backdrop
+ * change and the band collapsing never trip the fail-safe, and only the band
+ * opening does.
+ */
+export function needsBoundsAck(topInset: number, provenInset: number): boolean {
+  return topInset > provenInset
 }

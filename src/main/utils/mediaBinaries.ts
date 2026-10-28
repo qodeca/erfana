@@ -3,35 +3,40 @@
 /**
  * Central resolution of the bundled ffmpeg/ffprobe binary paths.
  *
- * ffmpeg-static's default export is a path string, or `null` when
- * `process.arch` is outside its per-platform allow-list — on win32 that
- * allow-list is `['x64', 'ia32']`, so it returns `null` on win32-arm64 even
- * though `scripts/fetch-ffmpeg-arm64.mjs` has already placed a real
- * `ffmpeg.exe` alongside it (see that script's doc comment). We recover that
- * path by resolving the ffmpeg-static package directory and looking for the
- * exe it dropped there. ffprobe-static has no such allow-list — it computes
- * its path unconditionally for every arch it vendors — so ffprobe needs no
- * fallback.
+ * Development: the packages' own answer (a path in the repo's node_modules).
+ * ffmpeg-static's default export is a path string (or null) and never throws,
+ * so importing it is safe at module load. It is `null` when `process.arch` is
+ * outside its per-platform allow-list – on win32 that is `['x64', 'ia32']` –
+ * so on win32-arm64 we recover the `ffmpeg.exe` that
+ * `scripts/fetch-ffmpeg-arm64.mjs` placed in the ffmpeg-static package
+ * directory. ffprobe-static has no such allow-list, so it needs no fallback.
  *
- * Both are placed/verified per-arch by the build hooks
- * (scripts/ensure-media-binaries.js + scripts/fuses.js) and, on win32-arm64,
- * by the postinstall step (scripts/fetch-ffmpeg-arm64.mjs).
+ * Packaged: the path is BUILT from `process.resourcesPath`, never taken from
+ * the package. Both packages compute it from `__dirname`, which points into
+ * `app.asar` (the OS cannot execute that), and ffmpeg-static also honours an
+ * `FFMPEG_BIN` environment variable – which would let whoever starts the app
+ * choose the binary it runs. The real files live in
+ * `Resources/app.asar.unpacked/` (`asarUnpack` in electron-builder.yml), and
+ * the build hooks place and verify them per arch (scripts/ensure-media-binaries.js
+ * + scripts/fuses.js; on win32-arm64 also the postinstall step
+ * scripts/fetch-ffmpeg-arm64.mjs).
  *
  * Single source of truth so the two consumers (AudioExtractionService,
  * LocalWhisperService) cannot drift.
  */
-import ffmpegStatic from 'ffmpeg-static'
-import ffprobeStatic from 'ffprobe-static'
+import { app } from 'electron'
 import { existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
+import ffmpegStatic from 'ffmpeg-static'
+import ffprobeStatic from 'ffprobe-static'
 
 /**
  * Recover the win32-arm64 ffmpeg.exe path that fetch-ffmpeg-arm64.mjs
  * installs into the ffmpeg-static package directory, when ffmpeg-static's
  * own resolution returned null (its arch allow-list omits arm64 on win32).
  */
-function resolveArm64FfmpegFallback(): string | undefined {
-  if (process.platform !== 'win32' || process.arch !== 'arm64') return undefined
+function resolveArm64FfmpegFallback(platform: NodeJS.Platform, arch: string): string | undefined {
+  if (platform !== 'win32' || arch !== 'arm64') return undefined
   try {
     const candidate = join(dirname(require.resolve('ffmpeg-static/package.json')), 'ffmpeg.exe')
     return existsSync(candidate) ? candidate : undefined
@@ -40,8 +45,36 @@ function resolveArm64FfmpegFallback(): string | undefined {
   }
 }
 
-export const ffmpegPath: string | undefined = ffmpegStatic ?? resolveArm64FfmpegFallback()
-export const ffprobePath: string | undefined = ffprobeStatic?.path ?? undefined
+/** Where a packaged build keeps an unpacked file, anchored on `process.resourcesPath`. */
+export function packagedUnpackedPath(resourcesPath: string, ...segments: string[]): string {
+  return join(resourcesPath, 'app.asar.unpacked', 'node_modules', ...segments)
+}
+
+/** The bundled ffmpeg / ffprobe paths for this process. Exported for tests. */
+export function resolveMediaBinaryPaths(
+  isPackaged: boolean,
+  resourcesPath: string | undefined,
+  platform: NodeJS.Platform = process.platform,
+  arch: string = process.arch
+): { ffmpegPath: string | undefined; ffprobePath: string | undefined } {
+  // Electron always sets resourcesPath in a packaged app; only a test double lacks it.
+  if (isPackaged && typeof resourcesPath === 'string' && resourcesPath.length > 0) {
+    const exe = platform === 'win32' ? '.exe' : ''
+    return {
+      ffmpegPath: packagedUnpackedPath(resourcesPath, 'ffmpeg-static', `ffmpeg${exe}`),
+      ffprobePath: packagedUnpackedPath(resourcesPath, 'ffprobe-static', 'bin', platform, arch, `ffprobe${exe}`)
+    }
+  }
+  return {
+    ffmpegPath: ffmpegStatic ?? resolveArm64FfmpegFallback(platform, arch),
+    ffprobePath: ffprobeStatic?.path ?? undefined
+  }
+}
+
+const resolved = resolveMediaBinaryPaths(app.isPackaged, process.resourcesPath)
+
+export const ffmpegPath: string | undefined = resolved.ffmpegPath
+export const ffprobePath: string | undefined = resolved.ffprobePath
 
 /** True when both ffmpeg and ffprobe binaries resolved. */
 export const mediaBinariesAvailable = (): boolean => !!ffmpegPath && !!ffprobePath

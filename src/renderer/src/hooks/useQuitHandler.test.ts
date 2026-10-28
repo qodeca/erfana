@@ -47,6 +47,10 @@ vi.mock('../components/Dialog/DialogContext', () => ({
 
 // Import after mocks
 import { checkQuitBlocked, buildQuitConfirmMessage } from '../utils/quitHelpers'
+import type { QuitBridge } from '../../../shared/ipc/quit-schema'
+import { gatewayBridgeMock, type BridgeMock } from '../test-utils/gatewayBridgeMock'
+
+const quitMock = (): BridgeMock<QuitBridge> => gatewayBridgeMock('quit')
 
 // Mock window.api.quit
 const mockOnQuitRequested = vi.fn()
@@ -84,7 +88,7 @@ describe('useQuitHandler', () => {
       const state = await checkQuitBlocked()
 
       if (!state.isBlocked) {
-        window.api.quit.sendQuitResponse(true)
+        quitMock().sendQuitResponse(true)
       }
 
       expect(state.isBlocked).toBe(false)
@@ -117,7 +121,7 @@ describe('useQuitHandler', () => {
           cancelLabel: 'Cancel',
           danger: true
         })
-        window.api.quit.sendQuitResponse(confirmed)
+        quitMock().sendQuitResponse(confirmed)
       }
 
       expect(mockShowConfirm).toHaveBeenCalledWith({
@@ -226,7 +230,7 @@ describe('useQuitHandler', () => {
           cancelLabel: 'Cancel',
           danger: true
         })
-        window.api.quit.sendQuitResponse(confirmed)
+        quitMock().sendQuitResponse(confirmed)
       }
 
       expect(mockSendQuitResponse).toHaveBeenCalledWith(true)
@@ -257,7 +261,7 @@ describe('useQuitHandler', () => {
           cancelLabel: 'Cancel',
           danger: true
         })
-        window.api.quit.sendQuitResponse(confirmed)
+        quitMock().sendQuitResponse(confirmed)
       }
 
       expect(mockSendQuitResponse).toHaveBeenCalledWith(false)
@@ -270,7 +274,7 @@ describe('useQuitHandler', () => {
         await checkQuitBlocked()
       } catch {
         // On error, fail-safe to proceed
-        window.api.quit.sendQuitResponse(true)
+        quitMock().sendQuitResponse(true)
       }
 
       expect(mockSendQuitResponse).toHaveBeenCalledWith(true)

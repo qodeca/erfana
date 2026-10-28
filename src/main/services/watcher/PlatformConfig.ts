@@ -171,10 +171,12 @@ export function isPlatformExcluded(filePath: string): boolean {
 /**
  * Check if path is a Windows long path (> 260 chars).
  *
- * **Status: deferred to Phase 6 (#163, Phase 2 Windows enablement).**
- *
- * This helper is intentionally unused as of #163. The Phase 2 plan deferred
- * activating long-path support because:
+ * **Status: promoted for the terminal check (v0.19.0); the `\\?\` prefixing
+ * of file I/O stays deferred to Phase 6 (#163).** The promotion criterion
+ * below was met on 2026-09-03: a real 320-char Windows project path hit the
+ * Win32 `CreateProcess` limit, and `TerminalService` now uses this helper to
+ * explain the refusal. File I/O over 260 chars worked on the same host, so
+ * the reasons recorded at the time still hold for that half:
  *
  *   1. No active victims — `docs/build/windows.md` step 5 already instructs
  *      users to enable Win32 long-path group policy, which is the same

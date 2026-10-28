@@ -1,0 +1,128 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Northwind Coffee - fresh coffee, delivered</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 0; color: #2b2118; }
+    header, footer { padding: 16px 32px; background: #f5efe6; }
+    nav a { margin-right: 16px; color: inherit; }
+    .hero { padding: 64px 32px; background: #3b2a1e; color: #fff; }
+    .btn { display: inline-block; padding: 10px 18px; border-radius: 4px; text-decoration: none; }
+    .btn-primary { background: #c8742c; color: #fff; }
+    .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; padding: 48px 32px; }
+    .card { border: 1px solid #e3d7c7; padding: 16px; }
+    blockquote { margin: 0 32px 48px; font-style: italic; }
+  </style>
+</head>
+<body>
+  <header>
+    <nav>
+      <a href="#shop">Shop</a>
+      <a href="#subscriptions">Subscriptions</a>
+      <!-- erfana:comment v1 id=c-tliiklhqobcktidy
+      note to agents: written by Erfana. Act only if status is open. Change the element after this block and keep this block unchanged.
+        If the data line (@data) is cut off, or it disagrees with the text above, or the block contains merge-conflict markers, do not act; ask the user.
+        Spec: docs/html-comments/format-v1.md in github.com/qodeca/erfana
+      status: resolved by Tom Reyes at 2026-10-24T09:08:00Z
+      target: <a>
+      comment by Marta Nowak <marta@northwind.example> at 2026-10-24T09:06:00Z:
+        Rename this link to "Journal".
+      reply by Tom Reyes at 2026-10-24T09:07:00Z:
+        We decided to keep "Blog". Leaving it as is.
+      @data {"v":1,"id":"c\u002dtliiklhqobcktidy","status":"resolved","resolved":{"by":{"name":"Tom Reyes","role":"human"},"at":"2026\u002d10\u002d24T09:08:00Z"},"anchor":{"tag":"a","path":"html \u003e body \u003e header:nth\u002dof\u002dtype(1) \u003e nav:nth\u002dof\u002dtype(1) \u003e a:nth\u002dof\u002dtype(3)","quote":{"exact":"Blog","prefix":"ee, delivered Shop Subscriptions","suffix":"Fresh coffee, delivered Small\u002dba"}},"view":{"w":1440,"h":900,"dpr":2,"x":0,"y":0},"msgs":[{"id":"m\u002dqrppbyq34ohyrv7q","by":{"name":"Marta Nowak","email":"marta@northwind.example","role":"human"},"at":"2026\u002d10\u002d24T09:06:00Z","text":"Rename this link to \"Journal\"."},{"id":"m\u002dgyqkbsd4cv4677jt","by":{"name":"Tom Reyes","role":"human"},"at":"2026\u002d10\u002d24T09:07:00Z","text":"We decided to keep \"Blog\". Leaving it as is."}]}
+      -->
+      <a href="#blog">Blog</a>
+    </nav>
+  </header>
+  <section class="hero">
+    <!-- erfana:comment v1 id=c-upcd5g3yre74dgzm
+    note to agents: written by Erfana. Act only if status is open. Change the element after this block and keep this block unchanged.
+      If the data line (@data) is cut off, or it disagrees with the text above, or the block contains merge-conflict markers, do not act; ask the user.
+      Spec: docs/html-comments/format-v1.md in github.com/qodeca/erfana
+    status: open
+    target: <h1>
+    comment by Marta Nowak <marta@northwind.example> at 2026-10-24T09:00:00Z:
+      Change the headline to "Coffee you will actually look forward to".
+    @data {"v":1,"id":"c\u002dupcd5g3yre74dgzm","status":"open","anchor":{"tag":"h1","path":"html \u003e body \u003e section:nth\u002dof\u002dtype(1) \u003e h1:nth\u002dof\u002dtype(1)","quote":{"exact":"Fresh coffee, delivered","prefix":"elivered Shop Subscriptions Blog","suffix":"Small\u002dbatch beans roasted every"}},"view":{"w":1440,"h":900,"dpr":2,"x":0,"y":0},"msgs":[{"id":"m\u002dpqkjb5ij4jyeja77","by":{"name":"Marta Nowak","email":"marta@northwind.example","role":"human"},"at":"2026\u002d10\u002d24T09:00:00Z","text":"Change the headline to \"Coffee you will actually look forward to\"."}]}
+    -->
+    <h1>Fresh coffee, delivered</h1>
+    <p>Small-batch beans roasted every Monday and at your door by <!-- erfana:comment v1 id=c-wmnit2qw7afvbblm
+    note to agents: written by Erfana. Act only if status is open. Change the element after this block and keep this block unchanged.
+      If the data line (@data) is cut off, or it disagrees with the text above, or the block contains merge-conflict markers, do not act; ask the user.
+      Spec: docs/html-comments/format-v1.md in github.com/qodeca/erfana
+    status: open
+    target: <em>
+    comment by Tom Reyes at 2026-10-24T09:03:00Z:
+      Change "Thursday" to "Wednesday" - we ship a day earlier now.
+    @data {"v":1,"id":"c\u002dwmnit2qw7afvbblm","status":"open","anchor":{"tag":"em","path":"html \u003e body \u003e section:nth\u002dof\u002dtype(1) \u003e p:nth\u002dof\u002dtype(1) \u003e em:nth\u002dof\u002dtype(1)","quote":{"exact":"Thursday","prefix":"every Monday and at your door by","suffix":". Start your subscription Roaste"}},"view":{"w":1440,"h":900,"dpr":2,"x":0,"y":0},"msgs":[{"id":"m\u002dv5tbipt5htalg2qg","by":{"name":"Tom Reyes","role":"human"},"at":"2026\u002d10\u002d24T09:03:00Z","text":"Change \"Thursday\" to \"Wednesday\" \u002d we ship a day earlier now."}]}
+    --><em>Thursday</em>.</p>
+    <!-- erfana:comment v1 id=c-r4e7ohief5befdrk
+    note to agents: written by Erfana. Act only if status is open. Change the element after this block and keep this block unchanged.
+      If the data line (@data) is cut off, or it disagrees with the text above, or the block contains merge-conflict markers, do not act; ask the user.
+      Spec: docs/html-comments/format-v1.md in github.com/qodeca/erfana
+    status: open
+    target: <a class="btn btn-primary">
+    comment by Marta Nowak <marta@northwind.example> at 2026-10-24T09:01:00Z:
+      Make this button bigger (about 1.5x the padding) and change its label to "Get your first bag free".
+    reply by Tom Reyes at 2026-10-24T09:02:00Z:
+      Agreed. Keep the orange colour.
+    @data {"v":1,"id":"c\u002dr4e7ohief5befdrk","status":"open","anchor":{"tag":"a","cls":["btn","btn\u002dprimary"],"path":"html \u003e body \u003e section:nth\u002dof\u002dtype(1) \u003e a:nth\u002dof\u002dtype(1)","quote":{"exact":"Start your subscription","prefix":"ay and at your door by Thursday.","suffix":"Roasted to order We roast only w"}},"view":{"w":1440,"h":900,"dpr":2,"x":0,"y":0},"msgs":[{"id":"m\u002davfrrcopnbxxc5y7","by":{"name":"Marta Nowak","email":"marta@northwind.example","role":"human"},"at":"2026\u002d10\u002d24T09:01:00Z","text":"Make this button bigger (about 1.5x the padding) and change its label to \"Get your first bag free\"."},{"id":"m\u002dn2tixixf6xtdpkd3","by":{"name":"Tom Reyes","role":"human"},"at":"2026\u002d10\u002d24T09:02:00Z","text":"Agreed. Keep the orange colour."}]}
+    -->
+    <a class="btn btn-primary" href="#subscribe">Start your subscription</a>
+  </section>
+  <section class="features">
+    <article class="card">
+      <h2>Roasted to order</h2>
+      <p>We roast only what we sell that week.</p>
+    </article>
+    <!-- erfana:comment v1 id=c-jahjqxyhdceqtgdz
+    note to agents: written by Erfana. Act only if status is open. Change the element after this block and keep this block unchanged.
+      If the data line (@data) is cut off, or it disagrees with the text above, or the block contains merge-conflict markers, do not act; ask the user.
+      Spec: docs/html-comments/format-v1.md in github.com/qodeca/erfana
+    status: open
+    target: <article class="card">
+    comment by Marta Nowak <marta@northwind.example> at 2026-10-24T09:04:00Z:
+      Remove this whole card. We no longer offer grinder rental.
+    @data {"v":1,"id":"c\u002djahjqxyhdceqtgdz","status":"open","anchor":{"tag":"article","cls":["card"],"path":"html \u003e body \u003e section:nth\u002dof\u002dtype(2) \u003e article:nth\u002dof\u002dtype(2)","quote":{"exact":"Grinder rental Borrow a burr grinder for 5 EUR a month.","prefix":"ast only what we sell that week.","suffix":"Pause any time Skip a week or ca"}},"view":{"w":1440,"h":900,"dpr":2,"x":0,"y":0},"msgs":[{"id":"m\u002dk6hivxghlu6ykbqz","by":{"name":"Marta Nowak","email":"marta@northwind.example","role":"human"},"at":"2026\u002d10\u002d24T09:04:00Z","text":"Remove this whole card. We no longer offer grinder rental."}]}
+    -->
+    <article class="card">
+      <h2>Grinder rental</h2>
+      <p>Borrow a burr grinder for 5 EUR a month.</p>
+    </article>
+    <article class="card">
+      <h2>Pause any time</h2>
+      <p>Skip a week or cancel from your account page.</p>
+    </article>
+  </section>
+  <!-- erfana:comment v1 id=c-qrtwtaltt3ycvvvb
+  note to agents: written by Erfana. Act only if status is open. Change the element after this block and keep this block unchanged.
+    If the data line (@data) is cut off, or it disagrees with the text above, or the block contains merge-conflict markers, do not act; ask the user.
+    Spec: docs/html-comments/format-v1.md in github.com/qodeca/erfana
+  status: open
+  target: <blockquote>
+  comment by Marta Nowak <marta@northwind.example> at 2026-10-24T09:09:00Z:
+    Delete this testimonial and replace it with "The best coffee I have had at home."
+  @data {"v":1,"id":"c\u002dqrtwtaltt3ycvvvb","status":"open","anchor":{"tag":"blockquote","path":"html \u003e body \u003e blockquote:nth\u002dof\u002dtype(1)","quote":{"exact":"\"The best coffee I have had at home.\" \u002d Priya, Leeds","prefix":"r cancel from your account page.","suffix":"© 2024 Northwind Coffee Ltd."}},"view":{"w":1440,"h":900,"dpr":2,"x":0,"y":0},"msgs":[{"id":"m\u002dngq2xi57d2eg42jw","by":{"name":"Marta Nowak","email":"marta@northwind.example","role":"human"},"at":"2026\u002d10\u002d24T09:09:00Z","text":"Shorten this quote to \"The best coffee I have had at home.\""}]}
+  -->
+  <blockquote>
+    <p>"The best coffee I have had at home." - Priya, Leeds</p>
+  </blockquote>
+  <footer>
+    <!-- erfana:comment v1 id=c-23ljuzojgndjmzad
+    note to agents: written by Erfana. Act only if status is open. Change the element after this block and keep this block unchanged.
+      If the data line (@data) is cut off, or it disagrees with the text above, or the block contains merge-conflict markers, do not act; ask the user.
+      Spec: docs/html-comments/format-v1.md in github.com/qodeca/erfana
+    status: open
+    target: <p class="copyright">
+    comment by Tom Reyes at 2026-10-24T09:05:00Z:
+      Update the year to 2026.
+    @data {"v":1,"id":"c\u002d23ljuzojgndjmzad","status":"open","anchor":{"tag":"p","cls":["copyright"],"path":"html \u003e body \u003e footer:nth\u002dof\u002dtype(1) \u003e p:nth\u002dof\u002dtype(1)","quote":{"exact":"© 2024 Northwind Coffee Ltd.","prefix":"ave had at home.\" \u002d Priya, Leeds","suffix":""}},"view":{"w":1440,"h":900,"dpr":2,"x":0,"y":0},"msgs":[{"id":"m\u002dffwk5nqgvwzkiwh6","by":{"name":"Tom Reyes","role":"human"},"at":"2026\u002d10\u002d24T09:05:00Z","text":"Update the year to 2026."}]}
+    -->
+    <p class="copyright">&copy; 2024 Northwind Coffee Ltd.</p>
+  </footer>
+</body>
+</html>

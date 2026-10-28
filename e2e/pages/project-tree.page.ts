@@ -77,6 +77,108 @@ export class ProjectTreePage {
     await btn.click()
   }
 
+  /** The toolbar "New file" button. */
+  newFileButton(): Locator {
+    return byTestId(this.page, TEST_IDS.PROJECT_TREE_BTN_NEW_FILE)
+  }
+
+  /** The toolbar "New folder" button. */
+  newFolderButton(): Locator {
+    return byTestId(this.page, TEST_IDS.PROJECT_TREE_BTN_NEW_FOLDER)
+  }
+
+  /** The toolbar "Refresh" button. */
+  refreshButton(): Locator {
+    return byTestId(this.page, TEST_IDS.PROJECT_TREE_BTN_REFRESH)
+  }
+
+  /** The toolbar "Close project" button. */
+  closeProjectButton(): Locator {
+    return byTestId(this.page, TEST_IDS.PROJECT_TREE_BTN_CLOSE)
+  }
+
+  /** The empty state shown when no project is open, or when a filter matches nothing. */
+  emptyState(): Locator {
+    return byTestId(this.page, TEST_IDS.PROJECT_TREE_EMPTY)
+  }
+
+  /** Wait until the tree lists a file at the given project-relative path. */
+  async waitForFile(relPath: string): Promise<void> {
+    await expect(this.fileRow(relPath)).toBeVisible({ timeout: 10_000 })
+  }
+
+  /** Wait until the tree no longer lists the given project-relative file. */
+  async waitForFileGone(relPath: string): Promise<void> {
+    await expect(this.fileRow(relPath)).toHaveCount(0, { timeout: 10_000 })
+  }
+
+  // ---------------------------------------------------------------------------
+  // Recent projects (on the Welcome tab)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * A recent-project row, addressed by the folder name it displays. The open and
+   * remove buttons share the row's testid prefix but hold no name element, so the
+   * `.recent-project-name` filter leaves only the row.
+   */
+  recentProject(name: string): Locator {
+    return this.page
+      .locator(`[data-testid^="${TEST_IDS.WELCOME_RECENT_PROJECT}-"]`)
+      .filter({ has: this.page.locator('.recent-project-name', { hasText: name }) })
+  }
+
+  /**
+   * Open the Welcome tab and click a recent project, returning once the click
+   * has landed. The switch itself (flush, prompt, open) runs on after this
+   * returns; wait on its outcome (the tree, the prompt, a toast).
+   */
+  async switchToRecent(name: string): Promise<void> {
+    await this.page.locator('.welcome-tab').click()
+    const row = this.recentProject(name)
+    await expect(row).toBeVisible({ timeout: 10_000 })
+    await row.click()
+  }
+
+  // ---------------------------------------------------------------------------
+  // Context menu
+  //
+  // The tree renders the shared `ContextMenu` primitive with no custom
+  // container testid, so it appears under `TEST_IDS.CONTEXT_MENU` in
+  // `#portal-root` — page-scoped, never scoped to the tree.
+  // ---------------------------------------------------------------------------
+
+  /** The open context menu, whichever row raised it. */
+  contextMenu(): Locator {
+    return byTestId(this.page, TEST_IDS.CONTEXT_MENU)
+  }
+
+  /** A context-menu entry addressed by its visible label. */
+  contextMenuItem(label: string): Locator {
+    return this.contextMenu().getByRole('menuitem').filter({ hasText: label })
+  }
+
+  /**
+   * Right-click a row and wait for its menu.
+   *
+   * `ContextMenu` ignores outside clicks for the first 50 ms so the opening
+   * click cannot immediately dismiss it; waiting for the menu to be visible
+   * before returning keeps callers clear of that window.
+   */
+  async openContextMenu(row: Locator): Promise<void> {
+    await expect(row).toBeVisible()
+    await row.click({ button: 'right' })
+    await expect(this.contextMenu()).toBeVisible({ timeout: 5000 })
+  }
+
+  /** Right-click a row and invoke one of its menu entries. */
+  async runContextMenuAction(row: Locator, label: string): Promise<void> {
+    await this.openContextMenu(row)
+    const item = this.contextMenuItem(label)
+    await expect(item).toBeVisible()
+    await item.click()
+    await expect(this.contextMenu()).toHaveCount(0, { timeout: 5000 })
+  }
+
   // ---------------------------------------------------------------------------
   // Git status decorations (badges on files, dots on folders)
   //
@@ -122,24 +224,25 @@ export class ProjectTreePage {
     )
   }
 
-  /** The wrapping treeitem (`.project-tree-node`) for a project-relative folder. */
+  /**
+   * The treeitem for a project-relative folder. Since #87 the role and
+   * `aria-expanded` sit on the row itself (`.project-tree-item`), the same
+   * element that is clicked and focused.
+   */
   private folderTreeItem(relPath: string): Locator {
     const suffix = this.cssEscapeAttr(this.nativeSuffix(relPath))
     return this.page.locator(
-      `.project-tree-node[role="treeitem"][data-type="directory"][data-path$="${suffix}"]`
+      `.project-tree-item[role="treeitem"][data-type="directory"][data-path$="${suffix}"]`
     )
   }
 
   /**
-   * The ROOT project folder item. It is the single top-level ProjectTreeNode
-   * (`rootFolderNode`) and is a direct child of `.project-tree-content`, so it
-   * cannot be addressed by a relative-path suffix (empty rel). Matched
-   * structurally instead.
+   * The ROOT project folder item. The tree is a flat list, and the root is its
+   * only row at `aria-level="1"`; it cannot be addressed by a relative-path
+   * suffix (empty rel).
    */
   rootFolderRow(): Locator {
-    return this.page.locator(
-      '.project-tree-content > .project-tree-node[data-type="directory"] > .project-tree-item'
-    )
+    return this.page.locator('.project-tree-item[role="treeitem"][aria-level="1"]')
   }
 
   // The git badge/dot is a `role="img"` span carrying `data-git-status`. Scope
@@ -185,7 +288,7 @@ export class ProjectTreePage {
    * Expand every ancestor folder (project-relative paths, root→leaf order) so
    * descendant nodes are mounted. Child nodes — and their git dots — only exist
    * in the DOM once their parent folder is expanded. aria-expanded lives on the
-   * wrapping treeitem; the click toggle is the inner `.file-icon` span.
+   * row (the treeitem), which is also what a click toggles.
    */
   async expandTo(ancestorRelPaths: string[]): Promise<void> {
     for (const relPath of ancestorRelPaths) {

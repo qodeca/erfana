@@ -386,5 +386,5 @@ async indexFiles(files: string[]): Promise<void> {
 - [Data ingestion – discovery and indexing](./data-ingestion-discovery.md) – project initialization, file discovery, event-driven indexing
 - [Architecture](./architecture-overview.md) – Event-driven integration with FileWatcherService
 - [User Guide](./user-guide-features.md) – User-facing features and workflows
-- [Implementation Guide](./implementation-guide.md) – M1 indexing pipeline tasks
+- [Implementation Guide](./implementation-guide/README.md) – M1 indexing pipeline tasks
 - [Performance](./performance.md) – Indexing benchmarks and optimization

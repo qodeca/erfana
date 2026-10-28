@@ -35,6 +35,7 @@ import {
   createTempUserDataDir
 } from './utils/helpers'
 import { TerminalPage } from './pages/terminal.page'
+import { E2E_CHROMIUM_ARGS } from './fixtures/isolation'
 
 const testSeed = {
   'note.md': '# Note\n\nFirst file.\n'
@@ -58,7 +59,7 @@ test.describe('Terminal sash drag', () => {
     )
 
     const electronApp = await electron.launch({
-      args: [path.join(__dirname, '..'), `--user-data-dir=${userDataDir}`],
+      args: [path.join(__dirname, '..'), `--user-data-dir=${userDataDir}`, ...E2E_CHROMIUM_ARGS],
       env: { ...process.env, NODE_ENV: 'development' }
     })
 

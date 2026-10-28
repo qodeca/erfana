@@ -11,12 +11,13 @@
  *
  * @example
  * await withWatcherPause(projectPath, isInternalOperation, setLoading, async () => {
- *   await window.api.file.createFile(targetPath, fileName)
+ *   await fileGateway.createFile({ dirPath: targetPath, name: fileName })
  *   await refreshProjectTree()
  * })
  */
 
 import { logger } from '../../utils/logger'
+import { directoryWatchGateway } from '../../services/directoryWatchGateway'
 
 export async function withWatcherPause<T>(
   projectPath: string | null,
@@ -30,7 +31,7 @@ export async function withWatcherPause<T>(
 
     // Pause watcher before operation
     if (projectPath) {
-      await window.api.directoryWatch.pause(projectPath)
+      await directoryWatchGateway.pause(projectPath)
     }
 
     // Execute the operation
@@ -42,20 +43,23 @@ export async function withWatcherPause<T>(
 
     // Resume watcher after success
     if (projectPath) {
-      await window.api.directoryWatch.resume(projectPath)
+      await directoryWatchGateway.resume(projectPath)
     }
 
     return result
   } catch (error) {
+    // Reset flag BEFORE resuming, as on the success path, so a catch-up or
+    // external change broadcast right after resume is not skipped
+    isInternalOperationRef.current = false
+
     // Resume watcher even on error
     if (projectPath) {
       try {
-        await window.api.directoryWatch.resume(projectPath)
+        await directoryWatchGateway.resume(projectPath)
       } catch (resumeErr) {
         logger.error('Failed to resume directory watcher', resumeErr instanceof Error ? resumeErr : undefined)
       }
     }
-    isInternalOperationRef.current = false
 
     // Re-throw the original error
     throw error

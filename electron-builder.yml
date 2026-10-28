@@ -35,8 +35,8 @@ files:
   # app-builder-lib's FileMatcher.containsOnlyIgnore() treats a list of only
   # '!' patterns as "no includes given", and getMainFileMatchers() then splices
   # an implicit '**/*' at index 0 - which packages the ENTIRE repository root
-  # into Contents/Resources/app/, untracked local-only directories included,
-  # and with `asar: false` it ships uncompressed and browsable.
+  # into the packed app, untracked local-only directories included (in the
+  # integrity-checked app.asar or not - asar does not change WHAT is packed).
   # Enforced twice: "Guard - electron-builder packaging allowlist" in
   # .github/workflows/checks.yml checks this file; assertPackagedAppContents()
   # in scripts/fuses.js checks the packed tree during afterPack, before signing.
@@ -62,7 +62,54 @@ files:
   - '!node_modules/jsdom/**'
   - '!node_modules/canvas/**'
   - '!node_modules/@mapbox/node-pre-gyp/**'
-asar: false
+  # Native artifacts @llamaindex/liteparse carries for OTHER platforms (review #167
+  # finding 5). The binary this app actually loads comes from the optional
+  # @llamaindex/liteparse-<platform> dependency; these two are Linux-only dead weight
+  # in a macOS/Windows bundle (Erfana ships no Linux target) and would otherwise go
+  # through signing and notarization. Anchored with '**/' so it reaches the packed
+  # node_modules tree, like the exclusions above.
+  - '!**/liteparse.linux-x64-gnu.node'
+  - '!**/libpdfium.so'
+  # node-pty's Windows prebuilds: debug symbols are never loaded, and the
+  # bundled conpty/ folder (Microsoft's OpenConsole.exe + conpty.dll) is only
+  # used with node-pty's `useConptyDll` option, which TerminalService never
+  # sets - Windows' own ConPTY is used. Keeping them out means they are neither
+  # packed nor re-signed with Erfana's certificate.
+  - '!**/node-pty/prebuilds/*/*.pdb'
+  - '!**/node-pty/prebuilds/*/conpty/**'
+  # The same for a locally rebuilt node-pty (build/Release, used ahead of the
+  # prebuilds when present): link-time and debug files and the build's own
+  # object folders are never loaded.
+  - '!**/node-pty/build/Release/{*.pdb,*.lib,*.exp}'
+  - '!**/node-pty/build/Release/{obj,obj.target}/**'
+  - '!**/node-pty/build/Release/conpty/**'
+# ASAR on (v0.22.0 spike, docs/spikes/2026-10-22-asar-integrity.md). The app's
+# JS ships inside app.asar, so the EnableEmbeddedAsarIntegrityValidation and
+# OnlyLoadAppFromAsar fuses in scripts/fuses.js can apply.
+# Only what the OS itself must open as a real file stays outside the archive,
+# in app.asar.unpacked/: native addons and the libraries they load (dlopen),
+# and executables (spawn/exec). Unpacked files are NOT covered by the asar
+# integrity check, so every pattern names binaries only - never a .js file and
+# never a package.json, whose "main" decides which JavaScript runs.
+# smartUnpack (an asar: option) is off because it unpacks the WHOLE package
+# root of any module with a binary in it (node-pty's JS, all of jszip).
+# This list is pinned: ASAR_OPTIONS / ASAR_UNPACK in scripts/fuses.js must match
+# it (binding test), afterPack compares the effective config with them, and
+# assertPackagedAsarContents refuses any .js/.cjs/.mjs/.json under
+# app.asar.unpacked/. Change all three together.
+asar:
+  smartUnpack: false
+asarUnpack:
+  - node_modules/node-pty/build/Release/*.node
+  - node_modules/node-pty/build/Release/*.{dll,exe}
+  - node_modules/node-pty/build/Release/spawn-helper
+  - node_modules/node-pty/prebuilds/*/*.{node,dll,exe}
+  - node_modules/node-pty/prebuilds/*/spawn-helper
+  - node_modules/ffmpeg-static/ffmpeg
+  - node_modules/ffmpeg-static/ffmpeg.exe
+  - node_modules/ffprobe-static/bin/*/*/ffprobe
+  - node_modules/ffprobe-static/bin/*/*/ffprobe.exe
+  - node_modules/@llamaindex/liteparse-*/*.{node,dylib,dll,so}
 npmRebuild: false
 # Explicitly disable auto-updater metadata.
 # Using 'publish: null' (not 'provider: github') so electron-builder does NOT

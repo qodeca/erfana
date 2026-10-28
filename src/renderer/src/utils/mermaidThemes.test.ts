@@ -24,6 +24,13 @@ describe('mermaidThemes', () => {
       expect(config.theme).toBe(ACTIVE_THEME)
     })
 
+    it('should pin the classic look and dagre layout (Mermaid 12 defaults to neo and ELK)', () => {
+      const config = getMermaidConfig(true)
+
+      expect(config.look).toBe('classic')
+      expect(config.layout).toBe('dagre')
+    })
+
     it('should include flowchart configuration', () => {
       const config = getMermaidConfig(true)
 

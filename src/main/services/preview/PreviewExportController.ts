@@ -16,21 +16,36 @@
  * `false`, which drops every CSS background colour and image from the output —
  * exactly what a previewed page relies on (design §1.7).
  *
- * @see specs/designs/sd-074-html-preview.md §1.7
+ * @see docs/designs/sd-074-html-preview.md §1.7
  */
 import { writeFile } from 'node:fs/promises'
+import { basename, extname } from 'node:path'
 
-import { dialog } from 'electron'
+import { BrowserWindow, dialog } from 'electron'
 
 import { ErrorCode } from '../../../shared/errors'
 import type { PdfExportResult } from '../../../shared/ipc/preview-types'
 import { deriveSafeFilename } from '../../utils/validateFilename'
+import { rememberDialogResult, withLastDirectory } from '../../utils/lastDialogDirectory'
 
 /** Fallback basename when the source name reduces to empty. */
 const DEFAULT_EXPORT_NAME = 'preview'
 
 /** Leave headroom for the `.pdf` extension and OS path limits (matches PdfService). */
 const MAX_FILENAME_LENGTH = 200
+
+/**
+ * The name a page suggests in the save dialog: its file name without the
+ * extension, so `pricing.html` suggests `pricing.pdf` (#124, P3-AC2).
+ * `fallback` when there is no page. `exportToPdf` still makes the result safe
+ * as a file name (#161).
+ */
+export function exportNameForPage(pagePath: string | null, fallback: string): string {
+  if (!pagePath) {
+    return fallback
+  }
+  return basename(pagePath, extname(pagePath)) || fallback
+}
 
 /** The `printToPDF` options subset this controller sets. */
 export interface PreviewPrintToPdfOptions {
@@ -42,6 +57,13 @@ export interface PreviewPrintContents {
   printToPDF(options: PreviewPrintToPdfOptions): Promise<Buffer>
 }
 
+/**
+ * Runs the print with HTML Preview comments' overlay hidden in every frame,
+ * and shows it again after, whatever the print did (html-preview-comments.md
+ * §10.2, M-064).
+ */
+export type PreviewAroundPrint = (print: () => Promise<Buffer>) => Promise<Buffer>
+
 /** A save-dialog result subset (matches Electron's `SaveDialogReturnValue`). */
 export interface PreviewSaveDialogResult {
   canceled: boolean
@@ -50,12 +72,21 @@ export interface PreviewSaveDialogResult {
 
 /** Injectable side effects so the controller is testable without Electron IO. */
 export interface PreviewExportControllerDeps {
-  showSaveDialog?: (options: {
-    title: string
-    defaultPath: string
-    buttonLabel: string
-    filters: { name: string; extensions: string[] }[]
-  }) => Promise<PreviewSaveDialogResult>
+  /**
+   * Show the save dialog, parented to the window `windowId` names when it is
+   * still alive. A file picker (unlike the external-link consent) may fall back
+   * to an unowned dialog when no window is found: it asks nothing security-
+   * relevant, and a lost picker costs one retry.
+   */
+  showSaveDialog?: (
+    options: {
+      title: string
+      defaultPath: string
+      buttonLabel: string
+      filters: { name: string; extensions: string[] }[]
+    },
+    windowId?: number
+  ) => Promise<PreviewSaveDialogResult>
   writeFile?: (path: string, data: Buffer) => Promise<void>
 }
 
@@ -63,9 +94,15 @@ export interface IPreviewExportController {
   /**
    * Show a save dialog, print `wc` to PDF with backgrounds on, and write it.
    * Returns a cancelled result if the user dismisses the dialog and a failed
-   * result on any print/write error; never throws.
+   * result on any print/write error; never throws. `aroundPrint` wraps the
+   * print alone – never the dialog, so the overlay stays while the reader picks.
    */
-  exportToPdf(wc: PreviewPrintContents, suggestedName: string): Promise<PdfExportResult>
+  exportToPdf(
+    wc: PreviewPrintContents,
+    suggestedName: string,
+    windowId?: number,
+    aroundPrint?: PreviewAroundPrint
+  ): Promise<PdfExportResult>
 }
 
 export class PreviewExportController implements IPreviewExportController {
@@ -74,13 +111,23 @@ export class PreviewExportController implements IPreviewExportController {
 
   constructor(deps: PreviewExportControllerDeps = {}) {
     this.showSaveDialog =
-      deps.showSaveDialog ?? ((options) => dialog.showSaveDialog(options))
+      deps.showSaveDialog ??
+      (async (options, windowId) => {
+        const win = windowId === undefined ? null : BrowserWindow.fromId(windowId)
+        const result = win !== null && !win.isDestroyed()
+          ? await dialog.showSaveDialog(win, withLastDirectory(options))
+          : await dialog.showSaveDialog(withLastDirectory(options))
+        if (!result.canceled) rememberDialogResult(result.filePath)
+        return result
+      })
     this.writeFile = deps.writeFile ?? ((path, data) => writeFile(path, data))
   }
 
   async exportToPdf(
     wc: PreviewPrintContents,
-    suggestedName: string
+    suggestedName: string,
+    windowId?: number,
+    aroundPrint?: PreviewAroundPrint
   ): Promise<PdfExportResult> {
     // #161: app-derived name → silent transform (reserved basenames, invalid
     // chars, control/bidi) via the shared helper, then length-bounded.
@@ -94,7 +141,7 @@ export class PreviewExportController implements IPreviewExportController {
       defaultPath: `${safeName}.pdf`,
       buttonLabel: 'Export',
       filters: [{ name: 'PDF Documents', extensions: ['pdf'] }]
-    })
+    }, windowId)
 
     if (result.canceled || !result.filePath) {
       return { ok: false, errorCode: ErrorCode.PDF_EXPORT_CANCELLED }
@@ -106,7 +153,8 @@ export class PreviewExportController implements IPreviewExportController {
 
     try {
       // printBackground:true — default false drops CSS backgrounds/images.
-      const pdf = await wc.printToPDF({ printBackground: true })
+      const print = (): Promise<Buffer> => wc.printToPDF({ printBackground: true })
+      const pdf = await (aroundPrint === undefined ? print() : aroundPrint(print))
       await this.writeFile(filePath, pdf)
       return { ok: true, path: filePath }
     } catch {

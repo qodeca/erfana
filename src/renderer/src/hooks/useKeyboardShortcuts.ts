@@ -6,11 +6,18 @@
  * Manages global keyboard shortcuts for the markdown editor panel.
  * Handles Cmd/Ctrl+S (save) and Cmd/Ctrl+W (close tab with confirmation).
  *
+ * The listener is registered on `window`, and dockview keeps EVERY opened
+ * editor panel mounted — so without a gate, one keypress is handled once per
+ * open tab. That is not theoretical: ⌘W used to close every tab at once, and
+ * ⌘S wrote every open buffer to disk. `enabled` is how a panel says "this
+ * keystroke is mine"; callers pass their dockview active state.
+ *
  * @module useKeyboardShortcuts
  */
 
-import { useEffect, useRef } from 'react'
+import { useEffect } from 'react'
 import { isMacOS } from '../utils/platform'
+import { useLatestRef } from './useLatestRef'
 
 /**
  * Configuration for confirmation dialog.
@@ -35,12 +42,24 @@ export interface UseKeyboardShortcutsOptions {
   onSave: () => void
   /** Callback to close the current tab/panel */
   onClose: () => void
-  /** Whether the file has unsaved changes */
-  isModified: boolean
+  /**
+   * Whether the file has unsaved changes. Pass a function to read it at
+   * keypress time: a render-time boolean can trail the edit by a frame, and a
+   * ⌘W landing in that gap closed a dirty tab with no warning.
+   */
+  isModified: boolean | (() => boolean)
   /** Function to show confirmation dialog, returns true if confirmed */
   showConfirm: (options: ConfirmOptions) => Promise<boolean>
   /** Current file name (for dialog message) */
   fileName: string | null
+  /**
+   * Whether this instance should handle keystrokes at all.
+   *
+   * Every mounted panel shares one `window` keydown stream, so exactly one of
+   * them may act on a given press — pass the panel's dockview active state.
+   * Defaults to `true` so a single-instance caller needs no extra wiring.
+   */
+  enabled?: boolean
 }
 
 /**
@@ -91,11 +110,15 @@ export interface UseKeyboardShortcutsOptions {
 export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions): void {
   // Use refs to access latest values without re-registering the listener
   // This prevents stale closure issues when options change
-  const optionsRef = useRef(options)
-  optionsRef.current = options
+  const optionsRef = useLatestRef(options)
 
   useEffect(() => {
     const handleKeyDown = async (e: KeyboardEvent): Promise<void> => {
+      // Only the active panel acts. Read through the ref so toggling this
+      // never re-registers the listener (and never drops a keypress while it
+      // is being swapped).
+      if (optionsRef.current.enabled === false) return
+
       // Detect platform for correct modifier key
       const isMac = isMacOS()
       const modKey = isMac ? e.metaKey : e.ctrlKey
@@ -112,7 +135,12 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions): void
 
         const currentOptions = optionsRef.current
 
-        if (currentOptions.isModified) {
+        const isModified =
+          typeof currentOptions.isModified === 'function'
+            ? currentOptions.isModified()
+            : currentOptions.isModified
+
+        if (isModified) {
           // Show confirmation dialog if unsaved changes
           const confirmed = await currentOptions.showConfirm({
             title: 'Unsaved Changes',
@@ -131,5 +159,5 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions): void
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, []) // Empty deps - we use refs to avoid stale closures
+  }, [optionsRef]) // optionsRef is stable: registers once, reads the latest options
 }

@@ -25,13 +25,19 @@
  * A change on any watched file is coalesced over `PREVIEW.WATCH_COALESCE_MS`
  * into a single "reload needed" signal carrying the changed paths, which the
  * consumer (the view service) feeds to `PreviewReloadPolicy`.
+ *
+ * The candidates arrive only after the page has loaded its files, so a file
+ * can change before its watch exists. `options.changedSince` – when the page's
+ * load began – goes to each watch this call ADDS, and the pool reports such a
+ * change once the watch is listening (`PreviewWatchPool.ts`), through the same
+ * coalescing as any other.
  */
 import { confinePath, type ConfineVerdict } from './previewPathResolve'
-import type { IPreviewWatchPool } from './PreviewWatchPool'
+import type { IPreviewWatchPool, PreviewWatchStartOptions } from './PreviewWatchPool'
 import { PREVIEW } from '../../../shared/constants'
 
 /** Why a candidate was not watched. */
-export type WatchDropReason = 'out-of-root' | 'over-cap'
+export type WatchDropReason = 'out-of-root' | 'over-cap' | 'watch-failed'
 
 /** A candidate that was dropped rather than watched. */
 export interface DroppedCandidate {
@@ -74,9 +80,13 @@ export interface IPreviewWatchCoordinator {
   /**
    * Replace the watch set with the confined subset of `candidatePaths`.
    * Releases removed watches (awaited) before acquiring added ones, and returns
-   * the confined paths now watched plus the dropped candidates.
+   * the confined paths now watched plus the dropped candidates. `options`
+   * reaches each added watch (see the module comment).
    */
-  setWatchSet(candidatePaths: readonly string[]): Promise<WatchSetResult>
+  setWatchSet(
+    candidatePaths: readonly string[],
+    options?: PreviewWatchStartOptions
+  ): Promise<WatchSetResult>
   /** Release every watch and cancel the pending coalesce timer. */
   dispose(): Promise<void>
 }
@@ -166,7 +176,8 @@ export function createPreviewWatchCoordinator(
   }
 
   const doSetWatchSet = async (
-    candidatePaths: readonly string[]
+    candidatePaths: readonly string[],
+    options: PreviewWatchStartOptions | undefined
   ): Promise<WatchSetResult> => {
     if (disposed) return { watched: [], dropped: [] }
     const { desired, dropped } = await resolveDesired(candidatePaths)
@@ -186,10 +197,24 @@ export function createPreviewWatchCoordinator(
     if (disposed) return { watched: [], dropped }
 
     // Acquire the added watches. A watch already held is a no-op refcount bump.
-    for (const target of desired) {
-      if (!watched.has(target)) {
-        deps.pool.acquire(target, () => recordChange(target))
+    // `watched` is assigned only on success, so a throw partway through this
+    // loop (chokidar on EMFILE — the pool rethrows on purpose) used to strand
+    // every watch acquired before it: absent from `watched`, unreachable by
+    // `dispose()`, holding its slot in the shared budget for the life of the
+    // process (#112). Release what THIS call acquired before rethrowing.
+    const acquired: string[] = []
+    try {
+      for (const target of desired) {
+        if (!watched.has(target)) {
+          deps.pool.acquire(target, () => recordChange(target), options)
+          acquired.push(target)
+        }
       }
+    } catch (error) {
+      for (const target of acquired) {
+        await deps.pool.release(target)
+      }
+      throw error
     }
 
     watched = desiredSet
@@ -197,8 +222,11 @@ export function createPreviewWatchCoordinator(
   }
 
   return {
-    setWatchSet(candidatePaths: readonly string[]): Promise<WatchSetResult> {
-      const op = doSetWatchSet(candidatePaths)
+    setWatchSet(
+      candidatePaths: readonly string[],
+      options?: PreviewWatchStartOptions
+    ): Promise<WatchSetResult> {
+      const op = doSetWatchSet(candidatePaths, options)
       inFlight.add(op)
       void op.catch(() => {}).finally(() => inFlight.delete(op))
       return op
@@ -215,6 +243,10 @@ export function createPreviewWatchCoordinator(
         await deps.pool.release(target)
       }
       watched = new Set<string>()
+      // The pool is this view's own (built per coordinator at the composition
+      // root) and had no production caller for `close()` at all (#112): anything
+      // it still holds would outlive the view.
+      await deps.pool.close()
     }
   }
 }

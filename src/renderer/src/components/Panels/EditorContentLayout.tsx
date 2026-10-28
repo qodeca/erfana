@@ -13,7 +13,7 @@ import type { RefObject } from 'react'
 import type * as monaco from 'monaco-editor'
 import { MonacoMarkdownEditor, type MonacoEditorHandle } from '../Editor/MonacoMarkdownEditor'
 import type { EditorContextMenuEvent } from '../Editor/MonacoMarkdownEditor'
-import { MarkdownPreview, type MarkdownPreviewHandle } from '../Editor/MarkdownPreview'
+import { MarkdownPreview, type MarkdownPreviewHandle, type PreviewRenderedInfo } from '../Editor/MarkdownPreview'
 import { ResizableDivider } from '../Editor/ResizableDivider'
 import { SearchBar } from '../Search'
 import type { MonacoSearchProvider } from '../../providers/search/MonacoSearchProvider'
@@ -39,6 +39,8 @@ export interface EditorContentLayoutProps {
   dividerPositionHorizontal: number
   /** Currently active pane for search bar visibility */
   activePaneId: 'editor' | 'preview'
+  /** Whether dockview is drawing the panel; forwarded to the preview */
+  isVisible?: boolean
 
   // Refs
   /** Ref to Monaco editor handle for formatting and scroll operations */
@@ -69,6 +71,8 @@ export interface EditorContentLayoutProps {
   onDividerResizeEnd: () => void
   /** Called when user clicks a markdown link to open a file */
   onOpenFile: (path: string, anchor?: string) => Promise<void>
+  /** Called when the preview DOM changed (new content committed, diagram drawn) – drives scroll sync */
+  onPreviewRendered?: (info: PreviewRenderedInfo) => void
   /** Called when text selection changes in editor */
   onSelectionChange: (text: string) => void
 }
@@ -133,7 +137,9 @@ export function EditorContentLayout({
   onDividerResizeHorizontal,
   onDividerResizeEnd,
   onOpenFile,
-  onSelectionChange
+  onPreviewRendered,
+  onSelectionChange,
+  isVisible = true
 }: EditorContentLayoutProps): JSX.Element {
   return (
     <div className={`editor-content view-mode-${viewMode}`} role="region" aria-label="Editor" data-testid={TEST_IDS.EDITOR_CONTENT}>
@@ -153,6 +159,8 @@ export function EditorContentLayout({
               content={currentFile.content}
               filePath={currentFile.path}
               onOpenFile={onOpenFile}
+              onRendered={onPreviewRendered}
+              isVisible={isVisible}
             />
             {activePaneId === 'preview' && (
               <SearchBar provider={previewProvider} />
@@ -234,6 +242,8 @@ export function EditorContentLayout({
                 content={currentFile.content}
                 filePath={currentFile.path}
                 onOpenFile={onOpenFile}
+                onRendered={onPreviewRendered}
+                isVisible={isVisible}
               />
               {(viewMode === 'preview' || activePaneId === 'preview') && (
                 <SearchBar provider={previewProvider} />

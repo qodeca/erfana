@@ -15,8 +15,7 @@
  * Solution: Wait 100ms after DELETE. If file reappears, emit CHANGE instead.
  */
 
-import { existsSync } from 'fs'
-import { stat } from 'fs/promises'
+import { isPresentAfterSettle } from './pathPresence'
 
 export type AtomicSaveCallback = (path: string, wasAtomicSave: boolean) => void
 
@@ -24,6 +23,12 @@ interface PendingDelete {
   path: string
   timer: NodeJS.Timeout
   callback: AtomicSaveCallback
+  /**
+   * This registration's identity. The entry stays in the map until its
+   * callback runs, so a cancel, a newer delete or `dispose()` also reaches a
+   * check that is already waiting on the disk (#252 review).
+   */
+  token: symbol
 }
 
 // VS Code uses 100ms delay for atomic save detection
@@ -48,44 +53,58 @@ export class AtomicSaveDetector {
     this.cancelPending(filePath)
 
     // Schedule check after delay
-    const timer = setTimeout(async () => {
-      if (this.isDisposed) return
-
-      this.pendingDeletes.delete(filePath)
-
-      try {
-        // Check if file reappeared (atomic save pattern)
-        const fileExists = await this.fileExists(filePath)
-
-        if (fileExists) {
-          // File reappeared → atomic save, emit as CHANGE
-          callback(filePath, true)
-        } else {
-          // File still gone → actual delete
-          callback(filePath, false)
-        }
-      } catch {
-        // On error, assume actual delete
-        callback(filePath, false)
-      }
+    const token = Symbol(filePath)
+    const timer = setTimeout(() => {
+      void this.settle(filePath, token, callback)
     }, ATOMIC_SAVE_DELAY_MS)
 
     this.pendingDeletes.set(filePath, {
       path: filePath,
       timer,
-      callback
+      callback,
+      token
     })
   }
 
   /**
-   * Check if a path has a pending delete being tracked
+   * Check if a path has a pending delete being tracked, including one whose
+   * existence check is still running
    */
   hasPending(filePath: string): boolean {
     return this.pendingDeletes.has(filePath)
   }
 
   /**
-   * Cancel a pending delete check (e.g., if we receive a CREATE event)
+   * Check whether the file reappeared and report it, unless the registration
+   * was cancelled, replaced or disposed while the disk was asked: the check
+   * can wait for a second look (`isPresentAfterSettle`), and a stale verdict
+   * would re-arm or delete a watch that is no longer the one it was about.
+   */
+  private async settle(filePath: string, token: symbol, callback: AtomicSaveCallback): Promise<void> {
+    if (!this.isCurrent(filePath, token)) return
+
+    let fileExists = false
+    try {
+      // Check if file reappeared (atomic save pattern)
+      fileExists = await this.fileExists(filePath)
+    } catch {
+      // On error, assume actual delete
+    }
+
+    if (!this.isCurrent(filePath, token)) return
+    this.pendingDeletes.delete(filePath)
+    // true: the file reappeared → atomic save, emit as CHANGE; false → actual delete
+    callback(filePath, fileExists)
+  }
+
+  /** Is this registration still the live one for the path? */
+  private isCurrent(filePath: string, token: symbol): boolean {
+    return !this.isDisposed && this.pendingDeletes.get(filePath)?.token === token
+  }
+
+  /**
+   * Cancel a pending delete check (e.g., if we receive a CREATE event). A check
+   * already waiting on the disk then reports nothing.
    */
   cancelPending(filePath: string): void {
     const pending = this.pendingDeletes.get(filePath)
@@ -121,16 +140,14 @@ export class AtomicSaveDetector {
   }
 
   /**
-   * Check if file exists (async with fallback to sync)
+   * Check if file exists. An unreadable file counts as there, so it comes back
+   * as an atomic save – except on Windows, where EPERM or EBUSY is asked about
+   * once more after a short wait (`isPresentAfterSettle`), and a file that
+   * still answers that way is being deleted under another process's open
+   * handle, so it counts as deleted.
    */
   private async fileExists(filePath: string): Promise<boolean> {
-    try {
-      await stat(filePath)
-      return true
-    } catch {
-      // Fallback to sync check
-      return existsSync(filePath)
-    }
+    return isPresentAfterSettle(filePath)
   }
 }
 

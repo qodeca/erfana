@@ -31,10 +31,10 @@
  */
 import { promises as fs } from 'node:fs'
 import { logger } from '../LoggingService'
-import { MAX_MODEL_ID_LENGTH } from '../../../shared/ipc/claude-status-schema'
 import {
   isExtendedVariant,
   isRecognisedVariant,
+  MAX_PROVIDER_MODEL_ID_LENGTH,
   parseModelId,
   stripModelVariants
 } from './modelId'
@@ -182,7 +182,7 @@ const COMMAND_ARGS_CLOSE = '</command-args>'
 /**
  * Upper bound on the `content` we will search for a `<command-args>` block.
  *
- * A `/model` argument is discarded above {@link MAX_MODEL_ID_LENGTH} characters,
+ * A `/model` argument is discarded above {@link MAX_PROVIDER_MODEL_ID_LENGTH} characters,
  * so a few KB of surrounding markup is already far more than any real command
  * needs. Transcripts record user messages VERBATIM, so `content` is attacker-
  * influenced at the size of whatever text an agent ingested and echoed back —
@@ -262,13 +262,19 @@ function modelOverrideFromRecord(
   if (!content.includes('<command-name>/model</command-name>')) return undefined
 
   const arg = extractCommandArgs(content)
-  if (arg === null || arg === '' || arg.length > MAX_MODEL_ID_LENGTH) return undefined
+  // The provider bound, not the IPC one: a Bedrock ARN selection is longer than
+  // 64 characters and still names a model (#49). `stripModelVariants` holds the
+  // NORMALISED id to the IPC bound, so what is returned still fits the wire.
+  if (arg === null || arg === '' || arg.length > MAX_PROVIDER_MODEL_ID_LENGTH) return undefined
 
   const stripped = stripModelVariants(arg)
   if (stripped === null) return undefined
   if (!stripped.variants.every(isRecognisedVariant)) return undefined
   // Accept only a full claude-* model id (reject aliases like `opus`, `default`).
-  if (parseModelId(stripped.base) === null) return undefined
+  // Parsed from `arg`, NOT from `stripped.base`: that base is already
+  // normalised, and normalising it a second time would peel a stacked prefix
+  // (`us.anthropic.us.anthropic.claude-…`) that `parseModelId` rejects (#49).
+  if (parseModelId(arg) === null) return undefined
 
   return { modelId: stripped.base, forceExtended: stripped.variants.some(isExtendedVariant) }
 }

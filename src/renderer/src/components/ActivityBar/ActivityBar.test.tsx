@@ -16,6 +16,13 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ActivityBar } from './ActivityBar'
 import * as config from './activityBarConfig'
+import { isMacOS } from '../../utils/platform'
+
+vi.mock('../../utils/platform', () => ({
+  isMacOS: vi.fn(() => true)
+}))
+
+const mockIsMacOS = vi.mocked(isMacOS)
 
 // Mock activityBarConfig
 vi.mock('./activityBarConfig', async () => {
@@ -55,6 +62,7 @@ describe('ActivityBar', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    mockIsMacOS.mockReturnValue(true)
   })
 
   describe('Left sidebar rendering', () => {
@@ -453,6 +461,22 @@ describe('ActivityBar', () => {
 
       const projectButton = screen.getByTestId('activity-bar-item-project')
       expect(projectButton).toHaveAttribute('title', 'Project (⌘B)')
+    })
+
+    it('shows Ctrl, not ⌘, in tooltips on Windows (#143)', () => {
+      mockIsMacOS.mockReturnValue(false)
+      render(
+        <ActivityBar
+          side="right"
+          activePanel={null}
+          onPanelClick={mockOnPanelClick}
+          projectPath="/some/path"
+        />
+      )
+
+      const terminalButton = screen.getByTestId('activity-bar-item-terminal')
+      expect(terminalButton).toHaveAttribute('title', 'Terminal (Ctrl+J)')
+      expect(terminalButton.getAttribute('title')).not.toMatch(/[⌘⌥⇧⌃]|Cmd/)
     })
   })
 })

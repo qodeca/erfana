@@ -6,26 +6,34 @@ import { z } from 'zod'
 export const ProjectChangedSchema = z.object({
   oldPath: z.string().nullable(),
   newPath: z.string().nullable(),
+  // The main-owned session's generation after this change; +1 per open or close
+  generation: z.number().int().nonnegative(),
 })
 export type ProjectChanged = z.infer<typeof ProjectChangedSchema>
 
-// Terminal event payloads (lightweight placeholders for future use)
-export const TerminalDataSchema = z.object({
-  terminalId: z.string(),
-  data: z.string(),
+// `file:getSession` reply: what the renderer may know of the open project
+export const ProjectSessionInfoSchema = z.object({
+  root: z.string(),
+  generation: z.number().int().nonnegative(),
 })
-export type TerminalData = z.infer<typeof TerminalDataSchema>
+export type ProjectSessionInfo = z.infer<typeof ProjectSessionInfoSchema>
 
-export const TerminalExitSchema = z.object({
-  terminalId: z.string(),
-  exitCode: z.number(),
-  signal: z.number().optional(),
-})
-export type TerminalExit = z.infer<typeof TerminalExitSchema>
+// Terminal event payloads live in ./terminal-schema; re-exported for existing importers
+export {
+  TerminalDataSchema,
+  TerminalExitSchema,
+  TerminalErrorSchema,
+  type TerminalData,
+  type TerminalExit,
+  type TerminalError
+} from './terminal-schema'
 
-export const TerminalErrorSchema = z.object({
-  terminalId: z.string(),
-  error: z.string(),
-})
-export type TerminalError = z.infer<typeof TerminalErrorSchema>
-
+/**
+ * The `{ success, error? }` reply most of the older request channels answer
+ * with: `success` says whether main did it, `error` carries the reason when it
+ * did not.
+ */
+export interface IpcAck {
+  success: boolean
+  error?: string
+}

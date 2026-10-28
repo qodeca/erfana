@@ -19,6 +19,16 @@ vi.mock('fs/promises', () => ({
   constants: { R_OK: 4 }
 }))
 
+// Persistence goes through atomicWriteJSON (temp file + rename, covered in
+// atomicWrite*.test.ts). Here it is routed to the mocked writeFile so these
+// tests keep asserting on what is written and when.
+vi.mock('../utils/atomicWrite', () => ({
+  atomicWriteJSON: async (path: string, content: unknown, space?: number) => {
+    const fs = await import('fs/promises')
+    await fs.writeFile(path, JSON.stringify(content, null, space), 'utf-8')
+  }
+}))
+
 // Mock os.homedir
 vi.mock('os', () => ({
   homedir: vi.fn(() => '/mock-home')
@@ -159,6 +169,52 @@ describe('GlobalSettingsService', () => {
       expect(settings.logging.level).toBe('info')
     })
 
+    // Issue #211 (design D7): a bad `files` block must not trip the
+    // corruption handler, which replaces every setting and writes a backup.
+    it('keeps other values and makes no backup when files is malformed', async () => {
+      vi.mocked(mkdir).mockResolvedValue(undefined)
+      vi.mocked(access).mockResolvedValue(undefined)
+      vi.mocked(readFile).mockResolvedValue(JSON.stringify({
+        logging: { level: 'debug' },
+        editor: { preserveLineBreaks: true },
+        files: 42
+      }))
+
+      await service.initialize()
+
+      const settings = service.getSettings()
+      expect(settings.logging.level).toBe('debug')
+      expect(settings.editor.preserveLineBreaks).toBe(true)
+      expect(settings.files).toEqual({ exclude: [] })
+      expect(copyFile).not.toHaveBeenCalled()
+      expect(writeFile).not.toHaveBeenCalled()
+      expect(logger.warn).not.toHaveBeenCalledWith('Global settings file corrupted', expect.anything())
+    })
+
+    it('loads a valid files.exclude list', async () => {
+      vi.mocked(mkdir).mockResolvedValue(undefined)
+      vi.mocked(access).mockResolvedValue(undefined)
+      vi.mocked(readFile).mockResolvedValue(JSON.stringify({
+        files: { exclude: ['tmp', 3] }
+      }))
+
+      await service.initialize()
+
+      expect(service.getSetting('files')).toEqual({ exclude: ['tmp', ''] })
+      expect(copyFile).not.toHaveBeenCalled()
+    })
+
+    it('writes the files default into a new settings file', async () => {
+      vi.mocked(mkdir).mockResolvedValue(undefined)
+      vi.mocked(access).mockRejectedValue(new Error('ENOENT'))
+      vi.mocked(writeFile).mockResolvedValue(undefined)
+
+      await service.initialize()
+
+      const written = JSON.parse(vi.mocked(writeFile).mock.calls[0][1] as string)
+      expect(written.files).toEqual({ exclude: [] })
+    })
+
     it('throws AppError when directory creation fails', async () => {
       const mkdirError = new Error('Permission denied')
       vi.mocked(mkdir).mockRejectedValue(mkdirError)
@@ -167,6 +223,67 @@ describe('GlobalSettingsService', () => {
         code: ErrorCode.GLOBAL_SETTINGS_DIR_CREATE_FAILED,
         message: expect.stringContaining('Permission denied')
       })
+    })
+  })
+
+  describe('save after a failed load', () => {
+    const SETTINGS = '/mock-home/.erfana/settings.json'
+
+    async function failToLoad(): Promise<void> {
+      vi.mocked(mkdir).mockResolvedValue(undefined)
+      vi.mocked(access).mockResolvedValue(undefined)
+      vi.mocked(readFile).mockRejectedValue(new Error('EIO: i/o error'))
+      await expect(service.initialize()).rejects.toMatchObject({
+        code: ErrorCode.GLOBAL_SETTINGS_READ_FAILED
+      })
+      vi.mocked(copyFile).mockReset()
+      vi.mocked(writeFile).mockReset()
+    }
+
+    it('backs the real file up before the first save overwrites it', async () => {
+      await failToLoad()
+      vi.mocked(copyFile).mockResolvedValue(undefined)
+      vi.mocked(writeFile).mockResolvedValue(undefined)
+
+      await service.setSetting('logging', { level: 'debug' })
+
+      expect(copyFile).toHaveBeenCalledWith(SETTINGS, expect.stringMatching(/settings\.json\.bak-\d{4}-/))
+      expect(vi.mocked(copyFile).mock.invocationCallOrder[0]).toBeLessThan(
+        vi.mocked(writeFile).mock.invocationCallOrder[0]
+      )
+    })
+
+    it('backs up only once', async () => {
+      await failToLoad()
+      vi.mocked(copyFile).mockResolvedValue(undefined)
+      vi.mocked(writeFile).mockResolvedValue(undefined)
+
+      await service.setSetting('logging', { level: 'debug' })
+      await service.setSetting('logging', { level: 'info' })
+
+      expect(copyFile).toHaveBeenCalledTimes(1)
+    })
+
+    it('refuses to save when the backup cannot be made', async () => {
+      await failToLoad()
+      vi.mocked(copyFile).mockRejectedValue(new Error('EACCES'))
+
+      await expect(service.setSetting('logging', { level: 'debug' })).rejects.toMatchObject({
+        code: ErrorCode.GLOBAL_SETTINGS_WRITE_FAILED
+      })
+      expect(writeFile).not.toHaveBeenCalled()
+    })
+
+    it('makes no extra backup after a normal load', async () => {
+      vi.mocked(mkdir).mockResolvedValue(undefined)
+      vi.mocked(access).mockRejectedValue(new Error('ENOENT'))
+      vi.mocked(writeFile).mockResolvedValue(undefined)
+      await service.initialize()
+      vi.mocked(copyFile).mockReset()
+
+      await service.setSetting('logging', { level: 'debug' })
+
+      expect(copyFile).not.toHaveBeenCalled()
     })
   })
 
@@ -217,6 +334,23 @@ describe('GlobalSettingsService', () => {
       vi.mocked(writeFile).mockResolvedValue(undefined)
       await service.initialize()
       vi.clearAllMocks() // Clear init calls
+    })
+
+    it('L6 refuses a comment identity with a control or invisible character, with a message naming the field', async () => {
+      const bidi = `Ada${String.fromCodePoint(0x202e)}x`
+      await expect(
+        service.setSetting('comments', { authorName: bidi, identityNoticeSeen: true })
+      ).rejects.toMatchObject({
+        code: ErrorCode.GLOBAL_SETTINGS_VALIDATION_FAILED,
+        message: expect.stringContaining('comments.authorName: The name contains a control or invisible character.')
+      })
+      await expect(
+        service.setSetting('comments', { authorName: 'Ada', authorEmail: `ada${String.fromCodePoint(0x200b)}@example.com`, identityNoticeSeen: true })
+      ).rejects.toMatchObject({ message: expect.stringContaining('comments.authorEmail') })
+      expect(writeFile).not.toHaveBeenCalled()
+
+      await service.setSetting('comments', { authorName: 'Ada Lovelace', authorEmail: 'ada@example.com', identityNoticeSeen: true })
+      expect(service.getSetting('comments')).toEqual({ authorName: 'Ada Lovelace', authorEmail: 'ada@example.com', identityNoticeSeen: true })
     })
 
     it('validates value against schema', async () => {

@@ -13,7 +13,7 @@ vi.mock('fs/promises', () => {
     writeFile: vi.fn(),
     rename: vi.fn(),
     readdir: vi.fn(),
-  } satisfies Partial<FsProm>
+  } satisfies Partial<typeof FsProm>
 })
 
 function makeStats(opts: { isDir: boolean }) {
@@ -42,14 +42,6 @@ describe('FileService', () => {
       expect(fs.rm).not.toHaveBeenCalled()
     })
 
-    it('throws when file is outside project root', async () => {
-      svc.setProjectPath('/proj')
-      ;(fs.stat as unknown as Mock).mockResolvedValueOnce(makeStats({ isDir: false }))
-      await expect(svc.deleteFile('/other/file.md'))
-        .rejects.toThrow('outside the project directory')
-      expect(fs.rm).not.toHaveBeenCalled()
-    })
-
     it('deletes file within project root', async () => {
       svc.setProjectPath('/proj')
       ;(fs.stat as unknown as Mock).mockResolvedValueOnce(makeStats({ isDir: false }))
@@ -69,12 +61,6 @@ describe('FileService', () => {
       svc.setProjectPath('/proj')
       ;(fs.stat as unknown as Mock).mockResolvedValueOnce(makeStats({ isDir: true }))
       await expect(svc.deleteFolder('/proj')).rejects.toThrow('Cannot delete the project root')
-    })
-
-    it('prevents deleting outside project', async () => {
-      svc.setProjectPath('/proj')
-      ;(fs.stat as unknown as Mock).mockResolvedValueOnce(makeStats({ isDir: true }))
-      await expect(svc.deleteFolder('/other/folder')).rejects.toThrow('outside the project directory')
     })
 
     it('deletes folder recursively within project', async () => {

@@ -1,0 +1,23 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+
+/*
+ * Used only by top pages (index.html, refused.html), never by a frame: saving
+ * it swaps the stylesheet in place, without a reload (WI-15).
+ */
+:root {
+  --page-mark: page-v1;
+}
+
+body {
+  margin: 0;
+  padding: 1rem;
+  font: 15px/1.5 system-ui, sans-serif;
+  color: #1b1b1f;
+  background: #eef3f8;
+}
+
+iframe {
+  border: 1px solid #9aa7b4;
+  background: #ffffff;
+}

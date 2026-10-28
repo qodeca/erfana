@@ -1,40 +1,102 @@
 # Known Issues & Workarounds
 
-Current issues and their workarounds. For historical resolved issues, see [archive/resolved-issues.md](./archive/resolved-issues.md).
+Current issues and their workarounds. For historical resolved issues, see [archive/resolved-issues.md](https://github.com/qodeca/erfana/blob/1d814e05d98b3005e5c13c0624b09653708136f7/docs/archive/resolved-issues.md).
+
+**Issue numbers**: a number written as a link (for example [#60](https://github.com/qodeca/erfana/issues/60)) is on the public `qodeca/erfana` tracker. A bare number without a link (#146, #147, #149, #150, #163, #164, #166, #177, #213, #241) is from the private pre-migration tracker: it does not resolve on `qodeca/erfana`, and a pre-migration number that the public tracker has since reached points at an unrelated issue. Treat bare numbers as provenance only – see [`docs/windows/implementation-plan.md`](./windows/implementation-plan.md).
+
+---
+
+## Accessibility
+
+An audit of the renderer on 2026-08-31 found nine defects. They share a cause: a
+role or an ARIA attribute was declared without the behaviour it promises, which is
+worse than declaring nothing – a screen reader changes its own behaviour on the
+strength of that promise and then gets nothing back. The design system decides the
+correct pattern for each; see [`docs/design-system/README.md`](design-system/README.md) for which
+card governs which defect.
+
+**Fixed in v0.22.0:** the project tree works with the keyboard and announces each
+row's own name ([#88](https://github.com/qodeca/erfana/issues/88),
+[#89](https://github.com/qodeca/erfana/issues/89)); every right-click menu opens with
+Shift+F10 or the Menu key and is keyboard-operable
+([#90](https://github.com/qodeca/erfana/issues/90)); every dialog keeps Tab inside
+itself ([#91](https://github.com/qodeca/erfana/issues/91)); tab close buttons show the 2px
+focus ring (part of [#93](https://github.com/qodeca/erfana/issues/93));
+"Reduce motion" stops every animation and small controls have 24 x 24 targets
+([#96](https://github.com/qodeca/erfana/issues/96)). Details are in the
+[changelog](./CHANGELOG.md#0220). Some of these issues may still be open on the tracker
+until they are closed after the release.
+
+Still shipping in v0.22.0:
+
+| Issue | What is broken | Workaround |
+|---|---|---|
+| [#92](https://github.com/qodeca/erfana/issues/92) | The app declares no language, so a screen reader may read the interface with the wrong voice. The issue was folded into [#230](https://github.com/qodeca/erfana/issues/230) and closed, but `src/renderer/index.html` still has no `lang` attribute (checked 2026-10-25). | Set the reader's default language manually. |
+| [#93](https://github.com/qodeca/erfana/issues/93) | Tab close buttons now show focus, but the welcome panel is still a Tab stop with no visible focus: its `.panel-content` area sets `outline: none` (`AppDockLayout.css`, checked 2026-10-25). The issue was folded into [#230](https://github.com/qodeca/erfana/issues/230) and closed. The editor panel was not re-checked. | None. |
+| [#94](https://github.com/qodeca/erfana/issues/94) | The rename field and the prompt textarea are announced as unlabelled boxes, and no validation error is linked to its field. | None. |
+| [#95](https://github.com/qodeca/erfana/issues/95) | Folder git state is shown by colour alone, and the `M3 U2 D1` counts change without being announced. | The per-file badges carry a letter; read those instead of the folder dot. |
 
 ---
 
 ## Windows-specific issues
 
-Phases 0–2 of Windows enablement shipped in **v0.9.3** (2026-04-22); Phase 4 (local Whisper trust chain + Windows x64 binary) shipped in **v0.9.4** (merge `110f1b9`, 2026-04-23). The following gaps remain user-visible until Phases 3, 5, and 6 ship. See [`docs/windows/implementation-plan.md`](./windows/implementation-plan.md) for the canonical roadmap.
+Phases 0–2 of Windows enablement shipped in **v0.9.3** (2026-04-22); Phase 4 (local Whisper trust chain + Windows x64 binary) shipped in **v0.9.4** (merge `110f1b9` – pre-migration; no longer resolvable, that history was rewritten at the 2026-06 migration; 2026-04-23); Phase 3 (screenshots) shipped in **v0.12.0**. The following gaps remain user-visible until Phases 5 and 6 ship. See [`docs/windows/implementation-plan.md`](./windows/implementation-plan.md) for the canonical roadmap.
+
+### Terminal: Windows has two narrower safeguards
+
+**Issue**: Two v0.22.0 terminal safeguards rely on knowing which program runs in the terminal, which Erfana cannot tell on Windows. **Restart terminal** asks first while Claude Code runs or the terminal is still producing output after you typed in it, but a silent program that has printed nothing for a while is ended without a question (on macOS any running program triggers the prompt). And when a program floods the terminal, output is batched on Windows but the program is never held back while the window catches up.
+
+**Workaround**: Stop the program in the terminal yourself (Ctrl+C) before restarting it.
+
+**Tracking**: Platform limitation; see the [changelog](./CHANGELOG.md#0220).
+
+---
 
 ### SmartScreen warning on first launch
 
-**Issue**: First-time launch of the NSIS installer triggers a Windows SmartScreen warning (`Windows protected your PC`) because Erfana is not yet code-signed.
+**Issue**: First-time launch of the NSIS installer can trigger a Windows SmartScreen warning (`Windows protected your PC`). The installer **is** code-signed – Azure Artifact Signing shipped in v0.9.5 (`azureSignOptions` in `electron-builder.yml`) – but SmartScreen also weighs download reputation, which a signing identity builds up over time.
 
 **Workaround**: Right-click the `.exe` → Properties → Unblock; OR click "More info → Run anyway" in the SmartScreen dialog.
 
-**Tracking**: #166 (Phase 5 — code-signing).
+**Tracking**: #177 (SmartScreen reputation). Phase 5 (#166) is now NSIS UX only – see [`docs/windows/implementation-plan.md`](./windows/implementation-plan.md).
+
+---
+
+### No local Windows package can be built
+
+**Issue**: Both `npm run build:win` and `npm run build:unpack` stop with `Error: Unable to find valid azure env field AZURE_TENANT_ID for signing`. `electron-builder.yml` declares `win.azureSignOptions` unconditionally and hooks `afterSign: ./scripts/resign.js`; CI supplies the Azure values at invocation, and a developer machine has none. There is no unsigned fallback — `--dir` fails the same way. Older notes describing local Windows builds as merely "unsigned" are wrong.
+
+**Workaround**: None today. Use CI: `release.yml` builds and signs Windows on `windows-latest`, and that path is healthy. Observed on Windows 11 Pro 26200 on 2026-09-15; inferred but not exercised for a Windows target cross-built from macOS or Linux.
+
+**Tracking**: [#132](https://github.com/qodeca/erfana/issues/132).
+
+---
+
+### The e2e suite never deletes its temp folders
+
+**Issue**: Playwright fixture teardown fails with `EBUSY: resource busy or locked, rmdir '.e2e-temp\test-…'` because files are still held when cleanup runs. The line repeats for nearly every test. One validation session left 419 folders and 6.1 MB under `.e2e-temp`.
+
+**Workaround**: Delete `.e2e-temp` by hand between runs. The directory is git-ignored, so this is unbounded litter and log noise rather than breakage — but the repeated teardown line does bury real failures in the e2e output.
+
+**Tracking**: [#134](https://github.com/qodeca/erfana/issues/134).
 
 ---
 
 ### `npm run test:cov` exits 1 on Windows
 
-**Issue**: All tests pass but vitest's v8 coverage aggregator hits an `ENOENT` race on Windows NTFS during the `coverage/.tmp` cleanup step. Wrapper exits with code 1 even though the test suite is green.
+**Resolved 2026-09-30.** `npm run test:cov` passes on a Windows host. It used to fail for two reasons: the runner spawned `npx.cmd` without a shell, which a current Node rejects with `EINVAL` before any test runs, and the symlink cases behind the `scripts/fuses.js` and `src/main/utils/tarArchive.ts` per-file floors were skipped on win32. The runner now starts vitest through `node`, the tar tests build their fixtures without a real symlink, and the fuses tests gate only their POSIX mode-bit assertions. On a Windows host without symlink privilege (no Developer Mode, not elevated) the symlink cases still skip, and both floors still hold.
 
-**Workaround**: Run `npx vitest --run --config vitest.main.ts --coverage` directly (exits 0). On macOS the wrapper exits 0 normally.
-
-**Tracking**: #158 (Phase 6 — switch coverage provider to Istanbul OR reduce parallelism on Windows).
+**Tracking**: [`docs/windows/known-flakes.md` § `npm run test:cov` cannot pass on a Windows host](./windows/known-flakes.md#npm-run-testcov-cannot-pass-on-a-windows-host).
 
 ---
 
-### Long paths (>260 chars) require user opt-in
+### Long paths (>260 chars): the terminal cannot start there
 
-**Issue**: File operations on paths longer than 260 chars fail unless the user enabled the Win32 long-paths group-policy setting. The `isWindowsLongPath` helper that would auto-prefix `\\?\` is dead code.
+**Issue**: A project whose path is longer than 260 chars cannot open a terminal. Win32 `CreateProcess` refuses the working directory whatever the long-paths policy says. Since v0.19.0 the Terminal panel says so ("This folder's path is longer than Windows allows for a terminal…") instead of the bare "Failed to create terminal". File operations (open, edit, save, preview) on the same paths worked in the 2026-09-03 Windows verification, so the earlier claim that they fail without the opt-in is withdrawn. The `\\?\` auto-prefixing that `isWindowsLongPath` was written for is still not wired into file I/O.
 
-**Workaround**: Enable Win32 long paths per [`docs/build/windows.md`](./build/windows.md) step 5 + `git config --global core.longpaths true`.
+**Workaround**: Move the project to a shorter path. For file operations, enabling Win32 long paths per [`docs/build/windows.md`](./build/windows.md) step 5 + `git config --global core.longpaths true` remains the safe default.
 
-**Tracking**: #163 (decision-deferred to Phase 6 with promotion criteria recorded inline at `PlatformConfig.ts:194-201`).
+**Tracking**: #163 (the `\\?\` prefixing stays deferred; the helper itself was promoted for the terminal check in v0.19.0).
 
 ---
 
@@ -70,6 +132,16 @@ Phases 0–2 of Windows enablement shipped in **v0.9.3** (2026-04-22); Phase 4 (
 
 ---
 
+### Local Whisper: Windows needs the Microsoft VC++ redistributable
+
+**Issue**: The Windows whisper build (`whisper.exe` and its 4 DLLs) links the Microsoft C++ runtime dynamically – `MSVCP140`, `VCRUNTIME140`, `VCRUNTIME140_1`, and `VCOMP140` (OpenMP, imported by `ggml-cpu.dll`). The zip does not carry these DLLs. On a machine without the Microsoft Visual C++ 2015–2022 (x64) redistributable, `whisper.exe` cannot start, so local transcription fails.
+
+**Workaround**: Install the Microsoft Visual C++ 2015–2022 Redistributable (x64), which most Windows machines already have, or use the OpenAI API backend. `whisper-build-v1.8.4-erfana2` was checked against runtime 14.44 and newer (see [phase4-binary-spec.md](./windows/phase4-binary-spec.md#verification-evidence--erfana2)); an older runtime, or none at all, is untested.
+
+**Tracking**: Not a regression – `erfana1` had the same requirement. Shipping the runtime DLLs app-local in the zip would remove it.
+
+---
+
 ### Local Whisper: cancellation on Windows is abrupt
 
 **Issue**: On Windows, `child.kill('SIGTERM')` maps to `TerminateProcess` — no graceful shutdown. Any partially-written `${audioPath}.txt` from whisper.cpp's `-otxt` flag may be corrupted.
@@ -92,10 +164,10 @@ Phases 0–2 of Windows enablement shipped in **v0.9.3** (2026-04-22); Phase 4 (
 
 ### Directory watcher latency on Windows
 
-**Issue**: End-to-end file-creation notification latency (terminal `touch` → Project Tree shows the new file) is 1500–2500 ms on Windows versus 200–600 ms on macOS/Linux. The difference is not an Erfana bug — it's the cost of the underlying OS primitives.
+**Issue**: End-to-end file-creation notification latency (terminal `touch` → Project Tree shows the new file) is 1500–2500 ms on Windows versus 200–600 ms on macOS/Linux. The difference is not an Erfana bug — it's the cost of the underlying OS primitives. These figures were measured with the chokidar backend, before [#211](https://github.com/qodeca/erfana/issues/211) moved Windows to a native `fs.watch` watcher (macOS followed in v0.22.0); they have not been re-measured since, but the e2e budget below still holds with the native backend.
 
 Pipeline contributors on Windows:
-- **chokidar `ReadDirectoryChangesW`** — 100–500 ms callback latency (vs. <5 ms for POSIX inotify).
+- **`ReadDirectoryChangesW`** (under chokidar before #211, under Node's `fs.watch` since) — 100–500 ms callback latency (vs. <5 ms for POSIX inotify). Since #211 each surviving event also waits for one `lstat` in a queue of at most two at a time.
 - **Windows Defender on-access scanning** — 200–800 ms scan of the new file before the FS notification fires. Enabled by default in Windows 11.
 - **ThrottledWorker collection delay** — 75 ms (VS Code value, deterministic).
 - **`useDirectoryWatcher` consumer debounce** — 250 ms (added in #241 to absorb multi-file write storms; same on macOS and Windows). Pushes the floor for cross-platform measurement above the 500 ms NFR-001 micro-target by design.
@@ -119,7 +191,7 @@ Pipeline contributors on Windows:
 
 ### cmd.exe terminals can leak pre-bootstrap text into scrollback after aggressive resizing
 
-**Issue**: On Windows, ConPTY keeps its own screen buffer and re-emits the buffer contents back through the PTY stream on every terminal resize. The Git Bash and PowerShell bootstraps emit a full CSI 2J / CSI 3J / CSI H sequence after the startup marker so ConPTY's buffer is wiped before the interactive shell takes over, leaving nothing for a later reflow to replay. cmd.exe can only clear the visible viewport (`cls` → CSI 2J + CSI H); `CSI 3J` (scrollback clear) isn't available from cmd without spawning a child process. In rare cases, a user who opens a fresh cmd.exe terminal and immediately drags the panel splitter may see faint reflowed pwd / marker text appear in scrollback history (not the visible viewport).
+**Issue**: On Windows, ConPTY keeps its own screen buffer and re-emits the buffer contents back through the PTY stream on every terminal resize. The Git Bash and PowerShell bootstraps emit a full CSI 2J / CSI 3J / CSI H sequence after the startup marker so ConPTY's buffer is wiped before the interactive shell takes over, leaving nothing for a later reflow to replay. The cmd.exe bootstrap waits in `pause >nul` after the marker, then runs `cls` once main has written `\r` (so the marker frame is flushed first and the cd line and marker are wiped from ConPTY's buffer; a resize repaint no longer brings them back). cmd.exe can only clear the visible viewport (`cls` → CSI 2J + CSI H); `CSI 3J` (scrollback clear) isn't available from cmd without spawning a child process. In rare cases, a user who opens a fresh cmd.exe terminal and immediately drags the panel splitter may see faint reflowed pwd / marker text appear in scrollback history (not the visible viewport).
 
 **Workaround**: Set `$env:SHELL` to `pwsh.exe` or Git Bash (`C:\Program Files\Git\usr\bin\bash.exe`) before launching Erfana — both emit the full three-sequence clear and have no scrollback-reflow leak.
 
@@ -161,6 +233,23 @@ Pipeline contributors on Windows:
 
 ---
 
+## HTML preview links
+
+**A link can stay dead in two cases** (sd-074b §5.1), both unchanged from before links worked at all:
+
+- The page's own JavaScript calls `stopPropagation()` on the click, which hides the event from Erfana. Nothing happens and no failure is recorded, because Erfana never saw the click.
+- The link lives inside a **closed** shadow root, which `composedPath()` cannot see from outside the page.
+
+**A link out of the preview asks first, and only one question is open at a time.** A link to an external destination raises a native message box naming the destination — the origin, or the scheme plus the addressed target for `mailto:`/`tel:`. That dialog is **owned by the window whose preview asked**, so it is modal to that window and is raised with it rather than sitting behind the app. Only one such question can be open per window: a second external link clicked while the first is still waiting is **refused, not queued**, and shows up in the panel's failure badge as a blocked link. Clicking it again once the first question is answered works normally.
+
+**A page's link opens a new tab by default.** Out of the box every plain link opens a new Erfana tab, so clicking through a generated documentation site accumulates tabs quickly. Idle previews sleep after `PREVIEW.MAX_LIVE_VIEWS`, so the cost is bounded, but the tabs remain until closed. To avoid that, switch the tab's **Open links in this tab** toggle on: a plain link to another previewed page then replaces the page in the same tab, with Back and Forward. The mode is per tab and in memory only, so after a restart tabs open links in new tabs again – see [HTML preview § Links](./html-preview/README.md#links) and [§ Back and Forward](./html-preview/README.md#back-and-forward).
+
+**A link inside a frame with `target="_top"` or `_blank` does nothing.** Links inside a frame move that frame, not the tab. A frame link that asks for the whole tab or a new tab is dropped, and because nothing outside the page sees that click, it is not listed in the failure badge either – see [HTML preview § Frames](./html-preview/README.md#frames).
+
+**Page state is lost when a preview sleeps.** A suspended preview reloads from disk when you return to it: scroll position, typed text and in-memory JavaScript state do not survive.
+
+**Windows: the preview's shader cache is never purged, and a purge timeout in the log is harmless.** On Windows (observed under Electron 39; not re-probed under Electron 44) clearing the `shadercache` storage of a preview's session partition never completes – probed per storage type on 2026-09-04, seven of the eight types settle in 0–5 ms and that one never returns, every time, only inside the full app. It holds compiled GPU programs, not page data, so the purge now names the seven data-bearing storages explicitly (`PURGED_STORAGES` in the storage seal) and leaves the shader cache out; the opaque origin still seals the page's storage. Every purge and teardown step is time-bounded as well (`PREVIEW.PURGE_TIMEOUT_MS`, `TEARDOWN_STEP_TIMEOUT_MS`, `PARTITION_PURGE_TIMEOUT_MS`, all 2 s), so a `... timed out after 2000ms` warn line in `main.log` means one step was skipped after its deadline and the teardown carried on – it is bounded and harmless, not a hang. Since the shader cache was dropped from the purge those lines no longer fire on the verified host; the timeouts stay as belts.
+
 ## Resolved (kept for the trail)
 
 ### v0.9.5 macOS — terminal does not work in the signed DMG (resolved in v0.9.6)
@@ -189,7 +278,7 @@ Pipeline contributors on Windows:
 tccutil reset ScreenCapture com.erfana.app
 ```
 
-Then relaunch Erfana and grant the permission again when prompted. A relaunch is genuinely required – macOS applies a fresh Screen Recording grant only to a newly-launched process – which is why the in-app dialog offers a *Relaunch* button next to *Open settings*.
+Then relaunch Erfana and grant the permission again when prompted. A relaunch is genuinely required – macOS applies a fresh Screen Recording grant only to a newly-launched process – which is why the in-app dialog offers a *Relaunch Erfana* button next to *Open Screen Recording settings*.
 
 **Tracking**: Accepted OS behaviour; no code fix planned.
 
@@ -217,7 +306,7 @@ Re-enable with `gh workflow enable "E2E Tests"` once the root cause is isolated.
 
 ### E2E terminal-driven tests sensitive to user's shell init speed
 
-**Issue**: E2E tests that drive the terminal via `terminal.sendCommand` assume the PTY's interactive shell will be ready 1500 ms after the panel becomes visible. The 1500 ms is a blind sleep in `TerminalPage.waitForPrompt` (`e2e/pages/terminal.page.ts:29` `PTY_INIT_DELAY_MS`), not a real readiness probe. On a developer machine with a heavy `.zshrc` (oh-my-zsh, slow plugins, async work), `exec -l "$SHELL" -i` in `TerminalService` can take >1500 ms to source startup files, leaving the typed command in the kernel PTY buffer with no shell to execute it; CI runners and clean dev machines have well under 500 ms init and pass the test, hiding the dependency.
+**Issue**: E2E tests that drive the terminal via `terminal.sendCommand` assume the PTY's interactive shell will be ready 1500 ms after the panel becomes visible. The 1500 ms is a blind sleep in `TerminalPage.waitForPrompt` (the `PTY_INIT_DELAY_MS` constant in `e2e/pages/terminal.page.ts`), not a real readiness probe. On a developer machine with a heavy `.zshrc` (oh-my-zsh, slow plugins, async work), `exec -l "$SHELL" -i` in `TerminalService` can take >1500 ms to source startup files, leaving the typed command in the kernel PTY buffer with no shell to execute it; CI runners and clean dev machines have well under 500 ms init and pass the test, hiding the dependency.
 
 **Symptom** (pre-fix): `e2e/directory-watcher.e2e.ts` times out at its 2000 ms budget with the new file never appearing in the tree on macOS dev machines with a heavy `.zshrc`. Instrumented PTY tracing showed the keystrokes reach the kernel PTY buffer and the kernel TTY line discipline echoes each character back, but no shell prompt is rendered and no command executes. The shell's first real output (e.g. an `(eval):N: warning: 1 jobs SIGHUPed` line) only arrives 5–6 s later, after the test has given up and `closeApp` has torn the PTY down.
 
@@ -243,9 +332,9 @@ See [E2E troubleshooting § Terminal commands not executing](./testing/e2e-troub
 
 ### Git Status: Global .gitignore not supported
 
-**Issue**: Files ignored via global gitignore (`~/.gitignore_global` or `~/.config/git/ignore`) may appear as "untracked" in the project tree git status indicators.
+**Issue**: When no `git` binary is available, files ignored via global gitignore (`~/.gitignore_global` or `~/.config/git/ignore`) may appear as "untracked" in the project tree git status indicators.
 
-**Root cause**: isomorphic-git only reads local `.gitignore` files. Does not support global gitignore. Known library limitation.
+**Root cause**: The git status worker prefers native `git` and falls back to isomorphic-git only when no git binary is found (`GitStatusService.ts`, `git-status.worker.ts`). isomorphic-git reads only local `.gitignore` files – a known library limitation – so the gap applies to that fallback. With native `git`, ignore rules are git's own.
 
 **Workaround**: Add patterns to the project's local `.gitignore` file instead of global config.
 
@@ -259,16 +348,36 @@ See [E2E troubleshooting § Terminal commands not executing](./testing/e2e-troub
 
 **Root cause**: chokidar directory watcher + git watcher + terminal PTY together consume most available FDs. On large repos, this exceeds the system FD limit (~10K on macOS).
 
-**Mitigation (v0.9.0)**: Git status now runs in a worker thread (#147) and uses native `git status --porcelain` for repos with `.git/index` > 5 MB. When FD pressure causes EBADF, the worker returns a transient error instead of cascading. The EMFILE restart cascade was also fixed (#146).
+**Mitigation (v0.9.0)**: Git status now runs in a worker thread (#147). It always prefers native `git status --porcelain`, whatever the repo size, and falls back to isomorphic-git only when no git binary is found, when the binary fails to start (ENOENT or EACCES), or after three consecutive transient native failures (`GitStatusService.ts`, `workers/git-status.worker.ts`). When FD pressure makes native git fail (e.g. EBADF), the worker returns a "temporarily unavailable" result instead of cascading, and only the third failure in a row falls back. The EMFILE restart cascade was also fixed (#146).
 
 **Fixed – black window on 100k+ files ([#60](https://github.com/qodeca/erfana/issues/60))**: opening a very large project (reported at 174k nodes on an external volume) used to blank the window outright. The project tree's `flattenTree` built its flat array with `flattened.push(...flattenTree(child))`; spread-into-push is `Function.prototype.apply`, whose argument count is bounded by the engine stack (~10^5 on V8), so the first directory whose *flattened subtree* crossed that bound threw `RangeError: Maximum call stack size exceeded`, React 18 unmounted the entire root, and nothing was left to paint. `flattenTree` is now an explicit-stack loop that pushes exactly one node per iteration – output-identical (pre-order DFS, forward sibling order, `depth` per level, `index` reset per parent) and covered by a 200k-node reproduction. Throws that happen *while Erfana is drawing the interface* now surface a recovery screen with Restart / Copy error details / Open logs folder instead of a black window – or, for the project tree specifically, a "Project tree unavailable" panel with the rest of the app still running. Errors outside drawing (background work, event handlers, rejected promises) are written to the log without interrupting the UI – see [UI Components § Error containment](./ui-components.md#error-containment).
 
-**Remaining – performance, not crashes**: a 100k+-file project still opens slowly. Per the #60 diagnosis the cost is dominated by the directory scan (~2.0 s for 169k files) and the main → renderer IPC clone (~1.2 s); the tree is neither memoized nor virtualized, directories load eagerly, and an open cannot be cancelled. Those limits are owned by **#149** (React memoization) and **#150** (lazy loading + virtualization) – see the [large-project performance plan](./large-project-performance-plan.md). The directory watcher also still consumes too many FDs on very large repos. Mitigated by `.erfana/settings.json` ignore patterns.
+**Improved in v0.22.0 – performance**: the project tree now draws only the rows on screen, build and cache folders the watcher ignores (`dist`, `build`, `.venv`, `.next`, `coverage`, …) still show but are read only when expanded, the other folders are read several at a time, and past 50,000 entries (`MAX_WALK_ENTRIES` in `FileService.ts`) the remaining folders are read on expand; a save no longer re-reads the tree. On a 120,000-file test project the tree was ready about 3 times sooner (figures in the [changelog](./CHANGELOG.md#0220)). An open still cannot be cancelled. macOS and Windows both use the native directory watcher, which holds at most 512 handles per project instead of one per folder and starts only after the first tree read; Linux keeps chokidar. Remaining work is tracked in the [large-project performance plan](./large-project-performance-plan.md).
 
-**Workaround**: Use `.erfana/settings.json` to ignore large subdirectories:
+**Workaround**: leave large folders you never need in Erfana out with the `files.exclude` list ([#211](https://github.com/qodeca/erfana/issues/211)). An excluded folder is not shown, not read when the tree loads, and not watched – unlike `watcher.ignoreList`, which only stops watching and still reads and shows the folder. In the project's `.erfana/settings.json` (or `~/.erfana/settings.json` for every project):
 ```json
-{ "watcher": { "ignoreList": { "mode": "extend", "patterns": ["large-folder"] } } }
+{ "files": { "exclude": [".local/test-tmp", "large-folder"] } }
 ```
+Then close the project and open it again (after editing the global file, restart Erfana first). Syntax and limits: the "Excluded folders" section of the user guide's settings reference, linked from [Settings § Exclude list](./settings.md#exclude-list-filesexclude). Git status still covers the whole repository, so also add the folder to `.gitignore` if git does not need to see it.
+
+---
+
+### Excluded folders (`files.exclude`): known limits
+
+**Issue**: [#211](https://github.com/qodeca/erfana/issues/211) added the exclude list and a new Windows directory watcher, which macOS also uses since v0.22.0. These limits are known and accepted:
+
+1. **(macOS and Windows) A nested folder that becomes excluded, hidden or ignored after the project opened stays inside the native watch until the project is reopened.** Typical cases are a new `packages/a/node_modules` from `npm install`, or a new `src/tmp` matching a pattern such as `**/tmp`. A new folder of that kind at the top level of the project is left out at once. Excluded or ignored folders beyond the watcher's limits (64 remembered nested folders, 512 handles) are in the same position. Their changes are still ignored one by one, but a heavy burst there can overflow the system's change buffer; Erfana then cannot tell where the lost changes were and re-reads the whole tree – about once per burst (a second after it ends, or every 5 s while it lasts). Everything excluded by a path entry, and every such folder that already existed when the project opened, is unaffected.
+2. **The exclude list does not change git status.** It hides folders from the tree and the watcher, not from git; an excluded folder that git still tracks, or sees as untracked, keeps costing git time and still counts in the git status bar.
+3. **(macOS and Windows) "One watcher for the whole project" is one watcher per project that holds a small, bounded set of system handles** (typically tens, at most 512), not a single handle, so that excluded folders can be left out entirely.
+4. **`.erfana` cannot be excluded**, so the settings that hide things stay findable in the tree.
+5. **An overly costly pattern fails open.** A pattern whose match exceeds the per-path work budget does not hide that path, and after 100 such overruns in one project session every pattern entry is switched off until the project is reopened (path entries keep working; one warning in the log). Real lists do not come near it; it exists because a cloned repository's settings are untrusted.
+6. **(macOS and Windows) A folder that keeps failing to be watched is left unwatched until the next restart or project open** – after 3 re-opens in 60 s, or when the system reports it as gone while it is in fact still there. The tree still shows it correctly after the next re-read; only live updates from inside it pause. A new folder created while the watcher already holds its 512 handles is left unwatched the same way, until the project is closed and opened again.
+7. **Changes made while the first tree is loading can show late.** The directory watcher now starts only after the project's first tree read. A change made during that read in a folder the read has already passed, or before the watcher has opened that folder's watch, shows up with the next change or a manual refresh (Cmd/Ctrl+Alt+R).
+8. **Changes to the list apply the next time the project is opened after being closed.** The global file is read when Erfana starts. Nothing in the tree marks that something was excluded.
+
+**Workaround**: close the project and open it again for items 1, 5, 6 and 8 (restart Erfana first after editing the global file); refresh the tree for item 7; use `.gitignore` for item 2.
+
+**Tracking**: [#211](https://github.com/qodeca/erfana/issues/211); design and the full list in [`docs/designs/211-large-project-windows-watcher.md`](./designs/211-large-project-windows-watcher.md) §9–§10; accepted debt in [technical debt § 65](./technical-debt.md#65-accepted-trade-offs-from-211-2026-09). Content-only changes no longer re-read the tree (only git status refreshes for them – see [watcher structural refresh](./performance/watcher-structural-refresh.md)); lazy loading stays with #150.
 
 ---
 
@@ -283,7 +392,7 @@ Error:
 ModuleNotFoundError: No module named 'distutils'
 ```
 
-Solution: downgrade to Python 3.12 (the `node-gyp` shipped with Node 24 doesn't yet handle Python 3.13's removed `distutils`). Not auto-fixable — see [`docs/build/windows.md`](./build/windows.md) step 2.
+Solution: use Python 3.12 (long-standing known-good) or 3.14.x – 3.14.3 was verified on the 2026-09-03 Windows 11 release check; only 3.13 fails (the `node-gyp` shipped with Node 24 doesn't handle Python 3.13's removed `distutils`). Not auto-fixable — see [`docs/build/windows.md`](./build/windows.md) step 2.
 
 **2. Windows 11 — `cmd.exe` current-directory hardening (resolved by #213)**
 
@@ -293,7 +402,7 @@ Symptom: `'GetCommitHash.bat' is not recognized` during the winpty build. When W
 
 Symptom: `MSB8040: Spectre-mitigated libraries are required for this project`. node-pty's gyp requests `SpectreMitigation: 'Spectre'`, which fails on a default MSVC install that lacks those libs.
 
-**Status of (2) and (3)**: both are now handled automatically by the committed `patches/node-pty+1.1.0.patch`, applied via `patch-package` in the `postinstall` hook, so a fresh `npm ci` on a default-hardened Windows 11 box succeeds. The patch is keyed to the resolved version — when `node-pty` is bumped it must be regenerated (see [`docs/build/README.md`](./build/README.md#install-dependencies) and [`docs/build/windows.md` § node-pty build failures on Windows 11](./build/windows.md#node-pty-build-failures-on-windows-11)). A follow-up will evaluate node-pty `1.2.0-beta.7+`, which removes the winpty build step and eliminates failure (2) at the root.
+**Status of (2) and (3)**: both are handled automatically by the committed `patches/node-pty+1.1.0.patch`, applied via `patch-package` in the `postinstall` hook. **A third, unrelated `npm ci` failure is still open**, so a fresh install on a default-hardened Windows 11 box does *not* currently succeed: `postinstall` dies with `node-gyp failed to rebuild node-pty` and `MSBuild.exe failed with exit code: 1` (`failedTask=installAppDeps`), with the documented toolchain in place. Observed 2026-09-15 on Windows 11 Pro 26200 (Node 24.14.1, Python 3.14.3), and on the previous Windows host before it. Workaround is `npm ci --ignore-scripts`, which leaves the terminal non-functional in that tree. See [`docs/build/windows.md` § node-pty build failures on Windows 11](./build/windows.md#node-pty-build-failures-on-windows-11). The patch is keyed to the resolved version — when `node-pty` is bumped it must be regenerated (see [`docs/build/README.md`](./build/README.md#install-dependencies) and [`docs/build/windows.md` § node-pty build failures on Windows 11](./build/windows.md#node-pty-build-failures-on-windows-11)). A follow-up will evaluate node-pty `1.2.0-beta.7+`, which removes the winpty build step and eliminates failure (2) at the root.
 
 **Tracking**: #213 (Windows 11 build fix, resolved); https://github.com/microsoft/node-pty/issues (upstream).
 
@@ -301,15 +410,15 @@ Symptom: `MSB8040: Spectre-mitigated libraries are required for this project`. n
 
 ### Template ID System
 
-**Issue**: Template IDs derived from slugified display names is fragile.
+**Issue**: Template IDs fall back to slugified display names when a template carries no explicit `id`, which is fragile for the templates still relying on the fallback.
 
 **Current Implementation**:
 ```typescript
 // parser.ts
-const id = slugify(result.data.name)  // Derives ID from name
+const id = result.data.id || slugify(result.data.name)  // Explicit id, else derived from name
 ```
 
-**Problem**:
+**Problem** (for templates without an explicit `id`):
 - Changing template name breaks all code references
 - `name: "Mermaid Bug Report"` → `id: "mermaid-bug-report"`
 - Code must look up by derived ID: `PROMPT_REGISTRY['mermaid-bug-report']`
@@ -338,41 +447,15 @@ name: Mermaid Bug Report  # Display name (can change freely)
 ```
 
 **Implementation Steps**:
-1. Add `id` field to `PromptFrontmatterSchema` (schema.ts)
-2. Update parser to use explicit ID instead of slugify
+1. ✅ Add `id` field to `PromptFrontmatterSchema` (schema.ts) – done, optional `id`
+2. ✅ Update parser to use explicit ID instead of slugify – done, with slugify as the fallback
 3. Add uniqueness validation in registry
-4. Migrate all existing templates (explain, improve, rewrite, simplify, mermaid-bug-report)
-5. Remove slugify function
+4. Migrate all existing templates – partial: 5 of the 14 templates in `src/renderer/src/prompts/templates/` declare an `id`
+5. Remove slugify function (only once step 4 is complete)
 
-**Status**: Architecture review complete, implementation pending.
+**Status**: Steps 1–2 shipped; uniqueness validation, the full template migration and the slugify removal remain open (re-verified 2026-09-05). Same item as [technical-debt.md § 2](./technical-debt.md).
 
 **See**: [Prompt Templates](./prompts/README.md)
-
----
-
-## Dockview CSS Import Path
-
-**Issue**: Vite cannot resolve `dockview/dist/styles.css`
-
-**Solution**: Use `import 'dockview/dist/styles/dockview.css'` (note the `/styles/` in path).
-
----
-
-## electron-store ES Module Import
-
-**Issue**: electron-store v11+ is an ES Module and cannot be imported with `require()` in CommonJS.
-
-**Solution**: Use dynamic `import()`. All SettingsService methods are async to handle this.
-
-**Pattern**: `constructor()` calls `import('electron-store')`, stores the promise. All methods await `ensureStore()` before accessing the store.
-
-**Files**: `src/main/services/SettingsService.ts`, `src/main/ipc/file-handlers.ts`
-
----
-
-## ESLint Peer Dependency Warnings
-
-**Issue**: ESLint 9 vs ESLint 8 peer dependencies. **Impact**: None (warnings only). Ignore.
 
 ---
 

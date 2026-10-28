@@ -54,3 +54,17 @@ playwright-report/
 
 # Superpowers visual brainstorm scratch
 .superpowers/
+
+# docs/design-system/ is the app's design system and is committed in full, generated files
+# included, so the folder renders on a fresh clone with nothing run first.
+# `npm run design -- --check` is what keeps the generated copies honest.
+
+# Scratch space for local experiments, never committed. Previously matched only
+# by the `*.local` pattern above, which caught this directory by accident.
+.local/
+
+# --- Xezar pipeline: skills are installed per machine, never committed ---
+/.agents/skills/xez-*
+/.claude/skills/xez-*
+/skills-lock.json
+/.claude/CLAUDE.md

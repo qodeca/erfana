@@ -20,7 +20,8 @@ Open an issue with one of the templates:
 
 - **Bug report** – [`bug_report.yml`](.github/ISSUE_TEMPLATE/bug_report.yml):
   something is broken or behaving unexpectedly. Include your Erfana version
-  (Help → About), your OS, and clear reproduction steps.
+  (shown in the window title as `ERFANA v<version>`, and on macOS also in the
+  About item of the app menu), your OS, and clear reproduction steps.
 - **Feature request** –
   [`feature_request.yml`](.github/ISSUE_TEMPLATE/feature_request.yml): propose a
   new capability or improvement.

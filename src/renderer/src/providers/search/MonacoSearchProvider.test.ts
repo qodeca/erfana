@@ -17,7 +17,7 @@
  * - dispose() (2 tests)
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, vi, type Mock } from 'vitest'
 import { MonacoSearchProvider } from './MonacoSearchProvider'
 import type * as monaco from 'monaco-editor'
 import type { MonacoEditorHandle } from '../../components/Editor/MonacoMarkdownEditor'
@@ -34,16 +34,16 @@ vi.mock('../../utils/logger', () => ({
 
 // Mock Monaco types
 type MockedModel = {
-  findMatches: ReturnType<typeof vi.fn>
-  getValueInRange: ReturnType<typeof vi.fn>
+  findMatches: Mock
+  getValueInRange: Mock
 }
 
 type MockedEditor = {
-  getModel: ReturnType<typeof vi.fn>
-  setSelection: ReturnType<typeof vi.fn>
-  revealLineInCenter: ReturnType<typeof vi.fn>
-  focus: ReturnType<typeof vi.fn>
-  deltaDecorations: ReturnType<typeof vi.fn>
+  getModel: Mock
+  setSelection: Mock
+  revealLineInCenter: Mock
+  focus: Mock
+  deltaDecorations: Mock
 }
 
 describe('MonacoSearchProvider', () => {
@@ -51,7 +51,7 @@ describe('MonacoSearchProvider', () => {
   let mockEditor: MockedEditor
   let mockModel: MockedModel
   let mockEditorHandle: MonacoEditorHandle
-  let editorRef: React.RefObject<MonacoEditorHandle | null>
+  let editorRef: React.MutableRefObject<MonacoEditorHandle | null>
 
   beforeEach(() => {
     vi.clearAllMocks()

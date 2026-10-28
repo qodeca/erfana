@@ -17,6 +17,8 @@ import { useGlobalSettingsInit } from './hooks/useGlobalSettingsInit'
 import { useQuitHandler } from './hooks/useQuitHandler'
 import { useGlobalSettingsStore } from './stores/useGlobalSettingsStore'
 import { useClaudeStatusStore } from './stores/useClaudeStatusStore'
+import { claudeStatusGateway } from './services/claudeStatusGateway'
+import { hasBridge } from './services/bridgePresence'
 import { initializeLogger, logger } from './utils/logger'
 
 /**
@@ -53,10 +55,10 @@ function AppContent() {
   // read only their own slice. Guarded so environments without the bridge
   // (e.g. tests) do not crash.
   useEffect(() => {
-    const unsubscribe = window.api?.claudeStatus?.onChanged((payload) => {
+    if (!hasBridge('claudeStatus')) return undefined
+    return claudeStatusGateway.onChanged((payload) => {
       useClaudeStatusStore.getState().setSnapshot(payload)
     })
-    return unsubscribe
   }, [])
 
   return (
@@ -91,7 +93,7 @@ function AppContent() {
  * Rendered inside `RootErrorBoundary`'s subtree, so the throw is caught by the
  * boundary rather than blanking the window.
  *
- * @see docs/design/design-issue-60.md §2.8
+ * @see docs/designs/design-issue-60.md §2.8
  */
 function ForcedCrash(): null {
   if (window.__ERFANA_FORCE_CRASH__ === true) {

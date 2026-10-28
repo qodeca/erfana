@@ -1,6 +1,9 @@
 # Terminal Flickering Prevention (v0.3.2)
 
-Hardware-accelerated rendering stability fixes for Electron 39 and production builds.
+Hardware-accelerated rendering stability fixes for production builds.
+
+> Written against Electron 39 (Chromium 142). The app now runs Electron 44 (Chromium 152); the switches below
+> have not been re-tested on it, and the code comment that says so still names Electron 39.
 
 ## Problem
 
@@ -40,19 +43,20 @@ const width = Math.round(cols * charWidth * devicePixelRatio)
 
 **Problem**: Simple disposal without recovery attempt
 
-**Current Behavior**: On WebGL context loss, addon disposed and terminal stuck in canvas mode permanently
+**Original Behavior** (before the fix below): On WebGL context loss, the addon was disposed and the terminal stayed in canvas mode for the rest of the session
 
-**Impact**: Single GPU hiccup degrades performance for entire session
+**Impact**: Single GPU hiccup degraded performance for the entire session. What ships today is the one-shot 100 ms retry in § Solutions 2 – the permanent-canvas behaviour is historical
 
 ## Solutions Implemented
 
 ### 1. Electron WebGL Command Line Switches
 
-**File**: `src/main/index.ts:19-23`
+**File**: `src/main/index.ts` (the `app.commandLine.appendSwitch` block above `buildAdditionalArguments`)
 
 ```typescript
-// WebGL Command Line Switches for Electron 39
+// WebGL Command Line Switches (originally added for Electron 33+)
 // Fixes WebGL context creation issues and terminal flickering in production builds
+// TODO: Test if still needed with Electron 39+ (Chromium 142)
 app.commandLine.appendSwitch('enable-webgl')
 app.commandLine.appendSwitch('enable-webgl2-compute-context')
 app.commandLine.appendSwitch('ignore-gpu-blocklist')
@@ -63,20 +67,13 @@ app.commandLine.appendSwitch('ignore-gpu-blocklist')
 - `enable-webgl2-compute-context`: Enable WebGL 2 compute capabilities
 - `ignore-gpu-blocklist`: Bypass GPU driver blocklist (safe for Electron apps)
 
-**Why Needed**: Electron 39 doesn't enable these by default in production builds
+**Why Needed**: added for Electron 33+ production builds; the code carries a TODO to re-test whether Electron 39 (Chromium 142) still needs them
 
-**Also Updated BrowserWindow**:
-```typescript
-webPreferences: {
-  // ... other options
-  webgl: true,
-  experimentalFeatures: true
-}
-```
+**BrowserWindow**: `experimentalFeatures: true` was once set alongside these switches and has since been removed (`src/main/index.ts` notes it is "not needed for current functionality"); the main window's `webPreferences` no longer enables it.
 
 ### 2. Enhanced WebGL Context Recovery
 
-**File**: `TerminalPanel.tsx:167-185`
+**File**: `TerminalPanel.tsx` – the `webglAddon.onContextLoss` handler in the xterm init effect
 
 **Strategy**: Automatic retry with GPU stabilization delay
 
@@ -114,7 +111,7 @@ webglAddon.onContextLoss(() => {
 
 ### 3. Integer Dimension Enforcement
 
-**File**: `TerminalPanel.tsx:378-381`
+**File**: `TerminalPanel/terminalPanel.logic.ts` (`shouldApplyResize` and the `RESIZE_COL_THRESHOLD` / `RESIZE_ROW_THRESHOLD` constants), called from the resize path in `TerminalPanel.tsx`
 
 **Strategy**: Force integer dimensions to prevent fractional oscillation
 
@@ -123,8 +120,8 @@ webglAddon.onContextLoss(() => {
 const cols = Math.floor(xtermRef.current.cols)
 const rows = Math.floor(xtermRef.current.rows)
 
-// Validate dimensions
-if ((colsDiff >= 2 || rowsDiff >= 1) && cols > 0 && rows > 0) {
+// Validate dimensions (RESIZE_COL_THRESHOLD = 2, RESIZE_ROW_THRESHOLD = 1)
+if ((colsDiff >= RESIZE_COL_THRESHOLD || rowsDiff >= RESIZE_ROW_THRESHOLD) && cols > 0 && rows > 0) {
   window.api.terminal.resize(terminalId, cols, rows)
 }
 ```
@@ -138,7 +135,7 @@ if ((colsDiff >= 2 || rowsDiff >= 1) && cols > 0 && rows > 0) {
 
 ### 4. Dimension Change Threshold
 
-**File**: `TerminalPanel.tsx:383-388`
+**File**: `TerminalPanel/terminalPanel.logic.ts` (`RESIZE_COL_THRESHOLD = 2`, `RESIZE_ROW_THRESHOLD = 1`)
 
 **Strategy**: Filter out tiny dimension changes caused by rounding noise
 

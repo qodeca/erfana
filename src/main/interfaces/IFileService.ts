@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import type { FileNode } from '../../preload/index'
+import type { FileNode } from '../../shared/ipc/file-schema'
 import type { ImageReadResponse } from '../../shared/ipc/file-image-schema'
+import type { ProjectPathFilter } from '../utils/projectPathFilter'
+import type { ProjectSession } from '../services/session/ProjectSession'
 
 /**
  * Interface for file system operations
@@ -21,7 +23,19 @@ export interface IFileService {
   /**
    * Read directory contents recursively
    */
-  readDirectory(dirPath: string): Promise<FileNode[]>
+  readDirectory(dirPath: string, options?: { shallow?: boolean }): Promise<FileNode[]>
+
+  /**
+   * Files of one name below a folder, bounded (terminal links on an incomplete tree).
+   * `readPath` is where `dirPath` is read (its real path); results are built from `dirPath`.
+   * `generation`: the project session generation the request was checked under.
+   */
+  findByName(
+    dirPath: string,
+    name: string,
+    readPath?: string,
+    generation?: number | null
+  ): Promise<{ paths: string[]; truncated: boolean }>
 
   /**
    * Read file contents
@@ -122,4 +136,18 @@ export interface IFileService {
    * Get current hidden patterns
    */
   getHiddenPatterns(): string[]
+
+  /**
+   * Set the project's path filter (#211, called by ProjectService on project
+   * open): tree walks skip excluded entries without reading them, and every
+   * completed walk of the project root replaces the filter's walk hints
+   * (read them with `filter.getWalkHints()`). Null means no exclusion.
+   */
+  setPathFilter(filter: ProjectPathFilter | null): void
+
+  /**
+   * Give the service the open-project session (called once by `ProjectService`),
+   * so it can refuse to delete or move the project root by its canonical path.
+   */
+  bindSession?(session: Pick<ProjectSession, 'current'>): void
 }

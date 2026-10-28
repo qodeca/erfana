@@ -38,6 +38,12 @@ Lightweight toast notifications in bottom-left corner.
 **API**: `showGlobalToast()` via event bus, rendered by `ToastProvider`
 **Types**: info, success, warning, error
 
+**Dwell and stacking** (v0.22.0, `toastDwell.ts`, `toastStack.ts`):
+- An error toast, or any toast with an action button, stays until it is closed. A warning stays at least 8 s (`WARNING_MIN_DWELL_MS`), even when the caller asked for less. Info and success keep the caller's duration
+- The countdown pauses while the pointer is over a toast or keyboard focus is inside it. Escape on a focused toast closes it and returns focus to where it was
+- The same type, title and message raised again while shown adds a count ("×3") to the toast on screen instead of a copy
+- At most five toasts that stay until closed (`MAX_STICKY_TOASTS`) are shown; a sixth drops the oldest, never the one that holds keyboard focus
+
 ## Control Panels
 
 Collapsible panels with chevron toggle (VS Code pattern).
@@ -46,18 +52,17 @@ Collapsible panels with chevron toggle (VS Code pattern).
 
 Header with ChevronDown/ChevronLeft icon (8px spacing). Click toggles visibility with 150ms rotation transition.
 
-**Implementation**:
+**Implementation** (`ProjectPanel.tsx` swaps the icon rather than rotating one):
 ```typescript
 const [show, setShow] = useState(true)
 
-<ChevronDown
-  className={`chevron-toggle ${show ? '' : 'collapsed'}`}
-  onClick={() => setShow(!show)}
-/>
+<button className="control-panel-chevron" onClick={() => setShow(!show)}>
+  {show ? <ChevronDown size={16} strokeWidth={2} /> : <ChevronLeft size={16} strokeWidth={2} />}
+</button>
 {show && <div className="control-panel">{/* Controls */}</div>}
 ```
 
-**CSS**: `.chevron-toggle.collapsed { transform: rotate(-90deg); transition: transform 0.15s; }`
+**CSS**: `.control-panel-chevron` (plus `:hover` / `:active`) in `ProjectPanel.css`
 
 **Example**: ProjectPanel file filtering - see [Project Panel](./project-panel.md#control-panel)
 
@@ -69,16 +74,16 @@ Hierarchical file tree with filtering, visual indicators, context menu operation
 
 **Features**:
 - File filtering (All Files | Markdown Only) with recursive logic
-- Sensitive file detection (credentials, keys, configs)
+- Sensitive file detection (credentials, keys, certificates, dotfile secrets)
 - Hidden file styling (dotfiles, 70% opacity)
-- Context menu (New, Rename, Delete)
+- Context menu (Open as source, Open in default browser (both HTML files only), Cut, Copy, Paste, New File, New Folder, Rename, Import…, Delete, Reveal in Finder / Show in Explorer – built per node type by `context-menu/strategies.tsx`)
 - Auto-refresh via directory watching
 
 📚 **Full docs**: [Project Panel](./project-panel.md)
 
 ### Visual Indicators
 
-**Sensitive** (amber + warning icon): `.env*`, `.npmrc`, `*.pem`, `.aws/`, `.ssh/`, `credentials*`, `config.json`
+**Sensitive** (amber + warning icon): `.env*`, `.npmrc`, `*.pem`, `*.key`, `.aws/`, `.ssh/`, `credentials`, `secrets`, `id_rsa` and the other SSH key names – see `isSensitiveFile()` in `ProjectTreeNode.tsx` (`config.json` is not on the list)
 **Hidden** (70% opacity, italic): Files starting with `.` (`.git/`, `.gitignore`)
 
 ## Terminal Panel
@@ -88,7 +93,7 @@ Hierarchical file tree with filtering, visual indicators, context menu operation
 Integrated terminal with xterm.js + node-pty.
 
 **Access**: Terminal icon (right sidebar) or Cmd/Ctrl+J
-**Restart**: `RotateCw` icon in the header (`title="Restart terminal"`) kills and restarts the session – there is no X in the terminal header
+**Restart**: `RotateCw` icon in the header (`title="Restart terminal"`) kills and restarts the session – there is no X in the terminal header. It asks first (focus on Cancel) when Claude Code is running in the terminal, when the terminal is still producing output after you typed in it, or – on macOS and Linux – when any program other than the shell is running (`terminal:getActivity`); an idle terminal restarts straight away (`TerminalPanel/restartGuard.ts`)
 
 **Header controls** (left to right, all rendered only once the terminal is ready):
 
@@ -101,7 +106,7 @@ Integrated terminal with xterm.js + node-pty.
 | Scroll to bottom | `ArrowDownToLine` | Scroll to bottom |
 | Restart terminal | `RotateCw` | Restart terminal |
 | Scroll lock | `LockKeyhole` / `LockKeyholeOpen` | Lock scroll to bottom / Disable scroll lock |
-| Maximize terminal | `Maximize2` / `Minimize2` | Maximize terminal (⌘⇧M) |
+| Maximize terminal | `Maximize2` / `Minimize2` | Maximize terminal (⇧⌘M on macOS, Ctrl+Shift+M on Windows) |
 
 The three capture buttons appear only on platforms where screenshot capture is supported.
 
@@ -112,7 +117,9 @@ The three capture buttons appear only on platforms where screenshot capture is s
 - High contrast theme (white on black)
 - Cross-platform screenshot capture (screen / window / area) and webcam photo capture, inserted as a path into the terminal
 - Maximize over the editor (Cmd/Ctrl+Shift+M)
-- Per-terminal Claude Code context status bar (`ClaudeStatusBar`)
+- Per-terminal Claude Code context status bar (`ClaudeStatusBar`) – Claude Code only; other CLI agents run in the terminal without it
+- Screen-reader mode (xterm's `screenReaderMode`): **Settings > Terminal > Screen reader mode** – Auto (on while macOS or Windows reports a screen reader, through `terminal:getScreenReaderSupport`), On or Off; changes apply to open terminals at once (`useTerminalScreenReaderMode`)
+- Right-click menu from the keyboard: Shift+F10 or the Menu key
 - Preview and editor context menus send a selection to the terminal via prompt templates (there is no "Send selection to terminal" item)
 
 **Theme**: Uses design tokens - `var(--color-black)` bg, white fg, `var(--color-cursor)` cursor
@@ -120,7 +127,7 @@ The three capture buttons appear only on platforms where screenshot capture is s
 **Tech**: xterm.js v6.0.0, node-pty v1.0.0, WebglAddon, FitAddon, WebLinksAddon
 
 **Modular architecture** (started v0.6.5, **not finished**):
-- Extraction is partial. `TerminalPanel.tsx` currently consumes only `useScreenshotCapture`, plus the extracted `TerminalStatusContent.tsx` and `ClaudeStatusBar.tsx` components; the rest of the panel – including its header toolbar – is still inlined in `TerminalPanel.tsx`.
+- Extraction is partial. `TerminalPanel.tsx` consumes the extracted session hooks `useXtermSession` (start-up, the single `teardownTerminal`, the start-up guard) and `useTerminalFileDrop`, plus `useScreenshotCapture`, `restartGuard.ts`, `outputAck.ts` (flow-control acks) and the `TerminalStatusContent.tsx` and `ClaudeStatusBar.tsx` components; its header toolbar is still inlined in `TerminalPanel.tsx`.
 - `useTerminalDragDrop`, `useTerminalResize`, `useTerminalPortal` and `TerminalToolbar.tsx` exist and are re-exported from `TerminalPanel/index.ts`, but nothing outside their own tests imports them yet.
 - `TerminalPanel/index.ts` still re-exports the component from its old location with a `// Will be moved here in Phase 6` comment, so the module boundary is not yet real.
 - `TerminalStatusContent.tsx` – Status state display (checking, unavailable, error, ready). In use.
@@ -147,6 +154,7 @@ The maintained inventory – BaseDialog API, focus trap, ESC/backdrop handling, 
 | `FilePickerDialog` | Disambiguate multiple file matches during smart path resolution |
 | `DropModeDialog` | Choose move / copy / import for dropped external files |
 | `ConflictDialog` | Resolve a name conflict at the drop target – replace or keep both; cancel skips the file |
+| `UnsavedChangesDialog` | Shown before an HTML preview tab moves to a page that has unsaved edits in another tab (#124), via `showUnsavedChanges()` from `useDialog()`. Variant `save`: Don't save / Cancel / Save, focus on Save. Variant `conflict` (the file changed on disk): Discard my changes / Cancel, focus on Cancel. Escape is Cancel; a click outside does nothing |
 | `TranscriptionDialog`, `DocumentImportDialog` | Media and document import – documented in their own sections below |
 
 ## Context Menu
@@ -157,9 +165,10 @@ Reusable menu for Project Panel file/folder operations and tab actions.
 
 **Features**:
 - Portal rendering (#portal-root)
-- Keyboard navigation
+- Keyboard (v0.22.0, #90): Shift+F10 or the Menu key opens the menu of the focused file, tab, editor, terminal or text field, and focus moves into it. ↑ / ↓, Home and End move between items (a disabled item is still reachable), Enter or Space chooses one, typing a letter jumps to it, and Escape or Tab closes the menu and puts focus back where it was. Escape on an open menu never reaches the terminal underneath
 - Separator support
-- Disabled state (grayed out, non-clickable) - v0.4.2
+- Disabled state (grayed out, non-clickable) - v0.4.2. A disabled item never shows danger styling, so a disabled Delete is grey, not red
+- Shortcut hints are exposed as `aria-keyshortcuts` (`⌘C` → `Meta+C`)
 
 **Interface**:
 ```typescript
@@ -167,8 +176,11 @@ interface ContextMenuItem {
   label: string
   icon?: ReactNode
   action: () => void
+  danger?: boolean    // Destructive styling (e.g. Delete)
   separator?: boolean
-  disabled?: boolean  // NEW: Grays out item, prevents click
+  disabled?: boolean  // Grays out item, prevents click
+  shortcut?: string   // Right-aligned shortcut hint
+  testId?: string     // Optional test ID for automated UI testing
 }
 ```
 
@@ -254,21 +266,23 @@ Home icon tab (41px fixed, non-draggable, no scaling).
 
 ### Hover
 
-**Inactive**: `#3a3d41` background
-**Active**: `#2d2d30` with 0.9 opacity
-**EditorTab**: `rgba(255, 255, 255, 0.05)` on hover
+**Inactive**: `var(--color-bg-hover-solid)` background (`AppDockLayout.css`, `.dv-inactive-tab:hover .dv-default-tab`)
+**Active**: `var(--color-bg-secondary)` with 0.9 opacity (`.dv-active-tab:hover .dv-default-tab`)
+**EditorTab**: `var(--color-bg-hover)` on hover; `var(--color-bg-hover-solid)` when the tab is active (`EditorTab.css`)
 
 ### Active Indicator
 
-2px Qodeca Violet bottom border via `::after` pseudo-element, matches activity bar styling.
+2px Qodeca **Lime** bottom border via an `::after` pseudo-element, matching the activity bar's active-panel edge (`AppDockLayout.css:93` and `:115`, `var(--color-brand-lime)`). This paragraph said *Violet* until 2026-09-01, contradicting both the shipped code and this same document five sections above. Decided by [`docs/design-system/system/components/row/index.html`](design-system/system/components/row/index.html), which cites this edge as the precedent for the selected-row rule.
 
 ### Focus
 
-Auto-focus on tab change ensures active indicator shows immediately. Panels need `tabIndex={0}` and `outline: none`.
+Auto-focus on tab change ensures the active indicator shows immediately, so a panel needs `tabIndex={0}`.
+
+**Do not add `outline: none`.** This document used to instruct exactly that, which contradicts the `decided` [Focus & keyboard card](design-system/system/foundations/focus.html): `outline: none` is allowed *only* with a replacement on the very next line. A panel that is a tab stop with no visible focus is a WCAG 2.4.7 failure, and it already ships — `AppDockLayout.css:138` carries a bare `outline: none; /* Remove focus outline */`, tracked by [#93](https://github.com/qodeca/erfana/issues/93). The instruction here was creating the next one.
 
 ## Welcome Tab & Panel
 
-**Location**: `WelcomePanel.tsx`, `WelcomeTab.tsx`
+**Location**: `WelcomePanel.tsx`, `components/Panels/WelcomeTab.tsx`
 
 Home-icon tab (41px square, non-draggable). The welcome screen is the central **home view** shown when no file is open:
 
@@ -340,8 +354,10 @@ Prompts user before quitting when there are unsaved changes or active terminal s
 
 ### Dialog options
 
-- **Discard and quit**: Close app without saving
+- **Quit**: Close app without saving (a danger prompt, so it opens with focus on Cancel; Enter presses the focused button)
 - **Cancel**: Stay in app
+
+Escape closes only the dialog on top, so dismissing the quit prompt during a transcription or document import does not also cancel the job (#229).
 
 ### Terminal activity detection
 
@@ -365,11 +381,11 @@ Terminal is considered "active" when:
 
 **Location**: `src/renderer/src/components/RootErrorBoundary/`, `src/renderer/src/components/Panels/PanelErrorBoundary.tsx`, `src/renderer/src/utils/installGlobalErrorTrail.ts`, `src/main/utils/rendererCrashHandlers.ts`
 
-Added by [#60](https://github.com/qodeca/erfana/issues/60), where a `RangeError` thrown while flattening a 174k-node project tree unmounted the React root and left a black window. Containment is layered on purpose – full rationale in [design-issue-60](./design/design-issue-60.md) §2.3.
+Added by [#60](https://github.com/qodeca/erfana/issues/60), where a `RangeError` thrown while flattening a 174k-node project tree unmounted the React root and left a black window. Containment is layered on purpose – full rationale in [design-issue-60](./designs/design-issue-60.md) §2.3.
 
 ### Two-tier boundary contract
 
-**Tier 1 – `PanelErrorBoundary`** wraps one panel. `ProjectPanel.tsx` wraps `<ProjectTree/>` with it, so a tree defect degrades to *"Project tree unavailable. The rest of Erfana still works."* inside the sidebar while editor buffers and the live terminal keep running. It logs at `error`, not `fatal` – the window is still usable, so this is not the crash of last resort. A failed Reload reads *"Project tree is still unavailable."*
+**Tier 1 – `PanelErrorBoundary`** wraps one panel or tab. It has three mount sites: `ProjectPanel.tsx` (the project tree), and in `DockLayout/components/EditorAreaSplitPanel.tsx` the image viewer (keyed by file path) and the HTML preview (keyed by panel id, with `resetKey={params.filePath}`). In the project tree case a tree defect degrades to *"Project tree unavailable. The rest of Erfana still works."* inside the sidebar while editor buffers and the live terminal keep running. It logs at `error`, not `fatal` – the window is still usable, so this is not the crash of last resort. A failed Reload reads *"Project tree is still unavailable."*
 
 **Focus contract**: swapping the subtree drops focus to `<body>`, so the boundary moves it deliberately – but only when the user was standing in this panel. Focus returns to the Reload button after a failed retry **or** any panel death with focus inside the panel (including an async re-throw after a reload succeeded, where no attempt counter changes); after a successful Reload it lands on the recovered panel container. A panel that throws while the user is in the editor never steals focus.
 
@@ -377,13 +393,15 @@ Added by [#60](https://github.com/qodeca/erfana/issues/60), where a `RangeError`
 
 **Mount-site contract**: the error state survives every re-render and is cleared only by Reload or by a remount, so a caller whose content is scoped to something the user can switch must **key** the boundary by it – `<PanelErrorBoundary key={projectPath ?? 'none'} componentName="Project tree">`. Without the key, a tree that crashed on project A still reads "unavailable" after the user opens project B.
 
+**`resetKey`, for content that must keep its mount**: a key change remounts the subtree, which an HTML preview tab cannot afford – moving the tab to another page would destroy its native view and its history. So the preview boundary is keyed by the panel id and receives the page as `resetKey`. When `resetKey` changes while the fallback is showing, `getDerivedStateFromProps` clears the error without a remount; that clear moves no focus and counts no retry, because the user did not press Reload.
+
 **Tier 2 – `RootErrorBoundary`** is the boundary of last resort. It wraps only the `<App/>` branch in `main.tsx`; the screenshot-overlay branch is deliberately unwrapped, having no recovery UI to show. It renders `{hasError ? <FallbackGuard><RootErrorFallback/></FallbackGuard> : children}`, where `FallbackGuard` is a **distinct** boundary class (colocated, never merged) – React never routes an error thrown by a boundary's own fallback back into that boundary, so the guard cannot live in the class it protects. The guard's fallback is dependency-free static JSX (no stylesheet, no `TEST_IDS`, no `window.api`, no detail extraction) and it appends an inline-styled **sibling** to `document.body` – never a write into `#root`, which React owns during commit. That sibling never becomes a second live region, and it takes focus **only** when no guard alert reached the document (it queries for `[role="alert"][data-erfana-guard-alert]`): with the React alert on screen, focusing the sibling would read the same copy twice, so it stays as silent visual insurance. `logger.fatal` is level-independent: in production an error caught by `componentDidCatch` does not reach `window.onerror`, so that line is the only record of the crash.
 
 **Layer-coverage rule** – "no blank window" holds only for the failure classes a boundary can intercept, and each layer is scoped to one class:
 
 | Failure class | Caught by | User sees | Record |
 |---|---|---|---|
-| Throw during render/lifecycle inside the project tree | `PanelErrorBoundary` (panel-scoped) | "Project tree unavailable" in the sidebar; editor and terminal keep running | `logger.error` |
+| Throw during render/lifecycle inside the project tree, an image viewer or an HTML preview | `PanelErrorBoundary` (panel-scoped) | "… unavailable" inside that panel or tab; the rest of the window keeps running | `logger.error` |
 | Throw during render/lifecycle anywhere else under `<App/>` | `RootErrorBoundary` | Full-window recovery screen | `logger.fatal` |
 | Throw inside the recovery screen itself | `FallbackGuard` (distinct inner boundary) | Dependency-free static text | best-effort `logger.fatal`, then an inline-styled `document.body` sibling |
 | Async throw, event-handler throw, unhandled rejection | `installGlobalErrorTrail()` | Nothing – the UI stays as it is | `logger.fatal`, boundary payload shape |
@@ -425,7 +443,7 @@ The message paragraph branches on **capability, not taste**: promising that "res
 
 Offering Restart on a crash screen is only safe because **start-up never auto-opens the last project** – the "Load last project on mount - DISABLED" effect in [`useProjectManagement.ts`](../src/renderer/src/hooks/useProjectManagement.ts), which shows the welcome screen with recent projects instead. Were auto-restore re-enabled, restarting after a crash *caused by* a project would reopen that project and crash again, in a loop.
 
-Rather than rest on that coupling alone, the Restart handler clears `lastProjectPath` best-effort before `relaunchApp()`. `closeProjectBestEffort()` races `window.api.file.closeProject()` against a `CLOSE_PROJECT_TIMEOUT_MS` (1500 ms) timer – comfortably inside the 3 s `RESTART_STALLED_MS` window, so even the worst case still reaches the relaunch before the screen offers manual-quit guidance. Three outcomes, one behaviour: the call **settles** (happy path), **rejects** (swallowed), or **never settles** – the realistic case when the main process is the unwell part – and the wait is abandoned at the timeout. The relaunch proceeds in all three; the timer is cleared on every branch so it cannot outlive the screen. Both halves are load bearing – if auto-restore is ever re-enabled, this handler is the second line of defence, not the first.
+Rather than rest on that coupling alone, the Restart handler clears `lastProjectPath` best-effort before `relaunchApp()`. `closeProjectBestEffort()` races `fileGateway.closeProject()` (a `'user'` close, which clears the last path main-side) against a `CLOSE_PROJECT_TIMEOUT_MS` (1500 ms) timer – comfortably inside the 3 s `RESTART_STALLED_MS` window, so even the worst case still reaches the relaunch before the screen offers manual-quit guidance. Three outcomes, one behaviour: the call **settles** (happy path), **rejects** (swallowed), or **never settles** – the realistic case when the main process is the unwell part – and the wait is abandoned at the timeout. The relaunch proceeds in all three; the timer is cleared on every branch so it cannot outlive the screen. Both halves are load bearing – if auto-restore is ever re-enabled, this handler is the second line of defence, not the first.
 
 The invariant is pinned by `src/renderer/src/hooks/useProjectManagement.noAutoLoad.test.ts`. **Do not delete that test to "fix" a future auto-restore feature** – changing the behaviour means revisiting this screen first.
 
@@ -475,6 +493,21 @@ Opens when clicking image files (PNG, JPG, GIF, WebP, SVG, BMP, ICO) in the proj
 
 ---
 
+## HTML preview panel
+
+**Location**: `src/renderer/src/components/Panels/HtmlPreviewPanel/`
+
+Runs an `.html` / `.htm` file as a live page in a native view. Registered in `DockLayout/components/EditorAreaSplitPanel.tsx` as the `htmlPreview` component (tab component `htmlPreviewTab`), inside a `PanelErrorBoundary` keyed by panel id (see § Error containment above).
+
+**Toolbar controls from #124** (`components/PreviewNavControls.tsx`, `components/PreviewToolbarTools.tsx`):
+- **Back** – the tab's previous page. There is no Forward button; Back's tooltip names the Forward key
+- **Open links in this tab** – a toggle (`aria-pressed`). Off, the default, opens a link in a new tab; on, a plain link to another previewed page in the project replaces the page in this tab. Per tab, in memory only
+- **Open in default browser** – hands the file to the system browser, the same action as the project tree's context-menu item
+
+**Full docs**: [HTML preview](./html-preview/README.md) · **Keyboard shortcuts**: [Keyboard Shortcuts § HTML preview](./keyboard-shortcuts.md#html-preview)
+
+---
+
 ## Transcription dialog
 
 **Location**: `src/renderer/src/components/Transcription/`
@@ -488,8 +521,8 @@ Modal dialog for media file import with transcription (OpenAI API or local whisp
 **State**: `useTranscriptionStore.ts` (Zustand) manages dialog visibility, progress, result, error
 
 **Features**:
-- Composes on BaseDialog (`closeOnEscape={false}`, `closeOnBackdrop={false}`) with custom Escape handling (cancel when transcribing, close otherwise)
-- Tab-cycling focus trap via BaseDialog's opt-in `trapFocus` prop (the dialog's own `handleFocusTrap` was removed in #42)
+- Composes on BaseDialog (`closeOnBackdrop={false}`); Escape runs the cancel-aware `onClose` (cancel when transcribing, close otherwise) and, like every dialog, reaches it only while it is the topmost overlay (#229)
+- Tab-cycling focus trap via BaseDialog's `trapFocus` prop (on by default since #91) (the dialog's own `handleFocusTrap` was removed in #42)
 - Progress bar with percentage, ETA, and chunk indicator ("chunk N of M")
 - ARIA: `role="progressbar"`, `aria-live` on phase text/error/success, `aria-describedby`
 - Cancel via footer button or Escape key
@@ -520,7 +553,7 @@ Modal dialog for configuring and executing LiteParse document imports (PDF, Offi
 - Indeterminate progress bar with phase text during import
 - OCR warning when OCR is disabled
 - Auto-open imported file on success
-- Dependency-missing modal for LibreOffice/ImageMagick with install guidance
+- Dependency-missing modal for LibreOffice (missing or unsafe location) with an "Open import tools" button
 - Batch drag-drop filtering – document files in multi-file drops show warning toast
 
 **IPC flow**: `import:document` (invoke with options) + `import:documentProgress` (streamed phase events) + `import:documentCancel` (abort)

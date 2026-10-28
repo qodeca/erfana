@@ -465,6 +465,114 @@ describe('useAutoSave', () => {
       expect(onSave).not.toHaveBeenCalled()
     })
 
+    it('re-arms the failsafe after a save when isModified never turns false (batched update)', () => {
+      // The save settles `modified` false and the next keystroke sets it true
+      // in the same React batch, so the hook only ever sees `true`: the
+      // modified-state effect never re-runs, and only triggerSave can re-arm.
+      const onSave = vi.fn()
+      const { result } = renderHook(() =>
+        useAutoSave(true, onSave, { delay: 2000, maxInterval: 5000 })
+      )
+
+      // Continuous typing for two full intervals
+      for (let i = 0; i < 10; i++) {
+        act(() => {
+          vi.advanceTimersByTime(1000)
+          result.current.signalChange()
+        })
+      }
+
+      expect(onSave).toHaveBeenCalledTimes(2)
+    })
+
+    it('does not re-arm the failsafe for a save that leaves the content clean', () => {
+      const onSave = vi.fn()
+      const { result, rerender } = renderHook(
+        ({ isModified }) => useAutoSave(isModified, onSave, { delay: 2000, maxInterval: 5000 }),
+        { initialProps: { isModified: true } }
+      )
+
+      act(() => void vi.advanceTimersByTime(2000))
+      expect(onSave).toHaveBeenCalledTimes(1)
+      // The save landed: nothing is unsaved any more
+      rerender({ isModified: false })
+      act(() => result.current.signalChange())
+      act(() => void vi.advanceTimersByTime(20000))
+
+      expect(onSave).toHaveBeenCalledTimes(1)
+    })
+
+    it('a hold taken during a save cancels the re-armed failsafe', () => {
+      // triggerSave re-arms the failsafe before calling onSave; a hold taken
+      // inside the save (a project switch can start one) must cancel it.
+      // (triggerSave's own `!heldRef.current` check is defensive: a hold
+      // cancels every timer, so none fires into it.)
+      const onSave = vi.fn()
+      const { result } = renderHook(() =>
+        useAutoSave(true, onSave, { delay: 2000, maxInterval: 5000 })
+      )
+
+      onSave.mockImplementationOnce(() => {
+        result.current.holdAutoSave()
+      })
+      act(() => void vi.advanceTimersByTime(2000))
+      act(() => void vi.advanceTimersByTime(20000))
+
+      expect(onSave).toHaveBeenCalledTimes(1)
+    })
+
+    it('a failing save fires once, is not retried at 30/60/90 s, and the next change re-arms it', async () => {
+      // A write that failed (missing folder, full disk) would fail again on
+      // every failsafe tick, with a toast each time
+      const onSave = vi.fn().mockResolvedValue(false)
+      const { result } = renderHook(() =>
+        useAutoSave(true, onSave, { delay: 2000, maxInterval: 30000 })
+      )
+
+      await act(async () => void (await vi.advanceTimersByTimeAsync(2000)))
+      expect(onSave).toHaveBeenCalledTimes(1)
+      for (const elapsed of [30000, 60000, 90000]) {
+        await act(async () => void (await vi.advanceTimersByTimeAsync(30000)))
+        expect(onSave, `after ${elapsed / 1000} s`).toHaveBeenCalledTimes(1)
+      }
+
+      // The user edits again: the debounce and the failsafe are both back
+      onSave.mockResolvedValue(true)
+      act(() => result.current.signalChange())
+      await act(async () => void (await vi.advanceTimersByTimeAsync(2000)))
+      expect(onSave).toHaveBeenCalledTimes(2)
+      // continuous typing after that edit: the failsafe saves again at 30 s
+      for (let i = 0; i < 30; i++) {
+        act(() => result.current.signalChange())
+        await act(async () => void (await vi.advanceTimersByTimeAsync(1000)))
+      }
+      expect(onSave).toHaveBeenCalledTimes(3)
+    })
+
+    it('a rejected save backs off the same way', async () => {
+      const onSave = vi.fn().mockRejectedValue(new Error('disk gone'))
+      renderHook(() => useAutoSave(true, onSave, { delay: 2000, maxInterval: 5000 }))
+
+      await act(async () => void (await vi.advanceTimersByTimeAsync(2000)))
+      await act(async () => void (await vi.advanceTimersByTimeAsync(20000)))
+
+      expect(onSave).toHaveBeenCalledTimes(1)
+    })
+
+    it('a save that answers true keeps the failsafe running', async () => {
+      const onSave = vi.fn().mockResolvedValue(true)
+      const { result } = renderHook(() =>
+        useAutoSave(true, onSave, { delay: 2000, maxInterval: 5000 })
+      )
+
+      for (let i = 0; i < 10; i++) {
+        await act(async () => void (await vi.advanceTimersByTimeAsync(1000)))
+        act(() => result.current.signalChange())
+      }
+
+      expect(onSave).toHaveBeenCalledTimes(2)
+    })
+
     it('should not double-save when both timers would fire at the same time', () => {
       const onSave = vi.fn()
       renderHook(() =>
@@ -519,6 +627,92 @@ describe('useAutoSave', () => {
       })
 
       expect(onSave).not.toHaveBeenCalled()
+    })
+
+    // #124 Q2: the preview move prompt holds autosave with cancelAutoSave and
+    // releases it with signalChange, so a Cancel still gets the edits written.
+    it('a signalChange after cancelAutoSave re-arms the debounce', () => {
+      const onSave = vi.fn()
+      const { result } = renderHook(() => useAutoSave(true, onSave, { delay: 2000, maxInterval: 30000 }))
+
+      act(() => result.current.cancelAutoSave())
+      act(() => void vi.advanceTimersByTime(2500))
+      expect(onSave).not.toHaveBeenCalled()
+
+      act(() => result.current.signalChange())
+      act(() => void vi.advanceTimersByTime(2000))
+      expect(onSave).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('holdAutoSave', () => {
+    it('never fires while held, whatever re-arms it', () => {
+      const onSave = vi.fn()
+      const { result, rerender } = renderHook(
+        ({ modified }) => useAutoSave(modified, onSave, { delay: 2000, maxInterval: 30000 }),
+        { initialProps: { modified: true } }
+      )
+
+      act(() => void result.current.holdAutoSave())
+      // typing keeps calling signalChange, and the modified flag flips
+      act(() => result.current.signalChange())
+      rerender({ modified: false })
+      rerender({ modified: true })
+      act(() => result.current.signalChange())
+      act(() => void vi.advanceTimersByTime(60000))
+
+      expect(onSave).not.toHaveBeenCalled()
+    })
+
+    it('re-arms on release when the content is still modified', () => {
+      const onSave = vi.fn()
+      const { result } = renderHook(() => useAutoSave(true, onSave, { delay: 2000 }))
+
+      let release = (): void => {}
+      act(() => {
+        release = result.current.holdAutoSave()
+      })
+      act(() => void vi.advanceTimersByTime(5000))
+      expect(onSave).not.toHaveBeenCalled()
+
+      act(() => release())
+      act(() => void vi.advanceTimersByTime(2000))
+      expect(onSave).toHaveBeenCalledTimes(1)
+    })
+
+    it('arms nothing on release when the content is clean, and release is idempotent', () => {
+      const onSave = vi.fn()
+      const { result } = renderHook(() => useAutoSave(false, onSave, { delay: 2000 }))
+
+      let release = (): void => {}
+      act(() => {
+        release = result.current.holdAutoSave()
+      })
+      act(() => {
+        release()
+        release()
+      })
+      act(() => void vi.advanceTimersByTime(60000))
+
+      expect(onSave).not.toHaveBeenCalled()
+    })
+
+    it('restores the max-interval failsafe on release', () => {
+      const onSave = vi.fn()
+      const { result } = renderHook(() => useAutoSave(true, onSave, { delay: 2000, maxInterval: 30000 }))
+
+      let release = (): void => {}
+      act(() => {
+        release = result.current.holdAutoSave()
+      })
+      act(() => release())
+      // the debounce keeps being reset by typing; only the failsafe can fire
+      for (let i = 0; i < 20; i++) {
+        act(() => result.current.signalChange())
+        act(() => void vi.advanceTimersByTime(1500))
+      }
+
+      expect(onSave).toHaveBeenCalledTimes(1)
     })
   })
 })

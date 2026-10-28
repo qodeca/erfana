@@ -22,21 +22,37 @@
   transition: background-color var(--transition-fast);
 }
 
-.context-menu-item:hover:not(.disabled) {
+/* Hover and keyboard focus look the same, per docs/design-system/system/components/menu:
+   a menu has one active item whichever device you use. The pointer moves the
+   roving focus too (ContextMenu.tsx, #90), so the two never disagree. */
+.context-menu-item:hover:not(.disabled),
+.context-menu-item:focus-visible:not(.disabled) {
   background-color: var(--color-bg-hover-solid);
 }
 
-.context-menu-item.disabled {
-  color: var(--color-gray-600);
-  cursor: not-allowed;
+/* Inset, like the Rows card: a long menu scrolls, and an outward ring on the
+   first or last item would be clipped. */
+.context-menu-item:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: calc(var(--space-1) * -1);
 }
 
 .context-menu-item.danger {
   color: var(--color-error);
 }
 
-.context-menu-item.danger:hover {
+.context-menu-item.danger:hover:not(.disabled),
+.context-menu-item.danger:focus-visible:not(.disabled) {
   background-color: var(--color-bg-danger-hover);
+}
+
+/* PRECEDENCE: disabled beats danger (Menu card, decided). This rule comes
+   AFTER .danger and matches it on specificity, so a disabled Delete is grey,
+   not red: the colour promises what activating the item does, and a disabled
+   item does nothing. SC 1.4.3 exempts inactive controls, so dim is allowed. */
+.context-menu-item.disabled {
+  color: var(--color-text-disabled);
+  cursor: not-allowed;
 }
 
 .context-menu-icon {

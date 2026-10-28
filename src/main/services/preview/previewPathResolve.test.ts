@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { basename, join } from 'node:path'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 
 /**
  * `node:fs/promises` is mocked so we can (a) observe every FileHandle.close()
@@ -10,8 +10,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
  * Everything except `open` and `lstat` passes straight through to the real
  * implementation, so realpath/symlink/write behaviour is genuine.
  */
-const closeSpies: Array<ReturnType<typeof vi.fn>> = []
-let lstatOverride: ((path: string) => Promise<{ dev: number; ino: number }>) | null = null
+const closeSpies: Array<Mock> = []
+let lstatOverride: ((path: string) => Promise<{ dev: bigint; ino: bigint }>) | null = null
 
 vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs/promises')>()
@@ -124,6 +124,79 @@ describe('confinePath', () => {
     const verdict = await confinePath(realRoot, join(realRoot, 'linkdir', 'secret.txt'))
     expect(verdict).toEqual({ ok: false, reason: 'escape' })
   })
+
+  /**
+   * `allowBuildDirs` is the link-routing relaxation (sd-074b §3.2). It skips the
+   * build-directory rule ONLY.
+   *
+   * An earlier revision spelled this `allowExcluded` and gated `hasDotSegment`
+   * on the same flag, so an untrusted page could open `.env` in the editor by
+   * clicking a link (lens review F2). These tests exist to keep the two rules
+   * apart — the dot-segment cases below FAIL against that revision.
+   */
+  describe('allowBuildDirs', () => {
+    it('opens a file inside a build directory', async () => {
+      await mkdir(join(realRoot, 'node_modules'))
+      await writeFile(join(realRoot, 'node_modules', 'demo.html'), '<h1>x</h1>')
+      const verdict = await confinePath(
+        realRoot,
+        join(realRoot, 'node_modules', 'demo.html'),
+        { allowBuildDirs: true }
+      )
+      expect(verdict).toEqual({
+        ok: true,
+        realTarget: join(realRoot, 'node_modules', 'demo.html'),
+        rel: join('node_modules', 'demo.html')
+      })
+    })
+
+    it('still refuses a dotfile at the root', async () => {
+      await writeFile(join(realRoot, '.env'), 'SECRET=1')
+      const verdict = await confinePath(realRoot, join(realRoot, '.env'), {
+        allowBuildDirs: true
+      })
+      expect(verdict).toEqual({ ok: false, reason: 'excluded' })
+    })
+
+    it('still refuses a file inside a dot-directory', async () => {
+      await mkdir(join(realRoot, '.git'))
+      await writeFile(join(realRoot, '.git', 'config'), '[core]')
+      const verdict = await confinePath(realRoot, join(realRoot, '.git', 'config'), {
+        allowBuildDirs: true
+      })
+      expect(verdict).toEqual({ ok: false, reason: 'excluded' })
+    })
+
+    it('still refuses a dotfile nested inside an allowed build directory', async () => {
+      await mkdir(join(realRoot, 'node_modules', 'pkg'), { recursive: true })
+      await writeFile(join(realRoot, 'node_modules', 'pkg', '.npmrc'), 'token=1')
+      const verdict = await confinePath(
+        realRoot,
+        join(realRoot, 'node_modules', 'pkg', '.npmrc'),
+        { allowBuildDirs: true }
+      )
+      expect(verdict).toEqual({ ok: false, reason: 'excluded' })
+    })
+
+    it('still refuses a symlink that resolves outside the root', async () => {
+      await writeFile(join(realOutside, 'secret.txt'), 'secret')
+      await symlink(join(realOutside, 'secret.txt'), join(realRoot, 'link.txt'), 'file')
+      const verdict = await confinePath(realRoot, join(realRoot, 'link.txt'), {
+        allowBuildDirs: true
+      })
+      expect(verdict).toEqual({ ok: false, reason: 'escape' })
+    })
+
+    it('still refuses a traversal that climbs out of the root', async () => {
+      await writeFile(join(realOutside, 'secret.txt'), 'secret')
+      const verdict = await confinePath(
+        realRoot,
+        join(realRoot, '..', basename(realOutside), 'secret.txt'),
+        { allowBuildDirs: true }
+      )
+      expect(verdict).toEqual({ ok: false, reason: 'escape' })
+    })
+  })
 })
 
 describe('resolveConfined', () => {
@@ -174,7 +247,7 @@ describe('resolveConfined', () => {
 
   it('returns 403 path-escape on a dev/ino mismatch and closes the descriptor', async () => {
     await writeFile(join(realRoot, 'index.html'), '<h1>hi</h1>')
-    lstatOverride = async () => ({ dev: 0xdead, ino: 0xbeef })
+    lstatOverride = async () => ({ dev: 0xdeadn, ino: 0xbeefn })
     const result = await resolveConfined(realRoot, ['index.html'])
     expect(result).toEqual({ ok: false, status: 403, reason: 'path-escape' })
     expect(closeSpies).toHaveLength(1)

@@ -102,7 +102,7 @@ vi.mock('./LoggingService', () => ({
 }))
 
 // Import after mocking
-import { readFile, readdir, mkdir, realpath, lstat, open } from 'node:fs/promises'
+import { readFile, readdir, mkdir, realpath, lstat, open, type FileHandle } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import { join } from 'node:path'
 import { hostname as osHostname } from 'node:os'
@@ -169,7 +169,7 @@ describe('ProjectLockService', () => {
         }),
         close: vi.fn().mockResolvedValue(undefined)
       }
-      return Promise.resolve(handle)
+      return Promise.resolve(handle as unknown as FileHandle) // writeFile + close are all the service uses
     })
 
     // Stateful readFile mock - reads from mockFileSystem
@@ -922,7 +922,7 @@ describe('ProjectLockService', () => {
           }),
           close: vi.fn().mockResolvedValue(undefined)
         }
-        return Promise.resolve(handle)
+        return Promise.resolve(handle as unknown as FileHandle) // writeFile + close are all the service uses
       })
 
       // Trigger both acquisitions at once
@@ -1444,7 +1444,7 @@ describe('ProjectLockService', () => {
     })
 
     it('should handle no main window during focus', async () => {
-      mockedGetMainWindow.mockReturnValue(null) // No window
+      mockedGetMainWindow.mockReturnValue(undefined) // No window
 
       await service.acquireLock(projectPath)
 
@@ -1570,7 +1570,7 @@ describe('ProjectLockService', () => {
       const result = await service.acquireLock('/Users/test/projects/new-project')
 
       expect(result.status).toBe('error')
-      expect(result.message).toContain('disposing')
+      expect((result as Extract<typeof result, { status: 'error' }>).message).toContain('disposing')
 
       await disposePromise
     })
@@ -1712,7 +1712,7 @@ describe('ProjectLockService', () => {
           }),
           close: vi.fn().mockResolvedValue(undefined)
         }
-        return Promise.resolve(handle)
+        return Promise.resolve(handle as unknown as FileHandle) // writeFile + close are all the service uses
       })
 
       const result = await service.acquireLock(projectPath)
@@ -1897,7 +1897,7 @@ describe('ProjectLockService', () => {
 
       const result = await service.acquireLock(projectPath)
       expect(result.status).toBe('error')
-      expect(result.message).toMatch(/symlink/i)
+      expect((result as Extract<typeof result, { status: 'error' }>).message).toMatch(/symlink/i)
     })
   })
 })

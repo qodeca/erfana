@@ -12,8 +12,11 @@ import {
   mimeForExtension
 } from './previewResponseHeaders'
 import { AppError, ErrorCode } from '../../../shared/errors'
+import { buildPreviewCsp } from './previewCsp'
 
 const VALID_CSP = "default-src 'none'; script-src erfana-preview:; sandbox allow-scripts"
+/** A root token of the shape the registry mints (issue #124 WI-13). */
+const TOKEN = '0123456789abcdef0123456789abcdef' // gitleaks:allow
 
 describe('mimeForExtension', () => {
   it.each([
@@ -68,10 +71,13 @@ describe('isKnownAssetType', () => {
 
 describe('buildResponseHeaders', () => {
   it('returns the full static security header set for a served asset', () => {
-    const headers = buildResponseHeaders('text/css; charset=utf-8', VALID_CSP)
+    // A real policy, as the registry builds it: the exact set below is also the
+    // proof that no framing header rides along (issue #124 WI-13).
+    const csp = buildPreviewCsp([], { ownToken: TOKEN })
+    const headers = buildResponseHeaders('text/css; charset=utf-8', csp)
     expect(headers).toEqual({
       'Content-Type': 'text/css; charset=utf-8',
-      'Content-Security-Policy': VALID_CSP,
+      'Content-Security-Policy': csp,
       'Cache-Control': 'no-store',
       'X-Content-Type-Options': 'nosniff',
       'Access-Control-Allow-Origin': '*',
@@ -106,5 +112,24 @@ describe('buildResponseHeaders', () => {
 
   it("throws when the CSP is missing default-src 'none'", () => {
     expect(() => buildResponseHeaders('text/css', 'sandbox allow-scripts')).toThrow(AppError)
+  })
+
+  it('serves no frame-ancestors and no X-Frame-Options, so a same-project frame loads (#124)', () => {
+    const headers = buildResponseHeaders(
+      'text/html; charset=utf-8',
+      buildPreviewCsp(['https://a.io'], { ownToken: TOKEN })
+    )
+    expect(headers['Content-Security-Policy']).not.toContain('frame-ancestors')
+    expect(headers['Content-Security-Policy']).toContain(`frame-src erfana-preview://${TOKEN}`)
+    expect(Object.keys(headers).map(name => name.toLowerCase())).not.toContain('x-frame-options')
+  })
+
+  it("serves a malformed token's degraded policy: both tripwires hold, frames are 'none'", () => {
+    const csp = buildPreviewCsp([], { ownToken: 'not-a-token' })
+    let headers: Record<string, string> = {}
+    expect(() => {
+      headers = buildResponseHeaders('text/html; charset=utf-8', csp)
+    }).not.toThrow()
+    expect(headers['Content-Security-Policy']).toContain("frame-src 'none'")
   })
 })

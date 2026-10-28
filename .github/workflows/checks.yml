@@ -9,8 +9,31 @@ name: Quality Checks
 # checks need macOS). Node version matches e2e.yml (24). npm download cache
 # enabled via setup-node-with-retry.
 
+# merge_group: the develop merge queue (#173). Branch protection matches check
+# NAMES, so every required job below must also run on the queue's
+# gh-readonly-queue/... ref or the queued PR waits forever. The repository
+# guard on each job holds there: a merge group always runs in qodeca/erfana.
+#
+# push ignores gh-readonly-queue/**: GitHub fires a push event on the queue's
+# temporary branch too, and that push run shares this workflow's ref-keyed
+# concurrency group with the merge_group run, so cancel-in-progress cancels the
+# merge_group run and the queue reads the cancelled required checks as
+# failed_checks (#173). Excluding those refs is GitHub's documented way to keep
+# only the merge_group run. This is a branch filter, not a path filter: the
+# required checks still run on every real branch push.
+#
+# tags: ['**'] keeps tag pushes running. A push trigger that defines
+# branches-ignore and no tag filter skips every tag ref, so without this a
+# pushed release tag would stop getting its own run - and release.yml's
+# green-run gate looks up a checks.yml run for the tagged SHA. tags: ['**']
+# matches every tag, so tags behave exactly as before this filter existed.
 on:
   push:
+    branches-ignore:
+      - 'gh-readonly-queue/**'
+    tags:
+      - '**'
+  merge_group:
 
 permissions:
   contents: read
@@ -25,25 +48,35 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
     steps:
-      # actions/checkout v6.0.3 — MUST run before the local composite action
+      # actions/checkout v7.0.1 — MUST run before the local composite action
       # below so the action.yml file can be loaded from the workspace.
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: ./.github/actions/setup-node-with-retry
       - name: Lint
         run: npm run lint
+      # Steps, not a separate job: branch protection matches the JOB name
+      # ("Lint"), so a new job called "Lint CSS" would be advisory only and
+      # nothing would be enforced. Adding steps here needs no protection change.
+      - name: Lint CSS
+        run: npm run lint:css
+      # Everything under docs/design-system/ is committed, generated files included, so the
+      # folder renders on a fresh clone. This is what stops a stale token copy or
+      # a stale index being trusted by a reader.
+      - name: Design system is in sync
+        run: npm run design -- --check
 
   typecheck:
     name: Typecheck
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
     steps:
-      # actions/checkout v6.0.3 — MUST run before the local composite action
+      # actions/checkout v7.0.1 — MUST run before the local composite action
       # below so the action.yml file can be loaded from the workspace.
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: ./.github/actions/setup-node-with-retry
       - name: Typecheck
         run: npm run typecheck
@@ -51,12 +84,15 @@ jobs:
   test:
     name: Unit tests
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # 20, not 10: the main-process timing-budget suites (`*.perf.test.*`) run
+    # last and one file at a time, after every other file (owner decision
+    # 2026-10-27), so their minutes add to the run instead of overlapping it.
+    timeout-minutes: 20
     if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
     steps:
-      # actions/checkout v6.0.3 — MUST run before the local composite action
+      # actions/checkout v7.0.1 — MUST run before the local composite action
       # below so the action.yml file can be loaded from the workspace.
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: ./.github/actions/setup-node-with-retry
         with:
           # ConverterRegistry.test.ts + other electron-aware tests import
@@ -65,32 +101,34 @@ jobs:
           # binary + node-pty are present for vitest.
           run-postinstall: "true"
 
-      # Guard: chokidar pinned to exact 3.6.0.
-      # v4 removed disableGlobbing — DirectoryWatcherService /
-      # FileWatcherService / GitWatcherService all rely on it (FD-exhaustion
-      # fix shipped in merge 1139bf2). A regenerated lockfile, an
-      # `npm install chokidar` bump, or a transitive declaring ^4 would all
-      # have failed today's clean-checkout typecheck silently in the past;
-      # this guard makes it loud. Runs before tests so we know what's being
-      # tested.
-      - name: Guard - chokidar v3 pinned
+      # Guard: chokidar pinned to exact 5.0.0, and no chokidar 3 left.
+      # chokidar 3 pulled `braces` (GHSA-vfj7-8cjw-p6xm, no patched release)
+      # into the production tree. 5.0.0 has no globbing and no fsevents, so
+      # the macOS project tree runs on NativeRecursiveWatcher instead
+      # (directoryWatchBackend.ts). A regenerated lockfile or a transitive
+      # declaring ^3 would quietly bring braces back; this guard makes it
+      # loud. Runs before tests so we know what's being tested.
+      - name: Guard - chokidar 5 pinned, no braces in production
         run: |
           set -euo pipefail
-          ACTUAL=$(node -p "require('chokidar/package.json').version")
-          if [ "$ACTUAL" != "3.6.0" ]; then
-            echo "::error::chokidar version drift: expected 3.6.0, got $ACTUAL — see package.json overrides and #1416"
+          ACTUAL=$(node -p "JSON.parse(require('fs').readFileSync('node_modules/chokidar/package.json', 'utf8')).version")
+          if [ "$ACTUAL" != "5.0.0" ]; then
+            echo "::error::chokidar version drift: expected 5.0.0, got $ACTUAL — see package.json overrides"
             exit 1
           fi
-          echo "chokidar pinned at $ACTUAL"
+          BRACES=$(npm ls braces --omit=dev --all --parseable 2>/dev/null || true)
+          if [ -n "$BRACES" ]; then
+            echo "::error::braces is back in the production tree (GHSA-vfj7-8cjw-p6xm): $BRACES"
+            exit 1
+          fi
+          echo "chokidar pinned at $ACTUAL; no braces in production"
 
       - name: Unit tests
         # Deprecation tripwire: captures vitest output and fails if any
-        # deprecation warning that ISN'T already on the known-and-tracked
-        # whitelist appears. The known `workspace` / `defineWorkspace`
-        # deprecation is on the whitelist because Phase H of the test-
-        # infrastructure plan migrates it (root vitest.config.ts with
-        # `projects: [...]`). Any other deprecation (e.g. a new vitest 3.x
-        # warning, a Node.js DEPnnn) fires this step.
+        # deprecation warning appears (e.g. a new vitest warning, a Node.js
+        # DEPnnn). The allowlist is empty: the one tracked entry, vitest's
+        # `workspace` / `defineWorkspace` deprecation, went away when the
+        # projects moved to `test.projects` in vitest.config.ts (vitest 5).
         run: |
           set -euo pipefail
           OUT="$RUNNER_TEMP/vitest.log"
@@ -98,11 +136,8 @@ jobs:
           npm run test:ci 2>&1 | tee "$OUT"
           TEST_EXIT=${PIPESTATUS[0]}
           set -e
-          # Match deprecation/DEP-warning lines NOT covered by the whitelist.
-          # Whitelist (known, tracked):
-          #   - `workspace` / `defineWorkspace` — vitest 3.2 → 4 migration (Phase H)
-          UNTRACKED=$(grep -iE 'deprecated|DEP[0-9]+' "$OUT" | \
-            grep -viE 'workspace|defineWorkspace' || true)
+          # Match deprecation/DEP-warning lines.
+          UNTRACKED=$(grep -iE 'deprecated|DEP[0-9]+' "$OUT" || true)
           if [ -n "$UNTRACKED" ]; then
             echo "::error::Untracked deprecation warning(s) detected:"
             echo "$UNTRACKED"
@@ -113,28 +148,38 @@ jobs:
   coverage:
     name: Coverage
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # 25, not 10: the job runs three coverage passes (main, preload, renderer);
+    # the renderer suite is the largest in the repo, and the main pass ends with
+    # the timing-budget suites run one file at a time (owner decision 2026-10-27).
+    timeout-minutes: 25
     if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
-    # Enforces the per-file coverage FLOORS declared in vitest.main.ts under
-    # test.coverage.thresholds: scripts/fuses.js (the issue #43/#55 packaging-
-    # integrity guards + Electron fuses) and the whisper trust-chain modules
+    # Enforces the coverage FLOORS declared in all three vitest configs. Main
+    # (vitest.main.config.ts, test.coverage.thresholds) carries the per-file floors for
+    # scripts/fuses.js (the issue #43/#55 packaging-integrity guards + Electron
+    # fuses) and the whisper trust-chain modules
     # (verifyManifest / secureDownloader / zipArchive / tarArchive) + the #41
     # model-id registry. The required `test` job runs `test:ci` WITHOUT coverage,
     # so these floors fire ONLY here — this job is what makes them a gate rather
     # than a local-only `npm run test:cov` nicety (issue #55, F4 residual).
+    # Preload and renderer floors (#124) run as extra steps in this same job, not
+    # as new jobs: branch protection matches the `Coverage` check name, so a new
+    # job would enforce nothing until it was added to the required set.
     #
     # Scoped to the main project (`--project main`) on purpose: only the main
     # project's tests load scripts/fuses.js (via scripts/fuses.test.mjs), so the
-    # v8 report carries exactly ONE fuses.js row at its real ~88% coverage. A
-    # full-workspace run pulls renderer/preload tests in too and — with an
-    # untested include or `all: true` — can emit a second 0%-baseline fuses.js
-    # row; `all: false` in vitest.main.ts already collapses that, and `--project
-    # main` keeps the instrumented set (and therefore the threshold match)
-    # unambiguous and deterministic. Do NOT drop `--project main`.
+    # v8 report carries exactly ONE fuses.js row at its real coverage. A
+    # run over all three projects pulls renderer/preload tests in too and can
+    # emit a second 0%-baseline fuses.js row; `--project main` keeps the
+    # instrumented set (and therefore the threshold match) unambiguous and
+    # deterministic. Do NOT drop `--project main`. `--project main-perf` goes
+    # with it: the main-process timing-budget suites (`*.perf.test.*`), which
+    # vitest.main.config.ts runs after `main`, one file at a time, into the
+    # same report (owner decision 2026-10-27). scripts/test-cov.test.mjs holds
+    # these three steps to the arguments `npm run test:cov` uses.
     steps:
-      # actions/checkout v6.0.3 — MUST run before the local composite action
+      # actions/checkout v7.0.1 — MUST run before the local composite action
       # below so the action.yml file can be loaded from the workspace.
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: ./.github/actions/setup-node-with-retry
         with:
           # scripts/fuses.test.mjs + the other main-process tests import the
@@ -142,10 +187,23 @@ jobs:
           # postinstall so they are present for the coverage run.
           run-postinstall: "true"
       - name: Main-project coverage (enforces the scripts/fuses.js + whisper floors)
-        # Fails the job when any per-file floor in vitest.main.ts is breached
+        # Fails the job when any per-file floor in vitest.main.config.ts is breached
         # (vitest exits non-zero on a threshold miss). --coverage activates the
-        # thresholds; --config supplies them; --project main scopes the run.
-        run: npx vitest --run --config vitest.main.ts --project main --coverage
+        # thresholds; --config supplies them; --project main scopes the run and
+        # --project main-perf adds the timing-budget suites, run last and alone.
+        run: npx vitest --run --config vitest.main.config.ts --project main --project main-perf --coverage
+      - name: Preload-project coverage (enforces the vitest.preload.config.ts floors)
+        # Global floors for src/preload (previewBridge.ts + index.ts), added in
+        # #124 QG-8. Scoped with --project preload like the main step, so the
+        # run can never expand to all three projects (vitest 3 auto-discovered
+        # the old vitest.workspace.ts). Reports go to coverage/preload, so the
+        # three steps never share an output directory.
+        run: npx vitest --run --config vitest.preload.config.ts --project preload --coverage
+      - name: Renderer-project coverage (enforces the #124 HTML-preview floors)
+        # Per-file floors in vitest.renderer.config.ts for usePreviewBounds, previewClip,
+        # previewDragFreeze and previewTabMove (#124 QG-8), plus the project-wide
+        # floor. None of them depend on symlink cases, so they hold on Linux.
+        run: npx vitest --run --config vitest.renderer.config.ts --project renderer --coverage
 
   build:
     name: Build
@@ -153,9 +211,9 @@ jobs:
     timeout-minutes: 10
     if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
     steps:
-      # actions/checkout v6.0.3 — MUST run before the local composite action
+      # actions/checkout v7.0.1 — MUST run before the local composite action
       # below so the action.yml file can be loaded from the workspace.
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: ./.github/actions/setup-node-with-retry
         with:
           # electron-vite build imports native modules at config resolution
@@ -167,12 +225,12 @@ jobs:
   license:
     name: License compliance
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
     steps:
-      # actions/checkout v6.0.3 — MUST run before the local composite action
+      # actions/checkout v7.0.1 — MUST run before the local composite action
       # below so the action.yml file can be loaded from the workspace.
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: ./.github/actions/setup-node-with-retry
       - name: SPDX headers present on all source files
         run: npm run check:headers
@@ -184,16 +242,16 @@ jobs:
   windows-checks:
     name: Windows checks
     runs-on: windows-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
     # Advisory Windows gate (typecheck + main-process tests only). Excluded
     # from branch-protection required checks until proven stable, mirroring
     # how e2e is kept out of the required set. The concurrency block above
     # already cancels in-flight runs on the same ref.
     steps:
-      # actions/checkout v6.0.3 — MUST run before the local composite action
+      # actions/checkout v7.0.1 — MUST run before the local composite action
       # below so the action.yml file can be loaded from the workspace.
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: ./.github/actions/setup-node-with-retry
         with:
           # test:main imports the electron binary + node-pty native bindings;
@@ -205,6 +263,12 @@ jobs:
         # the local composite action and the other jobs.
         shell: bash
         run: npm run typecheck
+      - name: Design sync check
+        # The Lint job runs this on Linux; on Windows it used to fail on every
+        # run because two generated files came out of checkout as CRLF (#104).
+        # Running it here keeps that from regressing invisibly.
+        shell: bash
+        run: npm run design -- --check
       - name: Main-process tests
         shell: bash
         run: npm run test:main
@@ -212,12 +276,12 @@ jobs:
   audit-signatures:
     name: npm audit signatures
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
     steps:
-      # actions/checkout v6.0.3 — MUST run before the local composite action
+      # actions/checkout v7.0.1 — MUST run before the local composite action
       # below so the action.yml file can be loaded from the workspace.
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: ./.github/actions/setup-node-with-retry
       - name: Verify npm registry signatures
         # Asserts every package in package-lock.json is signed by npm's
@@ -237,9 +301,9 @@ jobs:
           echo "package-lock.json digest: $(cat package-lock.sha256)"
 
       - name: Upload package-lock digest artifact
-        # actions/upload-artifact v7.0.1 — keep SHA aligned with build_*.yml
+        # actions/upload-artifact v7.0.2 — keep SHA aligned with build_*.yml
         # (Dependabot will keep these in lockstep once #B2 lands).
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: package-lock-digest
           path: package-lock.sha256
@@ -255,7 +319,7 @@ jobs:
       # the extraResources: block against the push/PR base commit (issue #55).
       # The default depth-1 checkout has no base to diff against, which would
       # force that guard into its fail-safe warn-always path.
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
 
@@ -388,9 +452,10 @@ jobs:
       - name: Guard - electron-builder packaging allowlist
         env:
           # Resolved here, not interpolated into the script body, so no github.*
-          # value is ever spliced into shell source. Empty on non-push/PR events;
-          # the guard treats empty as "no base" and falls back to warning.
-          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          # value is ever spliced into shell source. A merge group compares against
+          # the queue's base commit (it has no event.before). Empty on any other
+          # event; the guard treats empty as "no base" and falls back to warning.
+          BASE_SHA: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
         run: |
           set -euo pipefail
           # $1 is never passed by the `run:` step (it always defaults); it exists

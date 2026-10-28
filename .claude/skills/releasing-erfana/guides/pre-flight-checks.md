@@ -1,9 +1,9 @@
 # Phase 0 pre-flight checks (extracted)
 
-> Pre-flight check before the §0.5 agent delegation in the `releasing-erfana` skill.
-> SKILL.md §0.4.6 is a pointer to this guide; the script below is executed in exactly
-> one place — the `release-quality-runner` agent (`<workflow>` step 11, gate key
-> `windows_snapshot`).
+> Pre-flight checks before the §0.5 agent delegation in the `releasing-erfana` skill.
+> SKILL.md §0.4.6 and §0.4.7 are pointers to this guide; each check below is executed in
+> exactly one place — the `release-quality-runner` agent (`<workflow>` step 11, gate key
+> `windows_snapshot`, and step 12, gate key `version_drift`).
 
 ## 0.4.6 Windows status snapshot is current
 
@@ -24,7 +24,8 @@ miss is enough: the policy needs a gate rather than a convention.
 - **The snapshot is deliberately written ahead of the tag.** Re-anchoring on a version
   that is not yet released is not a documentation lie; it is part of release prep.
 - **The re-anchor does NOT ride the §1.5 commit bundle.** §1.5 stages exactly
-  `package.json`, `docs/CHANGELOG.md` and `docs/release-notes/v{version}.md` —
+  `package.json`, `package-lock.json`, `docs/CHANGELOG.md`,
+  `docs/release-notes/v{version}.md` and `CLAUDE.md` —
   `docs/windows/implementation-plan.md` is not in that list, and this gate runs at
   §0.4.6, i.e. *after* §0.2's clean-tree gate. So remediating a failure mid-release
   dirties the tree and §0.2 will refuse on the next run. The remediation is its own
@@ -81,3 +82,50 @@ fi
 | Line number is recomputed | `grep -n` supplies the hit line and `${SNAP_HIT%%:*}` strips it back out for the remediation message. Never hardcode the line – the snapshot paragraph moves whenever the file is edited. |
 | `VERSION` env override | `VERSION="${VERSION:-...}"` lets the gate be exercised (pass and fail paths) without touching `package.json`, which would otherwise pollute the release commit. |
 | `head -1` | Only the first anchor line counts. A second "Last updated" line elsewhere in the file must not silently satisfy the gate. |
+
+## 0.4.7 Documented versions match package.json
+
+Several docs state the current version, and nothing failed when one was left behind:
+the lens review of v0.21.0 (finding [40]) found `SDLC.md`'s stack row still naming
+Electron 39 after the move to Electron 44. `scripts/check-version-drift.mjs` compares each of
+those lines with the package manifests:
+
+| Claim | Must equal |
+|---|---|
+| `CLAUDE.md` "Current version" banner | `package.json` `"version"` |
+| The Electron major in `CLAUDE.md`, `SDLC.md` (stack row), `CONTRIBUTING.md`, `docs/security.md`, `docs/ui-style-guide.md`, `docs/terminal/flickering-prevention.md` | the major of the `electron` range in `package.json` |
+| The range quoted in `docs/security.md` | that range exactly as declared (`^44.9.0`), so a move to `~` or to an exact pin fails too |
+| The full Electron version in `docs/getting-started.md` and `docs/security.md` | the `electron` version resolved in `package-lock.json` |
+
+The exact lines are the `CLAIMS` list at the top of the script.
+
+### Semantics
+
+- **Strict equality, after the version bump** — the same timing as §0.4.6: at Phase 0
+  `package.json` already carries the version about to be tagged, so the banner must
+  already say it.
+- **Each phrase must match exactly once.** Any other count is reported as
+  `phrase matched N times`, not skipped: a line that stops matching would otherwise
+  pass unchecked for good, and with two matches only the first would be checked.
+  Rewording or copying such a line means updating the doc or `CLAIMS` in the same
+  change.
+- **Historical lines are not claims.** "Measured on Electron 39" in a design note or
+  spike is a record, not a statement of what ships, and is deliberately not listed.
+- **Not covered here:** the Windows status-snapshot anchor (§0.4.6 owns it), and the
+  Node.js version Electron bundles (`24.22.0` in `CLAUDE.md`), which `package.json`
+  does not carry.
+- **The remediation does NOT ride the §1.5 commit bundle**, for the same reason as
+  §0.4.6: §0.2's clean-tree gate has already run. Fix the lines in their own commit,
+  `git commit -m "docs: match documented versions to v{version}"`, push, wait for
+  `checks.yml`, then restart Phase 0 from §0.1. Cheapest path: run
+  `npm run check:version-drift` right after the version bump, before the skill is
+  invoked at all.
+
+### Script
+
+```bash
+npm run --silent check:version-drift
+```
+
+- [ ] Exit code 0: every documented version matches `package.json`
+- [ ] On exit code 1, each failing line is printed as `<file>:<line> says <found>; expected <value> (<source>)`

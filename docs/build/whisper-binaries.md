@@ -4,12 +4,16 @@ Erfana self-hosts its own builds of [ggml-org/whisper.cpp](https://github.com/gg
 
 See `docs/windows/phase4-binary-spec.md` for the currently pinned upstream SHA and per-platform SHA-256s.
 
+**Current pin:** `whisper-build-v1.8.4-erfana2` (`RELEASE_TAG` in `src/main/services/whisper-assets.ts`), first shipped in Erfana v0.22.0. It is the static macOS rebuild described in [macOS build is static](#macos-build-is-static); `erfana1` could not start on users' Macs and is no longer accepted.
+
+**The whisper tag also confuses changelog tooling.** A `whisper-build-*` tag is a git tag like any other, so `git cliff --unreleased` treats the newest one as the last release and drafts only the commits after it. Draft app release notes with an explicit range instead – see [release.md § Lessons from v0.22.0](./release.md#lessons-from-v0220).
+
 ## Release stream
 
 Two **separate** release streams in the same GitHub repo:
 
-- **`v{semver}`** — Erfana application releases. These set `electron-updater`'s "latest".
-- **`whisper-build-{upstream_label}-erfana{rev}`** — whisper binary releases. **Always marked pre-release** so `electron-updater` ignores them.
+- **`v{semver}`** — Erfana application releases. These are the GitHub "Latest" release (there is no in-app auto-updater: `electron-builder.yml` sets `publish: null`, so nothing consumes a "latest" feed).
+- **`whisper-build-{upstream_label}-erfana{rev}`** — whisper binary releases. **Always marked pre-release** so they never become the GitHub "Latest" release.
 
 The Erfana client (`src/main/services/whisper-assets.ts`) pins a specific `whisper-build-*` tag + per-platform SHA-256. App releases and whisper-builds evolve independently.
 
@@ -31,10 +35,10 @@ Requires an active [Apple Developer Program](https://developer.apple.com/program
 2. In "Certificates, Identifiers & Profiles" → create a **Developer ID Application** certificate. Download the .cer, add to Keychain Access, then export the combined cert + private key as a `.p12` file (with a strong password).
 3. Generate an App-Specific password at https://appleid.apple.com → Sign-In & Security → App-Specific Passwords → label it "Erfana notarytool CI".
 4. Add GitHub repo secrets (Settings → Environments → `production-signing` → Add secret):
-   - `APPLE_CERT_P12` — base64 of the .p12 file: `base64 -w0 DeveloperID.p12` (macOS: `base64 -i DeveloperID.p12 | tr -d '\n'`)
-   - `APPLE_CERT_PASSWORD` — the .p12 export password
+   - `MAC_CERT_P12_BASE64` — base64 of the .p12 file: `base64 -w0 DeveloperID.p12` (macOS: `base64 -i DeveloperID.p12 | tr -d '\n'`)
+   - `MAC_CERT_PASSWORD` — the .p12 export password
    - `APPLE_ID` — your Apple ID email
-   - `APPLE_APP_PASSWORD` — the app-specific password from step 3
+   - `APPLE_APP_SPECIFIC_PASSWORD` — the app-specific password from step 3
    - `APPLE_TEAM_ID` — 10-char alphanumeric Team ID from the developer account page
 
 ### 2. Windows code-signing
@@ -72,8 +76,9 @@ minisign -G -p rotation.pub -s rotation.key
 ```
 
 Then:
-- Upload `primary.key` contents as `MANIFEST_SIGNING_KEY` in `production-signing` environment.
-- Upload the passphrase as `MANIFEST_SIGNING_KEY_PASSWORD`.
+- Upload the base64 of `primary.key` as `MINISIGN_SECRET_KEY_BASE64` in `production-signing` environment (`base64 -i primary.key | tr -d '\n'`); the workflow decodes it with `base64 -d`, as `release.yml` does.
+- Upload the passphrase as `MINISIGN_KEY_PASSWORD`.
+- These are the same two secrets `release.yml` signs `SHA256SUMS` with: the whisper manifest primary key is the release key (key ID `4AEBCE8499845646`, also in [`docs/release-pubkey.txt`](../release-pubkey.txt)), so rotating it affects both workflows.
 - Commit **both** public keys (`primary.pub` + `rotation.pub`) to the Erfana repo at `src/main/services/whisper-pubkeys.ts` (embedded as constants; consumed by `verifyManifest.ts`).
 - Move `rotation.key` to offline storage (USB + paper backup in a secure location). Never put it in CI.
 
@@ -89,7 +94,7 @@ Verify anytime:
 gh api repos/qodeca/erfana/environments/production-signing --jq '.protection_rules'
 ```
 
-`can_admins_bypass` is `true`, so a repo admin can still skip the wait — the gate is an anti-mistake control, not a defence against a compromised admin account. The underlying trust boundary is unchanged: only repo admins can edit `.github/workflows/`, the same trust model as every other repo secret (e.g. `CLAUDE_CODE_OAUTH_TOKEN`).
+`can_admins_bypass` is `true`, so a repo admin can still skip the wait — the gate is an anti-mistake control, not a defence against a compromised admin account. The underlying trust boundary is unchanged: only repo admins can edit `.github/workflows/`, the same trust model as every other repo secret (e.g. `MINISIGN_KEY_PASSWORD`).
 
 ### 5. Tag protection on whisper-build-* tags
 
@@ -109,9 +114,24 @@ Verify anytime via `gh api repos/qodeca/erfana/rulesets/17762301`.
 - `erfana_revision` — integer, monotonic. Increment on rebuild (e.g. cert rotated; compiler pinned differently).
 - `skip_notarization` — debug only; the publish job refuses to create the release if this is true.
 
+The workflow reads the same secret names as `release.yml` (`MAC_CERT_P12_BASE64`, `MAC_CERT_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`, `MINISIGN_SECRET_KEY_BASE64`, `MINISIGN_KEY_PASSWORD`). Before v0.22.0 it asked for names that did not exist in `production-signing`, so a dispatch could not sign; if a run fails at a signing step with an empty secret, compare the names in the workflow with the environment first.
+
 Three of the workflow's four jobs — `build-macos`, `build-windows` and `publish-release` — declare `environment: production-signing`; only `validate-inputs` runs ungated. The approval prompt therefore appears within seconds of dispatch, as soon as input validation passes, and the run sits idle at the two build jobs until a reviewer approves. It does **not** build for ~25 minutes and then stop at publish. Approval is what attaches the signing / notarization / manifest secrets.
 
 Typical end-to-end time once approved: ~25–30 minutes (macOS build ~15 min + Windows build ~8 min + notary queue ~5–10 min).
+
+## macOS build is static
+
+The macOS tarball ships `whisper-cli` with no libraries beside it, so `build-macos` configures with `-DBUILD_SHARED_LIBS=OFF`: `libwhisper` and every `libggml*` library are linked into the binary. It also sets `-DGGML_OPENMP=OFF`, as upstream's own Apple build (`build-xcframework.sh`) does, so the binary cannot pick up a `libomp` dependency, even if a runner image makes OpenMP findable. Do not add `-DGGML_STATIC=ON` – on Apple it passes `-static` to the linker, which macOS does not support for executables. Two steps keep the binary self-contained:
+
+- **"Verify whisper-cli links system libraries only"** runs after staging, before signing. It fails if `otool -arch all -L staging/whisper-cli` lists anything outside `/usr/lib/` and `/System/Library/` (an `@rpath/`, `@loader_path/` or `@executable_path/` entry, or any other path), or if `otool -l` shows an `LC_RPATH` into the runner workspace.
+- **"Smoke test (transcribe JFK sample)"** runs a copy of `staging/` from `$RUNNER_TEMP/whisper-smoke`, with `build/` moved aside, so a library missing from the tarball fails the run.
+
+Why: `whisper-build-v1.8.4-erfana1` was a shared build. Its `whisper-cli` loads `@rpath/libwhisper.1.dylib` and five `libggml*` dylibs that are not in the tarball, so on a user's Mac it stops at launch and Erfana reports `WHISPER_PROCESS_FAILED`. The CI smoke test still passed, because it ran on the runner, where the binary's absolute `LC_RPATH` entries pointed into `build/`.
+
+## Windows build picks its own Visual Studio
+
+`build-windows` runs `cmake -A x64` with **no `-G` generator**, so CMake picks the newest Visual Studio installed on `windows-latest`. A generator pinned to Visual Studio 2022 with `-G` broke when the runner image moved to a newer Visual Studio. `-A x64` works only with a Visual Studio generator, so a non-VS fallback fails loudly, and the multi-config output stays in `build\bin\Release`. Do not add `-G` back.
 
 ## Diff-review checklist (every upstream bump)
 
@@ -143,7 +163,7 @@ This checklist and ["Security pre-check before the PR merge"](#security-pre-chec
 
 1. Revoke in [Apple developer portal](https://developer.apple.com/account/resources/certificates/list).
 2. Generate new Developer ID Application cert, export as .p12.
-3. Update `APPLE_CERT_P12` + `APPLE_CERT_PASSWORD` in `production-signing` environment.
+3. Update `MAC_CERT_P12_BASE64` + `MAC_CERT_PASSWORD` in `production-signing` environment.
 4. Trigger `whisper-binaries` workflow with `erfana_revision` bumped by 1 (e.g. `erfana2`).
 5. Update `src/main/services/whisper-assets.ts` in a hot-fix Erfana release pointing at the new `whisper-build-*` tag.
 6. **Time budget**: ~6 hours end-to-end (cert provisioning is slow).
@@ -151,7 +171,7 @@ This checklist and ["Security pre-check before the PR merge"](#security-pre-chec
 ### Minisign primary key compromised
 
 1. Generate new primary keypair on Marcin's Mac.
-2. Update `MANIFEST_SIGNING_KEY` + `MANIFEST_SIGNING_KEY_PASSWORD` in `production-signing`.
+2. Update `MINISIGN_SECRET_KEY_BASE64` + `MINISIGN_KEY_PASSWORD` in `production-signing` (shared with `release.yml` – update `docs/release-pubkey.txt` too).
 3. Commit new `primary.pub` to `src/main/services/whisper-pubkeys.ts` (rotation pubkey remains unchanged). Existing installs still trust the rotation key, so there's no trust gap.
 4. Trigger `whisper-binaries` workflow with `erfana_revision` bumped. Manifest will be signed by the new primary.
 5. Ship hot-fix Erfana release with the updated pubkey file.
@@ -189,7 +209,7 @@ Manual trigger: `gh workflow run whisper-binaries-canary.yml`.
 
 CMake embeds a git commit SHA + build timestamp into the compiled artifact. Re-running the workflow with the same `upstream_sha` + `erfana_revision` **does not** produce bit-identical binaries. The SHA-256 pin in `src/main/services/whisper-assets.ts` is "the hash of the build we published" — not "the hash of any deterministic rebuild".
 
-Quarterly integrity task: download and re-verify a random shipped binary against its pinned SHA-256 (e.g. `curl -sL https://github.com/qodeca/erfana/releases/download/whisper-build-v1.8.4-erfana1/whisper-win-x64-v1.8.4-erfana1.zip | shasum -a 256`).
+Quarterly integrity task: download and re-verify a random shipped binary against its pinned SHA-256 (e.g. `curl -sL https://github.com/qodeca/erfana/releases/download/whisper-build-v1.8.4-erfana2/whisper-win-x64-v1.8.4-erfana2.zip | shasum -a 256`).
 
 ## Cost
 
@@ -236,10 +256,12 @@ After CI publishes a new `whisper-build-<label>-erfana<N>` release, the app-side
    npm run typecheck
    npm run test:main -- src/main/services/WhisperModelManager.test.ts src/main/services/WhisperModelManager.downgrade.test.ts src/main/services/LocalWhisperService.test.ts src/main/utils/
    ```
-8. **Local smoke test** (on at least one of macOS / Windows, or both):
+8. **Local smoke test** – on macOS (required) and, if you can, on Windows:
+   - macOS is required because the CI smoke test runs on the build machine, and passed for a binary that could not start on a user's Mac (see [macOS build is static](#macos-build-is-static)).
    - Delete `{userData}/whisper/` to force a fresh install.
    - Launch Erfana → Settings → Transcription → Backend = Local → Download model → transcribe a test audio file.
    - Expected log: `INFO: Whisper binary installed` with the new `manifestRevision` value.
+   - Without a usable desktop session, run the same path headless: `ERFANA_WHISPER_REAL_RELEASE=1 npx vitest --run --config vitest.main.config.ts src/main/services/WhisperModelManager.realRelease.integration.test.ts`. It installs the pinned release into a temp `userData` through the shipped `WhisperModelManager` and transcribes the JFK sample with `ggml-tiny` through `LocalWhisperService` (~80 MB download). It does not cover Gatekeeper's first-launch check of a quarantined download.
 9. **Commit** with a conventional message: `feat(whisper): pin whisper-build-<label>-erfana<N> (upstream <whisper.cpp version>)`.
 10. **PR review** — reviewer should confirm: (a) SHAs match manifest, (b) `MIN_REVISION_INDEX` monotonic, (c) `CHANGELOG.md` mentions the security-relevant upstream changes (see the [diff-review checklist](#diff-review-checklist-every-upstream-bump) above).
 
@@ -263,24 +285,38 @@ If any red flag — treat as a security review, don't auto-merge. This is the re
 
 ### Why minisign (not cosign / Sigstore)
 
-See [ADR 0002](../adrs/0002-minisign-over-cosign-sigstore.md) for the full decision and alternatives. Short version: minisign gives us offline verification (no Rekor dependency), tiny verifier surface (`verifyManifest.ts` is 209 lines), and no CA chain.
+See [ADR 0002](../adrs/0002-minisign-over-cosign-sigstore.md) for the full decision and alternatives. Short version: minisign gives us offline verification (no Rekor dependency), tiny verifier surface (`verifyManifest.ts` is about 260 lines), and no CA chain.
 
 ### Dual-pubkey architecture (primary + rotation)
 
-See [ADR 0003](../adrs/0003-dual-pubkey-trust-primary-rotation.md). Primary key lives in the `production-signing` GitHub Environment secret `MANIFEST_SIGNING_KEY`; rotation key lives **offline on a hardware token** and is only used during an incident. Both pubkeys are embedded in `src/main/services/whisper-pubkeys.ts`.
+See [ADR 0003](../adrs/0003-dual-pubkey-trust-primary-rotation.md). Primary key lives in the `production-signing` GitHub Environment secret `MINISIGN_SECRET_KEY_BASE64` (shared with `release.yml`); rotation key lives **offline on a hardware token** and is only used during an incident. Both pubkeys are embedded in `src/main/services/whisper-pubkeys.ts`.
 
 ### Known minisign gotchas
 
 Hard-won knowledge from Phase 4 implementation — documented here so future maintainers don't re-derive them:
 
-1. **Key-ID byte order is reversed for display only.** The on-wire key ID in the signature file header is 8 bytes in little-endian order; the `minisign` CLI and `.pub` files show the hex reversed (big-endian). `verifyManifest.ts:91` reverses those bytes in a single statement, purely so the `signingKeyId` we report and log matches what a maintainer sees in the `.pub` file and the release description. The actual key-ID **comparison** runs on the raw, un-reversed bytes via `timingSafeEqual` (`verifyManifest.ts:109`). Future maintainers comparing hex dumps of `.pub` files vs `.minisig` payload: the bytes are reversed.
-2. **Two signature algorithm variants**: `Ed` (legacy, raw Ed25519 over the manifest bytes — magic bytes `0x45 0x64`) and `ED` (prehashed via BLAKE2b-512, then Ed25519 over the 64-byte digest — magic bytes `0x45 0x44`, the minisign ≥ 0.7 default). Both pairs are needed to detect both variants. `detectAlg` (`verifyManifest.ts:144-158`) matches the first two bytes against the `MINISIGN_ALG_ED_LEGACY` / `MINISIGN_ALG_ED_PREHASHED` constants (`verifyManifest.ts:29-30`) and throws `unsupported-algorithm` on anything else. Future test signers must produce one of these two variants — check `minisign --version` first.
+1. **Key-ID byte order is reversed for display only.** The on-wire key ID in the signature file header is 8 bytes in little-endian order; the `minisign` CLI and `.pub` files show the hex reversed (big-endian). `verifyManifest.ts:95` reverses those bytes in a single statement, purely so the `signingKeyId` we report and log matches what a maintainer sees in the `.pub` file and the release description. The actual key-ID **comparison** runs on the raw, un-reversed bytes via `timingSafeEqual` (`verifyManifest.ts:112`). Future maintainers comparing hex dumps of `.pub` files vs `.minisig` payload: the bytes are reversed.
+2. **Signature algorithm variants**: public keys always carry `Ed` (magic bytes `0x45 0x64`); signatures must be `ED` (prehashed via BLAKE2b-512, then Ed25519 over the 64-byte digest – magic bytes `0x45 0x44`, the minisign >= 0.7 default). `parseSignature` (`verifyManifest.ts`) refuses a legacy `Ed` signature and anything else with `unsupported-algorithm`. It also requires the trusted-comment and global-signature lines, and checks the global signature (same key, over signature || trusted comment). The BLAKE2b-512 is computed with the pure-JS `@noble/hashes`, because Electron's BoringSSL has no `blake2b512` (`crypto.createHash` throws "Digest method not supported").
 3. **Pure-JS verifier via `@noble/ed25519`.** We chose this over `sodium-native` to keep the verifier a pure-function with no native bindings. Tradeoff: ~100µs per verify vs ~10µs native — negligible for once-per-install use.
-4. **Test fixture pattern**: `src/main/utils/verifyManifest.test.ts` uses a real published manifest + signature from `whisper-build-v1.8.4-erfana1` as fixture bytes. When the pin advances, either (a) the fixture stays pointing at the old release (still cryptographically valid) or (b) refresh the fixture to the new release. Do NOT generate synthetic manifests with test keypairs — that would miss the `Ed`/`ED` variant-detection path.
+4. **Test fixture pattern**: `src/main/utils/verifyManifest.test.ts` uses a real published manifest + signature from `whisper-build-v1.8.4-erfana1` as fixture bytes. It still points there after the `erfana2` bump: the old signature stays valid, and the test pins its trusted-comment timestamp. When the pin advances, either (a) the fixture stays pointing at the old release (still cryptographically valid) or (b) refresh the fixture to the new release. Do NOT generate synthetic manifests with test keypairs — that would miss the `Ed`/`ED` variant-detection path.
+
+## Security baseline
+
+What `src/main/utils/secureDownloader.ts` enforces for every whisper download (binaries, manifest and GGML models):
+
+- **Exact host allowlist, no wildcards.** `github.com`, `objects.githubusercontent.com`, `release-assets.githubusercontent.com`, `huggingface.co`, `us.aws.cdn.hf.co` (Hugging Face Xet storage, where model files now redirect to), and the older `cdn-lfs.huggingface.co`, `cdn-lfs-us-1.huggingface.co`, `cdn-lfs-eu-1.huggingface.co`. Redirects are followed by hand and every hop is checked again. `eu.aws.cdn.hf.co` does not resolve (checked 2026-10-23), so it is not listed; add a host only after confirming it, as an exact name.
+- **Only `https:`, default port, no credentials in the URL.** Checked on the first URL and on every redirect hop. Error messages carry origin + path only (signed CDN query strings never reach logs or the renderer).
+- **Models are hash-pinned.** `MODEL_PINS` in `src/shared/whisper-model-pins.ts` (re-exported by `whisper-assets.ts`) holds the SHA-256 and exact size of each model, taken from the Hugging Face API (`https://huggingface.co/api/models/ggerganov/whisper.cpp/tree/main`, each file's `lfs.oid` and `size`). `ensureModel()` passes the hash to `downloadToFile`; on a mismatch the temp file is deleted and the download fails with `WHISPER_MODEL_DOWNLOAD_FAILED`. The host allowlist is therefore not the integrity check for models.
+- **Installed models are checked too.** A model counts as installed only with the exact pinned size (`isModelInstalled`, `listInstalledModels`). `LocalWhisperService` calls `verifyInstalledModelFile(model)` once per transcription job, before the first spawn; every chunk of that job shares the one check. It opens the file once, stats the handle, streams a SHA-256 through the same handle, then re-stats the handle and the path and requires the same dev, ino, size, mtime and ctime. **Nothing is cached across jobs**: a file rewritten in place with its mtime restored is caught by the next job, because each job hashes again (a multi-GB model costs a few seconds). The state it verified (dev, ino, size, mtime, ctime) is returned, and before each chunk's spawn `assertVerifiedModelUnchanged()` re-stats the path and requires the same state; a mismatch stops the job (`WHISPER_MODEL_CHANGED_DURING_CHECK`). The window between the check and the spawn is narrowed, not closed. The file is deleted only when its size or hash is wrong AND the path still names the exact file that was hashed (same dev and ino); `WHISPER_MODEL_INTEGRITY_FAILED` ("download it again from Settings") is raised. If the file merely *changed* while it was being checked, or between chunks, the job fails with `WHISPER_MODEL_CHANGED_DURING_CHECK` and nothing is deleted (the next job checks again). A cancel during hashing raises `TRANSCRIPTION_CANCELLED` and leaves the file. Nothing is re-downloaded without the user asking.
+- **Windows limit.** A same-user process can restore ChangeTime and LastWriteTime, so a swap between two chunks of one job is not caught by the per-chunk recheck; the next job re-hashes the file.
+- **No leftovers.** Temp files are named `ggml-<model>.bin.download-p<pid>-<uuid>`. An in-flight download is aborted and its temp file removed at app quit (`dispose()`). Any `ggml-*.bin.download-*` file from an earlier run is deleted the next time models are listed or downloaded, except a download of another Erfana instance sharing the same userData (its pid is still alive) and an unmarked file changed in the last 10 minutes. A pid-marked file untouched for over an hour is stale even if its pid is alive.
+- **`large` maps to `ggml-large-v3.bin`.** The repository has no plain `ggml-large.bin`; the file is stored locally as `ggml-large.bin`.
+- **Byte cap per model** is the pinned size plus 1 MiB, checked against `Content-Length` and the streamed bytes.
+- To refresh a pin (a model re-published upstream), re-read the API output above and update `MODEL_PINS` and its test mock together.
 
 ## Rejected approaches (don't re-propose without reading this section)
 
-1. **PowerShell `Compress-Archive` for Windows zips**. Produces stream-format zips that Node's `extract-zip` (via `yauzl`) rejects on long or non-ASCII paths. Use `7z a -tzip -mx=9 ...` as currently. A cleanup PR removing 7z as "redundant since Windows has native zip" would break every Erfana Windows install silently — the round-trip extract-zip check in the workflow catches it at CI time, but only if the check isn't removed too. **Leave 7z + extract-zip round-trip test in place.**
+1. **PowerShell `Compress-Archive` for Windows zips**. Produces stream-format zips that `yauzl` rejects on long or non-ASCII paths. Since v0.22.0 the Erfana client unpacks the zip with `yauzl` 3.4.0 directly (`src/main/utils/zipArchive.ts`, which also refuses symbolic-link and other non-regular entries); the workflow's round-trip step still checks the zip with `extract-zip@2.0.1`, a thin wrapper over `yauzl`, so it remains a close proxy rather than the exact client code. Use `7z a -tzip -mx=9 ...` as currently. A cleanup PR removing 7z as "redundant since Windows has native zip" would break every Erfana Windows install silently — the round-trip extract-zip check in the workflow catches it at CI time, but only if the check isn't removed too. **Leave 7z + extract-zip round-trip test in place.**
 2. **Live-log grep for leaked secrets from inside the runner job.** Infeasible — the runner doesn't have read access to its own rendered log (logs stream out to GitHub storage). The current impl scans `$GITHUB_STEP_SUMMARY` + `manifest.json` for credential patterns as a belt-and-suspenders check; the primary defense is GitHub's built-in `::add-mask::` redaction.
 3. **"Latest" Xcode on `macos-14` runner.** The runner image ships a specific Xcode version; `latest` is a moving target that can break notarization or cmake detection. `macos-14` currently ships 16.2 as latest (16.3 is NOT available as of 2026-04-22). Bump carefully when the runner image updates — check the `runner-images` repo release notes first.
 4. **Pin to ggml-org releases (Option B).** Never worked for macOS — no CLI binary published. See [ADR 0001](../adrs/0001-self-host-whisper-binaries.md) for the full rejection.
