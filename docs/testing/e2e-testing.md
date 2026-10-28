@@ -103,6 +103,8 @@ The script sets `ERFANA_E2E_LINUX_CONTAINER=1`. Tests read it only through `IS_L
 | `html-preview-drag-freeze.e2e.ts` › "should leave the terminal / project tree sash at the pointer…" (2 tests) | skipped (#299) | Same finding: the page is not reliably hidden during a sash drag under xvfb (failed in the last run, passed in earlier ones). |
 | `context-menu-explain.e2e.ts` › "Editor: right-click shows menu with disabled Explain…" | skipped (#299) | Explain is already enabled at the first right-click under xvfb, so a selection exists. Cause not isolated. |
 | `html-preview-drag-freeze.e2e.ts` › "should show the page on its settled area when a fast drag ends…" | skipped on every non-macOS host | Existing skip, unrelated to the container. |
+| `html-preview-comments-preload.e2e.ts` › J-005 and SEC-24 | **fail, left as is** (owner decision, PR #425) | A test artefact, not an app fault: the screenshot shows the pin gone. The "pin gone" step expects 0 pin-coloured pixels near the element, but Linux renders text with coloured subpixel fringes (for example `231,190,140` and `140,186,231`), and one falls inside `accentPixelsNear`'s ±24 match of the pin colour `160,168,255` (either channel order), so the count stays at 1. Seen in the first Linux run of the comment specs (2026-10-28). |
+| `html-preview-comments.e2e.ts` › E-007 | flaky (passed on retry) | Once, Alt+↑ announced "Showing h2, line 28." instead of "Showing em, line 24." – a timing flake, not reproduced on macOS or Windows. |
 
 One test helper was changed for the container, safely for macOS and Windows too:
 
