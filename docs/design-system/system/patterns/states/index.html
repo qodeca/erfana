@@ -38,6 +38,15 @@
                  color: var(--color-text-primary); font-size: var(--text-sm); }
   .mock__row { /* mockup: app scale */ padding: var(--space-3) var(--space-8); font-size: var(--text-sm); color: var(--color-text-primary); }
   .mock__row--dim { color: var(--color-text-tertiary); }
+  /* The comment drawer's filter, drawn at app scale: a stand-in, not a component. */
+  .st-filter { /* mockup: app scale */ display: flex; align-items: center; gap: var(--space-4);
+               padding: var(--space-4) var(--space-8); font-size: var(--text-sm); color: var(--color-text-tertiary);
+               border-bottom: var(--border-width) solid var(--color-border-default); }
+  .st-filter__option { /* mockup: app scale */ padding: var(--space-1) var(--space-4); color: var(--color-text-primary);
+                       border: var(--border-width) solid var(--color-border-subtle); }
+  .st-filter__option--on { border-color: var(--color-accent-primary); background: var(--color-bg-selected); }
+  .st-filter__count { color: var(--color-text-tertiary); }
+  .st-timeline { margin-bottom: var(--space-12); }
   .mock__window-body { flex: 1 1 auto; display: grid; grid-template-columns: 1fr 2fr; }
   .mock__pane { border-right: var(--border-width) solid var(--color-border-default); }
 
@@ -83,7 +92,7 @@
     <tr><td>has never had content – nothing is open yet</td><td>Empty: first run</td><td>Whole region, centred, one action</td><td>The editor with no file open</td></tr>
     <tr><td>is open, and its container is genuinely empty</td><td>Empty: empty container</td><td>Whole region, centred, action only if it changes the answer</td><td>A project with no Markdown files</td></tr>
     <tr><td>has content, but a search or filter hides all of it</td><td>Empty: no results</td><td>Inline, where the first row would be, and a way to clear</td><td>Search, the comment drawer's filters</td></tr>
-    <tr><td>is fetching what it is about to show</td><td>Loading: inline progress</td><td>In place of the content, region marked busy</td><td>The window picker's list</td></tr>
+    <tr><td>is fetching what it is about to show</td><td>Loading: inline progress</td><td>In place of the content, region marked busy, after a show delay; words only when the wait cannot be estimated</td><td>The window picker's list</td></tr>
     <tr><td>is changing something every other region depends on</td><td>Loading: full block</td><td>Scrim over the window, one message</td><td>Switching projects</td></tr>
     <tr><td>threw while rendering, and the rest of the app is fine</td><td>Error: panel</td><td>Whole region, message, Reload</td><td>The project tree crashed</td></tr>
     <tr><td>could not load what it was asked to show</td><td>Error: load</td><td>Whole region, error icon, reason, Try again</td><td>A file that cannot be read</td></tr>
@@ -133,13 +142,14 @@ focus; the keyboard contract is <a href="#keyboard">the table below</a>.</p>
   </figure>
   <figure class="ds-frame">
     <div class="mock mock--list on-secondary" inert aria-hidden="true">
-      <div class="mock__head">Comments · Unresolved</div>
+      <div class="mock__head">Comments</div>
+      <div class="st-filter"><span class="st-filter__label">Show</span><span class="st-filter__option">Open <span class="st-filter__count">4</span></span><span class="st-filter__option st-filter__option--on">Resolved <span class="st-filter__count">0</span></span></div>
       <div class="erf-state erf-state--inline">
-        <p class="erf-state__title">No unresolved comments</p>
-        <p class="erf-state__hint">Resolved comments are under All.</p>
+        <p class="erf-state__title">No resolved comments</p>
+        <p class="erf-state__hint">4 are under Open.</p>
       </div>
     </div>
-    <figcaption><span class="ds-frame__step">4</span><strong>No results, from a filter</strong> – the comment drawer. A filter is a search with fixed queries, so it takes the same inline shape and says where the hidden items went.</figcaption>
+    <figcaption><span class="ds-frame__step">4</span><strong>No results, from a filter</strong> – the comment drawer, with its shipped filter names, Open and Resolved. A filter is a search with fixed queries, so it takes the same inline shape and says where the hidden items are. When the filter sits directly above the list, as here, the hint that names the other filter <em>is</em> the way back – there is no Clear button and no “All” filter to send the reader to.</figcaption>
   </figure>
 </div>
 
@@ -149,22 +159,25 @@ focus; the keyboard contract is <a href="#keyboard">the table below</a>.</p>
   title. The action, when there is one, is a verb that changes the state (“New file”, “Show all files”, “Clear
   search”); an empty state with nothing useful to do has no button. <strong>Colour:</strong> title in
   <code>--color-text-primary</code>, hint in <code>--color-text-tertiary</code>, icon in
-  <code>--color-text-tertiary</code>. Not <code>--color-text-secondary</code>: it measures
+  <code>--color-text-tertiary</code>. The hint is never <code>--color-text-secondary</code> <strong>on the secondary
+  and tertiary surfaces</strong>, where it fails: it measures
   <span data-contrast="--color-text-secondary on --color-bg-tertiary" data-min="4.5" data-result="fail">4.15:1 · fail</span> on the project tree and
   <span data-contrast="--color-text-secondary on --color-bg-secondary" data-min="4.5" data-result="fail">3.72:1 · fail</span> on a panel, and both host an
-  empty state.
+  empty state. On <code>--color-bg-primary</code> it passes
+  (<span data-contrast="--color-text-secondary on --color-bg-primary" data-min="4.5" data-result="pass">5.00:1 · pass</span>), which is why the crash
+  screen's details may use it. <code>states.css</code> still uses tertiary for every hint, so one class reads on every surface.
 </div>
 
 <h3 id="loading">Loading</h3>
 <div class="ds-frames">
   <figure class="ds-frame">
     <div class="mock mock--list on-primary" inert aria-hidden="true">
-      <div class="mock__head">Choose a window</div>
+      <div class="mock__head">Outline</div>
       <div class="erf-state erf-state--inline">
-        <span class="erf-progress"><span class="erf-progress__spinner"></span>Looking for capturable windows…</span>
+        <span class="erf-progress"><span class="erf-progress__spinner"></span>Reading headings in notes/plan.md…</span>
       </div>
     </div>
-    <figcaption><span class="ds-frame__step">5</span><strong>Inline progress</strong> – the default. A small spinner and a sentence in the place the content will appear; the list it will fill carries <code>aria-busy="true"</code>, the sentence sits beside that list rather than inside it, and everything around it keeps working.</figcaption>
+    <figcaption><span class="ds-frame__step">5</span><strong>Inline progress</strong> – the default, once the show delay has passed. A small spinner and a sentence in the place the content will appear; the list it will fill carries <code>aria-busy="true"</code>, the sentence sits beside that list rather than inside it, and everything around it keeps working. The spinner is for work Erfana itself does; a wait on something outside Erfana takes words only (<a href="#loading-time">frame b</a>).</figcaption>
   </figure>
   <figure class="ds-frame">
     <div class="mock mock--list on-tertiary" inert aria-hidden="true">
@@ -205,6 +218,66 @@ focus; the keyboard contract is <a href="#keyboard">the table below</a>.</p>
 <p class="ds-muted">If neither column fits – a long job the user should be able to leave running – it is neither state:
 it is a task with its own progress and a way to cancel, and it does not belong on this card yet. A skeleton screen
 (grey placeholder rows) is not part of the system: nothing in the app draws one, and this card does not add one.</p>
+
+<h3 id="loading-time">Loading over time: delay, words, escalation</h3>
+<p>A wait has a life: most end before anyone notices, some run long, and a few never end on their own. Inline progress
+follows that life in four steps, and each step is a frame below. <strong>The two thresholds are proposed placeholders</strong>
+this card is deciding, not values measured from the app – no component implements either yet.</p>
+<table class="st-timeline">
+  <thead><tr><th>Step</th><th>When</th><th>What shows</th><th>What a screen reader hears</th></tr></thead>
+  <tbody>
+    <tr><td>Quiet</td><td>From the start until the show delay (proposed: 400 ms)</td><td>Nothing. The region keeps what it had, or stays blank. A load that ends here never flashes a spinner.</td><td>Nothing.</td></tr>
+    <tr><td>Waiting</td><td>From the show delay</td><td>Inline progress. Where Erfana cannot estimate the wait, <strong>words only, no spinner</strong>: the sentence names what is being waited for.</td><td>Nothing new. The sentence is in the status region, but the budget below holds its announcement back.</td></tr>
+    <tr><td>Escalated</td><td>From the escalation point (proposed: 10 s)</td><td>The same sentence, a second one that says it is taking longer than usual, and <strong>one Stop action</strong>.</td><td>Once, politely: the two sentences.</td></tr>
+    <tr><td>Ended</td><td>The wait finishes, fails or is stopped</td><td>The content, or the region's error state, or a stopped state with Try again.</td><td>Once, politely: what happened.</td></tr>
+  </tbody>
+</table>
+<div class="ds-frames">
+  <figure class="ds-frame">
+    <div class="mock mock--list on-primary" inert aria-hidden="true">
+      <div class="mock__head">Choose a window</div>
+    </div>
+    <figcaption><span class="ds-frame__step">a</span><strong>Quiet</strong> – the first moments of the window picker's wait. The list is busy (<code>aria-busy="true"</code>) but draws nothing, so a fast answer simply appears.</figcaption>
+  </figure>
+  <figure class="ds-frame">
+    <div class="mock mock--list on-primary" inert aria-hidden="true">
+      <div class="mock__head">Choose a window</div>
+      <div class="erf-state erf-state--inline">
+        <span class="erf-progress">Looking for capturable windows…</span>
+      </div>
+    </div>
+    <figcaption><span class="ds-frame__step">b</span><strong>Waiting, words only</strong> – what the window picker ships (<code>WindowPickerDialog.tsx</code>): the operating system gives no estimate, so no spinner pretends to measure one. The words say what is being looked for, with a real ellipsis.</figcaption>
+  </figure>
+  <figure class="ds-frame">
+    <div class="mock mock--list on-primary" inert aria-hidden="true">
+      <div class="mock__head">Choose a window</div>
+      <div class="erf-state erf-state--inline">
+        <span class="erf-progress">Looking for capturable windows…</span>
+        <p class="erf-state__hint">This is taking longer than usual. Erfana is still asking the system for its open windows.</p>
+        <div class="erf-state__actions"><button class="erf-state__action" type="button">Stop</button></div>
+      </div>
+    </div>
+    <figcaption><span class="ds-frame__step">c</span><strong>Escalated</strong> – one Stop action joins the sentence. It is a secondary action, never primary and never danger: stopping loses nothing. <strong>Stop is not focused</strong> when it appears; focus stays where the user left it.</figcaption>
+  </figure>
+  <figure class="ds-frame">
+    <div class="mock mock--list on-primary" inert aria-hidden="true">
+      <div class="mock__head">Choose a window</div>
+      <div class="erf-state erf-state--inline">
+        <p class="erf-state__title">Stopped looking for windows</p>
+        <p class="erf-state__hint">No window was found before you stopped.</p>
+        <div class="erf-state__actions"><button class="erf-state__action is-focus" type="button">Try again</button></div>
+      </div>
+    </div>
+    <figcaption><span class="ds-frame__step">d</span><strong>Stopped</strong> – the wait is over, so the progress sentence goes. The title says it was stopped, not that it failed. Focus was on Stop, which has gone, so it moves to Try again (drawn focused).</figcaption>
+  </figure>
+</div>
+<div class="ds-note">
+  <strong>The announcement budget.</strong> A wait is announced <strong>at most twice</strong>: once when it escalates,
+  and once when it ends. Both go through the region's existing polite status (<code>role="status"</code>), never
+  <code>alert</code> and never a second live region. The waiting sentence is not announced on arrival, because most
+  waits end before it would finish being read; a wait that ends during the quiet step is announced only by its
+  result. Stop is never focused automatically – a key press meant for something else must not stop a wait.
+</div>
 
 <h3 id="error">Error</h3>
 <div class="ds-frames">
@@ -277,7 +350,7 @@ it is a task with its own progress and a way to cancel, and it does not belong o
         </div>
       </div>
     </div>
-    <figcaption><span class="ds-frame__step">12</span><strong>Root error, details shown</strong> – the toggle's label says what it will do next, and it keeps focus. The details are untrusted text, shown as text only, in a scrollable region the keyboard can reach. The version and stack here are placeholders.</figcaption>
+    <figcaption><span class="ds-frame__step">12</span><strong>Root error, details shown</strong> – the toggle's label says what it will do next, and it keeps focus. The details are untrusted text, shown as text only, in a scrollable region the keyboard can reach. The version line and the stack are <code>--color-text-secondary</code>, as <code>RootErrorBoundary.css</code> ships them: the details sit on <code>--color-bg-primary</code>, where secondary passes. The version and stack here are placeholders.</figcaption>
   </figure>
   <figure class="ds-frame">
     <div class="mock mock--crash erf-crash" inert aria-hidden="true">
@@ -312,6 +385,8 @@ it is a task with its own progress and a way to cancel, and it does not belong o
     <tr><td><kbd>Tab</kbd> on the crash screen</td><td>Restart, Copy, Open logs, the details toggle, the details region.</td><td>The next of those. There is nothing else to escape to.</td></tr>
     <tr><td><kbd>Enter</kbd> on the details toggle</td><td>Shows or hides the details; the label flips.</td><td>The toggle.</td></tr>
     <tr><td>A full block starts</td><td>Pointer and keyboard input stop.</td><td>Unchanged; it returns to the same place when the block ends.</td></tr>
+    <tr><td>A wait escalates and Stop appears</td><td>The escalation sentences are announced once.</td><td>Unchanged. Stop is never focused automatically.</td></tr>
+    <tr><td><kbd>Enter</kbd> on Stop</td><td>The wait ends; the stopped state replaces the progress.</td><td>Try again, because Stop has gone.</td></tr>
     <tr><td><kbd>Enter</kbd> on an empty state's action</td><td>Does what it says (opens, clears, shows).</td><td>The first thing the action produced – the new file, the search field.</td></tr>
   </tbody>
 </table>
@@ -325,7 +400,7 @@ it is a task with its own progress and a way to cancel, and it does not belong o
   <tbody>
     <tr><td>Empty, whole region</td><td>Nothing on arrival – it is the region's content, read when reached.</td><td>Plain text. Not a live region: an empty editor is not news.</td></tr>
     <tr><td>No results</td><td>“No results for …” once, after typing stops.</td><td>The search's existing polite status region, not a second one.</td></tr>
-    <tr><td>Inline progress</td><td>The progress sentence, politely; the list or content it fills is busy until it ends.</td><td><code>aria-busy</code> on the list or content element only. <code>role="status"</code> on the sentence, a sibling outside that element – a status inside a busy element may be held back until the wait is over.</td></tr>
+    <tr><td>Inline progress</td><td>Within the <a href="#loading-time">announcement budget</a>: nothing on arrival, once politely at escalation, once at the end. The list or content it fills is busy until it ends.</td><td><code>aria-busy</code> on the list or content element only. <code>role="status"</code> on the sentence, a sibling outside that element – a status inside a busy element may be held back until the wait is over.</td></tr>
     <tr><td>Full block</td><td>The message, politely.</td><td>One status region. Not <code>alert</code>: waiting is not an error.</td></tr>
     <tr><td>Panel error, focus was inside</td><td>Through Reload's description, when focus moves there.</td><td>No <code>role="alert"</code>: one announcement channel, not two.</td></tr>
     <tr><td>Panel error, focus was elsewhere</td><td>The title and hint, once, without moving focus.</td><td>The app's one polite status region (<code>role="status"</code>), not a new live region per panel and not <code>alert</code>.</td></tr>
@@ -345,7 +420,7 @@ single token.</p>
     <tr><td><code>.editor-empty</code></td><td><code>Panels/MarkdownEditorPanel.css</code></td><td>“No file open” and a hint – and, reused by <code>EditorLoadError</code>, a load failure</td><td><span data-contrast="--color-text-secondary on --color-bg-primary" data-min="4.5" data-result="pass">5.00:1 · pass</span></td></tr>
     <tr><td><code>.emptyState</code></td><td><code>ImageViewerPanel/ImageViewerPanel.module.css</code></td><td>“No image to display” under a 32px icon</td><td><span data-contrast="--color-text-secondary on --color-bg-primary" data-min="4.5" data-result="pass">5.00:1 · pass</span></td></tr>
     <tr><td><code>.project-tree-empty</code></td><td><code>ProjectTree/ProjectTree.css</code></td><td>“No markdown files found”, “No files found”, “Open a project to get started”</td><td><span data-contrast="--color-text-secondary on --color-bg-tertiary" data-min="4.5" data-result="fail">4.15:1 · fail</span></td></tr>
-    <tr><td><code>.erf-comment-drawer__empty</code></td><td><code>HtmlPreviewPanel/comments/CommentDrawer.css</code></td><td>No comments, and each filter's empty sentence</td><td>–</td></tr>
+    <tr><td><code>.erf-comment-drawer__empty</code></td><td><code>HtmlPreviewPanel/comments/CommentDrawer.css</code></td><td>No comments, and each filter's empty sentence – today “No resolved comments.” alone, with no hint naming where the other comments are (frame 4 adds it)</td><td>–</td></tr>
     <tr><td><code>.camera-empty-state</code></td><td><code>Dialog/CameraDialog.css</code></td><td>“No camera detected” over the black preview</td><td>–</td></tr>
     <tr><td><code>.window-picker-empty</code></td><td><code>Dialog/WindowPickerDialog.css</code></td><td>“No capturable windows found.” (shares its rule with the loading line)</td><td><span data-contrast="--color-text-secondary on --color-bg-primary" data-min="4.5" data-result="pass">5.00:1 · pass</span></td></tr>
     <tr><td><code>.frontmatter-empty</code></td><td><code>Editor/MarkdownPreview.css</code></td><td><code>[]</code> or <code>{}</code> for an empty frontmatter value</td><td><span data-contrast="--color-text-tertiary on --color-bg-preview" data-min="4.5" data-result="pass">8.01:1 · pass</span></td></tr>
@@ -361,7 +436,7 @@ an empty value inside a table is data, not an empty region, so it does not take 
   <thead><tr><th>Where</th><th>File</th><th>Today</th></tr></thead>
   <tbody>
     <tr><td><code>UIBlocker</code></td><td><code>UIBlocker/UIBlocker.tsx</code>, <code>UIBlocker.css</code></td><td>The one full block, shown while the project changes. Its scrim is a colour literal rather than <code>--color-overlay-dialog</code>, its spinner has its own keyframe and duration, and its fallback copy uses three dots instead of an ellipsis.</td></tr>
-    <tr><td>Window picker</td><td><code>Dialog/WindowPickerDialog.tsx</code></td><td>Inline progress as text only, in a polite status – the right shape, no spinner.</td></tr>
+    <tr><td>Window picker</td><td><code>Dialog/WindowPickerDialog.tsx</code></td><td>Inline progress as text only, in a polite status – the right shape, no spinner (frame b). It shows from the first moment rather than after a show delay, announces on arrival, and has no escalation or Stop yet.</td></tr>
     <tr><td>Spinners</td><td>Many stylesheets</td><td>Counted on the <a href="../../foundations/motion.html">Motion</a> card, which owns the one spinner.</td></tr>
   </tbody>
 </table>
@@ -387,9 +462,17 @@ an empty value inside a table is data, not an empty region, so it does not take 
   &lt;div class="erf-state__actions"&gt;&lt;button class="erf-state__action" type="button"&gt;New file&lt;/button&gt;&lt;/div&gt;
 &lt;/div&gt;
 
-&lt;!-- Inline progress: only the list is busy; the status sentence is its sibling, outside it --&gt;
-&lt;span class="erf-progress" role="status"&gt;&lt;span class="erf-progress__spinner" aria-hidden="true"&gt;&lt;/span&gt;Looking for capturable windows…&lt;/span&gt;
+&lt;!-- Inline progress: only the list is busy; the status sentence is its sibling, outside it.
+     A wait Erfana cannot estimate drops the spinner and keeps the words. --&gt;
+&lt;span class="erf-progress" role="status"&gt;Looking for capturable windows…&lt;/span&gt;
 &lt;ul class="window-list" aria-label="Windows" aria-busy="true"&gt;&lt;/ul&gt;
+
+&lt;!-- Escalated: one Stop, never auto-focused --&gt;
+&lt;div class="erf-state erf-state--inline"&gt;
+  &lt;span class="erf-progress" role="status"&gt;Looking for capturable windows…&lt;/span&gt;
+  &lt;p class="erf-state__hint"&gt;This is taking longer than usual. …&lt;/p&gt;
+  &lt;div class="erf-state__actions"&gt;&lt;button class="erf-state__action" type="button"&gt;Stop&lt;/button&gt;&lt;/div&gt;
+&lt;/div&gt;
 
 &lt;!-- Panel error --&gt;
 &lt;div class="erf-state erf-state--error"&gt;
@@ -400,6 +483,41 @@ an empty value inside a table is data, not an empty region, so it does not take 
 
 &lt;!-- Panel error while focus is elsewhere: one line, once, in the app's polite status region --&gt;
 &lt;div role="status"&gt;Project tree unavailable. The rest of Erfana still works.&lt;/div&gt;</pre>
+
+<h2 id="tokens">Tokens</h2>
+<table class="ds-tokens">
+  <thead><tr><th>Part</th><th>Token</th><th>Resolves to</th></tr></thead>
+  <tbody>
+    <tr><td>Title</td><td><code>--color-text-primary</code></td><td><code data-token="--color-text-primary">#cccccc</code></td></tr>
+    <tr><td>Hint, icon, progress sentence</td><td><code>--color-text-tertiary</code></td><td><code data-token="--color-text-tertiary">#b0b0b0</code></td></tr>
+    <tr><td>Crash details: version line and stack</td><td><code>--color-text-secondary</code></td><td><code data-token="--color-text-secondary">#858585</code></td></tr>
+    <tr><td>Error icon</td><td><code>--color-error</code></td><td><code data-token="--color-error">#f48771</code></td></tr>
+    <tr><td>Blocker scrim</td><td><code>--color-overlay-dialog</code></td><td><code data-token="--color-overlay-dialog">rgba(0, 0, 0, 0.75)</code></td></tr>
+    <tr><td>Gap inside a state</td><td><code>--space-6</code> (whole region), <code>--space-4</code> (inline)</td><td><code data-token="--space-6">12px</code>, <code data-token="--space-4">8px</code></td></tr>
+  </tbody>
+</table>
+<p class="ds-muted">The show delay and the escalation point have no token: they are proposed placeholders on this card.
+A token for each lands with the first component that implements them.</p>
+
+<h2 id="open-defects">Open defects this card names</h2>
+<ul class="ds-muted">
+  <li><strong>Two classes named <code>.erf-progress</code>.</strong> This card's <code>states.css</code> uses it for the
+    spinner and sentence; the <a href="../../components/feedback/index.html">Feedback</a> card uses it, inside its own page,
+    for a progress bar. A shared feedback stylesheet must rename one of them before both can load on one screen.</li>
+  <li><strong>No wait has a show delay or a Stop.</strong> Every loading state in the app appears at once and runs until it
+    ends; the window picker's sentence is announced on arrival.</li>
+  <li><strong>Empty states fail contrast on their surface.</strong> <code>.project-tree-empty</code> uses secondary text on
+    the tertiary surface (see the consolidation set).</li>
+</ul>
+
+<h2 id="related">Related</h2>
+<ul class="ds-muted">
+  <li><a href="../dialog/index.html">Dialog</a>: the window picker's list lives in a dialog body; a dialog's own confirm steps.</li>
+  <li><a href="../../foundations/motion.html">Motion</a>: the one spinner, and announcing a busy state in words.</li>
+  <li><a href="../../components/feedback/index.html">Feedback</a>: banners, toasts and the progress bar for a task.</li>
+  <li><a href="../../foundations/writing.html">Writing</a>: sentence case, the real ellipsis, a verb on every button.</li>
+  <li><a href="../../foundations/colors.html">Colours</a>: every text and surface pairing these states sit on.</li>
+</ul>
 
 <section id="exceptions">
 <h2>Exceptions</h2>

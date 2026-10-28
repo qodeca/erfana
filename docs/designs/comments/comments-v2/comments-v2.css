@@ -5,80 +5,71 @@
  *
  * PROPOSED – not adopted. Plan: docs/designs/comments/comments-v2.md (change ids C-xx
  * below). Loaded AFTER ../html-comments/comments.css, ../html-comments/overlay.css
- * and ../markdown-comments/markdown-comments.css, which stay the base: this file
- * only adds parts and the few overrides each change asks for.
+ * and ../markdown-comments/markdown-comments.css, which stay the base, and AFTER the
+ * system's button.css, badge.css and feedback.css (and states.css on the drawer
+ * screen). Buttons, banners, bands, chips, counters, the unseen dot and empty states
+ * come from those system files; this file keeps only what is comment-specific.
  *
- * New component tokens are read with a fallback, so the file works before
+ * Proposed tokens are read with a fallback, so the file works before
  * design-tokens.css gains them and defers to the token the moment it does:
- *   --color-comment-mark         35% accent      (C-12)
- *   (no active fill token: active = thicker bar, see C-12 resolution R-01)
- *   --color-comment-mark-bar     accent          (C-12)
- *   --comment-mark-bar-width     --border-width-thick (C-12)
- *   --toolbar-tool-height        28px, the Markdown toolbar's row (C-12)
- *   --comment-icon-step          24px + 2px, so icon hit areas never overlap (C-17)
+ *   --color-comment-mark        35% accent             (docs/design-system/system/foundations/highlights.html#tokens-proposed)
+ *   --color-comment-mark-bar    accent; indigo on a light page ground (same card)
+ *   --comment-mark-bar-width    --border-width-thick   (same card)
+ *   --toolbar-tool-height       --input-height-sm      (docs/design-system/system/components/toolbar/index.html#tool-height)
+ *   --comment-icon-step         24px + 2px, so icon hit areas never overlap (C-17)
  */
 
-/* ================= C-12 the comment mark – one look in both previews ================= */
+/* ================= C-12 the comment mark – the Text highlights card's look ================= */
 
-/* Fill plus a continuous bar along the bottom of the text box. Never the
-   selection colour (--color-bg-selected), never a thin line that reads as a link. */
+/* Fill plus a continuous bar under the text, built only from background-color,
+   color and text-decoration – the properties ::highlight() allows – so the span
+   stands in exactly for the Markdown highlight. Never the selection colour
+   (--color-bg-selected), and always a fill, so it never reads as a link. */
 .erf-comment-mark {
   background-color: var(--color-comment-mark, color-mix(in srgb, var(--color-accent-primary) 35%, transparent));
-  box-shadow: inset 0 calc(var(--comment-mark-bar-width, var(--border-width-thick)) * -1) 0
-              var(--color-comment-mark-bar, var(--color-accent-primary));
   color: inherit;
-  text-decoration: none;
+  text-decoration: underline var(--comment-mark-bar-width, var(--border-width-thick))
+                   var(--color-comment-mark-bar, var(--color-accent-primary));
+  text-decoration-skip-ink: none;
+  text-underline-offset: var(--space-2);
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
   cursor: pointer;
 }
-/* Active keeps the 35% fill – a 55% fill over the text drops it to about 3:1
-   (measured on the marks card) – and shows "active" as a bar twice as thick
-   and the text at emphasis colour where Erfana owns the text (Markdown). */
+/* The open thread keeps the same fill and DOUBLES the bar (highlights.html#states). */
 .erf-comment-mark--active,
-.erf-comment-mark:hover {
-  box-shadow: inset 0 calc(var(--comment-mark-bar-width, var(--border-width-thick)) * -2) 0
-              var(--color-comment-mark-bar, var(--color-accent-primary));
-}
+.erf-comment-mark:hover { text-decoration-style: double; }
 .erf-mdc-content .erf-comment-mark--active,
 .erf-mdc-content .erf-comment-mark:hover { color: var(--color-text-emphasis); }
-/* On a light page ground only (the HTML overlay reads the container's luminance):
-   a 1px ink hairline on TOP of the bar, between text and bar – never under it. */
-.erf-comment-mark--on-light {
-  box-shadow: inset 0 calc(var(--comment-mark-bar-width, var(--border-width-thick)) * -1) 0
-              var(--color-comment-mark-bar, var(--color-accent-primary)),
-              inset 0 calc((var(--comment-mark-bar-width, var(--border-width-thick)) + var(--border-width)) * -1) 0
-              var(--color-brand-black);
-}
-/* C-06: words that changed after the comment – a dashed bar, no fill change. */
+/* On a light page ground the brand violet bar is under 3:1, so the bar takes
+   the deep indigo (highlights.html#contrast). The fill stays the same. */
+.erf-comment-mark--on-light { --color-comment-mark-bar: var(--color-brand-indigo); }
+/* C-06: words that changed after the comment – a dashed bar, no fill. */
 .erf-comment-mark--changed {
   background-color: transparent;
-  box-shadow: none;
-  text-decoration: underline dashed var(--color-comment-mark-bar, var(--color-accent-primary));
-  text-decoration-thickness: var(--comment-mark-bar-width, var(--border-width-thick));
-  text-underline-offset: var(--space-1);
-  text-decoration-skip-ink: none;
+  text-decoration-style: dashed;
 }
 @media (forced-colors: active) {
-  .erf-comment-mark, .erf-comment-mark--on-light {
-    background-color: Mark; color: MarkText; box-shadow: inset 0 calc(var(--space-1) * -1) 0 CanvasText;
-  }
-  .erf-comment-mark--active, .erf-comment-mark:hover { box-shadow: inset 0 calc(var(--space-2) * -1) 0 CanvasText; }
+  .erf-comment-mark { background-color: Mark; color: MarkText; text-decoration-color: CanvasText; }
+  .erf-comment-mark--changed { background-color: transparent; color: inherit; }
 }
 
 /* The live selection keeps its own colour, so "commented" never looks "selected". */
 .erf-comment-selection { background-color: var(--color-bg-selected); color: var(--color-text-emphasis); }
 
-/* ================= C-16 the Comment chip ================= */
+/* ================= C-16 the Comment button ================= */
 
-/* 28px, above the end of the selection's last line. Takes no focus. */
-.erf-comment-chip {
+/* A floating surface (Surfaces card #floating: --color-border-subtle plus
+   --shadow-md) above the end of the selection's last line. Takes no focus. */
+.erf-comment-button {
   position: absolute;
   z-index: var(--z-dropdown);
   display: inline-flex;
   align-items: center;
   gap: var(--space-3);
-  block-size: var(--toolbar-tool-height, 28px);
+  /* deviates-in-design: docs/design-system/system/components/toolbar/index.html#tool-height – the
+     tool height is a proposed token there (28px, from --input-height-sm), not yet in design-tokens.css */
+  block-size: var(--toolbar-tool-height, var(--input-height-sm));
   padding: 0 var(--space-6) 0 var(--space-4);
   background: var(--color-bg-elevated);
   border: var(--border-width) solid var(--color-border-subtle);
@@ -90,8 +81,9 @@
   white-space: nowrap;
   cursor: pointer;
 }
-.erf-comment-chip:hover { background: var(--color-bg-hover-solid); }
-.erf-comment-chip__text::before { content: attr(data-text); } /* HTML: generated, so Find ignores it */
+.erf-comment-button:is(:hover, [class~='is-hover']) { background: var(--color-bg-hover-solid); }
+.erf-comment-button svg { inline-size: var(--icon-size-sm); block-size: var(--icon-size-sm); }
+.erf-comment-button__text::before { content: attr(data-text); } /* HTML: generated, so Find ignores it */
 
 /* ================= C-13 the stepper in the window head ================= */
 
@@ -107,45 +99,16 @@
   white-space: nowrap;
 }
 
-/* ================= C-15 attention badge, three-cell filter, sort ================= */
+/* ================= C-15 the one-row filter ================= */
 
-/* A shape, not a tint: amber never sits as text next to lime. */
-.erf-comment-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  block-size: var(--space-8);
-  padding: 0 var(--space-2);
-  background: var(--color-warning);
-  color: var(--color-brand-black);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  font-weight: var(--font-semibold);
-  line-height: var(--leading-none);
-  border-radius: var(--border-radius);
-}
-
+/* Three equal cells. The Segmented control card (proposed) would stack these
+   three at 320px; keeping one row is an owner decision (comments-v2.md §8). */
 .erf-comment-filter--grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-2);
 }
 .erf-comment-filter--grid .erf-comment-filter__option { inline-size: 100%; padding: 0 var(--space-2); }
-
-.erf-comment-sort {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  block-size: var(--btn-height-sm);
-  padding: 0 var(--space-4);
-  background: transparent;
-  border: var(--border-width) solid var(--color-border-subtle);
-  border-radius: var(--border-radius);
-  color: var(--color-text-primary);
-  font-family: var(--font-sans);
-  font-size: var(--text-sm);
-  cursor: pointer;
-}
 
 /* C-26: sticky per-file headings in the drawer. */
 .erf-comment-drawer__group {
@@ -156,49 +119,16 @@
   background: var(--color-bg-secondary);
   border-block-end: var(--border-width) solid var(--color-border-default);
   font-family: var(--font-mono);
-  font-size: var(--text-xs);
+  font-size: var(--text-xs); /* mockup: app scale – the shipped drawer file line */
   color: var(--color-text-secondary);
 }
 
-/* C-06 / C-24 neutral tags: an accent outline, never the warning look. */
-.erf-comment-tag--changed { border-color: var(--color-accent-primary); color: var(--color-text-primary); }
-.erf-comment-tag--new { border-color: var(--color-accent-primary); background: var(--color-accent-primary);
-                        color: var(--color-brand-black); }
+/* ================= C-21 window parts ================= */
 
-/* ================= C-19 menu item reason line ================= */
-
-.erf-menu-item--described { flex-wrap: wrap; align-items: flex-start; }
-.erf-menu-desc {
-  flex: 1 0 100%;
-  margin: var(--space-1) 0 0;
-  padding-inline-start: calc(var(--icon-size-sm) + var(--space-4));
-  font-size: var(--text-sm);
-  color: var(--color-text-tertiary);
-  white-space: normal;
-}
-
-/* ================= C-21 window hierarchy ================= */
-
-/* Blocked primary looks blocked; the focus ring stays full strength. */
-.erf-comment-btn--primary.erf-comment-btn--blocked {
-  background: var(--color-bg-tertiary);
-  box-shadow: inset 0 0 0 var(--border-width) var(--color-border-subtle);
-  color: var(--color-text-tertiary);
-  cursor: default;
-}
-.erf-comment-btn--blocked > span { opacity: 1; }
-
-/* Busy: accent kept, a 12px spinner before the label (static here). */
-.erf-comment-spinner {
-  display: inline-block;
-  inline-size: var(--space-6);
-  block-size: var(--space-6);
-  margin-inline-end: var(--space-3);
-  vertical-align: -1px;
-  border: var(--border-width-thick) solid currentcolor;
-  border-inline-end-color: transparent;
-  border-radius: var(--border-radius); /* square, like everything else: an open-sided square turns */
-}
+/* Banners in the window body: the Feedback card's boxed banner, spaced like the
+   decided window card's banner. */
+.erf-comment-window__body > .erf-banner,
+.erf-comment-thread__reply > .erf-banner { margin-block-end: var(--space-8); }
 
 /* The quote of the words: quieter than the comment, three lines then "Show all". */
 .erf-comment-words {
@@ -227,32 +157,34 @@
 
 /* ================= C-07 Narrow to words ================= */
 
+/* The Form card's field edge and text size. Focus is the one ring from the
+   Focus card (the field takes :focus-visible like any other field). Its
+   read-only state is pending the Form card's owner decision. */
 .erf-comment-narrow { margin: var(--space-6) 0 0; }
 .erf-comment-narrow__field {
   inline-size: 100%;
-  min-block-size: calc(var(--text-sm) * 1.5 * 4 + var(--space-8));
+  min-block-size: calc(var(--text-base) * 1.5 * 4 + var(--space-8));
   padding: var(--space-4) var(--space-6);
   background: var(--color-bg-tertiary);
-  border: var(--border-width) solid var(--color-border-subtle);
+  border: var(--border-width) solid var(--color-border-input);
   border-radius: var(--border-radius);
   color: var(--color-text-primary);
   font-family: var(--font-sans);
-  font-size: var(--text-sm);
+  font-size: var(--text-base);
   line-height: var(--leading-normal);
   white-space: pre-wrap;
 }
-.erf-comment-narrow__field:focus-visible { outline: var(--border-width-thick) solid var(--color-border-focus);
-                                           outline-offset: var(--space-1); }
 .erf-comment-narrow__result { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4);
                               margin: var(--space-3) 0 0; font-size: var(--text-sm); color: var(--color-text-primary); }
 
 /* ================= C-05 / C-17 icon variants ================= */
 
-/* Not found (Markdown): a dashed ghost at the comment's slot. */
+/* Not found (Markdown): a dashed ghost at the comment's slot – a real button (R-16). */
 .erf-comment-ghost {
   position: absolute;
   inline-size: var(--btn-height-sm);
   block-size: var(--btn-height-sm);
+  padding: 0;
   border: var(--border-width) dashed var(--color-text-tertiary);
   background: transparent;
 }
@@ -273,24 +205,21 @@
 .erf-hpc-pin--stack .erf-hpc-pin__body { fill: var(--color-bg-elevated); stroke: var(--color-accent-primary); }
 .erf-hpc-pin--stack .erf-hpc-pin__count { color: var(--color-accent-primary); }
 
-/* Unseen (C-24): a 6px accent dot. */
-.erf-comment-dot { display: inline-block; inline-size: var(--space-3); block-size: var(--space-3);
-                   background: var(--color-accent-primary); vertical-align: middle; }
-
 /* ================= C-21 HTML label inside the outline ================= */
 
 .erf-hpc-label--inside { inset-block-end: auto !important; inset-block-start: 0 !important; inset-inline-start: 0 !important; }
 
 /* ================= C-18 Markdown non-modal window ================= */
 
-/* The collapsed form when its block scrolls away. */
+/* The collapsed form when its block scrolls away. A floating surface (Surfaces #floating). */
 .erf-comment-edgetab {
   position: absolute;
   z-index: var(--z-dropdown);
   display: inline-flex;
   align-items: center;
   gap: var(--space-3);
-  block-size: var(--toolbar-tool-height, 28px);
+  /* deviates-in-design: docs/design-system/system/components/toolbar/index.html#tool-height – proposed token */
+  block-size: var(--toolbar-tool-height, var(--input-height-sm));
   padding: 0 var(--space-6);
   background: var(--color-bg-elevated);
   border: var(--border-width) solid var(--color-border-subtle);
@@ -302,29 +231,14 @@
   cursor: pointer;
 }
 
-/* ================= C-09 / C-25 bands under the toolbar ================= */
-
-.erf-comment-band {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-4) var(--space-6);
-  padding: var(--space-4) var(--space-8);
-  background: var(--color-bg-elevated);
-  border-block-end: var(--border-width) solid var(--color-border-subtle);
-  font-family: var(--font-sans);
-  font-size: var(--text-sm);
-  color: var(--color-text-primary);
-}
-.erf-comment-band__text { flex: 1 1 240px; margin: 0; }
-
 /* ================= C-20 toolbar: the list as a labelled count ================= */
 
 .erf-comment-toolcount {
   display: inline-flex;
   align-items: center;
   gap: var(--space-3);
-  block-size: var(--toolbar-tool-height, 28px);
+  /* deviates-in-design: docs/design-system/system/components/toolbar/index.html#tool-height – proposed token */
+  block-size: var(--toolbar-tool-height, var(--input-height-sm));
   padding: 0 var(--space-4);
   background: transparent;
   border: var(--border-width) solid transparent;
@@ -337,12 +251,19 @@
   cursor: pointer;
 }
 .erf-comment-toolcount:hover { background: var(--color-bg-hover-solid); }
-/* An open drawer is a box, never the pressed signature: only the mode toggle
-   wears fill + lime foot, so a lit comment tool always means comment mode (C-20). */
-.erf-comment-toolcount[aria-expanded='true'] { background: var(--color-bg-tertiary); border-color: var(--color-border-subtle);
-                                               border-block-end: var(--border-width-thick) solid transparent; }
+/* While the drawer is open the count keeps the pressed signature – fill plus
+   the lime foot, the same as every on/off tool in the band (owner decision,
+   2026-10-28; replaces R-19's box). The markup stays a disclosure
+   (aria-expanded); the look reads the same tokens as the band's pressed toggle
+   (permission-band/nav.css). */
+.erf-comment-toolcount[aria-expanded='true'] { background: var(--color-bg-selected); color: var(--color-text-bright);
+                                               border-block-end-color: var(--color-brand-lime); }
+@media (forced-colors: active) {
+  .erf-comment-toolcount[aria-expanded='true'] { border-block-end-color: Highlight; }
+}
+/* The one focus ring (Focus card): the same width, colour and offset as everywhere. */
 .erf-comment-toolcount:focus-visible { outline: var(--border-width-thick) solid var(--color-border-focus);
-                                       outline-offset: calc(var(--space-1) * -1); }
+                                       outline-offset: var(--space-1); }
 
 /* ================= card chrome (documentation only) ================= */
 
@@ -352,6 +273,13 @@
                                  font-size: var(--ds-text-small); color: var(--color-text-tertiary); }
 .c2-grid > figure > figcaption strong { color: var(--color-text-bright); font-weight: var(--font-normal); }
 .c2-change { font-family: var(--font-mono); font-size: var(--ds-text-small); color: var(--color-brand-lime); }
-.c2-win { inline-size: 380px; }
+.c2-win { inline-size: var(--comments-window-width); }
 .c2-float { position: absolute; z-index: var(--z-modal); }
 .c2-anchor { position: relative; }
+
+/* "Cards this builds on": the card list every screen carries (path and status). */
+.c2-cards { max-inline-size: 1100px; margin-block-end: var(--space-16); }
+.c2-cards td:first-child { font-family: var(--font-mono); font-size: var(--ds-text-small); }
+.c2-cards a { color: var(--color-link); }
+.c2-status { font-family: var(--font-mono); font-size: var(--ds-text-small); color: var(--color-text-secondary); }
+.c2-status--decided { color: var(--color-brand-lime); }

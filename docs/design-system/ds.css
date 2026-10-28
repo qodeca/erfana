@@ -356,6 +356,60 @@ h3:not(:where([class*='erf-'])) {
   font-size: var(--ds-text-small);
 }
 
+/* ---------- a third-party previewed page ----------
+   The stand-in for someone else's HTML in the preview: the native view Erfana
+   does not style. One shared copy, so no card or screen re-declares its own
+   hex page. Markup:
+     <div class="ds-foreign-page">
+       <p class="ds-foreign-page__heading">Pricing</p>
+       <p class="ds-foreign-page__body">Text with a <span class="ds-foreign-page__link">link</span>.</p>
+       <div class="ds-foreign-page__missing">Image not loaded</div>
+     </div>
+   Add .ds-foreign-page--hidden for the fail-safe state, in which Erfana hides
+   the page rather than trust it (Permission band card). Sizes and spacing are
+   tokens and stay at 13px or more; only the paint and the face are the page's. */
+/* stylelint-disable color-no-hex, declaration-property-value-allowed-list --
+   This is NOT Erfana. It draws arbitrary third-party HTML on its own paper, in
+   its own face and colours; drawing it with Erfana's tokens would hide the one
+   boundary the frames that use it exist to show: where Erfana stops and
+   untrusted content begins. */
+.ds-foreign-page {
+  display: block;
+  overflow: hidden;
+  padding: var(--space-10);
+  background: #ffffff;
+  color: #3c3c3c;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: var(--text-md);
+  line-height: 1.6;
+}
+.ds-foreign-page__heading {
+  margin: 0 0 var(--space-6);
+  color: #1a1a1a;
+  font-size: var(--text-xl);
+  font-weight: 600;
+  line-height: 1.3;
+}
+.ds-foreign-page__body { margin: 0 0 var(--space-5); font-size: var(--text-md); }
+.ds-foreign-page__link,
+.ds-foreign-page__link:visited,
+.ds-foreign-page__link:hover { color: #1a0dab; text-decoration: underline; }
+/* A resource the page asked for and did not get – a blocked image or frame. */
+.ds-foreign-page__missing {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(var(--space-24) * 2);
+  padding: var(--space-4);
+  border: var(--border-width) dashed #8a8a8a;
+  background: #f4f4f4;
+  color: #595959;
+  font-size: var(--text-base);
+}
+/* stylelint-enable color-no-hex, declaration-property-value-allowed-list */
+/* The fail-safe: the page is hidden, its space kept, nothing of it drawn. */
+.ds-foreign-page--hidden { visibility: hidden; }
+
 /* mockup: app scale – code, a key or a table header inside a drawing of the
    app keeps the app's 11px. Specificity (0,0,1) beats the documentation rules
    above and loses to any component class rule. */

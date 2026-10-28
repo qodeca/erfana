@@ -66,6 +66,25 @@
             margin-bottom: var(--space-16); }
   .width-demo { border: var(--border-width) solid var(--color-border-subtle); }
   .width-demo.ds-resize { inline-size: 340px; min-inline-size: 160px; }
+
+  /* The load status slot (#load-status): decided 2026-10-28, NOT yet in band.css, so it is
+     drawn here – documentation only – with the Toolbar card's .erf-toolbar__status rules:
+     shrinks and truncates before any control does, never wraps (a taller bar moves the page). */
+  .erf-band__status { /* mockup: app scale – Toolbar card, .erf-toolbar__status */
+    display: flex; align-items: center; gap: var(--space-2);
+    flex: 0 1 auto; min-width: 0; overflow: hidden; margin-inline: var(--space-4);
+    color: var(--color-text-tertiary); font-size: var(--text-sm); white-space: nowrap; }
+  .erf-band__status-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  /* Stopped: the warning colour plus the warning icon, so colour is never the only signal. */
+  .erf-band__status--stopped { color: var(--color-warning); }
+  .erf-band__status-icon { flex: 0 0 auto; width: var(--icon-size-xs); height: var(--icon-size-xs); }
+  /* Below about 420px of bar the line drops out: near there it gets room for an ellipsis and
+     nothing a person could read. Reload stays. The container is .erf-band (nav.css). */
+  @container (width < 420px) {
+    .erf-band .erf-band__status { display: none; }
+  }
+  .load-frames { display: flex; flex-direction: column; gap: var(--space-8); margin-bottom: var(--space-16); }
+  .load-frames .ds-frame { max-width: 100%; overflow-x: auto; }
 </style>
 </head>
 <body>
@@ -77,6 +96,8 @@
   A preview page that asks for a remote host gets <strong>one row</strong> here, not a toast.
   The chip opens the list; <em>Allow</em> opens a confirm step on that row; Confirm or Cancel ends it, and
   <kbd>Esc</kbd> closes. Every one of those states is drawn below as its own frame.
+  The bar also holds an elastic <a href="#load-status">load status slot</a> for a page that is slow to arrive,
+  and a tool that opens a panel stays <a href="#toolbar">pressed</a> for as long as the panel is open.
 </p>
 
 <div class="ds-note">
@@ -265,7 +286,7 @@ contract is the table below.</p>
         could be sitting on top of – or imitate.</p>
     </div>
   </div>
-<figcaption><span class="ds-frame__step">C</span><strong>Confirm step – Allow on one row</strong> – Allow discloses the confirm step in place. It names the origin, says what the grant covers and does not, and puts Cancel first.</figcaption>
+<figcaption><span class="ds-frame__step">C</span><strong>Confirm step – Allow on one row</strong> – Allow discloses the confirm step in place. It names the origin, says what the grant covers and does not, and puts Cancel first. Focus lands on the question itself, so the first <kbd>Tab</kbd> from it reaches Cancel, the safe answer.</figcaption>
 </figure>
 <figure class="ds-frame">
 <div class="panel" style="height: 520px;" inert="" aria-hidden="true">
@@ -497,19 +518,312 @@ contract is the table below.</p>
 </figure>
 </div>
 
+<h2 id="results">What an approval says back, and a list that stopped growing</h2>
+<p class="ds-muted">A failed or late approval puts its one message in the row's <span data-claim="band-middle-track" title="middle track of a host row in PreviewChromeBand.css, px">72</span>px middle track
+(<code>PreviewBandRow.tsx</code>:53), and the band says it again in its polite region. Plain “Not saved” is frame D
+above; these are the reasoned variants that ship, then the notice for a truncated list. Each frame uses the shipping
+<code>band.css</code> at the app's scale, so text that does not fit the track is drawn not fitting. The app ships every
+dash in these strings as an em dash; no page here may carry that character, so the frames draw an en dash – slightly
+narrower – and the captions write ⟨em dash⟩. See <a href="#open-defects">Open defects</a>.</p>
+<div class="band-frames">
+<figure class="ds-frame">
+<div class="panel" style="height: 330px;" inert="" aria-hidden="true">
+    <div class="erf-band">
+      <div class="erf-band__announce">Could not save https://fonts.googleapis.com to this project. It is still blocked.</div>
+
+      <div class="erf-band__bar" aria-label="Preview">
+        <!-- Back leads (issue #124), as in every browser, Finder and Explorer.
+             aria-disabled, never disabled: see Exceptions. Its title names the
+             page only; its key is a visible caption plus aria-keyshortcuts. -->
+        <button class="erf-band__tool" type="button" aria-label="Back" aria-keyshortcuts="Meta+[" title="Back to overview.html">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg>
+        </button>
+        <!-- A toggle button: the name never changes, the state is aria-pressed. -->
+        <button class="erf-band__tool erf-band__tool--toggle" type="button" aria-label="Open links in this tab" aria-pressed="false" title="Open links in this tab – off: links open a new tab">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4.1 12 6"></path><path d="m5.1 8-2.9-.8"></path><path d="m6 12-1.9 2"></path><path d="M7.2 2.2 8 5.1"></path><path d="M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z"></path></svg>
+        </button>
+        <button class="erf-band__tool" type="button" aria-label="Find" aria-keyshortcuts="Meta+F" title="Find">
+          <!-- lucide `search`, 16px, matching MarkdownToolbar's button exactly.
+               Inline here so the card needs no script tag from a CDN. -->
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+        </button>
+        <span class="erf-band__spacer"></span>
+        <button class="erf-band__chip erf-band__chip--failed" aria-expanded="true" aria-label="3 blocked · 1 allowed. Remote hosts in this preview. Press Escape in the previewed page to return here.">
+          <!-- Two parts, as in the app: a compact band hides the tail. -->
+          <span><span>3 blocked</span><span class="erf-band__chip-allowed"> · 1 allowed</span></span>
+          <span class="erf-band__chip-caret" aria-hidden="true">▾</span>
+        </button>
+        <span class="erf-band__separator" aria-hidden="true"></span>
+        <button class="erf-band__tool" type="button" aria-label="Open in default browser" title="Open in default browser">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg>
+        </button>
+        <button class="erf-band__tool" type="button" aria-label="Export to PDF" aria-keyshortcuts="Meta+S" title="Export to PDF">
+          <!-- lucide `file-down`, 16px – the same button the markdown toolbar has. -->
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M12 18v-6"></path><path d="m9 15 3 3 3-3"></path></svg>
+        </button>
+      </div>
+
+
+      <div class="erf-band__paused" hidden="">
+        <span aria-hidden="true">⚠</span>
+        <span>Paused the page so this list cannot be covered.</span>
+      </div>
+
+      <div class="erf-band__list">
+        <div class="erf-band__scroll"><div class="erf-band__section">Blocked on load</div><div class="erf-band__row"><span class="erf-host" dir="ltr" aria-label="https://fonts.googleapis.com">fonts.<wbr>googleapis.<wbr>com</span><span class="erf-band__state erf-band__state--failed">Not saved – list full</span><button class="erf-band__allow" aria-label="Allow https://fonts.googleapis.com" aria-expanded="false">Allow</button></div><div class="erf-band__row"><span class="erf-host" dir="ltr" aria-label="https://cdn.jsdelivr.net">cdn.<wbr>jsdelivr.<wbr>net</span><span class="erf-band__kind"></span><button class="erf-band__allow" aria-label="Allow https://cdn.jsdelivr.net" aria-expanded="false">Allow</button></div><div class="erf-band__row"><span class="erf-host" dir="ltr" aria-label="https://unpkg.com">unpkg.<wbr>com</span><span class="erf-band__kind"></span><button class="erf-band__allow" aria-label="Allow https://unpkg.com" aria-expanded="false">Allow</button></div><div class="erf-band__section">Allowed in this project</div><div class="erf-band__row"><span class="erf-host" dir="ltr" aria-label="https://fonts.gstatic.com">fonts.<wbr>gstatic.<wbr>com</span><span class="erf-band__kind"></span><span class="erf-band__state">Allowed ✓</span></div></div>
+      </div>
+    </div>
+
+    <div class="fake-page">
+      <h3>Quarterly report</h3>
+      <p>This stands in for the previewed page. In the running app it is a native view painted
+        above the DOM, so it must be pushed down before a single button appears above it.</p>
+    </div>
+  </div>
+<figcaption><span class="ds-frame__step">R1</span><strong>Not saved – list full</strong> – appears when Confirm would take the project's allowlist past its cap of <span data-claim="band-allowlist-max-hosts" title="MAX_ALLOWLIST_HOSTS – origins one project&#x27;s allowlist may hold (src/shared/ipc/preview-settings-schema.ts)">200</span> hosts (<code>PREVIEW_ALLOWLIST_FULL</code>, thrown by <code>PreviewAllowlistStore.ts</code>). The grant is refused, the row keeps its Allow and the chip its red caret. Words carry it, not colour: the cell says <b>Not saved</b> and why. Shipped as “Not saved ⟨em dash⟩ list full” (<code>permissionBand.logic.ts</code>:354). Announced in the band's polite region (<code>role="status"</code>): “Could not save https://fonts.googleapis.com to this project. It is still blocked.” (<code>permissionBand.logic.ts</code>:133) – the same sentence for every “Not saved” variant, so the reason is heard only by browsing to the row.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div class="panel" style="height: 330px;" inert="" aria-hidden="true">
+    <div class="erf-band">
+      <div class="erf-band__announce">Could not save https://fonts.googleapis.com to this project. It is still blocked.</div>
+
+      <div class="erf-band__bar" aria-label="Preview">
+        <!-- Back leads (issue #124), as in every browser, Finder and Explorer.
+             aria-disabled, never disabled: see Exceptions. Its title names the
+             page only; its key is a visible caption plus aria-keyshortcuts. -->
+        <button class="erf-band__tool" type="button" aria-label="Back" aria-keyshortcuts="Meta+[" title="Back to overview.html">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg>
+        </button>
+        <!-- A toggle button: the name never changes, the state is aria-pressed. -->
+        <button class="erf-band__tool erf-band__tool--toggle" type="button" aria-label="Open links in this tab" aria-pressed="false" title="Open links in this tab – off: links open a new tab">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4.1 12 6"></path><path d="m5.1 8-2.9-.8"></path><path d="m6 12-1.9 2"></path><path d="M7.2 2.2 8 5.1"></path><path d="M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z"></path></svg>
+        </button>
+        <button class="erf-band__tool" type="button" aria-label="Find" aria-keyshortcuts="Meta+F" title="Find">
+          <!-- lucide `search`, 16px, matching MarkdownToolbar's button exactly.
+               Inline here so the card needs no script tag from a CDN. -->
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+        </button>
+        <span class="erf-band__spacer"></span>
+        <button class="erf-band__chip erf-band__chip--failed" aria-expanded="true" aria-label="3 blocked · 1 allowed. Remote hosts in this preview. Press Escape in the previewed page to return here.">
+          <!-- Two parts, as in the app: a compact band hides the tail. -->
+          <span><span>3 blocked</span><span class="erf-band__chip-allowed"> · 1 allowed</span></span>
+          <span class="erf-band__chip-caret" aria-hidden="true">▾</span>
+        </button>
+        <span class="erf-band__separator" aria-hidden="true"></span>
+        <button class="erf-band__tool" type="button" aria-label="Open in default browser" title="Open in default browser">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg>
+        </button>
+        <button class="erf-band__tool" type="button" aria-label="Export to PDF" aria-keyshortcuts="Meta+S" title="Export to PDF">
+          <!-- lucide `file-down`, 16px – the same button the markdown toolbar has. -->
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M12 18v-6"></path><path d="m9 15 3 3 3-3"></path></svg>
+        </button>
+      </div>
+
+
+      <div class="erf-band__paused" hidden="">
+        <span aria-hidden="true">⚠</span>
+        <span>Paused the page so this list cannot be covered.</span>
+      </div>
+
+      <div class="erf-band__list">
+        <div class="erf-band__scroll"><div class="erf-band__section">Blocked on load</div><div class="erf-band__row"><span class="erf-host" dir="ltr" aria-label="https://fonts.googleapis.com">fonts.<wbr>googleapis.<wbr>com</span><span class="erf-band__state erf-band__state--failed">Not saved – not allowed</span><button class="erf-band__allow" aria-label="Allow https://fonts.googleapis.com" aria-expanded="false">Allow</button></div><div class="erf-band__row"><span class="erf-host" dir="ltr" aria-label="https://cdn.jsdelivr.net">cdn.<wbr>jsdelivr.<wbr>net</span><span class="erf-band__kind"></span><button class="erf-band__allow" aria-label="Allow https://cdn.jsdelivr.net" aria-expanded="false">Allow</button></div><div class="erf-band__row"><span class="erf-host" dir="ltr" aria-label="https://unpkg.com">unpkg.<wbr>com</span><span class="erf-band__kind"></span><button class="erf-band__allow" aria-label="Allow https://unpkg.com" aria-expanded="false">Allow</button></div><div class="erf-band__section">Allowed in this project</div><div class="erf-band__row"><span class="erf-host" dir="ltr" aria-label="https://fonts.gstatic.com">fonts.<wbr>gstatic.<wbr>com</span><span class="erf-band__kind"></span><span class="erf-band__state">Allowed ✓</span></div></div>
+      </div>
+    </div>
+
+    <div class="fake-page">
+      <h3>Quarterly report</h3>
+      <p>This stands in for the previewed page. In the running app it is a native view painted
+        above the DOM, so it must be pushed down before a single button appears above it.</p>
+    </div>
+  </div>
+<figcaption><span class="ds-frame__step">R2</span><strong>Not saved – not allowed</strong> – appears only if a row offered Allow and main then refused the origin (<code>PREVIEW_HOST_NOT_APPROVABLE</code>): the defect the shared canonicaliser exists to make impossible. It still says “Not saved” because the reader did something and it did not take. Shipped as “Not saved ⟨em dash⟩ not allowed” (<code>permissionBand.logic.ts</code>:361). Announced in the band's polite region (<code>role="status"</code>): “Could not save https://fonts.googleapis.com to this project. It is still blocked.” (<code>permissionBand.logic.ts</code>:133) – the same sentence for every “Not saved” variant, so the reason is heard only by browsing to the row.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div class="panel" style="height: 330px;" inert="" aria-hidden="true">
+    <div class="erf-band">
+      <div class="erf-band__announce">Could not save https://fonts.googleapis.com to this project. It is still blocked.</div>
+
+      <div class="erf-band__bar" aria-label="Preview">
+        <!-- Back leads (issue #124), as in every browser, Finder and Explorer.
+             aria-disabled, never disabled: see Exceptions. Its title names the
+             page only; its key is a visible caption plus aria-keyshortcuts. -->
+        <button class="erf-band__tool" type="button" aria-label="Back" aria-keyshortcuts="Meta+[" title="Back to overview.html">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg>
+        </button>
+        <!-- A toggle button: the name never changes, the state is aria-pressed. -->
+        <button class="erf-band__tool erf-band__tool--toggle" type="button" aria-label="Open links in this tab" aria-pressed="false" title="Open links in this tab – off: links open a new tab">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4.1 12 6"></path><path d="m5.1 8-2.9-.8"></path><path d="m6 12-1.9 2"></path><path d="M7.2 2.2 8 5.1"></path><path d="M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z"></path></svg>
+        </button>
+        <button class="erf-band__tool" type="button" aria-label="Find" aria-keyshortcuts="Meta+F" title="Find">
+          <!-- lucide `search`, 16px, matching MarkdownToolbar's button exactly.
+               Inline here so the card needs no script tag from a CDN. -->
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+        </button>
+        <span class="erf-band__spacer"></span>
+        <button class="erf-band__chip erf-band__chip--failed" aria-expanded="true" aria-label="3 blocked · 1 allowed. Remote hosts in this preview. Press Escape in the previewed page to return here.">
+          <!-- Two parts, as in the app: a compact band hides the tail. -->
+          <span><span>3 blocked</span><span class="erf-band__chip-allowed"> · 1 allowed</span></span>
+          <span class="erf-band__chip-caret" aria-hidden="true">▾</span>
+        </button>
+        <span class="erf-band__separator" aria-hidden="true"></span>
+        <button class="erf-band__tool" type="button" aria-label="Open in default browser" title="Open in default browser">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg>
+        </button>
+        <button class="erf-band__tool" type="button" aria-label="Export to PDF" aria-keyshortcuts="Meta+S" title="Export to PDF">
+          <!-- lucide `file-down`, 16px – the same button the markdown toolbar has. -->
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M12 18v-6"></path><path d="m9 15 3 3 3-3"></path></svg>
+        </button>
+      </div>
+
+
+      <div class="erf-band__paused" hidden="">
+        <span aria-hidden="true">⚠</span>
+        <span>Paused the page so this list cannot be covered.</span>
+      </div>
+
+      <div class="erf-band__list">
+        <div class="erf-band__scroll"><div class="erf-band__section">Blocked on load</div><div class="erf-band__row"><span class="erf-host" dir="ltr" aria-label="https://fonts.googleapis.com">fonts.<wbr>googleapis.<wbr>com</span><span class="erf-band__state erf-band__state--failed">Not saved – check settings</span><button class="erf-band__allow" aria-label="Allow https://fonts.googleapis.com" aria-expanded="false">Allow</button></div><div class="erf-band__row"><span class="erf-host" dir="ltr" aria-label="https://cdn.jsdelivr.net">cdn.<wbr>jsdelivr.<wbr>net</span><span class="erf-band__kind"></span><button class="erf-band__allow" aria-label="Allow https://cdn.jsdelivr.net" aria-expanded="false">Allow</button></div><div class="erf-band__row"><span class="erf-host" dir="ltr" aria-label="https://unpkg.com">unpkg.<wbr>com</span><span class="erf-band__kind"></span><button class="erf-band__allow" aria-label="Allow https://unpkg.com" aria-expanded="false">Allow</button></div><div class="erf-band__section">Allowed in this project</div><div class="erf-band__row"><span class="erf-host" dir="ltr" aria-label="https://fonts.gstatic.com">fonts.<wbr>gstatic.<wbr>com</span><span class="erf-band__kind"></span><span class="erf-band__state">Allowed ✓</span></div></div>
+      </div>
+    </div>
+
+    <div class="fake-page">
+      <h3>Quarterly report</h3>
+      <p>This stands in for the previewed page. In the running app it is a native view painted
+        above the DOM, so it must be pushed down before a single button appears above it.</p>
+    </div>
+  </div>
+<figcaption><span class="ds-frame__step">R3</span><strong>Not saved – check settings</strong> – appears when the project's <code>.erfana/settings.json</code> is malformed, so the write is refused rather than allowed to destroy what is there (<code>PROJECT_SETTINGS_VALIDATION_FAILED</code>). It is the one failure the reader can fix, so it points them at the settings. Shipped as “Not saved ⟨em dash⟩ check settings” (<code>permissionBand.logic.ts</code>:372). Announced in the band's polite region (<code>role="status"</code>): “Could not save https://fonts.googleapis.com to this project. It is still blocked.” (<code>permissionBand.logic.ts</code>:133) – the same sentence for every “Not saved” variant, so the reason is heard only by browsing to the row.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div class="panel" style="height: 330px;" inert="" aria-hidden="true">
+    <div class="erf-band">
+      <div class="erf-band__announce">Saved https://fonts.googleapis.com, but the preview did not confirm. Reload it.</div>
+
+      <div class="erf-band__bar" aria-label="Preview">
+        <!-- Back leads (issue #124), as in every browser, Finder and Explorer.
+             aria-disabled, never disabled: see Exceptions. Its title names the
+             page only; its key is a visible caption plus aria-keyshortcuts. -->
+        <button class="erf-band__tool" type="button" aria-label="Back" aria-keyshortcuts="Meta+[" title="Back to overview.html">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg>
+        </button>
+        <!-- A toggle button: the name never changes, the state is aria-pressed. -->
+        <button class="erf-band__tool erf-band__tool--toggle" type="button" aria-label="Open links in this tab" aria-pressed="false" title="Open links in this tab – off: links open a new tab">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4.1 12 6"></path><path d="m5.1 8-2.9-.8"></path><path d="m6 12-1.9 2"></path><path d="M7.2 2.2 8 5.1"></path><path d="M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z"></path></svg>
+        </button>
+        <button class="erf-band__tool" type="button" aria-label="Find" aria-keyshortcuts="Meta+F" title="Find">
+          <!-- lucide `search`, 16px, matching MarkdownToolbar's button exactly.
+               Inline here so the card needs no script tag from a CDN. -->
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+        </button>
+        <span class="erf-band__spacer"></span>
+        <button class="erf-band__chip erf-band__chip--failed" aria-expanded="true" aria-label="3 blocked · 1 allowed. Remote hosts in this preview. Press Escape in the previewed page to return here.">
+          <!-- Two parts, as in the app: a compact band hides the tail. -->
+          <span><span>3 blocked</span><span class="erf-band__chip-allowed"> · 1 allowed</span></span>
+          <span class="erf-band__chip-caret" aria-hidden="true">▾</span>
+        </button>
+        <span class="erf-band__separator" aria-hidden="true"></span>
+        <button class="erf-band__tool" type="button" aria-label="Open in default browser" title="Open in default browser">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg>
+        </button>
+        <button class="erf-band__tool" type="button" aria-label="Export to PDF" aria-keyshortcuts="Meta+S" title="Export to PDF">
+          <!-- lucide `file-down`, 16px – the same button the markdown toolbar has. -->
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M12 18v-6"></path><path d="m9 15 3 3 3-3"></path></svg>
+        </button>
+      </div>
+
+
+      <div class="erf-band__paused" hidden="">
+        <span aria-hidden="true">⚠</span>
+        <span>Paused the page so this list cannot be covered.</span>
+      </div>
+
+      <div class="erf-band__list">
+        <div class="erf-band__scroll"><div class="erf-band__section">Blocked on load</div><div class="erf-band__row"><span class="erf-host" dir="ltr" aria-label="https://fonts.googleapis.com">fonts.<wbr>googleapis.<wbr>com</span><span class="erf-band__state erf-band__state--failed">Saved – reload to apply</span><button class="erf-band__allow" aria-label="Allow https://fonts.googleapis.com" aria-expanded="false">Allow</button></div><div class="erf-band__row"><span class="erf-host" dir="ltr" aria-label="https://cdn.jsdelivr.net">cdn.<wbr>jsdelivr.<wbr>net</span><span class="erf-band__kind"></span><button class="erf-band__allow" aria-label="Allow https://cdn.jsdelivr.net" aria-expanded="false">Allow</button></div><div class="erf-band__row"><span class="erf-host" dir="ltr" aria-label="https://unpkg.com">unpkg.<wbr>com</span><span class="erf-band__kind"></span><button class="erf-band__allow" aria-label="Allow https://unpkg.com" aria-expanded="false">Allow</button></div><div class="erf-band__section">Allowed in this project</div><div class="erf-band__row"><span class="erf-host" dir="ltr" aria-label="https://fonts.gstatic.com">fonts.<wbr>gstatic.<wbr>com</span><span class="erf-band__kind"></span><span class="erf-band__state">Allowed ✓</span></div></div>
+      </div>
+    </div>
+
+    <div class="fake-page">
+      <h3>Quarterly report</h3>
+      <p>This stands in for the previewed page. In the running app it is a native view painted
+        above the DOM, so it must be pushed down before a single button appears above it.</p>
+    </div>
+  </div>
+<figcaption><span class="ds-frame__step">R4</span><strong>Saved – reload to apply</strong> – appears when the band's own deadline on the approval passes (<code>PREVIEW_APPROVE_TIMED_OUT</code>). The grant is already on disk, so the next move is a reload, not a retry – yet the row still shows Allow, in the error colour, and the chip keeps its red caret. Shipped as “Saved ⟨em dash⟩ reload to apply” (<code>permissionBand.logic.ts</code>:366). Announced in the polite region: “Saved https://fonts.googleapis.com, but the preview did not confirm. Reload it.” (<code>permissionBand.logic.ts</code>:132).</figcaption>
+</figure>
+<figure class="ds-frame">
+<div class="panel" style="height: 330px;" inert="" aria-hidden="true">
+    <div class="erf-band">
+      <div class="erf-band__announce"></div>
+
+      <div class="erf-band__bar" aria-label="Preview">
+        <!-- Back leads (issue #124), as in every browser, Finder and Explorer.
+             aria-disabled, never disabled: see Exceptions. Its title names the
+             page only; its key is a visible caption plus aria-keyshortcuts. -->
+        <button class="erf-band__tool" type="button" aria-label="Back" aria-keyshortcuts="Meta+[" title="Back to overview.html">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg>
+        </button>
+        <!-- A toggle button: the name never changes, the state is aria-pressed. -->
+        <button class="erf-band__tool erf-band__tool--toggle" type="button" aria-label="Open links in this tab" aria-pressed="false" title="Open links in this tab – off: links open a new tab">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4.1 12 6"></path><path d="m5.1 8-2.9-.8"></path><path d="m6 12-1.9 2"></path><path d="M7.2 2.2 8 5.1"></path><path d="M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z"></path></svg>
+        </button>
+        <button class="erf-band__tool" type="button" aria-label="Find" aria-keyshortcuts="Meta+F" title="Find">
+          <!-- lucide `search`, 16px, matching MarkdownToolbar's button exactly.
+               Inline here so the card needs no script tag from a CDN. -->
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+        </button>
+        <span class="erf-band__spacer"></span>
+        <button class="erf-band__chip" aria-expanded="true" aria-label="N blocked · 2 allowed. Remote hosts in this preview. Press Escape in the previewed page to return here.">
+          <!-- Two parts, as in the app: a compact band hides the tail. -->
+          <span><span>N blocked</span><span class="erf-band__chip-allowed"> · 2 allowed</span></span>
+          <span class="erf-band__chip-caret" aria-hidden="true">▾</span>
+        </button>
+        <span class="erf-band__separator" aria-hidden="true"></span>
+        <button class="erf-band__tool" type="button" aria-label="Open in default browser" title="Open in default browser">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg>
+        </button>
+        <button class="erf-band__tool" type="button" aria-label="Export to PDF" aria-keyshortcuts="Meta+S" title="Export to PDF">
+          <!-- lucide `file-down`, 16px – the same button the markdown toolbar has. -->
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M12 18v-6"></path><path d="m9 15 3 3 3-3"></path></svg>
+        </button>
+      </div>
+
+
+      <div class="erf-band__paused" hidden="">
+        <span aria-hidden="true">⚠</span>
+        <span>Paused the page so this list cannot be covered.</span>
+      </div>
+
+      <div class="erf-band__list">
+        <div class="erf-band__scroll"><div class="erf-band__section">Blocked on load</div><div class="erf-band__row"><span class="erf-host" dir="ltr" aria-label="https://images.cdn.example.net">images.<wbr>cdn.<wbr>example.<wbr>net</span><span class="erf-band__kind"></span><button class="erf-band__allow" aria-label="Allow https://images.cdn.example.net" aria-expanded="false">Allow</button></div><div class="erf-band__row"><span class="erf-host" dir="ltr" aria-label="https://api.telemetry.example.org">api.<wbr>telemetry.<wbr>example.<wbr>org</span><span class="erf-band__kind"></span><button class="erf-band__allow" aria-label="Allow https://api.telemetry.example.org" aria-expanded="false">Allow</button></div><div class="erf-band__row"><span class="erf-host" dir="ltr" aria-label="https://static.example.org">static.<wbr>example.<wbr>org</span><span class="erf-band__kind"></span><button class="erf-band__allow" aria-label="Allow https://static.example.org" aria-expanded="false">Allow</button></div><div class="erf-band__section">Only the first hosts are listed – this page asked for more.</div><div class="erf-band__section">Allowed in this project</div><div class="erf-band__row"><span class="erf-host" dir="ltr" aria-label="https://fonts.gstatic.com">fonts.<wbr>gstatic.<wbr>com</span><span class="erf-band__kind"></span><span class="erf-band__state">Allowed ✓</span></div><div class="erf-band__row"><span class="erf-host" dir="ltr" aria-label="https://cdn.example.com">cdn.<wbr>example.<wbr>com</span><span class="erf-band__kind"></span><span class="erf-band__state">Allowed ✓</span></div></div>
+      </div>
+    </div>
+
+    <div class="fake-page">
+      <h3>Quarterly report</h3>
+      <p>This stands in for the previewed page. In the running app it is a native view painted
+        above the DOM, so it must be pushed down before a single button appears above it.</p>
+    </div>
+  </div>
+<figcaption><span class="ds-frame__step">T</span><strong>The host list is truncated</strong> – appears once main has recorded as many blocked origins for this view as the list cap allows – <span data-claim="band-blocked-hosts-per-view" title="MAX_BLOCKED_HOSTS_PER_VIEW – distinct blocked origins listed per view (src/shared/constants.ts)">50</span> (<code>MAX_BLOCKED_HOSTS_PER_VIEW</code> in <code>src/shared/constants.ts</code>); “N” on the chip stands for that number. The notice follows the last blocked row, as a section label; the frame draws only the last three blocked rows, and in the app the rest sit above them. It is words, never colour alone. It is hidden while a confirm step is open, and it is <strong>not announced</strong>: the polite region stays silent, and a screen reader meets it only by browsing the list. Shipped as “Only the first hosts are listed ⟨em dash⟩ this page asked for more.” (<code>PreviewChromeBand.tsx</code>:420).</figcaption>
+</figure>
+</div>
+
 <h2 id="keyboard">The keyboard contract</h2>
 <table class="ds-keys">
   <thead><tr><th>Key</th><th>Result</th><th>Focus ends on</th></tr></thead>
   <tbody>
-    <tr><td><kbd>Enter</kbd> / <kbd>Space</kbd> on the chip</td><td>Opens or closes the list.</td><td>The chip.</td></tr>
-    <tr><td><kbd>Tab</kbd> in the open list</td><td>Walks the rows' Allow buttons in order.</td><td>The next Allow.</td></tr>
-    <tr><td><kbd>Enter</kbd> on Allow</td><td>Opens that row's confirm step.</td><td>Cancel, the first button of the step.</td></tr>
-    <tr><td><kbd>Tab</kbd> inside the confirm step</td><td>Stays inside it: Cancel, Confirm, Cancel.</td><td>The other button.</td></tr>
-    <tr><td><kbd>Esc</kbd> in the confirm step</td><td>Closes the step; nothing is granted.</td><td>The chip.</td></tr>
-    <tr><td><kbd>Enter</kbd> on Confirm</td><td>Saves the grant and reloads the preview, or reports Not saved.</td><td>The chip.</td></tr>
+    <tr><td><kbd>Enter</kbd> / <kbd>Space</kbd> on the chip</td><td>Opens or closes the list. A click with the mouse opens it too, but leaves focus where it is.</td><td>Opening: the first Allow in the list. Closing: the chip.</td></tr>
+    <tr><td><kbd>Tab</kbd> into the open list</td><td>The whole list is <strong>one Tab stop</strong>: only the first row's Allow takes Tab, every other Allow is reached with the arrow keys. The next <kbd>Tab</kbd> leaves the list.</td><td>The first Allow.</td></tr>
+    <tr><td><kbd>↓</kbd> / <kbd>↑</kbd> in the open list</td><td>Moves to the next or previous Allow. Rows without one – allowed, or ones that cannot be allowed – are skipped. Stops at the first and last Allow; it does not wrap. <kbd>Home</kbd> and <kbd>End</kbd> do nothing here. The Tab stop does not follow the arrows: Tab back into the list lands on the first Allow again.</td><td>The next or previous Allow.</td></tr>
+    <tr><td><kbd>Enter</kbd> / <kbd>Space</kbd> on Allow</td><td>Opens that row's confirm step; the other rows step aside until it closes.</td><td>The confirm step itself (<code>role="alertdialog"</code>), never a button – a screen reader reads the whole question, and a stray <kbd>Enter</kbd> cannot confirm.</td></tr>
+    <tr><td><kbd>Tab</kbd>, or <kbd>⇧Tab</kbd> / <kbd>Shift+Tab</kbd>, inside the confirm step</td><td>Stays inside it. From the step, <kbd>Tab</kbd> lands on Cancel (first, the safe one) and <kbd>⇧Tab</kbd> / <kbd>Shift+Tab</kbd> on Confirm; after that, Cancel, Confirm, Cancel.</td><td>Cancel or Confirm.</td></tr>
+    <tr><td><kbd>Esc</kbd> in the confirm step, or <kbd>Enter</kbd> / <kbd>Space</kbd> on Cancel</td><td>Closes the step; nothing is granted. While a save is in flight both do nothing.</td><td>The chip. While saving: unchanged.</td></tr>
+    <tr><td><kbd>Enter</kbd> / <kbd>Space</kbd> on Confirm</td><td>Saves the grant and reloads the preview, or reports Not saved.</td><td>The chip.</td></tr>
     <tr><td><kbd>Esc</kbd> in the open list</td><td>Closes the list.</td><td>The chip.</td></tr>
     <tr><td><kbd>⌘[</kbd> / <kbd>⌘]</kbd> (macOS), <kbd>Alt+←</kbd> / <kbd>Alt+→</kbd> (Windows, Linux), focus anywhere in the panel</td><td>Steps this tab back or forward; matched on the physical key.</td><td>Unchanged; with no earlier page, Back stays focused and <code>aria-disabled</code>.</td></tr>
-    <tr><td><kbd>⌘F</kbd> / <kbd>Ctrl+F</kbd>, <kbd>⌘S</kbd> / <kbd>Ctrl+S</kbd></td><td>Find in the page; export it to PDF. Both keep working at the minimal width, where their buttons leave the row.</td><td>The find field; unchanged for export.</td></tr>
+    <tr><td><kbd>⌘F</kbd> / <kbd>Ctrl+F</kbd>, <kbd>⌘S</kbd> / <kbd>Ctrl+S</kbd></td><td>Find in the page; export it to PDF. Both keep working when their buttons leave the row (Export to PDF at the narrow width, Find at the minimal width).</td><td>The find field; unchanged for export.</td></tr>
+    <tr><td><kbd>Tab</kbd> to Reload (the load status slot, stopped)</td><td>Reload is an ordinary Tab stop between the status line and the chip, and only while the load is stopped. It is <strong>never</strong> focused automatically – a slow page does not take focus from the editor.</td><td>Reload.</td></tr>
+    <tr><td><kbd>Enter</kbd> / <kbd>Space</kbd> on Reload</td><td>Reloads the preview. The stopped line and Reload leave the bar; the polite region says nothing until the next stage, if one comes.</td><td>The chip – the band's destination when a control it owned goes away, as after Cancel.</td></tr>
   </tbody>
 </table>
 <p class="ds-muted">The tests that hold the shipping band to this: <code>PreviewChromeBand.test.tsx</code>,
@@ -535,7 +849,11 @@ remote host</a> screen.</p>
   key. The toggle's two states and Open in default browser's busy state are drawn as their own frames.
   <br><br>
   <strong>The pressed state is a shape, not a colour</strong> (SC 1.4.1): the Rows and lists card's "selected" signature,
-  a fill plus a 2px lime edge along the bottom. Both states carry the edge – transparent when off, with a
+  a fill plus a 2px lime edge along the bottom. <strong>It is the one "on" look in the bar.</strong> It marks every
+  on/off tool – the link-mode toggle, Comment mode and Show comment icons, on <code>aria-pressed</code> – and a tool
+  that opens a panel, the Comments list that opens the comments drawer, on <code>aria-expanded</code> for as long as
+  the panel is open. An open panel is never drawn as a box, an outline or a fill of its own (owner decision,
+  2026-10-28): a reader scanning the bar sees one signature for "this is on". Both states carry the edge – transparent when off, with a
   matching transparent one on top – so the icon sits where every other tool's sits and never moves. It is a
   border, so it survives a Windows contrast theme, where a <code>forced-colors</code> rule turns it
   <code>Highlight</code>.
@@ -596,6 +914,18 @@ remote host</a> screen.</p>
       <button class="erf-band__tool erf-band__tool--toggle is-focus" type="button" aria-label="Open links in this tab" aria-pressed="true" title="Open links in this tab – on: links replace this page"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4.1 12 6"></path><path d="m5.1 8-2.9-.8"></path><path d="m6 12-1.9 2"></path><path d="M7.2 2.2 8 5.1"></path><path d="M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z"></path></svg></button>
     </div></div>
     <figcaption><strong>On + focus</strong> – the band's inset ring draws over the fill</figcaption>
+  </figure>
+  <figure class="ds-frame">
+    <div class="erf-band" inert aria-hidden="true"><div class="erf-band__bar">
+      <button class="erf-band__tool erf-band__tool--toggle erf-band__tool--comment erf-band__tool--count" type="button" aria-label="Comments, 3 open" aria-expanded="false" title="Comments, 3 open"><svg data-icon="messages-square" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 10a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 14.286V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/><path d="M20 9a2 2 0 0 1 2 2v10.286a.71.71 0 0 1-1.212.502l-2.202-2.202A2 2 0 0 0 17.172 19H10a2 2 0 0 1-2-2v-1"/></svg><span>3</span></button>
+    </div></div>
+    <figcaption><strong>Comments list, drawer closed</strong> – <code>aria-expanded="false"</code>: no fill, a transparent edge</figcaption>
+  </figure>
+  <figure class="ds-frame">
+    <div class="erf-band" inert aria-hidden="true"><div class="erf-band__bar">
+      <button class="erf-band__tool erf-band__tool--toggle erf-band__tool--comment erf-band__tool--count" type="button" aria-label="Comments, 3 open" aria-expanded="true" title="Comments, 3 open"><svg data-icon="messages-square" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 10a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 14.286V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/><path d="M20 9a2 2 0 0 1 2 2v10.286a.71.71 0 0 1-1.212.502l-2.202-2.202A2 2 0 0 0 17.172 19H10a2 2 0 0 1-2-2v-1"/></svg><span>3</span></button>
+    </div></div>
+    <figcaption><strong>Comments list, drawer open</strong> – <code>aria-expanded="true"</code> keeps the pressed signature, fill plus the lime edge, the same look as Link mode on. Not a box</figcaption>
   </figure>
   <figure class="ds-frame">
     <div class="erf-band" inert aria-hidden="true"><div class="erf-band__bar">
@@ -661,6 +991,9 @@ remote host</a> screen.</p>
 </div>
 
 <div class="ds-note">
+  <strong>Decided here, 2026-10-28: the Comments list wears the pressed signature while the drawer is open</strong>
+  – drawn above, beside the link-mode toggle. The rest of the comment tools stays proposed.
+  <br><br>
   <strong>Proposed, not yet decided here: three comment tools after Find</strong> – Comment mode, the Comments
   list and Show comment icons, in this card's tool and toggle shapes. They make every tier wider, so the
   thresholds below must be re-measured before they ship; the proposed
@@ -668,14 +1001,171 @@ remote host</a> screen.</p>
   them and prints what each tier then needs. This card changes when that one is promoted.
 </div>
 
+<h2 id="load-status">Load status slot: still loading, stopped, Reload</h2>
+<div class="ds-note">
+  <strong>Decided by the owner, 2026-10-28.</strong> A page that is slow to arrive is not an error, but it must not
+  look like a finished page either. So the bar gets <strong>one elastic status slot</strong>, between the spacer and the
+  chip, that says one of two things:
+  <ul>
+    <li><strong>Still loading</strong> – “Still loading – part of the page has not arrived”, in
+      <code>--color-text-tertiary</code>, <strong><span data-claim="contrast-tertiary-on-band" title="--color-text-tertiary on --color-bg-primary">8.52</span>:1</strong> on the band.</li>
+    <li><strong>Stopped</strong> – “Stopped. The page may be missing parts.”, in <code>--color-warning</code>
+      (<span data-contrast="--color-warning on --color-bg-primary" data-min="4.5" data-result="pass">8.00:1 · pass</span> on the band) with the warning
+      icon in front, so colour is never the only signal (SC 1.4.1). <strong>Reload</strong> follows the line.</li>
+  </ul>
+  <strong>The slot follows the <a href="../toolbar/index.html">Toolbar</a> card's
+  <code>.erf-toolbar__status</code></strong>: it shrinks and ends in an ellipsis before any control gives way, and it
+  never wraps – a taller bar would push the native page down, a bounds push and a fresh proof cycle, and a slow load
+  is not worth that. That is also why it never carries a host name: a host is never cut (Rows and lists card).
+  <strong>Below about 420px of bar width the line drops out</strong>; near there it gets room for an ellipsis and
+  nothing a person could read. Reload stays at every width – it is the way back.
+  <br><br>
+  <strong>Reload is an existing control, not a new one</strong>: the band's tool button, the Toolbar and Buttons
+  cards' icon tool as it ships in this bar (<code>.erf-band__tool</code>, 32 × 28, the band's inset focus ring), with
+  the registry's <code>refresh</code> icon, the accessible name “Reload” and the tooltip “Reload”. It has no
+  shortcut, so it has no <code>aria-keyshortcuts</code> and no key caption. No warning fill: the line before it
+  carries the warning.
+  <br><br>
+  <strong>When</strong> the slot shows – the show delay and the point at which a wait becomes “stopped” – is the
+  <a href="../../../../designs/html-waiting/index.html">Waiting for a page</a> screen's call, still proposed. This card
+  decides where the words go, what they say, how they shrink and how they are announced.
+</div>
+
+<div class="load-frames">
+<figure class="ds-frame">
+<div class="width-demo" style="width: 640px"><div class="width-row" inert aria-hidden="true">
+<div class="erf-band"><div class="erf-band__announce">Still loading – part of the page has not arrived.</div><div class="erf-band__bar" aria-label="Preview">
+    <button class="erf-band__tool" type="button" aria-label="Back" aria-keyshortcuts="Meta+[" title="Back to overview.html"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg></button>
+    <button class="erf-band__tool erf-band__tool--toggle" type="button" aria-label="Open links in this tab" aria-pressed="false" title="Open links in this tab – off: links open a new tab"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4.1 12 6"></path><path d="m5.1 8-2.9-.8"></path><path d="m6 12-1.9 2"></path><path d="M7.2 2.2 8 5.1"></path><path d="M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z"></path></svg></button>
+    <button class="erf-band__tool" type="button" aria-label="Find" aria-keyshortcuts="Meta+F" title="Find"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg></button>
+    <span class="erf-band__spacer"></span>
+    <span class="erf-band__status"><span class="erf-band__status-text">Still loading – part of the page has not arrived</span></span>
+    <button class="erf-band__chip" type="button" aria-expanded="false"
+            aria-label="2 blocked · 6 allowed. Remote hosts in this preview. Press Escape in the previewed page to return here.">
+      <span>2 blocked<span class="erf-band__chip-allowed"> · 6 allowed</span></span>
+      <span class="erf-band__chip-caret" aria-hidden="true">▸</span>
+    </button>
+    <span class="erf-band__separator" aria-hidden="true"></span>
+    <button class="erf-band__tool" type="button" aria-label="Open in default browser" title="Open in default browser"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg></button>
+    <button class="erf-band__tool" type="button" aria-label="Export to PDF" aria-keyshortcuts="Meta+S" title="Export to PDF"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M12 18v-6"></path><path d="m9 15 3 3 3-3"></path></svg></button>
+  </div></div>
+</div></div>
+<figcaption><span class="ds-frame__step">L1</span><strong>Still loading, 640px</strong> – the slot sits between the spacer and the chip and takes only the room it needs. No Reload yet: the page is still arriving.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div class="width-demo" style="width: 640px"><div class="width-row" inert aria-hidden="true">
+<div class="erf-band"><div class="erf-band__announce">Stopped. The page may be missing parts.</div><div class="erf-band__bar" aria-label="Preview">
+    <button class="erf-band__tool" type="button" aria-label="Back" aria-keyshortcuts="Meta+[" title="Back to overview.html"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg></button>
+    <button class="erf-band__tool erf-band__tool--toggle" type="button" aria-label="Open links in this tab" aria-pressed="false" title="Open links in this tab – off: links open a new tab"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4.1 12 6"></path><path d="m5.1 8-2.9-.8"></path><path d="m6 12-1.9 2"></path><path d="M7.2 2.2 8 5.1"></path><path d="M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z"></path></svg></button>
+    <button class="erf-band__tool" type="button" aria-label="Find" aria-keyshortcuts="Meta+F" title="Find"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg></button>
+    <span class="erf-band__spacer"></span>
+    <span class="erf-band__status erf-band__status--stopped"><svg data-icon="triangle-alert" class="erf-band__status-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg><span class="erf-band__status-text">Stopped. The page may be missing parts.</span></span>
+    <button class="erf-band__tool" type="button" aria-label="Reload" title="Reload"><svg data-icon="refresh-cw" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg></button>
+    <button class="erf-band__chip" type="button" aria-expanded="false"
+            aria-label="2 blocked · 6 allowed. Remote hosts in this preview. Press Escape in the previewed page to return here.">
+      <span>2 blocked<span class="erf-band__chip-allowed"> · 6 allowed</span></span>
+      <span class="erf-band__chip-caret" aria-hidden="true">▸</span>
+    </button>
+    <span class="erf-band__separator" aria-hidden="true"></span>
+    <button class="erf-band__tool" type="button" aria-label="Open in default browser" title="Open in default browser"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg></button>
+    <button class="erf-band__tool" type="button" aria-label="Export to PDF" aria-keyshortcuts="Meta+S" title="Export to PDF"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M12 18v-6"></path><path d="m9 15 3 3 3-3"></path></svg></button>
+  </div></div>
+</div></div>
+<figcaption><span class="ds-frame__step">L2</span><strong>Stopped, with Reload, 640px</strong> – the warning colour plus the warning icon, then Reload as an ordinary band tool. With Reload beside it the line already loses its last word at 640px; “Stopped” is what must survive, and it does.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div class="width-demo" style="width: 480px"><div class="width-row" inert aria-hidden="true">
+<div class="erf-band"><div class="erf-band__announce">Stopped. The page may be missing parts.</div><div class="erf-band__bar" aria-label="Preview">
+    <button class="erf-band__tool" type="button" aria-label="Back" aria-keyshortcuts="Meta+[" title="Back to overview.html"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg></button>
+    <button class="erf-band__tool erf-band__tool--toggle" type="button" aria-label="Open links in this tab" aria-pressed="false" title="Open links in this tab – off: links open a new tab"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4.1 12 6"></path><path d="m5.1 8-2.9-.8"></path><path d="m6 12-1.9 2"></path><path d="M7.2 2.2 8 5.1"></path><path d="M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z"></path></svg></button>
+    <button class="erf-band__tool" type="button" aria-label="Find" aria-keyshortcuts="Meta+F" title="Find"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg></button>
+    <span class="erf-band__spacer"></span>
+    <span class="erf-band__status erf-band__status--stopped"><svg data-icon="triangle-alert" class="erf-band__status-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg><span class="erf-band__status-text">Stopped. The page may be missing parts.</span></span>
+    <button class="erf-band__tool" type="button" aria-label="Reload" title="Reload"><svg data-icon="refresh-cw" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg></button>
+    <button class="erf-band__chip" type="button" aria-expanded="false"
+            aria-label="2 blocked · 6 allowed. Remote hosts in this preview. Press Escape in the previewed page to return here.">
+      <span>2 blocked<span class="erf-band__chip-allowed"> · 6 allowed</span></span>
+      <span class="erf-band__chip-caret" aria-hidden="true">▸</span>
+    </button>
+    <span class="erf-band__separator" aria-hidden="true"></span>
+    <button class="erf-band__tool" type="button" aria-label="Open in default browser" title="Open in default browser"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg></button>
+    <button class="erf-band__tool" type="button" aria-label="Export to PDF" aria-keyshortcuts="Meta+S" title="Export to PDF"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M12 18v-6"></path><path d="m9 15 3 3 3-3"></path></svg></button>
+  </div></div>
+</div></div>
+<figcaption><span class="ds-frame__step">L3</span><strong>Stopped, 480px</strong> – the compact tier: the chip drops “· 6 allowed”, and the line shrinks to an ellipsis before any control gives way.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div class="width-demo" style="width: 400px"><div class="width-row" inert aria-hidden="true">
+<div class="erf-band"><div class="erf-band__announce">Stopped. The page may be missing parts.</div><div class="erf-band__bar" aria-label="Preview">
+    <button class="erf-band__tool" type="button" aria-label="Back" aria-keyshortcuts="Meta+[" title="Back to overview.html"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg></button>
+    <button class="erf-band__tool erf-band__tool--toggle" type="button" aria-label="Open links in this tab" aria-pressed="false" title="Open links in this tab – off: links open a new tab"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4.1 12 6"></path><path d="m5.1 8-2.9-.8"></path><path d="m6 12-1.9 2"></path><path d="M7.2 2.2 8 5.1"></path><path d="M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z"></path></svg></button>
+    <button class="erf-band__tool" type="button" aria-label="Find" aria-keyshortcuts="Meta+F" title="Find"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg></button>
+    <span class="erf-band__spacer"></span>
+    <span class="erf-band__status erf-band__status--stopped"><svg data-icon="triangle-alert" class="erf-band__status-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg><span class="erf-band__status-text">Stopped. The page may be missing parts.</span></span>
+    <button class="erf-band__tool" type="button" aria-label="Reload" title="Reload"><svg data-icon="refresh-cw" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg></button>
+    <button class="erf-band__chip" type="button" aria-expanded="false"
+            aria-label="2 blocked · 6 allowed. Remote hosts in this preview. Press Escape in the previewed page to return here.">
+      <span>2 blocked<span class="erf-band__chip-allowed"> · 6 allowed</span></span>
+      <span class="erf-band__chip-caret" aria-hidden="true">▸</span>
+    </button>
+    <span class="erf-band__separator" aria-hidden="true"></span>
+    <button class="erf-band__tool" type="button" aria-label="Open in default browser" title="Open in default browser"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg></button>
+    <button class="erf-band__tool" type="button" aria-label="Export to PDF" aria-keyshortcuts="Meta+S" title="Export to PDF"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M12 18v-6"></path><path d="m9 15 3 3 3-3"></path></svg></button>
+  </div></div>
+</div></div>
+<figcaption><span class="ds-frame__step">L4</span><strong>Narrow bar without the slot, 400px</strong> – under about 420px the line is not drawn at all; Reload stays. The announcement was already made through the band's region, so nothing is lost to a screen reader.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div class="width-demo ds-resize"><div class="width-row" inert aria-hidden="true">
+<div class="erf-band"><div class="erf-band__announce">Still loading – part of the page has not arrived.</div><div class="erf-band__bar" aria-label="Preview">
+    <button class="erf-band__tool" type="button" aria-label="Back" aria-keyshortcuts="Meta+[" title="Back to overview.html"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg></button>
+    <button class="erf-band__tool erf-band__tool--toggle" type="button" aria-label="Open links in this tab" aria-pressed="false" title="Open links in this tab – off: links open a new tab"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4.1 12 6"></path><path d="m5.1 8-2.9-.8"></path><path d="m6 12-1.9 2"></path><path d="M7.2 2.2 8 5.1"></path><path d="M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z"></path></svg></button>
+    <button class="erf-band__tool" type="button" aria-label="Find" aria-keyshortcuts="Meta+F" title="Find"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg></button>
+    <span class="erf-band__spacer"></span>
+    <span class="erf-band__status"><span class="erf-band__status-text">Still loading – part of the page has not arrived</span></span>
+    <button class="erf-band__chip" type="button" aria-expanded="false"
+            aria-label="2 blocked · 6 allowed. Remote hosts in this preview. Press Escape in the previewed page to return here.">
+      <span>2 blocked<span class="erf-band__chip-allowed"> · 6 allowed</span></span>
+      <span class="erf-band__chip-caret" aria-hidden="true">▸</span>
+    </button>
+    <span class="erf-band__separator" aria-hidden="true"></span>
+    <button class="erf-band__tool" type="button" aria-label="Open in default browser" title="Open in default browser"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg></button>
+    <button class="erf-band__tool" type="button" aria-label="Export to PDF" aria-keyshortcuts="Meta+S" title="Export to PDF"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M12 18v-6"></path><path d="m9 15 3 3 3-3"></path></svg></button>
+  </div></div>
+</div></div>
+<figcaption><strong>Any width</strong> – drag the corner of this frame to watch the line shrink, then leave.</figcaption>
+</figure>
+</div>
+
+<table>
+  <thead><tr><th>Accessibility rule</th><th>Decision</th></tr></thead>
+  <tbody>
+    <tr><td>Announcement</td><td>Through the band's <strong>one</strong> always-mounted polite region, <code>.erf-band__announce</code>
+      (<code>role="status"</code>, <code>aria-live="polite"</code>), the <a href="../feedback/index.html#announce">Feedback</a>
+      card's rule: the region exists before the text arrives, and it is never <code>assertive</code> – a slow load is not
+      an error. No second region.</td></tr>
+    <tr><td>The slot itself</td><td>Plain text with no live role, so a reading cursor reads it in place. Unlike the Toolbar
+      card's read-out it carries no <code>role="status"</code> of its own: it drops out below about 420px, and a region that
+      leaves is the Feedback card's “unmounts when idle” failure. The words are the same in both places.</td></tr>
+    <tr><td>How often it speaks</td><td>At most twice per load – once when “Still loading” appears, once when it turns to
+      “Stopped”. Nothing when the page finishes: the page arriving is the news.</td></tr>
+    <tr><td>Reload</td><td>A <code>button</code> named “Reload”, a Tab stop only while the load is stopped, never focused
+      automatically. Its target is the band tool's 32 × 28, above the 24 × 24 floor.</td></tr>
+    <tr><td>Wrapping and translation</td><td>The line never wraps; a longer translation ellipsis-clips instead, and the full
+      words are still in the announcement and the reading order.</td></tr>
+  </tbody>
+</table>
+<p class="ds-muted">Keys: the Reload rows of <a href="#keyboard">the keyboard contract</a>. Not built yet – see
+<a href="#open-defects">Open defects</a>.</p>
+
 <h2 id="narrow">Narrow panels: the row never wraps</h2>
 <div class="ds-note">
   A taller band pushes the native page down – a bounds push and the <span data-claim="band-ack-timeout-ms" title="time the previewed page has to confirm it moved, ms (src/shared/constants.ts)">300</span> ms proof cycle – so the row never wraps
   and never changes height. It steps down instead, by a container query on <code>.erf-band</code>.
   <strong>Compact</strong>, below the width the full row needs: tighter padding and gaps, and the chip keeps
   "12 blocked" but drops "· 34 allowed", so what stays visible is still the start of its accessible name
-  (SC 2.5.3). <strong>Minimal</strong>, below the width the compact row needs: Find and Export to PDF leave the row
-  and the Tab order, while their shortcuts keep working with focus in the page, which is reachable by keyboard;
+  (SC 2.5.3). <strong>Narrow</strong>, below the width the compact row needs: Export to PDF leaves the row and
+  the Tab order, and Find stays. <strong>Minimal</strong>, below the width the narrow row needs: Find leaves too. Both shortcuts keep working with focus in the page, which is reachable by keyboard;
   Open in default browser stays, because it has none.
   Anything that still does not fit scrolls sideways with no visible scrollbar, and focus brings a control into
   view (SC 2.4.11).
@@ -913,6 +1403,50 @@ remote host</a> screen.</p>
   <code>--color-bg-primary</code>. Every gate stayed green throughout, because the number was right about the
   pair it named and the pair was not this one.
 </div>
+
+<section id="open-defects">
+<h2>Open defects this card names</h2>
+<p class="ds-muted">Where the app has not caught up with a decision on this card. Checked on 2026-10-28 against
+<code>src/renderer/src/components/Panels/HtmlPreviewPanel/</code>.</p>
+<ul class="ds-muted">
+  <li><strong>Load status slot – decided, not yet built.</strong> The bar ships no status slot: there is no “Still
+    loading” or “Stopped” line and no Reload tool in <code>PreviewChromeBand.tsx</code> or
+    <code>PreviewNavControls.tsx</code>, and neither string exists anywhere in the panel's source. Reload ships only in the
+    failure banner (<code>PreviewBanner.tsx</code>, through <code>usePreviewPanelActions.ts</code>). Until it is built, a
+    page that hangs halfway looks finished. The slot's CSS above is drawn on this card only, not synced from
+    <code>band.css</code>; when the app builds it, the rules move into <code>PreviewChromeBand.css</code> and come back
+    here through the sync.</li>
+  <li><strong>The reasoned result messages do not fit their track.</strong> The middle track is sized to “Not saved”
+    (the <code>band.css</code> deviation note says so), but four shipped variants are longer – “Not saved ⟨em dash⟩ list
+    full”, “… not allowed”, “… check settings” and “Saved ⟨em dash⟩ reload to apply” (<code>permissionBand.logic.ts:354</code>–<code>372</code>).
+    <code>.erf-band__state</code> is <code>white-space: nowrap</code>, so the text runs out of its
+    <span data-claim="band-middle-track" title="middle track of a host row in PreviewChromeBand.css, px">72</span>px
+    track, across the gap and under that row's Allow button: frames R1–R4 draw it. The logic's own comment says the
+    message “must fit rather than widen the grid”; today it does neither.</li>
+  <li><strong>“Saved – reload to apply” is drawn as a failure.</strong> On a timeout the grant is already saved, yet the
+    row's text takes <code>--color-error</code>, the chip keeps its red caret and the row still offers Allow (frame R4).
+    The words are right; the colour and the button say the opposite, so the reader is invited to retry a grant that
+    exists.</li>
+  <li><strong>The polite region drops the reason.</strong> Every “Not saved” variant announces the same sentence,
+    “Could not save … to this project. It is still blocked.” (<code>permissionBand.logic.ts:133</code>), and focus goes to
+    the chip, whose name carries only the counts. A sighted reader sees “list full” or “check settings”; a
+    screen-reader user hears neither unless they browse to the row – not the same question, which this card's
+    <a href="#origin">origin rule</a> asks for.</li>
+  <li><strong>The truncated-list notice can say something untrue, and is silent.</strong> Main sets the flag when the
+    list <em>reaches</em> its cap (<code>previewBlockedLedger.ts:158</code>, a <code>&gt;=</code> comparison), so a page that
+    asked for exactly the cap's worth of hosts is told “this page asked for more”. The other way round (inferred from
+    the code, not run), an origin dropped by the per-hostname sub-cap (<code>MAX_BLOCKED_ORIGINS_PER_HOST</code>) sends
+    no event, so that loss never sets the flag. The notice is a section label, drawn in uppercase and not announced
+    (frame T).</li>
+  <li><strong>Em dashes in the shipped strings.</strong> All five strings in frames R1–R4 and T ship with an em dash
+    where the <a href="../../foundations/writing.html">Writing</a> card asks for an en dash; that card lists them with
+    file and line. This card draws them with an en dash, because no page here may carry the character.</li>
+</ul>
+<p class="ds-muted">The pressed signature on an open panel's tool already ships: <code>PreviewNavControls.css</code> gives
+<code>.erf-band__tool--toggle[aria-expanded='true']</code> the same fill and lime edge as <code>aria-pressed</code>, with the
+same <code>forced-colors</code> edge, and <code>CommentToolbarTools.tsx</code> puts that class on the Comments list. No row
+is needed for it.</p>
+</section>
 
 <section id="exceptions">
 <h2>Exceptions</h2>

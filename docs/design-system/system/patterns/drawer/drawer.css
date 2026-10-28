@@ -1,0 +1,129 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/**
+ * The drawer – a side panel that sits BESIDE the content, never over it.
+ *
+ * PROPOSED – not adopted. The first shipping instance is the comment drawer:
+ *   src/renderer/src/components/Panels/HtmlPreviewPanel/comments/CommentDrawer.css
+ *   (.erf-comment-drawer, __head, __title, __controls, __note, __scroll)
+ *   src/renderer/src/components/Panels/HtmlPreviewPanel/comments/useDrawerSheet.ts
+ *   (the 640px full-width switch, measured in script because the page is a
+ *   native view that must also be hidden)
+ * Adopting is a MOVE: those rules become this file, and scripts/design-sync.mjs
+ * syncs it back here. Classes are prefixed erf-.
+ *
+ * Anatomy, top to bottom: header (title + close), a fixed controls band, a
+ * note slot that stays in view, and the one part that scrolls.
+ */
+
+/* The host: the content and the drawer side by side, in one flex row. It is
+   a size container so a drawer in plain DOM goes full width below 640px with
+   no script. */
+.erf-drawer-host {
+  container: erf-drawer-host / inline-size;
+  display: flex;
+  min-inline-size: 0;
+  min-block-size: 0;
+}
+
+/* The content shrinks beside an open drawer; it is never covered. */
+.erf-drawer-host__content {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  min-block-size: 0;
+}
+
+/* The drawer. A flow sibling at the inline end: no position, no z-index, no
+   scrim, no shadow – it is part of the layout, not a layer. It opens in one
+   step: no width transition, because the content beside it reflows once. */
+.erf-drawer {
+  --erf-drawer-width: var(--comments-drawer-width);
+  --erf-drawer-min-width: calc(var(--space-20) * 7);
+  --erf-drawer-max-width: calc(var(--space-24) * 10);
+
+  flex: 0 0 var(--erf-drawer-width);
+  min-inline-size: var(--erf-drawer-min-width);
+  max-inline-size: var(--erf-drawer-max-width);
+  display: flex;
+  flex-direction: column;
+  min-block-size: 0;
+  box-sizing: border-box;
+  background: var(--color-bg-secondary);
+  border-inline-start: var(--border-width) solid var(--color-border-default);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+}
+
+/* Full width: below a 640px host the drawer takes the whole row and the
+   content steps aside. The container query does it for plain DOM; a host whose
+   content cannot be hidden by CSS (a native view) measures itself and sets
+   --full instead, and hides its content the same way. A container condition
+   cannot read a custom property, so 640px is written once, here. */
+@container erf-drawer-host (width < 640px) {
+  .erf-drawer {
+    flex-basis: 100%;
+    min-inline-size: 0;
+    max-inline-size: none;
+    border-inline-start: 0;
+  }
+  .erf-drawer-host__content:has(~ .erf-drawer) {
+    display: none;
+  }
+}
+.erf-drawer--full {
+  flex-basis: 100%;
+  min-inline-size: 0;
+  max-inline-size: none;
+  border-inline-start: 0;
+}
+
+/* Header: the title, then the close button (.erf-button.erf-button--icon). */
+.erf-drawer__head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-4) var(--space-4) var(--space-8);
+}
+.erf-drawer__title {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  line-height: var(--leading-tight);
+  color: var(--color-text-emphasis);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Controls: filters and options that act on the list. Fixed – it never
+   scrolls away – and closed off from the list by a rule. */
+.erf-drawer__controls {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: 0 var(--space-8) var(--space-6);
+  border-block-end: var(--border-width) solid var(--color-border-default);
+}
+
+/* Note: one message about the whole list (the Feedback card's banner). Above
+   the scroller, not in it, so it stays in view however far the list scrolls. */
+.erf-drawer__note {
+  flex: 0 0 auto;
+  padding: var(--space-6) var(--space-8) 0;
+}
+
+/* The one part that scrolls. */
+.erf-drawer__scroll {
+  position: relative;
+  flex: 1 1 auto;
+  min-block-size: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}

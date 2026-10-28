@@ -35,14 +35,14 @@
 <main>
 <h1>Erfana design system</h1>
 <p class="ds-lede">
-  25 cards, generated from the folder itself. Every page reads a synced copy of the app's
+  30 cards, generated from the folder itself. Every page reads a synced copy of the app's
   <code>design-tokens.css</code> and the real bundled Cascadia Mono, and every number a card quotes is
   baked in from the source by <code>npm run design</code> – no page runs JavaScript.
 </p>
 
 <ul class="ix-summary" aria-label="Cards by status">
   <li><span class="ds-status" data-status="decided">decided</span> 5</li>
-  <li><span class="ds-status" data-status="proposed">proposed</span> 20</li>
+  <li><span class="ds-status" data-status="proposed">proposed</span> 25</li>
   <li><span class="ds-status" data-status="superseded">superseded</span> 0</li>
 </ul>
 
@@ -66,8 +66,13 @@
   <a href="../designs/index.html">the designs index</a>. A screen cites a card; it never decides a system rule.
 </div>
 
-<h2 id="foundations">Foundations <span class="ix-count">11</span></h2>
+<h2 id="foundations">Foundations <span class="ix-count">13</span></h2>
 <div class="ix-grid">
+    <a class="ix-card" href="system/foundations/brand.html">
+      <span class="ix-card__name">Brand</span>
+      <span class="ix-card__sub">The icon as it ships, a Cascadia Mono wordmark, and the colours a light surface allows</span>
+      <span class="ix-card__meta"><span class="ds-status" data-status="proposed">proposed</span> not yet reviewed</span>
+    </a>
     <a class="ix-card" href="system/foundations/colors.html">
       <span class="ix-card__name">Colours</span>
       <span class="ix-card__sub">Every token resolved from the shipping CSS, every pairing judged on the surface it sits on</span>
@@ -81,6 +86,11 @@
     <a class="ix-card" href="system/foundations/forced-colors.html">
       <span class="ix-card__name">Forced colours</span>
       <span class="ix-card__sub">What survives a Windows contrast theme – every state keeps an edge, not just a fill</span>
+      <span class="ix-card__meta"><span class="ds-status" data-status="proposed">proposed</span> not yet reviewed</span>
+    </a>
+    <a class="ix-card" href="system/foundations/highlights.html">
+      <span class="ix-card__name">Text highlights</span>
+      <span class="ix-card__sub">Find, comment marks, changed words and the selection – one paint order, and no two that look alike</span>
       <span class="ix-card__meta"><span class="ds-status" data-status="proposed">proposed</span> not yet reviewed</span>
     </a>
     <a class="ix-card" href="system/foundations/layering.html">
@@ -125,7 +135,7 @@
     </a>
 </div>
 
-<h2 id="components">Components <span class="ix-count">12</span></h2>
+<h2 id="components">Components <span class="ix-count">14</span></h2>
 <div class="ix-grid">
     <a class="ix-card" href="system/components/badge/index.html">
       <span class="ix-card__name">Badges, chips and keys</span>
@@ -139,12 +149,12 @@
     </a>
     <a class="ix-card" href="system/components/feedback/index.html">
       <span class="ix-card__name">Feedback</span>
-      <span class="ix-card__sub">One warning colour, one banner shape, toasts that never steal focus, and progress that names itself</span>
+      <span class="ix-card__sub">One warning colour, one banner in a boxed and a band form, toasts that never steal focus, and progress bars and meters that name themselves</span>
       <span class="ix-card__meta"><span class="ds-status" data-status="proposed">proposed</span> reviewed 2026-08-31</span>
     </a>
     <a class="ix-card" href="system/components/form/index.html">
       <span class="ix-card__name">Form controls</span>
-      <span class="ix-card__sub">One input, one select, one checkbox – and an error that a screen reader can find</span>
+      <span class="ix-card__sub">One input, one multi-line field, one select, one checkbox – and an error that a screen reader can find</span>
       <span class="ix-card__meta"><span class="ds-status" data-status="decided">decided</span> reviewed 2026-10-28</span>
     </a>
     <a class="ix-card" href="system/components/icon/index.html">
@@ -167,9 +177,19 @@
       <span class="ix-card__sub">One selected state instead of four, the arrow-key contract the file tree keeps, and a route that needs no drag</span>
       <span class="ix-card__meta"><span class="ds-status" data-status="decided">decided</span> reviewed 2026-10-28</span>
     </a>
+    <a class="ix-card" href="system/components/segmented/index.html">
+      <span class="ix-card__name">Segmented control</span>
+      <span class="ix-card__sub">One of a few choices, all visible – a radio group drawn as equal cells, checked by a fill and a lime edge</span>
+      <span class="ix-card__meta"><span class="ds-status" data-status="proposed">proposed</span> not yet reviewed</span>
+    </a>
     <a class="ix-card" href="system/components/splitter/index.html">
       <span class="ix-card__name">Splitter</span>
       <span class="ix-card__sub">A 1px line with a 24px grip – a separator you can focus, arrow and read the value of</span>
+      <span class="ix-card__meta"><span class="ds-status" data-status="proposed">proposed</span> not yet reviewed</span>
+    </a>
+    <a class="ix-card" href="system/components/status-bar/index.html">
+      <span class="ix-card__name">Status bar</span>
+      <span class="ix-card__sub">One display-only footer strip for a panel – identity, a spacer, values that are never dropped, and one polite announcement</span>
       <span class="ix-card__meta"><span class="ds-status" data-status="proposed">proposed</span> not yet reviewed</span>
     </a>
     <a class="ix-card" href="system/components/tabs/index.html">
@@ -189,11 +209,16 @@
     </a>
 </div>
 
-<h2 id="patterns">Patterns <span class="ix-count">2</span></h2>
+<h2 id="patterns">Patterns <span class="ix-count">3</span></h2>
 <div class="ix-grid">
     <a class="ix-card" href="system/patterns/dialog/index.html">
       <span class="ix-card__name">Dialog</span>
       <span class="ix-card__sub">One modal shell – scrim, header, scrolling body, footer – and the focus contract BaseDialog keeps</span>
+      <span class="ix-card__meta"><span class="ds-status" data-status="proposed">proposed</span> not yet reviewed</span>
+    </a>
+    <a class="ix-card" href="system/patterns/drawer/index.html">
+      <span class="ix-card__name">Drawer</span>
+      <span class="ix-card__sub">A side panel beside the content, not over it – header, fixed controls, a note that stays, and one scroller</span>
       <span class="ix-card__meta"><span class="ds-status" data-status="proposed">proposed</span> not yet reviewed</span>
     </a>
     <a class="ix-card" href="system/patterns/states/index.html">
@@ -210,8 +235,11 @@
   <tr><td>Add a button</td><td><a href="system/components/button/index.html">Buttons</a></td></tr>
   <tr><td>Add a context menu</td><td><a href="system/components/menu/index.html">Menu</a></td></tr>
   <tr><td>Add a dialog</td><td><a href="system/patterns/dialog/index.html">Dialog</a></td></tr>
+  <tr><td>Add a footer to a panel</td><td><a href="system/components/status-bar/index.html">Status bar</a></td></tr>
   <tr><td>Add a light mode or a colour-scheme query</td><td><a href="system/foundations/theme.html">Theme</a></td></tr>
+  <tr><td>Add a multi-line field with a character limit</td><td><a href="system/components/form/index.html">Form controls</a></td></tr>
   <tr><td>Add a shadow or a border</td><td><a href="system/foundations/surfaces.html">Surfaces and elevation</a></td></tr>
+  <tr><td>Add a side panel to a view</td><td><a href="system/patterns/drawer/index.html">Drawer</a></td></tr>
   <tr><td>Add a tab strip</td><td><a href="system/components/tabs/index.html">Tabs</a></td></tr>
   <tr><td>Add a tag or chip</td><td><a href="system/components/badge/index.html">Badges, chips and keys</a></td></tr>
   <tr><td>Add a text field or select</td><td><a href="system/components/form/index.html">Form controls</a></td></tr>
@@ -220,6 +248,7 @@
   <tr><td>Animate something</td><td><a href="system/foundations/motion.html">Motion</a></td></tr>
   <tr><td>Announce a change to a screen reader</td><td><a href="system/components/feedback/index.html">Feedback</a></td></tr>
   <tr><td>Ask for a name in a dialog</td><td><a href="system/patterns/dialog/index.html">Dialog</a></td></tr>
+  <tr><td>Ask save or discard</td><td><a href="system/patterns/dialog/index.html">Dialog</a></td></tr>
   <tr><td>Ask the user to allow a remote host</td><td><a href="system/components/permission-band/index.html">Permission band</a></td></tr>
   <tr><td>Ask the user to confirm a destructive action</td><td><a href="system/patterns/dialog/index.html">Dialog</a></td></tr>
   <tr><td>Block the window while it waits</td><td><a href="system/patterns/states/index.html">Empty, loading and error states</a></td></tr>
@@ -232,26 +261,37 @@
   <tr><td>Colour git status or the context meter</td><td><a href="system/foundations/colors.html">Colours</a></td></tr>
   <tr><td>Colour inline code or a syntax token</td><td><a href="system/foundations/terminal.html">Terminal and code colours</a></td></tr>
   <tr><td>Colour terminal output or the cursor</td><td><a href="system/foundations/terminal.html">Terminal and code colours</a></td></tr>
+  <tr><td>Confirm a delete inside a dialog</td><td><a href="system/patterns/dialog/index.html">Dialog</a></td></tr>
   <tr><td>Decide whether an icon needs a name</td><td><a href="system/components/icon/index.html">Icons</a></td></tr>
   <tr><td>Describe a checkbox</td><td><a href="system/components/form/index.html">Form controls</a></td></tr>
   <tr><td>Describe what the agent does</td><td><a href="system/foundations/writing.html">Writing</a></td></tr>
   <tr><td>Draw a focus ring</td><td><a href="system/foundations/focus.html">Focus and keyboard</a></td></tr>
+  <tr><td>Draw the Erfana wordmark</td><td><a href="system/foundations/brand.html">Brand</a></td></tr>
+  <tr><td>Filter a list by state</td><td><a href="system/components/segmented/index.html">Segmented control</a></td></tr>
   <tr><td>Find a registry glyph</td><td><a href="system/components/icon/index.html">Icons</a></td></tr>
   <tr><td>Focus a button on a coloured fill</td><td><a href="system/foundations/focus.html">Focus and keyboard</a></td></tr>
   <tr><td>Group toolbar buttons</td><td><a href="system/components/toolbar/index.html">Toolbar</a></td></tr>
   <tr><td>Handle a toolbar that does not fit</td><td><a href="system/components/toolbar/index.html">Toolbar</a></td></tr>
+  <tr><td>Highlight a search hit</td><td><a href="system/foundations/highlights.html">Text highlights</a></td></tr>
+  <tr><td>Keep a mark from looking like a link or a selection</td><td><a href="system/foundations/highlights.html">Text highlights</a></td></tr>
   <tr><td>Keep focus visible under a sticky header</td><td><a href="system/foundations/focus.html">Focus and keyboard</a></td></tr>
   <tr><td>Label a destructive action</td><td><a href="system/components/button/index.html">Buttons</a></td></tr>
   <tr><td>Let the user resize two panes</td><td><a href="system/components/splitter/index.html">Splitter</a></td></tr>
+  <tr><td>Make a banner or a social image</td><td><a href="system/foundations/brand.html">Brand</a></td></tr>
   <tr><td>Make a divider keyboard-operable</td><td><a href="system/components/splitter/index.html">Splitter</a></td></tr>
+  <tr><td>Make a field read-only</td><td><a href="system/components/form/index.html">Form controls</a></td></tr>
+  <tr><td>Make a panel that works at narrow widths</td><td><a href="system/patterns/drawer/index.html">Drawer</a></td></tr>
   <tr><td>Make a popover or dialog stand off the panel</td><td><a href="system/foundations/surfaces.html">Surfaces and elevation</a></td></tr>
   <tr><td>Make a state visible in a Windows contrast theme</td><td><a href="system/foundations/forced-colors.html">Forced colours</a></td></tr>
   <tr><td>Make text selectable or not</td><td><a href="system/foundations/theme.html">Theme</a></td></tr>
   <tr><td>Make text survive zoom and text spacing</td><td><a href="system/foundations/type.html">Typography</a></td></tr>
   <tr><td>Mark a tab with unsaved changes</td><td><a href="system/components/tabs/index.html">Tabs</a></td></tr>
+  <tr><td>Mark commented text</td><td><a href="system/foundations/highlights.html">Text highlights</a></td></tr>
   <tr><td>Pick a system colour for focus, selection or disabled</td><td><a href="system/foundations/forced-colors.html">Forced colours</a></td></tr>
   <tr><td>Pick a text colour that passes contrast</td><td><a href="system/foundations/colors.html">Colours</a></td></tr>
+  <tr><td>Place a dialog beside what it is about</td><td><a href="system/patterns/dialog/index.html">Dialog</a></td></tr>
   <tr><td>Put a button beside a field</td><td><a href="system/components/button/index.html">Buttons</a></td></tr>
+  <tr><td>Put the brand on a light surface</td><td><a href="system/foundations/brand.html">Brand</a></td></tr>
   <tr><td>Remove an outline safely</td><td><a href="system/foundations/focus.html">Focus and keyboard</a></td></tr>
   <tr><td>Replace a title attribute</td><td><a href="system/components/tooltip/index.html">Tooltip</a></td></tr>
   <tr><td>Respect reduced motion</td><td><a href="system/foundations/motion.html">Motion</a></td></tr>
@@ -261,10 +301,17 @@
   <tr><td>Show a file&#x27;s git state</td><td><a href="system/components/badge/index.html">Badges, chips and keys</a></td></tr>
   <tr><td>Show a hostname</td><td><a href="system/components/row/index.html">Rows and lists</a></td></tr>
   <tr><td>Show a keyboard shortcut</td><td><a href="system/components/badge/index.html">Badges, chips and keys</a>, <a href="system/components/tooltip/index.html">Tooltip</a></td></tr>
+  <tr><td>Show a level such as context usage</td><td><a href="system/components/feedback/index.html">Feedback</a></td></tr>
+  <tr><td>Show a list beside a page</td><td><a href="system/patterns/drawer/index.html">Drawer</a></td></tr>
+  <tr><td>Show a live value under a terminal</td><td><a href="system/components/status-bar/index.html">Status bar</a></td></tr>
+  <tr><td>Show a note across a whole panel</td><td><a href="system/components/feedback/index.html">Feedback</a></td></tr>
   <tr><td>Show a toast</td><td><a href="system/components/feedback/index.html">Feedback</a></td></tr>
   <tr><td>Show an empty panel or list</td><td><a href="system/patterns/states/index.html">Empty, loading and error states</a></td></tr>
   <tr><td>Show an error, warning or success</td><td><a href="system/components/feedback/index.html">Feedback</a></td></tr>
+  <tr><td>Show git status under the project tree</td><td><a href="system/components/status-bar/index.html">Status bar</a></td></tr>
+  <tr><td>Show one-of-many choices without a menu</td><td><a href="system/components/segmented/index.html">Segmented control</a></td></tr>
   <tr><td>Show progress</td><td><a href="system/components/feedback/index.html">Feedback</a></td></tr>
+  <tr><td>Show text that changed under a comment</td><td><a href="system/foundations/highlights.html">Text highlights</a></td></tr>
   <tr><td>Show that a panel or the app failed</td><td><a href="system/patterns/states/index.html">Empty, loading and error states</a></td></tr>
   <tr><td>Show that something is loading</td><td><a href="system/foundations/motion.html">Motion</a>, <a href="system/patterns/states/index.html">Empty, loading and error states</a></td></tr>
   <tr><td>Show which tab is active</td><td><a href="system/components/tabs/index.html">Tabs</a></td></tr>
@@ -273,6 +320,7 @@
   <tr><td>Space a panel header, a menu or a dialog</td><td><a href="system/foundations/spacing.html">Spacing</a></td></tr>
   <tr><td>Style a panel title, hint or column header</td><td><a href="system/foundations/type.html">Typography</a></td></tr>
   <tr><td>Style a scrollbar</td><td><a href="system/foundations/surfaces.html">Surfaces and elevation</a></td></tr>
+  <tr><td>Switch between a few views</td><td><a href="system/components/segmented/index.html">Segmented control</a></td></tr>
   <tr><td>Word a button or a dialog</td><td><a href="system/foundations/writing.html">Writing</a></td></tr>
   <tr><td>Write a keyboard shortcut</td><td><a href="system/foundations/writing.html">Writing</a></td></tr>
   <tr><td>Write an error message</td><td><a href="system/foundations/writing.html">Writing</a></td></tr>

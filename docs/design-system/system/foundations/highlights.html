@@ -1,0 +1,285 @@
+<!-- @card group="Foundations" name="Text highlights" subtitle="Find, comment marks, changed words and the selection – one paint order, and no two that look alike" status="proposed" reviewed="never" answers="Highlight a search hit; Mark commented text; Show text that changed under a comment; Keep a mark from looking like a link or a selection" -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Text highlights – Erfana design system</title>
+<link rel="stylesheet" href="../../tokens.css">
+<link rel="stylesheet" href="../../ds.css">
+<style>
+  /* ---------- proposed tokens, card-private until they ship ----------
+     These three are NOT in design-tokens.css yet. They are defined here from
+     existing tokens so the card can draw them; adding them to the app is a
+     separate change. The comment screens (selection.css, markdown-comments.css,
+     comments-v2.css) already read them, with a 35% color-mix fallback; they
+     replaced the 22%, 38% and 40% literals those screens used before. */
+  :root {
+    --color-comment-mark: color-mix(in srgb, var(--color-accent-primary) 35%, transparent);
+    --color-comment-mark-bar: var(--color-accent-primary);
+    --comment-mark-bar-width: var(--border-width-thick);
+  }
+  /* A light page ground: the HTML overlay reads the container's luminance and
+     swaps the bar to the deep violet, because the brand violet is under 3:1 on
+     white (see the contrast table). The fill stays the same. */
+  .hl-light { --color-comment-mark-bar: var(--color-brand-indigo); }
+
+  /* ---------- the highlights, as spans standing in for ::highlight() ----------
+     Shipping code paints these with the CSS Custom Highlight API, which allows
+     only colour, background-color and text-decoration – so every look here is
+     built from those three and nothing else (no border, no box-shadow). */
+  .hl-find { background-color: var(--color-brand-lime-muted); }
+  .hl-find-current { background-color: var(--color-brand-lime); color: var(--color-brand-black); }
+  .hl-mark { background-color: var(--color-comment-mark);
+             text-decoration: underline var(--comment-mark-bar-width) var(--color-comment-mark-bar);
+             text-decoration-skip-ink: none; text-underline-offset: var(--space-2); }
+  .hl-mark--active { text-decoration-style: double; }
+  .hl-changed { text-decoration: underline dashed var(--comment-mark-bar-width) var(--color-comment-mark-bar);
+                text-decoration-skip-ink: none; text-underline-offset: var(--space-2); }
+  .hl-selection { background-color: var(--color-bg-selected); color: var(--color-text-emphasis); }
+  .hl-light .hl-selection { color: var(--color-brand-black); }
+  .hl-link { color: var(--color-link); text-decoration: underline; }
+  .hl-light .hl-link { color: var(--color-brand-indigo); }
+
+  /* ---------- grounds ---------- */
+  .hl-ground { /* mockup: the preview's reading size */ font: var(--text-md) var(--font-sans);
+               line-height: var(--leading-relaxed); padding: var(--space-12) var(--space-16); }
+  .hl-ground--white { background: var(--color-white); color: var(--color-brand-black); }
+  .hl-ground--grey { background: var(--color-gray-100); color: var(--color-brand-black); }
+  .hl-ground--dark { background: var(--color-bg-preview); color: var(--color-text-primary); }
+  .hl-ground p { margin: 0 0 var(--space-6); font-size: inherit; }
+  .hl-ground p:last-child { margin-bottom: 0; }
+
+  /* ---------- forced colours, simulated with the system keywords ---------- */
+  .hl-fc { color-scheme: dark; forced-color-adjust: none; background: Canvas; color: CanvasText;
+           font: var(--text-md) var(--font-sans); line-height: var(--leading-relaxed); padding: var(--space-12) var(--space-16); }
+  .hl-fc p { margin: 0 0 var(--space-6); font-size: inherit; }
+  .hl-fc p:last-child { margin-bottom: 0; }
+  .hl-fc .hl-find { background-color: Mark; color: MarkText; }
+  .hl-fc .hl-find-current { background-color: MarkText; color: Mark; }
+  .hl-fc .hl-mark { background-color: Mark; color: MarkText; text-decoration-color: CanvasText; }
+  .hl-fc .hl-changed { text-decoration-color: CanvasText; }
+  .hl-fc .hl-selection { background-color: Highlight; color: HighlightText; }
+  .hl-fc .hl-link { color: LinkText; }
+
+  /* ---------- card chrome ---------- */
+  /* Row headers read as names, not as column captions (as on the Forced colours card). */
+  tbody th { text-align: left; font-weight: var(--font-normal); text-transform: none; letter-spacing: normal;
+             font-size: var(--ds-text-small); color: var(--color-text-primary); }
+  .hl-order td:first-child, .hl-order th:first-child { width: 4ch; }
+  .hl-sample { display: inline-block; padding: 0 var(--space-2); font-size: var(--ds-text-small); }
+  .hl-sample-ground { display: inline-block; padding: var(--space-2) var(--space-4); background: var(--color-bg-preview);
+                      color: var(--color-text-primary); }
+  .hl-unbaked { color: var(--color-text-tertiary); font-size: var(--ds-text-small); }
+</style>
+</head>
+<body>
+<nav class="ds-crumbs" aria-label="Breadcrumb"><a href="../../index.html">Erfana design system</a> <span aria-hidden="true">/</span> <a href="../../index.html#foundations">Foundations</a> <span aria-hidden="true">/</span> <span aria-current="page">Text highlights</span></nav>
+<main>
+<h1>Text highlights</h1>
+<p class="ds-meta"><span class="ds-status" data-status="proposed">proposed</span> not yet reviewed</p>
+<p class="ds-lede" id="decision">
+  A highlight paints a range of text without changing it. Erfana has five, plus the reader's own selection.
+  <strong>Each has its own shape, not only its own colour: Find is a lime fill with no bar, a comment mark is a
+  violet fill with a solid bar under it, the open thread's mark doubles that bar, and changed words get a dashed
+  bar with no fill.</strong> Find paints last of Erfana's highlights, so a hit is never hidden under a mark. A comment
+  mark never uses <code>--color-bg-selected</code>, so it never reads as a selection, and it always has a fill, so it
+  never reads as a link. In forced colours, marks and hits use <code>Mark</code>; <code>Highlight</code> is kept for
+  the selection.
+</p>
+
+<h2 id="order">Paint order</h2>
+<p class="ds-muted">Bottom to top. Where two ranges overlap, the higher one's fill covers the lower one's. Shipping
+code sets this with the <code>priority</code> of each <code>Highlight</code> object; Find sets none today, so its
+current hit sits above its results only because it is registered second.</p>
+<table class="hl-order">
+<thead><tr><th scope="col">#</th><th scope="col">Highlight</th><th scope="col">Look</th><th scope="col">Name in code</th><th scope="col">Ships today</th></tr></thead>
+<tbody>
+  <tr><td>1</td><th scope="row">Changed words</th><td><span class="hl-sample-ground"><span class="hl-changed">dashed bar</span></span> – no fill</td><td><code>erf-comment-changed</code></td><td>No – comments v2 proposal</td></tr>
+  <tr><td>2</td><th scope="row">Comment mark</th><td><span class="hl-sample-ground"><span class="hl-mark">fill and bar</span></span></td><td><code>erf-comment</code></td><td>No – comments v2 proposal</td></tr>
+  <tr><td>3</td><th scope="row">Open thread's mark</th><td><span class="hl-sample-ground"><span class="hl-mark hl-mark--active">fill and double bar</span></span> – not a stronger fill</td><td><code>erf-comment-active</code></td><td>No – comments v2 proposal</td></tr>
+  <tr><td>4</td><th scope="row">Find result</th><td><span class="hl-sample-ground"><span class="hl-find">lime-muted fill</span></span></td><td><code>search-results</code></td><td>Yes, Markdown preview – <code>MarkdownPreview.css</code></td></tr>
+  <tr><td>5</td><th scope="row">Find, current hit</th><td><span class="hl-sample-ground"><span class="hl-find-current">lime, black text</span></span></td><td><code>search-current</code></td><td>Yes, Markdown preview – <code>MarkdownPreview.css</code></td></tr>
+  <tr><td>–</td><th scope="row">The selection</th><td><span class="hl-sample-ground"><span class="hl-selection">selected text</span></span></td><td><code>::selection</code></td><td>The browser's default today; the preview setting it to <code>--color-bg-selected</code> is proposed</td></tr>
+</tbody>
+</table>
+<p class="ds-muted">The selection is not in Erfana's ladder: the browser paints it above every custom highlight
+(CSS Pseudo-Elements level 4, highlight overlays). This is from the specification and has not been checked against
+Erfana's Chromium. That is why its look must differ from all five rather than sit above or below them by choice.
+Find in the HTML preview is Chromium's native <code>findInPage</code>, which paints its own colours; Erfana styles
+Find only in the Markdown preview.</p>
+
+<h2 id="tokens">Tokens</h2>
+<h3 id="tokens-proposed">Proposed – not in the app yet</h3>
+<p class="ds-muted">Defined on this card from existing tokens so it can draw them. Adding them to
+<code>design-tokens.css</code> is a separate app change. The comment screens already read them, with the card's 35% <code>color-mix</code> as the
+fallback until they ship: <code>docs/designs/comments/selection-comments/selection.css</code>,
+<code>docs/designs/comments/markdown-comments/markdown-comments.css</code> and
+<code>docs/designs/comments/comments-v2/comments-v2.css</code>. Those screens used three different fills before – 22% and
+40% in <code>selection.css</code>, 38% in <code>markdown-comments.css</code> – and the tokens replaced them.</p>
+<table class="ds-tokens">
+<thead><tr><th scope="col">Token</th><th scope="col">Built from</th><th scope="col">Use</th></tr></thead>
+<tbody>
+  <tr><th scope="row"><code>--color-comment-mark</code></th><td><code>color-mix(in srgb, var(--color-accent-primary) 35%, transparent)</code></td><td>The fill under commented text, on every ground and for the open thread too.</td></tr>
+  <tr><th scope="row"><code>--color-comment-mark-bar</code></th><td><code>var(--color-accent-primary)</code>; <code>var(--color-brand-indigo)</code> on a light ground</td><td>The bar under a mark and the dashed bar under changed words.</td></tr>
+  <tr><th scope="row"><code>--comment-mark-bar-width</code></th><td><code>var(--border-width-thick)</code></td><td>The bar's thickness. The open thread doubles the bar; it does not thicken it.</td></tr>
+</tbody>
+</table>
+
+<h3 id="tokens-used">Existing tokens these build on</h3>
+<table class="ds-tokens">
+<thead><tr><th scope="col">Token</th><th scope="col">Value</th><th scope="col">Here</th></tr></thead>
+<tbody>
+  <tr><th scope="row"><code>--color-brand-lime-muted</code></th><td><code data-token="--color-brand-lime-muted">rgba(227, 232, 41, 0.3)</code></td><td>Find result fill</td></tr>
+  <tr><th scope="row"><code>--color-brand-lime</code></th><td><code data-token="--color-brand-lime">#E3E829</code></td><td>Find current-hit fill</td></tr>
+  <tr><th scope="row"><code>--color-brand-black</code></th><td><code data-token="--color-brand-black">#161312</code></td><td>Text on the current hit</td></tr>
+  <tr><th scope="row"><code>--color-accent-primary</code></th><td><code data-token="--color-accent-primary">#A0A8FF</code></td><td>Mark fill (35%) and bar on a dark ground</td></tr>
+  <tr><th scope="row"><code>--color-brand-indigo</code></th><td><code data-token="--color-brand-indigo">#3F3FBA</code></td><td>Mark bar on a light ground</td></tr>
+  <tr><th scope="row"><code>--color-bg-selected</code></th><td><code data-token="--color-bg-selected">rgba(160, 168, 255, 0.2)</code></td><td>The selection only – never a mark</td></tr>
+  <tr><th scope="row"><code>--border-width-thick</code></th><td><code data-token="--border-width-thick">2px</code></td><td>Bar thickness</td></tr>
+</tbody>
+</table>
+
+<h2 id="states">Every highlight, on every ground</h2>
+<p class="ds-muted">Static frames. Spans stand in for <code>::highlight()</code> ranges, using only the properties
+that pseudo-element allows. The white and grey grounds are HTML pages; the dark ground is the Markdown preview. The
+link on the light grounds is drawn in the bar's own hue on purpose – the worst case. Find on the light grounds is
+drawn in lime only to set the marks against it: an HTML page gets Chromium's own find colours, and the lime-muted fill
+would all but vanish on white (see the contrast table).</p>
+<div class="ds-frames">
+  <figure class="ds-frame"><div class="hl-ground hl-ground--white hl-light" aria-hidden="true">
+      <p>See the <span class="hl-link">release notes</span> before the <span class="hl-mark">load test runs</span>.</p>
+      <p>The <span class="hl-mark hl-mark--active">open thread</span> and a <span class="hl-changed">changed phrase</span>.</p>
+      <p>Find: <span class="hl-find">staging</span> and <span class="hl-find-current">staging</span>; <span class="hl-selection">a selection</span>.</p>
+    </div>
+    <figcaption><strong>White page.</strong> The violet bar is under 3:1 on white, so the bar takes the deep violet.
+      The fill is faint here; the bar is what carries the mark.</figcaption></figure>
+  <figure class="ds-frame"><div class="hl-ground hl-ground--grey hl-light" aria-hidden="true">
+      <p>See the <span class="hl-link">release notes</span> before the <span class="hl-mark">load test runs</span>.</p>
+      <p>The <span class="hl-mark hl-mark--active">open thread</span> and a <span class="hl-changed">changed phrase</span>.</p>
+      <p>Find: <span class="hl-find">staging</span> and <span class="hl-find-current">staging</span>; <span class="hl-selection">a selection</span>.</p>
+    </div>
+    <figcaption><strong>Grey page.</strong> The same rules as white: deep-violet bar, the same fill.</figcaption></figure>
+  <figure class="ds-frame"><div class="hl-ground hl-ground--dark" aria-hidden="true">
+      <p>See the <span class="hl-link">release notes</span> before the <span class="hl-mark">load test runs</span>.</p>
+      <p>The <span class="hl-mark hl-mark--active">open thread</span> and a <span class="hl-changed">changed phrase</span>.</p>
+      <p>Find: <span class="hl-find">staging</span> and <span class="hl-find-current">staging</span>; <span class="hl-selection">a selection</span>.</p>
+    </div>
+    <figcaption><strong>Dark preview.</strong> The brand violet bar. The link is violet too, but has no fill and a
+      thin underline that breaks at descenders; the mark's bar is thick and continuous.</figcaption></figure>
+</div>
+
+<h3 id="overlaps">Where two meet</h3>
+<div class="ds-frames">
+  <figure class="ds-frame"><div class="hl-ground hl-ground--dark" aria-hidden="true">
+      <p>Run the <span class="hl-mark">load test against <span class="hl-find-current">staging</span> first</span>.</p>
+    </div>
+    <figcaption><strong>Find inside a mark.</strong> Find paints last: the current hit's lime covers the mark's fill.
+      Drawn here with the mark's bar still showing under the hit; whether Chromium paints a lower highlight's
+      decoration under a higher one's fill is unverified.</figcaption></figure>
+  <figure class="ds-frame"><div class="hl-ground hl-ground--dark" aria-hidden="true">
+      <p>Run the <span class="hl-mark">load test <span class="hl-find">against</span> staging</span> first.</p>
+    </div>
+    <figcaption><strong>Find result inside a mark.</strong> The lime-muted fill sits over the violet; the hue
+      changes, so the hit still reads.</figcaption></figure>
+  <figure class="ds-frame"><div class="hl-ground hl-ground--dark" aria-hidden="true">
+      <p>Run the <span class="hl-mark">load <span class="hl-selection">test against</span> staging</span> first.</p>
+    </div>
+    <figcaption><strong>Selecting inside a mark.</strong> The selection paints above; the bar under the mark is what
+      tells the two apart.</figcaption></figure>
+  <figure class="ds-frame"><div class="hl-ground hl-ground--white hl-light" aria-hidden="true">
+      <p>Run the <span class="hl-mark">load test against <span class="hl-find-current">staging</span> first</span>.</p>
+    </div>
+    <figcaption><strong>Find inside a mark, white page.</strong> The same order on a light ground.</figcaption></figure>
+</div>
+
+<h2 id="contrast">Contrast</h2>
+<p class="ds-muted">Text on a fill needs 4.5:1; a bar that carries a mark on its own needs 3:1 against the ground
+(WCAG 1.4.11). Translucent fills are measured over the ground they sit on.</p>
+<table>
+<thead><tr><th scope="col">Pairing</th><th scope="col">Ground</th><th scope="col">Ratio</th></tr></thead>
+<tbody>
+  <tr><th scope="row">Find result – text on lime-muted</th><td>Dark preview</td><td data-contrast="--color-text-primary on --color-brand-lime-muted over --color-bg-preview" data-min="4.5" data-result="pass">4.65:1 · pass</td></tr>
+  <tr><th scope="row">Find result – text on lime-muted</th><td>White page</td><td data-contrast="--color-brand-black on --color-brand-lime-muted over --color-white" data-min="4.5" data-result="pass">16.83:1 · pass</td></tr>
+  <tr><th scope="row">Find result – text on lime-muted</th><td>Grey page</td><td data-contrast="--color-brand-black on --color-brand-lime-muted over --color-gray-100" data-min="4.5" data-result="pass">14.56:1 · pass</td></tr>
+  <tr><th scope="row">Find, current hit – black on lime</th><td>Any (opaque)</td><td data-contrast="--color-brand-black on --color-brand-lime" data-min="4.5" data-result="pass">13.94:1 · pass</td></tr>
+  <tr><th scope="row">Selection – emphasis text on <code>--color-bg-selected</code></th><td>Dark preview</td><td data-contrast="--color-text-emphasis on --color-bg-selected over --color-bg-preview" data-min="4.5" data-result="pass">11.77:1 · pass</td></tr>
+  <tr><th scope="row">Comment mark – black text, floor at a full fill</th><td>White and grey pages</td><td data-contrast="--color-brand-black on --color-accent-primary" data-min="4.5" data-result="pass">8.39:1 · pass</td></tr>
+  <tr><th scope="row">Comment mark – text on the 35% fill</th><td>Dark preview</td><td class="hl-unbaked">Not measured yet – the bake reads tokens only, and the mix is not a token (open defect 1)</td></tr>
+  <tr><th scope="row">Bar – brand violet</th><td>Dark preview</td><td data-contrast="--color-accent-primary on --color-bg-preview" data-min="3" data-result="pass">7.89:1 · pass</td></tr>
+  <tr><th scope="row">Bar – brand violet</th><td>White page</td><td data-contrast="--color-accent-primary on --color-white" data-min="3" data-result="fail">2.20:1 · fail</td></tr>
+  <tr><th scope="row">Bar – deep violet</th><td>White page</td><td data-contrast="--color-brand-indigo on --color-white" data-min="3" data-result="pass">7.98:1 · pass</td></tr>
+  <tr><th scope="row">Bar – deep violet</th><td>Grey page</td><td data-contrast="--color-brand-indigo on --color-gray-100" data-min="3" data-result="pass">6.51:1 · pass</td></tr>
+  <tr><th scope="row">Find result fill – step from the ground</th><td>Dark preview</td><td data-contrast="--color-brand-lime-muted on --color-bg-preview">2.32:1</td></tr>
+  <tr><th scope="row">Find result fill – step from the ground</th><td>White page</td><td data-contrast="--color-brand-lime-muted on --color-white">1.09:1</td></tr>
+</tbody>
+</table>
+<p class="ds-muted">The floor row is a bound, not the value: on a light ground a 35% fill is lighter than the full
+violet, so dark text on the real mark is at least that ratio. On the dark ground no such bound exists, which is why
+that row waits for the token. The violet bar fails on white, which is why light grounds take the deep violet.</p>
+
+<h2 id="forced">Forced colours</h2>
+<p class="ds-muted">A Windows contrast theme drops every colour above. Each highlight keeps a shape and takes a system
+colour by meaning: <code>Mark</code> and <code>MarkText</code> for search hits and comment marks,
+<code>Highlight</code> and <code>HighlightText</code> for the selection only. The bars stay, repainted in
+<code>CanvasText</code>. The current hit swaps <code>Mark</code> and <code>MarkText</code>, so it differs from the
+other hits by more than a fill. See <a href="forced-colors.html#map">Forced colours</a>.</p>
+<div class="ds-frames">
+  <figure class="ds-frame"><div class="hl-fc" aria-hidden="true">
+      <p>See the <span class="hl-link">release notes</span> before the <span class="hl-mark">load test runs</span>.</p>
+      <p>The <span class="hl-mark hl-mark--active">open thread</span> and a <span class="hl-changed">changed phrase</span>.</p>
+      <p>Find: <span class="hl-find">staging</span> and <span class="hl-find-current">staging</span>; <span class="hl-selection">a selection</span>.</p>
+    </div>
+    <figcaption><strong>Forced colours, simulated.</strong> Painted with this browser's system keywords in its dark
+      scheme; a real contrast theme picks its own values. Marks and hits share <code>Mark</code>, and a mark is told
+      apart by its bar.</figcaption></figure>
+</div>
+<pre class="ds-code"><code>@media (forced-colors: active) {
+  ::highlight(search-results)       { background-color: Mark; color: MarkText; }
+  ::highlight(search-current)       { background-color: MarkText; color: Mark; }
+  ::highlight(erf-comment),
+  ::highlight(erf-comment-active)   { background-color: Mark; color: MarkText; text-decoration-color: CanvasText; }
+  ::highlight(erf-comment-changed)  { text-decoration-color: CanvasText; }
+  ::selection                       { background-color: Highlight; color: HighlightText; }
+}</code></pre>
+
+<h2 id="rules">Rules for a new highlight</h2>
+<ul class="ds-muted">
+  <li>Build it from <code>background-color</code>, <code>color</code> and <code>text-decoration</code> only – the
+    properties <code>::highlight()</code> allows – so the same look works in the overlay and in the Custom Highlight
+    API.</li>
+  <li>Give it a shape that differs from every highlight above: fill or none, bar or none, bar style.</li>
+  <li>Set its <code>priority</code> below Find.</li>
+  <li>A highlight is paint only; a screen reader hears nothing. What it marks must also be reachable by a control
+    with a name (for comments, the thread's own button).</li>
+</ul>
+
+<h2 id="open-defects">Open defects</h2>
+<ol class="ds-muted">
+  <li>Text on the 35% mark over the dark preview is not baked. The contrast bake reads tokens only; it needs either
+    <code>--color-comment-mark</code> in <code>design-tokens.css</code> or a mix form in the contrast spec.</li>
+  <li>The proposed <code>::selection</code> colour for the preview is not set in <code>MarkdownPreview.css</code>, so
+    the preview still paints the browser's default selection.</li>
+  <li>Find sets no <code>priority</code>; once comment marks ship, Find must set one above them.</li>
+  <li>How Chromium layers a lower highlight's bar under a higher one's fill is drawn, not checked.</li>
+</ol>
+
+<h2 id="related">Related</h2>
+<ul class="ds-muted">
+  <li><a href="colors.html">Colours</a> – the lime, violet and selected tokens these use.</li>
+  <li><a href="forced-colors.html">Forced colours</a> – the system-colour map this card fills in for marks and hits.</li>
+  <li><a href="../../../designs/comments/comments-v2.md">Comments v2, C-12</a> – the design these marks come from.</li>
+</ul>
+
+<section id="exceptions">
+<h2>Exceptions</h2>
+<p class="ds-muted">None recorded. A shipping highlight that departs from this card carries a
+<code>deviates:</code> marker at the site and gets a row here, naming the file.</p>
+</section>
+
+</main>
+</body>
+</html>

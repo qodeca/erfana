@@ -13,4 +13,4 @@ Guards that check what goes into the installers.
 
 | File | Title |
 | --- | --- |
-| [`design-issue-55.md`](design-issue-55.md) | Design — Issue #55: packaging guards must cover `extraFiles` / `extraResources` |
+| [`design-issue-55.md`](design-issue-55.md) | Design – Issue #55: packaging guards must cover `extraFiles` / `extraResources` |

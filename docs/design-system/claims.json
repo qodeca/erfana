@@ -272,55 +272,6 @@
     "foreground": "--color-border-focus",
     "background": "--color-accent-primary"
   },
-  "contrast-gp-wordmark-dark": {
-    "kind": "contrast",
-    "card": "../designs/github-presentation/index.html",
-    "label": "--color-brand-white on --color-brand-black, the wordmark on the dark banner",
-    "foreground": "--color-brand-white",
-    "background": "--color-brand-black"
-  },
-  "contrast-gp-wordmark-light": {
-    "kind": "contrast",
-    "card": "../designs/github-presentation/index.html",
-    "label": "--color-brand-black on --color-brand-white, the wordmark on the light banner",
-    "foreground": "--color-brand-black",
-    "background": "--color-brand-white"
-  },
-  "contrast-gp-prompt": {
-    "kind": "contrast",
-    "card": "../designs/github-presentation/index.html",
-    "label": "--color-text-primary on --color-brand-black, the prompt glyph on the terminal strip",
-    "foreground": "--color-text-primary",
-    "background": "--color-brand-black"
-  },
-  "contrast-gp-cursor": {
-    "kind": "contrast",
-    "card": "../designs/github-presentation/index.html",
-    "label": "--color-brand-lime on --color-brand-black, the cursor on the terminal strip",
-    "foreground": "--color-brand-lime",
-    "background": "--color-brand-black"
-  },
-  "contrast-gp-indigo-light": {
-    "kind": "contrast",
-    "card": "../designs/github-presentation/index.html",
-    "label": "--color-brand-indigo on --color-brand-white, the light banner accent",
-    "foreground": "--color-brand-indigo",
-    "background": "--color-brand-white"
-  },
-  "contrast-gp-lime-light": {
-    "kind": "contrast",
-    "card": "../designs/github-presentation/index.html",
-    "label": "--color-brand-lime on --color-brand-white, why lime never sits on the light banner",
-    "foreground": "--color-brand-lime",
-    "background": "--color-brand-white"
-  },
-  "contrast-gp-violet-light": {
-    "kind": "contrast",
-    "card": "../designs/github-presentation/index.html",
-    "label": "--color-brand-violet on --color-brand-white, why violet is only a muted fill on light",
-    "foreground": "--color-brand-violet",
-    "background": "--color-brand-white"
-  },
   "contrast-muted-on-panel": {
     "kind": "contrast",
     "card": "system/foundations/colors.html",
@@ -962,6 +913,138 @@
     ],
     "includePath": "htmlPreview\\.logic\\.ts$",
     "match": "PREVIEW_MIN_SPLIT_HEIGHT_PX\\s*=\\s*([0-9]+)",
+    "group": 1
+  },
+  "comment-max-chars": {
+    "kind": "capture",
+    "card": "system/foundations/writing.html",
+    "label": "COMMENT_MAX_CHARS in commentFormat.ts – characters one comment or reply may hold",
+    "dir": "src/renderer",
+    "ext": [
+      ".ts"
+    ],
+    "includePath": "comments/commentFormat\\.ts$",
+    "match": "export const COMMENT_MAX_CHARS = ([0-9_]+)\\b",
+    "group": 1
+  },
+  "comment-warn-chars": {
+    "kind": "capture",
+    "card": "system/foundations/writing.html",
+    "label": "COMMENT_WARN_CHARS in commentFormat.ts – where the character counter starts warning",
+    "dir": "src/renderer",
+    "ext": [
+      ".ts"
+    ],
+    "includePath": "comments/commentFormat\\.ts$",
+    "match": "export const COMMENT_WARN_CHARS = ([0-9_]+)\\b",
+    "group": 1
+  },
+  "comment-max-replies": {
+    "kind": "capture",
+    "card": "system/foundations/writing.html",
+    "label": "PREVIEW_LIMITS.COMMENT_MAX_REPLIES – replies one thread holds after its first comment",
+    "dir": "src/shared",
+    "ext": [
+      ".ts"
+    ],
+    "includePath": "^src/shared/preview-limits\\.ts$",
+    "match": "COMMENT_MAX_REPLIES:\\s*([0-9]+),",
+    "group": 1
+  },
+  "comment-max-threads-per-file": {
+    "kind": "capture",
+    "card": "system/foundations/writing.html",
+    "label": "PREVIEW_LIMITS.COMMENT_MAX_BLOCKS_PER_FILE – threads (comment blocks) one file holds before its comments turn read-only",
+    "dir": "src/shared",
+    "ext": [
+      ".ts"
+    ],
+    "includePath": "^src/shared/preview-limits\\.ts$",
+    "match": "COMMENT_MAX_BLOCKS_PER_FILE:\\s*([0-9]+),",
+    "group": 1
+  },
+  "comment-file-max-mb": {
+    "kind": "capture",
+    "card": "system/foundations/writing.html",
+    "label": "PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES in MB – the largest file Erfana adds comments to",
+    "dir": "src/shared",
+    "ext": [
+      ".ts"
+    ],
+    "includePath": "^src/shared/preview-limits\\.ts$",
+    "match": "COMMENT_FILE_MAX_BYTES:\\s*([0-9]+)\\s*\\*\\s*1024\\s*\\*\\s*1024\\s*,",
+    "group": 1
+  },
+  "claude-status-amber-threshold": {
+    "kind": "capture",
+    "card": "system/components/status-bar/index.html",
+    "label": "AMBER_THRESHOLD in thresholds.ts – the context percentage where the Claude status bar turns warning",
+    "dir": "src/main",
+    "ext": [
+      ".ts"
+    ],
+    "includePath": "claudeStatus/thresholds\\.ts$",
+    "match": "const AMBER_THRESHOLD = ([0-9]+)\\b",
+    "group": 1
+  },
+  "claude-status-red-threshold": {
+    "kind": "capture",
+    "card": "system/components/status-bar/index.html",
+    "label": "RED_THRESHOLD in thresholds.ts – the context percentage where the Claude status bar turns danger",
+    "dir": "src/main",
+    "ext": [
+      ".ts"
+    ],
+    "includePath": "claudeStatus/thresholds\\.ts$",
+    "match": "const RED_THRESHOLD = ([0-9]+)\\b",
+    "group": 1
+  },
+  "drawer-full-below-px": {
+    "kind": "capture",
+    "card": "system/patterns/drawer/index.html",
+    "label": "DRAWER_FULL_BELOW_PX in useDrawerSheet.ts – host width in px below which the comment drawer goes full width",
+    "dir": "src/renderer",
+    "ext": [
+      ".ts"
+    ],
+    "includePath": "comments/useDrawerSheet\\.ts$",
+    "match": "export const DRAWER_FULL_BELOW_PX = ([0-9]+)\\b",
+    "group": 1
+  },
+  "drawer-min-width-px": {
+    "kind": "capture",
+    "card": "system/patterns/drawer/index.html",
+    "label": "min-inline-size in CommentDrawer.css – the comment drawer's shipped floor, px",
+    "dir": "src/renderer",
+    "ext": [
+      ".css"
+    ],
+    "includePath": "comments/CommentDrawer\\.css$",
+    "match": "min-inline-size:\\s*([1-9][0-9]*)px",
+    "group": 1
+  },
+  "band-blocked-hosts-per-view": {
+    "kind": "capture",
+    "card": "system/components/permission-band/index.html",
+    "label": "MAX_BLOCKED_HOSTS_PER_VIEW – distinct blocked origins listed per view (src/shared/constants.ts)",
+    "dir": "src/shared",
+    "ext": [
+      ".ts"
+    ],
+    "includePath": "constants\\.ts$",
+    "match": "MAX_BLOCKED_HOSTS_PER_VIEW:\\s*([0-9]+)",
+    "group": 1
+  },
+  "band-allowlist-max-hosts": {
+    "kind": "capture",
+    "card": "system/components/permission-band/index.html",
+    "label": "MAX_ALLOWLIST_HOSTS – origins one project's allowlist may hold (src/shared/ipc/preview-settings-schema.ts)",
+    "dir": "src/shared",
+    "ext": [
+      ".ts"
+    ],
+    "includePath": "ipc/preview-settings-schema\\.ts$",
+    "match": "export const MAX_ALLOWLIST_HOSTS = ([0-9]+)",
     "group": 1
   }
 }

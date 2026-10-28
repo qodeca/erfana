@@ -7,10 +7,13 @@
 <meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Erfana – comments v2, marks, icons and the chip</title>
+<title>Erfana – comments v2, marks, icons and the Comment button</title>
 <link rel="stylesheet" href="../../../design-system/tokens.css">
 <link rel="stylesheet" href="../../../design-system/ds.css">
 <link rel="stylesheet" href="../../../design-system/system/components/menu/menu.css">
+<link rel="stylesheet" href="../../../design-system/system/components/button/button.css">
+<link rel="stylesheet" href="../../../design-system/system/components/badge/badge.css">
+<link rel="stylesheet" href="../../../design-system/system/components/feedback/feedback.css">
 <link rel="stylesheet" href="../html-comments/demo.css">
 <link rel="stylesheet" href="../html-comments/overlay.css">
 <link rel="stylesheet" href="../html-comments/comments.css">
@@ -75,7 +78,6 @@
   .mk-chip { inset-block-end: calc(100% + var(--space-4)); inset-inline-end: 0; line-height: var(--leading-normal); }
   .mk-chip--below { inset-block-end: auto; inset-block-start: calc(100% + var(--space-4)); }
   .mk-chip--static { position: static; box-shadow: none; }
-  .mk-chip--hover { background: var(--color-bg-hover-solid); }
   .mk-chips { display: flex; gap: var(--space-12); align-items: center; padding: var(--space-8);
               border: var(--border-width) solid var(--color-border-subtle); background: var(--color-bg-preview); }
 
@@ -103,8 +105,9 @@
   /* Forced colours, simulated with the system colour keywords. */
   .mk-fc { padding: var(--space-8); background: Canvas; color: CanvasText; font-family: var(--font-serif);
            font-size: var(--text-prose); max-inline-size: 520px; border: var(--border-width) solid var(--color-border-subtle); }
-  .mk-fc-mark { background: Mark; color: MarkText; box-shadow: inset 0 calc(var(--space-1) * -1) 0 CanvasText; }
-  .mk-fc-mark--active { box-shadow: inset 0 calc(var(--space-2) * -1) 0 CanvasText; }
+  .mk-fc-mark { background: Mark; color: MarkText; text-decoration: underline var(--border-width-thick) CanvasText;
+                text-decoration-skip-ink: none; text-underline-offset: var(--space-2); }
+  .mk-fc-mark--active { text-decoration-style: double; }
   .mk-fc-sel { background: Highlight; color: HighlightText; }
 
   .mk-code { margin: 0 0 var(--space-8); padding: var(--space-6) var(--space-8); max-inline-size: 960px;
@@ -112,15 +115,19 @@
              font-family: var(--font-mono); font-size: var(--ds-text-small); color: var(--color-text-primary);
              white-space: pre-wrap; overflow-wrap: anywhere; }
   .mk-muted { color: var(--color-text-tertiary); }
+
+  /* Find hits, as the Text highlights card draws them (highlights.html#states): result fill, then the current hit. */
+  .mk-find { background-color: var(--color-brand-lime-muted); }
+  .mk-find-current { background-color: var(--color-brand-lime); color: var(--color-brand-black); }
 </style>
 </head>
 <body>
 
-<h1>Comments v2 – marks, icons and the chip</h1>
+<h1>Comments v2 – marks, icons and the Comment button</h1>
 <p class="ds-lede">
   What a comment looks like <strong>on the content</strong>, in the HTML Preview and the Markdown Preview: the
   comment mark under commented words, the icon at a commented part's top-right corner, the dashed ghost where a
-  comment lost its target, the Comment chip after a selection, and the HTML label. One look in both previews.
+  comment lost its target, the Comment button after a selection, and the HTML label. One look in both previews.
 </p>
 <div class="ds-note"><strong>Static, proposed.</strong> No script: every state is drawn on its own. Plan:
   <code>docs/designs/comments/comments-v2.md</code> §3 – C-05, C-06, C-11, C-12, C-16, C-17, C-21. Hover, focus and
@@ -131,17 +138,21 @@
 <!-- ======================================================= C-12 mark -->
 <h2 id="mark">The comment mark on every ground</h2>
 <div class="ds-note">
-  <strong>One mark in both previews (C-12):</strong> a 35% accent fill plus a continuous 2px accent bar along the
-  bottom of the text box – no break at descenders. The active thread (its window open, its drawer row active,
-  or hovered) keeps the 35% fill and gets a bar twice as thick; in Markdown its words also turn to the emphasis colour. A 55% fill was tried and rejected: drawn over the text it drops contrast to about 3:1 (design doc R-01). <strong>On light page grounds only</strong>, the HTML overlay reads the
-  container's luminance and adds a 1px ink hairline on <em>top</em> of the bar, between the text and the bar:
-  the accent bar alone is too faint on white and grey, and the ink line is what carries the edge there. The mark
+  <strong>One mark in both previews (C-12), as the Text highlights card proposes it:</strong> the
+  <code>--color-comment-mark</code> fill (35% accent) plus a continuous <code>--comment-mark-bar-width</code> bar
+  under the text – no break at descenders – built only from <code>background-color</code>, <code>color</code> and
+  <code>text-decoration</code>, the properties <code>::highlight()</code> allows. The active thread (its window open,
+  its drawer row active, or hovered) keeps the same fill and <strong>doubles</strong> the bar; in Markdown its words
+  also turn to the emphasis colour. A stronger fill was rejected: drawn over the text it loses contrast (R-01).
+  <strong>On light page grounds only</strong>, the HTML overlay reads the container's luminance and the bar takes
+  the deep indigo (<code>--color-brand-indigo</code>): the brand violet bar is under 3:1 on white (Text highlights card,
+  contrast table). The mark
   never uses <code>--color-bg-selected</code>, so <strong>commented never looks selected</strong>; and it fills
   rather than colouring the words, so it never reads as a <strong>link</strong>.
 </div>
 
 <div class="c2-grid">
-  <figure><figcaption><strong>C-12 · white page</strong> – <code>--on-light</code>: bar plus ink hairline; a link and a live selection beside it</figcaption>
+  <figure><figcaption><strong>C-12 · white page</strong> – <code>--on-light</code>: the indigo bar; a link and a live selection beside it</figcaption>
     <div class="mk-scene page-area"><div class="page">
       <h4>Release</h4>
       <p>Read the <a href="#mark">release plan</a> first. We will <span class="erf-comment-mark erf-comment-mark--on-light">ship by Friday</span> if the <span class="mk-page-sel">load test <span class="erf-comment-mark erf-comment-mark--on-light">passes</span></span><span class="erf-comment-mark erf-comment-mark--on-light"> on staging</span>.</p>
@@ -153,7 +164,7 @@
       <p>Read the <a href="#mark">release plan</a> first. We will <span class="erf-comment-mark erf-comment-mark--on-light">ship by Friday</span> if the <span class="mk-page-sel">load test <span class="erf-comment-mark erf-comment-mark--on-light">passes</span></span><span class="erf-comment-mark erf-comment-mark--on-light"> on staging</span>.</p>
     </div></div></figure>
 
-  <figure><figcaption><strong>C-12 · dark page</strong> – no hairline: the accent bar carries the edge</figcaption>
+  <figure><figcaption><strong>C-12 · dark page</strong> – the accent bar carries the edge</figcaption>
     <div class="mk-scene page-area"><div class="page page--dark">
       <h4>Release</h4>
       <p>Read the <a href="#mark">release plan</a> first. We will <span class="erf-comment-mark">ship by Friday</span> if the <span class="mk-page-sel">load test <span class="erf-comment-mark">passes</span></span><span class="erf-comment-mark"> on staging</span>.</p>
@@ -166,7 +177,7 @@
 </div>
 
 <div class="c2-grid">
-  <figure><figcaption><strong>C-12 · active, wrapped</strong> – white page: thick bar, one box per line</figcaption>
+  <figure><figcaption><strong>C-12 · active, wrapped</strong> – white page: double bar, one box per line</figcaption>
     <div class="mk-scene page-area"><div class="page">
       <h4>Pricing</h4>
       <p class="mk-narrow">The page should <span class="erf-comment-mark erf-comment-mark--on-light erf-comment-mark--active">explain the annual discount before the monthly price</span> and link to the FAQ.</p>
@@ -191,6 +202,28 @@
     </div></div></div></figure>
 </div>
 
+<h2 id="beside-find">Beside Find and the selection</h2>
+<div class="ds-note">
+  <strong>Four highlights on one line (C-12).</strong> A comment mark, a Find result, the current Find hit and the
+  live selection, as the <a href="../../../design-system/system/foundations/highlights.html#order">Text highlights
+  card</a> orders them: changed words, then the mark, then Find results, then the current hit; the native selection
+  paints above all of them. Each differs by shape as well as colour – the mark has its bar, a Find hit has none, the
+  current hit is the solid lime with ink text, and the selection is <code>--color-bg-selected</code>, which a mark
+  never uses. In the HTML Preview, Find uses Chromium's own colours, so the lime looks apply to the Markdown preview
+  only (the card records this).
+</div>
+<div class="c2-grid">
+  <figure><figcaption><strong>Markdown preview</strong> – a mark, two Find results for “ship”, the current hit, and a selection</figcaption>
+    <div class="erf-mdc-panel mk-mini mk-mini--wide"><div class="erf-mdc-preview"><div class="erf-mdc-content">
+      <p>We <span class="mk-find-current">ship</span> the beta first. The target is to <span class="erf-comment-mark"><span class="mk-find">ship</span> by Friday</span>, and we <span class="mk-find">ship</span> the docs after <span class="erf-comment-selection">the review</span>.</p>
+    </div></div></div></figure>
+
+  <figure><figcaption><strong>Markdown preview, the open thread</strong> – the double bar under a Find result inside the mark</figcaption>
+    <div class="erf-mdc-panel mk-mini mk-mini--wide"><div class="erf-mdc-preview"><div class="erf-mdc-content">
+      <p>The target is to <span class="erf-comment-mark erf-comment-mark--active"><span class="mk-find-current">ship</span> by Friday</span>, after <span class="erf-comment-mark erf-comment-mark--changed">the security review</span>.</p>
+    </div></div></div></figure>
+</div>
+
 <!-- ======================================================= C-06 changed -->
 <h2 id="changed">Changed since the comment</h2>
 <div class="ds-note">
@@ -204,7 +237,7 @@
   <figure><figcaption><strong>C-06 · white page</strong> – dashed words, notched icon (1 open)</figcaption>
     <div class="mk-scene page-area"><div class="page">
       <h4>Schedule</h4>
-      <p class="erf-mdc-block mk-narrower mk-gap">We will <span class="erf-comment-mark erf-comment-mark--changed">ship by Thursday</span> after the review.<span class="erf-hpc-pin erf-hpc-pin--changed" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="erf-hpc-pin__body" d="M2 2H22V17H7L2 22Z"></path><rect class="erf-hpc-pin__line" x="6" y="6" width="12" height="2"></rect><rect class="erf-hpc-pin__line" x="6" y="10" width="8" height="2"></rect></svg></span></p>
+      <p class="erf-mdc-block mk-narrower mk-gap">We will <span class="erf-comment-mark erf-comment-mark--on-light erf-comment-mark--changed">ship by Thursday</span> after the review.<span class="erf-hpc-pin erf-hpc-pin--changed" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="erf-hpc-pin__body" d="M2 2H22V17H7L2 22Z"></path><rect class="erf-hpc-pin__line" x="6" y="6" width="12" height="2"></rect><rect class="erf-hpc-pin__line" x="6" y="10" width="8" height="2"></rect></svg></span></p>
     </div></div></figure>
 
   <figure><figcaption><strong>C-06 · dark page</strong> – the notch's ink ring keeps it apart from the fill</figcaption>
@@ -215,7 +248,7 @@
 
   <figure><figcaption><strong>C-06 · Markdown</strong> – a changed thread beside an unchanged one on the same paragraph</figcaption>
     <div class="erf-mdc-panel mk-mini"><div class="erf-mdc-preview"><div class="erf-mdc-content">
-      <p class="erf-mdc-block" aria-details="mk-pin-c06">We will <span class="erf-comment-mark erf-comment-mark--changed">ship by Thursday</span> after the <span class="erf-comment-mark">security review</span>.<button type="button" id="mk-pin-c06" class="erf-hpc-pin erf-hpc-pin--changed" tabindex="-1" aria-label="2 comments on paragraph, line 12, 1 changed. Open."><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="erf-hpc-pin__body" d="M2 2H22V17H7L2 22Z"></path><foreignObject x="2" y="2" width="20" height="15"><span xmlns="http://www.w3.org/1999/xhtml" class="erf-hpc-pin__count erf-hpc-text" data-text="2"></span></foreignObject></svg></button></p>
+      <p class="erf-mdc-block" aria-details="mk-pin-c06">We will <span class="erf-comment-mark erf-comment-mark--changed">ship by Thursday</span> after the <span class="erf-comment-mark">security review</span>.<button type="button" id="mk-pin-c06" class="erf-hpc-pin erf-hpc-pin--changed" tabindex="-1" aria-label="2 comments on paragraph, line 12, changed. Open."><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="erf-hpc-pin__body" d="M2 2H22V17H7L2 22Z"></path><foreignObject x="2" y="2" width="20" height="15"><span xmlns="http://www.w3.org/1999/xhtml" class="erf-hpc-pin__count erf-hpc-text" data-text="2"></span></foreignObject></svg></button></p>
     </div></div></div></figure>
 </div>
 
@@ -283,64 +316,67 @@
   <figure><figcaption><strong>C-05 · not found</strong> – ghost at the comment's slot between two paragraphs</figcaption>
     <div class="erf-mdc-panel mk-mini"><div class="erf-mdc-preview"><div class="erf-mdc-content">
       <p>The beta goes to ten customers in the first week.</p>
-      <div class="mk-slot c2-anchor"><span class="erf-comment-ghost"></span></div>
+      <div class="mk-slot c2-anchor"><button type="button" class="erf-comment-ghost" tabindex="-1" aria-label="Comment not found, line 12. Open."></button></div>
       <p>Support answers within a day, in English and Polish.</p>
     </div></div></div></figure>
 
   <figure><figcaption><strong>C-05 · beside a live icon</strong> – the ghost never takes an icon's look</figcaption>
     <div class="erf-mdc-panel mk-mini"><div class="erf-mdc-preview"><div class="erf-mdc-content">
       <p class="erf-mdc-block" aria-details="mk-pin-g">The beta goes to <span class="erf-comment-mark">ten customers</span> in the first week.<button type="button" id="mk-pin-g" class="erf-hpc-pin" tabindex="-1" aria-label="1 comment on paragraph, line 10. Open."><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="erf-hpc-pin__body" d="M2 2H22V17H7L2 22Z"></path><rect class="erf-hpc-pin__line" x="6" y="6" width="12" height="2"></rect><rect class="erf-hpc-pin__line" x="6" y="10" width="8" height="2"></rect></svg></button></p>
-      <div class="mk-slot c2-anchor"><span class="erf-comment-ghost"></span></div>
+      <div class="mk-slot c2-anchor"><button type="button" class="erf-comment-ghost" tabindex="-1" aria-label="Comment not found, line 12. Open."></button></div>
       <p>Support answers within a day, in English and Polish.</p>
     </div></div></div></figure>
 </div>
 
 <!-- ======================================================= C-16 chip -->
-<h2 id="chip">The Comment chip</h2>
+<h2 id="chip">The Comment button</h2>
 <div class="ds-note">
   <strong>A visible next step after a drag (C-16).</strong> About 150ms after a pointer-up that leaves text
-  selected inside a commentable part, a 28px chip appears 8px above the end of the selection's last line (below
-  it near the top edge): the <code>message-square-plus</code> icon plus "Comment", on
-  <code>--color-bg-elevated</code> with a 1px <code>--color-border-subtle</code> edge. It takes no focus, does not
+  selected inside a commentable part, the <strong>Comment button</strong> appears
+  <code data-token="--space-4">8px</code> above the end of the selection's last line (below it near the top edge): the
+  <code>message-square-plus</code> icon plus "Comment", at the Toolbar card's proposed tool height
+  (<code data-token="--input-height-sm">28px</code>), on <code>--color-bg-elevated</code> with the Surfaces card's
+  floating edge and shadow (<code>--color-border-subtle</code> plus <code>--shadow-md</code>). It is a button, not
+  a chip: the Badges card's chip is a static label. It takes no focus, does not
   change the selection, and hides on Esc, scroll or collapse. <strong>Markdown:</strong> inside and outside
   comment mode. <strong>HTML:</strong> only in comment mode – outside it the page owns its mouse, and the
   right-click menu offers "Comment on selection" instead (OD-01). In HTML the label is generated content in the
   overlay's shadow root, so Find never counts it.
 </div>
 <div class="c2-grid">
-  <figure><figcaption><strong>C-16 · HTML, comment mode</strong> – frame, tab, the page's selection and the chip</figcaption>
+  <figure><figcaption><strong>C-16 · HTML, comment mode</strong> – frame, tab, the page's selection and the Comment button</figcaption>
     <div class="mk-scene mk-scene--tall page-area"><div class="page">
       <h4>Release</h4>
-      <p>Read the <a href="#mark">release plan</a> first. We will <span class="mk-page-sel">ship the beta to ten <span class="c2-anchor">customers<span class="erf-comment-chip mk-chip" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"></path><path d="M12 8v6"></path><path d="M9 11h6"></path></svg><span class="erf-comment-chip__text" data-text="Comment"></span></span></span></span> in the first week, then widen the group.</p>
+      <p>Read the <a href="#mark">release plan</a> first. We will <span class="mk-page-sel">ship the beta to ten <span class="c2-anchor">customers<span class="erf-comment-button mk-chip" aria-hidden="true"><svg data-icon="message-square-plus" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/><path d="M12 8v6"/><path d="M9 11h6"/></svg><span class="erf-comment-button__text" data-text="Comment"></span></span></span></span> in the first week, then widen the group.</p>
     </div><div class="erf-hpc-root" aria-hidden="true"><div class="erf-hpc-frame"></div><div class="erf-hpc-tab erf-hpc-tab--bottom">Comment mode – Esc to leave</div></div></div></figure>
 
-  <figure><figcaption><strong>C-16 · HTML, outside comment mode</strong> – no chip: the page owns its mouse</figcaption>
+  <figure><figcaption><strong>C-16 · HTML, outside comment mode</strong> – no Comment button: the page owns its mouse</figcaption>
     <div class="mk-scene mk-scene--tall page-area"><div class="page">
       <h4>Release</h4>
       <p>Read the <a href="#mark">release plan</a> first. We will <span class="mk-page-sel">ship the beta to ten customers</span> in the first week, then widen the group.</p>
     </div></div></figure>
 
-  <figure><figcaption><strong>C-16 · Markdown, outside comment mode</strong> – the chip still shows</figcaption>
+  <figure><figcaption><strong>C-16 · Markdown, outside comment mode</strong> – the Comment button still shows</figcaption>
     <div class="erf-mdc-panel mk-mini"><div class="erf-mdc-preview"><div class="erf-mdc-content">
-      <p>Read the <a href="#mark">release plan</a> first. We will <span class="erf-comment-selection">ship the beta to ten <span class="c2-anchor">customers<span class="erf-comment-chip mk-chip" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"></path><path d="M12 8v6"></path><path d="M9 11h6"></path></svg><span class="erf-comment-chip__text" data-text="Comment"></span></span></span></span> in the first week.</p>
+      <p>Read the <a href="#mark">release plan</a> first. We will <span class="erf-comment-selection">ship the beta to ten <span class="c2-anchor">customers<span class="erf-comment-button mk-chip" aria-hidden="true"><svg data-icon="message-square-plus" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/><path d="M12 8v6"/><path d="M9 11h6"/></svg><span class="erf-comment-button__text" data-text="Comment"></span></span></span></span> in the first week.</p>
     </div></div></div></figure>
 
   <figure><figcaption><strong>C-16 · Markdown, comment mode</strong> – the tab names the target (C-21)</figcaption>
     <div class="erf-mdc-panel mk-mini mk-mini--wide mk-mini--mode"><div class="erf-mdc-preview"><div class="erf-mdc-content">
-      <p>Read the <a href="#mark">release plan</a> first. We will <span class="erf-comment-selection">ship the beta to ten <span class="c2-anchor">customers<span class="erf-comment-chip mk-chip" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"></path><path d="M12 8v6"></path><path d="M9 11h6"></path></svg><span class="erf-comment-chip__text" data-text="Comment"></span></span></span></span> in the first week.</p>
+      <p>Read the <a href="#mark">release plan</a> first. We will <span class="erf-comment-selection">ship the beta to ten <span class="c2-anchor">customers<span class="erf-comment-button mk-chip" aria-hidden="true"><svg data-icon="message-square-plus" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/><path d="M12 8v6"/><path d="M9 11h6"/></svg><span class="erf-comment-button__text" data-text="Comment"></span></span></span></span> in the first week.</p>
     </div><div class="erf-hpc-root" aria-hidden="true"><div class="erf-hpc-frame"></div><div class="erf-hpc-tab erf-hpc-tab--bottom">Comment mode · Paragraph, line 12 · Esc to leave</div></div></div></div></figure>
 </div>
 
 <div class="c2-grid">
-  <figure><figcaption><strong>C-16 · near the top edge</strong> – Markdown: the chip flips below the last line</figcaption>
+  <figure><figcaption><strong>C-16 · near the top edge</strong> – Markdown: the button flips below the last line</figcaption>
     <div class="erf-mdc-panel mk-mini"><div class="erf-mdc-preview"><div class="erf-mdc-content">
-      <p>We will <span class="erf-comment-selection">ship by <span class="c2-anchor">Friday<span class="erf-comment-chip mk-chip mk-chip--below" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"></path><path d="M12 8v6"></path><path d="M9 11h6"></path></svg><span class="erf-comment-chip__text" data-text="Comment"></span></span></span></span>, after the review and the load test against staging.</p>
+      <p>We will <span class="erf-comment-selection">ship by <span class="c2-anchor">Friday<span class="erf-comment-button mk-chip mk-chip--below" aria-hidden="true"><svg data-icon="message-square-plus" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/><path d="M12 8v6"/><path d="M9 11h6"/></svg><span class="erf-comment-button__text" data-text="Comment"></span></span></span></span>, after the review and the load test against staging.</p>
     </div></div></div></figure>
 
-  <figure><figcaption><strong>C-16 · the chip alone</strong> – rest and hover (<code>--color-bg-hover-solid</code>); no focus state, it never takes focus</figcaption>
+  <figure><figcaption><strong>C-16 · the Comment button alone</strong> – rest and hover (<code>--color-bg-hover-solid</code>); no focus state, it never takes focus</figcaption>
     <div class="mk-chips">
-      <span class="erf-comment-chip mk-chip--static" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"></path><path d="M12 8v6"></path><path d="M9 11h6"></path></svg><span class="erf-comment-chip__text" data-text="Comment"></span></span>
-      <span class="erf-comment-chip mk-chip--static mk-chip--hover" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"></path><path d="M12 8v6"></path><path d="M9 11h6"></path></svg><span class="erf-comment-chip__text" data-text="Comment"></span></span>
+      <span class="erf-comment-button mk-chip--static" aria-hidden="true"><svg data-icon="message-square-plus" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/><path d="M12 8v6"/><path d="M9 11h6"/></svg><span class="erf-comment-button__text" data-text="Comment"></span></span>
+      <span class="erf-comment-button mk-chip--static is-hover" aria-hidden="true"><svg data-icon="message-square-plus" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/><path d="M12 8v6"/><path d="M9 11h6"/></svg><span class="erf-comment-button__text" data-text="Comment"></span></span>
     </div></figure>
 </div>
 
@@ -350,7 +386,7 @@
   <strong>Labels stop covering text (C-21).</strong> The HTML label drops the pixel size unless Alt is held.
   When the outline's top touches content, the label moves inside the outline's top-left corner, on its solid
   <code>--color-brand-black</code> ground. The Markdown Preview has no floating label at all: its comment-mode
-  tab names the target instead ("Comment mode · List item, line 14 · Esc to leave", in the chip frames above).
+  tab names the target instead ("Comment mode · List item, line 14 · Esc to leave", in the Comment button frames above).
 </div>
 <div class="c2-grid">
   <figure><figcaption><strong>C-21 · room above</strong> – the label stays above, no size</figcaption>
@@ -420,15 +456,15 @@
     <tr><td>Changed</td>
       <td><span class="mk-icon"><span class="erf-hpc-pin erf-hpc-pin--changed"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="erf-hpc-pin__body" d="M2 2H22V17H7L2 22Z"></path><rect class="erf-hpc-pin__line" x="6" y="6" width="12" height="2"></rect><rect class="erf-hpc-pin__line" x="6" y="10" width="8" height="2"></rect></svg></span></span></td>
       <td><span class="mk-icon"><span class="page"></span><span class="erf-hpc-pin erf-hpc-pin--changed"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="erf-hpc-pin__body" d="M2 2H22V17H7L2 22Z"></path><rect class="erf-hpc-pin__line" x="6" y="6" width="12" height="2"></rect><rect class="erf-hpc-pin__line" x="6" y="10" width="8" height="2"></rect></svg></span></span></td>
-      <td>1 comment on paragraph, line 12, changed. Open. <span class="mk-muted">(proposed wording)</span></td><td>Target text changed after the comment: 4px notch top-left (C-06).</td></tr>
+      <td>1 comment on paragraph, line 12, changed. Open. <span class="mk-muted">(R-17)</span></td><td>Target text changed after the comment: 4px notch top-left (C-06).</td></tr>
     <tr><td>Stack</td>
       <td><span class="mk-icon"><span class="erf-hpc-pin erf-hpc-pin--stack"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="erf-hpc-pin__body" d="M2 2H22V17H7L2 22Z"></path><foreignObject x="2" y="2" width="20" height="15"><span xmlns="http://www.w3.org/1999/xhtml" class="erf-hpc-pin__count erf-hpc-text" data-text="+3"></span></foreignObject></svg></span></span></td>
       <td><span class="mk-icon"><span class="page"></span><span class="erf-hpc-pin erf-hpc-pin--stack"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="erf-hpc-pin__body" d="M2 2H22V17H7L2 22Z"></path><foreignObject x="2" y="2" width="20" height="15"><span xmlns="http://www.w3.org/1999/xhtml" class="erf-hpc-pin__count erf-hpc-text" data-text="+3"></span></foreignObject></svg></span></span></td>
-      <td><span class="mk-muted">open – C-17 gives "3 more commented elements here. Open.", but C-03 bans "element" in Markdown</span></td><td>The rest of a crowded row; opens a list in document order (C-17).</td></tr>
+      <td>3 more comments in this row. Open. <span class="mk-muted">(R-16; HTML stacks are visual only)</span></td><td>The rest of a crowded row; opens a list in document order (C-17).</td></tr>
     <tr><td>Ghost</td>
-      <td><span class="mk-icon"><span class="erf-comment-ghost"></span></span></td>
+      <td><span class="mk-icon"><button type="button" class="erf-comment-ghost" tabindex="-1" aria-label="Comment not found, line 12. Open."></button></span></td>
       <td><span class="mk-muted">not drawn in HTML</span></td>
-      <td><span class="mk-muted">open – the spec gives the ghost no name and no click</span></td><td>Markdown only: the target was not found; the comment's slot (C-05).</td></tr>
+      <td>Comment not found, line 12. Open. <span class="mk-muted">(R-16: a real button)</span></td><td>Markdown only: the target was not found; the comment's slot (C-05).</td></tr>
   </tbody>
 </table>
 
@@ -460,8 +496,8 @@
 <h2 id="forced">Forced colours</h2>
 <div class="ds-note">
   <strong>Mark, never Highlight (C-12).</strong> In forced colours (Windows High Contrast and similar) the mark
-  takes the system <code>Mark</code> fill with <code>MarkText</code> words, plus a 2px <code>CanvasText</code> edge
-  along the bottom; the active mark gets a 4px edge. <code>Highlight</code> / <code>HighlightText</code> stay
+  takes the system <code>Mark</code> fill with <code>MarkText</code> words, plus a <code>CanvasText</code> bar
+  under the text; the active mark doubles it (Text highlights card, forced colours). <code>Highlight</code> / <code>HighlightText</code> stay
   reserved for the live selection, so commented and selected still differ. Changed words keep their dashed
   underline, which forced colours draw in <code>CanvasText</code>. Icons follow the overlay card's
   forced-colours rules unchanged; the changed notch is a shape, so it survives.
@@ -475,6 +511,20 @@
 </figure></div>
 
 <!-- ======================================================= exceptions -->
+<h2 id="cards">Cards this builds on</h2>
+<table class="c2-cards">
+  <thead><tr><th>Card</th><th>Status</th><th>What this screen takes from it</th></tr></thead>
+  <tbody>
+    <tr><td><a href="../html-comments/overlay.html">docs/designs/comments/html-comments/overlay.html</a></td><td><span class="c2-status c2-status--decided">decided</span></td><td>The icon, outline, label and comment-mode frame</td></tr>
+    <tr><td><a href="../../../design-system/system/foundations/highlights.html#states">docs/design-system/system/foundations/highlights.html#states</a></td><td><span class="c2-status">proposed</span></td><td>The comment mark, Find hits and the selection</td></tr>
+    <tr><td><a href="../../../design-system/system/foundations/forced-colors.html">docs/design-system/system/foundations/forced-colors.html</a></td><td><span class="c2-status">proposed</span></td><td>Mark / MarkText for marks, Highlight for the selection</td></tr>
+    <tr><td><a href="../../../design-system/system/foundations/surfaces.html#floating">docs/design-system/system/foundations/surfaces.html#floating</a></td><td><span class="c2-status">proposed</span></td><td>The Comment button and edge tab: subtle edge plus --shadow-md</td></tr>
+    <tr><td><a href="../../../design-system/system/components/toolbar/index.html#tool-height">docs/design-system/system/components/toolbar/index.html#tool-height</a></td><td><span class="c2-status">proposed</span></td><td>The proposed 28px tool height</td></tr>
+    <tr><td><a href="../../../design-system/system/components/icon/index.html#glyphs">docs/design-system/system/components/icon/index.html#glyphs</a></td><td><span class="c2-status">proposed</span></td><td>Registry icons through data-icon</td></tr>
+    <tr><td><a href="../../../design-system/system/foundations/focus.html#ring">docs/design-system/system/foundations/focus.html#ring</a></td><td><span class="c2-status c2-status--decided">decided</span></td><td>The one focus ring, drawn with .is-focus</td></tr>
+  </tbody>
+</table>
+
 <h2 id="exceptions">Exceptions</h2>
 <p style="max-width: 72ch; color: var(--color-text-tertiary)">
   Where this card draws differently from the app, or from the system, with the reason.
@@ -492,7 +542,7 @@
       <td>The overlay box lies above the page's words, so its fill tints them.</td>
       <td>A span paints under the words, so on page scenes the card tints the words by the same 35% with
         <code>color-mix()</code>. Without it the card would show better contrast than the app.</td></tr>
-    <tr><td>HTML icons, chip, outline and label</td>
+    <tr><td>HTML icons, Comment button, outline and label</td>
       <td>In the overlay root, <code>position: fixed</code>, the icon layer <code>aria-hidden</code>.</td>
       <td>Children of the page element they belong to (the Markdown placement rule from
         <code>markdown-comments.css</code>), each <code>aria-hidden</code>, so each scene needs no measuring.</td></tr>
@@ -507,7 +557,7 @@
     <tr><td>Hover and focus states</td>
       <td>Live <code>:hover</code>; the native <code>title</code> tooltip.</td>
       <td>Drawn with <code>.erf-comment-mark--active</code>, <code>.erf-hpc-pin--hover</code>,
-        <code>.mk-chip--hover</code> and a tooltip box, because a static card cannot hover.</td></tr>
+        <code>.is-hover</code> and a tooltip box, because a static card cannot hover.</td></tr>
     <tr><td>Icon step classes</td>
       <td>Shared CSS in <code>comments-v2.css</code>.</td>
       <td><code>.erf-comment-icon--step-1…3</code> are defined in this card: <code>comments-v2.css</code> names
@@ -522,6 +572,7 @@
       <td><code>overlay.css</code> recolours lines through <code>color</code>.</td>
       <td>The static SVG rects take <code>fill</code>, so the selected state sets it inline to the accent (as on the
         Markdown states card).</td></tr>
+    <tr><td>Find hits</td><td>Markdown: <code>::highlight(search-results)</code> and <code>search-current</code> in <code>MarkdownPreview.css</code>.</td><td>Spans with card-private <code>.mk-find</code> / <code>.mk-find-current</code>, the Text highlights card's colours, because a static card cannot run Find.</td></tr>
     <tr><td>Forced colours</td>
       <td>Rendered by the system theme.</td>
       <td>Simulated with system colour keywords outside forced colours; the note states the rule.</td></tr>

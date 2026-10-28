@@ -10,6 +10,8 @@
 <link rel="stylesheet" href="../../../design-system/tokens.css">
 <link rel="stylesheet" href="../../../design-system/ds.css">
 <link rel="stylesheet" href="../../../design-system/system/components/menu/menu.css">
+<link rel="stylesheet" href="../../../design-system/system/components/button/button.css">
+<link rel="stylesheet" href="../../../design-system/system/components/feedback/feedback.css">
 <link rel="stylesheet" href="./demo.css">
 <link rel="stylesheet" href="./overlay.css">
 <link rel="stylesheet" href="./comments.css">
@@ -31,16 +33,20 @@
 
 <div class="ds-note">
   <strong>The shape.</strong> A dialog through the dialog stack: <code>role="dialog"</code>,
-  <code>aria-modal="true"</code> and a real focus trap. 360px wide (at least 320, at most 480 or the page area
-  less 16px), at most 560px tall; the title and the action row stay put, the body scrolls. Placed right of the
+  <code>aria-modal="true"</code> and a real focus trap. <code data-token="--comments-window-width">360px</code> wide
+  (<code>--comments-window-width</code>; at least 320px, at most <code data-token="--comments-window-max-width">480px</code>
+  or the page area less 16px), at most 560px tall; the title and the action row stay put, the body scrolls. Placed right of the
   element, else left, else below, else above; under 400px of page width it becomes a sheet across the page
   area's foot. <code>--color-bg-elevated</code>, a 1px <code>--color-border-subtle</code> edge,
   <code>--shadow-dialog</code>, square corners.
   <br><br>
-  <strong>Built from what exists:</strong> the buttons are the Buttons card's Dialog.css variants, the banners
-  the Feedback card's one banner, the field and its error the decided Form controls card, the per-message menu
-  the decided Menu card. Proposed, as the plan files it (§10.11); the focus rules in the table below are
-  contracts and are the first candidates for promotion.
+  <strong>Built from what exists:</strong> the buttons are the proposed
+  <a href="../../../design-system/system/components/button/index.html">Buttons</a> card's <code>.erf-button</code>, the banners the proposed
+  <a href="../../../design-system/system/components/feedback/index.html">Feedback</a> card's <code>.erf-banner</code>, the field and its
+  error the decided <a href="../../../design-system/system/components/form/index.html">Form controls</a> card, the per-message menu the
+  decided <a href="../../../design-system/system/components/menu/index.html">Menu</a> card, and the inline delete question the proposed
+  <a href="../../../design-system/system/patterns/dialog/index.html#inline-confirm">Dialog</a> pattern's inline confirm. Shipped in v0.23.1,
+  and decided: the focus rules in the table below are contracts the app's tests hold.
 </div>
 
 <div class="ds-note">
@@ -55,12 +61,21 @@
 
 <div class="ds-note">
   <strong>One button size in the window.</strong> Every text button – the foot, a thread's Resolve and Reply, a
-  folded thread's Re-open, a banner's Go to tab or Pick again, a damaged block's Copy raw text – is the Buttons
-  card's Dialog.css button, so the window reads like every other Erfana dialog. Secondary unless it is the
-  view's one primary action: Save in a new comment, Continue in the identity step, Save changes in an edit, and
-  Reply only while the view holds a single open thread. The compact <code>.erf-comment-action</code> belongs to
-  the drawer, which is panel chrome sized with the toolbar. Only the 24px icon buttons (close, a message's
-  <em>…</em>, a resolved thread's chevron) differ, as icon buttons do in every dialog.
+  folded thread's Re-open, a banner's Go to tab or Pick again, a damaged block's Copy raw text – is one size, so
+  the window reads like every other Erfana dialog. Secondary unless it is the view's one primary action: Save in a
+  new comment, Continue in the identity step, Save changes in an edit, and Reply only while the view holds a single
+  open thread. The compact size belongs to the drawer, which is panel chrome sized with the toolbar. Only the 24px
+  icon buttons (close, a message's <em>…</em>, a resolved thread's chevron) differ, as icon buttons do in every
+  dialog.
+  <br><br>
+  <strong>Where the app differs from the Buttons card.</strong> The frames draw <code>.erf-button</code>
+  <code>--lg</code>, the card's height nearest the button that ships: the app still renders Dialog.css's
+  <code>.dialog-btn</code> (<code>CommentParts.tsx:327</code>, about 37px, the same <code>--text-md</code>
+  semibold label) until <code>button.css</code> is adopted. Icon buttons are the card's
+  <code>.erf-button--icon</code>, whose resting glyph is <code>--color-text-secondary</code>; the app paints its
+  <code>.erf-comment-icon-btn</code> glyph <code>--color-text-tertiary</code>. A banner's actions keep the window's
+  one size, not the Feedback card's <code>--sm</code> banner action – a deliberate difference, because the window's
+  one-size rule is the decided one here.
 </div>
 
 <h2 id="keyboard">The keyboard contract</h2>
@@ -68,11 +83,19 @@
 <table class="ds-keys">
   <thead><tr><th>Key</th><th>Result</th><th>Focus ends on</th></tr></thead>
   <tbody>
-    <tr><td><kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd></td><td>Cycles inside the window only</td><td>The next or previous control in the window</td></tr>
-    <tr><td><kbd>Ctrl</kbd>+<kbd>Enter</kbd> (<kbd>Cmd</kbd>+<kbd>Enter</kbd> on macOS)</td><td>Saves the focused field. On an empty field Save says why instead of doing nothing; past 4,000 characters the field is marked invalid</td><td>The opener, after a save – and the live region says so</td></tr>
+    <tr><td><kbd>Tab</kbd> and <kbd>⇧Tab</kbd> / <kbd>Shift+Tab</kbd></td><td>Cycles inside the window only</td><td>The next or previous control in the window</td></tr>
+    <tr><td><kbd>⌘Enter</kbd> / <kbd>Ctrl+Enter</kbd></td><td>Saves the focused field. On an empty field Save says why instead of doing nothing; past 4,000 characters the field is marked invalid</td><td>The opener, after a save – and the live region says so</td></tr>
     <tr><td><kbd>Esc</kbd></td><td>Closes the window and keeps the text; reopening it says “Draft restored”</td><td>The opener</td></tr>
   </tbody>
 </table>
+<div class="ds-note">
+  <strong>Shortcut notation.</strong> Keys are written as the
+  <a href="../../../design-system/system/foundations/writing.html#shortcuts">Writing</a> card asks – one box per chord, macOS first. The
+  frames draw macOS, so Save's tooltip reads “Save (⌘Enter)”. The shipping copy still spells it out, “Save
+  (Cmd+Enter)” (<code>saveShortcutLabel</code> in <code>commentCopy.ts</code>) – an open defect the Writing card
+  names. Tooltips are the native <code>title</code> until the window adopts the proposed
+  <a href="../../../design-system/system/components/tooltip/index.html">Tooltip</a> card.
+</div>
 
 <h2>Focus, exactly</h2>
 <table>
@@ -95,7 +118,7 @@
         <p class="erf-comment-window__context"><bdi dir="ltr">button.cta</bdi> · index.html, line 42</p>
         
       </div>
-      <button class="erf-comment-icon-btn" type="button" aria-label="Close" data-close="" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
+      <button class="erf-button erf-button--icon" type="button" aria-label="Close" data-close="" tabindex="-1"><svg data-icon="x" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
     </div>
     <div class="erf-comment-window__body"><div class="erf-comment-field">
     <label class="erf-comment-field__label" for="f1">Comment</label>
@@ -103,11 +126,11 @@
     
     <div class="erf-comment-field__foot">
       <p class="erf-comment-field__hint" id="f1-h">Plain text. Saved inside index.html.</p>
-      <span class="erf-comment-counter" id="f1-c">0 / 4000</span>
+      <span class="erf-comment-counter" id="f1-c">0 / <span data-claim="comment-max-chars" title="COMMENT_MAX_CHARS in commentFormat.ts – characters one comment or reply may hold">4000</span></span>
     </div>
     
-  </div><p class="erf-comment-identity">Commenting as <bdi>Marcin Obel</bdi> <button class="erf-comment-link" type="button" tabindex="-1">Change</button></p></div>
-    <div class="erf-comment-window__foot"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Cancel</span></button><button class="erf-comment-btn erf-comment-btn--primary" type="button" title="Save (Ctrl+Enter)" aria-keyshortcuts="Control+Enter" aria-disabled="true" tabindex="-1"><span>Save</span></button></div>
+  </div><p class="erf-comment-identity">Commenting as <bdi>Marcin Obel</bdi> <button class="erf-button erf-button--text" type="button" tabindex="-1"><span>Change</span></button></p></div>
+    <div class="erf-comment-window__foot"><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Cancel</span></button><button class="erf-button erf-button--primary erf-button--lg" type="button" title="Save (⌘Enter)" aria-keyshortcuts="Meta+Enter" aria-disabled="true" tabindex="-1"><span>Save</span></button></div>
   </div></figure><figure class="state"><figcaption><strong>an element a script built</strong> – saved before its in-file ancestor</figcaption><div class="erf-comment-window" role="group" aria-label="Example: New comment" aria-labelledby="w4-t">
     <div class="erf-comment-window__head">
       <div class="erf-comment-window__heading">
@@ -115,7 +138,7 @@
         <p class="erf-comment-window__context"><bdi dir="ltr">div.toast</bdi> · index.html, line 61</p>
         <p class="erf-comment-note">Added by a script – saved before &lt;section id="pricing"&gt;.</p>
       </div>
-      <button class="erf-comment-icon-btn" type="button" aria-label="Close" data-close="" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
+      <button class="erf-button erf-button--icon" type="button" aria-label="Close" data-close="" tabindex="-1"><svg data-icon="x" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
     </div>
     <div class="erf-comment-window__body"><div class="erf-comment-field">
     <label class="erf-comment-field__label" for="f3">Comment</label>
@@ -123,11 +146,11 @@
     
     <div class="erf-comment-field__foot">
       <p class="erf-comment-field__hint" id="f3-h">Plain text. Saved inside index.html.</p>
-      <span class="erf-comment-counter" id="f3-c">0 / 4000</span>
+      <span class="erf-comment-counter" id="f3-c">0 / <span data-claim="comment-max-chars" title="COMMENT_MAX_CHARS in commentFormat.ts – characters one comment or reply may hold">4000</span></span>
     </div>
     
-  </div><p class="erf-comment-identity">Commenting as <bdi>Marcin Obel</bdi> <button class="erf-comment-link" type="button" tabindex="-1">Change</button></p></div>
-    <div class="erf-comment-window__foot"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Cancel</span></button><button class="erf-comment-btn erf-comment-btn--primary" type="button" title="Save (Ctrl+Enter)" aria-keyshortcuts="Control+Enter" aria-disabled="true" tabindex="-1"><span>Save</span></button></div>
+  </div><p class="erf-comment-identity">Commenting as <bdi>Marcin Obel</bdi> <button class="erf-button erf-button--text" type="button" tabindex="-1"><span>Change</span></button></p></div>
+    <div class="erf-comment-window__foot"><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Cancel</span></button><button class="erf-button erf-button--primary erf-button--lg" type="button" title="Save (⌘Enter)" aria-keyshortcuts="Meta+Enter" aria-disabled="true" tabindex="-1"><span>Save</span></button></div>
   </div></figure><figure class="state"><figcaption><strong>inside a same-project frame</strong> – saved in the frame’s own file</figcaption><div class="erf-comment-window" role="group" aria-label="Example: New comment" aria-labelledby="w6-t">
     <div class="erf-comment-window__head">
       <div class="erf-comment-window__heading">
@@ -135,7 +158,7 @@
         <p class="erf-comment-window__context"><bdi dir="ltr">td.price</bdi> · pricing-table.html, line 18</p>
         <p class="erf-comment-note">Saved in pricing-table.html.</p>
       </div>
-      <button class="erf-comment-icon-btn" type="button" aria-label="Close" data-close="" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
+      <button class="erf-button erf-button--icon" type="button" aria-label="Close" data-close="" tabindex="-1"><svg data-icon="x" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
     </div>
     <div class="erf-comment-window__body"><div class="erf-comment-field">
     <label class="erf-comment-field__label" for="f5">Comment</label>
@@ -143,11 +166,11 @@
     
     <div class="erf-comment-field__foot">
       <p class="erf-comment-field__hint" id="f5-h">Plain text. Saved inside pricing-table.html.</p>
-      <span class="erf-comment-counter" id="f5-c">0 / 4000</span>
+      <span class="erf-comment-counter" id="f5-c">0 / <span data-claim="comment-max-chars" title="COMMENT_MAX_CHARS in commentFormat.ts – characters one comment or reply may hold">4000</span></span>
     </div>
     
-  </div><p class="erf-comment-identity">Commenting as <bdi>Marcin Obel</bdi> <button class="erf-comment-link" type="button" tabindex="-1">Change</button></p></div>
-    <div class="erf-comment-window__foot"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Cancel</span></button><button class="erf-comment-btn erf-comment-btn--primary" type="button" title="Save (Ctrl+Enter)" aria-keyshortcuts="Control+Enter" aria-disabled="true" tabindex="-1"><span>Save</span></button></div>
+  </div><p class="erf-comment-identity">Commenting as <bdi>Marcin Obel</bdi> <button class="erf-button erf-button--text" type="button" tabindex="-1"><span>Change</span></button></p></div>
+    <div class="erf-comment-window__foot"><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Cancel</span></button><button class="erf-button erf-button--primary erf-button--lg" type="button" title="Save (⌘Enter)" aria-keyshortcuts="Meta+Enter" aria-disabled="true" tabindex="-1"><span>Save</span></button></div>
   </div></figure><figure class="state"><figcaption><strong>from 3,600 characters</strong> – the counter gains a glyph and the warning colour</figcaption><div class="erf-comment-window" role="group" aria-label="Example: New comment" aria-labelledby="w8-t">
     <div class="erf-comment-window__head">
       <div class="erf-comment-window__heading">
@@ -155,7 +178,7 @@
         <p class="erf-comment-window__context"><bdi dir="ltr">button.cta</bdi> · index.html, line 42</p>
         
       </div>
-      <button class="erf-comment-icon-btn" type="button" aria-label="Close" data-close="" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
+      <button class="erf-button erf-button--icon" type="button" aria-label="Close" data-close="" tabindex="-1"><svg data-icon="x" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
     </div>
     <div class="erf-comment-window__body"><div class="erf-comment-field">
     <label class="erf-comment-field__label" for="f7">Comment</label>
@@ -163,11 +186,11 @@
     
     <div class="erf-comment-field__foot">
       <p class="erf-comment-field__hint" id="f7-h">Plain text. Saved inside index.html.</p>
-      <span class="erf-comment-counter erf-comment-counter--near" id="f7-c"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg> 3712 / 4000</span>
+      <span class="erf-comment-counter erf-comment-counter--near" id="f7-c"><svg data-icon="triangle-alert" width="12" height="12" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg> 3712 / <span data-claim="comment-max-chars" title="COMMENT_MAX_CHARS in commentFormat.ts – characters one comment or reply may hold">4000</span></span>
     </div>
     
-  </div><p class="erf-comment-identity">Commenting as <bdi>Marcin Obel</bdi> <button class="erf-comment-link" type="button" tabindex="-1">Change</button></p></div>
-    <div class="erf-comment-window__foot"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Cancel</span></button><button class="erf-comment-btn erf-comment-btn--primary" type="button" title="Save (Ctrl+Enter)" aria-keyshortcuts="Control+Enter" tabindex="-1"><span>Save</span></button></div>
+  </div><p class="erf-comment-identity">Commenting as <bdi>Marcin Obel</bdi> <button class="erf-button erf-button--text" type="button" tabindex="-1"><span>Change</span></button></p></div>
+    <div class="erf-comment-window__foot"><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Cancel</span></button><button class="erf-button erf-button--primary erf-button--lg" type="button" title="Save (⌘Enter)" aria-keyshortcuts="Meta+Enter" tabindex="-1"><span>Save</span></button></div>
   </div></figure><figure class="state"><figcaption><strong>over 4,000</strong> – invalid, with the reason under the field; Save says why</figcaption><div class="erf-comment-window" role="group" aria-label="Example: New comment" aria-labelledby="w10-t">
     <div class="erf-comment-window__head">
       <div class="erf-comment-window__heading">
@@ -175,19 +198,19 @@
         <p class="erf-comment-window__context"><bdi dir="ltr">button.cta</bdi> · index.html, line 42</p>
         
       </div>
-      <button class="erf-comment-icon-btn" type="button" aria-label="Close" data-close="" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
+      <button class="erf-button erf-button--icon" type="button" aria-label="Close" data-close="" tabindex="-1"><svg data-icon="x" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
     </div>
     <div class="erf-comment-window__body"><div class="erf-comment-field">
     <label class="erf-comment-field__label" for="f9">Comment</label>
     <textarea class="erf-comment-textarea" id="f9" placeholder="What should change here?" aria-describedby="f9-e f9-h f9-c" aria-invalid="true" tabindex="-1">Long review text…</textarea>
-    <p class="erf-comment-error" id="f9-e"><span aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0"></path><path d="m15 9-6 6"></path><path d="m9 9 6 6"></path></svg></span><span>Comments can be up to 4,000 characters. This one is 4,212.</span></p>
+    <p class="erf-comment-error" id="f9-e"><span aria-hidden="true"><svg data-icon="circle-x" width="14" height="14" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg></span><span>Comments can be up to 4,000 characters. This one is 4,212.</span></p>
     <div class="erf-comment-field__foot">
       <p class="erf-comment-field__hint" id="f9-h">Plain text. Saved inside index.html.</p>
-      <span class="erf-comment-counter erf-comment-counter--over" id="f9-c"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0"></path><path d="m15 9-6 6"></path><path d="m9 9 6 6"></path></svg> 4212 / 4000</span>
+      <span class="erf-comment-counter erf-comment-counter--over" id="f9-c"><svg data-icon="circle-x" width="12" height="12" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg> 4212 / <span data-claim="comment-max-chars" title="COMMENT_MAX_CHARS in commentFormat.ts – characters one comment or reply may hold">4000</span></span>
     </div>
     
-  </div><p class="erf-comment-identity">Commenting as <bdi>Marcin Obel</bdi> <button class="erf-comment-link" type="button" tabindex="-1">Change</button></p></div>
-    <div class="erf-comment-window__foot"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Cancel</span></button><button class="erf-comment-btn erf-comment-btn--primary" type="button" title="Save (Ctrl+Enter)" aria-keyshortcuts="Control+Enter" aria-disabled="true" tabindex="-1"><span>Save</span></button></div>
+  </div><p class="erf-comment-identity">Commenting as <bdi>Marcin Obel</bdi> <button class="erf-button erf-button--text" type="button" tabindex="-1"><span>Change</span></button></p></div>
+    <div class="erf-comment-window__foot"><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Cancel</span></button><button class="erf-button erf-button--primary erf-button--lg" type="button" title="Save (⌘Enter)" aria-keyshortcuts="Meta+Enter" aria-disabled="true" tabindex="-1"><span>Save</span></button></div>
   </div></figure><figure class="state"><figcaption><strong>Save on an empty field</strong> – Save is aria-disabled and says why when pressed</figcaption><div class="erf-comment-window" role="group" aria-label="Example: New comment" aria-labelledby="w12-t">
     <div class="erf-comment-window__head">
       <div class="erf-comment-window__heading">
@@ -195,19 +218,19 @@
         <p class="erf-comment-window__context"><bdi dir="ltr">button.cta</bdi> · index.html, line 42</p>
         
       </div>
-      <button class="erf-comment-icon-btn" type="button" aria-label="Close" data-close="" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
+      <button class="erf-button erf-button--icon" type="button" aria-label="Close" data-close="" tabindex="-1"><svg data-icon="x" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
     </div>
     <div class="erf-comment-window__body"><div class="erf-comment-field">
     <label class="erf-comment-field__label" for="f11">Comment</label>
     <textarea class="erf-comment-textarea" id="f11" placeholder="What should change here?" aria-describedby="f11-e f11-h f11-c" aria-invalid="true" tabindex="-1"></textarea>
-    <p class="erf-comment-error" id="f11-e"><span aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0"></path><path d="m15 9-6 6"></path><path d="m9 9 6 6"></path></svg></span><span>Write a comment first.</span></p>
+    <p class="erf-comment-error" id="f11-e"><span aria-hidden="true"><svg data-icon="circle-x" width="14" height="14" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg></span><span>Write a comment first.</span></p>
     <div class="erf-comment-field__foot">
       <p class="erf-comment-field__hint" id="f11-h">Plain text. Saved inside index.html.</p>
-      <span class="erf-comment-counter" id="f11-c">0 / 4000</span>
+      <span class="erf-comment-counter" id="f11-c">0 / <span data-claim="comment-max-chars" title="COMMENT_MAX_CHARS in commentFormat.ts – characters one comment or reply may hold">4000</span></span>
     </div>
     
-  </div><p class="erf-comment-identity">Commenting as <bdi>Marcin Obel</bdi> <button class="erf-comment-link" type="button" tabindex="-1">Change</button></p></div>
-    <div class="erf-comment-window__foot"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Cancel</span></button><button class="erf-comment-btn erf-comment-btn--primary" type="button" title="Save (Ctrl+Enter)" aria-keyshortcuts="Control+Enter" aria-disabled="true" tabindex="-1"><span>Save</span></button></div>
+  </div><p class="erf-comment-identity">Commenting as <bdi>Marcin Obel</bdi> <button class="erf-button erf-button--text" type="button" tabindex="-1"><span>Change</span></button></p></div>
+    <div class="erf-comment-window__foot"><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Cancel</span></button><button class="erf-button erf-button--primary erf-button--lg" type="button" title="Save (⌘Enter)" aria-keyshortcuts="Meta+Enter" aria-disabled="true" tabindex="-1"><span>Save</span></button></div>
   </div></figure><figure class="state"><figcaption><strong>Draft restored</strong> – reopened after Esc; the text was kept per element</figcaption><div class="erf-comment-window" role="group" aria-label="Example: New comment" aria-labelledby="w14-t">
     <div class="erf-comment-window__head">
       <div class="erf-comment-window__heading">
@@ -215,7 +238,7 @@
         <p class="erf-comment-window__context"><bdi dir="ltr">button.cta</bdi> · index.html, line 42</p>
         
       </div>
-      <button class="erf-comment-icon-btn" type="button" aria-label="Close" data-close="" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
+      <button class="erf-button erf-button--icon" type="button" aria-label="Close" data-close="" tabindex="-1"><svg data-icon="x" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
     </div>
     <div class="erf-comment-window__body"><div class="erf-comment-field">
     <label class="erf-comment-field__label" for="f13">Comment</label>
@@ -223,11 +246,11 @@
     
     <div class="erf-comment-field__foot">
       <p class="erf-comment-field__hint" id="f13-h">Plain text. Saved inside index.html.</p>
-      <span class="erf-comment-counter" id="f13-c">27 / 4000</span>
+      <span class="erf-comment-counter" id="f13-c">27 / <span data-claim="comment-max-chars" title="COMMENT_MAX_CHARS in commentFormat.ts – characters one comment or reply may hold">4000</span></span>
     </div>
     <p class="erf-comment-note">Draft restored</p>
-  </div><p class="erf-comment-identity">Commenting as <bdi>Marcin Obel</bdi> <button class="erf-comment-link" type="button" tabindex="-1">Change</button></p></div>
-    <div class="erf-comment-window__foot"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Cancel</span></button><button class="erf-comment-btn erf-comment-btn--primary" type="button" title="Save (Ctrl+Enter)" aria-keyshortcuts="Control+Enter" tabindex="-1"><span>Save</span></button></div>
+  </div><p class="erf-comment-identity">Commenting as <bdi>Marcin Obel</bdi> <button class="erf-button erf-button--text" type="button" tabindex="-1"><span>Change</span></button></p></div>
+    <div class="erf-comment-window__foot"><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Cancel</span></button><button class="erf-button erf-button--primary erf-button--lg" type="button" title="Save (⌘Enter)" aria-keyshortcuts="Meta+Enter" tabindex="-1"><span>Save</span></button></div>
   </div></figure></div>
 
 <h2>Saving, and when saving cannot happen</h2>
@@ -236,6 +259,20 @@
   write, so it can fail for reasons the reviewer did not cause. The field stays as it was, a banner above the
   actions says what happened and what to do, and the assertive live region reads it once. A field problem
   (empty, too long) sits directly under the field instead, as the Form card requires.
+  <br><br>
+  <strong>Banners.</strong> Each is the Feedback card's boxed <code>.erf-banner</code> in its tone, and its first
+  line starts with the card's visually hidden severity word (“Warning: ”, “Error: ”, “Note: ”, “Done: ”). Two
+  differences from the card, both as the app ships them: the actions sit under the sentence rather than on the end
+  edge (<code>CommentParts.tsx</code>), and the app's <code>CommentBanner</code> does not yet say the severity word
+  – a defect the Feedback card lists. The info tone is the card's proposed one; the app fills its info banners
+  <code>--color-brand-violet-muted</code> with an <code>--color-accent-primary</code> edge (marked
+  <code>deviates:</code> in <code>CommentWindow.css</code>, recorded in the Feedback card's Exceptions).
+  <br><br>
+  <strong>The field.</strong> The comment field, its counter and its error are this screen's own
+  <code>comments.css</code> mirror of <code>CommentWindow.css</code>: the decided
+  <a href="../../../design-system/system/components/form/index.html">Form controls</a> card has no shared stylesheet and no multi-line
+  field yet. Its note proposes this textarea as an addition; adding it to that decided card is the owner's call,
+  and until then the field stays drawn here.
 </div>
 <div class="gallery" id="g-save"><figure class="state"><figcaption><strong>Saving…</strong> – aria-disabled, focus stays on it, the text is kept</figcaption><div class="erf-comment-window" role="group" aria-label="Example: New comment" aria-labelledby="w16-t">
     <div class="erf-comment-window__head">
@@ -244,7 +281,7 @@
         <p class="erf-comment-window__context"><bdi dir="ltr">button.cta</bdi> · index.html, line 42</p>
         
       </div>
-      <button class="erf-comment-icon-btn" type="button" aria-label="Close" data-close="" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
+      <button class="erf-button erf-button--icon" type="button" aria-label="Close" data-close="" tabindex="-1"><svg data-icon="x" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
     </div>
     <div class="erf-comment-window__body"><div class="erf-comment-field">
     <label class="erf-comment-field__label" for="f15">Comment</label>
@@ -252,11 +289,11 @@
     
     <div class="erf-comment-field__foot">
       <p class="erf-comment-field__hint" id="f15-h">Plain text. Saved inside index.html.</p>
-      <span class="erf-comment-counter" id="f15-c">27 / 4000</span>
+      <span class="erf-comment-counter" id="f15-c">27 / <span data-claim="comment-max-chars" title="COMMENT_MAX_CHARS in commentFormat.ts – characters one comment or reply may hold">4000</span></span>
     </div>
     
-  </div><p class="erf-comment-identity">Commenting as <bdi>Marcin Obel</bdi> <button class="erf-comment-link" type="button" tabindex="-1">Change</button></p></div>
-    <div class="erf-comment-window__foot"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Cancel</span></button><button class="erf-comment-btn erf-comment-btn--primary" type="button" aria-disabled="true" tabindex="-1"><span>Saving…</span></button></div>
+  </div><p class="erf-comment-identity">Commenting as <bdi>Marcin Obel</bdi> <button class="erf-button erf-button--text" type="button" tabindex="-1"><span>Change</span></button></p></div>
+    <div class="erf-comment-window__foot"><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Cancel</span></button><button class="erf-button erf-button--primary erf-button--lg" type="button" aria-disabled="true" tabindex="-1"><span>Saving…</span></button></div>
   </div></figure><figure class="state"><figcaption><strong>unsaved source</strong> – the file has unsaved edits in another tab</figcaption><div class="erf-comment-window" role="group" aria-label="Example: New comment" aria-labelledby="w18-t">
     <div class="erf-comment-window__head">
       <div class="erf-comment-window__heading">
@@ -264,23 +301,23 @@
         <p class="erf-comment-window__context"><bdi dir="ltr">button.cta</bdi> · index.html, line 42</p>
         
       </div>
-      <button class="erf-comment-icon-btn" type="button" aria-label="Close" data-close="" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
+      <button class="erf-button erf-button--icon" type="button" aria-label="Close" data-close="" tabindex="-1"><svg data-icon="x" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
     </div>
-    <div class="erf-comment-window__body"><div class="erf-comment-banner erf-comment-banner--warning">
-  <span class="erf-comment-banner__icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg></span>
-  <div class="erf-comment-banner__body"><p class="erf-comment-banner__title">Save your edits first</p>
-    <p class="erf-comment-banner__text">index.html has unsaved changes in another tab. Save them first so your edits and this comment don't overwrite each other.</p>
-    <div class="erf-comment-banner__actions"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Go to tab</span></button><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Save index.html</span></button></div></div></div><div class="erf-comment-field">
+    <div class="erf-comment-window__body"><div class="erf-banner erf-banner--warning">
+  <span class="erf-banner__icon" aria-hidden="true"><svg data-icon="triangle-alert" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
+  <div class="erf-banner__body"><p class="erf-banner__title"><span class="erf-visually-hidden">Warning: </span>Save your edits first</p>
+    <p class="erf-banner__text">index.html has unsaved changes in another tab. Save them first so your edits and this comment don't overwrite each other.</p>
+    <div class="erf-banner__actions"><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Go to tab</span></button><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Save index.html</span></button></div></div></div><div class="erf-comment-field">
     <label class="erf-comment-field__label" for="f17">Comment</label>
     <textarea class="erf-comment-textarea" id="f17" placeholder="What should change here?" aria-describedby="f17-h f17-c" tabindex="-1">Make the button text bigger</textarea>
     
     <div class="erf-comment-field__foot">
       <p class="erf-comment-field__hint" id="f17-h">Plain text. Saved inside index.html.</p>
-      <span class="erf-comment-counter" id="f17-c">27 / 4000</span>
+      <span class="erf-comment-counter" id="f17-c">27 / <span data-claim="comment-max-chars" title="COMMENT_MAX_CHARS in commentFormat.ts – characters one comment or reply may hold">4000</span></span>
     </div>
     
-  </div><p class="erf-comment-identity">Commenting as <bdi>Marcin Obel</bdi> <button class="erf-comment-link" type="button" tabindex="-1">Change</button></p></div>
-    <div class="erf-comment-window__foot"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Cancel</span></button><button class="erf-comment-btn erf-comment-btn--primary" type="button" title="Save (Ctrl+Enter)" aria-keyshortcuts="Control+Enter" aria-disabled="true" tabindex="-1"><span>Save</span></button></div>
+  </div><p class="erf-comment-identity">Commenting as <bdi>Marcin Obel</bdi> <button class="erf-button erf-button--text" type="button" tabindex="-1"><span>Change</span></button></p></div>
+    <div class="erf-comment-window__foot"><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Cancel</span></button><button class="erf-button erf-button--primary erf-button--lg" type="button" title="Save (⌘Enter)" aria-keyshortcuts="Meta+Enter" aria-disabled="true" tabindex="-1"><span>Save</span></button></div>
   </div></figure><figure class="state"><figcaption><strong>unsaved source, changed on disk</strong> – Go to tab only: saving would overwrite the outside edit</figcaption><div class="erf-comment-window" role="group" aria-label="Example: New comment" aria-labelledby="w20-t">
     <div class="erf-comment-window__head">
       <div class="erf-comment-window__heading">
@@ -288,23 +325,23 @@
         <p class="erf-comment-window__context"><bdi dir="ltr">button.cta</bdi> · index.html, line 42</p>
         
       </div>
-      <button class="erf-comment-icon-btn" type="button" aria-label="Close" data-close="" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
+      <button class="erf-button erf-button--icon" type="button" aria-label="Close" data-close="" tabindex="-1"><svg data-icon="x" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
     </div>
-    <div class="erf-comment-window__body"><div class="erf-comment-banner erf-comment-banner--warning">
-  <span class="erf-comment-banner__icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg></span>
-  <div class="erf-comment-banner__body"><p class="erf-comment-banner__title">Save your edits first</p>
-    <p class="erf-comment-banner__text">index.html has unsaved changes in another tab. Save them first so your edits and this comment don't overwrite each other.</p>
-    <div class="erf-comment-banner__actions"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Go to tab</span></button></div></div></div><div class="erf-comment-field">
+    <div class="erf-comment-window__body"><div class="erf-banner erf-banner--warning">
+  <span class="erf-banner__icon" aria-hidden="true"><svg data-icon="triangle-alert" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
+  <div class="erf-banner__body"><p class="erf-banner__title"><span class="erf-visually-hidden">Warning: </span>Save your edits first</p>
+    <p class="erf-banner__text">index.html has unsaved changes in another tab. Save them first so your edits and this comment don't overwrite each other.</p>
+    <div class="erf-banner__actions"><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Go to tab</span></button></div></div></div><div class="erf-comment-field">
     <label class="erf-comment-field__label" for="f19">Comment</label>
     <textarea class="erf-comment-textarea" id="f19" placeholder="What should change here?" aria-describedby="f19-h f19-c" tabindex="-1">Make the button text bigger</textarea>
     
     <div class="erf-comment-field__foot">
       <p class="erf-comment-field__hint" id="f19-h">Plain text. Saved inside index.html.</p>
-      <span class="erf-comment-counter" id="f19-c">27 / 4000</span>
+      <span class="erf-comment-counter" id="f19-c">27 / <span data-claim="comment-max-chars" title="COMMENT_MAX_CHARS in commentFormat.ts – characters one comment or reply may hold">4000</span></span>
     </div>
     
-  </div><p class="erf-comment-identity">Commenting as <bdi>Marcin Obel</bdi> <button class="erf-comment-link" type="button" tabindex="-1">Change</button></p></div>
-    <div class="erf-comment-window__foot"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Cancel</span></button><button class="erf-comment-btn erf-comment-btn--primary" type="button" title="Save (Ctrl+Enter)" aria-keyshortcuts="Control+Enter" aria-disabled="true" tabindex="-1"><span>Save</span></button></div>
+  </div><p class="erf-comment-identity">Commenting as <bdi>Marcin Obel</bdi> <button class="erf-button erf-button--text" type="button" tabindex="-1"><span>Change</span></button></p></div>
+    <div class="erf-comment-window__foot"><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Cancel</span></button><button class="erf-button erf-button--primary erf-button--lg" type="button" title="Save (⌘Enter)" aria-keyshortcuts="Meta+Enter" aria-disabled="true" tabindex="-1"><span>Save</span></button></div>
   </div></figure><figure class="state"><figcaption><strong>the other tab saved</strong> – the banner clears itself and says so</figcaption><div class="erf-comment-window" role="group" aria-label="Example: New comment" aria-labelledby="w22-t">
     <div class="erf-comment-window__head">
       <div class="erf-comment-window__heading">
@@ -312,23 +349,23 @@
         <p class="erf-comment-window__context"><bdi dir="ltr">button.cta</bdi> · index.html, line 42</p>
         
       </div>
-      <button class="erf-comment-icon-btn" type="button" aria-label="Close" data-close="" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
+      <button class="erf-button erf-button--icon" type="button" aria-label="Close" data-close="" tabindex="-1"><svg data-icon="x" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
     </div>
-    <div class="erf-comment-window__body"><div class="erf-comment-banner erf-comment-banner--success">
-  <span class="erf-comment-banner__icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M20 6 9 17l-5-5"></path></svg></span>
-  <div class="erf-comment-banner__body">
-    <p class="erf-comment-banner__text">Saved. You can add your comment now.</p>
+    <div class="erf-comment-window__body"><div class="erf-banner erf-banner--success">
+  <span class="erf-banner__icon" aria-hidden="true"><svg data-icon="check" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+  <div class="erf-banner__body">
+    <p class="erf-banner__text"><span class="erf-visually-hidden">Done: </span>Saved. You can add your comment now.</p>
     </div></div><div class="erf-comment-field">
     <label class="erf-comment-field__label" for="f21">Comment</label>
     <textarea class="erf-comment-textarea" id="f21" placeholder="What should change here?" aria-describedby="f21-h f21-c" tabindex="-1">Make the button text bigger</textarea>
     
     <div class="erf-comment-field__foot">
       <p class="erf-comment-field__hint" id="f21-h">Plain text. Saved inside index.html.</p>
-      <span class="erf-comment-counter" id="f21-c">27 / 4000</span>
+      <span class="erf-comment-counter" id="f21-c">27 / <span data-claim="comment-max-chars" title="COMMENT_MAX_CHARS in commentFormat.ts – characters one comment or reply may hold">4000</span></span>
     </div>
     
-  </div><p class="erf-comment-identity">Commenting as <bdi>Marcin Obel</bdi> <button class="erf-comment-link" type="button" tabindex="-1">Change</button></p></div>
-    <div class="erf-comment-window__foot"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Cancel</span></button><button class="erf-comment-btn erf-comment-btn--primary" type="button" title="Save (Ctrl+Enter)" aria-keyshortcuts="Control+Enter" tabindex="-1"><span>Save</span></button></div>
+  </div><p class="erf-comment-identity">Commenting as <bdi>Marcin Obel</bdi> <button class="erf-button erf-button--text" type="button" tabindex="-1"><span>Change</span></button></p></div>
+    <div class="erf-comment-window__foot"><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Cancel</span></button><button class="erf-button erf-button--primary erf-button--lg" type="button" title="Save (⌘Enter)" aria-keyshortcuts="Meta+Enter" tabindex="-1"><span>Save</span></button></div>
   </div></figure><figure class="state"><figcaption><strong>the write failed</strong> – text kept, Save stays</figcaption><div class="erf-comment-window" role="group" aria-label="Example: New comment" aria-labelledby="w24-t">
     <div class="erf-comment-window__head">
       <div class="erf-comment-window__heading">
@@ -336,7 +373,7 @@
         <p class="erf-comment-window__context"><bdi dir="ltr">button.cta</bdi> · index.html, line 42</p>
         
       </div>
-      <button class="erf-comment-icon-btn" type="button" aria-label="Close" data-close="" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
+      <button class="erf-button erf-button--icon" type="button" aria-label="Close" data-close="" tabindex="-1"><svg data-icon="x" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
     </div>
     <div class="erf-comment-window__body"><div class="erf-comment-field">
     <label class="erf-comment-field__label" for="f23">Comment</label>
@@ -344,15 +381,15 @@
     
     <div class="erf-comment-field__foot">
       <p class="erf-comment-field__hint" id="f23-h">Plain text. Saved inside index.html.</p>
-      <span class="erf-comment-counter" id="f23-c">27 / 4000</span>
+      <span class="erf-comment-counter" id="f23-c">27 / <span data-claim="comment-max-chars" title="COMMENT_MAX_CHARS in commentFormat.ts – characters one comment or reply may hold">4000</span></span>
     </div>
     
-  </div><p class="erf-comment-identity">Commenting as <bdi>Marcin Obel</bdi> <button class="erf-comment-link" type="button" tabindex="-1">Change</button></p><div style="margin-top: var(--space-8)"></div><div class="erf-comment-banner erf-comment-banner--error">
-  <span class="erf-comment-banner__icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0"></path><path d="m15 9-6 6"></path><path d="m9 9 6 6"></path></svg></span>
-  <div class="erf-comment-banner__body">
-    <p class="erf-comment-banner__text">Couldn't save the comment. Your text is still here – try again.</p>
+  </div><p class="erf-comment-identity">Commenting as <bdi>Marcin Obel</bdi> <button class="erf-button erf-button--text" type="button" tabindex="-1"><span>Change</span></button></p><div style="margin-top: var(--space-8)"></div><div class="erf-banner erf-banner--error">
+  <span class="erf-banner__icon" aria-hidden="true"><svg data-icon="circle-x" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg></span>
+  <div class="erf-banner__body">
+    <p class="erf-banner__text"><span class="erf-visually-hidden">Error: </span>Couldn't save the comment. Your text is still here – try again.</p>
     </div></div></div>
-    <div class="erf-comment-window__foot"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Cancel</span></button><button class="erf-comment-btn erf-comment-btn--primary" type="button" title="Save (Ctrl+Enter)" aria-keyshortcuts="Control+Enter" tabindex="-1"><span>Save</span></button></div>
+    <div class="erf-comment-window__foot"><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Cancel</span></button><button class="erf-button erf-button--primary erf-button--lg" type="button" title="Save (⌘Enter)" aria-keyshortcuts="Meta+Enter" tabindex="-1"><span>Save</span></button></div>
   </div></figure><figure class="state"><figcaption><strong>the element moved</strong> – close and pick again; the text comes back</figcaption><div class="erf-comment-window" role="group" aria-label="Example: New comment" aria-labelledby="w26-t">
     <div class="erf-comment-window__head">
       <div class="erf-comment-window__heading">
@@ -360,7 +397,7 @@
         <p class="erf-comment-window__context"><bdi dir="ltr">button.cta</bdi> · index.html, line 42</p>
         
       </div>
-      <button class="erf-comment-icon-btn" type="button" aria-label="Close" data-close="" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
+      <button class="erf-button erf-button--icon" type="button" aria-label="Close" data-close="" tabindex="-1"><svg data-icon="x" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
     </div>
     <div class="erf-comment-window__body"><div class="erf-comment-field">
     <label class="erf-comment-field__label" for="f25">Comment</label>
@@ -368,15 +405,15 @@
     
     <div class="erf-comment-field__foot">
       <p class="erf-comment-field__hint" id="f25-h">Plain text. Saved inside index.html.</p>
-      <span class="erf-comment-counter" id="f25-c">27 / 4000</span>
+      <span class="erf-comment-counter" id="f25-c">27 / <span data-claim="comment-max-chars" title="COMMENT_MAX_CHARS in commentFormat.ts – characters one comment or reply may hold">4000</span></span>
     </div>
     
-  </div><p class="erf-comment-identity">Commenting as <bdi>Marcin Obel</bdi> <button class="erf-comment-link" type="button" tabindex="-1">Change</button></p><div style="margin-top: var(--space-8)"></div><div class="erf-comment-banner erf-comment-banner--error">
-  <span class="erf-comment-banner__icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0"></path><path d="m15 9-6 6"></path><path d="m9 9 6 6"></path></svg></span>
-  <div class="erf-comment-banner__body">
-    <p class="erf-comment-banner__text">This element changed in the file since you picked it. Close and pick it again – your text will be restored.</p>
+  </div><p class="erf-comment-identity">Commenting as <bdi>Marcin Obel</bdi> <button class="erf-button erf-button--text" type="button" tabindex="-1"><span>Change</span></button></p><div style="margin-top: var(--space-8)"></div><div class="erf-banner erf-banner--error">
+  <span class="erf-banner__icon" aria-hidden="true"><svg data-icon="circle-x" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg></span>
+  <div class="erf-banner__body">
+    <p class="erf-banner__text"><span class="erf-visually-hidden">Error: </span>This element changed in the file since you picked it. Close and pick it again – your text will be restored.</p>
     </div></div></div>
-    <div class="erf-comment-window__foot"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Close</span></button></div>
+    <div class="erf-comment-window__foot"><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Close</span></button></div>
   </div></figure><figure class="state"><figcaption><strong>the window was open too long</strong> – Pick again, text kept</figcaption><div class="erf-comment-window" role="group" aria-label="Example: New comment" aria-labelledby="w28-t">
     <div class="erf-comment-window__head">
       <div class="erf-comment-window__heading">
@@ -384,7 +421,7 @@
         <p class="erf-comment-window__context"><bdi dir="ltr">button.cta</bdi> · index.html, line 42</p>
         
       </div>
-      <button class="erf-comment-icon-btn" type="button" aria-label="Close" data-close="" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
+      <button class="erf-button erf-button--icon" type="button" aria-label="Close" data-close="" tabindex="-1"><svg data-icon="x" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
     </div>
     <div class="erf-comment-window__body"><div class="erf-comment-field">
     <label class="erf-comment-field__label" for="f27">Comment</label>
@@ -392,15 +429,15 @@
     
     <div class="erf-comment-field__foot">
       <p class="erf-comment-field__hint" id="f27-h">Plain text. Saved inside index.html.</p>
-      <span class="erf-comment-counter" id="f27-c">27 / 4000</span>
+      <span class="erf-comment-counter" id="f27-c">27 / <span data-claim="comment-max-chars" title="COMMENT_MAX_CHARS in commentFormat.ts – characters one comment or reply may hold">4000</span></span>
     </div>
     
-  </div><p class="erf-comment-identity">Commenting as <bdi>Marcin Obel</bdi> <button class="erf-comment-link" type="button" tabindex="-1">Change</button></p><div style="margin-top: var(--space-8)"></div><div class="erf-comment-banner erf-comment-banner--error">
-  <span class="erf-comment-banner__icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0"></path><path d="m15 9-6 6"></path><path d="m9 9 6 6"></path></svg></span>
-  <div class="erf-comment-banner__body">
-    <p class="erf-comment-banner__text">This comment window was open too long. Pick the element again – your text is kept.</p>
-    <div class="erf-comment-banner__actions"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Pick again</span></button></div></div></div></div>
-    <div class="erf-comment-window__foot"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Cancel</span></button></div>
+  </div><p class="erf-comment-identity">Commenting as <bdi>Marcin Obel</bdi> <button class="erf-button erf-button--text" type="button" tabindex="-1"><span>Change</span></button></p><div style="margin-top: var(--space-8)"></div><div class="erf-banner erf-banner--error">
+  <span class="erf-banner__icon" aria-hidden="true"><svg data-icon="circle-x" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg></span>
+  <div class="erf-banner__body">
+    <p class="erf-banner__text"><span class="erf-visually-hidden">Error: </span>This comment window was open too long. Pick the element again – your text is kept.</p>
+    <div class="erf-banner__actions"><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Pick again</span></button></div></div></div></div>
+    <div class="erf-comment-window__foot"><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Cancel</span></button></div>
   </div></figure><figure class="state"><figcaption><strong>the file is gone</strong> – nothing to save into; copy the text out</figcaption><div class="erf-comment-window" role="group" aria-label="Example: New comment" aria-labelledby="w30-t">
     <div class="erf-comment-window__head">
       <div class="erf-comment-window__heading">
@@ -408,7 +445,7 @@
         <p class="erf-comment-window__context"><bdi dir="ltr">button.cta</bdi> · index.html, line 42</p>
         
       </div>
-      <button class="erf-comment-icon-btn" type="button" aria-label="Close" data-close="" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
+      <button class="erf-button erf-button--icon" type="button" aria-label="Close" data-close="" tabindex="-1"><svg data-icon="x" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
     </div>
     <div class="erf-comment-window__body"><div class="erf-comment-field">
     <label class="erf-comment-field__label" for="f29">Comment</label>
@@ -416,15 +453,15 @@
     
     <div class="erf-comment-field__foot">
       <p class="erf-comment-field__hint" id="f29-h">Plain text. Saved inside index.html.</p>
-      <span class="erf-comment-counter" id="f29-c">27 / 4000</span>
+      <span class="erf-comment-counter" id="f29-c">27 / <span data-claim="comment-max-chars" title="COMMENT_MAX_CHARS in commentFormat.ts – characters one comment or reply may hold">4000</span></span>
     </div>
     
-  </div><div style="margin-top: var(--space-8)"></div><div class="erf-comment-banner erf-comment-banner--error">
-  <span class="erf-comment-banner__icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0"></path><path d="m15 9-6 6"></path><path d="m9 9 6 6"></path></svg></span>
-  <div class="erf-comment-banner__body">
-    <p class="erf-comment-banner__text">index.html no longer exists. Copy your text before closing.</p>
+  </div><div style="margin-top: var(--space-8)"></div><div class="erf-banner erf-banner--error">
+  <span class="erf-banner__icon" aria-hidden="true"><svg data-icon="circle-x" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg></span>
+  <div class="erf-banner__body">
+    <p class="erf-banner__text"><span class="erf-visually-hidden">Error: </span>index.html no longer exists. Copy your text before closing.</p>
     </div></div></div>
-    <div class="erf-comment-window__foot"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Close</span></button></div>
+    <div class="erf-comment-window__foot"><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Close</span></button></div>
   </div></figure></div>
 
 <h3 style="color: var(--color-text-bright)">Every save error</h3>
@@ -445,6 +482,11 @@
   delete any message (decision 31), so every message has the same <em>…</em> menu: Edit, Delete….
   <strong>The UI never implies an author is verified</strong> – there is no badge, no avatar, nothing that
   reads as identity (threat S19).
+  <br><br>
+  <strong>Deleting.</strong> The question replaces the message's text, never a second dialog: Cancel first and
+  focused, the danger button on the right with a verb label. That is the proposed Dialog pattern's
+  <a href="../../../design-system/system/patterns/dialog/index.html#inline-confirm">inline confirm</a> (<code>.erf-dialog-confirm</code>);
+  the frames keep the shipped class, <code>.erf-comment-confirm</code>, which draws the same box.
 </div>
 <div class="gallery" id="g-thread"><figure class="state"><figcaption><strong>a thread</strong> – reply, resolve, a folded resolved thread, New comment</figcaption><div class="erf-comment-window" role="group" aria-label="Example: Comments on button.cta" aria-labelledby="w34-t">
     <div class="erf-comment-window__head">
@@ -453,25 +495,25 @@
         <p class="erf-comment-window__context"><bdi dir="ltr">button.cta</bdi> · index.html, line 42</p>
         
       </div>
-      <button class="erf-comment-icon-btn" type="button" aria-label="Close" data-close="" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
+      <button class="erf-button erf-button--icon" type="button" aria-label="Close" data-close="" tabindex="-1"><svg data-icon="x" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
     </div>
     <div class="erf-comment-window__body"><section class="erf-comment-thread" aria-label="Thread started by Marcin Obel">
   <article class="erf-comment-message" aria-labelledby="m31-a" aria-describedby="m31-d">
     <div class="erf-comment-message__meta">
       <span class="erf-comment-message__meta-text" id="m31-a"><bdi class="erf-comment-message__author" title="marcin@qodeca.example">Marcin Obel</bdi> · <time datetime="2026-10-26T14:32">Today, 14:32</time></span>
-      <button class="erf-comment-icon-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Actions for the comment by Marcin Obel, Today, 14:32" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg></button>
+      <button class="erf-button erf-button--icon" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Actions for the comment by Marcin Obel, Today, 14:32" tabindex="-1"><svg data-icon="ellipsis" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button>
     </div>
     <p class="erf-comment-message__text" dir="auto">Make this say "Start free trial".</p>
-    <span class="erf-comment-sr" id="m31-d">marcin@qodeca.example</span>
+    <span class="erf-visually-hidden" id="m31-d">marcin@qodeca.example</span>
   </article>
   <div class="erf-comment-replies">
     <article class="erf-comment-message" aria-labelledby="m32-a" aria-describedby="m32-d">
     <div class="erf-comment-message__meta">
       <span class="erf-comment-message__meta-text" id="m32-a"><bdi class="erf-comment-message__author" title="anna@studio.example">Anna K.</bdi> · <time datetime="2026-10-25T09:10">Yesterday, 09:10</time> · edited</span>
-      <button class="erf-comment-icon-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Actions for the comment by Anna K., Yesterday, 09:10" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg></button>
+      <button class="erf-button erf-button--icon" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Actions for the comment by Anna K., Yesterday, 09:10" tabindex="-1"><svg data-icon="ellipsis" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button>
     </div>
     <p class="erf-comment-message__text" dir="auto">Agreed – and move it above the fold.</p>
-    <span class="erf-comment-sr" id="m32-d">anna@studio.example</span>
+    <span class="erf-visually-hidden" id="m32-d">anna@studio.example</span>
   </article>
   </div>
   <div class="erf-comment-thread__reply"><div class="erf-comment-field">
@@ -480,19 +522,19 @@
     
     <div class="erf-comment-field__foot">
       <p class="erf-comment-field__hint" id="f33-h">Plain text. Saved inside index.html.</p>
-      <span class="erf-comment-counter" id="f33-c">0 / 4000</span>
+      <span class="erf-comment-counter" id="f33-c">0 / <span data-claim="comment-max-chars" title="COMMENT_MAX_CHARS in commentFormat.ts – characters one comment or reply may hold">4000</span></span>
     </div>
     
   </div>
-  <div class="erf-comment-thread__actions"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Resolve</span></button><button class="erf-comment-btn erf-comment-btn--primary" type="button" title="Reply (Ctrl+Enter)" tabindex="-1"><span>Reply</span></button></div></div>
+  <div class="erf-comment-thread__actions"><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Resolve</span></button><button class="erf-button erf-button--primary erf-button--lg" type="button" title="Reply (⌘Enter)" tabindex="-1"><span>Reply</span></button></div></div>
 </section><div class="erf-comment-resolved">
-  <span class="erf-comment-resolved__text"><span class="erf-comment-resolved__icon" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M20 6 9 17l-5-5"></path></svg></span>
+  <span class="erf-comment-resolved__text"><span class="erf-comment-resolved__icon" aria-hidden="true"><svg data-icon="check" width="14" height="14" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
   <span>Resolved by <bdi>Anna K.</bdi> · <time datetime="2026-10-25T16:05">25 Oct, 16:05</time></span></span>
-  <button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Re-open</span></button>
-  <button class="erf-comment-icon-btn" type="button" aria-expanded="false" aria-label="Show the resolved thread" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"></path></svg></button>
+  <button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Re-open</span></button>
+  <button class="erf-button erf-button--icon" type="button" aria-expanded="false" aria-label="Show the resolved thread" tabindex="-1"><svg data-icon="chevron-down" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
   
 </div></div>
-    <div class="erf-comment-window__foot"><span class="erf-comment-window__foot-start"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Open in source</span></button></span><span class="erf-comment-window__foot-end"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>New comment</span></button><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Close</span></button></span></div>
+    <div class="erf-comment-window__foot"><span class="erf-comment-window__foot-start"><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Open in source</span></button></span><span class="erf-comment-window__foot-end"><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>New comment</span></button><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Close</span></button></span></div>
   </div></figure><figure class="state"><figcaption><strong>the … menu</strong> – Edit, Delete… (decided Menu card)</figcaption><div class="erf-comment-window" role="group" aria-label="Example: Comment on button.cta" aria-labelledby="w37-t" style="position: relative;">
     <div class="erf-comment-window__head">
       <div class="erf-comment-window__heading">
@@ -500,30 +542,30 @@
         <p class="erf-comment-window__context"><bdi dir="ltr">button.cta</bdi> · index.html, line 42</p>
         
       </div>
-      <button class="erf-comment-icon-btn" type="button" aria-label="Close" data-close="" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
+      <button class="erf-button erf-button--icon" type="button" aria-label="Close" data-close="" tabindex="-1"><svg data-icon="x" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
     </div>
     <div class="erf-comment-window__body"><section class="erf-comment-thread" aria-label="Thread started by Marcin Obel">
   <article class="erf-comment-message" aria-labelledby="m35-a" aria-describedby="m35-d">
     <div class="erf-comment-message__meta">
       <span class="erf-comment-message__meta-text" id="m35-a"><bdi class="erf-comment-message__author" title="marcin@qodeca.example">Marcin Obel</bdi> · <time datetime="2026-10-26T14:32">Today, 14:32</time></span>
-      <button class="erf-comment-icon-btn" type="button" aria-haspopup="menu" aria-expanded="true" aria-label="Actions for the comment by Marcin Obel, Today, 14:32" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg></button>
+      <button class="erf-button erf-button--icon" type="button" aria-haspopup="menu" aria-expanded="true" aria-label="Actions for the comment by Marcin Obel, Today, 14:32" tabindex="-1"><svg data-icon="ellipsis" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button>
     </div>
     <p class="erf-comment-message__text" dir="auto">Make this say "Start free trial".</p>
-    <span class="erf-comment-sr" id="m35-d">marcin@qodeca.example</span>
+    <span class="erf-visually-hidden" id="m35-d">marcin@qodeca.example</span>
   </article>
   <div class="erf-comment-replies">
     <article class="erf-comment-message" aria-labelledby="m36-a" aria-describedby="m36-d">
     <div class="erf-comment-message__meta">
       <span class="erf-comment-message__meta-text" id="m36-a"><bdi class="erf-comment-message__author" title="anna@studio.example">Anna K.</bdi> · <time datetime="2026-10-25T09:10">Yesterday, 09:10</time> · edited</span>
-      <button class="erf-comment-icon-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Actions for the comment by Anna K., Yesterday, 09:10" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg></button>
+      <button class="erf-button erf-button--icon" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Actions for the comment by Anna K., Yesterday, 09:10" tabindex="-1"><svg data-icon="ellipsis" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button>
     </div>
     <p class="erf-comment-message__text" dir="auto">Agreed – and move it above the fold.</p>
-    <span class="erf-comment-sr" id="m36-d">anna@studio.example</span>
+    <span class="erf-visually-hidden" id="m36-d">anna@studio.example</span>
   </article>
   </div>
   
 </section></div>
-    <div class="erf-comment-window__foot"><span class="erf-comment-window__foot-start"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Open in source</span></button></span><span class="erf-comment-window__foot-end"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>New comment</span></button><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Close</span></button></span></div>
+    <div class="erf-comment-window__foot"><span class="erf-comment-window__foot-start"><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Open in source</span></button></span><span class="erf-comment-window__foot-end"><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>New comment</span></button><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Close</span></button></span></div>
   <div class="erf-menu" role="menu" aria-label="Comment actions" style="position: absolute; --ds-left: 147px; left: var(--ds-left); --ds-top: 102px; top: var(--ds-top);"><div class="erf-menu-item erf-menu-item--active" role="menuitem"><span class="erf-menu-label">Edit</span></div>
       <div class="erf-menu-item erf-menu-item--danger" role="menuitem"><span class="erf-menu-label">Delete…</span></div></div></div></figure><figure class="state"><figcaption><strong>edit in place</strong> – the message becomes its field</figcaption><div class="erf-comment-window" role="group" aria-label="Example: Comment on button.cta" aria-labelledby="w41-t">
     <div class="erf-comment-window__head">
@@ -532,13 +574,13 @@
         <p class="erf-comment-window__context"><bdi dir="ltr">button.cta</bdi> · index.html, line 42</p>
         
       </div>
-      <button class="erf-comment-icon-btn" type="button" aria-label="Close" data-close="" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
+      <button class="erf-button erf-button--icon" type="button" aria-label="Close" data-close="" tabindex="-1"><svg data-icon="x" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
     </div>
     <div class="erf-comment-window__body"><section class="erf-comment-thread" aria-label="Thread started by Marcin Obel">
   <article class="erf-comment-message" aria-labelledby="m39-a" aria-describedby="m39-d">
     <div class="erf-comment-message__meta">
       <span class="erf-comment-message__meta-text" id="m39-a"><bdi class="erf-comment-message__author" title="marcin@qodeca.example">Marcin Obel</bdi> · <time datetime="2026-10-26T14:32">Today, 14:32</time></span>
-      <button class="erf-comment-icon-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Actions for the comment by Marcin Obel, Today, 14:32" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg></button>
+      <button class="erf-button erf-button--icon" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Actions for the comment by Marcin Obel, Today, 14:32" tabindex="-1"><svg data-icon="ellipsis" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button>
     </div>
     <div class="erf-comment-field">
     <label class="erf-comment-field__label" for="f38">Edit comment</label>
@@ -546,25 +588,25 @@
     
     <div class="erf-comment-field__foot">
       <p class="erf-comment-field__hint" id="f38-h">Plain text. Saved inside index.html.</p>
-      <span class="erf-comment-counter" id="f38-c">33 / 4000</span>
+      <span class="erf-comment-counter" id="f38-c">33 / <span data-claim="comment-max-chars" title="COMMENT_MAX_CHARS in commentFormat.ts – characters one comment or reply may hold">4000</span></span>
     </div>
     
-  </div><div class="erf-comment-thread__actions"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Cancel</span></button><button class="erf-comment-btn erf-comment-btn--primary" type="button" tabindex="-1"><span>Save changes</span></button></div>
-    <span class="erf-comment-sr" id="m39-d">marcin@qodeca.example</span>
+  </div><div class="erf-comment-thread__actions"><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Cancel</span></button><button class="erf-button erf-button--primary erf-button--lg" type="button" tabindex="-1"><span>Save changes</span></button></div>
+    <span class="erf-visually-hidden" id="m39-d">marcin@qodeca.example</span>
   </article>
   <div class="erf-comment-replies">
     <article class="erf-comment-message" aria-labelledby="m40-a" aria-describedby="m40-d">
     <div class="erf-comment-message__meta">
       <span class="erf-comment-message__meta-text" id="m40-a"><bdi class="erf-comment-message__author" title="anna@studio.example">Anna K.</bdi> · <time datetime="2026-10-25T09:10">Yesterday, 09:10</time> · edited</span>
-      <button class="erf-comment-icon-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Actions for the comment by Anna K., Yesterday, 09:10" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg></button>
+      <button class="erf-button erf-button--icon" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Actions for the comment by Anna K., Yesterday, 09:10" tabindex="-1"><svg data-icon="ellipsis" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button>
     </div>
     <p class="erf-comment-message__text" dir="auto">Agreed – and move it above the fold.</p>
-    <span class="erf-comment-sr" id="m40-d">anna@studio.example</span>
+    <span class="erf-visually-hidden" id="m40-d">anna@studio.example</span>
   </article>
   </div>
   
 </section></div>
-    <div class="erf-comment-window__foot"><span class="erf-comment-window__foot-start"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Open in source</span></button></span><span class="erf-comment-window__foot-end"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>New comment</span></button><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Close</span></button></span></div>
+    <div class="erf-comment-window__foot"><span class="erf-comment-window__foot-start"><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Open in source</span></button></span><span class="erf-comment-window__foot-end"><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>New comment</span></button><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Close</span></button></span></div>
   </div></figure><figure class="state"><figcaption><strong>delete a comment</strong> – inline, destructive on the right, focus on Cancel</figcaption><div class="erf-comment-window" role="group" aria-label="Example: Comment on button.cta" aria-labelledby="w43-t">
     <div class="erf-comment-window__head">
       <div class="erf-comment-window__heading">
@@ -572,19 +614,19 @@
         <p class="erf-comment-window__context"><bdi dir="ltr">button.cta</bdi> · index.html, line 42</p>
         
       </div>
-      <button class="erf-comment-icon-btn" type="button" aria-label="Close" data-close="" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
+      <button class="erf-button erf-button--icon" type="button" aria-label="Close" data-close="" tabindex="-1"><svg data-icon="x" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
     </div>
     <div class="erf-comment-window__body"><section class="erf-comment-thread"><article class="erf-comment-message" aria-labelledby="m42-a" aria-describedby="m42-d">
     <div class="erf-comment-message__meta">
       <span class="erf-comment-message__meta-text" id="m42-a"><bdi class="erf-comment-message__author" title="anna@studio.example">Anna K.</bdi> · <time datetime="2026-10-25T09:10">Yesterday, 09:10</time></span>
-      <button class="erf-comment-icon-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Actions for the comment by Anna K., Yesterday, 09:10" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg></button>
+      <button class="erf-button erf-button--icon" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Actions for the comment by Anna K., Yesterday, 09:10" tabindex="-1"><svg data-icon="ellipsis" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button>
     </div>
     <p class="erf-comment-message__text" dir="auto">Agreed – and move it above the fold.</p>
     <div class="erf-comment-confirm" role="group" aria-label="Confirm delete">
   <p class="erf-comment-confirm__text">Delete this comment? It is removed from index.html. Git history keeps earlier versions.</p>
-  <div class="erf-comment-confirm__actions"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" data-autofocus="" tabindex="-1"><span>Cancel</span></button><button class="erf-comment-btn erf-comment-btn--danger" type="button" tabindex="-1"><span>Delete comment</span></button></div></div><span class="erf-comment-sr" id="m42-d">anna@studio.example</span>
+  <div class="erf-comment-confirm__actions"><button class="erf-button erf-button--secondary erf-button--lg" type="button" data-autofocus="" tabindex="-1"><span>Cancel</span></button><button class="erf-button erf-button--danger erf-button--lg" type="button" tabindex="-1"><span>Delete comment</span></button></div></div><span class="erf-visually-hidden" id="m42-d">anna@studio.example</span>
   </article></section></div>
-    <div class="erf-comment-window__foot"><span class="erf-comment-window__foot-start"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Open in source</span></button></span><span class="erf-comment-window__foot-end"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>New comment</span></button><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Close</span></button></span></div>
+    <div class="erf-comment-window__foot"><span class="erf-comment-window__foot-start"><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Open in source</span></button></span><span class="erf-comment-window__foot-end"><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>New comment</span></button><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Close</span></button></span></div>
   </div></figure><figure class="state"><figcaption><strong>delete a thread</strong> – deleting the first message deletes its replies</figcaption><div class="erf-comment-window" role="group" aria-label="Example: Comment on button.cta" aria-labelledby="w46-t">
     <div class="erf-comment-window__head">
       <div class="erf-comment-window__heading">
@@ -592,32 +634,32 @@
         <p class="erf-comment-window__context"><bdi dir="ltr">button.cta</bdi> · index.html, line 42</p>
         
       </div>
-      <button class="erf-comment-icon-btn" type="button" aria-label="Close" data-close="" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
+      <button class="erf-button erf-button--icon" type="button" aria-label="Close" data-close="" tabindex="-1"><svg data-icon="x" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
     </div>
     <div class="erf-comment-window__body"><section class="erf-comment-thread" aria-label="Thread started by Marcin Obel">
   <article class="erf-comment-message" aria-labelledby="m44-a" aria-describedby="m44-d">
     <div class="erf-comment-message__meta">
       <span class="erf-comment-message__meta-text" id="m44-a"><bdi class="erf-comment-message__author" title="marcin@qodeca.example">Marcin Obel</bdi> · <time datetime="2026-10-26T14:32">Today, 14:32</time></span>
-      <button class="erf-comment-icon-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Actions for the comment by Marcin Obel, Today, 14:32" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg></button>
+      <button class="erf-button erf-button--icon" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Actions for the comment by Marcin Obel, Today, 14:32" tabindex="-1"><svg data-icon="ellipsis" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button>
     </div>
     <p class="erf-comment-message__text" dir="auto">Make this say "Start free trial".</p>
     <div class="erf-comment-confirm" role="group" aria-label="Confirm delete">
-  <p class="erf-comment-confirm__text">Delete this thread and its 1 replies?</p>
-  <div class="erf-comment-confirm__actions"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" data-autofocus="" tabindex="-1"><span>Cancel</span></button><button class="erf-comment-btn erf-comment-btn--danger" type="button" tabindex="-1"><span>Delete thread</span></button></div></div><span class="erf-comment-sr" id="m44-d">marcin@qodeca.example</span>
+  <p class="erf-comment-confirm__text">Delete this thread and its 1 reply?</p>
+  <div class="erf-comment-confirm__actions"><button class="erf-button erf-button--secondary erf-button--lg" type="button" data-autofocus="" tabindex="-1"><span>Cancel</span></button><button class="erf-button erf-button--danger erf-button--lg" type="button" tabindex="-1"><span>Delete thread</span></button></div></div><span class="erf-visually-hidden" id="m44-d">marcin@qodeca.example</span>
   </article>
   <div class="erf-comment-replies">
     <article class="erf-comment-message" aria-labelledby="m45-a" aria-describedby="m45-d">
     <div class="erf-comment-message__meta">
       <span class="erf-comment-message__meta-text" id="m45-a"><bdi class="erf-comment-message__author" title="anna@studio.example">Anna K.</bdi> · <time datetime="2026-10-25T09:10">Yesterday, 09:10</time> · edited</span>
-      <button class="erf-comment-icon-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Actions for the comment by Anna K., Yesterday, 09:10" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg></button>
+      <button class="erf-button erf-button--icon" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Actions for the comment by Anna K., Yesterday, 09:10" tabindex="-1"><svg data-icon="ellipsis" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button>
     </div>
     <p class="erf-comment-message__text" dir="auto">Agreed – and move it above the fold.</p>
-    <span class="erf-comment-sr" id="m45-d">anna@studio.example</span>
+    <span class="erf-visually-hidden" id="m45-d">anna@studio.example</span>
   </article>
   </div>
   
 </section></div>
-    <div class="erf-comment-window__foot"><span class="erf-comment-window__foot-start"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Open in source</span></button></span><span class="erf-comment-window__foot-end"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>New comment</span></button><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Close</span></button></span></div>
+    <div class="erf-comment-window__foot"><span class="erf-comment-window__foot-start"><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Open in source</span></button></span><span class="erf-comment-window__foot-end"><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>New comment</span></button><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Close</span></button></span></div>
   </div></figure><figure class="state"><figcaption><strong>a resolved thread, unfolded</strong></figcaption><div class="erf-comment-window" role="group" aria-label="Example: Comment on footer img.logo" aria-labelledby="w48-t">
     <div class="erf-comment-window__head">
       <div class="erf-comment-window__heading">
@@ -625,23 +667,23 @@
         <p class="erf-comment-window__context"><bdi dir="ltr">img.logo</bdi> · index.html, line 120</p>
         
       </div>
-      <button class="erf-comment-icon-btn" type="button" aria-label="Close" data-close="" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
+      <button class="erf-button erf-button--icon" type="button" aria-label="Close" data-close="" tabindex="-1"><svg data-icon="x" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
     </div>
     <div class="erf-comment-window__body"><div class="erf-comment-resolved">
-  <span class="erf-comment-resolved__text"><span class="erf-comment-resolved__icon" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M20 6 9 17l-5-5"></path></svg></span>
+  <span class="erf-comment-resolved__text"><span class="erf-comment-resolved__icon" aria-hidden="true"><svg data-icon="check" width="14" height="14" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
   <span>Resolved by <bdi>Anna K.</bdi> · <time datetime="2026-10-25T16:05">25 Oct, 16:05</time></span></span>
-  <button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Re-open</span></button>
-  <button class="erf-comment-icon-btn" type="button" aria-expanded="true" aria-label="Show the resolved thread" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m18 15-6-6-6 6"></path></svg></button>
+  <button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Re-open</span></button>
+  <button class="erf-button erf-button--icon" type="button" aria-expanded="true" aria-label="Show the resolved thread" tabindex="-1"><svg data-icon="chevron-up" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg></button>
   <div class="erf-comment-resolved__body"><article class="erf-comment-message" aria-labelledby="m47-a" aria-describedby="m47-d">
     <div class="erf-comment-message__meta">
       <span class="erf-comment-message__meta-text" id="m47-a"><bdi class="erf-comment-message__author" title="anna@studio.example">Anna K.</bdi> · <time datetime="2026-10-24T11:20">24 Oct, 11:20</time></span>
-      <button class="erf-comment-icon-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Actions for the comment by Anna K., 24 Oct, 11:20" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg></button>
+      <button class="erf-button erf-button--icon" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Actions for the comment by Anna K., 24 Oct, 11:20" tabindex="-1"><svg data-icon="ellipsis" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button>
     </div>
     <p class="erf-comment-message__text" dir="auto">The footer logo is blurry on retina screens.</p>
-    <span class="erf-comment-sr" id="m47-d">anna@studio.example</span>
+    <span class="erf-visually-hidden" id="m47-d">anna@studio.example</span>
   </article></div>
 </div></div>
-    <div class="erf-comment-window__foot"><span class="erf-comment-window__foot-start"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Open in source</span></button></span><span class="erf-comment-window__foot-end"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>New comment</span></button><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Close</span></button></span></div>
+    <div class="erf-comment-window__foot"><span class="erf-comment-window__foot-start"><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Open in source</span></button></span><span class="erf-comment-window__foot-end"><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>New comment</span></button><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Close</span></button></span></div>
   </div></figure><figure class="state"><figcaption><strong>two authors share a name</strong> – the email is shown in full</figcaption><div class="erf-comment-window" role="group" aria-label="Example: Comment on h1" aria-labelledby="w51-t">
     <div class="erf-comment-window__head">
       <div class="erf-comment-window__heading">
@@ -649,26 +691,26 @@
         <p class="erf-comment-window__context"><bdi dir="ltr">h1</bdi> · index.html, line 12</p>
         
       </div>
-      <button class="erf-comment-icon-btn" type="button" aria-label="Close" data-close="" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
+      <button class="erf-button erf-button--icon" type="button" aria-label="Close" data-close="" tabindex="-1"><svg data-icon="x" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
     </div>
     <div class="erf-comment-window__body"><section class="erf-comment-thread">
     <article class="erf-comment-message" aria-labelledby="m49-a" aria-describedby="m49-d">
     <div class="erf-comment-message__meta">
       <span class="erf-comment-message__meta-text" id="m49-a"><bdi class="erf-comment-message__author" title="anna@studio.example">Anna K.</bdi> <span>(anna@studio.example)</span> · <time datetime="2026-10-25T09:10">Yesterday, 09:10</time></span>
-      <button class="erf-comment-icon-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Actions for the comment by Anna K., Yesterday, 09:10" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg></button>
+      <button class="erf-button erf-button--icon" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Actions for the comment by Anna K., Yesterday, 09:10" tabindex="-1"><svg data-icon="ellipsis" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button>
     </div>
     <p class="erf-comment-message__text" dir="auto">Shorter headline?</p>
-    <span class="erf-comment-sr" id="m49-d">anna@studio.example</span>
+    <span class="erf-visually-hidden" id="m49-d">anna@studio.example</span>
   </article>
     <div class="erf-comment-replies"><article class="erf-comment-message" aria-labelledby="m50-a" aria-describedby="m50-d">
     <div class="erf-comment-message__meta">
       <span class="erf-comment-message__meta-text" id="m50-a"><bdi class="erf-comment-message__author" title="anna.k@client.example">Anna K.</bdi> <span>(anna.k@client.example)</span> · <time datetime="2026-10-26T08:02">Today, 08:02</time></span>
-      <button class="erf-comment-icon-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Actions for the comment by Anna K., Today, 08:02" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg></button>
+      <button class="erf-button erf-button--icon" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Actions for the comment by Anna K., Today, 08:02" tabindex="-1"><svg data-icon="ellipsis" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button>
     </div>
     <p class="erf-comment-message__text" dir="auto">Fine by me.</p>
-    <span class="erf-comment-sr" id="m50-d">anna.k@client.example</span>
+    <span class="erf-visually-hidden" id="m50-d">anna.k@client.example</span>
   </article></div></section></div>
-    <div class="erf-comment-window__foot"><span class="erf-comment-window__foot-start"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Open in source</span></button></span><span class="erf-comment-window__foot-end"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>New comment</span></button><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Close</span></button></span></div>
+    <div class="erf-comment-window__foot"><span class="erf-comment-window__foot-start"><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Open in source</span></button></span><span class="erf-comment-window__foot-end"><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>New comment</span></button><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Close</span></button></span></div>
   </div></figure></div>
 
 <h2>Plain text, and what it refuses to hide</h2>
@@ -686,18 +728,18 @@
         <p class="erf-comment-window__context"><bdi dir="ltr">a.download</bdi> · index.html, line 77</p>
         
       </div>
-      <button class="erf-comment-icon-btn" type="button" aria-label="Close" data-close="" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
+      <button class="erf-button erf-button--icon" type="button" aria-label="Close" data-close="" tabindex="-1"><svg data-icon="x" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
     </div>
     <div class="erf-comment-window__body"><section class="erf-comment-thread">
     <article class="erf-comment-message" aria-labelledby="m52-a">
     <div class="erf-comment-message__meta">
       <span class="erf-comment-message__meta-text" id="m52-a"><bdi class="erf-comment-message__author">Marcin Obel</bdi> · <time datetime="2026-10-26T10:00">Today, 10:00</time></span>
-      <button class="erf-comment-icon-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Actions for the comment by Marcin Obel, Today, 10:00" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg></button>
+      <button class="erf-button erf-button--icon" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Actions for the comment by Marcin Obel, Today, 10:00" tabindex="-1"><svg data-icon="ellipsis" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button>
     </div>
     <p class="erf-comment-message__text" dir="auto">Rename the file to invoice<span class="erf-comment-bidi" title="Invisible control character U+202E">⟨U+202E⟩</span>fdp.exe before release</p>
     
   </article></section></div>
-    <div class="erf-comment-window__foot"><span class="erf-comment-window__foot-start"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Open in source</span></button></span><span class="erf-comment-window__foot-end"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>New comment</span></button><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Close</span></button></span></div>
+    <div class="erf-comment-window__foot"><span class="erf-comment-window__foot-start"><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Open in source</span></button></span><span class="erf-comment-window__foot-end"><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>New comment</span></button><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Close</span></button></span></div>
   </div></figure><figure class="state"><figcaption><strong>right-to-left text</strong> – dir="auto" per message; long words break, never widen</figcaption><div class="erf-comment-window" role="group" aria-label="Example: Comment on p.lead" aria-labelledby="w56-t">
     <div class="erf-comment-window__head">
       <div class="erf-comment-window__heading">
@@ -705,13 +747,13 @@
         <p class="erf-comment-window__context"><bdi dir="ltr">p.lead</bdi> · index.html, line 30</p>
         
       </div>
-      <button class="erf-comment-icon-btn" type="button" aria-label="Close" data-close="" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
+      <button class="erf-button erf-button--icon" type="button" aria-label="Close" data-close="" tabindex="-1"><svg data-icon="x" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
     </div>
     <div class="erf-comment-window__body"><section class="erf-comment-thread">
     <article class="erf-comment-message" aria-labelledby="m54-a">
     <div class="erf-comment-message__meta">
       <span class="erf-comment-message__meta-text" id="m54-a"><bdi class="erf-comment-message__author">Yael</bdi> · <time datetime="2026-10-26T11:40">Today, 11:40</time></span>
-      <button class="erf-comment-icon-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Actions for the comment by Yael, Today, 11:40" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg></button>
+      <button class="erf-button erf-button--icon" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Actions for the comment by Yael, Today, 11:40" tabindex="-1"><svg data-icon="ellipsis" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button>
     </div>
     <p class="erf-comment-message__text" dir="auto">הכותרת הזאת ארוכה מדי למסך של טלפון.</p>
     
@@ -719,12 +761,12 @@
     <div class="erf-comment-replies"><article class="erf-comment-message" aria-labelledby="m55-a">
     <div class="erf-comment-message__meta">
       <span class="erf-comment-message__meta-text" id="m55-a"><bdi class="erf-comment-message__author">Marcin Obel</bdi> · <time datetime="2026-10-26T11:52">Today, 11:52</time></span>
-      <button class="erf-comment-icon-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Actions for the comment by Marcin Obel, Today, 11:52" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg></button>
+      <button class="erf-button erf-button--icon" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Actions for the comment by Marcin Obel, Today, 11:52" tabindex="-1"><svg data-icon="ellipsis" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button>
     </div>
     <p class="erf-comment-message__text" dir="auto">See https://example.com/a/very/long/path/that/must/wrap/instead/of/widening/the/window</p>
     
   </article></div></section></div>
-    <div class="erf-comment-window__foot"><span class="erf-comment-window__foot-start"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Open in source</span></button></span><span class="erf-comment-window__foot-end"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>New comment</span></button><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Close</span></button></span></div>
+    <div class="erf-comment-window__foot"><span class="erf-comment-window__foot-start"><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Open in source</span></button></span><span class="erf-comment-window__foot-end"><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>New comment</span></button><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Close</span></button></span></div>
   </div></figure></div>
 
 <h2>When the comment cannot be used normally</h2>
@@ -735,19 +777,19 @@
         <p class="erf-comment-window__context">index.html, line 57</p>
         
       </div>
-      <button class="erf-comment-icon-btn" type="button" aria-label="Close" data-close="" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
+      <button class="erf-button erf-button--icon" type="button" aria-label="Close" data-close="" tabindex="-1"><svg data-icon="x" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
     </div>
-    <div class="erf-comment-window__body"><div class="erf-comment-banner erf-comment-banner--warning">
-  <span class="erf-comment-banner__icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg></span>
-  <div class="erf-comment-banner__body">
-    <p class="erf-comment-banner__text">Erfana can't read this comment block, so it won't change it. Fix it in the source, or delete it.</p>
+    <div class="erf-comment-window__body"><div class="erf-banner erf-banner--warning">
+  <span class="erf-banner__icon" aria-hidden="true"><svg data-icon="triangle-alert" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
+  <div class="erf-banner__body">
+    <p class="erf-banner__text"><span class="erf-visually-hidden">Warning: </span>Erfana can't read this comment block, so it won't change it. Fix it in the source, or delete it.</p>
     </div></div><span class="erf-comment-raw-label" id="raw56">Raw text (read-only)</span>
   <pre class="erf-comment-raw" tabindex="-1" aria-labelledby="raw56">&lt;!-- erfana:comment v1
 Marcin Obel · 2026-10-20 14:02
 Move the CTA above the fold.
 @data {"v":1,"id":"c_7f3k","thread":[{"author":{"name":"Marcin Obel"},"text":"Move the CTA above the fold.",
 --&gt;</pre></div>
-    <div class="erf-comment-window__foot"><span class="erf-comment-window__foot-start"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Copy raw text</span></button></span><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Open in source</span></button><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Delete block…</span></button></div>
+    <div class="erf-comment-window__foot"><span class="erf-comment-window__foot-start"><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Copy raw text</span></button></span><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Open in source</span></button><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Delete block…</span></button></div>
   </div></figure><figure class="state"><figcaption><strong>damaged by a merge</strong> – conflict wording; the file is read-only, so no Delete</figcaption><div class="erf-comment-window" role="group" aria-label="Example: Damaged comment" aria-labelledby="w58-t">
     <div class="erf-comment-window__head">
       <div class="erf-comment-window__heading">
@@ -755,12 +797,12 @@ Move the CTA above the fold.
         <p class="erf-comment-window__context">index.html, line 57</p>
         
       </div>
-      <button class="erf-comment-icon-btn" type="button" aria-label="Close" data-close="" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
+      <button class="erf-button erf-button--icon" type="button" aria-label="Close" data-close="" tabindex="-1"><svg data-icon="x" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
     </div>
-    <div class="erf-comment-window__body"><div class="erf-comment-banner erf-comment-banner--warning">
-  <span class="erf-comment-banner__icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg></span>
-  <div class="erf-comment-banner__body">
-    <p class="erf-comment-banner__text">This block contains git conflict markers. Resolve the conflict in the source.</p>
+    <div class="erf-comment-window__body"><div class="erf-banner erf-banner--warning">
+  <span class="erf-banner__icon" aria-hidden="true"><svg data-icon="triangle-alert" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
+  <div class="erf-banner__body">
+    <p class="erf-banner__text"><span class="erf-visually-hidden">Warning: </span>This block contains git conflict markers. Resolve the conflict in the source.</p>
     </div></div><span class="erf-comment-raw-label" id="raw57">Raw text (read-only)</span>
   <pre class="erf-comment-raw" tabindex="-1" aria-labelledby="raw57">&lt;!-- erfana:comment v1
 &lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD
@@ -770,7 +812,7 @@ Anna K. · Keep the CTA where it is.
 &gt;&gt;&gt;&gt;&gt;&gt;&gt; review/anna
 @data {"v":1,"id":"c_7f3k", …}
 --&gt;</pre></div>
-    <div class="erf-comment-window__foot"><span class="erf-comment-window__foot-start"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Copy raw text</span></button></span><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Open in source</span></button></div>
+    <div class="erf-comment-window__foot"><span class="erf-comment-window__foot-start"><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Copy raw text</span></button></span><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Open in source</span></button></div>
   </div></figure><figure class="state"><figcaption><strong>delete a damaged block</strong> – removes exactly the text shown</figcaption><div class="erf-comment-window" role="group" aria-label="Example: Damaged comment" aria-labelledby="w59-t">
     <div class="erf-comment-window__head">
       <div class="erf-comment-window__heading">
@@ -778,7 +820,7 @@ Anna K. · Keep the CTA where it is.
         <p class="erf-comment-window__context">index.html, line 57</p>
         
       </div>
-      <button class="erf-comment-icon-btn" type="button" aria-label="Close" data-close="" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
+      <button class="erf-button erf-button--icon" type="button" aria-label="Close" data-close="" tabindex="-1"><svg data-icon="x" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
     </div>
     <div class="erf-comment-window__body"><span class="erf-comment-raw-label" id="raw58">Raw text (read-only)</span>
   <pre class="erf-comment-raw" tabindex="-1" aria-labelledby="raw58">&lt;!-- erfana:comment v1
@@ -787,7 +829,7 @@ Move the CTA above the fold.
 @data {"v":1,"id":"c_7f3k","thread":[{"author":{"name":"Marcin Obel"},"text":"Move the CTA above the fold.",
 --&gt;</pre><div class="erf-comment-confirm" role="group" aria-label="Confirm delete">
   <p class="erf-comment-confirm__text">Delete this damaged block? Erfana removes exactly the text shown above from index.html.</p>
-  <div class="erf-comment-confirm__actions"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" data-autofocus="" tabindex="-1"><span>Cancel</span></button><button class="erf-comment-btn erf-comment-btn--danger" type="button" tabindex="-1"><span>Delete block</span></button></div></div></div>
+  <div class="erf-comment-confirm__actions"><button class="erf-button erf-button--secondary erf-button--lg" type="button" data-autofocus="" tabindex="-1"><span>Cancel</span></button><button class="erf-button erf-button--danger erf-button--lg" type="button" tabindex="-1"><span>Delete block</span></button></div></div></div>
     
   </div></figure><figure class="state"><figcaption><strong>the block changed meanwhile</strong> – nothing deleted</figcaption><div class="erf-comment-window" role="group" aria-label="Example: Damaged comment" aria-labelledby="w60-t">
     <div class="erf-comment-window__head">
@@ -796,19 +838,19 @@ Move the CTA above the fold.
         <p class="erf-comment-window__context">index.html, line 57</p>
         
       </div>
-      <button class="erf-comment-icon-btn" type="button" aria-label="Close" data-close="" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
+      <button class="erf-button erf-button--icon" type="button" aria-label="Close" data-close="" tabindex="-1"><svg data-icon="x" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
     </div>
-    <div class="erf-comment-window__body"><div class="erf-comment-banner erf-comment-banner--error">
-  <span class="erf-comment-banner__icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0"></path><path d="m15 9-6 6"></path><path d="m9 9 6 6"></path></svg></span>
-  <div class="erf-comment-banner__body">
-    <p class="erf-comment-banner__text">This block changed on disk. Reopen it and try again.</p>
+    <div class="erf-comment-window__body"><div class="erf-banner erf-banner--error">
+  <span class="erf-banner__icon" aria-hidden="true"><svg data-icon="circle-x" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg></span>
+  <div class="erf-banner__body">
+    <p class="erf-banner__text"><span class="erf-visually-hidden">Error: </span>This block changed on disk. Reopen it and try again.</p>
     </div></div><span class="erf-comment-raw-label" id="raw59">Raw text (read-only)</span>
   <pre class="erf-comment-raw" tabindex="-1" aria-labelledby="raw59">&lt;!-- erfana:comment v1
 Marcin Obel · 2026-10-20 14:02
 Move the CTA above the fold.
 @data {"v":1,"id":"c_7f3k","thread":[{"author":{"name":"Marcin Obel"},"text":"Move the CTA above the fold.",
 --&gt;</pre></div>
-    <div class="erf-comment-window__foot"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Close</span></button></div>
+    <div class="erf-comment-window__foot"><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Close</span></button></div>
   </div></figure><figure class="state"><figcaption><strong>read-only file</strong> – the reason up front (same §10.10 sentence), no reply, edit or delete</figcaption><div class="erf-comment-window" role="group" aria-label="Example: Comment on button.cta" aria-labelledby="w62-t">
     <div class="erf-comment-window__head">
       <div class="erf-comment-window__heading">
@@ -816,12 +858,12 @@ Move the CTA above the fold.
         <p class="erf-comment-window__context"><bdi dir="ltr">button.cta</bdi> · legacy.html, line 42</p>
         
       </div>
-      <button class="erf-comment-icon-btn" type="button" aria-label="Close" data-close="" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
+      <button class="erf-button erf-button--icon" type="button" aria-label="Close" data-close="" tabindex="-1"><svg data-icon="x" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
     </div>
-    <div class="erf-comment-window__body"><div class="erf-comment-banner erf-comment-banner--info">
-  <span class="erf-comment-banner__icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0"></path><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg></span>
-  <div class="erf-comment-banner__body">
-    <p class="erf-comment-banner__text">Erfana can only add comments to UTF-8 files.</p>
+    <div class="erf-comment-window__body"><div class="erf-banner erf-banner--info">
+  <span class="erf-banner__icon" aria-hidden="true"><svg data-icon="info" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></span>
+  <div class="erf-banner__body">
+    <p class="erf-banner__text"><span class="erf-visually-hidden">Note: </span>Erfana can only add comments to UTF-8 files.</p>
     </div></div><section class="erf-comment-thread"><article class="erf-comment-message" aria-labelledby="m61-a">
     <div class="erf-comment-message__meta">
       <span class="erf-comment-message__meta-text" id="m61-a"><bdi class="erf-comment-message__author">Anna K.</bdi> · <time datetime="2026-10-25T09:10">Yesterday, 09:10</time></span>
@@ -830,7 +872,7 @@ Move the CTA above the fold.
     <p class="erf-comment-message__text" dir="auto">Typo in the price.</p>
     
   </article></section></div>
-    <div class="erf-comment-window__foot"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Close</span></button></div>
+    <div class="erf-comment-window__foot"><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Close</span></button></div>
   </div></figure><figure class="state"><figcaption><strong>not found</strong> – the element is gone from the file; the stored quote, struck through</figcaption><div class="erf-comment-window" role="group" aria-label="Example: Comment on section#pricing" aria-labelledby="w64-t">
     <div class="erf-comment-window__head">
       <div class="erf-comment-window__heading">
@@ -838,12 +880,12 @@ Move the CTA above the fold.
         <p class="erf-comment-window__context">index.html, line 88</p>
         
       </div>
-      <button class="erf-comment-icon-btn" type="button" aria-label="Close" data-close="" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
+      <button class="erf-button erf-button--icon" type="button" aria-label="Close" data-close="" tabindex="-1"><svg data-icon="x" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
     </div>
-    <div class="erf-comment-window__body"><div class="erf-comment-banner erf-comment-banner--warning">
-  <span class="erf-comment-banner__icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg></span>
-  <div class="erf-comment-banner__body">
-    <p class="erf-comment-banner__text">Erfana can't find this element any more. The comment stays in index.html, line 88.<br><span>It was attached to:</span><s class="erf-comment-quote">Choose the plan that fits your team</s></p>
+    <div class="erf-comment-window__body"><div class="erf-banner erf-banner--warning">
+  <span class="erf-banner__icon" aria-hidden="true"><svg data-icon="triangle-alert" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
+  <div class="erf-banner__body">
+    <p class="erf-banner__text"><span class="erf-visually-hidden">Warning: </span>Erfana can't find this element any more. The comment stays in index.html, line 88.<br><span>It was attached to:</span><s class="erf-comment-quote">Choose the plan that fits your team</s></p>
     </div></div><section class="erf-comment-thread"><article class="erf-comment-message" aria-labelledby="m63-a">
     <div class="erf-comment-message__meta">
       <span class="erf-comment-message__meta-text" id="m63-a"><bdi class="erf-comment-message__author">Marcin Obel</bdi> · <time datetime="2026-10-20T14:02">20 Oct, 14:02</time></span>
@@ -852,7 +894,7 @@ Move the CTA above the fold.
     <p class="erf-comment-message__text" dir="auto">Rename to "Plans".</p>
     
   </article></section></div>
-    <div class="erf-comment-window__foot"><span class="erf-comment-window__foot-start"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Open in source</span></button></span><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Delete…</span></button></div>
+    <div class="erf-comment-window__foot"><span class="erf-comment-window__foot-start"><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Open in source</span></button></span><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Delete…</span></button></div>
   </div></figure><figure class="state"><figcaption><strong>not visible now</strong> – a hidden slide or tab; still fully usable</figcaption><div class="erf-comment-window" role="group" aria-label="Example: Comment on li.slide-4" aria-labelledby="w68-t">
     <div class="erf-comment-window__head">
       <div class="erf-comment-window__heading">
@@ -860,29 +902,29 @@ Move the CTA above the fold.
         <p class="erf-comment-window__context"><bdi dir="ltr">li.slide-4</bdi> · deck.html, line 140</p>
         
       </div>
-      <button class="erf-comment-icon-btn" type="button" aria-label="Close" data-close="" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
+      <button class="erf-button erf-button--icon" type="button" aria-label="Close" data-close="" tabindex="-1"><svg data-icon="x" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
     </div>
-    <div class="erf-comment-window__body"><div class="erf-comment-banner erf-comment-banner--info">
-  <span class="erf-comment-banner__icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0"></path><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg></span>
-  <div class="erf-comment-banner__body">
-    <p class="erf-comment-banner__text">This element isn't on screen right now – it may be on another slide or tab. Its icon comes back when it does.</p>
+    <div class="erf-comment-window__body"><div class="erf-banner erf-banner--info">
+  <span class="erf-banner__icon" aria-hidden="true"><svg data-icon="info" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></span>
+  <div class="erf-banner__body">
+    <p class="erf-banner__text"><span class="erf-visually-hidden">Note: </span>This element isn't on screen right now – it may be on another slide or tab. Its icon comes back when it does.</p>
     </div></div><section class="erf-comment-thread" aria-label="Thread started by Marcin Obel">
   <article class="erf-comment-message" aria-labelledby="m65-a" aria-describedby="m65-d">
     <div class="erf-comment-message__meta">
       <span class="erf-comment-message__meta-text" id="m65-a"><bdi class="erf-comment-message__author" title="marcin@qodeca.example">Marcin Obel</bdi> · <time datetime="2026-10-26T14:32">Today, 14:32</time></span>
-      <button class="erf-comment-icon-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Actions for the comment by Marcin Obel, Today, 14:32" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg></button>
+      <button class="erf-button erf-button--icon" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Actions for the comment by Marcin Obel, Today, 14:32" tabindex="-1"><svg data-icon="ellipsis" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button>
     </div>
     <p class="erf-comment-message__text" dir="auto">Make this say "Start free trial".</p>
-    <span class="erf-comment-sr" id="m65-d">marcin@qodeca.example</span>
+    <span class="erf-visually-hidden" id="m65-d">marcin@qodeca.example</span>
   </article>
   <div class="erf-comment-replies">
     <article class="erf-comment-message" aria-labelledby="m66-a" aria-describedby="m66-d">
     <div class="erf-comment-message__meta">
       <span class="erf-comment-message__meta-text" id="m66-a"><bdi class="erf-comment-message__author" title="anna@studio.example">Anna K.</bdi> · <time datetime="2026-10-25T09:10">Yesterday, 09:10</time> · edited</span>
-      <button class="erf-comment-icon-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Actions for the comment by Anna K., Yesterday, 09:10" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg></button>
+      <button class="erf-button erf-button--icon" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Actions for the comment by Anna K., Yesterday, 09:10" tabindex="-1"><svg data-icon="ellipsis" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button>
     </div>
     <p class="erf-comment-message__text" dir="auto">Agreed – and move it above the fold.</p>
-    <span class="erf-comment-sr" id="m66-d">anna@studio.example</span>
+    <span class="erf-visually-hidden" id="m66-d">anna@studio.example</span>
   </article>
   </div>
   <div class="erf-comment-thread__reply"><div class="erf-comment-field">
@@ -891,13 +933,13 @@ Move the CTA above the fold.
     
     <div class="erf-comment-field__foot">
       <p class="erf-comment-field__hint" id="f67-h">Plain text. Saved inside index.html.</p>
-      <span class="erf-comment-counter" id="f67-c">0 / 4000</span>
+      <span class="erf-comment-counter" id="f67-c">0 / <span data-claim="comment-max-chars" title="COMMENT_MAX_CHARS in commentFormat.ts – characters one comment or reply may hold">4000</span></span>
     </div>
     
   </div>
-  <div class="erf-comment-thread__actions"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Resolve</span></button><button class="erf-comment-btn erf-comment-btn--primary" type="button" title="Reply (Ctrl+Enter)" tabindex="-1"><span>Reply</span></button></div></div>
+  <div class="erf-comment-thread__actions"><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Resolve</span></button><button class="erf-button erf-button--primary erf-button--lg" type="button" title="Reply (⌘Enter)" tabindex="-1"><span>Reply</span></button></div></div>
 </section></div>
-    <div class="erf-comment-window__foot"><span class="erf-comment-window__foot-start"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Open in source</span></button></span><span class="erf-comment-window__foot-end"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>New comment</span></button><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Close</span></button></span></div>
+    <div class="erf-comment-window__foot"><span class="erf-comment-window__foot-start"><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Open in source</span></button></span><span class="erf-comment-window__foot-end"><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>New comment</span></button><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Close</span></button></span></div>
   </div></figure></div>
 
 <h2>Narrow pages</h2>
@@ -915,7 +957,7 @@ Move the CTA above the fold.
         <p class="erf-comment-window__context"><bdi dir="ltr">button.cta</bdi> · index.html, line 42</p>
         
       </div>
-      <button class="erf-comment-icon-btn" type="button" aria-label="Close" data-close="" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
+      <button class="erf-button erf-button--icon" type="button" aria-label="Close" data-close="" tabindex="-1"><svg data-icon="x" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
     </div>
     <div class="erf-comment-window__body"><div class="erf-comment-field">
     <label class="erf-comment-field__label" for="f69">Comment</label>
@@ -923,11 +965,11 @@ Move the CTA above the fold.
     
     <div class="erf-comment-field__foot">
       <p class="erf-comment-field__hint" id="f69-h">Plain text. Saved inside index.html.</p>
-      <span class="erf-comment-counter" id="f69-c">0 / 4000</span>
+      <span class="erf-comment-counter" id="f69-c">0 / <span data-claim="comment-max-chars" title="COMMENT_MAX_CHARS in commentFormat.ts – characters one comment or reply may hold">4000</span></span>
     </div>
     
-  </div><p class="erf-comment-identity">Commenting as <bdi>Marcin Obel</bdi> <button class="erf-comment-link" type="button" tabindex="-1">Change</button></p></div>
-    <div class="erf-comment-window__foot"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Cancel</span></button><button class="erf-comment-btn erf-comment-btn--primary" type="button" title="Save (Ctrl+Enter)" aria-keyshortcuts="Control+Enter" aria-disabled="true" tabindex="-1"><span>Save</span></button></div>
+  </div><p class="erf-comment-identity">Commenting as <bdi>Marcin Obel</bdi> <button class="erf-button erf-button--text" type="button" tabindex="-1"><span>Change</span></button></p></div>
+    <div class="erf-comment-window__foot"><button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Cancel</span></button><button class="erf-button erf-button--primary erf-button--lg" type="button" title="Save (⌘Enter)" aria-keyshortcuts="Meta+Enter" aria-disabled="true" tabindex="-1"><span>Save</span></button></div>
   </div></div></div></div>
 
 <h2>Time, as it is printed</h2>
@@ -948,10 +990,9 @@ Move the CTA above the fold.
     <tr>
       <td>Window size</td>
       <td>Sizes from tokens.</td>
-      <td>320px minimum and 560px maximum height are literals, and 360 / 480 are read as
-        <code>var(--comments-window-width, 360px)</code> / <code>var(--comments-window-max-width, 480px)</code>
-        until P6 adds them to <code>design-tokens.css</code> (plan §10.9). The fallback means nothing changes
-        the day the token lands.</td>
+      <td>The width and the maximum width are the <code>--comments-window-width</code> and
+        <code>--comments-window-max-width</code> tokens. The 320px minimum and the 560px maximum height are
+        literals, marked <code>deviates:</code> in <code>CommentWindow.css</code>: no token holds them yet.</td>
     </tr>
     <tr>
       <td>Close</td>

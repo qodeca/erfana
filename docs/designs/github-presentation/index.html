@@ -33,7 +33,7 @@
     --gp-fg: var(--color-brand-black);
     --gp-frame: var(--color-gray-200);
     --gp-bar: var(--color-gray-300);
-    /* Lime and violet fail on a light surface; indigo carries the accent here. */
+    /* Brand card (system/foundations/brand.html#rules): on a light surface the accent is indigo. */
     --gp-accent: var(--color-brand-indigo);
   }
 
@@ -46,26 +46,27 @@
   }
   /* deviates: docs/design-system/system/foundations/type.html – the banner is drawn at image scale, so
      its icon (88px) and wordmark (60px, 38px in the social card) sit outside the UI type
-     scale. They are values this screen decides; see Exceptions. */
+     scale, and the wordmark is tracked -0.02em, which no type token holds. They are values
+     this screen decides; see Exceptions. */
   .gp-banner { width: 800px; height: 200px; padding: 0 var(--space-16); }
   .gp-social { width: 640px; height: 320px; padding: var(--space-20); gap: var(--space-12); }
 
   .gp-brand { display: flex; align-items: center; gap: var(--space-10); }
   .gp-brand img { display: block; width: 88px; height: 88px; }
-  /* stylelint-disable declaration-property-unit-disallowed-list, declaration-property-value-allowed-list --
+  /* stylelint-disable declaration-property-unit-disallowed-list --
      Artwork, not UI: the wordmark and pitch are set at fixed sizes on a fixed
      canvas that scripts/capture/brand.mjs screenshots. No UI type token is that
      large, and the image must not move when the UI scale does. */
-  .gp-wordmark { margin: 0; font-size: 60px; font-weight: var(--font-bold); line-height: 1;
+  .gp-wordmark { margin: 0; font-size: 60px; font-weight: var(--font-bold); line-height: var(--leading-none);
                  letter-spacing: -0.02em; color: var(--gp-fg); }
 
   .gp-social .gp-lead { display: flex; flex-direction: column; gap: var(--space-8); flex: 1 1 auto; }
   .gp-social .gp-brand { gap: var(--space-6); }
   .gp-social .gp-brand img { width: 56px; height: 56px; }
   .gp-social .gp-wordmark { font-size: 38px; }
-  .gp-pitch { margin: 0; font-size: var(--text-lg); font-weight: 400; line-height: 1.4;
+  .gp-pitch { margin: 0; font-size: var(--text-lg); font-weight: var(--font-normal); line-height: var(--leading-snug);
               color: var(--gp-fg); max-width: 22ch; }
-  /* stylelint-enable declaration-property-unit-disallowed-list, declaration-property-value-allowed-list */
+  /* stylelint-enable declaration-property-unit-disallowed-list */
   .gp-nowrap { white-space: nowrap; }
 
   /* The abstract window: tree, editor with one selected line, preview with a two-node flow,
@@ -103,6 +104,18 @@
   .gp-cursor { width: var(--space-4); height: var(--space-8); background: var(--color-brand-lime); }
 
   .gp-stage { margin: var(--space-8) 0 var(--space-24); }
+  /* Doc-only: the dashed stage outline shows the canvas edge, which vanishes on purpose against
+     the dark page. It sits outside the element, so the clip brand.mjs takes never contains it. */
+  .gp-stage > .gp-art { outline: var(--border-width) dashed var(--color-border-input);
+                        outline-offset: var(--space-2); }
+  /* Doc-only safe-area diagram, a sibling of the artwork – never inside #gp-social. The canvas is
+     the social card's layout size; the safe area is inset by half the 80px export margin. */
+  .gp-safe { box-sizing: border-box; width: 640px; height: 320px; padding: var(--space-10);
+             outline: var(--border-width) dashed var(--color-border-input);
+             outline-offset: var(--space-2); background: var(--color-brand-black); }
+  .gp-safe__area { box-sizing: border-box; display: flex; align-items: center; justify-content: center;
+                   height: 100%; border: var(--border-width) dashed var(--color-brand-lime);
+                   color: var(--color-text-secondary); font-size: var(--ds-text-small); }
   .gp-stage figcaption { margin-top: var(--space-4); color: var(--color-text-tertiary);
                          font-size: var(--ds-text-small); }
 </style>
@@ -118,22 +131,16 @@
 </p>
 
 <div class="ds-note">
-  <strong>Four rules this artwork follows.</strong>
+  <strong>The brand rules live on the
+  <a href="../../design-system/system/foundations/brand.html#rules">Brand</a> card</strong>
+  (<code>proposed</code>): the icon used as it ships, the wordmark in Cascadia Mono bold, no third-party
+  name or mark, flat and square, and indigo – never lime or violet – as the accent on a light surface.
+  This screen does not restate them; it decides only the <strong>banner geometry</strong>: the two
+  canvases (800×200 and 640×320 layout), where the lockup and the abstract window sit on them, the
+  social card's safe area, and the image-scale sizes recorded under Exceptions.
   <br><br>
-  <strong>1 · The icon is used as it ships.</strong> <code>resources/icon.png</code>, unmodified: no
-  recolour, crop, outline or effect (<code>TRADEMARKS.md</code>).
-  <br><br>
-  <strong>2 · Every glyph is Cascadia Mono.</strong> It is bundled and OFL-licensed, so the images
-  render identically on any machine. The system sans would rasterise as a face whose licence is not
-  ours to redistribute in marketing images.
-  <br><br>
-  <strong>3 · No third-party name or mark.</strong> The terminal strip shows a bare prompt glyph and a
-  cursor – no command name – so the banner and the social preview say "a terminal agent" without
-  naming one. The README says which agents in words.
-  <br><br>
-  <strong>4 · Flat and square.</strong> 1px borders, <code>border-radius: 0</code>, no shadow, no
-  gradient, solid backgrounds (the edge disappears against both GitHub canvases, and a viewer that
-  ignores <code>&lt;picture&gt;</code> still shows a legible light banner).
+  The dashed outline around each piece of artwork is page furniture, not artwork: it marks the canvas
+  edge, which is meant to disappear against GitHub's page, and it is never in the exported PNG.
 </div>
 
 <h2>Banner – dark</h2>
@@ -159,7 +166,8 @@
 
 <h2>Banner – light</h2>
 <p>Shown by GitHub's light theme, and the fallback <code>&lt;img&gt;</code> for any viewer that does
-not honour <code>&lt;picture&gt;</code>. Same geometry; indigo replaces violet for the accent.</p>
+not honour <code>&lt;picture&gt;</code>. Same geometry; indigo replaces violet for the accent, as
+<a href="../../design-system/system/foundations/brand.html#rules">Brand</a> requires on a light surface.</p>
 <figure class="gp-stage">
   <div id="gp-banner-light" class="gp-art gp-art--light gp-banner">
     <div class="gp-brand">
@@ -203,21 +211,33 @@ only – it is not theme-aware. Uploaded by hand in Settings after the README me
   <figcaption>Output: <code>docs/assets/readme/social-preview.png</code></figcaption>
 </figure>
 
-<h2>Contrast</h2>
+<h3 id="safe-area">Safe area</h3>
+<p>Sites that show the social card may crop its edges, so the lockup, the pitch and the window stay
+inside a 1200×560 safe area – a 40px margin on the exported image, 20px on the layout. The card's
+own padding is wider than that, so nothing reaches the margin.</p>
+<figure class="gp-stage">
+  <div class="gp-safe" aria-hidden="true"><div class="gp-safe__area">Safe area – 600×280 layout, 1200×560 exported</div></div>
+  <figcaption>Doc-only diagram at the social card's layout size. It is not part of <code>#gp-social</code> and is never exported.</figcaption>
+</figure>
+
+<h2 id="contrast">Contrast</h2>
 <table>
   <thead><tr><th>Element</th><th>Pair</th><th>Ratio</th></tr></thead>
   <tbody>
-    <tr><td>Wordmark, dark banner</td><td><code>--color-brand-white</code> on <code>--color-brand-black</code></td><td class="ds-ratio ds-pass"><span data-claim="contrast-gp-wordmark-dark" title="--color-brand-white on --color-brand-black, the wordmark on the dark banner">17.62</span>:1</td></tr>
-    <tr><td>Wordmark, light banner</td><td><code>--color-brand-black</code> on <code>--color-brand-white</code></td><td class="ds-ratio ds-pass"><span data-claim="contrast-gp-wordmark-light" title="--color-brand-black on --color-brand-white, the wordmark on the light banner">17.62</span>:1</td></tr>
-    <tr><td>Prompt glyph (both)</td><td><code>--color-text-primary</code> on <code>--color-brand-black</code></td><td class="ds-ratio ds-pass"><span data-claim="contrast-gp-prompt" title="--color-text-primary on --color-brand-black, the prompt glyph on the terminal strip">11.51</span>:1</td></tr>
-    <tr><td>Cursor (both, on the dark strip)</td><td><code>--color-brand-lime</code> on <code>--color-brand-black</code></td><td class="ds-ratio ds-pass"><span data-claim="contrast-gp-cursor" title="--color-brand-lime on --color-brand-black, the cursor on the terminal strip">13.94</span>:1</td></tr>
-    <tr><td>Accent, light banner</td><td><code>--color-brand-indigo</code> on <code>--color-brand-white</code></td><td class="ds-ratio ds-pass"><span data-claim="contrast-gp-indigo-light" title="--color-brand-indigo on --color-brand-white, the light banner accent">7.60</span>:1</td></tr>
-    <tr><td>Why lime never sits on the light surface</td><td><code>--color-brand-lime</code> on <code>--color-brand-white</code></td><td class="ds-ratio ds-fail"><span data-claim="contrast-gp-lime-light" title="--color-brand-lime on --color-brand-white, why lime never sits on the light banner">1.26</span>:1</td></tr>
-    <tr><td>Why violet is only a muted fill on light</td><td><code>--color-brand-violet</code> on <code>--color-brand-white</code></td><td class="ds-ratio ds-fail"><span data-claim="contrast-gp-violet-light" title="--color-brand-violet on --color-brand-white, why violet is only a muted fill on light">2.09</span>:1</td></tr>
+    <tr><td>Wordmark, dark banner</td><td><code>--color-brand-white</code> on <code>--color-brand-black</code></td><td data-contrast="--color-brand-white on --color-brand-black" data-min="4.5" data-result="pass">17.62:1 · pass</td></tr>
+    <tr><td>Wordmark, light banner</td><td><code>--color-brand-black</code> on <code>--color-brand-white</code></td><td data-contrast="--color-brand-black on --color-brand-white" data-min="4.5" data-result="pass">17.62:1 · pass</td></tr>
+    <tr><td>Prompt glyph (both)</td><td><code>--color-text-primary</code> on <code>--color-brand-black</code></td><td data-contrast="--color-text-primary on --color-brand-black" data-min="4.5" data-result="pass">11.51:1 · pass</td></tr>
+    <tr><td>Cursor (both, on the dark strip)</td><td><code>--color-brand-lime</code> on <code>--color-brand-black</code></td><td data-contrast="--color-brand-lime on --color-brand-black" data-min="3" data-result="pass">13.94:1 · pass</td></tr>
+    <tr><td>Accent, light banner</td><td><code>--color-brand-indigo</code> on <code>--color-brand-white</code></td><td data-contrast="--color-brand-indigo on --color-brand-white" data-min="3" data-result="pass">7.60:1 · pass</td></tr>
+    <tr><td>Why lime never sits on the light surface</td><td><code>--color-brand-lime</code> on <code>--color-brand-white</code></td><td data-contrast="--color-brand-lime on --color-brand-white" data-min="3" data-result="fail">1.26:1 · fail</td></tr>
+    <tr><td>Why violet is only a muted fill on light</td><td><code>--color-brand-violet</code> on <code>--color-brand-white</code></td><td data-contrast="--color-brand-violet on --color-brand-white" data-min="3" data-result="fail">2.09:1 · fail</td></tr>
   </tbody>
 </table>
-<p>Frames, pane bars and the selected line are decorative and carry no meaning; the README says in
-text everything the banner shows.</p>
+<p>Every ratio is baked from the tokens. Text is judged against 4.5:1; the cursor, the light banner's
+indigo nodes and edge, and the lime and violet rows against the 3:1 a non-text mark needs. Frames,
+pane bars and the selected line are decorative and carry no meaning; the README says in text
+everything the banner shows. The full brand set is on
+<a href="../../design-system/system/foundations/brand.html#tokens">Brand – brand colours and their contrast</a>.</p>
 
 <h2>What it deliberately does not do</h2>
 <table>
@@ -236,6 +256,7 @@ text everything the banner shows.</p>
   <tbody>
     <tr><td><code>.gp-art--light</code> on this screen</td><td>Theme – Erfana is dark-only</td><td>GitHub has a light theme, and the banner is a page asset on github.com, not app chrome. The app rule does not change.</td></tr>
     <tr><td><code>.gp-banner</code>, <code>.gp-social</code> on this screen</td><td>Type – the UI type scale</td><td>The icon (88px) and the wordmark (60px, 38px in the social card) are drawn at image scale, which the UI scale does not reach.</td></tr>
+    <tr><td><code>.gp-wordmark</code> on this screen</td><td>Type – no letter-spacing token</td><td>The wordmark is tracked <code>-0.02em</code> so the bold mono name sits as one mark at 60px. The type scale has no tracking token, and the UI never tracks text; this is a value of the image, not of the app.</td></tr>
     <tr><td>Every <code>gp-</code> class and <code>#gp-*</code> id on this screen</td><td>Naming – the <code>erf-</code> namespace (<code>docs/design-system/README.md</code>, <code>.stylelintrc.json</code>)</td><td>The namespace guards component CSS that moves into <code>src/</code>, where a bare class can collide with Mermaid's. This artwork never ships as CSS; it is rendered to PNG by <code>scripts/capture/brand.mjs</code>, which, with its test, reads the <code>#gp-*</code> ids.</td></tr>
   </tbody>
 </table>

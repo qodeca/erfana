@@ -33,9 +33,10 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Presence without a number ("a session is running"). Square, like every
-   corner in Erfana. Allowed only when the item's accessible name says the
-   same thing in words. */
+/* Presence without a number ("a session is running"), and the UNSEEN dot
+   ("something here you have not looked at yet") – there is no second dot
+   class for unseen. Square, like every corner in Erfana. Allowed only when
+   the item's accessible name says the same thing in words. */
 .erf-badge--dot {
   min-width: 0;
   width: var(--space-4);
@@ -97,6 +98,27 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* A count that needs attention: "2 hosts failed", "3 unresolved". The amber
+   fill repeats it; the triangle and the number carry it, so the meaning never
+   rests on colour (SC 1.4.1). The triangle is drawn here, not typed in the
+   markup, so no screen reader reads "black up-pointing triangle": the "/ ''"
+   gives it empty alternative text. The words ("3 need attention") go in the
+   parent's accessible name, as for every badge. Ink, not white: white on
+   --color-warning fails 4.5:1 (the card measures both). */
+.erf-counter--attention {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  border-color: var(--color-warning);
+  background: var(--color-warning);
+  color: var(--color-text-on-accent);
+}
+.erf-counter--attention::before {
+  content: '\25B2' / '';
+  font-size: var(--text-xs);
+  line-height: var(--leading-none);
+}
+
 /* ---------- chip ---------- */
 
 /* A static label: a frontmatter tag, a window size. Not a control. */
@@ -126,6 +148,34 @@
   outline-offset: var(--space-1);
 }
 .erf-chip__caret { color: var(--color-text-tertiary); }
+
+/* Tones. Each is for one kind of news, named by the word in the chip; the
+   tone only repeats the word. Never put amber (warning) text or the attention
+   counter right beside a lime fill or lime text: the two are both bright
+   yellows and differ mostly in hue, which many readers cannot see.
+
+   Outline: neutral news the reader may want to look at – "Changed",
+   "Edited". An accent edge on the resting chip; the text stays primary. */
+.erf-chip--outline {
+  border-color: var(--color-accent-primary);
+  background: transparent;
+}
+
+/* Accent: something the reader has not seen yet – "New". A violet fill with
+   ink text, the same pairing as the activity-bar badge. One per row at most;
+   a column of accent chips is a warning colour scheme by another name. */
+.erf-chip--accent {
+  border-color: var(--color-brand-violet);
+  background: var(--color-brand-violet);
+  color: var(--color-text-on-accent);
+}
+
+/* A contrast theme drops fills: the attention counter and the accent chip
+   keep a border and their words (Forced colours card). */
+@media (forced-colors: active) {
+  .erf-counter--attention,
+  .erf-chip--accent { border-color: CanvasText; }
+}
 
 /* ---------- key ---------- */
 

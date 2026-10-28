@@ -9,6 +9,8 @@
 <title>Erfana – who is commenting</title>
 <link rel="stylesheet" href="../../../design-system/tokens.css">
 <link rel="stylesheet" href="../../../design-system/ds.css">
+<link rel="stylesheet" href="../../../design-system/system/components/button/button.css">
+<link rel="stylesheet" href="../../../design-system/system/components/feedback/feedback.css">
 <link rel="stylesheet" href="./demo.css">
 <link rel="stylesheet" href="./comments.css">
 <style>
@@ -32,8 +34,9 @@
   window</strong>, not a second dialog on top of it: nothing typed is lost and there is one focus trap, not two.
   <br><br>
   <strong>The notice is the whole truth, including the part that cannot be fixed:</strong> scripts in a previewed
-  page can read the file they came from, so they can read the names in it (threat S6). The card is proposed, as
-  the plan files it; its copy is the plan's §10.7 word for word.
+  page can read the file they came from, so they can read the names in it (threat S6). Decided: this shipped in
+  v0.23.1, and its copy is <code>IDENTITY_COPY</code> and <code>SETTINGS_COPY</code> in <code>commentCopy.ts</code>
+  word for word.
 </div>
 
 <h2>The identity step</h2>
@@ -42,12 +45,21 @@
   field (decided Form card: <code>aria-invalid</code>, <code>aria-describedby</code>, icon plus text). With a
   name, Continue turns the same window into the new comment, with your text field focused. <strong>Cancel</strong>
   closes the window; nothing is saved and the notice will show again next time.
+  <br><br>
+  <strong>Built from what exists.</strong> Buttons are the proposed
+  <a href="../../../design-system/system/components/button/index.html">Buttons</a> card's <code>.erf-button</code> (the app still ships
+  Dialog.css's <code>.dialog-btn</code> until <code>button.css</code> is adopted), the Settings notice is the
+  proposed <a href="../../../design-system/system/components/feedback/index.html">Feedback</a> card's info banner with its visually hidden
+  “Note:”. The fields, their errors and the checkbox follow the decided
+  <a href="../../../design-system/system/components/form/index.html">Form controls</a> card, but that card has no shared stylesheet, so they
+  stay drawn by this screen's <code>comments.css</code> mirror of <code>CommentWindow.css</code> – whether the
+  decided card gains the comment window's multi-line field and a shared stylesheet is an open owner decision.
 </div>
 <div id="live"><div class="erf-comment-window" role="dialog" aria-modal="true" aria-labelledby="t0" aria-describedby="n0">
     <div class="erf-comment-window__head"><div class="erf-comment-window__heading">
       <h2 class="erf-comment-window__title" id="t0" tabindex="-1">Before your first comment</h2>
       <p class="erf-comment-window__context"><bdi dir="ltr">button.cta</bdi> · index.html, line 42</p></div>
-      <button class="erf-comment-icon-btn" type="button" aria-label="Close" data-cancel="" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+      <button class="erf-button erf-button--icon" type="button" aria-label="Close" data-cancel="" tabindex="-1"><svg data-icon="x" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div>
     <div class="erf-comment-window__body">
       <p class="erf-comment-notice" id="n0">Erfana writes your name – and your email, if you add one – into the HTML file next to each comment. Anyone who can open the file can read them: in Erfana, in the page source, and in git history once the file is committed and pushed. Scripts in pages previewed in this project can read them too. Deleting a comment later does not remove it from git history.</p>
       <div class="erf-comment-field">
@@ -64,8 +76,8 @@
   </div>
     </div>
     <div class="erf-comment-window__foot">
-      <button class="erf-comment-btn erf-comment-btn--secondary" type="button" data-cancel="" tabindex="-1"><span>Cancel</span></button>
-      <button class="erf-comment-btn erf-comment-btn--primary" type="button" data-continue="" tabindex="-1"><span>Continue</span></button>
+      <button class="erf-button erf-button--secondary erf-button--lg" type="button" data-cancel="" tabindex="-1"><span>Cancel</span></button>
+      <button class="erf-button erf-button--primary erf-button--lg" type="button" data-continue="" tabindex="-1"><span>Continue</span></button>
     </div></div></div>
 
 <h2>Every state</h2>
@@ -73,7 +85,7 @@
     <div class="erf-comment-window__head"><div class="erf-comment-window__heading">
       <h2 class="erf-comment-window__title" id="t2" tabindex="-1">Before your first comment</h2>
       <p class="erf-comment-window__context"><bdi dir="ltr">button.cta</bdi> · index.html, line 42</p></div>
-      <button class="erf-comment-icon-btn" type="button" aria-label="Close" data-cancel="" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+      <button class="erf-button erf-button--icon" type="button" aria-label="Close" data-cancel="" tabindex="-1"><svg data-icon="x" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div>
     <div class="erf-comment-window__body">
       <p class="erf-comment-notice" id="n2">Erfana writes your name – and your email, if you add one – into the HTML file next to each comment. Anyone who can open the file can read them: in Erfana, in the page source, and in git history once the file is committed and pushed. Scripts in pages previewed in this project can read them too. Deleting a comment later does not remove it from git history.</p>
       <div class="erf-comment-field">
@@ -90,13 +102,13 @@
   </div>
     </div>
     <div class="erf-comment-window__foot">
-      <button class="erf-comment-btn erf-comment-btn--secondary" type="button" data-cancel="" tabindex="-1"><span>Cancel</span></button>
-      <button class="erf-comment-btn erf-comment-btn--primary" type="button" data-continue="" tabindex="-1"><span>Continue</span></button>
+      <button class="erf-button erf-button--secondary erf-button--lg" type="button" data-cancel="" tabindex="-1"><span>Cancel</span></button>
+      <button class="erf-button erf-button--primary erf-button--lg" type="button" data-continue="" tabindex="-1"><span>Continue</span></button>
     </div></div></figure><figure class="state"><figcaption><strong>name already set in Settings</strong> – pre-filled; the notice still shows, once</figcaption><div class="erf-comment-window" role="group" aria-label="Example: identity step" aria-labelledby="t4" aria-describedby="n4">
     <div class="erf-comment-window__head"><div class="erf-comment-window__heading">
       <h2 class="erf-comment-window__title" id="t4" tabindex="-1">Before your first comment</h2>
       <p class="erf-comment-window__context"><bdi dir="ltr">button.cta</bdi> · index.html, line 42</p></div>
-      <button class="erf-comment-icon-btn" type="button" aria-label="Close" data-cancel="" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+      <button class="erf-button erf-button--icon" type="button" aria-label="Close" data-cancel="" tabindex="-1"><svg data-icon="x" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div>
     <div class="erf-comment-window__body">
       <p class="erf-comment-notice" id="n4">Erfana writes your name – and your email, if you add one – into the HTML file next to each comment. Anyone who can open the file can read them: in Erfana, in the page source, and in git history once the file is committed and pushed. Scripts in pages previewed in this project can read them too. Deleting a comment later does not remove it from git history.</p>
       <div class="erf-comment-field">
@@ -113,19 +125,19 @@
   </div>
     </div>
     <div class="erf-comment-window__foot">
-      <button class="erf-comment-btn erf-comment-btn--secondary" type="button" data-cancel="" tabindex="-1"><span>Cancel</span></button>
-      <button class="erf-comment-btn erf-comment-btn--primary" type="button" data-continue="" tabindex="-1"><span>Continue</span></button>
+      <button class="erf-button erf-button--secondary erf-button--lg" type="button" data-cancel="" tabindex="-1"><span>Cancel</span></button>
+      <button class="erf-button erf-button--primary erf-button--lg" type="button" data-continue="" tabindex="-1"><span>Continue</span></button>
     </div></div></figure><figure class="state"><figcaption><strong>no name</strong> – Continue says why</figcaption><div class="erf-comment-window" role="group" aria-label="Example: identity step" aria-labelledby="t6" aria-describedby="n6">
     <div class="erf-comment-window__head"><div class="erf-comment-window__heading">
       <h2 class="erf-comment-window__title" id="t6" tabindex="-1">Before your first comment</h2>
       <p class="erf-comment-window__context"><bdi dir="ltr">button.cta</bdi> · index.html, line 42</p></div>
-      <button class="erf-comment-icon-btn" type="button" aria-label="Close" data-cancel="" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+      <button class="erf-button erf-button--icon" type="button" aria-label="Close" data-cancel="" tabindex="-1"><svg data-icon="x" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div>
     <div class="erf-comment-window__body">
       <p class="erf-comment-notice" id="n6">Erfana writes your name – and your email, if you add one – into the HTML file next to each comment. Anyone who can open the file can read them: in Erfana, in the page source, and in git history once the file is committed and pushed. Scripts in pages previewed in this project can read them too. Deleting a comment later does not remove it from git history.</p>
       <div class="erf-comment-field">
     <label class="erf-comment-field__label" for="i7">Name</label>
     <input class="erf-comment-input" id="i7" type="text" value="" autocomplete="name" aria-describedby="i7-e i7-h" aria-invalid="true" aria-required="true" data-field="name" tabindex="-1">
-    <p class="erf-comment-error" id="i7-e"><span aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0"></path><path d="m15 9-6 6"></path><path d="m9 9 6 6"></path></svg></span><span>Enter a name to continue.</span></p>
+    <p class="erf-comment-error" id="i7-e"><span aria-hidden="true"><svg data-icon="circle-x" width="14" height="14" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg></span><span>Enter a name to continue.</span></p>
     <p class="erf-comment-note" id="i7-h">Shown next to your comments.</p>
   </div>
       <div class="erf-comment-field">
@@ -136,13 +148,13 @@
   </div>
     </div>
     <div class="erf-comment-window__foot">
-      <button class="erf-comment-btn erf-comment-btn--secondary" type="button" data-cancel="" tabindex="-1"><span>Cancel</span></button>
-      <button class="erf-comment-btn erf-comment-btn--primary" type="button" data-continue="" tabindex="-1"><span>Continue</span></button>
+      <button class="erf-button erf-button--secondary erf-button--lg" type="button" data-cancel="" tabindex="-1"><span>Cancel</span></button>
+      <button class="erf-button erf-button--primary erf-button--lg" type="button" data-continue="" tabindex="-1"><span>Continue</span></button>
     </div></div></figure><figure class="state"><figcaption><strong>malformed email</strong></figcaption><div class="erf-comment-window" role="group" aria-label="Example: identity step" aria-labelledby="t8" aria-describedby="n8">
     <div class="erf-comment-window__head"><div class="erf-comment-window__heading">
       <h2 class="erf-comment-window__title" id="t8" tabindex="-1">Before your first comment</h2>
       <p class="erf-comment-window__context"><bdi dir="ltr">button.cta</bdi> · index.html, line 42</p></div>
-      <button class="erf-comment-icon-btn" type="button" aria-label="Close" data-cancel="" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+      <button class="erf-button erf-button--icon" type="button" aria-label="Close" data-cancel="" tabindex="-1"><svg data-icon="x" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div>
     <div class="erf-comment-window__body">
       <p class="erf-comment-notice" id="n8">Erfana writes your name – and your email, if you add one – into the HTML file next to each comment. Anyone who can open the file can read them: in Erfana, in the page source, and in git history once the file is committed and pushed. Scripts in pages previewed in this project can read them too. Deleting a comment later does not remove it from git history.</p>
       <div class="erf-comment-field">
@@ -154,17 +166,17 @@
       <div class="erf-comment-field">
     <label class="erf-comment-field__label" for="i10">Email (optional)</label>
     <input class="erf-comment-input" id="i10" type="email" value="marcin@" autocomplete="email" aria-describedby="i10-e i10-h" aria-invalid="true" data-field="email" tabindex="-1">
-    <p class="erf-comment-error" id="i10-e"><span aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0"></path><path d="m15 9-6 6"></path><path d="m9 9 6 6"></path></svg></span><span>That doesn't look like an email address.</span></p>
+    <p class="erf-comment-error" id="i10-e"><span aria-hidden="true"><svg data-icon="circle-x" width="14" height="14" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg></span><span>That doesn't look like an email address.</span></p>
     <p class="erf-comment-note" id="i10-h">Leave empty to keep your email out of the file.</p>
   </div>
     </div>
     <div class="erf-comment-window__foot">
-      <button class="erf-comment-btn erf-comment-btn--secondary" type="button" data-cancel="" tabindex="-1"><span>Cancel</span></button>
-      <button class="erf-comment-btn erf-comment-btn--primary" type="button" data-continue="" tabindex="-1"><span>Continue</span></button>
+      <button class="erf-button erf-button--secondary erf-button--lg" type="button" data-cancel="" tabindex="-1"><span>Cancel</span></button>
+      <button class="erf-button erf-button--primary erf-button--lg" type="button" data-continue="" tabindex="-1"><span>Continue</span></button>
     </div></div></figure><figure class="state"><figcaption><strong>Change, inline</strong> – the identity line opens in place; no second dialog</figcaption><div class="erf-comment-window" role="group" aria-label="Example: changing the identity inline">
     <div class="erf-comment-window__head"><div class="erf-comment-window__heading"><h2 class="erf-comment-window__title">New comment</h2>
       <p class="erf-comment-window__context"><bdi dir="ltr">button.cta</bdi> · index.html, line 42</p></div>
-      <button class="erf-comment-icon-btn" type="button" aria-label="Close" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+      <button class="erf-button erf-button--icon" type="button" aria-label="Close" tabindex="-1"><svg data-icon="x" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div>
     <div class="erf-comment-window__body">
       <div class="erf-comment-field"><label class="erf-comment-field__label" for="cc">Comment</label>
         <textarea class="erf-comment-textarea" id="cc" tabindex="-1">Make the button text bigger</textarea></div>
@@ -182,8 +194,8 @@
     <p class="erf-comment-note" id="i12-h">Leave empty to keep your email out of the file.</p>
   </div>
         <div class="erf-comment-thread__actions">
-          <button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Cancel</span></button>
-          <button class="erf-comment-btn erf-comment-btn--primary" type="button" tabindex="-1"><span>Save changes</span></button></div>
+          <button class="erf-button erf-button--secondary erf-button--lg" type="button" tabindex="-1"><span>Cancel</span></button>
+          <button class="erf-button erf-button--primary erf-button--lg" type="button" tabindex="-1"><span>Save changes</span></button></div>
       </div>
     </div></div></figure></div>
 
@@ -223,9 +235,9 @@
         
       </div>
     </div>
-    <div class="erf-comment-banner erf-comment-banner--info" style="margin: var(--space-4) 0 0">
-      <span class="erf-comment-banner__icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0"></path><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg></span>
-      <div class="erf-comment-banner__body"><p class="erf-comment-banner__text">Both are visible to anyone who can open the file – in the page source and in git history once pushed.</p></div>
+    <div class="erf-banner erf-banner--info" style="margin: var(--space-4) 0 0">
+      <span class="erf-banner__icon" aria-hidden="true"><svg data-icon="info" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></span>
+      <div class="erf-banner__body"><p class="erf-banner__text"><span class="erf-visually-hidden">Note: </span>Both are visible to anyone who can open the file – in the page source and in git history once pushed.</p></div>
     </div>
   </section></figure><figure class="state"><figcaption><strong>name cleared</strong> – what that means, said under the field</figcaption><section class="settings" aria-labelledby="s14">
     <h2 class="erf-comment-settings__title" id="s14">Comments</h2>
@@ -253,9 +265,9 @@
         
       </div>
     </div>
-    <div class="erf-comment-banner erf-comment-banner--info" style="margin: var(--space-4) 0 0">
-      <span class="erf-comment-banner__icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0"></path><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg></span>
-      <div class="erf-comment-banner__body"><p class="erf-comment-banner__text">Both are visible to anyone who can open the file – in the page source and in git history once pushed.</p></div>
+    <div class="erf-banner erf-banner--info" style="margin: var(--space-4) 0 0">
+      <span class="erf-banner__icon" aria-hidden="true"><svg data-icon="info" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></span>
+      <div class="erf-banner__body"><p class="erf-banner__text"><span class="erf-visually-hidden">Note: </span>Both are visible to anyone who can open the file – in the page source and in git history once pushed.</p></div>
     </div>
   </section></figure><figure class="state"><figcaption><strong>malformed email</strong> – checked on blur</figcaption><section class="settings" aria-labelledby="s15">
     <h2 class="erf-comment-settings__title" id="s15">Comments</h2>
@@ -280,12 +292,12 @@
         <p class="erf-comment-settings__desc" id="s15-ed">Also saved into the file. Leave empty to keep it out.</p></div>
       <div class="erf-comment-settings__control">
         <input class="erf-comment-input" id="s15-e" type="email" autocomplete="email" value="marcin@" aria-describedby="s15-ed s15-ee" aria-invalid="true" tabindex="-1">
-        <p class="erf-comment-error" id="s15-ee"><span aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0"></path><path d="m15 9-6 6"></path><path d="m9 9 6 6"></path></svg></span><span>That doesn't look like an email address.</span></p>
+        <p class="erf-comment-error" id="s15-ee"><span aria-hidden="true"><svg data-icon="circle-x" width="14" height="14" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg></span><span>That doesn't look like an email address.</span></p>
       </div>
     </div>
-    <div class="erf-comment-banner erf-comment-banner--info" style="margin: var(--space-4) 0 0">
-      <span class="erf-comment-banner__icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0"></path><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg></span>
-      <div class="erf-comment-banner__body"><p class="erf-comment-banner__text">Both are visible to anyone who can open the file – in the page source and in git history once pushed.</p></div>
+    <div class="erf-banner erf-banner--info" style="margin: var(--space-4) 0 0">
+      <span class="erf-banner__icon" aria-hidden="true"><svg data-icon="info" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></span>
+      <div class="erf-banner__body"><p class="erf-banner__text"><span class="erf-visually-hidden">Note: </span>Both are visible to anyone who can open the file – in the page source and in git history once pushed.</p></div>
     </div>
   </section></figure><figure class="state"><figcaption><strong>feature off</strong> – the fields keep their values but take no input</figcaption><section class="settings" aria-labelledby="s16">
     <h2 class="erf-comment-settings__title" id="s16">Comments</h2>
@@ -313,9 +325,9 @@
         
       </div>
     </div>
-    <div class="erf-comment-banner erf-comment-banner--info" style="margin: var(--space-4) 0 0">
-      <span class="erf-comment-banner__icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0"></path><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg></span>
-      <div class="erf-comment-banner__body"><p class="erf-comment-banner__text">Both are visible to anyone who can open the file – in the page source and in git history once pushed.</p></div>
+    <div class="erf-banner erf-banner--info" style="margin: var(--space-4) 0 0">
+      <span class="erf-banner__icon" aria-hidden="true"><svg data-icon="info" width="16" height="16" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></span>
+      <div class="erf-banner__body"><p class="erf-banner__text"><span class="erf-visually-hidden">Note: </span>Both are visible to anyone who can open the file – in the page source and in git history once pushed.</p></div>
     </div>
   </section></figure></div>
 
@@ -325,12 +337,13 @@
   <tbody>
     <tr>
       <td>Info banner</td>
-      <td>The Feedback card has warning, error and success tones – no info tone.</td>
-      <td>The privacy notice under Settings › Comments, "Not visible now" and the read-only reason are neither
-        a problem nor a success, so the banner borrows the accent: <code>--color-brand-violet-muted</code> fill,
-        <code>--color-accent-primary</code> edge and icon. No new token: if the Feedback card gains an info tone,
-        <code>.erf-comment-banner--info</code> moves to it. Marked <code>deviates:</code> at the rule in
-        <code>CommentWindow.css</code>.</td>
+      <td>The Feedback card now proposes an info tone: <code>--color-info</code> at a 10% fill and a 30% edge
+        (<code>.erf-banner--info</code>), which these frames draw.</td>
+      <td>The app shipped before that tone existed: the privacy notice under Settings › Comments, "Not visible now"
+        and the read-only reason borrow the accent – <code>--color-brand-violet-muted</code> fill,
+        <code>--color-accent-primary</code> edge and icon. Marked <code>deviates:</code> at the rule in
+        <code>CommentWindow.css</code> and recorded in the Feedback card's Exceptions; it moves to the card's tone
+        once that tone is decided and its tokens exist.</td>
     </tr>
   </tbody>
 </table>

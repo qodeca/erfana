@@ -25,7 +25,7 @@ Use the project tree to create, move, rename, import, or delete files.
 
 ## What happens next / If something goes wrong
 
-Deletion cannot be undone. If the name already exists, select Skip, Keep both, or Replace. A name cannot contain `/ \ : * ? " < > |`. Keyboard users can do all of this from the tree's row menu (<kbd>Shift</kbd>+<kbd>F10</kbd>) – see [keyboard navigation](../reference/project-tree.md#keyboard-navigation).
+Deletion cannot be undone. If the name already exists, select Skip, Keep both, or Replace. A name cannot contain `/ \ : * ? " < > |`. Keyboard users can do all of this from the tree's row menu (<kbd>⇧F10</kbd> / <kbd>Shift+F10</kbd>) – see [keyboard navigation](../reference/project-tree.md#keyboard-navigation).
 
 ## Related
 

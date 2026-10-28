@@ -18,7 +18,7 @@ Erfana uses a Monaco text editor with Markdown formatting, a separate Find bar, 
 
 ## Editor commands
 
-**What they do:** Monaco supports its command palette, multiple cursors, undo and redo, selection and line operations. **How to reach them:** Focus the editor; press <kbd>F1</kbd> for the palette. Use <kbd>Alt</kbd>+<kbd>↑/↓</kbd> to move a line, <kbd>Cmd</kbd>+<kbd>D</kbd> (Windows: <kbd>Ctrl</kbd>+<kbd>D</kbd>) to select the next match, and <kbd>Alt</kbd>+select on both platforms to add a cursor. Erfana provides its own Find bar, not Monaco's find widget.
+**What they do:** Monaco supports its command palette, multiple cursors, undo and redo, selection and line operations. **How to reach them:** Focus the editor; press <kbd>F1</kbd> for the palette. Use <kbd>⌥↑</kbd> / <kbd>Alt+↑</kbd> and <kbd>⌥↓</kbd> / <kbd>Alt+↓</kbd> to move a line up or down, <kbd>⌘D</kbd> / <kbd>Ctrl+D</kbd> to select the next match, and hold <kbd>⌥</kbd> / <kbd>Alt</kbd> and select to add a cursor. Erfana provides its own Find bar, not Monaco's find widget.
 
 ## View modes and scroll sync
 
@@ -26,13 +26,13 @@ Erfana uses a Monaco text editor with Markdown formatting, a separate Find bar, 
 
 ## Formatting toolbar
 
-**What it does:** Apply **Bold**, **Italic**, **Strikethrough**, **Inline Code**, **Insert Link**, **Insert Image**, **Heading 1**, **Bullet List**, or **Numbered List** to the selection. **How to reach it:** Switch to Editor or Split mode, then select the toolbar control. <kbd>Cmd</kbd>+<kbd>I</kbd> and <kbd>Cmd</kbd>+<kbd>K</kbd> (Windows: <kbd>Ctrl</kbd>) also apply italic and link. The Bold key overlaps the global sidebar binding; use the toolbar if needed.
+**What it does:** Apply **Bold**, **Italic**, **Strikethrough**, **Inline Code**, **Insert Link**, **Insert Image**, **Heading 1**, **Bullet List**, or **Numbered List** to the selection. **How to reach it:** Switch to Editor or Split mode, then select the toolbar control. <kbd>⌘I</kbd> / <kbd>Ctrl+I</kbd> and <kbd>⌘K</kbd> / <kbd>Ctrl+K</kbd> also apply italic and link. The Bold key overlaps the global sidebar binding; use the toolbar if needed.
 
 ![Screenshot of the Markdown formatting toolbar.](../images/edit-and-preview/formatting-toolbar.png)
 
 ## Find bar
 
-**What it does:** Searches the open document; use next and previous controls, **Case sensitive**, and **Whole word**. **How to reach it:** <kbd>Cmd</kbd>+<kbd>F</kbd> (Windows: <kbd>Ctrl</kbd>+<kbd>F</kbd>). <kbd>Enter</kbd> and <kbd>Shift</kbd>+<kbd>Enter</kbd> move between matches, <kbd>Esc</kbd> closes it. With the find bar focused, <kbd>Cmd</kbd>+<kbd>Option</kbd>+<kbd>C</kbd>/<kbd>W</kbd> (Windows: <kbd>Alt</kbd>+<kbd>C</kbd>/<kbd>W</kbd>) toggle case sensitivity and whole word. See the [find-bar shortcut table](keyboard-shortcuts.md#editor-and-markdown-preview).
+**What it does:** Searches the open document; use next and previous controls, **Case sensitive**, and **Whole word**. **How to reach it:** <kbd>⌘F</kbd> / <kbd>Ctrl+F</kbd>. <kbd>Enter</kbd> and <kbd>⇧Enter</kbd> / <kbd>Shift+Enter</kbd> move between matches, <kbd>Esc</kbd> closes it. With the find bar focused, <kbd>⌥⌘C</kbd> / <kbd>Alt+C</kbd> toggles case sensitivity and <kbd>⌥⌘W</kbd> / <kbd>Alt+W</kbd> whole word. See the [find-bar shortcut table](keyboard-shortcuts.md#editor-and-markdown-preview).
 
 ## Statistics bar
 
@@ -42,4 +42,4 @@ Erfana uses a Monaco text editor with Markdown formatting, a separate Find bar, 
 
 ## Save and close
 
-**What it does:** Autosave writes after two seconds idle and during continued editing at least every 30 seconds. <kbd>Cmd</kbd>+<kbd>S</kbd> (Windows: <kbd>Ctrl</kbd>+<kbd>S</kbd>) saves the active buffer; <kbd>Cmd</kbd>+<kbd>W</kbd> (Windows: <kbd>Ctrl</kbd>+<kbd>W</kbd>) closes the active tab. An unsaved tab asks before closing. If the file changes outside Erfana, choose **Reload from Disk** or **Keep My Version**.
+**What it does:** Autosave writes after two seconds idle and during continued editing at least every 30 seconds. <kbd>⌘S</kbd> / <kbd>Ctrl+S</kbd> saves the active buffer; <kbd>⌘W</kbd> / <kbd>Ctrl+W</kbd> closes the active tab. An unsaved tab asks before closing. If the file changes outside Erfana, choose **Reload from Disk** or **Keep My Version**.

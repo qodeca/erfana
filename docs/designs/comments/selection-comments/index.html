@@ -11,6 +11,8 @@
 <link rel="stylesheet" href="../../../design-system/tokens.css">
 <link rel="stylesheet" href="../../../design-system/ds.css">
 <link rel="stylesheet" href="../../../design-system/system/components/menu/menu.css">
+<link rel="stylesheet" href="../../../design-system/system/components/button/button.css">
+<link rel="stylesheet" href="../../../design-system/system/components/feedback/feedback.css">
 <link rel="stylesheet" href="../html-comments/demo.css">
 <link rel="stylesheet" href="../html-comments/overlay.css">
 <link rel="stylesheet" href="../html-comments/comments.css">
@@ -25,7 +27,7 @@
   block (Markdown) that holds the words – so its place in the file, its pin and its thread work as they do
   today – and it also remembers the words, which stay underlined while they can be found.
   <strong>This card shows the HTML Preview, where selecting is new; the Markdown side is on the
-  <a href="../markdown-comments/index.html" style="color: var(--color-link)">Markdown cards</a>.</strong>
+  <a href="../markdown-comments/index.html">Markdown cards</a>.</strong>
 </p>
 <div class="ds-note">
   <strong>Proposed, and static.</strong> Plan: <code>docs/designs/comments/selection-comments.md</code>. No script: every
@@ -53,7 +55,7 @@
       <strong>moves 4 px or more</strong> selects text; a still click still opens the window on the element.
       Page scripts still never see the press.</p>
     <p class="step__text">The outline moves to the <strong>smallest element that holds the whole selection</strong>,
-      labelled <code>p.lede · selection</code>. Announced: "Text selected in p.lede. Press Shift+F10 to comment."</p>
+      labelled <code>p.lede · selection</code>. Announced: "Text selected in p.lede. Press ⇧F10 to comment." – the key as <code>formatShortcut</code> renders it on macOS; “Shift+F10” on Windows and Linux.</p>
   </div>
 </section>
 
@@ -67,14 +69,14 @@
     </div>
     <span class="still-tag">still image under the menu</span>
     <div class="erf-menu sel-float" role="menu" aria-label="Selection" style="--ds-inset-block-start: 96px; inset-block-start: var(--ds-inset-block-start); --ds-inset-inline-start: 260px; inset-inline-start: var(--ds-inset-inline-start);">
-      <div class="erf-menu-item erf-menu-item--active" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"></path><path d="M12 8v6"></path><path d="M9 11h6"></path></svg></span><span class="erf-menu-label">Add comment</span></div>
-      <div class="erf-menu-item" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 3a2 2 0 0 0-2 2"></path><path d="M19 3a2 2 0 0 1 2 2"></path><path d="M21 19a2 2 0 0 1-2 2"></path><path d="M5 21a2 2 0 0 1-2-2"></path><path d="M9 3h1"></path><path d="M9 21h1"></path><path d="M14 3h1"></path><path d="M14 21h1"></path><path d="M3 9v1"></path><path d="M21 9v1"></path><path d="M3 14v1"></path><path d="M21 14v1"></path></svg></span><span class="erf-menu-label">Comment on whole p.lede</span></div>
+      <div class="erf-menu-item erf-menu-item--active" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"><svg width="16" height="16" data-icon="message-square-plus" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/><path d="M12 8v6"/><path d="M9 11h6"/></svg></span><span class="erf-menu-label">Add comment</span></div>
+      <div class="erf-menu-item" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"><svg width="16" height="16" data-icon="square-dashed" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 3a2 2 0 0 0-2 2"/><path d="M19 3a2 2 0 0 1 2 2"/><path d="M21 19a2 2 0 0 1-2 2"/><path d="M5 21a2 2 0 0 1-2-2"/><path d="M9 3h1"/><path d="M9 21h1"/><path d="M14 3h1"/><path d="M14 21h1"/><path d="M3 9v1"/><path d="M21 9v1"/><path d="M3 14v1"/><path d="M21 14v1"/></svg></span><span class="erf-menu-label">Comment on whole p.lede</span></div>
     </div>
   </div></div></div>
   <div>
     <p class="step__no">2 · menu</p>
     <h3 class="step__title" id="h2">Two items: the words, or the whole element</h3>
-    <p class="step__text">Right-click, Shift+F10 or the Menu key. Menu label <strong>"Selection"</strong>.
+    <p class="step__text">Right-click, <kbd>⇧F10</kbd> / <kbd>Shift+F10</kbd> or the Menu key. Menu label <strong>"Selection"</strong>.
       <strong>Add comment</strong> comments on the words and has focus; <strong>Comment on whole p.lede</strong>
       is today's element comment. Without a selection the menu is unchanged: one item.</p>
     <p class="step__text">The Markdown preview gets the same two items in comment mode.</p>
@@ -94,12 +96,12 @@
         <h2 class="erf-comment-window__title" id="w1-t" tabindex="-1">New comment</h2>
         <p class="erf-comment-window__context"><bdi dir="ltr">p.lede</bdi> · index.html, line 12</p>
         <span class="erf-sel-quote">ship by Friday</span>
-      </div><button class="erf-comment-icon-btn" type="button" aria-label="Close" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+      </div><button class="erf-comment-icon-btn" type="button" aria-label="Close" tabindex="-1"><svg width="16" height="16" data-icon="x" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div>
       <div class="erf-comment-window__body"><div class="erf-comment-field"><label class="erf-comment-field__label" for="f1">Comment</label>
         <textarea class="erf-comment-textarea" id="f1" placeholder="What should change here?" tabindex="-1">Friday is a holiday in two markets. Say Thursday.</textarea>
-        <div class="erf-comment-field__foot"><p class="erf-comment-field__hint">Plain text. Saved inside index.html.</p><span class="erf-comment-counter">49 / 4000</span></div></div>
+        <div class="erf-comment-field__foot"><p class="erf-comment-field__hint">Plain text. Saved inside index.html.</p><span class="erf-comment-counter">49 / <span data-claim="comment-max-chars" title="COMMENT_MAX_CHARS in commentFormat.ts – characters one comment or reply may hold">4000</span></span></div></div>
         <p class="erf-comment-identity">Commenting as <bdi>Marcin Obel</bdi> <button class="erf-comment-link" type="button" tabindex="-1">Change</button></p></div>
-      <div class="erf-comment-window__foot"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Cancel</span></button><button class="erf-comment-btn erf-comment-btn--primary" type="button" title="Save (Cmd+Enter)" tabindex="-1"><span>Save</span></button></div>
+      <div class="erf-comment-window__foot"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Cancel</span></button><button class="erf-comment-btn erf-comment-btn--primary" type="button" aria-keyshortcuts="Meta+Enter" tabindex="-1"><span>Save</span></button></div>
     </div>
   </div></div></div>
   <div>
@@ -134,17 +136,19 @@
 
 <!-- 5. select first -->
 <section class="sel-step" aria-labelledby="h5">
-  <div class="sel-row" style="margin: 0">
-    <figure><figcaption><strong>mode off</strong> · the page owns the mouse; select as usual</figcaption>
+  <div class="ds-frames sel-frames--pair">
+    <figure class="ds-frame">
       <div class="panel sel-mini"><div class="panel__body"><div class="page-area">
         <div class="page"><h4>Pricing</h4><p>Plans start at <span class="erf-sel-native">10 EUR</span> a month.</p></div>
-      </div></div></div></figure>
-    <figure><figcaption><strong>Cmd+Option+M</strong> · the window opens on the selection at once</figcaption>
+      </div></div></div>
+    <figcaption><span class="ds-frame__step">1</span><strong>mode off</strong> · the page owns the mouse; select as usual</figcaption></figure>
+    <figure class="ds-frame">
       <div class="panel sel-mini"><div class="panel__body"><div class="page-area">
         <div class="page"><h4>Pricing</h4><p>Plans start at <span class="erf-hpc-mark erf-hpc-mark--active">10 EUR</span> a month.</p></div>
         <div class="erf-hpc-root" aria-hidden="true"><div class="erf-hpc-frame"></div></div>
         <span class="still-tag">window opens beside – see step 3</span>
-      </div></div></div></figure>
+      </div></div></div>
+    <figcaption><span class="ds-frame__step">2</span><strong><kbd>⌥⌘M</kbd> / <kbd>Ctrl+Alt+M</kbd></strong> · the window opens on the selection at once</figcaption></figure>
   </div>
   <div>
     <p class="step__no">5 · select first</p>
@@ -157,87 +161,94 @@
 </section>
 
 <h2>States</h2>
-<div class="sel-row">
+<div class="ds-frames">
 
-  <figure><figcaption><strong>selection across elements</strong> · the container is their nearest common element</figcaption>
+  <figure class="ds-frame">
     <div class="panel sel-mini" style="block-size: 200px"><div class="panel__body"><div class="page-area">
       <div class="page"><div class="sel-anchor" style="margin-block-start: var(--space-12)"><h4>Plans</h4><p>Start <span class="erf-sel-native">free, then pay</span></p><p><span class="erf-sel-native">for what</span> you use.</p><span class="erf-hpc-outline" aria-hidden="true"></span><span class="erf-hpc-label" aria-hidden="true"><span class="erf-hpc-label__tag">section.plans</span><span class="erf-hpc-label__size">selection</span></span></div></div>
-    </div></div></div></figure>
+    </div></div></div>
+    <figcaption><span class="ds-frame__step">1</span><strong>selection across elements</strong> · the container is their nearest common element</figcaption></figure>
 
-  <figure><figcaption><strong>dark page</strong> · the ink line carries the underline on black</figcaption>
+  <figure class="ds-frame">
     <div class="panel sel-mini"><div class="panel__body"><div class="page-area">
       <div class="page page--dark"><h4>Pricing</h4><p>The target is to <span class="erf-hpc-mark">ship by Friday</span>, after the review.</p></div>
-    </div></div></div></figure>
+    </div></div></div>
+    <figcaption><span class="ds-frame__step">2</span><strong>dark page</strong> · the ink line carries the underline on black</figcaption></figure>
 
-  <figure class="sel-win"><figcaption><strong>refused</strong> · a script changed the words, so they are not in the file</figcaption>
+  <figure class="ds-frame">
     <div class="erf-comment-window" role="group" aria-label="Example: refused selection" aria-labelledby="w2-t">
       <div class="erf-comment-window__head"><div class="erf-comment-window__heading">
         <h2 class="erf-comment-window__title" id="w2-t" tabindex="-1">New comment</h2>
         <p class="erf-comment-window__context"><bdi dir="ltr">span.price</bdi> · index.html, line 30</p>
-      </div><button class="erf-comment-icon-btn" type="button" aria-label="Close" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+      </div><button class="erf-comment-icon-btn" type="button" aria-label="Close" tabindex="-1"><svg width="16" height="16" data-icon="x" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div>
       <div class="erf-comment-window__body">
-        <div class="erf-comment-banner erf-comment-banner--warning"><span class="erf-comment-banner__icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg></span>
-          <div class="erf-comment-banner__body"><p class="erf-comment-banner__text">This text isn't in index.html as written – a script may have changed it.</p>
-            <span class="erf-comment-quote">9.99 EUR / month</span>
-            <div class="erf-comment-banner__actions"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Comment on the whole element instead</span></button></div></div></div>
+        <div class="erf-banner erf-banner--warning"><span class="erf-banner__icon" aria-hidden="true"><svg width="16" height="16" data-icon="triangle-alert" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
+          <div class="erf-banner__body"><p class="erf-banner__text"><span class="erf-visually-hidden">Warning: </span>This text isn't in index.html as written – a script may have changed it.</p>
+            <span class="erf-comment-quote">9.99 EUR / month</span></div>
+          <div class="erf-banner__actions"><button class="erf-button erf-button--secondary erf-button--sm" type="button" tabindex="-1"><span>Comment on the whole element instead</span></button></div></div>
       </div>
       <div class="erf-comment-window__foot"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Cancel</span></button></div>
-    </div></figure>
+    </div>
+    <figcaption><span class="ds-frame__step">3</span><strong>refused</strong> · a script changed the words, so they are not in the file</figcaption></figure>
 
-  <figure class="sel-win"><figcaption><strong>script-built element</strong> · cannot be checked; accepted like today's script quote</figcaption>
+  <figure class="ds-frame">
     <div class="erf-comment-window" role="group" aria-label="Example: script-built" aria-labelledby="w3-t">
       <div class="erf-comment-window__head"><div class="erf-comment-window__heading">
         <h2 class="erf-comment-window__title" id="w3-t" tabindex="-1">New comment</h2>
         <p class="erf-comment-window__context"><bdi dir="ltr">div.toast</bdi> · index.html, line 61</p>
         <p class="erf-comment-note">Added by a script – saved before &lt;section id="pricing"&gt;.</p>
         <span class="erf-sel-quote">Saved!</span>
-      </div><button class="erf-comment-icon-btn" type="button" aria-label="Close" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+      </div><button class="erf-comment-icon-btn" type="button" aria-label="Close" tabindex="-1"><svg width="16" height="16" data-icon="x" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div>
       <div class="erf-comment-window__body"><div class="erf-comment-field"><label class="erf-comment-field__label" for="f3">Comment</label>
         <textarea class="erf-comment-textarea" id="f3" tabindex="-1">Say "Changes saved".</textarea>
-        <div class="erf-comment-field__foot"><p class="erf-comment-field__hint">Plain text. Saved inside index.html.</p><span class="erf-comment-counter">20 / 4000</span></div></div></div>
+        <div class="erf-comment-field__foot"><p class="erf-comment-field__hint">Plain text. Saved inside index.html.</p><span class="erf-comment-counter">20 / <span data-claim="comment-max-chars" title="COMMENT_MAX_CHARS in commentFormat.ts – characters one comment or reply may hold">4000</span></span></div></div></div>
       <div class="erf-comment-window__foot"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Cancel</span></button><button class="erf-comment-btn erf-comment-btn--primary" type="button" tabindex="-1"><span>Save</span></button></div>
-    </div></figure>
+    </div>
+    <figcaption><span class="ds-frame__step">4</span><strong>script-built element</strong> · cannot be checked; accepted like today's script quote</figcaption></figure>
 
-  <figure class="sel-win"><figcaption><strong>long selection</strong> · cut at 200 characters</figcaption>
+  <figure class="ds-frame">
     <div class="erf-comment-window" role="group" aria-label="Example: long selection" aria-labelledby="w4-t">
       <div class="erf-comment-window__head"><div class="erf-comment-window__heading">
         <h2 class="erf-comment-window__title" id="w4-t" tabindex="-1">New comment</h2>
         <p class="erf-comment-window__context"><bdi dir="ltr">section.terms</bdi> · index.html, line 80</p>
         <span class="erf-sel-quote">You can cancel at any time. Unused days are refunded to the card you paid with within ten working days, and your data stays available for export for thirty days after the end of the billing period, after which…</span>
         <p class="erf-comment-note" style="margin-block-start: var(--space-3)">Only the first 200 characters are kept.</p>
-      </div><button class="erf-comment-icon-btn" type="button" aria-label="Close" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+      </div><button class="erf-comment-icon-btn" type="button" aria-label="Close" tabindex="-1"><svg width="16" height="16" data-icon="x" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div>
       <div class="erf-comment-window__body"><div class="erf-comment-field"><label class="erf-comment-field__label" for="f4">Comment</label>
         <textarea class="erf-comment-textarea" id="f4" placeholder="What should change here?" tabindex="-1"></textarea>
-        <div class="erf-comment-field__foot"><p class="erf-comment-field__hint">Plain text. Saved inside index.html.</p><span class="erf-comment-counter">0 / 4000</span></div></div></div>
+        <div class="erf-comment-field__foot"><p class="erf-comment-field__hint">Plain text. Saved inside index.html.</p><span class="erf-comment-counter">0 / <span data-claim="comment-max-chars" title="COMMENT_MAX_CHARS in commentFormat.ts – characters one comment or reply may hold">4000</span></span></div></div></div>
       <div class="erf-comment-window__foot"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Cancel</span></button><button class="erf-comment-btn erf-comment-btn--primary" type="button" aria-disabled="true" tabindex="-1"><span>Save</span></button></div>
-    </div></figure>
+    </div>
+    <figcaption><span class="ds-frame__step">5</span><strong>long selection</strong> · cut at 200 characters</figcaption></figure>
 
-  <figure class="sel-win"><figcaption><strong>words changed</strong> · the element is found, the words are not; the pin stays</figcaption>
+  <figure class="ds-frame">
     <div class="erf-comment-window" role="group" aria-label="Example: words changed" aria-labelledby="w5-t">
       <div class="erf-comment-window__head"><div class="erf-comment-window__heading">
         <h2 class="erf-comment-window__title" id="w5-t" tabindex="-1">Comment on p.lede</h2>
         <p class="erf-comment-window__context"><bdi dir="ltr">p.lede</bdi> · index.html, line 12</p>
-      </div><button class="erf-comment-icon-btn" type="button" aria-label="Close" tabindex="-1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+      </div><button class="erf-comment-icon-btn" type="button" aria-label="Close" tabindex="-1"><svg width="16" height="16" data-icon="x" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div>
       <div class="erf-comment-window__body">
-        <div class="erf-comment-banner erf-comment-banner--info"><span class="erf-comment-banner__icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0"></path><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg></span>
-          <div class="erf-comment-banner__body"><p class="erf-comment-banner__text">The selected text changed. The comment is still on this element.</p><span class="erf-comment-quote">ship by Friday</span></div></div>
+        <div class="erf-banner erf-banner--info"><span class="erf-banner__icon" aria-hidden="true"><svg width="16" height="16" data-icon="info" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></span>
+          <div class="erf-banner__body"><p class="erf-banner__text"><span class="erf-visually-hidden">Note: </span>The selected text changed. The comment is still on this element.</p><span class="erf-comment-quote">ship by Friday</span></div></div>
         <article class="erf-comment-message"><div class="erf-comment-message__meta"><span class="erf-comment-message__meta-text"><bdi class="erf-comment-message__author">Marcin Obel</bdi> · <time datetime="2026-10-28T12:40">Today, 12:40</time></span></div>
           <p class="erf-comment-message__text" dir="auto">Friday is a holiday in two markets. Say Thursday.</p></article>
       </div>
       <div class="erf-comment-window__foot"><span class="erf-comment-window__foot-start"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Open in source</span></button></span><span class="erf-comment-window__foot-end"><button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Close</span></button></span></div>
-    </div></figure>
+    </div>
+    <figcaption><span class="ds-frame__step">6</span><strong>words changed</strong> · the element is found, the words are not; the pin stays</figcaption></figure>
 </div>
 
 <h2>Markdown preview – the same two items in comment mode</h2>
-<div class="sel-row">
-  <figure><figcaption><strong>comment mode, a selection</strong> · label "Selection"</figcaption>
+<div class="ds-frames">
+  <figure class="ds-frame">
     <div class="erf-mdc-panel" style="inline-size: 420px; --mdc-body-height: 190px"><div class="erf-mdc-panel__body"><div class="erf-mdc-preview">
       <div class="erf-mdc-content"><ul><li>Run the <span class="erf-mdc-selection">load test</span> against staging.</li></ul></div>
       <div class="erf-menu sel-float" role="menu" aria-label="Selection" style="--ds-inset-block-start: 70px; inset-block-start: var(--ds-inset-block-start); --ds-inset-inline-start: 120px; inset-inline-start: var(--ds-inset-inline-start);">
-        <div class="erf-menu-item erf-menu-item--active" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"></path><path d="M12 8v6"></path><path d="M9 11h6"></path></svg></span><span class="erf-menu-label">Add comment</span></div>
-        <div class="erf-menu-item" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 3a2 2 0 0 0-2 2"></path><path d="M19 3a2 2 0 0 1 2 2"></path><path d="M21 19a2 2 0 0 1-2 2"></path><path d="M5 21a2 2 0 0 1-2-2"></path><path d="M9 3h1"></path><path d="M9 21h1"></path><path d="M14 3h1"></path><path d="M14 21h1"></path><path d="M3 9v1"></path><path d="M21 9v1"></path><path d="M3 14v1"></path><path d="M21 14v1"></path></svg></span><span class="erf-menu-label">Comment on whole li</span></div>
+        <div class="erf-menu-item erf-menu-item--active" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"><svg width="16" height="16" data-icon="message-square-plus" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/><path d="M12 8v6"/><path d="M9 11h6"/></svg></span><span class="erf-menu-label">Add comment</span></div>
+        <div class="erf-menu-item" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"><svg width="16" height="16" data-icon="square-dashed" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 3a2 2 0 0 0-2 2"/><path d="M19 3a2 2 0 0 1 2 2"/><path d="M21 19a2 2 0 0 1-2 2"/><path d="M5 21a2 2 0 0 1-2-2"/><path d="M9 3h1"/><path d="M9 21h1"/><path d="M14 3h1"/><path d="M14 21h1"/><path d="M3 9v1"/><path d="M21 9v1"/><path d="M3 14v1"/><path d="M21 14v1"/></svg></span><span class="erf-menu-label">Comment on the whole list item</span></div>
       </div>
-    </div></div></div></figure>
+    </div></div></div>
+    <figcaption><span class="ds-frame__step">1</span><strong>comment mode, a selection</strong> · label "Selection"</figcaption></figure>
 </div>
 
 <h2>Exceptions</h2>

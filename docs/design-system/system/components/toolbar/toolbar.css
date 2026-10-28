@@ -11,7 +11,8 @@
  *   src/renderer/src/components/Panels/TerminalPanel/components/TerminalToolbar.css
  *   src/renderer/src/components/Panels/ImageViewerPanel/ImageViewerPanel.module.css
  * This file owns the ROW only. The icon button and the toggle inside it are
- * the Buttons card's button.css, and are never restyled here.
+ * the Buttons card's button.css, and are never restyled here – except their
+ * HEIGHT, which is the row's to set so every tool lines up (Tool height).
  *
  * The overflow rule is drawn with a container query: a group marked
  * collapsible leaves the row below a width, and the More button takes its
@@ -23,6 +24,14 @@
  */
 
 .erf-toolbar {
+  /* PROPOSED TOKEN, NOT YET IN design-tokens.css: --toolbar-tool-height, the
+     one height for a toolbar tool and anything that lines up with one (a
+     count button, a floating action). Adding the token is an owner decision.
+     Until then this card-private fallback carries the proposed value, which is
+     --input-height-sm's, so a find field in the row shares the tools' line.
+     Delete this line when the token lands and read var(--toolbar-tool-height). */
+  --erf-toolbar-tool-height: var(--input-height-sm);
+
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
@@ -56,6 +65,12 @@
   margin: 0 var(--space-4);
   background-color: var(--color-border-default);
 }
+
+/* Tool height: every button in the row – icon tools, toggles, view modes,
+   More and a menu button – takes the tool height, and an icon-only tool is a
+   square of it. Width beyond that is the button's own. */
+.erf-toolbar .erf-button { block-size: var(--erf-toolbar-tool-height); }
+.erf-toolbar .erf-button--icon { inline-size: var(--erf-toolbar-tool-height); }
 
 /* Pushes everything after it to the right edge. Not a control, not announced. */
 .erf-toolbar__spacer {

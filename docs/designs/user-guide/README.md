@@ -40,6 +40,16 @@ Wording rule for every page: Erfana **hosts** CLI agents in its terminal; it has
 Prompt templates send text to whatever agent runs in the terminal. The context meter is specific to
 Claude Code and reads Claude Code's own transcripts.
 
+## Cards it builds on
+
+The guide changes no app UI, so it builds on one card, for its words. It names app controls exactly as the app shows them, so where the app's own wording breaks the card, the guide quotes the app.
+
+| Card | Status | What this design takes from it |
+| --- | --- | --- |
+| [Writing – case](../../design-system/system/foundations/writing.html#case) | proposed | Sentence case in titles and body text; UI labels spelt as the app shows them |
+| [Writing – Erfana hosts the agent](../../design-system/system/foundations/writing.html#agent) | proposed | The no-AI rule above: Erfana hosts CLI agents and has no built-in AI; the context meter is Claude Code-specific |
+| [Writing – keyboard shortcuts](../../design-system/system/foundations/writing.html#shortcuts) | proposed | Key notation: one box per chord in glyph form, macOS first (`⌥⌘M / Ctrl+Alt+M`); reference tables keep a macOS and a Windows column. The guide follows the card (owner decision, 2026-10-28) |
+
 ## Screens
 
 The "screens" of this design are the guide's pages. None of them changes the app's UI; the
@@ -147,9 +157,10 @@ style guides in [research.md](research.md#style-guides)):
   UI labels in **bold**, spelt exactly as the app shows them (the inventory records the real labels –
   for example the setting is **Run HTML files**, not "Enable HTML preview").
 - "Select" rather than "click". Menu paths use `>`: **File > New Window**.
-- Keys: `<kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>M</kbd>` inline, macOS first, then Windows in
-  brackets: "press <kbd>Cmd</kbd>+<kbd>J</kbd> (Windows: <kbd>Ctrl</kbd>+<kbd>J</kbd>)". Reference
-  tables have separate **macOS** and **Windows** columns and never write `Cmd/Ctrl`.
+- Keys follow the [Writing card](../../design-system/system/foundations/writing.html#shortcuts): one `<kbd>` box per
+  chord in glyph form, macOS first, then Windows – "press <kbd>⌘J</kbd> / <kbd>Ctrl+J</kbd>". Reference tables have
+  separate **macOS** and **Windows** columns, each cell in that platform's form, and never write `Cmd/Ctrl`
+  (owner decision, 2026-10-28).
 - Commands a reader types go in code blocks, not screenshots (Google: no images of text). Terminal
   screenshots appear only where the picture carries something text cannot: the agent and the editor
   side by side, the status bar.
@@ -607,6 +618,11 @@ leader decided them that way (2026-09-25).
      auto-execute step in `docs/prompts/README.md`;
    - not filed: whether <kbd>Cmd</kbd>+<kbd>B</kbd> in the editor makes text bold or toggles the
      sidebar is unverified; a capture scene observes it and the guide states what happens.
+5. **Key notation – open, owner decision (2026-10-28).** The guide's key rule (split boxes,
+   spelled-out modifiers, separate macOS and Windows columns, under [Page template](#page-template))
+   conflicts with the Writing card's "Docs, cards and issues" row (one box per chord, `⌘B / Ctrl+B`).
+   Either the card's row changes or the guide's rule and `docs/user-guide/` do. Until then, both stay
+   as they are; converting `docs/user-guide/` is out of scope for the design-system pass.
 
 ## Developer handoff
 

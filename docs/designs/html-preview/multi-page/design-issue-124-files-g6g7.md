@@ -96,7 +96,7 @@ As built (the orchestrator's file list, each path checked with `wc -l`): the spe
 - C `e2e/pages/html-preview.navigation.ts` (plain functions)
 - M `e2e/html-preview-links.e2e.ts`
 - C in `e2e/fixtures/html-preview-corpus/design-set/`: `index.html` (overview: plain and `_self` links, a phone-width frame showing `pricing.html`), `pricing.html`, `about.html`, `contact.html` (each with `#section` anchors and links back), `styles.css`
-- M `e2e/fixtures/html-preview-corpus/links/index.html` (rows for the new rules: plain, `_self`, `_blank`, named target, Cmd-click, middle-click)
+- M `e2e/fixtures/html-preview-corpus/links/index.html` (rows for the new rules: plain, `_self`, `_blank`, named target, ⌘-click / Ctrl-click, middle-click)
 - C `e2e/fixtures/html-preview-corpus/links/base-self.html` (`<base target="_self">`)
 
 ### WI-26 – e2e part 4

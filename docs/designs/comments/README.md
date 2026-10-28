@@ -19,18 +19,26 @@ Markdown Preview, including comments on selected text. The written designs:
 
 ## Cards it builds on
 
+Status as on each card's line 1, 2026-10-28. A `proposed` card is the direction of travel, not settled law.
+
 | Card | Status | What this design takes from it |
 | --- | --- | --- |
 | [Permission band](../../design-system/system/components/permission-band/index.html) | `decided` | The comment tools in the HTML band, after Find |
-| [Focus and keyboard](../../design-system/system/foundations/focus.html) | `decided` | Focus rings and Tab order, with the exceptions listed in [`html-preview-comments.md`](html-preview-comments.md) §10.11 |
-| [Menu](../../design-system/system/components/menu/index.html) | `decided` | The comment menus |
-| [Rows and lists](../../design-system/system/components/row/index.html) | `decided` | The drawer's list of comments |
-| [Form controls](../../design-system/system/components/form/index.html) | `decided` | The comment textarea: multi-line, counter, Cmd/Ctrl+Enter |
+| [Focus and keyboard](../../design-system/system/foundations/focus.html) | `decided` | The one ring – outward, offset `--space-1` – and Tab order, with the exceptions listed in [`html-preview-comments.md`](html-preview-comments.md) §10.11 |
+| [Menu](../../design-system/system/components/menu/index.html) | `decided` | The comment menus. Where a disabled item's reason goes is not on this card; the Markdown screens propose a tooltip |
+| [Rows and lists](../../design-system/system/components/row/index.html) | `decided` | The drawer's list of comments. The drawer's two Tab stops per active row are a recorded deviation – the card's [Exceptions](../../design-system/system/components/row/index.html#exceptions) row "HTML-preview comments drawer" |
+| [Form controls](../../design-system/system/components/form/index.html) | `decided` | Borders, ring and error contract. The comment **textarea** (multi-line, counter, <kbd>⌘Enter</kbd> / <kbd>Ctrl+Enter</kbd>) is the card's *proposed addition*, not yet part of the decided card – it joins it when the comment window is promoted |
+| [Writing](../../design-system/system/foundations/writing.html) | `proposed` | The comment glossary – comment, thread, reply, icon, underline, selection, comment mode ([#glossary](../../design-system/system/foundations/writing.html#glossary)) – the Markdown kind nouns ([#kind-nouns](../../design-system/system/foundations/writing.html#kind-nouns)) and shortcut notation ([#shortcuts](../../design-system/system/foundations/writing.html#shortcuts)) |
+| [Text highlights](../../design-system/system/foundations/highlights.html) | `proposed` | The comment mark: `erf-comment`, `erf-comment-active` (same fill, double bar) and `erf-comment-changed`, the proposed `--color-comment-mark` tokens, the paint order under Find, and forced colours (`Mark` / `MarkText`) |
+| [Buttons](../../design-system/system/components/button/index.html), [Toolbar](../../design-system/system/components/toolbar/index.html) | `proposed` | The Markdown toolbar's comment tools as `.erf-button--icon` and `--toggle` in `.erf-toolbar`; the Markdown toolbar keeps 32 × 28 tools and one Tab stop per control, as shipped |
+| [Feedback](../../design-system/system/components/feedback/index.html) | `proposed` | Banners inside the window (`.erf-banner`) with the spoken severity word – which the shipped `CommentBanner` still lacks |
+| [Badges, chips and keys](../../design-system/system/components/badge/index.html) | `proposed` | The open count and the needs-attention count (`.erf-counter`, `.erf-counter--attention`), the drawer's badge |
+| [Tooltip](../../design-system/system/components/tooltip/index.html) | `proposed` | Tool names and shortcuts; the reason on a disabled menu item, tied by `aria-describedby` |
+| [Empty, loading and error states](../../design-system/system/patterns/states/index.html) | `proposed` | The empty drawer (`.erf-state--inline`) |
+| [Drawer](../../design-system/system/patterns/drawer/index.html) | `proposed` | The comments drawer's shell – flow sibling, width, header, controls band, one scroller |
+| [Segmented control](../../design-system/system/components/segmented/index.html) | `proposed` | The drawer's Open / Resolved / Needs attention filter |
 | [Colours](../../design-system/system/foundations/colors.html), [Layering](../../design-system/system/foundations/layering.html), [Motion](../../design-system/system/foundations/motion.html) | `proposed` | Colour pairings, the top-layer and dialog rungs, the one-shot flash |
-| [Icons](../../design-system/system/components/icon/index.html), [Buttons](../../design-system/system/components/button/index.html), [Feedback](../../design-system/system/components/feedback/index.html), [Badges, chips and keys](../../design-system/system/components/badge/index.html) | `proposed` | The pin and glyphs, inline destructive confirmation, banners inside the window, the drawer's badge |
-| [Writing](../../design-system/system/foundations/writing.html), [Forced colours](../../design-system/system/foundations/forced-colors.html) | `proposed` | The comment glossary; how marks look in forced colours |
-
-The comment mark has no system card yet: it stays on [`comments-v2/marks.html`](comments-v2/marks.html) until it is adopted ([`comments-v2.md`](comments-v2.md) R-03).
+| [Icons](../../design-system/system/components/icon/index.html), [Forced colours](../../design-system/system/foundations/forced-colors.html) | `proposed` | The registry glyphs (`<svg data-icon>`); how marks and the overlay look in forced colours |
 
 ## Screens
 

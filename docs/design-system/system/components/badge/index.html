@@ -41,6 +41,7 @@
          background: var(--color-bg-tertiary); border: var(--border-width) solid var(--color-border-default);
          font-size: var(--text-sm); color: var(--color-text-primary); }
   .forced-hover { background: var(--color-bg-hover-solid); }
+  .bd-lime { color: var(--color-brand-lime); }
 
   pre.markup { margin: 0 0 var(--space-12); padding: var(--space-8); overflow-x: auto;
                background: var(--color-bg-secondary); border: var(--border-width) solid var(--color-border-default);
@@ -53,7 +54,7 @@
 <h1>Badges, chips and keys</h1>
 <p class="ds-meta"><span class="ds-status" data-status="proposed">proposed</span> not yet reviewed</p>
 <p class="ds-lede" id="decision">
-  Five small labels, one rule: <strong>the text is the information</strong> – a number, a letter, a word, a key
+  Every small label, one rule: <strong>the text is the information</strong> – a number, a letter, a word, a key
   name – and colour only repeats it. Whatever a badge says on screen is also said in words to a screen reader,
   in the name of the thing it is attached to. Nothing here is colour alone, and nothing here hides in a
   <code>title</code>.
@@ -64,8 +65,12 @@
   <tbody>
     <tr><td><span class="erf-badge">3</span> Badge</td><td>A count or a presence pinned to an activity-bar icon</td><td>Text inside a sentence – that is a counter</td></tr>
     <tr><td><span class="erf-git" data-git="modified">M</span> Git badge</td><td>One file's or folder's git state, at the end of its tree row</td><td>Anything that is not git</td></tr>
-    <tr><td><span class="erf-counter">12</span> Counter</td><td>A neutral count next to a label, in the text flow</td><td>A warning – a count that needs attention uses the Feedback card's colours and words</td></tr>
+    <tr><td><span class="erf-badge erf-badge--dot"></span> Dot</td><td>Presence, or something the user has not seen yet – the unseen dot is this same <code>.erf-badge--dot</code></td><td>A count – a count is a number</td></tr>
+    <tr><td><span class="erf-counter">12</span> Counter</td><td>A neutral count next to a label, in the text flow</td><td>A count that needs attention – that is the attention counter</td></tr>
+    <tr><td><span class="erf-counter erf-counter--attention">2</span> Attention counter</td><td>A count the user should act on: failed hosts, unresolved threads</td><td>A neutral count, or a count beside lime</td></tr>
     <tr><td><span class="erf-chip">draft</span> Chip</td><td>A short static label, or a compact button that opens something</td><td>A primary action – use a button</td></tr>
+    <tr><td><span class="erf-chip erf-chip--outline">Changed</span> Outline chip</td><td>Neutral news the reader may want to look at: Changed, Edited</td><td>Anything that needs action</td></tr>
+    <tr><td><span class="erf-chip erf-chip--accent">New</span> Accent chip</td><td>Something the reader has not seen yet: New</td><td>More than one per row</td></tr>
     <tr><td><kbd class="erf-kbd">⌘S</kbd> Key</td><td>A keyboard shortcut, shown where the user can read it</td><td>A shortcut that is only in a tooltip</td></tr>
   </tbody>
 </table>
@@ -96,6 +101,15 @@ the one interactive label, the action chip, has <a href="#keyboard">a keyboard c
       <div class="abar-name"><span>“Terminal, a session is running”</span><span>“Terminal”</span></div>
     </div>
     <figcaption><strong>Presence, and none</strong> – a square dot means “something is happening here” and is allowed only because the name says what. Zero shows no badge at all, never a “0”.</figcaption>
+  </figure>
+  <figure class="ds-frame">
+    <div class="abar-row" inert aria-hidden="true">
+      <div class="abar">
+        <div class="abar__item"><svg data-icon="message-square" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></svg><span class="erf-badge erf-badge--dot"></span></div>
+      </div>
+      <div class="abar-name"><span>“Comments, new since you last looked”</span></div>
+    </div>
+    <figcaption><strong>Unseen</strong> – the same <code>.erf-badge--dot</code>, not a second class. What makes it “unseen” is the name; the dot clears when the user opens the item.</figcaption>
   </figure>
 </div>
 
@@ -144,6 +158,14 @@ the one interactive label, the action chip, has <a href="#keyboard">a keyboard c
     </div>
     <figcaption><strong>One, two and four digits</strong> – tabular figures, so a counter that ticks does not jitter. The label beside it is part of the same name: “Comments, 3”.</figcaption>
   </figure>
+  <figure class="ds-frame">
+    <div class="surface-primary" inert aria-hidden="true">
+      <div class="line"><span>Blocked hosts</span><span class="erf-counter">12</span><span class="erf-counter erf-counter--attention">2</span></div>
+      <br>
+      <div class="line"><span>Threads</span><span class="erf-counter erf-counter--attention">3</span></div>
+    </div>
+    <figcaption><strong>Attention</strong> – <code>.erf-counter--attention</code>: an amber fill, ink text, and a ▲ before the number. The triangle and the number carry it; the amber only repeats it. The words go in the parent's name: “Blocked hosts, 12, 2 failed”. The triangle has empty alternative text, so it is never read aloud.</figcaption>
+  </figure>
 </div>
 
 <h3 id="chip">Chip</h3>
@@ -167,6 +189,22 @@ the one interactive label, the action chip, has <a href="#keyboard">a keyboard c
       </div>
     </div>
     <figcaption><strong>Action: resting, hover, focus, open</strong> – a button that looks like a chip, at least 24px tall. The caret repeats <code>aria-expanded</code>; it is never the only sign. The Permission band's host chip is this shape.</figcaption>
+  </figure>
+  <figure class="ds-frame">
+    <div class="surface-secondary" inert aria-hidden="true">
+      <div class="line"><span class="erf-chip">draft</span><span class="erf-chip erf-chip--outline">Changed</span><span class="erf-chip erf-chip--accent">New</span></div>
+      <br>
+      <div class="line"><span>plan.md</span><span class="erf-chip erf-chip--outline">Edited</span></div>
+    </div>
+    <figcaption><strong>Tones: plain, outline, accent</strong> – <code>.erf-chip--outline</code> is neutral news (an accent edge: Changed, Edited); <code>.erf-chip--accent</code> is something the reader has not seen (a violet fill: New), one per row at most. The word is the information in every tone.</figcaption>
+  </figure>
+  <figure class="ds-frame">
+    <div class="surface-secondary" inert aria-hidden="true">
+      <div class="line"><span class="erf-counter erf-counter--attention">2</span><span class="erf-chip erf-chip--accent">New</span></div>
+      <br>
+      <div class="line"><span class="erf-counter erf-counter--attention">2</span><span class="bd-lime">3 approved</span></div>
+    </div>
+    <figcaption><strong>Right, then wrong</strong> – amber beside violet reads as two things. Amber beside lime text does not: both are bright yellows that differ mostly in hue, which many readers cannot see. Never put amber text or the attention counter right beside a lime fill or lime text.</figcaption>
   </figure>
 </div>
 
@@ -223,6 +261,15 @@ and its modifiers are read, wrapped and spaced as one thing. How a shortcut is w
     <tr><td>Today's folder dot, conflicted</td><td><code>--color-git-conflicted</code> on <code>--color-bg-tertiary</code></td><td data-contrast="--color-git-conflicted on --color-bg-tertiary" data-min="3" data-result="pass">4.40:1 · pass</td></tr>
     <tr><td>Counter and chip text</td><td><code>--color-text-primary</code> on <code>--color-bg-tertiary</code></td><td data-contrast="--color-text-primary on --color-bg-tertiary" data-min="4.5" data-result="pass">9.53:1 · pass</td></tr>
     <tr><td>Action chip, hover</td><td><code>--color-text-primary</code> on <code>--color-bg-hover-solid</code></td><td data-contrast="--color-text-primary on --color-bg-hover-solid" data-min="4.5" data-result="pass">8.64:1 · pass</td></tr>
+    <tr><td>Attention counter, ink on amber</td><td><code>--color-text-on-accent</code> on <code>--color-warning</code></td><td data-contrast="--color-text-on-accent on --color-warning" data-min="4.5" data-result="pass">8.00:1 · pass</td></tr>
+    <tr><td>Attention counter, white on amber (why not white)</td><td><code>--color-white</code> on <code>--color-warning</code></td><td data-contrast="--color-white on --color-warning" data-min="4.5" data-result="fail">2.30:1 · fail</td></tr>
+    <tr><td>Attention fill against a panel</td><td><code>--color-warning</code> on <code>--color-bg-secondary</code></td><td data-contrast="--color-warning on --color-bg-secondary" data-min="3" data-result="pass">5.94:1 · pass</td></tr>
+    <tr><td>Attention fill against the editor</td><td><code>--color-warning</code> on <code>--color-bg-primary</code></td><td data-contrast="--color-warning on --color-bg-primary" data-min="3" data-result="pass">8.00:1 · pass</td></tr>
+    <tr><td>Outline chip edge</td><td><code>--color-accent-primary</code> on <code>--color-bg-secondary</code></td><td data-contrast="--color-accent-primary on --color-bg-secondary" data-min="3" data-result="pass">6.23:1 · pass</td></tr>
+    <tr><td>Outline chip text</td><td><code>--color-text-primary</code> on <code>--color-bg-secondary</code></td><td data-contrast="--color-text-primary on --color-bg-secondary" data-min="4.5" data-result="pass">8.54:1 · pass</td></tr>
+    <tr><td>Accent chip text</td><td><code>--color-text-on-accent</code> on <code>--color-brand-violet</code></td><td data-contrast="--color-text-on-accent on --color-brand-violet" data-min="4.5" data-result="pass">8.39:1 · pass</td></tr>
+    <tr><td>Accent chip fill against a panel</td><td><code>--color-brand-violet</code> on <code>--color-bg-secondary</code></td><td data-contrast="--color-brand-violet on --color-bg-secondary" data-min="3" data-result="pass">6.23:1 · pass</td></tr>
+    <tr><td>Amber against lime (why they never touch – a bare measurement)</td><td><code>--color-warning</code> on <code>--color-brand-lime</code></td><td data-contrast="--color-warning on --color-brand-lime">1.74:1</td></tr>
     <tr><td>Key label</td><td><code>--color-text-bright</code> on <code>--color-bg-primary</code></td><td data-contrast="--color-text-bright on --color-bg-primary" data-min="4.5" data-result="pass">14.00:1 · pass</td></tr>
     <tr><td>Key edge (decorative – the label carries it)</td><td><code>--color-border-subtle</code> on <code>--color-bg-tertiary</code></td><td data-contrast="--color-border-subtle on --color-bg-tertiary">1.59:1</td></tr>
   </tbody>
@@ -250,6 +297,9 @@ covers the badge, git or key styles yet.</p>
     <tr><td>Git, folder</td><td><code>M</code> outlined</td><td>“docs, contains modified files”</td><td>As for a file.</td></tr>
     <tr><td>Git, a change</td><td>The letter swaps</td><td>“plan.md is now staged”, once</td><td>One polite status region for the tree, not one per row (#95).</td></tr>
     <tr><td>Counter</td><td><code>3</code></td><td>“Comments, 3”</td><td>Plain text beside its label, read as one name.</td></tr>
+    <tr><td>Attention counter</td><td><code>▲ 2</code></td><td>“Blocked hosts, 2 failed”</td><td>The words go in the parent's name; the counter is <code>aria-hidden</code> and the triangle has empty alternative text.</td></tr>
+    <tr><td>Dot, unseen</td><td>A square</td><td>“Comments, new since you last looked”</td><td>The item's name; the dot is <code>aria-hidden</code>.</td></tr>
+    <tr><td>Chip, outline or accent</td><td><code>Changed</code>, <code>New</code></td><td>“plan.md, changed”</td><td>The word is visible text; the tone adds nothing a listener needs.</td></tr>
     <tr><td>Key</td><td><code>⌘F</code></td><td>“Command F” where the caption is read; the control says it via <code>aria-keyshortcuts="Meta+F"</code></td><td>Visible text and the attribute, never <code>title</code> alone.</td></tr>
   </tbody>
 </table>
@@ -281,6 +331,36 @@ covers the badge, git or key styles yet.</p>
     <tr><td><code>.chat-tooltip-content kbd</code></td><td><code>Editor/DiagramViewer/ChatBubble.css</code></td><td>The third style: a different surface, border and size.</td></tr>
   </tbody>
 </table>
+
+<h2 id="tokens">Tokens</h2>
+<table class="ds-tokens">
+  <thead><tr><th>Token</th><th>Value</th><th>Used for</th></tr></thead>
+  <tbody>
+    <tr><td><code>--color-brand-violet</code></td><td><code data-token="--color-brand-violet">#A0A8FF</code></td><td>Badge fill, accent chip fill</td></tr>
+    <tr><td><code>--color-accent-primary</code></td><td><code data-token="--color-accent-primary">#A0A8FF</code></td><td>Outline chip edge (an alias of the violet)</td></tr>
+    <tr><td><code>--color-warning</code></td><td><code data-token="--color-warning">#cca700</code></td><td>Attention counter fill</td></tr>
+    <tr><td><code>--color-text-on-accent</code></td><td><code data-token="--color-text-on-accent">#161312</code></td><td>Ink on every violet or amber fill</td></tr>
+    <tr><td><code>--text-xs</code></td><td><code data-token="--text-xs">10px</code></td><td>Badge, counter and git letter – a mockup size inside <code>erf-</code> classes, never documentation text</td></tr>
+  </tbody>
+</table>
+
+<section id="open-defects">
+<h2>Open defects this card names</h2>
+<ul class="ds-muted">
+  <li><strong>The folder git dot is colour alone</strong> (#95) – <code>.git-status-dot</code>; renamed measures under 3:1 (the table above).</li>
+  <li><strong>The git counts read as letters</strong> – <code>GitStatusBar.tsx</code> renders “M3”, read aloud as “M3”; renamed has no count.</li>
+  <li><strong>The activity-bar badge keeps its value in <code>title</code></strong> – <code>ActivityBarBadge.tsx</code>; both sources return <code>null</code> today, so nothing renders yet.</li>
+  <li><strong>No attention count and no tones ship yet</strong> – the attention counter and the chip tones are proposals; no app class draws them.</li>
+</ul>
+</section>
+
+<h2 id="related">Related</h2>
+<ul class="ds-muted">
+  <li><a href="../../foundations/colors.html">Colours</a> – owns every token named here.</li>
+  <li><a href="../feedback/index.html">Feedback</a> – the severity words a banner or toast uses; the attention counter is the inline count, not a banner.</li>
+  <li><a href="../../foundations/writing.html#shortcuts">Writing – Keyboard shortcuts</a> – owns how a shortcut is spelled.</li>
+  <li><a href="../permission-band/index.html">Permission band</a> – the action chip's reference.</li>
+</ul>
 
 <section id="exceptions">
 <h2>Exceptions</h2>

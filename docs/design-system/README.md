@@ -41,9 +41,9 @@ defects on its first run: a warning strip that was permanently visible because `
 
 | Path | What it is |
 |---|---|
-| `system/foundations/` | Colours, typography, spacing, surfaces and elevation, focus and keyboard, motion, layering, theme (dark only, text selection), terminal and code colours, forced colours, writing |
-| `system/components/` | Badges, buttons, feedback, form controls, icons, menu, permission band, rows and lists, splitter, tabs, toolbar, tooltip – one folder each, with its `index.html` card and its component CSS |
-| `system/patterns/` | Recurring flows built from components: the dialog, and the empty, loading and error states – one folder each, like a component |
+| `system/foundations/` | Colours, typography, spacing, surfaces and elevation, focus and keyboard, motion, layering, theme (dark only, text selection), terminal and code colours, forced colours, text highlights (`highlights.html`), writing, brand (`brand.html`) |
+| `system/components/` | Badges, buttons, feedback, form controls, icons, menu, permission band, rows and lists, segmented control (`segmented/`), splitter, status bar (`status-bar/`), tabs, toolbar, tooltip – one folder each, with its `index.html` card and its component CSS |
+| `system/patterns/` | Recurring flows built from components: the dialog, the drawer (`drawer/`), and the empty, loading and error states – one folder each, like a component |
 | `ds.css`, `fonts.css` | Hand-written page chrome for the documentation itself |
 | `claims.json` | The claims ledger: every count or ratio a card quotes, with the code that derives it |
 | `tokens.css`, `fonts/`, `index.html`, `deviations.html` | **Generated** by `scripts/design-sync.mjs` – never edit |
@@ -119,6 +119,37 @@ The page's own headings step down from the h1 (`--ds-text-title`, one step above
 attribute name in prose takes `class="ds-nowrap"`, because a browser may wrap inline code after any hyphen.
 
 `ds-` is reserved for `ds.css`; card-private helpers use a card prefix (`dl-`, `tt-`, `ic-` …).
+
+## A third-party page in a drawing
+
+Several cards and screens draw the HTML preview, and the preview shows someone else's page – a native view Erfana
+does not style. `ds.css` owns the one stand-in for it, so no card or screen declares its own hex page:
+
+```html
+<div class="ds-foreign-page">
+  <p class="ds-foreign-page__heading">Pricing</p>
+  <p class="ds-foreign-page__body">Plans start at … <span class="ds-foreign-page__link">Compare plans</span></p>
+  <div class="ds-foreign-page__missing">Image not loaded</div>
+</div>
+```
+
+| Class | Draws |
+|---|---|
+| `.ds-foreign-page` | The page: white paper, a serif body face, its own text colour, clipped to its box |
+| `__heading`, `__body`, `__link` | A heading, a paragraph and an underlined link in the page's own blue |
+| `__missing` | A resource the page asked for and did not get – a blocked image or frame – as a dashed placeholder |
+| `--hidden` | The fail-safe: the page is hidden but keeps its space, as when Erfana stops trusting it (Permission band) |
+
+Its colours and face are deliberately **not** Erfana tokens – they sit in one `stylelint-disable` block in `ds.css`
+that says why – because the drawing exists to show where Erfana stops and untrusted content begins. Its sizes and
+spacing are tokens, and no text in it is below 13px.
+
+**One known exception.** The comment screens (`docs/designs/comments/html-comments/`, `selection-comments/` and
+`comments-v2/`) still draw the page with the older `.page` stand-in in `docs/designs/comments/html-comments/demo.css`.
+Their overlay outlines, labels and marks are placed at coordinates measured against that page's own padding and
+type (for example `top: 81.2344px` on `html-comments/overlay.html`), so moving them onto `.ds-foreign-page` means
+re-measuring every overlay frame, not swapping a class. `demo.css` says so at the block; new screens use
+`.ds-foreign-page`, and no screen adds to `.page`.
 
 ## The one rule
 
@@ -264,9 +295,11 @@ card should probably absorb.
 ### Component CSS: proposed or adopted
 
 **Proposed** – authored here, no home in `src/` yet: under `system/components/`, `badge/badge.css`,
-`button/button.css`, `menu/menu.css`, `row/row.css`, `splitter/splitter.css`, `tabs/tabs.css`,
-`toolbar/toolbar.css` and `tooltip/tooltip.css`; under `system/patterns/`, `dialog/dialog.css` and
-`states/states.css`. (`row.css` and `tabs.css` are *consolidations* when adopted: the app already ships their
+`button/button.css`, `feedback/feedback.css`, `form/form.css`, `menu/menu.css`, `row/row.css`, `segmented/segmented.css`,
+`splitter/splitter.css`, `status-bar/status-bar.css`, `tabs/tabs.css`, `toolbar/toolbar.css` and `tooltip/tooltip.css`; under
+`system/patterns/`, `dialog/dialog.css`, `drawer/drawer.css` and `states/states.css`. Each also sits in
+`PROPOSED_NOT_YET_ADOPTED` in `scripts/design-claims.test.mjs`, which fails on a stylesheet that is neither listed
+there nor synced. (`row.css` and `tabs.css` are *consolidations* when adopted: the app already ships their
 rules several times over, under several class names. Their headers carry the list.)
 
 **Adopted** – the file lives in `src/`, and `scripts/design-sync.mjs` (`COMPONENT_CSS`) copies it back here so
@@ -305,7 +338,8 @@ A card decides; the app has to catch up. Checked on 2026-10-28 against GitHub an
 | Control heights | The button heights and the field heights do not pair, so a button beside a field never lines up. Both scales are baked on their cards: [Buttons § heights](system/components/button/index.html#heights), [Form controls § sizes](system/components/form/index.html#sizes) | [Buttons](system/components/button/index.html), [Form controls](system/components/form/index.html) |
 | [#431](https://github.com/qodeca/erfana/issues/431) | Deleting a file or folder is permanent (`rm`), with no way back. The owner chose the system trash on 2026-10-28; the Dialog card keeps "deleted permanently" until the app changes | Dialog |
 | [#432](https://github.com/qodeca/erfana/issues/432) | Success and warning banners share an olive tint, because `--color-success` is the brand lime. The owner chose a distinct green on 2026-10-28; it needs a `design-tokens.css` change | Feedback |
-| Focus after Cancel on the permission band | After Cancel, and after a failed approval, focus goes to the row's *Allow* button. The card returns it to the chip – the owner confirmed the chip on 2026-10-28, so this is a defect, not an exception | [Permission band](system/components/permission-band/index.html) |
+| Menu item reason line | The Menu card lets an item carry a visible reason line (`aria-describedby`), but `ContextMenu.tsx:26` has no field for it, so the comment menu's disabled "Can't comment here" ships with no reason (`PreviewCommentsLayer.tsx:111`) | [Menu](system/components/menu/index.html) |
+| Comment field against the Form card | The comment window keeps its own copy of the field rules (`erf-comment-*`); its hover darkens the border instead of brightening it and also reacts on read-only fields (`CommentWindow.css:300`); the too-long message types "4,000" instead of reading `COMMENT_MAX_CHARS` (`commentCopy.ts:279`) | [Form controls](system/components/form/index.html) |
 | Confirm inside the list clamp | `.erf-band__confirm` renders inside `.erf-band__scroll`, whose height is clamped (`PreviewChromeBand.css:215`). With one row and the question, the content is taller than the clamp, and at a narrower band Cancel and Confirm are cut and must be scrolled to – against "one question, on screen in full". The card's frames draw what ships and give the measurements | [Permission band](system/components/permission-band/index.html) |
 | Renamed folder dot | `.git-status-dot[data-git-status="renamed"]` paints `--color-git-renamed`, which fails 3:1 on the sidebar; the badge and the file name already use `--color-git-renamed-light` (`ProjectTree/ProjectTree.css:620`) | [Colours](system/foundations/colors.html) |
 | Tab height literals | `EditorTab.css:19` and `ImageTab.css:22` type a pixel height, and their close buttons type `border-radius: 0`, instead of reading `--tab-height` and the radius token as `HtmlPreviewTab.css` does | [Surfaces and elevation](system/foundations/surfaces.html), [Tabs](system/components/tabs/index.html) |
@@ -332,6 +366,10 @@ A card decides; the app has to catch up. Checked on 2026-10-28 against GitHub an
 | Dialog buttons | `.dialog-btn` departs from the button scale: its height comes from padding (`Dialog/Dialog.css:120`), `transition: all` (`:126`) and a letter-spacing literal (`:127`). The full list is the Buttons card's Exceptions table | [Buttons](system/components/button/index.html) |
 | Load error looks empty | `EditorLoadError` uses the empty state's class (`Panels/EditorLoadError.tsx:36`), so a failure looks exactly like nothing to show | [Empty, loading and error states](system/patterns/states/index.html) |
 | Crash heading | "Erfana stopped unexpectedly." is a heading that ends with a full stop; the Writing card puts no full stop on a title (`RootErrorFallback.tsx:55`, `RootErrorBoundary.tsx:61`) | [Empty, loading and error states](system/patterns/states/index.html), [Writing](system/foundations/writing.html) |
+| Em dashes in shipped strings | The permission band's confirm sentence and approval failures, its truncation line, and the clipboard toast use an em dash (`PreviewBandConfirm.tsx:169`–`170`, `permissionBand.logic.ts:354`–`372`, `PreviewChromeBand.tsx:420`, `textClipboard.ts:44`–`46`) | [Writing](system/foundations/writing.html) |
+| "block" in comment strings | "Delete block", "Delete block…" and "This block contains git conflict markers" use a word the Writing card keeps out of the UI (`commentCopy.ts:251`, `:252`, `:257`) | [Writing](system/foundations/writing.html) |
+| User guide shortcut notation | `docs/user-guide` writes one box per key with spelled-out modifiers (`<kbd>Cmd</kbd>+<kbd>B</kbd>`), against the card's one box per chord. **Owner decision pending** on which one changes | [Writing](system/foundations/writing.html) |
+| Unicode marks | "Allowed ✓" reads the glyph aloud (`PreviewBandRow.tsx:64`); emoji marks ship in the terminal error state and broken links (`TerminalStatusContent.tsx:71`, `markdownLinkResolver.ts:407`) | [Icons](system/components/icon/index.html) |
 
 ### Fixed (kept for history)
 

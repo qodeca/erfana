@@ -130,6 +130,35 @@
   color: var(--color-text-tertiary);
 }
 
+/* The reason line: a second line under an item that says why – mainly why a
+   disabled item is disabled ("Can't comment here" / "Comments can't be added
+   to the frontmatter."). It is PART of the item, not a stop: it sits inside the
+   menuitem, the arrows move past it with the item, and typeahead matches the
+   label only. The item links it with aria-describedby and takes its name from
+   the label with aria-labelledby, so the reason is read once, as a description.
+   --color-text-tertiary, set explicitly, so a disabled item's reason does NOT
+   inherit the dim disabled colour: the label may be inactive, but the reason
+   is information and has to clear 4.5:1.
+   This file leads the app here (decided 2026-10-28): ContextMenuItem has no
+   field for a reason yet – the Menu card lists it under its defects. */
+.erf-menu-item--described {
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.erf-menu-desc {
+  flex: 1 0 100%;
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-base);
+  color: var(--color-text-tertiary);
+  white-space: normal;
+}
+
+/* Under the label, not under the icon: indent by the icon column when there is one. */
+.erf-menu-item--described:has(> .erf-menu-icon) > .erf-menu-desc {
+  padding-inline-start: calc(var(--icon-size-sm) + var(--space-4));
+}
+
 .erf-menu-separator {
   height: var(--border-width);
   margin: var(--space-2) 0;

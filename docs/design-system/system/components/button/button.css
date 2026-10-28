@@ -13,6 +13,8 @@
  *   - no translateY lift on hover (motion that carries no meaning);
  *   - no letter-spacing literal (0.2px was the one tracking value in the app);
  *   - secondary hover really changes something (fill, edge and label);
+ *   - disabled dims the content and the fill, never the button, so the focus
+ *     ring keeps full strength (the shipped band and comment-window rule);
  *   - every state also has a .is-* hook so the card can draw it statically.
  *
  * .is-hover, [class~='is-active'] and .is-focus are documentation-only hooks; they never
@@ -128,19 +130,21 @@
 .erf-button--icon:is(:hover, [class~='is-hover']) { background: var(--color-bg-hover); color: var(--color-text-bright); }
 .erf-button--icon:is(:active, [class~='is-active']) { background: var(--color-bg-hover-solid); color: var(--color-text-bright); }
 
-/* Toggle: aria-pressed carries the state. Pressed is a fill AND a lime bottom
-   edge – the permission band's toggle signature – never colour alone (1.4.1).
-   A radio in a toolbar's one-of-many group (role="radio", aria-checked) wears
-   the same look; the Toolbar card's view-mode group is the case.
+/* Toggle: aria-pressed carries the state. Pressed (ON) is a fill AND a lime
+   bottom edge – the permission band's toggle signature – never colour alone
+   (1.4.1). A radio in a toolbar's one-of-many group (role="radio",
+   aria-checked) is FILLED only, with no lime foot, so a view-mode group read
+   beside on/off toggles says "one of these" rather than "on". The Toolbar
+   card's view-mode group is the case.
    Resting text is tertiary: secondary measures under 4.5:1 on a panel, and a
    toggle usually carries a word, not only a glyph. */
 .erf-button--toggle { color: var(--color-text-tertiary); }
 .erf-button--toggle:is(:hover, [class~='is-hover']) { background: var(--color-bg-hover); color: var(--color-text-bright); }
 .erf-button--toggle:is([aria-pressed='true'], [aria-checked='true']) {
   background: var(--color-bg-selected);
-  border-block-end-color: var(--color-brand-lime);
   color: var(--color-text-bright);
 }
+.erf-button--toggle[aria-pressed='true'] { border-block-end-color: var(--color-brand-lime); }
 
 /* Text: an action that reads as a link but does something (Retry, Show more).
    A real navigation is an <a>, not this. */
@@ -155,42 +159,101 @@
 .erf-button--text:is(:hover, [class~='is-hover']) { color: var(--color-link-hover); }
 .erf-button--text:is(:active, [class~='is-active']) { color: var(--color-brand-violet-active); }
 
+/* ---------- menu button ---------- */
+
+/* A button that opens a menu: the label, then a chevron-down caret
+   (<svg class="erf-button__caret" data-icon="chevron-down">). It carries
+   aria-haspopup="menu" and aria-expanded; the caret turns and the button keeps
+   the hover fill while the menu is open, and both only repeat aria-expanded.
+   Combine it with a variant (--secondary, --ghost); the variant decides the
+   resting look, this class only the caret and the open state. */
+.erf-button--menu { gap: var(--space-2); }
+.erf-button--menu .erf-button__caret {
+  inline-size: var(--icon-size-xs);
+  block-size: var(--icon-size-xs);
+  color: var(--color-text-tertiary);
+}
+.erf-button--menu[aria-expanded='true'] {
+  background: var(--color-bg-hover-solid);
+  color: var(--color-text-bright);
+}
+.erf-button--menu[aria-expanded='true'] .erf-button__caret {
+  transform: rotate(180deg);
+  color: var(--color-text-bright);
+}
+
 /* ---------- disabled and busy ---------- */
 
-/* Disabled: one rule for every variant. Hover and active do nothing, which is
-   why each variant's hover rule is overridden here rather than guarded with
-   :not(:disabled) in seven places. */
-.erf-button:is(:disabled, [aria-disabled='true']),
-.erf-button:is(:disabled, [aria-disabled='true']):is(:hover, [class~='is-hover'], :active, [class~='is-active']) {
-  opacity: var(--opacity-disabled);
+/*
+ * Disabled: one rule for every variant, and THE DIM GOES ON THE CONTENT,
+ * NEVER ON THE BUTTON. `opacity` on the button makes a group that includes the
+ * button's own focus outline, so an aria-disabled button that holds focus (a
+ * blocked Save, a Back with nowhere to go) would show a ring at a fraction of
+ * its strength – under the 3:1 a focus indicator needs (SC 1.4.11, 2.4.7).
+ * This is the rule that ships in PreviewChromeBand.css (.erf-band__tool,
+ * .erf-band__allow) and CommentWindow.css (.dialog-btn[aria-disabled]).
+ *
+ *   - the label and icon are dimmed: every child element (`> *`), so the label
+ *     is always an element – <span>Save</span>, never a bare text node;
+ *   - the fill and edge are dimmed by mixing the variant's own colour towards
+ *     transparent by the same amount, so the button looks as it did under the
+ *     old whole-button opacity;
+ *   - the ring is untouched and keeps full strength.
+ *
+ * Hover and active do nothing, which is why each variant's hover rule is
+ * overridden here rather than guarded with :not(:disabled) in seven places.
+ * Busy is excluded: busy is not disabled-looking.
+ */
+.erf-button:is(:disabled, [aria-disabled='true']):not([aria-busy='true']) {
+  --erf-button-dim: calc(var(--opacity-disabled) * 100%);
+
   cursor: not-allowed;
 }
-.erf-button--secondary:is(:disabled, [aria-disabled='true']):is(:hover, [class~='is-hover'], :active, [class~='is-active']) {
+.erf-button:is(:disabled, [aria-disabled='true']):not([aria-busy='true']) > * {
+  opacity: var(--opacity-disabled);
+}
+.erf-button--secondary:is(:disabled, [aria-disabled='true']):not([aria-busy='true']),
+.erf-button--secondary:is(:disabled, [aria-disabled='true']):not([aria-busy='true']):is(:hover, [class~='is-hover'], :active, [class~='is-active']) {
   background: transparent;
-  border-color: var(--color-border-subtle);
+  border-color: color-mix(in srgb, var(--color-border-subtle) var(--erf-button-dim), transparent);
   color: var(--color-text-primary);
 }
-.erf-button--ghost:is(:disabled, [aria-disabled='true']):is(:hover, [class~='is-hover'], :active, [class~='is-active']),
-.erf-button--icon:is(:disabled, [aria-disabled='true']):is(:hover, [class~='is-hover'], :active, [class~='is-active']),
-.erf-button--toggle:is(:disabled, [aria-disabled='true']):is(:hover, [class~='is-hover'], :active, [class~='is-active']) {
+.erf-button--ghost:is(:disabled, [aria-disabled='true']):not([aria-busy='true']):is(:hover, [class~='is-hover'], :active, [class~='is-active']),
+.erf-button--icon:is(:disabled, [aria-disabled='true']):not([aria-busy='true']):is(:hover, [class~='is-hover'], :active, [class~='is-active']),
+.erf-button--toggle:is(:disabled, [aria-disabled='true']):not([aria-busy='true']):is(:hover, [class~='is-hover'], :active, [class~='is-active']),
+.erf-button--menu:is(:disabled, [aria-disabled='true']):not([aria-busy='true']) {
   background: transparent;
 }
-.erf-button--primary:is(:disabled, [aria-disabled='true']):is(:hover, [class~='is-hover'], :active, [class~='is-active']) {
-  background: var(--color-btn-primary-bg);
+.erf-button--toggle:is([aria-pressed='true'], [aria-checked='true']):is(:disabled, [aria-disabled='true']) {
+  background: color-mix(in srgb, var(--color-bg-selected) var(--erf-button-dim), transparent);
+  border-block-end-color: color-mix(in srgb, var(--color-brand-lime) var(--erf-button-dim), transparent);
 }
-.erf-button--danger:is(:disabled, [aria-disabled='true']):is(:hover, [class~='is-hover'], :active, [class~='is-active']) {
-  background: var(--color-btn-danger-bg);
+.erf-button--toggle[aria-checked='true']:is(:disabled, [aria-disabled='true']) { border-block-end-color: transparent; }
+.erf-button--primary:is(:disabled, [aria-disabled='true']):not([aria-busy='true']),
+.erf-button--primary:is(:disabled, [aria-disabled='true']):not([aria-busy='true']):is(:hover, [class~='is-hover'], :active, [class~='is-active']) {
+  background: color-mix(in srgb, var(--color-btn-primary-bg) var(--erf-button-dim), transparent);
+}
+.erf-button--danger:is(:disabled, [aria-disabled='true']):not([aria-busy='true']),
+.erf-button--danger:is(:disabled, [aria-disabled='true']):not([aria-busy='true']):is(:hover, [class~='is-hover'], :active, [class~='is-active']) {
+  background: color-mix(in srgb, var(--color-btn-danger-bg) var(--erf-button-dim), transparent);
   border-color: transparent;
 }
+
+/* Blocked: a primary that cannot run yet because a required field is empty.
+   It is NOT a third look – it is this same disabled rule on aria-disabled
+   (never `disabled`), so it stays in the tab order, keeps its full ring when
+   focused, and names what is missing through aria-describedby. No class. */
 
 /* Busy: the action is running. The button keeps its width and its label, adds
    a spinner, and stays focusable (aria-disabled, not disabled) so focus is not
    thrown to <body> mid-action. The label may change ("Saving…"); the width
-   may not jump. */
-/* Busy is not disabled-looking: full opacity, so the label stays readable
-   while the work runs. */
-.erf-button[aria-busy='true'],
-.erf-button[aria-busy='true']:is(:hover, [class~='is-hover']) { opacity: 1; cursor: progress; }
+   may not jump. Busy is not disabled-looking: full strength, so the label stays
+   readable while the work runs.
+
+   THIS ::before RING IS THE ONLY BUSY SPINNER. Feature CSS must not add a
+   second one (an icon, a pseudo-element or a States-card .erf-progress inside
+   the button); a button that shows progress shows it here. */
+.erf-button[aria-busy='true'] { cursor: progress; }
 .erf-button[aria-busy='true']::before {
   content: '';
   flex: 0 0 auto;
@@ -218,5 +281,7 @@
 @media (forced-colors: active) {
   .erf-button { border-color: ButtonText; }
   .erf-button--text { border-color: transparent; }
-  .erf-button--toggle:is([aria-pressed='true'], [aria-checked='true']) { border-block-end-color: Highlight; }
+  .erf-button--toggle[aria-pressed='true'] { border-block-end-color: Highlight; }
+  .erf-button--toggle[aria-checked='true'] { border-color: Highlight; }
+  .erf-button:is(:disabled, [aria-disabled='true']) { border-color: GrayText; color: GrayText; }
 }

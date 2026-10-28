@@ -1,4 +1,4 @@
-<!-- @card group="Patterns" name="Dialog" subtitle="One modal shell – scrim, header, scrolling body, footer – and the focus contract BaseDialog keeps" status="proposed" reviewed="never" answers="Add a dialog; Ask the user to confirm a destructive action; Ask for a name in a dialog" -->
+<!-- @card group="Patterns" name="Dialog" subtitle="One modal shell – scrim, header, scrolling body, footer – and the focus contract BaseDialog keeps" status="proposed" reviewed="never" answers="Add a dialog; Ask the user to confirm a destructive action; Ask for a name in a dialog; Ask save or discard; Place a dialog beside what it is about; Confirm a delete inside a dialog" -->
 <!-- SPDX-License-Identifier: GPL-3.0-only -->
 <!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
 <!DOCTYPE html>
@@ -47,6 +47,26 @@
               font-size: var(--text-sm); color: var(--color-error); }
 
   .erf-dialog__icon svg { width: 100%; height: 100%; }
+
+  /* Anchored frames: a stand-in page with one picked element. Positions are the
+     component's job in the app; here they are fixed per frame. */
+  .dl-stage--narrow { max-inline-size: calc(var(--comments-window-width) + var(--space-10)); }
+  .dl-page { padding: var(--space-8); }
+  .dl-target { /* mockup: app scale */ inline-size: 30%; padding: var(--space-4) var(--space-6); margin-bottom: var(--space-6);
+               outline: var(--border-width-thick) dashed var(--color-accent-primary); color: var(--color-text-primary);
+               font-size: var(--text-lg); font-weight: var(--font-semibold); }
+  .dl-target--right { margin-inline-start: auto; }
+  .dl-at-right { inset-block-start: var(--space-24); inset-inline-start: calc(30% + var(--space-16)); }
+  .dl-at-left { inset-block-start: var(--space-24); inset-inline-end: calc(30% + var(--space-16)); }
+  /* Frame-only cap so the picture shows the body scrolling. */
+  .dl-at-short { max-block-size: calc(var(--comments-window-width) - var(--space-8)); }
+  .dl-textarea { /* mockup: app scale */ display: block; min-block-size: calc(var(--input-height-md) * 2); padding: var(--space-4) var(--space-6);
+                 margin-bottom: var(--space-4); background: var(--color-bg-input); border: var(--border-width) solid var(--color-border-input);
+                 color: var(--color-text-primary); font-size: var(--text-base); }
+  .dl-textarea.is-focus { outline-offset: var(--space-1); }
+  .dl-thread { padding: var(--space-4) 0; border-bottom: var(--border-width) solid var(--color-border-default); }
+  .dl-thread__meta { /* mockup: app scale */ margin: 0; font-size: var(--text-sm); color: var(--color-text-tertiary); }
+  .dl-thread__text { /* mockup: app scale */ margin: var(--space-2) 0 0; font-size: var(--text-base); color: var(--color-text-primary); }
   /* A class name in the anatomy table stays on one line. */
   #anatomy + table td:nth-child(2) > code { white-space: nowrap; }
 </style>
@@ -83,7 +103,11 @@
     <tr><td>Container</td><td><code>.erf-dialog</code></td><td><code>role="dialog"</code>, <code>aria-modal="true"</code>, <code>aria-labelledby</code> the title. Width from <code>--dialog-min-width</code> (<code data-token="--dialog-min-width">500px</code>) to <code>--dialog-max-width</code> (<code data-token="--dialog-max-width">800px</code>), shrinking with a narrow window. Edge <code>--color-border-subtle</code>, depth <code>--shadow-dialog</code>, corners 0.</td></tr>
     <tr><td>Header</td><td><code>.erf-dialog__header</code></td><td>The title, an <code>h2</code> in <code>--text-xl</code>, and an optional decorative icon. The title says what is being decided: “Delete 3 files?”, not “Confirm”.</td></tr>
     <tr><td>Body</td><td><code>.erf-dialog__body</code></td><td>The only part that scrolls. <code>aria-describedby</code> points at a short message when there is exactly one.</td></tr>
-    <tr><td>Footer</td><td><code>.erf-dialog__footer</code></td><td>Actions on the right: Cancel, then the action that answers the title. A hint or count goes in <code>.erf-dialog__footer-start</code> on the left. The buttons are the <a href="../../components/button/index.html">Buttons</a> card's <code>.erf-button</code> variants; the dialogs ship <code>.dialog-btn</code> today, and its departures are listed in that card's <a href="../../components/button/index.html#exceptions">Exceptions</a>.</td></tr>
+    <tr><td>Footer</td><td><code>.erf-dialog__footer</code></td><td>Actions on the right: Cancel, then the action that answers the title. <code>.erf-dialog__footer-start</code> on the left holds one of: a hint, a count, a “Don't ask again” checkbox, or the <strong>discard answer</strong> of a save-or-discard question (“Don't save”, “Discard my changes”) as a danger button set apart from the default. The buttons are the <a href="../../components/button/index.html">Buttons</a> card's <code>.erf-button</code> variants; the dialogs ship <code>.dialog-btn</code> today, and its departures are listed in that card's <a href="../../components/button/index.html#exceptions">Exceptions</a>.</td></tr>
+    <tr><td>Clear layer</td><td><code>.erf-dialog-scrim--clear</code></td><td>The layer under an anchored dialog: it catches an outside click and paints nothing.</td></tr>
+    <tr><td>Anchored</td><td><code>.erf-dialog--anchored</code></td><td>Placed beside its target – right, left, below, above – inside the <a href="#anchored">anchored-dialog bounds</a>. Floating surface <code>--color-bg-elevated</code>.</td></tr>
+    <tr><td>Sheet</td><td><code>.erf-dialog--sheet</code></td><td>With <code>--anchored</code>, under 400px of room: full width across the foot of the area, top edge only.</td></tr>
+    <tr><td>Inline confirm</td><td><code>.erf-dialog-confirm</code></td><td>A destructive question in place of the item, inside the body: <code>__text</code>, then <code>__actions</code> with Cancel (focused) and a danger verb. Never a second dialog.</td></tr>
   </tbody>
 </table>
 
@@ -95,17 +119,34 @@
   <div class="dl-app"><div class="dl-app__line"></div><div class="dl-app__line"></div><div class="dl-app__line"></div><div class="dl-app__line"></div><div class="dl-app__line"></div><div class="dl-app__line"></div></div>
   <div class="erf-dialog-scrim">
     <div class="erf-dialog">
-      <div class="erf-dialog__header"><h2 class="erf-dialog__title">Save changes to notes.md?</h2></div>
-      <div class="erf-dialog__body"><p class="erf-dialog__message"><code>notes.md</code> has changes that are not saved. Closing the tab without saving loses them.</p></div>
+      <div class="erf-dialog__header"><span class="erf-dialog__icon erf-dialog__icon--warning"><svg data-icon="triangle-alert" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span><h2 class="erf-dialog__title">Save changes to notes.md?</h2></div>
+      <div class="erf-dialog__body"><p class="erf-dialog__message"><code>notes.md</code> is open in another tab with unsaved changes. Showing it here closes that tab – if you don't save, the changes are lost.</p></div>
       <div class="erf-dialog__footer">
-        <span class="erf-button erf-button--secondary">Don't save</span>
+        <span class="erf-dialog__footer-start"><span class="erf-button erf-button--danger">Don't save</span></span>
         <span class="erf-button erf-button--secondary">Cancel</span>
         <span class="erf-button erf-button--primary is-focus">Save</span>
       </div>
     </div>
   </div>
 </div>
-<figcaption><strong>Confirm</strong> – a question with a safe answer. Initial focus is Save, because pressing it loses nothing. Cancel, to its left, keeps the tab open; Don't save, leftmost, closes it and drops the changes.</figcaption>
+<figcaption><strong>Save or discard</strong> – a question with a safe answer. <strong>Save is the initial focus</strong>, because pressing it loses nothing. Cancel, beside it, keeps everything as it was. The discard answer, Don't save, is danger and <strong>sits apart</strong> in <code>.erf-dialog__footer-start</code>, so it is never next to the default – the macOS alert layout, which <code>UnsavedChangesDialog.tsx</code> ships on every platform.</figcaption>
+</figure>
+
+<figure class="ds-frame dl-frame-overflow">
+<div class="dl-stage" aria-hidden="true">
+  <div class="dl-app"><div class="dl-app__line"></div><div class="dl-app__line"></div><div class="dl-app__line"></div><div class="dl-app__line"></div><div class="dl-app__line"></div><div class="dl-app__line"></div></div>
+  <div class="erf-dialog-scrim">
+    <div class="erf-dialog">
+      <div class="erf-dialog__header"><span class="erf-dialog__icon erf-dialog__icon--warning"><svg data-icon="triangle-alert" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span><h2 class="erf-dialog__title">Discard your changes to notes.md?</h2></div>
+      <div class="erf-dialog__body"><p class="erf-dialog__message"><code>notes.md</code> changed on disk while another tab had unsaved changes to it. Showing it here closes that tab and keeps the version on disk.</p></div>
+      <div class="erf-dialog__footer">
+        <span class="erf-dialog__footer-start"><span class="erf-button erf-button--danger">Discard my changes</span></span>
+        <span class="erf-button erf-button--secondary is-focus">Cancel</span>
+      </div>
+    </div>
+  </div>
+</div>
+<figcaption><strong>Save or discard, conflict</strong> – the file changed on disk, so saving is not offered. Only two answers remain: Discard my changes, still apart on the left, and <strong>Cancel, which takes focus</strong> because it is now the only safe answer.</figcaption>
 </figure>
 
 <figure class="ds-frame dl-frame-overflow">
@@ -205,7 +246,7 @@
     <div class="erf-dialog dl-mid-rise">
       <div class="erf-dialog__header"><h2 class="erf-dialog__title">Save changes to notes.md?</h2></div>
       <div class="erf-dialog__body"><p class="erf-dialog__message"><code>notes.md</code> has changes that are not saved.</p></div>
-      <div class="erf-dialog__footer"><span class="erf-button erf-button--secondary">Don't save</span><span class="erf-button erf-button--secondary">Cancel</span><span class="erf-button erf-button--primary">Save</span></div>
+      <div class="erf-dialog__footer"><span class="erf-dialog__footer-start"><span class="erf-button erf-button--danger">Don't save</span></span><span class="erf-button erf-button--secondary">Cancel</span><span class="erf-button erf-button--primary">Save</span></div>
     </div>
   </div>
 </div>
@@ -219,13 +260,119 @@
     <div class="erf-dialog dl-mid-fade">
       <div class="erf-dialog__header"><h2 class="erf-dialog__title">Save changes to notes.md?</h2></div>
       <div class="erf-dialog__body"><p class="erf-dialog__message"><code>notes.md</code> has changes that are not saved.</p></div>
-      <div class="erf-dialog__footer"><span class="erf-button erf-button--secondary">Don't save</span><span class="erf-button erf-button--secondary">Cancel</span><span class="erf-button erf-button--primary">Save</span></div>
+      <div class="erf-dialog__footer"><span class="erf-dialog__footer-start"><span class="erf-button erf-button--danger">Don't save</span></span><span class="erf-button erf-button--secondary">Cancel</span><span class="erf-button erf-button--primary">Save</span></div>
     </div>
   </div>
 </div>
 <figcaption><span class="ds-frame__step">b</span><strong>Opening, reduced motion</strong> – the same moment with <code>prefers-reduced-motion: reduce</code>: the dialog is already where it will stay and only fades. Nothing moves. The rule is in <code>dialog.css</code>, not left to the app's global 1ms override.</figcaption>
 </figure>
 
+</div>
+
+<h2 id="anchored">Anchored dialog</h2>
+<p>A dialog <strong>about one thing on screen</strong> – a comment on an element of the HTML preview – is placed beside
+that thing, so the reader can see what they are writing about. It is still modal: <code>role="dialog"</code>,
+<code>aria-modal="true"</code>, the same focus trap, <kbd>Esc</kbd> and focus return. What changes is where it sits
+and what is behind it.</p>
+<ul>
+  <li><strong>No scrim.</strong> The layer under it (<code>.erf-dialog-scrim--clear</code>) still catches a click
+    outside, which closes the dialog, but paints nothing, so the rest of the window stays readable.</li>
+  <li><strong>Placement order:</strong> right of the target, then left, then below, then above – the first side with
+    room wins, so it <strong>flips</strong> at the window's edges. It always stays inside the area, less a
+    <code>--space-4</code> (<code data-token="--space-4">8px</code>) margin.</li>
+  <li><strong>The anchored-dialog bounds</strong> are <code>--comments-window-width</code>
+    (<code data-token="--comments-window-width">360px</code>, its usual width) and
+    <code>--comments-window-max-width</code> (<code data-token="--comments-window-max-width">480px</code>, its widest).
+    Its height never passes the area less the margin.</li>
+  <li><strong>Header and footer stay fixed</strong>; only the body scrolls, as in every dialog.</li>
+  <li><strong>Under 400px of room</strong> it becomes a sheet across the foot of the area (<code>.erf-dialog--sheet</code>):
+    full width, top edge only.</li>
+  <li>It floats over content, so it takes the floating surface <code>--color-bg-elevated</code>, an edge and
+    <code>--shadow-dialog</code> (<a href="../../foundations/surfaces.html">Surfaces</a>).</li>
+</ul>
+<div class="ds-frames dl-frames-wide">
+<figure class="ds-frame dl-frame-overflow">
+<div class="dl-stage" aria-hidden="true">
+  <div class="dl-page"><div class="dl-app__line"></div><div class="dl-app__line"></div><div class="dl-app__line"></div><div class="dl-target dl-target--left">Pricing</div><div class="dl-app__line"></div><div class="dl-app__line"></div><div class="dl-app__line"></div></div>
+  <div class="erf-dialog-scrim erf-dialog-scrim--clear">
+    <div class="erf-dialog erf-dialog--anchored  dl-at-right">
+      <div class="erf-dialog__header"><h2 class="erf-dialog__title">New comment</h2></div>
+      <div class="erf-dialog__body"><span class="dl-label">Comment</span><span class="dl-textarea is-focus">Show the yearly price next to the monthly one.</span></div>
+      <div class="erf-dialog__footer"><span class="erf-button erf-button--secondary">Cancel</span><span class="erf-button erf-button--primary">Save</span></div>
+    </div>
+  </div>
+</div>
+<figcaption><span class="ds-frame__step">1</span><strong>Right of the target</strong> – the first choice. The page behind is not dimmed; the target keeps its outline so the reader sees what the comment is about.</figcaption>
+</figure>
+<figure class="ds-frame dl-frame-overflow">
+<div class="dl-stage" aria-hidden="true">
+  <div class="dl-page"><div class="dl-app__line"></div><div class="dl-app__line"></div><div class="dl-app__line"></div><div class="dl-target dl-target--right">Pricing</div><div class="dl-app__line"></div><div class="dl-app__line"></div><div class="dl-app__line"></div></div>
+  <div class="erf-dialog-scrim erf-dialog-scrim--clear">
+    <div class="erf-dialog erf-dialog--anchored  dl-at-left">
+      <div class="erf-dialog__header"><h2 class="erf-dialog__title">New comment</h2></div>
+      <div class="erf-dialog__body"><span class="dl-label">Comment</span><span class="dl-textarea is-focus">Show the yearly price next to the monthly one.</span></div>
+      <div class="erf-dialog__footer"><span class="erf-button erf-button--secondary">Cancel</span><span class="erf-button erf-button--primary">Save</span></div>
+    </div>
+  </div>
+</div>
+<figcaption><span class="ds-frame__step">2</span><strong>Flipped to the left</strong> – the target is near the right edge, so there is no room on its right. Below and above are tried only when neither side fits.</figcaption>
+</figure>
+<figure class="ds-frame dl-frame-overflow">
+<div class="dl-stage dl-stage--tall" aria-hidden="true">
+  <div class="dl-page"><div class="dl-app__line"></div><div class="dl-app__line"></div><div class="dl-app__line"></div><div class="dl-target dl-target--left">Pricing</div><div class="dl-app__line"></div><div class="dl-app__line"></div><div class="dl-app__line"></div></div>
+  <div class="erf-dialog-scrim erf-dialog-scrim--clear">
+    <div class="erf-dialog erf-dialog--anchored erf-dialog--scrolls dl-at-right dl-at-short">
+      <div class="erf-dialog__header"><h2 class="erf-dialog__title">Comments on Pricing</h2></div>
+      <div class="erf-dialog__body"><div class="dl-thread"><p class="dl-thread__meta">Ana · 2 days ago</p><p class="dl-thread__text">Should this say “per seat”?</p></div>
+        <div class="dl-thread"><p class="dl-thread__meta">Marek · yesterday</p><p class="dl-thread__text">Yes – the plan is billed per seat. I will change it in the source.</p></div>
+        <div class="dl-thread"><p class="dl-thread__meta">Ana · today</p><p class="dl-thread__text">Thanks. Leaving this open until the page is rebuilt.</p></div>
+        <div class="dl-thread"><p class="dl-thread__meta">Marek · today</p><p class="dl-thread__text">Rebuilt – the heading now reads “Pricing per seat”.</p></div></div>
+      <div class="erf-dialog__footer"><span class="erf-button erf-button--secondary">Close</span><span class="erf-button erf-button--primary">Reply</span></div>
+    </div>
+  </div>
+</div>
+<figcaption><span class="ds-frame__step">3</span><strong>A long thread</strong> – the title and the buttons stay put; only the thread scrolls, with a line above and below the body.</figcaption>
+</figure>
+<figure class="ds-frame dl-frame-overflow">
+<div class="dl-stage dl-stage--narrow" aria-hidden="true">
+  <div class="dl-page"><div class="dl-app__line"></div><div class="dl-app__line"></div><div class="dl-app__line"></div><div class="dl-target dl-target--left">Pricing</div><div class="dl-app__line"></div><div class="dl-app__line"></div><div class="dl-app__line"></div></div>
+  <div class="erf-dialog-scrim erf-dialog-scrim--clear">
+    <div class="erf-dialog erf-dialog--anchored erf-dialog--sheet ">
+      <div class="erf-dialog__header"><h2 class="erf-dialog__title">New comment</h2></div>
+      <div class="erf-dialog__body"><span class="dl-label">Comment</span><span class="dl-textarea is-focus">Show the yearly price next to the monthly one.</span></div>
+      <div class="erf-dialog__footer"><span class="erf-button erf-button--secondary">Cancel</span><span class="erf-button erf-button--primary">Save</span></div>
+    </div>
+  </div>
+</div>
+<figcaption><span class="ds-frame__step">4</span><strong>Sheet, under 400px</strong> – too narrow to sit beside anything, so it spans the foot of the area and leaves the target visible above it.</figcaption>
+</figure>
+</div>
+
+<h2 id="inline-confirm">Inline destructive confirm</h2>
+<p>A delete <strong>inside</strong> a dialog asks in place, never with a second dialog on top. The question replaces the
+item that would go, in an error-tinted box (<code>.erf-dialog-confirm</code>, <code>--color-error-bg</code> with a
+<code>--color-error-border</code> edge). The question says what goes and whether it can be undone. <strong>Cancel comes
+first and takes focus</strong>; the danger button is on the right and its label is a verb (“Delete comment”, not
+“Yes”). <kbd>Esc</kbd> means Cancel and closes the question, not the dialog. The text measures
+<span data-contrast="--color-text-primary on --color-error-bg" data-min="4.5" data-result="pass">9.28:1 · pass</span> on the tint.</p>
+<div class="ds-frames dl-frames-wide">
+<figure class="ds-frame dl-frame-overflow">
+<div class="dl-stage" aria-hidden="true">
+  <div class="dl-page"><div class="dl-app__line"></div><div class="dl-app__line"></div><div class="dl-app__line"></div><div class="dl-target dl-target--left">Pricing</div><div class="dl-app__line"></div><div class="dl-app__line"></div><div class="dl-app__line"></div></div>
+  <div class="erf-dialog-scrim erf-dialog-scrim--clear">
+    <div class="erf-dialog erf-dialog--anchored  dl-at-right">
+      <div class="erf-dialog__header"><h2 class="erf-dialog__title">Comment on Pricing</h2></div>
+      <div class="erf-dialog__body"><div class="dl-thread"><p class="dl-thread__meta">Ana · 2 days ago</p><p class="dl-thread__text">Should this say “per seat”?</p></div>
+        <div class="erf-dialog-confirm" role="group" aria-labelledby="dl-confirm-text">
+          <p class="erf-dialog-confirm__text" id="dl-confirm-text">Delete this comment? It is removed from <code>pricing.html</code>. Git history keeps earlier versions.</p>
+          <div class="erf-dialog-confirm__actions"><span class="erf-button erf-button--secondary is-focus">Cancel</span><span class="erf-button erf-button--danger">Delete comment</span></div>
+        </div></div>
+      <div class="erf-dialog__footer"><span class="erf-button erf-button--secondary">Close</span><span class="erf-button erf-button--primary">Reply</span></div>
+    </div>
+  </div>
+</div>
+<figcaption><strong>Asking in place</strong> – the comment being deleted is replaced by the question; the one above it stays. Focus is on Cancel. After Cancel or <kbd>Esc</kbd> the comment comes back and focus returns to its Delete… button; after Delete comment, focus goes to the next comment, or to the body if none is left.</figcaption>
+</figure>
 </div>
 
 <h2 id="keyboard">The keyboard contract</h2>
@@ -240,6 +387,8 @@ the app test that holds the shipping component to each row; a row without one is
     <tr><td>Focus escapes (a backdrop click, a control disabled while focused)</td><td>The next <kbd>Tab</kbd> or the focusout rescue pulls focus back.</td><td>The first control, or <code>focusRescueRef</code>.</td><td><code>BaseDialog.test.tsx</code> – “trapFocus recovery of escaped focus”, “trapFocus focusout rescue”</td></tr>
     <tr><td><kbd>Esc</kbd></td><td>Closes the <strong>topmost</strong> dialog only, unless it sets <code>closeOnEscape={false}</code> – then nothing happens; it does not fall through.</td><td>The opener (next row).</td><td><code>overlayStack.test.ts</code> – “Escape”: runs only the topmost handler when two overlays are stacked</td></tr>
     <tr><td>The dialog closes</td><td>Focus goes back to the opener; if the opener is gone, to the tree or <code>[data-focus-return]</code> region it lived in. Focus the close action already moved elsewhere is left alone.</td><td>The opener.</td><td><code>BaseDialog.test.tsx</code> – “focus return on close”</td></tr>
+    <tr><td>A click outside an anchored dialog</td><td>The clear layer takes it and the dialog closes; a draft is kept, not lost.</td><td>The opener.</td><td>No app test named here</td></tr>
+    <tr><td><kbd>Esc</kbd> in an inline confirm</td><td>Cancels the question only; the item comes back. The dialog stays open.</td><td>The control that asked (for example Delete…).</td><td>No app test named here</td></tr>
     <tr><td><kbd>Enter</kbd> <kbd>Space</kbd></td><td>Activate the focused button. There is no hidden default button: <kbd>Enter</kbd> on Cancel cancels.</td><td>The opener, once the dialog closes.</td><td>No app test</td></tr>
     <tr><td>Screen reader</td><td><code>role="dialog"</code>, <code>aria-modal="true"</code> exactly while the trap is on, <code>aria-labelledby</code> the title, <code>aria-describedby</code> the message.</td><td>–</td><td><code>BaseDialog.test.tsx</code> – “modality and the trap travel together (#91)”. <code>aria-labelledby</code> on every dialog: <strong>no app test</strong></td></tr>
     <tr><td>Everything behind the scrim</td><td>Should be <code>inert</code>, so a pointer, <kbd>Tab</kbd> or a screen reader's virtual cursor cannot reach it.</td><td>–</td><td><strong>Not implemented, no app test</strong> – the app relies on <code>aria-modal</code> and the Tab trap alone (see Open defects)</td></tr>
@@ -271,6 +420,30 @@ the app test that holds the shipping component to each row; a row without one is
   &lt;/div&gt;
 &lt;/div&gt;</code></pre>
 
+<h2 id="adoption">Adoption</h2>
+<p class="ds-muted">Where each part of this card stands in the app, checked in <code>src/renderer/</code> on 2026-10-28.</p>
+<table>
+  <thead><tr><th>Part</th><th>Ships in</th><th>State</th></tr></thead>
+  <tbody>
+    <tr><td>The shell</td><td><code>Dialog/Dialog.css</code>, <code>BaseDialog.tsx</code></td><td>Ships as <code>.dialog-*</code>; differs in the container scroll (see Open defects).</td></tr>
+    <tr><td>Discard answer in <code>footer-start</code></td><td><code>Dialog/UnsavedChangesDialog.tsx</code> (the <code>.dialog-actions-left</code> slot)</td><td><strong>Matches.</strong> Don't save or Discard my changes as danger, set apart; Save focused, or Cancel in the conflict variant.</td></tr>
+    <tr><td>Anchored dialog and sheet</td><td><code>HtmlPreviewPanel/comments/CommentWindow.css</code>, <code>commentPlacement.ts</code></td><td>Ships as <code>.erf-comment-layer</code>, <code>.erf-comment-shell</code> and <code>.erf-comment-window</code> composed on <code>BaseDialog</code>. Its 560px height cap is a literal recorded on the comment window design, not here.</td></tr>
+    <tr><td>Inline confirm</td><td><code>HtmlPreviewPanel/comments/CommentWindow.css</code> (<code>.erf-comment-confirm</code>)</td><td>Ships under the comment name; would become <code>.erf-dialog-confirm</code> on adoption.</td></tr>
+  </tbody>
+</table>
+
+<h2 id="tokens">Tokens</h2>
+<table class="ds-tokens">
+  <thead><tr><th>Part</th><th>Token</th><th>Resolves to</th></tr></thead>
+  <tbody>
+    <tr><td>Scrim</td><td><code>--color-overlay-dialog</code></td><td><code data-token="--color-overlay-dialog">rgba(0, 0, 0, 0.75)</code></td></tr>
+    <tr><td>Centred width</td><td><code>--dialog-min-width</code> – <code>--dialog-max-width</code></td><td><code data-token="--dialog-min-width">500px</code> – <code data-token="--dialog-max-width">800px</code></td></tr>
+    <tr><td>Anchored width</td><td><code>--comments-window-width</code> – <code>--comments-window-max-width</code></td><td><code data-token="--comments-window-width">360px</code> – <code data-token="--comments-window-max-width">480px</code></td></tr>
+    <tr><td>Anchored surface</td><td><code>--color-bg-elevated</code></td><td><code data-token="--color-bg-elevated">#2d2d30</code></td></tr>
+    <tr><td>Inline confirm</td><td><code>--color-error-bg</code>, <code>--color-error-border</code></td><td><code data-token="--color-error-bg">#3c1f1f</code>, <code data-token="--color-error-border">#5c2e2e</code></td></tr>
+  </tbody>
+</table>
+
 <h2 id="open-defects">Open defects this card names</h2>
 <ul class="ds-muted">
   <li><strong>The page behind a dialog is not <code>inert</code>.</strong> A screen reader's virtual cursor and a pointer
@@ -282,6 +455,16 @@ the app test that holds the shipping component to each row; a row without one is
     <code>.erf-dialog__body</code> does here.</li>
   <li><strong>No test asserts a name.</strong> <code>BaseDialog.test.tsx</code> checks modality and the trap, but nothing
     fails if a dialog ships without <code>aria-labelledby</code> pointing at its title.</li>
+</ul>
+
+<h2 id="related">Related</h2>
+<ul class="ds-muted">
+  <li><a href="../../components/button/index.html">Buttons</a>: every footer and confirm button.</li>
+  <li><a href="../../foundations/focus.html">Focus</a>: the one ring, and why it never sits on a danger fill.</li>
+  <li><a href="../../foundations/layering.html">Layering</a>: the dialog rungs, including the clear layer.</li>
+  <li><a href="../../foundations/surfaces.html">Surfaces</a>: the elevated surface an anchored dialog floats on.</li>
+  <li><a href="../states/index.html">Empty, loading and error states</a>: what a dialog body shows while it waits.</li>
+  <li><a href="../../foundations/writing.html">Writing</a>: titles, verbs on buttons, Cancel's wording.</li>
 </ul>
 
 <section id="exceptions">

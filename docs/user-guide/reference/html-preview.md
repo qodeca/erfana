@@ -23,7 +23,7 @@ HTML preview runs a project page with its CSS and JavaScript in a sandboxed view
 
 ## Toolbar and navigation
 
-**What it does:** **Back** returns to the previous page; **Open links in this tab** changes link behavior; **Find** searches the page; the permission chip shows remote-host status; **Open in default browser** opens the page outside Erfana; **Export to PDF** saves it. **How to reach it:** toolbar above the page. Back/Forward keyboard navigation is <kbd>Cmd</kbd>+<kbd>[ / ]</kbd> (Windows: <kbd>Alt</kbd>+<kbd>←/→</kbd>). The tab keeps up to 50 history entries; external links ask before opening.
+**What it does:** **Back** returns to the previous page; **Open links in this tab** changes link behavior; **Find** searches the page; the permission chip shows remote-host status; **Open in default browser** opens the page outside Erfana; **Export to PDF** saves it. **How to reach it:** toolbar above the page. Back and Forward are <kbd>⌘[</kbd> and <kbd>⌘]</kbd> / <kbd>Alt+←</kbd> and <kbd>Alt+→</kbd>. The tab keeps up to 50 history entries; external links ask before opening.
 
 ![Screenshot of the HTML preview toolbar.](../images/html-preview/toolbar.png)
 
@@ -41,8 +41,8 @@ HTML preview runs a project page with its CSS and JavaScript in a sandboxed view
 
 ## Zoom and PDF
 
-**What they do:** **View > Actual Size / Zoom In / Zoom Out** apply to the focused page. <kbd>Cmd</kbd>+<kbd>S</kbd> (Windows: <kbd>Ctrl</kbd>+<kbd>S</kbd>) exports the page to PDF rather than saving HTML source. **How to reach them:** View menu, preview toolbar, or the active preview tab.
+**What they do:** **View > Actual Size / Zoom In / Zoom Out** apply to the focused page. <kbd>⌘S</kbd> / <kbd>Ctrl+S</kbd> exports the page to PDF rather than saving HTML source. **How to reach them:** View menu, preview toolbar, or the active preview tab.
 
 ## Comments
 
-**What it does:** Leave a comment on an element of the page. The comment is saved inside the `.html` file, right before the element, so it travels with the file through git and a coding agent reading the file sees it. A speech-bubble pin marks each commented element; the **Comments** drawer lists every comment as Open, Resolved or Needs attention. **How to reach it:** select **Comment mode** in the toolbar or press <kbd>Cmd</kbd>+<kbd>Option</kbd>+<kbd>M</kbd> (Windows: <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>M</kbd>), then click an element, or right-click it and choose **Add comment**. <kbd>Esc</kbd> leaves comment mode. The first comment asks for your name; change it, or turn comments off, in [Settings > Comments](settings.md#comments). Full detail, limits and when comments are unavailable: [HTML preview § Comments](../../html-preview/README.md#comments).
+**What it does:** Leave a comment on an element of the page. The comment is saved inside the `.html` file, right before the element, so it travels with the file through git and a coding agent reading the file sees it. A speech-bubble pin marks each commented element; the **Comments** drawer lists every comment as Open, Resolved or Needs attention. **How to reach it:** select **Comment mode** in the toolbar or press <kbd>⌥⌘M</kbd> / <kbd>Ctrl+Alt+M</kbd>, then click an element, or right-click it and choose **Add comment**. <kbd>Esc</kbd> leaves comment mode. The first comment asks for your name; change it, or turn comments off, in [Settings > Comments](settings.md#comments). Full detail, limits and when comments are unavailable: [HTML preview § Comments](../../html-preview/README.md#comments).

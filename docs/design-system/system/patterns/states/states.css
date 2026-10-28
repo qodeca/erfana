@@ -12,9 +12,17 @@
 
    Text colours are chosen for the surface a state actually lands on:
    - title: --color-text-primary, readable on every app surface;
-   - hint: --color-text-tertiary, never --color-text-secondary – secondary
-     fails 4.5:1 on --color-bg-tertiary (the project tree) and on
-     --color-bg-secondary, both of which host an empty state today.
+   - hint: --color-text-tertiary. Secondary fails 4.5:1 on
+     --color-bg-tertiary (the project tree) and on --color-bg-secondary, both
+     of which host an empty state today, so one class keeps tertiary everywhere;
+   - crash details: --color-text-secondary, which passes on
+     --color-bg-primary, the only surface the details sit on – matching the
+     shipping RootErrorBoundary.css (.root-error-meta, .root-error-stack).
+
+   Loading follows the card's timeline: nothing during the show delay, then
+   the progress sentence (words only, no spinner, when the wait cannot be
+   estimated), then one Stop at the escalation point. The timing is the
+   component's job; this file only draws each step.
    ========================================================================== */
 
 /* ---------- the shared block ---------- */
@@ -213,7 +221,7 @@
 }
 .erf-crash__meta {
   margin: 0;
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
   font-size: var(--text-base);
 }
 .erf-crash__stack {
@@ -221,7 +229,7 @@
   font-family: var(--font-mono);
   font-size: var(--text-sm);
   line-height: var(--leading-normal);
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
   white-space: pre-wrap;
   overflow-wrap: break-word;
 }

@@ -1,0 +1,377 @@
+<!-- @card group="Patterns" name="Drawer" subtitle="A side panel beside the content, not over it – header, fixed controls, a note that stays, and one scroller" status="proposed" reviewed="never" answers="Add a side panel to a view; Show a list beside a page; Make a panel that works at narrow widths" -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Drawer – Erfana design system</title>
+<link rel="stylesheet" href="../../../tokens.css">
+<link rel="stylesheet" href="../../../ds.css">
+<link rel="stylesheet" href="../../components/button/button.css">
+<link rel="stylesheet" href="../../components/badge/badge.css">
+<link rel="stylesheet" href="../../components/segmented/segmented.css">
+<link rel="stylesheet" href="../../components/row/row.css">
+<link rel="stylesheet" href="./drawer.css">
+<style>
+  /* Documentation-only scaffolding: a preview panel at the app's scale. */
+  .dr-frames { grid-template-columns: 1fr; }
+  .dr-panel { display: flex; flex-direction: column; block-size: calc(var(--space-20) * 9); max-inline-size: 100%;
+              border: var(--border-width) solid var(--color-border-default); }
+  .dr-w-wide { inline-size: calc(var(--space-20) * 22); }
+  .dr-w-narrow { inline-size: calc(var(--space-20) * 15); }
+  .dr-w-mid { inline-size: calc(var(--space-20) * 17); }
+  .dr-panel > .erf-drawer-host { flex: 1 1 auto; }
+  /* The band the opener lives in (the Permission band card draws the real one). */
+  .dr-band { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-2);
+             block-size: var(--header-height); padding: 0 var(--space-4); box-sizing: border-box;
+             background: var(--color-bg-tertiary); border-block-end: var(--border-width) solid var(--color-border-default); }
+  /* The page the drawer sits beside: a few grey lines on the preview surface. */
+  .dr-page { background: var(--color-bg-preview); padding: var(--space-12); overflow: hidden; }
+  .dr-line { block-size: var(--space-4); margin-block-end: var(--space-6); background: var(--color-border-default); }
+  .dr-line--short { inline-size: 60%; }
+  .dr-line--head { block-size: var(--space-8); inline-size: 40%; margin-block-end: var(--space-10); background: var(--color-border-subtle); }
+  /* The comment filters' break, as on the Segmented control card. */
+  .dr-filters { --erf-segmented-break: calc(var(--space-24) * 9); }
+  /* A checkbox drawn as a picture (the Form controls card has no shared CSS yet). */
+  .dr-check { display: flex; align-items: center; gap: var(--space-4); font-size: var(--text-base); }
+  .dr-box { inline-size: var(--icon-size-xs); block-size: var(--icon-size-xs); border: var(--border-width) solid var(--color-border-input);
+            background: var(--color-bg-input); }
+  /* The note slot's content: the Feedback card's info banner, drawn as a picture
+     because that card has no shared stylesheet yet. */
+  .dr-banner { padding: var(--space-4) var(--space-6); border: var(--border-width) solid var(--color-border-subtle);
+               border-inline-start: var(--border-width-thick) solid var(--color-info); font-size: var(--text-base); }
+  .dr-file { margin: 0; padding: var(--space-6) var(--space-8) var(--space-2); font-family: var(--font-mono);
+             font-size: var(--text-sm); /* mockup: app scale */ color: var(--color-text-tertiary); }
+  .dr-scrolled { margin-block-start: calc(var(--space-6) * -1); }
+  .dr-narrowest { --erf-drawer-width: calc(var(--space-20) * 5); }
+</style>
+</head>
+<body>
+<nav class="ds-crumbs" aria-label="Breadcrumb"><a href="../../../index.html">Erfana design system</a> <span aria-hidden="true">/</span> <a href="../../../index.html#patterns">Patterns</a> <span aria-hidden="true">/</span> <span aria-current="page">Drawer</span></nav>
+<main>
+<h1>Drawer</h1>
+<p class="ds-meta"><span class="ds-status" data-status="proposed">proposed</span> not yet reviewed</p>
+<p class="ds-lede" id="decision">
+  A drawer is a <strong>flow sibling</strong> at the inline end of a view, never an overlay: the content beside it
+  shrinks, and nothing is covered. It opens in one step, sits between a minimum and a maximum width, and below a <span data-claim="drawer-full-below-px" title="DRAWER_FULL_BELOW_PX in useDrawerSheet.ts – host width in px below which the comment drawer goes full width">640</span>px
+  host it takes the whole width. Inside, top to bottom: a header (title and a close button), a fixed controls band, a
+  note slot that stays in view, and one list that scrolls. Opening puts focus on the close button; closing returns it to
+  the button that opened the drawer.
+</p>
+
+<div class="ds-note">
+  <strong>Why not a dialog or a popover.</strong> A drawer is for work done <em>beside</em> the content – a list of
+  comments next to the page they point at. A dialog would block the page and a popover would cover it. A
+  <a href="../dialog/index.html">Dialog</a> stays the answer when the reader must decide before going on. The close
+  button is the <a href="../../components/button/index.html">Buttons</a> card's <code>.erf-button--icon</code>; the filters are a
+  <a href="../../components/segmented/index.html">Segmented control</a>; the list is the
+  <a href="../../components/row/index.html">Rows and lists</a> card's.
+</div>
+
+<h2 id="anatomy">Anatomy</h2>
+<table>
+  <thead><tr><th>Part</th><th>Class</th><th>Rule</th></tr></thead>
+  <tbody>
+    <tr><td>Host</td><td><code>.erf-drawer-host</code>, <code>.erf-drawer-host__content</code></td><td>A flex row. The content shrinks; it is a size container, so the full-width switch needs no script in plain DOM.</td></tr>
+    <tr><td>Drawer</td><td><code>.erf-drawer</code></td><td><code>&lt;aside aria-labelledby&gt;</code> – a named complementary region. Width <code>--erf-drawer-width</code> (default <code>--comments-drawer-width</code>), at least <span data-claim="drawer-min-width-px" title="min-inline-size in CommentDrawer.css – the comment drawer&#x27;s shipped floor, px">280</span>px (the shipped floor), at most 480px. A start border, no shadow, no z-index.</td></tr>
+    <tr><td>Header</td><td><code>.erf-drawer__head</code>, <code>.erf-drawer__title</code></td><td>The title is an <code>h2</code> in the panel-title weight; a long title truncates. The close button follows it.</td></tr>
+    <tr><td>Controls</td><td><code>.erf-drawer__controls</code></td><td>Filters and options that act on the list. Never scrolls; a rule closes it off.</td></tr>
+    <tr><td>Note</td><td><code>.erf-drawer__note</code></td><td>One message about the whole list, in a banner. Above the scroller, so it stays in view.</td></tr>
+    <tr><td>Scroller</td><td><code>.erf-drawer__scroll</code></td><td>The only part that scrolls. It holds the list, or the list's empty, loading or error state (the <a href="../states/index.html">States</a> card).</td></tr>
+  </tbody>
+</table>
+
+<h2 id="states">Every state</h2>
+<p class="ds-muted">Drawn at the app's scale: a preview panel with its band, the page, and the comment drawer – the
+reference instance (<code>CommentDrawer.css</code>, the drawer rules; <code>useDrawerSheet.ts</code>, the full-width switch).</p>
+<div class="ds-frames dr-frames">
+
+<figure class="ds-frame">
+<div aria-hidden="true" inert class="dr-panel dr-w-wide">
+  <div class="dr-band"><span class="erf-button erf-button--toggle erf-button--icon"><svg data-icon="messages-square" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 10a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 14.286V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/><path d="M20 9a2 2 0 0 1 2 2v10.286a.71.71 0 0 1-1.212.502l-2.202-2.202A2 2 0 0 0 17.172 19H10a2 2 0 0 1-2-2v-1"/></svg></span></div>
+  <div class="erf-drawer-host">
+    <div class="erf-drawer-host__content dr-page"><div class="dr-line dr-line--head"></div><div class="dr-line"></div><div class="dr-line"></div><div class="dr-line dr-line--short"></div><div class="dr-line"></div><div class="dr-line"></div></div>
+  </div>
+</div>
+<figcaption><strong>Closed</strong> – the page has the whole width. The opener in the band is <code>aria-expanded="false"</code>.</figcaption>
+</figure>
+
+<figure class="ds-frame">
+<div aria-hidden="true" inert class="dr-panel dr-w-wide">
+  <div class="dr-band"><span class="erf-button erf-button--toggle erf-button--icon" aria-pressed="true"><svg data-icon="messages-square" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 10a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 14.286V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/><path d="M20 9a2 2 0 0 1 2 2v10.286a.71.71 0 0 1-1.212.502l-2.202-2.202A2 2 0 0 0 17.172 19H10a2 2 0 0 1-2-2v-1"/></svg></span></div>
+  <div class="erf-drawer-host">
+    <div class="erf-drawer-host__content dr-page"><div class="dr-line dr-line--head"></div><div class="dr-line"></div><div class="dr-line"></div><div class="dr-line dr-line--short"></div><div class="dr-line"></div><div class="dr-line"></div></div>
+    <div class="erf-drawer">
+      <div class="erf-drawer__head"><h2 class="erf-drawer__title">Comments</h2><span class="erf-button erf-button--icon is-focus"><svg data-icon="x" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span></div>
+      <div class="erf-drawer__controls">
+        <div class="erf-segmented dr-filters">
+          <span class="erf-segmented__label">Show</span>
+          <div class="erf-segmented__cells">
+            <span class="erf-segmented__cell" aria-checked="true">Open <span class="erf-counter">12</span></span>
+            <span class="erf-segmented__cell" aria-checked="false">Resolved <span class="erf-counter">4</span></span>
+            <span class="erf-segmented__cell" aria-checked="false">Needs attention <span class="erf-counter">2</span></span>
+          </div>
+        </div>
+        <span class="dr-check"><span class="dr-box"></span>Show comment icons</span>
+      </div>
+      <div class="erf-drawer__note"><div class="dr-banner">2 files are not open in this window.</div></div>
+      <div class="erf-drawer__scroll">
+        <p class="dr-file">docs/index.html</p>
+        <div class="erf-row-list">
+          <div class="erf-row erf-row--selected"><span class="erf-row__glyph"><svg data-icon="message-square" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></svg></span><span class="erf-row__name">Heading – “Typo in the title”</span></div>
+          <div class="erf-row"><span class="erf-row__glyph"><svg data-icon="message-square" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></svg></span><span class="erf-row__name">Button – “Use a verb here”</span></div>
+          <div class="erf-row"><span class="erf-row__glyph"><svg data-icon="message-square" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></svg></span><span class="erf-row__name">Table – “Column order”</span></div>
+          <div class="erf-row"><span class="erf-row__glyph"><svg data-icon="message-square" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></svg></span><span class="erf-row__name">Footer – “Link is broken”</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<figcaption><strong>Open, side by side – focus on open</strong> – the page shrinks beside the drawer; nothing is covered,
+so the page stays live. The drawer appeared in one step, and focus went to its close button (the ring): the reader
+hears “Comments, complementary” and can close at once. In the drawer's default
+<code data-token="--comments-drawer-width">320px</code> the three filters stack (the Segmented control card's break).</figcaption>
+</figure>
+
+<figure class="ds-frame">
+<div aria-hidden="true" inert class="dr-panel dr-w-wide">
+  <div class="dr-band"><span class="erf-button erf-button--toggle erf-button--icon" aria-pressed="true"><svg data-icon="messages-square" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 10a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 14.286V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/><path d="M20 9a2 2 0 0 1 2 2v10.286a.71.71 0 0 1-1.212.502l-2.202-2.202A2 2 0 0 0 17.172 19H10a2 2 0 0 1-2-2v-1"/></svg></span></div>
+  <div class="erf-drawer-host">
+    <div class="erf-drawer-host__content dr-page"><div class="dr-line dr-line--head"></div><div class="dr-line"></div><div class="dr-line"></div><div class="dr-line dr-line--short"></div><div class="dr-line"></div><div class="dr-line"></div></div>
+    <div class="erf-drawer">
+      <div class="erf-drawer__head"><h2 class="erf-drawer__title">Comments</h2><span class="erf-button erf-button--icon"><svg data-icon="x" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span></div>
+      <div class="erf-drawer__controls">
+        <div class="erf-segmented dr-filters">
+          <span class="erf-segmented__label">Show</span>
+          <div class="erf-segmented__cells">
+            <span class="erf-segmented__cell" aria-checked="true">Open <span class="erf-counter">12</span></span>
+            <span class="erf-segmented__cell" aria-checked="false">Resolved <span class="erf-counter">4</span></span>
+            <span class="erf-segmented__cell" aria-checked="false">Needs attention <span class="erf-counter">2</span></span>
+          </div>
+        </div>
+        <span class="dr-check"><span class="dr-box"></span>Show comment icons</span>
+      </div>
+      <div class="erf-drawer__note"><div class="dr-banner">2 files are not open in this window.</div></div>
+      <div class="erf-drawer__scroll">
+        <div class="erf-row-list dr-scrolled">
+          <div class="erf-row"><span class="erf-row__glyph"><svg data-icon="message-square" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></svg></span><span class="erf-row__name">Card 9 – “Align the price”</span></div>
+          <div class="erf-row"><span class="erf-row__glyph"><svg data-icon="message-square" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></svg></span><span class="erf-row__name">Card 10 – “Shorter caption”</span></div>
+          <div class="erf-row erf-row--selected erf-row--focus"><span class="erf-row__glyph"><svg data-icon="message-square" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></svg></span><span class="erf-row__name">Card 11 – “Image is blurry”</span></div>
+          <div class="erf-row"><span class="erf-row__glyph"><svg data-icon="message-square" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></svg></span><span class="erf-row__name">Card 12 – “Wrong date”</span></div>
+          <div class="erf-row"><span class="erf-row__glyph"><svg data-icon="message-square" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></svg></span><span class="erf-row__name">Footer – “Link is broken”</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<figcaption><strong>Scrolled</strong> – the list scrolled far down; the header, the filters and the note did not move.
+Only <code>.erf-drawer__scroll</code> scrolls, and it holds its overscroll so the page beside it does not scroll too.</figcaption>
+</figure>
+
+<figure class="ds-frame">
+<div aria-hidden="true" inert class="dr-panel dr-w-narrow">
+  <div class="dr-band"><span class="erf-button erf-button--toggle erf-button--icon" aria-pressed="true"><svg data-icon="messages-square" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 10a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 14.286V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/><path d="M20 9a2 2 0 0 1 2 2v10.286a.71.71 0 0 1-1.212.502l-2.202-2.202A2 2 0 0 0 17.172 19H10a2 2 0 0 1-2-2v-1"/></svg></span></div>
+  <div class="erf-drawer-host">
+    <div class="erf-drawer-host__content dr-page"><div class="dr-line dr-line--head"></div><div class="dr-line"></div></div>
+    <div class="erf-drawer">
+      <div class="erf-drawer__head"><h2 class="erf-drawer__title">Comments</h2><span class="erf-button erf-button--icon"><svg data-icon="x" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span></div>
+      <div class="erf-drawer__controls">
+        <div class="erf-segmented dr-filters">
+          <span class="erf-segmented__label">Show</span>
+          <div class="erf-segmented__cells">
+            <span class="erf-segmented__cell" aria-checked="true">Open <span class="erf-counter">12</span></span>
+            <span class="erf-segmented__cell" aria-checked="false">Resolved <span class="erf-counter">4</span></span>
+            <span class="erf-segmented__cell" aria-checked="false">Needs attention <span class="erf-counter">2</span></span>
+          </div>
+        </div>
+        <span class="dr-check"><span class="dr-box"></span>Show comment icons</span>
+      </div>
+      <div class="erf-drawer__scroll">
+        <p class="dr-file">docs/index.html</p>
+        <div class="erf-row-list">
+          <div class="erf-row erf-row--selected"><span class="erf-row__glyph"><svg data-icon="message-square" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></svg></span><span class="erf-row__name">Heading – “Typo in the title”</span></div>
+          <div class="erf-row"><span class="erf-row__glyph"><svg data-icon="message-square" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></svg></span><span class="erf-row__name">Button – “Use a verb here”</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<figcaption><strong>Full width, below a <span data-claim="drawer-full-below-px" title="DRAWER_FULL_BELOW_PX in useDrawerSheet.ts – host width in px below which the comment drawer goes full width">640</span>px host</strong> – a 600px panel. The drawer takes the whole row and the page
+steps aside; with nothing beside it, the drawer now behaves like a sheet: <kbd>Esc</kbd> closes it, and an action that
+shows something on the page (“Show on page”) closes it first. The container query does this in plain DOM; the preview
+measures itself in <code>useDrawerSheet.ts</code> because its page is a native view that CSS cannot hide.</figcaption>
+</figure>
+
+<figure class="ds-frame">
+<div aria-hidden="true" inert class="dr-panel dr-w-mid">
+  <div class="dr-band"><span class="erf-button erf-button--toggle erf-button--icon" aria-pressed="true"><svg data-icon="messages-square" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 10a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 14.286V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/><path d="M20 9a2 2 0 0 1 2 2v10.286a.71.71 0 0 1-1.212.502l-2.202-2.202A2 2 0 0 0 17.172 19H10a2 2 0 0 1-2-2v-1"/></svg></span></div>
+  <div class="erf-drawer-host">
+    <div class="erf-drawer-host__content dr-page"><div class="dr-line dr-line--head"></div><div class="dr-line"></div><div class="dr-line"></div><div class="dr-line dr-line--short"></div></div>
+    <div class="erf-drawer dr-narrowest">
+      <div class="erf-drawer__head"><h2 class="erf-drawer__title">Comments</h2><span class="erf-button erf-button--icon"><svg data-icon="x" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span></div>
+      <div class="erf-drawer__controls">
+        <div class="erf-segmented dr-filters">
+          <span class="erf-segmented__label">Show</span>
+          <div class="erf-segmented__cells">
+            <span class="erf-segmented__cell" aria-checked="true">Open <span class="erf-counter">12</span></span>
+            <span class="erf-segmented__cell" aria-checked="false">Resolved <span class="erf-counter">4</span></span>
+            <span class="erf-segmented__cell" aria-checked="false">Needs attention <span class="erf-counter">2</span></span>
+          </div>
+        </div>
+      </div>
+      <div class="erf-drawer__scroll">
+        <div class="erf-row-list">
+          <div class="erf-row erf-row--selected"><span class="erf-row__glyph"><svg data-icon="message-square" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></svg></span><span class="erf-row__name">Heading – “Typo in the title”</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<figcaption><strong>The minimum</strong> – the instance asked for 200px; the drawer holds at its <span data-claim="drawer-min-width-px" title="min-inline-size in CommentDrawer.css – the comment drawer&#x27;s shipped floor, px">280</span>px floor, so the
+filters and a row name still read. The ceiling is 480px: a drawer wider than that is taking the content's place and
+should be a view of its own.</figcaption>
+</figure>
+
+<figure class="ds-frame">
+<div aria-hidden="true" inert class="dr-panel dr-w-wide">
+  <div class="dr-band"><span class="erf-button erf-button--toggle erf-button--icon is-focus"><svg data-icon="messages-square" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 10a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 14.286V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/><path d="M20 9a2 2 0 0 1 2 2v10.286a.71.71 0 0 1-1.212.502l-2.202-2.202A2 2 0 0 0 17.172 19H10a2 2 0 0 1-2-2v-1"/></svg></span></div>
+  <div class="erf-drawer-host">
+    <div class="erf-drawer-host__content dr-page"><div class="dr-line dr-line--head"></div><div class="dr-line"></div><div class="dr-line"></div><div class="dr-line dr-line--short"></div><div class="dr-line"></div><div class="dr-line"></div></div>
+  </div>
+</div>
+<figcaption><strong>Focus on close</strong> – the drawer closed (close button, <kbd>Esc</kbd> at full width, or the opener
+again); focus is back on the opener, never on <code>&lt;body&gt;</code>. If the opener is gone, focus goes to the
+content the drawer sat beside.</figcaption>
+</figure>
+
+</div>
+
+<h3 id="resize">Drag the corner</h3>
+<p class="ds-muted">A panel you can resize by its bottom-right corner – the page shrinks beside the drawer, then under
+<span data-claim="drawer-full-below-px" title="DRAWER_FULL_BELOW_PX in useDrawerSheet.ts – host width in px below which the comment drawer goes full width">640</span>px the drawer takes the whole width.</p>
+<div class="ds-frame ds-resize" aria-hidden="true" inert>
+  <div class="dr-panel">
+    <div class="dr-band"><span class="erf-button erf-button--toggle erf-button--icon" aria-pressed="true"><svg data-icon="messages-square" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 10a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 14.286V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/><path d="M20 9a2 2 0 0 1 2 2v10.286a.71.71 0 0 1-1.212.502l-2.202-2.202A2 2 0 0 0 17.172 19H10a2 2 0 0 1-2-2v-1"/></svg></span></div>
+    <div class="erf-drawer-host">
+      <div class="erf-drawer-host__content dr-page"><div class="dr-line dr-line--head"></div><div class="dr-line"></div><div class="dr-line"></div><div class="dr-line dr-line--short"></div></div>
+      <div class="erf-drawer">
+        <div class="erf-drawer__head"><h2 class="erf-drawer__title">Comments</h2><span class="erf-button erf-button--icon"><svg data-icon="x" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span></div>
+        <div class="erf-drawer__controls">
+          <div class="erf-segmented dr-filters">
+            <span class="erf-segmented__label">Show</span>
+            <div class="erf-segmented__cells">
+              <span class="erf-segmented__cell" aria-checked="true">Open <span class="erf-counter">12</span></span>
+              <span class="erf-segmented__cell" aria-checked="false">Resolved <span class="erf-counter">4</span></span>
+              <span class="erf-segmented__cell" aria-checked="false">Needs attention <span class="erf-counter">2</span></span>
+            </div>
+          </div>
+        </div>
+        <div class="erf-drawer__scroll">
+          <div class="erf-row-list">
+            <div class="erf-row erf-row--selected"><span class="erf-row__glyph"><svg data-icon="message-square" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></svg></span><span class="erf-row__name">Heading – “Typo in the title”</span></div>
+            <div class="erf-row"><span class="erf-row__glyph"><svg data-icon="message-square" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></svg></span><span class="erf-row__name">Button – “Use a verb here”</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h2 id="keyboard">The keyboard contract</h2>
+<p class="ds-muted">The drawer is not modal: <kbd>Tab</kbd> moves in and out of it freely, and the page beside it stays
+reachable. Inside, each part is one tab stop – the close button, the filter group, each option, then the list.</p>
+<table class="ds-keys">
+  <thead><tr><th>Key</th><th>Result</th><th>Focus ends on</th><th>Held by</th></tr></thead>
+  <tbody>
+    <tr><td><kbd>Enter</kbd> <kbd>Space</kbd> on the opener</td><td>Opens the drawer; the opener becomes <code>aria-expanded="true"</code> and <code>aria-controls</code> the drawer.</td><td>The drawer's close button.</td><td><code>CommentDrawer.test.tsx</code> – is a labelled region that focuses its close button</td></tr>
+    <tr><td>The opener again</td><td>Closes the drawer.</td><td>Stays on the opener.</td><td><code>CommentToolbarTools.test.tsx</code> – the list button expands the drawer and names its counts</td></tr>
+    <tr><td><kbd>Enter</kbd> <kbd>Space</kbd> on Close</td><td>Closes the drawer.</td><td>The opener.</td><td><code>CommentDrawer.test.tsx</code> – closes. The return to the opener is <code>usePreviewComments.ts</code>, with no test.</td></tr>
+    <tr><td><kbd>Esc</kbd></td><td>At full width only, closes the drawer. Beside the content, <kbd>Esc</kbd> belongs to whatever has focus.</td><td>The opener.</td><td><code>CommentDrawer.test.tsx</code> – L13 Esc closes a full-width drawer, and only a full-width one</td></tr>
+    <tr><td><kbd>Tab</kbd> <kbd>Shift</kbd>+<kbd>Tab</kbd></td><td>Close → filters → options → list, then out to what follows in the view.</td><td>The next part.</td><td>No app test</td></tr>
+    <tr><td>A dialog opened from the drawer closes</td><td>Focus returns to the row that opened it; if that row is gone, into the drawer (<code>data-focus-return</code>).</td><td>The row, else the drawer's first control.</td><td><code>CommentDrawer.test.tsx</code> – M5 the drawer is a focus-return region that hands focus to its first control</td></tr>
+    <tr><td>Screen reader</td><td>The drawer is <code>&lt;aside&gt;</code> named by its title (“Comments, complementary”). The close button's name says what it closes (“Close comments”).</td><td>–</td><td><code>CommentDrawer.test.tsx</code> – is a labelled region that focuses its close button</td></tr>
+  </tbody>
+</table>
+
+<h2 id="markup">Markup</h2>
+<pre class="ds-code"><code>&lt;div class="erf-drawer-host"&gt;
+  &lt;div class="erf-drawer-host__content"&gt;…the page…&lt;/div&gt;
+  &lt;aside class="erf-drawer" id="cd" aria-labelledby="cd-title" data-focus-return&gt;
+    &lt;div class="erf-drawer__head"&gt;
+      &lt;h2 class="erf-drawer__title" id="cd-title"&gt;Comments&lt;/h2&gt;
+      &lt;button type="button" class="erf-button erf-button--icon" aria-label="Close comments"&gt;…&lt;/button&gt;
+    &lt;/div&gt;
+    &lt;div class="erf-drawer__controls"&gt;…a segmented control, options…&lt;/div&gt;
+    &lt;div class="erf-drawer__note"&gt;…one banner, when there is something to say…&lt;/div&gt;
+    &lt;div class="erf-drawer__scroll"&gt;…the list, or its empty, loading or error state…&lt;/div&gt;
+  &lt;/aside&gt;
+&lt;/div&gt;
+&lt;!-- The opener, wherever it lives:
+     &lt;button aria-expanded="true" aria-controls="cd" aria-label="Comments"&gt;…&lt;/button&gt; --&gt;</code></pre>
+
+<h2 id="tokens">Tokens</h2>
+<table class="ds-tokens">
+  <thead><tr><th>Part</th><th>Token</th></tr></thead>
+  <tbody>
+    <tr><td>Width · floor · ceiling</td><td><code>--comments-drawer-width</code> (<code data-token="--comments-drawer-width">320px</code>) · <code>calc(var(--space-20) * 7)</code> · <code>calc(var(--space-24) * 10)</code>, as <code>--erf-drawer-width</code>, <code>--erf-drawer-min-width</code>, <code>--erf-drawer-max-width</code></td></tr>
+    <tr><td>Full-width switch</td><td><span data-claim="drawer-full-below-px" title="DRAWER_FULL_BELOW_PX in useDrawerSheet.ts – host width in px below which the comment drawer goes full width">640</span>px, written once in the container query (a condition cannot read a custom property); <code>DRAWER_FULL_BELOW_PX</code> in <code>useDrawerSheet.ts</code></td></tr>
+    <tr><td>Surface · edge</td><td><code>--color-bg-secondary</code> · <code>--border-width</code> <code>--color-border-default</code></td></tr>
+    <tr><td>Title</td><td><code>--text-base</code> · <code>--font-semibold</code> · <code>--color-text-emphasis</code></td></tr>
+    <tr><td>Padding</td><td>Header <code>--space-4</code>, start <code>--space-8</code> · controls <code>--space-8</code> sides, <code>--space-6</code> below · note <code>--space-6</code> above</td></tr>
+  </tbody>
+</table>
+
+<h2 id="contrast">Contrast</h2>
+<table>
+  <thead><tr><th>Part</th><th>Pair</th><th>Ratio</th></tr></thead>
+  <tbody>
+    <tr><td>Title</td><td><code>--color-text-emphasis</code> on <code>--color-bg-secondary</code></td><td data-contrast="--color-text-emphasis on --color-bg-secondary" data-min="4.5" data-result="pass">13.72:1 · pass</td></tr>
+    <tr><td>Body text</td><td><code>--color-text-primary</code> on <code>--color-bg-secondary</code></td><td data-contrast="--color-text-primary on --color-bg-secondary" data-min="4.5" data-result="pass">8.54:1 · pass</td></tr>
+    <tr><td>File label, hint</td><td><code>--color-text-tertiary</code> on <code>--color-bg-secondary</code></td><td data-contrast="--color-text-tertiary on --color-bg-secondary" data-min="4.5" data-result="pass">6.33:1 · pass</td></tr>
+    <tr><td>Close glyph (3:1)</td><td><code>--color-text-secondary</code> on <code>--color-bg-secondary</code></td><td data-contrast="--color-text-secondary on --color-bg-secondary" data-min="3" data-result="pass">3.72:1 · pass</td></tr>
+    <tr><td>Start edge against the page (measured)</td><td><code>--color-border-default</code> on <code>--color-bg-preview</code></td><td data-contrast="--color-border-default on --color-bg-preview">1.57:1</td></tr>
+  </tbody>
+</table>
+
+<h2 id="consolidation">What this replaces</h2>
+<table>
+  <thead><tr><th>Today</th><th>Becomes</th></tr></thead>
+  <tbody>
+    <tr><td><code>.erf-comment-drawer</code>, <code>--full</code> (<code>CommentDrawer.css</code>)</td><td><code>.erf-drawer</code>, <code>.erf-drawer--full</code></td></tr>
+    <tr><td><code>.erf-comment-drawer__head</code>, <code>__title</code></td><td><code>.erf-drawer__head</code>, <code>.erf-drawer__title</code></td></tr>
+    <tr><td><code>.erf-comment-icon-btn</code> (the close button)</td><td><code>.erf-button.erf-button--icon</code></td></tr>
+    <tr><td><code>.erf-comment-drawer__controls</code>, <code>__note</code>, <code>__scroll</code></td><td><code>.erf-drawer__controls</code>, <code>__note</code>, <code>__scroll</code></td></tr>
+    <tr><td><code>min-inline-size</code> typed as a literal (<span data-claim="drawer-min-width-px" title="min-inline-size in CommentDrawer.css – the comment drawer&#x27;s shipped floor, px">280</span>px) with a <code>deviates:</code> marker</td><td><code>--erf-drawer-min-width</code>, from the spacing scale – the marker and its Exceptions row on the comments design can go</td></tr>
+  </tbody>
+</table>
+
+<section id="open-defects">
+<h2>Open defects this card names</h2>
+<ul class="ds-muted">
+  <li><strong>No ceiling.</strong> The comment drawer has a floor but no maximum width.</li>
+  <li><strong>A typed floor.</strong> <code>min-inline-size</code> is a literal (<span data-claim="drawer-min-width-px" title="min-inline-size in CommentDrawer.css – the comment drawer&#x27;s shipped floor, px">280</span>px) (marked as a deviation from the comments design).</li>
+  <li><strong>Focus return is untested.</strong> Closing hands focus back to the opener in <code>usePreviewComments.ts</code>, and no test holds it.</li>
+  <li><strong>A one-off close button.</strong> <code>.erf-comment-icon-btn</code> re-implements the icon button.</li>
+</ul>
+</section>
+
+<h2 id="related">Related</h2>
+<ul class="ds-muted">
+  <li><a href="../dialog/index.html">Dialog</a>: when the reader must decide before going on.</li>
+  <li><a href="../states/index.html">States</a>: what the scroller shows when the list is empty, loading or failed.</li>
+  <li><a href="../../components/segmented/index.html">Segmented control</a> and <a href="../../components/row/index.html">Rows and lists</a>: the controls band and the list.</li>
+  <li><a href="../../components/splitter/index.html">Splitter</a>: if a drawer ever becomes resizable, its edge is a splitter.</li>
+  <li><a href="../../foundations/focus.html">Focus</a>: the ring on the close button and on the opener.</li>
+</ul>
+
+<section id="exceptions">
+<h2>Exceptions</h2>
+<p class="ds-muted">None recorded. A shipping drawer that departs from this card carries a
+<code>deviates:</code> marker at the site and gets a row here, naming the file.</p>
+</section>
+</main>
+</body>
+</html>

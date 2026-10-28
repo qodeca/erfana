@@ -4,9 +4,9 @@
  * Card chrome for the HTML preview comments cards: the layout of the
  * documentation, and the fake previewed page the overlay is drawn on.
  *
- * NOT shipping CSS. The shipping rules are in comments.css (Erfana's own
- * chrome) and overlay.css (a mirror of the in-page overlay). Nothing here moves
- * to src/.
+ * NOT shipping CSS, and not a mirror of it: comments.css mirrors the shipped
+ * CommentWindow.css and CommentDrawer.css, overlay.css the in-page overlay.
+ * Nothing here moves to src/.
  */
 
 /* ---------- layout ---------- */
@@ -14,7 +14,8 @@
 .step { display: grid; grid-template-columns: minmax(0, 620px) minmax(0, 1fr);
         gap: var(--space-16); align-items: start; margin-bottom: var(--space-24); }
 .step__no { font-family: var(--font-mono); font-size: var(--ds-text-small);
-            color: var(--color-accent-primary); letter-spacing: 0.1em; margin: 0 0 var(--space-2); }
+            color: var(--color-accent-primary); letter-spacing: var(--ds-caps-tracking);
+            margin: 0 0 var(--space-2); }
 .step__title { margin: 0 0 var(--space-6); font-size: var(--text-lg);
                font-weight: var(--font-semibold); color: var(--color-text-emphasis); }
 .step__text { margin: 0 0 var(--space-6); max-width: 60ch; color: var(--color-text-tertiary); }
@@ -39,8 +40,7 @@
 .not-in-plan { font-family: var(--font-mono); font-size: var(--ds-text-small); color: var(--color-warning);
                border: var(--border-width) solid var(--color-warning-border); padding: 0 var(--space-2); }
 
-kbd { font-family: var(--font-mono); font-size: var(--ds-text-small); padding: 0 var(--space-2);
-      border: var(--border-width) solid var(--color-border-subtle); background: var(--color-bg-secondary); }
+/* Keys use ds.css's own <kbd> (Badges card key style); no override here. */
 
 /* ---------- a preview panel, drawn to scale ---------- */
 
@@ -57,7 +57,14 @@ kbd { font-family: var(--font-mono); font-size: var(--ds-text-small); padding: 0
    These are the PREVIEWED PAGE, not Erfana. It is arbitrary third-party HTML
    in a native view; using Erfana tokens here would make the demo lie about the
    one thing these cards exist to show - where Erfana stops and the page begins.
-   Same reasoning, same exemption, as docs/designs/html-approval. */
+   Same reasoning, same exemption, as docs/designs/html-approval.
+   Legacy mirror – .ds-foreign-page in docs/design-system/ds.css is the shared
+   stand-in, and it is listed as a known exception in docs/design-system/README.md
+   § A third-party page in a drawing. This one stays because the comment
+   screens place their overlay outlines, labels and marks at coordinates
+   measured against this page's padding and type; moving them means
+   re-measuring every overlay frame. New screens use .ds-foreign-page, and
+   nothing new is added here. */
 .page { position: absolute; inset: 0; background: #ffffff; padding: 18px 22px; overflow: hidden;
         font: 13px/1.55 Georgia, serif; color: #2a2a2a; }
 .page--dark { background: #0f1720; color: #d7e0ea; }

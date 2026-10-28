@@ -290,6 +290,14 @@ keyboard. The ratio under each frame is the ring against what it actually touche
   Where the shipping component departs from this card, with the reason. An undocumented deviation is a
   bug; a documented one is a decision.
 </p>
+<div class="ds-note" id="two-tone">
+  <strong>The two-tone ring is for a page Erfana does not own.</strong> The HTML Preview's comment overlay draws
+  its ring inside a third-party page, from literal colours, with an ink line or halo beside the accent (the
+  overlay row below). That is the only place it is allowed. <strong>When the reader picks a block to comment on in
+  the Markdown Preview</strong> (comment mode), the picked block shows the one standard ring of this card –
+  <code>var(--color-border-focus)</code> at <code>--border-width-thick</code> – because Erfana renders that DOM
+  itself and its tokens apply. No Exceptions row allows the two-tone ring there. Owner decision, 2026-10-28.
+</div>
 <table>
   <thead><tr><th>Where</th><th>The card</th><th>The component, and why</th></tr></thead>
   <tbody>
@@ -336,21 +344,30 @@ keyboard. The ratio under each frame is the ring against what it actually touche
       <td>The ring is <code>var(--color-border-focus)</code> at <code>--border-width-thick</code>.</td>
       <td>Literal colours passed in by main as <code>commentState.theme</code> – the accent ring with an ink line or
         halo beside it – because the overlay is drawn in the previewed page, where a <code>var()</code> would read
-        the page's own properties. See <code>overlayStyles.ts</code> and the proposed
+        the page's own properties. HTML Preview only – the Markdown Preview takes the standard ring
+        (<a href="#two-tone">rule above</a>). See <code>overlayStyles.ts</code> and the
         <a href="../../../designs/comments/html-comments/overlay.html">Comment overlay</a> card.</td>
     </tr>
     <tr>
       <td>Comment pins</td>
       <td>Every control is reachable with Tab.</td>
-      <td>Focusable (<code>role="button"</code>) but <code>tabindex="-1"</code>. A page can carry hundreds, and every
-        thread is reachable from the comments drawer, which is the guaranteed keyboard route (plan §10.8).</td>
+      <td>Out of the Tab order in both previews: a page can carry hundreds, and the comments drawer is the
+        guaranteed keyboard route to every thread (plan §10.8). <strong>Ships today (HTML):</strong> each pin is
+        focusable – <code>role="button"</code>, an <code>aria-label</code>, <code>tabindex="-1"</code> (see
+        <code>pins.ts</code> in <code>src/preload/previewPageComments/</code>). <strong>Planned (C-11):</strong> the
+        HTML pin layer becomes <code>aria-hidden="true"</code> and its pins lose role, tabindex and name – a visual
+        cue only; Markdown pins become real <code>&lt;button type="button"&gt;</code> elements with
+        <code>tabindex="-1"</code>, pressable with Enter and Space and reached through the comments drawer. Markdown
+        Preview comments do not ship yet. See <a href="../../../designs/comments/comments-v2.md">comments-v2.md</a>,
+        C-11.</td>
     </tr>
     <tr>
       <td>Closing the comment window or menu opened from the page</td>
       <td>Escape returns focus to whatever opened it.</td>
       <td>The opener is page content, so focus returns <em>natively</em> to the page view, with the picker on the same
-        element – Erfana cannot focus a node inside the native view. Planned for P6; see the proposed
-        <a href="../../../designs/comments/html-comments/window.html">Comment window</a> card.</td>
+        element – Erfana cannot focus a node inside the native view. Ships: closing a window the page opened
+        calls <code>focusPageSoon</code> (<code>usePreviewComments.ts</code>); see the
+        <a href="../../../designs/comments/html-comments/window.html">Comment window</a> screen.</td>
     </tr>
   </tbody>
 </table>

@@ -29,7 +29,7 @@ One addition to the public format serves both previews: an optional `anchor.sel`
 | S1 | A selection comment **targets the smallest commentable element or block that contains the whole selection**. The selection only narrows it. Everything about targets in the two existing designs stays true. |
 | S2 | The words are stored as `anchor.sel = { exact, prefix, suffix }`: normalised as quotes are today (whitespace collapsed, trimmed, NFC), `exact` 1–200 characters, `prefix` and `suffix` up to 32. A longer selection is cut at 200 and the window says so. |
 | S3 | The words never decide the target. If they cannot be found any more, the comment stays on its element or block, keeps its pin, loses its underline, and shows "The selected text changed". It is not "needs attention". |
-| S4 | **Three ways in, same in both previews.** (a) Comment mode: drag selects text instead of picking; right-click or Shift+F10 then offers **Add comment** (on the words) and **Comment on whole {label}**. (b) Select first, then turn on comment mode (toggle or Cmd+Option+M / Ctrl+Alt+M): the new-comment window opens on the selection at once. (c) Markdown only: right-click a selection outside comment mode (the existing menu). |
+| S4 | **Three ways in, same in both previews.** (a) Comment mode: drag selects text instead of picking; right-click or ⇧F10 / Shift+F10 then offers **Add comment** (on the words) and **Comment on whole {label}**. (b) Select first, then turn on comment mode (toggle or ⌥⌘M / Ctrl+Alt+M): the new-comment window opens on the selection at once. (c) Markdown only: right-click a selection outside comment mode (the existing menu). |
 | S5 | HTML: the selected words come from untrusted page text. Main accepts `sel` only when its `exact` text occurs in the target element's **source** text (the parse5 `visibleText` that `quoteOf` already uses), with prefix and suffix corroborating when the text occurs more than once. Otherwise the window offers **Comment on the whole element instead**. A script-built target (no token of its own) cannot be verified; it accepts `sel` exactly as it accepts today's `runtime.quote`, and the window says "Added by a script". |
 | S6 | A selection never spans two frames (each frame has its own Selection). A selection that crosses a frame boundary is cut to the frame where it started (inferred browser behaviour; checked in P0). |
 | S7 | The underline is never the only cue: the pin and the drawer row carry the same thread. Resolved threads and "pins hidden" draw no underline. Find, export and copy never include it. |
@@ -88,7 +88,7 @@ The same function runs in main against the source text for verification (§5.4),
 ### 5.1 Entry
 
 - **In comment mode, drag selects.** The preload's capture-phase guard (`src/preload/previewPageComments/input.ts`) stops calling `preventDefault` on a primary-button `mousedown`; it still calls `stopImmediatePropagation`, so page scripts never see it. On `pointerup`: if the pointer moved 4 px or more, or the page's Selection is not collapsed, it is a **selection gesture** – the following `click` is swallowed and no pick is sent. Otherwise it is a click and opens the window, as today. `dragstart` stays blocked (no link or image drags).
-- After a selection gesture the overlay outlines the **container** (S1) with the label `{label} · selection`, for example `p.lede · selection`. Right-click, Shift+F10 or the Menu key open the menu.
+- After a selection gesture the overlay outlines the **container** (S1) with the label `{label} · selection`, for example `p.lede · selection`. Right-click, ⇧F10 / Shift+F10 or the Menu key open the menu. In Markdown there is no floating label: the mode tab names the target ([markdown-preview-comments.md](markdown-preview-comments.md) §9.2).
 - **Select first, then the mode.** With the mode off, the page owns the mouse and the user selects normally. Turning comment mode on (toggle or shortcut) asks the focused frame's preload for its Selection; a non-collapsed selection in a commentable frame opens the new-comment window on it at once. An empty selection starts the picker, as today.
 - Double-click and triple-click stay swallowed in comment mode (they would send two picks). Word selection by double-click works with the mode off, before turning it on.
 
@@ -98,7 +98,7 @@ The same function runs in main against the source text for verification (§5.4),
 |---|---|
 | Comment mode, a selection | **Add comment** (`message-square-plus`, on the words) · **Comment on whole {label}** (`square-dashed`) |
 | Comment mode, no selection | **Add comment** (unchanged) |
-| Selection that cannot be commented (refused frame, `srcdoc`, read-only file) | **Add comment** disabled, "Can't comment here", reason in the tooltip (unchanged wording) |
+| Selection that cannot be commented (refused frame, `srcdoc`, read-only file) | **Add comment** disabled, "Can't comment here", the reason on the [Menu](../../design-system/system/components/menu/index.html#reason) card's visible reason line (decided), tied by `aria-describedby` – never a tooltip (unchanged wording; see [markdown-preview-comments.md](markdown-preview-comments.md) §9.3) |
 
 Menu label: "Selection" when a selection exists, "Element" otherwise.
 
@@ -128,7 +128,8 @@ This closes, for `sel`, the gap the code map found for page-supplied quotes: in-
 
 - Main sends each open thread's `sel` with the existing `preview-page:commentState` message (one receive channel – unchanged contract, one more optional field). The text is already in the page's own file, so nothing new reaches the page.
 - The preload runs §4 per thread, keeps the `Range`, and draws one box per `Range.getClientRects()` rectangle into the closed shadow root – the same scheduler, clipping and pixel snapping as outlines (`scheduling.ts`, `geometry.ts`). No `CSS.highlights`: the registry is visible to page scripts and its `::highlight` rule would have to live in a page-visible stylesheet.
-- Look: 22 % accent fill plus a 2 px accent bar along the box's bottom with a 1 px ink line under it – the outline's two-tone idea, so it reads on white and on black pages. The active thread: 40 % fill. Forced colours: `Highlight` fill.
+- Look: the [Text highlights](../../design-system/system/foundations/highlights.html) card's comment mark (proposed) – the `--color-comment-mark` fill (35 % accent) and a `--color-comment-mark-bar` bar along the box's bottom, with a 1 px ink line under it (the outline's two-tone idea, so it reads on white and on black pages). On a light page the bar takes `--color-brand-indigo`, because the brand violet is under 3:1 on white (the card's decision, pending owner confirmation). The active thread: the **same** fill with a double bar – one active value, never a stronger fill (this replaces the earlier 22 % / 40 % fills). The overlay draws boxes, not `::highlight()`, so the bar is an inset shadow; the look is the same.
+- Forced colours: `Mark` fill and `MarkText` text, the bar repainted in `CanvasText`; `Highlight` stays for the native selection only ([highlights.html#forced](../../design-system/system/foundations/highlights.html#forced)).
 - Redrawn on the same triggers as outlines; a `Range` whose nodes left the DOM is rebuilt from §4 on the next DOM-change pass.
 - Find in page: the boxes are not text, so Find never counts them. `stopFindInPage('clearSelection')` may clear the user's live selection; the comment does not depend on it after the pick (P0 check).
 - Printing: the overlay is hidden while printing (existing rule), so the boxes never reach PDF.
@@ -159,7 +160,7 @@ Everything in [markdown-preview-comments.md](markdown-preview-comments.md) stays
 - Context line as today (`{label} · {file}, line {n}`), then the selected words in a quote box: serif for Markdown (the document's font), the system sans for HTML (the page's font is unknown), left accent rule.
 - Over 200 characters: cut with "…" and "Only the first 200 characters are kept."
 - Thread view: the quote box sits under the context line for the whole window; every thread on the element that has its own `sel` shows its words above its first message.
-- Text no longer found: info banner "The selected text changed. The comment is still on this {element|block}." with the stored words struck through (the existing `.erf-comment-quote` look).
+- Text no longer found: info banner "The selected text changed. The comment is still on this {element|kind}." with the stored words struck through (the existing `.erf-comment-quote` look). Banners are the [Feedback](../../design-system/system/components/feedback/index.html) card's boxed `.erf-banner`, starting with a visually hidden "Note: " or "Warning: "; the action is `erf-button--secondary erf-button--sm`. The shipped `CommentBanner` has no spoken severity word yet (Feedback card's open defect).
 
 ### 7.2 Drawer
 
@@ -174,9 +175,10 @@ Rows of selection comments start their excerpt with the words in quotes: `"ship 
 | Window, long selection | "Only the first 200 characters are kept." |
 | Window, refused (HTML) | "This text isn't in {file} as written – a script may have changed it." · button "Comment on the whole element instead" |
 | Window, script-built (HTML) | "Added by a script – saved before <{ancestor}>." (existing) |
-| Text gone | "The selected text changed. The comment is still on this element." / "… on this block." |
+| Text gone | "The selected text changed. The comment is still on this element." / "… on this {kind}." (Markdown kind noun – Writing card) |
 | Drawer tag | "Text changed" |
-| Announce | "Text selected in {label}. Press Shift+F10 to comment." · "Comment mode on. Commenting on the selected text." |
+| Announce | "Text selected in {label}. Press {menu key} to comment." – the key from `formatShortcut`: "⇧F10" on macOS, "Shift+F10" on Windows and Linux · "Comment mode on. Commenting on the selected text." |
+| Banner severity (spoken only) | "Warning: " (refused) · "Note: " (text gone) |
 | Pin name | unchanged: "{n} comment(s) on {label}. Open." |
 
 ### 7.4 Accessibility
@@ -195,8 +197,8 @@ As both existing designs. Additions: the selected words are read as part of the 
 | M-S01 | Main | Verification: in-file match accepted; script-changed text refused with `not-in-file`; script-built target accepted |
 | R-S01 | Preload | Comment mode: drag selects and sends no pick; a still click picks as before; page `mousedown` listeners never fire; `dragstart` blocked |
 | R-S02 | Preload | Underline boxes per line of a wrapped selection; rebuilt after a DOM change; none for resolved threads or with pins hidden |
-| E-S01 | e2e HTML | Comment mode → drag → Shift+F10 → Add comment → save → underline + pin → reopen shows the words |
-| E-S02 | e2e HTML | Select with the mode off → Cmd+Option+M → window opens on the selection |
+| E-S01 | e2e HTML | Comment mode → drag → ⇧F10 / Shift+F10 → Add comment → save → underline + pin → reopen shows the words |
+| E-S02 | e2e HTML | Select with the mode off → ⌥⌘M / Ctrl+Alt+M → window opens on the selection |
 | E-S03 | e2e HTML | Script rewrites the text → "not in file" → Comment on the whole element instead |
 | E-S04 | e2e both | Edit the words in the file → "Text changed", pin stays |
 | E-S05 | e2e both | Find in page never counts underline; PDF export contains none |
@@ -231,4 +233,26 @@ H1 can ship before the Markdown work if the format phase goes first. Inferred si
 - `docs/designs/comments/html-preview-comments.md` – decision 14 row points here.
 - `docs/security.md` – page-supplied selection text and its verification.
 - `docs/html-preview/README.md`, `docs/editor/markdown-preview.md`, user guide.
-- Screen: [`docs/designs/comments/selection-comments/index.html`](selection-comments/index.html) (proposed).
+
+## 12. Screens
+
+| Screen | Status | Holds |
+|---|---|---|
+| [`selection-comments/index.html`](selection-comments/index.html) | proposed | The HTML journey (select, menu, window, saved, select first), every state, and the Markdown menu |
+
+Static – no script. It reuses `../html-comments/comments.css` and `overlay.css`, the Markdown quote from `../markdown-comments/markdown-comments.css`, the design system's component CSS, and adds `selection.css` for the HTML underline, the sans quote and the native selection stand-in. Shortcut notation follows the [Writing](../../design-system/system/foundations/writing.html#shortcuts) card: both platforms in this note (⌥⌘M / Ctrl+Alt+M), the platform's own label from `formatShortcut` in the UI.
+
+### Cards it builds on
+
+Status as on each card's line 1, 2026-10-28.
+
+| Card | Status | Used for |
+|---|---|---|
+| [`components/menu/index.html`](../../design-system/system/components/menu/index.html) | decided | The selection menu; a disabled item's reason line (§5.2) |
+| [`foundations/focus.html`](../../design-system/system/foundations/focus.html) | decided | Focus in the window and menu |
+| [`foundations/highlights.html`](../../design-system/system/foundations/highlights.html) | proposed | The underline's fill, bar, active value and forced colours (§5.5, §6.2) |
+| [`components/feedback/index.html`](../../design-system/system/components/feedback/index.html) | proposed | The refused and text-gone banners (§7.1) |
+| [`components/button/index.html`](../../design-system/system/components/button/index.html) | proposed | The banner's action |
+| [`foundations/writing.html`](../../design-system/system/foundations/writing.html) | proposed | Microcopy, kind nouns, shortcut notation (§7.3) |
+| [`foundations/forced-colors.html`](../../design-system/system/foundations/forced-colors.html) | proposed | `Mark` / `MarkText` for marks (§5.5) |
+| [`components/icon/index.html`](../../design-system/system/components/icon/index.html) | proposed | Registry glyphs, drawn as `<svg data-icon>` |

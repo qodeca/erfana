@@ -9,6 +9,19 @@ SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 
 The preview keeps a site of several pages inside its panel: frames, same-tab links and opening a page in the default browser. Start with [`design-issue-124.md`](design-issue-124.md); the parts, planned files and the as-built log follow it.
 
+## Cards it builds on
+
+| Card | Status | What this design takes from it |
+| --- | --- | --- |
+| [Permission band](../../../design-system/system/components/permission-band/index.html) | decided | The band, its Back button and link-mode toggle, and the narrow-width tiers (#124 sections on the card) |
+| [Toolbar](../../../design-system/system/components/toolbar/index.html) | proposed | The trailing tools (Open in default browser, Export to PDF) and the "a role is a promise" rule |
+| [Dialog](../../../design-system/system/patterns/dialog/index.html) | proposed | The unsaved-changes dialog: Save focused, Don't save set apart on the start edge (part 3 §3.6) |
+| [Feedback](../../../design-system/system/components/feedback/index.html#toast) | proposed | The open-in-browser and frame toasts; the failure badge's messages |
+| [Focus and keyboard](../../../design-system/system/foundations/focus.html) | decided | Keyboard entry into the page and the placeholder's top-edge-only focus ring |
+| [Writing](../../../design-system/system/foundations/writing.html#shortcuts) | proposed | Shortcut notation (`⌘[ / Alt+←`, `⌘F / Ctrl+F`) and button verbs |
+
+These notes are the as-built record of #124; the cards are the rules today. Where a note and a card disagree, the card wins.
+
 ## Documents
 
 | File | Title |

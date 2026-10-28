@@ -56,6 +56,12 @@
                      color: var(--color-text-tertiary); }
   .ty-role-code { /* mockup: app scale */ font-family: var(--font-mono); font-size: var(--text-sm); font-weight: var(--font-normal);
                   line-height: var(--leading-normal); color: var(--color-text-primary); }
+  /* The status line: one sentence set inside a chrome bar or a toolbar
+     (.erf-toolbar__status). The sample cell is the toolbar's own surface. */
+  .ty-role-status { /* mockup: app scale */ font-family: var(--font-sans); font-size: var(--text-sm); font-weight: var(--font-normal);
+                    line-height: var(--leading-snug); color: var(--color-text-tertiary); }
+  .ty-role-status--warning { color: var(--color-warning); }
+  .ty-role-status svg { inline-size: var(--icon-size-xs); block-size: var(--icon-size-xs); margin-inline-end: var(--space-2); vertical-align: middle; }
   .ty-role-prose { font-family: var(--font-serif); font-size: var(--text-prose); font-weight: var(--font-normal);
                    line-height: var(--leading-relaxed); color: var(--color-text-primary); }
   .ty-roles td:nth-child(2) { min-width: calc(var(--space-24) * 5); background: var(--color-bg-secondary);
@@ -100,7 +106,7 @@
 </p>
 
 <h2 id="roles">Text styles</h2>
-<p class="ds-muted">Proposed. Six roles cover almost every string in the chrome. Each is a fixed bundle of
+<p class="ds-muted">Proposed. Seven roles cover almost every string in the chrome. Each is a fixed bundle of
 family, size, weight, leading, case and colour; the contrast cell measures the role's colour on a panel
 (<code>--color-bg-secondary</code>) against the 4.5:1 that text needs.</p>
 <table class="ds-tokens ty-roles">
@@ -121,6 +127,12 @@ family, size, weight, leading, case and colour; the contrast cell measures the r
   <tr><td>Column header</td><td><span class="ty-role-colhead">Modified</span></td>
       <td><code>--text-sm</code> · <code>--font-medium</code> · <code>--leading-none</code> · uppercase · <code>--tracking-caps</code> · <code>--color-text-tertiary</code></td>
       <td data-contrast="--color-text-tertiary on --color-bg-secondary" data-min="4.5" data-result="pass">6.33:1 · pass</td></tr>
+  <tr><td>Status line</td><td><span class="ty-role-status">Saved to plan.md</span></td>
+      <td><code>--text-sm</code> · <code>--font-normal</code> · <code>--leading-snug</code> · <code>--color-text-tertiary</code> · one sentence, one line, truncates with …</td>
+      <td data-contrast="--color-text-tertiary on --color-bg-secondary" data-min="4.5" data-result="pass">6.33:1 · pass</td></tr>
+  <tr><td>Status line, warning</td><td><span class="ty-role-status ty-role-status--warning"><svg data-icon="triangle-alert" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>Paused the page so this list cannot be covered.</span></td>
+      <td>As the status line, with <code>--color-warning</code> – and a warning icon or the word “Warning” before it, so the tone is not carried by colour alone</td>
+      <td data-contrast="--color-warning on --color-bg-secondary" data-min="4.5" data-result="pass">5.94:1 · pass</td></tr>
   <tr><td>Code, paths, ids</td><td><span class="ty-role-code">src/renderer/index.css</span></td>
       <td><code>--font-mono</code> · <code>--text-sm</code> · <code>--font-normal</code> · <code>--leading-normal</code> · <code>--color-text-primary</code></td>
       <td data-contrast="--color-text-primary on --color-bg-secondary" data-min="4.5" data-result="pass">8.54:1 · pass</td></tr>
@@ -133,6 +145,14 @@ family, size, weight, leading, case and colour; the contrast cell measures the r
   <strong>Hints use tertiary text, never secondary.</strong> <code>--color-text-secondary</code> on a panel measures
   <span data-contrast="--color-text-secondary on --color-bg-secondary" data-min="4.5" data-result="fail">3.72:1 · fail</span> – it is a label colour
   for the darkest surface only. A hint is text someone has to read, so it takes the colour that passes everywhere.
+  <br><br>
+  <strong>A status line is <code>--text-sm</code>, never <code>--text-xs</code>.</strong> It is a sentence someone reads
+  – “Saved to plan.md”, “3 hosts blocked” – and <code>--text-xs</code> is for a label of a word or two: a count, a chip.
+  It sits in a toolbar (<code class="ds-nowrap">--color-bg-secondary</code>, measured above) or in the preview's chrome band
+  (<code class="ds-nowrap">--color-bg-primary</code>, where the same colour measures
+  <span data-contrast="--color-text-tertiary on --color-bg-primary" data-min="4.5" data-result="pass">8.52:1 · pass</span> and the warning tone
+  <span data-contrast="--color-warning on --color-bg-primary" data-min="4.5" data-result="pass">8.00:1 · pass</span>). It is announced through
+  <code>role="status"</code>, never by stealing focus – see <a href="../components/toolbar/index.html">Toolbar</a>.
   <br><br>
   <strong>Uppercase is for two roles only</strong> – panel titles and column headers – and always with tracking.
   Never uppercase a sentence, a button label or anything longer than three words.

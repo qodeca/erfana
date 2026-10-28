@@ -5,7 +5,7 @@
 > Inputs: six specialist reviews (interaction, accessibility, visual, benchmark of collaborative review tools, content design, state model and information architecture) and one design-lead synthesis, run 2026-10-28 over the shipped HTML Preview comments and the proposed Markdown and selection designs; then the owner's eight decisions (§2).
 > Builds on and, **where they conflict, overrides**: [html-preview-comments.md](html-preview-comments.md) (shipped v0.23.1), [markdown-preview-comments.md](markdown-preview-comments.md), [selection-comments.md](selection-comments.md).
 > Plan: both previews are built at the same time (owner, 2026-10-28).
-> Screens (proposed, plain HTML and CSS, no script): [`docs/designs/comments/comments-v2/`](comments-v2/index.html).
+> Screens (proposed, plain HTML and CSS, no script): [`docs/designs/comments/comments-v2/`](comments-v2/index.html). They build on the design system – buttons, banners, bands, chips, counters, empty states, the focus ring and icons come from its cards (§8); each screen lists the cards it uses.
 
 ## 1. Verdict
 
@@ -49,7 +49,7 @@ Priority: **P0** must be in the enhanced designs; **P1** clear improvement, do n
 | [C-13](#c-13) | P1 | Step through comments: stepper, key pair, 'Resolve and next', 'Reply and resolve' | shared, html-shipped | yes |
 | [C-14](#c-14) | P1 | File changed under an open window: text travels with the reader, drafts never silently expire, lists refresh on any change | shared, html-shipped, markdown-proposed | yes |
 | [C-15](#c-15) | P1 | Attention badge as a shape, one-row drawer filter, sort menu | shared, html-shipped | yes |
-| [C-16](#c-16) | P1 | Visible selection 'Comment' chip, parallel menu items, honest toggle, mode copy that teaches selection | selection-proposed, markdown-proposed, shared | yes |
+| [C-16](#c-16) | P1 | Visible selection 'Comment' button, parallel menu items, honest toggle, mode copy that teaches selection | selection-proposed, markdown-proposed, shared | yes |
 | [C-17](#c-17) | P1 | Underline and pin act as one: click an underline to open its thread; non-overlapping pins | shared, selection-proposed, markdown-proposed, html-shipped | yes |
 | [C-18](#c-18) | P1 | Non-modal anchored window in Markdown | markdown-proposed | no |
 | [C-19](#c-19) | P1 | Every refusal names its reason and a next step; disabled items carry a visible reason | shared, html-shipped | yes |
@@ -151,7 +151,7 @@ The stored item is always 'comment', in both previews:
 
 HTML keeps selectors in the visible label. 'Block' stays only in format-v1.md, which is for tool authors.
 
-Add a unit test that renders every Markdown-path string and fails on 'element', 'page', 'block' or a bare tag name. Add a glossary to the Writing card (`docs/design-system/system/foundations/writing.html`, proposed): comment, thread, reply, icon, underline, selection, comment mode. Banned in UI: block, pin, pick as a noun, element in Markdown.
+Add a unit test that renders every Markdown-path string and fails on 'element', 'page', 'block' or a bare tag name. The glossary is on the Writing card (`docs/design-system/system/foundations/writing.html#glossary`, proposed): comment, thread, reply, icon, underline, selection, comment mode. Banned in UI (`#banned-words`): block, pin, pick as a noun, element in Markdown.
 
 Cards: docs/designs/comments/markdown-comments/states.html; docs/designs/comments/markdown-comments/index.html; docs/designs/comments/selection-comments/index.html (Markdown frame); docs/designs/comments/html-comments/window.html (damaged state strings); docs/design-system/system/foundations/writing.html (glossary).
 
@@ -187,7 +187,7 @@ Cards: docs/designs/comments/html-comments/identity.html; docs/designs/comments/
 One rule for open threads in every state (attached, not visible, changed, words changed, not found): the reply box and Resolve are always present. In not-found and words-changed states, Resolve is the primary button and takes focus. Delete moves into the first message's … menu, as for any thread. Footer stays one row and uses the HTML button sizes. No filled danger button outside the inline delete confirmation.
 
 Not-found banner:
-- Style: `info` (accent icon, `--color-bg-selected` fill per the Feedback card), not `warning`.
+- Style: the Feedback card's info banner (`.erf-banner--info`, `docs/design-system/system/components/feedback/index.html#banner`, proposed), not `warning`. Its fill and edge read the proposed `--color-info-bg` / `--color-info-border`, which the Colours card (`colors.html#info`) does not yet have – an owner decision (§8).
 - HTML: 'This element is no longer in {file} – it may have been removed or rewritten as asked. Check, then resolve.'
 - Markdown: 'This {kind} is no longer in {file} – it may have been removed or rewritten as asked. Check, then resolve.'
 - Below it: 'It was attached to:' plus the struck-through stored quote, then the messages.
@@ -228,11 +228,11 @@ Window:
 
 Underline: 'now' words get a dashed accent underline (`::highlight(erf-comment-changed)` in Markdown; dashed boxes in the HTML overlay).
 
-Drawer row: neutral tag 'Changed' (1px `--color-accent-primary` outline, `--color-text-primary` label, never the warning look). Excerpt for words: '“ship by Friday” → “ship by Thursday”'. A 'Changed first' sort (C-15).
+Drawer row: neutral tag 'Changed' – the Badges card's outline chip (`.erf-chip--outline`), never the warning look. Excerpt for words: '“ship by Friday” → “ship by Thursday”'. A 'Changed first' sort (C-15).
 
 Pin: a filled 4px corner notch top-left (shape, not colour only).
 
-Toolbar accessible name: 'Comments, 7 open, 4 changed'.
+Toolbar accessible name: '7 comments, 4 changed' – it starts with the visible text (WCAG 2.5.3).
 
 Limit stated in the drawer help: 'Changes to attributes or styles only are not detected.'
 
@@ -250,11 +250,11 @@ Cards: docs/designs/comments/html-comments/window.html (new state: changed); doc
 
 Add a field to the new-comment window, and to Edit on a thread's first message.
 
-Placement and look: under the context line, a disclosure button 'Narrow to words' (text button, `--color-link`). It expands a read-only `<textarea readonly>`, 4 rows, `--text-sm`, `--color-bg-tertiary` fill, 1px `--color-border-subtle`, radius 0.
+Placement and look: under the context line, a disclosure button 'Narrow to words' (the Buttons card's text button). It expands a read-only `<textarea readonly>`, 4 rows, `--text-base`, `--color-bg-tertiary` fill, 1px `--color-border-input` – the Form card's field edge and size; focus is the one ring. The decided Form card has no read-only state, so this look is an owner decision (§8).
 
 Label: 'Text of {kind}, line {n} – select words to narrow this comment'.
 
-Content: the target's text from main's own parse – parse5 visible text for HTML, rendered block text for Markdown. Shift+arrows and Shift+Ctrl/Option+arrows select.
+Content: the target's text from main's own parse – parse5 visible text for HTML, rendered block text for Markdown. ⇧ with an arrow / Shift+arrow selects by character, ⌥⇧ with an arrow / Ctrl+Shift+arrow by word.
 
 A polite line under it reads 'Comment on: “ship by Friday”', with a 'Whole {kind}' button that clears the selection.
 
@@ -277,9 +277,9 @@ Cards: docs/designs/comments/selection-comments/index.html (new frame: keyboard 
 Write into §9.2:
 1. The preview scroller is a tab stop: `tabindex=0`, aria-label 'Preview of plan.md'.
 2. Turning comment mode on from the keyboard moves DOM focus to the block holding the selection anchor, else the first block in view.
-3. The picked block gets `tabindex="-1"` and real focus, so NVDA and VoiceOver read its own role and text. The outline follows `:focus-visible`. The attribute is removed on blur and never exported (extend E-M10).
-4. One keydown listener on `.markdown-preview`, active only in comment mode and in the active panel. It handles Tab/Shift+Tab (sibling blocks), Alt+↑/↓ (parent/child), Enter (new comment), Shift+F10/Menu (menu at the block's rect) and Esc (leave mode; focus returns to the Comment mode toggle).
-5. Outside comment mode, Shift+F10 or the Menu key with a selection opens the existing menu at the selection's rect, not the pointer.
+3. The picked block gets `tabindex="-1"` and real focus, so NVDA and VoiceOver read its own role and text. It wears the Focus card's one ring (`foundations/focus.html#ring`, decided) – never the two-tone ring, which is only for the HTML Preview overlay over a third-party page (owner decision, 2026-10-28). The attribute is removed on blur and never exported (extend E-M10).
+4. One keydown listener on `.markdown-preview`, active only in comment mode and in the active panel. It handles Tab / ⇧Tab / Shift+Tab (sibling blocks), ⌥↑ ⌥↓ / Alt+↑ Alt+↓ (parent/child), Enter (new comment), ⇧F10 / Shift+F10 or Menu (menu at the block's rect) and Esc (leave mode; focus returns to the Comment mode toggle).
+5. Outside comment mode, ⇧F10 / Shift+F10 or the Menu key with a selection opens the existing menu at the selection's rect, not the pointer.
 6. The drawer's 'Show in preview' keeps focus in the list, as in HTML.
 
 Draw a 'keyboard picking' state on the states card with the focus ring on a list item.
@@ -296,7 +296,7 @@ Cards: docs/designs/comments/markdown-comments/states.html (keyboard picking; fo
 
 Display: parse comment blocks from the same text the preview renders (shared parser over the buffer), so icons always match what is shown.
 
-Writes: while buffer ≠ disk, comment tools are aria-disabled with the reason, and a band appears at the top of the preview. The band uses the Feedback card's info band: `--color-bg-elevated`, 1px `--color-border-subtle` bottom edge, `--text-sm`.
+Writes: while buffer ≠ disk, comment tools are aria-disabled with the reason, and a band appears at the top of the preview. The band is the Feedback card's band form (`.erf-banner--band`, `feedback/index.html#band-or-banner`, proposed): full width under the toolbar, bottom edge only, one row, the sentence at `--text-base`, actions as small secondary buttons on the end edge. Dirty is a note (info); the conflict is a warning.
 - Dirty: 'plan.md has unsaved changes – comments are read-only until you save.' [Save plan.md]
 - Conflict: 'plan.md changed on disk. The preview shows your unsaved version and its comments. Choose a version in the editor to continue.' [Go to editor]
 
@@ -376,7 +376,7 @@ The mark never uses `--color-bg-selected`. MarkdownPreview.css sets `::selection
 
 Forced colours: Mark/MarkText fill plus a 2px CanvasText bottom edge; active = 4px edge. Highlight/HighlightText is reserved for the live selection.
 
-Cards: a 'Comment mark' card, deferred by R-03 (§7): until it is adopted the mark lives on docs/designs/comments/comments-v2/marks.html, then moves to docs/design-system/system/components/comment-mark/index.html. Rendered on white, #f5f5f5 and #0f1720 grounds, next to a real link, and overlapping a live selection. Remove the per-surface fills from selection.css and markdown-comments.css. Also replace the literals in markdown-comments.css: 28px → new `--toolbar-tool-height` token shared with the HTML band; the 22px pin step → the C-17 value; drop letter-spacing 0.2px in comments.css or tokenise it.
+Cards: the mark is now on the Text highlights card ([`docs/design-system/system/foundations/highlights.html`](../../design-system/system/foundations/highlights.html), proposed), which also holds the three proposed tokens, the paint order against Find and the selection, and the forced-colours mapping (R-03). Rendered on white, #f5f5f5 and #0f1720 grounds, next to a real link, and overlapping a live selection. Remove the per-surface fills from selection.css and markdown-comments.css. Also replace the literals in markdown-comments.css: 28px → new `--toolbar-tool-height` token shared with the HTML band; the 22px pin step → the C-17 value; drop letter-spacing 0.2px in comments.css or tokenise it.
 
 Cards: docs/designs/comments/comments-v2/marks.html (system card deferred, R-03); docs/designs/comments/selection-comments/index.html + selection.css; docs/designs/comments/markdown-comments/states.html + markdown-comments.css; docs/designs/comments/html-comments/comments.css.
 
@@ -388,9 +388,9 @@ Cards: docs/designs/comments/comments-v2/marks.html (system card deferred, R-03)
 
 **Design.**
 
-Window head, right of the title: `‹ 3 of 12 ›`. Two 24px icon buttons ('Previous comment' / 'Next comment', Buttons card icon variant) around a muted `--text-sm` `--color-text-tertiary` count. They step through threads in file order within the drawer's current filter (default Open).
+Window head, right of the title: `‹ 3 of 12 ›`. Two `--btn-height-sm` icon buttons ('Previous comment' / 'Next comment', Buttons card icon variant) around a muted `--text-sm` `--color-text-tertiary` count. They step through threads in file order within the drawer's current filter (default Open).
 
-Keys while focus is in the window or preview: Alt+F9 / Shift+Alt+F9 (VS Code's next-comment-thread pair, matched on the physical key). This avoids Alt+↑/↓, which the picker uses for parent/child, and Alt+[ ], which types characters on macOS Option.
+Keys while focus is in the window or preview: ⌥F9 / Alt+F9 for next and ⇧⌥F9 / Alt+Shift+F9 for previous (VS Code's next-comment-thread pair, matched on the physical key). This avoids Alt+↑/↓, which the picker uses for parent/child, and Alt+[ ], which types characters on macOS Option.
 
 Each step:
 - reveals the next target (existing reveal command; HTML takes one fresh still);
@@ -398,7 +398,7 @@ Each step:
 - announces 'Comment 3 of 12, on Paragraph, line 42.'
 
 Thread footer:
-- When another open thread exists, the secondary 'Resolve' becomes 'Resolve and next'.
+- When another open thread exists, the secondary 'Resolve' becomes 'Resolve and next' – unless the element has several open threads (R-21). It sits in the window foot with Close, one row with the primary last – Close, then Resolve and next (Dialog pattern, `patterns/dialog/index.html#anatomy`); Open in source and New comment move into a More actions (…) menu in the head (R-06, confirmed by the owner on 2026-10-28).
 - When the reply field has text, an extra 'Reply and resolve' does one write and one reload.
 - After the last one: body 'All open comments are resolved' with Close focused.
 
@@ -439,8 +439,8 @@ Cards: docs/designs/comments/html-comments/window.html (moved, expired, updated-
 
 **Design.**
 
-Badge `erf-badge--attention` (add to the Feedback card):
-- 16px tall, `--color-warning` fill, `--color-brand-black` mono text, a ▲ glyph plus the count, radius 0.
+Badge: the Badges card's attention counter `.erf-counter--attention` (`docs/design-system/system/components/badge/index.html#counter`, proposed):
+- `--color-warning` fill, ink text, the ▲ drawn in CSS with empty alternative text, so the words go in the parent's accessible name.
 - Used in the toolbar list tool ('3 · ▲1'), the drawer segment, row tags ('▲ Damaged') and the window head for damaged threads.
 - Amber never appears as tinted text next to lime.
 
@@ -450,28 +450,28 @@ Sort: a menu button in the drawer header, 'Sort: File order' (default) / 'Change
 
 **Owner decision OD-04 applied (2026-10-28):** the third segment is **Can't edit** (damaged and newer-format comments), not Attention. Not-found comments count as Open with a 'Not found' tag. The ▲ badge counts damaged comments only: toolbar '7 comments · ▲1'. Filter: 'Open 7' · 'Resolved 2' · 'Can't edit 1'.
 
-Cards: docs/design-system/system/components/badge/index.html (new badge); docs/designs/comments/html-comments/drawer.html; docs/designs/comments/html-comments/toolbar.html; docs/designs/comments/markdown-comments/states.html (drawer, toolbar).
+Cards: docs/design-system/system/components/badge/index.html#counter (the attention counter); docs/designs/comments/html-comments/drawer.html; docs/designs/comments/html-comments/toolbar.html; docs/designs/comments/markdown-comments/states.html (drawer, toolbar).
 
 ### C-16
 
-**Visible selection 'Comment' chip, parallel menu items, honest toggle, mode copy that teaches selection** – P1, surfaces: selection-proposed, markdown-proposed, shared. Source findings: INT-03, INT-04, BEN-04, CON-05, CON-14, INT-02.
+**Visible selection 'Comment' button, parallel menu items, honest toggle, mode copy that teaches selection** – P1, surfaces: selection-proposed, markdown-proposed, shared. Source findings: INT-03, INT-04, BEN-04, CON-05, CON-14, INT-02.
 
 **Problem.** After a drag, nothing visible says what to do next; the only cue is a screen-reader announcement (selection-comments.md §5.1, §7.3). Menu items are not parallel: 'Add comment' silently means words or whole, and 'Comment on whole p.lede' puts a selector in a sentence. Turning the mode on with a stale selection opens a window instead of the mode (S4b). Mode tooltip, announcement and empty drawer still say only 'click an element' (commentCopy.ts:379,427,452).
 
 **Design.**
 
-Chip:
-- About 150ms after a pointer-up that leaves a non-collapsed selection inside a commentable target, draw a 28px chip 8px above the end of the selection's last line, flipped below near the viewport top.
+Comment button (called the 'chip' in earlier drafts – the Badges card's chip is a static label, so this is a button):
+- About 150ms after a pointer-up that leaves a non-collapsed selection inside a commentable target, draw a Comment button at the proposed `--toolbar-tool-height` (28px, Toolbar card) `--space-4` above the end of the selection's last line, flipped below near the viewport top.
 - Content: `message-square-plus` 16px plus 'Comment'.
-- Look: `--color-bg-elevated`, 1px `--color-border-subtle`, radius 0, `--text-sm`.
+- Look: `--color-bg-elevated` with the Surfaces card's floating edge and shadow (`--color-border-subtle` plus `--shadow-md`, `foundations/surfaces.html#floating`), radius 0, `--text-sm`.
 - Takes no focus and does not alter the selection. Hides on Esc, scroll or collapse.
 - Click → new-comment window on the words.
 - Markdown: shown inside and outside comment mode. HTML: only in comment mode (the page owns its mouse outside it; see OD-01), drawn in the overlay shadow root with the label as generated content so Find ignores it.
-- This resolves INT-03 (28px label) vs BEN-04 (24px icon only): the label wins for learnability.
+- This resolves INT-03 (labelled button) vs BEN-04 (24px icon only): the label wins for learnability.
 
 Menu with a selection: 'Comment on selection' (matches 'Copy selection'), then 'Comment on the whole {kind}' (HTML: 'Comment on the whole element'). Without a selection: 'Add comment'.
 
-Toggle: turning the mode on with a selection only turns the mode on. It outlines the container, shows the chip and announces 'Comment mode on. Text is selected – press Enter or click Comment to comment on it.' A selection outside the viewport is ignored.
+Toggle: turning the mode on with a selection only turns the mode on. It outlines the container, shows the Comment button and announces 'Comment mode on. Text is selected – press Enter or click Comment to comment on it.' A selection outside the viewport is ignored.
 
 Copy:
 - HTML tooltip: 'Comment mode (Ctrl+Alt+M) – on: click an element or select text to comment, Esc to leave'.
@@ -483,7 +483,7 @@ Markdown right-click with no selection, outside comment mode: the menu gets 'Com
 
 **Owner decision OD-01 applied (2026-10-28):** the HTML Preview handles the view's context-menu event outside comment mode (only when the page did not cancel its own right-click) and shows one item: 'Comment here…' (turns comment mode on with the picker on that element), or 'Comment on selection' when the page has selected text.
 
-Cards: docs/designs/comments/selection-comments/index.html (chip frame; menus); docs/designs/comments/markdown-comments/states.html (menu without selection); docs/designs/comments/html-comments/toolbar.html (tooltip copy); docs/designs/comments/html-comments/drawer.html (empty state).
+Cards: docs/designs/comments/selection-comments/index.html (Comment button frame; menus); docs/designs/comments/markdown-comments/states.html (menu without selection); docs/designs/comments/html-comments/toolbar.html (tooltip copy); docs/designs/comments/html-comments/drawer.html (empty state).
 
 ### C-17
 
@@ -530,7 +530,7 @@ Cards: docs/designs/comments/markdown-comments/index.html (frame 3); docs/design
 
 **Design.**
 
-1. ContextMenuItem gets `description?: string`, rendered as a second line (`--text-sm`, `--color-text-tertiary`) linked with aria-describedby. Example: 'Can't comment here' / 'Comments can't be added to the frontmatter.' The toolbar toggle, when aria-disabled and pressed, speaks its reason in the polite region: 'Comment mode is unavailable: file too large.'
+1. ContextMenuItem gets `description?: string`, rendered as a second line (`--text-base`, `--color-text-tertiary`) linked with aria-describedby. **Owner decision:** the Menu card is decided and has no description line, so this needs the owner to change it; the screens draw it as a labelled proposal. Example: 'Can't comment here' / 'Comments can't be added to the frontmatter.' The toolbar toggle, when aria-disabled and pressed, speaks its reason in the polite region: 'Comment mode is unavailable: file too large.'
 2. The save answer carries `reason` next to `code`. commentCopy keeps one table reason → {sentence, action}:
    - too-many-blocks: '{file} already has 500 comments, the most Erfana adds to one file. Delete resolved threads to add more. Your text is still here.'
    - replies: 'This thread has 200 replies, the most it can hold. Start a new comment instead – your text is still here.'
@@ -539,11 +539,11 @@ Cards: docs/designs/comments/markdown-comments/index.html (frame 3); docs/design
    - path: 'Erfana doesn't add comments to files in build, dependency or hidden folders such as {folder}.' / 'Erfana adds comments only to HTML and Markdown files.' / '{file} is outside this project, so Erfana won't write to it.'
 3. Markdown render check: 'Erfana can't add a comment to this list item without changing how plan.md looks in the preview. Comment on the whole list instead – your text is kept.' Add a secondary button 'Comment on the whole list' that re-targets the draft. With no parent: '…Copy your text and comment on a nearby paragraph.'
 4. Wording: the status action is 'Reopen' and the announcement 'Comment reopened.' Errors never say 'reopen': BLOCK_CHANGED see C-14; KEY_INVALID 'This window is out of date – the comment changed or was removed. Close it and open the comment again.'
-5. Local validation calls the window's assertive alert ('Write a comment first.' / 'Comments can be up to 4,000 characters. This one is 4,120.'). Counter crossings are announced once each in the polite region: '400 characters left', 'Over the limit by {n}'.
+5. Local validation calls the window's assertive alert ('Write a comment first.' / 'Comments can be up to 4,000 characters. This one is 4,120.' – 4,000 is `COMMENT_MAX_CHARS`; screens bake it from the claims ledger). Counter crossings are announced once each in the polite region: '400 characters left', 'Over the limit by {n}'.
 
 **Owner decision OD-07 applied (2026-10-28):** no folder is refused, in either preview. The 'build, dependency or hidden folders' refusal and its string are removed; HTML decision 35's never-served list no longer limits commenting. Kept: 'Erfana adds comments only to HTML and Markdown files.' and '{file} is outside this project, so Erfana won't write to it.'
 
-Cards: docs/design-system/system/components/menu/index.html (description line); docs/designs/comments/html-comments/window.html (refusal strings); docs/designs/comments/markdown-comments/states.html (render check refused, frontmatter menu).
+Cards: docs/design-system/system/components/menu/index.html (description line – owner decision, decided card); docs/designs/comments/html-comments/window.html (refusal strings); docs/designs/comments/markdown-comments/states.html (render check refused, frontmatter menu).
 
 ### C-20
 
@@ -555,7 +555,9 @@ Cards: docs/design-system/system/components/menu/index.html (description line); 
 
 - Remove 'Show comment icons' from the toolbar at every tier. It lives in the drawer as a checkbox labelled 'Show comment icons and underlines'.
 - At full and compact tiers the list tool becomes a text button '7 comments' / '7 comments · ▲1' (C-15 badge); at the narrow tier, the icon plus count.
-- Only the mode toggle uses the pressed signature (fill plus 2px lime edge), so a lit comment tool always means comment mode is on.
+- The pressed signature (fill plus 2px lime edge) marks every on/off tool that is on, as everywhere else in the band: the mode toggle while comment mode is on, and the count while the drawer is open (owner decision, 2026-10-28; replaces R-19's box). The count stays a disclosure (`aria-expanded`); only its look is the pressed one. With Show comment icons gone, the two lit tools can no longer be confused with a third.
+- The count's accessible name starts with its visible text ('7 comments', '7 comments, 1 damaged') and it carries no `title` that repeats it.
+- **Owner decision:** this changes the decided comment-tools card (`html-comments/toolbar.html`), so it needs the owner's call before the screens move to decided.
 - 'Icon' is used in all UI strings; 'pin' only in docs.
 - Same rules for the Markdown toolbar in §9.1.
 
@@ -570,11 +572,10 @@ Cards: docs/designs/comments/html-comments/toolbar.html; docs/designs/comments/h
 **Design.**
 
 Buttons:
-- Blocked (empty field, unsaved source): fill `--color-bg-tertiary`, 1px `--color-border-subtle`, label `--color-text-tertiary`; the focus ring stays full strength.
-- Busy ('Saving…'): keep the accent fill and add a 12px spinner before the label.
-- Record this in the Buttons card.
+- Blocked (empty field, unsaved source): the Buttons card's blocked state (`components/button/index.html#blocked`) – `aria-disabled` plus `aria-describedby` naming what is missing; the label and fill are dimmed, the focus ring stays full strength.
+- Busy ('Saving…'): the Buttons card's busy state – full strength, with the card's one `::before` spinner; no spinner of our own.
 
-Quote: `--text-base`, `--color-text-primary`, 2px accent rule kept, `line-clamp: 3`, with a 'Show all' text button in `--color-link`. 'Only the first 200 characters are kept' appears only when expanded.
+Quote: `--text-base`, `--color-text-primary`, 2px accent rule kept, `line-clamp: 3`, with a 'Show all' text button (Buttons card). 'Only the first 200 characters are kept' appears only when expanded.
 
 Labels:
 - Markdown has no floating label. The comment-mode tab shows 'Comment mode · List item, line 14 · Esc to leave' (target in mono, updated on hover or keyboard move).
@@ -591,6 +592,8 @@ Cards: docs/design-system/system/components/button/index.html; docs/designs/comm
 **Design.**
 
 When the clicked target has open threads, open the threads view with reply fields, and make 'New comment' the first footer button. Right-click → 'Add comment' stays an explicit new thread. Markdown inherits the rule.
+
+Several open threads on one element (**owner decision, 2026-10-28**, R-21): the window foot holds Close only – no 'Resolve and next', because it would be unclear which thread it resolves. Each thread keeps its own Resolve, and the head's ‹ › stepper still moves to the next element. With R-06, 'New comment' is the first item in the head's More actions menu while the stepper shows.
 
 Cards: docs/designs/comments/html-comments/window.html (threads footer order).
 
@@ -624,12 +627,12 @@ Automate what can be automated: an axe-core run over every card in html-comments
 Per-user, per-project 'seen' ledger in app data (never in the file): thread id → last seen message id, status, target fingerprint. On first launch after upgrade, everything is marked seen.
 
 Unseen items:
-- a 6px `--color-accent-primary` dot before the row label and on the pin's top-left;
-- a 'New' tag before the author.
+- the Badges card's unseen dot (`.erf-badge--dot`) before the row label and on the pin's top-left;
+- a 'New' tag before the author – the Badges card's accent chip (`.erf-chip--accent`).
 
 Row meta shows the last activity: 'Anna K. replied · Today, 09:10' / 'Resolved by Marcin Obel · 25 Oct'.
 
-The drawer header gets 'Mark all as seen'. Toolbar name: 'Comments, 3 open, 2 new'. Opening a thread for 1s marks it seen.
+The drawer header gets 'Mark all as seen'. Toolbar name: '3 comments, 2 new'. Opening a thread for 1s marks it seen.
 
 Cards: docs/designs/comments/html-comments/drawer.html; docs/designs/comments/html-comments/overlay.html.
 
@@ -646,7 +649,7 @@ When a previewed file changes on disk outside Erfana and at least one open threa
 Review opens the window in pass layout:
 - title 'Review 1 of 4' with a dot progress strip;
 - Was/Now box, then the thread;
-- actions: Resolve (primary, Cmd/Ctrl+Enter), 'Needs more work' (focuses Reply), Skip.
+- actions: Resolve (primary, ⌘Enter / Ctrl+Enter), 'Needs more work' (focuses Reply), Skip.
 
 Changed threads come first. Resolves are queued per file ('3 to resolve') and written in one write, so HTML reloads once. Closing with a queue asks 'Resolve 3 now?'.
 
@@ -666,7 +669,7 @@ Cards: docs/designs/comments/html-comments/window.html (pass layout); docs/desig
 
 Drawer: sticky sub-headings per file, 'index.html · 3 open' and 'pricing-table.html · in a frame · 1 open'. Drop the 'In frame:' tag. In the windowed list, headers are virtual items with role=group and aria-labelledby.
 
-Banners: actions use the compact `.erf-comment-action` (24px, `--text-sm`) in one row, primary first ('Save index.html', then 'Go to tab'). Add an Exceptions row to the one-button-size rule: banner actions are part of the message, not the window's choices.
+Banners: actions are the Feedback card's banner actions – small secondary buttons (`--btn-height-sm`) in one row on the end edge, primary first ('Save index.html', then 'Go to tab'). Add an Exceptions row to the one-button-size rule: banner actions are part of the message, not the window's choices.
 
 Cards: docs/designs/comments/html-comments/drawer.html; docs/designs/comments/html-comments/window.html (unsaved source).
 
@@ -684,7 +687,7 @@ Cards: docs/designs/comments/html-comments/drawer.html; docs/designs/comments/ht
 
 (c) Markdown panes ≥ 1,200px: an opt-in 'Margin' toggle in the drawer header shows a 240px rail of compact cards (author · time, 2-line excerpt, 'n replies') top-aligned to their blocks, stacked with an 8px gap. Below 1,200px it falls back to icons.
 
-(d) 'Comment on…' finder (Cmd/Ctrl+Alt+Shift+M or a 'New comment…' button atop the drawer): a combobox over main's parse in document order, options 'Paragraph, line 42: “We ship…” – 2 comments'. Moving reveals live; Enter opens the window with Narrow to words.
+(d) 'Comment on…' finder (⌥⇧⌘M / Ctrl+Alt+Shift+M or a 'New comment…' button atop the drawer): a combobox over main's parse in document order, options 'Paragraph, line 42: “We ship…” – 2 comments'. Moving reveals live; Enter opens the window with Narrow to words.
 
 Cards: docs/designs/comments/markdown-comments/states.html.
 
@@ -706,17 +709,17 @@ Cards: docs/designs/comments/markdown-comments/states.html.
 
 | Card | Holds |
 |---|---|
-| [`index.html`](comments-v2/index.html) | Overview and the v2 journey in both previews: select → Comment chip → window with Narrow to words → save → underline and icon → stepper → Resolve and next |
+| [`index.html`](comments-v2/index.html) | Overview and the v2 journey in both previews: select → Comment button → window with Narrow to words → save → underline and icon → stepper → Resolve and next |
 | [`window.html`](comments-v2/window.html) | Every window state: new comment (Narrow to words collapsed and expanded), thread with stepper, Resolve and next, all done, Changed (Was/Now), words changed, not found (info), moved and expired drafts, updated from file, removed, refusals with reasons, damaged with Rebuild, disabled Save, clamped quote |
 | [`drawer.html`](comments-v2/drawer.html) | Three-segment filter (Open / Resolved / Can't edit), sort menu, Changed and Not found tags, removed-outside note, rows that open on click, file grouping, empty states, icons-and-underlines checkbox |
-| [`marks.html`](comments-v2/marks.html) | Comment mark on white, grey and dark grounds, next to a link and over a live selection; Comment chip; icon states (open, count, changed notch, stack '+3', ghost); HTML label inside the outline; forced colours |
-| [`menus-toolbar.html`](comments-v2/menus-toolbar.html) | Toolbars in both previews (only the mode toggle uses the pressed look; '7 comments · ▲1'); all menus incl. HTML outside comment mode and the disabled item with a reason line; Markdown keyboard picking; comment-mode tab with the target; Markdown non-modal window in the margin and its edge tab; 'comments paused' bands |
+| [`marks.html`](comments-v2/marks.html) | Comment mark on white, grey and dark grounds, next to a link and over a live selection, beside Find hits; Comment button; icon states (open, count, changed notch, stack '+3', ghost); HTML label inside the outline; forced colours |
+| [`menus-toolbar.html`](comments-v2/menus-toolbar.html) | Toolbars in both previews (the mode toggle and the open drawer's count use the pressed look; '7 comments ▲1'); all menus incl. HTML outside comment mode and the disabled item with a reason line; Markdown keyboard picking; comment-mode tab with the target; Markdown non-modal window in the margin and its edge tab; 'comments paused' bands |
 
 ## 6. Rejected findings
 
 - **BEN-11** – An author filter has little value in a single-file drawer, and the lens itself says to add it only once a project view exists. Deferred with OD-08, not planned now.
-- **STA-12 (Alt+↓/↑ key choice)** – Only the key choice is rejected; the stepper itself is kept in C-13. Alt+↑/↓ already moves to the parent and child in the picker (html §10.8, md §9.2), so stepping uses Alt+F9 / Shift+Alt+F9. INT-01's Alt+F9 was chosen over BEN-07's Alt+[ / Alt+], because on macOS Option+[ types a character.
-- **BEN-04 (24px accent icon-only adder, HTML outside comment mode excluded; 'whole' moved out of the menu)** – Partly superseded by C-16. A labelled 28px neutral chip teaches the gesture better than an unlabelled accent square. The 'whole {kind}' choice stays in the menu and is mirrored in the window by the Narrow to words field (C-07), so it does not need to leave the menu.
+- **STA-12 (Alt+↓/↑ key choice)** – Only the key choice is rejected; the stepper itself is kept in C-13. Alt+↑/↓ already moves to the parent and child in the picker (html §10.8, md §9.2), so stepping uses ⌥F9 / Alt+F9 and ⇧⌥F9 / Alt+Shift+F9. INT-01's Alt+F9 was chosen over BEN-07's Alt+[ / Alt+], because on macOS Option+[ types a character.
+- **BEN-04 (24px accent icon-only adder, HTML outside comment mode excluded; 'whole' moved out of the menu)** – Partly superseded by C-16. A labelled neutral Comment button teaches the gesture better than an unlabelled accent square. The 'whole {kind}' choice stays in the menu and is mirrored in the window by the Narrow to words field (C-07), so it does not need to leave the menu.
 - **BEN-03 (fourth 'Ready to check' filter segment)** – Conflicts with VIS-11's one-row, three-segment filter. 'Changed' is delivered as a row tag plus a 'Changed first' sort (C-06, C-15) instead.
 - **CON-08 (change the frozen readable target rendering, owner call)** – No owner call is needed. The same information goes into the agent-note area, whose wording readers never compare (C-01, C-02). That avoids a frozen-format change and the v0.23.1 damage trap I verified in parse.ts:230-233.
 
@@ -726,12 +729,12 @@ The five card designers found gaps and conflicts in §3. These resolutions are b
 
 | # | Topic | Resolution |
 |---|---|---|
-| R-01 | C-12 active mark contrast | A 55% fill drawn over the text drops it to about 3:1 (measured on the marks card). **Active keeps the 35% fill and gets a bar twice as thick**; in Markdown the active words also take `--color-text-emphasis`. No `--color-comment-mark-active` token. |
+| R-01 | C-12 active mark contrast | A stronger fill drawn over the text loses contrast. **Active keeps the 35% fill and doubles the bar** (Text highlights card, `foundations/highlights.html#states` – this replaces the earlier 'twice as thick'); in Markdown the active words also take `--color-text-emphasis`. No `--color-comment-mark-active` token. |
 | R-02 | C-12 token name | The accent token is `--color-accent-primary`; `--color-accent` does not exist. |
-| R-03 | C-12 separate system card | Not created now; the mark lives on `docs/designs/comments/comments-v2/marks.html` until it is adopted, then moves to `system/`. |
+| R-03 | C-12 separate system card | The mark lives on the [Text highlights card](../../design-system/system/foundations/highlights.html) (proposed). `comments-v2/marks.html` draws it in the comment screens. |
 | R-04 | C-03 new-comment title in Markdown | "New comment on {kind}" (for example "New comment on paragraph"); threads keep "Comment on {kind}" / "Comments on {kind}". HTML keeps "New comment". |
-| R-05 | C-07 Narrow to words | Folded by default, also from the chip – the words quote already shows the selection. Expanding it shows the field with the current range selected. |
-| R-06 | C-13 stepper | Hidden once nothing is left to step to ("All open comments are resolved"). "Resolve and next" sits in the window footer; the thread footer keeps one row, so "Open in source" and "New comment" move into the … menu while the stepper is shown. |
+| R-05 | C-07 Narrow to words | Folded by default, also from the Comment button – the words quote already shows the selection. Expanding it shows the field with the current range selected. |
+| R-06 | C-13 stepper | **Confirmed by the owner (2026-10-28).** Hidden once nothing is left to step to ("All open comments are resolved"). "Resolve and next" and "Close" sit in the window footer, one row, primary last (Close, then Resolve and next); "Open in source" and "New comment" move into the head's "More actions" (…) menu while the stepper is shown. |
 | R-07 | C-14 button order | Primary last, as everywhere in the window: [Cancel] [Pick again]. Markdown save announcement: "Comment saved to plan.md, line 16 (the list item moved)." – never "block". |
 | R-08 | §4.1 status-only rebuild | "Mark resolved" and "Keep open" are both secondary; focus starts on Cancel. |
 | R-09 | C-15 Can't edit count vs ▲ badge | The filter cell shows a plain count ("Can't edit 2"); the ▲ badge marks damaged rows and the toolbar count, where it counts damaged comments only. Empty Can't edit: "Every comment in this file can be edited." |
@@ -739,10 +742,50 @@ The five card designers found gaps and conflicts in §3. These resolutions are b
 | R-11 | C-10 row name vs "was → now" excerpt | The row shows both: the first message excerpt (its accessible name) and, under it, the words line. |
 | R-12 | C-09 paused bands | Only Comment mode is disabled; the count stays clickable so existing threads can be read. |
 | R-13 | C-16 Markdown comment-mode menu with a selection | Comment items only, no prompt items – like the comment-mode menu without a selection. |
-| R-14 | C-15 toolbar badge | The badge needs no "·" separator: "7 comments ▲1". Name: "Comments, 7 open, 1 damaged". |
+| R-14 | C-15 toolbar badge | The badge needs no "·" separator: "7 comments ▲1". Name: "7 comments, 1 damaged" – it starts with the visible text. |
 | R-15 | C-18 margin placement | Measure the free space from the text column's right edge to the preview's edge; with the 860px column centred, the margin form appears from about 1,612px of preview width, otherwise right → left → below → above. |
 | R-16 | C-17 stack icon | Cap at 3 icons per row. HTML stack icons are visual only (C-11); Markdown name: "3 more comments in this row. Open." The Markdown ghost (C-05) is a button named "Comment not found, line 12. Open." |
 | R-17 | C-06 changed icon name | Markdown: "{n} comments on {kind}, line {n}, changed. Open." |
 | R-18 | C-21 HTML label inside the outline | Accepted cost: it covers the target's own first line, never a neighbour's – the reason for moving it. |
-| R-19 | C-20 open drawer look | Shared CSS fixed: an open drawer is a box (`--color-bg-tertiary` + subtle border), never the pressed signature. |
-| R-20 | Markdown link inside a mark | The violet link inside a violet mark is about 3.8:1 – the marks card flags it. To fix at adoption: inside a mark, links keep their colour and gain an underline. |
+| R-19 | C-20 open drawer look | **Replaced by the owner (2026-10-28):** the tool that opens the drawer keeps the pressed signature (fill plus lime foot) while the drawer is open, the same as other on/off tools – not a box. |
+| R-20 | Markdown link inside a mark | The violet link inside a violet mark loses contrast – the marks card flags it. To fix at adoption: inside a mark, links keep their colour and gain an underline. |
+| R-21 | C-22 with R-06, several open threads on one element | **Decided by the owner (2026-10-28).** The window foot holds Close only – no "Resolve and next", because it would be unclear which thread it resolves. Each thread keeps its own "Resolve"; the head's ‹ › stepper still moves to the next element. |
+
+## 8. Design-system cards these screens build on
+
+Every screen also lists its cards at the end, with path and status. A **decided** card is binding; a **proposed** card is the direction of travel. Paths are under `docs/design-system/`.
+
+| Card | Path | Status | Used for |
+|---|---|---|---|
+| Buttons | [`system/components/button/index.html`](../../design-system/system/components/button/index.html) | proposed | every button: primary, secondary, text, icon, small, menu button; blocked and busy states |
+| Badges | [`system/components/badge/index.html`](../../design-system/system/components/badge/index.html) | proposed | tags (outline, accent chips), the ▲ attention counter, the unseen dot |
+| Feedback | [`system/components/feedback/index.html`](../../design-system/system/components/feedback/index.html) | proposed | info, warning and error banners; the paused band form |
+| Empty, loading and error states | [`system/patterns/states/index.html`](../../design-system/system/patterns/states/index.html) | proposed | drawer empty states (inline form) |
+| Dialog | [`system/patterns/dialog/index.html`](../../design-system/system/patterns/dialog/index.html) | proposed | window foot: one row, primary last |
+| Menu | [`system/components/menu/index.html`](../../design-system/system/components/menu/index.html) | decided | every menu; the description line is an owner decision |
+| Toolbar | [`system/components/toolbar/index.html`](../../design-system/system/components/toolbar/index.html) | proposed | tool height (proposed `--toolbar-tool-height`, 28px) |
+| Segmented | [`system/components/segmented/index.html`](../../design-system/system/components/segmented/index.html) | proposed | drawer filter (Open / Resolved / Can't edit) |
+| Form | [`system/components/form/index.html`](../../design-system/system/components/form/index.html) | decided | the Narrow to words field; its read-only look is an owner decision |
+| Icons | [`system/components/icon/index.html`](../../design-system/system/components/icon/index.html) | proposed | every icon, by name (`data-icon`) |
+| Permission band | [`system/components/permission-band/index.html`](../../design-system/system/components/permission-band/index.html) | decided | the pressed signature the comment-mode toggle and the open drawer's count reuse |
+| Row | [`system/components/row/index.html`](../../design-system/system/components/row/index.html) | decided | drawer rows |
+| Drawer | [`system/patterns/drawer/index.html`](../../design-system/system/patterns/drawer/index.html) | proposed | the comment drawer |
+| Text highlights | [`system/foundations/highlights.html`](../../design-system/system/foundations/highlights.html) | proposed | the comment mark, Find hits, the selection (R-03) |
+| Focus | [`system/foundations/focus.html`](../../design-system/system/foundations/focus.html) | decided | the one focus ring, also on a picked block |
+| Surfaces | [`system/foundations/surfaces.html`](../../design-system/system/foundations/surfaces.html) | proposed | the floating Comment button and the window |
+| Writing | [`system/foundations/writing.html`](../../design-system/system/foundations/writing.html) | proposed | glossary, banned words, shortcuts (one platform per frame) |
+| Colours | [`system/foundations/colors.html`](../../design-system/system/foundations/colors.html) | proposed | ink and ground pairs; contrast ratios are baked, never typed |
+| Forced colours | [`system/foundations/forced-colors.html`](../../design-system/system/foundations/forced-colors.html) | proposed | the mark and icons in Windows contrast themes |
+
+### 8.1 Owner decisions these screens raise
+
+| # | Card | Status | Question |
+|---|---|---|---|
+| D-1 | Menu | decided | Add a description line under a disabled item (C-19)? The screens draw it as a labelled proposal. |
+| D-2 | Comment tools (`html-comments/toolbar.html`), Permission band | decided | Accept the quieter toolbar and the count's new name (C-20)? |
+| D-3 | Form | decided | Add a read-only state for the Narrow to words field (C-07)? |
+| D-4 | Focus | decided | **Answered by the owner (2026-10-28):** no two-tone ring for a picked Markdown block (C-08); it shows the one ring. The two-tone ring stays only on the HTML Preview overlay. |
+| D-5 | Segmented | proposed | Keep the drawer filter cells on one row (count beside the label) rather than the card's stacked cells? |
+| D-6 | Toolbar | proposed | Adopt `--toolbar-tool-height` (28px) for the Comment button, edge tab and count? |
+| D-7 | Colours | proposed | Add `--color-info-bg` / `--color-info-border` for the info banner (C-05)? |
+| D-8 | Claims ledger | – | Done: `comment-max-chars` and `comment-warn-chars` are numeric claims, so counters read 4000 and 3600, as the app shows them. |

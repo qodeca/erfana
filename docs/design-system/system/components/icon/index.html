@@ -70,6 +70,16 @@
   .btn24:focus-visible { outline: var(--border-width-thick) solid var(--color-border-focus);
                          outline-offset: var(--space-1); }
   .dot { display: inline-flex; color: var(--color-git-modified-light); }
+
+  /* Unicode glyphs as status marks: a band-sized line, as it ships and as proposed. */
+  .ic-mark { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-6);
+             background: var(--color-bg-primary); /* mockup: app scale – a band line */ font-size: var(--text-sm);
+             color: var(--color-text-primary); }
+  .ic-mark--warning { color: var(--color-warning); }
+  .ic-mark svg { inline-size: var(--icon-size-xs); block-size: var(--icon-size-xs); flex: 0 0 auto; }
+  .ic-mark__glyph { font-family: var(--font-sans); }
+  .ic-glyph-map td:first-child { font-family: var(--font-sans); font-size: var(--text-lg); text-align: center; }
+  .ic-glyph-map svg { inline-size: var(--icon-size-sm); block-size: var(--icon-size-sm); vertical-align: middle; color: var(--color-text-primary); }
 </style>
 </head>
 <body>
@@ -218,6 +228,44 @@ lucide's own export map resolves it. A glyph not on this list is added to the re
   <a href="../../../../designs/comments/html-comments/toolbar.html">toolbar</a> screens.
 </div>
 
+<h2 id="glyphs">Unicode glyphs as marks</h2>
+<p class="ds-muted">
+  Proposed. A typed character – ⚠ ✓ ▸ ▾ – is not an icon: it takes the font's shape and weight, not the registry's
+  stroke; it changes with the platform face; a screen reader reads it aloud (“check mark”, “black right-pointing small
+  triangle”) unless it is hidden; and with a variation selector or an emoji font it turns into a colour picture that
+  forced colours cannot repaint. <strong>Use the registry icon.</strong> Where a glyph has to stay, it is
+  <code>aria-hidden="true"</code>, the meaning is in words beside it, and it is painted in <code>currentColor</code>
+  text so it survives forced colours (see <a href="../../foundations/forced-colors.html">Forced colours</a>). An emoji
+  is never a mark.
+</p>
+<table class="ds-tokens ic-glyph-map">
+<thead><tr><th>Glyph</th><th>Used as</th><th>Registry icon instead</th><th>Where it ships</th></tr></thead>
+<tbody>
+  <tr><td>⚠</td><td>Warning mark</td><td><svg data-icon="triangle-alert" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg> <code>alert-triangle</code> (draws lucide <code>triangle-alert</code>)</td><td><code>PreviewChromeBand.tsx:373</code> – the paused line. Hidden, with the words beside it: the rule's fallback, met</td></tr>
+  <tr><td>✓</td><td>Done or allowed mark</td><td><svg data-icon="check" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> <code>check</code></td><td><code>PreviewBandRow.tsx:64</code> – “Allowed ✓”. Not hidden, so the row is read as “Allowed check mark”</td></tr>
+  <tr><td>▸</td><td>Collapsed caret</td><td><svg data-icon="chevron-right" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg> <code>chevron-right</code> – not in the registry yet; add it first</td><td><code>PreviewChromeBand.tsx:361</code> – the chip caret, hidden; <code>aria-expanded</code> carries the state</td></tr>
+  <tr><td>▾</td><td>Expanded caret</td><td><svg data-icon="chevron-down" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg> <code>chevron-down</code></td><td>The same caret, open</td></tr>
+</tbody>
+</table>
+
+<div class="ds-frames">
+  <figure class="ds-frame"><div aria-hidden="true">
+      <div class="ic-mark ic-mark--warning"><span class="ic-mark__glyph">⚠</span><span>Paused the page so this list cannot be covered.</span></div></div>
+    <figcaption><strong>As it ships</strong> – a font glyph: its shape and weight come from whatever face the platform has, not the registry, so it matches the icons beside it only by luck. Hidden from screen readers, so it is allowed to stay.</figcaption></figure>
+  <figure class="ds-frame"><div aria-hidden="true">
+      <div class="ic-mark ic-mark--warning"><svg class="ic--stroke" data-icon="triangle-alert" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg><span>Paused the page so this list cannot be covered.</span></div></div>
+    <figcaption><strong>Proposed</strong> – the registry's warning icon at <code>xs</code>, the decided stroke, the same colour as the words.</figcaption></figure>
+  <figure class="ds-frame"><div aria-hidden="true">
+      <div class="ic-mark"><span>Allowed ✓</span></div></div>
+    <figcaption><strong>As it ships</strong> – the mark is part of the text, so it is read aloud and cannot be hidden on its own.</figcaption></figure>
+  <figure class="ds-frame"><div aria-hidden="true">
+      <div class="ic-mark"><svg class="ic--stroke" data-icon="check" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span>Allowed</span></div></div>
+    <figcaption><strong>Proposed</strong> – the icon is hidden and the word alone carries the state.</figcaption></figure>
+</div>
+<p class="ds-muted">Emoji marks ship too and are the form the rule rules out: <code>⚠️</code> in the terminal's error
+state (<code>TerminalStatusContent.tsx:71</code>), in the broken-link text (<code>markdownLinkResolver.ts:407</code>) and
+in a blocked link's <code>title</code> (<code>MarkdownPreview.tsx:414</code>).</p>
+
 <h2 id="target">Minimum target</h2>
 <p class="ds-muted">
   An icon that can be clicked lives in a target of at least <strong>24 × 24</strong> – WCAG 2.2 SC 2.5.8.
@@ -230,6 +278,24 @@ lucide's own export map resolves it. A glyph not on this list is added to the re
 <h2>Exceptions</h2>
 <p class="ds-muted">None recorded. A shipping component that departs from this card carries a
 <code>deviates:</code> marker at the site and gets a row here, naming the file.</p>
+<h3 id="open-defects">Open defects this card names</h3>
+<ul class="ds-muted">
+  <li><strong>A read-aloud check mark.</strong> “Allowed ✓” puts the glyph inside the state text
+  (<code>PreviewBandRow.tsx:64</code>), so a screen reader says “check mark”. See <a href="#glyphs">Unicode glyphs as marks</a>.</li>
+  <li><strong>Emoji as marks.</strong> <code>TerminalStatusContent.tsx:71</code>, <code>markdownLinkResolver.ts:407</code>,
+  <code>MarkdownPreview.tsx:414</code>.</li>
+  <li><strong>No <code>chevron-right</code> in the registry.</strong> The caret replacement needs it added to
+  <code>utils/iconRegistry.tsx</code> first.</li>
+</ul>
+</section>
+
+<section id="related">
+<h2>Related</h2>
+<ul class="ds-muted">
+  <li><a href="../../foundations/forced-colors.html">Forced colours</a> – what a mark must keep in a contrast theme.</li>
+  <li><a href="../../foundations/writing.html">Writing</a> – the words that carry the meaning a mark only repeats.</li>
+  <li><a href="../tooltip/index.html">Tooltip</a> – a description, never an icon's name.</li>
+</ul>
 </section>
 
 </main>

@@ -48,6 +48,8 @@
   .wr-hint { /* mockup: app scale – a dialog hint */ display: flex; flex-direction: column; gap: var(--space-3);
              padding: var(--space-6); background: var(--color-bg-secondary); font-size: var(--text-sm); color: var(--color-text-tertiary); }
   .wr-label { font-size: var(--text-base); color: var(--color-text-primary); }
+  /* Glossary tables: the word itself reads first. */
+  .wr-glossary td:first-child { white-space: nowrap; color: var(--color-text-bright); }
   .wr-caps { /* mockup: app scale – a panel title */ font-size: var(--text-sm); font-weight: var(--font-semibold); text-transform: uppercase;
              letter-spacing: var(--ds-caps-tracking); color: var(--color-text-primary); }
 </style>
@@ -170,6 +172,70 @@ intelligence is the agent's. Copy that blurs this overclaims, and breaks the day
 </tbody>
 </table>
 
+<h2 id="glossary">Product words</h2>
+<p class="ds-muted">Proposed. One word for each thing the reader handles, used the same way in every preview, menu,
+tooltip, announcement and error. The words below are the comment feature's, because that is where the vocabulary
+drifted first: the HTML preview shipped its own nouns, and the Markdown and selection comments inherited them. Decided
+for the comment feature by <a href="../../../designs/comments/comments-v2.md">Comments v2</a> (C-03 and the toolbar
+finding); this card makes them the app's words.</p>
+<table class="ds-tokens wr-glossary">
+<thead><tr><th>Word</th><th>Means</th><th>Write it like this</th></tr></thead>
+<tbody>
+  <tr><td>comment</td><td>One message the reader wrote, and the stored item in the file. Always "comment" – in both previews, in a delete and in an error</td><td>“Delete comment”, “Couldn't save the comment.”</td></tr>
+  <tr><td>thread</td><td>A first comment and its replies, about one target. Only where the difference from one comment matters – a delete, a count of conversations</td><td>“Delete thread”, “3 threads”</td></tr>
+  <tr><td>reply</td><td>A comment that answers a thread's first comment. The verb is the button</td><td>“Reply”, “2 replies”</td></tr>
+  <tr><td>icon</td><td>The small mark drawn on the preview beside a commented target. The reader's word for it, in every string</td><td>“Show comment icons and underlines”, “Its icon comes back when it does.”</td></tr>
+  <tr><td>underline</td><td>The mark under a commented phrase of text. Written “underline” in UI text; <em>mark</em> is the design and code name for the same thing and stays out of the UI</td><td>“Show comment icons and underlines”</td></tr>
+  <tr><td>selection</td><td>Text the reader selected to comment on. Not “highlight” – the app also highlights search results</td><td>“Comment on selection”</td></tr>
+  <tr><td>comment mode</td><td>The mode in which a click on the preview chooses a target instead of following a link. Lower case inside a sentence, capital at the start of a label</td><td>“Comment mode · List item, line 14 · Esc to leave”</td></tr>
+</tbody>
+</table>
+<p class="ds-muted">The limits a sentence may quote are read from the code, not typed:
+<code>COMMENT_MAX_CHARS = <span data-claim="comment-max-chars" title="COMMENT_MAX_CHARS in commentFormat.ts – characters one comment or reply may hold">4000</span></code> characters in one comment or reply, with the
+counter warning from <code>COMMENT_WARN_CHARS = <span data-claim="comment-warn-chars" title="COMMENT_WARN_CHARS in commentFormat.ts – where the character counter starts warning">3600</span></code>;
+<span data-claim="comment-max-replies" title="PREVIEW_LIMITS.COMMENT_MAX_REPLIES – replies one thread holds after its first comment">200</span> replies in a thread; <span data-claim="comment-max-threads-per-file" title="PREVIEW_LIMITS.COMMENT_MAX_BLOCKS_PER_FILE – threads (comment blocks) one file holds before its comments turn read-only">500</span>
+threads in one file before its comments turn read-only; files of up to <span data-claim="comment-file-max-mb" title="PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES in MB – the largest file Erfana adds comments to">25</span> MB.
+A string that states one of them builds it from the constant, as <code>FILE_LIMIT_TEXT</code> does
+(<code>commentCopy.ts:40</code>–<code>42</code>).</p>
+
+<h3 id="kind-nouns">What the reader commented on</h3>
+<p class="ds-muted">Each preview names a target by its kind, in words, never by a tag name (“Comment on p”). The HTML
+preview keeps the element's selector in a visible label, because an HTML author thinks in selectors; every other
+string uses these nouns.</p>
+<table class="ds-tokens wr-glossary">
+<thead><tr><th>Markdown target</th><th>Noun</th><th>Markdown target</th><th>Noun</th></tr></thead>
+<tbody>
+  <tr><td>Paragraph</td><td>paragraph</td><td>Quote</td><td>quote</td></tr>
+  <tr><td>Heading, levels 1–6</td><td>H1 heading … H6 heading</td><td>Table</td><td>table</td></tr>
+  <tr><td>List item</td><td>list item</td><td>Body row</td><td>row 2 (counted from 1)</td></tr>
+  <tr><td>List</td><td>list</td><td>Header row</td><td>header row</td></tr>
+  <tr><td>Code block</td><td>code block</td><td>Cell</td><td>row 2, column 3</td></tr>
+  <tr><td>Mermaid diagram</td><td>diagram</td><td>Divider</td><td>divider</td></tr>
+  <tr><td>Image</td><td>image</td><td>Raw HTML</td><td>HTML block</td></tr>
+</tbody>
+</table>
+<p class="ds-muted"><strong>Casing.</strong> A noun is capitalised at the start of a label, a title or a row and lower
+case inside a sentence: “List item · line 14” in the drawer, “Showing list item, line 14.” as an announcement,
+“Comments on H2 heading “Next steps”” as a window title. “H2” keeps its capital everywhere, because it is a name.
+“Code block” and “HTML block” are the only places the word <em>block</em> may appear – as part of a Markdown noun the
+reader already knows.</p>
+
+<h3 id="banned-words">Words the UI does not use</h3>
+<table class="ds-tokens wr-glossary">
+<thead><tr><th>Not in UI text</th><th>Write instead</th><th>Why</th></tr></thead>
+<tbody>
+  <tr><td>block</td><td>comment (the stored item); the kind noun (the target)</td><td>It meant both, so “Delete block…” read as “delete this paragraph”. It stays in <code>format-v1.md</code>, which is for tool authors</td></tr>
+  <tr><td>pin</td><td>icon</td><td>The design name for the mark on the preview. Fine in design notes and code; the reader never sees it</td></tr>
+  <tr><td>pick, as a noun</td><td>target, or the kind noun</td><td>“Your pick” is jargon. The verb is fine on a button: “Pick again”</td></tr>
+  <tr><td>element, in Markdown</td><td>the kind noun – paragraph, list item …</td><td>Markdown has no elements. Correct only in the HTML preview, where it is the reader's own word</td></tr>
+  <tr><td>page, in Markdown</td><td>preview, or file</td><td>A Markdown preview is a rendered file, not a page: “Show in preview”, not “Show on page”</td></tr>
+</tbody>
+</table>
+<p class="ds-muted"><strong>The HTML-only nouns, as they ship.</strong> These strings are right for the HTML preview and
+must not reach a Markdown or selection comment: “elements” in the file limit (<code>commentCopy.ts:42</code>), “page too
+large – it has too many elements” (<code>:71</code>), “Show on page” (<code>:234</code>) and “This element isn't on screen
+right now” (<code>:259</code>).</p>
+
 <h2 id="numbers">Numbers and names</h2>
 <ul class="ds-muted">
   <li>Numerals for every count and size ("3 files", not "three files") – they scan faster in a dense UI.</li>
@@ -182,10 +248,40 @@ intelligence is the agent's. Copy that blurs this overclaims, and breaks the day
 <h2>Exceptions</h2>
 <p class="ds-muted">None recorded. A shipping string that departs from this card carries a <code>deviates:</code>
 marker at the site and gets a row here, naming the file.</p>
-<h3 id="defects">Defects this card names</h3>
+<h3 id="open-defects">Open defects this card names</h3>
 <ul class="ds-muted">
   <li><strong>Two macOS shortcut notations.</strong> <code>commentCopy.ts</code> types "Cmd+Option+M" and
   "Cmd+Enter" for macOS, while <code>formatShortcut</code> renders the glyph form (⌥⌘M) everywhere else.</li>
+  <li><strong>Em dashes in the permission band.</strong> Shipped strings use an em dash where this card asks for an en
+  dash (shown here as ⟨em dash⟩, because no page in this folder may carry the character): the confirm sentence “but Erfana cannot limit it to that ⟨em dash⟩ the host will also be able to run code…”
+  (<code>PreviewBandConfirm.tsx:169</code>–<code>170</code>); the four approval failures “Not saved ⟨em dash⟩ list full”, “Not
+  saved ⟨em dash⟩ not allowed”, “Saved ⟨em dash⟩ reload to apply” and “Not saved ⟨em dash⟩ check settings”
+  (<code>permissionBand.logic.ts:354</code>–<code>372</code>); and “Only the first hosts are listed ⟨em dash⟩ this page asked for
+  more.” (<code>PreviewChromeBand.tsx:420</code>).</li>
+  <li><strong>Em dash in the clipboard toast.</strong> “Could not access the clipboard ⟨em dash⟩ another app may be using it.
+  Try again in a moment.” (<code>textClipboard.ts:44</code>–<code>46</code>). It also says “Could not” where the app's
+  other errors say “Couldn't”.</li>
+  <li><strong>“block” in shipped HTML comment strings.</strong> “Delete block”, “Delete block…” and “This block contains
+  git conflict markers” (<code>commentCopy.ts:251</code>, <code>:252</code>, <code>:257</code>) use the word this card
+  keeps out of the UI. The replacement wording is in <a href="#banned-words">Words the UI does not use</a>.</li>
+</ul>
+<h3 id="open-decisions">Decided – the user guide follows this card</h3>
+<ul class="ds-muted">
+  <li><strong>The user guide writes one box per chord.</strong> Owner decision, 2026-10-28: <code>docs/user-guide/</code>
+  follows the <a href="#shortcuts">Docs, cards and issues</a> row – glyphs, macOS first (<kbd>⌥⌘M</kbd> / <kbd>Ctrl+Alt+M</kbd>);
+  reference tables keep a macOS and a Windows column, each cell in that platform's form. <code>maintaining-this-guide.md</code>
+  points here.</li>
+</ul>
+</section>
+
+<section id="related">
+<h2>Related</h2>
+<ul class="ds-muted">
+  <li><a href="type.html">Typography</a> – the text styles a string is set in.</li>
+  <li><a href="brand.html">Brand</a> – how the name and the wordmark are written and drawn.</li>
+  <li><a href="../components/badge/index.html#kbd">Badges, chips and keys</a> – the key box a shortcut is drawn in.</li>
+  <li><a href="../patterns/states/index.html">Empty, loading and error states</a> – where an error sentence sits.</li>
+  <li><a href="../../../designs/comments/comments-v2.md">Comments v2</a> – the design the product words come from.</li>
 </ul>
 </section>
 

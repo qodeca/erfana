@@ -291,7 +291,8 @@ const KINDS = {
     for (const file of selectFiles(root, claim)) hits.push(...bodyOf(file, root).matchAll(re))
     const hit = hits[claim.index ?? 0]
     if (!hit) throw new Error(`no match number ${claim.index ?? 0} for ${claim.match}`)
-    const value = Number(hit[claim.group ?? 1])
+    // A numeric separator (4_000) is how the source spells the number, not part of it.
+    const value = Number(hit[claim.group ?? 1].replace(/_/g, ''))
     if (!Number.isFinite(value)) throw new Error(`capture "${hit[claim.group ?? 1]}" is not a number`)
     return value
   },

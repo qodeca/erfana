@@ -122,7 +122,12 @@
   padding: var(--space-12) var(--space-14) var(--space-14);
 }
 
-/* Left side of the footer: a hint, a character count, a "Don't ask again". */
+/* Left side of the footer, set apart from the answers on the right. It holds
+   one of: a hint, a character count, a "Don't ask again" checkbox – or the
+   one DISCARD answer of a save-or-discard question ("Don't save", "Discard my
+   changes"), a danger button kept away from the safe default (the macOS alert
+   layout UnsavedChangesDialog ships). A button here keeps its own Buttons-card
+   size and colour; the small tertiary text below is for a hint or a count. */
 .erf-dialog__footer-start {
   display: flex;
   align-items: center;
@@ -130,6 +135,74 @@
   margin-inline-end: auto;
   font-size: var(--text-sm);
   color: var(--color-text-tertiary);
+}
+
+/* ---------- inline destructive confirm ----------
+   A delete inside a dialog asks in place: this box replaces the item that
+   would go, and is never a second dialog. The question says what goes; Cancel
+   comes first and takes focus; the danger button, with a verb label, is on the
+   right; Esc means Cancel. Reference: .erf-comment-confirm in CommentWindow.css. */
+.erf-dialog-confirm {
+  margin-block: var(--space-4);
+  padding: var(--space-6);
+  background: var(--color-error-bg);
+  border: var(--border-width) solid var(--color-error-border);
+  border-radius: var(--border-radius);
+}
+.erf-dialog-confirm__text {
+  margin: 0;
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  color: var(--color-text-primary);
+  overflow-wrap: anywhere;
+}
+.erf-dialog-confirm__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-4);
+  margin-block-start: var(--space-6);
+}
+
+/* ---------- anchored dialog ----------
+   Still modal (aria-modal, the focus trap, Esc) but placed beside the thing it
+   is about rather than centred, so the target stays visible. The layer under
+   it catches an outside click (which closes it) and paints NO scrim: the rest
+   of the window stays readable. The component computes the position: right of
+   the target, else left, else below, else above, always inside the window less
+   a margin. Reference: CommentWindow.css (.erf-comment-layer, .erf-comment-shell,
+   .erf-comment-window). */
+.erf-dialog-scrim--clear {
+  display: block;
+  padding: 0;
+  background: none;
+  animation: none;
+}
+
+.erf-dialog--anchored {
+  position: absolute;
+  /* The anchored-dialog bounds: the comment window's two size tokens. */
+  inline-size: min(var(--comments-window-width), 100% - var(--space-8));
+  min-inline-size: 0;
+  max-inline-size: min(var(--comments-window-max-width), 100% - var(--space-8));
+  /* Height: never past the window less the same margin; the body scrolls. */
+  max-block-size: calc(100% - var(--space-8));
+  background-color: var(--color-bg-elevated);
+  animation: none;
+}
+.erf-dialog--anchored .erf-dialog__header { padding: var(--space-8) var(--space-8) var(--space-4); }
+.erf-dialog--anchored .erf-dialog__title { font-size: var(--text-md); }
+.erf-dialog--anchored .erf-dialog__body { padding: 0 var(--space-8); }
+.erf-dialog--anchored .erf-dialog__footer { padding: var(--space-6) var(--space-8) var(--space-8); }
+
+/* Under 400px of room: a sheet across the foot of the area, full width, with
+   only its top edge drawn. The component sets the inline position. */
+.erf-dialog--sheet {
+  inset-inline: 0;
+  inset-block-end: 0;
+  inline-size: auto;
+  max-inline-size: none;
+  border-inline: 0;
+  border-block-end: 0;
 }
 
 @keyframes erf-dialog-fade {

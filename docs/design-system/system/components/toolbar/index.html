@@ -18,6 +18,21 @@
   .tl-under { position: relative; min-height: 220px; background: var(--color-bg-preview); }
   .tl-under .erf-menu { position: absolute; top: var(--space-1); right: var(--space-6); min-width: 200px; }
   .tl-narrow { width: 400px; max-width: 100%; }
+  .tl-promises { max-width: var(--ds-measure); color: var(--color-text-secondary); }
+  /* The tool-height frames: a find field at the tool height, a count button and a floating action. */
+  .tl-find { display: flex; align-items: center; box-sizing: border-box; inline-size: calc(var(--space-24) * 3);
+             block-size: var(--input-height-sm); padding: 0 var(--space-4); background: var(--color-bg-input);
+             border: var(--border-width) solid var(--color-border-input); color: var(--color-text-placeholder);
+             font-size: var(--text-base); }
+  .tl-canvas { position: relative; min-block-size: calc(var(--space-24) * 3); background: var(--color-bg-preview); }
+  .tl-float { position: absolute; inset-block-end: var(--space-6); inset-inline-end: var(--space-6);
+              block-size: var(--erf-toolbar-tool-height, var(--input-height-sm)); }
+  .tl-measure { display: flex; align-items: flex-end; gap: var(--space-8); padding: var(--space-8);
+                background: var(--color-bg-secondary); }
+  .tl-measure__box { display: flex; align-items: flex-end; justify-content: center; inline-size: calc(var(--space-24) * 1.5);
+                     background: var(--color-brand-violet-muted); border: var(--border-width) solid var(--color-accent-primary);
+                     font-family: var(--font-mono); font-size: var(--ds-text-small); color: var(--color-text-primary); }
+  .tl-measure__box--tool { border-color: var(--color-brand-lime); }
 </style>
 </head>
 <body>
@@ -37,10 +52,20 @@
   <a href="../permission-band/index.html">Permission band</a> card. The frames below load the Buttons card's <code>button.css</code> – <code>.erf-button--icon</code> and <code>.erf-button--toggle</code> – so a toolbar built from this card has one button style, not two. This card owns the
   row: spacing, grouping, overflow and the keyboard.
   <br><br>
-  <strong>A role is a promise</strong> – the rule the <a href="../menu/index.html">Menu</a> card set. The Markdown, Mermaid and
-  image viewer toolbars declare <code>role="toolbar"</code> today and implement none of its keyboard: every button is
-  its own tab stop and the arrow keys do nothing.
+  <strong>A role is a promise</strong> – the rule the <a href="../menu/index.html">Menu</a> card set. These declare
+  <code>role="toolbar"</code> today and implement none of its keyboard:
 </div>
+<ul class="tl-promises">
+  <li><strong>The Markdown toolbar</strong> – <code>MarkdownToolbar.tsx</code>: one <kbd>Tab</kbd> stop per control, no roving
+  <code>tabindex</code>, no arrow keys.</li>
+  <li><strong>The Mermaid toolbar</strong> – <code>MermaidToolbar.tsx</code>: the same.</li>
+  <li><strong>The image viewer toolbar</strong> – <code>ImageViewerToolbar.tsx</code>: the same.</li>
+  <li><strong>The preview band's bar</strong> – <code>PreviewChromeBand.tsx:335</code>, <code>role="toolbar"</code> named
+  “Preview”: no <kbd>←</kbd> <kbd>→</kbd> between its tools. Its only arrow keys move between the Allow buttons in the
+  blocked-host list, which is not the bar.</li>
+</ul>
+<p class="ds-muted">Either the keyboard below is added, or the role comes off and the controls stay a plain row of tab
+stops. A role without its keyboard tells a screen-reader user to press keys that do nothing.</p>
 
 <h2 id="states">Every state</h2>
 <div class="ds-frames tl-frames-wide">
@@ -134,7 +159,7 @@
     </span>
   </div>
 </div>
-<figcaption><span class="ds-frame__step">4</span><strong><kbd>Space</kbd> on a view mode</strong> – split horizontal is now the mode. The view modes are one of many, so the group is <code>role="radiogroup"</code> named “View mode” and each mode is <code>role="radio"</code>; the current one is <code>aria-checked="true"</code>, and the fill and lime edge repeat it for the eye. Its name stays “Split horizontal”. Never only a class.</figcaption>
+<figcaption><span class="ds-frame__step">4</span><strong><kbd>Space</kbd> on a view mode</strong> – split horizontal is now the mode. The view modes are one of many, so the group is <code>role="radiogroup"</code> named “View mode” and each mode is <code>role="radio"</code>; the current one is <code>aria-checked="true"</code>, and the fill repeats it for the eye – no lime foot, which belongs to an on/off toggle (<a href="#view-modes">View modes beside toggles</a>). Its name stays “Split horizontal”. Never only a class.</figcaption>
 </figure>
 
 <figure class="ds-frame">
@@ -206,6 +231,90 @@
   </div>
 </div>
 
+<h2 id="view-modes">View modes beside toggles</h2>
+<p class="ds-muted">A toolbar often holds both kinds of state: a <strong>view-mode group</strong> (one of many, always
+exactly one) and <strong>on/off toggles</strong> (Wrap, Show pins). They must not look alike, or a reader cannot tell
+“this is the current mode” from “this is switched on”.</p>
+<table>
+  <thead><tr><th>Control</th><th>Role and state</th><th>Look</th></tr></thead>
+  <tbody>
+    <tr><td>View mode, the selected one</td><td><code>role="radio"</code> in a <code>role="radiogroup"</code>, <code>aria-checked="true"</code></td><td>Filled (<code>--color-bg-selected</code>) and a bright glyph – no lime foot</td></tr>
+    <tr><td>Toggle, on</td><td><code>aria-pressed="true"</code></td><td>Fill <em>plus</em> the lime foot</td></tr>
+    <tr><td>Either, off</td><td><code>aria-checked="false"</code> or <code>aria-pressed="false"</code></td><td>No fill, a tertiary glyph</td></tr>
+  </tbody>
+</table>
+<p class="ds-muted">Both looks are <code>.erf-button--toggle</code>; the attribute picks the look, so nothing extra is
+written. The mode group sits in its own <code>erf-toolbar__group</code>, with a separator between it and the toggles.</p>
+<div class="ds-frames tl-frames-wide">
+<figure class="ds-frame">
+<div aria-hidden="true">
+  <div class="erf-toolbar">
+    <span class="erf-toolbar__group">
+      <span class="erf-button erf-button--icon erf-button--toggle" aria-pressed="true"><svg data-icon="wrap-text" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 16-3 3 3 3"/><path d="M3 12h14.5a1 1 0 0 1 0 7H13"/><path d="M3 19h6"/><path d="M3 5h18"/></svg></span><span class="erf-button erf-button--icon erf-button--toggle" aria-pressed="false"><svg data-icon="map-pin" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg></span>
+    </span>
+    <span class="erf-toolbar__spacer"></span>
+    <span class="erf-toolbar__group">
+      <span class="erf-button erf-button--icon erf-button--toggle" aria-checked="false"><svg data-icon="file-pen" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.5 22H18a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v9.5"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M13.378 15.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/></svg></span><span class="erf-button erf-button--icon erf-button--toggle" aria-checked="true"><svg data-icon="columns-2" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M12 3v18"/></svg></span><span class="erf-button erf-button--icon erf-button--toggle" aria-checked="false"><svg data-icon="rows-2" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 12h18"/></svg></span><span class="erf-button erf-button--icon erf-button--toggle" aria-checked="false"><svg data-icon="eye" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg></span>
+    </span>
+  </div>
+</div>
+<figcaption><strong>Toggles left, modes right</strong> – Wrap is on (fill and lime foot), Show pins is off. In the mode group, split horizontal is the mode (fill only). A listener hears “Wrap, toggle button, pressed” and “Split horizontal, radio button, checked, 2 of 4”.</figcaption>
+</figure>
+</div>
+
+<h2 id="tool-height">Tool height</h2>
+<p class="ds-muted">
+  One height for every tool in a toolbar, and for anything that has to line up with one: a count button
+  (“3 comments”), a menu button, a find field, a floating action over a canvas. The proposal is a token,
+  <code>--toolbar-tool-height</code>, at the value of <code>--input-height-sm</code>
+  (<code data-token="--input-height-sm">28px</code>). It is a <strong>proposed token, not yet in
+  <code>design-tokens.css</code></strong>; adding it is an owner decision. Until then <code>toolbar.css</code> carries a
+  card-private fallback, <code>--erf-toolbar-tool-height</code>, that every frame on this card reads, and a comment
+  saying to delete it when the token lands.
+</p>
+<table class="ds-tokens">
+  <thead><tr><th>Token</th><th>Value</th><th>Where it is the height</th></tr></thead>
+  <tbody>
+    <tr><td><code>--btn-height-sm</code></td><td><code data-token="--btn-height-sm">24px</code></td><td>The target floor: an icon button in a tree row, a dialog header, a tab's close. Not a toolbar tool.</td></tr>
+    <tr><td><code>--toolbar-tool-height</code> <span class="ds-status" data-status="proposed">proposed</span></td><td><code data-token="--input-height-sm">28px</code>, the same as <code>--input-height-sm</code></td><td>Every toolbar tool, and what aligns with one. Above the target floor, and on the same line as a small field, so a find field and its tools share both edges.</td></tr>
+    <tr><td><code>--btn-height-md</code></td><td><code data-token="--btn-height-md">32px</code></td><td>A text button in a dialog, a panel or settings. Not a toolbar tool: too tall for a dense row.</td></tr>
+  </tbody>
+</table>
+<p class="ds-muted">An icon-only tool is a square of the tool height. A text tool, a count button or a menu button
+takes the height and keeps its own width. The Markdown toolbar already draws its tools this tall (the Buttons card
+records it as an <a href="../button/index.html#exceptions">exception</a>); this makes it the rule instead of a literal.</p>
+<div class="ds-frames">
+<figure class="ds-frame">
+<div class="tl-measure" aria-hidden="true">
+  <span class="tl-measure__box" style="block-size: var(--btn-height-sm)">sm</span>
+  <span class="tl-measure__box tl-measure__box--tool" style="block-size: var(--input-height-sm)">tool</span>
+  <span class="tl-measure__box" style="block-size: var(--btn-height-md)">md</span>
+</div>
+<figcaption><strong>Where it sits</strong> – the tool height (lime edge) between the small and the default button heights, drawn at real size.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div aria-hidden="true">
+  <div class="erf-toolbar">
+    <span class="erf-toolbar__group">
+      <span class="erf-button erf-button--icon"><svg data-icon="bold" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12h9a4 4 0 0 1 0 8H7a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h7a4 4 0 0 1 0 8"/></svg></span><span class="erf-button erf-button--icon"><svg data-icon="italic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" x2="10" y1="4" y2="4"/><line x1="14" x2="5" y1="20" y2="20"/><line x1="15" x2="9" y1="4" y2="20"/></svg></span>
+    </span>
+    <span class="erf-toolbar__separator"></span>
+    <span class="tl-find">Find</span>
+    <span class="erf-button erf-button--icon"><svg data-icon="arrow-down" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></span>
+    <span class="erf-toolbar__spacer"></span>
+    <span class="erf-button erf-button--ghost"><span>Comments</span><span>3</span></span>
+  </div>
+</div>
+<figcaption><strong>Tools, a find field and a count button on one line</strong> – every edge at the tool height. The count button (“Comments, 3”) is a ghost button with the count as its last word.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div class="tl-canvas" aria-hidden="true">
+  <span class="erf-button erf-button--secondary tl-float"><svg data-icon="message-square-plus" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/><path d="M12 8v6"/><path d="M9 11h6"/></svg><span>Comment</span></span>
+</div>
+<figcaption><strong>A floating action</strong> – a button over a canvas, at the tool height so it matches the toolbar above the same canvas. It reads the proposed height through the same fallback.</figcaption>
+</figure>
+</div>
+
 <h2 id="keyboard">The keyboard contract</h2>
 <p class="ds-muted">The WAI-ARIA toolbar pattern, with a roving <code>tabindex</code>. A text field inside a toolbar keeps its own
 <kbd>←</kbd> <kbd>→</kbd>; <kbd>Tab</kbd> leaves it.</p>
@@ -240,20 +349,44 @@
   &lt;button class="erf-toolbar__more" tabindex="-1" aria-label="More actions" aria-haspopup="menu" aria-expanded="false"&gt;…&lt;/button&gt;
 &lt;/div&gt;</code></pre>
 
-<section id="defects">
-<h2>Defects this card names</h2>
+<section id="open-defects">
+<h2>Open defects this card names</h2>
 <ul class="ds-muted">
   <li><strong><code>role="toolbar"</code> without its keyboard</strong> – <code>MarkdownToolbar.tsx</code>, <code>MermaidToolbar.tsx</code>,
-    <code>ImageViewerToolbar.tsx</code>: no roving <code>tabindex</code> and no arrow keys, so every button is its own tab stop.</li>
+    <code>ImageViewerToolbar.tsx</code>: no roving <code>tabindex</code> and no arrow keys, so every button is its own tab stop.
+    The preview band's bar (<code>PreviewChromeBand.tsx:335</code>) declares the role with no <kbd>←</kbd> <kbd>→</kbd> either.</li>
   <li><strong>View-mode buttons carry their state in a class only</strong> – <code>MarkdownToolbar.tsx</code> marks the current
     mode with <code>.active</code> and no <code>aria-pressed</code> or <code>aria-checked</code>, and the modes are not a radio group, so a
     screen reader cannot tell which mode is on.</li>
-  <li><strong>Literal sizes</strong> – <code>MarkdownToolbar.css</code> sets its buttons to <code>height: 28px</code> and its separator to
-    <code>width: 1px</code>, off the button scale and the border token.</li>
+  <li><strong>Literal sizes</strong> – <code>MarkdownToolbar.css</code> sets its buttons to <code>height: 28px</code> (lines 72 and 102)
+    and its separator to <code>width: 1px</code>, off the button scale and the border token. The height is the proposed
+    tool height; it becomes the token once <code>--toolbar-tool-height</code> exists.</li>
   <li><strong>The image viewer scrolls instead of overflowing</strong> (#73) – a locked requirement there, kept as a legitimate
     exception once it carries a <code>deviates:</code> marker.</li>
 </ul>
 </section>
+
+<h2 id="tokens">Tokens</h2>
+<table class="ds-tokens">
+  <thead><tr><th>Token</th><th>Value</th><th>Used for</th></tr></thead>
+  <tbody>
+    <tr><td><code>--input-height-sm</code></td><td><code data-token="--input-height-sm">28px</code></td><td>The proposed tool height, through <code>--erf-toolbar-tool-height</code></td></tr>
+    <tr><td><code>--space-1</code></td><td><code data-token="--space-1">2px</code></td><td>The gap between controls in a group</td></tr>
+    <tr><td><code>--space-4</code></td><td><code data-token="--space-4">8px</code></td><td>The margin either side of a separator</td></tr>
+    <tr><td><code>--icon-size-lg</code></td><td><code data-token="--icon-size-lg">24px</code></td><td>A separator's height</td></tr>
+    <tr><td><code>--color-bg-selected</code></td><td>The violet, muted</td><td>A checked view mode and an on toggle</td></tr>
+    <tr><td><code>--color-brand-lime</code></td><td><code data-token="--color-brand-lime">#E3E829</code></td><td>An on toggle's foot – never a view mode's</td></tr>
+  </tbody>
+</table>
+
+<h2 id="related">Related</h2>
+<ul class="ds-muted">
+  <li><a href="../button/index.html">Buttons</a> – the icon button, the toggle, the menu button and the disabled rule the tools use.</li>
+  <li><a href="../menu/index.html">Menu</a> (decided) – what More opens, and the source of “a role is a promise”.</li>
+  <li><a href="../permission-band/index.html">Permission band</a> (decided) – the band's bar, and the pressed-toggle signature.</li>
+  <li><a href="../tooltip/index.html">Tooltip</a> – how an icon tool shows its name and shortcut.</li>
+  <li><a href="../../foundations/focus.html">Focus</a> (decided) – the ring on the roving control.</li>
+</ul>
 
 <section id="exceptions">
 <h2>Exceptions</h2>

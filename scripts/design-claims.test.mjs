@@ -358,52 +358,63 @@ describe('a card does not render the contrast failure it warns about', () => {
    * --color-text-muted at --text-xs on the pre-paint backdrop: 3.63:1, under the
    * 4.5:1 small text needs (WCAG 1.4.3). Every gate was green, because the ratio
    * was never a claim – and a card is the reference the app copies. So every text
-   * rule of Surface A is read from the card's own <style> and measured against
-   * the backdrop it sits on.
+   * rule of Surface A is measured against the backdrop it sits on.
+   *
+   * Surface A is now the States pattern's inline state (states.css), drawn on the
+   * card's backdrop. The colours are read from states.css, and the card's own
+   * <style> must not re-colour them – a local override would escape the measure.
    */
   const CARD = readFileSync(path.join(ROOT, 'docs/designs/html-waiting/index.html'), 'utf8')
   const STYLE = stripCssComments(CARD.slice(CARD.indexOf('<style>'), CARD.indexOf('</style>')))
+  const STATES = stripCssComments(
+    readFileSync(path.join(ROOT, 'docs/design-system/system/patterns/states/states.css'), 'utf8')
+  )
   const TOKENS = collectCustomProperties(
     readFileSync(path.join(ROOT, 'src/renderer/src/styles/design-tokens.css'), 'utf8')
   )
-  /** The value `property` takes in the card's first rule for exactly `selector`. */
-  const declOf = (selector, property) => {
-    for (const [, sel, body] of STYLE.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+  const SURFACE_A = ['.erf-state', '.erf-state__title', '.erf-state__hint', '.erf-state__action']
+  /** The value `property` takes in the first rule of `css` for exactly `selector`. */
+  const declOf = (css, selector, property) => {
+    for (const [, sel, body] of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
       if (sel.trim() !== selector) continue
       return new RegExp(`(?:^|;)\\s*${property}:\\s*([^;]+)`).exec(body)?.[1].trim()
     }
     return undefined
   }
+  /** Innermost rules whose selector mentions the class and that set `color`. */
+  const colourSetters = (css, selector) => {
+    // Innermost brace pairs, so rules nested in @media or @container are seen
+    // as themselves. Any rule whose selector mentions the class counts, not
+    // only an exact match: a `.panel .erf-state__hint` would win just as well.
+    const name = new RegExp(`${selector.replace('.', '\\.')}(?![\\w-])`)
+    return [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+      .filter(([, sel, body]) => name.test(sel) && /(?:^|;)\s*color:/.test(body))
+      .map(([, sel]) => sel.trim())
+  }
 
   it('paints the waiting message on the brand-black backdrop', () => {
     // The surface the ratios below are measured against. If this moves, so do they.
-    expect(declOf('.panel__body--backdrop', 'background')).toBe('var(--color-brand-black)')
+    expect(declOf(STYLE, '.hw-body--backdrop', 'background')).toBe('var(--color-brand-black)')
+    expect(CARD).toMatch(
+      /class="hw-body hw-body--backdrop"[^>]*>\s*<div class="erf-state erf-state--inline"/
+    )
   })
 
-  it.each(['.erf-wait__title', '.erf-wait__text', '.erf-wait__aside'])(
-    '%s clears 4.5:1 on that backdrop',
-    selector => {
-      const colour = declOf(selector, 'color')
-      expect(colour, `${selector} must declare a colour`).toBeDefined()
-      const ratio = contrastRatio(
-        resolveVar(colour, TOKENS),
-        resolveVar('var(--color-brand-black)', TOKENS)
-      )
-      expect(ratio, `${selector} is ${ratio}:1`).toBeGreaterThanOrEqual(4.5)
-    }
-  )
+  it.each(SURFACE_A)('%s clears 4.5:1 on that backdrop', selector => {
+    const colour = declOf(STATES, selector, 'color')
+    expect(colour, `${selector} must declare a colour`).toBeDefined()
+    const ratio = contrastRatio(
+      resolveVar(colour, TOKENS),
+      resolveVar('var(--color-brand-black)', TOKENS)
+    )
+    expect(ratio, `${selector} is ${ratio}:1`).toBeGreaterThanOrEqual(4.5)
+  })
 
-  it.each(['.erf-wait__title', '.erf-wait__text', '.erf-wait__aside'])(
+  it.each(SURFACE_A)(
     '%s sets its colour exactly once, so no later rule can override the measured one',
     selector => {
-      // Innermost brace pairs, so rules nested in @media or @container are seen
-      // as themselves. Any rule whose selector mentions the class counts, not
-      // only an exact match: a `.panel .erf-wait__aside` would win just as well.
-      const name = new RegExp(`${selector.replace('.', '\\.')}(?![\\w-])`)
-      const setters = [...STYLE.matchAll(/([^{}]+)\{([^{}]*)\}/g)].filter(
-        ([, sel, body]) => name.test(sel) && /(?:^|;)\s*color:/.test(body)
-      )
-      expect(setters.map(([, sel]) => sel.trim())).toHaveLength(1)
+      expect(colourSetters(STATES, selector)).toHaveLength(1)
+      expect(colourSetters(STYLE, selector)).toHaveLength(0)
     }
   )
 })
@@ -427,7 +438,12 @@ describe('design folder hygiene', () => {
       'docs/design-system/system/components/toolbar/toolbar.css',
       'docs/design-system/system/components/tooltip/tooltip.css',
       'docs/design-system/system/patterns/dialog/dialog.css',
-      'docs/design-system/system/patterns/states/states.css'
+      'docs/design-system/system/patterns/states/states.css',
+      'docs/design-system/system/components/feedback/feedback.css',
+      'docs/design-system/system/components/form/form.css',
+      'docs/design-system/system/components/segmented/segmented.css',
+      'docs/design-system/system/components/status-bar/status-bar.css',
+      'docs/design-system/system/patterns/drawer/drawer.css'
     ]
 
     const synced = COMPONENT_CSS.map(({ rel }) => `docs/design-system/${rel}`)

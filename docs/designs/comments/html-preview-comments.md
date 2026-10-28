@@ -452,7 +452,7 @@ Rewrite `:699` ("no file-write path" → "no write path from the page; one user-
 | Comments list | Disclosure, `aria-expanded` + `aria-controls` | `messages-square` + count | "Comments, 3 open" |
 | Pins | Toggle, `aria-pressed`, default on, per tab, not persisted | `message-square` / `message-square-off` | "Show comment icons" |
 
-- Shortcut Ctrl+Alt+M / Cmd+Option+M. Match the **typed key** `m` with modifiers, never the physical key (AltGr+M types µ on German layouts). Verify Cmd+Option+M is not "Minimize All" on macOS.
+- Shortcut ⌥⌘M / Ctrl+Alt+M (notation per the Writing card; the shipping tooltip still spells out "Cmd+Option+M" – see §10.10). Match the **typed key** `m` with modifiers, never the physical key (AltGr+M types µ on German layouts). Verify Cmd+Option+M is not "Minimize All" on macOS.
   - *Rev 3 note:* the shortcut has three routes – main's forwarder (focus in the page), the panel root's `onKeyDown` (focus in the chrome) and `usePreviewGroupKeys` (focus on dockview's group element, where `group.focus()` leaves it after a tab switch; the panel renders in the overlay layer, outside that element). The third route acts only for the active tab and skips keys the root already saw; it also carries Back/Forward. Without it the toggle did nothing right after a preview tab became active (found on macOS).
 - Leave with Esc, the toggle or the shortcut. Esc order with focus in the page: open window → comment mode → existing "return to chip".
 - Mode indicators: pressed toggle; 2 px accent frame inside the page edge; top-centre tab "Comment mode – Esc to leave" (moves to the bottom when the pointer comes within 48 px). The band height never changes.
@@ -510,7 +510,7 @@ Resolved by Anna K. · 25 Oct     [Re-open] [v]
 - Author name shown; email in `title` and accessible description, shown in full only when two authors share a name.
 - Time: absolute local via `Intl.DateTimeFormat` in `<time datetime>` ("Today, 14:32", "Yesterday, 09:10", "25 Oct, 14:32", year when not this year). Never counts up live.
 - Body is **plain text**: `white-space: pre-wrap`, `overflow-wrap: anywhere`, `dir="auto"`; 4,000 characters, counter from 3,600; trimmed; NUL/control characters stripped; bidi controls shown as visible tokens; `-->` escapes hidden from the user.
-- Cmd/Ctrl+Enter saves the focused field; Esc closes; a typed draft is kept in memory per element for the session ("Draft restored").
+- ⌘Enter / Ctrl+Enter saves the focused field; Esc closes; a typed draft is kept in memory per element for the session ("Draft restored").
 - Focus: new comment → text field; thread → window title (`tabindex="-1"`); delete confirmation → Cancel; close → back to the opener (list row, or native focus to the page with the picker on the same element).
 - Saving: "Saving…" (`aria-disabled`) → write → reload → restore → pin within 1 s with one flash → announce "Comment saved to index.html."
 - `[...]` per message: Edit (in place), Delete… (inline danger confirmation, destructive button right, focus on Cancel).
@@ -583,7 +583,7 @@ Form card errors (`aria-invalid`, `aria-describedby`, icon + text). Settings get
 
 ### 10.8 Accessibility
 
-- Keyboard-only path: shortcut or toggle → picker starts on the hovered element, else the element at the viewport centre → Tab / Shift+Tab next/previous at the same level (then the parent's next sibling), Alt+↑/↓ level, each move scrolls into view → Enter opens the window, Shift+F10 the menu. Arrow keys keep scrolling.
+- Keyboard-only path: shortcut or toggle → picker starts on the hovered element, else the element at the viewport centre → Tab and ⇧Tab / Shift+Tab next/previous at the same level (then the parent's next sibling), ⌥↑ ⌥↓ / Alt+↑ Alt+↓ level, each move scrolls into view → Enter opens the window, ⇧F10 / Shift+F10 the menu. Arrow keys keep scrolling.
 - Always-mounted polite live region in the shadow root ("button, Buy now, 2 comments."); mode and save results also go to `.erf-band__announce`; an assertive region for errors. Verify with NVDA, VoiceOver and Orca. *Rev 3 note (P7):* the page holds **no** live region – Find in page counts its text (E-022). The keyboard picker sends each move to main as a `step` pick (what it reached, as an element token – §19 "Picker words"), main passes it on as `commentModeChanged` with reason `picker`, and the comment chrome's polite region (`useLiveText`) says the §10.10 "Announce" sentence. Mode on and off are said there too.
 - The drawer is the guaranteed keyboard route to every thread.
 - Reduced motion: no transitions; flash = static highlight for 1.5 s; instant scrolling; nothing loops.
@@ -602,7 +602,7 @@ Contrast numbers quoted in design-system cards go into `docs/design-system/claim
 
 | Where | String |
 |---|---|
-| Toggle tooltip | "Comment mode (Ctrl+Alt+M) – off" / "Comment mode (Ctrl+Alt+M) – on: click an element to comment, Esc to leave" (macOS: Cmd+Option+M); not ready: "Comment mode – available once the page has loaded" |
+| Toggle tooltip | "Comment mode (Ctrl+Alt+M) – off" / "Comment mode (Ctrl+Alt+M) – on: click an element to comment, Esc to leave" (macOS: Cmd+Option+M); not ready: "Comment mode – available once the page has loaded". *Shipped as written; the Writing card's macOS form is "(⌥⌘M)", which the screens draw – an open Writing card defect (`commentModeShortcutLabel`).* |
 | List button | "Comments, {n} open" · "Comments, {n} open, {k} need attention" · "Comments, {n} open, 1 needs attention" (a count of 1 takes the singular verb) · "Comments, none yet" · "Comments, none open" (nothing open, but resolved threads exist) |
 | Pins tooltip | "Show comment icons – on" / "Show comment icons – off: icons hidden on this page" |
 | Mode tab | "Comment mode – Esc to leave" |
@@ -612,13 +612,13 @@ Contrast numbers quoted in design-system cards go into `docs/design-system/claim
 | Context line | "{label} · {file}, line {n}" · "Added by a script – saved before <{ancestor}>." · "Saved in {frame file}." |
 | Field | label "Comment", placeholder "What should change here?", hint "Plain text. Saved inside {file}.", counter "{n} / 4000" |
 | Identity line | "Commenting as {name}" · "Change" |
-| Buttons | "Cancel" · "Save" (tooltip "Save (Ctrl+Enter)") · "Saving…" · "Reply" · "Resolve" · "Re-open" · "New comment" · "Edit" · "Delete…" · "Save changes" · "Close" · "Open" · "Show on page" · "Try again" |
-| Meta | "{name} · {time}" · "· edited" · "Resolved by {name} · {time}" · "{n} replies" · "Draft restored" |
+| Buttons | "Cancel" · "Save" (tooltip "Save (Ctrl+Enter)"; macOS ships "Save (Cmd+Enter)", the Writing card asks for "Save (⌘Enter)") · "Saving…" · "Reply" · "Resolve" · "Re-open" · "New comment" · "Edit" · "Delete…" · "Save changes" · "Close" · "Open" · "Show on page" · "Try again" |
+| Meta | "{name} · {time}" · "· edited" · "Resolved by {name} · {time}" · "{n} replies" ("1 reply" for one) · "Draft restored" |
 | Save errors | "Write a comment first." · "Comments can be up to 4,000 characters. This one is {n}." · "Couldn't save: {file} is read-only. Your text is still here." · "This element changed in the file since you picked it. Close and pick it again – your text will be restored." · "{file} no longer exists. Copy your text before closing." · "Couldn't save the comment. Your text is still here – try again." · "Erfana can only add comments to UTF-8 files." · "{file} has unresolved git conflicts. Resolve them first." · "{file} is a link to another file, so Erfana won't write to it." |
 | Save pending (rev 3, P5) | "Still saving to {file}. Your comment appears here once it is written – no need to save again." |
 | Saved | "Comment saved to {file}." |
 | Unsaved source | "Save your edits first" / "{file} has unsaved changes in another tab. Save them first so your edits and this comment don't overwrite each other." · "Go to tab" · "Save {file}" · "Saved. You can add your comment now." · conflict variant (the tab also changed on disk; Go to tab only, no Save): "{file} has unsaved changes in another tab, and the file changed on disk too. Go to the tab and decide which version to keep, then add your comment." · the tab became clean without a save Erfana made: "The other tab has no unsaved changes now. You can add your comment." |
-| Delete | "Delete this comment? It is removed from {file}. Git history keeps earlier versions." → "Delete comment" · "Delete this thread and its {n} replies?" → "Delete thread" |
+| Delete | "Delete this comment? It is removed from {file}. Git history keeps earlier versions." → "Delete comment" · "Delete this thread and its {n} replies?" ("its 1 reply?" for one) → "Delete thread" |
 | Damaged | "Erfana can't read this comment block, so it won't change it. Fix it in the source, or delete it." · "This block contains git conflict markers. Resolve the conflict in the source." · "Raw text (read-only)" · "Copy raw text" · "Open in source" · "Delete block…" · "Delete this damaged block? Erfana removes exactly the text shown above from {file}." → "Delete block" · "This block changed on disk. Reopen it and try again." |
 | Not found / not visible | "Erfana can't find this element any more. The comment stays in {file}, line {n}." · "It was attached to:" · "This element isn't on screen right now – it may be on another slide or tab. Its icon comes back when it does." |
 | Drawer | "Comments" · "Close comments" · "Show" · "Open {n}" · "Resolved {n}" · "Needs attention {n}" · "Show comment icons" · tags "Not visible now", "Element not found", "Damaged", "Resolved", "In frame: {file}" · "Reading comments…" · "No comments in this file yet. Turn on comment mode and click an element." · "No open comments." · "No resolved comments." · "Nothing needs attention." · "Couldn't read comments from {file}." |
@@ -634,17 +634,31 @@ Contrast numbers quoted in design-system cards go into `docs/design-system/claim
 
 ### 10.11 Design-system cards (change cards before code that departs from them)
 
-| Card (status) | Change |
-|---|---|
-| `docs/designs/comments/html-comments/` screens (decided) | The whole journey and every state of §10 on a fake page |
-| Permission band (decided) | Three new tools after Find; re-measure `nav.css` tier thresholds |
-| Focus (decided) | Exceptions: in-page ring uses passed-in colours; close returns native focus to the page; pins focusable but not in the Tab order |
-| Menu (decided) | Exception: the opener is page content, so no `aria-haspopup` |
-| Rows (decided) | Exception: the active row's Open button is a second Tab stop |
-| Form (decided) | New textarea entry: multi-line, counter, Cmd/Ctrl+Enter |
-| Colours, Layering, Motion, Icons, Buttons, Feedback (proposed) | In-page literals resolved from tokens; top-layer rung + dialog rung; one-shot flash; bubble pin + three lucide glyphs; inline destructive confirmation; banners inside the window |
+The six screens in `docs/designs/comments/html-comments/` are **decided**: v1 shipped in v0.23.1 and they are its design of record. Each screen draws with the cards below and says, in a note on the screen, where the shipping CSS still differs from a card. Statuses as of 2026-10-28; a card's line 1 is the authority.
 
-Each code site that deviates carries `/* deviates: docs/design-system/<card>.html – why */` plus a row in that card's `#exceptions` section.
+| Card | Path | Status | What the comment screens take from it |
+|---|---|---|---|
+| Permission band | `docs/design-system/system/components/permission-band/index.html` | decided | The three tools after Find, the toggle signature, the tier thresholds in `nav.css` |
+| Focus and keyboard | `docs/design-system/system/foundations/focus.html` | decided | Exceptions: the in-page ring uses passed-in colours; close returns native focus to the page; pins focusable but not in the Tab order |
+| Menu | `docs/design-system/system/components/menu/index.html` | decided | The element menu and the per-message menu; exception: the opener is page content, so no `aria-haspopup` |
+| Rows and lists | `docs/design-system/system/components/row/index.html` | decided | Drawer rows on `row.css` (`.erf-row-list > .erf-row`, `.erf-row--selected`); exception: the active row's Open is a second Tab stop |
+| Form controls | `docs/design-system/system/components/form/index.html` | decided | Field, error, checkbox. The card's note proposes the comment textarea (multi-line, counter, ⌘Enter / Ctrl+Enter) as an addition; adding it to the decided card is an open owner decision, so the screens keep drawing the field from `comments.css` |
+| Buttons | `docs/design-system/system/components/button/index.html` | proposed | `.erf-button` in the screens (`--lg` in the window, `--sm` in the drawer); the app still ships `.dialog-btn` (`CommentParts.tsx`) and `.erf-comment-action` until `button.css` is adopted |
+| Feedback | `docs/design-system/system/components/feedback/index.html` | proposed | `.erf-banner` in every tone, with its spoken severity word; Exceptions row for the shipped info banner |
+| Empty, loading and error states | `docs/design-system/system/patterns/states/index.html` | proposed | The drawer's empty, loading and error lines (`.erf-state--inline`), with the shipped strings |
+| Dialog | `docs/design-system/system/patterns/dialog/index.html` | proposed | The window is a modal dialog placed beside its target (anchored dialog); the inline destructive confirm |
+| Writing | `docs/design-system/system/foundations/writing.html` | proposed | Sentence case, en dashes, key notation (one box per chord, macOS first), "1 reply" / "1 needs attention"; its open defects include the spelled-out "Cmd+Option+M" and "Cmd+Enter" |
+| Tooltip | `docs/design-system/system/components/tooltip/index.html` | proposed | Native `title` until the band and window adopt `tooltip.css`; a title never repeats the name |
+| Badges, chips and keys | `docs/design-system/system/components/badge/index.html` | proposed | The `<kbd>` key style; the list tool's attention count and the drawer's tags are its candidates |
+| Typography | `docs/design-system/system/foundations/type.html` | proposed | Text sizes and the mono face for selectors and paths |
+| Segmented control | `docs/design-system/system/components/segmented/index.html` | proposed | The planned replacement for the drawer's Open / Resolved / Needs attention filter (not adopted yet) |
+| Drawer | `docs/design-system/system/patterns/drawer/index.html` | proposed | Generalises this drawer: a flow sibling, its width token, full width below the switch, focus on open and close |
+| Colours | `docs/design-system/system/foundations/colors.html` | proposed | In-page literals resolved from tokens; contrast pairs baked, never typed |
+| Layering | `docs/design-system/system/foundations/layering.html` | proposed | Top-layer rung and dialog rung |
+| Motion | `docs/design-system/system/foundations/motion.html` | proposed | The one-shot static flash; nothing animates |
+| Icons | `docs/design-system/system/components/icon/index.html` | proposed | Registry glyphs, drawn on the screens with `<svg data-icon>`; the self-drawn bubble pin |
+
+Each code site that deviates carries `/* deviates: docs/design-system/system/<group>/<card>/index.html – why */` (a foundation card is `docs/design-system/system/foundations/<card>.html`; a screen is its own path under `docs/designs/`) plus a row in that card's or screen's Exceptions section.
 
 ## 11. Cross-OS
 

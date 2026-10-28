@@ -6,22 +6,33 @@
  * PROPOSED – not adopted. Plan: docs/designs/comments/markdown-preview-comments.md §9.
  *
  * Everything a comment looks like is reused unchanged and is NOT restated here:
- *  - the comment window, thread, drawer, banners, buttons:
- *    ../html-comments/comments.css (`.erf-comment-*`);
- *  - the pin, outline, label, comment-mode frame and tab:
- *    ../html-comments/overlay.css (`.erf-hpc-*`).
+ *  - the comment window, thread and drawer: ../html-comments/comments.css (`.erf-comment-*`);
+ *  - the pin, outline, comment-mode frame and tab: ../html-comments/overlay.css (`.erf-hpc-*`);
+ *  - toolbar row and tools: the Toolbar and Buttons cards (toolbar.css, button.css –
+ *    `.erf-toolbar`, `.erf-button--icon`, `--toggle`);
+ *  - banners: the Feedback card (feedback.css, `.erf-banner`);
+ *  - counts: the Badges card (badge.css, `.erf-counter`, `--attention`);
+ *  - the empty drawer: the States pattern (states.css, `.erf-state--inline`);
+ *  - the disabled item's reason: the Tooltip card (tooltip.css, `.erf-tooltip`).
  *
- * This file adds four things:
- *  1. a static mirror of the Markdown panel – toolbar and preview – built from the
- *     rules in MarkdownToolbar.css and MarkdownPreview.css, so the cards show the
- *     comment parts on the surface they ship on;
- *  2. the three comment tools in the Markdown toolbar;
- *  3. the phrase underline (shipping: `::highlight(erf-comment)`; drawn here with
- *     spans, because a static card cannot call CSS.highlights);
- *  4. pin and outline placement relative to a block (shipping: measured from the
- *     block's box into an overlay outside `.markdown-preview-content`).
+ * This file adds:
+ *  1. a static mirror of the Markdown panel – preview and the toolbar's own
+ *     surface – built from MarkdownToolbar.css and MarkdownPreview.css, so the
+ *     screens show the comment parts on the surface they ship on;
+ *  2. what the Markdown toolbar keeps that differs from the cards (32 × 28 tools,
+ *     the primary surface) and the comment group's gap and count button;
+ *  3. the phrase underline, in the Text highlights card's names and values
+ *     (shipping: `::highlight(erf-comment)`; drawn here with spans, because a
+ *     static screen cannot call CSS.highlights);
+ *  4. outline and icon placement relative to a block (shipping: measured from
+ *     the block's box into an overlay outside `.markdown-preview-content`).
  *
- * The cards carry no script: every state is drawn on its own.
+ * The `.erf-mdc-tool*` and `.erf-mdc-toolbar*` classes are the older hand-built
+ * toolbar. The screens in this folder no longer use them; they stay only
+ * because docs/designs/comments/comments-v2/ still links them. Delete them when
+ * those screens move onto button.css and toolbar.css.
+ *
+ * The screens carry no script: every state is drawn on its own.
  */
 
 /* ================= 1. the Markdown panel mirror ================= */
@@ -45,6 +56,44 @@
   block-size: var(--mdc-body-height, 380px);
 }
 
+/* ================= 2. the Markdown toolbar on the cards ================= */
+
+/* The row is the Toolbar card's `.erf-toolbar`. Two things differ, both as the
+   Markdown toolbar ships (MarkdownToolbar.css):
+   - its surface is the panel's primary background, not the card's secondary;
+   - its icon tools are 32 wide (`--btn-height-md`) and 28 tall. The height is
+     the Toolbar card's proposed tool height (`--input-height-sm`), so only the
+     width differs from the card's square tool. The shipped literal is
+     MarkdownToolbar.css:72 and :102 – the Buttons card's Exceptions row and the
+     Toolbar card's open defect "Literal sizes" record it. */
+.erf-mdc-bar { background-color: var(--color-bg-primary); }
+.erf-mdc-bar .erf-button--icon { inline-size: var(--btn-height-md); }
+
+/* One gap before the comment group, none inside it – the HTML band's grouping. */
+.erf-mdc-bar__comments { margin-inline-start: var(--space-4); }
+
+/* Comments list: icon plus the open count (`.erf-counter`). It opens the
+   drawer, so its markup is a disclosure (aria-expanded), but it is an on/off
+   tool like the others in the row: while the drawer is open it wears the
+   Buttons card's pressed signature – fill plus the lime foot – read from the
+   same tokens as `.erf-button--toggle[aria-pressed='true']` (owner decision,
+   2026-10-28). The amber attention counter keeps its own glyph and number, so
+   it never relies on colour beside the lime (Badges card). */
+.erf-mdc-bar__count { padding-inline: var(--space-3); gap: var(--space-2); }
+.erf-mdc-bar__count[aria-expanded='true'] {
+  background: var(--color-bg-selected);
+  border-block-end-color: var(--color-brand-lime);
+  color: var(--color-text-bright);
+}
+@media (forced-colors: active) {
+  .erf-mdc-bar__count[aria-expanded='true'] { border-block-end-color: Highlight; }
+}
+
+/* A stand-in for the formatting tools a frame leaves out. */
+.mdc-placeholder { margin: 0; font-size: var(--ds-text-small); }
+
+/* ---------- the older hand-built toolbar (comments-v2 only) ---------- */
+
 /* Mirror of MarkdownToolbar.css `.markdown-toolbar`. */
 .erf-mdc-toolbar {
   display: flex;
@@ -65,6 +114,7 @@
   margin: 0 var(--space-4);
 }
 
+/* The unsaved-changes dot. Also used beside `.erf-toolbar` on these screens. */
 .erf-mdc-toolbar__modified {
   margin-inline-end: var(--space-6);
   font-size: var(--text-lg);
@@ -79,7 +129,7 @@
   justify-content: center;
   gap: var(--space-2);
   inline-size: var(--btn-height-md);
-  block-size: 28px;
+  block-size: var(--input-height-sm);
   padding: 0;
   background-color: transparent;
   border: var(--border-width) solid transparent;
@@ -88,26 +138,20 @@
   cursor: pointer;
 }
 .erf-mdc-tool:hover { background-color: var(--color-bg-hover-solid); color: var(--color-white); }
+/* The decided Focus ring: outward, offset --space-1. */
 .erf-mdc-tool:focus-visible {
   outline: var(--border-width-thick) solid var(--color-border-focus);
-  outline-offset: calc(var(--space-1) * -1);
+  outline-offset: var(--space-1);
 }
 
-/* The view-mode radio: a filled square, as today. */
 .erf-mdc-tool--view[aria-pressed='true'] {
   background-color: var(--color-btn-primary-bg);
   border-color: var(--color-btn-primary-bg);
   color: var(--color-btn-primary-text);
 }
 
-/* ================= 2. the comment tools ================= */
-
-/* One gap before the group, none inside it – the HTML band's grouping. */
 .erf-mdc-tool--comment-first { margin-inline-start: var(--space-4); }
 
-/* Comment mode and Pins are toggles, and the open drawer reads as pressed. They take
-   the HTML band's toggle signature – fill plus a 2px lime foot – NOT the view-mode
-   fill, so "a mode is on" never looks like "this view is chosen". */
 .erf-mdc-tool--toggle { border-block-end: var(--border-width-thick) solid transparent; }
 .erf-mdc-tool--toggle[aria-pressed='true'],
 .erf-mdc-tool--toggle[aria-expanded='true'] {
@@ -115,17 +159,6 @@
   border-block-end-color: var(--color-brand-lime);
   color: var(--color-text-emphasis);
 }
-
-/* Comments list: icon plus the open count. */
-.erf-mdc-tool--count {
-  inline-size: auto;
-  min-inline-size: var(--btn-height-md);
-  padding-inline: var(--space-3);
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-  font-variant-numeric: tabular-nums;
-}
-.erf-mdc-tool__attention { color: var(--color-warning); }
 
 @media (forced-colors: active) {
   .erf-mdc-tool--toggle[aria-pressed='true'],
@@ -210,7 +243,7 @@
 }
 .erf-mdc-content blockquote p:last-child { margin: 0; }
 
-/* A picked code block must not clip its own outline and label. */
+/* A picked code block must not clip its own outline. */
 .erf-mdc-content pre.erf-mdc-block { overflow: visible; }
 
 /* A Mermaid diagram stand-in: the wrapper box only. */
@@ -234,29 +267,36 @@
 
 /* Shipping: ::highlight(erf-comment) and ::highlight(erf-comment-active), set
    through CSS.highlights – no DOM node is added, so React re-renders, export and
-   copy never see it. A span stands in for it here. Find keeps its lime
-   (::highlight(search-results)); comments use the accent, so the two never read
-   as one another. */
+   copy never see it. A span stands in for it here.
+   Names and values are the Text highlights card's (foundations/highlights.html):
+   the proposed --color-comment-mark (35% accent fill), --color-comment-mark-bar
+   and --comment-mark-bar-width, read with their card values as fallbacks until
+   design-tokens.css has them. Only colour, background-color and text-decoration,
+   the properties ::highlight() allows. The open thread's mark is ONE value – the
+   same fill with a double bar, never a stronger fill. */
 .erf-mdc-mark {
-  background-color: var(--color-brand-violet-muted);
+  background-color: var(--color-comment-mark, color-mix(in srgb, var(--color-accent-primary) 35%, transparent));
   color: inherit;
-  text-decoration: underline;
-  text-decoration-color: var(--color-accent-primary);
-  text-decoration-thickness: var(--border-width-thick);
-  text-underline-offset: var(--space-1);
+  text-decoration: underline var(--comment-mark-bar-width, var(--border-width-thick))
+                   var(--color-comment-mark-bar, var(--color-accent-primary));
+  text-decoration-skip-ink: none;
+  text-underline-offset: var(--space-2);
 }
-.erf-mdc-mark--active {
-  background-color: color-mix(in srgb, var(--color-accent-primary) 38%, transparent);
-  color: var(--color-text-emphasis);
-}
-/* Find's current match, for the "both apply" state: Find paints last. */
+.erf-mdc-mark--active { text-decoration-style: double; }
+
+/* Find's current hit (`search-current`), for the "both apply" state: Find paints last. */
 .erf-mdc-find { background-color: var(--color-brand-lime); color: var(--color-brand-black); }
 
-/* A live text selection, as Chromium draws it in the preview. */
+/* A live text selection, as the Text highlights card proposes for the preview. */
 .erf-mdc-selection { background-color: var(--color-bg-selected); color: var(--color-text-emphasis); }
 
+/* Forced colours: the Text highlights card's mapping (highlights.html#forced) –
+   Mark and MarkText for marks and search hits, the bar repainted in CanvasText,
+   the current hit swaps the two, Highlight only for the selection. */
 @media (forced-colors: active) {
-  .erf-mdc-mark, .erf-mdc-mark--active { background-color: Highlight; color: HighlightText; }
+  .erf-mdc-mark { background-color: Mark; color: MarkText; text-decoration-color: CanvasText; }
+  .erf-mdc-find { background-color: MarkText; color: Mark; }
+  .erf-mdc-selection { background-color: Highlight; color: HighlightText; }
 }
 
 /* ================= 4. placing the overlay against a block ================= */
@@ -266,33 +306,39 @@
    geometry. */
 .erf-mdc-block { position: relative; }
 
-/* The outline is the HTML two-tone ring on the border box, grown outward by the
-   ring so it never covers text. */
+/* The picked block wears the Focus card's ONE ring – the same width, colour
+   and outward offset as every focused control – never the HTML overlay's
+   two-tone ring. The two-tone ring exists only because the HTML Preview draws
+   over a third-party page of any colour; the Markdown Preview is Erfana's own
+   dark surface, the ground the Focus card measures its ring on (owner
+   decision, 2026-10-28). The ring sits outside the border box, so it never covers text. */
 .erf-mdc-block > .erf-hpc-outline,
 tr.erf-mdc-block > td > .erf-hpc-outline {
-  inset: calc(var(--border-width-thick) * -2);
+  inset: 0;
+  border: 0;
+  box-shadow: none;
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
+}
+@media (forced-colors: active) {
+  .erf-mdc-block > .erf-hpc-outline,
+  tr.erf-mdc-block > td > .erf-hpc-outline { outline-color: Highlight; }
 }
 
-/* The label sits above the block's top-left, flipped below at the top edge. */
-.erf-mdc-block > .erf-hpc-label,
-tr.erf-mdc-block > td > .erf-hpc-label {
-  inset-block-end: calc(100% + var(--border-width-thick) * 2);
-  inset-inline-start: calc(var(--border-width-thick) * -2);
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-  line-height: var(--leading-snug);
-}
-.erf-mdc-block > .erf-hpc-label--below { inset-block-end: auto; inset-block-start: calc(100% + var(--border-width-thick) * 2); }
+/* No floating label in Markdown (Comments v2, C-21): a label above the outline
+   covered the line above it. The target's name and source line go into the
+   comment-mode tab instead ("Comment mode · List item, line 14 · Esc to leave"),
+   which already sits on the frame's top edge. Nothing is drawn over the text. */
 
-/* The pin: tail tip on the block's top-right corner, 4px outward (HTML §10.5).
-   The tail tip is at (2, 22) in the 24-unit box, so the box starts 2px right of
-   the corner and 26px above it. In a full-width block that lands in the
-   content's 32px right padding. */
+/* The icon (design name: pin): tail tip on the block's top-right corner, 4px
+   outward (HTML §10.5). The tail tip is at (2, 22) in the 24-unit box, so the box
+   starts 2px right of the corner and 26px above it. In a full-width block that
+   lands in the content's 32px right padding. */
 .erf-mdc-block > .erf-hpc-pin {
   inset-inline-start: calc(100% + var(--space-1));
   inset-block-start: calc((var(--btn-height-sm) + var(--space-1)) * -1);
 }
-/* Two pins on one row: the second moves left in 22px steps (HTML rule). */
+/* Two icons on one row: the second moves left in 22px steps (HTML rule). */
 /* stylelint-disable-next-line declaration-property-unit-disallowed-list -- 22px is the pin glyph width, a drawing coordinate that aligns the pin to the block edge */
 .erf-mdc-block > .erf-hpc-pin--step-1 { inset-inline-start: calc(100% + var(--space-1) - 22px); }
 
@@ -302,17 +348,30 @@ tr.erf-mdc-block > td > .erf-hpc-label {
 /* Flash after save: one static highlight, 1.5s in the app, drawn here at rest. */
 .erf-mdc-block > .erf-hpc-flash { inset: calc(var(--border-width-thick) * -2); }
 
-/* ================= card chrome (documentation only) ================= */
+/* ================= 5. the selected phrase inside the comment window ================= */
 
-.mdc-row { display: flex; flex-wrap: wrap; gap: var(--space-16); align-items: flex-start; margin-block-end: var(--space-16); }
-.mdc-state { margin: 0; flex: 0 1 auto; min-inline-size: 0; }
-.mdc-state > figcaption {
-  margin: 0 0 var(--space-4);
-  font-family: var(--font-mono);
-  font-size: var(--ds-text-small);
-  color: var(--color-text-tertiary);
+/* What the reviewer selected, quoted under the context line. In the preview's serif,
+   so it reads as the document's words, not Erfana's. Not struck through: that look
+   belongs to "no longer found" (`.erf-comment-quote`, reused for "The selected text
+   changed"). */
+.erf-mdc-quote {
+  display: block;
+  margin: var(--space-4) 0 0;
+  padding-inline-start: var(--space-6);
+  border-inline-start: var(--border-width-thick) solid var(--color-accent-primary);
+  font-family: var(--font-serif);
+  font-size: var(--text-md);
+  line-height: var(--leading-snug);
+  color: var(--color-text-bright);
+  overflow-wrap: anywhere;
 }
-.mdc-state > figcaption strong { color: var(--color-text-bright); font-weight: var(--font-normal); }
+
+/* ================= screen chrome (documentation only) ================= */
+
+/* Frames are the system's .ds-frames / .ds-frame (ds.css). These only size them. */
+.mdc-frames--wide { grid-template-columns: minmax(0, 1fr); }
+.mdc-frames--win { grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); }
+.mdc-frame--fit { justify-self: start; }
 
 .mdc-step {
   display: grid;
@@ -385,29 +444,12 @@ tr.erf-mdc-block > td > .erf-hpc-label {
 
 .mdc-verdict { display: inline-flex; align-items: center; gap: var(--space-3); margin: var(--space-4) 0 0;
                font-size: var(--ds-text-small); }
+.mdc-verdict svg { inline-size: var(--icon-size-sm); block-size: var(--icon-size-sm); }
 .mdc-verdict--ok { color: var(--color-success); }
 .mdc-verdict--bad { color: var(--color-error); }
 .mdc-verdict > span { color: var(--color-text-tertiary); }
 
 .mdc-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: var(--space-12);
-            max-inline-size: 1100px; margin-block-end: var(--space-16); }
+            max-inline-size: var(--ds-table-max); margin-block-end: var(--space-16); }
 .mdc-pair h3 { margin: 0 0 var(--space-4); font-size: var(--text-md); color: var(--color-text-bright); }
 .mdc-pair p { margin: 0 0 var(--space-4); color: var(--color-text-tertiary); max-inline-size: 60ch; }
-
-/* ================= 5. the selected phrase inside the comment window ================= */
-
-/* What the reviewer selected, quoted under the context line. In the preview's serif,
-   so it reads as the document's words, not Erfana's. Not struck through: that look
-   belongs to "no longer found" (`.erf-comment-quote`, reused for "The selected text
-   changed"). */
-.erf-mdc-quote {
-  display: block;
-  margin: var(--space-4) 0 0;
-  padding-inline-start: var(--space-6);
-  border-inline-start: var(--border-width-thick) solid var(--color-accent-primary);
-  font-family: var(--font-serif);
-  font-size: var(--text-md);
-  line-height: var(--leading-snug);
-  color: var(--color-text-bright);
-  overflow-wrap: anywhere;
-}

@@ -9,6 +9,7 @@
 <title>Erfana – comment overlay in the page</title>
 <link rel="stylesheet" href="../../../design-system/tokens.css">
 <link rel="stylesheet" href="../../../design-system/ds.css">
+<link rel="stylesheet" href="../../../design-system/system/components/button/button.css">
 <link rel="stylesheet" href="./demo.css">
 <link rel="stylesheet" href="./overlay.css">
 <style>
@@ -35,8 +36,8 @@
   bubble</strong> at the element's <strong>top-right</strong> (decision 33); several threads on one element are
   <strong>one numbered pin</strong>; <strong>resolved threads hide their pin</strong>; pins are <strong>always
   visible</strong>, also outside comment mode, and can be hidden per tab (decision 20). Those are not
-  re-opened here. The card is <em>proposed</em> because the sizes and fills below are still values being
-  chosen, and the plan (§10.11) files the whole HTML-comments set as proposed.
+  re-opened here. Decided: the overlay shipped in v0.23.1 with the sizes and fills below, and changing one now
+  means changing <code>overlayStyles.ts</code>, its theme and this screen together.
   <br><br>
   <strong>The source.</strong> <code>src/preload/previewPageComments/overlayStyles.ts</code> (the rules) and
   <code>src/main/services/preview/comments/commentOverlayTheme.ts</code> (the values). This card renders a
@@ -49,13 +50,13 @@
   The page cannot see <code>design-tokens.css</code>, and must not: a <code>var()</code> in the page would read
   the <em>page's</em> custom properties, which the page controls. So main sends each value resolved, in
   <code>commentState.theme</code>, and <code>commentOverlayTheme.test.ts</code> pins each field to its token
-  (R-012). The third column is read from this page's token file as it loads – nothing is typed.
+  (R-012). The third column is baked from <code>design-tokens.css</code> by <code>npm run design</code> – nothing
+  is typed.
 </p>
 
 <table class="map">
   <thead><tr><th>Theme field</th><th>Token</th><th>Resolves to</th><th>What it draws</th></tr></thead>
-  <tbody id="mapping"><tr><td><code>accent</code></td><td><code>--color-accent-primary</code></td><td title="#A0A8FF"><span class="swatch" style="background: var(--color-accent-primary)"></span>#A0A8FF</td><td>Ring, pin fill, label tag, frame, tab ground</td></tr><tr><td><code>accentHover</code></td><td><code>--color-brand-violet-hover</code></td><td title="#8b94ff"><span class="swatch" style="background: var(--color-brand-violet-hover)"></span>#8b94ff</td><td>Pin fill on hover</td></tr><tr><td><code>ink</code></td><td><code>--color-brand-black</code></td><td title="#161312"><span class="swatch" style="background: var(--color-brand-black)"></span>#161312</td><td>Ring lines, pin stroke and content, label ground, tab text</td></tr><tr><td><code>paper</code></td><td><code>--color-brand-white</code></td><td title="#F8FAF8"><span class="swatch" style="background: var(--color-brand-white)"></span>#F8FAF8</td><td>Label text</td></tr><tr><td><code>muted</code></td><td><code>--color-text-primary</code></td><td title="#cccccc"><span class="swatch" style="background: var(--color-text-primary)"></span>#cccccc</td><td>The size in the label</td></tr><tr><td><code>warning</code></td><td><code>--color-warning</code></td><td title="#cca700"><span class="swatch" style="background: var(--color-warning)"></span>#cca700</td><td>Damaged pin fill</td></tr><tr><td><code>font</code></td><td><code>--font-mono</code></td><td title="'Cascadia Mono', 'SF Mono', Monaco, 'Cascadia Code',
-               'Roboto Mono', Consolas, 'Courier New', monospace">'Cascadia Mono', 'SF Mono', Monaco, 'C…</td><td>Label, tab and pin number</td></tr><tr><td><code>size</code></td><td><code>--text-sm</code></td><td title="11px">11px</td><td>Label, tab and pin number</td></tr><tr><td><code>ring</code></td><td><code>--border-width-thick</code></td><td title="2px">2px</td><td>Ring, frame and flash width</td></tr><tr><td><code>pinTarget</code></td><td><code>--btn-height-sm</code></td><td title="24px">24px</td><td>The pin hit box</td></tr><tr><td><code>hairline</code></td><td><code>--border-width</code></td><td title="1px">1px</td><td>The ink lines of the ring, the label border</td></tr><tr><td><code>space1</code></td><td><code>--space-1</code></td><td title="2px">2px</td><td>Tab block padding, pin focus offset</td></tr><tr><td><code>space2</code></td><td><code>--space-2</code></td><td title="4px">4px</td><td>Label inline padding, pin focus halo</td></tr><tr><td><code>space4</code></td><td><code>--space-4</code></td><td title="8px">8px</td><td>Tab inline padding</td></tr><tr><td><code>leading</code></td><td><code>--leading-snug</code></td><td title="1.375">1.375</td><td>Line height of the label and the tab</td></tr></tbody>
+  <tbody id="mapping"><tr><td><code>accent</code></td><td><code>--color-accent-primary</code></td><td><span class="swatch" style="background: var(--color-accent-primary)"></span><code data-token="--color-accent-primary">#A0A8FF</code></td><td>Ring, pin fill, label tag, frame, tab ground</td></tr><tr><td><code>accentHover</code></td><td><code>--color-brand-violet-hover</code></td><td><span class="swatch" style="background: var(--color-brand-violet-hover)"></span><code data-token="--color-brand-violet-hover">#8b94ff</code></td><td>Pin fill on hover</td></tr><tr><td><code>ink</code></td><td><code>--color-brand-black</code></td><td><span class="swatch" style="background: var(--color-brand-black)"></span><code data-token="--color-brand-black">#161312</code></td><td>Ring lines, pin stroke and content, label ground, tab text</td></tr><tr><td><code>paper</code></td><td><code>--color-brand-white</code></td><td><span class="swatch" style="background: var(--color-brand-white)"></span><code data-token="--color-brand-white">#F8FAF8</code></td><td>Label text</td></tr><tr><td><code>muted</code></td><td><code>--color-text-primary</code></td><td><span class="swatch" style="background: var(--color-text-primary)"></span><code data-token="--color-text-primary">#cccccc</code></td><td>The size in the label</td></tr><tr><td><code>warning</code></td><td><code>--color-warning</code></td><td><span class="swatch" style="background: var(--color-warning)"></span><code data-token="--color-warning">#cca700</code></td><td>Damaged pin fill</td></tr><tr><td><code>font</code></td><td><code>--font-mono</code></td><td><code data-token="--font-mono">&#x27;Cascadia Mono&#x27;, &#x27;SF Mono&#x27;, Monaco, &#x27;Cascadia Code&#x27;, &#x27;Roboto Mono&#x27;, Consolas, &#x27;Courier New&#x27;, monospace</code></td><td>Label, tab and pin number</td></tr><tr><td><code>size</code></td><td><code>--text-sm</code></td><td><code data-token="--text-sm">11px</code></td><td>Label, tab and pin number</td></tr><tr><td><code>ring</code></td><td><code>--border-width-thick</code></td><td><code data-token="--border-width-thick">2px</code></td><td>Ring, frame and flash width</td></tr><tr><td><code>pinTarget</code></td><td><code>--btn-height-sm</code></td><td><code data-token="--btn-height-sm">24px</code></td><td>The pin hit box</td></tr><tr><td><code>hairline</code></td><td><code>--border-width</code></td><td><code data-token="--border-width">1px</code></td><td>The ink lines of the ring, the label border</td></tr><tr><td><code>space1</code></td><td><code>--space-1</code></td><td><code data-token="--space-1">2px</code></td><td>Tab block padding, pin focus offset</td></tr><tr><td><code>space2</code></td><td><code>--space-2</code></td><td><code data-token="--space-2">4px</code></td><td>Label inline padding, pin focus halo</td></tr><tr><td><code>space4</code></td><td><code>--space-4</code></td><td><code data-token="--space-4">8px</code></td><td>Tab inline padding</td></tr><tr><td><code>leading</code></td><td><code>--leading-snug</code></td><td><code data-token="--leading-snug">1.375</code></td><td>Line height of the label and the tab</td></tr></tbody>
 </table>
 
 <div class="ds-note" style="margin-top: var(--space-8)">
@@ -137,7 +138,8 @@
   content so Find in page never counts it (E-022); the card draws them the same way.
   <br><br>
   <strong>Damaged and selected.</strong> A selected damaged pin keeps its warning fill under the selected accent
-  stroke, so its <code>!</code> stays ink – the selected accent on the warning fill would be about 1.05:1.
+  stroke, so its <code>!</code> stays ink – the selected accent on the warning fill would be
+  <span data-contrast="--color-accent-primary on --color-warning">1.04:1</span>, no step at all.
   Hover recolours an open pin only, never a selected or damaged one.
 </div>
 
@@ -171,7 +173,7 @@
   the plan's “flash once” is the same box appearing and going away. A new pin after Save gets the same
   highlight once.
   <br><br>
-  <button class="erf-comment-action" type="button" id="revealBtn" tabindex="-1">Show on page</button>
+  <button class="erf-button erf-button--secondary erf-button--sm" type="button" id="revealBtn" tabindex="-1"><span>Show on page</span></button>
 </div>
 <div class="scene page-area" id="reveal"><div class="page">
   <h4>Team</h4>
@@ -203,7 +205,7 @@
         each with no token of its own: the 12% selected and 24% flash fill mixes; the pin's SVG stroke widths 1.5
         and 2 (selected), in view-box units; the label's <code>1ch</code> gap before the size; the count's weight
         700 (the value of <code>--font-bold</code>, which the theme does not carry); the geometry percentages
-        (<code>50%</code> centring and clip, <code>100%</code> SVG size);. The page has no live region any more: the panel speaks the picker's sentences (E-022). The R-012 test lists exactly these.</td>
+        (<code>50%</code> centring and clip, <code>100%</code> SVG size). The page has no live region any more: the panel speaks the picker's sentences (E-022). The R-012 test lists exactly these.</td>
     </tr>
     <tr>
       <td>Pin focus</td>

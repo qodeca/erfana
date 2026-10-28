@@ -282,7 +282,7 @@ Editor, live preview, project tree and a terminal running Claude Code – or any
 </p>
 ```
 
-- The Download button is a shields.io `for-the-badge` badge: square corners (matches `--border-radius: 0`), label on `--color-brand-black`, message on `--color-brand-lime` with dark text (13.94:1). It reads in both GitHub themes without a second variant. It links `releases/latest` because asset names carry the version (`erfana-<version>-arm64.dmg`), so there is no stable per-platform asset URL.
+- The Download button is a shields.io `for-the-badge` badge: square corners (matches `--border-radius: 0`), label on `--color-brand-black`, message on `--color-brand-lime` with dark text – the same brand-lime / brand-black pair as the cursor row, whose ratio is baked in the card's [Contrast](../github-presentation/index.html#contrast) table and not typed here. It reads in both GitHub themes without a second variant. It links `releases/latest` because asset names carry the version (`erfana-<version>-arm64.dmg`), so there is no stable per-platform asset URL.
 - The fallback `<img>` of the banner is the **light** variant (research: a viewer that strips `<picture>` shows the fallback), and it carries the alt text.
 - `prefers-reduced-motion` in a `<source media>` gives motion-sensitive readers the still (the `media` attribute is on the allowlist; the behaviour on github.com is checked in plan step 9).
 
@@ -316,20 +316,20 @@ Composition, 1600×400 px (4:1), exported at 2× of an 800×200 layout:
 - **Right**: a flat, abstract window – project tree, editor with one line in the selection colour, preview with a two-node flowchart, and a terminal strip with a bare `❯` prompt glyph and a lime block cursor – no command name, so no third-party name or mark appears in the banner or the social preview. It tells the same story as the demo (select → agent → diagram) without a screenshot's detail. Borders 1 px, `border-radius: 0`, no shadow, no gradient.
 - **Why Cascadia Mono for every glyph in the image**: it is bundled and OFL-licensed, so the banner renders identically on any machine and ties the brand to the terminal. The system sans (`--font-sans`) would rasterise as SF Pro on the macOS capture machine, whose licence is not ours to redistribute in marketing images.
 
-| Element | Dark variant | Light variant | Contrast (computed) |
+| Element | Dark variant | Light variant | Contrast |
 |---|---|---|---|
-| Background | `--color-brand-black` #161312 | `--color-brand-white` #F8FAF8 | vs GitHub canvas: 1.02:1 (#0d1117) / 1.05:1 (#fff) – the banner edge disappears, so it reads as part of the page |
-| Wordmark | `--color-brand-white` | `--color-brand-black` | 17.62:1 both |
+| Background | `--color-brand-black` #161312 | `--color-brand-white` #F8FAF8 | Near-identical to both GitHub canvases, so the banner edge disappears and it reads as part of the page (hand-checked: GitHub's canvas colours are not tokens, so this pair cannot be baked) |
+| Wordmark | `--color-brand-white` | `--color-brand-black` | Baked on the card ([Contrast](../github-presentation/index.html#contrast)) |
 | Window frame and pane borders | `--color-border-default` (gray-800) | `--color-gray-200` | decorative |
 | Pane text bars | `--color-gray-700` | `--color-gray-300` | decorative |
 | Selected line | `--color-brand-violet-muted` | `--color-brand-violet-muted` | decorative |
 | Terminal strip | `--color-brand-black` fill in **both** variants (the app's terminal is always dark) | same | – |
-| Prompt glyph `❯` | `--color-text-primary` (gray-300) on brand-black | same | 11.51:1 |
-| Cursor | `--color-brand-lime` | `--color-brand-lime` (on the dark strip) | 13.94:1 |
+| Prompt glyph `❯` | `--color-text-primary` (gray-300) on brand-black | same | Baked on the card |
+| Cursor | `--color-brand-lime` | `--color-brand-lime` (on the dark strip) | Baked on the card |
 
-Lime is never placed on a light surface: lime on `#F8FAF8` is **1.26:1**. Violet on light is 2.10:1, so violet only appears as a muted fill. Where the light variant needs an accent line, it uses `--color-brand-indigo` (7.61:1 on brand-white).
+Lime is never placed on a light surface, and violet appears there only as a muted fill; where the light variant needs an accent line, it uses `--color-brand-indigo`. This is the light-surface rule of the [Brand](../../design-system/system/foundations/brand.html#rules) card (proposed). The ratios behind it – lime and violet failing on brand-white, indigo passing – are baked from the tokens in the card's [Contrast](../github-presentation/index.html#contrast) table and on [Brand – brand colours and their contrast](../../design-system/system/foundations/brand.html#tokens); this document does not type them.
 
-The ratios in this section were computed by hand for the design. In the card they are **not typed**: each one the card shows is a `contrast` entry in `docs/design-system/claims.json` written as `<span data-claim="…">` (`docs/design-system/README.md` § A card is done when), so the design-claims test re-derives them from the tokens on every CI run.
+No ratio is typed, here or in the card: each one the card shows is a `data-contrast="<fg> on <bg>"` cell with a `data-min` threshold (4.5 for text, 3 for the cursor and the indigo graphic rows), which `npm run design` bakes from the tokens and `npm run design -- --check` re-derives on every CI run (`docs/design-system/README.md` § A card is done when).
 
 **Solid backgrounds, not transparent**: the fallback `<img>` (light) and any viewer that ignores `<picture>` stay legible, and the edge still vanishes against both GitHub canvases. On GitHub's dimmed dark theme (#22272e) the dark banner shows as a flat rectangle – acceptable and consistent with the flat design; recorded in QA.
 
@@ -493,7 +493,7 @@ Ordered; each step lists its files and its verification. Evidence (screenshots, 
 
 **Step 1 – Spike: animated WebP on github.com.** Encode a 3-second test clip with #138's `encode.mjs` WebP output (R138-9; `ffmpeg-static` with `-c:v libwebp_anim -loop 0` directly only if #138 has not landed it yet), commit it on the working branch with a scratch Markdown file, and view it on github.com in Chrome, Safari and Firefox, in both themes, and with reduced motion emulated. Remove the scratch files before review. *Verify*: a short note in the PR: plays / does not play per browser; the chosen format. *Files*: none kept.
 
-**Step 2 – Banner card.** `docs/designs/github-presentation/index.html`. Line 1 is the card marker with all four required attributes (`docs/design-system/README.md` § Adding a card), e.g. `<!-- @card group="GitHub presentation" name="GitHub presentation" subtitle="README banner, wordmark and social preview" status="proposed" reviewed="<authoring date>" -->`; lines 2–3 the SPDX header. It renders the dark banner, the light banner and the social preview at layout size, links `../../design-system/tokens.css`, `../../design-system/fonts.css` and `../../design-system/ds.css` (the depth for `docs/designs/github-presentation/`), loads the icon from `../../../resources/icon.png`, and has an Exceptions section for the light variant. Every contrast ratio it shows is a `data-claim` span backed by a `contrast` entry added to `docs/design-system/claims.json` (foreground and background tokens as in the banner table). Run `npm run design` (bakes each ratio into the card's own text and regenerates `docs/designs/index.html`; there is no `claims.js` – the pages run no script). *Verify*: `npm run lint:css`, `npm run design -- --check`, the design-claims test (`scripts/design-claims.test.mjs`, in `test:ci`) green; open the card in a browser and tab through it.
+**Step 2 – Banner card.** `docs/designs/github-presentation/index.html`. Line 1 is the card marker with all four required attributes (`docs/design-system/README.md` § Adding a card), e.g. `<!-- @card group="GitHub presentation" name="GitHub presentation" subtitle="README banner, wordmark and social preview" status="proposed" reviewed="<authoring date>" -->`; lines 2–3 the SPDX header. It renders the dark banner, the light banner and the social preview at layout size, links `../../design-system/tokens.css`, `../../design-system/fonts.css` and `../../design-system/ds.css` (the depth for `docs/designs/github-presentation/`), loads the icon from `../../../resources/icon.png`, and has an Exceptions section for the light variant. Every contrast ratio it shows is a `data-contrast="<fg> on <bg>"` cell with a `data-min` threshold (4.5 for text, 3 for the cursor and the indigo graphic rows), foreground and background tokens as in the banner table; no `claims.json` entry is needed. Run `npm run design` (bakes each ratio into the card's own text and regenerates `docs/designs/index.html`; there is no `claims.js` – the pages run no script). *Verify*: `npm run lint:css`, `npm run design -- --check`, the design-claims test (`scripts/design-claims.test.mjs`, in `test:ci`) green; open the card in a browser and tab through it.
 
 **Step 3 – Render script for brand assets.** A script in #138's capture folder (proposed `scripts/capture/brand.mjs`, SPDX header) that opens the card in Playwright Chromium at `deviceScaleFactor: 2` and screenshots the three elements to `docs/assets/readme/banner-dark.png`, `banner-light.png` (1600×400) and `social-preview.png` (1280×640 at 1×). An npm script (`docs:brand`). *Verify*: pixel dimensions (`file`), sizes within budget (≤ 150 KB, ≤ 150 KB, ≤ 300 KB), two runs produce the same dimensions; view each PNG.
 
@@ -524,7 +524,6 @@ Ordered; each step lists its files and its verification. Evidence (screenshots, 
 | `docs/designs/readme/README.md` | This design (this PR) |
 | `docs/README.md` | Index entry for this design (this PR); `docs/about.md` entry (implementation) |
 | `docs/designs/github-presentation/index.html` | New card |
-| `docs/design-system/claims.json` | `contrast` entries for every ratio the card shows |
 | `docs/designs/index.html`, and the baked values inside the card | Regenerated by `npm run design` |
 | `scripts/capture/brand.mjs` (name follows #138's folder) | New script, SPDX header – renders the card; nothing in #138 does this |
 | `scripts/capture/encode.mjs` | **#138's file.** Animated WebP output beside GIF and MP4 (R138-9). Lands in #138; changed here only if #138 merged without it |

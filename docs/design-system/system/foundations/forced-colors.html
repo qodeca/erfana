@@ -44,6 +44,11 @@
               border: var(--border-width) solid CanvasText; background: Canvas; }
   .fc-check--on { background: Highlight; border-color: Highlight; }
   .fc-link { color: LinkText; text-decoration: underline; }
+  .fc-mark { background: Mark; color: MarkText; text-decoration: underline var(--border-width-thick) CanvasText;
+             text-decoration-skip-ink: none; text-underline-offset: var(--space-2); }
+  .fc-hit { background: Mark; color: MarkText; }
+  .fc-hit-current { background: MarkText; color: Mark; }
+  .fc-sel { background: Highlight; color: HighlightText; }
   /* The same frames as the app would lose them: no fill, no shadow. */
   .fc-lost-selected { border-left-color: transparent; }
 
@@ -111,7 +116,7 @@
   <tr><th scope="row">Disabled</th><td><span class="sys" style="background: GrayText"></span><code>GrayText</code></td><td>Its own border in <code>GrayText</code></td><td>The browser applies it to native disabled controls; a custom one sets it.</td></tr>
   <tr><th scope="row">Button</th><td><span class="sys" style="background: ButtonFace"></span><code>ButtonFace</code></td><td><code>ButtonText</code>, <code>ButtonBorder</code></td><td>Native buttons get it for free.</td></tr>
   <tr><th scope="row">Link</th><td><span class="sys" style="background: LinkText"></span><code>LinkText</code></td><td>An underline</td><td>Native links get it for free.</td></tr>
-  <tr><th scope="row">Search match, highlighted text</th><td><span class="sys" style="background: Mark"></span><code>Mark</code></td><td><code>MarkText</code></td><td>Not used yet.</td></tr>
+  <tr><th scope="row">Search match, highlighted text</th><td><span class="sys" style="background: Mark"></span><code>Mark</code></td><td><code>MarkText</code></td><td>Proposed for Find hits and comment marks, with the current hit swapping the two and a mark keeping a <code>CanvasText</code> bar – <a href="highlights.html#forced">Text highlights</a>. Not shipped yet.</td></tr>
 </tbody>
 </table>
 <p class="ds-muted">The swatches are painted with the keywords themselves, so they show this browser's values in its
@@ -148,6 +153,10 @@ it.</p>
   <figure class="ds-frame"><div class="fc" aria-hidden="true"><span class="fc-btn fc-disabled">Export</span> <span class="fc-link">Open settings</span></div>
     <figcaption><strong>Disabled and link.</strong> <code>GrayText</code> for the disabled button's text and edge;
       <code>LinkText</code> with its underline for the link.</figcaption></figure>
+  <figure class="ds-frame"><div class="fc" aria-hidden="true">A <span class="fc-mark">commented phrase</span>, a <span class="fc-hit">hit</span>, the <span class="fc-hit-current">current hit</span> and <span class="fc-sel">a selection</span>.</div>
+    <figcaption><strong>Text highlights – proposed.</strong> Marks and hits take <code>Mark</code>; a comment mark
+      keeps a <code>CanvasText</code> bar, the current hit swaps <code>Mark</code> and <code>MarkText</code>, and
+      <code>Highlight</code> stays the selection's (<a href="highlights.html#forced">Text highlights</a>).</figcaption></figure>
 </div>
 
 <h2 id="code">The rule, in code</h2>
@@ -190,6 +199,7 @@ Rendering and emulate <code>forced-colors: active</code>, then Tab to them: the 
 <ul class="ds-muted">
   <li><a href="focus.html">Focus and keyboard</a> – the outline that survives without a rule.</li>
   <li><a href="colors.html#states">Colours, interaction-state layers</a> – which states are fill-only by design.</li>
+  <li><a href="highlights.html">Text highlights</a> – Find, comment marks and the selection, and the system colour each takes.</li>
   <li><a href="../components/form/index.html">Form controls</a> and <a href="../components/permission-band/index.html">Permission band</a> – components that ship a forced-colours block.</li>
 </ul>
 
