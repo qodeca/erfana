@@ -10,7 +10,7 @@ Operator checks out `main`, bumps `package.json` to `0.9.5`, appends CHANGELOG e
 2. Phase 1: `git cliff` emits technical section; operator supplies 4 bullet points for the summary; single commit pushed.
 3. `checks.yml` turns green within ~3 min.
 4. Phase 2: signed tag pushed.
-5. Phase 3: `release.yml` runs for ~60 min. `gh run watch` returns exit 0.
+5. Phase 3: polling (240 s cadence) sees the run pause at the `production-signing` approval, then reach `completed/success` (~60 min of running time).
 6. Phase 4: minisign verifies; per-asset sha256 matches signed SHA256SUMS; workflow-output digest matches.
 7. Operator approves publish.
 8. Phase 5: post-publish verification clean. Release URL surfaced.
@@ -21,9 +21,9 @@ Operator tags a commit that never produced a green `checks.yml` run.
 
 1. Phase 0–2 run normally.
 2. Phase 3: `release.yml` starts. `prepare` job fails the lockfile-drift guard (`No green checks.yml run for <sha>`).
-3. `cleanup` deletes the draft and exits red.
+3. `cleanup` finds no draft (none was created) and exits red.
 4. Skill surfaces the run URL and the `prepare` failure log.
-5. Operator re-runs `checks.yml` on the commit; once green, operator re-invokes the skill from Phase 3 (idempotent resume).
+5. Once `checks.yml` is green for the SHA, the operator runs `gh run rerun <run-id>` on the release run (the tag is not burned) and resumes at Phase 3.
 
 ### Example 3: Hash mismatch in Phase 4
 

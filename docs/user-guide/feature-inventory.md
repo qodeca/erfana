@@ -133,6 +133,7 @@ Source paths are relative to `src/renderer/src/` (**R/**), `src/main/` (**M/**) 
 | HP-10 | Stopped preview with Reload | all | PreviewFallback.tsx | [reference/troubleshooting](./reference/troubleshooting.md#html-preview-stopped-or-reports-issues) |
 | HP-11 | Keyboard into and out of the page (Enter/Space, Esc); Back/Forward keys | all (keys differ) | S/previewNavKeys.ts | [reference/keyboard-shortcuts](./reference/keyboard-shortcuts.md#html-preview) |
 | HP-12 | Off-switch: **Run HTML files** setting | all | Settings/sections/HtmlPreviewSection.tsx | [reference/settings](./reference/settings.md#html-preview) |
+| HP-13 | Comments on page elements, saved in the `.html` file: comment mode, pins, the Comments drawer, threads (v0.23.0) | all | M/services/preview/comments/, HtmlPreviewPanel/comments/, docs/html-preview/README.md | [reference/html-preview](./reference/html-preview.md#comments) |
 
 ## Terminal
 
@@ -212,6 +213,7 @@ Source paths are relative to `src/renderer/src/` (**R/**), `src/main/` (**M/**) 
 | SET-13 | Import tools: PDF, images, Office (LibreOffice found / not found / unsafe), install hint per OS, Check again | status list + button | [reference/settings](./reference/settings.md#import-tools) |
 | SET-14 | Terminal > Screen reader mode | Auto / On / Off, Auto | [reference/settings](./reference/settings.md#terminal) |
 | SET-15 | Transcription > Cancel a model download | button while downloading | [reference/settings](./reference/settings.md#transcription) |
+| SET-16 | Comments > Comments in HTML preview, Your name, Your email (optional) | checkbox, on; two text fields, empty | [reference/settings](./reference/settings.md#comments) |
 
 ## Keyboard shortcuts
 
@@ -246,6 +248,7 @@ Every row goes into `reference/keyboard-shortcuts.md` with macOS and Windows col
 | KEY-25 | Cmd+M, Cmd+H, Cmd+Q (macOS); Ctrl+M, Alt+F4, F11 (Windows) | Window management | OS | [Shortcuts](./reference/keyboard-shortcuts.md#app-and-windows) |
 | KEY-26 | Shift+F10 / Shift+F10 or Menu key; then arrows, Home/End, Enter/Space, type-ahead, Esc or Tab | Open and use any right-click menu | menus | [Shortcuts](./reference/keyboard-shortcuts.md#menus) |
 | KEY-27 | Esc on a focused toast | Close the message | toasts | [Shortcuts](./reference/keyboard-shortcuts.md#app-and-windows) |
+| KEY-28 | Cmd+Option+M / Ctrl+Alt+M; Esc | Turn HTML Preview comment mode on or off; leave it | HTML preview | [Shortcuts](./reference/keyboard-shortcuts.md#html-preview) |
 
 
 ## Menus and dialogs

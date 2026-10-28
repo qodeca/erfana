@@ -410,7 +410,7 @@ If `main` has new commits on `origin` (raced), re-fetch and confirm with operato
 
 - [ ] Commit is on `origin/main` (`chore(release): bump version to {version}` if `package.json` was in the staged diff, else `docs(release): add release notes for v{version}`)
 - [ ] The same SHA is on `origin/develop`, so the two integration branches do not diverge over release-prep commits
-- [ ] Both `checks.yml` and `secret-scan.yml` runs for this SHA reached `completed`/`success` **before** the push to `main` (the push cannot succeed otherwise) and therefore before tagging, which is what the release workflow's `prepare` job asserts
+- [ ] Both `checks.yml` and `secret-scan.yml` runs for this SHA reached `completed`/`success` **before** the push to `main` (the push cannot succeed otherwise) and therefore before tagging. `prepare` asserts the `checks.yml` run; `Secret scan` is enforced by the push to protected `main`
 
 ---
 

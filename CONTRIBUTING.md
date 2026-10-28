@@ -19,7 +19,8 @@ By participating you agree to abide by our [Code of Conduct](CODE_OF_CONDUCT.md)
 
 - **Node.js 24+** (Electron 44 bundles Node.js 24.22.0; the build toolchain needs 24+). The major is pinned in
   [`.nvmrc`](.nvmrc), so `nvm use` in the repo root selects it, and CI pins the same major (hard-coded in
-  `.github/actions/setup-node-with-retry/action.yml`, not read from `.nvmrc`) – a local check and a CI check are
+  `.github/actions/setup-node-with-retry/action.yml`, not read from `.nvmrc`), and the release build legs
+  (`build_mac.yml`, `build_win.yml`) pin the exact patch, 24.22.1 – a local check and a CI check are
   then running the same Node major. Worth confirming with `node --version` before you trust a green local
   run: a `node` earlier on your `PATH` than your version manager will silently win.
 - **Python 3.12 (known good) or 3.14.x** – **not 3.13** (`node-pty` fails to build on 3.13).
@@ -142,7 +143,7 @@ Never commit a real secret, even to history – rewrite it out and rotate the cr
 
 - TypeScript strict mode; React functional components with hooks; Zustand for state.
 - IPC pattern: `shared/ipc` schemas → `main/services` → `main/ipc` handlers → preload bridge → renderer.
-- UI: open the design system first – [`docs/design-system/index.html`](docs/design-system/index.html) – and use design tokens (`var(--color-*)`, `var(--space-*)`, `var(--text-*)`); `border-radius: 0` always. `npm run lint:css` enforces the token rules. (`docs/design-system/` is the design system; `docs/design*/` are per-issue notes.)
+- UI: open the design system first – [`docs/design-system/index.html`](docs/design-system/index.html) – and use design tokens (`var(--color-*)`, `var(--space-*)`, `var(--text-*)`); `border-radius: 0` always. `npm run lint:css` enforces the token rules. (`docs/design-system/` is the design system; `docs/designs/` holds per-issue notes.)
 - Prose: **sentence case**, en dashes (not em dashes).
 - New source files must carry the SPDX header (`npm run check:headers` enforces it; the Xezar kit under `.xezar/` is MIT and exempt, see `REUSE.toml`); new binary assets are covered by the `REUSE.toml` catch-all – add a `.license` sidecar only to *override* it (e.g. a third-party asset). `reuse lint` must pass.
 

@@ -65,7 +65,7 @@ Walk hints for the Windows watcher are unchanged: a lazy folder is still recorde
 ```sh
 node docs/performance/2026-10-22-lazy-tree-walk.gen.mjs .local/bench
 # put the harness described above at src/main/services/zzBenchLazyTree.test.ts, then:
-BENCH_DIR=.local/bench npx vitest run --config vitest.main.ts src/main/services/zzBenchLazyTree.test.ts
+BENCH_DIR=.local/bench npx vitest run --config vitest.main.config.ts --project main src/main/services/zzBenchLazyTree.test.ts
 ```
 
 ## Not measured

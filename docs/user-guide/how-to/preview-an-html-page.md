@@ -24,6 +24,14 @@ Open an HTML file to run its page in Erfana. Approve a remote host only when you
 > [!NOTE]
 > Approved remote hosts are stored per project and cannot be removed in the app.
 
+## Comment on an element
+
+1. Select **Comment mode** in the toolbar, or press <kbd>Cmd</kbd>+<kbd>Option</kbd>+<kbd>M</kbd> (Windows: <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>M</kbd>).
+2. Click an element, or right-click it and choose **Add comment**. The first time, enter your name.
+3. Type the comment and select **Save**. It is saved inside the `.html` file, and a pin marks the element.
+
+See [HTML preview reference § Comments](../reference/html-preview.md#comments).
+
 ## What happens next / If something goes wrong
 
 Open the preview issues list for script errors, blocked hosts, links, and frames. A stopped preview offers Reload.

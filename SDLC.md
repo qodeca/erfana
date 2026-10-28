@@ -654,8 +654,9 @@ The file kinds and their rules are in `.xezar/docs/campaign-notes.md`.
 
 `.xezar/checks/repo-gates.sh` runs the commands in `validation.commands`. Required GitHub checks:
 `Lint`, `Typecheck`, `Unit tests`, `Build`, `Coverage`, `License compliance` and `Secret scan`. `e2e`
-does not run in CI: a change to Electron-specific paths runs `npm run test:e2e` locally before it
-merges, and the result goes into the pull request.
+is not a required check: the advisory `E2E (Linux, xvfb)` job (`e2e-linux.yml`) runs on pull requests
+that change more than docs, and a change to Electron-specific paths still runs `npm run test:e2e`
+locally before it merges, with the result in the pull request.
 
 ### Gates in this project
 
@@ -735,5 +736,4 @@ None.
   above settles it.
 - The PR template still asks for both `test:ci` and `test:cov`; the gate runs only `test:cov`.
 - `CONTRIBUTING.md` lists `npm run lint` (with `--fix`); the gate runs `lint:check`.
-- `changelog.d/` and its `README.md` must be added.
 - The release skill cites the dead design anchor #174 and an unversioned `model: opus`.

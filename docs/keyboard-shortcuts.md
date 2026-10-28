@@ -50,6 +50,10 @@ The running page is a native view that swallows every key, so the preview's shor
 
 **Zoom is not forwarded.** `Cmd/Ctrl+Plus`, `-` and `0` reach a focused preview through the View menu (see [Application Menu](#application-menu)).
 
+### Comment mode
+
+**Cmd+Option+M** (macOS) or **Ctrl+Alt+M** (Windows, Linux) turns HTML Preview comment mode on and off. One rule serves both processes, `matchCommentModeKey` in `src/shared/commentModeKey.ts`: main matches it in the page's `before-input-event` (`previewInputForward.ts`), and the panel matches it on its own chrome and dockview group element (`usePreviewComments`). It matches the **typed** key `m` with exactly those modifiers – no Shift, no other modifier, a press only – so AltGr+M on a layout where that types a character (µ on German) keeps typing it. On macOS, where Option changes the typed character, the physical `KeyM` stands in when the typed key is not printable ASCII. **Esc** leaves comment mode. The keys inside comment mode (Tab, Alt+Up / Down Arrow, Enter, Shift+F10) are listed in [HTML preview § Comments](./html-preview/README.md#comments).
+
 
 ## Image Viewer
 

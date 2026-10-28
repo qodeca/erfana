@@ -30,8 +30,8 @@ Erfana is an agent-native Markdown workspace – an Electron app that runs a ter
 - [Editor](./editor/README.md) - Monaco editor, markdown preview, scroll sync, Mermaid diagrams (full-screen viewer), PDF/DOCX export
   - [Export](./editor/export.md) - PDF and DOCX export pipeline
   - [Mermaid Viewer](./editor/mermaid-viewer.md) - Full-screen diagram viewer with zoom and pan
-- [HTML Preview](./html-preview/README.md) - Live `.html` preview running real CSS + JS in a sealed process, with a per-project host allowlist, auto-refresh, find-in-page and PDF export (issue #74), plus same-project frames, same-tab links with Back and Forward, Open in default browser, and keyboard entry into the page (issue #124). Threat model in [Security § HTML preview](./security.md#html-preview)
-- [HTML comments – format v1](./html-comments/format-v1.md) - Draft public spec of the `erfana:comment v1` block that HTML Preview comments store in the `.html` file: grammar, `@data` schema, escaping, placement, damaged blocks and rules for coding agents
+- [HTML Preview](./html-preview/README.md) - Live `.html` preview running real CSS + JS in a sealed process, with a per-project host allowlist, auto-refresh, find-in-page and PDF export (issue #74), plus same-project frames, same-tab links with Back and Forward, Open in default browser, and keyboard entry into the page (issue #124), plus comments on page elements stored in the `.html` file (v0.23.0). Threat model in [Security § HTML preview](./security.md#html-preview)
+- [HTML comments – format v1](./html-comments/format-v1.md) - Public spec, final for v1, of the `erfana:comment v1` block that HTML Preview comments store in the `.html` file: grammar, `@data` schema, escaping, placement, damaged blocks and rules for coding agents
 - [Image Viewer](./ui-components.md#image-viewer-panel) - Image preview panel with zoom, pan, and fullscreen
 - [Terminal](./terminal/README.md) - xterm.js terminal integration
   - [Bootstrap Pattern](./terminal/bootstrap-pattern.md) - Clean initialization without artifacts
@@ -88,6 +88,7 @@ Erfana is an agent-native Markdown workspace – an Electron app that runs a ter
   - [What the #138 capture design assumes](./spikes/138-capture-spike.md) - user-guide screenshots
   - [Posting review verdicts without a model Bash call](./spikes/172-verdict-posting.md) - Xezar pipeline, #172
   - [Leader liveness and a 30-minute silence alert](./spikes/179-leader-liveness.md) - Xezar pipeline, #179
+  - [HTML Preview comments, phase P0](./spikes/html-preview-comments.md) - the probes that revision 3 of the comments design rests on
 - [Leader-silence alert runbook](./runbooks/leader-watch.md) - the macOS notification when the Xezar project leader goes quiet (#179)
 - [Testing](./testing/README.md) - Testing strategies and coverage
   - [E2E Testing](./testing/e2e-testing.md) - Playwright/Electron E2E guide
@@ -135,6 +136,7 @@ Not to be confused with **[`docs/design-system/`](design-system/index.html)**, w
 - [README and GitHub presentation](./designs/139-readme-redesign/README.md) - Banner, demo loop, page structure and fact audit for the README redesign (issue #139)
 - [HTML preview with CSS and JavaScript](./designs/sd-074-html-preview.md) - Sealed-box live preview that runs a project's real CSS and JavaScript (spec 074, issue #74)
 - [Preview link navigation and multiple views](./designs/sd-074b-preview-navigation-and-multiview.md) - In-page link navigation and independent preview tabs (spec 074; superseded in part by #124)
+- [HTML Preview comments](./designs/html-preview-comments.md) - Comments on page elements, stored as `erfana:comment v1` blocks in the `.html` file (shipped in v0.23.1); sub-frame decision in [ADR 0005](./adrs/0005-sub-frame-preload-one-receive-channel.md)
 
 ### Future Features (Planned)
 - [Graph Engine](./future/graph-engine.md) – SQLite + vec + FTS5 knowledge graph (not yet implemented). The full specification lives in [`future/graph-engine/`](./future/graph-engine/), covering the data model, embeddings, hybrid search, MCP server, packaging and performance, plus a milestone-by-milestone [implementation guide](./future/graph-engine/implementation-guide/) and [wireframes](./future/graph-engine/wireframes/)
@@ -152,7 +154,7 @@ Not to be confused with **[`docs/design-system/`](design-system/index.html)**, w
 
 ## Changelog
 
-- [CHANGELOG](./CHANGELOG.md) – Per-version release notes (v0.9.0 onward; v0.8.x and v0.3–v0.5 in the [Archive](#archive); v0.6.x–v0.7.x have no entries). Latest release: v0.22.0 (2026-10-25), which also ships the never-released 0.21.0 changes
+- [CHANGELOG](./CHANGELOG.md) – Per-version release notes (v0.9.0 onward; v0.8.x and v0.3–v0.5 in the [Archive](#archive); v0.6.x–v0.7.x have no entries). Latest release: v0.23.1 (2026-10-28), which also ships the v0.23.0 changes – v0.23.0 was tagged but never published
 - [Changelog fragments](../changelog.d/README.md) – where a pull request records its change instead of editing the changelog; folded into the changelog at release
 - [Release notes](./release-notes/README.md) – Per-version release-notes files used as GitHub release bodies (v0.9.5 onward)
 - [Release incidents](./release-incidents/index.md) – Running log of `release.yml` failures with matched signatures and fixes

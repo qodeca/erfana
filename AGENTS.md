@@ -6,8 +6,9 @@ SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 # Agents working in Erfana
 
 This file is for every coding agent (Claude Code, Codex, pi) that works in this repository.
-The project rules are in [CLAUDE.md](CLAUDE.md) - read it first. It holds the design-system,
-path-handling, panel-id, IPC and autosave rules, and they win over anything below.
+The project rules are in [CLAUDE.md](CLAUDE.md) - read it first. It holds the design-system and IPC
+rules; the renderer rules (panel ids, path handling, autosave) are in
+[src/renderer/CLAUDE.md](src/renderer/CLAUDE.md). Both win over anything below.
 
 ## The gate
 
@@ -30,14 +31,15 @@ It reports these steps in canonical order:
 9. npm run check:headers
 10. .xezar/checks/repository-checks.sh
 
-`npm run test:cov` runs every unit test in the main, preload and renderer projects once and checks
+`npm run test:cov` runs every unit test in the main, main-perf, preload and renderer projects once and checks
 every coverage floor, so the gate has no separate `npm run test:ci` step (#170). CI still runs
 `test:ci` as the required `Unit tests` check.
 
 The GitHub checks that gate a pull request are `Lint`, `Typecheck`, `Unit tests`, `Build`,
 `Coverage`, `License compliance` (`.github/workflows/checks.yml`) and `Secret scan`
 (`.github/workflows/secret-scan.yml`). CI also runs `reuse lint` and gitleaks over every ref, which the
-local gate does not. CI does not run e2e: for Electron-specific changes run `npm run test:e2e` locally.
+local gate does not. CI runs e2e only as the advisory `E2E (Linux, xvfb)` job, not a required check: for Electron-specific
+changes run `npm run test:e2e` locally.
 
 The application gates run in two lanes by default (`validation.applicationLanes` in
 `.xezar/pipeline/config.json`); `GATE_APPLICATION_LANES` overrides the schedule. The security

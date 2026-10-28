@@ -15,6 +15,7 @@ HTML preview runs a project page with its CSS and JavaScript in a sandboxed view
 - [Live refresh and frames](#live-refresh-and-frames)
 - [Find, issues and stopped state](#find-issues-and-stopped-state)
 - [Zoom and PDF](#zoom-and-pdf)
+- [Comments](#comments)
 
 ## Opening and limits
 
@@ -41,3 +42,7 @@ HTML preview runs a project page with its CSS and JavaScript in a sandboxed view
 ## Zoom and PDF
 
 **What they do:** **View > Actual Size / Zoom In / Zoom Out** apply to the focused page. <kbd>Cmd</kbd>+<kbd>S</kbd> (Windows: <kbd>Ctrl</kbd>+<kbd>S</kbd>) exports the page to PDF rather than saving HTML source. **How to reach them:** View menu, preview toolbar, or the active preview tab.
+
+## Comments
+
+**What it does:** Leave a comment on an element of the page. The comment is saved inside the `.html` file, right before the element, so it travels with the file through git and a coding agent reading the file sees it. A speech-bubble pin marks each commented element; the **Comments** drawer lists every comment as Open, Resolved or Needs attention. **How to reach it:** select **Comment mode** in the toolbar or press <kbd>Cmd</kbd>+<kbd>Option</kbd>+<kbd>M</kbd> (Windows: <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>M</kbd>), then click an element, or right-click it and choose **Add comment**. <kbd>Esc</kbd> leaves comment mode. The first comment asks for your name; change it, or turn comments off, in [Settings > Comments](settings.md#comments). Full detail, limits and when comments are unavailable: [HTML preview § Comments](../../html-preview/README.md#comments).

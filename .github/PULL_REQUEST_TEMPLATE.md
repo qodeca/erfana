@@ -39,7 +39,7 @@ Design review evidence: <link to the "## Design review" comment or the design RE
 - [ ] `npx electron-vite build` succeeds.
 - [ ] `npm run check:headers` and `reuse lint` pass (SPDX headers / REUSE compliance).
 - [ ] No secrets introduced — `Secret scan` is a required check and gitleaks scans every ref in the repo, not just this branch.
-- [ ] Ran `npm run test:e2e` locally if this touches Electron-specific paths (CI does not cover e2e).
+- [ ] Ran `npm run test:e2e` locally if this touches Electron-specific paths (CI runs e2e only in the advisory `E2E (Linux, xvfb)` job, which never blocks a merge).
 - [ ] Documentation updated if behavior or APIs changed.
 
 > By opening this PR you agree to the project [Contributor License Agreement](../CLA.md); your Git author identity is your signature of record. (Automatic signature recording via a CLA-assistant bot may be added in the future.)

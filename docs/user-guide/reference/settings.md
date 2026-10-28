@@ -15,6 +15,7 @@ Open **Settings** with the gear at the bottom of the left activity bar. <kbd>Esc
 - [Transcription](#transcription)
 - [Import tools](#import-tools)
 - [HTML preview](#html-preview)
+- [Comments](#comments)
 - [Terminal](#terminal)
 - [Per-project settings](#per-project-settings)
 - [Excluded folders](#excluded-folders)
@@ -85,6 +86,18 @@ A copy found in the open project, a temporary folder, a network share or through
 | **Run HTML files** | On | When off, HTML files open as source only; live previews stop and no preview process is started. |
 
 Remote-host approvals belong to each project. An approved host is saved to `.erfana/settings.json`; the app currently has no remove-approval control. See [HTML preview](html-preview.md#remote-host-permission).
+
+## Comments
+
+**What it does:** Turns [HTML Preview comments](html-preview.md#comments) on or off and sets the name and email saved with each comment you write. **How to reach it:** **Settings > Comments**, right below HTML preview.
+
+| Option | Default | Effect |
+| --- | --- | --- |
+| **Comments in HTML preview** | On | Lets you add comments to elements of a previewed page. When off, previews have no comment mode and no pins; comments already in your files are left alone, and the two fields below keep their values but cannot be edited. |
+| **Your name** | Empty | Saved into HTML files next to each comment you write; changing it affects new comments only. Leave it empty and Erfana asks for a name the next time you comment. |
+| **Your email (optional)** | Empty | Also saved into the file. Leave it empty to keep it out. |
+
+Each field is saved when you leave it. Both are stored in Erfana's own settings (`~/.erfana/settings.json`), never in the project, and both are visible to anyone who can open the file – in the page source and in git history once pushed.
 
 ## Terminal
 
