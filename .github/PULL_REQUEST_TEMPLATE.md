@@ -17,8 +17,9 @@ SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 
 <!-- UI in scope = the renderer's screens, panels, dialogs and the preview, the words users read in them, the design system in docs/design-system/, or anything under docs/designs/. SDLC.md § The design gate. -->
 - [ ] Not UI in scope
-- [ ] UI in scope – `needs-design` applied (outside contributors: a maintainer applies it). Design: `docs/designs/<feature>/` or "fix-sized"
+- [ ] UI in scope – `needs-design` applied (outside contributors: a maintainer applies it). Design: `docs/designs/<functionality>/` or "fix-sized"
 - [ ] `skip-design`, because: <rendered output unchanged – say why>
+- [ ] UI changed: follows every card it touches; each departure has a `/* deviates: docs/design-system/<card>.html – why */` marker and a row in the card's Exceptions; a part no card covers has a new `proposed` card in this PR; no card was promoted to `decided`, changed in what it requires, or superseded (those are the owner's).
 
 Design review evidence: <link to the "## Design review" comment or the design README section>
 
@@ -33,7 +34,7 @@ Design review evidence: <link to the "## Design review" comment or the design RE
 - [ ] Work is on a `feature/...` branch cut from the right integration branch, and this PR targets that same branch, not `main` — `develop` for general work, `graph` for graph-engine work.
 - [ ] Commits follow [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `chore:`, `docs:`).
 - [ ] `npm run lint`, `npm run lint:css` and `npm run typecheck` pass.
-- [ ] `npm run design -- --check` passes (regenerate with `npm run design` and commit if it does not).
+- [ ] `npm run design -- --check` passes (stale values: run `npm run design` and commit; a guard failure – JavaScript, a broken link, a `deviates:` marker its card does not list – needs a fix).
 - [ ] `npm run test:ci` passes (added/updated tests where it makes sense).
 - [ ] `npm run test:cov` passes (`Coverage` is a required check, and `test:ci` does not run it).
 - [ ] `npx electron-vite build` succeeds.

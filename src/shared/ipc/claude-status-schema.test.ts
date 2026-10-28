@@ -8,7 +8,7 @@
  * the change payload, and the pid-free register request.
  *
  * @see Issue #216 - Per-terminal Claude Code context status bar
- * @see docs/designs/216-claude-status-bar.md §2, §10
+ * @see docs/designs/context-meter/216-claude-status-bar.md §2, §10
  */
 import { describe, it, expect } from 'vitest'
 import {

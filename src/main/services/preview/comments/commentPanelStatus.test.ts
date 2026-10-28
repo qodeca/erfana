@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * One view's comment status as the renderer reads it
- * (docs/designs/html-preview-comments.md §8, §10.4, §10.10): the files the
+ * (docs/designs/comments/html-preview-comments.md §8, §10.4, §10.10): the files the
  * drawer lists, the threads not rendered now, the tab's counts and why
  * comments are unavailable.
  */

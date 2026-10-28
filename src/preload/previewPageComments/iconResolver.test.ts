@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Pin elements, resolved once per page change (security review L9;
- * docs/designs/html-preview-comments.md §6 "JS-built elements").
+ * docs/designs/comments/html-preview-comments.md §6 "JS-built elements").
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { resolvePath } from './domPath'

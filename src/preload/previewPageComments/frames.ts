@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Child frames ↔ their `<iframe>` and `<frame>` elements
- * (docs/designs/html-preview-comments.md §6 "Frames", §10.2, §19 R3-3, R3-4;
+ * (docs/designs/comments/html-preview-comments.md §6 "Frames", §10.2, §19 R3-3, R3-4;
  * test J-017).
  *
  * Main sends a parent its child frames as opaque keys in `WebFrameMain.frames`

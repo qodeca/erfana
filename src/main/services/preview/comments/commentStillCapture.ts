@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * The fresh still under a comment popup (docs/designs/html-preview-comments.md
+ * The fresh still under a comment popup (docs/designs/comments/html-preview-comments.md
  * §3 "Stale still image under popups", §7.3 step 4, §19 R3-6; spike S6; test
  * E-011).
  *

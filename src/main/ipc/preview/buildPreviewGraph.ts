@@ -14,7 +14,7 @@
  * binds to per-view data (the new view's realRoot / webContents) absent at
  * construction time.
  *
- * @see docs/designs/sd-074-html-preview.md §4.4, §5(a)
+ * @see docs/designs/html-preview/sd-074-html-preview.md §4.4, §5(a)
  */
 import { BrowserWindow, dialog, screen, type Session } from 'electron'
 import { openExternalSafe } from '../../utils/openExternalSafe'
@@ -214,7 +214,7 @@ export function buildPreviewGraph(deps: BuildPreviewGraphDeps): PreviewGraph {
     allowlistStore,
     previewPagePreloadPath: resolvePreviewPagePreload(),
     // HTML Preview comments: the flag is read per request, so turning it off
-    // serves the next page raw (docs/designs/html-preview-comments.md §3).
+    // serves the next page raw (docs/designs/comments/html-preview-comments.md §3).
     comments: { isEnabled: comments.isEnabled }
   })
   const stillFrameCache = createPreviewStillFrameCache()

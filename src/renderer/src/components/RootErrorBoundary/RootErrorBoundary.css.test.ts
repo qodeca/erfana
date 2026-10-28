@@ -162,7 +162,7 @@ describe('RootErrorBoundary.css selector allowlist', () => {
  * viewport-bounded root. VISUAL CONFIRMATION AT 200% ZOOM IS A UAT STEP, not
  * something this file can do.
  *
- * @see docs/designs/design-issue-60.md §2.3 (layout paragraph), §5 row F31
+ * @see docs/designs/large-projects/design-issue-60.md §2.3 (layout paragraph), §5 row F31
  */
 describe('RootErrorBoundary.css layout contract (F31 substitute)', () => {
   it('bounds the root container to the viewport so it can never grow past it', () => {

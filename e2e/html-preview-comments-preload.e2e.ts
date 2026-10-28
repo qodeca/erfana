@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * HTML Preview comments – preload exit test (P4;
- * docs/designs/html-preview-comments.md §13 P4 "e2e exit", §6, §9.2, §19
+ * docs/designs/comments/html-preview-comments.md §13 P4 "e2e exit", §6, §9.2, §19
  * R3-2, R3-7; docs/adrs/0005-sub-frame-preload-one-receive-channel.md).
  *
  * Real Chromium, real preload, real instrumented copy:

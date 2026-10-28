@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * The overlay's stylesheet (docs/designs/html-preview-comments.md §10.2,
+ * The overlay's stylesheet (docs/designs/comments/html-preview-comments.md §10.2,
  * §10.5, §10.9, §19 R3-7).
  *
  * Applied ONLY through a constructable stylesheet adopted by the closed
@@ -17,7 +17,7 @@
  * is generated content from a `data-text` attribute (`.erf-hpc-text`), which
  * Find in page does not count (E-022).
  *
- * The design-system card `docs/design-system/product/html-comments/overlay.css`
+ * The design-system card `docs/designs/comments/html-comments/overlay.css`
  * mirrors these rules with each theme field written back as its token: change
  * both together.
  */
@@ -27,7 +27,7 @@ import type { OverlayTheme } from './state'
 const HIDDEN_CSS = '.erf-hpc-root { display: none !important; }'
 
 /*
- * deviates: docs/design-system/product/html-comments/overlay.html — the pin's
+ * deviates: docs/designs/comments/html-comments/overlay.html — the pin's
  * focus ring is the passed-in accent with an ink halo, and pins are focusable
  * but outside the Tab order (card Exceptions, "Pin focus").
  */
@@ -36,7 +36,7 @@ function pinFocusCss(t: OverlayTheme): string {
 }
 
 /*
- * deviates: docs/design-system/product/html-comments/overlay.html — in forced
+ * deviates: docs/designs/comments/html-comments/overlay.html — in forced
  * colours the theme gives way to system colours, written as literals; a
  * selected pin inverts (Canvas body, Highlight stroke and content) so it still
  * differs from an open one (card Exceptions, "Forced colours").
@@ -52,7 +52,7 @@ const FORCED_COLOURS_CSS = `@media (forced-colors: active) {
 }`
 
 /*
- * deviates: docs/design-system/product/html-comments/overlay.html — every
+ * deviates: docs/designs/comments/html-comments/overlay.html — every
  * colour and size is a literal interpolated from `commentState.theme`, never
  * `var()`: a `var()` in the page would read the page's own custom properties
  * (card Exceptions, "Every colour and size").

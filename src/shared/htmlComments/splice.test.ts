@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Placement and byte identity (docs/designs/html-preview-comments.md
+ * Placement and byte identity (docs/designs/comments/html-preview-comments.md
  * decision 24, §5.2, §19 R3-8; U-040–U-043, U-050–U-061).
  *
  * Every write here goes through the bytes, as the writer will: decode

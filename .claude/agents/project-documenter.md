@@ -59,3 +59,4 @@ For changelog entries, follow the existing format in `docs/CHANGELOG.md`.
 - `docs/architecture.md` - System design documentation
 - `docs/testing/README.md` - Test documentation and counts
 - `docs/ui-components.md` - UI component documentation
+- `docs/design-system/` - The design system: a visual rule goes on a card (or a new `proposed` card), never in `docs/ui-components.md` or `docs/ui-style-guide.md`; its generated files (listed in its `README.md` § The one rule) are rebuilt with `npm run design`, never hand-edited

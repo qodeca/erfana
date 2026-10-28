@@ -21,7 +21,7 @@
  *    placeholder ONLY if it is still provisional for this version, so neither a
  *    concurrent finalized result nor a finalized no-turn negative is ever clobbered.
  *
- * @see docs/designs/47-context-meter-freeze.md §3.2, §4
+ * @see docs/designs/context-meter/47-context-meter-freeze.md §3.2, §4
  */
 // Type-only import — erased at compile time, so no runtime cycle with the parser
 // (the parser imports this module's functions at runtime; this module imports only

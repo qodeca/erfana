@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Main-thread cost of the comment file jobs – a list, a pick and a write
- * (docs/designs/html-preview-comments.md §19 R3-12).
+ * (docs/designs/comments/html-preview-comments.md §19 R3-12).
  *
  * A pick, a pin, the list and a write used to parse the file on the main
  * thread: listing eight 3.9 MB frames took 5.3 s and stalled the event loop

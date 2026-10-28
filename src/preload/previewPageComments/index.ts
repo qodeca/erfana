@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * HTML Preview comments in the preview page's preload
- * (docs/designs/html-preview-comments.md §4.2 "Preload", §7, §8, §9.2;
+ * (docs/designs/comments/html-preview-comments.md §4.2 "Preload", §7, §8, §9.2;
  * docs/adrs/0005-sub-frame-preload-one-receive-channel.md).
  *
  * Installed only when main built the view with `htmlPreview.comments.enabled`,

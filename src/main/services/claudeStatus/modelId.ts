@@ -34,7 +34,7 @@
  *
  * @see Issue #41 - Context meter reads the 200k window for Opus 5 sessions
  * @see Issue #49 - Model ids from Bedrock, Vertex and Foundry are not recognised
- * @see docs/designs/41-model-capability-registry.md §5, §6, §7, §8, §11
+ * @see docs/designs/context-meter/41-model-capability-registry.md §5, §6, §7, §8, §11
  */
 import { MAX_MODEL_ID_LENGTH } from '../../../shared/ipc/claude-status-schema'
 

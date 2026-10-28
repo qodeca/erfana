@@ -8,7 +8,7 @@
  * main/preload/renderer boundary.
  *
  * @see Issue #74 - HTML preview with CSS and JavaScript execution
- * @see docs/designs/sd-074-html-preview.md §4.1 - Channels
+ * @see docs/designs/html-preview/sd-074-html-preview.md §4.1 - Channels
  */
 
 /**

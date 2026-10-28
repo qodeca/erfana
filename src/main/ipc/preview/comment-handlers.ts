@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * HTML Preview comments' renderer → main requests
- * (docs/designs/html-preview-comments.md §7, §8; tests I-001–I-005, SEC-07).
+ * (docs/designs/comments/html-preview-comments.md §7, §8; tests I-001–I-005, SEC-07).
  *
  * Every handler mirrors `focus-handlers.ts`:
  *   1. refuses an untrusted sender (`isTrustedSender`) BEFORE the payload is

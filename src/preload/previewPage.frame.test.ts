@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * The preview-page preload loaded in a SUB-FRAME (SEC-22; HTML Preview
- * comments, docs/designs/html-preview-comments.md §9.2,
+ * comments, docs/designs/comments/html-preview-comments.md §9.2,
  * docs/adrs/0005-sub-frame-preload-one-receive-channel.md).
  *
  * With `htmlPreview.comments.enabled` the preload also runs in every frame,

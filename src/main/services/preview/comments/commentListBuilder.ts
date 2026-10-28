@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * `preview:commentList` – every comment of the page on screen and of its
- * same-project frames, read from disk (docs/designs/html-preview-comments.md
+ * same-project frames, read from disk (docs/designs/comments/html-preview-comments.md
  * §7.7, §8, §10.4, §10.6, decision 15; tests M-014, M-053).
  *
  * Every file is re-read on every list; loading never writes. Main reads the

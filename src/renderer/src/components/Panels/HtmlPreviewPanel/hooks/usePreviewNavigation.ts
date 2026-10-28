@@ -22,7 +22,7 @@
  * tab switch) arrive through `usePreviewGroupKeys`, gated on the active panel.
  *
  * @module usePreviewNavigation
- * @see docs/designs/design-issue-124-part3.md §3.7, §3.8
+ * @see docs/designs/html-preview/multi-page/design-issue-124-part3.md §3.7, §3.8
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'

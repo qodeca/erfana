@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Reading a file for comments (docs/designs/html-preview-comments.md §7.6
+ * Reading a file for comments (docs/designs/comments/html-preview-comments.md §7.6
  * steps 1–5; M-014) and the refusal → ErrorCode table (§8). Main reads the
  * bytes; the parse is the comment file jobs' (`commentJobDocs.ts`), checked
  * here on the bytes the loader returned.

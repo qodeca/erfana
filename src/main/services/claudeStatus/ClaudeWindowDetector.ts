@@ -52,7 +52,7 @@
  *
  * @see Issue #216 - Per-terminal Claude Code context status bar
  * @see Issue #41 - Context meter reads the 200k window for Opus 5 sessions
- * @see docs/designs/41-model-capability-registry.md §5, §8
+ * @see docs/designs/context-meter/41-model-capability-registry.md §5, §8
  */
 import { promises as fs } from 'node:fs'
 import os from 'node:os'

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Pin visibility reports (docs/designs/html-preview-comments.md §6 status,
+ * Pin visibility reports (docs/designs/comments/html-preview-comments.md §6 status,
  * §8 `preview-page:commentAnchors`, decision 30; test J-006).
  *
  * After each render the controller hands over, per pin key, whether its

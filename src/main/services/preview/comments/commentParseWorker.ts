@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * The persistent comment parse worker (docs/designs/html-preview-comments.md
+ * The persistent comment parse worker (docs/designs/comments/html-preview-comments.md
  * §19 R3-12; pattern `src/main/services/workers/git-status.worker.ts`).
  *
  * Built as its own main-process bundle entry (`comment-parse.worker`,

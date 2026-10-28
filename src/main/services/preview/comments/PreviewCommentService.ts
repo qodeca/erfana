@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * HTML Preview comments for one live preview view – the façade
- * (docs/designs/html-preview-comments.md §4.1, §4.2 "PreviewCommentService",
+ * (docs/designs/comments/html-preview-comments.md §4.1, §4.2 "PreviewCommentService",
  * §7, §8).
  *
  * Built by `previewLiveComments.ts` beside the view's other collaborators,

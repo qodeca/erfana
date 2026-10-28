@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Pin elements, re-resolved only when the page changed
- * (docs/designs/html-preview-comments.md §6 "JS-built elements", §7.5 step 7;
+ * (docs/designs/comments/html-preview-comments.md §6 "JS-built elements", §7.5 step 7;
  * security review L9).
  *
  * A pin on a JS-built element names its tokened ancestor plus a structural

@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * What a pick says about an element that is not in the file
- * (docs/designs/html-preview-comments.md §5.3 `runtime`, §5.6, §6
+ * (docs/designs/comments/html-preview-comments.md §5.3 `runtime`, §5.6, §6
  * "JS-built elements", decisions 16–17 and 34, §19 R3-8; test J-007).
  *
  * A JS-built element has no token of its own. The pick names its nearest

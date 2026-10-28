@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * What the panel says when a write answered "still saving" settles
- * (docs/designs/html-preview-comments.md §19 "Save pending settles"; review
+ * (docs/designs/comments/html-preview-comments.md §19 "Save pending settles"; review
  * finding H1).
  */
 import { act, renderHook } from '@testing-library/react'

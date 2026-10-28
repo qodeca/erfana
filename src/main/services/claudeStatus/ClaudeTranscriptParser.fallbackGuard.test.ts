@@ -17,7 +17,7 @@
  * closed, T8 concurrency). The guard-storage unit tests — eviction/cap (AC6, was
  * T7) and the provisional/rollback lifecycle — live in `fallbackGuard.test.ts`.
  *
- * @see docs/designs/47-context-meter-freeze.md §8 (test plan T1–T8)
+ * @see docs/designs/context-meter/47-context-meter-freeze.md §8 (test plan T1–T8)
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { promises as fs } from 'node:fs'

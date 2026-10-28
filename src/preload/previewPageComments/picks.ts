@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Pick signals (docs/designs/html-preview-comments.md §7.3, §8
+ * Pick signals (docs/designs/comments/html-preview-comments.md §7.3, §8
  * `preview-page:commentPick`, §19 R3-5, R3-8; tests J-007, J-008, SEC-05,
  * SEC-06).
  *

@@ -1,105 +1,647 @@
-<!-- @card group="Foundations" name="Colours" subtitle="Every token resolved from the shipping CSS, contrast measured in the page" status="proposed" reviewed="2026-08-31" -->
+<!-- @card group="Foundations" name="Colours" subtitle="Every token resolved from the shipping CSS, every pairing judged on the surface it sits on" status="proposed" reviewed="2026-08-31" answers="Pick a text colour that passes contrast; Check whether a colour token is retired; Colour a hover, selected or drop-target state; Colour git status or the context meter" -->
 <!-- SPDX-License-Identifier: GPL-3.0-only -->
 <!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Erfana — colour foundations</title>
+<title>Colours – Erfana design system</title>
 <link rel="stylesheet" href="../../tokens.css">
 <link rel="stylesheet" href="../../ds.css">
-<script src="../../claims.js"></script>
+<style>
+  /* Row headers name a token or a status: no small caps, which ds.css gives column headers. */
+  tbody th { text-transform: none; letter-spacing: normal; font-size: var(--text-base);
+             font-weight: var(--font-normal); color: var(--color-text-primary); }
+
+  /* The rules list under the decision. */
+  .rules { max-width: var(--ds-measure-wide); margin: 0 0 var(--space-16); padding-left: var(--space-16);
+           color: var(--color-text-tertiary); font-size: var(--ds-text-body); }
+  .rules li { margin-bottom: var(--space-4); }
+  .rules strong { color: var(--color-text-bright); font-weight: var(--font-semibold); }
+
+  /* The token x surface matrix. Wider than the page on a narrow window, so it
+     scrolls inside its own region, and the region is a Tab stop so a keyboard
+     user can scroll it too. */
+  .mx-scroll { overflow-x: auto; max-width: 100%; margin-bottom: var(--space-12); }
+  .mx-scroll:focus-visible { outline: var(--border-width-thick) solid var(--color-border-focus);
+                             outline-offset: var(--space-1); }
+  .mx { width: auto; max-width: none; }
+  .mx th, .mx td { padding-right: var(--space-6); }
+  .mx td[data-contrast] { font-size: var(--ds-text-small); }
+  .mx thead th { vertical-align: top; text-transform: none; letter-spacing: 0;
+                 font-size: var(--ds-text-small); color: var(--color-text-tertiary); }
+  .mx thead th code { font-size: var(--ds-text-small); color: var(--color-text-tertiary); }
+  .mx tbody th { text-align: left; font-weight: var(--font-normal); padding: var(--space-4) var(--space-8) var(--space-4) 0;
+                 border-bottom: var(--border-width) solid var(--color-border-default); white-space: nowrap;
+                 position: sticky; left: 0; background: var(--color-bg-primary); }
+  .mx-surface { display: block; width: 100%; height: var(--space-8); margin-bottom: var(--space-3);
+                border: var(--border-width) solid var(--color-border-subtle); }
+  .mx-use { font-size: var(--ds-text-small); color: var(--color-text-tertiary); }
+
+  /* A sample strip: a token drawn on a surface, for the eye. */
+  .strip { display: flex; flex-wrap: wrap; gap: var(--space-8); margin: 0 0 var(--space-12); }
+  .chip { display: inline-flex; align-items: center; gap: var(--space-4); height: var(--btn-height-md);
+          padding: 0 var(--space-8); font-weight: var(--font-semibold); }
+
+  /* Text on a violet fill: the three fill states, drawn. */
+  .fill { display: inline-flex; align-items: center; justify-content: center; min-width: calc(var(--space-24) * 4);
+          height: var(--btn-height-md); padding: 0 var(--space-12); font-weight: var(--font-semibold); }
+  .fill--rest { background: var(--color-btn-primary-bg); color: var(--color-text-on-accent); }
+  .fill--hover { background: var(--color-btn-primary-hover); color: var(--color-text-on-accent); }
+  .fill--active { background: var(--color-btn-primary-active); color: var(--color-text-on-accent); }
+  .fill--inset { outline: var(--border-width-thick) solid var(--color-border-focus);
+                 outline-offset: calc(var(--border-width-thick) * -2); }
+
+  /* Interaction-state frames: one list row per state. */
+  .rows { background: var(--color-bg-tertiary); padding: var(--space-4) 0; }
+  .r { display: flex; align-items: center; gap: var(--space-4); height: var(--btn-height-sm);
+       padding: 0 var(--space-8); color: var(--color-text-primary); font-size: var(--text-base);
+       border-left: var(--border-width-thick) solid transparent; }
+  .r--hover { background: var(--color-bg-hover-solid); }
+  .r--wash { background: var(--color-bg-hover); }
+  .r--active { background: var(--color-bg-active); }
+  .r--selected { background: var(--color-bg-selected); border-left-color: var(--color-brand-lime); }
+  .r--focus { outline: var(--border-width-thick) solid var(--color-border-focus);
+              outline-offset: calc(var(--space-1) * -1); }
+  .r--disabled { opacity: var(--opacity-disabled); }
+  .r--drop { background: var(--color-accent-drag-bg); outline: var(--border-width) solid var(--color-accent-drag);
+             outline-offset: calc(var(--border-width) * -1); }
+  .r--drop-subtle { background: var(--color-accent-drag-bg-subtle); outline: var(--border-width) dashed var(--color-accent-drag-border);
+                    outline-offset: calc(var(--border-width) * -1); }
+
+  /* Data colours: git status as the tree draws it. */
+  .git-dot { display: inline-block; width: var(--space-3); height: var(--space-3); border-radius: var(--border-radius-circle); }
+  .git-badge { /* mockup: app scale – the tree's badge */ display: inline-block; min-width: var(--space-8); padding: 0 var(--space-2); text-align: center;
+               font-family: var(--font-mono); font-size: var(--text-xs); font-weight: var(--font-semibold);
+               color: var(--color-bg-primary); }
+
+  /* The context meter, as ClaudeStatusBar.css draws it. */
+  .meter-bar { display: flex; align-items: center; gap: var(--space-6); padding: var(--space-4) var(--space-6);
+               background: var(--color-bg-secondary); }
+  .meter { flex: 1 1 auto; height: var(--space-2); background: var(--color-bg-tertiary); }
+  .meter > span { display: block; height: 100%; }
+  .meter-pct { /* mockup: app scale – the status bar */ font-size: var(--text-sm); font-weight: var(--font-semibold); font-variant-numeric: tabular-nums; }
+
+  /* Named defects: two swatches side by side. */
+  .pair { display: flex; gap: 0; margin: 0 0 var(--space-6); }
+  .pair > div { width: calc(var(--space-24) * 3); height: var(--btn-height-lg); display: flex; align-items: center;
+                padding: 0 var(--space-6); font-size: var(--ds-text-small); font-weight: var(--font-semibold);
+                color: var(--color-text-on-accent); }
+</style>
 </head>
 <body>
-
+<nav class="ds-crumbs" aria-label="Breadcrumb"><a href="../../index.html">Erfana design system</a> <span aria-hidden="true">/</span> <a href="../../index.html#foundations">Foundations</a> <span aria-hidden="true">/</span> <span aria-current="page">Colours</span></nav>
+<main>
 <h1>Colours</h1>
-<p class="ds-lede">
+<p class="ds-meta"><span class="ds-status" data-status="proposed">proposed</span> reviewed 2026-08-31</p>
+<div class="ds-lede" id="decision">
+  <p>
   Erfana is <strong>dark mode only</strong>, and that is now true rather than aspirational: the
-  renderer contains <strong><span data-claim="prefers-color-scheme-blocks"></span></strong>
-  <code>prefers-color-scheme</code> blocks.
-  <br><br>
-  It shipped one until recently — thirty lines restyling the Mermaid toolbar for a light OS. Not dead
+  renderer contains <strong><span data-claim="prefers-color-scheme-blocks" title="prefers-color-scheme blocks shipping in the renderer">0</span></strong>
+  <code>prefers-color-scheme</code> blocks. Every colour on screen is a token from
+  <code>design-tokens.css</code>, and a pairing is judged by its contrast <strong>on the surface it sits on</strong>,
+  never on its own.
+  </p>
+  <p>
+  It shipped one until recently – thirty lines restyling the Mermaid toolbar for a light OS. Not dead
   code: <code>color-scheme: dark</code> does not change what that query reports, because the query
   follows the operating system. It was a second, unmaintained theme that real users saw in exactly one
   component. It was deleted rather than documented, because a card reading "dark only, except there"
   writes a bug down as a rule.
-</p>
+  </p>
+</div>
+
+<h2 id="rules">The rules</h2>
+<ol class="rules">
+  <li><strong>Text clears 4.5:1 on the surface it sits on</strong> – WCAG 2.2 SC 1.4.3 Contrast (Minimum), level AA.
+    Read the pair off the <a href="#text">text matrix</a>, never the colour off a swatch.</li>
+  <li><strong>Large text may drop to 3:1</strong>, as SC 1.4.3 allows: 24px and up at regular weight, or about
+    18.66px and up when bold. In Erfana only <code>--text-2xl</code> at <code data-token="--text-2xl">20px</code>
+    qualifies, and only when it is bold. Everything smaller – which is nearly all UI text – stays at 4.5:1. The
+    text matrix below judges every pair at 4.5:1; a bold <code>--text-2xl</code> pair that reads "fail" there
+    passes if it clears 3:1.</li>
+  <li><strong>Non-text parts clear 3:1 against what is next to them</strong> – SC 1.4.11 Non-text Contrast, level AA:
+    an icon that carries meaning, a control's boundary, a focus ring, a selected-state edge, a meter's fill, a
+    status dot. A fill that only decorates is not held to it.</li>
+  <li><strong><code>--color-text-muted</code> is decoration and disabled only.</strong> A disabled control is
+    exempt from both criteria; a divider glyph or a background ornament carries no information. Anything a
+    person has to read or recognise – a label, a hint, an icon that means something – takes
+    <code>--color-text-tertiary</code> or brighter.</li>
+  <li><strong>State that carries information is never a fill alone.</strong> Hover and pressed may be a wash.
+    Selected and drop-target carry an edge that clears 3:1, because a wash measures under 1.5:1 and a forced-colours
+    theme removes it entirely (<a href="forced-colors.html">Forced colours</a>).</li>
+  <li><strong>On a violet fill, the foreground is dark.</strong> <code>--color-text-on-accent</code>, never white,
+    on every violet state (<a href="#on-accent">below</a>).</li>
+  <li><strong>A data colour is never the only signal.</strong> Git status carries a letter, the context meter
+    carries its percentage, and an error carries its words.</li>
+</ol>
 
 <div class="ds-note">
   <strong>Nothing on this page is typed by hand.</strong> Every swatch is painted with
-  <code>var(--token)</code> from the app's own <code>design-tokens.css</code>, then read back with
-  <code>getComputedStyle</code>. Every contrast ratio is computed in this page at load, across the
-  <span data-claim="colour-tokens"></span> colour tokens the app declares.
+  <code>var(--token)</code> from the synced copy of the app's <code>design-tokens.css</code>. Every
+  resolved value and every contrast ratio is <em>baked</em> into this page by <code>npm run design</code>
+  from the shipping token file, across all <span data-claim="colour-tokens" title="colour tokens declared in design-tokens.css">110</span> colour tokens the app
+  declares – the page itself runs no JavaScript.
   <br><br>
-  This page used to claim the two <em>cannot</em> drift. That was false three ways:
-  <code>tokens.css</code> here is a copy refreshed by a build step, the tables below hand-list a subset
-  of the tokens, and a deleted token falls back to inherited colour — so it renders as a plausible
-  swatch with a plausible ratio rather than failing. What is true is narrower and worth more:
-  <code>npm run design -- --check</code> fails in CI when the copy and the app disagree.
+  What that guarantees is narrow and worth stating exactly: <code>npm run design -- --check</code> fails in CI
+  when the token copy, a resolved value or a ratio here disagrees with the app, and the ownership guard fails
+  when a colour token is added to the app and not to this page.
 </div>
 
-<h2>Brand</h2>
-<table data-group="brand"><thead><tr>
-  <th>Token</th><th>Swatch</th><th>Resolved</th><th>on panel</th><th>on app bg</th>
-</tr></thead><tbody></tbody></table>
-
-<h2>Neutral scale</h2>
-<table data-group="neutral"><thead><tr>
-  <th>Token</th><th>Swatch</th><th>Resolved</th><th>on panel</th><th>on app bg</th>
-</tr></thead><tbody></tbody></table>
-
-<h2>Surfaces</h2>
-<table data-group="surface"><thead><tr>
-  <th>Token</th><th>Swatch</th><th>Resolved</th><th>on panel</th><th>on app bg</th>
-</tr></thead><tbody></tbody></table>
-
-<h2>Text</h2>
+<h2 id="text">Text</h2>
 <div class="ds-note">
-  This is the table that decides accessibility arguments. <strong>4.5:1</strong> is the WCAG 2.2
-  minimum for normal text (SC 1.4.3); <strong>3:1</strong> is the minimum for large text and for
-  non-text parts of a control (SC 1.4.11).
+  <strong>Two criteria, two bars – and they are not interchangeable.</strong> SC 1.4.3 Contrast (Minimum) asks
+  <strong>4.5:1</strong> of text, or 3:1 of large text. SC 1.4.11 Non-text Contrast asks <strong>3:1</strong> of a
+  control's visual boundary, its states and meaningful graphics; it says nothing about text.
+  <br><br>
   <code>--color-text-secondary</code> reaches only
-  <strong><span data-claim="contrast-secondary-on-panel"></span>:1</strong> on a panel — it is a muted
-  label colour, not a body-text colour. <code>--color-text-tertiary</code> is the lightest muted option
-  that passes.
-  <br><br>
-  Read the scope of that carefully: <em>on a panel</em>. The same token on the app background clears
-  4.5:1 comfortably, which is why this card judges a pair, never a colour on its own.
-  <br><br>
-  <code>--color-text-muted</code> is not a text colour at all: it reaches only
-  <strong><span data-claim="contrast-muted-on-panel"></span>:1</strong> on a panel and stays under
-  4.5:1 on every surface. Keep it for icons and large text; a label someone has to read takes
+  <strong><span data-claim="contrast-secondary-on-panel" title="--color-text-secondary on --color-bg-secondary">3.72</span>:1</strong> on a panel and
+  <strong><span data-claim="contrast-secondary-on-tertiary" title="--color-text-secondary on --color-bg-tertiary, the sidebar and tree">4.15</span>:1</strong> on the sidebar and tree. The same
+  token on the app background clears 4.5:1, which is why this card judges a pair, never a colour on its own:
+  secondary is a text colour for the app background only. On a panel or the sidebar, a label takes
   <code>--color-text-tertiary</code>.
+  <br><br>
+  <code>--color-text-muted</code> is not a text colour at all. It measures
+  <strong><span data-claim="contrast-muted-on-panel" title="--color-text-muted on --color-bg-secondary, why muted is not a label colour">2.69</span>:1</strong> on a panel,
+  <strong><span data-claim="contrast-muted-on-tertiary" title="--color-text-muted on --color-bg-tertiary">3.00</span>:1</strong> on the sidebar,
+  <strong><span data-claim="contrast-muted-on-hover-solid" title="--color-text-muted on --color-bg-hover-solid">2.72</span>:1</strong> on a hovered row and
+  <strong><span data-claim="contrast-muted-on-selected" title="--color-text-muted on --color-bg-selected over --color-bg-tertiary">2.02</span>:1</strong> on a selected one – under 4.5:1
+  everywhere, and under 3:1 on three of the four, so it fails a meaningful icon too. That is why it is
+  decoration and disabled only (rule 4).
 </div>
 
-<h2>Text on a violet fill</h2>
+<h3 id="matrix">Every text token on every surface</h3>
+<p class="ds-muted">Rows are the text tokens, columns the surfaces text sits on in the app. Every cell is
+judged against 4.5:1 and says <strong>pass</strong> or <strong>fail</strong> in words. A translucent surface is
+measured composited over the opaque surface named under it. The surface swatch heads each column.</p>
+<div class="mx-scroll" role="region" aria-label="Text token by surface contrast matrix" tabindex="0">
+<table class="mx">
+<thead><tr><th scope="col">Text token</th><th scope="col"><span class="mx-surface" style="background: var(--color-bg-primary)"></span>App bg<br><code>bg-primary</code></th><th scope="col"><span class="mx-surface" style="background: var(--color-bg-secondary)"></span>Panel<br><code>bg-secondary</code></th><th scope="col"><span class="mx-surface" style="background: var(--color-bg-tertiary)"></span>Sidebar<br><code>bg-tertiary</code></th><th scope="col"><span class="mx-surface" style="background: var(--color-bg-input)"></span>Input<br><code>bg-input</code></th><th scope="col"><span class="mx-surface" style="background: var(--color-bg-preview)"></span>Preview<br><code>bg-preview</code></th><th scope="col"><span class="mx-surface" style="background: var(--color-bg-hover-solid)"></span>Hovered row<br><code>bg-hover-solid</code></th><th scope="col"><span class="mx-surface" style="background: var(--color-bg-selected)"></span>Selected row<br><code>bg-selected</code><br><code>over bg-tertiary</code></th><th scope="col"><span class="mx-surface" style="background: var(--color-warning-bg)"></span>Warning box<br><code>warning-bg</code><br><code>over bg-secondary</code></th><th scope="col"><span class="mx-surface" style="background: var(--color-error-bg)"></span>Error box<br><code>error-bg</code></th><th scope="col"><span class="mx-surface" style="background: var(--color-bg-danger-hover)"></span>Danger hover<br><code>bg-danger-hover</code></th></tr></thead>
+<tbody>
+  <tr><th scope="row"><code>--color-text-emphasis</code><br><span class="mx-use">Emphasis – headings</span></th><td data-contrast="--color-text-emphasis on --color-bg-primary" data-min="4.5" data-result="pass">18.48:1 · pass</td><td data-contrast="--color-text-emphasis on --color-bg-secondary" data-min="4.5" data-result="pass">13.72:1 · pass</td><td data-contrast="--color-text-emphasis on --color-bg-tertiary" data-min="4.5" data-result="pass">15.31:1 · pass</td><td data-contrast="--color-text-emphasis on --color-bg-input" data-min="4.5" data-result="pass">13.72:1 · pass</td><td data-contrast="--color-text-emphasis on --color-bg-preview" data-min="4.5" data-result="pass">17.37:1 · pass</td><td data-contrast="--color-text-emphasis on --color-bg-hover-solid" data-min="4.5" data-result="pass">13.87:1 · pass</td><td data-contrast="--color-text-emphasis on --color-bg-selected over --color-bg-tertiary" data-min="4.5" data-result="pass">10.30:1 · pass</td><td data-contrast="--color-text-emphasis on --color-warning-bg over --color-bg-secondary" data-min="4.5" data-result="pass">11.52:1 · pass</td><td data-contrast="--color-text-emphasis on --color-error-bg" data-min="4.5" data-result="pass">14.91:1 · pass</td><td data-contrast="--color-text-emphasis on --color-bg-danger-hover" data-min="4.5" data-result="pass">12.89:1 · pass</td></tr>
+  <tr><th scope="row"><code>--color-text-bright</code><br><span class="mx-use">Bright – titles</span></th><td data-contrast="--color-text-bright on --color-bg-primary" data-min="4.5" data-result="pass">14.00:1 · pass</td><td data-contrast="--color-text-bright on --color-bg-secondary" data-min="4.5" data-result="pass">10.40:1 · pass</td><td data-contrast="--color-text-bright on --color-bg-tertiary" data-min="4.5" data-result="pass">11.60:1 · pass</td><td data-contrast="--color-text-bright on --color-bg-input" data-min="4.5" data-result="pass">10.40:1 · pass</td><td data-contrast="--color-text-bright on --color-bg-preview" data-min="4.5" data-result="pass">13.16:1 · pass</td><td data-contrast="--color-text-bright on --color-bg-hover-solid" data-min="4.5" data-result="pass">10.51:1 · pass</td><td data-contrast="--color-text-bright on --color-bg-selected over --color-bg-tertiary" data-min="4.5" data-result="pass">7.80:1 · pass</td><td data-contrast="--color-text-bright on --color-warning-bg over --color-bg-secondary" data-min="4.5" data-result="pass">8.73:1 · pass</td><td data-contrast="--color-text-bright on --color-error-bg" data-min="4.5" data-result="pass">11.29:1 · pass</td><td data-contrast="--color-text-bright on --color-bg-danger-hover" data-min="4.5" data-result="pass">9.77:1 · pass</td></tr>
+  <tr><th scope="row"><code>--color-text-primary</code><br><span class="mx-use">Primary – body</span></th><td data-contrast="--color-text-primary on --color-bg-primary" data-min="4.5" data-result="pass">11.51:1 · pass</td><td data-contrast="--color-text-primary on --color-bg-secondary" data-min="4.5" data-result="pass">8.54:1 · pass</td><td data-contrast="--color-text-primary on --color-bg-tertiary" data-min="4.5" data-result="pass">9.53:1 · pass</td><td data-contrast="--color-text-primary on --color-bg-input" data-min="4.5" data-result="pass">8.54:1 · pass</td><td data-contrast="--color-text-primary on --color-bg-preview" data-min="4.5" data-result="pass">10.82:1 · pass</td><td data-contrast="--color-text-primary on --color-bg-hover-solid" data-min="4.5" data-result="pass">8.64:1 · pass</td><td data-contrast="--color-text-primary on --color-bg-selected over --color-bg-tertiary" data-min="4.5" data-result="pass">6.41:1 · pass</td><td data-contrast="--color-text-primary on --color-warning-bg over --color-bg-secondary" data-min="4.5" data-result="pass">7.17:1 · pass</td><td data-contrast="--color-text-primary on --color-error-bg" data-min="4.5" data-result="pass">9.28:1 · pass</td><td data-contrast="--color-text-primary on --color-bg-danger-hover" data-min="4.5" data-result="pass">8.03:1 · pass</td></tr>
+  <tr><th scope="row"><code>--color-text-tertiary</code><br><span class="mx-use">Tertiary – labels, hints</span></th><td data-contrast="--color-text-tertiary on --color-bg-primary" data-min="4.5" data-result="pass">8.52:1 · pass</td><td data-contrast="--color-text-tertiary on --color-bg-secondary" data-min="4.5" data-result="pass">6.33:1 · pass</td><td data-contrast="--color-text-tertiary on --color-bg-tertiary" data-min="4.5" data-result="pass">7.06:1 · pass</td><td data-contrast="--color-text-tertiary on --color-bg-input" data-min="4.5" data-result="pass">6.33:1 · pass</td><td data-contrast="--color-text-tertiary on --color-bg-preview" data-min="4.5" data-result="pass">8.01:1 · pass</td><td data-contrast="--color-text-tertiary on --color-bg-hover-solid" data-min="4.5" data-result="pass">6.39:1 · pass</td><td data-contrast="--color-text-tertiary on --color-bg-selected over --color-bg-tertiary" data-min="4.5" data-result="pass">4.75:1 · pass</td><td data-contrast="--color-text-tertiary on --color-warning-bg over --color-bg-secondary" data-min="4.5" data-result="pass">5.31:1 · pass</td><td data-contrast="--color-text-tertiary on --color-error-bg" data-min="4.5" data-result="pass">6.87:1 · pass</td><td data-contrast="--color-text-tertiary on --color-bg-danger-hover" data-min="4.5" data-result="pass">5.94:1 · pass</td></tr>
+  <tr><th scope="row"><code>--color-text-secondary</code><br><span class="mx-use">Secondary – app background only</span></th><td data-contrast="--color-text-secondary on --color-bg-primary" data-min="4.5" data-result="pass">5.00:1 · pass</td><td data-contrast="--color-text-secondary on --color-bg-secondary" data-min="4.5" data-result="fail">3.72:1 · fail</td><td data-contrast="--color-text-secondary on --color-bg-tertiary" data-min="4.5" data-result="fail">4.15:1 · fail</td><td data-contrast="--color-text-secondary on --color-bg-input" data-min="4.5" data-result="fail">3.72:1 · fail</td><td data-contrast="--color-text-secondary on --color-bg-preview" data-min="4.5" data-result="pass">4.70:1 · pass</td><td data-contrast="--color-text-secondary on --color-bg-hover-solid" data-min="4.5" data-result="fail">3.76:1 · fail</td><td data-contrast="--color-text-secondary on --color-bg-selected over --color-bg-tertiary" data-min="4.5" data-result="fail">2.79:1 · fail</td><td data-contrast="--color-text-secondary on --color-warning-bg over --color-bg-secondary" data-min="4.5" data-result="fail">3.12:1 · fail</td><td data-contrast="--color-text-secondary on --color-error-bg" data-min="4.5" data-result="fail">4.04:1 · fail</td><td data-contrast="--color-text-secondary on --color-bg-danger-hover" data-min="4.5" data-result="fail">3.49:1 · fail</td></tr>
+  <tr><th scope="row"><code>--color-text-placeholder</code><br><span class="mx-use">Placeholder</span></th><td data-contrast="--color-text-placeholder on --color-bg-primary" data-min="4.5" data-result="pass">6.09:1 · pass</td><td data-contrast="--color-text-placeholder on --color-bg-secondary" data-min="4.5" data-result="pass">4.52:1 · pass</td><td data-contrast="--color-text-placeholder on --color-bg-tertiary" data-min="4.5" data-result="pass">5.04:1 · pass</td><td data-contrast="--color-text-placeholder on --color-bg-input" data-min="4.5" data-result="pass">4.52:1 · pass</td><td data-contrast="--color-text-placeholder on --color-bg-preview" data-min="4.5" data-result="pass">5.72:1 · pass</td><td data-contrast="--color-text-placeholder on --color-bg-hover-solid" data-min="4.5" data-result="pass">4.57:1 · pass</td><td data-contrast="--color-text-placeholder on --color-bg-selected over --color-bg-tertiary" data-min="4.5" data-result="fail">3.39:1 · fail</td><td data-contrast="--color-text-placeholder on --color-warning-bg over --color-bg-secondary" data-min="4.5" data-result="fail">3.79:1 · fail</td><td data-contrast="--color-text-placeholder on --color-error-bg" data-min="4.5" data-result="pass">4.91:1 · pass</td><td data-contrast="--color-text-placeholder on --color-bg-danger-hover" data-min="4.5" data-result="fail">4.25:1 · fail</td></tr>
+  <tr><th scope="row"><code>--color-link</code><br><span class="mx-use">Link</span></th><td data-contrast="--color-link on --color-bg-primary" data-min="4.5" data-result="pass">8.39:1 · pass</td><td data-contrast="--color-link on --color-bg-secondary" data-min="4.5" data-result="pass">6.23:1 · pass</td><td data-contrast="--color-link on --color-bg-tertiary" data-min="4.5" data-result="pass">6.95:1 · pass</td><td data-contrast="--color-link on --color-bg-input" data-min="4.5" data-result="pass">6.23:1 · pass</td><td data-contrast="--color-link on --color-bg-preview" data-min="4.5" data-result="pass">7.89:1 · pass</td><td data-contrast="--color-link on --color-bg-hover-solid" data-min="4.5" data-result="pass">6.30:1 · pass</td><td data-contrast="--color-link on --color-bg-selected over --color-bg-tertiary" data-min="4.5" data-result="pass">4.68:1 · pass</td><td data-contrast="--color-link on --color-warning-bg over --color-bg-secondary" data-min="4.5" data-result="pass">5.23:1 · pass</td><td data-contrast="--color-link on --color-error-bg" data-min="4.5" data-result="pass">6.77:1 · pass</td><td data-contrast="--color-link on --color-bg-danger-hover" data-min="4.5" data-result="pass">5.85:1 · pass</td></tr>
+  <tr><th scope="row"><code>--color-link-visited</code><br><span class="mx-use">Visited link</span></th><td data-contrast="--color-link-visited on --color-bg-primary" data-min="4.5" data-result="pass">5.54:1 · pass</td><td data-contrast="--color-link-visited on --color-bg-secondary" data-min="4.5" data-result="fail">4.11:1 · fail</td><td data-contrast="--color-link-visited on --color-bg-tertiary" data-min="4.5" data-result="pass">4.59:1 · pass</td><td data-contrast="--color-link-visited on --color-bg-input" data-min="4.5" data-result="fail">4.11:1 · fail</td><td data-contrast="--color-link-visited on --color-bg-preview" data-min="4.5" data-result="pass">5.21:1 · pass</td><td data-contrast="--color-link-visited on --color-bg-hover-solid" data-min="4.5" data-result="fail">4.16:1 · fail</td><td data-contrast="--color-link-visited on --color-bg-selected over --color-bg-tertiary" data-min="4.5" data-result="fail">3.09:1 · fail</td><td data-contrast="--color-link-visited on --color-warning-bg over --color-bg-secondary" data-min="4.5" data-result="fail">3.45:1 · fail</td><td data-contrast="--color-link-visited on --color-error-bg" data-min="4.5" data-result="fail">4.47:1 · fail</td><td data-contrast="--color-link-visited on --color-bg-danger-hover" data-min="4.5" data-result="fail">3.86:1 · fail</td></tr>
+  <tr><th scope="row"><code>--color-error</code><br><span class="mx-use">Error</span></th><td data-contrast="--color-error on --color-bg-primary" data-min="4.5" data-result="pass">7.52:1 · pass</td><td data-contrast="--color-error on --color-bg-secondary" data-min="4.5" data-result="pass">5.59:1 · pass</td><td data-contrast="--color-error on --color-bg-tertiary" data-min="4.5" data-result="pass">6.23:1 · pass</td><td data-contrast="--color-error on --color-bg-input" data-min="4.5" data-result="pass">5.59:1 · pass</td><td data-contrast="--color-error on --color-bg-preview" data-min="4.5" data-result="pass">7.07:1 · pass</td><td data-contrast="--color-error on --color-bg-hover-solid" data-min="4.5" data-result="pass">5.65:1 · pass</td><td data-contrast="--color-error on --color-bg-selected over --color-bg-tertiary" data-min="4.5" data-result="fail">4.19:1 · fail</td><td data-contrast="--color-error on --color-warning-bg over --color-bg-secondary" data-min="4.5" data-result="pass">4.69:1 · pass</td><td data-contrast="--color-error on --color-error-bg" data-min="4.5" data-result="pass">6.07:1 · pass</td><td data-contrast="--color-error on --color-bg-danger-hover" data-min="4.5" data-result="pass">5.25:1 · pass</td></tr>
+  <tr><th scope="row"><code>--color-warning</code><br><span class="mx-use">Warning</span></th><td data-contrast="--color-warning on --color-bg-primary" data-min="4.5" data-result="pass">8.00:1 · pass</td><td data-contrast="--color-warning on --color-bg-secondary" data-min="4.5" data-result="pass">5.94:1 · pass</td><td data-contrast="--color-warning on --color-bg-tertiary" data-min="4.5" data-result="pass">6.63:1 · pass</td><td data-contrast="--color-warning on --color-bg-input" data-min="4.5" data-result="pass">5.94:1 · pass</td><td data-contrast="--color-warning on --color-bg-preview" data-min="4.5" data-result="pass">7.52:1 · pass</td><td data-contrast="--color-warning on --color-bg-hover-solid" data-min="4.5" data-result="pass">6.01:1 · pass</td><td data-contrast="--color-warning on --color-bg-selected over --color-bg-tertiary" data-min="4.5" data-result="fail">4.46:1 · fail</td><td data-contrast="--color-warning on --color-warning-bg over --color-bg-secondary" data-min="4.5" data-result="pass">4.99:1 · pass</td><td data-contrast="--color-warning on --color-error-bg" data-min="4.5" data-result="pass">6.45:1 · pass</td><td data-contrast="--color-warning on --color-bg-danger-hover" data-min="4.5" data-result="pass">5.58:1 · pass</td></tr>
+  <tr><th scope="row"><code>--color-success</code><br><span class="mx-use">Success</span></th><td data-contrast="--color-success on --color-bg-primary" data-min="4.5" data-result="pass">13.94:1 · pass</td><td data-contrast="--color-success on --color-bg-secondary" data-min="4.5" data-result="pass">10.35:1 · pass</td><td data-contrast="--color-success on --color-bg-tertiary" data-min="4.5" data-result="pass">11.55:1 · pass</td><td data-contrast="--color-success on --color-bg-input" data-min="4.5" data-result="pass">10.35:1 · pass</td><td data-contrast="--color-success on --color-bg-preview" data-min="4.5" data-result="pass">13.10:1 · pass</td><td data-contrast="--color-success on --color-bg-hover-solid" data-min="4.5" data-result="pass">10.46:1 · pass</td><td data-contrast="--color-success on --color-bg-selected over --color-bg-tertiary" data-min="4.5" data-result="pass">7.77:1 · pass</td><td data-contrast="--color-success on --color-warning-bg over --color-bg-secondary" data-min="4.5" data-result="pass">8.69:1 · pass</td><td data-contrast="--color-success on --color-error-bg" data-min="4.5" data-result="pass">11.25:1 · pass</td><td data-contrast="--color-success on --color-bg-danger-hover" data-min="4.5" data-result="pass">9.72:1 · pass</td></tr>
+  <tr><th scope="row"><code>--color-error-text-hint</code><br><span class="mx-use">Error hint</span></th><td data-contrast="--color-error-text-hint on --color-bg-primary" data-min="4.5" data-result="pass">8.56:1 · pass</td><td data-contrast="--color-error-text-hint on --color-bg-secondary" data-min="4.5" data-result="pass">6.35:1 · pass</td><td data-contrast="--color-error-text-hint on --color-bg-tertiary" data-min="4.5" data-result="pass">7.09:1 · pass</td><td data-contrast="--color-error-text-hint on --color-bg-input" data-min="4.5" data-result="pass">6.35:1 · pass</td><td data-contrast="--color-error-text-hint on --color-bg-preview" data-min="4.5" data-result="pass">8.04:1 · pass</td><td data-contrast="--color-error-text-hint on --color-bg-hover-solid" data-min="4.5" data-result="pass">6.42:1 · pass</td><td data-contrast="--color-error-text-hint on --color-bg-selected over --color-bg-tertiary" data-min="4.5" data-result="pass">4.77:1 · pass</td><td data-contrast="--color-error-text-hint on --color-warning-bg over --color-bg-secondary" data-min="4.5" data-result="pass">5.33:1 · pass</td><td data-contrast="--color-error-text-hint on --color-error-bg" data-min="4.5" data-result="pass">6.90:1 · pass</td><td data-contrast="--color-error-text-hint on --color-bg-danger-hover" data-min="4.5" data-result="pass">5.97:1 · pass</td></tr>
+</tbody>
+</table>
+</div>
+<p class="ds-muted">Reading the failures:</p>
+<ul class="ds-muted">
+  <li><code>--color-text-secondary</code> passes on the app background and the preview surface only.</li>
+  <li><code>--color-link-visited</code> fails on panels and on every row state – which is why the documentation keeps
+    visited links in the link colour, and why the app should too.</li>
+  <li><strong>The selected row is the hardest surface.</strong> Placeholder, error and warning text all fail there. A
+    status shown inside a selected row is carried by its icon and words, or by <code>--color-error-text-hint</code>,
+    which passes.</li>
+  <li>Placeholder text also fails in a warning box and on the danger hover: a field does not sit there.</li>
+</ul>
+
+<h2 id="on-accent">Text on a violet fill</h2>
 <div class="ds-note">
-  The brand violet is a light tint, so anything drawn <em>on</em> it — a primary button's label, an
-  active toggle's icon, a badge count — is dark, not white. <code>--color-text-on-accent</code>
+  The brand violet is a light tint, so anything drawn <em>on</em> it – a primary button's label, an
+  active toggle's icon, a badge count – is dark, not white. <code>--color-text-on-accent</code>
   (brand black) measures
-  <strong><span data-claim="contrast-on-accent"></span>:1</strong> on the resting fill;
+  <strong><span data-claim="contrast-on-accent" title="--color-text-on-accent on --color-btn-primary-bg">8.39</span>:1</strong> on the resting fill;
   <code>--color-white</code> measures only
-  <strong><span data-claim="contrast-white-on-accent"></span>:1</strong>, under both the 4.5:1 text
+  <strong><span data-claim="contrast-white-on-accent" title="--color-white on --color-btn-primary-bg, the pairing #231 removed">2.20</span>:1</strong>, under both the 4.5:1 text
   bar and the 3:1 icon bar. <code>--color-btn-primary-text</code> is the button alias of it.
   <code>accentFill.contrast.test.ts</code> holds every violet fill in the renderer to 4.5:1.
 </div>
-<table data-group="text"><thead><tr>
-  <th>Token</th><th>Sample</th><th>Resolved</th><th>on panel</th><th>on app bg</th>
-</tr></thead><tbody></tbody></table>
+<div class="strip" aria-hidden="true">
+  <span class="fill fill--rest">Resting</span>
+  <span class="fill fill--hover">Hover</span>
+  <span class="fill fill--active">Pressed</span>
+  <span class="fill fill--rest fill--inset">Inset ring – invisible</span>
+</div>
+<table class="ds-tokens">
+<thead><tr><th scope="col">On the fill</th><th scope="col">Bar</th><th scope="col">Resting <code>btn-primary-bg</code></th><th scope="col">Hover <code>btn-primary-hover</code></th><th scope="col">Pressed <code>btn-primary-active</code></th></tr></thead>
+<tbody>
+  <tr><th scope="row"><code>--color-text-on-accent</code> – the label</th><td>4.5:1</td><td data-contrast="--color-text-on-accent on --color-btn-primary-bg" data-min="4.5" data-result="pass">8.39:1 · pass</td><td data-contrast="--color-text-on-accent on --color-btn-primary-hover" data-min="4.5" data-result="pass">6.84:1 · pass</td><td data-contrast="--color-text-on-accent on --color-btn-primary-active" data-min="4.5" data-result="pass">5.54:1 · pass</td></tr>
+  <tr><th scope="row"><code>--color-white</code> – never</th><td>4.5:1</td><td data-contrast="--color-white on --color-btn-primary-bg" data-min="4.5" data-result="fail">2.20:1 · fail</td><td data-contrast="--color-white on --color-btn-primary-hover" data-min="4.5" data-result="fail">2.70:1 · fail</td><td data-contrast="--color-white on --color-btn-primary-active" data-min="4.5" data-result="fail">3.33:1 · fail</td></tr>
+  <tr><th scope="row"><code>--color-border-focus</code> – a ring drawn <em>inside</em> the fill</th><td>3:1</td><td data-contrast="--color-border-focus on --color-btn-primary-bg" data-min="3" data-result="fail">1.00:1 · fail</td><td data-contrast="--color-border-focus on --color-btn-primary-hover" data-min="3" data-result="fail">1.22:1 · fail</td><td data-contrast="--color-border-focus on --color-btn-primary-active" data-min="3" data-result="fail">1.51:1 · fail</td></tr>
+  <tr><th scope="row"><code>--color-border-focus</code> – the outward ring, on the panel beside the fill</th><td>3:1</td><td data-contrast="--color-border-focus on --color-bg-secondary" data-min="3" data-result="pass">6.23:1 · pass</td><td colspan="2" class="ds-muted">Same – the ring sits on the panel, not on the fill, whatever the fill's state.</td></tr>
+</tbody>
+</table>
+<p class="ds-muted">The focus ring is the brand violet, so on a violet fill an inset ring disappears. That is why
+the <a href="focus.html#fills">Focus card</a> forbids an inset ring on a violet, lime or danger fill: the ring goes
+outward, across a gap of the surface colour.</p>
 
-<h2>Borders and accents</h2>
-<table data-group="line"><thead><tr>
-  <th>Token</th><th>Swatch</th><th>Resolved</th><th>on panel</th><th>on app bg</th>
-</tr></thead><tbody></tbody></table>
+<h2 id="states">Interaction-state layers</h2>
+<p class="ds-muted">The colour half of a state. The opacity steps themselves are decided on the
+<a href="surfaces.html#states">Surfaces card</a>; this card decides which colour token each state paints, and what
+it must clear. Each frame is a sidebar row (<code>--color-bg-tertiary</code>).</p>
+<div class="ds-frames">
+  <figure class="ds-frame"><div class="rows" aria-hidden="true"><div class="r">notes.md</div></div>
+    <figcaption><strong>Resting</strong> – no fill.</figcaption></figure>
+  <figure class="ds-frame"><div class="rows" aria-hidden="true"><div class="r r--hover">notes.md</div></div>
+    <figcaption><strong>Hover, opaque</strong> – <code>--color-bg-hover-solid</code>, step
+      <span data-contrast="--color-bg-hover-solid on --color-bg-tertiary">1.10:1</span> from the row. Used where the row sits
+      on one known surface (the tree).</figcaption></figure>
+  <figure class="ds-frame"><div class="rows" aria-hidden="true"><div class="r r--wash">notes.md</div></div>
+    <figcaption><strong>Hover, wash</strong> – <code>--color-bg-hover</code> (<code data-token="--color-bg-hover">rgba(255, 255, 255, 0.05)</code>),
+      step <span data-contrast="--color-bg-hover on --color-bg-tertiary">1.15:1</span>. Used where the surface underneath
+      varies.</figcaption></figure>
+  <figure class="ds-frame"><div class="rows" aria-hidden="true"><div class="r r--active">notes.md</div></div>
+    <figcaption><strong>Pressed</strong> – <code>--color-bg-active</code>, step
+      <span data-contrast="--color-bg-active on --color-bg-tertiary">1.36:1</span>. Lasts as long as the press.</figcaption></figure>
+  <figure class="ds-frame"><div class="rows" aria-hidden="true"><div class="r r--selected">notes.md</div></div>
+    <figcaption><strong>Selected</strong> – <code>--color-bg-selected</code> plus a lime edge. The fill steps only
+      <span data-contrast="--color-bg-selected on --color-bg-tertiary">1.48:1</span>; the edge measures
+      <span data-contrast="--color-brand-lime on --color-bg-selected over --color-bg-tertiary" data-min="3" data-result="pass">7.77:1 · pass</span>, and it is
+      what carries the state.</figcaption></figure>
+  <figure class="ds-frame"><div class="rows" aria-hidden="true"><div class="r r--selected r--focus">notes.md</div></div>
+    <figcaption><strong>Selected and focused</strong> – the inset ring on the selected fill measures
+      <span data-contrast="--color-border-focus on --color-bg-selected over --color-bg-tertiary" data-min="3" data-result="pass">4.68:1 · pass</span>.</figcaption></figure>
+  <figure class="ds-frame"><div class="rows" aria-hidden="true"><div class="r r--disabled">notes.md</div></div>
+    <figcaption><strong>Disabled</strong> – <code>--opacity-disabled</code> (<code data-token="--opacity-disabled">0.4</code>) on
+      the whole row. Exempt from contrast; never used to mean anything but "unavailable".</figcaption></figure>
+  <figure class="ds-frame"><div class="rows" aria-hidden="true"><div class="r r--drop">docs/</div></div>
+    <figcaption><strong>Drop target</strong> – <code>--color-accent-drag-bg</code> plus a
+      <code>--color-accent-drag</code> edge at <span data-contrast="--color-accent-drag on --color-bg-tertiary" data-min="3" data-result="pass">6.95:1 · pass</span>.</figcaption></figure>
+  <figure class="ds-frame"><div class="rows" aria-hidden="true"><div class="r r--drop-subtle">docs/</div></div>
+    <figcaption><strong>Drop zone, ambient</strong> – <code>--color-accent-drag-bg-subtle</code> and
+      <code>--color-accent-drag-border</code>, which measures only
+      <span data-contrast="--color-accent-drag-border on --color-bg-tertiary" data-min="3" data-result="fail">1.84:1 · fail</span>. Decoration: the
+      zone that will take the drop always gets the solid edge above.</figcaption></figure>
+</div>
 
-<h2>Status</h2>
-<table data-group="status"><thead><tr>
-  <th>Token</th><th>Swatch</th><th>Resolved</th><th>on panel</th><th>on app bg</th>
-</tr></thead><tbody></tbody></table>
+<h2 id="data">Data colours</h2>
 
+<h3 id="git">Git status</h3>
+<p class="ds-muted">The tree draws a status three ways: a small dot on a folder, a coloured file name, and a letter
+badge. The dot takes the base token, the name and the badge the <code>-light</code> variant. The letter is what
+makes the state readable without colour (#95 is the folder case, where only the dot exists).</p>
+<table class="ds-tokens">
+<thead><tr><th scope="col">Status</th><th scope="col">Drawn</th><th scope="col">Dot on sidebar (3:1)</th><th scope="col">Name on sidebar (4.5:1)</th><th scope="col">Badge letter on its fill (4.5:1)</th></tr></thead>
+<tbody>
+  <tr><th scope="row">Modified</th><td><span class="git-dot" style="background: var(--color-git-modified)"></span> <span style="color: var(--color-git-modified-light)">notes.md</span> <span class="git-badge" style="background: var(--color-git-modified-light)">M</span></td><td data-contrast="--color-git-modified on --color-bg-tertiary" data-min="3" data-result="pass">7.68:1 · pass</td><td data-contrast="--color-git-modified-light on --color-bg-tertiary" data-min="4.5" data-result="pass">10.46:1 · pass</td><td data-contrast="--color-bg-primary on --color-git-modified-light" data-min="4.5" data-result="pass">12.63:1 · pass</td></tr>
+  <tr><th scope="row">Untracked</th><td><span class="git-dot" style="background: var(--color-git-untracked)"></span> <span style="color: var(--color-git-untracked-light)">draft.md</span> <span class="git-badge" style="background: var(--color-git-untracked-light)">U</span></td><td data-contrast="--color-git-untracked on --color-bg-tertiary" data-min="3" data-result="pass">11.55:1 · pass</td><td data-contrast="--color-git-untracked-light on --color-bg-tertiary" data-min="4.5" data-result="pass">13.42:1 · pass</td><td data-contrast="--color-bg-primary on --color-git-untracked-light" data-min="4.5" data-result="pass">16.20:1 · pass</td></tr>
+  <tr><th scope="row">Deleted</th><td><span class="git-dot" style="background: var(--color-git-deleted)"></span> <span style="color: var(--color-git-deleted-light)">old.md</span> <span class="git-badge" style="background: var(--color-git-deleted-light)">D</span></td><td data-contrast="--color-git-deleted on --color-bg-tertiary" data-min="3" data-result="pass">5.25:1 · pass</td><td data-contrast="--color-git-deleted-light on --color-bg-tertiary" data-min="4.5" data-result="pass">9.03:1 · pass</td><td data-contrast="--color-bg-primary on --color-git-deleted-light" data-min="4.5" data-result="pass">10.90:1 · pass</td></tr>
+  <tr><th scope="row">Staged</th><td><span class="git-dot" style="background: var(--color-git-staged)"></span> <span style="color: var(--color-git-staged-light)">plan.md</span> <span class="git-badge" style="background: var(--color-git-staged-light)">A</span></td><td data-contrast="--color-git-staged on --color-bg-tertiary" data-min="3" data-result="pass">6.95:1 · pass</td><td data-contrast="--color-git-staged-light on --color-bg-tertiary" data-min="4.5" data-result="pass">11.06:1 · pass</td><td data-contrast="--color-bg-primary on --color-git-staged-light" data-min="4.5" data-result="pass">13.35:1 · pass</td></tr>
+  <tr><th scope="row">Renamed</th><td><span class="git-dot" style="background: var(--color-git-renamed)"></span> <span style="color: var(--color-git-renamed-light)">moved.md</span> <span class="git-badge" style="background: var(--color-git-renamed-light)">R</span></td><td data-contrast="--color-git-renamed on --color-bg-tertiary" data-min="3" data-result="fail">1.91:1 · fail</td><td data-contrast="--color-git-renamed-light on --color-bg-tertiary" data-min="4.5" data-result="pass">5.27:1 · pass</td><td data-contrast="--color-bg-primary on --color-git-renamed-light" data-min="4.5" data-result="pass">6.36:1 · pass</td></tr>
+  <tr><th scope="row">Conflicted</th><td><span class="git-dot" style="background: var(--color-git-conflicted)"></span> <span style="color: var(--color-git-conflicted-light)">merge.md</span> <span class="git-badge" style="background: var(--color-git-conflicted-light)">C</span></td><td data-contrast="--color-git-conflicted on --color-bg-tertiary" data-min="3" data-result="pass">4.40:1 · pass</td><td data-contrast="--color-git-conflicted-light on --color-bg-tertiary" data-min="4.5" data-result="pass">7.70:1 · pass</td><td data-contrast="--color-bg-primary on --color-git-conflicted-light" data-min="4.5" data-result="pass">9.29:1 · pass</td></tr>
+</tbody>
+</table>
+<div class="ds-note">
+  <strong><code>--color-git-renamed</code> (brand indigo) is never a foreground.</strong> It is a dark blue on a dark
+  surface and fails the 3:1 a meaningful dot needs. Anything renamed that has to be seen – a name, a count, a dot –
+  takes <code>--color-git-renamed-light</code>. The folder dot still paints the base token today, so a renamed folder's
+  dot is the one row above that fails; see <a href="#defects">open defects</a>.
+</div>
+
+<h3 id="context-meter">Context meter</h3>
+<p class="ds-muted">The terminal's Claude Code context meter is a traffic light, and its percentage text repeats the
+band so colour is never alone. The safe band is a true green, <code>--color-context-safe</code>, because Qodeca lime
+reads as yellow beside the amber band – the same collision named under <a href="#defects">open defects</a>.</p>
+<div class="ds-frames">
+  <figure class="ds-frame"><div class="meter-bar" aria-hidden="true"><span class="meter"><span style="width: 32%; background: var(--color-context-safe)"></span></span><span class="meter-pct" style="color: var(--color-text-primary)">32%</span></div>
+    <figcaption><strong>Safe</strong> – fill <span data-contrast="--color-context-safe on --color-bg-tertiary" data-min="3" data-result="pass">6.02:1 · pass</span> on the track; percentage in <code>--color-text-primary</code>.</figcaption></figure>
+  <figure class="ds-frame"><div class="meter-bar" aria-hidden="true"><span class="meter"><span style="width: 74%; background: var(--color-warning)"></span></span><span class="meter-pct" style="color: var(--color-warning)">74%</span></div>
+    <figcaption><strong>Amber</strong> – decided: <code>--color-warning</code>, fill <span data-contrast="--color-warning on --color-bg-tertiary" data-min="3" data-result="pass">6.63:1 · pass</span>, text <span data-contrast="--color-warning on --color-bg-secondary" data-min="4.5" data-result="pass">5.94:1 · pass</span>.</figcaption></figure>
+  <figure class="ds-frame"><div class="meter-bar" aria-hidden="true"><span class="meter"><span style="width: 93%; background: var(--color-error)"></span></span><span class="meter-pct" style="color: var(--color-error)">93%</span></div>
+    <figcaption><strong>Red</strong> – decided: <code>--color-error</code>, fill <span data-contrast="--color-error on --color-bg-tertiary" data-min="3" data-result="pass">6.23:1 · pass</span>, text <span data-contrast="--color-error on --color-bg-secondary" data-min="4.5" data-result="pass">5.59:1 · pass</span>.</figcaption></figure>
+</div>
+<p class="ds-muted">What ships differs: <code>ClaudeStatusBar.css</code> paints amber and red with the retired
+<code>--color-warning-bright</code> (text <span data-contrast="--color-warning-bright on --color-bg-secondary" data-min="4.5" data-result="pass">6.39:1 · pass</span>) and
+<code>--color-error-bright</code> (text <span data-contrast="--color-error-bright on --color-bg-secondary" data-min="4.5" data-result="pass">4.94:1 · pass</span>).
+Both pass; the change is consolidation, not repair. It is one of the retired-token sites in the README defects.</p>
+
+<h2 id="defects">Open defects in the palette</h2>
+<p class="ds-muted">Named here so a design does not lean on them. Each is also a row in the README's defects list.</p>
+
+<h3 id="success-warning">Success and warning collide</h3>
+<div class="pair" aria-hidden="true">
+  <div style="background: var(--color-success)">success</div>
+  <div style="background: var(--color-warning)">warning</div>
+</div>
+<p class="ds-muted"><code>--color-success</code> is Qodeca lime and <code>--color-warning</code> an amber-yellow: two
+yellows, <span data-contrast="--color-success on --color-warning">1.74:1</span> apart. Side by side a person with full colour
+vision can tell them apart; in a toast seen alone, or with a red–green deficiency, they read as the same message. Until
+the palette is changed, a success and a warning must differ by icon and words, never by colour.</p>
+
+<h3 id="info">There is no info tone</h3>
+<div class="pair" aria-hidden="true">
+  <div style="background: var(--color-info)">info</div>
+  <div style="background: var(--color-accent-primary)">accent</div>
+  <div style="background: var(--color-link)">link</div>
+</div>
+<p class="ds-muted"><code>--color-info</code> is the brand violet: <span data-contrast="--color-info on --color-accent-primary">1.00:1</span>
+from the accent, the link and the focus ring. There is no <code>--color-info-bg</code> or <code>--color-info-border</code>,
+so an info banner borrows the accent and looks like a selected or focused thing. Until an info tone exists, an info
+message is drawn neutral (panel fill, default border, an info icon) rather than violet.</p>
+
+<h3 id="renamed-dot">The renamed folder dot</h3>
+<p class="ds-muted">The folder dot paints <code>--color-git-renamed</code>
+(<span data-contrast="--color-git-renamed on --color-bg-tertiary" data-min="3" data-result="fail">1.91:1 · fail</span> on the sidebar). It should take
+<code>--color-git-renamed-light</code>, which the file name already uses.</p>
+
+<h2 id="tokens">Every colour token</h2>
+<p class="ds-muted">
+  Grouped as <code>design-tokens.css</code> groups them. Text-like tokens are judged against 4.5:1, everything
+  else against the 3:1 non-text bar. Fills and washes – backgrounds, <code>-muted</code> tints, drag
+  highlights – carry no verdict: they are surfaces, so the figure is their <em>step</em> from the panel and
+  from the app background, which is what tells you whether two surfaces read as different.
+</p>
+
+<h3 id="c-qodeca-brand-palette">Qodeca brand palette</h3>
+<p class="ds-muted">From <code>design-tokens.css</code>: “Primary brand identity colors”</p>
+<table class="ds-tokens">
+<thead><tr><th>Token</th><th>Sample</th><th>Resolved</th><th>On panel</th><th>On app bg</th></tr></thead>
+<tbody>
+  <tr><td><code>--color-brand-lime</code></td><td><div class="ds-swatch" style="background: var(--color-brand-lime)"></div></td><td><code data-token="--color-brand-lime">#E3E829</code></td><td data-contrast="--color-brand-lime on --color-bg-secondary" data-min="3" data-result="pass">10.35:1 · pass</td><td data-contrast="--color-brand-lime on --color-bg-primary" data-min="3" data-result="pass">13.94:1 · pass</td></tr>
+  <tr><td><code>--color-brand-violet</code></td><td><div class="ds-swatch" style="background: var(--color-brand-violet)"></div></td><td><code data-token="--color-brand-violet">#A0A8FF</code></td><td data-contrast="--color-brand-violet on --color-bg-secondary" data-min="3" data-result="pass">6.23:1 · pass</td><td data-contrast="--color-brand-violet on --color-bg-primary" data-min="3" data-result="pass">8.39:1 · pass</td></tr>
+  <tr><td><code>--color-brand-black</code></td><td><div class="ds-swatch" style="background: var(--color-brand-black)"></div></td><td><code data-token="--color-brand-black">#161312</code></td><td data-contrast="--color-brand-black on --color-bg-secondary" data-min="3" data-result="fail">1.34:1 · fail</td><td data-contrast="--color-brand-black on --color-bg-primary" data-min="3" data-result="fail">1.00:1 · fail</td></tr>
+  <tr><td><code>--color-brand-white</code></td><td><div class="ds-swatch" style="background: var(--color-brand-white)"></div></td><td><code data-token="--color-brand-white">#F8FAF8</code></td><td data-contrast="--color-brand-white on --color-bg-secondary" data-min="3" data-result="pass">13.08:1 · pass</td><td data-contrast="--color-brand-white on --color-bg-primary" data-min="3" data-result="pass">17.62:1 · pass</td></tr>
+  <tr><td><code>--color-brand-lime-hover</code></td><td><div class="ds-swatch" style="background: var(--color-brand-lime-hover)"></div></td><td><code data-token="--color-brand-lime-hover">#d6d925</code></td><td data-contrast="--color-brand-lime-hover on --color-bg-secondary" data-min="3" data-result="pass">9.02:1 · pass</td><td data-contrast="--color-brand-lime-hover on --color-bg-primary" data-min="3" data-result="pass">12.15:1 · pass</td></tr>
+  <tr><td><code>--color-brand-lime-active</code></td><td><div class="ds-swatch" style="background: var(--color-brand-lime-active)"></div></td><td><code data-token="--color-brand-lime-active">#c9cc21</code></td><td data-contrast="--color-brand-lime-active on --color-bg-secondary" data-min="3" data-result="pass">7.93:1 · pass</td><td data-contrast="--color-brand-lime-active on --color-bg-primary" data-min="3" data-result="pass">10.68:1 · pass</td></tr>
+  <tr><td><code>--color-brand-lime-muted</code></td><td><div class="ds-swatch" style="background: var(--color-brand-lime-muted)"></div></td><td><code data-token="--color-brand-lime-muted">rgba(227, 232, 41, 0.3)</code></td><td data-contrast="--color-brand-lime-muted on --color-bg-secondary">2.25:1</td><td data-contrast="--color-brand-lime-muted on --color-bg-primary">2.30:1</td></tr>
+  <tr><td><code>--color-brand-violet-hover</code></td><td><div class="ds-swatch" style="background: var(--color-brand-violet-hover)"></div></td><td><code data-token="--color-brand-violet-hover">#8b94ff</code></td><td data-contrast="--color-brand-violet-hover on --color-bg-secondary" data-min="3" data-result="pass">5.08:1 · pass</td><td data-contrast="--color-brand-violet-hover on --color-bg-primary" data-min="3" data-result="pass">6.84:1 · pass</td></tr>
+  <tr><td><code>--color-brand-violet-active</code></td><td><div class="ds-swatch" style="background: var(--color-brand-violet-active)"></div></td><td><code data-token="--color-brand-violet-active">#7680ff</code></td><td data-contrast="--color-brand-violet-active on --color-bg-secondary" data-min="3" data-result="pass">4.11:1 · pass</td><td data-contrast="--color-brand-violet-active on --color-bg-primary" data-min="3" data-result="pass">5.54:1 · pass</td></tr>
+  <tr><td><code>--color-brand-violet-muted</code></td><td><div class="ds-swatch" style="background: var(--color-brand-violet-muted)"></div></td><td><code data-token="--color-brand-violet-muted">rgba(160, 168, 255, 0.2)</code></td><td data-contrast="--color-brand-violet-muted on --color-bg-secondary">1.47:1</td><td data-contrast="--color-brand-violet-muted on --color-bg-primary">1.44:1</td></tr>
+</tbody>
+</table>
+
+<h3 id="c-secondary-accent-palette">Secondary accent palette</h3>
+<p class="ds-muted">From <code>design-tokens.css</code>: “Extended brand colors for UI variety”</p>
+<table class="ds-tokens">
+<thead><tr><th>Token</th><th>Sample</th><th>Resolved</th><th>On panel</th><th>On app bg</th></tr></thead>
+<tbody>
+  <tr><td><code>--color-brand-amber</code></td><td><div class="ds-swatch" style="background: var(--color-brand-amber)"></div></td><td><code data-token="--color-brand-amber">#FFA335</code></td><td data-contrast="--color-brand-amber on --color-bg-secondary" data-min="3" data-result="pass">6.89:1 · pass</td><td data-contrast="--color-brand-amber on --color-bg-primary" data-min="3" data-result="pass">9.28:1 · pass</td></tr>
+  <tr><td><code>--color-brand-coral</code></td><td><div class="ds-swatch" style="background: var(--color-brand-coral)"></div></td><td><code data-token="--color-brand-coral">#FF626A</code></td><td data-contrast="--color-brand-coral on --color-bg-secondary" data-min="3" data-result="pass">4.71:1 · pass</td><td data-contrast="--color-brand-coral on --color-bg-primary" data-min="3" data-result="pass">6.34:1 · pass</td></tr>
+  <tr><td><code>--color-brand-magenta</code></td><td><div class="ds-swatch" style="background: var(--color-brand-magenta)"></div></td><td><code data-token="--color-brand-magenta">#FF3381</code></td><td data-contrast="--color-brand-magenta on --color-bg-secondary" data-min="3" data-result="pass">3.95:1 · pass</td><td data-contrast="--color-brand-magenta on --color-bg-primary" data-min="3" data-result="pass">5.31:1 · pass</td></tr>
+  <tr><td><code>--color-brand-indigo</code></td><td><div class="ds-swatch" style="background: var(--color-brand-indigo)"></div></td><td><code data-token="--color-brand-indigo">#3F3FBA</code></td><td data-contrast="--color-brand-indigo on --color-bg-secondary" data-min="3" data-result="fail">1.72:1 · fail</td><td data-contrast="--color-brand-indigo on --color-bg-primary" data-min="3" data-result="fail">2.31:1 · fail</td></tr>
+</tbody>
+</table>
+
+<h3 id="c-neutral-scale">Neutral scale</h3>
+<p class="ds-muted">From <code>design-tokens.css</code>: “Gray scale from white to black”</p>
+<table class="ds-tokens">
+<thead><tr><th>Token</th><th>Sample</th><th>Resolved</th><th>On panel</th><th>On app bg</th></tr></thead>
+<tbody>
+  <tr><td><code>--color-white</code></td><td><div class="ds-swatch" style="background: var(--color-white)"></div></td><td><code data-token="--color-white">#ffffff</code></td><td data-contrast="--color-white on --color-bg-secondary" data-min="3" data-result="pass">13.72:1 · pass</td><td data-contrast="--color-white on --color-bg-primary" data-min="3" data-result="pass">18.48:1 · pass</td></tr>
+  <tr><td><code>--color-gray-100</code></td><td><div class="ds-swatch" style="background: var(--color-gray-100)"></div></td><td><code data-token="--color-gray-100">#e8e8e8</code></td><td data-contrast="--color-gray-100 on --color-bg-secondary" data-min="3" data-result="pass">11.20:1 · pass</td><td data-contrast="--color-gray-100 on --color-bg-primary" data-min="3" data-result="pass">15.08:1 · pass</td></tr>
+  <tr><td><code>--color-gray-200</code></td><td><div class="ds-swatch" style="background: var(--color-gray-200)"></div></td><td><code data-token="--color-gray-200">#d4d4d4</code></td><td data-contrast="--color-gray-200 on --color-bg-secondary" data-min="3" data-result="pass">9.26:1 · pass</td><td data-contrast="--color-gray-200 on --color-bg-primary" data-min="3" data-result="pass">12.47:1 · pass</td></tr>
+  <tr><td><code>--color-gray-300</code></td><td><div class="ds-swatch" style="background: var(--color-gray-300)"></div></td><td><code data-token="--color-gray-300">#cccccc</code></td><td data-contrast="--color-gray-300 on --color-bg-secondary" data-min="3" data-result="pass">8.54:1 · pass</td><td data-contrast="--color-gray-300 on --color-bg-primary" data-min="3" data-result="pass">11.51:1 · pass</td></tr>
+  <tr><td><code>--color-gray-400</code></td><td><div class="ds-swatch" style="background: var(--color-gray-400)"></div></td><td><code data-token="--color-gray-400">#b8b8b8</code></td><td data-contrast="--color-gray-400 on --color-bg-secondary" data-min="3" data-result="pass">6.92:1 · pass</td><td data-contrast="--color-gray-400 on --color-bg-primary" data-min="3" data-result="pass">9.31:1 · pass</td></tr>
+  <tr><td><code>--color-gray-450</code></td><td><div class="ds-swatch" style="background: var(--color-gray-450)"></div></td><td><code data-token="--color-gray-450">#949494</code></td><td data-contrast="--color-gray-450 on --color-bg-secondary" data-min="3" data-result="pass">4.52:1 · pass</td><td data-contrast="--color-gray-450 on --color-bg-primary" data-min="3" data-result="pass">6.09:1 · pass</td></tr>
+  <tr><td><code>--color-gray-500</code></td><td><div class="ds-swatch" style="background: var(--color-gray-500)"></div></td><td><code data-token="--color-gray-500">#858585</code></td><td data-contrast="--color-gray-500 on --color-bg-secondary" data-min="3" data-result="pass">3.72:1 · pass</td><td data-contrast="--color-gray-500 on --color-bg-primary" data-min="3" data-result="pass">5.00:1 · pass</td></tr>
+  <tr><td><code>--color-gray-550</code></td><td><div class="ds-swatch" style="background: var(--color-gray-550)"></div></td><td><code data-token="--color-gray-550">#787878</code></td><td data-contrast="--color-gray-550 on --color-bg-secondary" data-min="3" data-result="pass">3.10:1 · pass</td><td data-contrast="--color-gray-550 on --color-bg-primary" data-min="3" data-result="pass">4.18:1 · pass</td></tr>
+  <tr><td><code>--color-gray-600</code></td><td><div class="ds-swatch" style="background: var(--color-gray-600)"></div></td><td><code data-token="--color-gray-600">#6e6e6e</code></td><td data-contrast="--color-gray-600 on --color-bg-secondary" data-min="3" data-result="fail">2.69:1 · fail</td><td data-contrast="--color-gray-600 on --color-bg-primary" data-min="3" data-result="pass">3.62:1 · pass</td></tr>
+  <tr><td><code>--color-gray-700</code></td><td><div class="ds-swatch" style="background: var(--color-gray-700)"></div></td><td><code data-token="--color-gray-700">#454545</code></td><td data-contrast="--color-gray-700 on --color-bg-secondary" data-min="3" data-result="fail">1.43:1 · fail</td><td data-contrast="--color-gray-700 on --color-bg-primary" data-min="3" data-result="fail">1.92:1 · fail</td></tr>
+  <tr><td><code>--color-gray-800</code></td><td><div class="ds-swatch" style="background: var(--color-gray-800)"></div></td><td><code data-token="--color-gray-800">#3c3c3c</code></td><td data-contrast="--color-gray-800 on --color-bg-secondary" data-min="3" data-result="fail">1.24:1 · fail</td><td data-contrast="--color-gray-800 on --color-bg-primary" data-min="3" data-result="fail">1.67:1 · fail</td></tr>
+  <tr><td><code>--color-gray-900</code></td><td><div class="ds-swatch" style="background: var(--color-gray-900)"></div></td><td><code data-token="--color-gray-900">#2d2d30</code></td><td data-contrast="--color-gray-900 on --color-bg-secondary" data-min="3" data-result="fail">1.00:1 · fail</td><td data-contrast="--color-gray-900 on --color-bg-primary" data-min="3" data-result="fail">1.34:1 · fail</td></tr>
+  <tr><td><code>--color-gray-950</code></td><td><div class="ds-swatch" style="background: var(--color-gray-950)"></div></td><td><code data-token="--color-gray-950">#252526</code></td><td data-contrast="--color-gray-950 on --color-bg-secondary" data-min="3" data-result="fail">1.11:1 · fail</td><td data-contrast="--color-gray-950 on --color-bg-primary" data-min="3" data-result="fail">1.20:1 · fail</td></tr>
+  <tr><td><code>--color-gray-1000</code></td><td><div class="ds-swatch" style="background: var(--color-gray-1000)"></div></td><td><code data-token="--color-gray-1000">#161312</code></td><td data-contrast="--color-gray-1000 on --color-bg-secondary" data-min="3" data-result="fail">1.34:1 · fail</td><td data-contrast="--color-gray-1000 on --color-bg-primary" data-min="3" data-result="fail">1.00:1 · fail</td></tr>
+  <tr><td><code>--color-black</code></td><td><div class="ds-swatch" style="background: var(--color-black)"></div></td><td><code data-token="--color-black">#000000</code></td><td data-contrast="--color-black on --color-bg-secondary" data-min="3" data-result="fail">1.52:1 · fail</td><td data-contrast="--color-black on --color-bg-primary" data-min="3" data-result="fail">1.13:1 · fail</td></tr>
+</tbody>
+</table>
+
+<h3 id="c-semantic-backgrounds">Semantic backgrounds</h3>
+<p class="ds-muted">From <code>design-tokens.css</code>: “Use these for component backgrounds”</p>
+<table class="ds-tokens">
+<thead><tr><th>Token</th><th>Sample</th><th>Resolved</th><th>On panel</th><th>On app bg</th></tr></thead>
+<tbody>
+  <tr><td><code>--color-bg-primary</code></td><td><div class="ds-swatch" style="background: var(--color-bg-primary)"></div></td><td><code data-token="--color-bg-primary">#161312</code></td><td data-contrast="--color-bg-primary on --color-bg-secondary">1.34:1</td><td data-contrast="--color-bg-primary on --color-bg-primary">1.00:1</td></tr>
+  <tr><td><code>--color-bg-secondary</code></td><td><div class="ds-swatch" style="background: var(--color-bg-secondary)"></div></td><td><code data-token="--color-bg-secondary">#2d2d30</code></td><td data-contrast="--color-bg-secondary on --color-bg-secondary">1.00:1</td><td data-contrast="--color-bg-secondary on --color-bg-primary">1.34:1</td></tr>
+  <tr><td><code>--color-bg-tertiary</code></td><td><div class="ds-swatch" style="background: var(--color-bg-tertiary)"></div></td><td><code data-token="--color-bg-tertiary">#252526</code></td><td data-contrast="--color-bg-tertiary on --color-bg-secondary">1.11:1</td><td data-contrast="--color-bg-tertiary on --color-bg-primary">1.20:1</td></tr>
+  <tr><td><code>--color-bg-elevated</code></td><td><div class="ds-swatch" style="background: var(--color-bg-elevated)"></div></td><td><code data-token="--color-bg-elevated">#2d2d30</code></td><td data-contrast="--color-bg-elevated on --color-bg-secondary">1.00:1</td><td data-contrast="--color-bg-elevated on --color-bg-primary">1.34:1</td></tr>
+  <tr><td><code>--color-bg-input</code></td><td><div class="ds-swatch" style="background: var(--color-bg-input)"></div></td><td><code data-token="--color-bg-input">#2d2d30</code></td><td data-contrast="--color-bg-input on --color-bg-secondary">1.00:1</td><td data-contrast="--color-bg-input on --color-bg-primary">1.34:1</td></tr>
+  <tr><td><code>--color-bg-subtle</code></td><td><div class="ds-swatch" style="background: var(--color-bg-subtle)"></div></td><td><code data-token="--color-bg-subtle">#161312</code></td><td data-contrast="--color-bg-subtle on --color-bg-secondary">1.34:1</td><td data-contrast="--color-bg-subtle on --color-bg-primary">1.00:1</td></tr>
+  <tr><td><code>--color-bg-hover</code></td><td><div class="ds-swatch" style="background: var(--color-bg-hover)"></div></td><td><code data-token="--color-bg-hover">rgba(255, 255, 255, 0.05)</code></td><td data-contrast="--color-bg-hover on --color-bg-secondary">1.16:1</td><td data-contrast="--color-bg-hover on --color-bg-primary">1.12:1</td></tr>
+  <tr><td><code>--color-bg-hover-solid</code></td><td><div class="ds-swatch" style="background: var(--color-bg-hover-solid)"></div></td><td><code data-token="--color-bg-hover-solid">#2a2d2e</code></td><td data-contrast="--color-bg-hover-solid on --color-bg-secondary">1.01:1</td><td data-contrast="--color-bg-hover-solid on --color-bg-primary">1.33:1</td></tr>
+  <tr><td><code>--color-bg-active</code></td><td><div class="ds-swatch" style="background: var(--color-bg-active)"></div></td><td><code data-token="--color-bg-active">rgba(255, 255, 255, 0.1)</code></td><td data-contrast="--color-bg-active on --color-bg-secondary">1.37:1</td><td data-contrast="--color-bg-active on --color-bg-primary">1.30:1</td></tr>
+  <tr><td><code>--color-bg-selected</code></td><td><div class="ds-swatch" style="background: var(--color-bg-selected)"></div></td><td><code data-token="--color-bg-selected">rgba(160, 168, 255, 0.2)</code></td><td data-contrast="--color-bg-selected on --color-bg-secondary">1.47:1</td><td data-contrast="--color-bg-selected on --color-bg-primary">1.44:1</td></tr>
+</tbody>
+</table>
+
+<h3 id="c-semantic-text">Semantic text</h3>
+<p class="ds-muted">From <code>design-tokens.css</code>: “Use these for text content”</p>
+<table class="ds-tokens">
+<thead><tr><th>Token</th><th>Sample</th><th>Resolved</th><th>On panel</th><th>On app bg</th></tr></thead>
+<tbody>
+  <tr><td><code>--color-text-primary</code></td><td><span style="color: var(--color-text-primary)">The quick brown fox</span></td><td><code data-token="--color-text-primary">#cccccc</code></td><td data-contrast="--color-text-primary on --color-bg-secondary" data-min="4.5" data-result="pass">8.54:1 · pass</td><td data-contrast="--color-text-primary on --color-bg-primary" data-min="4.5" data-result="pass">11.51:1 · pass</td></tr>
+  <tr><td><code>--color-text-secondary</code></td><td><span style="color: var(--color-text-secondary)">The quick brown fox</span></td><td><code data-token="--color-text-secondary">#858585</code></td><td data-contrast="--color-text-secondary on --color-bg-secondary" data-min="4.5" data-result="fail">3.72:1 · fail</td><td data-contrast="--color-text-secondary on --color-bg-primary" data-min="4.5" data-result="pass">5.00:1 · pass</td></tr>
+  <tr><td><code>--color-text-muted</code></td><td><span style="color: var(--color-text-muted)">The quick brown fox</span></td><td><code data-token="--color-text-muted">#6e6e6e</code></td><td data-contrast="--color-text-muted on --color-bg-secondary">2.69:1</td><td data-contrast="--color-text-muted on --color-bg-primary">3.62:1</td></tr>
+  <tr><td><code>--color-text-emphasis</code></td><td><span style="color: var(--color-text-emphasis)">The quick brown fox</span></td><td><code data-token="--color-text-emphasis">#ffffff</code></td><td data-contrast="--color-text-emphasis on --color-bg-secondary" data-min="4.5" data-result="pass">13.72:1 · pass</td><td data-contrast="--color-text-emphasis on --color-bg-primary" data-min="4.5" data-result="pass">18.48:1 · pass</td></tr>
+  <tr><td><code>--color-text-disabled</code></td><td><span style="color: var(--color-text-disabled)">The quick brown fox</span></td><td><code data-token="--color-text-disabled">#6e6e6e</code></td><td data-contrast="--color-text-disabled on --color-bg-secondary" data-min="4.5" data-result="fail">2.69:1 · fail</td><td data-contrast="--color-text-disabled on --color-bg-primary" data-min="4.5" data-result="fail">3.62:1 · fail</td></tr>
+  <tr><td><code>--color-text-placeholder</code></td><td><span style="color: var(--color-text-placeholder)">The quick brown fox</span></td><td><code data-token="--color-text-placeholder">#949494</code></td><td data-contrast="--color-text-placeholder on --color-bg-secondary" data-min="4.5" data-result="pass">4.52:1 · pass</td><td data-contrast="--color-text-placeholder on --color-bg-primary" data-min="4.5" data-result="pass">6.09:1 · pass</td></tr>
+  <tr><td><code>--color-text-on-accent</code></td><td><div class="ds-swatch" style="background: var(--color-text-on-accent)"></div></td><td><code data-token="--color-text-on-accent">#161312</code></td><td data-contrast="--color-text-on-accent on --color-bg-secondary" data-min="3" data-result="fail">1.34:1 · fail</td><td data-contrast="--color-text-on-accent on --color-bg-primary" data-min="3" data-result="fail">1.00:1 · fail</td></tr>
+</tbody>
+</table>
+
+<h3 id="c-semantic-borders">Semantic borders</h3>
+<p class="ds-muted">From <code>design-tokens.css</code>: “Use these for borders and dividers”</p>
+<table class="ds-tokens">
+<thead><tr><th>Token</th><th>Sample</th><th>Resolved</th><th>On panel</th><th>On app bg</th></tr></thead>
+<tbody>
+  <tr><td><code>--color-border-default</code></td><td><div class="ds-swatch" style="background: var(--color-border-default)"></div></td><td><code data-token="--color-border-default">#3c3c3c</code></td><td data-contrast="--color-border-default on --color-bg-secondary" data-min="3" data-result="fail">1.24:1 · fail</td><td data-contrast="--color-border-default on --color-bg-primary" data-min="3" data-result="fail">1.67:1 · fail</td></tr>
+  <tr><td><code>--color-border-subtle</code></td><td><div class="ds-swatch" style="background: var(--color-border-subtle)"></div></td><td><code data-token="--color-border-subtle">#454545</code></td><td data-contrast="--color-border-subtle on --color-bg-secondary" data-min="3" data-result="fail">1.43:1 · fail</td><td data-contrast="--color-border-subtle on --color-bg-primary" data-min="3" data-result="fail">1.92:1 · fail</td></tr>
+  <tr><td><code>--color-border-input</code></td><td><div class="ds-swatch" style="background: var(--color-border-input)"></div></td><td><code data-token="--color-border-input">#787878</code></td><td data-contrast="--color-border-input on --color-bg-secondary" data-min="3" data-result="pass">3.10:1 · pass</td><td data-contrast="--color-border-input on --color-bg-primary" data-min="3" data-result="pass">4.18:1 · pass</td></tr>
+  <tr><td><code>--color-border-focus</code></td><td><div class="ds-swatch" style="background: var(--color-border-focus)"></div></td><td><code data-token="--color-border-focus">#A0A8FF</code></td><td data-contrast="--color-border-focus on --color-bg-secondary" data-min="3" data-result="pass">6.23:1 · pass</td><td data-contrast="--color-border-focus on --color-bg-primary" data-min="3" data-result="pass">8.39:1 · pass</td></tr>
+</tbody>
+</table>
+
+<h3 id="c-interactive-accent">Interactive / accent</h3>
+<p class="ds-muted">From <code>design-tokens.css</code>: “Use these for interactive elements”</p>
+<table class="ds-tokens">
+<thead><tr><th>Token</th><th>Sample</th><th>Resolved</th><th>On panel</th><th>On app bg</th></tr></thead>
+<tbody>
+  <tr><td><code>--color-accent-primary</code></td><td><div class="ds-swatch" style="background: var(--color-accent-primary)"></div></td><td><code data-token="--color-accent-primary">#A0A8FF</code></td><td data-contrast="--color-accent-primary on --color-bg-secondary" data-min="3" data-result="pass">6.23:1 · pass</td><td data-contrast="--color-accent-primary on --color-bg-primary" data-min="3" data-result="pass">8.39:1 · pass</td></tr>
+  <tr><td><code>--color-accent-secondary</code></td><td><div class="ds-swatch" style="background: var(--color-accent-secondary)"></div></td><td><code data-token="--color-accent-secondary">#E3E829</code></td><td data-contrast="--color-accent-secondary on --color-bg-secondary" data-min="3" data-result="pass">10.35:1 · pass</td><td data-contrast="--color-accent-secondary on --color-bg-primary" data-min="3" data-result="pass">13.94:1 · pass</td></tr>
+  <tr><td><code>--color-accent-tertiary</code></td><td><div class="ds-swatch" style="background: var(--color-accent-tertiary)"></div></td><td><code data-token="--color-accent-tertiary">#A0A8FF</code></td><td data-contrast="--color-accent-tertiary on --color-bg-secondary" data-min="3" data-result="pass">6.23:1 · pass</td><td data-contrast="--color-accent-tertiary on --color-bg-primary" data-min="3" data-result="pass">8.39:1 · pass</td></tr>
+  <tr><td><code>--color-accent-drag</code></td><td><div class="ds-swatch" style="background: var(--color-accent-drag)"></div></td><td><code data-token="--color-accent-drag">#A0A8FF</code></td><td data-contrast="--color-accent-drag on --color-bg-secondary" data-min="3" data-result="pass">6.23:1 · pass</td><td data-contrast="--color-accent-drag on --color-bg-primary" data-min="3" data-result="pass">8.39:1 · pass</td></tr>
+  <tr><td><code>--color-accent-drag-bg</code></td><td><div class="ds-swatch" style="background: var(--color-accent-drag-bg)"></div></td><td><code data-token="--color-accent-drag-bg">rgba(160, 168, 255, 0.2)</code></td><td data-contrast="--color-accent-drag-bg on --color-bg-secondary">1.47:1</td><td data-contrast="--color-accent-drag-bg on --color-bg-primary">1.44:1</td></tr>
+  <tr><td><code>--color-accent-drag-bg-subtle</code></td><td><div class="ds-swatch" style="background: var(--color-accent-drag-bg-subtle)"></div></td><td><code data-token="--color-accent-drag-bg-subtle">rgba(160, 168, 255, 0.05)</code></td><td data-contrast="--color-accent-drag-bg-subtle on --color-bg-secondary">1.09:1</td><td data-contrast="--color-accent-drag-bg-subtle on --color-bg-primary">1.07:1</td></tr>
+  <tr><td><code>--color-accent-drag-border</code></td><td><div class="ds-swatch" style="background: var(--color-accent-drag-border)"></div></td><td><code data-token="--color-accent-drag-border">rgba(160, 168, 255, 0.3)</code></td><td data-contrast="--color-accent-drag-border on --color-bg-secondary">1.80:1</td><td data-contrast="--color-accent-drag-border on --color-bg-primary">1.83:1</td></tr>
+</tbody>
+</table>
+
+<h3 id="c-links">Links</h3>
+<p class="ds-muted">From <code>design-tokens.css</code>: “Use these for anchor/link elements”</p>
+<table class="ds-tokens">
+<thead><tr><th>Token</th><th>Sample</th><th>Resolved</th><th>On panel</th><th>On app bg</th></tr></thead>
+<tbody>
+  <tr><td><code>--color-link</code></td><td><span style="color: var(--color-link)">The quick brown fox</span></td><td><code data-token="--color-link">#A0A8FF</code></td><td data-contrast="--color-link on --color-bg-secondary" data-min="4.5" data-result="pass">6.23:1 · pass</td><td data-contrast="--color-link on --color-bg-primary" data-min="4.5" data-result="pass">8.39:1 · pass</td></tr>
+  <tr><td><code>--color-link-hover</code></td><td><span style="color: var(--color-link-hover)">The quick brown fox</span></td><td><code data-token="--color-link-hover">#8b94ff</code></td><td data-contrast="--color-link-hover on --color-bg-secondary" data-min="4.5" data-result="pass">5.08:1 · pass</td><td data-contrast="--color-link-hover on --color-bg-primary" data-min="4.5" data-result="pass">6.84:1 · pass</td></tr>
+  <tr><td><code>--color-link-visited</code></td><td><span style="color: var(--color-link-visited)">The quick brown fox</span></td><td><code data-token="--color-link-visited">#9d7dd2</code></td><td data-contrast="--color-link-visited on --color-bg-secondary" data-min="4.5" data-result="fail">4.11:1 · fail</td><td data-contrast="--color-link-visited on --color-bg-primary" data-min="4.5" data-result="pass">5.54:1 · pass</td></tr>
+</tbody>
+</table>
+
+<h3 id="c-button-variants">Button variants</h3>
+<p class="ds-muted">From <code>design-tokens.css</code>: “Specific colors for button states”</p>
+<table class="ds-tokens">
+<thead><tr><th>Token</th><th>Sample</th><th>Resolved</th><th>On panel</th><th>On app bg</th></tr></thead>
+<tbody>
+  <tr><td><code>--color-btn-primary-bg</code></td><td><div class="ds-swatch" style="background: var(--color-btn-primary-bg)"></div></td><td><code data-token="--color-btn-primary-bg">#A0A8FF</code></td><td data-contrast="--color-btn-primary-bg on --color-bg-secondary">6.23:1</td><td data-contrast="--color-btn-primary-bg on --color-bg-primary">8.39:1</td></tr>
+  <tr><td><code>--color-btn-primary-hover</code></td><td><div class="ds-swatch" style="background: var(--color-btn-primary-hover)"></div></td><td><code data-token="--color-btn-primary-hover">#8b94ff</code></td><td data-contrast="--color-btn-primary-hover on --color-bg-secondary">5.08:1</td><td data-contrast="--color-btn-primary-hover on --color-bg-primary">6.84:1</td></tr>
+  <tr><td><code>--color-btn-primary-active</code></td><td><div class="ds-swatch" style="background: var(--color-btn-primary-active)"></div></td><td><code data-token="--color-btn-primary-active">#7680ff</code></td><td data-contrast="--color-btn-primary-active on --color-bg-secondary">4.11:1</td><td data-contrast="--color-btn-primary-active on --color-bg-primary">5.54:1</td></tr>
+  <tr><td><code>--color-btn-primary-text</code></td><td><div class="ds-swatch" style="background: var(--color-btn-primary-text)"></div></td><td><code data-token="--color-btn-primary-text">#161312</code></td><td data-contrast="--color-btn-primary-text on --color-bg-secondary" data-min="3" data-result="fail">1.34:1 · fail</td><td data-contrast="--color-btn-primary-text on --color-bg-primary" data-min="3" data-result="fail">1.00:1 · fail</td></tr>
+  <tr><td><code>--color-btn-secondary-bg</code></td><td><div class="ds-swatch" style="background: var(--color-btn-secondary-bg)"></div></td><td><code data-token="--color-btn-secondary-bg">#3c3c3c</code></td><td data-contrast="--color-btn-secondary-bg on --color-bg-secondary">1.24:1</td><td data-contrast="--color-btn-secondary-bg on --color-bg-primary">1.67:1</td></tr>
+  <tr><td><code>--color-btn-secondary-hover</code></td><td><div class="ds-swatch" style="background: var(--color-btn-secondary-hover)"></div></td><td><code data-token="--color-btn-secondary-hover">#505050</code></td><td data-contrast="--color-btn-secondary-hover on --color-bg-secondary">1.70:1</td><td data-contrast="--color-btn-secondary-hover on --color-bg-primary">2.29:1</td></tr>
+  <tr><td><code>--color-btn-danger-bg</code></td><td><div class="ds-swatch" style="background: var(--color-btn-danger-bg)"></div></td><td><code data-token="--color-btn-danger-bg">#c72e0f</code></td><td data-contrast="--color-btn-danger-bg on --color-bg-secondary">2.50:1</td><td data-contrast="--color-btn-danger-bg on --color-bg-primary">3.36:1</td></tr>
+  <tr><td><code>--color-btn-danger-hover</code></td><td><div class="ds-swatch" style="background: var(--color-btn-danger-hover)"></div></td><td><code data-token="--color-btn-danger-hover">#ad280d</code></td><td data-contrast="--color-btn-danger-hover on --color-bg-secondary">2.01:1</td><td data-contrast="--color-btn-danger-hover on --color-bg-primary">2.71:1</td></tr>
+  <tr><td><code>--color-bg-danger-hover</code></td><td><div class="ds-swatch" style="background: var(--color-bg-danger-hover)"></div></td><td><code data-token="--color-bg-danger-hover">#5a1d1d</code></td><td data-contrast="--color-bg-danger-hover on --color-bg-secondary">1.06:1</td><td data-contrast="--color-bg-danger-hover on --color-bg-primary">1.43:1</td></tr>
+</tbody>
+</table>
+
+<h3 id="c-status-feedback">Status / feedback</h3>
+<p class="ds-muted">From <code>design-tokens.css</code>: “Use these for status indicators”</p>
+<table class="ds-tokens">
+<thead><tr><th>Token</th><th>Sample</th><th>Resolved</th><th>On panel</th><th>On app bg</th></tr></thead>
+<tbody>
+  <tr><td><code>--color-success</code></td><td><div class="ds-swatch" style="background: var(--color-success)"></div></td><td><code data-token="--color-success">#E3E829</code></td><td data-contrast="--color-success on --color-bg-secondary" data-min="3" data-result="pass">10.35:1 · pass</td><td data-contrast="--color-success on --color-bg-primary" data-min="3" data-result="pass">13.94:1 · pass</td></tr>
+  <tr><td><code>--color-context-safe</code></td><td><div class="ds-swatch" style="background: var(--color-context-safe)"></div></td><td><code data-token="--color-context-safe">#3fb950</code></td><td data-contrast="--color-context-safe on --color-bg-secondary" data-min="3" data-result="pass">5.40:1 · pass</td><td data-contrast="--color-context-safe on --color-bg-primary" data-min="3" data-result="pass">7.27:1 · pass</td></tr>
+  <tr><td><code>--color-warning</code></td><td><div class="ds-swatch" style="background: var(--color-warning)"></div></td><td><code data-token="--color-warning">#cca700</code></td><td data-contrast="--color-warning on --color-bg-secondary" data-min="3" data-result="pass">5.94:1 · pass</td><td data-contrast="--color-warning on --color-bg-primary" data-min="3" data-result="pass">8.00:1 · pass</td></tr>
+  <tr><td><code>--color-error</code></td><td><div class="ds-swatch" style="background: var(--color-error)"></div></td><td><code data-token="--color-error">#f48771</code></td><td data-contrast="--color-error on --color-bg-secondary" data-min="3" data-result="pass">5.59:1 · pass</td><td data-contrast="--color-error on --color-bg-primary" data-min="3" data-result="pass">7.52:1 · pass</td></tr>
+  <tr><td><code>--color-info</code></td><td><div class="ds-swatch" style="background: var(--color-info)"></div></td><td><code data-token="--color-info">#A0A8FF</code></td><td data-contrast="--color-info on --color-bg-secondary" data-min="3" data-result="pass">6.23:1 · pass</td><td data-contrast="--color-info on --color-bg-primary" data-min="3" data-result="pass">8.39:1 · pass</td></tr>
+</tbody>
+</table>
+
+<h3 id="c-error-state-extended-palette">Error state (extended palette)</h3>
+<p class="ds-muted">From <code>design-tokens.css</code>: “For error dialogs, Mermaid errors, etc.”</p>
+<table class="ds-tokens">
+<thead><tr><th>Token</th><th>Sample</th><th>Resolved</th><th>On panel</th><th>On app bg</th></tr></thead>
+<tbody>
+  <tr><td><code>--color-error-bg</code></td><td><div class="ds-swatch" style="background: var(--color-error-bg)"></div></td><td><code data-token="--color-error-bg">#3c1f1f</code></td><td data-contrast="--color-error-bg on --color-bg-secondary">1.08:1</td><td data-contrast="--color-error-bg on --color-bg-primary">1.23:1</td></tr>
+  <tr><td><code>--color-error-bg-dark</code></td><td><div class="ds-swatch" style="background: var(--color-error-bg-dark)"></div></td><td><code data-token="--color-error-bg-dark">#2a1414</code></td><td data-contrast="--color-error-bg-dark on --color-bg-secondary">1.26:1</td><td data-contrast="--color-error-bg-dark on --color-bg-primary">1.06:1</td></tr>
+  <tr><td><code>--color-error-border</code></td><td><div class="ds-swatch" style="background: var(--color-error-border)"></div></td><td><code data-token="--color-error-border">#5c2e2e</code></td><td data-contrast="--color-error-border on --color-bg-secondary" data-min="3" data-result="fail">1.23:1 · fail</td><td data-contrast="--color-error-border on --color-bg-primary" data-min="3" data-result="fail">1.65:1 · fail</td></tr>
+  <tr><td><code>--color-error-text-hint</code></td><td><span style="color: var(--color-error-text-hint)">The quick brown fox</span></td><td><code data-token="--color-error-text-hint">#d4a5a5</code></td><td data-contrast="--color-error-text-hint on --color-bg-secondary" data-min="4.5" data-result="pass">6.35:1 · pass</td><td data-contrast="--color-error-text-hint on --color-bg-primary" data-min="4.5" data-result="pass">8.56:1 · pass</td></tr>
+</tbody>
+</table>
+
+<h3 id="c-success-state">Success state</h3>
+<p class="ds-muted">From <code>design-tokens.css</code>: “For success dialogs, transcription complete, etc.”</p>
+<table class="ds-tokens">
+<thead><tr><th>Token</th><th>Sample</th><th>Resolved</th><th>On panel</th><th>On app bg</th></tr></thead>
+<tbody>
+  <tr><td><code>--color-success-bg</code></td><td><div class="ds-swatch" style="background: var(--color-success-bg)"></div></td><td><code data-token="--color-success-bg">rgba(227, 232, 41, 0.1)</code></td><td data-contrast="--color-success-bg on --color-bg-secondary">1.29:1</td><td data-contrast="--color-success-bg on --color-bg-primary">1.24:1</td></tr>
+  <tr><td><code>--color-success-border</code></td><td><div class="ds-swatch" style="background: var(--color-success-border)"></div></td><td><code data-token="--color-success-border">rgba(227, 232, 41, 0.3)</code></td><td data-contrast="--color-success-border on --color-bg-secondary" data-min="3" data-result="fail">2.25:1 · fail</td><td data-contrast="--color-success-border on --color-bg-primary" data-min="3" data-result="fail">2.30:1 · fail</td></tr>
+</tbody>
+</table>
+
+<h3 id="c-warning-state">Warning state</h3>
+<p class="ds-muted">From <code>design-tokens.css</code>: “For OCR warnings, import cautions, etc.”</p>
+<table class="ds-tokens">
+<thead><tr><th>Token</th><th>Sample</th><th>Resolved</th><th>On panel</th><th>On app bg</th></tr></thead>
+<tbody>
+  <tr><td><code>--color-warning-bg</code></td><td><div class="ds-swatch" style="background: var(--color-warning-bg)"></div></td><td><code data-token="--color-warning-bg">rgba(204, 167, 0, 0.1)</code></td><td data-contrast="--color-warning-bg on --color-bg-secondary">1.19:1</td><td data-contrast="--color-warning-bg on --color-bg-primary">1.16:1</td></tr>
+  <tr><td><code>--color-warning-border</code></td><td><div class="ds-swatch" style="background: var(--color-warning-border)"></div></td><td><code data-token="--color-warning-border">rgba(204, 167, 0, 0.3)</code></td><td data-contrast="--color-warning-border on --color-bg-secondary" data-min="3" data-result="fail">1.75:1 · fail</td><td data-contrast="--color-warning-border on --color-bg-primary" data-min="3" data-result="fail">1.79:1 · fail</td></tr>
+</tbody>
+</table>
+
+<h3 id="c-syntax-highlighting">Syntax highlighting</h3>
+<p class="ds-muted">From <code>design-tokens.css</code>: “For code blocks and inline code”</p>
+<table class="ds-tokens">
+<thead><tr><th>Token</th><th>Sample</th><th>Resolved</th><th>On panel</th><th>On app bg</th></tr></thead>
+<tbody>
+  <tr><td><code>--color-syntax-string</code></td><td><span style="color: var(--color-syntax-string)">The quick brown fox</span></td><td><code data-token="--color-syntax-string">#ce9178</code></td><td data-contrast="--color-syntax-string on --color-bg-secondary" data-min="4.5" data-result="pass">5.19:1 · pass</td><td data-contrast="--color-syntax-string on --color-bg-primary" data-min="4.5" data-result="pass">6.99:1 · pass</td></tr>
+  <tr><td><code>--color-syntax-keyword</code></td><td><span style="color: var(--color-syntax-keyword)">The quick brown fox</span></td><td><code data-token="--color-syntax-keyword">#569cd6</code></td><td data-contrast="--color-syntax-keyword on --color-bg-secondary" data-min="4.5" data-result="pass">4.65:1 · pass</td><td data-contrast="--color-syntax-keyword on --color-bg-primary" data-min="4.5" data-result="pass">6.26:1 · pass</td></tr>
+  <tr><td><code>--color-syntax-number</code></td><td><span style="color: var(--color-syntax-number)">The quick brown fox</span></td><td><code data-token="--color-syntax-number">#b5cea8</code></td><td data-contrast="--color-syntax-number on --color-bg-secondary" data-min="4.5" data-result="pass">8.07:1 · pass</td><td data-contrast="--color-syntax-number on --color-bg-primary" data-min="4.5" data-result="pass">10.87:1 · pass</td></tr>
+</tbody>
+</table>
+
+<h3 id="c-terminal">Terminal</h3>
+<p class="ds-muted">From <code>design-tokens.css</code>: “Terminal-specific colors”</p>
+<table class="ds-tokens">
+<thead><tr><th>Token</th><th>Sample</th><th>Resolved</th><th>On panel</th><th>On app bg</th></tr></thead>
+<tbody>
+  <tr><td><code>--color-cursor</code></td><td><span style="color: var(--color-cursor)">The quick brown fox</span></td><td><code data-token="--color-cursor">#4fc1ff</code></td><td data-contrast="--color-cursor on --color-bg-secondary" data-min="4.5" data-result="pass">6.80:1 · pass</td><td data-contrast="--color-cursor on --color-bg-primary" data-min="4.5" data-result="pass">9.15:1 · pass</td></tr>
+</tbody>
+</table>
+
+<h3 id="c-git-status-brand-palette">Git status (brand palette)</h3>
+<p class="ds-muted">From <code>design-tokens.css</code>: “Visual indicators using Qodeca brand colors”</p>
+<table class="ds-tokens">
+<thead><tr><th>Token</th><th>Sample</th><th>Resolved</th><th>On panel</th><th>On app bg</th></tr></thead>
+<tbody>
+  <tr><td><code>--color-git-modified</code></td><td><div class="ds-swatch" style="background: var(--color-git-modified)"></div></td><td><code data-token="--color-git-modified">#FFA335</code></td><td data-contrast="--color-git-modified on --color-bg-secondary" data-min="3" data-result="pass">6.89:1 · pass</td><td data-contrast="--color-git-modified on --color-bg-primary" data-min="3" data-result="pass">9.28:1 · pass</td></tr>
+  <tr><td><code>--color-git-untracked</code></td><td><div class="ds-swatch" style="background: var(--color-git-untracked)"></div></td><td><code data-token="--color-git-untracked">#E3E829</code></td><td data-contrast="--color-git-untracked on --color-bg-secondary" data-min="3" data-result="pass">10.35:1 · pass</td><td data-contrast="--color-git-untracked on --color-bg-primary" data-min="3" data-result="pass">13.94:1 · pass</td></tr>
+  <tr><td><code>--color-git-deleted</code></td><td><div class="ds-swatch" style="background: var(--color-git-deleted)"></div></td><td><code data-token="--color-git-deleted">#FF626A</code></td><td data-contrast="--color-git-deleted on --color-bg-secondary" data-min="3" data-result="pass">4.71:1 · pass</td><td data-contrast="--color-git-deleted on --color-bg-primary" data-min="3" data-result="pass">6.34:1 · pass</td></tr>
+  <tr><td><code>--color-git-staged</code></td><td><div class="ds-swatch" style="background: var(--color-git-staged)"></div></td><td><code data-token="--color-git-staged">#A0A8FF</code></td><td data-contrast="--color-git-staged on --color-bg-secondary" data-min="3" data-result="pass">6.23:1 · pass</td><td data-contrast="--color-git-staged on --color-bg-primary" data-min="3" data-result="pass">8.39:1 · pass</td></tr>
+  <tr><td><code>--color-git-renamed</code></td><td><div class="ds-swatch" style="background: var(--color-git-renamed)"></div></td><td><code data-token="--color-git-renamed">#3F3FBA</code></td><td data-contrast="--color-git-renamed on --color-bg-secondary" data-min="3" data-result="fail">1.72:1 · fail</td><td data-contrast="--color-git-renamed on --color-bg-primary" data-min="3" data-result="fail">2.31:1 · fail</td></tr>
+  <tr><td><code>--color-git-conflicted</code></td><td><div class="ds-swatch" style="background: var(--color-git-conflicted)"></div></td><td><code data-token="--color-git-conflicted">#FF3381</code></td><td data-contrast="--color-git-conflicted on --color-bg-secondary" data-min="3" data-result="pass">3.95:1 · pass</td><td data-contrast="--color-git-conflicted on --color-bg-primary" data-min="3" data-result="pass">5.31:1 · pass</td></tr>
+</tbody>
+</table>
+
+<h3 id="c-git-status-light-variants">Git status - light variants</h3>
+<p class="ds-muted">From <code>design-tokens.css</code>: “Lighter versions for better visibility on dark backgrounds Used for badges and file names (folders keep original)”</p>
+<table class="ds-tokens">
+<thead><tr><th>Token</th><th>Sample</th><th>Resolved</th><th>On panel</th><th>On app bg</th></tr></thead>
+<tbody>
+  <tr><td><code>--color-git-modified-light</code></td><td><span style="color: var(--color-git-modified-light)">The quick brown fox</span></td><td><code data-token="--color-git-modified-light">#FFCC99</code></td><td data-contrast="--color-git-modified-light on --color-bg-secondary" data-min="4.5" data-result="pass">9.38:1 · pass</td><td data-contrast="--color-git-modified-light on --color-bg-primary" data-min="4.5" data-result="pass">12.63:1 · pass</td></tr>
+  <tr><td><code>--color-git-untracked-light</code></td><td><span style="color: var(--color-git-untracked-light)">The quick brown fox</span></td><td><code data-token="--color-git-untracked-light">#F5F599</code></td><td data-contrast="--color-git-untracked-light on --color-bg-secondary" data-min="4.5" data-result="pass">12.03:1 · pass</td><td data-contrast="--color-git-untracked-light on --color-bg-primary" data-min="4.5" data-result="pass">16.20:1 · pass</td></tr>
+  <tr><td><code>--color-git-deleted-light</code></td><td><span style="color: var(--color-git-deleted-light)">The quick brown fox</span></td><td><code data-token="--color-git-deleted-light">#FFB3B8</code></td><td data-contrast="--color-git-deleted-light on --color-bg-secondary" data-min="4.5" data-result="pass">8.10:1 · pass</td><td data-contrast="--color-git-deleted-light on --color-bg-primary" data-min="4.5" data-result="pass">10.90:1 · pass</td></tr>
+  <tr><td><code>--color-git-staged-light</code></td><td><span style="color: var(--color-git-staged-light)">The quick brown fox</span></td><td><code data-token="--color-git-staged-light">#D4D9FF</code></td><td data-contrast="--color-git-staged-light on --color-bg-secondary" data-min="4.5" data-result="pass">9.91:1 · pass</td><td data-contrast="--color-git-staged-light on --color-bg-primary" data-min="4.5" data-result="pass">13.35:1 · pass</td></tr>
+  <tr><td><code>--color-git-renamed-light</code></td><td><span style="color: var(--color-git-renamed-light)">The quick brown fox</span></td><td><code data-token="--color-git-renamed-light">#8F8FE5</code></td><td data-contrast="--color-git-renamed-light on --color-bg-secondary" data-min="4.5" data-result="pass">4.72:1 · pass</td><td data-contrast="--color-git-renamed-light on --color-bg-primary" data-min="4.5" data-result="pass">6.36:1 · pass</td></tr>
+  <tr><td><code>--color-git-conflicted-light</code></td><td><span style="color: var(--color-git-conflicted-light)">The quick brown fox</span></td><td><code data-token="--color-git-conflicted-light">#FF99BF</code></td><td data-contrast="--color-git-conflicted-light on --color-bg-secondary" data-min="4.5" data-result="pass">6.90:1 · pass</td><td data-contrast="--color-git-conflicted-light on --color-bg-primary" data-min="4.5" data-result="pass">9.29:1 · pass</td></tr>
+</tbody>
+</table>
+
+<h3 id="c-special-backgrounds">Special backgrounds</h3>
+<p class="ds-muted">From <code>design-tokens.css</code>: “Component-specific backgrounds”</p>
+<table class="ds-tokens">
+<thead><tr><th>Token</th><th>Sample</th><th>Resolved</th><th>On panel</th><th>On app bg</th></tr></thead>
+<tbody>
+  <tr><td><code>--color-bg-diagram</code></td><td><div class="ds-swatch" style="background: var(--color-bg-diagram)"></div></td><td><code data-token="--color-bg-diagram">#F8FAF8</code></td><td data-contrast="--color-bg-diagram on --color-bg-secondary">13.08:1</td><td data-contrast="--color-bg-diagram on --color-bg-primary">17.62:1</td></tr>
+  <tr><td><code>--color-bg-preview</code></td><td><div class="ds-swatch" style="background: var(--color-bg-preview)"></div></td><td><code data-token="--color-bg-preview">#1a1a1c</code></td><td data-contrast="--color-bg-preview on --color-bg-secondary">1.26:1</td><td data-contrast="--color-bg-preview on --color-bg-primary">1.06:1</td></tr>
+  <tr><td><code>--color-bg-warning</code></td><td><div class="ds-swatch" style="background: var(--color-bg-warning)"></div></td><td><code data-token="--color-bg-warning">rgba(204, 167, 0, 0.12)</code></td><td data-contrast="--color-bg-warning on --color-bg-secondary">1.23:1</td><td data-contrast="--color-bg-warning on --color-bg-primary">1.21:1</td></tr>
+  <tr><td><code>--color-bg-tertiary-translucent</code></td><td><div class="ds-swatch" style="background: var(--color-bg-tertiary-translucent)"></div></td><td><code data-token="--color-bg-tertiary-translucent">rgba(45, 45, 48, 0.9)</code></td><td data-contrast="--color-bg-tertiary-translucent on --color-bg-secondary">1.00:1</td><td data-contrast="--color-bg-tertiary-translucent on --color-bg-primary">1.29:1</td></tr>
+  <tr><td><code>--color-overlay-dialog</code></td><td><div class="ds-swatch" style="background: var(--color-overlay-dialog)"></div></td><td><code data-token="--color-overlay-dialog">rgba(0, 0, 0, 0.75)</code></td><td data-contrast="--color-overlay-dialog on --color-bg-secondary">1.43:1</td><td data-contrast="--color-overlay-dialog on --color-bg-primary">1.10:1</td></tr>
+</tbody>
+</table>
+
+<h3 id="c-warning-states-extended-palette">Warning states (extended palette)</h3>
+<p class="ds-muted">From <code>design-tokens.css</code>: “For warning notifications, alerts, etc.”</p>
+<table class="ds-tokens">
+<thead><tr><th>Token</th><th>Sample</th><th>Resolved</th><th>On panel</th><th>On app bg</th></tr></thead>
+<tbody>
+  <tr><td><code>--color-border-warning</code></td><td><div class="ds-swatch" style="background: var(--color-border-warning)"></div></td><td><code data-token="--color-border-warning">rgba(204, 167, 0, 0.3)</code></td><td data-contrast="--color-border-warning on --color-bg-secondary" data-min="3" data-result="fail">1.75:1 · fail</td><td data-contrast="--color-border-warning on --color-bg-primary" data-min="3" data-result="fail">1.79:1 · fail</td></tr>
+  <tr><td><code>--color-text-tertiary</code></td><td><span style="color: var(--color-text-tertiary)">The quick brown fox</span></td><td><code data-token="--color-text-tertiary">#b0b0b0</code></td><td data-contrast="--color-text-tertiary on --color-bg-secondary" data-min="4.5" data-result="pass">6.33:1 · pass</td><td data-contrast="--color-text-tertiary on --color-bg-primary" data-min="4.5" data-result="pass">8.52:1 · pass</td></tr>
+  <tr><td><code>--color-text-bright</code></td><td><span style="color: var(--color-text-bright)">The quick brown fox</span></td><td><code data-token="--color-text-bright">#e0e0e0</code></td><td data-contrast="--color-text-bright on --color-bg-secondary" data-min="4.5" data-result="pass">10.40:1 · pass</td><td data-contrast="--color-text-bright on --color-bg-primary" data-min="4.5" data-result="pass">14.00:1 · pass</td></tr>
+</tbody>
+</table>
+
+<div class="ds-retired" id="retired">
+  <strong>Retired – do not use. Each is still declared, and still read by
+  <span data-claim="retired-token-stylesheets" title="stylesheets in src/ that still read a retired token (design-tokens.css excluded)">8</span>
+  stylesheets in <code>src/</code> until its migration lands; stylelint already bans it in
+  <code>docs/design-system/</code> and <code>docs/designs/</code>.</strong>
+  <span><s>--color-warning-bright</s> <code data-token="--color-warning-bright">#f59e0b</code> → <code>--color-warning</code></span>
+  <span><s>--color-warning-icon</s> <code data-token="--color-warning-icon">#dcdcaa</code> → <code>--color-warning</code></span>
+  <span><s>--color-error-bright</s> <code data-token="--color-error-bright">#ff6b6b</code> → <code>--color-error</code></span>
+  <span><s>--color-error-text-light</s> <code data-token="--color-error-text-light">#ffcccb</code> → <code>--color-error</code></span>
+</div>
+
+<h2 id="unused">Declared, never read</h2>
+<p class="ds-muted">
+  Colour tokens nothing in <code>src/</code> reads – not another token, not a stylesheet, not a script:
+  <code data-claim="unused-colour-tokens" title="colour tokens declared in design-tokens.css that nothing in src/ reads">--color-brand-lime-active, --color-brand-lime-hover, --color-gray-100, --color-link-hover, --color-link-visited</code>. Each is a candidate for deletion or for the rule that was
+  meant to use it.
+</p>
+
+<h2 id="related">Related</h2>
+<ul class="ds-muted">
+  <li><a href="focus.html">Focus and keyboard</a> – the ring colour, and where it may not be drawn inset.</li>
+  <li><a href="forced-colors.html">Forced colours</a> – what happens to every colour here in a Windows contrast theme.</li>
+  <li><a href="terminal.html">Terminal and code colours</a> – the ANSI palette and the syntax tokens.</li>
+  <li><a href="surfaces.html">Surfaces and elevation</a> – the opacity steps and scrollbar tokens.</li>
+  <li><a href="../components/feedback/index.html">Feedback</a> – which status token a toast, banner or field error takes.</li>
+  <li><a href="../components/row/index.html">Rows and lists</a> – the selected and hover states in a real row.</li>
+</ul>
+
+<section id="exceptions">
 <h2>Exceptions</h2>
-<p style="max-width: 72ch; color: var(--color-text-tertiary)">
+<p class="ds-muted">
   Where the shipping component departs from this card, with the reason. An undocumented deviation is a
   bug; a documented one is a decision. Each row has a <code>deviates:</code> marker at the site. For the
   screenshot overlay the bypass is colour, type size and offsets – no tokens reach the window;
@@ -134,122 +676,12 @@
       <td>Literal values, resolved from the tokens by main and sent in <code>commentState.theme</code>
         (<code>commentOverlayTheme.ts</code>, pinned to <code>design-tokens.css</code> by a test). The overlay is
         drawn inside the page, where a <code>var()</code> would read the page's own properties. The mapping is
-        drawn in the proposed <a href="../../product/html-comments/overlay.html">Comment overlay</a> card.</td>
+        drawn in the proposed <a href="../../../designs/comments/html-comments/overlay.html">Comment overlay</a> card.</td>
     </tr>
   </tbody>
 </table>
+</section>
 
-<script>
-const TOKENS = {
-  brand: ['--color-brand-lime', '--color-brand-violet', '--color-brand-black',
-          '--color-brand-white', '--color-brand-amber', '--color-brand-coral',
-          '--color-brand-magenta', '--color-brand-indigo'],
-  neutral: ['--color-white', '--color-gray-100', '--color-gray-200', '--color-gray-300',
-            '--color-gray-400', '--color-gray-500', '--color-gray-600', '--color-gray-700',
-            '--color-gray-800', '--color-gray-900', '--color-gray-950', '--color-gray-1000',
-            '--color-black'],
-  surface: ['--color-bg-primary', '--color-bg-secondary', '--color-bg-tertiary',
-            '--color-bg-elevated', '--color-bg-input', '--color-bg-hover-solid',
-            '--color-bg-selected', '--color-bg-preview'],
-  text: ['--color-text-emphasis', '--color-text-bright', '--color-text-primary',
-         '--color-text-tertiary', '--color-text-secondary', '--color-text-muted',
-         '--color-text-disabled'],
-  line: ['--color-border-default', '--color-border-subtle', '--color-border-focus',
-         '--color-accent-primary', '--color-accent-secondary', '--color-link'],
-  status: ['--color-success', '--color-context-safe', '--color-warning',
-           '--color-warning-bright', '--color-error', '--color-error-bright', '--color-info']
-};
-
-/** Resolve a token to an [r,g,b,a] tuple by letting the browser do it. */
-function resolve(token) {
-  const probe = document.createElement('span');
-  probe.style.color = `var(${token})`;
-  probe.style.display = 'none';
-  document.body.appendChild(probe);
-  const value = getComputedStyle(probe).color;
-  probe.remove();
-  const parts = value.match(/[\d.]+/g) || [];
-  return [Number(parts[0]) || 0, Number(parts[1]) || 0, Number(parts[2]) || 0,
-          parts[3] === undefined ? 1 : Number(parts[3])];
-}
-
-/** Composite a translucent colour over an opaque one, so the ratio is honest. */
-function over(fg, bg) {
-  const a = fg[3];
-  return [a * fg[0] + (1 - a) * bg[0], a * fg[1] + (1 - a) * bg[1], a * fg[2] + (1 - a) * bg[2], 1];
-}
-
-function luminance([r, g, b]) {
-  const channel = (c) => {
-    const s = c / 255;
-    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
-  };
-  return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
-}
-
-function contrast(fg, bg) {
-  const a = luminance(over(fg, bg));
-  const b = luminance(bg);
-  const [hi, lo] = a > b ? [a, b] : [b, a];
-  return (hi + 0.05) / (lo + 0.05);
-}
-
-function hex([r, g, b, a]) {
-  const pair = (n) => Math.round(n).toString(16).padStart(2, '0');
-  const base = `#${pair(r)}${pair(g)}${pair(b)}`;
-  return a === 1 ? base : `${base} · alpha ${a}`;
-}
-
-const PANEL = resolve('--color-bg-secondary');
-const APP = resolve('--color-bg-primary');
-
-function ratioCell(value, isText) {
-  const cell = document.createElement('td');
-  cell.className = 'ds-ratio';
-  const bar = isText ? 4.5 : 3;
-  cell.textContent = `${value.toFixed(2)}:1`;
-  cell.classList.add(value >= bar ? 'ds-pass' : 'ds-fail');
-  cell.title = isText ? 'Body text needs 4.5:1' : 'Non-text needs 3:1';
-  return cell;
-}
-
-for (const [group, tokens] of Object.entries(TOKENS)) {
-  const body = document.querySelector(`table[data-group="${group}"] tbody`);
-  const isText = group === 'text';
-  for (const token of tokens) {
-    const rgba = resolve(token);
-    const row = document.createElement('tr');
-
-    const nameCell = document.createElement('td');
-    nameCell.className = 'ds-mono';
-    nameCell.textContent = token;
-    row.appendChild(nameCell);
-
-    const sampleCell = document.createElement('td');
-    if (isText) {
-      const sample = document.createElement('span');
-      sample.style.color = `var(${token})`;
-      sample.style.fontSize = 'var(--text-base)';
-      sample.textContent = 'The quick brown fox';
-      sampleCell.appendChild(sample);
-    } else {
-      const swatch = document.createElement('div');
-      swatch.className = 'ds-swatch';
-      swatch.style.background = `var(${token})`;
-      sampleCell.appendChild(swatch);
-    }
-    row.appendChild(sampleCell);
-
-    const hexCell = document.createElement('td');
-    hexCell.className = 'ds-mono';
-    hexCell.textContent = hex(rgba);
-    row.appendChild(hexCell);
-
-    row.appendChild(ratioCell(contrast(rgba, PANEL), isText));
-    row.appendChild(ratioCell(contrast(rgba, APP), isText));
-    body.appendChild(row);
-  }
-}
-</script>
+</main>
 </body>
 </html>

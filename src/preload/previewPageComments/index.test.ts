@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Installing the comment overlay in a frame: the one receive channel, the
- * hello at `DOMContentLoaded`, and clean removal (docs/designs/html-preview-comments.md
+ * hello at `DOMContentLoaded`, and clean removal (docs/designs/comments/html-preview-comments.md
  * §8, §9.2; SEC-01).
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'

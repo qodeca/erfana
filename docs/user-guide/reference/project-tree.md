@@ -18,7 +18,7 @@ The left project panel shows files and folders in the open project. It offers cr
 
 ## Toolbar and filter
 
-**What they do:** **New markdown file**, **New folder**, **Import** and **Refresh** act on the tree or selected folder. The filter switches between **All Files** and **Markdown Only**. **How to reach them:** Project panel toolbar and filter control. Select a folder before importing with <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd> (Windows: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>); refresh with <kbd>Cmd</kbd>+<kbd>Alt</kbd>+<kbd>R</kbd> (Windows: <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>R</kbd>).
+**What they do:** **New markdown file**, **New folder**, **Import** and **Refresh** act on the tree or selected folder. The filter switches between **All Files** and **Markdown Only**. **How to reach them:** Project panel toolbar and filter control. Select a folder before importing with <kbd>⇧⌘I</kbd> / <kbd>Ctrl+Shift+I</kbd>; refresh with <kbd>⌥⌘R</kbd> / <kbd>Ctrl+Alt+R</kbd>.
 
 ## Git badges and status
 
@@ -36,7 +36,7 @@ The left project panel shows files and folders in the open project. It offers cr
 
 ## Keyboard navigation
 
-**What it does:** The tree is one stop in the <kbd>Tab</kbd> order. Inside it, the arrow keys move between rows and open or close folders, <kbd>Enter</kbd> opens a file or opens and selects a folder, and typing the first letters of a name jumps to it. <kbd>Shift</kbd>+<kbd>F10</kbd> opens the focused row's menu. **How to reach it:** Press <kbd>Tab</kbd> until the tree has focus; the full list is in [keyboard shortcuts](keyboard-shortcuts.md#project-tree). Moving with the arrows does not change the selected folder; <kbd>Enter</kbd> does. The selected folder is the row with the lime edge, and it is where paste, **New markdown file** and import go; screen readers announce that row as selected. Opening a file does not select it. Screen readers hear each row's own name, level and position, such as "3 of 7".
+**What it does:** The tree is one stop in the <kbd>Tab</kbd> order. Inside it, the arrow keys move between rows and open or close folders, <kbd>Enter</kbd> opens a file or opens and selects a folder, and typing the first letters of a name jumps to it. <kbd>⇧F10</kbd> / <kbd>Shift+F10</kbd> opens the focused row's menu. **How to reach it:** Press <kbd>Tab</kbd> until the tree has focus; the full list is in [keyboard shortcuts](keyboard-shortcuts.md#project-tree). Moving with the arrows does not change the selected folder; <kbd>Enter</kbd> does. The selected folder is the row with the lime edge, and it is where paste, **New markdown file** and import go; screen readers announce that row as selected. Opening a file does not select it. Screen readers hear each row's own name, level and position, such as "3 of 7".
 
 ## Large projects
 

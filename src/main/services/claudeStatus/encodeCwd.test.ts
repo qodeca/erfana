@@ -6,7 +6,7 @@
  * Verifies the `/` + `.` → `-` encoding rule for Claude Code transcript dirs.
  *
  * @see Issue #216 - Per-terminal Claude Code context status bar
- * @see docs/designs/216-claude-status-bar.md §2
+ * @see docs/designs/context-meter/216-claude-status-bar.md §2
  */
 import { describe, it, expect } from 'vitest'
 import { encodeProjectDir, candidateProjectDirs } from './encodeCwd'

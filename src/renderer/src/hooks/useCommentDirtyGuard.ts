@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * HTML Preview comments – the unsaved-editor guard of decision 13
- * (docs/designs/html-preview-comments.md §7.8; R-007, R-024).
+ * (docs/designs/comments/html-preview-comments.md §7.8; R-007, R-024).
  *
  * If the HTML file a comment goes into is also open in an "Open as source"
  * editor tab with unsaved changes, a comment write and the editor's next save

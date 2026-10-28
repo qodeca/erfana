@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Pins, counts and the overlay theme main sends
- * (docs/designs/html-preview-comments.md §8 `icons`, §10.1, §10.9).
+ * (docs/designs/comments/html-preview-comments.md §8 `icons`, §10.1, §10.9).
  */
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'

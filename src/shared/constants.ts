@@ -498,7 +498,7 @@ export const PAUSE_CONTROLLER = {
  * timeouts, the host-block toast budget, the post-load reload rate limit and
  * the still-frame downscale caps.
  *
- * @see docs designs/sd-074-html-preview.md §1.4, §2.4
+ * @see docs/designs/html-preview/sd-074-html-preview.md §1.4, §2.4
  */
 export const PREVIEW = {
   /** Max bytes served per asset; a larger file yields HTTP 413 */

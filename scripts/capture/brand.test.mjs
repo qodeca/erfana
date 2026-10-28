@@ -15,7 +15,7 @@ import { describe, expect, it } from 'vitest'
 import { ARTWORK } from './brand.mjs'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
-const CARD = readFileSync(path.join(ROOT, 'docs/design-system/product/github-presentation/index.html'), 'utf8')
+const CARD = readFileSync(path.join(ROOT, 'docs/designs/github-presentation/index.html'), 'utf8')
 
 describe('README brand artwork', () => {
   it.each(ARTWORK)('the card has an element with id $id', art => {

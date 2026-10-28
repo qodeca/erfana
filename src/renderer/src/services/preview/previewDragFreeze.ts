@@ -27,7 +27,7 @@
  * `useSplitterDragFreeze` mounts the one production instance.
  *
  * @module services/preview/previewDragFreeze
- * @see docs/designs/design-issue-124-part1.md §1.5
+ * @see docs/designs/html-preview/multi-page/design-issue-124-part1.md §1.5
  */
 
 import { PREVIEW_LIMITS } from '../../../../shared/preview-limits'

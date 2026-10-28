@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * HTML Preview comments – tells main which HTML files this window holds
- * unsaved editor changes for (docs/designs/html-preview-comments.md
+ * unsaved editor changes for (docs/designs/comments/html-preview-comments.md
  * decision 13, §7.8; `preview:commentSetUnsavedSources`).
  *
  * Main refuses a comment write into any of them with `COMMENT_UNSAVED_SOURCE`.

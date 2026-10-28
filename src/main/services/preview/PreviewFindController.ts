@@ -15,7 +15,7 @@
  * highlights clear, and `stopFindInPage` emits no terminating `found-in-page`
  * of its own, so the zero has to be pushed explicitly and first.
  *
- * @see docs/designs/sd-074-html-preview.md §1.4
+ * @see docs/designs/html-preview/sd-074-html-preview.md §1.4
  */
 
 /** A settled/interim Chromium `found-in-page` payload (structural subset). */

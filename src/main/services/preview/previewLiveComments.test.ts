@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Building one live view's comment service (docs/designs/html-preview-comments.md
+ * Building one live view's comment service (docs/designs/comments/html-preview-comments.md
  * §4.2, §7.5): only when both halves exist, from the view's own parts, and
  * never throwing – a view without comments is still a preview.
  */

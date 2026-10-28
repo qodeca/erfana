@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * The comment overlay's page channels (docs/designs/html-preview-comments.md §8)
+ * The comment overlay's page channels (docs/designs/comments/html-preview-comments.md §8)
  * beside the page's other channels. Lives in `src/main` because it reads the
  * main-side link and CSP channel names (`src/shared` must not import `src/main`).
  * The preload's copies are pinned by `src/preload/previewPageComments/contract.test.ts`.

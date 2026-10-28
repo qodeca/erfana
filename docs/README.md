@@ -52,8 +52,8 @@ Erfana is an agent-native Markdown workspace – an Electron app that runs a ter
 - [Settings](./settings.md) - Settings overlay implementation notes: storage and parse rules, API-key and model storage, the `files.exclude` list, terminal screen-reader mode. The user-facing list of settings is the [settings reference](./user-guide/reference/settings.md)
 
 ### UI/UX
-- **[Design system](design-system/index.html)** - the cards that decide colours, type, spacing, surfaces, focus, motion, layering and each component (MANDATORY for UI changes; open it in a browser)
-- [UI Style Guide](./ui-style-guide.md) - text-selection policy and the dark-only stance; its visual sections are stubs pointing at the cards
+- **[Design system](design-system/index.html)** - the cards that decide the foundations, each component and each pattern (MANDATORY for UI changes; open it in a browser). How to use and change it: [`design-system/README.md`](design-system/README.md); every `deviates:` marker in the code: the [deviation register](design-system/deviations.html)
+- [UI Style Guide](./ui-style-guide.md) - the `erf-` class namespace and token-discipline notes; every other section is a stub pointing at a card (text selection and dark-only are on the [Theme card](design-system/system/foundations/theme.html))
 - [UI Style Guide Reference](./ui-style-guide-reference.md) - common token gotchas left over from the v0.5.3 token migration
 - [UI Components](./ui-components.md) - React component architecture
 - [Keyboard Shortcuts](./keyboard-shortcuts.md) - Application keyboard shortcuts
@@ -115,28 +115,28 @@ Erfana is an agent-native Markdown workspace – an Electron app that runs a ter
 
 ### Design records and plans
 
-Not to be confused with **[`docs/design-system/`](design-system/index.html)**, which is the design system. All design *notes* live in `docs/designs/`. They mix three file-naming conventions (`<issue>-<slug>.md`, `issue-<issue>-<slug>.md` and the older `design-issue-<n>.md`), because two folders were merged into one; spec design notes use `sd-<spec>-<slug>.md`.
+Not to be confused with **[`docs/design-system/`](design-system/index.html)**, which is the design system – rules for the whole app. Every feature design lives in `docs/designs/<functionality>/`, one folder per functionality with its own `README.md`; a design there cites cards and never decides a system rule. The full list, screens included, is the generated [`designs/index.html`](designs/index.html) (folder rules: [`designs/README.md`](designs/README.md)); the entries below are the most-linked notes.
 
-- [Packaging guards for `extraFiles` / `extraResources`](./designs/design-issue-55.md) - Build-time leak guards beyond the `files:` allowlist (issue #55)
-- [Renderer crash on very large projects](./designs/design-issue-60.md) - `flattenTree` stack overflow, error containment (root + panel boundaries), crash trail (issue #60)
-- [Multi-page HTML preview](./designs/design-issue-124.md) - Frames, same-tab links with history, and Open in default browser (issue #124)
-  - [Part 1: the preview stays inside its panel](./designs/design-issue-124-part1.md)
-  - [Part 2: frames show pages from the same project](./designs/design-issue-124-part2.md)
-  - [Part 3: links can open in the same tab](./designs/design-issue-124-part3.md)
-  - [Part 4: open in default browser](./designs/design-issue-124-part4.md)
-  - [Phase 5 as built – deviations log](./designs/design-issue-124-impl.md)
-  - [Planned files](./designs/design-issue-124-files.md) and [planned files, G6 and G7](./designs/design-issue-124-files-g6g7.md)
-- [Claude Code status bar](./designs/216-claude-status-bar.md) - Per-terminal context status bar design (issue #216; Windows follow-up #217)
-- [Model capability registry](./designs/41-model-capability-registry.md) - Shared model-id parser + context-window capability table (issue #41)
-- [Context-meter freeze after compaction](./designs/47-context-meter-freeze.md) - Bounded fallback read + per-file-version result cache (issue #47)
-- [Clipboard service](./designs/issue-203-clipboard-service.md) - Central text-clipboard service design (issue #203)
-- [Large projects on Windows](./designs/211-large-project-windows-watcher.md) - Native Windows directory watcher, the `files.exclude` list, and the watcher starting after the first tree read (issue #211); measured in the [W0 spike on `fs.watch`](./spikes/211-windows-fs-watch.md) and the [W17 manual Windows run](./performance/211-large-project-windows-run.md) (no-exclusion arm; the with-exclusion arm is pending)
-- [`http://` and IPv6 in the preview](./designs/108-http-and-ipv6-in-the-preview.md) - What Chromium does with `http://` and IPv6 hosts in the HTML preview (issue #108)
-- [Illustrated user guide](./designs/138-user-guide/README.md) - Guide outline, screenshot list, demo project and capture script (issue #138, proposed); [feature inventory](./user-guide/feature-inventory.md), [research](./designs/138-user-guide/research.md), [spec and plan](./features/138-user-guide.md)
-- [README and GitHub presentation](./designs/139-readme-redesign/README.md) - Banner, demo loop, page structure and fact audit for the README redesign (issue #139)
-- [HTML preview with CSS and JavaScript](./designs/sd-074-html-preview.md) - Sealed-box live preview that runs a project's real CSS and JavaScript (spec 074, issue #74)
-- [Preview link navigation and multiple views](./designs/sd-074b-preview-navigation-and-multiview.md) - In-page link navigation and independent preview tabs (spec 074; superseded in part by #124)
-- [HTML Preview comments](./designs/html-preview-comments.md) - Comments on page elements, stored as `erfana:comment v1` blocks in the `.html` file (shipped in v0.23.1); sub-frame decision in [ADR 0005](./adrs/0005-sub-frame-preload-one-receive-channel.md)
+- [Packaging guards for `extraFiles` / `extraResources`](./designs/packaging/design-issue-55.md) - Build-time leak guards beyond the `files:` allowlist (issue #55)
+- [Renderer crash on very large projects](./designs/large-projects/design-issue-60.md) - `flattenTree` stack overflow, error containment (root + panel boundaries), crash trail (issue #60)
+- [Multi-page HTML preview](./designs/html-preview/multi-page/design-issue-124.md) - Frames, same-tab links with history, and Open in default browser (issue #124)
+  - [Part 1: the preview stays inside its panel](./designs/html-preview/multi-page/design-issue-124-part1.md)
+  - [Part 2: frames show pages from the same project](./designs/html-preview/multi-page/design-issue-124-part2.md)
+  - [Part 3: links can open in the same tab](./designs/html-preview/multi-page/design-issue-124-part3.md)
+  - [Part 4: open in default browser](./designs/html-preview/multi-page/design-issue-124-part4.md)
+  - [Phase 5 as built – deviations log](./designs/html-preview/multi-page/design-issue-124-impl.md)
+  - [Planned files](./designs/html-preview/multi-page/design-issue-124-files.md) and [planned files, G6 and G7](./designs/html-preview/multi-page/design-issue-124-files-g6g7.md)
+- [Claude Code status bar](./designs/context-meter/216-claude-status-bar.md) - Per-terminal context status bar design (issue #216; Windows follow-up #217)
+- [Model capability registry](./designs/context-meter/41-model-capability-registry.md) - Shared model-id parser + context-window capability table (issue #41)
+- [Context-meter freeze after compaction](./designs/context-meter/47-context-meter-freeze.md) - Bounded fallback read + per-file-version result cache (issue #47)
+- [Clipboard service](./designs/clipboard/issue-203-clipboard-service.md) - Central text-clipboard service design (issue #203)
+- [Large projects on Windows](./designs/large-projects/211-large-project-windows-watcher.md) - Native Windows directory watcher, the `files.exclude` list, and the watcher starting after the first tree read (issue #211); measured in the [W0 spike on `fs.watch`](./spikes/211-windows-fs-watch.md) and the [W17 manual Windows run](./performance/211-large-project-windows-run.md) (no-exclusion arm; the with-exclusion arm is pending)
+- [`http://` and IPv6 in the preview](./designs/html-preview/108-http-and-ipv6-in-the-preview.md) - What Chromium does with `http://` and IPv6 hosts in the HTML preview (issue #108)
+- [Illustrated user guide](./designs/user-guide/README.md) - Guide outline, screenshot list, demo project and capture script (issue #138, proposed); [feature inventory](./user-guide/feature-inventory.md), [research](./designs/user-guide/research.md), [spec and plan](./features/138-user-guide.md)
+- [README and GitHub presentation](./designs/readme/README.md) - Banner, demo loop, page structure and fact audit for the README redesign (issue #139)
+- [HTML preview with CSS and JavaScript](./designs/html-preview/sd-074-html-preview.md) - Sealed-box live preview that runs a project's real CSS and JavaScript (spec 074, issue #74)
+- [Preview link navigation and multiple views](./designs/html-preview/sd-074b-preview-navigation-and-multiview.md) - In-page link navigation and independent preview tabs (spec 074; superseded in part by #124)
+- [HTML Preview comments](./designs/comments/html-preview-comments.md) - Comments on page elements, stored as `erfana:comment v1` blocks in the `.html` file (shipped in v0.23.1); sub-frame decision in [ADR 0005](./adrs/0005-sub-frame-preload-one-receive-channel.md)
 
 ### Future Features (Planned)
 - [Graph Engine](./future/graph-engine.md) – SQLite + vec + FTS5 knowledge graph (not yet implemented). The full specification lives in [`future/graph-engine/`](./future/graph-engine/), covering the data model, embeddings, hybrid search, MCP server, packaging and performance, plus a milestone-by-milestone [implementation guide](./future/graph-engine/implementation-guide/) and [wireframes](./future/graph-engine/wireframes/)
@@ -170,13 +170,13 @@ Archived documentation was removed from the tree on 2026-10-25. It stays in git 
 
 ## Folders added by the Xezar pipeline
 
-The pipeline's process documents sit at the repository root: [SDLC.md](../SDLC.md) (how work moves), [AGENTS.md](../AGENTS.md) (what every agent runs), [CODE_REVIEW.md](../CODE_REVIEW.md) and [BACKWARD_COMPATIBILITY.md](../BACKWARD_COMPATIBILITY.md). New pipeline designs go in `designs/<feature>/`; the single-file notes already in `designs/` stay as they are.
+The pipeline's process documents sit at the repository root: [SDLC.md](../SDLC.md) (how work moves), [AGENTS.md](../AGENTS.md) (what every agent runs), [CODE_REVIEW.md](../CODE_REVIEW.md) and [BACKWARD_COMPATIBILITY.md](../BACKWARD_COMPATIBILITY.md). Every design goes in `designs/<functionality>/` – no single-file notes are left loose in `designs/`.
 
 A folder appears when its first document does, so some of these do not exist yet.
 
 | Path | What lands there | Who it is for |
 |---|---|---|
-| `designs/` | one folder per designed feature, and the [index](designs/README.md) | whoever builds or reviews a screen |
+| `designs/` | one folder per functionality, each with a `README.md`; the [folder rules](designs/README.md) and the generated [index](designs/index.html) | whoever builds or reviews a screen |
 | `adrs/` | decision records and architecture pages (shared with the records above) | anyone about to reverse a choice |
 | `spikes/` | the findings page of a spike, never its prototype code | whoever decides after the spike |
 | `runbooks/` | what to do when an alert fires, how a release is rolled back | whoever is on call |

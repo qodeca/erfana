@@ -1,0 +1,211 @@
+<!-- @card group="Components" name="Tooltip" subtitle="A description on hover and focus – never a name, never the only way to learn something" status="proposed" reviewed="never" answers="Add a tooltip; Show a keyboard shortcut; Replace a title attribute" -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tooltip – Erfana design system</title>
+<link rel="stylesheet" href="../../../tokens.css">
+<link rel="stylesheet" href="../../../ds.css">
+<link rel="stylesheet" href="../button/button.css">
+<link rel="stylesheet" href="tooltip.css">
+<style>
+  /* Documentation chrome. A stage leaves room above and below for the tooltip. */
+  .tt-stage { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-16);
+              padding: var(--space-24) var(--space-16); background: var(--color-bg-secondary); margin-bottom: var(--space-12); }
+  .tt-frames .ds-frame > div { position: relative; display: flex; align-items: flex-end;
+                                    min-block-size: calc(var(--space-24) * 2.5); padding-top: var(--space-24);
+                                    background: var(--color-bg-secondary); padding-inline: var(--space-6); }
+  .tt-frames .ds-frame > div.tt-top { align-items: flex-start; padding-top: var(--space-4); }
+  .tt-frames .ds-frame > div.tt-right { justify-content: flex-end; }
+  .tt-frames .ds-frame > div.tt-left { padding-inline: 0; }
+  .tt-frames .ds-frame > div.tt-right { padding-inline: 0; }
+  .tt-panel-edge { border-inline: var(--border-width) dashed var(--color-border-subtle); }
+  .tt-panel-top { border-block-start: var(--border-width) dashed var(--color-border-subtle); }
+  /* A dialog footer, its left edge drawn, with the toggletip forced open below its "i" button. */
+  .tt-frames .ds-frame > div.tt-footer { align-items: flex-start; justify-content: space-between; gap: var(--space-8);
+                                         padding: var(--space-6) var(--space-6) calc(var(--space-24) * 2.5) 0;
+                                         border-block-start: var(--border-width) dashed var(--color-border-subtle);
+                                         border-inline-start: var(--border-width) dashed var(--color-border-subtle); }
+  .tt-footer__actions { display: flex; gap: var(--space-4); }
+  .tt-toggletip-pin { position: relative; display: inline-flex; }
+  .tt-toggletip-pin > .erf-toggletip { position: absolute; inset-block-start: calc(100% + var(--space-2)); inset-inline-start: 0;
+                                       inline-size: max-content; }
+
+  /* A drawing of the native title bubble: the thing NOT to use. */
+  .tt-native-title { /* mockup: app scale – the native title bubble */ position: absolute; inset-block-start: var(--space-4); inset-inline-start: var(--space-20);
+                     padding: 0 var(--space-2); background: var(--color-gray-100); color: var(--color-brand-black);
+                     font-family: var(--font-system); font-size: var(--text-sm); border: var(--border-width) solid var(--color-gray-500); }
+  .tt-cross { outline: var(--border-width) dashed var(--color-error); outline-offset: var(--space-2); }
+  /* Paint the otherwise invisible bridge, for the Hoverable frame only. */
+  .tt-show-bridge .erf-tooltip::before { background: var(--color-error); opacity: var(--opacity-active); }
+</style>
+</head>
+<body>
+<nav class="ds-crumbs" aria-label="Breadcrumb"><a href="../../../index.html">Erfana design system</a> <span aria-hidden="true">/</span> <a href="../../../index.html#components">Components</a> <span aria-hidden="true">/</span> <span aria-current="page">Tooltip</span></nav>
+<main>
+<h1>Tooltip</h1>
+<p class="ds-meta"><span class="ds-status" data-status="proposed">proposed</span> not yet reviewed</p>
+<p class="ds-lede" id="decision">
+  A tooltip is <code>.erf-tooltip</code> in <a href="tooltip.css">tooltip.css</a>: a short <strong>description</strong> that
+  appears on hover <em>and</em> on keyboard focus, can be hovered itself, stays until the pointer or focus leaves or
+  <kbd>Esc</kbd> is pressed, and is linked with <code class="ds-nowrap">aria-describedby</code>. It is never the control's name, never
+  a <code>title</code> attribute, never interactive, and never the only place information lives.
+</p>
+
+<div class="ds-note">
+  <strong>Why a card now.</strong> Erfana ships two tooltips that disagree – <code>.dialog-tooltip</code> in
+  <code>Dialog.css</code> and <code>.chat-tooltip</code> in <code>ChatBubble.css</code>, with different fills, edges
+  and shortcut keys – and both are built so WCAG 2.2 SC 1.4.13 fails: <code>pointer-events: none</code> means the
+  pointer cannot move onto them, and <kbd>Esc</kbd> closes the whole dialog instead of the tooltip. Neither is linked
+  to its button, so its text never reaches a screen reader. Everywhere else the renderer reaches for
+  <code>title</code>, which is no tooltip at all.
+</div>
+
+<h2 id="live">Live</h2>
+<p class="ds-muted">Real triggers with the proposed CSS. Hover them, move the pointer onto the tooltip, tab to them.
+Pure CSS: <kbd>Esc</kbd> is not wired on this page, because a static page cannot listen for a key – the app must.</p>
+<div class="tt-stage">
+  <span class="erf-tooltip-anchor">
+    <button type="button" class="erf-button erf-button--icon" aria-label="Project" aria-describedby="tt-project-keys" aria-keyshortcuts="Meta+B"><svg data-icon="folder" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></button>
+    <span class="erf-tooltip" role="tooltip" id="tt-project"><span class="erf-tooltip__line">Project</span><span class="erf-tooltip__line" id="tt-project-keys"><kbd>⌘B</kbd></span></span>
+  </span>
+  <span class="erf-tooltip-anchor">
+    <button type="button" class="erf-button erf-button--secondary" aria-describedby="tt-export">Export</button>
+    <span class="erf-tooltip" role="tooltip" id="tt-export">Writes a PDF next to the file. Images are embedded.</span>
+  </span>
+  <span class="erf-tooltip-anchor">
+    <button type="button" class="erf-button erf-button--toggle" aria-pressed="false" aria-label="Case sensitive" aria-describedby="tt-case-keys" aria-keyshortcuts="Alt+Meta+C">Aa</button>
+    <span class="erf-tooltip" role="tooltip" id="tt-case"><span class="erf-tooltip__line">Case sensitive</span><span class="erf-tooltip__line" id="tt-case-keys"><kbd>⌥⌘C</kbd></span></span>
+  </span>
+  <span>
+    <button type="button" class="erf-button erf-button--icon" popovertarget="tt-keys" aria-label="Keyboard shortcuts" style="anchor-name: --tt-keys"><svg data-icon="info" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></button>
+    <span class="erf-toggletip" id="tt-keys" popover style="position-anchor: --tt-keys"><kbd>⌘Enter</kbd> to submit<br><kbd>Esc</kbd> to cancel</span>
+  </span>
+</div>
+<p class="ds-muted">The shortcuts are real and written in the macOS glyph form: Project <kbd>⌘B</kbd>
+(<code>activityBarConfig.ts</code>), Case sensitive <kbd>⌥⌘C</kbd> (<code>SearchBar.tsx</code>) and
+<kbd>⌘Enter</kbd> to submit (<code>PromptDialog.tsx</code>). On Windows and Linux the same box reads
+<kbd>Ctrl+B</kbd>, <kbd>Alt+C</kbd> and <kbd>Ctrl+Enter</kbd> – see
+<a href="../../foundations/writing.html#shortcuts">Writing – Keyboard shortcuts</a>. Each trigger points
+<code class="ds-nowrap">aria-describedby</code> at the shortcut line only, so the name is not read twice, and declares the keys in
+<code class="ds-nowrap">aria-keyshortcuts</code>.</p>
+<p class="ds-muted">The last one is a <strong>toggletip</strong>: click it or press <kbd>Enter</kbd>. Its button exists
+only to show that text, so it opens on activation and works on touch – the shape the dialog and chat “i” buttons
+should take.</p>
+
+<h2 id="states">Every state</h2>
+<p class="ds-muted">Static pictures, forced open with the documentation-only <code>.is-open</code> hook on the anchor.</p>
+<div class="ds-frames tt-frames">
+  <figure class="ds-frame"><div inert aria-hidden="true">
+      <span class="erf-tooltip-anchor"><button type="button" class="erf-button erf-button--icon" aria-label="Copy path"><svg data-icon="copy" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button><span class="erf-tooltip">Copy path</span></span></div>
+    <figcaption><strong>Resting</strong> – hidden, but in the DOM, so <code>aria-describedby</code> still resolves.</figcaption></figure>
+  <figure class="ds-frame"><div inert aria-hidden="true">
+      <span class="erf-tooltip-anchor is-open"><button type="button" class="erf-button erf-button--icon is-hover" aria-label="Copy path"><svg data-icon="copy" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button><span class="erf-tooltip">Copy path</span></span></div>
+    <figcaption><strong>Hover</strong> – above, start-aligned, <code>--space-2</code> off the trigger.</figcaption></figure>
+  <figure class="ds-frame"><div inert aria-hidden="true">
+      <span class="erf-tooltip-anchor is-open"><button type="button" class="erf-button erf-button--icon is-focus" aria-label="Copy path"><svg data-icon="copy" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button><span class="erf-tooltip">Copy path</span></span></div>
+    <figcaption><strong>Focus-visible</strong> – the same tooltip, at once. Keyboard users get it too.</figcaption></figure>
+  <figure class="ds-frame"><div inert aria-hidden="true">
+      <span class="erf-tooltip-anchor is-open"><button type="button" class="erf-button erf-button--icon is-hover" aria-label="Project"><svg data-icon="folder" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></button><span class="erf-tooltip"><span class="erf-tooltip__line">Project</span><span class="erf-tooltip__line"><kbd>⌘B</kbd></span></span></span></div>
+    <figcaption><strong>With a shortcut</strong> – the action, then the shortcut on its own line in one <code>&lt;kbd&gt;</code>: the string <code>formatShortcut</code> returns (<kbd>Ctrl+B</kbd> on Windows and Linux).</figcaption></figure>
+  <figure class="ds-frame"><div inert aria-hidden="true">
+      <span class="erf-tooltip-anchor is-open"><button type="button" class="erf-button erf-button--secondary is-hover">Export</button><span class="erf-tooltip">Writes a PDF next to the file. Images are embedded, links stay live.</span></span></div>
+    <figcaption><strong>Long text</strong> – wraps at <code>32ch</code>. Two lines is the limit; more belongs on the surface.</figcaption></figure>
+  <figure class="ds-frame"><div class="tt-left tt-panel-edge" inert aria-hidden="true">
+      <span class="erf-tooltip-anchor is-open"><button type="button" class="erf-button erf-button--icon is-hover" aria-label="Collapse"><svg data-icon="arrow-left" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg></button><span class="erf-tooltip">Collapse sidebar</span></span></div>
+    <figcaption><strong>Left edge</strong> – start-aligned (the default), so it grows inward.</figcaption></figure>
+  <figure class="ds-frame"><div class="tt-right tt-panel-edge" inert aria-hidden="true">
+      <span class="erf-tooltip-anchor is-open"><button type="button" class="erf-button erf-button--icon is-hover" aria-label="Close"><svg data-icon="x" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button><span class="erf-tooltip erf-tooltip--end">Close preview</span></span></div>
+    <figcaption><strong>Right edge</strong> – <code>.erf-tooltip--end</code>, aligned to the trigger's end.</figcaption></figure>
+  <figure class="ds-frame"><div class="tt-top tt-panel-top" inert aria-hidden="true">
+      <span class="erf-tooltip-anchor is-open"><button type="button" class="erf-button erf-button--icon is-hover" aria-label="Refresh"><svg data-icon="refresh-cw" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg></button><span class="erf-tooltip erf-tooltip--below">Refresh preview</span></span></div>
+    <figcaption><strong>Top edge</strong> – <code>.erf-tooltip--below</code>, for a toolbar at the top of a panel.</figcaption></figure>
+  <figure class="ds-frame"><div class="tt-show-bridge" inert aria-hidden="true">
+      <span class="erf-tooltip-anchor is-open"><button type="button" class="erf-button erf-button--icon is-hover" aria-label="Copy path"><svg data-icon="copy" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button><span class="erf-tooltip">Copy path</span></span></div>
+    <figcaption><strong>Hoverable</strong> – the tinted strip is the bridge over the gap. The pointer crosses it onto the tooltip and the tooltip stays (1.4.13).</figcaption></figure>
+  <figure class="ds-frame"><div inert aria-hidden="true">
+      <span class="tt-cross"><button type="button" class="erf-button erf-button--icon is-hover"><svg data-icon="copy" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button></span><span class="tt-native-title">Copy path</span></div>
+    <figcaption><strong>Never: <code>title</code></strong> – an OS bubble after a delay nobody sets, mouse only, not hoverable, not on focus, and on an icon button it is the only name.</figcaption></figure>
+  <figure class="ds-frame"><div class="tt-footer" inert aria-hidden="true">
+      <span class="tt-toggletip-pin"><button type="button" class="erf-button erf-button--icon is-focus" aria-label="Keyboard shortcuts"><svg data-icon="info" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></button><span class="erf-toggletip"><kbd>⌘Enter</kbd> to submit<br><kbd>Esc</kbd> to cancel</span></span>
+      <span class="tt-footer__actions"><button type="button" class="erf-button erf-button--secondary">Cancel</button><button type="button" class="erf-button erf-button--primary">Run</button></span></div>
+    <figcaption><strong>Toggletip, open</strong> – at a dialog footer's left edge, start-aligned below the “i” so it grows inward. A click, <kbd>Enter</kbd> or <kbd>Space</kbd> on the button opens it; the same again, <kbd>Esc</kbd>, a click outside or <kbd>Tab</kbd> away closes it. Focus stays on the button while it is open.</figcaption></figure>
+</div>
+
+<h2 id="rules">The rules</h2>
+<table>
+  <thead><tr><th>Rule</th><th>Why</th></tr></thead>
+  <tbody>
+    <tr><td><strong>The control has its own name</strong> – visible text, or <code>aria-label</code> on an icon button</td><td>The tooltip is a description. If it is removed, the control must still say what it is.</td></tr>
+    <tr><td><strong><code>title</code> is never the accessible name</strong>, and never a tooltip</td><td>Browsers fall back to <code>title</code> for the name only when nothing else names the control, and screen readers do not treat that fallback alike – so it never stands in for <code>aria-label</code> or visible text. It is not shown on keyboard focus or touch, cannot be hovered and cannot be styled.</td></tr>
+    <tr><td>The trigger points at it: <code>aria-describedby="&lt;tooltip id&gt;"</code>; the tooltip has <code>role="tooltip"</code> and stays in the DOM</td><td>A description is read after the name. Removing the node or toggling <code>aria-hidden</code> on it is not needed and only risks losing it.</td></tr>
+    <tr><td>A tooltip that only repeats the visible name adds nothing – leave it out</td><td>A text button already says it. Tooltips belong on icon buttons and on controls with a shortcut.</td></tr>
+    <tr><td><strong>Hoverable</strong> (1.4.13)</td><td>The pointer can move onto the tooltip – no <code>pointer-events: none</code>, and the gap is bridged – so a magnifier user can read it.</td></tr>
+    <tr><td><strong>Persistent</strong> (1.4.13)</td><td>It stays until hover or focus leaves, or it is dismissed. No timeout.</td></tr>
+    <tr><td><strong>Dismissible</strong> (1.4.13)</td><td><kbd>Esc</kbd> hides it without moving the pointer or focus – and is consumed, so the dialog behind it stays open. A second <kbd>Esc</kbd> reaches the dialog.</td></tr>
+    <tr><td>Nothing interactive inside</td><td>Focus never enters a tooltip. A link or button in it makes it a popover; use the toggletip.</td></tr>
+    <tr><td>Never the only place information lives</td><td>Touch has no hover. Anything needed to finish the task is on the surface, or behind a toggletip.</td></tr>
+    <tr><td>Short – one line, two at most, sentence case</td><td>It is read in passing. A paragraph belongs on the surface.</td></tr>
+    <tr><td>Shown after a short hover delay, at once on focus; no motion under reduced motion</td><td>A delay stops tooltips flashing as the pointer crosses a toolbar; focus is deliberate, so it gets no delay.</td></tr>
+  </tbody>
+</table>
+
+<h3>Contrast</h3>
+<table>
+  <thead><tr><th>Pair</th><th>Ratio</th></tr></thead>
+  <tbody>
+    <tr><td>Text: <code>--color-text-primary</code> on <code>--color-gray-800</code></td><td data-contrast="--color-text-primary on --color-gray-800" data-min="4.5" data-result="pass">6.86:1 · pass</td></tr>
+    <tr><td>Toggletip text: <code>--color-text-primary</code> on <code>--color-gray-800</code> (the same fill as a tooltip)</td><td data-contrast="--color-text-primary on --color-gray-800" data-min="4.5" data-result="pass">6.86:1 · pass</td></tr>
+    <tr><td>Shortcut: <code>--color-text-bright</code> on <code>--color-bg-tertiary</code></td><td data-contrast="--color-text-bright on --color-bg-tertiary" data-min="4.5" data-result="pass">11.60:1 · pass</td></tr>
+    <tr><td>Fill against a panel: <code>--color-gray-800</code> on <code>--color-bg-secondary</code> – a step too small to be a boundary on its own (the ratio is baked beside it), so the edge and shadow carry it</td><td data-contrast="--color-gray-800 on --color-bg-secondary">1.24:1</td></tr>
+    <tr><td>Why not the dialog tooltip's fill: <code>--color-bg-secondary</code> over a panel of <code>--color-bg-secondary</code> – fine inside a dialog, gone over any panel</td><td data-contrast="--color-bg-secondary on --color-bg-secondary">1.00:1</td></tr>
+  </tbody>
+</table>
+
+<h2 id="keyboard">The keyboard contract</h2>
+<table class="ds-keys">
+  <thead><tr><th>Key</th><th>Result</th><th>Focus ends on</th></tr></thead>
+  <tbody>
+    <tr><td><kbd>Tab</kbd> to the trigger</td><td>The tooltip shows at once</td><td>The trigger</td></tr>
+    <tr><td><kbd>Esc</kbd> while it shows</td><td>The tooltip hides; the event stops there, so a dialog behind it stays open</td><td>The trigger – focus does not move</td></tr>
+    <tr><td><kbd>Esc</kbd> again</td><td>Reaches the surface: the dialog closes</td><td>The control that opened the dialog</td></tr>
+    <tr><td><kbd>Tab</kbd> away</td><td>The tooltip hides</td><td>The next control</td></tr>
+    <tr><td><kbd>Tab</kbd> while a hover tooltip shows on another control</td><td>The hover tooltip hides, so it never covers the control that now has focus (<a href="../../foundations/focus.html#obscured">Focus not obscured</a>)</td><td>The next control</td></tr>
+    <tr><td><kbd>Enter</kbd> / <kbd>Space</kbd> on a toggletip</td><td>Opens it; again closes it</td><td>The toggletip button</td></tr>
+    <tr><td><kbd>Esc</kbd> or a click outside a toggletip</td><td>Closes it (native popover light dismiss)</td><td>The toggletip button</td></tr>
+    <tr><td><kbd>Tab</kbd> away from an open toggletip</td><td>Closes it</td><td>The next control</td></tr>
+  </tbody>
+</table>
+<p class="ds-muted">A hover tooltip hides when keyboard focus moves to another control – the pointer may still rest on
+its trigger, but the tooltip must not sit over the newly focused control. No app test holds a tooltip to this
+contract yet. The <kbd>Esc</kbd> rows, the hover tooltip hiding on a focus move, and the toggletip closing on
+<kbd>Tab</kbd> away need script – a native popover is not dismissed when focus leaves it – which this static page
+cannot have. They are the part a test must prove.</p>
+
+<section id="exceptions">
+<h2>Exceptions</h2>
+<p class="ds-muted">None recorded. No <code>deviates:</code> marker points at this card yet; a shipping file that
+departs from it on purpose carries one at the site and gets a row here.</p>
+</section>
+
+<section id="defects">
+<h2>Defects this card names</h2>
+<p class="ds-muted">What ships today and breaks the rules above. These are not exceptions: nothing in the app
+says it departs on purpose. They stay listed until <code>.erf-tooltip</code> is adopted.</p>
+<table>
+  <thead><tr><th>File</th><th>Defect</th></tr></thead>
+  <tbody>
+    <tr><td><code>Dialog.css</code>, <code>ChatBubble.css</code></td><td><code>pointer-events: none</code> – not hoverable (1.4.13). Two fills and two edges for one component.</td></tr>
+    <tr><td><code>PromptDialog.tsx</code>, <code>FileSystemDialog.tsx</code>, <code>ChatBubble.tsx</code></td><td>The info button opens a hover tooltip it should be a toggletip for; the tooltip is not linked with <code class="ds-nowrap">aria-describedby</code>; <kbd>Esc</kbd> closes the dialog or panel instead of the tooltip.</td></tr>
+    <tr><td>Renderer <code>.tsx</code> files</td><td><code>title=</code> used as a tooltip, and on some icon buttons as the only name.</td></tr>
+  </tbody>
+</table>
+</section>
+
+</main>
+</body>
+</html>

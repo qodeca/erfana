@@ -3,7 +3,7 @@
 /**
  * Guard 1 — parse the capability tables out of the DESIGN DOCUMENT (#41 §9.4.2).
  *
- * Reads `docs/designs/41-model-capability-registry.md` §7.1 (exact-id map) and
+ * Reads `docs/designs/context-meter/41-model-capability-registry.md` §7.1 (exact-id map) and
  * §7.1.1 (undecomposable-id map) and returns their rows. It reads THE DOCUMENT
  * and never `modelId.ts`, so a test comparing this against the oracle table
  * detects design-versus-code divergence in either direction. Had it existed on
@@ -26,7 +26,7 @@
  *
  * Not collected by vitest: the filename carries no `.test.` segment.
  *
- * @see docs/designs/41-model-capability-registry.md §7.1 (parsing contract), §9.4.2
+ * @see docs/designs/context-meter/41-model-capability-registry.md §7.1 (parsing contract), §9.4.2
  */
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -41,7 +41,7 @@ export interface DesignCapabilityRow {
 /** Absolute path to the design document, resolved from this file's location. */
 export const DESIGN_DOC_PATH = resolve(
   __dirname,
-  '../../../../../docs/designs/41-model-capability-registry.md'
+  '../../../../../docs/designs/context-meter/41-model-capability-registry.md'
 )
 
 /** The header the tables must carry, verbatim. Column order is load-bearing. */

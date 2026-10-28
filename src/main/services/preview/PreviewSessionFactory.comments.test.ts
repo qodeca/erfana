@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * PreviewSessionFactory × HTML Preview comments: the flag picks the view's
- * `WebPreferences` when the view is built (docs/designs/html-preview-comments.md
+ * `WebPreferences` when the view is built (docs/designs/comments/html-preview-comments.md
  * §3 "Feature flag", §4.2; SEC-22; docs/adrs/0005-sub-frame-preload-one-receive-channel.md).
  *
  * The default `buildWebPreferences` runs here – that default is the code under

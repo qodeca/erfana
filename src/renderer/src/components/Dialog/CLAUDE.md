@@ -31,7 +31,7 @@ Every open BaseDialog (trapping or not – a `trapFocus={false}` dialog on top m
 
 ## Dialog buttons (mandatory – never create custom button styles)
 
-Use the `.dialog-btn` classes from `Dialog.css` (`.dialog-btn` is always required, plus one of `-primary` / `-secondary` / `-danger`).
+Use the `.dialog-btn` classes from `Dialog.css` (`.dialog-btn` is always required, plus one of `-primary` / `-secondary` / `-danger`). Visual rules: the Dialog pattern card (`docs/design-system/system/patterns/dialog/`) and the Buttons card (`docs/design-system/system/components/button/`), both `proposed`.
 
 `.dialog-btn` / `-primary` / `-secondary` have an out-of-directory consumer: `RootErrorFallback` (the crash-recovery screen) references them from markup while `RootErrorBoundary.css` deliberately never declares them, relying on `Dialog.css` already being in the entry bundle at crash time. A future "scope these to dialogs only" cleanup would leave the crash screen with unstyled buttons – caught by the "shared Dialog.css contract" block in `../RootErrorBoundary/RootErrorBoundary.css.test.ts`, which asserts both halves: that `Dialog.css` still declares `.dialog-btn` / `-primary` / `-secondary`, and that `RootErrorBoundary.css` never re-declares them.
 

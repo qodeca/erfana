@@ -93,7 +93,7 @@ function AppContent() {
  * Rendered inside `RootErrorBoundary`'s subtree, so the throw is caught by the
  * boundary rather than blanking the window.
  *
- * @see docs/designs/design-issue-60.md §2.8
+ * @see docs/designs/large-projects/design-issue-60.md §2.8
  */
 function ForcedCrash(): null {
   if (window.__ERFANA_FORCE_CRASH__ === true) {

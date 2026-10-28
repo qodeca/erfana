@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * fast-check generators for the htmlComments property tests
- * (docs/designs/html-preview-comments.md §17 "L1p property", P-001–P-007):
+ * (docs/designs/comments/html-preview-comments.md §17 "L1p property", P-001–P-007):
  * comment data full of hostile text, and HTML documents from a small grammar.
  *
  * Every character that is invisible or reorders text is built from its number,

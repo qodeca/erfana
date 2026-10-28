@@ -14,7 +14,7 @@
  * terminals are not re-rendered (arch §10 "store selector contract").
  *
  * @see Issue #216 - Per-terminal Claude Code context status bar
- * @see docs/designs/216-claude-status-bar.md §10
+ * @see docs/designs/context-meter/216-claude-status-bar.md §10
  */
 import { create } from 'zustand'
 import type {

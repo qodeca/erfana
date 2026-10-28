@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * HTML Preview comments – client-side validation of what the reviewer types
- * (docs/designs/html-preview-comments.md §10.4, §10.7, SEC-18).
+ * (docs/designs/comments/html-preview-comments.md §10.4, §10.7, SEC-18).
  *
  * Main is the authority: `CommentSaveRequestSchema` re-checks every message
  * and the writer refuses a bidi or control character in an author. These

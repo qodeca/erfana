@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Settings → Comments (docs/designs/html-preview-comments.md §10.8; R-014).
+ * Settings → Comments (docs/designs/comments/html-preview-comments.md §10.8; R-014).
  */
 import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'

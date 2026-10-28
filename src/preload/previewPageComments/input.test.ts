@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Comment mode's input guards and picks (docs/designs/html-preview-comments.md
+ * Comment mode's input guards and picks (docs/designs/comments/html-preview-comments.md
  * §3, §7.1–§7.3, decision 19; J-003, J-004, J-009, J-012, J-013, J-015,
  * SEC-02, SEC-03, SEC-29).
  */

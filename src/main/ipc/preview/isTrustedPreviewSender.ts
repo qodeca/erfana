@@ -16,7 +16,7 @@
  *  - **Production**: the sender URL must equal the exact bundled renderer file
  *    URL — pinned the same way `src/main/index.ts` loads it.
  *
- * @see docs/designs/sd-074-html-preview.md §4.3, §7.1 debt item 31
+ * @see docs/designs/html-preview/sd-074-html-preview.md §4.3, §7.1 debt item 31
  * @see src/main/ipc/claude-status-handlers.ts (the mirrored predicate)
  */
 import { pathToFileURL } from 'node:url'

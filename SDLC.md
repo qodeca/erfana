@@ -663,7 +663,7 @@ locally before it merges, with the result in the pull request.
 | Gate | State |
 |---|---|
 | QA gate | On. Browser tool: `playwright` (Electron) |
-| Design gate | Awake: the renderer, its panels, dialogs and the preview. The design system is `docs/design-system/` (open `docs/design-system/index.html`); a card marked `status="decided"` is binding. Designs: `docs/designs/` |
+| Design gate | Awake: the renderer, its panels, dialogs and the preview. The design system is `docs/design-system/` (open `docs/design-system/index.html`); a card marked `status="decided"` is binding. Designs: `docs/designs/<functionality>/` |
 | Verdicts name the head | Yes (`gates.requireVerdictHead: true`) |
 | Deploy | Asleep: Erfana ships as signed desktop releases |
 | Performance budgets, localisation | Asleep (`[]`) |
@@ -698,6 +698,30 @@ Failure recovery: `docs/build/release.md`. Incident notes: `docs/release-inciden
 - An agent creates or changes an issue only when the owner asked for it or this file requires it
   (a deferred finding, a hotfix follow-up).
 - Install with `npm ci`; never commit a `package-lock.json` that `npm install` rewrote.
+
+### Design system in this project
+
+The rules themselves live in `CLAUDE.md` (§ Design system) and
+[`docs/design-system/README.md`](docs/design-system/README.md); this section says when an agent uses
+them. The design system is the rules for the whole app. `docs/designs/` holds the design for one
+feature, and a design there cites cards – it never decides a system rule.
+
+- **Designing.** Before drawing, read the card for every part the change touches. Save the design in
+  `docs/designs/<functionality>/` and list the cards it builds on, with their status. A part the app
+  needs and no card covers gets a new card marked `proposed`, in the same pull request.
+- **Building.** Use the tokens and the component CSS the cards name. A departure from a card is
+  allowed only with a `/* deviates: … */` comment at the site and a row in that card's Exceptions; an
+  undocumented one is a review finding. An app defect a card names goes in the README defects list.
+- **Who decides.** An agent may create and edit `proposed` cards. Owner-only, adding to § Owner-only
+  decisions: promoting a card to `decided`, changing what a `decided` card requires, and superseding
+  one. An agent that edits a `decided` card for any other reason (a fact, a link, a typo) says so in
+  the pull request, and the owner re-dates the card's `reviewed` field after reading it.
+- **Checks.** Design pages are HTML, CSS and images only – no JavaScript. `npm run design -- --check`
+  and `npm run lint:css` run in the required `Lint` job; run both before pushing a design change, and
+  after a code change to tokens, synced component CSS, icons or a `deviates` marker, regenerate with
+  `npm run design` and commit the result.
+- **Review.** The design review checks that the change follows every card its design cites, and that
+  each deviation is recorded. A screenshot of the changed screen is part of the evidence.
 
 ### Guards in this project
 
@@ -737,3 +761,9 @@ None.
 - The PR template still asks for both `test:ci` and `test:cov`; the gate runs only `test:cov`.
 - `CONTRIBUTING.md` lists `npm run lint` (with `--fix`); the gate runs `lint:check`.
 - The release skill cites the dead design anchor #174 and an unversioned `model: opus`.
+- The kit design skills (`xezar-design-system`, `xezar-ux-design`, `xezar-ui-design`) and the
+  `design`, `design-review` and `design-system` workflows expect twelve `.md` pages (`known-gaps.md`,
+  `recipes.md`, `usage.md` …), one stylesheet, Draft → Approved statuses and two themes. This design
+  system is HTML cards with `proposed` / `decided` / `superseded` status, dark only, with a forced
+  colours card. Until a kit pull request fixes it, a design run reads `docs/design-system/README.md`
+  and § Design system in this project, checks dark and forced colours, and must not create those pages.

@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * HTML Preview comments – what opens the comment window
- * (docs/designs/html-preview-comments.md §7.3, §7.4, §7.7).
+ * (docs/designs/comments/html-preview-comments.md §7.3, §7.4, §7.7).
  *
  * @module HtmlPreviewPanel/comments/commentWindowTypes
  */
@@ -71,7 +71,7 @@ export type CommentWindowRequest =
 
 /**
  * The draft a pin event carries – its token and element key – if well-formed
- * ones are there (docs/designs/html-preview-comments.md §10.4 "[New comment]").
+ * ones are there (docs/designs/comments/html-preview-comments.md §10.4 "[New comment]").
  *
  * Main's events are not schema-parsed again in the renderer; a malformed
  * token would only be refused at save, after the reader typed a comment, so

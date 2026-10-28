@@ -11,7 +11,7 @@
  *
  * Not collected by vitest: the filename carries no `.test.` segment.
  *
- * @see docs/designs/41-model-capability-registry.md §9.6
+ * @see docs/designs/context-meter/41-model-capability-registry.md §9.6
  */
 import { vi, type Mock } from 'vitest'
 import { ClaudeStatusService, type ClaudeStatusDeps } from '../ClaudeStatusService'

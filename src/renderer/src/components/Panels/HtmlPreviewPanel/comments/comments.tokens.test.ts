@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * R-012 – the comments UI uses only design tokens that exist, and the page
- * overlay's theme matches them (docs/designs/html-preview-comments.md §10.2,
+ * overlay's theme matches them (docs/designs/comments/html-preview-comments.md §10.2,
  * §12.2; the same approach as `../HtmlPreviewPanel.tokens.test.ts`).
  *
  * Three halves, because the comments UI is drawn in three places:

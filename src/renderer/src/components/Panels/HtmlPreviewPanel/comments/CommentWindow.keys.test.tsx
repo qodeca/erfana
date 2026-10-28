@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * The comment window's first focus and its save key, per platform
- * (docs/designs/html-preview-comments.md §10.4, §19 "Rev 4 – owner test:
+ * (docs/designs/comments/html-preview-comments.md §10.4, §19 "Rev 4 – owner test:
  * comment window focus and save key"; R-003, R-013).
  *
  * The owner's report: the window opened without the keyboard in its field, and

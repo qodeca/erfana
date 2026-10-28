@@ -21,7 +21,7 @@ Erfana exports Markdown as PDF or Word, an HTML preview as PDF, and viewed image
 
 ## HTML page to PDF
 
-**What it does:** Saves the running HTML page as a PDF. **How to reach it:** select **Export to PDF** in the HTML preview toolbar or press <kbd>Cmd</kbd>+<kbd>S</kbd> (Windows: <kbd>Ctrl</kbd>+<kbd>S</kbd>) while the HTML preview is active. This shortcut exports; it does not save HTML source.
+**What it does:** Saves the running HTML page as a PDF. **How to reach it:** select **Export to PDF** in the HTML preview toolbar or press <kbd>⌘S</kbd> / <kbd>Ctrl+S</kbd> while the HTML preview is active. This shortcut exports; it does not save HTML source.
 
 ## Image to PNG, PDF or clipboard
 

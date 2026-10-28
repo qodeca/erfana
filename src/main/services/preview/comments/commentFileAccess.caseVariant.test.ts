@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * A comment file path that names the project root in another letter case
- * (docs/designs/html-preview-comments.md §19 Rev 4 "case-only path
+ * (docs/designs/comments/html-preview-comments.md §19 Rev 4 "case-only path
  * differences on macOS"; M-009). On Windows and macOS rules it passes the
  * lexical check, and the realpath step – not the lexical one – then decides:
  * the same folder on disk is accepted under its on-disk spelling, another

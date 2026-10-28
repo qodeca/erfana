@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * A checked pick, turned into `preview:commentDraftOpened`
- * (docs/designs/html-preview-comments.md §7.3 steps 3–5, §7.4, §7.7, §19
+ * (docs/designs/comments/html-preview-comments.md §7.3 steps 3–5, §7.4, §7.7, §19
  * R3-5, R3-6; tests M-033, M-054, E-011).
  *
  * For an element: the draft is built from disk (`commentDraftBuilder.ts`)

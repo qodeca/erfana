@@ -8,7 +8,7 @@
  * against a module that was already installed by a previous test would prove
  * nothing.
  *
- * @see docs/designs/design-issue-60.md §5 (`installGlobalErrorTrail` row)
+ * @see docs/designs/large-projects/design-issue-60.md §5 (`installGlobalErrorTrail` row)
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'

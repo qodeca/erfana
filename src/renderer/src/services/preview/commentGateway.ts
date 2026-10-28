@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * HTML Preview comments – the renderer's one door to
- * `window.api.previewComments` (docs/designs/html-preview-comments.md §4.2, §8).
+ * `window.api.previewComments` (docs/designs/comments/html-preview-comments.md §4.2, §8).
  *
  * Two jobs on top of the raw bridge (`previewCommentsGateway` in
  * `../previewGateway.ts`, the only file that reads it off `window.api`):

@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Re-attach cost of orphaned blocks in the comment parse worker
- * (docs/designs/html-preview-comments.md §5.9, §19 R3-10, R3-12).
+ * (docs/designs/comments/html-preview-comments.md §5.9, §19 R3-10, R3-12).
  *
  * A block whose element is gone falls through every re-attach tier – position,
  * `id`, CSS path, text quote – before it is orphaned. Scanned per block, the

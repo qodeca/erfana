@@ -2,9 +2,9 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * CommentsSection – Settings › Comments for HTML Preview comments
- * (docs/designs/html-preview-comments.md decision 3, §3 "Feature flag",
+ * (docs/designs/comments/html-preview-comments.md decision 3, §3 "Feature flag",
  * §7.9, §10.7, §10.10 "Settings"; R-014;
- * docs/design-system/product/html-comments/identity.html "Settings › Comments").
+ * docs/designs/comments/html-comments/identity.html "Settings › Comments").
  *
  * - **Comments in HTML preview** – the feature flag
  *   (`htmlPreview.comments.enabled`, default on). Off restores today's

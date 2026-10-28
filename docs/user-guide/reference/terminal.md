@@ -18,11 +18,11 @@ The integrated terminal runs your shell and any CLI agent you start. Erfana host
 
 ## Opening and session state
 
-**What it does:** A terminal opens when a project loads. If you close it yourself, it stays closed during that project; loading another project opens it again. **How to reach it:** the right activity bar or <kbd>Cmd</kbd>+<kbd>J</kbd> (Windows: <kbd>Ctrl</kbd>+<kbd>J</kbd>). A shell starts in the project context. If unavailable, the panel offers [recovery controls](troubleshooting.md#terminal-not-available).
+**What it does:** A terminal opens when a project loads. If you close it yourself, it stays closed during that project; loading another project opens it again. **How to reach it:** the right activity bar or <kbd>⌘J</kbd> / <kbd>Ctrl+J</kbd>. A shell starts in the project context. If unavailable, the panel offers [recovery controls](troubleshooting.md#terminal-not-available).
 
 ## Header controls
 
-**What they do:** **Scroll to bottom** jumps to the latest output; **Restart terminal** starts a new terminal session; **Lock scroll to bottom** keeps new output in view, while **Disable scroll lock** lets you scroll back; **Maximize terminal** expands it over the editor. **How to reach them:** terminal header. <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>M</kbd> (Windows: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>M</kbd>) maximizes it, opening the terminal if closed. Opening a file restores the editor layout. Restarting ends the running shell or agent, so **Restart terminal** asks first (**Restart terminal?**, with focus on **Cancel**) while Claude Code runs there, while the terminal is still producing output after you typed in it, or – on macOS – while any program other than the shell is running. On Windows Erfana cannot see which program is running, so a silent program that has printed nothing for a while is ended without a question. An idle terminal restarts straight away.
+**What they do:** **Scroll to bottom** jumps to the latest output; **Restart terminal** starts a new terminal session; **Lock scroll to bottom** keeps new output in view, while **Disable scroll lock** lets you scroll back; **Maximize terminal** expands it over the editor. **How to reach them:** terminal header. <kbd>⇧⌘M</kbd> / <kbd>Ctrl+Shift+M</kbd> maximizes it, opening the terminal if closed. Opening a file restores the editor layout. Restarting ends the running shell or agent, so **Restart terminal** asks first (**Restart terminal?**, with focus on **Cancel**) while Claude Code runs there, while the terminal is still producing output after you typed in it, or – on macOS – while any program other than the shell is running. On Windows Erfana cannot see which program is running, so a silent program that has printed nothing for a while is ended without a question. An idle terminal restarts straight away.
 
 ![Screenshot of the maximised terminal.](../images/run-an-agent/terminal-maximized.png)
 
@@ -36,7 +36,7 @@ The integrated terminal runs your shell and any CLI agent you start. Erfana host
 
 ## Copy and paste
 
-**What it does:** Right-click for **Copy** and **Paste**. On Windows, <kbd>Ctrl</kbd>+<kbd>C</kbd> copies a selection but interrupts the running process if nothing is selected. **How to reach it:** terminal context menu – right-click, or press <kbd>Shift</kbd>+<kbd>F10</kbd> (Windows: also the <kbd>Menu</kbd> key) to open it at the terminal cursor – or the [shortcut reference](keyboard-shortcuts.md#terminal).
+**What it does:** Right-click for **Copy** and **Paste**. On Windows, <kbd>Ctrl+C</kbd> copies a selection but interrupts the running process if nothing is selected. **How to reach it:** terminal context menu – right-click, or press <kbd>⇧F10</kbd> / <kbd>Shift+F10</kbd> (Windows: also the <kbd>Menu</kbd> key) to open it at the terminal cursor – or the [shortcut reference](keyboard-shortcuts.md#terminal).
 
 ## Screen readers
 

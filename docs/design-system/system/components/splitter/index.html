@@ -1,0 +1,199 @@
+<!-- @card group="Components" name="Splitter" subtitle="A 1px line with a 24px grip – a separator you can focus, arrow and read the value of" status="proposed" reviewed="never" answers="Let the user resize two panes; Make a divider keyboard-operable" -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Splitter – Erfana design system</title>
+<link rel="stylesheet" href="../../../tokens.css">
+<link rel="stylesheet" href="../../../ds.css">
+<link rel="stylesheet" href="./splitter.css">
+<style>
+  /* Forced states for the frames (documentation-only hooks, never shipped). */
+  .erf-splitter.is-hover::after { opacity: 1; }
+  .erf-splitter.is-focus { outline: none; }
+  .erf-splitter.is-focus::after { opacity: 1; }
+  .erf-splitter.is-focus::before { outline: var(--border-width-thick) solid var(--color-border-focus);
+                                   outline-offset: calc(var(--border-width-thick) * -1); }
+  /* Shows where the 24px hit area is. Documentation only. */
+  .erf-splitter.sl-show-hit::before { background: var(--color-brand-violet-muted);
+                                      outline: var(--border-width) dashed var(--color-border-focus);
+                                      outline-offset: calc(var(--border-width) * -1); }
+
+  /* Two panes and the splitter between them. */
+  .sl-split { display: flex; height: 180px; background: var(--color-bg-primary);
+              border: var(--border-width) solid var(--color-border-default); }
+  .sl-split--col { flex-direction: column; height: 240px; }
+  .sl-pane { flex: 1 1 0; min-width: 0; min-height: 0; overflow: hidden; padding: var(--space-6); }
+  .sl-pane--editor { background: var(--color-bg-secondary); }
+  .sl-pane--preview { background: var(--color-bg-preview); }
+  .sl-pane__line { height: var(--space-3); margin-bottom: var(--space-4); background: var(--color-border-default); }
+  .sl-pane__line:nth-child(2n) { width: 75%; }
+  .sl-pane__line:nth-child(3n) { width: 50%; }
+  .sl-w62 { flex: 0 0 62%; }
+  .sl-at-min { flex: 0 0 20%; }
+  .sl-dragging { cursor: col-resize; }
+  .sl-value { position: absolute; top: var(--space-4); left: var(--space-8); padding: 0 var(--space-3);
+              background: var(--color-bg-elevated); border: var(--border-width) solid var(--color-border-subtle);
+              color: var(--color-text-bright); font-family: var(--font-mono); font-size: var(--ds-text-small); white-space: nowrap; }
+</style>
+</head>
+<body>
+<nav class="ds-crumbs" aria-label="Breadcrumb"><a href="../../../index.html">Erfana design system</a> <span aria-hidden="true">/</span> <a href="../../../index.html#components">Components</a> <span aria-hidden="true">/</span> <span aria-current="page">Splitter</span></nav>
+<main>
+<h1>Splitter</h1>
+<p class="ds-meta"><span class="ds-status" data-status="proposed">proposed</span> not yet reviewed</p>
+<p class="ds-lede" id="decision">
+  A splitter is a 1px line in the layout with a 24px hit area over it. It is a focusable
+  <code>role="separator"</code> that says how the space is shared (<code>aria-valuenow</code>), and the arrow keys move it.
+  Hover, drag and focus all draw the same 2px lime line.
+</p>
+
+<div class="ds-note">
+  <strong>What ships today.</strong> The editor/preview divider (<code>Editor/ResizableDivider.tsx</code>) is a grey bar
+  that turns lime under the pointer. It has <strong>no role, no tab stop, no keyboard and no value</strong> – a keyboard
+  or screen-reader user cannot resize the panes at all, and its target is narrower than the 24 × 24 floor. The README
+  lists it under Open defects; this card is the shape to build against. The dock's sash is a second, separate splitter,
+  with a hit area that is also under the floor.
+</div>
+
+<h2 id="states">Every state</h2>
+<div class="ds-frames">
+
+<figure class="ds-frame">
+<div aria-hidden="true">
+  <div class="sl-split">
+    <div class="sl-pane sl-pane--editor"><div class="sl-pane__line"></div><div class="sl-pane__line"></div><div class="sl-pane__line"></div><div class="sl-pane__line"></div></div>
+    <div class="erf-splitter"></div>
+    <div class="sl-pane sl-pane--preview"><div class="sl-pane__line"></div><div class="sl-pane__line"></div><div class="sl-pane__line"></div></div>
+  </div>
+</div>
+<figcaption><strong>Resting</strong> – a 1px <code>--color-border-default</code> line. Nothing announces that it moves until the pointer or focus arrives. <em>This frame is live: hover the line.</em></figcaption>
+</figure>
+
+<figure class="ds-frame">
+<div aria-hidden="true">
+  <div class="sl-split">
+    <div class="sl-pane sl-pane--editor"><div class="sl-pane__line"></div><div class="sl-pane__line"></div><div class="sl-pane__line"></div><div class="sl-pane__line"></div></div>
+    <div class="erf-splitter sl-show-hit"></div>
+    <div class="sl-pane sl-pane--preview"><div class="sl-pane__line"></div><div class="sl-pane__line"></div><div class="sl-pane__line"></div></div>
+  </div>
+</div>
+<figcaption><strong>The hit area</strong> (drawn here, invisible in the app) – 24px, centred on the line, laid over both panes. The line costs 1px of layout; the target still meets SC 2.5.8.</figcaption>
+</figure>
+
+<figure class="ds-frame">
+<div aria-hidden="true">
+  <div class="sl-split">
+    <div class="sl-pane sl-pane--editor"><div class="sl-pane__line"></div><div class="sl-pane__line"></div><div class="sl-pane__line"></div><div class="sl-pane__line"></div></div>
+    <div class="erf-splitter is-hover"></div>
+    <div class="sl-pane sl-pane--preview"><div class="sl-pane__line"></div><div class="sl-pane__line"></div><div class="sl-pane__line"></div></div>
+  </div>
+</div>
+<figcaption><strong>Hover</strong> – the pointer is inside the hit area: a 2px <code>--color-accent-secondary</code> line and a <code>col-resize</code> cursor. The same lime the dock sash uses when active.</figcaption>
+</figure>
+
+<figure class="ds-frame">
+<div aria-hidden="true">
+  <div class="sl-split sl-dragging">
+    <div class="sl-pane sl-pane--editor sl-w62"><div class="sl-pane__line"></div><div class="sl-pane__line"></div><div class="sl-pane__line"></div><div class="sl-pane__line"></div></div>
+    <div class="erf-splitter erf-splitter--dragging"><span class="sl-value">62%</span></div>
+    <div class="sl-pane sl-pane--preview"><div class="sl-pane__line"></div><div class="sl-pane__line"></div><div class="sl-pane__line"></div></div>
+  </div>
+</div>
+<figcaption><strong>Dragging</strong> – <code>.erf-splitter--dragging</code>: the line stays lime even when the pointer outruns it, the cursor is held on the whole window, text selection is off. <code>aria-valuenow</code> follows; the read-out is optional.</figcaption>
+</figure>
+
+<figure class="ds-frame">
+<div aria-hidden="true">
+  <div class="sl-split">
+    <div class="sl-pane sl-pane--editor"><div class="sl-pane__line"></div><div class="sl-pane__line"></div><div class="sl-pane__line"></div><div class="sl-pane__line"></div></div>
+    <div class="erf-splitter is-focus"></div>
+    <div class="sl-pane sl-pane--preview"><div class="sl-pane__line"></div><div class="sl-pane__line"></div><div class="sl-pane__line"></div></div>
+  </div>
+</div>
+<figcaption><strong>Focus-visible</strong> – reached with <kbd>Tab</kbd>. The one ring is drawn round the 24px hit area, not the 1px line, so it is a ring and not a sliver; the lime line shows too.</figcaption>
+</figure>
+
+<figure class="ds-frame">
+<div aria-hidden="true">
+  <div class="sl-split">
+    <div class="sl-pane sl-pane--editor sl-at-min"><div class="sl-pane__line"></div><div class="sl-pane__line"></div><div class="sl-pane__line"></div><div class="sl-pane__line"></div></div>
+    <div class="erf-splitter is-focus"></div>
+    <div class="sl-pane sl-pane--preview"><div class="sl-pane__line"></div><div class="sl-pane__line"></div><div class="sl-pane__line"></div></div>
+  </div>
+</div>
+<figcaption><strong>At its limit</strong> – <kbd>Home</kbd> moved it to <code>aria-valuemin</code>, the floor of the clamp. Further <kbd>←</kbd> does nothing; neither pane can be dragged to zero.</figcaption>
+</figure>
+
+<figure class="ds-frame">
+<div aria-hidden="true">
+  <div class="sl-split sl-split--col">
+    <div class="sl-pane sl-pane--editor"><div class="sl-pane__line"></div><div class="sl-pane__line"></div><div class="sl-pane__line"></div></div>
+    <div class="erf-splitter erf-splitter--horizontal is-hover"></div>
+    <div class="sl-pane sl-pane--preview"><div class="sl-pane__line"></div><div class="sl-pane__line"></div></div>
+  </div>
+</div>
+<figcaption><strong>Horizontal, hover</strong> – a line between a top and a bottom pane: <code>.erf-splitter--horizontal</code>, <code>aria-orientation="horizontal"</code>, a <code>row-resize</code> cursor, and <kbd>↑</kbd> <kbd>↓</kbd> instead of <kbd>←</kbd> <kbd>→</kbd>.</figcaption>
+</figure>
+
+</div>
+
+<h2 id="keyboard">The keyboard contract</h2>
+<p class="ds-muted">The WAI-ARIA window splitter pattern. The value is the share of the <strong>first</strong> pane, in percent.
+<code>aria-valuemin</code> and <code>aria-valuemax</code> are the clamp <code>ResizableDivider.tsx</code> already applies to a drag –
+read from there, not restated here.</p>
+<p class="ds-muted"><strong>One departure from the pattern, on purpose.</strong> The pattern's optional <kbd>Enter</kbd> collapses the
+first pane and restores it. Here <kbd>Enter</kbd> resets the split to 50% instead: the clamp means neither pane may collapse, and
+collapsing is already the view-mode toggles' job (editor only, preview only), so a second way to do it would only disagree with
+them. Reset is the one thing a keyboard user cannot otherwise do in a single key.</p>
+<table class="ds-keys">
+  <thead><tr><th>Key</th><th>Result</th><th>Focus ends on</th><th>Held by</th></tr></thead>
+  <tbody>
+    <tr><td><kbd>Tab</kbd></td><td>The splitter is one tab stop, between the two panes in reading order.</td><td>The splitter.</td><td>No app test – no tab stop ships</td></tr>
+    <tr><td><kbd>←</kbd> <kbd>→</kbd> (vertical line), <kbd>↑</kbd> <kbd>↓</kbd> (horizontal)</td><td>Moves the line by 2%. <code>aria-valuenow</code> follows.</td><td>The splitter.</td><td>No app test – no keyboard ships</td></tr>
+    <tr><td><kbd>Shift</kbd> + arrow</td><td>Moves by 10%.</td><td>The splitter.</td><td>No app test</td></tr>
+    <tr><td><kbd>Home</kbd> <kbd>End</kbd></td><td>To <code>aria-valuemin</code> and <code>aria-valuemax</code>, the ends of the clamp.</td><td>The splitter.</td><td>No app test</td></tr>
+    <tr><td><kbd>Enter</kbd>, or a double-click</td><td>Back to the default split, 50% – not the pattern's collapse; see above.</td><td>The splitter.</td><td>No app test</td></tr>
+    <tr><td>Drag</td><td>Moves the line, held inside the clamp; the value is saved on release.</td><td>Unchanged.</td><td><code>ResizableDivider.test.tsx</code></td></tr>
+    <tr><td>Screen reader</td><td><code>role="separator"</code>, <code>aria-orientation</code>, <code>aria-valuenow</code>/<code>min</code>/<code>max</code>, <code>aria-valuetext</code> (“Editor 62%”), <code>aria-controls</code> the first pane, and a name (“Resize editor and preview”).</td><td>–</td><td>No app test – no role ships</td></tr>
+  </tbody>
+</table>
+
+<div class="ds-note">
+  <strong>A pointer that cannot drag.</strong> WCAG 2.2 SC 2.5.7 asks for a way to do with one click what a drag does. The
+  view-mode toggles (editor only, split, preview only) cover the extremes; for the split itself, the splitter's right-click
+  menu offers <em>Reset to 50%</em> and the presets <em>30%</em> and <em>70%</em> (the <a href="../menu/index.html">Menu</a> card).
+</div>
+
+<h2 id="markup">Markup</h2>
+<pre class="ds-code"><code>&lt;div class="erf-splitter" role="separator" tabindex="0"
+     aria-orientation="vertical" aria-label="Resize editor and preview"
+     aria-controls="editor-pane"
+     aria-valuenow="62" aria-valuemin="<var>clamp floor</var>" aria-valuemax="<var>clamp ceiling</var>"
+     aria-valuetext="Editor 62%"&gt;&lt;/div&gt;</code></pre>
+<p class="ds-muted">The panes on either side must not be positioned (or must sit in their own stacking context below the
+splitter): the hit area is a positioned <code>::before</code> and wins over static siblings without a z-index, but a
+positioned pane later in the DOM would paint over its right half.</p>
+
+<section id="defects">
+<h2>Defects this card names</h2>
+<ul class="ds-muted">
+  <li><strong><code>ResizableDivider</code></strong> (<code>Editor/ResizableDivider.tsx</code>, <code>.css</code>) – no role, no tab stop, no
+    keyboard, no value, a target narrower than the 24 × 24 floor, and <code>z-index: var(--z-dropdown)</code> to lift a divider
+    that needs no lifting. Already in the README's Open defects.</li>
+  <li><strong>Dock sash</strong> (<code>AppDockLayout.css</code>) – a literal hit area, below the 24 × 24 floor.</li>
+</ul>
+</section>
+
+<section id="exceptions">
+<h2>Exceptions</h2>
+<p class="ds-muted">None recorded. A shipping splitter that departs from this card carries a
+<code>deviates:</code> marker at the site and gets a row here, naming the file.</p>
+</section>
+</main>
+</body>
+</html>

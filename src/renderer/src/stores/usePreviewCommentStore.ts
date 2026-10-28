@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * HTML Preview comments – per-tab renderer state
- * (docs/designs/html-preview-comments.md §4.2, §10.1, §10.6; R-015, R-023).
+ * (docs/designs/comments/html-preview-comments.md §4.2, §10.1, §10.6; R-015, R-023).
  *
  * One entry per preview panel id. What it holds, and who is the record:
  *

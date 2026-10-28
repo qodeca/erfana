@@ -1,0 +1,310 @@
+<!-- @card group="Markdown preview" name="Commenting in the Markdown preview" subtitle="The HTML Preview comment journey on a Markdown file – select text or pick a block, write, save, reopen" status="proposed" reviewed="2026-10-28" -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Erfana – commenting in the Markdown preview</title>
+<link rel="stylesheet" href="../../../design-system/tokens.css">
+<link rel="stylesheet" href="../../../design-system/ds.css">
+<link rel="stylesheet" href="../../../design-system/system/components/menu/menu.css">
+<link rel="stylesheet" href="../../../design-system/system/components/button/button.css">
+<link rel="stylesheet" href="../../../design-system/system/components/toolbar/toolbar.css">
+<link rel="stylesheet" href="../../../design-system/system/components/badge/badge.css">
+<link rel="stylesheet" href="../html-comments/overlay.css">
+<link rel="stylesheet" href="../html-comments/comments.css">
+<link rel="stylesheet" href="./markdown-comments.css">
+<style>
+  .links { columns: 2 320px; column-gap: var(--space-16); max-inline-size: var(--ds-table-max); padding-inline-start: var(--space-8); }
+  .links a { color: var(--color-link); }
+  .links li { margin-block-end: var(--space-4); break-inside: avoid; color: var(--color-text-tertiary); }
+  .s3 { --mdc-body-height: 470px; }
+  .s4 { --mdc-body-height: 420px; }
+</style>
+</head>
+<body>
+
+<h1>Commenting in the Markdown preview</h1>
+<p class="ds-lede">
+  The HTML Preview's comments, on a Markdown file. A reviewer selects a few words – or turns on comment mode
+  and picks a whole block – and leaves a comment. Erfana writes the same <code>erfana:comment v1</code> block
+  into the <code>.md</code> file, on its own lines, before that block. The preview hides it; a pin and an
+  underline show it. <strong>Everything a comment looks like is the HTML feature, reused unchanged. This card
+  shows only where it lands in the Markdown panel.</strong>
+</p>
+
+<div class="ds-note">
+  <strong>Proposed, and static.</strong> Plan: <code>docs/designs/comments/markdown-preview-comments.md</code>. These
+  cards carry no script, so every state is drawn on its own and nothing here can be clicked through. The
+  window and drawer come from <code>../html-comments/comments.css</code>; the pin, outline
+  and mode frame from <code>../html-comments/overlay.css</code>. The toolbar is the
+  <a href="../../../design-system/system/components/toolbar/index.html">Toolbar</a> card's row with the
+  <a href="../../../design-system/system/components/button/index.html">Buttons</a> card's icon tools and toggles, the
+  count is the <a href="../../../design-system/system/components/badge/index.html">Badges</a> card's counter, and the
+  underline uses the <a href="../../../design-system/system/foundations/highlights.html">Text highlights</a> card's
+  names and values. Only the Markdown panel mirror and what the Markdown toolbar keeps of its own are in
+  <code>markdown-comments.css</code>.
+</div>
+
+<div class="ds-note">
+  <strong>Where this screen differs from a card, and why.</strong>
+  <ul>
+    <li><strong>Tool size – <a href="../../../design-system/system/components/button/index.html">Buttons</a> and
+      <a href="../../../design-system/system/components/toolbar/index.html#tool-height">Toolbar</a>.</strong> The Markdown
+      toolbar's icon tools are 32 × 28, not the card's 28 × 28 square, and the row sits on the panel's primary
+      surface. Both ship that way (<code>MarkdownToolbar.css:72</code>, <code>:102</code>); the comment tools match
+      their row. The Buttons card's Exceptions row records the size.</li>
+    <li><strong>Keyboard – <a href="../../../design-system/system/components/toolbar/index.html#open-defects">Toolbar</a>.</strong>
+      The Markdown toolbar keeps one <kbd>Tab</kbd> stop per control, as it ships, with no roving
+      <code>tabindex</code> and no arrow keys. The Toolbar card asks for one stop and arrows, and lists this toolbar as an
+      open defect. The comment tools follow their row; they add no keys of their own.</li>
+  </ul>
+</div>
+
+<ul class="links">
+  <li><a href="./states.html">Every state</a> – toolbar per view mode, outline labels per block kind, pins,
+    underline, menus, window and drawer.</li>
+  <li><a href="./placement.html">Where the block goes in the file</a> – the slot for each kind of block, and
+    the three places Erfana never writes.</li>
+  <li><a href="../html-comments/index.html">HTML Preview comments</a> – the decided cards this one reuses:
+    window, drawer, identity, toolbar, overlay.</li>
+</ul>
+
+<h2>The journey</h2>
+
+<!-- ============ 1. read ============ -->
+<section class="mdc-step" aria-labelledby="s1-t">
+  <div class="erf-mdc-panel" role="group" aria-label="Example: a commented Markdown file in the preview">
+    <div class="erf-toolbar erf-mdc-bar" role="toolbar" aria-label="Markdown formatting">
+      <button class="erf-button erf-button--icon" type="button" aria-label="Find" aria-keyshortcuts="Meta+F" tabindex="-1"><svg data-icon="search" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg></button>
+      <span class="erf-toolbar__group erf-mdc-bar__comments">
+        <button class="erf-button erf-button--icon erf-button--toggle" type="button" aria-pressed="false" aria-label="Comment mode" aria-keyshortcuts="Alt+Meta+M" tabindex="-1"><svg data-icon="message-square-plus" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/><path d="M12 8v6"/><path d="M9 11h6"/></svg></button>
+        <button class="erf-button erf-button--ghost erf-mdc-bar__count" type="button" aria-expanded="false" aria-label="Comments, 3 open" tabindex="-1"><svg data-icon="messages-square" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 10a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 14.286V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/><path d="M20 9a2 2 0 0 1 2 2v10.286a.71.71 0 0 1-1.212.502l-2.202-2.202A2 2 0 0 0 17.172 19H10a2 2 0 0 1-2-2v-1"/></svg><span class="erf-counter">3</span></button>
+        <button class="erf-button erf-button--icon erf-button--toggle" type="button" aria-pressed="true" aria-label="Show comment icons" tabindex="-1"><svg data-icon="message-square" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></svg></button>
+      </span>
+      <span class="erf-toolbar__spacer"></span>
+      <span class="erf-toolbar__group" role="radiogroup" aria-label="View mode">
+        <button class="erf-button erf-button--icon erf-button--toggle" type="button" role="radio" aria-checked="false" aria-label="Editor only" tabindex="-1"><svg data-icon="file-pen" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.5 22H18a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v9.5"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M13.378 15.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/></svg></button>
+        <button class="erf-button erf-button--icon erf-button--toggle" type="button" role="radio" aria-checked="false" aria-label="Split horizontal" tabindex="-1"><svg data-icon="rows-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 12h18"/></svg></button>
+        <button class="erf-button erf-button--icon erf-button--toggle" type="button" role="radio" aria-checked="false" aria-label="Split vertical" tabindex="-1"><svg data-icon="columns-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M12 3v18"/></svg></button>
+        <button class="erf-button erf-button--icon erf-button--toggle" type="button" role="radio" aria-checked="true" aria-label="Preview only" tabindex="-1"><svg data-icon="eye" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg></button>
+      </span>
+      <span class="erf-toolbar__separator" aria-hidden="true"></span>
+      <button class="erf-button erf-button--icon" type="button" aria-label="Export to PDF" tabindex="-1"><svg data-icon="file-down" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M12 18v-6"/><path d="m9 15 3 3 3-3"/></svg></button>
+      <button class="erf-button erf-button--icon" type="button" aria-label="Export to Word" tabindex="-1"><svg data-icon="file-text" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg></button>
+    </div>
+    <div class="erf-mdc-panel__body">
+      <div class="erf-mdc-preview">
+        <div class="erf-mdc-content">
+          <h2>Launch plan</h2>
+          <p class="erf-mdc-block">We ship the beta to the first ten customers. The target is to <span class="erf-mdc-mark">ship by Friday</span>, after the security review has signed off.
+            <span class="erf-hpc-pin" role="button" tabindex="-1" aria-label="1 comment on paragraph. Open."><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="erf-hpc-pin__body" d="M2 2H22V17H7L2 22Z"></path><rect class="erf-hpc-pin__line" x="6" y="6" width="12" height="2"></rect><rect class="erf-hpc-pin__line" x="6" y="10" width="8" height="2"></rect></svg></span></p>
+          <h3>Steps</h3>
+          <ul>
+            <li>Freeze the API on Monday.</li>
+            <li class="erf-mdc-block">Run the load test against staging.
+              <span class="erf-hpc-pin" role="button" tabindex="-1" aria-label="2 comments on list item. Open."><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="erf-hpc-pin__body" d="M2 2H22V17H7L2 22Z"></path><foreignObject x="2" y="2" width="20" height="15"><span xmlns="http://www.w3.org/1999/xhtml" class="erf-hpc-pin__count erf-hpc-text" data-text="2"></span></foreignObject></svg></span></li>
+            <li>Write the release notes.</li>
+          </ul>
+          <p>The rollback plan is in <code>docs/rollback.md</code>.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div>
+    <p class="mdc-step__no">1 · read</p>
+    <h3 class="mdc-step__title" id="s1-t">Pins in the margin, words underlined</h3>
+    <p class="mdc-step__text">The <strong>preview-only</strong> view, the default for Markdown. Three comment tools
+      follow Find, as in the HTML band. A pin's tail sits on its block's top-right corner, which in this
+      preview is the content's right padding – clear of the text.</p>
+    <p class="mdc-step__text">The paragraph's comment was made on a selection, so <strong>"ship by Friday"</strong>
+      stays underlined. The list item has two open threads, so its pin shows <strong>2</strong>.</p>
+  </div>
+</section>
+
+<!-- ============ 2. select ============ -->
+<section class="mdc-step" aria-labelledby="s2-t">
+  <div class="erf-mdc-panel" role="group" aria-label="Example: right-click on selected text">
+    <div class="erf-mdc-panel__body">
+      <div class="erf-mdc-preview">
+        <div class="erf-mdc-content">
+          <h3>Steps</h3>
+          <ul>
+            <li>Freeze the API on Monday.</li>
+            <li>Run the <span class="erf-mdc-selection">load test against staging</span>.</li>
+            <li>Write the release notes.</li>
+          </ul>
+          <p>The rollback plan is in <code>docs/rollback.md</code>.</p>
+        </div>
+        <div class="erf-menu mdc-float" role="menu" aria-label="Selection" style="--ds-inset-block-start: 112px; inset-block-start: var(--ds-inset-block-start); --ds-inset-inline-start: 300px; inset-inline-start: var(--ds-inset-inline-start);">
+          <div class="erf-menu-item erf-menu-item--active" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"><svg width="16" height="16" data-icon="message-square-plus" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/><path d="M12 8v6"/><path d="M9 11h6"/></svg></span><span class="erf-menu-label">Add comment</span></div>
+          <div class="erf-menu-separator" role="separator"></div>
+          <div class="erf-menu-item" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"></span><span class="erf-menu-label">Ask</span></div>
+          <div class="erf-menu-item" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"></span><span class="erf-menu-label">Explain</span></div>
+          <div class="erf-menu-item" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"></span><span class="erf-menu-label">Modify</span></div>
+          <div class="erf-menu-item" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"></span><span class="erf-menu-label">Prompt</span></div>
+          <div class="erf-menu-separator" role="separator"></div>
+          <div class="erf-menu-item" role="menuitem" tabindex="-1"><span class="erf-menu-icon" aria-hidden="true"><svg width="16" height="16" data-icon="copy" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></span><span class="erf-menu-label">Copy selection</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div>
+    <p class="mdc-step__no">2 · select</p>
+    <h3 class="mdc-step__title" id="s2-t">Right-click a selection</h3>
+    <p class="mdc-step__text">No mode needed. The preview's existing menu – the prompt items and Copy selection –
+      gains <strong>Add comment</strong> as its first item, with a separator after it. Focus starts on it
+      (decided Menu card: first item, roving tabindex).</p>
+    <p class="mdc-step__text">The prompt items keep their own icons; they are left blank here because they are not
+      part of this design.</p>
+  </div>
+</section>
+
+<!-- ============ 3. window ============ -->
+<section class="mdc-step s3" aria-labelledby="s3-t">
+  <div class="erf-mdc-panel" role="group" aria-label="Example: the new-comment window beside a list item">
+    <div class="erf-mdc-panel__body">
+      <div class="erf-mdc-preview">
+        <div class="erf-mdc-content" style="margin-inline: 0;">
+          <h3>Steps</h3>
+          <ul>
+            <li>Freeze the API on Monday.</li>
+            <li class="erf-mdc-block">Run the <span class="erf-mdc-mark erf-mdc-mark--active">load test against staging</span>.<span class="erf-hpc-outline erf-hpc-outline--selected" aria-hidden="true"></span></li>
+            <li>Write the release notes.</li>
+          </ul>
+        </div>
+        <div class="erf-comment-window mdc-float" role="group" aria-label="Example: New comment" aria-labelledby="w3-t" style="inset-block-start: var(--space-8); inset-inline-end: var(--space-8);">
+          <div class="erf-comment-window__head">
+            <div class="erf-comment-window__heading">
+              <h2 class="erf-comment-window__title" id="w3-t" tabindex="-1">New comment</h2>
+              <p class="erf-comment-window__context">List item · plan.md, line 14</p>
+              <span class="erf-mdc-quote">load test against staging</span>
+            </div>
+            <button class="erf-comment-icon-btn" type="button" aria-label="Close" tabindex="-1"><svg width="16" height="16" data-icon="x" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+          </div>
+          <div class="erf-comment-window__body">
+            <div class="erf-comment-field">
+              <label class="erf-comment-field__label" for="f3">Comment</label>
+              <textarea class="erf-comment-textarea" id="f3" placeholder="What should change here?" aria-describedby="f3-h f3-c" tabindex="-1">Which staging – eu-1 or us-2? Name it here.</textarea>
+              <div class="erf-comment-field__foot">
+                <p class="erf-comment-field__hint" id="f3-h">Plain text. Saved inside plan.md.</p>
+                <span class="erf-comment-counter" id="f3-c">43 / <span data-claim="comment-max-chars" title="COMMENT_MAX_CHARS in commentFormat.ts – characters one comment or reply may hold">4000</span></span>
+              </div>
+            </div>
+            <p class="erf-comment-identity">Commenting as <bdi>Marcin Obel</bdi> <button class="erf-comment-link" type="button" tabindex="-1">Change</button></p>
+          </div>
+          <div class="erf-comment-window__foot">
+            <button class="erf-comment-btn erf-comment-btn--secondary" type="button" tabindex="-1"><span>Cancel</span></button>
+            <button class="erf-comment-btn erf-comment-btn--primary" type="button" aria-keyshortcuts="Meta+Enter" tabindex="-1"><span>Save</span></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div>
+    <p class="mdc-step__no">3 · write</p>
+    <h3 class="mdc-step__title" id="s3-t">The same window, with the words quoted</h3>
+    <p class="mdc-step__text">The HTML comment window, unchanged in size, focus and buttons. The context line names the
+      block and its source line – <code>List item · plan.md, line 14</code>. Under it, the selected words in the
+      preview's serif, on an accent rule.</p>
+    <p class="mdc-step__text">While the window is open, its block keeps the <strong>selected outline</strong> and its
+      phrase the <strong>active underline</strong>. Nothing freezes: this preview is Erfana's own DOM, so the
+      HTML "still image" step does not exist here.</p>
+  </div>
+</section>
+
+<!-- ============ 4. saved ============ -->
+<section class="mdc-step s4" aria-labelledby="s4-t">
+  <div>
+  <div class="erf-mdc-panel" role="group" aria-label="Example: the preview after saving">
+    <div class="erf-mdc-panel__body">
+      <div class="erf-mdc-preview">
+        <div class="erf-mdc-content">
+          <h3>Steps</h3>
+          <ul>
+            <li>Freeze the API on Monday.</li>
+            <li class="erf-mdc-block">Run the <span class="erf-mdc-mark">load test against staging</span>.<span class="erf-hpc-flash" aria-hidden="true"></span>
+              <span class="erf-hpc-pin" role="button" tabindex="-1" aria-label="1 comment on list item. Open."><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="erf-hpc-pin__body" d="M2 2H22V17H7L2 22Z"></path><rect class="erf-hpc-pin__line" x="6" y="6" width="12" height="2"></rect><rect class="erf-hpc-pin__line" x="6" y="10" width="8" height="2"></rect></svg></span></li>
+            <li>Write the release notes.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+    <p class="mdc-step__text" style="margin: var(--space-8) 0 var(--space-4)">What <code>plan.md</code> now holds (not shown in the app while commenting – the editor is closed in this view):</p>
+    <pre class="mdc-src"><span>### Steps</span><span></span><span>- Freeze the API on Monday.</span><span class="mdc-src__add">  &lt;!-- erfana:comment v1 id=c-k3j7q2m6x7p4d2za</span><span class="mdc-src__add">  note to agents: written by Erfana. …</span><span class="mdc-src__add">  status: open</span><span class="mdc-src__add">  target: &lt;li&gt; (selected text: "load test …")</span><span class="mdc-src__add">  comment by Marcin Obel at 2026-10-28T12:40:00Z:</span><span class="mdc-src__add">    Which staging – eu-1 or us-2? Name it here.</span><span class="mdc-src__add">  @data {"v":1,"id":"c-k3j7…"}</span><span class="mdc-src__add">  --&gt;</span><span class="mdc-src__target">- Run the load test against staging.</span><span>- Write the release notes.</span></pre>
+  </div>
+  <div>
+    <p class="mdc-step__no">4 · saved</p>
+    <h3 class="mdc-step__title" id="s4-t">In the file, on its own lines</h3>
+    <p class="mdc-step__text">Comments live in the <strong>Preview only</strong> view (decision M11). The block went <strong>after the previous item, indented to its content</strong> – the only list slot that keeps one list (<a href="./placement.html" style="color: var(--color-link)">placement card</a>). The target line is unchanged.</p>
+    <p class="mdc-step__text">The pin appears with one flash; "Comment saved to plan.md." is announced. The editor
+      shows the raw block – folding it is out of scope (plan M10).</p>
+  </div>
+</section>
+
+<!-- ============ 5. comment mode ============ -->
+<section class="mdc-step" aria-labelledby="s5-t">
+  <div class="erf-mdc-panel" role="group" aria-label="Example: comment mode on a table row">
+    <div class="erf-mdc-panel__body">
+      <div class="erf-mdc-preview">
+        <div class="erf-hpc-root" aria-hidden="true">
+          <div class="erf-hpc-frame"></div>
+          <div class="erf-hpc-tab"><span class="erf-hpc-text" data-text="Comment mode · Row 2, line 21 · Esc to leave"></span></div>
+        </div>
+        <div class="erf-mdc-content" style="cursor: crosshair;">
+          <h3>Owners</h3>
+          <p>Everyone below has agreed to the dates.</p>
+          <table>
+            <thead><tr><th>Owner</th><th>Task</th><th>Due</th></tr></thead>
+            <tbody>
+              <tr><td>Anna</td><td>API freeze</td><td>Mon</td></tr>
+              <tr class="erf-mdc-block"><td>Piotr</td><td>Load test</td><td>Wed<span class="erf-hpc-outline" aria-hidden="true"></span></td></tr>
+              <tr><td>Marta</td><td>Release notes</td><td>Thu</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div>
+    <p class="mdc-step__no">5 · comment mode</p>
+    <h3 class="mdc-step__title" id="s5-t">Pick a whole block</h3>
+    <p class="mdc-step__text"><kbd>⌥⌘M</kbd> / <kbd>Ctrl+Alt+M</kbd> or the toggle. The HTML mode frame, and the picked block in
+      the one focus ring (never the HTML overlay's two-tone ring). There is no floating label: the mode tab names the target and its source line –
+      <strong>Comment mode · Row 2, line 21 · Esc to leave</strong> – so nothing is drawn over the text (Comments v2,
+      C-21). Click opens the window; right-click opens a one-item menu; <kbd>Tab</kbd> and <kbd>⌥↑</kbd> / <kbd>Alt+↑</kbd>,
+      <kbd>⌥↓</kbd> / <kbd>Alt+↓</kbd> move between targets in source order.</p>
+    <p class="mdc-step__text">A table row cannot carry a comment block of its own, so this comment is saved before the
+      table and names the row inside it. The window says "Saved before the table on line 18."</p>
+  </div>
+</section>
+
+<h2>Exceptions</h2>
+<table>
+  <thead><tr><th>Where</th><th>The system</th><th>Here, and why</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>Overlay parts inside the block</td>
+      <td>The overlay draws outside <code>.markdown-preview-content</code> (plan §7.1, M7).</td>
+      <td>A static card cannot measure, so the icon and outline are children of their block with the same
+        geometry. The shipping overlay is a sibling of the content, so export never sees it.</td>
+    </tr>
+    <tr>
+      <td>Underline as a span</td>
+      <td>Shipping uses <code>::highlight(erf-comment)</code> – no DOM node.</td>
+      <td>A static card cannot call <code>CSS.highlights</code>; <code>.erf-mdc-mark</code> draws the same look.</td>
+    </tr>
+    <tr>
+      <td>Fixed positions of the menu and window</td>
+      <td>Placed by measurement: right of the block, then left, below, above.</td>
+      <td>Inline <code>style</code> offsets stand in for the measured placement in each frame.</td>
+    </tr>
+  </tbody>
+</table>
+
+</body>
+</html>

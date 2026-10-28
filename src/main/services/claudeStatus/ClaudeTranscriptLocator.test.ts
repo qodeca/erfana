@@ -9,7 +9,7 @@
  * escape rejection, and the missing/empty-dir null paths.
  *
  * @see Issue #216 - Per-terminal Claude Code context status bar
- * @see docs/designs/216-claude-status-bar.md §2, §8, §10
+ * @see docs/designs/context-meter/216-claude-status-bar.md §2, §8, §10
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { promises as fs } from 'node:fs'

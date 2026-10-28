@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Whether a leave may drop the picker's element
- * (docs/designs/html-preview-comments.md §7.3, §10.2, §10.8).
+ * (docs/designs/comments/html-preview-comments.md §7.3, §10.2, §10.8).
  *
  * A pick main answers with its menu or comment window puts the page behind a
  * still frame: the view is hidden, and hiding it takes the pointer out of the

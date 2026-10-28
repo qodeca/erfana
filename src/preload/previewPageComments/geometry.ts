@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Rectangles and visibility for the overlay
- * (docs/designs/html-preview-comments.md §6 status, §10.2, §10.5, §19 R3-7).
+ * (docs/designs/comments/html-preview-comments.md §6 status, §10.2, §10.5, §19 R3-7).
  *
  * Everything is in the frame's CSS pixels, relative to its viewport – the
  * coordinate space of `getBoundingClientRect` and of `position: fixed` in the

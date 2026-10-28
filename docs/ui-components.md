@@ -1,5 +1,7 @@
 # UI Components & Behavior
 
+This page describes behaviour and where the code is. The visual and keyboard rules are decided by the [design system](design-system/index.html) cards – for the parts below, see Tabs, Menu, Feedback (toasts), Splitter, Toolbar, Tooltip, the Dialog pattern and the Terminal and code colours card. Read the card before changing a component.
+
 ## Activity Bars
 
 **Location**: `src/renderer/src/components/ActivityBar/`
@@ -272,13 +274,13 @@ Home icon tab (41px fixed, non-draggable, no scaling).
 
 ### Active Indicator
 
-2px Qodeca **Lime** bottom border via an `::after` pseudo-element, matching the activity bar's active-panel edge (`AppDockLayout.css:93` and `:115`, `var(--color-brand-lime)`). This paragraph said *Violet* until 2026-09-01, contradicting both the shipped code and this same document five sections above. Decided by [`docs/design-system/system/components/row/index.html`](design-system/system/components/row/index.html), which cites this edge as the precedent for the selected-row rule.
+2px Qodeca **Lime** bottom border via an `::after` pseudo-element, matching the activity bar's active-panel edge (`AppDockLayout.css:93` and `:115`, `var(--color-brand-lime)`). This paragraph said *Violet* until 2026-09-01, contradicting both the shipped code and this same document five sections above. Decided by [`docs/design-system/system/components/row/index.html`](design-system/system/components/row/index.html), which cites this edge as the precedent for the selected-row rule; the tab strip itself is drawn on the proposed [Tabs card](design-system/system/components/tabs/index.html).
 
 ### Focus
 
 Auto-focus on tab change ensures the active indicator shows immediately, so a panel needs `tabIndex={0}`.
 
-**Do not add `outline: none`.** This document used to instruct exactly that, which contradicts the `decided` [Focus & keyboard card](design-system/system/foundations/focus.html): `outline: none` is allowed *only* with a replacement on the very next line. A panel that is a tab stop with no visible focus is a WCAG 2.4.7 failure, and it already ships — `AppDockLayout.css:138` carries a bare `outline: none; /* Remove focus outline */`, tracked by [#93](https://github.com/qodeca/erfana/issues/93). The instruction here was creating the next one.
+**Do not add `outline: none`.** This document used to instruct exactly that, which contradicts the `decided` [Focus and keyboard card](design-system/system/foundations/focus.html): `outline: none` is allowed *only* with a replacement on the very next line. A panel that is a tab stop with no visible focus is a WCAG 2.4.7 failure, and it already ships — `AppDockLayout.css:138` carries a bare `outline: none; /* Remove focus outline */`, tracked by [#93](https://github.com/qodeca/erfana/issues/93). The instruction here was creating the next one.
 
 ## Welcome Tab & Panel
 
@@ -381,7 +383,7 @@ Terminal is considered "active" when:
 
 **Location**: `src/renderer/src/components/RootErrorBoundary/`, `src/renderer/src/components/Panels/PanelErrorBoundary.tsx`, `src/renderer/src/utils/installGlobalErrorTrail.ts`, `src/main/utils/rendererCrashHandlers.ts`
 
-Added by [#60](https://github.com/qodeca/erfana/issues/60), where a `RangeError` thrown while flattening a 174k-node project tree unmounted the React root and left a black window. Containment is layered on purpose – full rationale in [design-issue-60](./designs/design-issue-60.md) §2.3.
+Added by [#60](https://github.com/qodeca/erfana/issues/60), where a `RangeError` thrown while flattening a 174k-node project tree unmounted the React root and left a black window. Containment is layered on purpose – full rationale in [design-issue-60](./designs/large-projects/design-issue-60.md) §2.3.
 
 ### Two-tier boundary contract
 

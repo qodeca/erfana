@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * The overlay's stylesheet (docs/designs/html-preview-comments.md §10.2, §7.11;
+ * The overlay's stylesheet (docs/designs/comments/html-preview-comments.md §10.2, §7.11;
  * M-064): while main prints the page to PDF, nothing of the overlay is drawn,
  * whatever media the print engine reports.
  */

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Speech-bubble pins (docs/designs/html-preview-comments.md §10.5,
+ * Speech-bubble pins (docs/designs/comments/html-preview-comments.md §10.5,
  * decisions 20 and 33; tests J-005, J-014).
  *
  * One pin per element, its tail tip on the element's top-right corner, 4 px

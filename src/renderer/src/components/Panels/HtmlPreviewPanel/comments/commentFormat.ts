@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * HTML Preview comments – pure text helpers for Erfana's comment chrome
- * (docs/designs/html-preview-comments.md §10.2, §10.4, §10.10; R-016, R-017).
+ * (docs/designs/comments/html-preview-comments.md §10.2, §10.4, §10.10; R-016, R-017).
  *
  * Everything here is a pure function of its arguments – the clock and the
  * locale are parameters – so the window, the drawer and their tests format

@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * The request-kind ledger's class rule and `forget` (HTML Preview comments
- * spike S1e; docs/designs/html-preview-comments.md §19 R3-1; M-066). A note
+ * spike S1e; docs/designs/comments/html-preview-comments.md §19 R3-1; M-066). A note
  * is handed back only to a request of its own class – a document load arrives
  * without `user-agent`, every fetch and subresource with one – and a request
  * that fails before the handler drops its note.

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Per-load token tables (docs/designs/html-preview-comments.md §4.2
+ * Per-load token tables (docs/designs/comments/html-preview-comments.md §4.2
  * "ElementTokenTable", §6, §19 R3-12): M-032 generations, M-033 forged and
  * unknown tokens, M-059 one file shown as page and frame.
  */

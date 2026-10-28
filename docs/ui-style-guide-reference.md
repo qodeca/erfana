@@ -15,7 +15,7 @@
 
 ## Component Patterns
 
-> **Decided by [`docs/design-system/system/components/button/index.html`](design-system/system/components/button/index.html).** Buttons, inputs and dialogs, each rendered live with every state. See also the Form controls and Permission band cards.
+> **Decided by [`docs/design-system/system/components/button/index.html`](design-system/system/components/button/index.html).** Buttons and inputs, each drawn in every state. See also the Form controls and Permission band cards, and the [Dialog pattern](design-system/system/patterns/dialog/index.html) for dialogs.
 >
 > This section is a stub. It keeps its heading so existing links still
 > resolve, and it holds no rule, so it cannot contradict the card.

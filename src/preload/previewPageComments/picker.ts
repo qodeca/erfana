@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Keyboard picker moves (docs/designs/html-preview-comments.md §10.2, §10.8;
+ * Keyboard picker moves (docs/designs/comments/html-preview-comments.md §10.2, §10.8;
  * tests J-002, J-010).
  *
  * - Tab / Shift+Tab: the next / previous element at the same level, then the

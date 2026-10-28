@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * HTML Preview comments – where the comment window goes
- * (docs/designs/html-preview-comments.md §10.4 "Placement").
+ * (docs/designs/comments/html-preview-comments.md §10.4 "Placement").
  *
  * Right of the picked point, else left, else below, else above, always inside
  * the page area less an 8px margin; under 400px of page-area width the window

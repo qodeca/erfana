@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Pins and counts from a served load (docs/designs/html-preview-comments.md
+ * Pins and counts from a served load (docs/designs/comments/html-preview-comments.md
  * §8 `icons`, §10.1 badge, §10.5, decision 33; tests J-005, M-018).
  *
  * A pin stands on one element – a token, plus a JS-built path below it when

@@ -23,7 +23,7 @@
  * ONLY after a successful clipboard write (write-guards-delete).
  *
  * @see Spec #002 - Editor context menu with AI prompts
- * @see docs/designs/issue-203-clipboard-service.md §10
+ * @see docs/designs/clipboard/issue-203-clipboard-service.md §10
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Thread operations (docs/designs/html-preview-comments.md §7.7): each returns
+ * Thread operations (docs/designs/comments/html-preview-comments.md §7.7): each returns
  * a new object, keeps fields it does not own and never touches the anchor.
  */
 import { describe, expect, it } from 'vitest'

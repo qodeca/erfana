@@ -7,7 +7,7 @@ SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 
 - **Issue:** [#138](https://github.com/qodeca/erfana/issues/138), plan step 1 of
   [`docs/features/138-user-guide.md`](../features/138-user-guide.md#step-1--spike-confirm-what-the-design-assumes-no-committed-code).
-- **Design:** [docs/designs/138-user-guide/](../designs/138-user-guide/README.md).
+- **Design:** [docs/designs/user-guide/](../designs/user-guide/README.md).
 - **Date:** 2026-09-25. **Time box:** about 3 hours; used about 1.5, plus a second run the same day
   once the owner had made the subscription token (Q4 real token, Q5, Q7).
 

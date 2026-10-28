@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * The two HTML Preview comments settings actions
- * (docs/designs/html-preview-comments.md §10.8; R-014).
+ * (docs/designs/comments/html-preview-comments.md §10.8; R-014).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { globalSettings } from '../test-utils/globalSettings'

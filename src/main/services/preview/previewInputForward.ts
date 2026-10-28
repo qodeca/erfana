@@ -22,8 +22,8 @@
  * on, leave Esc with the page, whose preload leaves the mode
  * (html-preview-comments.md §3, §7.1, §10.1; M-052).
  *
- * @see docs/designs/sd-074-html-preview.md §1.9, §0 (Enumerated keystrokes)
- * @see docs/designs/design-issue-124-part3.md §3.7
+ * @see docs/designs/html-preview/sd-074-html-preview.md §1.9, §0 (Enumerated keystrokes)
+ * @see docs/designs/html-preview/multi-page/design-issue-124-part3.md §3.7
  */
 
 import { COMMENT_MODE_KEY, matchCommentModeKey } from '../../../shared/commentModeKey'

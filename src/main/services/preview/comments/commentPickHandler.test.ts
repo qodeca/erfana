@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * The page's comment signals, checked (docs/designs/html-preview-comments.md
+ * The page's comment signals, checked (docs/designs/comments/html-preview-comments.md
  * §7.3 steps 1–2, §8; M-033, SEC-04, SEC-05, SEC-06, SEC-09, SEC-26).
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'

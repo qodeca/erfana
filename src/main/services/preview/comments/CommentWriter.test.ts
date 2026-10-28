@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * CommentWriter on real files in a temp project (docs/designs/html-preview-comments.md
+ * CommentWriter on real files in a temp project (docs/designs/comments/html-preview-comments.md
  * §7.6, §7.7; M-001–M-003, M-007, M-008, M-011–M-013, M-015–M-019, M-056).
  * Byte identity and damaged blocks: `CommentWriter.bytes.test.ts`; path
  * rules: `CommentWriter.confinement.test.ts`; races and fs failures (mocked

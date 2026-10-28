@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Security gates of the comment format (docs/designs/html-preview-comments.md
+ * Security gates of the comment format (docs/designs/comments/html-preview-comments.md
  * §17; SEC-12, SEC-13, SEC-15, SEC-16).
  *
  * - SEC-12: hostile text in every field a block carries round-trips through

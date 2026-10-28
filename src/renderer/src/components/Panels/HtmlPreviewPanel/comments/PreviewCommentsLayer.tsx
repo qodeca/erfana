@@ -3,7 +3,7 @@
 /**
  * HTML Preview comments – what one tab draws over its frozen page: the
  * element menu, the comment window, and the always-mounted live regions
- * (docs/designs/html-preview-comments.md §10.3, §10.4, §10.8; R-001, R-002,
+ * (docs/designs/comments/html-preview-comments.md §10.3, §10.4, §10.8; R-001, R-002,
  * R-013).
  *
  * The menu is the shared `ContextMenu` – its `useOccluder('menu', true)`

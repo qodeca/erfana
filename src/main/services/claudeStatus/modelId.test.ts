@@ -6,7 +6,7 @@
  *
  * PROVENANCE OF {@link REGISTRY_ORACLE}
  * -------------------------------------
- * Source document: `docs/designs/41-model-capability-registry.md`
+ * Source document: `docs/designs/context-meter/41-model-capability-registry.md`
  * (§7.1 exact-id map, §7.1.1 undecomposable-id map).
  *
  * The table was **independently derived on 2026-08-08 from Revision 3**, with
@@ -43,7 +43,7 @@
  * artefact meant to catch it had quietly switched sides.
  *
  * @see Issue #41 - Context meter reads the 200k window for Opus 5 sessions
- * @see docs/designs/41-model-capability-registry.md §7.1, §9.4, §9.4.1, §9.4.2
+ * @see docs/designs/context-meter/41-model-capability-registry.md §7.1, §9.4, §9.4.1, §9.4.2
  */
 import { describe, it, expect, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
@@ -599,7 +599,7 @@ describe('capability freshness (F18)', () => {
         '  https://platform.claude.com/docs/en/about-claude/models/introducing-claude-fable-5-and-claude-mythos-5',
         '  https://platform.claude.com/docs/en/about-claude/models/whats-new-opus-5',
         'Procedure (what to check per row, and what to do when a value differs):',
-        '  docs/designs/41-model-capability-registry.md §2.0'
+        '  docs/designs/context-meter/41-model-capability-registry.md §2.0'
       ].join('\n')
     ).toBeLessThan(MAX_AGE_DAYS)
   })
@@ -739,7 +739,7 @@ describe('guard 1 - the DESIGN DOCUMENT and the oracle agree (§9.4.2)', () => {
     expect(sonnet46?.window).toBe(STANDARD)
 
     const raw = readFileSync(
-      resolve(__dirname, '../../../../docs/designs/41-model-capability-registry.md'),
+      resolve(__dirname, '../../../../docs/designs/context-meter/41-model-capability-registry.md'),
       'utf8'
     )
     const line = raw.split('\n').find((l) => l.startsWith('| claude-sonnet-4-6 |'))

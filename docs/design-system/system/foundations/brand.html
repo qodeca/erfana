@@ -1,0 +1,142 @@
+<!-- @card group="Foundations" name="Brand" subtitle="The icon as it ships, a Cascadia Mono wordmark, and the colours a light surface allows" status="proposed" reviewed="never" answers="Draw the Erfana wordmark; Put the brand on a light surface; Make a banner or a social image" -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Brand – Erfana design system</title>
+<link rel="stylesheet" href="../../tokens.css">
+<link rel="stylesheet" href="../../ds.css">
+<style>
+  /* The lockup: the shipping icon beside the wordmark, on a brand surface.
+     Artwork, not chrome – the sizes below are image sizes this card decides,
+     built from tokens so nothing here is a bare literal. */
+  .br-art { display: flex; align-items: center; gap: var(--space-8); padding: var(--space-12) var(--space-16);
+            border: var(--border-width) solid var(--color-border-default); }
+  .br-art--dark { background: var(--color-brand-black); color: var(--color-brand-white); }
+  .br-art--light { background: var(--color-brand-white); color: var(--color-brand-black); border-color: var(--color-gray-200); }
+  .br-art img { display: block; inline-size: calc(var(--space-16) * 2); block-size: calc(var(--space-16) * 2); }
+  .br-wordmark { margin: 0; font-family: var(--font-mono); font-weight: var(--font-bold);
+                 font-size: calc(var(--text-2xl) * 2); line-height: var(--leading-none); letter-spacing: -0.02em; }
+  .br-rule { flex: 1 1 auto; block-size: var(--border-width-thick); }
+  .br-rule--lime { background: var(--color-brand-lime); }
+  .br-rule--violet { background: var(--color-brand-violet); }
+  .br-rule--indigo { background: var(--color-brand-indigo); }
+  .br-term { display: inline-flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-4);
+             background: var(--color-brand-black); color: var(--color-text-primary); font-family: var(--font-mono);
+             font-size: var(--text-base); }
+  .br-cursor { inline-size: var(--space-4); block-size: var(--space-8); background: var(--color-brand-lime); }
+  /* Don't: the icon recoloured. A filter stands in for any edit to the pixels. */
+  .br-art img.br-recolour { filter: hue-rotate(160deg) saturate(2); }
+  .br-art--light .br-lime-text { color: var(--color-brand-lime); }
+  .br-frames { grid-template-columns: repeat(auto-fit, minmax(calc(var(--space-24) * 7), 1fr)); }
+</style>
+</head>
+<body>
+<nav class="ds-crumbs" aria-label="Breadcrumb"><a href="../../index.html">Erfana design system</a> <span aria-hidden="true">/</span> <a href="../../index.html#foundations">Foundations</a> <span aria-hidden="true">/</span> <span aria-current="page">Brand</span></nav>
+<main>
+<h1>Brand</h1>
+<p class="ds-meta"><span class="ds-status" data-status="proposed">proposed</span> not yet reviewed</p>
+<p class="ds-lede" id="decision">
+  The Erfana brand is <strong>the icon, used unmodified</strong>, and <strong>the wordmark</strong> – the name set in
+  Cascadia Mono bold beside it. Brand images are <strong>flat and square</strong> and carry <strong>no third-party name
+  or mark</strong>. On a light surface, lime and violet are never a foreground or an edge; <strong>indigo is the
+  accent</strong>.
+</p>
+
+<div class="ds-note">
+  <strong>Scope.</strong> This card is about brand artwork – the README banner, the social preview, anything that shows
+  the name as a mark. It does not change the app, which stays dark only (<a href="theme.html">Theme</a>). The rules
+  for the marks themselves are legal ones and live in <code>TRADEMARKS.md</code>: the icon and the wordmark are Erfana
+  marks, and a renamed fork replaces both.
+</div>
+
+<h2 id="states">The lockup on each surface</h2>
+<div class="ds-frames br-frames">
+  <figure class="ds-frame"><div aria-hidden="true">
+      <div class="br-art br-art--dark"><img src="../../../../resources/icon.png" alt=""><p class="br-wordmark">Erfana</p><span class="br-rule br-rule--lime"></span></div></div>
+    <figcaption><strong>Dark surface</strong> – <code>--color-brand-white</code> wordmark on <code>--color-brand-black</code>; lime or violet may draw an accent.</figcaption></figure>
+  <figure class="ds-frame"><div aria-hidden="true">
+      <div class="br-art br-art--light"><img src="../../../../resources/icon.png" alt=""><p class="br-wordmark">Erfana</p><span class="br-rule br-rule--indigo"></span></div></div>
+    <figcaption><strong>Light surface</strong> – <code>--color-brand-black</code> wordmark on <code>--color-brand-white</code>; the accent is indigo.</figcaption></figure>
+  <figure class="ds-frame"><div aria-hidden="true">
+      <div class="br-art br-art--dark"><span class="br-term"><span>&gt;</span><span class="br-cursor"></span></span></div></div>
+    <figcaption><strong>A terminal, without naming one</strong> – a bare prompt glyph and a cursor say “a terminal agent”. The README names the agents in words.</figcaption></figure>
+</div>
+
+<h2 id="dont">What brand artwork never does</h2>
+<div class="ds-frames br-frames">
+  <figure class="ds-frame"><div aria-hidden="true">
+      <div class="br-art br-art--dark"><img class="br-recolour" src="../../../../resources/icon.png" alt=""><p class="br-wordmark">Erfana</p></div></div>
+    <figcaption><strong>Don't – edit the icon.</strong> No recolour, crop, outline, shadow or effect. <code>resources/icon.png</code> is used as it ships.</figcaption></figure>
+  <figure class="ds-frame"><div aria-hidden="true">
+      <div class="br-art br-art--light"><img src="../../../../resources/icon.png" alt=""><p class="br-wordmark br-lime-text">Erfana</p><span class="br-rule br-rule--violet"></span></div></div>
+    <figcaption><strong>Don't – lime or violet on light.</strong> As text they fail, and as an edge they disappear: the ratios are below.</figcaption></figure>
+  <figure class="ds-frame"><div aria-hidden="true">
+      <div class="br-art br-art--dark"><span class="br-term"><span>$ some-vendor-cli</span><span class="br-cursor"></span></span></div></div>
+    <figcaption><strong>Don't – a third-party name or mark.</strong> A command name, a vendor logo or a model's name in an image implies an endorsement Erfana does not have.</figcaption></figure>
+</div>
+
+<h2 id="rules">The rules</h2>
+<table class="ds-tokens">
+<thead><tr><th>Rule</th><th>What it means</th></tr></thead>
+<tbody>
+  <tr><td>The icon is unmodified</td><td>The file as it ships, at any size, on any brand surface. Nothing drawn over, under or around it beyond the surface itself</td></tr>
+  <tr><td>The wordmark is Cascadia Mono bold</td><td>The bundled, OFL-licensed face (<code>fonts.css</code>), so an image renders the same on every machine and no system face is redistributed in a marketing image. Set in sentence case – “Erfana”, never “ERFANA” – beside the icon</td></tr>
+  <tr><td>No third-party names or marks</td><td>No vendor, product or model name or logo inside an image. Text around the image may name tools descriptively (<code>TRADEMARKS.md</code>, “Third-party trademarks”)</td></tr>
+  <tr><td>Flat and square</td><td>A 1px border at most, <code>border-radius: 0</code>, no shadow, no gradient, solid backgrounds – the app's own surface rules (<a href="surfaces.html">Surfaces and elevation</a>)</td></tr>
+  <tr><td>Light surface: indigo is the accent</td><td>Lime and violet never draw text, an icon, a rule or an edge on a light surface. The brand's colour there is indigo</td></tr>
+</tbody>
+</table>
+
+<h2 id="tokens">Brand colours and their contrast</h2>
+<table class="ds-tokens">
+<thead><tr><th>Token</th><th>Value</th><th>On <code>--color-brand-black</code></th><th>On <code>--color-brand-white</code></th><th>Use</th></tr></thead>
+<tbody>
+  <tr><td><code>--color-brand-white</code></td><td><code data-token="--color-brand-white">#F8FAF8</code></td>
+      <td data-contrast="--color-brand-white on --color-brand-black" data-min="4.5" data-result="pass">17.62:1 · pass</td><td class="ds-na">–</td><td>The light surface; the wordmark on dark</td></tr>
+  <tr><td><code>--color-brand-black</code></td><td><code data-token="--color-brand-black">#161312</code></td>
+      <td class="ds-na">–</td><td data-contrast="--color-brand-black on --color-brand-white" data-min="4.5" data-result="pass">17.62:1 · pass</td><td>The dark surface; the wordmark on light</td></tr>
+  <tr><td><code>--color-brand-indigo</code></td><td><code data-token="--color-brand-indigo">#3F3FBA</code></td>
+      <td data-contrast="--color-brand-indigo on --color-brand-black" data-min="3" data-result="fail">2.31:1 · fail</td><td data-contrast="--color-brand-indigo on --color-brand-white" data-min="4.5" data-result="pass">7.60:1 · pass</td><td>The accent on light only – text, rules, edges. Never on dark, where it fails</td></tr>
+  <tr><td><code>--color-brand-lime</code></td><td><code data-token="--color-brand-lime">#E3E829</code></td>
+      <td data-contrast="--color-brand-lime on --color-brand-black" data-min="4.5" data-result="pass">13.94:1 · pass</td><td data-contrast="--color-brand-lime on --color-brand-white" data-min="3" data-result="fail">1.26:1 · fail</td><td>Dark only – <strong>never</strong> on light</td></tr>
+  <tr><td><code>--color-brand-violet</code></td><td><code data-token="--color-brand-violet">#A0A8FF</code></td>
+      <td data-contrast="--color-brand-violet on --color-brand-black" data-min="4.5" data-result="pass">8.39:1 · pass</td><td data-contrast="--color-brand-violet on --color-brand-white" data-min="3" data-result="fail">2.09:1 · fail</td><td>Dark only – <strong>never</strong> on light</td></tr>
+</tbody>
+</table>
+<p class="ds-muted">Text is judged against 4.5:1; lime, violet and indigo as an edge or a rule against the 3:1 that a
+non-text mark needs (SC 1.4.11). Lime and violet fail even that on the light surface, which is the whole reason for the
+indigo rule. The full token set and every other pairing are on <a href="colors.html">Colours</a>.</p>
+
+<h2 id="light-artwork">A light variant without a light theme</h2>
+<p class="ds-muted">GitHub shows a README in a light or a dark theme, so a banner may come in a light variant – the
+<a href="../../../designs/github-presentation/index.html">GitHub presentation</a> screen draws both. That is artwork on
+someone else's page, not app chrome: Erfana itself stays dark only. It belongs with the other light pixels the app
+shows on purpose without being a theme, listed on <a href="theme.html#light-surfaces">Theme – The light surfaces that are
+not a theme</a>.</p>
+
+<section id="exceptions">
+<h2>Exceptions</h2>
+<p class="ds-muted">None recorded. Brand artwork that departs from this card carries a <code>deviates:</code> marker at
+the site and gets a row here, naming the file.</p>
+<h3 id="open-defects">Open defects this card names</h3>
+<p class="ds-muted">None found. The GitHub presentation screen already follows every rule above.</p>
+</section>
+
+<section id="related">
+<h2>Related</h2>
+<ul class="ds-muted">
+  <li><a href="colors.html">Colours</a> – every brand token and every pairing.</li>
+  <li><a href="type.html">Typography</a> – Cascadia Mono, the one face Erfana bundles.</li>
+  <li><a href="theme.html">Theme</a> – dark only, and the light surfaces that are not a theme.</li>
+  <li><a href="writing.html">Writing</a> – how the product is described in words: it hosts the agent, it is not one.</li>
+</ul>
+</section>
+
+</main>
+</body>
+</html>

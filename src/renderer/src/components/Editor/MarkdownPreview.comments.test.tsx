@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * G-005 (docs/designs/html-preview-comments.md §12, decision 22): a v1
+ * G-005 (docs/designs/comments/html-preview-comments.md §12, decision 22): a v1
  * comment block inside a Markdown file stays hidden in the Markdown preview.
  *
  * The block is an HTML comment, and the preview's pipeline (rehype-raw, then

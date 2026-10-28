@@ -31,7 +31,7 @@
  * rules name.
  *
  * @see WCAG 2.2 SC 1.4.3 Contrast (Minimum)
- * @see docs/designs/design-issue-60.md §2.3 (colour contract)
+ * @see docs/designs/large-projects/design-issue-60.md §2.3 (colour contract)
  */
 
 import { readFileSync } from 'node:fs'

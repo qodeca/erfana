@@ -1,0 +1,228 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/**
+ * The modal dialog shell – scrim, container, header, body, footer.
+ *
+ * PROPOSED – not adopted. The app's version is
+ * src/renderer/src/components/Dialog/Dialog.css (.dialog-overlay,
+ * .dialog-container, .dialog-header, .dialog-body, .dialog-actions), driven by
+ * BaseDialog.tsx, which owns the focus contract (#91). Adopting this is a MOVE,
+ * not a copy: the rules land there, and scripts/design-sync.mjs then syncs the
+ * file back here (COMPONENT_CSS), so the card renders what actually ships.
+ *
+ * What this file changes against the shipping shell, and why:
+ *   - Only the BODY scrolls. Today the whole container scrolls (max-height:
+ *     85vh; overflow-y: auto), so on a long body the title and the buttons
+ *     scroll out of view – the user loses the question and the way to answer it.
+ *   - Header, body and footer are a column, so the footer is always on screen.
+ *   - Reduced motion removes the 20px slide; the fade stays (opacity is not
+ *     motion). The app's global reduce rule shortens every animation to 1ms,
+ *     which also works, but says nothing about which part is safe to keep.
+ *
+ * Buttons are the Buttons card's, fields the Form controls card's – this file
+ * lays them out and never restyles them. Classes are prefixed erf-.
+ */
+
+/* The scrim covers the whole window. Its z-index is handed out at runtime by
+   DialogContext, counting up from --z-dialog (see the Layering card) – one
+   rung per open dialog, so a stacked dialog's scrim covers the dialog under it. */
+.erf-dialog-scrim {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-10);
+  background-color: var(--color-overlay-dialog);
+  z-index: var(--z-dialog);
+  animation: erf-dialog-fade var(--transition-normal);
+}
+
+/* The container. A flex column: header and footer keep their height, the body
+   takes the rest and is the only part that scrolls. */
+.erf-dialog {
+  display: flex;
+  flex-direction: column;
+  /* Never wider than the window minus the scrim's padding, so a narrow window
+     shrinks the dialog instead of clipping it (SC 1.4.10 Reflow). */
+  inline-size: min(var(--dialog-min-width), 100%);
+  min-inline-size: min(var(--dialog-min-width), 100%);
+  max-inline-size: var(--dialog-max-width);
+  max-block-size: 85vh;
+  background-color: var(--color-bg-primary);
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-dialog);
+  color: var(--color-text-primary);
+  animation: erf-dialog-rise var(--transition-slow);
+}
+
+/* A dialog whose content needs the room (a prompt with a long preview). */
+.erf-dialog--wide { inline-size: min(var(--dialog-max-width), 100%); }
+
+.erf-dialog__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--space-14) var(--space-14) var(--space-8);
+}
+
+/* The element aria-labelledby points at. Every dialog has one: an unnamed
+   dialog is announced as "dialog" and nothing else. */
+.erf-dialog__title {
+  margin: 0;
+  font-size: var(--text-xl);
+  font-weight: var(--font-semibold);
+  line-height: var(--leading-tight);
+  color: var(--color-text-emphasis);
+}
+
+/* An optional leading icon. Decorative – aria-hidden – because the title
+   already says what kind of dialog this is. */
+.erf-dialog__icon {
+  flex-shrink: 0;
+  inline-size: var(--icon-size-lg);
+  block-size: var(--icon-size-lg);
+  color: var(--color-text-secondary);
+}
+.erf-dialog__icon--danger { color: var(--color-error); }
+.erf-dialog__icon--warning { color: var(--color-warning); }
+
+/* The only scrolling part. min-block-size: 0 lets a flex child shrink below its
+   content, which is what makes overflow work inside a column. */
+.erf-dialog__body {
+  flex: 1 1 auto;
+  min-block-size: 0;
+  overflow-y: auto;
+  padding: 0 var(--space-14);
+  overscroll-behavior: contain;
+}
+
+/* aria-describedby points at the message, when there is one short message. */
+.erf-dialog__message {
+  margin: 0 0 var(--space-8);
+  max-inline-size: 70ch;
+  font-size: var(--text-md);
+  line-height: var(--leading-relaxed);
+  color: var(--color-text-primary);
+}
+
+/* When the body can scroll, the reader needs to know there is more. The edge
+   between body and footer turns into a line; a body that fits draws none. */
+.erf-dialog--scrolls .erf-dialog__body { border-block: var(--border-width) solid var(--color-border-default); }
+
+/* Actions, right-aligned. Order: Cancel, then the action that answers the
+   title. A destructive action is the rightmost and never the initial focus. */
+.erf-dialog__footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-6);
+  padding: var(--space-12) var(--space-14) var(--space-14);
+}
+
+/* Left side of the footer, set apart from the answers on the right. It holds
+   one of: a hint, a character count, a "Don't ask again" checkbox – or the
+   one DISCARD answer of a save-or-discard question ("Don't save", "Discard my
+   changes"), a danger button kept away from the safe default (the macOS alert
+   layout UnsavedChangesDialog ships). A button here keeps its own Buttons-card
+   size and colour; the small tertiary text below is for a hint or a count. */
+.erf-dialog__footer-start {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  margin-inline-end: auto;
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+}
+
+/* ---------- inline destructive confirm ----------
+   A delete inside a dialog asks in place: this box replaces the item that
+   would go, and is never a second dialog. The question says what goes; Cancel
+   comes first and takes focus; the danger button, with a verb label, is on the
+   right; Esc means Cancel. Reference: .erf-comment-confirm in CommentWindow.css. */
+.erf-dialog-confirm {
+  margin-block: var(--space-4);
+  padding: var(--space-6);
+  background: var(--color-error-bg);
+  border: var(--border-width) solid var(--color-error-border);
+  border-radius: var(--border-radius);
+}
+.erf-dialog-confirm__text {
+  margin: 0;
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  color: var(--color-text-primary);
+  overflow-wrap: anywhere;
+}
+.erf-dialog-confirm__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-4);
+  margin-block-start: var(--space-6);
+}
+
+/* ---------- anchored dialog ----------
+   Still modal (aria-modal, the focus trap, Esc) but placed beside the thing it
+   is about rather than centred, so the target stays visible. The layer under
+   it catches an outside click (which closes it) and paints NO scrim: the rest
+   of the window stays readable. The component computes the position: right of
+   the target, else left, else below, else above, always inside the window less
+   a margin. Reference: CommentWindow.css (.erf-comment-layer, .erf-comment-shell,
+   .erf-comment-window). */
+.erf-dialog-scrim--clear {
+  display: block;
+  padding: 0;
+  background: none;
+  animation: none;
+}
+
+.erf-dialog--anchored {
+  position: absolute;
+  /* The anchored-dialog bounds: the comment window's two size tokens. */
+  inline-size: min(var(--comments-window-width), 100% - var(--space-8));
+  min-inline-size: 0;
+  max-inline-size: min(var(--comments-window-max-width), 100% - var(--space-8));
+  /* Height: never past the window less the same margin; the body scrolls. */
+  max-block-size: calc(100% - var(--space-8));
+  background-color: var(--color-bg-elevated);
+  animation: none;
+}
+.erf-dialog--anchored .erf-dialog__header { padding: var(--space-8) var(--space-8) var(--space-4); }
+.erf-dialog--anchored .erf-dialog__title { font-size: var(--text-md); }
+.erf-dialog--anchored .erf-dialog__body { padding: 0 var(--space-8); }
+.erf-dialog--anchored .erf-dialog__footer { padding: var(--space-6) var(--space-8) var(--space-8); }
+
+/* Under 400px of room: a sheet across the foot of the area, full width, with
+   only its top edge drawn. The component sets the inline position. */
+.erf-dialog--sheet {
+  inset-inline: 0;
+  inset-block-end: 0;
+  inline-size: auto;
+  max-inline-size: none;
+  border-inline: 0;
+  border-block-end: 0;
+}
+
+@keyframes erf-dialog-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes erf-dialog-rise {
+  from { opacity: 0; transform: translateY(var(--space-10)); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes erf-dialog-appear {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Reduced motion: the dialog appears in place. Fading is kept – a change of
+   opacity is not movement, and an instant swap of the whole window is harsher
+   than a short fade. */
+@media (prefers-reduced-motion: reduce) {
+  .erf-dialog { animation-name: erf-dialog-appear; }
+}

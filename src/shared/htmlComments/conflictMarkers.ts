@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Git conflict-marker detection (docs/designs/html-preview-comments.md §3
+ * Git conflict-marker detection (docs/designs/comments/html-preview-comments.md §3
  * "Conflict markers outside any block", decision 32, U-070–U-076).
  *
  * Two different questions, two different strictnesses:

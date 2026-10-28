@@ -33,7 +33,7 @@ import { createPreviewRequestKindLedger } from './PreviewRequestKindLedger'
 
 /**
  * What a session's HTML Preview comments are built from
- * (docs/designs/html-preview-comments.md §4.2): the feature flag, plus test
+ * (docs/designs/comments/html-preview-comments.md §4.2): the feature flag, plus test
  * seams. Absent, the session serves every body raw.
  */
 export type PreviewSessionCommentDeps = PreviewCommentServingDeps

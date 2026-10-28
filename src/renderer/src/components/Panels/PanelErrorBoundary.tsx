@@ -47,7 +47,7 @@
  * announced — which is the correct outcome for a failure in a surface the user
  * is not looking at, and the copy is waiting when they navigate to it.
  *
- * @see docs/designs/design-issue-60.md §2.3 (two-tier contract)
+ * @see docs/designs/large-projects/design-issue-60.md §2.3 (two-tier contract)
  * @module components/Panels/PanelErrorBoundary
  */
 

@@ -54,7 +54,7 @@ Return review in this format:
 
 - NEVER modify files, only report findings
 - ALWAYS categorize findings by severity
-- Focus on substantive issues, not style nitpicks
+- Focus on substantive issues, not style nitpicks – but the rules in `CODE_REVIEW.md` § Always check (design tokens, card deviations) are findings, not nitpicks
 - If no issues found, explicitly state "No issues found"
 
 ## Review Focus Areas
@@ -62,4 +62,4 @@ Return review in this format:
 1. **Security**: Injection, XSS, path traversal, secrets
 2. **Performance**: N+1 queries, unnecessary re-renders, memory leaks
 3. **Quality**: Error handling, edge cases, type safety
-4. **Patterns**: Consistency with codebase conventions
+4. **Patterns**: Consistency with codebase conventions and `CODE_REVIEW.md` § Always check

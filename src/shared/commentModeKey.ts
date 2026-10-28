@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * The comment-mode shortcut: one rule for both processes
- * (docs/designs/html-preview-comments.md §3, §7.1, §10.1; M-052, L14).
+ * (docs/designs/comments/html-preview-comments.md §3, §7.1, §10.1; M-052, L14).
  *
  * Main matches it in the page's `before-input-event` (`previewInputForward.ts`)
  * and the panel on its own chrome and its dockview group element

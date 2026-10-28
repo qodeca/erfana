@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Framework pages (docs/designs/html-preview-comments.md §19 R3-11, spike S7;
+ * Framework pages (docs/designs/comments/html-preview-comments.md §19 R3-11, spike S7;
  * U-044): inside a hydrated region a block goes before the region's root
  * container, and the clicked element becomes a runtime path inside it.
  */

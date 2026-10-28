@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Lossless decoding (docs/designs/html-preview-comments.md §3 "Non-UTF-8
+ * Lossless decoding (docs/designs/comments/html-preview-comments.md §3 "Non-UTF-8
  * files"; U-094): only a byte-identical UTF-8 round trip may be written.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'

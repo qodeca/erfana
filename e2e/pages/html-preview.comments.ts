@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * HTML Preview comments – e2e reads (docs/designs/html-preview-comments.md
+ * HTML Preview comments – e2e reads (docs/designs/comments/html-preview-comments.md
  * §12.4, §13 P3, P4 and P5 exits).
  *
  * Comment state is read main-side through the e2e hook the app installs on

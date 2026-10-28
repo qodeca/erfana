@@ -29,7 +29,7 @@ export const EXTENSIONS = ['.png', '.gif', '.mp4', '.webp']
 export const GUIDE_TOTAL_BYTES = 12 * 1024 * 1024
 
 /** The design's screenshot list, which the manifest must agree with. */
-export const DESIGN_FILE = 'docs/designs/138-user-guide/README.md'
+export const DESIGN_FILE = 'docs/designs/user-guide/README.md'
 
 const MAX_KB_CEILING = 5120
 const ID_PART = /^[a-z0-9]+(?:-[a-z0-9]+)*$/

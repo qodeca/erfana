@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * The element menu and the live regions (docs/designs/html-preview-comments.md
+ * The element menu and the live regions (docs/designs/comments/html-preview-comments.md
  * §10.3, §10.9; R-001, R-002, R-013).
  */
 import { render, screen } from '@testing-library/react'

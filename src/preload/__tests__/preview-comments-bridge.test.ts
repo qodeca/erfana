@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * The preload HTML Preview comments bridge (`previewComments`) against its
- * wire (docs/designs/html-preview-comments.md §8): every method sends the
+ * wire (docs/designs/comments/html-preview-comments.md §8): every method sends the
  * channel and payload main validates – a panel and main-minted keys, never a
  * path to write or an author – and every event subscription unsubscribes the
  * listener it added.

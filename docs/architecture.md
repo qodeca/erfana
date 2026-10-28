@@ -64,7 +64,7 @@ The tree below covers `src/` and is annotated rather than exhaustive: `interface
 
 Two tracked trees sit outside `src/` and are not shown below:
 
-- **`docs/design-system/`** — the design system. Plain HTML cards, opened in a browser, that decide the visual rules and render them live. Built by `scripts/design-sync.mjs`; see [`docs/design-system/README.md`](design-system/README.md).
+- **`docs/design-system/`** — the design system. Plain HTML and CSS cards (no JavaScript), opened in a browser, that decide the visual rules; `scripts/design-sync.mjs` (`npm run design`) bakes the app's real token values and counts into them, and `--check` guards them in the required `Lint` job. See [`docs/design-system/README.md`](design-system/README.md). Feature designs and screens built from the cards live in `docs/designs/<functionality>/`.
 - **`scripts/`** — build and check tooling (`.mjs`/`.js`, no shell or Python), including `scripts/lib/` for shared helpers.
 
 ```

@@ -138,7 +138,7 @@ These are **CVE pins**, forced onto transitive consumers. 4.18.1 is a real publi
 
 ## Electron upgrade checklist
 
-Some features lean on Electron and Chromium behaviour that is documented only in part. After any Electron major or minor bump, re-check these before release. HTML Preview comments ([design](../designs/html-preview-comments.md) R17, [spike results](../spikes/html-preview-comments.md)) add the following:
+Some features lean on Electron and Chromium behaviour that is documented only in part. After any Electron major or minor bump, re-check these before release. HTML Preview comments ([design](../designs/comments/html-preview-comments.md) R17, [spike results](../spikes/html-preview-comments.md)) add the following:
 
 | Re-check | Why it can break | Where it is pinned |
 |---|---|---|

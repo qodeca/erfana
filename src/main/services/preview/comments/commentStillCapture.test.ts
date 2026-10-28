@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * The fresh still under a comment popup and where the menu opens
- * (docs/designs/html-preview-comments.md §7.3 step 4, §19 R3-5, R3-6;
+ * (docs/designs/comments/html-preview-comments.md §7.3 step 4, §19 R3-5, R3-6;
  * M-067).
  */
 import { describe, expect, it, vi } from 'vitest'

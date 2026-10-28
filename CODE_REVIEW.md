@@ -13,8 +13,11 @@ never approves the reviewer's own work.
 The rules in `CLAUDE.md` (Code Style & Conventions, Design system, IPC Contracts) win. The ones a
 lint run does not catch:
 
-- Design tokens: spacing and typography tokens are convention, not lint; a hardcoded `padding` or
-  `font-size`, or an undocumented deviation from a `docs/design-system/` card, is a finding.
+- Design tokens: in `src/`, spacing and typography tokens are convention, not lint; a hardcoded
+  `padding` or `font-size`, or a departure from a `docs/design-system/` card without a
+  `/* deviates: … */` marker and a row in the card's Exceptions, is a finding. So is an agent's change
+  that promotes a card to `decided`, changes what a `decided` card requires or supersedes one – those
+  are the owner's (SDLC.md § Design system in this project).
 - Panel ids come from `getFilePanelId()` / `openFileInPanel()`, never hand-built.
 - Renderer paths use the helpers in `src/renderer/src/utils/fileUtils.ts`; `lastIndexOf('/')`,
   a bare `.split('/')` or a manual join passes lint and is still a finding.

@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * The message contract between main and the comment parse worker
- * (docs/designs/html-preview-comments.md §19 R3-12).
+ * (docs/designs/comments/html-preview-comments.md §19 R3-12).
  *
  * Its own module so the main bundle imports the contract without importing
  * the worker entry (`commentParseWorker.ts`), which would make the main

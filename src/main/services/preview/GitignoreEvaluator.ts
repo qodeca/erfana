@@ -35,7 +35,7 @@
  * cases, and failing closed would make `.html` un-previewable on every non-git
  * project. Exit 0 = ignored, 1 = not ignored, anything else = fail open.
  *
- * @see docs/designs/sd-074-html-preview.md §1.5, §2.8 (control table, risk 9)
+ * @see docs/designs/html-preview/sd-074-html-preview.md §1.5, §2.8 (control table, risk 9)
  */
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'

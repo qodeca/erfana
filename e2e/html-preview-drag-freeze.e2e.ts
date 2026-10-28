@@ -26,7 +26,7 @@
  *
  * Local gate only: e2e is disabled in CI. Condition-based waits only.
  *
- * @see docs/designs/design-issue-124-part1.md §1.5
+ * @see docs/designs/html-preview/multi-page/design-issue-124-part1.md §1.5
  * @see e2e/html-preview-bounds.harness.ts
  */
 

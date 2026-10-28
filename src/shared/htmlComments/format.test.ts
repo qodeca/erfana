@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * The v1 block format: serializer, escaping, schema and limits
- * (docs/designs/html-preview-comments.md §5.1–§5.4, §5.8; U-001–U-023).
+ * (docs/designs/comments/html-preview-comments.md §5.1–§5.4, §5.8; U-001–U-023).
  *
  * Escaping is the critical part (threat S13): no text a reviewer types or a
  * page supplies may end the HTML comment, and `@data` must give back exactly

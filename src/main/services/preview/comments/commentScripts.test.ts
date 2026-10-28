@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * The top-frame scripts (docs/designs/html-preview-comments.md §7.5 steps 3
+ * The top-frame scripts (docs/designs/comments/html-preview-comments.md §7.5 steps 3
  * and 6; M-041): what they do in a stand-in window, and the parsers main
  * trusts their results through.
  */

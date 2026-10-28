@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * HTML Preview comments' IPC schemas and channel names
- * (docs/designs/html-preview-comments.md §8; I-001 – I-005).
+ * (docs/designs/comments/html-preview-comments.md §8; I-001 – I-005).
  */
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'

@@ -13,7 +13,7 @@
  * to a trusted location (the Windows detector sets it to the powershell binary's
  * own System32 dir to defeat current-directory DLL-planting).
  *
- * @see docs/designs/216-claude-status-bar.md §10
+ * @see docs/designs/context-meter/216-claude-status-bar.md §10
  */
 export type ExecLike = (
   file: string,

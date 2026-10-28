@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * HTML Preview comments' main → renderer events
- * (docs/designs/html-preview-comments.md §8; tests I-005, SEC-07).
+ * (docs/designs/comments/html-preview-comments.md §8; tests I-005, SEC-07).
  *
  * The comment events carry comment text, authors and paths in project space,
  * so unlike most preview events they are never broadcast: each goes to the

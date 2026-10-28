@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * The scripts comments run in the preview's top frame
- * (docs/designs/html-preview-comments.md §7.5 steps 3 and 6, §19 R3-6; spikes
+ * (docs/designs/comments/html-preview-comments.md §7.5 steps 3 and 6, §19 R3-6; spikes
  * S2, S6).
  *
  * All of them run in isolated world {@link COMMENT_WORLD_ID} – 997 to 999 are

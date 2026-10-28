@@ -176,7 +176,7 @@ templates/
 ### 013-NFR-005: UI consistency
 
 **Priority**: Medium
-**Description**: The CLI tool dropdown must follow the existing UI style guide and design tokens. Use standard dropdown component patterns consistent with other toolbar controls. Dropdown must be keyboard accessible (Tab, Enter, Arrow keys per WCAG 2.1).
+**Description**: The CLI tool dropdown must follow the design system (`docs/design-system/` – the Toolbar card, and the Form controls or Menu card depending on whether it is a select or a menu button) and its tokens. Use standard dropdown component patterns consistent with other toolbar controls. Dropdown must be keyboard accessible (Tab, Enter, Arrow keys per WCAG 2.1).
 
 **Traces to**: 013-TC-011
 

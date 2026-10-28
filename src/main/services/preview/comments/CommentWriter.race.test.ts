@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * CommentWriter under races and file-system failures
- * (docs/designs/html-preview-comments.md §7.6 steps 8–9, threats S10/S11;
+ * (docs/designs/comments/html-preview-comments.md §7.6 steps 8–9, threats S10/S11;
  * M-004, M-013, M-056, M-061, SEC-11).
  *
  * Split from `CommentWriter.test.ts` because the module-scope `fs/promises`

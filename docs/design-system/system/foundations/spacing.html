@@ -1,63 +1,143 @@
-<!-- @card group="Foundations" name="Spacing" subtitle="The 2px-per-step scale, drawn to size — the token number is NOT the pixel count" status="proposed" reviewed="2026-08-31" -->
+<!-- @card group="Foundations" name="Spacing" subtitle="A 2px grid, drawn to size – the token number is a step, not a pixel count" status="proposed" reviewed="2026-08-31" answers="Choose a padding or gap; Space a panel header, a menu or a dialog" -->
 <!-- SPDX-License-Identifier: GPL-3.0-only -->
 <!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Erfana — spacing</title>
+<title>Spacing – Erfana design system</title>
 <link rel="stylesheet" href="../../tokens.css">
 <link rel="stylesheet" href="../../ds.css">
 <style>
-  .sp-row { display: grid; grid-template-columns: 120px 64px 1fr; gap: var(--space-8);
-            align-items: center; padding: var(--space-3) 0;
-            border-bottom: var(--border-width) solid var(--color-border-default); }
-  .sp-token { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-text-tertiary); }
-  .sp-px { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-text-secondary); }
-  .sp-bar { height: 16px; background: var(--color-accent-primary); }
+  /* The scale bar: drawn at the token's own width. */
+  .sp-bar { height: var(--space-8); background: var(--color-accent-primary); }
+  .sp-off { color: var(--color-text-tertiary); }
+
+  /* Anatomy frames. Padding is painted violet, a gap lime, content grey – so
+     every space in the drawing is a token you can see. */
+  .sp-pad { background: var(--color-brand-violet-muted); }
+  .sp-gap { background: var(--color-brand-lime-muted); }
+  .sp-box { background: var(--color-bg-secondary); color: var(--color-text-primary); font-size: var(--text-base); }
+  .sp-label { display: block; margin-top: var(--space-2); font-family: var(--font-mono); font-size: var(--ds-text-small);
+              color: var(--color-text-tertiary); }
+
+  .sp-header { display: flex; align-items: center; padding: 0 var(--space-6); height: var(--header-height); }
+  .sp-row { display: flex; align-items: center; gap: var(--space-4); }
+  .sp-header > span { display: flex; align-items: center; height: var(--icon-size-sm); }
+  .sp-icon { display: block; width: var(--icon-size-sm); height: var(--icon-size-sm); background: var(--color-text-tertiary); }
+  .sp-title { /* mockup: app scale – a panel title */ padding: 0 var(--space-1); font-size: var(--text-sm); font-weight: var(--font-semibold);
+              text-transform: uppercase; color: var(--color-text-primary); }
+
+  .sp-menu { display: flex; flex-direction: column; padding: var(--space-2) 0; width: calc(var(--space-24) * 4); }
+  .sp-item { margin: 0; padding: var(--space-3) var(--space-6); }
+  .sp-fill { display: block; }
+
+  .sp-dialog { padding: var(--space-14); }
+  .sp-dialog-body { padding: var(--space-4); margin-bottom: var(--space-8); }
+  .sp-actions { display: flex; justify-content: flex-end; padding-top: var(--space-2); }
+  .sp-actions > .sp-row { gap: var(--space-6); }
+  .sp-btn { padding: var(--space-2) var(--space-8); }
+
+  .sp-legend { display: flex; gap: var(--space-8); flex-wrap: wrap; margin: 0 0 var(--space-8);
+               font-size: var(--ds-text-small); color: var(--color-text-tertiary); }
+  .sp-legend span::before { content: ''; display: inline-block; width: var(--space-6); height: var(--space-6);
+                            margin-right: var(--space-2); vertical-align: middle; }
+  .sp-legend .sp-k-pad::before { background: var(--color-brand-violet-muted); }
+  .sp-legend .sp-k-gap::before { background: var(--color-brand-lime-muted); }
+  .sp-legend .sp-k-box::before { background: var(--color-bg-secondary); border: var(--border-width) solid var(--color-border-subtle); }
 </style>
 </head>
 <body>
-
+<nav class="ds-crumbs" aria-label="Breadcrumb"><a href="../../index.html">Erfana design system</a> <span aria-hidden="true">/</span> <a href="../../index.html#foundations">Foundations</a> <span aria-hidden="true">/</span> <span aria-current="page">Spacing</span></nav>
+<main>
 <h1>Spacing</h1>
-<p class="ds-lede">A 2px grid. Bars below are drawn at their true width.</p>
+<p class="ds-meta"><span class="ds-status" data-status="proposed">proposed</span> reviewed 2026-08-31</p>
+<p class="ds-lede" id="decision">
+  A <strong>2px grid</strong>: every space token is a whole number of 2px steps, and every padding, margin and
+  gap in the app is one of them. Lay out on even steps (multiples of 4px); the odd steps (6, 10, 14px) are for
+  the inside of a control, where 4px is too coarse.
+</p>
 
 <div class="ds-note">
   <strong>Read this before you use a space token.</strong>
-  The number in the name is <em>half</em> the pixel value.
-  <code>--space-4</code> is <strong>8px</strong>, not 4px.
-  The 4px value is <code>--space-2</code>.
-  This trips people up constantly, so the bars are drawn to scale — trust the bar, not the name.
+  The number in the name is the number of 2px steps, so it is <em>half</em> the pixel value.
+  <code>--space-4</code> is <strong><span data-token="--space-4">8px</span></strong>, not 4px; the 4px value is
+  <code>--space-2</code>. Trust the bar, not the name.
 </div>
 
-<div id="scale"></div>
+<h2 id="scale">The scale</h2>
+<table class="ds-tokens">
+<thead><tr><th>Token</th><th>Value</th><th>Drawn to scale</th><th>Use</th></tr></thead>
+<tbody>
+  <tr><td><code>--space-0</code></td><td><code data-token="--space-0">0</code></td><td><div class="sp-bar" style="width: var(--space-0)"></div></td><td>Resetting a margin</td></tr>
+  <tr><td><code>--space-1</code></td><td><code data-token="--space-1">2px</code></td><td><div class="sp-bar" style="width: var(--space-1)"></div></td><td class="sp-off">Optical nudges, focus-ring offset – off the 4px rhythm</td></tr>
+  <tr><td><code>--space-2</code></td><td><code data-token="--space-2">4px</code></td><td><div class="sp-bar" style="width: var(--space-2)"></div></td><td>Inside a control; a menu's top and bottom padding</td></tr>
+  <tr><td><code>--space-3</code></td><td><code data-token="--space-3">6px</code></td><td><div class="sp-bar" style="width: var(--space-3)"></div></td><td class="sp-off">A menu item's block padding – off the 4px rhythm</td></tr>
+  <tr><td><code>--space-4</code></td><td><code data-token="--space-4">8px</code></td><td><div class="sp-bar" style="width: var(--space-4)"></div></td><td>The common gap: icon to label, related items</td></tr>
+  <tr><td><code>--space-5</code></td><td><code data-token="--space-5">10px</code></td><td><div class="sp-bar" style="width: var(--space-5)"></div></td><td class="sp-off">Button block padding – off the 4px rhythm</td></tr>
+  <tr><td><code>--space-6</code></td><td><code data-token="--space-6">12px</code></td><td><div class="sp-bar" style="width: var(--space-6)"></div></td><td>Inline padding of a header, a row or a menu item; button gaps</td></tr>
+  <tr><td><code>--space-7</code></td><td><code data-token="--space-7">14px</code></td><td><div class="sp-bar" style="width: var(--space-7)"></div></td><td class="sp-off">Rare – off the 4px rhythm</td></tr>
+  <tr><td><code>--space-8</code></td><td><code data-token="--space-8">16px</code></td><td><div class="sp-bar" style="width: var(--space-8)"></div></td><td>Between groups inside a panel or a dialog</td></tr>
+  <tr><td><code>--space-10</code></td><td><code data-token="--space-10">20px</code></td><td><div class="sp-bar" style="width: var(--space-10)"></div></td><td>The gap a dialog keeps from the window edge</td></tr>
+  <tr><td><code>--space-12</code></td><td><code data-token="--space-12">24px</code></td><td><div class="sp-bar" style="width: var(--space-12)"></div></td><td>Between sections</td></tr>
+  <tr><td><code>--space-14</code></td><td><code data-token="--space-14">28px</code></td><td><div class="sp-bar" style="width: var(--space-14)"></div></td><td>A dialog's padding</td></tr>
+  <tr><td><code>--space-16</code></td><td><code data-token="--space-16">32px</code></td><td><div class="sp-bar" style="width: var(--space-16)"></div></td><td>Page padding on a full-panel screen (welcome, settings)</td></tr>
+  <tr><td><code>--space-20</code></td><td><code data-token="--space-20">40px</code></td><td><div class="sp-bar" style="width: var(--space-20)"></div></td><td>Between the major blocks of a full-panel screen</td></tr>
+  <tr><td><code>--space-24</code></td><td><code data-token="--space-24">48px</code></td><td><div class="sp-bar" style="width: var(--space-24)"></div></td><td>The largest gap – an empty state's breathing room</td></tr>
+</tbody>
+</table>
+<p class="ds-muted">The scale has gaps on purpose – there is no <code>--space-9</code>, <code>--space-11</code> or
+<code>--space-13</code>. If no step fits, the layout is wrong, not the scale.</p>
 
-<script>
-const STEPS = ['--space-0', '--space-1', '--space-2', '--space-3', '--space-4', '--space-5',
-               '--space-6', '--space-7', '--space-8', '--space-10', '--space-12', '--space-14',
-               '--space-16', '--space-20', '--space-24'];
+<h2 id="rhythm">Which step, when</h2>
+<table class="ds-tokens">
+<thead><tr><th>Relationship</th><th>Step</th><th>Why</th></tr></thead>
+<tbody>
+  <tr><td>Inside one control (icon to its own label, text to its edge)</td><td><code>--space-2</code> – <code>--space-4</code></td><td>Reads as one object</td></tr>
+  <tr><td>Between related items (buttons in a group, fields in a group)</td><td><code>--space-4</code> – <code>--space-6</code></td><td>Reads as one group</td></tr>
+  <tr><td>Between groups</td><td><code>--space-8</code></td><td>Twice the gap inside a group – the eye sees two groups</td></tr>
+  <tr><td>Between sections</td><td><code>--space-12</code> – <code>--space-16</code></td><td>A heading's space belongs to the section it starts</td></tr>
+</tbody>
+</table>
 
-function resolved(token) {
-  const probe = document.createElement('span');
-  probe.style.setProperty('--probe', `var(${token})`);
-  document.body.appendChild(probe);
-  const value = getComputedStyle(probe).getPropertyValue('--probe').trim();
-  probe.remove();
-  return value;
-}
+<h2 id="anatomy">Anatomy – where the steps go</h2>
+<p class="ds-muted">Three surfaces drawn with the spacing the app ships today, read from their stylesheets.
+Every space is painted, so you can see which token fills it.</p>
+<p class="sp-legend" aria-hidden="true"><span class="sp-k-pad">padding</span><span class="sp-k-gap">gap</span><span class="sp-k-box">content</span></p>
+<div class="ds-frames">
+  <figure class="ds-frame"><div aria-hidden="true">
+      <div class="sp-header sp-pad"><div class="sp-row sp-gap"><span class="sp-box"><span class="sp-icon"></span></span><span class="sp-box sp-title">Project</span></div></div>
+      <span class="sp-label">padding-inline --space-6 · gap --space-4 · height --header-height</span>
+    </div>
+    <figcaption><strong>Panel header</strong> – <code>ProjectPanel.css</code>.</figcaption></figure>
+  <figure class="ds-frame"><div aria-hidden="true">
+      <div class="sp-menu sp-pad"><p class="sp-item sp-pad"><span class="sp-box sp-fill">Rename</span></p><p class="sp-item sp-pad"><span class="sp-box sp-fill">Duplicate</span></p><p class="sp-item sp-pad"><span class="sp-box sp-fill">Delete</span></p></div>
+      <span class="sp-label">menu padding-block --space-2 · item --space-3 --space-6</span>
+    </div>
+    <figcaption><strong>Context menu</strong> – <code>ContextMenu.css</code>.</figcaption></figure>
+  <figure class="ds-frame"><div aria-hidden="true">
+      <div class="sp-dialog sp-pad"><div class="sp-box sp-dialog-body">Delete this file?</div>
+        <div class="sp-actions"><div class="sp-row sp-gap"><span class="sp-box sp-btn">Cancel</span><span class="sp-box sp-btn">Delete file</span></div></div></div>
+      <span class="sp-label">dialog padding --space-14 · actions gap --space-6</span>
+    </div>
+    <figcaption><strong>Dialog</strong> – <code>Dialog.css</code>.</figcaption></figure>
+</div>
 
-const host = document.getElementById('scale');
-for (const token of STEPS) {
-  const px = resolved(token);
-  const row = document.createElement('div');
-  row.className = 'sp-row';
-  row.innerHTML = '<div class="sp-token"></div><div class="sp-px"></div><div><div class="sp-bar"></div></div>';
-  row.children[0].textContent = token;
-  row.children[1].textContent = px === '0' ? '0' : px;
-  row.children[2].firstElementChild.style.width = `var(${token})`;
-  host.appendChild(row);
-}
-</script>
+<section id="exceptions">
+<h2>Exceptions</h2>
+<p class="ds-muted">None recorded. A shipping component that departs from this card carries a
+<code>deviates:</code> marker at the site and gets a row here, naming the file.</p>
+<h3 id="defects">Defects this card names</h3>
+<ul class="ds-muted">
+  <li><strong>The token file's header says "4px Base Grid".</strong> The scale steps by 2px –
+  <code>--space-1</code> is <code data-token="--space-1">2px</code> and three steps (<code>--space-3</code>,
+  <code>--space-5</code>, <code>--space-7</code>) sit off any 4px grid. The header should say "2px grid; lay out on
+  even steps". Recorded in the README's defects list, not fixed here: the card decides, the token file catches up.</li>
+</ul>
+</section>
+
+</main>
 </body>
 </html>

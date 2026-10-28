@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * The per-path comment write lock (docs/designs/html-preview-comments.md §7.6;
+ * The per-path comment write lock (docs/designs/comments/html-preview-comments.md §7.6;
  * M-012 at the lock level, M-063 key separation).
  */
 import { describe, it, expect } from 'vitest'

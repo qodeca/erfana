@@ -3,7 +3,7 @@
 
 # HTML Preview comments – test fixtures
 
-Fixtures for the `src/shared/htmlComments` suites ([design](../../../../docs/designs/html-preview-comments.md) § 12 and § 16, [format](../../../../docs/html-comments/format-v1.md)). They are byte-exact: `-text` in [`.gitattributes`](../../../../.gitattributes), so git never converts their line endings.
+Fixtures for the `src/shared/htmlComments` suites ([design](../../../../docs/designs/comments/html-preview-comments.md) § 12 and § 16, [format](../../../../docs/html-comments/format-v1.md)). They are byte-exact: `-text` in [`.gitattributes`](../../../../.gitattributes), so git never converts their line endings.
 
 | Path | What it holds | Written by |
 |---|---|---|

@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * One reload per comment write, and the reader put back where they were
- * (docs/designs/html-preview-comments.md §7.5 steps 3, 5–6, §19; spike S2;
+ * (docs/designs/comments/html-preview-comments.md §7.5 steps 3, 5–6, §19; spike S2;
  * tests M-013, M-040, M-041, M-042, M-058).
  *
  * A save does not reload the view itself. Before the write, the top frame's

@@ -18,7 +18,7 @@
  * narrowed, settings-based replacement is tracked separately.
  *
  * @see Issue #41 - Context meter reads the 200k window for Opus 5 sessions
- * @see docs/designs/41-model-capability-registry.md §8 (rule order)
+ * @see docs/designs/context-meter/41-model-capability-registry.md §8 (rule order)
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { promises as fs } from 'node:fs'

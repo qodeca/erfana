@@ -1,0 +1,183 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/**
+ * The tab – one tab instead of three.
+ *
+ * PROPOSED – not adopted. A CONSOLIDATION: the app ships these rules three
+ * times, under three class names, with drift between them:
+ *   src/renderer/src/components/Tabs/EditorTab.css       (.editor-tab)
+ *   src/renderer/src/components/Tabs/HtmlPreviewTab.css  (.html-preview-tab)
+ *   src/renderer/src/components/Tabs/ImageTab.css        (.image-tab)
+ * plus the dockview overrides and the active underline in
+ * src/renderer/src/components/DockLayout/AppDockLayout.css.
+ * Drift found while writing this: EditorTab.css and ImageTab.css both
+ * hardcode `height: 41px` and give the close button `border-radius: 0`, where
+ * HtmlPreviewTab.css reads --tab-height and the radius token. The width floor
+ * and ceiling are literals in all three, and again as !important dockview
+ * overrides. The Tabs card counts each of these from the files.
+ *
+ * Adopting is a MOVE: the three files become one, and scripts/design-sync.mjs
+ * syncs it back here. Classes are prefixed erf-.
+ */
+
+/* The strip. It scrolls sideways once every tab is at its minimum width, and
+   it is its own stacking context, so nothing inside it can compete with a
+   dropdown or a menu outside it (the Layering card's z-index:100 tie). */
+.erf-tablist {
+  display: flex;
+  flex-wrap: nowrap;
+  height: var(--tab-height);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  background-color: var(--color-bg-tertiary);
+  isolation: isolate;
+}
+
+/* One tab. Chrome-style sizing: every tab grows and shrinks equally, between a
+   floor that still shows a few characters and a ceiling that stops one long
+   name eating the strip. */
+.erf-tab {
+  --erf-tab-min-width: calc(var(--space-20) * 2);
+  --erf-tab-max-width: 300px;
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: var(--erf-tab-min-width);
+  max-width: var(--erf-tab-max-width);
+  height: var(--tab-height);
+  padding: 0 var(--space-2) 0 var(--space-6);
+  background-color: var(--color-bg-tertiary);
+  /* Tertiary, not secondary: secondary is under 4.5:1 on the strip. */
+  color: var(--color-text-tertiary);
+  font-size: var(--text-base);
+  cursor: pointer;
+  user-select: none;
+  transition: background-color var(--transition-fast);
+}
+
+/* The group that holds focus: its tabs sit on the panel surface, so the eye
+   finds the active group without reading the underline. */
+.erf-tablist--active-group,
+.erf-tablist--active-group .erf-tab {
+  background-color: var(--color-bg-secondary);
+}
+.erf-tablist--active-group .erf-tab { color: var(--color-text-primary); }
+
+.erf-tab:hover { background-color: var(--color-bg-hover-solid); }
+
+/* Selected: brightest text, and the lime underline – in EVERY group, focused or
+   not, because "which file is showing in that group" is true either way.
+   No z-index: a positioned ::after already paints above the tab's own content,
+   and the strip's isolation keeps it out of the global stacking order. */
+.erf-tab[aria-selected='true'] { color: var(--color-text-primary); }
+.erf-tablist--active-group .erf-tab[aria-selected='true'] { color: var(--color-text-emphasis); }
+.erf-tab[aria-selected='true']::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: var(--border-width-thick);
+  background-color: var(--color-accent-secondary);
+  pointer-events: none;
+}
+
+/* The ring is INSET: the strip clips its overflow, so an outward ring would be
+   cut off at the top and bottom. */
+.erf-tab:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: calc(var(--border-width-thick) * -1);
+}
+
+.erf-tab__icon {
+  flex-shrink: 0;
+  width: var(--icon-size-sm);
+  height: var(--icon-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.erf-tab__label {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Unsaved changes: a dot before the name. Never colour or shape alone – a
+   visually hidden state span beside it says "unsaved changes", and the tab is
+   aria-labelledby its label, then that span. The dot itself says nothing. */
+.erf-tab__dirty {
+  flex-shrink: 0;
+  width: var(--space-4);
+  height: var(--space-4);
+  border-radius: var(--border-radius-circle);
+  background-color: currentColor;
+}
+
+/* The file is gone from disk. Words, in the warning colour – "(deleted)" is
+   readable without the colour, and this span is the state span the tab's
+   aria-labelledby names after the label. */
+.erf-tab__deleted {
+  flex-shrink: 0;
+  color: var(--color-warning);
+  white-space: nowrap;
+}
+
+/* Close. A 24 x 24 target around a 14px glyph (WCAG 2.2 SC 2.5.8). Hidden at
+   rest so a strip of tabs is not a strip of crosses; revealed on hover, on
+   the selected tab, on a tab with unsaved changes, and whenever the tab holds
+   keyboard focus, so the keyboard user sees what Delete will do. It is
+   aria-hidden and pointer-only: a role="tab" cannot hold another control, so
+   the keyboard and assistive technology close a tab with Delete on the tab
+   itself or the tab menu's Close, and a strip has one tab stop, not two per tab. */
+.erf-tab__close {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: var(--btn-height-sm);
+  height: var(--btn-height-sm);
+  padding: 0;
+  border: 0;
+  border-radius: var(--border-radius);
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  margin-left: auto;
+  opacity: 0;
+  transition: opacity var(--transition-fast), background-color var(--transition-fast);
+}
+.erf-tab__close svg { width: var(--space-7); height: var(--space-7); }
+
+.erf-tab:hover .erf-tab__close,
+.erf-tab:focus-visible .erf-tab__close,
+.erf-tab[aria-selected='true'] .erf-tab__close,
+.erf-tab:has(.erf-tab__dirty) .erf-tab__close {
+  opacity: 1;
+}
+
+.erf-tab__close:hover {
+  background-color: var(--color-border-default);
+  color: var(--color-text-primary);
+}
+.erf-tab__close:active { background-color: var(--color-gray-600); }
+
+/* Pinned: a fixed square with an icon and no close button – today only the
+   Home tab. Its name lives in aria-label, since it shows no text. */
+.erf-tab--pinned {
+  flex: 0 0 var(--tab-height);
+  justify-content: center;
+  min-width: var(--tab-height);
+  max-width: var(--tab-height);
+  padding: 0;
+}
+.erf-tab--pinned .erf-tab__icon { width: var(--icon-size-md); height: var(--icon-size-md); }
+
+@media (prefers-reduced-motion: reduce) {
+  .erf-tab,
+  .erf-tab__close { transition: none; }
+}

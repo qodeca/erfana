@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Where the page's keyboard picker moved, passed on for the comment window's
- * live region in main's own words (docs/designs/html-preview-comments.md
+ * live region in main's own words (docs/designs/comments/html-preview-comments.md
  * §10.8, §10.10 "Announce"; E-022; security review S-L-A).
  */
 import { describe, expect, it } from 'vitest'

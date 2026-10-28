@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * The keyboard picker and the hover label (docs/designs/html-preview-comments.md
+ * The keyboard picker and the hover label (docs/designs/comments/html-preview-comments.md
  * §10.2, §10.8, §10.10; J-001, J-002, J-010).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'

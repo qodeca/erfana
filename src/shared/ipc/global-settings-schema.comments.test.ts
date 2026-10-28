@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * The HTML Preview comments feature flag, `htmlPreview.comments.enabled`
- * (docs/designs/html-preview-comments.md §3 "Feature flag", §18): default on,
+ * (docs/designs/comments/html-preview-comments.md §3 "Feature flag", §18): default on,
  * lenient, and read through `isHtmlPreviewCommentsEnabled`.
  */
 import { describe, expect, it } from 'vitest'

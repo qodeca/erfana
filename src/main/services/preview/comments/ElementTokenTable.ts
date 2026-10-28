@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Element tokens of the documents one preview view served, kept per LOAD
- * (docs/designs/html-preview-comments.md §4.2 "ElementTokenTable", §6, §19
+ * (docs/designs/comments/html-preview-comments.md §4.2 "ElementTokenTable", §6, §19
  * R3-12, R3-13; tests M-031–033, M-059).
  *
  * Every instrumented document load registers its own table: token → the
