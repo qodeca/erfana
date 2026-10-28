@@ -10,9 +10,21 @@ Each version uses the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) g
 
 Changes merged since the last release are not listed here. Each pull request adds a fragment to [`changelog.d/`](../changelog.d/README.md) instead, so no two pull requests edit the same lines of this file. At release time the fragments are folded into a new `## X.Y.Z` section directly below this one and deleted in the same commit; this section stays as it is. To see what is pending, read the fragments, or run `npx git-cliff --unreleased`, which lists the Conventional Commits since the last `v*` tag – the same command drafts the technical half of the release notes.
 
-## 0.23.0
+## 0.23.1
 
-*Released 2026-10-28. Tag `v0.23.0`.*
+*Released 2026-10-28. Tag `v0.23.1`.* v0.23.0 was tagged but never published – its macOS build failed – so this is the first release since v0.22.0 and it also ships everything listed under 0.23.0 below.
+
+### Internal
+
+- **Release builds bundle with a bigger Node heap and a pinned Node patch.** The v0.23.0 tag run's
+  macOS leg ran out of JavaScript heap in `electron-vite build` (exit 134), after its dry-run on the
+  same commit had passed, so v0.23.0 was never published. The bundle step in `build_mac.yml` and
+  `build_win.yml` now sets `--max-old-space-size=4096`, and both legs install Node 24.22.1 instead
+  of whatever `24` the runner image caches. Incident memo: `docs/release-incidents/v0.23.0-attempt-1.md`.
+
+## 0.23.0 – never released
+
+*Tagged 2026-10-28 but never published: the tag run's macOS build ran out of memory, and these changes first ship in [v0.23.1](#0231).*
 
 ### Added
 
