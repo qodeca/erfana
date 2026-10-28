@@ -593,7 +593,9 @@ The HTML preview's diagnostic signals follow the same rule: length-bounded and c
 
 Run `npm audit` to check. **Policy**: zero high/critical production advisories at release. Pre-release: `npm audit --omit=dev --json` and diff against the previous release's table of accepted exceptions (the `### Accepted exceptions for v<version>` heading below). A release with no such table shipped with no accepted exceptions, so every advisory the audit reports is new.
 
-**Current state** (audited 2026-10-25, at the `v0.22.0` tag): `npm audit --omit=dev` reports **3** production advisories – **2 high** and **1 moderate** – all published before the tag was pushed, so v0.22.0 shipped with them open. No accepted-exception table has been recorded for v0.22.0, so under the policy above they are **open and not yet triaged** – an owner decision is pending. Each has a fixed release:
+**Current state** (audited 2026-10-28, at the `v0.23.1` tag): `npm audit --omit=dev` reports **0** production advisories, and the full tree (`npm audit`) reports 0 as well. All three v0.22.0 advisories below are cleared: the tree now resolves `electron` 44.9.3, `zod` 4.6.7 and `fast-uri` 3.1.9, each at or past its fixed release.
+
+**At v0.22.0** (audited 2026-10-25, at the `v0.22.0` tag): `npm audit --omit=dev` reported **3** production advisories – **2 high** and **1 moderate** – all published before the tag was pushed, so v0.22.0 shipped with them open. No accepted-exception table was recorded for v0.22.0. Each has a fixed release:
 
 | Package (shipped) | Advisory | Severity | Fixed in | Where Erfana reaches it |
 |---|---|---|---|---|

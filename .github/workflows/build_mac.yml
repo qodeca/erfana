@@ -59,6 +59,11 @@ jobs:
       - name: Setup Node + install
         uses: ./.github/actions/setup-node-with-retry
         with:
+          # Exact patch, so a dry-run and the tag run bundle with the same Node:
+          # a bare "24" resolves to whatever the runner image caches, and the
+          # v0.23.0 tag run got an older patch than its dry-run (incident memo
+          # docs/release-incidents/v0.23.0-attempt-1.md).
+          node-version: "24.22.1"
           run-postinstall: "true"
 
       - name: Verify Rosetta 2 present (cross-arch native module rebuild)
@@ -113,6 +118,10 @@ jobs:
         # electron-builder packages prebuilt bundles from out/; it does NOT
         # invoke electron-vite itself. Must run before electron-builder or
         # packaging fails the sanity check for out/main/index.js.
+        # The renderer bundle outgrew Node's default heap: the v0.23.0 macOS
+        # leg died with "JavaScript heap out of memory" (exit 134) here.
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
         run: npx electron-vite build
 
       - name: Build + sign + notarize + staple (electron-builder)

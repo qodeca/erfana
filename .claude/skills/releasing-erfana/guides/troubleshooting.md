@@ -2,7 +2,7 @@
 
 ## CI failure signatures
 
-This is the canonical cookbook for `release.yml` failures. Each row below is a real failure mode encountered in the v0.9.5 bring-up (≥15 dry-run cycles, runs 24897481170 → 24908659275).
+This is the canonical cookbook for `release.yml` failures. Each row below is a real failure mode. Rows 1–10 come from the v0.9.5 bring-up (≥15 dry-run cycles, runs 24897481170 → 24908659275); later rows name their own first-seen run.
 
 **Each row carries a typed `regex` field** — a single-line `grep -E -i`-compatible pattern that uniquely identifies the failure. The `release-failure-analyzer` agent extracts these by parsing lines starting with `- **Regex:**` and matches them (case-insensitive) against the failed-step log. Operators reading the cookbook by hand can also `grep -E -i` for the regex against a downloaded log.
 
@@ -109,7 +109,7 @@ This is the canonical cookbook for `release.yml` failures. Each row below is a r
 - **Root cause:** TWO distinct causes share this signature (the size gate passes — binary is non-empty — so this is not the CR/LF truncation from Row 9):
   - **(1) Secret pair mismatch** (first seen v0.16.1): `AZURE_CLIENT_CERTIFICATE_BASE64` and `AZURE_CLIENT_CERTIFICATE_PASSWORD` don't match. Either (a) the PFX was regenerated with a new password and only one secret was updated, or (b) the base64 encodes the wrong file (a CA cert or CSR, not the PFX).
   - **(2) Legacy-encrypted PFX** (first seen v0.16.2): the PFX uses legacy PKCS#12 algorithms (`pbeWithSHA1And40BitRC2-CBC`, `3DES`). The CI runner's **OpenSSL 3.x** (and `@azure/identity`/Node) reject these by default; macOS **LibreSSL reads them transparently**, so the secret pair verifies `MAC verified OK` locally yet still fails in CI. See `docs/release-incidents/v0.16.2-attempt-1.md`.
-- **Fix:** (1) On the signing workstation, locate the matching PFX + password (see `docs/build/release.md § B.3 PFX hygiene`). (2) Verify with **OpenSSL 3.x specifically** (not LibreSSL/macOS `/usr/bin/openssl`, which masks the legacy issue): `openssl pkcs12 -info -in signing.pfx -noout -password env:PFXPW` must load **without `-legacy`**. If it only loads with `-legacy`, re-export as AES per § B.3 (`-keypbe AES-256-CBC -certpbe AES-256-CBC -macalg sha256`). (3) Re-upload BOTH secrets atomically: `base64 -i signing.pfx | tr -d '\n' | gh secret set AZURE_CLIENT_CERTIFICATE_BASE64 --repo qodeca/erfana` and `printf '%s' '<password>' | gh secret set AZURE_CLIENT_CERTIFICATE_PASSWORD --repo qodeca/erfana`. (4) Bump to the next patch version (the failed tag is burned) and re-invoke the releasing-erfana skill from Phase 0.
+- **Fix:** (1) On the signing workstation, locate the matching PFX + password (see `docs/build/release.md § B.3 Secret hygiene — Azure cert PFX + password`). (2) Verify with **OpenSSL 3.x specifically** (not LibreSSL/macOS `/usr/bin/openssl`, which masks the legacy issue): `openssl pkcs12 -info -in signing.pfx -noout -password env:PFXPW` must load **without `-legacy`**. If it only loads with `-legacy`, re-export as AES per § B.3 (`-keypbe AES-256-CBC -certpbe AES-256-CBC -macalg sha256`). (3) Re-upload BOTH secrets atomically: `base64 -i signing.pfx | tr -d '\n' | gh secret set AZURE_CLIENT_CERTIFICATE_BASE64 --repo qodeca/erfana` and `printf '%s' '<password>' | gh secret set AZURE_CLIENT_CERTIFICATE_PASSWORD --repo qodeca/erfana`. (4) Bump to the next patch version (the failed tag is burned) and re-invoke the releasing-erfana skill from Phase 0.
 - **Platform:** Windows
 - **First seen:** run 27699667579 (cause 1); run 27716374257 (cause 2, legacy PFX)
 
@@ -134,6 +134,15 @@ This is the canonical cookbook for `release.yml` failures. Each row below is a r
 - **Fix:** The Apple Developer team's **Account Holder** signs in at developer.apple.com/account (and App Store Connect → Business, if it lists a pending agreement) and accepts the new agreement. Nothing in the repo changes. Re-run the macOS leg (`gh run rerun <run-id> --failed`) or, for a dry-run, dispatch `release.yml` again. Prevention: run a `release.yml` dry-run (`gh workflow run release.yml --ref main -f dry-run=true`) before tagging, so the 403 shows up before a tag is spent.
 - **Platform:** macOS
 - **First seen:** run 39144882739 (v0.21.0 pre-release dry-run, 2026-10-18)
+
+### Row 14: `electron-vite build` runs out of JavaScript heap
+
+- **Regex:** `Ineffective mark-compacts near heap limit Allocation failed - JavaScript heap out of memory`
+- **Human-readable symptom:** A build leg fails in "Bundle sources (electron-vite)" with a V8 `FATAL ERROR` ending in `JavaScript heap out of memory`, then `Abort trap: 6` and `Process completed with exit code 134`. Nothing was signed or notarized yet; the other leg can still pass.
+- **Root cause:** The renderer bundle (about 12 MB in v0.23.0) needs more than Node's default heap on a hosted runner, which is sized from the runner's memory. The same commit can pass on one run and fail on the next, because a bare `node-version: 24` resolves to whichever patch the runner image caches. Reproduced locally: `NODE_OPTIONS=--max-old-space-size=2048 npx electron-vite build` exits 134, 3072 and 4096 exit 0.
+- **Fix:** The bundle step in `build_mac.yml` and `build_win.yml` sets `NODE_OPTIONS: --max-old-space-size=4096`, and both legs pin an exact Node patch. If it returns, raise the heap further (the macOS arm64 runner has 7 GB) and look at why the bundle grew. The tag is burned: bump the patch.
+- **Platform:** macOS (the Windows leg uses the same step)
+- **First seen:** run 40669617826 (v0.23.0 tag run, 2026-10-28)
 
 ## Operator-side failures (not `release.yml`)
 
@@ -274,7 +283,7 @@ After this, `git log --show-signature` displays "Good signature" for both commit
 The skill no longer builds locally — every binary is produced by `release.yml` on GitHub-hosted runners. There is no local `release/{version}/` directory to clean.
 
 1. Read the `release-failure-analyzer` incident memo at `docs/release-incidents/v{version}-attempt-{N}.md`.
-2. Match the failure signature against the cookbook above (Rows 1–11) using the typed regex field. Apply the matched fix verbatim.
+2. Match the failure signature against the cookbook above (Rows 1–14) using the typed regex field. Apply the matched fix verbatim.
 3. If no row matches, follow the diagnostic habits and **add a new row** using the template — preserves the next operator's discovery cost.
 4. Bump the patch version (`v{N}` is burned regardless of `release.yml` outcome) and re-invoke the skill from Phase 0.
 

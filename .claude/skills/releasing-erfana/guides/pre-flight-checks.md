@@ -8,8 +8,8 @@
 ## 0.4.6 Windows status snapshot is current
 
 `docs/windows/implementation-plan.md` is the declared single source of truth for
-Windows phase status, and the root `CLAUDE.md` refresh policy requires bumping its
-"Status snapshot" version anchor **before** tagging. v0.16.3 — the only one of the
+Windows phase status, and this gate requires bumping its "Status snapshot" version
+anchor **before** tagging. v0.16.3 — the only one of the
 0.16.x attempts that actually published — shipped with the snapshot still anchored
 on **v0.16.0** (`git show v0.16.3:docs/windows/implementation-plan.md`); the two
 attempts before it, v0.16.1 and v0.16.2, were burned by Windows signing failures and
@@ -38,10 +38,8 @@ miss is enough: the policy needs a gate rather than a convention.
   `release-quality-runner` `windows_snapshot` gate. This is deliberate delegation, not
   the inline+agent duplication used for gates 0.1 / 0.2 / 0.3 — a shell script this
   fiddly (BSD/GNU `sed`, `grep` exit codes) is worth keeping in exactly one place.
-- **The gate is unconditional; the `CLAUDE.md` refresh policy it serves is not.** That
-  policy asks for a refresh "on any release that touches Windows-phase scope OR changes
-  a phase issue's state". This gate is deliberately stricter: strict equality on *every*
-  release, including a pure macOS bugfix. Rationale — the anchor declares which release
+- **The gate is unconditional.** It applies strict equality on *every* release,
+  including a pure macOS bugfix, not only on releases that touch Windows-phase scope. Rationale — the anchor declares which release
   the snapshot describes, so a stale anchor is factually wrong whether or not anything
   Windows-specific moved. Over-triggering costs one line (date + version); under-
   triggering costs silent doc-vs-code drift, which is what v0.16.3 shipped.

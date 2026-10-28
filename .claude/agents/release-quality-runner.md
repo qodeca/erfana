@@ -118,8 +118,8 @@ Run the Phase 0 release-readiness checklist and return structured results.
 
 11. Windows status snapshot is current
     `docs/windows/implementation-plan.md` is the single source of truth for Windows
-    phase status; the root CLAUDE.md refresh policy requires re-anchoring it on the
-    version about to ship, BEFORE the tag. Strict equality against package.json —
+    phase status; this gate requires re-anchoring it on the version about to ship,
+    BEFORE the tag. Strict equality against package.json —
     Phase 0 runs after the version bump, so the snapshot is deliberately written
     ahead of the tag. Full rationale + traps: `.claude/skills/releasing-erfana/guides/pre-flight-checks.md`.
 

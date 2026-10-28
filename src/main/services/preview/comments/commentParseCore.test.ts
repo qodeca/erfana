@@ -151,7 +151,7 @@ describe('instrumentDocument – the served copy', () => {
     expect(instrumentDocument(bytes)).toEqual({ kind: 'unavailable', reason: 'too-large' })
   })
 
-  it('§19 Rev 4 more start tags than the cap are refused before the decode and the parse, so no tree is built', () => {
+  it('M-069 §19 Rev 4 more start tags than the cap are refused before the decode and the parse, so no tree is built', () => {
     const cap = PREVIEW_LIMITS.COMMENT_MAX_TOKENS_PER_DOCUMENT
     // Invalid UTF-8 at the end: refused for its start tags, not for its encoding.
     const over = encodeText(`${'<a>'.repeat(cap + 1)}`)

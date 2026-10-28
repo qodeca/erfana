@@ -122,11 +122,17 @@ src/
 │   │   ├── file/                # imageRead, readDocumentImage, findByName (bounded name search), restoreParentDirectory
 │   │   ├── imageExport/         # ImageExportService, ImageRasterizeWindow, rasterizeSession, exportSinks,
 │   │   │                        #   exportPaths, imageMetadata, declaredDimensions, pdfGeometry
-│   │   ├── preview/             # HTML preview engine (70 modules): PreviewViewService, PreviewViewRegistry,
+│   │   ├── preview/             # HTML preview engine (80 modules, counted 2026-10-28): PreviewViewService, PreviewViewRegistry,
 │   │   │                        #   PreviewLiveView, PreviewSessionFactory, PreviewProtocolHandler, previewCsp,
 │   │   │                        #   PreviewAllowlistStore, PreviewWatchCoordinator, PreviewFindController,
 │   │   │                        #   previewPageNavigator, previewTabHistory, previewLinkDisposition,
-│   │   │                        #   previewFrameGuard, previewResizeHold, previewHostFocus (#124), …
+│   │   │                        #   previewFrameGuard, previewResizeHold, previewHostFocus (#124),
+│   │   │                        #   PreviewLinkScanWorkerAdapter + previewLinkScanWorker/Core/Protocol (link scan
+│   │   │                        #   off the main thread, v0.23.0), previewLiveComments, …
+│   │   │   └── comments/        # HTML Preview comments (37 modules, v0.23.0): PreviewCommentService (per-view façade),
+│   │   │                        #   CommentWriter + commentFileLock + commentFileAccess (the one write path),
+│   │   │                        #   CommentParseWorkerAdapter + commentParseWorker + commentFileJobs (parse off main),
+│   │   │                        #   commentInstrumentation + ElementTokenTable (served copy), commentKeyStore, …
 │   │   ├── docx/                # DOCX conversion isolation: docxImageStrip (parse5 SSRF strip),
 │   │   │                        #   DocxConvertProcessAdapter (utilityProcess lifecycle), docx-convert.process (child)
 │   │   ├── watcher/             # ThrottledWorker (offset-deque, #173), EventCoalescer, GitEventCoalescer,
@@ -156,7 +162,7 @@ src/
 │   │   ├── confinement/         # registerConfinedHandle, resolveConfinedPath, ConfinementError – path checks (v0.22.0)
 │   │   └── preview/             # Preview IPC split: lifecycle-, allowlist-, find-, navigation- (navigate, pageChanged,
 │   │                            #   resizeHold), focus-handlers (focusPage), buildPreviewGraph, externalLinkConsent,
-│   │                            #   isTrustedPreviewSender, emit
+│   │                            #   isTrustedPreviewSender, emit, comment-handlers + commentEmit (HTML Preview comments)
 │   └── utils/
 │       ├── PauseController.ts   # Pause/resume with safety timeout
 │       ├── RateLimitedLogger.ts # Cooldown-based log deduplication
@@ -172,6 +178,9 @@ src/
 │   ├── ipcSubscribe.ts       # Event subscription helper (unsubscribe returns nothing)
 │   ├── previewBridge.ts      # window.api.preview surface
 │   ├── previewPage.ts        # Preload for the sealed preview page (link clicks, CSP refusals; exposes nothing)
+│   ├── previewCommentsBridge.ts  # window.api.previewComments surface (HTML Preview comments)
+│   ├── previewPageComments/  # The comment overlay inside the sealed page and its frames: picker, pins,
+│   │                         #   closed-shadow-root overlay, token strip (22 modules, ADR 0005)
 │   ├── imageExport.ts        # Preload for the hidden image-rasterize window
 │   └── screenshotOverlay.ts  # Preload for the area-select overlay window
 ├── shared/                   # Imported by main, preload and renderer
@@ -183,6 +192,8 @@ src/
 │   ├── previewNavKeys.ts     # HTML preview Back/Forward key table (#124)
 │   ├── preview-limits.ts     # #124 preview caps and timers
 │   ├── dropReporter.ts       # Rate-capped reporter for dropped preview bounds updates (#124)
+│   ├── htmlComments/         # The erfana:comment v1 format: parse, format, splice, anchor, instrument (16 modules)
+│   ├── commentModeKey.ts     # The comment-mode chord (Cmd+Option+M / Ctrl+Alt+M), one rule for main and the renderer
 │   └── constants.ts, linkProtocolPolicy.ts, previewFrameBadgeText.ts, shellKind.ts, config/
 └── renderer/
     └── src/

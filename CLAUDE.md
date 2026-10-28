@@ -5,7 +5,7 @@ An agent-native Markdown workspace (Electron): integrated terminal for CLI codin
 - **Repository**: `qodeca/erfana` (GitHub, public)
 - **License and legal**: `GPL-3.0-only` with REUSE-style SPDX headers – see [LICENSE](LICENSE), [`REUSE.toml`](REUSE.toml), [TRADEMARKS.md](TRADEMARKS.md) (forks must rebrand) and [CLA.md](CLA.md). `"private": true` in package.json is a publish guard for the desktop app, not a license statement.
 - **Node Version**: 24+ (development), Electron 44 bundles Node.js 24.22.0
-- **Current version**: v0.22.0 (see [docs/CHANGELOG.md](docs/CHANGELOG.md); bump this line at release)
+- **Current version**: v0.23.1 (see [docs/CHANGELOG.md](docs/CHANGELOG.md); bump this line at release)
 
 ## Branching model
 - `main` — released code only. Protected (required status checks, `enforce_admins`, signed `v*.*.*` tags); direct push is the intended solo-dev workflow, no PR required. The checks are enforced **on push**, so a commit whose checks have not yet finished green for that SHA is rejected with `GH006` — push it to `develop` first, wait for the run, then push `main` ([release.md § Branch protection](docs/build/release.md#branch-protection-phase-i--done-2026-04-25)).
@@ -19,7 +19,7 @@ Index and descriptions live in [docs/README.md](docs/README.md) — read that ra
 
 - **Before filing, editing or closing a GitHub issue**: [GitHub issues protocol](docs/claude-code/github-issues-protocol.md). The repo ships issue *forms*; `gh issue create` applies neither their title prefix nor their required fields, so both must be supplied by hand. Security vulnerabilities go to private advisory reporting, never a public issue.
 
-- **Windows enablement**: phase roadmap and current status live in [`docs/windows/implementation-plan.md`](docs/windows/implementation-plan.md) (sub-docs are indexed from [docs/windows/README.md](docs/windows/README.md)). **Refresh policy**: on any release that touches Windows-phase scope or changes a phase issue's state, bump the "Status snapshot" date + version anchor in that file before tagging – it is the single source of truth.
+- **Windows enablement**: phase roadmap and current status live in [`docs/windows/implementation-plan.md`](docs/windows/implementation-plan.md) (sub-docs are indexed from [docs/windows/README.md](docs/windows/README.md)).
 
 ## Feature specifications
 
@@ -75,7 +75,7 @@ The full channel index is [docs/ipc-patterns.md](docs/ipc-patterns.md) § Curren
 - node-pty may fail to build on Python 3.13 (use 3.12; 3.14.3 also verified) — this one is worth keeping here because it fails at install time, before any doc gets read
 
 ## Xezar pipeline
-Added by `xez-onboard-opinionated`. How work moves: [SDLC.md](SDLC.md); what every agent runs: [AGENTS.md](AGENTS.md); review rules: [CODE_REVIEW.md](CODE_REVIEW.md).
+How work moves: [SDLC.md](SDLC.md); what every agent runs: [AGENTS.md](AGENTS.md); review rules: [CODE_REVIEW.md](CODE_REVIEW.md).
 - The project leader is started with `./scripts/xezar-leader.sh`; only that session leads. Every other Claude Code session here is an ordinary session.
 - The pipeline's base branch is `develop`. Graph-engine work stays on `graph` and is started by the owner, not dispatched by the leader.
 - The pipeline adds these `docs/` folders, each created with its first document: `spikes/`, `runbooks/`, `deprecations/`, `performance/`, `migrations/`. Designs go in `docs/designs/`, decision records in `docs/adrs/`, and the design system stays in `docs/design-system/`.

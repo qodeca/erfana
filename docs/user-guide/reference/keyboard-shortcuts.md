@@ -92,6 +92,7 @@ Your shell also handles <kbd>Ctrl</kbd>+<kbd>D</kbd> (EOF), <kbd>Ctrl</kbd>+<kbd
 | Back; Forward | <kbd>Cmd</kbd>+<kbd>[</kbd>; <kbd>Cmd</kbd>+<kbd>]</kbd> | <kbd>Alt</kbd>+<kbd>←</kbd>; <kbd>Alt</kbd>+<kbd>→</kbd> |
 | Find; export PDF; close tab | <kbd>Cmd</kbd>+<kbd>F</kbd>; <kbd>Cmd</kbd>+<kbd>S</kbd>; <kbd>Cmd</kbd>+<kbd>W</kbd> | <kbd>Ctrl</kbd>+<kbd>F</kbd>; <kbd>Ctrl</kbd>+<kbd>S</kbd>; <kbd>Ctrl</kbd>+<kbd>W</kbd> |
 | Enter page; return to toolbar | <kbd>Enter</kbd> or <kbd>Space</kbd>; <kbd>Esc</kbd> | Same |
+| Turn comment mode on or off; leave it | <kbd>Cmd</kbd>+<kbd>Option</kbd>+<kbd>M</kbd>; <kbd>Esc</kbd> | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>M</kbd>; <kbd>Esc</kbd> |
 
 ## Image and diagram viewers
 

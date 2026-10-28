@@ -1,6 +1,6 @@
 # Design – HTML Preview comments (v1)
 
-> Status: planned (2026-10-25). Implementation plan for comments on elements in the HTML Preview.
+> Status: shipped in v0.23.1 (2026-10-28; v0.23.0 carried it but was tagged and never published). Planned 2026-10-25 as the implementation plan for comments on elements in the HTML Preview.
 > Branch: `feature/html-preview-comments` (off `develop`). No GitHub issue yet.
 > Inputs: owner interview (grill-me, depth full, 35 locked decisions), an online survey of 20+ commenting tools, and four specialist designs (architecture, UX, security, test strategy). Conflicts between those designs are resolved in §3.
 > Revision 2 (2026-10-25): folds in three plan reviews – correctness against the code, coverage of the decisions, and risk/sequencing. Their blockers are fixed in place; §18 lists what changed.

@@ -10,6 +10,106 @@ Each version uses the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) g
 
 Changes merged since the last release are not listed here. Each pull request adds a fragment to [`changelog.d/`](../changelog.d/README.md) instead, so no two pull requests edit the same lines of this file. At release time the fragments are folded into a new `## X.Y.Z` section directly below this one and deleted in the same commit; this section stays as it is. To see what is pending, read the fragments, or run `npx git-cliff --unreleased`, which lists the Conventional Commits since the last `v*` tag – the same command drafts the technical half of the release notes.
 
+## 0.23.1
+
+*Released 2026-10-28. Tag `v0.23.1`.* v0.23.0 was tagged but never published – its macOS build failed – so this is the first release since v0.22.0 and it also ships everything listed under 0.23.0 below.
+
+### Internal
+
+- **Release builds bundle with a bigger Node heap and a pinned Node patch.** The v0.23.0 tag run's
+  macOS leg ran out of JavaScript heap in `electron-vite build` (exit 134), after its dry-run on the
+  same commit had passed, so v0.23.0 was never published. The bundle step in `build_mac.yml` and
+  `build_win.yml` now sets `--max-old-space-size=4096`, and both legs install Node 24.22.1 instead
+  of whatever `24` the runner image caches. Incident memo: `docs/release-incidents/v0.23.0-attempt-1.md`.
+
+## 0.23.0 – never released
+
+*Tagged 2026-10-28 but never published: the tag run's macOS build ran out of memory, and these changes first ship in [v0.23.1](#0231).*
+
+### Added
+
+- **You can comment on elements of a previewed HTML page.** Turn on comment mode in the preview
+  toolbar (Ctrl+Alt+M, Cmd+Option+M on macOS), click an element, and write what should change.
+  Comments appear as pins on the page and in a drawer that lists every thread, with reply, edit,
+  resolve and delete. The comment is saved inside the `.html` file as an ordinary HTML comment right
+  before the element, so it travels with the file through git and a coding agent that reads the file
+  sees your request next to the markup. Every comment block starts with a short note telling agents
+  to act only on open comments and to leave the block unchanged. Comments work inside same-project
+  frames too. The format is documented in `docs/html-comments/format-v1.md`.
+- **A Settings > Comments section.** It holds your name and optional email, which Erfana writes next
+  to each comment, and the **Comments in HTML preview** switch (on by default). With the switch off,
+  previews behave exactly as before.
+
+### Changed
+
+- **Pages that Vue, Svelte or Angular hydrate get their comment block before the app's root.**
+  Those frameworks do not tolerate an extra comment inside the markup they hydrate. A page script
+  that walks `childNodes` can still see comment blocks. Files over 25 MB show no comments.
+
+### Removed
+
+- **Unmaintained history folders.** `docs/handoffs/`, `docs/archive/` and
+  `docs/architecture-reviews/` are deleted; the docs that cited them link to
+  the files in git history instead. (#414)
+
+### Fixed
+
+- **A file created just after a project opens now shows in the project tree.** The file watcher
+  starts after the tree is first read, and on Windows each folder's watch opens a moment later
+  still, so a file created in between appeared only after pressing Refresh – collapsing and
+  re-opening its folder did not help. The tree is now read once more when the watcher is ready, and
+  opening a folder checks it against the disk and refreshes the tree when they differ.
+- **An HTML preview no longer misses a save made just after it opens.** A stylesheet or script
+  saved while the preview was still finding the page's linked files was not watched yet, so the
+  page kept the old version until the next save. Each newly watched file is now checked when its
+  watch starts, and a file changed since the page began loading refreshes the preview once.
+
+### Security
+
+- **Comment saves are gated end to end.** The preview page can only ask for a comment window; the
+  write happens from Erfana's own Save, replaces the file only if it is still exactly the file that
+  was read, refuses links, keeps the Windows mark of the web, and never logs comment text, names or
+  paths. The preview preload now runs in frames and has one receive channel when comments are on
+  (ADR 0005). See `docs/security.md` § HTML Preview comments.
+- **Electron 44.9.3.** Picks up Electron's mitigation for compromised eMudhra intermediate
+  certificates, with patch releases of vite (Windows argument escaping in `launch-editor`),
+  brace-expansion, fast-uri, postcss-selector-parser and source-map-js from `npm audit fix`.
+- **Mermaid 12.2.0.** Clears the KaTeX prototype-pollution advisory that reached the preview
+  through Mermaid 11. Mermaid 12 defaults to a new look and the ELK layout; Erfana pins the
+  classic look and the dagre layout, so existing diagrams keep their shape, and a diagram can
+  still opt in through its own front matter.
+
+### Internal
+
+- **Timing-budget tests run alone.** The `*.perf.test.*` suites now run in their own vitest
+  project, `main-perf`, one file at a time and after every other test file – in `test:ci`,
+  `test:main`, `test:cov` and the Coverage job – because other files running beside them pushed
+  their event-loop stalls past budget. Their budgets are unchanged, and their coverage still counts
+  in the main report. See `docs/ci.md` § Quality checks.
+- **Design material has two homes.** The design system moved from `design/`
+  to `docs/design-system/`, and every per-issue design note now lives in
+  `docs/designs/`; tooling, tests and links follow the move. (#414)
+- **Third-party licenses regenerated.** `THIRD-PARTY-LICENSES.md` now lists the shipped
+  versions (Electron 44.9.3, liteparse 2.15.1 and five other dependency updates) and names the
+  liteparse native package of both shipped builds, macOS arm64 and Windows x64.
+- **vitest 5.** Upgraded vitest and `@vitest/coverage-v8` from 3.2 to 5.0.5, which removes
+  the critical tinypool and `@vitest/mocker` advisories from the dev tree. The three projects
+  are listed in `vitest.config.ts` (`test.projects`) instead of `vitest.workspace.ts`, and the
+  per-project configs are renamed `vitest.<project>.config.ts`, as vitest 5 requires. Mocks
+  that code builds with `new` use `function` implementations, and test helpers type their
+  mocks as `Mock` rather than `ReturnType<typeof vi.fn>`. The coverage floors were
+  re-measured: vitest 5 maps v8 coverage through the AST and counts more branches, so the same
+  code reads lower (main branches 91.37 → 82.85). The CI deprecation allowlist is now empty.
+- **Three e2e tests that failed on a Windows host now pass.** `MonacoPage.focus()` waits for
+  Monaco's text area to settle before it clicks (an early click became a drag that selected
+  line 1), the tree focus-ring check expects 2 px snapped to device pixels as Chromium draws it
+  at 125 % scaling, and the tree right-click lands well inside the row instead of 10 px from an
+  edge that moves. Recorded in `docs/windows/known-flakes.md`.
+- **Two-worker e2e runs on Windows no longer freeze the covered window.** Chromium stops
+  rendering a window another one covers, so the HTML-preview and editor checks in the hidden
+  worker's app timed out. Every e2e launch now passes `E2E_CHROMIUM_ARGS`
+  (`--disable-features=CalculateNativeWinOcclusion` on Windows).
+
 ## 0.22.0
 
 *Released 2026-10-25. Tag `v0.22.0`.* v0.21.0 was never tagged or published, so this is the first release since v0.20.1 and it also ships everything listed under 0.21.0 below.

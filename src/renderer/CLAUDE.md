@@ -1,6 +1,6 @@
 # Renderer
 
-Rules for `src/renderer/` that are not readable from the code. Moved from the root CLAUDE.md so they load only for renderer work. Index: docs/README.md
+Rules for `src/renderer/` that are not readable from the code. Index: docs/README.md
 
 - Panel ids and panel opening: never hand-build an `editor-…` / `image-…` / `preview-…` id. An id past `PANEL_ID_PATH_BUDGET` (180 sanitized chars) is shortened to a 150-char head plus a 16-hex digest, so never read a path back out of an id. Use `getFilePanelId()` / `openFileInPanel()` from `src/renderer/src/utils/openFileInPanel.ts`, so the id prefix, `component` and `tabComponent` are all derived from one `isImageFile` call and cannot disagree. An ESLint `no-restricted-syntax` selector (in the same `src/renderer/**` block as the Windows-path rules) catches it (#70) for the `editor-`, `image-` and `preview-` prefixes – but only the `` `editor-${sanitizeFilePath(…)}` `` shape: the `sanitizeFilePath` callee is part of the selector on purpose (a bare `` `editor-${x}` `` is also a legitimate React key), so any other expression passes lint and has to be caught by review
 - Renderer platform detection: use `isMacOS()` / `isWindows()` from `src/renderer/src/utils/platform.ts` (backed by the sync `window.api.utils.getPlatform()` bridge). Never read `navigator.platform` or `process.platform` in the renderer — `process.platform` is `undefined` under the sandbox
