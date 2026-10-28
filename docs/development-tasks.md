@@ -199,7 +199,9 @@ The import pipeline uses `ConverterRegistry` to match file extensions to convert
 
 **Configurable converters**: If your converter needs per-import options, implement `IConfigurableConverter` and the `createConfigured(options)` method. `ImportService` detects this via the `isConfigurableConverter()` type guard – no `instanceof` checks needed.
 
-**Dynamic extensions**: If extensions depend on runtime tool availability, use `ConverterRegistry.updateConverterExtensions(category, extensions)` after detection completes (see `DependencyDetector` pattern).
+**Dynamic extensions**: If extensions depend on runtime tool availability, use `ConverterRegistry.updateConverterExtensions(category, extensions)` after detection completes, and `removeConverterExtensions` when the tool is gone. `ImportToolStatusService` (`src/main/services/import/ImportToolStatusService.ts`, #250) is the model: it wraps `DependencyDetector`, keeps the registry in step with what was found, and re-runs the probe when **Settings > Import tools > Check again** asks, so a tool installed after launch is picked up without a restart.
+
+**External programs**: a converter that hands work to an outside program must not run one found in the open project, a temporary folder, a network path or a relative `PATH` entry. `conversionToolGuard.ts` does this for LibreOffice: `LiteParseConverter` calls `findUntrustedConversionTool` before each Office conversion and refuses when the answer is unsafe. Follow the same pattern for a new tool.
 
 **Example**: See `LiteParseConverter.ts` (document import with OCR) or `AudioConverter.ts` (transcription).
 
@@ -469,12 +471,13 @@ See: [Testing Index](./testing/README.md) | [Test Scenarios](./testing/test-scen
 
 ## Testing Auto-Refresh
 
-File and directory watching with chokidar provides automatic refresh on external changes.
+File and directory watching provides automatic refresh on external changes: single files are watched with chokidar on every platform; the project tree is watched by a native recursive watcher on macOS and Windows and by chokidar on Linux ([File Watching § Watch backends](./file-watching/README.md#watch-backends-211)).
 
 **Test Scenarios:**
 - File content reload (300ms debounce) - modify file externally, expect auto-reload
 - Conflict detection - unsaved changes + external modification shows conflict UI
-- Directory tree refresh (75 ms collect + 200 ms throttle main side, 250 ms renderer debounce) - external file/folder create/delete/rename and in-place edits appear automatically; git badges update on edits via the chokidar `change` listener (#241)
+- Directory tree refresh (75 ms collect + 200 ms throttle main side, 250 ms renderer debounce) - external file/folder create/delete/rename appear automatically; under a steady stream the refresh is held back at most max(1 s, twice a tree read), capped at 10 s (`DIRECTORY_WATCHER` in `src/renderer/src/components/ProjectTree/constants.ts`)
+- Content-only edits (v0.22.0) - an in-place save, or a temp file renamed over the target, arrives as a `structural: false` batch: git badges update, the tree is **not** re-read ([measurement](./performance/watcher-structural-refresh.md))
 - Pause/resume pattern - internal CRUD operations don't trigger duplicate refreshes
 
 See: [File Watching](./file-watching/README.md) for detailed testing instructions

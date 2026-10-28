@@ -62,4 +62,4 @@ Spike results (March 28, 2026, LiteParse v1.4.0):
 
 ## Design document
 
-See `design/001-liteparse-document-import-design.md` for full architectural design.
+See `../design/001-liteparse-document-import-design.md` for full architectural design.

@@ -6,7 +6,7 @@ import { isNodeRow, type TreeRow } from './visibleRows'
  * What a key press on the focused tree row should do.
  *
  * Kept as data, apart from the component, so the whole keyboard contract
- * (WAI-ARIA APG tree view; decided by design/system/components/row/index.html)
+ * (WAI-ARIA APG tree view; decided by docs/design-system/system/components/row/index.html)
  * is testable without rendering a tree.
  */
 export type TreeKeyAction =

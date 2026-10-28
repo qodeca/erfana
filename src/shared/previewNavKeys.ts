@@ -22,7 +22,7 @@
  * Nothing here reads the platform itself; callers pass it in (`process.platform`
  * in main, `getRendererPlatform()` in the renderer).
  *
- * @see docs/design/design-issue-124-part3.md §3.7
+ * @see docs/designs/design-issue-124-part3.md §3.7
  */
 
 /** A history step a key can ask for. */

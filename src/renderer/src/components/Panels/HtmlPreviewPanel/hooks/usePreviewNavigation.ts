@@ -17,10 +17,12 @@
  * its toolbar, find bar or banner – so the active-panel gate (CLAUDE.md) is met
  * by construction: no `window` listener, so Monaco's Cmd+[ and the terminal's
  * Alt+arrows can never reach it. Keys pressed inside the native page arrive
- * forwarded instead (`usePreviewFindShortcuts`), with origin `page`.
+ * forwarded instead (`usePreviewFindShortcuts`), with origin `page`. Keys on
+ * the panel's dockview group element (where `group.focus()` leaves focus on a
+ * tab switch) arrive through `usePreviewGroupKeys`, gated on the active panel.
  *
  * @module usePreviewNavigation
- * @see docs/design/design-issue-124-part3.md §3.7, §3.8
+ * @see docs/designs/design-issue-124-part3.md §3.7, §3.8
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -55,6 +57,7 @@ import {
   usePreviewMoveAnnouncer,
   type PreviewFrameScheduler
 } from './usePreviewMoveAnnouncer'
+import type { PreviewKeyEventLike } from './usePreviewGroupKeys'
 
 /** Inputs to {@link failedBannerNavigation}. */
 export interface FailedBannerNavigationInput {
@@ -158,8 +161,12 @@ export interface PreviewNavigation {
    * main, when there is nowhere to go or no router; never rejects.
    */
   step: (action: PreviewNavAction, origin: PreviewMoveOrigin) => Promise<PreviewMoveOutcome | null>
-  /** The panel root's `onKeyDown`: Back and Forward with focus in Erfana's chrome. */
-  onRootKeyDown: (event: React.KeyboardEvent<HTMLElement>) => void
+  /**
+   * Back and Forward with focus in Erfana's chrome: the panel root's
+   * `onKeyDown`, and the group-element route (`usePreviewGroupKeys`), so it
+   * takes a native event too.
+   */
+  onRootKeyDown: (event: PreviewKeyEventLike) => void
   /** Puts focus on Back one frame later; the announcement waits for it. */
   focusBack: () => void
   /** Handles a `pageChanged` for this tab (wired through `usePreviewEvents`). */
@@ -255,7 +262,7 @@ export function usePreviewNavigation({
   )
 
   const onRootKeyDown = useCallback(
-    (event: React.KeyboardEvent<HTMLElement>) => {
+    (event: PreviewKeyEventLike) => {
       if (event.defaultPrevented) return
       const action = matchPreviewNavKey(navKeyFromDomEvent(event), platform)
       if (action === null) return

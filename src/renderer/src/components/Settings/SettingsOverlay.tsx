@@ -710,7 +710,7 @@ export function SettingsOverlay() {
                     </div>
                   </div>
                   {/* Mounted before any download starts, so a screen reader hears
-                      their updates (design/system/components/feedback, decision three):
+                      their updates (docs/design-system/system/components/feedback, decision three):
                       progress and outcome as a status, a failure as an alert */}
                   <div
                     role="status"

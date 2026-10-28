@@ -11,8 +11,8 @@
  * and leaves `graph.db-wal` visible in the tree and in the watcher.
  *
  * @see Issue #21 - graph R1 architecture
- * @see specs/designs/sd-021-errata-and-risks.md §11 item 2
- * @see specs/designs/sd-021-worker-contracts.md §8.4 - the normative constant block
+ * @see docs/designs/sd-021-errata-and-risks.md §11 item 2
+ * @see docs/designs/sd-021-worker-contracts.md §8.4 - the normative constant block
  */
 import { describe, it, expect } from 'vitest'
 import { DEFAULT_GRAPH_EXCLUDE_PATTERNS, GRAPH, MCP } from './graph-constants'

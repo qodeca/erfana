@@ -8,7 +8,7 @@
  *
  * @see GraphStatusPublisher for implementation (#29)
  * @see Issue #21 - graph R1 architecture
- * @see specs/designs/sd-021-ipc-contracts.md §7.6 - the push-rate contract
+ * @see docs/designs/sd-021-ipc-contracts.md §7.6 - the push-rate contract
  */
 import type { GraphStatusChangePayload } from '../../shared/ipc/graph-schema'
 

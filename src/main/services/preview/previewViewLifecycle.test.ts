@@ -8,7 +8,7 @@
  * failure input (uncaught exceptions ⇒ `script-error`, bad ES-module specifiers
  * ⇒ `unresolved-specifier`), and the listener must detach on `dispose`.
  */
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi, type Mock } from 'vitest'
 import {
   wirePreviewLifecycle,
   type PreviewLifecycleHooks,
@@ -16,7 +16,7 @@ import {
 } from './previewViewLifecycle'
 import type { PreviewWebContentsHandle } from './PreviewSessionFactory'
 import { PREVIEW_PAGE_CSP_VIOLATION_CHANNEL } from './previewCspViolationBridge'
-import { PREVIEW_PAGE_LINK_NOTE_CHANNEL } from './previewLinkBridge'
+import { PREVIEW_PAGE_LINK_CHANNEL, PREVIEW_PAGE_LINK_NOTE_CHANNEL } from './previewLinkBridge'
 
 /** A WebContents test double that records listeners keyed by event name. */
 /** The object the fake uses as its top-level frame identity. */
@@ -198,6 +198,34 @@ describe('wirePreviewLifecycle link-note wiring', () => {
   })
 })
 
+describe('wirePreviewLifecycle sender-frame gate (SEC-27)', () => {
+  // With HTML Preview comments every frame runs the preview preload, so a
+  // message whose sender frame is unknown must not count as the page's. It
+  // used to (`undefined` was read as the main frame), which was safe only
+  // while frames had no preload (docs/adrs/0005-sub-frame-preload-one-receive-channel.md).
+  const CASES = [
+    { channel: PREVIEW_PAGE_LINK_CHANNEL, hook: 'onLinkActivated' },
+    { channel: PREVIEW_PAGE_LINK_NOTE_CHANNEL, hook: 'onLinkNote' },
+    { channel: PREVIEW_PAGE_CSP_VIOLATION_CHANNEL, hook: 'onCspViolation' }
+  ] as const
+
+  it.each(CASES)('SEC-27 refuses $channel without a known sender frame, and takes it from the main frame', ({ channel, hook }) => {
+    const { wc, emitIpc } = makeWebContents()
+    const hooks: PreviewLifecycleHooks = { ...makeHooks(), onLinkActivated: vi.fn() }
+    wirePreviewLifecycle(makeParams(wc), hooks)
+    const payload = { probe: channel }
+
+    for (const event of [{}, { senderFrame: undefined }, { senderFrame: null }, null, undefined]) {
+      emitIpc(channel, event, payload)
+    }
+    expect(hooks[hook]).not.toHaveBeenCalled()
+
+    emitIpc(channel, { senderFrame: MAIN_FRAME }, payload)
+    expect(hooks[hook]).toHaveBeenCalledTimes(1)
+    expect(hooks[hook]).toHaveBeenCalledWith(payload)
+  })
+})
+
 describe('wirePreviewLifecycle console-message wiring', () => {
   it('routes an uncaught page exception to onConsoleMessage as a script-error', () => {
     const { wc, emit } = makeWebContents()
@@ -292,7 +320,7 @@ describe('wirePreviewLifecycle navigation guards', () => {
     const { wc } = makeWebContents()
     wirePreviewLifecycle(makeParams(wc), makeHooks())
 
-    const setWindowOpenHandler = wc.setWindowOpenHandler as unknown as ReturnType<typeof vi.fn>
+    const setWindowOpenHandler = wc.setWindowOpenHandler as unknown as Mock
     expect(setWindowOpenHandler).toHaveBeenCalledTimes(1)
 
     const handler = setWindowOpenHandler.mock.calls[0][0] as (details: unknown) => unknown
@@ -315,7 +343,7 @@ describe('wirePreviewLifecycle navigation guards', () => {
 })
 
 describe('wirePreviewLifecycle did-fail-load (issue #124, RX2-3)', () => {
-  function makeLoadHooks(): PreviewLifecycleHooks & { onDidFailLoad: ReturnType<typeof vi.fn> } {
+  function makeLoadHooks(): PreviewLifecycleHooks & { onDidFailLoad: Mock } {
     return {
       ...makeHooks(),
       onDidStartLoading: vi.fn(),

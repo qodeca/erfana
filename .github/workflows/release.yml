@@ -322,14 +322,14 @@ jobs:
 
       - name: Publish SHA256SUMS as workflow artifact (tamper-check for skill Phase 4)
         if: needs.prepare.outputs.is_dry_run != 'true'
-        # actions/upload-artifact v7.0.1
+        # actions/upload-artifact v7.0.2
         # The skill downloads this artifact via `gh run download` and byte-compares
         # against the SHA256SUMS on the draft release. Any delta between this
         # artifact and the release asset indicates tampering after finalize.
         # Note: job-level `outputs` are not retrievable via the REST API after
         # a workflow run completes; an artifact gives us a durable, API-reachable
         # handle that the skill can diff against.
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: sha256sums-digest
           path: dl/SHA256SUMS

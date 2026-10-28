@@ -5,8 +5,9 @@
  *
  * Builds the preview object graph (via {@link buildPreviewGraph}), registers the
  * lifecycle / find / allowlist handler bundles (items 44–46) and, beside the
- * lifecycle ones, `preview:navigate` and `preview:focusPage` (issue #124), and
- * wires the two cross-cutting hops:
+ * lifecycle ones, `preview:navigate` and `preview:focusPage` (issue #124), the
+ * HTML Preview comment channels (`comment-handlers.ts`), and wires the two
+ * cross-cutting hops:
  *   - `globalSettings.onSettingsChanged` → `service.destroyAll('globally-disabled')`
  *     when `htmlPreview.enabled` flips false (AC21). Without this hop AC21 would
  *     only hold for previews opened AFTER the toggle (design §1.6).
@@ -42,6 +43,7 @@ import { registerPreviewNavigationHandlers } from './preview/navigation-handlers
 import { registerPreviewFocusHandlers } from './preview/focus-handlers'
 import { registerPreviewFindHandlers } from './preview/find-handlers'
 import { registerPreviewAllowlistHandlers } from './preview/allowlist-handlers'
+import { registerPreviewCommentHandlers } from './preview/comment-handlers'
 import { isTrustedPreviewSender } from './preview/isTrustedPreviewSender'
 import { logger } from '../services/LoggingService'
 import { redactedLogError } from '../utils/redactUserInput'
@@ -132,6 +134,12 @@ export function registerPreviewHandlers(deps: PreviewHandlerDeps): PreviewHandle
     service: graph.service,
     isTrustedSender
   })
+  // HTML Preview comments (html-preview-comments.md §8), when the graph has them.
+  const comments = graph.comments
+  const unregisterComments =
+    comments === undefined
+      ? () => {}
+      : registerPreviewCommentHandlers({ registry: comments.registry, unsaved: comments.unsaved, isTrustedSender })
 
   // AC21: a global-off toggle tears down any live view immediately.
   const unsubscribeSettings = globalSettings.onSettingsChanged((event) => {
@@ -171,6 +179,7 @@ export function registerPreviewHandlers(deps: PreviewHandlerDeps): PreviewHandle
       unregisterFocus()
       unregisterFind()
       unregisterAllowlist()
+      unregisterComments()
       unsubscribeSettings()
       unsubscribeProject()
       graph.disposeEmitters()

@@ -14,8 +14,8 @@
  *   query threw", or it picks no `ERROR_MESSAGES` entry and renders a blank.
  *
  * @see Issue #21 - graph R1 architecture
- * @see specs/designs/sd-021-errata-and-risks.md §11 item 1
- * @see specs/designs/sd-021-ipc-contracts.md §7
+ * @see docs/designs/sd-021-errata-and-risks.md §11 item 1
+ * @see docs/designs/sd-021-ipc-contracts.md §7
  */
 import { describe, it, expect } from 'vitest'
 import { ErrorCode } from '../errors'

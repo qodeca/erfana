@@ -16,7 +16,7 @@
  * - window-scope — {@link registerWindowResponsiveness} (hangs) and
  *   {@link registerWindowErrorSignals} (entry-module failures), once per window
  *
- * @see docs/design/design-issue-60.md §2.6 — instrumentation placement
+ * @see docs/designs/design-issue-60.md §2.6 — instrumentation placement
  */
 import { app } from 'electron'
 import type {

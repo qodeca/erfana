@@ -3,12 +3,12 @@
 /**
  * The permission band, one test per state the card renders.
  *
- * `design/README.md` § "A card is done when" names the failure mode these guard:
+ * `docs/design-system/README.md` § "A card is done when" names the failure mode these guard:
  * "Most defects here were states the demo never reached — a badge that was
  * invisible because nothing seeded it, a `failed` flag only ever set to `null`."
  * A state with no test is the one that regresses.
  *
- * @see design/system/components/permission-band/index.html - status="decided"
+ * @see docs/design-system/system/components/permission-band/index.html - status="decided"
  */
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'

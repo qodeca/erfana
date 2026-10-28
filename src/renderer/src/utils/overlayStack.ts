@@ -48,7 +48,7 @@ export type OverlayEscapeHandler = () => void
  * A z-index layering token from `design-tokens.css` (e.g. `'--z-modal'`).
  *
  * Overlays whose z-index comes from a stylesheet pass the TOKEN, never its
- * number: the layering card (design/system/foundations/layering.html) forbids
+ * number: the layering card (docs/design-system/system/foundations/layering.html) forbids
  * mirroring a token into TypeScript, because changing the CSS would then
  * silently desynchronise the runtime. The value is read from `:root` when the
  * stack is queried, so it always matches what is painted.

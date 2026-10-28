@@ -5,7 +5,7 @@ SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 
 # Use menus
 
-The app menu provides window, editing and view commands. Right-click menus act on the tab, tree item or selected text beneath the pointer; unavailable actions are disabled.
+The app menu provides window, editing and view commands. Right-click menus act on the tab, tree item or selected text beneath the pointer; unavailable actions are disabled. Every right-click menu also opens from the keyboard: press <kbd>Shift</kbd>+<kbd>F10</kbd> (Windows: also the <kbd>Menu</kbd> key) on the focused tab, tree row, editor, terminal or text field, then use the arrow keys and <kbd>Enter</kbd> – see [keyboard shortcuts](keyboard-shortcuts.md#menus).
 
 **On this page**
 

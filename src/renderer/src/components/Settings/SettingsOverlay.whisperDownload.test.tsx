@@ -8,13 +8,13 @@
  *   the download runs, and a Cancel button stops it;
  * - progress reaches an always-mounted status region at most every 10 % or 5 s;
  * - an error goes to an always-mounted alert region, a cancel to the status
- *   region (design/system/components/feedback), and focus is handed on when
+ *   region (docs/design-system/system/components/feedback), and focus is handed on when
  *   the control that held it goes away.
  *
  * Split from SettingsOverlay.test.tsx (its own mocks and a fake clock).
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
 import { render, screen, act, fireEvent, waitFor } from '@testing-library/react'
 import { SettingsOverlay } from './SettingsOverlay'
 import { useSettingsStore } from '../../stores/useSettingsStore'
@@ -41,9 +41,9 @@ let emitProgress: (progress: Progress) => void
 let binary: ReturnType<typeof deferred<DownloadResult>>
 let model: ReturnType<typeof deferred<DownloadResult>>
 let api: {
-  ensureBinary: ReturnType<typeof vi.fn>
-  ensureModel: ReturnType<typeof vi.fn>
-  cancelDownload: ReturnType<typeof vi.fn>
+  ensureBinary: Mock
+  ensureModel: Mock
+  cancelDownload: Mock
 }
 
 const downloadButton = (): HTMLElement => screen.getByTestId('settings-btn-whisper-model')

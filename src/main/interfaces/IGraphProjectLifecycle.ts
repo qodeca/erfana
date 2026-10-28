@@ -10,7 +10,7 @@
  *
  * @see GraphLifecycle for implementation (#23); wired by #32
  * @see Issue #21 - graph R1 architecture
- * @see specs/designs/sd-021-db-contracts.md §5.2 - close-then-open sequence
+ * @see docs/designs/sd-021-db-contracts.md §5.2 - close-then-open sequence
  */
 
 export interface IGraphProjectLifecycle {

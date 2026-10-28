@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { APP_ID } from '../shared/constants'
@@ -111,7 +111,7 @@ describe('Main Process - Window Creation', () => {
       }
     }
 
-    mockBrowserWindow = vi.fn(() => createdWindow)
+    mockBrowserWindow = vi.fn(function () { return createdWindow })
     // #216: registerClaudeStatusHandlers wires window-destroy cleanup over the
     // currently-open windows, so the BrowserWindow factory needs getAllWindows.
     ;(mockBrowserWindow as unknown as { getAllWindows: () => unknown[] }).getAllWindows = vi.fn(
@@ -460,7 +460,7 @@ describe('Main Process - Window Creation', () => {
       const { directoryWatcherService } = await import('./services/DirectoryWatcherService')
       const { fileWatcherService } = await import('./services/FileWatcherService')
 
-      const onPathsRemoved = directoryWatcherService.onPathsRemoved as unknown as ReturnType<typeof vi.fn>
+      const onPathsRemoved = directoryWatcherService.onPathsRemoved as unknown as Mock
       expect(onPathsRemoved).toHaveBeenCalledTimes(1)
       const listener = onPathsRemoved.mock.calls[0][0] as (paths: readonly string[]) => void
       listener(['/proj/docs'])
@@ -474,7 +474,7 @@ describe('Main Process - Window Creation', () => {
       const { fileWatcherService } = await import('./services/FileWatcherService')
 
       // Removals a paused watch lost without their paths: check the disk under that root
-      const onRemovalsLost = directoryWatcherService.onRemovalsLost as unknown as ReturnType<typeof vi.fn>
+      const onRemovalsLost = directoryWatcherService.onRemovalsLost as unknown as Mock
       expect(onRemovalsLost).toHaveBeenCalledTimes(1)
       const lost = onRemovalsLost.mock.calls[0][0] as (
         root: string,
@@ -485,7 +485,7 @@ describe('Main Process - Window Creation', () => {
       expect(fileWatcherService.checkWatchedFilesUnder).toHaveBeenCalledWith('/proj', isOwnRemoval)
 
       // Files the project watcher cannot see: the project watcher itself says which those are
-      const watchUnseen = fileWatcherService.watchUnseenFiles as unknown as ReturnType<typeof vi.fn>
+      const watchUnseen = fileWatcherService.watchUnseenFiles as unknown as Mock
       expect(watchUnseen).toHaveBeenCalledTimes(1)
       expect(watchUnseen).toHaveBeenCalledWith(directoryWatcherService)
     })
@@ -496,12 +496,12 @@ describe('Main Process - Window Creation', () => {
       const { globalSettingsService } = await import('./services/GlobalSettingsService')
       const { loggingService } = await import('./services/LoggingService')
       if (which !== 'logging') {
-        ;(globalSettingsService.initialize as ReturnType<typeof vi.fn>).mockRejectedValue(
+        ;(globalSettingsService.initialize as Mock).mockRejectedValue(
           new Error('settings dir is read-only')
         )
       }
       if (which !== 'settings') {
-        ;(loggingService.initialize as ReturnType<typeof vi.fn>).mockRejectedValue(
+        ;(loggingService.initialize as Mock).mockRejectedValue(
           new Error('logs dir is a symlink')
         )
       }

@@ -9,14 +9,17 @@
  * serves real bytes through real realpath confinement; the REAL page scopes
  * hold what gets badged; the REAL registry mints the token. Only Electron's
  * session is faked – an object that captures the listeners `attach` installs.
- * Requests look the way Electron 39 hands them over – no `sec-fetch-dest`, an
+ * Requests look the way Electron hands them over – no `sec-fetch-dest`, an
  * empty `destination` (spike S1) – so the ledger is the only way a badge can
- * know what a request was.
+ * know what a request was. A subresource carries a `user-agent` header and a
+ * document load does not (HTML Preview comments spike S1e, Electron 44); the
+ * ledger matches a note only to a request of its own class, so `serve` sends
+ * the header for a subresource.
  */
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { ErrorCode } from '../../../shared/errors'
 import { createPreviewFailureLog } from './PreviewFailureLog'
 import { attach as attachHandler } from './PreviewProtocolHandler'
@@ -44,21 +47,29 @@ interface SessionHarness {
   readonly token: string
   readonly realRoot: string
   readonly holder: PreviewPageScopeHolder
-  readonly onBlocked: ReturnType<typeof vi.fn>
+  readonly onBlocked: Mock
   /** The URL of a file inside the real root, built as the live view builds it. */
   url(...segments: string[]): string
   /** The filter's half of a request: `true` when it let it through (and noted it). */
   note(url: string, resourceType: string): boolean
-  /** The handler's half: what `protocol.handle` answers. */
-  serve(url: string): Promise<GlobalResponse>
+  /** The handler's half: what `protocol.handle` answers, for a request of `resourceType`. */
+  serve(url: string, resourceType?: string): Promise<GlobalResponse>
   /** Both halves, in Chromium's order; `null` when the filter cancelled. */
   load(url: string, resourceType: string): Promise<GlobalResponse | null>
   close(): void
 }
 
-/** A request as Electron 39 hands it to `protocol.handle` (S1). */
-function electronRequest(url: string): GlobalRequest {
-  return { url, method: 'GET', headers: new Headers(), destination: '' } as unknown as GlobalRequest
+/** Resource types Chromium loads as a document, without `user-agent` (S1e). */
+const DOCUMENT_TYPES = new Set(['mainFrame', 'subFrame'])
+
+/**
+ * A request as Electron hands it to `protocol.handle` (S1): a document load
+ * carries no `user-agent`, a subresource always does (S1e).
+ */
+function electronRequest(url: string, resourceType?: string): GlobalRequest {
+  const subresource = resourceType !== undefined && !DOCUMENT_TYPES.has(resourceType)
+  const headers = new Headers(subresource ? { 'user-agent': 'Mozilla/5.0 Electron' } : {})
+  return { url, method: 'GET', headers, destination: '' } as unknown as GlobalRequest
 }
 
 async function openSession(
@@ -109,7 +120,8 @@ async function openSession(
     })
     return !cancel
   }
-  const serve = (url: string): Promise<GlobalResponse> => captured.handler!(electronRequest(url))
+  const serve = (url: string, resourceType?: string): Promise<GlobalResponse> =>
+    captured.handler!(electronRequest(url, resourceType))
 
   return {
     token,
@@ -119,7 +131,7 @@ async function openSession(
     url: (...segments) => buildPreviewUrl(token, realRoot, join(realRoot, ...segments)),
     note,
     serve,
-    load: async (url, resourceType) => (note(url, resourceType) ? serve(url) : null),
+    load: async (url, resourceType) => (note(url, resourceType) ? serve(url, resourceType) : null),
     close: () => {
       detachFilter()
       detachHandler()
@@ -269,10 +281,10 @@ describe('the ledger between the filter and the handler', () => {
     expect(s.note(url, 'subFrame')).toBe(true)
 
     // The image first: a broken <img> is the page's own console's business.
-    expect((await s.serve(url)).status).toBe(404)
+    expect((await s.serve(url, 'image')).status).toBe(404)
     expect(listed(s.holder.committed())).toEqual([])
     // Then the frame, which is listed.
-    expect((await s.serve(url)).status).toBe(404)
+    expect((await s.serve(url, 'subFrame')).status).toBe(404)
     expect(listed(s.holder.committed())).toEqual([
       {
         type: 'missing-local-file',
@@ -286,8 +298,8 @@ describe('the ledger between the filter and the handler', () => {
     const s = await session()
     s.note(s.url('app.tsx'), 'script')
 
-    await s.serve(s.url('app.tsx'))
-    await s.serve(s.url('app.tsx'))
+    await s.serve(s.url('app.tsx'), 'script')
+    await s.serve(s.url('app.tsx'), 'script')
     expect(listed(s.holder.committed())).toHaveLength(1)
   })
 

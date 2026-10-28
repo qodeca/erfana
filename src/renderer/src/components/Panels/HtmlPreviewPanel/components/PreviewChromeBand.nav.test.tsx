@@ -8,7 +8,7 @@
  * Split from `PreviewChromeBand.test.tsx`, which is past the 500-line cap
  * already (the split policy in docs/windows/contributing.md).
  *
- * @see design/system/components/permission-band/index.html - status="decided"
+ * @see docs/design-system/system/components/permission-band/index.html - status="decided"
  */
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'

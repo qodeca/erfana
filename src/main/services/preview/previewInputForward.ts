@@ -17,10 +17,16 @@
  * outside the frozen list is ever forwarded (design §1.9): Cmd+R, Cmd+P and
  * plain typing all stay with the page.
  *
+ * HTML Preview comments add one row of their own, `PREVIEW_COMMENT_TOGGLE`,
+ * taken only while comments are on for the view – and, while comment mode is
+ * on, leave Esc with the page, whose preload leaves the mode
+ * (html-preview-comments.md §3, §7.1, §10.1; M-052).
+ *
  * @see docs/designs/sd-074-html-preview.md §1.9, §0 (Enumerated keystrokes)
- * @see docs/design/design-issue-124-part3.md §3.7
+ * @see docs/designs/design-issue-124-part3.md §3.7
  */
 
+import { COMMENT_MODE_KEY, matchCommentModeKey } from '../../../shared/commentModeKey'
 import { matchPreviewNavKey, type PreviewNavAction } from '../../../shared/previewNavKeys'
 
 /** A forwarded key. `accel` true ⇒ requires Cmd (macOS) / Ctrl (else). */
@@ -61,6 +67,28 @@ export const PREVIEW_FORWARDED_SHORTCUTS = Object.freeze([
   { key: 'back', accel: false, nav: true },
   { key: 'forward', accel: false, nav: true }
 ] as const satisfies readonly ForwardedShortcut[])
+
+/**
+ * The comment-mode toggle: Ctrl+Alt+M, Cmd+Option+M on macOS. Its own frozen
+ * row, outside the list above, because it is taken only while comments are on
+ * for the view – off, the chord stays with the page. Which key press it is –
+ * the typed `m`, the physical KeyM on macOS only for a non-ASCII character –
+ * is the one rule in `src/shared/commentModeKey.ts`, which the panel's own
+ * chrome asks too (M3).
+ */
+export const PREVIEW_COMMENT_TOGGLE = Object.freeze({
+  key: 'comment-mode',
+  typed: COMMENT_MODE_KEY.typed,
+  darwinCode: COMMENT_MODE_KEY.macCode
+} as const)
+
+/** What the forwarder asks about the view's comments, per key press. */
+export interface CommentKeyState {
+  /** Comments are on for the view: the toggle is the view's to take. */
+  readonly enabled: () => boolean
+  /** Comment mode is on: Esc stays with the page, whose preload leaves the mode. */
+  readonly modeOn: () => boolean
+}
 
 /**
  * The slice of Electron's `Input` this module reads. Declared locally so the
@@ -112,10 +140,15 @@ export interface InputForwardTarget {
  */
 export function matchForwardedShortcut(
   input: ForwardableInput,
-  platform: NodeJS.Platform = process.platform
+  platform: NodeJS.Platform = process.platform,
+  comments?: CommentKeyState
 ): string | null {
   if (input.type !== 'keyDown') {
     return null
+  }
+
+  if (comments !== undefined && comments.enabled() && matchCommentToggle(input, platform)) {
+    return PREVIEW_COMMENT_TOGGLE.key
   }
 
   const accelDown = platform === 'darwin' ? input.meta : input.control
@@ -123,11 +156,25 @@ export function matchForwardedShortcut(
 
   for (const shortcut of PREVIEW_FORWARDED_SHORTCUTS) {
     if (matchesShortcut(shortcut, input, accelDown, navAction)) {
-      return shortcut.key
+      // In comment mode the page's preload takes Esc: it leaves the mode first.
+      return shortcut.key === 'Escape' && comments?.modeOn() === true ? null : shortcut.key
     }
   }
 
   return null
+}
+
+/**
+ * Whether a key press is the comment-mode toggle – the shared rule
+ * (`matchCommentModeKey`): the typed `m` (on macOS also the M key typing a
+ * non-ASCII character) with exactly Ctrl+Alt, or Cmd+Option on macOS – Shift
+ * never.
+ */
+export function matchCommentToggle(
+  input: ForwardableInput,
+  platform: NodeJS.Platform = process.platform
+): boolean {
+  return matchCommentModeKey(input, platform === 'darwin')
 }
 
 /** One row of the frozen list against one key press. */
@@ -157,10 +204,11 @@ function matchesShortcut(
 export function attachInputForwarding(
   target: InputForwardTarget,
   onShortcut: (key: string) => void,
-  platform: NodeJS.Platform = process.platform
+  platform: NodeJS.Platform = process.platform,
+  comments?: CommentKeyState
 ): () => void {
   const listener = (event: InputForwardEvent, input: ForwardableInput): void => {
-    const key = matchForwardedShortcut(input, platform)
+    const key = matchForwardedShortcut(input, platform, comments)
     if (key !== null) {
       event.preventDefault()
       onShortcut(key)

@@ -42,3 +42,8 @@ e42a931a80ddd4a8d1185bf3b5ba4c0fb439855c:src/main/services/preview/previewLinkNa
 8576397d9aa8777a9329b7b7100fa93c54037597:src/main/services/preview/previewCsp.test.ts:generic-api-key:16
 8576397d9aa8777a9329b7b7100fa93c54037597:src/main/services/preview/previewUrl.test.ts:generic-api-key:8
 8576397d9aa8777a9329b7b7100fa93c54037597:src/shared/ipc/preview-navigation-schema.test.ts:generic-api-key:100
+# HTML Preview comments: schema test fixtures (element tokens, a 25-char hex key) – not secrets.
+e4e3c73cec9dbdd525082d68069754e54ca7b283:src/shared/ipc/preview-comment-schema.test.ts:generic-api-key:103
+e4e3c73cec9dbdd525082d68069754e54ca7b283:src/shared/ipc/preview-comment-schema.test.ts:generic-api-key:150
+e4e3c73cec9dbdd525082d68069754e54ca7b283:src/shared/ipc/preview-comment-schema.test.ts:generic-api-key:44
+e4e3c73cec9dbdd525082d68069754e54ca7b283:src/shared/ipc/preview-comment-schema.test.ts:generic-api-key:96

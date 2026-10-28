@@ -518,8 +518,8 @@ export const PREVIEW = {
   MAX_ASSET_BYTES: 25 * 1024 * 1024,
   /**
    * Max bytes of the entry HTML read for static-link discovery. Bounds both the
-   * read and the synchronous parse5 parse that runs on the main thread, so a
-   * large or generated entry file cannot freeze the UI on every reload. Links
+   * read and its scan in the link scan worker (#124 audit), so a large or
+   * generated entry file cannot keep auto-refresh busy on every reload. Links
    * live near the top of a document, so a truncated head still finds them.
    */
   MAX_ENTRY_HTML_BYTES: 4 * 1024 * 1024,

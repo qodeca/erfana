@@ -3,7 +3,7 @@
 /**
  * The permission band's decisions, tested without a DOM.
  *
- * @see design/system/components/permission-band/index.html - status="decided"
+ * @see docs/design-system/system/components/permission-band/index.html - status="decided"
  */
 import { describe, expect, it } from 'vitest'
 

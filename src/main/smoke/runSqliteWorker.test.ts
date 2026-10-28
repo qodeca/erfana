@@ -13,7 +13,7 @@
  * Mirrors the EventEmitter-backed mock-worker pattern in
  * `GitStatusWorkerAdapter.test.ts` (~:275-333).
  *
- * @see specs/designs/sd-019-native-dep-spike.md §5
+ * @see docs/designs/sd-019-native-dep-spike.md §5
  */
 
 import { describe, it, expect, vi, afterEach } from 'vitest'

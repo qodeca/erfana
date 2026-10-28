@@ -70,6 +70,14 @@ export interface PreviewEmitTarget {
    * receiving.
    */
   readonly windowId?: number
+  /**
+   * Give this window's own contents native keyboard focus, only while the
+   * window is the OS key window (`focusHostWhileKey`). The comment emitters
+   * call it before `preview:commentDraftOpened`, whose menu or window opens
+   * while the page still holds focus. Absent on test fakes and non-window
+   * targets: then nothing is focused.
+   */
+  readonly focusHost?: () => boolean
 }
 
 /** Injectable dependencies (all but `resolveTargets` defaulted). */

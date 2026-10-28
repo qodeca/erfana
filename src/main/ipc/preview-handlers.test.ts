@@ -9,7 +9,7 @@
  * unsubscribes both hops, cancels emissions and disposes the service. The graph
  * and all five sub-handler bundles are mocked so the root is tested in isolation.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import type { GlobalSettings, GlobalSettingsChanged } from '../../shared/ipc/global-settings-schema'
 import { logger } from '../services/LoggingService'
 import { redactedLogError } from '../utils/redactUserInput'
@@ -54,11 +54,11 @@ function settingsWith(enabled: boolean): GlobalSettings {
 
 function makeGraph(): {
   graph: PreviewGraph
-  destroyAll: ReturnType<typeof vi.fn>
-  onProjectChanged: ReturnType<typeof vi.fn>
-  dispose: ReturnType<typeof vi.fn>
-  disposeEmitters: ReturnType<typeof vi.fn>
-  setResizeHold: ReturnType<typeof vi.fn>
+  destroyAll: Mock
+  onProjectChanged: Mock
+  dispose: Mock
+  disposeEmitters: Mock
+  setResizeHold: Mock
 } {
   const destroyAll = vi.fn(async () => undefined)
   const onProjectChanged = vi.fn(async () => undefined)
@@ -82,15 +82,15 @@ function makeGraph(): {
 
 function setup(overrides: Partial<PreviewHandlerDeps> = {}): {
   bundle: ReturnType<typeof registerPreviewHandlers>
-  destroyAll: ReturnType<typeof vi.fn>
-  onProjectChanged: ReturnType<typeof vi.fn>
-  dispose: ReturnType<typeof vi.fn>
-  disposeEmitters: ReturnType<typeof vi.fn>
-  setResizeHold: ReturnType<typeof vi.fn>
+  destroyAll: Mock
+  onProjectChanged: Mock
+  dispose: Mock
+  disposeEmitters: Mock
+  setResizeHold: Mock
   fireSettings: (event: GlobalSettingsChanged) => void
   fireProjectChanged: (oldPath: string | null, newPath: string | null) => void
-  unsubscribeSettings: ReturnType<typeof vi.fn>
-  unsubscribeProject: ReturnType<typeof vi.fn>
+  unsubscribeSettings: Mock
+  unsubscribeProject: Mock
 } {
   const { graph, destroyAll, onProjectChanged, dispose, disposeEmitters, setResizeHold } =
     makeGraph()

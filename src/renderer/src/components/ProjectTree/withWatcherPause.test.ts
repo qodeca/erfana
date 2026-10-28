@@ -12,7 +12,7 @@
  * - Edge cases: null projectPath, async operations, ref state
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import { withWatcherPause } from './withWatcherPause'
 
 const { mockLogger } = vi.hoisted(() => ({
@@ -43,7 +43,7 @@ global.window = {
 
 describe('withWatcherPause', () => {
   let isInternalOperationRef: React.MutableRefObject<boolean>
-  let setLoading: ReturnType<typeof vi.fn>
+  let setLoading: Mock
 
   beforeEach(() => {
     vi.clearAllMocks()

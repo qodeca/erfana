@@ -5,9 +5,9 @@
  * toolbar, and the band's narrow-width tiers (issue #124, UX spec §1.1-§1.5).
  *
  * SOURCE OF TRUTH. scripts/design-sync.mjs copies this file to
- * design/system/components/permission-band/nav.css so the card renders what
+ * docs/design-system/system/components/permission-band/nav.css so the card renders what
  * actually ships, and `npm run design -- --check` fails CI on drift. Edit this
- * copy; never the one under design/.
+ * copy; never the one under docs/design-system/.
  *
  * A second file rather than more rules in PreviewChromeBand.css, which is at
  * its line budget. Every selector here starts at `.erf-band`: this file can load
@@ -59,7 +59,9 @@
  *
  *   full     everything (UX spec §1.1)
  *   compact  below the width the full row needs
- *   minimal  below the width the compact row needs
+ *   narrow   below the width the compact row needs: Show comment icons and
+ *            Export to PDF leave, Find stays
+ *   minimal  below the width the narrow row needs: Find leaves too
  *
  * Each threshold is the width the next-wider row NEEDS, measured on the
  * permission-band card with a two-digit chip ("12 blocked · 34 allowed"); the
@@ -84,8 +86,11 @@
 
 /* Compact. Tighter padding and gaps, and the chip drops its "· 34 allowed"
    tail. What stays visible is the START of the chip's accessible name, so
-   label-in-name (SC 2.5.3) still holds. Buttons keep their 32 x 28. */
-@container (width < 385px) {
+   label-in-name (SC 2.5.3) still holds. Buttons keep their 32 x 28.
+   534px is what the full row needs with the three comment tools, measured on
+   docs/design-system/product/html-comments/toolbar.html (was 385px before
+   them). */
+@container (width < 534px) {
   .erf-band .erf-band__bar {
     padding-inline: var(--space-3);
   }
@@ -103,17 +108,78 @@
   }
 }
 
-/* Minimal. Find and Export to PDF leave the row - `display: none`, so they
-   leave the Tab order too - while Cmd/Ctrl+F and Cmd/Ctrl+S keep working with
-   focus in the page, which is reachable by keyboard, so a keyboard reader loses
-   the buttons but not the actions. Open
-   in default browser stays: it has no shortcut, and it is the natural way out
-   of a panel too small to use. Matched by their accessible names because
-   PreviewToolbarTools owns those buttons; the names are pinned by its tests and
-   by the UX spec. */
-@container (width < 293px) {
-  .erf-band .erf-band__tool[aria-label='Find'],
-  .erf-band .erf-band__tool[aria-label='Export to PDF'] {
+/* Narrow, below what the compact row needs (446px with the comment tools).
+   The comment tools give way before Find: Show comment icons leaves first -
+   the comments drawer's checkbox does the same job - and Export to PDF with
+   it, as Cmd/Ctrl+S keeps exporting with focus in the page. Find STAYS, so it
+   is on the row at every width the editor area can have (its minimum is
+   400px; the narrow row needs 378px). `display: none`, so a hidden tool
+   leaves the Tab order too. Matched by accessible names because
+   PreviewToolbarTools and CommentToolbarTools own those buttons; the names are
+   pinned by their tests and by the UX spec. */
+@container (width < 446px) {
+  .erf-band .erf-band__tool[aria-label='Export to PDF'],
+  .erf-band .erf-band__tool[aria-label='Show comment icons'] {
     display: none;
+  }
+}
+
+/* Minimal, below what the narrow row needs (378px; was 293px before the
+   comment tools). Find leaves too, while Cmd/Ctrl+F keeps working with focus
+   in the page, which is reachable by keyboard, so a keyboard reader loses the
+   button but not the action. Open in default browser stays: it has no
+   shortcut, and it is the natural way out of a panel too small to use.
+   Comment mode and the list stay - the feature's front door and the keyboard
+   route to every thread (the list has no shortcut, Find does). The minimal
+   row itself needs 344px; below that it scrolls sideways. */
+@container (width < 378px) {
+  .erf-band .erf-band__tool[aria-label='Find'] {
+    display: none;
+  }
+}
+
+/* ---------- the comment tools (HTML Preview comments) ---------- */
+
+/*
+ * Comment mode, the Comments list and Show comment icons: one group after Find
+ * (docs/design-system/product/html-comments/toolbar.html, proposed). They
+ * reuse the toggle signature above, but not the link toggle's 8px gap after
+ * EACH tool: one 8px gap before the group, the band's own 2px inside it.
+ */
+.erf-band .erf-band__tool.erf-band__tool--comment {
+  margin-inline-end: 0;
+}
+
+.erf-band .erf-band__tool.erf-band__tool--comment-first {
+  margin-inline-start: var(--space-4);
+}
+
+/* The Comments list: icon plus the open count, so wider than a 32px tool -
+   the count is the information (card Exceptions). Same height, colours and
+   inset ring as every band tool. */
+.erf-band .erf-band__tool--count {
+  inline-size: auto;
+  min-inline-size: var(--btn-height-md);
+  gap: var(--space-2);
+  padding-inline: var(--space-3);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.erf-band .erf-band__tool-attention {
+  color: var(--color-warning);
+}
+
+/* An open drawer reads as a pressed tool: the toggle signature, on aria-expanded. */
+.erf-band .erf-band__tool--toggle[aria-expanded='true'],
+.erf-band .erf-band__tool--toggle[aria-expanded='true']:hover {
+  background: var(--color-bg-selected);
+  border-block-end-color: var(--color-brand-lime);
+}
+
+@media (forced-colors: active) {
+  .erf-band .erf-band__tool--toggle[aria-expanded='true'] {
+    border-block-end-color: Highlight;
   }
 }

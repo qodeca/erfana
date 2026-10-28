@@ -25,7 +25,6 @@ import type { IFileOperations } from '../../interfaces/IFileOperations'
  */
 describe('ProjectTree paste operations (integration tests)', () => {
   let mockFileOps: IFileOperations
-  let mockShowConfirm: ReturnType<typeof vi.fn>
 
   beforeEach(() => {
     // Create mock file operations
@@ -33,9 +32,6 @@ describe('ProjectTree paste operations (integration tests)', () => {
       moveItem: vi.fn(async () => ({ path: '/project/target/file.md' })),
       copyItem: vi.fn(async () => ({ path: '/project/target/file.md' }))
     }
-
-    // Mock showConfirm dialog
-    mockShowConfirm = vi.fn(async () => true) // Default: user confirms
 
     // Setup window.api mock
     ;(window as any).api = {
@@ -69,21 +65,6 @@ describe('ProjectTree paste operations (integration tests)', () => {
         onDirectoryError: vi.fn(() => () => {})
       }
     }
-
-    // Mock dialog hook in component
-    // Note: This requires the component to use DialogContext
-    vi.mock('../Dialog', async () => {
-      const actual = await vi.importActual('../Dialog')
-      return {
-        ...actual,
-        useDialog: () => ({
-          showConfirm: mockShowConfirm,
-          showRename: vi.fn(),
-          showNewFile: vi.fn(),
-          showNewFolder: vi.fn()
-        })
-      }
-    })
   })
 
   afterEach(() => {

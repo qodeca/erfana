@@ -10,7 +10,7 @@
  * This file is the single source of truth for all design values.
  * Import this file in index.css and use these variables in all NEW CSS.
  *
- * Governed by design/system/foundations/colors.html (and the type, spacing,
+ * Governed by docs/design-system/system/foundations/colors.html (and the type, spacing,
  * surfaces, motion and layering cards). Those render every token live and
  * compute their own contrast; docs/ui-style-guide.md keeps only the
  * text-selection policy now.
@@ -178,7 +178,7 @@
   /* RETIRED as a warning colour - use --color-warning.
    * Erfana carried several colours for one meaning, and the toast (the surface
    * users see most) was the odd one out. Still referenced in src/; the ban is
-   * enforced in design/ today and follows here with the migration. */
+   * enforced in docs/design-system/ today and follows here with the migration. */
   --color-warning-bright: #f59e0b;           /* RETIRED - use --color-warning */
   --color-warning-icon: #dcdcaa;             /* RETIRED - use --color-warning */
   --color-error: #f48771;                    /* Coral - unchanged */
@@ -415,6 +415,12 @@
   --input-height-sm: 28px;
   --input-height-md: 36px;
   --input-height-lg: 44px;
+
+  /* HTML Preview comments (docs/designs/html-preview-comments.md §10.9):
+     the comment window's inline size and its cap, and the drawer's width */
+  --comments-window-width: 360px;
+  --comments-window-max-width: 480px;
+  --comments-drawer-width: 320px;
 
   /* ============================================
    * INTERACTIVE STATES

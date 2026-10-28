@@ -10,7 +10,7 @@
  * (`mountPreviewLinkRouter`, called by `EditorAreaSplitPanel`); the reader
  * creates nothing (changed on purpose: the lazily created singleton is gone).
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 
 import { ErrorCode } from '../../../../shared/errors'
 import type { PreviewNavigateRequest } from '../../../../shared/ipc/preview-navigation-schema'
@@ -47,7 +47,7 @@ const dockviewApi = { getPanel: vi.fn() } as never
 function mount(options: {
   kind?: 'editor' | 'image' | 'preview'
   api?: unknown
-  resolveKind?: ReturnType<typeof vi.fn>
+  resolveKind?: Mock
   getLinkMode?: (panelId: string) => 'new-tab' | 'same-tab'
 }) {
   let listener: ((payload: PreviewOpenFileRequestedPayload) => void) | null = null
@@ -221,7 +221,7 @@ describe('mountPreviewLinkRouter / getPreviewLinkRouter – one creator', () => 
   const A = '/proj/site/overview.html'
   const B = '/proj/site/pricing.html'
   let listener: ((payload: PreviewOpenFileRequestedPayload) => void) | null
-  let bridge: { onOpenFileRequested: ReturnType<typeof vi.fn>; navigate: ReturnType<typeof vi.fn> }
+  let bridge: { onOpenFileRequested: Mock; navigate: Mock }
   const unsubscribe = vi.fn()
   const panelOf = (id: string, component: string, filePath: string) => ({
     id,

@@ -22,7 +22,7 @@
   transition: background-color var(--transition-fast);
 }
 
-/* Hover and keyboard focus look the same, per design/system/components/menu:
+/* Hover and keyboard focus look the same, per docs/design-system/system/components/menu:
    a menu has one active item whichever device you use. The pointer moves the
    roving focus too (ContextMenu.tsx, #90), so the two never disagree. */
 .context-menu-item:hover:not(.disabled),

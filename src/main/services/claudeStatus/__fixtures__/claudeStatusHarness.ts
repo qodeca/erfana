@@ -13,7 +13,7 @@
  *
  * @see docs/designs/41-model-capability-registry.md §9.6
  */
-import { vi } from 'vitest'
+import { vi, type Mock } from 'vitest'
 import { ClaudeStatusService, type ClaudeStatusDeps } from '../ClaudeStatusService'
 import { EXTENDED_WINDOW } from '../ClaudeWindowDetector'
 import { windowForModelId } from '../modelId'
@@ -43,12 +43,12 @@ export type FakeWatcher = ReturnType<typeof makeFakeWatcher>
 
 export interface Harness {
   service: ClaudeStatusService
-  detector: { isClaudeRunning: ReturnType<typeof vi.fn> }
-  locateTranscripts: ReturnType<typeof vi.fn>
-  parseTranscript: ReturnType<typeof vi.fn>
-  detectWindowSize: ReturnType<typeof vi.fn>
+  detector: { isClaudeRunning: Mock }
+  locateTranscripts: Mock
+  parseTranscript: Mock
+  detectWindowSize: Mock
   watcher: FakeWatcher
-  emit: ReturnType<typeof vi.fn>
+  emit: Mock
   emitted: Array<{ wc: number; payload: ClaudeStatusChangePayload }>
 }
 

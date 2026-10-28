@@ -53,6 +53,8 @@ interface ContextMenuProps {
   onClose: () => void
   /** Optional test ID for the container element (overrides default) */
   containerTestId?: string
+  /** The menu's accessible name (Menu card: "Element" for a page element's menu) */
+  ariaLabel?: string
 }
 
 /** Typed characters within this many ms extend one typeahead search. */
@@ -87,7 +89,7 @@ function lastItem(items: ContextMenuItem[]): number {
 
 /**
  * The shared right-click menu, with the keyboard contract `role="menu"`
- * promises (issue #90, design/system/components/menu – decided).
+ * promises (issue #90, docs/design-system/system/components/menu – decided).
  *
  * - Focus moves to the first item when the menu opens.
  * - Roving `tabindex`: the active item is `0`, every other item `-1`, so the
@@ -121,7 +123,7 @@ function lastItem(items: ContextMenuItem[]): number {
  * )}
  * ```
  */
-export function ContextMenu({ x, y, items, onClose, containerTestId }: ContextMenuProps) {
+export function ContextMenu({ x, y, items, onClose, containerTestId, ariaLabel }: ContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null)
   // Stamped on mount by the click-outside effect below; 0 until then.
   const openTimeRef = useRef<number>(0)
@@ -355,6 +357,7 @@ export function ContextMenu({ x, y, items, onClose, containerTestId }: ContextMe
       ref={menuRef}
       className="context-menu"
       role="menu"
+      aria-label={ariaLabel}
       // Focusable only so an EMPTY menu can still hold focus; with items the
       // roving stop is always an item.
       tabIndex={-1}

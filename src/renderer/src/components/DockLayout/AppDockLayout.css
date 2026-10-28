@@ -92,7 +92,7 @@
   height: 2px;
   background: var(--color-brand-lime) !important;
   /* stylelint-disable-next-line declaration-property-value-disallowed-list --
-     KNOWN DEFECT, documented by design/system/foundations/layering.html: 100 is
+     KNOWN DEFECT, documented by docs/design-system/system/foundations/layering.html: 100 is
      the exact value of --z-dropdown, so when this underline and a dropdown
      overlap the winner is decided by DOM order, not intent. Not silently
      repointed at a token here - the fix is a layering decision (its own rung, or
@@ -114,7 +114,7 @@
   height: 2px;
   background: var(--color-brand-lime) !important;
   /* stylelint-disable-next-line declaration-property-value-disallowed-list --
-     KNOWN DEFECT, documented by design/system/foundations/layering.html: 100 is
+     KNOWN DEFECT, documented by docs/design-system/system/foundations/layering.html: 100 is
      the exact value of --z-dropdown, so when this underline and a dropdown
      overlap the winner is decided by DOM order, not intent. Not silently
      repointed at a token here - the fix is a layering decision (its own rung, or
@@ -439,7 +439,7 @@
   cursor: not-allowed;
 }
 
-/* The standard ring (design/system/foundations/focus.html). Offset outward, it
+/* The standard ring (docs/design-system/system/foundations/focus.html). Offset outward, it
    sits on the dark .welcome-content overlay, not on the button's own violet:
    violet on that 78% overlay measures about 4.5:1 even with white behind it, clear
    of the 3:1 SC 1.4.11 asks. */

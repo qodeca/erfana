@@ -14,6 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { PREVIEW } from '../../../shared/constants'
 import { PREVIEW_LIMITS } from '../../../shared/preview-limits'
+import { inProcessLinkScanner } from './__test-helpers__/inProcessLinkScanner'
 import type { ConfineVerdict } from './previewPathResolve'
 import type { IPreviewWatchPool } from './PreviewWatchPool'
 import {
@@ -82,6 +83,7 @@ async function collect(
     readHtml,
     realRoot: SITE,
     confine: insideBy(path),
+    scanner: inProcessLinkScanner,
     ...options
   })
   return { ...sources, reads: readHtml.mock.calls.map(([filePath]) => filePath) }
@@ -322,7 +324,8 @@ describe('collectPreviewFrameSources – frames outside the project (fail closed
       entryPath,
       entryHtml,
       readHtml,
-      realRoot: root
+      realRoot: root,
+      scanner: inProcessLinkScanner
     })
     return { ...sources, reads: readHtml.mock.calls.map(([filePath]) => filePath) }
   }

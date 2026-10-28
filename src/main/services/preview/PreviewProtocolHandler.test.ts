@@ -12,16 +12,20 @@
  * refusal; and that the handler registers on the PASSED session's `protocol`,
  * not the global one.
  *
- * Requests look the way Electron 39 really hands them over: no `sec-fetch-dest`
+ * Requests look the way Electron really hands them over: no `sec-fetch-dest`
  * header and an empty `destination` (spike S1). The request kind comes from a
  * note the request filter leaves in the session's ledger, so these tests note
  * what the filter would have noted – they no longer fake the header (§5.2).
+ * A subresource request carries a `user-agent` header and a document load does
+ * not (HTML Preview comments spike S1e, Electron 44), and the ledger matches a
+ * note only to a request of its own class, so `send` adds the header for a
+ * subresource note.
  */
 
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, truncateSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { PREVIEW } from '../../../shared/constants'
 import { ErrorCode } from '../../../shared/errors'
 import type { PreviewFailureInput } from '../../../shared/ipc/preview-types'
@@ -50,8 +54,8 @@ type ProtocolListener = (request: GlobalRequest) => Promise<GlobalResponse>
 /** A fake partition session whose `protocol.handle` captures the listener. */
 function makeSession(): {
   session: Parameters<typeof attach>[0]
-  handle: ReturnType<typeof vi.fn>
-  unhandle: ReturnType<typeof vi.fn>
+  handle: Mock
+  unhandle: Mock
 } {
   const handle = vi.fn<(scheme: string, listener: ProtocolListener) => void>()
   const unhandle = vi.fn<(scheme: string) => void>()
@@ -130,6 +134,11 @@ function install(entry: PreviewRootEntryLike | null): {
   return { listener, detach, session }
 }
 
+/** The `user-agent` every subresource request carries and no document load does (S1e). */
+const SUBRESOURCE_HEADERS = { 'user-agent': 'Mozilla/5.0 Electron' }
+/** Resource types Chromium loads as a document, without `user-agent`. */
+const DOCUMENT_TYPES = new Set(['mainFrame', 'subFrame'])
+
 /** Send `url`, first noting it as the request filter would for `resourceType`. */
 function send(
   listener: ProtocolListener,
@@ -140,7 +149,9 @@ function send(
   if (resourceType !== undefined) {
     ledger.note(url, resourceType)
   }
-  return listener(makeRequest(url, opts))
+  const subresource = resourceType !== undefined && !DOCUMENT_TYPES.has(resourceType)
+  const headers = opts?.headers ?? (subresource ? SUBRESOURCE_HEADERS : undefined)
+  return listener(makeRequest(url, { ...opts, headers }))
 }
 
 describe('PreviewProtocolHandler.attach', () => {
@@ -380,7 +391,10 @@ describe('PreviewProtocolHandler refusals by request kind (#124, WI-12)', () => 
     ledger.note(`${BASE}/gone.html`, 'image')
 
     expect((await listener(makeRequest(`${BASE}/gone.html`, { method: 'POST' }))).status).toBe(405)
-    expect((await listener(makeRequest(`${BASE}/gone.html`))).status).toBe(404)
+    // The image, which carries a `user-agent` like every subresource (S1e).
+    expect(
+      (await listener(makeRequest(`${BASE}/gone.html`, { headers: SUBRESOURCE_HEADERS }))).status
+    ).toBe(404)
 
     expect(recordDocumentFailure).not.toHaveBeenCalled()
     expect(recordFrameRefusal).not.toHaveBeenCalled()

@@ -99,10 +99,12 @@ export class PreviewViewService implements IPreviewViewService, PreviewFindExpor
       getZoomFactor: deps.getZoomFactor,
       now: deps.now,
       readEntryHtml: deps.readEntryHtml,
+      linkScanner: deps.linkScanner,
       onForwardedShortcut: deps.onForwardedShortcut,
       platform: deps.platform,
       openExternal: deps.openExternal,
-      checkEligibility: deps.checkEligibility
+      checkEligibility: deps.checkEligibility,
+      comments: deps.comments
     }
     this.openDiscard = createPreviewOpenDiscard({ registry: deps.registry })
     this.resizeHolds = createResizeHoldRegistry({

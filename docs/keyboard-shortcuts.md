@@ -61,13 +61,14 @@ The image panel handles its own keys in `imageViewer.logic.ts`; the [user-facing
 
 ## Context menus
 
-Every context menu is the shared `ContextMenu` (`components/ContextMenu/ContextMenu.tsx`), which implements the decided [Menu card](../design/system/components/menu/index.html): focus moves to the first item on open, roving tabindex, ↑ ↓ with wrap, Home / End, Enter / Space, typeahead, and Escape or Tab close it and return focus to the opener (#90). **Shift+F10** and the **Menu key** open the menu of the focused project-tree row (`ProjectTree/treeKeyboard.ts`), dock tab (`Tabs/useTabMenuKey.ts`, on dockview's `.dv-tab`), editor (Monaco commands, under the caret), terminal (`TerminalPanel/terminalMenuKey.ts`, at the cursor – the shell no longer receives Shift+F10) and the dialog and diagram-chat text fields (`onKeyDownCapture`). Windows also sends a native `contextmenu` after the Menu key; `contextMenuKey.ts` drops that echo so the menu does not open twice.
+Every context menu is the shared `ContextMenu` (`components/ContextMenu/ContextMenu.tsx`), which implements the decided [Menu card](design-system/system/components/menu/index.html): focus moves to the first item on open, roving tabindex, ↑ ↓ with wrap, Home / End, Enter / Space, typeahead, and Escape or Tab close it and return focus to the opener (#90). **Shift+F10** and the **Menu key** open the menu of the focused project-tree row (`ProjectTree/treeKeyboard.ts`), dock tab (`Tabs/useTabMenuKey.ts`, on dockview's `.dv-tab`), editor (Monaco commands, under the caret), terminal (`TerminalPanel/terminalMenuKey.ts`, at the cursor – the shell no longer receives Shift+F10) and the dialog and diagram-chat text fields (`onKeyDownCapture`). Windows also sends a native `contextmenu` after the Menu key; `contextMenuKey.ts` drops that echo so the menu does not open twice.
 
 ## DevTools
 
 | Shortcut | Action |
 |----------|--------|
-| platform default for `toggleDevTools` | Toggle DevTools – Electron's `toggleDevTools` role in the View menu (`src/main/menu.ts`); Erfana binds no `F12` |
+| platform default for `toggleDevTools` | Toggle DevTools – Electron's `toggleDevTools` role in the View menu (`src/main/menu.ts`) |
+| `F12` (development builds only) | Toggle DevTools (undocked) – `optimizer.watchWindowShortcuts` from `@electron-toolkit/utils`, attached to every window in `src/main/index.ts`. In a packaged build the same helper binds no `F12` and blocks `Cmd/Ctrl+R` |
 | platform default for `reload` / `forceReload` | Reload – Electron's `reload` and `forceReload` roles |
 
 There is no `Cmd/Ctrl+Shift+I` DevTools binding and no `Cmd/Ctrl+Shift+C` inspect-element binding in `src/`. `Cmd/Ctrl+Shift+I` is the Project Panel's external-file import shortcut (see [project tree shortcuts](./user-guide/reference/keyboard-shortcuts.md#project-tree)).

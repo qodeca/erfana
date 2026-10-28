@@ -170,7 +170,7 @@ await terminal.sendCommand(page, 'echo test')
 await terminal.waitForOutput(page, 'test')
 ```
 
-`terminal.*` methods (each takes `page` first): `getTerminal`, `open`, `close`, `focus`, `sendCommand(command, pressEnter = true)`, `waitForOutput(text, { timeout })`, `interrupt`, `clear`, `scrollToBottom`, `restart`, `toggleScrollLock`, `waitForReady`, `waitForPrompt({ timeout })`. `waitForPrompt()` is the readiness wait: it polls for the xterm textarea, then applies the one annotated `KNOWN_WAIT` (`PTY_INIT_DELAY_MS`) for shell start-up – see [e2e-troubleshooting.md § Terminal commands not executing](./e2e-troubleshooting.md#terminal-commands-not-executing).
+`terminal.*` methods (each takes `page` first): `getTerminal`, `open`, `close`, `focus`, `sendCommand(command, pressEnter = true)`, `waitForOutput(text, { timeout })`, `interrupt`, `clear`, `scrollToBottom`, `restart`, `toggleScrollLock`, `waitForReady`, `waitForPrompt({ timeout })`. `waitForPrompt()` is the readiness wait: it polls for the xterm textarea, then reads the screen until a prompt is drawn and stable (up to `PROMPT_TIMEOUT_MS`, 30 s; no fixed sleep) – see [e2e-troubleshooting.md § Terminal commands not executing](./e2e-troubleshooting.md#terminal-commands-not-executing).
 
 ### Settings helpers
 

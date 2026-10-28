@@ -62,7 +62,7 @@ jobs:
       # nothing would be enforced. Adding steps here needs no protection change.
       - name: Lint CSS
         run: npm run lint:css
-      # Everything under design/ is committed, generated files included, so the
+      # Everything under docs/design-system/ is committed, generated files included, so the
       # folder renders on a fresh clone. This is what stops a stale token copy or
       # a stale index being trusted by a reader.
       - name: Design system is in sync
@@ -84,7 +84,10 @@ jobs:
   test:
     name: Unit tests
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # 20, not 10: the main-process timing-budget suites (`*.perf.test.*`) run
+    # last and one file at a time, after every other file (owner decision
+    # 2026-10-27), so their minutes add to the run instead of overlapping it.
+    timeout-minutes: 20
     if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
     steps:
       # actions/checkout v7.0.1 — MUST run before the local composite action
@@ -122,12 +125,10 @@ jobs:
 
       - name: Unit tests
         # Deprecation tripwire: captures vitest output and fails if any
-        # deprecation warning that ISN'T already on the known-and-tracked
-        # whitelist appears. The known `workspace` / `defineWorkspace`
-        # deprecation is on the whitelist because Phase H of the test-
-        # infrastructure plan migrates it (root vitest.config.ts with
-        # `projects: [...]`). Any other deprecation (e.g. a new vitest 3.x
-        # warning, a Node.js DEPnnn) fires this step.
+        # deprecation warning appears (e.g. a new vitest warning, a Node.js
+        # DEPnnn). The allowlist is empty: the one tracked entry, vitest's
+        # `workspace` / `defineWorkspace` deprecation, went away when the
+        # projects moved to `test.projects` in vitest.config.ts (vitest 5).
         run: |
           set -euo pipefail
           OUT="$RUNNER_TEMP/vitest.log"
@@ -135,11 +136,8 @@ jobs:
           npm run test:ci 2>&1 | tee "$OUT"
           TEST_EXIT=${PIPESTATUS[0]}
           set -e
-          # Match deprecation/DEP-warning lines NOT covered by the whitelist.
-          # Whitelist (known, tracked):
-          #   - `workspace` / `defineWorkspace` — vitest 3.2 → 4 migration (Phase H)
-          UNTRACKED=$(grep -iE 'deprecated|DEP[0-9]+' "$OUT" | \
-            grep -viE 'workspace|defineWorkspace' || true)
+          # Match deprecation/DEP-warning lines.
+          UNTRACKED=$(grep -iE 'deprecated|DEP[0-9]+' "$OUT" || true)
           if [ -n "$UNTRACKED" ]; then
             echo "::error::Untracked deprecation warning(s) detected:"
             echo "$UNTRACKED"
@@ -150,12 +148,13 @@ jobs:
   coverage:
     name: Coverage
     runs-on: ubuntu-latest
-    # 15, not 10: the job runs three coverage passes (main, preload, renderer);
-    # the renderer suite is the largest in the repo.
-    timeout-minutes: 15
+    # 25, not 10: the job runs three coverage passes (main, preload, renderer);
+    # the renderer suite is the largest in the repo, and the main pass ends with
+    # the timing-budget suites run one file at a time (owner decision 2026-10-27).
+    timeout-minutes: 25
     if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
     # Enforces the coverage FLOORS declared in all three vitest configs. Main
-    # (vitest.main.ts, test.coverage.thresholds) carries the per-file floors for
+    # (vitest.main.config.ts, test.coverage.thresholds) carries the per-file floors for
     # scripts/fuses.js (the issue #43/#55 packaging-integrity guards + Electron
     # fuses) and the whisper trust-chain modules
     # (verifyManifest / secureDownloader / zipArchive / tarArchive) + the #41
@@ -168,12 +167,15 @@ jobs:
     #
     # Scoped to the main project (`--project main`) on purpose: only the main
     # project's tests load scripts/fuses.js (via scripts/fuses.test.mjs), so the
-    # v8 report carries exactly ONE fuses.js row at its real ~88% coverage. A
-    # full-workspace run pulls renderer/preload tests in too and — with an
-    # untested include or `all: true` — can emit a second 0%-baseline fuses.js
-    # row; `all: false` in vitest.main.ts already collapses that, and `--project
-    # main` keeps the instrumented set (and therefore the threshold match)
-    # unambiguous and deterministic. Do NOT drop `--project main`.
+    # v8 report carries exactly ONE fuses.js row at its real coverage. A
+    # run over all three projects pulls renderer/preload tests in too and can
+    # emit a second 0%-baseline fuses.js row; `--project main` keeps the
+    # instrumented set (and therefore the threshold match) unambiguous and
+    # deterministic. Do NOT drop `--project main`. `--project main-perf` goes
+    # with it: the main-process timing-budget suites (`*.perf.test.*`), which
+    # vitest.main.config.ts runs after `main`, one file at a time, into the
+    # same report (owner decision 2026-10-27). scripts/test-cov.test.mjs holds
+    # these three steps to the arguments `npm run test:cov` uses.
     steps:
       # actions/checkout v7.0.1 — MUST run before the local composite action
       # below so the action.yml file can be loaded from the workspace.
@@ -185,22 +187,23 @@ jobs:
           # postinstall so they are present for the coverage run.
           run-postinstall: "true"
       - name: Main-project coverage (enforces the scripts/fuses.js + whisper floors)
-        # Fails the job when any per-file floor in vitest.main.ts is breached
+        # Fails the job when any per-file floor in vitest.main.config.ts is breached
         # (vitest exits non-zero on a threshold miss). --coverage activates the
-        # thresholds; --config supplies them; --project main scopes the run.
-        run: npx vitest --run --config vitest.main.ts --project main --coverage
-      - name: Preload-project coverage (enforces the vitest.preload.ts floors)
+        # thresholds; --config supplies them; --project main scopes the run and
+        # --project main-perf adds the timing-budget suites, run last and alone.
+        run: npx vitest --run --config vitest.main.config.ts --project main --project main-perf --coverage
+      - name: Preload-project coverage (enforces the vitest.preload.config.ts floors)
         # Global floors for src/preload (previewBridge.ts + index.ts), added in
-        # #124 QG-8. Scoped with --project preload for the same reason as the
-        # main step: vitest.workspace.ts is auto-discovered, so without it the
-        # run would expand to all three projects. Reports go to coverage/preload,
-        # so the three steps never share an output directory.
-        run: npx vitest --run --config vitest.preload.ts --project preload --coverage
+        # #124 QG-8. Scoped with --project preload like the main step, so the
+        # run can never expand to all three projects (vitest 3 auto-discovered
+        # the old vitest.workspace.ts). Reports go to coverage/preload, so the
+        # three steps never share an output directory.
+        run: npx vitest --run --config vitest.preload.config.ts --project preload --coverage
       - name: Renderer-project coverage (enforces the #124 HTML-preview floors)
-        # Per-file floors in vitest.renderer.ts for usePreviewBounds, previewClip,
+        # Per-file floors in vitest.renderer.config.ts for usePreviewBounds, previewClip,
         # previewDragFreeze and previewTabMove (#124 QG-8), plus the project-wide
         # floor. None of them depend on symlink cases, so they hold on Linux.
-        run: npx vitest --run --config vitest.renderer.ts --project renderer --coverage
+        run: npx vitest --run --config vitest.renderer.config.ts --project renderer --coverage
 
   build:
     name: Build
@@ -251,7 +254,7 @@ jobs:
   windows-checks:
     name: Windows checks
     runs-on: windows-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
     # Advisory Windows gate (typecheck + main-process tests only). Excluded
     # from branch-protection required checks until proven stable, mirroring
@@ -310,9 +313,9 @@ jobs:
           echo "package-lock.json digest: $(cat package-lock.sha256)"
 
       - name: Upload package-lock digest artifact
-        # actions/upload-artifact v7.0.1 — keep SHA aligned with build_*.yml
+        # actions/upload-artifact v7.0.2 — keep SHA aligned with build_*.yml
         # (Dependabot will keep these in lockstep once #B2 lands).
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: package-lock-digest
           path: package-lock.sha256

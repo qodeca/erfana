@@ -21,7 +21,7 @@ This document covers, in order: the research it rests on, the fact audit, the pa
 
 - Issue #139 body: owner decisions and acceptance criteria (AC-1 … AC-9 below).
 - `.xezar/campaigns/20260925-release-0.21.0/decisions.md`: the owner's interview picks.
-- `CLAUDE.md`: never claim built-in AI (Erfana hosts CLI agents); the context meter is Claude Code-specific; REUSE annotations on new files; the design system (`design/`) is the rule of record for anything visual.
+- `CLAUDE.md`: never claim built-in AI (Erfana hosts CLI agents); the context meter is Claude Code-specific; REUSE annotations on new files; the design system (`docs/design-system/`) is the rule of record for anything visual.
 - `TRADEMARKS.md`: "Erfana" and the Erfana logo are Qodeca trademarks; third-party names are used nominatively only.
 - `BACKWARD_COMPATIBILITY.md`: release verification must keep working – the README must not publish key values that drift from `docs/release-pubkey.txt` (`checks.yml` Guard 5 reads `README.md`).
 
@@ -111,7 +111,7 @@ GitHub's production HTML sanitizer is not public; the closest public version is 
 
 - The app icon is `resources/icon.png`, 512×512 RGBA: a lime rounded square with a black "E" (read with `file` and viewed).
 - Brand tokens in `src/renderer/src/styles/design-tokens.css`: `--color-brand-lime` `#E3E829`, `--color-brand-violet` `#A0A8FF`, `--color-brand-black` `#161312`, `--color-brand-white` `#F8FAF8`, `--color-brand-indigo` `#3F3FBA`, the gray scale, `--font-mono` (Cascadia Mono first), `--border-radius: 0`.
-- The bundled Cascadia Mono Regular and Bold (SIL OFL) are in `design/fonts/`.
+- The bundled Cascadia Mono Regular and Bold (SIL OFL) are in `docs/design-system/fonts/`.
 - The app is dark-only (`docs/ui-style-guide.md`: "Do not add `prefers-color-scheme` queries"). That rule is about the app; the README banner is a GitHub page asset and needs both themes (see [Open decisions](#open-decisions), item 4, for how the deviation is recorded).
 - The latest release, `v0.20.0`, ships `erfana-0.20.0-arm64.dmg`, `erfana-0.20.0-setup.exe`, `SHA256SUMS` and `SHA256SUMS.minisig` (`gh release view`). `electron-builder.yml` builds macOS for **arm64 only** ("Apple Silicon only"). The Windows target sets no arch (x64 inferred, not verified).
 - The already-installed `ffmpeg-static` binary has the `libwebp_anim` and `gif` encoders and the `palettegen`/`paletteuse` filters (checked locally), so encoding the demo needs **no new dependency**. Playwright's Chromium is installed for `@playwright/test`.
@@ -296,7 +296,7 @@ Words the README must not use about Erfana itself: "AI-powered", "built-in AI", 
 
 ### Banner and wordmark
 
-**Source of truth is a design-system card**, not an image editor: `design/product/github-presentation/index.html` (status `proposed`, the same layout as the existing `design/product/html-approval/index.html`), built only from `design/tokens.css` (the synced copy of `design-tokens.css`) and `design/fonts.css`. A script rasterises it (plan step 3). So the banner's colours are the shipping tokens, `npm run lint:css` rejects a hex colour in it, and a token change is one re-run away from a new banner.
+**Source of truth is a design-system card**, not an image editor: `docs/design-system/product/github-presentation/index.html` (status `proposed`, the same layout as the existing `docs/design-system/product/html-approval/index.html`), built only from `docs/design-system/tokens.css` (the synced copy of `design-tokens.css`) and `docs/design-system/fonts.css`. A script rasterises it (plan step 3). So the banner's colours are the shipping tokens, `npm run lint:css` rejects a hex colour in it, and a token change is one re-run away from a new banner.
 
 Composition, 1600×400 px (4:1), exported at 2× of an 800×200 layout:
 
@@ -329,7 +329,7 @@ Composition, 1600×400 px (4:1), exported at 2× of an 800×200 layout:
 
 Lime is never placed on a light surface: lime on `#F8FAF8` is **1.26:1**. Violet on light is 2.10:1, so violet only appears as a muted fill. Where the light variant needs an accent line, it uses `--color-brand-indigo` (7.61:1 on brand-white).
 
-The ratios in this section were computed by hand for the design. In the card they are **not typed**: each one the card shows is a `contrast` entry in `design/claims.json` written as `<span data-claim="…">` (`design/README.md` § A card is done when), so the design-claims test re-derives them from the tokens on every CI run.
+The ratios in this section were computed by hand for the design. In the card they are **not typed**: each one the card shows is a `contrast` entry in `docs/design-system/claims.json` written as `<span data-claim="…">` (`docs/design-system/README.md` § A card is done when), so the design-claims test re-derives them from the tokens on every CI run.
 
 **Solid backgrounds, not transparent**: the fallback `<img>` (light) and any viewer that ignores `<picture>` stay legible, and the edge still vanishes against both GitHub canvases. On GitHub's dimmed dark theme (#22272e) the dark banner shows as a flat rectangle – acceptable and consistent with the flat design; recorded in QA.
 
@@ -493,7 +493,7 @@ Ordered; each step lists its files and its verification. Evidence (screenshots, 
 
 **Step 1 – Spike: animated WebP on github.com.** Encode a 3-second test clip with #138's `encode.mjs` WebP output (R138-9; `ffmpeg-static` with `-c:v libwebp_anim -loop 0` directly only if #138 has not landed it yet), commit it on the working branch with a scratch Markdown file, and view it on github.com in Chrome, Safari and Firefox, in both themes, and with reduced motion emulated. Remove the scratch files before review. *Verify*: a short note in the PR: plays / does not play per browser; the chosen format. *Files*: none kept.
 
-**Step 2 – Banner card.** `design/product/github-presentation/index.html`. Line 1 is the card marker with all four required attributes (`design/README.md` § Adding a card), e.g. `<!-- @card group="Product" name="GitHub presentation" subtitle="README banner, wordmark and social preview" status="proposed" reviewed="<authoring date>" -->`; lines 2–3 the SPDX header. It renders the dark banner, the light banner and the social preview at layout size, links `../../tokens.css`, `../../fonts.css` and `../../ds.css` (the depth for a folder under `product/`), loads the icon from `../../../resources/icon.png`, and has an Exceptions section for the light variant. Every contrast ratio it shows is a `data-claim` span backed by a `contrast` entry added to `design/claims.json` (foreground and background tokens as in the banner table). Run `npm run design` (regenerates `design/index.html` and `design/claims.js`). *Verify*: `npm run lint:css`, `npm run design -- --check`, the design-claims test (`scripts/design-claims.test.mjs`, in `test:ci`) green; open the card in a browser and tab through it.
+**Step 2 – Banner card.** `docs/design-system/product/github-presentation/index.html`. Line 1 is the card marker with all four required attributes (`docs/design-system/README.md` § Adding a card), e.g. `<!-- @card group="Product" name="GitHub presentation" subtitle="README banner, wordmark and social preview" status="proposed" reviewed="<authoring date>" -->`; lines 2–3 the SPDX header. It renders the dark banner, the light banner and the social preview at layout size, links `../../tokens.css`, `../../fonts.css` and `../../ds.css` (the depth for a folder under `product/`), loads the icon from `../../../resources/icon.png`, and has an Exceptions section for the light variant. Every contrast ratio it shows is a `data-claim` span backed by a `contrast` entry added to `docs/design-system/claims.json` (foreground and background tokens as in the banner table). Run `npm run design` (regenerates `docs/design-system/index.html` and `docs/design-system/claims.js`). *Verify*: `npm run lint:css`, `npm run design -- --check`, the design-claims test (`scripts/design-claims.test.mjs`, in `test:ci`) green; open the card in a browser and tab through it.
 
 **Step 3 – Render script for brand assets.** A script in #138's capture folder (proposed `scripts/capture/brand.mjs`, SPDX header) that opens the card in Playwright Chromium at `deviceScaleFactor: 2` and screenshots the three elements to `docs/assets/readme/banner-dark.png`, `banner-light.png` (1600×400) and `social-preview.png` (1280×640 at 1×). An npm script (`docs:brand`). *Verify*: pixel dimensions (`file`), sizes within budget (≤ 150 KB, ≤ 150 KB, ≤ 300 KB), two runs produce the same dimensions; view each PNG.
 
@@ -523,9 +523,9 @@ Ordered; each step lists its files and its verification. Evidence (screenshots, 
 |---|---|
 | `docs/designs/139-readme-redesign/README.md` | This design (this PR) |
 | `docs/README.md` | Index entry for this design (this PR); `docs/about.md` entry (implementation) |
-| `design/product/github-presentation/index.html` | New card |
-| `design/claims.json` | `contrast` entries for every ratio the card shows |
-| `design/index.html`, `design/claims.js` | Regenerated by `npm run design` |
+| `docs/design-system/product/github-presentation/index.html` | New card |
+| `docs/design-system/claims.json` | `contrast` entries for every ratio the card shows |
+| `docs/design-system/index.html`, `docs/design-system/claims.js` | Regenerated by `npm run design` |
 | `scripts/capture/brand.mjs` (name follows #138's folder) | New script, SPDX header – renders the card; nothing in #138 does this |
 | `scripts/capture/encode.mjs` | **#138's file.** Animated WebP output beside GIF and MP4 (R138-9). Lands in #138; changed here only if #138 merged without it |
 | `scripts/capture/manifest.mjs`, `scripts/capture/run.mjs` | **#138's files.** Accept `.webp`; add `docs/assets/readme/` to the output allow-list (R138-10); the `readme-demo` row and scenario (R138-2). Same rule |
@@ -557,7 +557,7 @@ Not touched: `SECURITY.md` (its anchor is preserved), `.github/workflows/` (no n
 | Demo text unreadable on a phone (NB-1, PR #159 design review) | At 375 px the 1280 px loop scales to about 309 px (24 %), so its terminal and editor text cannot be read | **Accepted limit, not fixed.** The design gives narrow views no other presentation: UX item 8 says nothing is removed and images shrink, and the `<picture>` sources switch only on `prefers-reduced-motion`. The alt text, the caption and the How it works bullets carry the sequence in text. A narrow-view variant (a cropped terminal clip, or a link to #138's MP4) would need a new design decision and a re-recording, which this build does not do |
 | Demo too heavy | Slow first load | 5 MiB hard cap; 12 fps; 1280×800; measured in step 5 |
 | GitHub layout differs from the budget (column width, spacing) | AC-1 fails | Measured on github.com, not assumed; banner and demo heights are the adjustable parts |
-| Banner drifts from tokens later | Off-brand banner | The card is the source; `docs:brand` re-renders it; the card sits in `design/` under the same lint |
+| Banner drifts from tokens later | Off-brand banner | The card is the source; `docs:brand` re-renders it; the card sits in `docs/design-system/` under the same lint |
 | Trademark misuse (icon modified, a third-party name in the banner) | Legal exposure | Icon used unmodified; no third-party name or mark in banner or social preview (the terminal strip shows a bare `❯` glyph); the Anthropic notice stays on the page; `TRADEMARKS.md` names the new brand files (open decision 2) |
 | Anchor or link breakage | Broken links from `SECURITY.md` and outside | Kept headings; `npm run check:links` and the external fetch in step 8 |
 | Guard 5 trips | Required check fails | No key values in the README |

@@ -13,6 +13,7 @@
  * `previewGateway.setVisibility` anywhere else (design §1.8).
  */
 import type { PreviewBridge } from '../../../shared/ipc/preview-bridge-types'
+import type { PreviewCommentsBridge } from '../../../shared/ipc/preview-comment-schema'
 
 /** The bridge is read per call, so a test that swaps `window.api` is honoured. */
 // `Window['api']` leaves this bridge out of its type; this module is the only place it is put back
@@ -44,4 +45,28 @@ export const previewGateway: PreviewBridge = {
   onOpenFileRequested: (...args) => bridge().onOpenFileRequested(...args),
   onPageChanged: (...args) => bridge().onPageChanged(...args),
   onResizeHold: (...args) => bridge().onResizeHold(...args)
+}
+
+/** The comments bridge, read per call like the preview bridge above. */
+// `Window['api']` leaves this bridge out of its type too; put back here only
+const commentsBridge = (): PreviewCommentsBridge =>
+  (window as unknown as { api: { previewComments: PreviewCommentsBridge } }).api.previewComments
+
+/**
+ * `window.api.previewComments` (HTML Preview comments, design §8), forwarded
+ * with the same contract. Renderer code reaches it only through
+ * `services/preview/commentGateway.ts`, which adds the "no bridge" and
+ * "rejected invoke" handling every caller would otherwise repeat.
+ */
+export const previewCommentsGateway: PreviewCommentsBridge = {
+  setMode: (...args) => commentsBridge().setMode(...args),
+  list: (...args) => commentsBridge().list(...args),
+  reveal: (...args) => commentsBridge().reveal(...args),
+  save: (...args) => commentsBridge().save(...args),
+  setUnsavedSources: (...args) => commentsBridge().setUnsavedSources(...args),
+  onDraftOpened: (...args) => commentsBridge().onDraftOpened(...args),
+  onCommentsChanged: (...args) => commentsBridge().onCommentsChanged(...args),
+  onAnchorStatus: (...args) => commentsBridge().onAnchorStatus(...args),
+  onModeChanged: (...args) => commentsBridge().onModeChanged(...args),
+  onSaveSettled: (...args) => commentsBridge().onSaveSettled(...args)
 }

@@ -17,8 +17,8 @@
  * Contract-only for #21: nothing calls these yet.
  *
  * @see Issue #21 - graph R1 architecture
- * @see specs/designs/sd-021-ipc-contracts.md §7.9 - correlation policy
- * @see specs/designs/sd-021-cross-cutting.md §9.9 - diagnosability
+ * @see docs/designs/sd-021-ipc-contracts.md §7.9 - correlation policy
+ * @see docs/designs/sd-021-cross-cutting.md §9.9 - diagnosability
  */
 import { randomBytes } from 'node:crypto'
 

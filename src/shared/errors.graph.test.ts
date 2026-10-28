@@ -11,8 +11,8 @@
  * typecheck, ship, and then fail `safeParse` on the wire.
  *
  * @see Issue #21 - graph R1 architecture
- * @see specs/designs/sd-021-errata-and-risks.md §11 item 3
- * @see specs/designs/sd-021-cross-cutting.md §9.2 - the code table with user copy
+ * @see docs/designs/sd-021-errata-and-risks.md §11 item 3
+ * @see docs/designs/sd-021-cross-cutting.md §9.2 - the code table with user copy
  */
 import { describe, it, expect } from 'vitest'
 import { ERROR_MESSAGES, ErrorCode, AppError, getUserFriendlyMessage } from './errors'

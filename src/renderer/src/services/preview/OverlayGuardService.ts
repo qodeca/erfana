@@ -17,7 +17,8 @@
  *
  * `gate` is per panel ({@link PreviewPanelGate}): the permission band's chrome
  * gate, else `'collapsed'` while the panel's page area is clipped away (issue
- * #124 C2 – the terminal expanded over the editor).
+ * #124 C2 – the terminal expanded over the editor), else `'covered'` while the
+ * panel's comments drawer is a full-width sheet over its page area.
  *
  * **This is the ONLY file in `src/renderer/**` allowed to call
  * `setVisibility` (on `previewGateway`, the preview bridge's gateway).** An
@@ -58,6 +59,7 @@ import {
   type PreviewChromeGateReason
 } from '../../stores/usePreviewChromeGateStore'
 import { usePreviewCollapsedStore } from '../../stores/usePreviewCollapsedStore'
+import { usePreviewCoveredStore } from '../../stores/usePreviewCoveredStore'
 import { logger } from '../../utils/logger'
 import { previewGateway } from '../previewGateway'
 
@@ -84,17 +86,20 @@ const VISIBILITY_REASON = {
    * Hidden because the panel's page area is clipped away by a collapsed
    * ancestor (issue #124 C2), so the page would paint over something else.
    */
-  collapsed: 'collapsed'
+  collapsed: 'collapsed',
+  /** Hidden because the panel's own comments drawer covers its page area. */
+  covered: 'covered'
 } as const
 
 /**
  * Why one panel's page must stay hidden: a chrome-gate reason from the
- * permission band, or `'collapsed'` from the bounds hook (issue #124 C2).
+ * permission band, `'collapsed'` from the bounds hook (issue #124 C2), or
+ * `'covered'` from the comments drawer as a full-width sheet.
  *
- * One term, two stores: each has a single writer, so neither can overwrite or
- * lift the other's hide (see `usePreviewCollapsedStore`).
+ * One term, three stores: each has a single writer, so none can overwrite or
+ * lift another's hide (see `usePreviewCollapsedStore`).
  */
-export type PreviewPanelGate = PreviewChromeGateReason | 'collapsed'
+export type PreviewPanelGate = PreviewChromeGateReason | 'collapsed' | 'covered'
 
 /**
  * Everything the guard needs from the outside world.
@@ -331,7 +336,9 @@ class OverlayGuardService implements IOverlayGuard {
               ? VISIBILITY_REASON.chromeTooShort
               : gate === 'collapsed'
                 ? VISIBILITY_REASON.collapsed
-                : VISIBILITY_REASON.occluded
+                : gate === 'covered'
+                  ? VISIBILITY_REASON.covered
+                  : VISIBILITY_REASON.occluded
       this.deps.setVisibility(panelId, visible, reason)
     }
 
@@ -374,7 +381,7 @@ export function createOverlayGuard(deps: OverlayGuardDeps): IOverlayGuard {
 
 /**
  * The production gate read: the permission band's chrome gate first, then the
- * bounds hook's collapsed flag.
+ * bounds hook's collapsed flag, then the comments drawer's covered flag.
  *
  * @param panelId - The live preview panel to ask about
  * @returns Why the panel's page must stay hidden, or `null`
@@ -382,21 +389,24 @@ export function createOverlayGuard(deps: OverlayGuardDeps): IOverlayGuard {
 function readPanelGate(panelId: string): PreviewPanelGate | null {
   const chromeGate = usePreviewChromeGateStore.getState().getGate(panelId)
   if (chromeGate !== null) return chromeGate
-  return usePreviewCollapsedStore.getState().isCollapsed(panelId) ? 'collapsed' : null
+  if (usePreviewCollapsedStore.getState().isCollapsed(panelId)) return 'collapsed'
+  return usePreviewCoveredStore.getState().isCovered(panelId) ? 'covered' : null
 }
 
 /**
- * Subscribes to both stores behind {@link readPanelGate}.
+ * Subscribes to every store behind {@link readPanelGate}.
  *
- * @param listener - Called (no args) after either store changes
- * @returns One unsubscribe that detaches both
+ * @param listener - Called (no args) after any of them changes
+ * @returns One unsubscribe that detaches them all
  */
 function subscribePanelGate(listener: () => void): () => void {
-  const unsubscribeChrome = usePreviewChromeGateStore.subscribe(listener)
-  const unsubscribeCollapsed = usePreviewCollapsedStore.subscribe(listener)
+  const unsubscribers = [
+    usePreviewChromeGateStore.subscribe(listener),
+    usePreviewCollapsedStore.subscribe(listener),
+    usePreviewCoveredStore.subscribe(listener)
+  ]
   return () => {
-    unsubscribeChrome()
-    unsubscribeCollapsed()
+    for (const unsubscribe of unsubscribers) unsubscribe()
   }
 }
 

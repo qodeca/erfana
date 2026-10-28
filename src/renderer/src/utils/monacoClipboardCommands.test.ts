@@ -8,10 +8,10 @@
  * paste-on-empty-clipboard no-op. Deps are mocked with `vi.fn()`; the async
  * clipboard primitives use `mockResolvedValue`.
  *
- * @see docs/design/issue-203-clipboard-service.md §5, §10
+ * @see docs/designs/issue-203-clipboard-service.md §5, §10
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import {
   clipboardCopy,
   clipboardCut,
@@ -30,14 +30,14 @@ const SELECTION: MonacoRangeLike = {
 }
 
 interface MockDeps extends MonacoClipboardDeps {
-  getSelection: ReturnType<typeof vi.fn>
-  isSelectionEmpty: ReturnType<typeof vi.fn>
-  getValueInRange: ReturnType<typeof vi.fn>
-  executeEdits: ReturnType<typeof vi.fn>
-  isReadOnly: ReturnType<typeof vi.fn>
+  getSelection: Mock
+  isSelectionEmpty: Mock
+  getValueInRange: Mock
+  executeEdits: Mock
+  isReadOnly: Mock
   clipboard: {
-    readText: ReturnType<typeof vi.fn>
-    writeText: ReturnType<typeof vi.fn>
+    readText: Mock
+    writeText: Mock
   }
 }
 

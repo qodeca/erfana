@@ -338,7 +338,13 @@ export class PreviewLiveView {
       return Promise.resolve({ ok: false, errorCode: ErrorCode.PDF_EXPORT_FAILED })
     }
     const name = exportNameForPage(this.currentPage(), fallbackName)
-    return this.deps.exportController.exportToPdf(this.wc, name, this.window.id)
+    const comments = this.parts.comments
+    return this.deps.exportController.exportToPdf(
+      this.wc,
+      name,
+      this.window.id,
+      comments === undefined ? undefined : (print) => comments.aroundPrint(print)
+    )
   }
 
   /**
@@ -412,6 +418,8 @@ export class PreviewLiveView {
       view: this.view,
       wc: this.wc,
       collaborators: [
+        // First: its listeners, drafts and keys go before anything they read.
+        { label: 'comments.dispose', run: () => this.parts.comments?.dispose() },
         { label: 'lifecycle.dispose', runAsync: () => this.parts.lifecycle.dispose() },
         { label: 'entryWatch.dispose', runAsync: () => this.parts.entryWatch.dispose() },
         { label: 'frameEvents.dispose', run: () => this.parts.frameEvents.dispose() },

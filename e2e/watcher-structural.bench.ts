@@ -39,6 +39,7 @@ import * as path from 'path'
 import { _electron as electron, expect, test } from '@playwright/test'
 import type { ElectronApplication, Page } from '@playwright/test'
 import { closeApp, createTempUserDataDir, openProject, waitForAppReady } from './utils/helpers'
+import { E2E_CHROMIUM_ARGS } from './fixtures/isolation'
 
 const FOLDERS = 250
 const FILES_PER_FOLDER = 100
@@ -144,7 +145,7 @@ test.describe('Watcher structural refresh benchmark', () => {
       let window: Page | undefined
       try {
         app = await electron.launch({
-          args: [path.join(__dirname, '..'), `--user-data-dir=${userDataDir}`],
+          args: [path.join(__dirname, '..'), `--user-data-dir=${userDataDir}`, ...E2E_CHROMIUM_ARGS],
           env: { ...process.env, NODE_ENV: 'development', ERFANA_E2E_FAST_SHELL: '1' }
         })
         window = await app.firstWindow()

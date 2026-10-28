@@ -24,6 +24,10 @@
  * These one-level reads are not fed to `recordTreeReadMs`: that average spaces
  * out forced refreshes by what a whole-tree read costs, and a one-folder read
  * of a few milliseconds would make a slow project look fast.
+ *
+ * Given `onFolderStale`, a folder that is not lazy is checked against the disk
+ * when the user opens it, and the whole tree is refreshed when it differs
+ * (`useExpandReconcile`).
  */
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import type { FileNode } from '../../../../shared/ipc/file-schema'
@@ -31,6 +35,7 @@ import { fileGateway, isProjectChanged } from '../../services/fileGateway'
 import { logger } from '../../utils/logger'
 import { useLazyFolderStore, type LazyFolderStatus, type LoadedChildren } from '../../stores/useLazyFolderStore'
 import { collectLazyPaths, mergeLazyChildren } from '../../utils/lazyTree'
+import { useExpandReconcile } from './useExpandReconcile'
 
 /** Every folder of a tree that shows children, by path. */
 function foldersWithChildren(nodes: FileNode[], into: Map<string, FileNode[]> = new Map()): Map<string, FileNode[]> {
@@ -99,6 +104,8 @@ export interface LazyFolderView {
     status: ReadonlyMap<string, LazyFolderStatus>,
     base: FileNode[]
   ) => FileNode[]
+  /** Refresh the whole tree: an opened folder differs from the disk (`useExpandReconcile`) */
+  readonly onFolderStale?: () => void
 }
 
 /**
@@ -129,6 +136,7 @@ export function useLazyFolderChildren(
 
   const tree = useMemo(() => mergeLazyChildren(files, loaded), [files, loaded])
   const { rootPath, filter } = view
+  useExpandReconcile(files, expandedFolders, rootPath, view.onFolderStale)
 
   // A new base tree: carry children over to folders that turned lazy and drop
   // entries that left the tree – before paint, so a row never flashes empty

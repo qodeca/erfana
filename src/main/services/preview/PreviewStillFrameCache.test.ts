@@ -7,7 +7,7 @@
  * (`isBeingCaptured`) and throwing captures all emit NO frame (never a blank),
  * downscale runs via `NativeImage.resize`, and a good capture is stored.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 
 import { PREVIEW } from '../../../shared/constants'
 import { TimeoutError } from '../../utils/withTimeout'
@@ -24,10 +24,10 @@ const PANEL = 'panel-1'
 const SHORT_DATA_URL = 'data:image/png;base64,AAAA'
 
 interface ImageMock extends PreviewNativeImage {
-  resize: ReturnType<typeof vi.fn>
-  toDataURL: ReturnType<typeof vi.fn>
-  getSize: ReturnType<typeof vi.fn>
-  isEmpty: ReturnType<typeof vi.fn>
+  resize: Mock
+  toDataURL: Mock
+  getSize: Mock
+  isEmpty: Mock
 }
 
 function makeImage(
@@ -45,8 +45,8 @@ function makeImage(
 }
 
 interface WcMock extends PreviewCaptureContents {
-  isBeingCaptured: ReturnType<typeof vi.fn>
-  capturePage: ReturnType<typeof vi.fn>
+  isBeingCaptured: Mock
+  capturePage: Mock
 }
 
 function makeWc(capturePage: WcMock['capturePage'], beingCaptured = false): WcMock {

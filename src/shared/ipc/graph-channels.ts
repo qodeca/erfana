@@ -11,7 +11,7 @@
  * yet — `registerGraphHandlers` lands with #26.
  *
  * @see Issue #21 - graph R1 architecture
- * @see specs/designs/sd-021-ipc-contracts.md §7.1 - the normative channel list
+ * @see docs/designs/sd-021-ipc-contracts.md §7.1 - the normative channel list
  */
 
 /**

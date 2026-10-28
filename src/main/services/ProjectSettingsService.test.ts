@@ -270,8 +270,8 @@ describe('ProjectSettingsService', () => {
    * defaults: the watcher's 27 entries protect chokidar's file-descriptor
    * budget and are over-broad for indexing.
    *
-   * @see specs/designs/sd-021-errata-and-risks.md §11 item 5
-   * @see specs/designs/sd-021-cross-cutting.md §9.1 rows 1-2
+   * @see docs/designs/sd-021-errata-and-risks.md §11 item 5
+   * @see docs/designs/sd-021-cross-cutting.md §9.1 rows 1-2
    */
   describe('graph exclude folders (#21)', () => {
     it('returns exactly DEFAULT_GRAPH_EXCLUDE_PATTERNS when no settings file exists', async () => {

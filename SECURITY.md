@@ -14,7 +14,7 @@ Please report security issues **privately** — do not open a public issue, pull
 - **Preferred:** use GitHub's [private vulnerability reporting](https://github.com/qodeca/erfana/security/advisories/new) (the "Report a vulnerability" button under the repository's **Security** tab). This keeps the report confidential between you and the maintainers until a fix ships.
 - **If private reporting is unavailable to you:** open a minimal public issue with **no exploit details** — just ask the maintainers to open a private channel — and we will follow up.
 
-Please include: the affected component or file(s), the Erfana version (Help → About, or the app's version string), your OS, reproduction steps or a proof of concept, the impact, and any suggested remediation. We aim to acknowledge a report within a few business days and will credit reporters who wish to be named once a fix is released.
+Please include: the affected component or file(s), the Erfana version (shown in the window title as `ERFANA v<version>`; on macOS also under **Erfana → About Erfana**), your OS, reproduction steps or a proof of concept, the impact, and any suggested remediation. We aim to acknowledge a report within a few business days and will credit reporters who wish to be named once a fix is released.
 
 ## Scope
 
@@ -55,7 +55,7 @@ second way to report: the report itself still goes through private vulnerability
 
 ## Security documentation
 
-For Electron fuses, sandboxing, context isolation, CSP configuration, and audit history, see **[docs/security.md](docs/security.md)**.
+For Electron fuses and ASAR integrity, sandboxing, context isolation, CSP configuration, IPC sender gating, path confinement, and audit history (including the advisories open at the latest release), see **[docs/security.md](docs/security.md)**.
 
 ## Release verification
 

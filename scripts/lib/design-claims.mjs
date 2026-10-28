@@ -5,7 +5,7 @@
  * The claims ledger — every number a design card states, and the code that
  * derives it.
  *
- * WHY THIS EXISTS. Two reviews found nine numbers in design/ that were simply
+ * WHY THIS EXISTS. Two reviews found nine numbers in docs/design-system/ that were simply
  * wrong: "7 spinners at 6 speeds" (6 at 3), "all 52 files bypass the registry"
  * (50), "4 warning colours and 3 error" (transposed). Each was written to make a
  * rule credible, and a wrong number does the opposite — the first reader who
@@ -18,8 +18,8 @@
  *
  * So a card has nowhere to type a number by hand. It writes
  * `<span data-claim="spinner-keyframes"></span>`; the value is computed here
- * from the shipping source, written into the generated design/claims.js, and
- * re-derived by design/claims.test.ts on every CI run. A count that drifts turns
+ * from the shipping source, written into the generated docs/design-system/claims.js, and
+ * re-derived by scripts/design-claims.test.mjs on every CI run. A count that drifts turns
  * a silent lie into a red test.
  *
  * SCOPE, stated honestly. These predicates read source as TEXT. They do not

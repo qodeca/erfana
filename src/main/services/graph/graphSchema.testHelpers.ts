@@ -16,7 +16,7 @@
  * type-checked on every `npm run typecheck`.
  *
  * @see Issue #21 - graph R1 architecture
- * @see specs/designs/sd-021-db-schema.md §6.3 - the DDL these columns mirror
+ * @see docs/designs/sd-021-db-schema.md §6.3 - the DDL these columns mirror
  */
 import type { Database } from 'better-sqlite3'
 import { GRAPH_SCHEMA_DDL } from './graphSchema'

@@ -1,6 +1,6 @@
 # Build Documentation
 
-**Last updated**: September 2026 (v0.20.0)
+**Last updated**: October 2026 (v0.22.0)
 
 This directory contains detailed documentation for Erfana's production build configuration.
 
@@ -12,7 +12,7 @@ This directory contains detailed documentation for Erfana's production build con
 
 **TL;DR** - Build command:
 ```bash
-# Prerequisites: macOS 12+, Node.js 24+, Python 3.12 or 3.14.3 (NOT 3.13), npm ci completed
+# Prerequisites: macOS 13+, Node.js 24+, Python 3.12 or 3.14.3 (NOT 3.13), npm ci completed
 
 # Build the macOS arm64 DMG (Apple Silicon only)
 npm run build:mac
@@ -31,7 +31,7 @@ npm run build:mac
 ### System Requirements
 
 **Operating System**:
-- macOS 12+ (Monterey or newer) - Required for building macOS apps
+- macOS 13+ (Ventura or newer) - Required for building macOS apps. Electron 44 does not run on macOS 12, so the built app (and its tests) cannot start there
 - Linux or Windows can build for those platforms, but not for macOS
 
 **Development Tools**:

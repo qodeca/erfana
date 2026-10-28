@@ -7,6 +7,8 @@
  */
 import { describe, it, expect } from 'vitest'
 import {
+  CommentIdentityWriteSchema,
+  GLOBAL_SETTINGS_WRITE_SCHEMAS,
   GlobalSettingsSchema,
   LoggingLevelSchema,
   GitStatusSettingsSchema,
@@ -115,6 +117,10 @@ describe('GlobalSettingsSchema', () => {
         },
         terminal: {
           screenReaderMode: 'on' as const
+        },
+        comments: {
+          authorName: 'Ada',
+          identityNoticeSeen: true
         }
       }
 
@@ -147,6 +153,10 @@ describe('GlobalSettingsSchema', () => {
         },
         terminal: {
           screenReaderMode: 'on' as const
+        },
+        comments: {
+          authorName: 'Ada',
+          identityNoticeSeen: true
         }
       }
 
@@ -260,6 +270,59 @@ describe('GlobalSettingsSchema', () => {
     })
   })
 
+  describe('comments – the reviewer identity (html-preview-comments §7.9)', () => {
+    it('defaults to "not set" with the notice unseen', () => {
+      expect(GlobalSettingsSchema.parse({}).comments).toEqual({ identityNoticeSeen: false })
+    })
+
+    it('keeps a name, an email and the notice flag', () => {
+      const parsed = GlobalSettingsSchema.parse({
+        comments: { authorName: 'Ada', authorEmail: 'ada@example.com', identityNoticeSeen: true }
+      })
+      expect(parsed.comments).toEqual({ authorName: 'Ada', authorEmail: 'ada@example.com', identityNoticeSeen: true })
+    })
+
+    it('reads an over-cap or non-string value as unset, never failing the whole file', () => {
+      const result = GlobalSettingsSchema.safeParse({
+        comments: { authorName: 'x'.repeat(101), authorEmail: 7, identityNoticeSeen: 'yes' }
+      })
+      expect(result.success).toBe(true)
+      expect(result.data?.comments).toEqual({ authorName: undefined, authorEmail: undefined, identityNoticeSeen: false })
+
+      const badSection = GlobalSettingsSchema.safeParse({ comments: 'me' })
+      expect(badSection.success).toBe(true)
+      expect(badSection.data?.comments).toEqual({ identityNoticeSeen: false })
+    })
+
+    it('strips unknown keys', () => {
+      const parsed = GlobalSettingsSchema.parse({ comments: { authorName: 'Ada', identityNoticeSeen: true, role: 'admin' } })
+      expect(parsed.comments).toEqual({ authorName: 'Ada', identityNoticeSeen: true })
+    })
+
+    it('L6 reads a name or email with a control or invisible character as unset – the writer\'s own rule', () => {
+      for (const code of [0x202e, 0x200b, 0x2060, 0xfeff, 0x0007, 0xe000, 0x2028]) {
+        const char = String.fromCodePoint(code)
+        const parsed = GlobalSettingsSchema.parse({
+          comments: { authorName: `Ada${char}`, authorEmail: `a${char}@example.com`, identityNoticeSeen: true }
+        })
+        expect(parsed.comments).toEqual({ authorName: undefined, authorEmail: undefined, identityNoticeSeen: true })
+      }
+      expect(GlobalSettingsSchema.parse({ comments: { authorName: 'Zoë Ångström 李', identityNoticeSeen: true } }).comments.authorName).toBe('Zoë Ångström 李')
+    })
+
+    it('L6 a write of comments is checked strictly: a refused value is an error with a clear message', () => {
+      const write = GLOBAL_SETTINGS_WRITE_SCHEMAS.comments!
+      expect(write.safeParse({ authorName: 'Ada', authorEmail: 'ada@example.com', identityNoticeSeen: false }).success).toBe(true)
+      const bidi = write.safeParse({ authorName: `Ada${String.fromCodePoint(0x202e)}`, identityNoticeSeen: false })
+      expect(bidi.success).toBe(false)
+      expect(bidi.error?.issues[0]).toMatchObject({ path: ['authorName'], message: 'The name contains a control or invisible character.' })
+      const long = CommentIdentityWriteSchema.safeParse({ authorName: 'x'.repeat(101), identityNoticeSeen: false })
+      expect(long.error?.issues[0]).toMatchObject({ path: ['authorName'], message: 'The name is longer than 100 characters.' })
+      const email = CommentIdentityWriteSchema.safeParse({ authorEmail: `${'x'.repeat(250)}@a.io`, identityNoticeSeen: false })
+      expect(email.error?.issues[0]).toMatchObject({ path: ['authorEmail'], message: 'The email is longer than 254 characters.' })
+    })
+  })
+
   describe('type inference', () => {
     it('infers correct type for logging.level', () => {
       const settings: GlobalSettings = {
@@ -286,6 +349,9 @@ describe('GlobalSettingsSchema', () => {
         },
         terminal: {
           screenReaderMode: 'auto'
+        },
+        comments: {
+          identityNoticeSeen: false
         }
       }
 
@@ -303,7 +369,8 @@ describe('GlobalSettingsSchema', () => {
         transcription: { backend: 'openai', openaiApiKeyStored: false, whisperModel: 'base' },
         htmlPreview: { enabled: true },
         files: { exclude: [] },
-        terminal: { screenReaderMode: 'auto' }
+        terminal: { screenReaderMode: 'auto' },
+        comments: { identityNoticeSeen: false }
       }
       expect(validSettings.logging.level).toBe('info')
     })

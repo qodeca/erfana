@@ -4,7 +4,7 @@
  * Tests for the two-level correlation id helpers.
  *
  * @see Issue #21 - graph R1 architecture
- * @see specs/designs/sd-021-errata-and-risks.md §11 item 8
+ * @see docs/designs/sd-021-errata-and-risks.md §11 item 8
  */
 import { describe, expect, it } from 'vitest'
 import {

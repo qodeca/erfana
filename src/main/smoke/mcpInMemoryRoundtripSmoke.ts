@@ -14,7 +14,7 @@
  * server will hit; that is carried forward as an open risk for #30, not
  * blessed here (no `StdioServerTransport` is exercised).
  *
- * @see specs/designs/sd-019-native-dep-spike.md §4 Decision 4, §8.8
+ * @see docs/designs/sd-019-native-dep-spike.md §4 Decision 4, §8.8
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'

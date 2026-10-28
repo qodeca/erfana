@@ -5,7 +5,7 @@
  *
  * Plain co-located global CSS (not a CSS module, per design §1.8). All values
  * come from design tokens; no rounded corners. Governed by
- * design/system/foundations/surfaces.html.
+ * docs/design-system/system/foundations/surfaces.html.
  *
  * The placeholder's background is the STARTING half of a two-value invariant:
  * the DOM placeholder and the native view's backdrop always carry the same
@@ -98,6 +98,23 @@
 }
 
 /*
+ * The comments drawer is open (HTML Preview comments, §10.6): the page area
+ * becomes a row and the placeholder a flex item beside the drawer, so the
+ * bounds loop measures a narrower placeholder and the native page shrinks –
+ * the drawer is a flow sibling, never drawn over the page.
+ */
+.html-preview-page-area--drawer {
+  display: flex;
+}
+
+.html-preview-page-area--drawer > .html-preview-placeholder {
+  position: relative;
+  inset: auto;
+  flex: 1 1 auto;
+  min-inline-size: 0;
+}
+
+/*
  * THE PAGE'S FOCUS RING IS DRAWN OUTSIDE THE PLACEHOLDER — the only place it can
  * be seen at all.
  *
@@ -114,14 +131,14 @@
  * draw them in. The top edge lies over the band's bottom rule — the 1px rule
  * plus 1px of the bar's 6px padding, never a control — and reads as that rule
  * turning focus-coloured, right under the toolbar. It measures against the band
- * background, `contrast-focus-ring-on-band` in design/claims.json.
+ * background, `contrast-focus-ring-on-band` in docs/design-system/claims.json.
  *
  * Do not make this inset, and do not add `overflow: hidden` or a stacking
  * context to `.html-preview-page-area` or `.html-preview-surface`: any of those
  * hides the last visible edge. The placeholder paints over the band only because
  * it is positioned and the band is not.
  */
-/* deviates: design/system/foundations/focus.html — outward ring at offset 0, top edge only; the native view covers the box (see the card's Exceptions) */
+/* deviates: docs/design-system/system/foundations/focus.html — outward ring at offset 0, top edge only; the native view covers the box (see the card's Exceptions) */
 .html-preview-placeholder:focus-visible {
   outline: var(--border-width-thick) solid var(--color-border-focus);
   outline-offset: 0;

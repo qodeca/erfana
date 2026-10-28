@@ -88,9 +88,22 @@ Real-time metrics in bottom status bar:
 - Selection character count
 
 ### Auto-Save
-- Triggers 2 seconds after last edit, and at least every 30 seconds during continuous typing
-- Visual indicator during save
+- Triggers 2 seconds after last edit, and at least every 30 seconds during continuous typing. Every save that starts while the tab is still modified re-arms the 30-second save, so long typing sessions keep getting it (before v0.22.0 only the first one fired)
+- A failed save is not retried on a timer: `useAutoSave` backs off until the next edit, so a write that cannot succeed (a missing folder, a full disk) no longer raises a fresh error toast every 30 seconds
+- While the "file changed on disk" bar is showing for a tab with unsaved edits, autosave waits for the user's choice instead of writing over the newer file. It resumes as soon as the bar goes away ("Keep My Version" or Dismiss) – see [File Watching § Conflict resolution UI](../file-watching/README.md#conflict-resolution-ui)
+- Visual indicator during save; its timer is cleared when the tab closes
 - Manual save with Cmd/Ctrl+S
+- Saves are crash-safe: the file is written to a temporary file and swapped in when complete (see [File Watching § Use cases](../file-watching/README.md#use-cases))
+
+### Saving before a project switch or close
+Opening another project (picker or recent list) or closing the project first saves every edited tab (`editorSaveRegistry.flushAll({ skipConflicts: true })`, called from `ProjectTree/switchHelpers.ts`; each tab gets at most 10 seconds, `FLUSH_TAB_TIMEOUT_MS`). A tab in the "changed on disk" state is left alone, because a save would overwrite the newer file. The "Unsaved Changes" prompt appears only for tabs that could not be saved and says how many ("1 tab could not be saved. Discard and switch project?"). Cancel keeps the project and autosave running; **Switch Anyway** / **Close Anyway** leaves those tabs unsaved, with no late write into the project being left.
+
+### Loading a file
+- `useLatestFileLoad` (`src/renderer/src/hooks/useLatestFileLoad.ts`) applies only the newest read, so switching files fast can no longer leave the wrong file's text on screen.
+- A read that fails is never silent: the tab shows `EditorLoadError` (the file name, the reason and a **Try again** button) and an error toast, which is what screen readers hear. Before v0.22.0 a failed read left the tab reading "No file open".
+
+### Uncontrolled editor value
+`MonacoMarkdownEditor` mounts with `defaultValue`, never `value`, so Monaco owns its buffer. In controlled mode `@monaco-editor/react` replaced the whole buffer whenever the prop and the buffer differed, and a key typed between React's commit and that check was lost and the cursor jumped to the end – under load about half of a typed burst. `src/renderer/src/utils/monacoValueSync.ts` now decides for each new `content` whether it is the editor's own echo (never written back), already in the buffer, or an outside change (a reload, an accepted external change, "Reload from Disk"), which it applies as one minimal `pushEditOperations` edit, so the cursor and the undo stack survive. Detail: [File Watching § Self-save echo detection](../file-watching/README.md#self-save-echo-detection-v091).
 
 ## Implementation Files
 
@@ -124,10 +137,11 @@ Real-time metrics in bottom status bar:
 - `DocxService.ts` - DOCX generation via `@turbodocx/html-to-docx`
 
 ### Pure Logic (`src/renderer/src/components/Panels/`)
-- `markdownEditorPanel.logic.ts` - Pure functions (stats, scroll sync) - 587 lines, 82 tests
+- `markdownEditorPanel.logic.ts` - Pure functions (stats, scroll sync)
 
 ## Related Hooks (`src/renderer/src/hooks/`)
-- `useAutoSave.ts` - Debounced auto-save with React state management
+- `useAutoSave.ts` - Debounced auto-save with a 30-second safety save, back-off after a failed write, and `holdAutoSave()` for callers that must stop it for a while
+- `useLatestFileLoad.ts` - Loads the tab's file and applies only the latest read; keeps the failure reason for `EditorLoadError`
 - `useFileWatcher.ts` - File change detection with race condition protection. Since #70 it holds its watch through the shared `fileWatchSlot.ts` (serialised acquire/release, so a start and its stop can never get out of order), and it takes `INDICATOR_DURATION_MS` from `constants/fileWatch.ts` rather than owning it. The read-only sibling for surfaces that never write is `useFileChangeSubscription.ts` — see [File Watching](../file-watching/README.md#single-file-watch-internals-70)
 - `useDividerPosition.ts` - Resizable split pane position management
 - `useEditorContextMenu.ts` - Context menu state and positioning
@@ -199,7 +213,7 @@ is reachable from the editor only.
 
 Bidirectional scroll sync between editor and preview in the split view modes.
 Implemented by `useScrollSync.ts`
-(`src/renderer/src/components/Editor/MarkdownEditorPanel/hooks/`, 494 lines).
+(`src/renderer/src/components/Editor/MarkdownEditorPanel/hooks/`).
 
 ### Features
 

@@ -7,8 +7,8 @@
  * React component owns focus and effects; everything that can be decided from
  * values lives here, where it can be tested without a DOM.
  *
- * @see design/system/components/permission-band/index.html - status="decided"
- * @see design/product/html-approval/index.html - the nine-state journey
+ * @see docs/design-system/system/components/permission-band/index.html - status="decided"
+ * @see docs/design-system/product/html-approval/index.html - the nine-state journey
  */
 import { ErrorCode } from '../../../../../shared/errors'
 import {

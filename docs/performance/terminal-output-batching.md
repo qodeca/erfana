@@ -6,6 +6,7 @@ SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 # A program floods the terminal: output batching and flow control (finding [30])
 
 - **Finding:** [30] "Terminal output has no batching or flow control" (lens review of v0.21.0). Branch `fix/terminal-output-batching`.
+- **Shipped:** in v0.22.0 (2026-10-25) – see the [changelog](../CHANGELOG.md#0220).
 - **Date:** 2026-10-22. **Host:** Apple M5 Max, 128 GB, macOS 26.6.2, production build (`npx electron-vite build`), Electron 44.9.0. 1-minute load average 4–7 during the runs (other agents were active). Before and after were run interleaved (B, A, B, A) so drift hits both.
 - **Data:** 6 runs before, 6 after, each a fresh app launch with the fast e2e shell (`/bin/sh`). Raw per-run data: [`terminal-output-batching.raw.json`](terminal-output-batching.raw.json). Driver: [`terminal-output-batching.ab.sh`](terminal-output-batching.ab.sh); benchmark: [`e2e/terminal-output.bench.ts`](../../e2e/terminal-output.bench.ts).
 

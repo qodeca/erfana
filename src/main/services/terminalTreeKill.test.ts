@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { EventEmitter } from 'events'
 import { win32 } from 'path'
 
@@ -16,7 +16,7 @@ import {
 } from './terminalTreeKill'
 
 function fakeChild() {
-  const child = new EventEmitter() as EventEmitter & { kill: ReturnType<typeof vi.fn>; unref: ReturnType<typeof vi.fn> }
+  const child = new EventEmitter() as EventEmitter & { kill: Mock; unref: Mock }
   child.kill = vi.fn()
   child.unref = vi.fn()
   return child

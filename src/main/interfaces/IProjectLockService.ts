@@ -103,7 +103,7 @@ export interface IProjectLockService {
    * @param cb - Invoked with the project path whose lock was lost
    * @returns Unsubscribe function
    * @see Issue #21 - graph R1 architecture
-   * @see specs/designs/sd-021-cross-cutting.md §9.7
+   * @see docs/designs/sd-021-cross-cutting.md §9.7
    */
   onOwnershipLost?(cb: (projectPath: string) => void): () => void
 

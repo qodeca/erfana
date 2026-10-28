@@ -4,14 +4,14 @@
  * Terminal screen-reader support IPC (lens review [23]): the payload-free,
  * sender-gated query and the app-wide change broadcast.
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import type { IpcMainInvokeEvent } from 'electron'
 import { TERMINAL_CHANNELS, TERMINAL_EVENTS } from '../../shared/ipc/terminal-channels'
 
 const mockIpcMainHandle = vi.fn()
 const appListeners = new Map<string, Array<(...args: unknown[]) => void>>()
 const mockIsAccessibilitySupportEnabled = vi.fn(() => false)
-const windows: Array<{ isDestroyed: () => boolean; webContents: { isDestroyed: () => boolean; send: ReturnType<typeof vi.fn> } }> = []
+const windows: Array<{ isDestroyed: () => boolean; webContents: { isDestroyed: () => boolean; send: Mock } }> = []
 
 vi.mock('electron', () => ({
   ipcMain: { handle: mockIpcMainHandle },

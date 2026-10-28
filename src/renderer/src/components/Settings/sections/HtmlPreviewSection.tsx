@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { useGlobalSettingsStore } from '../../../stores/useGlobalSettingsStore'
 import { TEST_IDS } from '../../../constants/testids'
+import { CommentsSection } from './CommentsSection'
 
 /**
  * HtmlPreviewSection - global on/off switch for HTML execution (Issue #74, AC21).
@@ -30,30 +31,35 @@ export function HtmlPreviewSection(): JSX.Element {
   // partial test fixture) must not throw here — it falls back to enabled.
   const enabled = settings?.htmlPreview?.enabled ?? true
 
+  // The Comments section rides along here: SettingsOverlay.tsx is at its
+  // max-lines baseline, and comments are part of the HTML preview.
   return (
-    <section className="settings-section" data-testid={TEST_IDS.SETTINGS_SECTION_HTML_PREVIEW}>
-      <h2 className="settings-section-title">HTML preview</h2>
-      <div className="settings-row">
-        <div className="settings-field">
-          <label htmlFor="html-preview-enabled" className="settings-label">
-            Run HTML files
-          </label>
-          <p id="html-preview-enabled-description" className="settings-description">
-            Open <code>.html</code> files as a live, running page. When off, they open as
-            source only and no preview process is created.
-          </p>
+    <>
+      <section className="settings-section" data-testid={TEST_IDS.SETTINGS_SECTION_HTML_PREVIEW}>
+        <h2 className="settings-section-title">HTML preview</h2>
+        <div className="settings-row">
+          <div className="settings-field">
+            <label htmlFor="html-preview-enabled" className="settings-label">
+              Run HTML files
+            </label>
+            <p id="html-preview-enabled-description" className="settings-description">
+              Open <code>.html</code> files as a live, running page. When off, they open as source
+              only and no preview process is created.
+            </p>
+          </div>
+          <input
+            type="checkbox"
+            id="html-preview-enabled"
+            className="settings-checkbox"
+            checked={enabled}
+            onChange={e => updateHtmlPreviewEnabled(e.target.checked)}
+            disabled={!settings}
+            aria-describedby="html-preview-enabled-description"
+            data-testid={TEST_IDS.SETTINGS_TOGGLE_HTML_PREVIEW}
+          />
         </div>
-        <input
-          type="checkbox"
-          id="html-preview-enabled"
-          className="settings-checkbox"
-          checked={enabled}
-          onChange={(e) => updateHtmlPreviewEnabled(e.target.checked)}
-          disabled={!settings}
-          aria-describedby="html-preview-enabled-description"
-          data-testid={TEST_IDS.SETTINGS_TOGGLE_HTML_PREVIEW}
-        />
-      </div>
-    </section>
+      </section>
+      <CommentsSection />
+    </>
   )
 }

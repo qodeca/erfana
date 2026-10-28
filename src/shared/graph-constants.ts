@@ -8,9 +8,9 @@
  * Re-exported from `constants.ts` — import from either.
  *
  * @see Issue #21 - graph R1 architecture
- * @see specs/designs/sd-021-worker-contracts.md §8.4 - the normative constant block
- * @see specs/designs/sd-021-cross-cutting.md §9.3, §9.5, §9.10, §9.11
- * @see specs/designs/sd-021-errata-and-risks.md §12.4 - the split decision
+ * @see docs/designs/sd-021-worker-contracts.md §8.4 - the normative constant block
+ * @see docs/designs/sd-021-cross-cutting.md §9.3, §9.5, §9.10, §9.11
+ * @see docs/designs/sd-021-errata-and-risks.md §12.4 - the split decision
  */
 
 /** Hoisted so `DB_ARTIFACTS` derives from a single literal instead of duplicating it. */
@@ -37,7 +37,7 @@ export const GRAPH = {
    * own in-process filtering (watcher, tree, discovery) and the `.erfana/.gitignore`
    * written on DB creation — both derive from here, so the literal appears once.
    *
-   * @see specs/designs/sd-021-cross-cutting.md §9.11
+   * @see docs/designs/sd-021-cross-cutting.md §9.11
    */
   DB_ARTIFACTS: [GRAPH_DB_FILE, `${GRAPH_DB_FILE}-wal`, `${GRAPH_DB_FILE}-shm`],
 
@@ -129,7 +129,7 @@ export const GRAPH = {
  * replaces FR-042's unbounded delay-queueing (erratum E9), payload byte caps,
  * and the two constant strings every tool response carries.
  *
- * @see specs/designs/sd-021-cross-cutting.md §9.3, §9.5
+ * @see docs/designs/sd-021-cross-cutting.md §9.3, §9.5
  */
 export const MCP = {
   /** Default; overridable via the optional `graph.mcpRateLimitPerMinute` global setting. */
@@ -183,7 +183,7 @@ export const MCP = {
  * The `.erfana` entry keeps the index out of its own corpus (FR-010 / AC-008).
  *
  * @see DEFAULT_WATCHER_IGNORE_PATTERNS in ./constants.ts
- * @see specs/designs/sd-021-cross-cutting.md §9.1 row 2
+ * @see docs/designs/sd-021-cross-cutting.md §9.1 row 2
  */
 export const DEFAULT_GRAPH_EXCLUDE_PATTERNS = [
   '.erfana',

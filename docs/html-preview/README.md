@@ -49,6 +49,8 @@ That question is a native message box **owned by the window whose preview asked*
 
 Every path is re-checked by Erfana itself before anything opens: the page's own idea of where a link points is never trusted.
 
+**A link the page cancels is not followed.** Erfana waits until all of the page's own click handlers have run before it acts on a click, so a page that calls `preventDefault()` in any of them – including a handler on `window` that runs after Erfana's – keeps the link closed. Before v0.22.0 a cancel in one of the page's later handlers was missed and the link opened anyway. (The preview preload, `src/preload/previewPage.ts`, tells main about the click at once, then sends the link – or a "cancelled" note – one task later, after the whole click has been dispatched; a microtask was not enough, because the browser runs microtasks after each listener.)
+
 **Two cases where a link stays dead**, both the same as before this feature existed:
 
 - a page whose own JavaScript calls `stopPropagation()` on the click, which hides it from Erfana;
@@ -123,6 +125,10 @@ The preview watches the page plus every local file it links, and re-subscribes w
 
 **At most 16 files are watched per preview.** The page's own links come first, then the frames' files by depth. A file past that budget is left out and counted, so a framed page with many files can report a non-zero "not watched" count – expected, not a fault. Saving an unwatched file does not refresh the preview.
 
+**Finding the linked files has a fixed cost, paid in the background.** Erfana reads each page's markup once, start to end, without building the page, on a background thread of its own, so a hostile or very large page cannot stall Erfana's windows (#124). A tag keeps its first 1,024 attributes, a page is read up to its first 4 MiB and hands back at most 4,096 linked files, and one preview reads at most 16 MiB of markup across the page and its frames; a link past any of these bounds is not watched, and Erfana's log records which bound was reached and how many frame documents were skipped. If the background read fails – it times out, say – that page's linked files are not watched until the page loads again, and the log says why. Markup a browser repairs while building the page – content inside `<select>` or `<frameset>`, a repeated `<body>` – can add a watched file or change which 16 come first.
+
+**A save made while the linked files are still being found is not lost.** The page loads its files before Erfana has finished finding them, so a file can be saved before anything watches it. When the watch on a newly found file starts, Erfana checks the file's modification time: if it changed after the page began loading, the preview refreshes once, exactly as a save would – a stylesheet swaps in place, anything else reloads. A file that has not changed causes no refresh. The check reads one timestamp per newly watched file, so it stays within the 16-file budget, and it allows 50 ms either way for the coarser clock file times use; a file stamped in the future does not count as a save. The page's own `.html` file does not wait for the search: it is watched from the moment the preview opens.
+
 For the acceptance corpus, save-to-visible-change stays under 300 ms.
 
 ## Colours, zoom, and the preview toolbar
@@ -150,6 +156,46 @@ A page can also be opened outside Erfana, in your own web browser – for browse
 - **When your default browser cannot be found**, the file goes to the app your system uses for `.html` files instead, and a notice says so ("Opened in the app for .html files"). That app may be an editor rather than a browser. On **Linux**, Erfana does not look up the default browser at all, so this is what happens every time. If the browser was found but did not start, nothing else is tried: the notice "Could not open in browser" suggests Reveal in Finder, Explorer or File Manager instead.
 
 **This page runs unsealed.** In a real browser the page has no sandbox, no host allowlist and open network access. It is started only from Erfana's own interface – a previewed page cannot trigger it – and this is recorded as an accepted risk in [Security § HTML preview](../security.md#html-preview).
+
+## Comments
+
+You can leave comments on the elements of a previewed page. A comment is saved **inside the `.html` file**, as an ordinary HTML comment right before the element. Browsers do not show it, it travels with the file through git, and a coding agent that reads the file sees your request next to the markup it is about. The file format is described in [HTML comments format v1](../html-comments/format-v1.md).
+
+**Comment mode.** Turn it on with the **Comment mode** button in the preview's toolbar, or press **Ctrl+Alt+M** (macOS: **Cmd+Option+M**). While it is on, the page is frozen for clicking: hovering outlines an element and shows its label, and a click picks it instead of running the page's own click handlers. Wheel scrolling still works. **Esc** leaves the mode.
+
+- **Click** an element to open the comment window. **Right-click** opens a small menu with **Add comment**.
+- **Keyboard**: Tab and Shift+Tab move the outline to the next or previous element, Alt+Up Arrow selects the parent (and, from the top of a frame, the frame element), Alt+Down Arrow the first child, Enter opens the comment window and Shift+F10 or the Menu key opens the menu.
+- **The comment window** takes the text (up to 4,000 characters) and saves with **Save** or Ctrl+Enter (Cmd+Enter on macOS). It also shows the thread of an element that already has comments, where you can reply, edit, resolve, re-open or delete. Your text is kept if a save fails.
+
+**Pins.** An element with comments shows a small speech-bubble pin in the page. Click it to open its thread. The **Show comment icons** button hides or shows the pins for this tab only; the choice is not saved. Pins are left out of a PDF export.
+
+**The drawer.** The **Comments** button in the toolbar (its name says how many are open, for example "Comments, 3 open, 1 needs attention") opens a drawer that lists every comment in the page and in its same-project frames, filtered by **Open**, **Resolved** and **Needs attention**. **Show on page** scrolls to the element and flashes it. A comment whose element is hidden right now is tagged **Not visible now**; one whose element is gone is tagged **Element not found** and stays in the file. A very long list shows only the rows near the screen.
+
+**Folded sections.** A comment inside a collapsible section (`<details>`) shows its pin only while the section is open. Sections you opened stay open when saving a comment reloads the page. **Show on page**, and a row's **Open**, unfold the sections around the comment's element so its pin shows; in a group where only one section can be open at a time, that folds the other one. An element hidden in any other way – on another slide or tab of the page – stays hidden and keeps **Not visible now**.
+
+**Identity.** The first time you comment, Erfana asks for your name (and an optional email) and tells you who can read them: anyone who can open the file, in the page source and in git history once pushed. A script in a page you preview can read them too. Both are stored in Erfana's own settings (`~/.erfana/settings.json`), never in the project, and you can change them in **Settings > Comments**. Changing your name affects new comments only. Erfana does not check who a name belongs to.
+
+**Where comments are stored.** In the `.html` file itself. Deleting a comment removes its block, and git history keeps earlier versions. If the same file is open in an editor tab with unsaved changes, Erfana asks you to save those first ("Save your edits first"), so the two writes cannot overwrite each other. Erfana writes the file in one step and only if it is still exactly the file it read; if it changed in the meantime, the save is refused and your text stays in the window.
+
+**When comments are unavailable.** The toolbar tooltip says why. The usual reasons:
+
+| Reason | What happens |
+|---|---|
+| The file is over **25 MB** | The preview does not show a file that large, so there is nothing to comment on. A file that grows past 25 MB while it is open keeps its comments read-only |
+| The file is not UTF-8 | Existing comments are shown read-only; no new ones |
+| The file holds an unresolved git conflict | Read-only until you resolve it |
+| The file is a link to another file, or has other hard links | Erfana will not write to it |
+| The page has too many elements (over 640,000) | Comments are unavailable for that page |
+| The page keeps removing Erfana's overlay | Comments are unavailable for that page |
+| An `<iframe srcdoc>` or a remote frame | You cannot comment inside it; you can comment on the `<iframe>` element itself |
+
+A comment block that has been damaged (for example by a hand edit) or was written by a newer Erfana is shown read-only. You can open it in the source or delete a damaged block.
+
+**Framework pages.** Pages that a framework hydrates from server-rendered markup (Vue, Svelte, Angular) do not tolerate an extra comment inside the markup they hydrate. For those pages Erfana places the block **before the app's root container** and remembers the element you clicked by its path inside it. The comment still pins to the right element. **Limitation:** a page script that walks `childNodes` can see comment blocks anywhere in the document, because that is what they are. React pages are not affected.
+
+**Other limits.** A page `<dialog>` or popover opened later sits above Erfana's pins; while a page modal is open the pins cannot be clicked. A page can read the comments in its own file, names and emails included; see [Security § HTML Preview comments](../security.md#html-preview-comments). An editor tab in another Erfana window is not seen by the unsaved-changes guard.
+
+**The off-switch.** **Settings > Comments > Comments in HTML preview** (`htmlPreview.comments.enabled`, on by default). With it off, previews behave exactly as before: no comment mode, no pins, no instrumented page. Turning it off never touches comment blocks already in your files.
 
 ## Failure reporting
 

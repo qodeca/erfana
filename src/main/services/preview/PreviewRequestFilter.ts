@@ -87,8 +87,11 @@ export interface PreviewFilterContext {
    * any other token is refused; an empty one refuses every preview frame.
    */
   readonly ownToken: string
-  /** Where each preview-scheme request's type is noted for the protocol handler (S1). */
-  readonly ledger: Pick<PreviewRequestKindLedger, 'note'>
+  /**
+   * Where each preview-scheme request's type is noted for the protocol handler
+   * (S1), and forgotten when that request fails before reaching it (S1e).
+   */
+  readonly ledger: Pick<PreviewRequestKindLedger, 'note' | 'forget'>
   /**
    * List a refused frame on the page on screen – the failure badge, never the
    * permission band. The page is looked up at every write.
@@ -185,8 +188,9 @@ export function attach(
       // (and other-scheme) request exactly as before.
       if (isPreviewSchemeUrl(details.url)) {
         // Its type, for the handler, which cannot see it (S1). Noted only for
-        // what is let through, so a refused request leaves no note behind.
-        ctx.ledger.note(details.url, details.resourceType)
+        // what is let through, so a refused request leaves no note behind; the
+        // id lets a request that fails before the handler drop its note (S1e).
+        ctx.ledger.note(details.url, details.resourceType, details.id)
         inFlight.set(details.id, { startedAt: now(), host: hostOf(details.url), url: details.url })
         ctx.onRequestStarted(details.id)
         answer({ cancel: false })
@@ -244,6 +248,10 @@ export function attach(
     settle(details.id)
   })
   session.webRequest.onErrorOccurred((details) => {
+    // A request aborted before the handler (a reload cancelling a page's own
+    // fetch) must not leave a note for the next request of its URL (S1e).
+    // Once the handler took the note, this finds nothing.
+    ctx.ledger.forget(details.id)
     settle(details.id)
   })
 

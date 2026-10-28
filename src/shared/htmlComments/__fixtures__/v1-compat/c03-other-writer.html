@@ -1,0 +1,54 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Compat c03 - non-canonical writer</title>
+</head>
+<body>
+  <main>
+    <!--   erfana:comment   v1   id=c-aaaaaaaaaaaaaadj
+    status: open
+    target: <h1 id="title">
+    comment by Ada Lovelace <ada@example.com> at 2026-10-25T14:03:00Z:
+      Shorter headline, please.
+    @data {"msgs": [{"text": "Shorter headline, please.", "at": "2026\u002D10\u002D25T14:03:00Z", "by": {"role": "human", "email": "ada@example.com", "name": "Ada Lovelace"}, "id": "m\u002Daaaaaaaaaaaaaadj"}], "view": {"w": 1280, "h": 800, "dpr": 2, "x": 0, "y": 120}, "anchor": {"path": "", "tag": "h1", "id": "title"}, "status": "open", "id": "c\u002Daaaaaaaaaaaaaadj", "v": 1, "x\u002Dother\u002Dwriter": {"version": "0.1", "note": "kept on edit"}}
+    -->
+    <h1 id="title">Pricing</h1>
+    <p>From <!-- erfana:comment v1 id=c-aaaaaaaaaaaaaadk
+status: open
+target: <em>
+comment by Grace Hopper at 2026-10-25T14:03:00Z:
+  Say 9 EUR here.
+@data {
+  "v": 1,
+  "id": "c\u002daaaaaaaaaaaaaadk",
+  "status": "open",
+  "anchor": {
+    "tag": "em",
+    "path": ""
+  },
+  "view": {
+    "w": 1280,
+    "h": 800,
+    "dpr": 2,
+    "x": 0,
+    "y": 120
+  },
+  "msgs": [
+    {
+      "id": "m\u002daaaaaaaaaaaaaadk",
+      "by": {
+        "name": "Grace Hopper",
+        "role": "human"
+      },
+      "at": "2026\u002d10\u002d25T14:03:00Z",
+      "text": "Say 9 EUR here."
+    }
+  ]
+}
+--><em>10 EUR</em>.</p>
+  </main>
+</body>
+</html>

@@ -35,7 +35,7 @@ function getProjectItemTitle(
  * The row the roving focus should move to for a navigation key, or `null` when
  * the key is not one the list handles.
  *
- * Implements the decided Rows & lists card (design/system/components/row):
+ * Implements the decided Rows & lists card (docs/design-system/system/components/row):
  * the list holds ONE Tab stop, ↑/↓ move between rows, Home/End jump to the
  * ends. Movement clamps rather than wraps, like a native list.
  *
@@ -417,7 +417,7 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
                           e.stopPropagation()
                           if (!isDisabled) void handleRemoveProject(project.path)
                         }}
-                        /* deviates: design/system/components/row — the card gives a
+                        /* deviates: docs/design-system/system/components/row — the card gives a
                            list ONE Tab stop; the active row's Remove is a second
                            one, so removing a project needs no extra shortcut to
                            learn. Every other row's Remove stays out of the Tab

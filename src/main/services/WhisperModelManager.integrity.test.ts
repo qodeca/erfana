@@ -9,7 +9,7 @@
  * `tiny` is re-pinned to a tiny payload so no test needs a 75 MB file.
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { spawn, type ChildProcess } from 'child_process'
 import { createHash } from 'crypto'
 import { mkdir, mkdtemp, readFile, readdir, rm, stat, utimes, writeFile } from 'fs/promises'
@@ -77,7 +77,7 @@ function bytesResponse(body: Buffer): Response {
 }
 
 /** huggingface.co 302 -> us.aws.cdn.hf.co 200, like the live host. */
-function stubFetchServing(body: Buffer): ReturnType<typeof vi.fn> {
+function stubFetchServing(body: Buffer): Mock {
   const fetchMock = vi.fn(async (url: string) => {
     if (new URL(url).hostname === 'huggingface.co') {
       return new Response(null, {

@@ -25,7 +25,7 @@ import * as path from 'path'
 import { sep } from 'path'
 import { TEST_IDS } from '../../src/renderer/src/constants/testids'
 import { byTestId } from '../utils/locators'
-import { E2E_TEMP_DIR, buildAppEnv, closeAppAndWait, removeDirWithRetry } from './isolation'
+import { E2E_TEMP_DIR, buildAppEnv, closeAppAndWait, removeDirWithRetry, E2E_CHROMIUM_ARGS } from './isolation'
 import {
   initRepoWithCommit,
   writeFileTree,
@@ -148,7 +148,7 @@ export const test = base.extend<GitProjectFixtures>({
 
   windowWithGitProject: async ({ userDataDir, homeDir, gitTestProject }, use) => {
     const app: ElectronApplication = await electron.launch({
-      args: [PROJECT_ROOT, `--user-data-dir=${userDataDir}`],
+      args: [PROJECT_ROOT, `--user-data-dir=${userDataDir}`, ...E2E_CHROMIUM_ARGS],
       env: buildAppEnv({ homeDir })
     })
 

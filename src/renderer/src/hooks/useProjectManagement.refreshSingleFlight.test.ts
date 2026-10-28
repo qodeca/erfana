@@ -13,7 +13,7 @@
  * Every `readDirectory` call returns its own deferred, settled by the test.
  * No timers and no wall-clock waits.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import type { FileNode } from '../interfaces/IProjectTreeApi'
 import { useProjectManagement } from './useProjectManagement'
@@ -81,7 +81,7 @@ const LOADED = '[useProjectManagement] File tree loaded'
 
 let reads: ReadCall[]
 let projectChangedListener: ProjectChangedListener | null
-let readDirectory: ReturnType<typeof vi.fn>
+let readDirectory: Mock
 
 /** Drain queued promise reactions without touching any clock. */
 async function flushMicrotasks(ticks = 20): Promise<void> {

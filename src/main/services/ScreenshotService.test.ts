@@ -46,8 +46,8 @@ const desktopCapturer = {
   capture: vi.fn(async () => ({ success: true, filePath: '/tmp/desktop.png' }))
 }
 
-const MacCtor = vi.fn().mockImplementation(() => macCapturer)
-const DesktopCtor = vi.fn().mockImplementation(() => desktopCapturer)
+const MacCtor = vi.fn().mockImplementation(function () { return macCapturer })
+const DesktopCtor = vi.fn().mockImplementation(function () { return desktopCapturer })
 
 vi.mock('./screenshot/MacScreenshotCapturer', () => ({
   MacScreenshotCapturer: MacCtor
@@ -78,8 +78,8 @@ function stubCapturer(capabilities: ScreenshotCapabilities = desktopCapabilities
 describe('ScreenshotService dispatcher + factory', () => {
   beforeEach(() => {
     vi.resetAllMocks()
-    MacCtor.mockImplementation(() => macCapturer)
-    DesktopCtor.mockImplementation(() => desktopCapturer)
+    MacCtor.mockImplementation(function () { return macCapturer })
+    DesktopCtor.mockImplementation(function () { return desktopCapturer })
     macCapturer.getCapabilities.mockReturnValue(macCapabilities)
     macCapturer.enumerateWindowsRaw.mockResolvedValue([])
     macCapturer.capture.mockResolvedValue({ success: true, filePath: '/tmp/mac.png' })

@@ -16,13 +16,16 @@
  *
  * @see docs/designs/sd-074-html-preview.md §4.4, §5(a)
  */
-import { BrowserWindow, dialog, type Session } from 'electron'
+import { BrowserWindow, dialog, screen, type Session } from 'electron'
 import { openExternalSafe } from '../../utils/openExternalSafe'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import type { ChokidarOptions } from 'chokidar'
 import { PREVIEW } from '../../../shared/constants'
-import type { GlobalSettings } from '../../../shared/ipc/global-settings-schema'
+import {
+  isHtmlPreviewCommentsEnabled,
+  type GlobalSettings
+} from '../../../shared/ipc/global-settings-schema'
 import { createPreviewRootRegistry } from '../../services/preview/PreviewRootRegistry'
 import { createPreviewAllowlistStore } from '../../services/preview/PreviewAllowlistStore'
 import { createPreviewSessionFactory } from '../../services/preview/PreviewSessionFactory'
@@ -51,7 +54,15 @@ import {
 } from '../../services/preview/PreviewViewService'
 import type { IPreviewEligibilityService } from '../../services/preview/PreviewEligibilityService'
 import type { IPreviewAllowlistStore } from '../../services/preview/PreviewAllowlistStore'
+import {
+  createPreviewCommentRegistry,
+  type PreviewCommentShared
+} from '../../services/preview/comments/commentServiceTypes'
+import type { CommentIdentity } from '../../services/preview/comments/CommentWriter'
+import { createCommentUnsavedSources } from '../../services/preview/comments/commentUnsavedSources'
+import { focusHostWhileKey } from '../../services/preview/previewHostFocus'
 import { createPreviewEmitters, type PreviewEmitTarget } from './emit'
+import { createPreviewCommentEmitters } from './commentEmit'
 import { createExternalLinkConsent } from './externalLinkConsent'
 import { logger } from '../../services/LoggingService'
 
@@ -80,6 +91,12 @@ export interface PreviewGraph {
   readonly allowlistStore: IPreviewAllowlistStore
   /** Cancels any pending coalesced emission; called on dispose. */
   readonly disposeEmitters: () => void
+  /**
+   * HTML Preview comments' shared collaborators – the registry the comment
+   * handlers find a panel's service in, and the windows' unsaved files.
+   * Optional so a test graph without comments stays valid.
+   */
+  readonly comments?: PreviewCommentShared
 }
 
 /** Preview-tuned entry-file watch timings (mirrors the pool's overrides, §1.4). */
@@ -104,7 +121,8 @@ export function defaultResolveEmitTargets(): readonly PreviewEmitTarget[] {
       return {
         isDestroyed: () => contents.isDestroyed(),
         send: (channel, payload) => contents.send(channel, payload),
-        windowId: win.id
+        windowId: win.id,
+        focusHost: () => focusHostWhileKey(win)
       }
     })
 }
@@ -150,6 +168,29 @@ function defaultZoomFactor(window: Pick<PreviewWindowLike, 'webContents'>): numb
   return window.webContents.getZoomFactor()
 }
 
+/** The reviewer from the app-level settings; the writer checks and trims it (§7.9). */
+function commentIdentityOf(settings: GlobalSettings): CommentIdentity | undefined {
+  const { authorName, authorEmail } = settings.comments
+  if (authorName === undefined) return undefined
+  return authorEmail === undefined || authorEmail === '' ? { name: authorName } : { name: authorName, email: authorEmail }
+}
+
+/** What every view's comment service shares (html-preview-comments.md §4.2). */
+function buildCommentShared(
+  getSettings: () => GlobalSettings,
+  resolveTargets: () => readonly PreviewEmitTarget[],
+  getProjectPath: () => string | null
+): PreviewCommentShared {
+  return {
+    registry: createPreviewCommentRegistry(),
+    unsaved: createCommentUnsavedSources({ projectRoot: getProjectPath }),
+    emit: createPreviewCommentEmitters({ resolveTargets }),
+    identity: () => commentIdentityOf(getSettings()),
+    isEnabled: () => isHtmlPreviewCommentsEnabled(getSettings()),
+    cursor: () => screen.getCursorScreenPoint()
+  }
+}
+
 /**
  * Build the preview object graph.
  */
@@ -159,6 +200,7 @@ export function buildPreviewGraph(deps: BuildPreviewGraphDeps): PreviewGraph {
   const getZoomFactor = deps.getZoomFactor ?? defaultZoomFactor
 
   const emitters = createPreviewEmitters({ resolveTargets })
+  const comments = buildCommentShared(getSettings, resolveTargets, getProjectPath)
 
   const registry = createPreviewRootRegistry()
   const allowlistStore = createPreviewAllowlistStore({
@@ -170,7 +212,10 @@ export function buildPreviewGraph(deps: BuildPreviewGraphDeps): PreviewGraph {
   const sessionFactory = createPreviewSessionFactory({
     registry,
     allowlistStore,
-    previewPagePreloadPath: resolvePreviewPagePreload()
+    previewPagePreloadPath: resolvePreviewPagePreload(),
+    // HTML Preview comments: the flag is read per request, so turning it off
+    // serves the next page raw (docs/designs/html-preview-comments.md §3).
+    comments: { isEnabled: comments.isEnabled }
   })
   const stillFrameCache = createPreviewStillFrameCache()
   const exportController = createPreviewExportController()
@@ -232,7 +277,8 @@ export function buildPreviewGraph(deps: BuildPreviewGraphDeps): PreviewGraph {
     // when this says so (issue #124, part 3 §3.5).
     checkEligibility: (filePath, projectPath) => eligibility.check(filePath, projectPath),
     now: Date.now,
-    onForwardedShortcut: (panelId, key) => emitters.forwardedShortcut(panelId, key)
+    onForwardedShortcut: (panelId, key) => emitters.forwardedShortcut(panelId, key),
+    comments
   }
 
   // No cast needed: the class `implements` both halves of the composed service,
@@ -243,6 +289,7 @@ export function buildPreviewGraph(deps: BuildPreviewGraphDeps): PreviewGraph {
     service,
     eligibility,
     allowlistStore,
-    disposeEmitters: () => emitters.dispose()
+    disposeEmitters: () => emitters.dispose(),
+    comments
   }
 }

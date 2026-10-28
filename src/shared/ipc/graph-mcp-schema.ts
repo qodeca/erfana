@@ -16,8 +16,8 @@
  * Contract-only for #21: nothing hosts an endpoint yet (#30).
  *
  * @see Issue #21 - graph R1 architecture
- * @see specs/designs/sd-021-ipc-contracts.md §7.10 - port + tool schemas
- * @see specs/designs/sd-021-cross-cutting.md §9.3, §9.4, §9.5 - trust boundary
+ * @see docs/designs/sd-021-ipc-contracts.md §7.10 - port + tool schemas
+ * @see docs/designs/sd-021-cross-cutting.md §9.3, §9.4, §9.5 - trust boundary
  */
 import { z } from 'zod'
 import { GRAPH, MCP } from '../graph-constants'

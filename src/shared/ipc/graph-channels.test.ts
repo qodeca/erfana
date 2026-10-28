@@ -8,8 +8,8 @@
  * below are the only mechanical guard against that.
  *
  * @see Issue #21 - graph R1 architecture
- * @see specs/designs/sd-021-errata-and-risks.md §11 item 2
- * @see specs/designs/sd-021-ipc-contracts.md §7.1 - the normative channel list
+ * @see docs/designs/sd-021-errata-and-risks.md §11 item 2
+ * @see docs/designs/sd-021-ipc-contracts.md §7.1 - the normative channel list
  */
 import { describe, it, expect } from 'vitest'
 import { GraphChannels, GraphEvents, type GraphChannel, type GraphEvent } from './graph-channels'

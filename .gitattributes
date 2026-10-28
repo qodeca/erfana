@@ -19,10 +19,10 @@ patches/*.patch text eol=lf
 # design-sync generated files must stay LF — scripts/design-sync.mjs builds
 # these two from template strings as LF and byte-compares them in --check
 # mode, so a CRLF checkout on Windows makes `npm run design -- --check` fail
-# on every run (#104). Every other generated file under design/ is a byte
+# on every run (#104). Every other generated file under docs/design-system/ is a byte
 # copy of a src/ file and follows that file's line endings.
-design/claims.js text eol=lf
-design/index.html text eol=lf
+docs/design-system/claims.js text eol=lf
+docs/design-system/index.html text eol=lf
 
 # The preload surface snapshot must stay LF — it is LF in the repo, and this
 # keeps a local Windows checkout (autocrlf) or a snapshot update run there from
@@ -44,3 +44,9 @@ src/preload/__snapshots__/surface.test.ts.snap text eol=lf
 *.tar.gz binary
 *.tgz binary
 *.traineddata binary
+
+# HTML Preview comment fixtures are byte-exact goldens: LF, CRLF and CR-only
+# files on purpose, pinned by SHA-256 in v1.lock.json (G-003) and replayed by
+# the agent-review check (X-001). Line-ending conversion would change them.
+src/shared/htmlComments/__fixtures__/** -text
+e2e/fixtures/html-preview-corpus/comments/** -text

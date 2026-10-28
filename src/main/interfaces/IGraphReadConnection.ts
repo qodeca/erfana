@@ -11,7 +11,7 @@
  *
  * @see GraphReadConnection for implementation (#23)
  * @see Issue #21 - graph R1 architecture
- * @see specs/designs/sd-021-db-contracts.md §5.5, C1-C4 - the reader contracts
+ * @see docs/designs/sd-021-db-contracts.md §5.5, C1-C4 - the reader contracts
  */
 import type { GraphQueryKey } from '../services/graph/graphSchema'
 import type { FtsMatchExpression } from '../../shared/graphMatch'

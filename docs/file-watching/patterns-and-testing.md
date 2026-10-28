@@ -247,11 +247,11 @@ rm -rf /path/to/project
 The directory and git watcher pipelines are covered by 78 automated tests added in v0.7.2, verifying all 18 acceptance criteria from [spec T3-016](../../specs/archived/spec-t3-016-project-tree-refresh/requirements/03-acceptance.md). The breakdown below (file names, test counts, AC coverage) is the reference for that suite; the general testing guide is [Testing](../testing/README.md).
 
 Key test files:
-- `DirectoryWatcherService.pipeline.test.ts` – directory refresh pipeline (17 tests, AC-001/002/003/007/008/010/013)
+- `DirectoryWatcherService.pipeline.test.ts` – directory refresh pipeline (26 tests, counted 2026-10-25, AC-001/002/003/007/008/010/013)
 - `GitWatcherService.pipeline.test.ts` – git status pipeline (22 tests, AC-004/005/006/014/018)
 - `WatcherResilience.test.ts` – auto-restart and polling fallback (14 tests, AC-011/015/016)
-- `ProjectService.switching.test.ts` – project switching orchestration (20 tests, AC-009/014)
-- `useGitStatus.test.ts` – visibility gating and cooldowns (5 of the file's 38 tests, AC-012)
+- `ProjectService.switching.test.ts` – project switching orchestration (AC-009/014)
+- `useGitStatus.test.ts` – visibility gating and cooldowns (5 of the file's 39 tests, counted 2026-10-25, AC-012)
 
 Single-flight tree refresh ([#208](https://github.com/qodeca/erfana/issues/208), see [Technical Details § Tree refresh is single-flight](./technical-details.md#tree-refresh-is-single-flight-208)) – 53 tests in five new files, plus `isTreeReadCurrent` cases added to `useProjectManagement.logic.test.ts`. All drive reads with deferred promises and microtask flushing; fake timers appear only where a timer is the subject, and fake only the timer pair involved:
 - `src/shared/coalescingRunner.test.ts` – the runner's state machine: trailing run, latest task wins, never two at once, re-entrancy, per-run errors, `onIdle` ordering (12 tests; runs in the main vitest project)

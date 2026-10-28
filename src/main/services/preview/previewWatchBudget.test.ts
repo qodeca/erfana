@@ -7,12 +7,12 @@
  * previews. What matters is that take and give stay symmetric across the pool's
  * three asymmetric paths, so the suite drives it through a real pool.
  */
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi, type Mock } from 'vitest'
 import { createPreviewWatchBudget } from './previewWatchBudget'
 import { createPreviewWatchPool } from './PreviewWatchPool'
 
 /** A watcher factory that never touches chokidar. */
-function fakeWatcherDeps(): { createWatcher: ReturnType<typeof vi.fn> } {
+function fakeWatcherDeps(): { createWatcher: Mock } {
   return {
     createWatcher: vi.fn(() => ({
       close: vi.fn().mockResolvedValue(undefined),

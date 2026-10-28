@@ -15,6 +15,18 @@
  * construction site (NEW-2). `preload` is DELIBERATELY absent — asserted by the
  * KEY not being present, never by a value.
  *
+ * Two variants, chosen by `htmlPreview.comments.enabled` when the view is
+ * built (docs/designs/html-preview-comments.md §3 "Feature flag", §4.2; ADR
+ * 0005): flag off is today's literal exactly; flag on differs in TWO keys.
+ * `nodeIntegrationInSubFrames: true` gives frames no Node at all under
+ * `sandbox: true` – it makes Electron run the (sandboxed, isolated) preload in
+ * every sub-frame, which the comment overlay needs to capture tokens, draw
+ * pins and swallow clicks inside same-project frames. `additionalArguments`
+ * carries {@link PREVIEW_COMMENTS_ARGUMENT}, the preload's only signal to
+ * install the overlay at all: without it the preload is today's link and CSP
+ * reporter and nothing more, so the flag is a kill switch. The frozen-literal
+ * test pins both variants.
+ *
  * `hardenPreviewSession` denies every permission, blocks downloads and narrows
  * WebRTC local-IP exposure. It does NOT touch response headers: the CSP has a
  * single owner, the protocol handler's `buildResponseHeaders` (design §2.5,
@@ -54,18 +66,68 @@ export const PREVIEW_WEB_PREFERENCES = Object.freeze({
 } as const)
 
 /**
+ * The renderer argument that tells the preview preload to install the comment
+ * overlay (`process.argv` in the sandboxed preload). The preload inlines the
+ * same string (`src/preload/previewPageComments/constants.ts`); a drift test
+ * pins the two together.
+ */
+export const PREVIEW_COMMENTS_ARGUMENT = '--erfana-hpc'
+
+/**
+ * The pinned preferences with HTML Preview comments on: {@link
+ * PREVIEW_WEB_PREFERENCES} with `nodeIntegrationInSubFrames: true`, the
+ * {@link PREVIEW_COMMENTS_ARGUMENT} renderer argument and every other key
+ * unchanged (SEC-22). Sandboxed, so frames run the preload, not Node.
+ */
+export const PREVIEW_WEB_PREFERENCES_WITH_COMMENTS = Object.freeze({
+  ...PREVIEW_WEB_PREFERENCES,
+  nodeIntegrationInSubFrames: true,
+  additionalArguments: Object.freeze([PREVIEW_COMMENTS_ARGUMENT] as const)
+} as const)
+
+/** Per-view choices for {@link buildPreviewWebPreferences}. */
+export interface PreviewWebPreferenceOptions {
+  /** `htmlPreview.comments.enabled`, read when the view is built. */
+  readonly comments?: boolean
+}
+
+/**
+ * Whether HTML Preview comments are on for a view about to be built. Unwired,
+ * or a settings read that throws, counts as off: the safe side is today's preview.
+ */
+export function commentsFlagOf(comments: { isEnabled(): boolean } | undefined): boolean {
+  if (comments === undefined) return false
+  try {
+    return comments.isEnabled()
+  } catch {
+    return false
+  }
+}
+
+/**
  * The ONLY construction site for preview `WebPreferences`.
  *
  * @param session - The sealed partition (design §1.2).
  * @param preloadPath - Absolute path to the built `previewPage.js`. Omitted or
  * `null` means no preload at all, which is a working preview with inert links —
  * the deliberate degradation when the bundle is missing, rather than a crash.
+ * @param options - `comments: true` runs the preload in sub-frames too and
+ * tells it to install the comment overlay.
  */
 export function buildPreviewWebPreferences(
   session: Session,
-  preloadPath?: string | null
+  preloadPath?: string | null,
+  options: PreviewWebPreferenceOptions = {}
 ): WebPreferences {
-  const base: WebPreferences = { ...PREVIEW_WEB_PREFERENCES, session }
+  const base: WebPreferences =
+    options.comments === true
+      ? {
+          ...PREVIEW_WEB_PREFERENCES_WITH_COMMENTS,
+          // A fresh array: Electron is handed nothing it could share with the frozen literal.
+          additionalArguments: [...PREVIEW_WEB_PREFERENCES_WITH_COMMENTS.additionalArguments],
+          session
+        }
+      : { ...PREVIEW_WEB_PREFERENCES, session }
   return preloadPath ? { ...base, preload: preloadPath } : base
 }
 

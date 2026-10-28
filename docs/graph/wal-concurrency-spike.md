@@ -18,9 +18,9 @@ collected by `vitest.main.ts` (`scripts/spikes/**/*.test.{js,mjs,ts}`) and there
 on **every push** by the required `test` job — one `expect` per contract, C1–C9.
 
 Read the contract text itself in
-[`specs/designs/sd-021-db-contracts.md` §5.3](../../specs/designs/sd-021-db-contracts.md);
+[`docs/designs/sd-021-db-contracts.md` §5.3](../designs/sd-021-db-contracts.md);
 the C1–C9 → test-file → owner matrix is in
-[`sd-021-errata-and-risks.md` §11.2](../../specs/designs/sd-021-errata-and-risks.md).
+[`sd-021-errata-and-risks.md` §11.2](../designs/sd-021-errata-and-risks.md).
 
 ---
 

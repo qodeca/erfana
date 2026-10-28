@@ -24,8 +24,8 @@
  * production 5 000 ms, so the whole file stays well under a second.
  *
  * @see Issue #21 - graph R1 architecture
- * @see specs/designs/sd-021-db-contracts.md §5.3 - the C1-C9 contract text
- * @see specs/designs/sd-021-errata-and-risks.md §11 item 10, §11.2 matrix
+ * @see docs/designs/sd-021-db-contracts.md §5.3 - the C1-C9 contract text
+ * @see docs/designs/sd-021-errata-and-risks.md §11 item 10, §11.2 matrix
  * @see docs/graph/wal-concurrency-spike.md - the findings note
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'

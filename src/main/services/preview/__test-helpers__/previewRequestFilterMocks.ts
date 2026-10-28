@@ -8,7 +8,7 @@
  *
  * Plain values and builders; there is no `vi.mock()` here.
  */
-import { vi } from 'vitest'
+import { vi, type Mock } from 'vitest'
 import type { PreviewFailureType } from '../../../../shared/ipc/preview-types'
 import type { PreviewFrameRefusalType } from '../previewFrameRefusals'
 import type { attach, PreviewFilterContext } from '../PreviewRequestFilter'
@@ -26,9 +26,9 @@ export type SettleListener = (details: { id: number }) => void
 /** A fake session whose `webRequest` methods capture their listeners. */
 export function makeSession(): {
   session: Parameters<typeof attach>[0]
-  onBeforeRequest: ReturnType<typeof vi.fn>
-  onCompleted: ReturnType<typeof vi.fn>
-  onErrorOccurred: ReturnType<typeof vi.fn>
+  onBeforeRequest: Mock
+  onCompleted: Mock
+  onErrorOccurred: Mock
 } {
   const onBeforeRequest = vi.fn<(...args: unknown[]) => void>()
   const onCompleted = vi.fn<(...args: unknown[]) => void>()
@@ -54,10 +54,10 @@ export function makeContext(
   ownToken = OWN_TOKEN
 ): {
   ctx: PreviewFilterContext
-  onBlocked: ReturnType<typeof vi.fn>
-  onRequestStarted: ReturnType<typeof vi.fn>
-  onRequestSettled: ReturnType<typeof vi.fn>
-  recordFrameRefusal: ReturnType<typeof vi.fn>
+  onBlocked: Mock
+  onRequestStarted: Mock
+  onRequestSettled: Mock
+  recordFrameRefusal: Mock
   ledger: PreviewRequestKindLedger
 } {
   const set = new Set(allowed)

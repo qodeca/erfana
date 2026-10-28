@@ -81,6 +81,37 @@ export function focusHostContents(window: PreviewHostFocusWindow): boolean {
   }
 }
 
+/** A host window that can also say whether it is the OS key window. Structural for tests. */
+export interface PreviewHostKeyWindow extends PreviewHostFocusWindow {
+  isFocused(): boolean
+}
+
+/**
+ * Give native keyboard focus to the host contents for an Erfana surface main
+ * is about to open over the page – the comment menu or window
+ * (docs/designs/html-preview-comments.md §19 "Rev 4 – owner test: comment
+ * window focus and save key").
+ *
+ * A comment pick is a click or a key INSIDE the page, so the page holds native
+ * focus when the menu or window opens, and the renderer's `textarea.focus()`
+ * alone cannot take it back (Electron #18859): the reader's typing and
+ * Cmd/Ctrl+Enter would keep landing in the page.
+ *
+ * Only while the window is the OS key window: building a draft reads the file
+ * from disk (up to 25 MB), and `webContents.focus()` also raises its window –
+ * a reader who switched to another app meanwhile must not be pulled back.
+ * Then the renderer's DOM focus is still set, and nothing else changes.
+ *
+ * @param window - The window that owns the view.
+ * @returns `true` when focus was handed to the host contents.
+ */
+export function focusHostWhileKey(window: PreviewHostKeyWindow): boolean {
+  if (window.isDestroyed() || !window.isFocused()) {
+    return false
+  }
+  return focusHostContents(window)
+}
+
 /**
  * Forward one matched key to the renderer, first returning native focus to the
  * host when the key's action moves focus there.

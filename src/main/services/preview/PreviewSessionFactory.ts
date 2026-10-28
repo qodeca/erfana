@@ -56,12 +56,15 @@ import { attach as attachProtocolHandler } from './PreviewProtocolHandler'
 import { attach as attachRequestFilter } from './PreviewRequestFilter'
 import {
   buildPreviewWebPreferences,
+  commentsFlagOf,
   hardenPreviewSession,
   nextPartitionName
 } from './previewSessionPolicy'
 import { assertSealed, purge as purgePreviewSession } from './PreviewStorageSeal'
 import {
   buildPreviewSessionContexts,
+  type PreviewSessionCommentDeps,
+  type PreviewSessionContexts,
   type PreviewSessionPageScopes
 } from './previewSessionFilterContext'
 
@@ -187,6 +190,8 @@ export interface PreviewSession {
   readonly realRoot: string
   /** Detach the protocol handler, the request filter and the session hardening. */
   readonly teardown: () => void
+  /** The view's comment serving, when the view was built with comments on (html-preview-comments.md §4.2). */
+  readonly comments?: PreviewSessionContexts['comments']
 }
 
 export interface IPreviewSessionFactory {
@@ -235,28 +240,31 @@ export interface PreviewSessionFactoryDeps {
   readonly attachFilter?: (session: PreviewSessionLike, ctx: PreviewFilterContext) => () => void
   /** Assert the session is in-memory; defaults to the item-22 `assertSealed`. */
   readonly assertSealed?: (session: PreviewSessionLike) => void
+  /** HTML Preview comments (html-preview-comments.md §4.2); absent, pages are served raw. */
+  readonly comments?: PreviewSessionCommentDeps
 }
 
 export class PreviewSessionFactory implements IPreviewSessionFactory {
   private readonly deps: Required<
-    Omit<PreviewSessionFactoryDeps, 'registry' | 'allowlistStore'>
+    Omit<PreviewSessionFactoryDeps, 'registry' | 'allowlistStore' | 'comments'>
   > &
-    Pick<PreviewSessionFactoryDeps, 'registry' | 'allowlistStore'>
+    Pick<PreviewSessionFactoryDeps, 'registry' | 'allowlistStore' | 'comments'>
 
   constructor(deps: PreviewSessionFactoryDeps) {
     this.deps = {
       registry: deps.registry,
       allowlistStore: deps.allowlistStore,
+      comments: deps.comments,
       createSession: deps.createSession ?? defaultCreateSession,
       createView: deps.createView ?? defaultCreateView,
       previewPagePreloadPath: deps.previewPagePreloadPath ?? null,
       buildWebPreferences:
         deps.buildWebPreferences ??
         ((session) =>
-          buildPreviewWebPreferences(
-            session as unknown as Session,
-            deps.previewPagePreloadPath ?? null
-          )),
+          buildPreviewWebPreferences(session as unknown as Session, deps.previewPagePreloadPath ?? null, {
+            // Read per view: a view keeps its policy for life (html-preview-comments.md §3).
+            comments: commentsFlagOf(deps.comments)
+          })),
       nextPartitionName: deps.nextPartitionName ?? nextPartitionName,
       purge: deps.purge ?? ((session) => purgePreviewSession(session as unknown as Session)),
       hardenSession:
@@ -377,19 +385,14 @@ export class PreviewSessionFactory implements IPreviewSessionFactory {
       resolve: (t) => registry.resolve(t) ?? null,
       getAllowedHosts: () => allowlistStore.getOrigins(),
       pageScopes: ctx.pageScopes,
-      onBlocked: ctx.onBlocked
+      onBlocked: ctx.onBlocked,
+      comments: this.deps.comments
     })
 
-    // Steps 3–9 all run AFTER the token is live, and every one of them can
-    // throw: `createView` allocates a WebContentsView, `hardenSession` touches
-    // the new webContents, and both attach steps install session-level wiring.
-    //
-    // An earlier revision guarded step 9 only, under a comment claiming "no
-    // half-wired view leaks". That was true of the seal tripwire and of nothing
-    // else: a throw in `attachFilter` left the token resolvable and the protocol
-    // handler attached, so it kept serving confined file reads for the life of
-    // the process (lens review F9). The cleanup list is now built incrementally,
-    // so a failure at ANY step unwinds exactly what was built before it.
+    // Steps 3–9 run AFTER the token is live, and each can throw. A throw in
+    // `attachFilter` once left the token resolvable and the handler serving
+    // confined reads for the life of the process (lens review F9), so the cleanup
+    // list is built incrementally: a failure at ANY step unwinds what came before.
     const unwind: Array<() => void> = [() => registry.revoke(token)]
     const rollback = (): void => {
       // Last built, first undone. Each step is independently guarded: one
@@ -423,6 +426,8 @@ export class PreviewSessionFactory implements IPreviewSessionFactory {
       unwind.push(() => {
         void release()
       })
+      // Read as the web prefs are built, so the frame preload and the service agree.
+      const commentsOn = commentsFlagOf(this.deps.comments)
       const webPreferences = this.deps.buildWebPreferences(session)
       const view = this.deps.createView(webPreferences)
       unwind.push(() => {
@@ -460,7 +465,8 @@ export class PreviewSessionFactory implements IPreviewSessionFactory {
         realRoot: entry.realRoot,
         partition,
         teardown,
-        release
+        release,
+        ...(commentsOn && contexts.comments !== undefined ? { comments: contexts.comments } : {})
       }
     } catch (error) {
       rollback()

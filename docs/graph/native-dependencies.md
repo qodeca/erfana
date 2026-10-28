@@ -27,7 +27,7 @@ DMG-stapled load was not separately smoked. The
 only. The sole remaining task is the multi-run green soak before promoting the
 advisory step to a hard gate. Treat any claim tagged _(UNVERIFIED)_ accordingly.
 
-See the design for full rationale: `specs/designs/sd-019-native-dep-spike.md`.
+See the design for full rationale: `docs/designs/sd-019-native-dep-spike.md`.
 
 ---
 
@@ -504,4 +504,4 @@ the packaged smoke to a hard gate — two single green runs do not satisfy it.
 ---
 
 _Addressed to #23 (DB layer) and #30 (MCP server). Design of record:
-`specs/designs/sd-019-native-dep-spike.md`._
+`docs/designs/sd-019-native-dep-spike.md`._

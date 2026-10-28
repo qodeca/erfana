@@ -16,7 +16,7 @@
  * permission-band card.
  *
  * @module HtmlPreviewPanel/components/PreviewToolbarTools
- * @see design/system/components/permission-band/index.html - status="decided"
+ * @see docs/design-system/system/components/permission-band/index.html - status="decided"
  */
 import { ExternalLink, FileDown, Search } from 'lucide-react'
 import { formatShortcut } from '../../../../utils/shortcutLabel'
@@ -186,7 +186,7 @@ export function PreviewToolbarTools({
           aria-label="Export to PDF"
           title="Export to PDF"
           data-testid="preview-band-export-pdf"
-          /* deviates: design/system/components/permission-band/index.html — the card
+          /* deviates: docs/design-system/system/components/permission-band/index.html — the card
              makes a tool that cannot act aria-disabled; Export still takes disabled,
              which Chromium blurs, so focus falls to the page body when the save
              dialog closes. Moving it to aria-disabled is follow-up work. */

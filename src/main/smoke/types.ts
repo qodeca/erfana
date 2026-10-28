@@ -7,7 +7,7 @@
  * concerns stay orthogonal (better-sqlite3 for #23, MCP SDK for #30) and can
  * be reused independently without one importing the other's module.
  *
- * @see specs/designs/sd-019-native-dep-spike.md §5
+ * @see docs/designs/sd-019-native-dep-spike.md §5
  */
 
 /**

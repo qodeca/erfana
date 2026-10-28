@@ -96,7 +96,7 @@
     "deprecations": "docs/deprecations",
     "performance": "docs/performance",
     "migrations": "docs/migrations",
-    "designSystem": "design"
+    "designSystem": "docs/design-system"
   },
   "deploy": {
     "environments": [],

@@ -1,0 +1,30 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>-HPC-RAWTEXT-</title>
+  <style>
+    body { font: 16px/1.5 sans-serif; margin: 40px; background: #fff; color: #111; }
+    pre { font: 14px/1.4 monospace; padding: 8px; border: 1px solid #ccc; width: 420px; }
+    .keep { white-space: pre; font: 14px/1.4 monospace; border: 1px solid #ccc; width: 420px; }
+    svg { display: block; border: 1px solid #ccc; }
+  </style>
+</head>
+<body>
+  <h1 id="title">Whitespace that renders</h1>
+  <pre id="code">first line
+  <span id="in-pre">a span on its own line in pre</span>
+last line</pre>
+  <p id="para">Text with <em id="inline">an inline element</em> in the middle.</p>
+  <div class="keep" id="ws-pre">kept spaces
+    <b id="in-ws">bold on its own line</b>
+  after it</div>
+  <svg id="pic" width="420" height="80" viewBox="0 0 420 80">
+    <text id="label" x="10" y="30">SVG text</text>
+    <text id="label-2" x="10" y="60">Second SVG text</text>
+  </svg>
+  <p id="plain">A plain paragraph that starts its own line.</p>
+</body>
+</html>

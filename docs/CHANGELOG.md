@@ -1,6 +1,6 @@
 # Erfana Changelog
 
-Per-version release notes for Erfana, v0.9.0 onwards. Earlier: v0.8.0–v0.8.3 in [archive/changelog-v08.md](./archive/changelog-v08.md), v0.3.0–v0.5.4 in [archive/changelog-v03-v05.md](./archive/changelog-v03-v05.md); v0.6.x–v0.7.x have no entries at all, as recorded under "Earlier versions (archived)" at the foot of this file. For in-flight Windows enablement work not yet released, see [`docs/windows/implementation-plan.md`](./windows/implementation-plan.md) "Status snapshot".
+Per-version release notes for Erfana, v0.9.0 onwards. Earlier: v0.8.0–v0.8.3 in [archive/changelog-v08.md](https://github.com/qodeca/erfana/blob/1d814e05d98b3005e5c13c0624b09653708136f7/docs/archive/changelog-v08.md), v0.3.0–v0.5.4 in [archive/changelog-v03-v05.md](https://github.com/qodeca/erfana/blob/1d814e05d98b3005e5c13c0624b09653708136f7/docs/archive/changelog-v03-v05.md); v0.6.x–v0.7.x have no entries at all, as recorded under "Earlier versions (archived)" at the foot of this file. For in-flight Windows enablement work not yet released, see [`docs/windows/implementation-plan.md`](./windows/implementation-plan.md) "Status snapshot".
 
 > **Note:** In v0.7.2, BRS (Business Requirements Specifications) were renamed to "specs" and relocated from `specs/business-reqs/` to `specs/spec-t{tier}-{id}-{slug}/`. All references in code and docs now use `Spec #XXX`. Historical entries below have been updated accordingly.
 
@@ -10,9 +10,537 @@ Each version uses the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) g
 
 Changes merged since the last release are not listed here. Each pull request adds a fragment to [`changelog.d/`](../changelog.d/README.md) instead, so no two pull requests edit the same lines of this file. At release time the fragments are folded into a new `## X.Y.Z` section directly below this one and deleted in the same commit; this section stays as it is. To see what is pending, read the fragments, or run `npx git-cliff --unreleased`, which lists the Conventional Commits since the last `v*` tag – the same command drafts the technical half of the release notes.
 
-## 0.21.0
+## 0.23.0
 
-*Released 2026-10-18. Tag `v0.21.0`.*
+*Released 2026-10-28. Tag `v0.23.0`.*
+
+### Added
+
+- **You can comment on elements of a previewed HTML page.** Turn on comment mode in the preview
+  toolbar (Ctrl+Alt+M, Cmd+Option+M on macOS), click an element, and write what should change.
+  Comments appear as pins on the page and in a drawer that lists every thread, with reply, edit,
+  resolve and delete. The comment is saved inside the `.html` file as an ordinary HTML comment right
+  before the element, so it travels with the file through git and a coding agent that reads the file
+  sees your request next to the markup. Every comment block starts with a short note telling agents
+  to act only on open comments and to leave the block unchanged. Comments work inside same-project
+  frames too. The format is documented in `docs/html-comments/format-v1.md`.
+- **A Settings > Comments section.** It holds your name and optional email, which Erfana writes next
+  to each comment, and the **Comments in HTML preview** switch (on by default). With the switch off,
+  previews behave exactly as before.
+
+### Changed
+
+- **Pages that Vue, Svelte or Angular hydrate get their comment block before the app's root.**
+  Those frameworks do not tolerate an extra comment inside the markup they hydrate. A page script
+  that walks `childNodes` can still see comment blocks. Files over 25 MB show no comments.
+
+### Removed
+
+- **Unmaintained history folders.** `docs/handoffs/`, `docs/archive/` and
+  `docs/architecture-reviews/` are deleted; the docs that cited them link to
+  the files in git history instead. (#414)
+
+### Fixed
+
+- **A file created just after a project opens now shows in the project tree.** The file watcher
+  starts after the tree is first read, and on Windows each folder's watch opens a moment later
+  still, so a file created in between appeared only after pressing Refresh – collapsing and
+  re-opening its folder did not help. The tree is now read once more when the watcher is ready, and
+  opening a folder checks it against the disk and refreshes the tree when they differ.
+- **An HTML preview no longer misses a save made just after it opens.** A stylesheet or script
+  saved while the preview was still finding the page's linked files was not watched yet, so the
+  page kept the old version until the next save. Each newly watched file is now checked when its
+  watch starts, and a file changed since the page began loading refreshes the preview once.
+
+### Security
+
+- **Comment saves are gated end to end.** The preview page can only ask for a comment window; the
+  write happens from Erfana's own Save, replaces the file only if it is still exactly the file that
+  was read, refuses links, keeps the Windows mark of the web, and never logs comment text, names or
+  paths. The preview preload now runs in frames and has one receive channel when comments are on
+  (ADR 0005). See `docs/security.md` § HTML Preview comments.
+- **Electron 44.9.3.** Picks up Electron's mitigation for compromised eMudhra intermediate
+  certificates, with patch releases of vite (Windows argument escaping in `launch-editor`),
+  brace-expansion, fast-uri, postcss-selector-parser and source-map-js from `npm audit fix`.
+- **Mermaid 12.2.0.** Clears the KaTeX prototype-pollution advisory that reached the preview
+  through Mermaid 11. Mermaid 12 defaults to a new look and the ELK layout; Erfana pins the
+  classic look and the dagre layout, so existing diagrams keep their shape, and a diagram can
+  still opt in through its own front matter.
+
+### Internal
+
+- **Timing-budget tests run alone.** The `*.perf.test.*` suites now run in their own vitest
+  project, `main-perf`, one file at a time and after every other test file – in `test:ci`,
+  `test:main`, `test:cov` and the Coverage job – because other files running beside them pushed
+  their event-loop stalls past budget. Their budgets are unchanged, and their coverage still counts
+  in the main report. See `docs/ci.md` § Quality checks.
+- **Design material has two homes.** The design system moved from `design/`
+  to `docs/design-system/`, and every per-issue design note now lives in
+  `docs/designs/`; tooling, tests and links follow the move. (#414)
+- **Third-party licenses regenerated.** `THIRD-PARTY-LICENSES.md` now lists the shipped
+  versions (Electron 44.9.3, liteparse 2.15.1 and five other dependency updates) and names the
+  liteparse native package of both shipped builds, macOS arm64 and Windows x64.
+- **vitest 5.** Upgraded vitest and `@vitest/coverage-v8` from 3.2 to 5.0.5, which removes
+  the critical tinypool and `@vitest/mocker` advisories from the dev tree. The three projects
+  are listed in `vitest.config.ts` (`test.projects`) instead of `vitest.workspace.ts`, and the
+  per-project configs are renamed `vitest.<project>.config.ts`, as vitest 5 requires. Mocks
+  that code builds with `new` use `function` implementations, and test helpers type their
+  mocks as `Mock` rather than `ReturnType<typeof vi.fn>`. The coverage floors were
+  re-measured: vitest 5 maps v8 coverage through the AST and counts more branches, so the same
+  code reads lower (main branches 91.37 → 82.85). The CI deprecation allowlist is now empty.
+- **Three e2e tests that failed on a Windows host now pass.** `MonacoPage.focus()` waits for
+  Monaco's text area to settle before it clicks (an early click became a drag that selected
+  line 1), the tree focus-ring check expects 2 px snapped to device pixels as Chromium draws it
+  at 125 % scaling, and the tree right-click lands well inside the row instead of 10 px from an
+  edge that moves. Recorded in `docs/windows/known-flakes.md`.
+- **Two-worker e2e runs on Windows no longer freeze the covered window.** Chromium stops
+  rendering a window another one covers, so the HTML-preview and editor checks in the hidden
+  worker's app timed out. Every e2e launch now passes `E2E_CHROMIUM_ARGS`
+  (`--disable-features=CalculateNativeWinOcclusion` on Windows).
+
+## 0.22.0
+
+*Released 2026-10-25. Tag `v0.22.0`.* v0.21.0 was never tagged or published, so this is the first release since v0.20.1 and it also ships everything listed under 0.21.0 below.
+
+### Added
+
+- **Screen readers can now read the terminal.** The terminal turns on xterm's screen-reader mode while macOS or Windows reports a screen reader (VoiceOver, NVDA and others), and **Settings > Terminal > Screen reader mode** can force it On (for Linux, where the system does not report screen readers) or Off. Changes apply to open terminals at once. (lens review [23])
+- **Settings now shows which import formats work before you pick a file.** A new Import tools section
+  lists PDF, Office documents and images, says in words whether LibreOffice was found,
+  and tells you how to install it – the Homebrew command with a Copy button on macOS, a
+  download button on Windows, the package name on Linux. Check again looks for it again without a
+  restart. The "LibreOffice required" message now offers an "Open import tools" button, and on macOS the
+  file picker says why Office formats are not listed. (#250)
+- **The project tree works with the keyboard.** The tree is now one stop in the Tab order. Inside it,
+  the arrow keys move between rows and open or close folders, Home and End jump to the first and last
+  row, Enter opens a file or opens and selects a folder, typing the first letters of a name jumps to
+  it, and Shift+F10 (or the Menu key) opens the row's menu. Screen readers now hear each row's own
+  name, level and position ("3 of 7") instead of a folder name followed by everything inside it, and
+  the focused row shows the standard focus ring. Before, every row was its own Tab stop and no key
+  did anything. (#87, #88, #89)
+- **You can cancel a Whisper model download.** Settings now shows a Cancel button while the model
+  downloads. A cancelled download leaves no partial file behind, and the Download button comes back.
+
+### Changed
+
+- **The coverage floors now count untested files and sit just under real coverage.** All three
+  vitest configs set `all: true`, so a source file no test loads counts at 0 % instead of
+  dropping out of the totals. The project-wide floors rise to one point under the measured
+  values (lines, functions, branches, statements): main from 10/10/5/10 to 90/92/90/90,
+  renderer from 10/10/5/10 to 85/90/89/85, preload from 62/28/95/62 to 74/53/97/74. The
+  sealed preview page's preload, which reports link clicks and CSP refusals to main, gains a
+  unit test that sends it real DOM events. (lens review finding [62])
+- **A drop of more than 100 files is refused before you are asked how to add it.** Dropping more than
+  100 files from Finder or File Explorer onto the project tree now shows "Too many files" straight
+  away, instead of first asking Move, Copy or Import. Copy now has the same 100-file limit as the
+  Add files dialog.
+- **`npm run typecheck` now checks the tests too.** The unit tests (main, preload, shared and
+  renderer) and the Playwright e2e specs are type-checked in the required Typecheck job, through
+  one config per process. The type errors that had built up in tests were fixed in the tests,
+  not silenced. (#109)
+- **Images import without ImageMagick.** The document converter reads and OCRs images itself, so JPG,
+  PNG, GIF, BMP, TIFF and WebP are available out of the box and the "ImageMagick required" message is
+  gone. (#250)
+- **Dropping several files to move them asks once.** Moving a group of files from outside the project into it used to open one confirmation box per file. It now opens one box that names them all, and Cancel moves none of them. A very large group is still split into boxes of ten files.
+- **The app now keeps track of the open project in one place.** Opening, switching and closing a
+  project run one at a time, so a quick double-click on two recent projects ends with the second one
+  open instead of a half-switched state. A project that cannot be opened is no longer recorded as
+  the open one.
+- **Restart terminal now also asks while any program is running in it.** Previously the prompt appeared only for Claude Code or a terminal with recent output. A silent command or another coding agent that was waiting without printing anything could be ended without a question; now the prompt appears whenever something other than the shell is running (macOS and Linux).
+- **Terminal requests are checked more strictly.** The terminal only starts in the open project's folders (or the home folder when no project is open), each terminal answers only to the window that created it, and oversized or malformed requests are refused with a clear error.
+- **SDLC.md now holds the whole delivery process in one file.** A shared core (version 1.0, the same
+  text in every project that uses it) plus this project's profile. It adds rules for untrusted
+  input, agent permissions and guards, test quality, flaky tests, agent sessions, release and
+  after-release steps. Pull requests now add a changelog fragment in `changelog.d/`.
+- **Large folders open instantly.** The project tree now draws only the rows on screen, so expanding
+  a folder with thousands of files, or scrolling a large project, no longer stalls the window; a
+  click or a Git refresh also redraws only the rows that changed. While dragging, the rows inside the
+  target folder are tinted as before. Dropping an item next to itself (on a sibling, or on its own
+  folder) now does nothing, instead of asking to move it where it already is, and auto-scroll while
+  dragging follows the pointer. A cut file or folder is now dimmed until it is pasted – the
+  dimming was designed but never reached any row below the project root. (review finding [33])
+- **Moving a file into the project now asks before the original is removed.** A native box names the file and its folder; Cancel leaves everything as it was.
+- **Imported files always land in the open project.**
+- **File actions now check every path against the open project in the app's main process.** Reading,
+  writing, creating, renaming, moving, copying, deleting and revealing a file all go through the same
+  check, and a folder listing or a name-conflict check does too. A path that is not inside the open
+  project is refused with a clear message.
+- **Writes through a link that points outside the project are now refused, like reads already were.**
+  A link inside the project that leads to a folder elsewhere can still be renamed or deleted as a
+  link, and nothing outside the project is touched.
+- **File and folder names must not contain `/` or `\`.** Such a name is now rejected instead of having
+  the separators silently removed, so the name you typed is the name that is used.
+- **A program that floods the terminal no longer swamps the window.** Terminal output is now sent to the window in batches (about 380 times fewer messages for a 50 MB flood, which also finishes about 7 % sooner), and when the window falls behind, the program in the terminal is briefly held back until it catches up instead of output piling up without limit (macOS and Linux; on Windows output is batched only). A terminal in a minimised or hidden window is never held back, so builds and agents left running in the background keep their speed.
+- **Warnings now stay on screen for at least 8 seconds**, up from 3, even where a feature asked for
+  less. This is deliberate: a warning usually asks you to notice something, which takes longer to
+  read than a confirmation such as "Saved".
+- **A large project opens faster, and a huge one still opens.** Build and cache folders the watcher already ignores (`dist`, `build`, `.venv`, `.next`, `coverage`, ...) still show in the project tree, but their contents are read only when you expand them; the remaining folders are read several at a time instead of one by one; and past 50,000 entries the tree leaves the remaining folders to be read on expand. On a 25,000-file test project with a large `.venv` the tree is ready about 13 times sooner with 12 times fewer folder reads; on a 120,000-file project about 3 times sooner. The sort order is unchanged. While such a folder is read, a "Loading…" line sits under it (and "Could not read this folder" if the read fails); the arrow keys step over that line, and a drop on it lands in the folder. With the Markdown filter on, unread build folders stay hidden, and a folder left unread by the 50,000 limit stays visible until you expand it. When the tree is incomplete, a file name clicked in the terminal is also searched for on disk, and the file chooser lists every match and says the list may be incomplete. That search is bounded in time and size, and only two run at once.
+- **Saving a file no longer reloads the whole project tree.** Every save used to make Erfana
+  re-read and re-send the entire tree; on a 25,000-file project on a Mac, 50 saves meant 50 full
+  reads and 189 MB sent to the window – whether the file was written in place or through a temp
+  file renamed over it, as Erfana itself saves. Both now cause no tree read. Adding, removing or
+  renaming files and folders still refreshes the tree, and git badges still update on every save.
+  Under a steady stream of new files the tree still refreshes: about once a second, or every two
+  read-lengths (at most every 10 seconds) on a project whose tree is slow to read.
+- **The context meter holds one file handle per project, not one per Claude session.** On macOS the
+  transcript watcher used to keep a handle open for every transcript in the project's Claude
+  folder – hundreds for a long-lived project. It also starts watching when Claude creates the
+  folder after the terminal opened, and recovers when the folder's watch fails or the folder is
+  deleted and re-created.
+- **Fewer blocking disk calls on the main thread.** The file watcher no longer repeats a failed
+  check with a blocking one, and log rotation makes one call per file. Rotation now keeps the five
+  older logs per type that the logging docs describe; it kept four before.
+
+### Removed
+
+- **An unused internal channel for the last opened project was removed.** The app never read it, so
+  nothing changes for you.
+
+### Fixed
+
+- **A drop is moved only if every confirmation box says Move.** A large drop is confirmed in boxes
+  of ten files. If one of those boxes could not be shown (the window was hidden, or too many boxes
+  had opened in the last minute), the files from earlier boxes were still moved. Now none of the
+  drop's files are moved, and one message says the box could not be shown.
+- **The open- and close-project error messages use the same wording.** They now read "Failed to
+  Open Project" and "Failed to Close Project", like the other project messages.
+- **Unsaved tabs are saved before a project switch or close.** Opening another project (from the picker or the recent list) or closing the project now saves every edited tab first, so a quick edit is no longer lost or written late into the project being left. The "discard?" prompt appears only for tabs that could not be saved (for example a file that changed on disk) and says how many, such as "1 tab could not be saved". Cancel keeps the project and autosave running; "Switch Anyway" leaves those tabs unsaved without a late write.
+- **Autosave no longer overwrites a file that changed on disk.** While the "file changed on disk" bar is showing for a tab with unsaved edits, autosave now waits for your choice instead of writing the buffer over the newer file about two seconds later. Autosave resumes as soon as you pick "Keep My Version" or dismiss the bar.
+- **Saving is now crash-safe.** Erfana writes a document, or your settings file, to a temporary file
+  first and swaps it in only when it is complete. A crash or power cut in the middle of a save can no
+  longer leave you with a half-written or empty file. Files that are read-only, symbolic links or
+  shared hard links behave as before.
+- **The context meter now recognises Claude models used through Amazon Bedrock and Google Cloud.**
+  Model names such as `us.anthropic.claude-opus-4-8`, a Bedrock ARN or `claude-haiku-4-5@20251001`
+  get the same window size and friendly name as the plain Claude name, and a `/model` choice that
+  uses one is honoured. When Erfana cannot read a model name – including plain names outside its
+  grammar, such as `claude-3-7-sonnet-20250219` or the alias `opus` – the meter now marks its 200k
+  size as `(inferred)` instead of showing it as fact. A Bedrock ARN no longer shows your AWS
+  account number in the model label. (#49)
+- **On Windows, Command Prompt terminals now show their output and prompt.** The cmd.exe startup command was quoted in a way cmd does not understand, so the terminal stayed blank (commands still ran). It is now built as a ready-made command line. If a shell's startup ever fails to report in, the terminal now shows its output after 10 seconds instead of staying blank.
+- **Enter in a confirm prompt now presses the button that has focus.** Before, Enter always confirmed,
+  so tabbing to Cancel on a delete, discard or quit prompt and pressing Enter still deleted, discarded
+  or quit. Those destructive prompts now open with focus on Cancel, other prompts open on Confirm, and
+  holding Enter down no longer repeats into an answer.
+- **Right-click menus now work from the keyboard.** Press Shift+F10, or the Menu key on Windows, to
+  open the menu of the focused file, tab, editor, terminal or text field. Focus moves into the menu;
+  the arrow keys, Home and End move between items, Enter or Space chooses one, and typing a letter
+  jumps to it. Escape or Tab closes the menu and puts focus back where it was. (#90)
+- **Labels on the violet buttons are readable.** The Save button, the editor's view-mode toggles,
+  the welcome screen's action button, the diagram chat buttons and the activity-bar badge now draw
+  their text and icons in near-black instead of white, which was very hard to read on the light
+  violet. (#231)
+- **Small grey labels are easier to read.** Labels such as "Selected text" in the prompt dialog,
+  the front-matter header, keys and placeholder values in the preview, empty-editor hints and the "Clean" git count
+  use a lighter grey that meets the contrast minimum for text. (#231)
+- **One clear focus outline everywhere.** The search bar, settings controls and dialog fields and
+  dropdowns now show the same solid 2px outline as the rest of the app when you move to them with
+  the keyboard, instead of a faint glow. Tabs, activity-bar buttons and toolbar buttons that had a
+  1px outline now show the 2px one too. (#230)
+- **A disabled "Delete" menu item no longer looks dangerous.** It is shown greyed out, like any
+  other unavailable item, and no longer turns red under the pointer.
+- **Consistent text sizes and square corners.** The activity-bar badge and the preview's
+  front-matter labels use the app's text sizes, and the screenshot area-select hints have square
+  corners like the rest of the app.
+- **An open file is marked deleted in the cases that used to miss it.** When the folder above an
+  open file is renamed or deleted outside Erfana, its tab now shows "(deleted)" and the banner
+  even if the folder is one Erfana does not watch (excluded, hidden or ignored, such as `dist`),
+  or if the change happened while Erfana was busy with a file operation of its own. A file
+  restored with "Save to restore it" is watched again, so later outside edits reach the editor
+  without reopening the tab, and a second tab on the same file keeps hearing them too. A file
+  that is only locked or unreadable for a moment is no longer taken for deleted, and one that is
+  still unreadable just after Windows reports it deleted (another program holds it open) is
+  marked deleted rather than silently no longer followed. (#252)
+- **Every row in the HTML preview's host list is the same height.** Rows without an Allow button
+  (an allowed host, an IPv6 address) used to come out shorter than the rest. The list's section
+  headings also use the same letter spacing as the app's other uppercase labels. (#114)
+- **Tab stays inside every dialog.** Ten dialogs (confirm, alert, prompt, rename, new file and new
+  folder, drop mode, conflict, the file, screen and window pickers, and the screen-permission notice)
+  told screen readers the app behind them was switched off, yet Tab still walked out into it. Every
+  dialog now keeps Tab and Shift+Tab inside itself – in the screen and window pickers Tab returns to
+  the selected option – and closing a dialog puts focus back on whatever opened it. After New File,
+  Rename or Delete from the project tree's right-click menu, focus lands back in the tree instead of
+  being lost. (#91)
+- **Recent projects can be opened with the keyboard.** Tab reaches the recent-projects list on the
+  Welcome tab, the arrow keys (and Home and End) move between projects, and Enter or Space opens one.
+  Each project's remove button now names its project for screen readers, opening a project is
+  announced, and removing one keeps focus in the list.
+- **Copy, cut and paste no longer act on a folder you clicked earlier.** After clicking a folder in
+  the project tree, Cmd/Ctrl+C on text selected elsewhere – a dialog message, for example – copied
+  the folder and left the text off the clipboard; Cmd/Ctrl+X and V likewise acted on the folder.
+  These shortcuts now act on the tree only while it has focus, and only with the platform's own
+  modifier (Cmd on macOS, Ctrl elsewhere) and no Shift or Alt.
+- **An editor tab that cannot read its file now says so.** Before, a failed read left the tab
+  reading "No file open" with no message. Now the tab names the file and the reason, shows a
+  "Try again" button and raises an error toast. A file the user may not read (Windows "Deny
+  Read") now says "permission denied" instead of "Cannot verify this path is inside the project
+  directory"; it is still refused, and a link keeps the old answer. When two reads race, only the latest one is
+  shown, so switching files fast can no longer leave the wrong file's text on screen, and the
+  log no longer records the first 100 characters of every opened document.
+- **Autosave keeps its 30-second safety save during long typing sessions, and stops retrying a
+  save that failed.** After the first periodic save, continuous typing could skip every later one
+  until the user paused. No keystrokes were lost, but now each save arms the periodic save again.
+  A save that fails is no longer retried every 30 seconds with a fresh error toast each time: the
+  next edit tries again. The "auto-saved" indicator's timer is also cleared when the tab closes.
+- **Typed characters could be dropped when the app was busy.** While the app was busy (a large file, a heavy preview), a key typed at the wrong moment could vanish and the cursor jumped to the end of the file. The editor now keeps every key you type. A file that changes on disk while its tab is clean also no longer moves your cursor, and you can undo that change in one step.
+- **The unsaved dot stayed on after "Reload from Disk".** After choosing "Reload from Disk" in the file-changed bar, the tab kept showing unsaved changes although the editor matched the file. The dot now clears. Undo right after a reload brings your discarded edit back, and autosave then saves it.
+- **Escape now closes only the dialog on top.** One press used to close every open dialog at once,
+  so dismissing the quit prompt during a transcription or document import also cancelled the job,
+  and Escape on a prompt over Settings closed Settings too. Escape on an open context menu no longer
+  reaches the terminal underneath it either. (#229)
+- **Restart terminal asks first while the terminal is busy.** Restarting ends everything running in
+  the terminal, so it now asks for confirmation when Claude Code is running there or the terminal is
+  still producing output after you typed in it. The prompt opens with focus on Cancel; an idle
+  terminal restarts straight away.
+- **Every link that opens outside Erfana now goes through one check.** Clicks, middle-clicks, links
+  in the terminal and pages that try to open a new window all use it. Network-share paths, `file:`
+  links and `ftp:` links no longer open, and `mailto:` links keep only the address, subject and body.
+- **Paths are matched to the project by whole folder names.** A folder that merely starts with the
+  project's name, such as `my-project-old` next to `my-project`, is a different folder.
+- **Saving a file whose project folder was renamed or removed now says so**, instead of reporting a
+  path problem.
+- **Git status and the HTML preview's "ignored by git" check work with Git for Windows again.** Git
+  for Windows refused the null-device setting the hardened git call used, so every status read fell
+  back to the slower built-in reader. The setting now uses a form that every git build accepts.
+- **LibreOffice is now detected correctly on Windows, so Office documents can be imported there.**
+  Erfana used to launch LibreOffice just to ask its version. On Windows that check never finished and
+  left a LibreOffice process running in the background after every start. Erfana now finds LibreOffice
+  by its install location and launches nothing. (#329)
+- **On Windows, quitting with many terminals open no longer crashes.** (#305)
+- **On Windows, quitting no longer leaves console hosts or terminal programs running in the background.** (#305)
+- **On Windows, a PowerShell terminal is now one process instead of two, so the quit cleanup can find what you started from it.** Your PowerShell profiles still load, after the terminal has moved to the project folder. (#305)
+- **Markdown export to PDF works on Windows when the temp folder has a short name.** The export
+  window refused its own page when the Windows temp path held an 8.3 short name such as
+  `MARCIN~1`, so every export failed at once. The page is now matched by the file it names.
+- **PDF export can no longer hang the app's export queue.** Each step now has a time limit, and a
+  stuck export fails cleanly so the next one works. The export page also runs in its own sealed
+  session and loads only its own content and `https:` or embedded images.
+- **Paths with curly apostrophes now open correctly in PowerShell.** A folder or file name such as
+  `Bob’s Files` no longer ends the quoted path early when Erfana starts a PowerShell terminal in it
+  or drops a path into one. The typographic single quotes are now escaped like the plain `'`.
+- **Drops and inserts now quote paths for the terminal's own shell.** Files dropped onto the
+  terminal, items dragged from the project tree and camera photos used the macOS and Linux quoting
+  even in PowerShell or Command Prompt terminals. They now use the quoting of the terminal they go to.
+- **Images in the Markdown preview show up, and update when the file changes.** An image
+  referenced with a path relative to the document, such as `![logo](./assets/logo.svg)`, used to
+  show as a broken image; it now renders, and refreshes within about a second when the file is
+  rewritten on disk, without reopening the tab. Images outside the project, absolute paths and
+  `file:` addresses are not loaded and show their alt text instead. (#71)
+- **Smaller HTML preview lifecycle defects.** A discarded still-frame capture is no longer scaled and encoded first, a preview whose page is gone no longer exports, reloads or swaps a stylesheet, a failed start detaches its native view from the window, the window-edge resize hold and repeated growth pushes no longer start a repaint check in the page for every push, and window routing no longer writes onto Electron's live web contents. (#120)
+- **A link the previewed page cancels is no longer followed.** When an HTML page in the preview
+  cancelled a link click in one of its own later click handlers, Erfana still opened the link.
+  The preview now waits until the page's handlers have all run before it acts on a click.
+- **Opening the top of a drive (such as `/` or `C:\`) or of a network share as a project is now refused,** because every file on it would count as part of the project. A link or shortcut that leads to such a place is refused as well.
+- **On Windows, the Windows, Program Files and ProgramData folders (and your `.ssh`, `.aws` and similar folders) can no longer be opened as projects,** as the equivalent system folders already could not on macOS and Linux.
+- **A refused project now says why, the same way everywhere.** Whether you open from the folder dialog, from the recent list or by dropping, the message and the inline error read in plain words, without the internal "Error invoking remote method" text.
+- **Quitting with a terminal open no longer crashes on Windows.** When Erfana closed, it killed the
+  terminal's shell and exited at once. The shell's exit report could then arrive while the app was
+  already shutting down, and the main process aborted. Erfana now waits up to 1.5 s for each shell
+  to report its exit before it quits (#214).
+- **Opening two projects in quick succession no longer shows a false "Failed to Load Project" error.**
+  When a second project was opened before the first had finished loading, the first project's
+  folder read could be refused and reported as an error. Erfana now recognises that read as
+  superseded and drops it quietly, and the second project opens normally.
+- **Two log lines no longer write full folder paths.** A failed save and a folder that disappeared
+  while the project tree was read both wrote the full path into the log files. They now write
+  `[redacted-path]`, or only the last folder name. The error toast still shows the full path.
+- **"Reduce motion" now stops every animation.** With the system setting on (Windows: Settings →
+  Accessibility → Visual effects → Animation effects off; macOS: Reduce motion), loading spinners
+  kept spinning and taking a photo still flashed the whole window – twelve stylesheets had no
+  reduced-motion rule. One rule for the whole app now ends every animation at once: spinners rest
+  as a still ring, the camera flash no longer shows, and panels that slid in appear in place.
+  Toasts keep their gentle fade. (#96)
+- **Small controls are easier to hit.** The close button on editor, image and HTML preview tabs,
+  the settings checkboxes, the dialog's keyboard-shortcuts info button and the import dialog's
+  checkboxes now each take a pointer target of at least 24 × 24 pixels, the WCAG 2.2 minimum. Icons
+  keep their size. (#96)
+- **The app window now gets only the permissions it needs.** Only the camera (for photo capture) is
+  allowed; every other browser permission is refused. The app page also sees a smaller set of
+  functions.
+- **An OpenAI key is never stored as plain text.** If the system cannot encrypt it (for example Linux
+  without a keyring), Erfana says so and does not save it. Before, a failed save showed nothing.
+  Project locks now use a stable random secret, so two windows on Windows recognise each other's lock.
+- **No false "Failed to Load Project" when you switch projects quickly.** Opening a second project
+  while the first one was still loading could show an error for the first one, even though the
+  second one opened correctly.
+- **Erfana now opens even when its settings or log files cannot be set up.** Before, a broken
+  settings file or log folder could leave a running app with no window and no log. Now the window
+  still opens with default settings, a short message explains what happened, and the cause is
+  written to `crash.log` in the logs folder. If the settings file could not be read, a copy is kept
+  before it is ever replaced.
+- **Crashes that used to leave no trace are now recorded.** Unhandled errors in the main process
+  are written to the log and to `crash.log` (with file paths and user names removed); the app
+  behaves as before.
+- **Log files no longer grow without limit.** At most 5 older files are kept per log (was 100,
+  up to about 3 GB), old logs are removed oldest-first even when the disk is nearly full, and a
+  flood of messages from the app window is capped with a note about what was dropped. Overlong
+  messages are shortened, and line breaks and other control characters can no longer fake extra
+  log lines.
+- **Terminal output and full file paths no longer appear in the logs.** Only the size of terminal
+  output and the file or folder name are logged.
+- **Git status now runs with the project's own git settings kept out of the way.** Erfana starts git
+  from a neutral folder with a short list of environment variables, and turns off every setting that
+  could make git start another program (hooks, fsmonitor, filter drivers, lazy fetch). Projects that
+  use filter drivers or a partial clone fall back to the built-in git reader. The HTML preview's
+  "ignored by git" check now works, and no longer blocks a whole project that sits inside a folder
+  another repository ignores.
+- **Restarting the terminal, switching projects fast or closing the panel while a terminal is still starting no longer leaves a second shell running.** A start that is overtaken now gives up and ends the shell main created for it, and its late output never reaches the terminal that replaced it. (lens review [18])
+- **The terminal can start again after a failed start.** When creating the shell failed, the dead terminal stayed behind and blocked every later attempt, so "Recheck" could not bring the terminal back; a failure while loading the font or opening the terminal also leaked the half-built terminal. Both now clean up after themselves.
+- **Opening a good project after a terminal error starts the terminal again.** After a failed start (for example a project folder whose path contains `&` on Windows), switching to another project cleared the error but left the terminal panel black with no prompt, because the new start ran before the terminal area was back on screen. It now starts as soon as the terminal area returns.
+- **A new terminal could stay blank until you pressed a key.** A shell that drew its prompt while the
+  terminal was still starting had that prompt thrown away. It is now kept and shown. (#302)
+- **Error messages no longer disappear before you can read them.** An error toast now stays until
+  you close it. Every toast also stops its countdown while the pointer is over it or keyboard focus
+  is inside it, so a message is never pulled away while you are reading it or about to press its
+  button. Press Escape on a focused toast to close it; focus goes back to where it was.
+- **A repeating error no longer fills the screen.** The same message raised again while it is still
+  shown now adds a count ("×3") to the toast already on screen instead of stacking a copy, and at
+  most five toasts that stay until closed are shown at once – the oldest one goes first, but never
+  the one you are on with the keyboard.
+- **Video import can download its speech-recognition tools again.** In the installed app, the
+  download failed with "Digest method not supported" while checking the signed list of files. The
+  check now uses a bundled implementation that works in the app. Signature parsing is also
+  stricter: the full signature, including its comment, must now verify.
+- **A Whisper download that fails after Cancel is reported as a failure.** An integrity or other
+  error that lands after Cancel is now shown and logged as that error, instead of as a cancelled
+  download. A cancelled download is still logged, at debug level.
+- **The Whisper download Cancel button sends one request.** After the first press it reads
+  "Cancelling…" and stays focusable but inactive until the download ends, so repeated presses do
+  not send repeated cancel requests. Cancel also stops a download that is still getting ready to
+  start, and if the cancel request itself fails, the button can be pressed again.
+- **Screen readers follow a Whisper model download.** The progress is announced every 10 % or every
+  5 seconds, and so are "Model ready" and "Download cancelled". A failed download is announced as an
+  alert. The Download button keeps the keyboard focus while it waits, instead of dropping it.
+- **Local transcription model downloads work again.** The model host moved to a new CDN, which made
+  downloads fail. Downloads are now checked against pinned hashes, and the large model now downloads
+  from its current file.
+- **Installed transcription models are checked before use.** A model file with the wrong size or
+  content is removed and you are asked to download it again. Half-finished model downloads are
+  cleaned up when the app quits or starts a new download.
+- **Local speech-to-text now works on macOS.** Erfana now downloads the rebuilt whisper engine
+  (`whisper-build-v1.8.4-erfana2`), which carries everything it needs inside one signed and
+  notarized file. The previous build could not start on users' Macs, so local transcription
+  failed. After updating, Erfana needs an internet connection once: the first local
+  transcription replaces the old engine (on macOS and Windows), and the old build is no longer
+  accepted.
+- **Windows taskbar grouping.** On Windows, the running app now groups with its pinned taskbar
+  shortcut instead of showing a second icon.
+- **On Windows, relative links in the preview now show when their file is missing, and open the linked file.** Links with percent-escapes such as `my%20file.md` or `#%C3%A9t%C3%A9` now resolve on every platform, and links with backslashes, spaces in `<...>`, or non-ASCII names get the same broken-link styling as any other. A link can no longer reach outside the project, and a link that leaves the project and comes back in (`../<project>/x.md`) is now refused too. Windows device names such as `CON`, `NUL` or `CONIN$` are refused as file paths. (#300)
+- **One name for a project on Windows.** A project opened with a different spelling of its path (other letter case, or a short 8.3 name) now shows one consistent name in the title, the recent projects list and the project tree.
+- **Folder links show as folders.** Junctions and folder links that lead to another folder inside the project now appear as folders in the project tree and can be expanded. Links that lead outside the project, or that loop back on themselves, are not followed.
+- **Faster file access on network projects.** Opening folders and files in a project on a network share makes fewer file-system calls, with the same checks as before.
+- **On Windows, closing the window with many terminals open no longer leaves Erfana or its shells running.** When the window closes or the app quits, the terminals and the programs they started are now ended together, and the wait is limited. Closing or restarting a single terminal still ends only its shell. (#296, #303)
+- **Typing in a long Markdown file stays fast.** The live preview used to rebuild the whole
+  document on every keystroke; in a 3,000-line file that blocked the editor so long that, in our
+  typing test, about half of what was typed (22–24 of 50 characters) was dropped and the cursor
+  jumped to the end. In the same test no characters are lost now. The preview updates when you
+  pause (straight away in short files, and at least once a second while you keep typing), diagrams
+  redraw once you stop editing them, and PDF and Word exports wait for the preview to catch up.
+- **Links in the Markdown preview catch up with files that appear or disappear.** A link to a file
+  created after the preview opened used to stay marked as broken until you edited the links; it is
+  now re-checked when the file is added or removed, and otherwise within about 30 seconds. The
+  preview also remembers what it already checked, so editing one link in a document with 300 of
+  them asks about that one link instead of all 300, and tabs in the background wait until you look
+  at them.
+- **Restarting the terminal or switching projects no longer leaves listeners from the old terminal behind.** Every way a terminal closes now goes through one teardown that clears its pending timers and removes its start-up, file-drop and input listeners before the next terminal starts. (lens review [51], [52], [53])
+
+### Security
+
+- **The installed app now checks its own code at start-up.** Erfana's JavaScript ships in a single
+  `app.asar` archive that Electron compares with a hash embedded at build time, and the app loads
+  only from that archive. Until now the code shipped as plain files that any program running as the
+  same user could change without anything noticing. On macOS the hash is sealed by the app's code
+  signature. On Windows, where Erfana installs per user, the check raises the bar and makes
+  tampering visible, but it does not stop a program running as the same user, which can change
+  `Erfana.exe` itself; a per-machine install is planned for a later release. Native
+  parts (the terminal addon, `ffmpeg`, `ffprobe`, the PDF parser) stay outside the archive and are
+  not covered by the check. Cookie encryption stays off, because Erfana keeps no cookies on disk.
+- **Import tool checks and conversions never run a program from the open project.** LibreOffice is
+  looked up the way the converter looks it up, without spawning a lookup command. A copy from a relative
+  PATH entry, a network path, the project folder or a temporary folder is shown as "found in an unsafe
+  location", is never run, and makes an Office conversion refuse with a message naming the program. The
+  packaged app also stops using the folder it was launched from as its working folder. (#250)
+- **Updated the bundled DOMPurify to 3.4.17.** The Mermaid diagram renderer and the Monaco editor
+  each bundle DOMPurify, an HTML sanitiser. Both now use the 3.4.17 code, each with its own
+  instance, which includes fixes for five published advisories (GHSA-p98j-92pf-mc4p,
+  GHSA-6688-9rhm-gjv2, GHSA-cg2g-xh64-v4q7, GHSA-mrv2-3pqr-j5jr and GHSA-c6gr-qvv4-5v3f). The
+  build now fails if a second or older copy appears.
+- Updated follow-redirects to 1.16.1 (dependency of the Word export).
+
+### Internal
+
+- **The release pre-flight now fails when a doc states a stale version.**
+  `npm run check:version-drift` compares the `CLAUDE.md` version banner and the Electron version
+  that `SDLC.md`, `CONTRIBUTING.md` and the docs state as current with `package.json` and the
+  lockfile, and runs as the `version_drift` gate of the `releasing-erfana` pre-flight. The
+  changelog gains a fixed `## [Unreleased]` pointer to `changelog.d/`, and the release audit step
+  in `docs/security.md` now diffs against the previous release's exceptions table, whatever its
+  version.
+- **Source files can no longer grow past 500 lines.** ESLint's `max-lines` rule now holds every
+  non-test `src/**/*.{ts,tsx}` file to 500 lines, and each of the 43 files already over it to its
+  current size, listed in `scripts/max-lines-baseline.json`: a file may shrink, never grow. A new
+  `npm run lint` step, `lint:max-lines`, counts every file's lines itself, so an inline comment
+  that switches the ESLint rule off cannot let a file grow. It also fails when a listed file
+  shrinks without its entry being lowered, when an entry is no longer needed, or when a file has
+  such a comment. `npm run lint:max-lines -- --update` lowers or removes entries and never raises
+  one (technical debt #26 in `docs/technical-debt.md`). (lens review finding [65])
+- **The bare-name file search's bound tests no longer depend on machine speed.** The folder-cap
+  test and the event-loop test in `findByName.test.ts` failed at random under coverage load: the
+  search's real 1.5 s deadline cut the walk short, and the event-loop test measured wall-clock
+  turns. Both now run with a frozen clock and a generous `timeLimitMs` (a new test-only option;
+  production keeps the 1.5 s default), and the event-loop test counts reads and entries handled
+  per turn of the loop instead of timing them.
+- **The real-pwsh bootstrap test no longer times out under coverage.** The curly-apostrophe
+  case in `WindowsTerminalBootstrap.test.ts` spawns a real `pwsh`, whose start-up took 6.5 s
+  under coverage on Linux CI and tripped the 5 s default, ejecting pull requests from the merge
+  queue. It now has its own 20 s budget; the assertions are unchanged.
+- **React hooks lint is now an error, with the last 43 warnings fixed and no change in behaviour.**
+  Every `eslint-plugin-react-hooks` rule in the renderer (`exhaustive-deps` and the
+  React-Compiler-derived rules) is `error`, so a new stale closure or render-time ref write fails
+  `npm run lint` instead of adding to a warning count. The fixes follow #368: `useLatestRef` for
+  render-time ref writes (HTML preview hooks, file and directory watchers, git status), the
+  `useDockviewValue` hook for the preview panel's visible and active state, resets moved from
+  effects into render, and promise chains where an `async` loader was misread as setting state
+  synchronously. Four deliberate cases carry an `eslint-disable` comment with its reason.
+- **`npm run lint` drops from 107 to 43 react-hooks warnings, with no change in behaviour.** Every
+  warning in a file no open pull request touches is resolved: render-time ref writes move to a new
+  `useLatestRef` hook (assigned in a layout effect), the dockview "re-read on subscribe" effects
+  move to a `useDockviewValue` hook built on `useSyncExternalStore`, resets move from effects into
+  render, missing dependencies are added where they are stable, and the deliberate cases carry an
+  `eslint-disable` comment with its reason. The 43 left are in files open pull requests change;
+  the rule level stays `warn` until a follow-up.
+- **The whisper binaries workflow can run again.** `whisper-binaries.yml` now reads the signing
+  secrets that actually exist in the `production-signing` environment – the same names
+  `release.yml` uses (`MAC_CERT_P12_BASE64`, `MAC_CERT_PASSWORD`, `APPLE_APP_SPECIFIC_PASSWORD`,
+  `MINISIGN_SECRET_KEY_BASE64`, `MINISIGN_KEY_PASSWORD`) – and the Windows build lets CMake pick
+  the installed Visual Studio instead of pinning Visual Studio 2022, which `windows-latest` no
+  longer ships. The runbooks list the real secret names.
+- **The macOS whisper build now links its libraries into the binary.** The `Whisper Binaries`
+  workflow builds whisper.cpp for macOS with static libraries, fails when `whisper-cli` needs any
+  library that is not part of macOS, and runs its smoke test from a clean copy of the packaged
+  files. The published `whisper-build-v1.8.4-erfana1` binary needed libraries that were not in its
+  download, which is why local transcription on macOS failed to start; the rebuilt binary reaches
+  users with the next whisper pin update.
+- **`DirectoryWatcherService.ts` is split into layers and back under the 500-line limit.** The
+  1,605-line file is now the public lifecycle (420 lines) on top of three layers in
+  `src/main/services/watcher/` – shared state and path rules, error recovery and restarts, and
+  the event pipeline with pauses – plus small helpers for building the backend watcher, the
+  removal listeners, the health line and error classification. No behaviour change: the public
+  API, IPC channels and log lines are unchanged and every watcher test passes untouched. Its
+  max-lines baseline entry is removed. (lens review finding [65])
+- **The repository-isolation control test no longer fails on a stricter git.** Its plain
+  `git status` runs a filter process that exits before git's handshake; newer git builds abort with
+  exit 128 where older ones carry on. The control now ignores the exit code and still checks that
+  the fsmonitor and filter commands ran, so it keeps proving the hardened case is not vacuous.
+- **A test now catches a style that names a colour or spacing value that does not exist.** When a
+  stylesheet names a design token that is not defined, the browser silently drops that style, so a
+  border or background just disappears. The new check reads every app stylesheet, the inline styles
+  in the code and the layering names handed to the overlay stack, and fails on any such name. It
+  found none today. (#82)
+
+## 0.21.0 – never released
+
+*Prepared 2026-10-18 but never tagged: the owner skipped v0.21.0, and these changes first ship in [v0.22.0](#0220).*
 
 ### Changed
 
@@ -125,7 +653,7 @@ Changes merged since the last release are not listed here. Each pull request add
     Approving something over plain `http://` also says what that costs: the connection is not encrypted, so anyone between you and that address can change what the page loads.
   - **No row claims a host was blocked for one kind of thing.** A blocked host is blocked for everything, and an approved one is allowed everything — Erfana cannot narrow a grant. An earlier draft of the list put "style" or "script" beside each host, which is true of what the page asked for but reads as a limit on what you are granting. The confirm step still names it, in the one sentence that also says the limit is not real.
 - **Two more checks now have to pass before code can merge**, both inside the existing `Lint` job: a stylesheet linter that fails on a raw colour, a hard-coded stacking order, or a rounded corner; and a check that the design system in `design/` has been rebuilt after a token change. Run `npm run lint:css` and `npm run design -- --check` locally before pushing. See [Continuous integration](./ci.md).
-- **`design/` is now the source of truth for how Erfana looks.** It is a set of pages you open in a browser, each deciding one rule – one focus ring, one selected state, one warning colour – and showing it working rather than describing it. Every number in it is calculated from the real code on each run, so it cannot quietly go out of date. [`docs/ui-style-guide.md`](./ui-style-guide.md) has been cut back to the few things the cards do not cover. Start at [`design/index.html`](../design/index.html).
+- **`design/` is now the source of truth for how Erfana looks.** It is a set of pages you open in a browser, each deciding one rule – one focus ring, one selected state, one warning colour – and showing it working rather than describing it. Every number in it is calculated from the real code on each run, so it cannot quietly go out of date. [`docs/ui-style-guide.md`](./ui-style-guide.md) has been cut back to the few things the cards do not cover. Start at [`design/index.html`](design-system/index.html).
 
 ### Fixed
 - **Opening and closing previews no longer leaks operating-system handles** – every preview took a fresh in-memory session that could never be given back, so each open/close cycle left about eleven handles behind for the life of the app (measured on Windows 11). Session partitions are now purged and reused, and a project switch forgets them; 24 open/close cycles now show no growth. An open that fell over part-way through never gave its session back at all, losing about sixteen handles each time on the path most likely to repeat; that path returns it too, a session can no longer be handed back twice, and a project switch can never pass one to the project that follows it. See [Known issues § HTML preview](./known-issues.md#html-preview-links) for the one purge step Windows never completes.
@@ -207,7 +735,7 @@ Changes merged since the last release are not listed here. Each pull request add
 
 ### Fixed
 
-- **Erfana no longer crashes to a black window when you open a very large project** ([#60](https://github.com/qodeca/erfana/issues/60)) – opening a project with roughly 100 000 files or more (reported on a 174 000-item folder held on an external drive) turned the whole window black: no message, nothing to click, force-quit the only way out. Building the project tree's internal flat list ran into a hard limit in the JavaScript engine on how many items may be handed to a single function call, and the resulting error tore down the entire interface. That list is now built one item at a time, so the limit cannot be reached – checked against a 200 000-node test tree. In case something else ever fails the same way, the damage is now contained instead of taking the window with it: a failure inside the project tree leaves the rest of the app running and shows "Project tree unavailable" in the sidebar with a Reload button, and a failure anywhere else shows a recovery screen offering **Restart Erfana**, **Copy error details** and **Open logs folder**. Restarting always reopens Erfana on the welcome screen, never the project that just crashed. Crashes and hangs are also written to the log file now – including the case where the window dies outright and no in-app message is possible – so a report can carry evidence rather than a description. Very large projects still open **slowly** (that work is tracked separately as #149/#150); they no longer open fatally. See [`docs/design/design-issue-60.md`](design/design-issue-60.md) and [UI components § Error containment](ui-components.md#error-containment).
+- **Erfana no longer crashes to a black window when you open a very large project** ([#60](https://github.com/qodeca/erfana/issues/60)) – opening a project with roughly 100 000 files or more (reported on a 174 000-item folder held on an external drive) turned the whole window black: no message, nothing to click, force-quit the only way out. Building the project tree's internal flat list ran into a hard limit in the JavaScript engine on how many items may be handed to a single function call, and the resulting error tore down the entire interface. That list is now built one item at a time, so the limit cannot be reached – checked against a 200 000-node test tree. In case something else ever fails the same way, the damage is now contained instead of taking the window with it: a failure inside the project tree leaves the rest of the app running and shows "Project tree unavailable" in the sidebar with a Reload button, and a failure anywhere else shows a recovery screen offering **Restart Erfana**, **Copy error details** and **Open logs folder**. Restarting always reopens Erfana on the welcome screen, never the project that just crashed. Crashes and hangs are also written to the log file now – including the case where the window dies outright and no in-app message is possible – so a report can carry evidence rather than a description. Very large projects still open **slowly** (that work is tracked separately as #149/#150); they no longer open fatally. See [`docs/design/design-issue-60.md`](designs/design-issue-60.md) and [UI components § Error containment](ui-components.md#error-containment).
 
 ### Internal
 
@@ -627,7 +1155,7 @@ Known gaps (deferred to Phases 3–6): screenshots, local Whisper, auto-updater 
 
 ## Earlier versions (archived)
 
-Entries for **v0.8.0 through v0.8.3** are archived in [`docs/archive/changelog-v08.md`](./archive/changelog-v08.md). Entries for **v0.3.0 through v0.5.4** are in [`docs/archive/changelog-v03-v05.md`](./archive/changelog-v03-v05.md). v0.6.x–v0.7.x are missing historical entries; they predate the current changelog discipline.
+Entries for **v0.8.0 through v0.8.3** are archived in [`docs/archive/changelog-v08.md`](https://github.com/qodeca/erfana/blob/1d814e05d98b3005e5c13c0624b09653708136f7/docs/archive/changelog-v08.md). Entries for **v0.3.0 through v0.5.4** are in [`docs/archive/changelog-v03-v05.md`](https://github.com/qodeca/erfana/blob/1d814e05d98b3005e5c13c0624b09653708136f7/docs/archive/changelog-v03-v05.md). v0.6.x–v0.7.x are missing historical entries; they predate the current changelog discipline.
 
 Archival criterion: once a major version is two releases behind the current shipped version AND the CHANGELOG file exceeds the 500-line cap, move the oldest major-version block to an archive file and leave a one-line pointer here.
 

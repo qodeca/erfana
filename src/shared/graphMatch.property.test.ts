@@ -20,7 +20,7 @@
  * `src/main/**` / `src/preload/**` tests are excluded — so its
  * `@ts-expect-error` directives are actually verified by `npm run typecheck`).
  *
- * @see specs/designs/sd-021-cross-cutting.md §9.6
+ * @see docs/designs/sd-021-cross-cutting.md §9.6
  */
 import Database from 'better-sqlite3'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'

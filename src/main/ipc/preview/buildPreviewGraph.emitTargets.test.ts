@@ -13,10 +13,12 @@ import { describe, expect, it, vi } from 'vitest'
 interface FakeContents {
   isDestroyed: () => boolean
   send: (channel: string, payload: unknown) => void
+  focus?: () => void
 }
 interface FakeWindow {
   readonly id: number
   isDestroyed(): boolean
+  isFocused?(): boolean
   readonly webContents: FakeContents
 }
 
@@ -55,5 +57,21 @@ describe('defaultResolveEmitTargets', () => {
     ]
 
     expect(defaultResolveEmitTargets()).toEqual([])
+  })
+
+  it('focusHost focuses the own contents of the window only while the window is key (§19 Rev 4 owner test)', () => {
+    const focus = vi.fn()
+    let key = true
+    electron.windows = [
+      { id: 3, isDestroyed: () => false, isFocused: () => key, webContents: { isDestroyed: () => false, send: vi.fn(), focus } }
+    ]
+
+    const [target] = defaultResolveEmitTargets()
+
+    expect(target.focusHost?.()).toBe(true)
+    expect(focus).toHaveBeenCalledTimes(1)
+    key = false
+    expect(target.focusHost?.()).toBe(false)
+    expect(focus).toHaveBeenCalledTimes(1)
   })
 })

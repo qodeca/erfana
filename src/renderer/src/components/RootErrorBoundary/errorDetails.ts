@@ -18,7 +18,7 @@
  *   copies it (capped at {@link MAX_REPORT_CHARS}) — which is what makes the
  *   elision marker's "use Copy error details for the full stack" truthful.
  *
- * @see docs/design/design-issue-60.md §2.3 (error containment) and §5 (test rows)
+ * @see docs/designs/design-issue-60.md §2.3 (error containment) and §5 (test rows)
  * @module components/RootErrorBoundary/errorDetails
  */
 
@@ -68,7 +68,7 @@ const UNKNOWN = 'unknown'
  * Build-time app version, resolved defensively.
  *
  * `__APP_VERSION__` is inlined by the renderer build (`electron.vite.config.ts`)
- * and mirrored in `vitest.renderer.ts`. The guard costs nothing and keeps this
+ * and mirrored in `vitest.renderer.config.ts`. The guard costs nothing and keeps this
  * module usable from any host that forgot the `define`.
  */
 export const APP_VERSION: string = ((): string => {

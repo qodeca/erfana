@@ -14,12 +14,13 @@
  *
  * Restart is deliberately never clicked — it relaunches the app mid-test.
  *
- * @see docs/design/design-issue-60.md §2.8
+ * @see docs/designs/design-issue-60.md §2.8
  */
 
 import { test, expect, _electron as electron, ElectronApplication } from '@playwright/test'
 import * as path from 'path'
 import { TEST_IDS, byTestId, createTempUserDataDir } from './utils/helpers'
+import { E2E_CHROMIUM_ARGS } from './fixtures/isolation'
 
 const APP_ENTRY = path.join(__dirname, '..')
 
@@ -40,7 +41,7 @@ async function launchApp(
   extraEnv: NodeJS.ProcessEnv = {}
 ): Promise<ElectronApplication> {
   return electron.launch({
-    args: [APP_ENTRY, `--user-data-dir=${userDataDir}`],
+    args: [APP_ENTRY, `--user-data-dir=${userDataDir}`, ...E2E_CHROMIUM_ARGS],
     // ProcessEnv allows `undefined` values in its type only; a real environment holds strings.
     env: { ...baseEnv(), ...extraEnv } as Record<string, string>
   })

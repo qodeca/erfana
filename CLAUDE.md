@@ -5,7 +5,7 @@ An agent-native Markdown workspace (Electron): integrated terminal for CLI codin
 - **Repository**: `qodeca/erfana` (GitHub, public)
 - **License and legal**: `GPL-3.0-only` with REUSE-style SPDX headers – see [LICENSE](LICENSE), [`REUSE.toml`](REUSE.toml), [TRADEMARKS.md](TRADEMARKS.md) (forks must rebrand) and [CLA.md](CLA.md). `"private": true` in package.json is a publish guard for the desktop app, not a license statement.
 - **Node Version**: 24+ (development), Electron 44 bundles Node.js 24.22.0
-- **Current version**: v0.21.0 (see [docs/CHANGELOG.md](docs/CHANGELOG.md); bump this line at release)
+- **Current version**: v0.23.0 (see [docs/CHANGELOG.md](docs/CHANGELOG.md); bump this line at release)
 
 ## Branching model
 - `main` — released code only. Protected (required status checks, `enforce_admins`, signed `v*.*.*` tags); direct push is the intended solo-dev workflow, no PR required. The checks are enforced **on push**, so a commit whose checks have not yet finished green for that SHA is rejected with `GH006` — push it to `develop` first, wait for the run, then push `main` ([release.md § Branch protection](docs/build/release.md#branch-protection-phase-i--done-2026-04-25)).
@@ -62,27 +62,19 @@ Index and descriptions live in [docs/README.md](docs/README.md) — read that ra
 
 ## Design system (MANDATORY)
 
-**Before implementing ANY UI changes**: open [`design/index.html`](design/index.html) in a browser. It is the design system — plain HTML cards that each **decide** one rule and render it live, loading a synced copy of the app's real `src/renderer/src/styles/design-tokens.css` and its real bundled font. A card shows every state rather than describing it, which is how its defects get found.
+**Before implementing ANY UI changes**: open [`docs/design-system/index.html`](docs/design-system/index.html) in a browser. It is the design system — plain HTML cards that each **decide** one rule and render it live, loading a synced copy of the app's real `src/renderer/src/styles/design-tokens.css` and its real bundled font. A card shows every state rather than describing it, which is how its defects get found.
 
 Read the card for what you are changing. A card marked `status="decided"` is binding; `status="proposed"` means it is still a sketch — use it as the direction of travel, not as settled law.
 
-## Changelog
+**Key rules**: Use `var(--color-*)`, `var(--space-*)`, `var(--text-*)` tokens. No hardcoded values. `border-radius: 0` always. `npm run lint:css` in the required `Lint` job enforces **four** of these mechanically — no hex colours, no bare `z-index`, `border-radius` from the token only, and the `erf-` class namespace on design-system component CSS. A fifth rule, scoped to `docs/design-system/**`, bans retired tokens (`--shadow-focus`, `--color-warning-bright`, `--color-warning-icon`, `--color-error-bright`, `--color-error-text-light`), so a card that reaches for one fails the job. **Spacing and typography tokens are convention, not enforcement**: `padding: 11px` and `font-size: 13px` both pass lint, so review for them by hand.
 
-For detailed changelog, see [docs/CHANGELOG.md](docs/CHANGELOG.md).
+**Numbers in a card are generated**, never typed: they come from `docs/design-system/claims.json` and are re-derived on every CI run. Do not hand-edit a number into a card – add a ledger entry.
 
-## Nested CLAUDE.md (component-specific patterns)
-- [`src/main/services/CLAUDE.md`](src/main/services/CLAUDE.md) - catalogue of every main-process service, with the issue context behind each
-- [`src/renderer/src/components/Dialog/CLAUDE.md`](src/renderer/src/components/Dialog/CLAUDE.md) - BaseDialog API, focus trap, ESC/backdrop handling
-- [`src/renderer/src/components/Transcription/CLAUDE.md`](src/renderer/src/components/Transcription/CLAUDE.md) - Dual-backend transcription (OpenAI + local whisper.cpp), IPC flow, store
-**Key rules**: Use `var(--color-*)`, `var(--space-*)`, `var(--text-*)` tokens. No hardcoded values. `border-radius: 0` always. `npm run lint:css` in the required `Lint` job enforces **four** of these mechanically — no hex colours, no bare `z-index`, `border-radius` from the token only, and the `erf-` class namespace on design-system component CSS. A fifth rule, scoped to `design/**`, bans retired tokens (`--shadow-focus`, `--color-warning-bright`, `--color-warning-icon`, `--color-error-bright`, `--color-error-text-light`), so a card that reaches for one fails the job. **Spacing and typography tokens are convention, not enforcement**: `padding: 11px` and `font-size: 13px` both pass lint, so review for them by hand.
-
-**Numbers in a card are generated**, never typed: they come from `design/claims.json` and are re-derived on every CI run. Do not hand-edit a number into a card – add a ledger entry.
-
-**Deviating is allowed if the code says so at the site**: `/* deviates: design/<card> — why */`, plus a row in that card's Exceptions section. An undocumented deviation is a bug.
+**Deviating is allowed if the code says so at the site**: `/* deviates: docs/design-system/<card> — why */`, plus a row in that card's Exceptions section. An undocumented deviation is a bug.
 
 [docs/ui-style-guide.md](docs/ui-style-guide.md) holds only the text-selection policy and the dark-only stance – do not put a new visual rule there.
 
-**Naming, because it is confusable**: `design/` (repo root) is the design system. `docs/design/` and `docs/designs/` are per-issue design notes and are unrelated.
+**Naming, because it is confusable**: `docs/design-system/` is the design system. `docs/designs/` holds per-issue design notes and is unrelated.
 
 ## Testing
 - E2E: Playwright with Electron, Page Object Model pattern — POM classes, composed fixtures, and the shared locator/wait helpers are catalogued in [docs/testing/e2e-testing.md](docs/testing/e2e-testing.md)
@@ -97,10 +89,6 @@ See [docs/ci.md](docs/ci.md) for the full pipeline map — workflow table, per-j
 - **Workflow display names** use Title Case in the Actions UI. This project-specific convention overrides the global sentence-case style rule for workflow `name:` fields only; filenames stay lowercase/kebab-case.
 - **Before pushing**, run the local equivalents (`npm run lint && npm run lint:css && npm run design -- --check && npm run typecheck && npm run test:cov && npx electron-vite build`; `test:cov` runs every unit test once – the same suite the required `Unit tests` job runs as `test:ci` – and also checks the coverage floors the required `Coverage` job enforces, so running `test:ci` as well repeats the suite for no extra signal (#170)) to catch issues without CI minutes. `lint:css` and the design-sync check are **steps inside the required `Lint` job** (the design-sync check runs again in the advisory `Windows checks` job, to catch a CRLF regression - #104), not separate jobs – branch protection matches the job name, so a new job would enforce nothing.
 
-## Project Switching Safeguards
-Behaviour is readable from the code; the one non-obvious guard is:
-- Autosave must never lose keystrokes: a save in flight, its own echo event, and local edits made during the save are each guarded separately in `useFileWatcher`, and `MarkdownEditorPanel` re-checks the Monaco buffer after every write (#124). See [docs/file-watching/README.md](docs/file-watching/README.md)
-
 ## IPC Contracts
 
 The full channel index is [docs/ipc-patterns.md](docs/ipc-patterns.md) § Current IPC Channels; payload shapes live in `src/shared/ipc/*-schema.ts`, and name constants for the newer domains in `*-channels.ts` (older domains still declare channel strings inline in `src/main/ipc/*-handlers.ts`). Read those rather than duplicating them here. The invariants that are **not** visible from the schemas:
@@ -109,16 +97,15 @@ The full channel index is [docs/ipc-patterns.md](docs/ipc-patterns.md) § Curren
 - **Clipboard** – backed by Electron's main-process `clipboard` module, never `navigator.clipboard`, so the sandbox stays on. `src/main/ipc/clipboard-handlers.ts` validates the sender frame (`event.senderFrame`, top-level frame from the dev-server origin or the exact bundled `file://` entry URL only – `senderValidation.ts`). The renderer `textClipboard` singleton (`src/renderer/src/services/textClipboard.ts`) is the **single** transport-error chokepoint (retry-once + debounced toast) — don't call the bridge directly.
 - **Claude Code status** – register carries `terminalId` only; the PTY pid is resolved main-side and is **never** trusted from the renderer.
 - **Graph engine** – **declared and schema-frozen by [#21](https://github.com/qodeca/erfana/issues/21); NO handler, NO preload bridge, NO renderer caller exists yet.** Do not treat these as live channels; #26 registers the handlers and adds the `api.graph` bridge. Requests use `strictObject` (an unknown key is rejected, not stripped), every payload carries a `correlationId`, and paths are project-relative and confinement-checked. The 26 `GRAPH_*` / `MCP_*` error codes are contract-only until #23–#32 raise them.
-- **Image export** (`image-export:run`) – the renderer sends `{ filePath, target }` and no image bytes ever travel back to it: the main process re-reads the file from disk, rasterizes it in a hidden hardened window, then writes the file or the clipboard itself. The handler is **sender-gated** (`isTrustedSender`) before the payload is parsed, unlike the older `pdf:` / `docx:` handlers — see [docs/technical-debt.md](docs/technical-debt.md). The three `image-export:harness-*` channels are frame-scoped to that hidden window and never registered on global `ipcMain`, so they are absent from the channel index (#73).
+- **Image export** (`image-export:run`) – the renderer sends `{ filePath, target }` and no image bytes ever travel back to it: the main process re-reads the file from disk, rasterizes it in a hidden hardened window, then writes the file or the clipboard itself. The handler is **sender-gated** (`isTrustedSender`) before the payload is parsed, unlike the older `pdf:` / `docx:` handlers, which rely only on the process-wide gate in `registry.ts` — see [docs/technical-debt.md](docs/technical-debt.md). The three `image-export:harness-*` channels are frame-scoped to that hidden window and never registered on global `ipcMain`, so they are absent from the channel index (#73).
 - **System actions** (`system:*`) – payload-free and sender-gated; `system:relaunchApp` must quit gracefully, and the paired `screenshot:getScreenPermission` read is advisory and never gates a capture. Rationale for both in [docs/api-services.md § System actions](docs/api-services.md#system-actions-apisystem).
 
 ## Important Notes
 - node-pty may fail to build on Python 3.13 (use 3.12; 3.14.3 also verified) — this one is worth keeping here because it fails at install time, before any doc gets read
-- **Install with `npm ci`, and never commit a `package-lock.json` that `npm install` rewrote.** Under npm 11 `npm install` drops `encoding@0.1.13` (an optional peer of `node-fetch`) from the lock; `npm ci` requires it, so such a lock fails every CI job that installs — `Missing: encoding@0.1.13 from lock file`. This is here for the same reason as the line above: it bites before any doc gets read, and the resulting diff looks like harmless metadata churn. Detail in [CONTRIBUTING](CONTRIBUTING.md#local-setup)
 
 ## Xezar pipeline
 Added by `xez-onboard-opinionated`. How work moves: [SDLC.md](SDLC.md); what every agent runs: [AGENTS.md](AGENTS.md); review rules: [CODE_REVIEW.md](CODE_REVIEW.md).
 - The project leader is started with `./scripts/xezar-leader.sh`; only that session leads. Every other Claude Code session here is an ordinary session.
 - The pipeline's base branch is `develop`. Graph-engine work stays on `graph` and is started by the owner, not dispatched by the leader.
-- The pipeline adds these `docs/` folders, each created with its first document: `spikes/`, `runbooks/`, `deprecations/`, `performance/`, `migrations/`. Designs go in `docs/designs/`, decision records in `docs/adrs/`, and the design system stays in `design/`.
+- The pipeline adds these `docs/` folders, each created with its first document: `spikes/`, `runbooks/`, `deprecations/`, `performance/`, `migrations/`. Designs go in `docs/designs/`, decision records in `docs/adrs/`, and the design system stays in `docs/design-system/`.
 - Pipeline files: `.xezar/` (kit files are MIT, see `REUSE.toml`). Agent-kit rules: @.xezar/CLAUDE.md

@@ -40,16 +40,16 @@ function makeXterm() {
 const instances: Array<ReturnType<typeof makeXterm>> = []
 
 vi.mock('@xterm/xterm', () => ({
-  Terminal: vi.fn().mockImplementation(() => {
+  Terminal: vi.fn().mockImplementation(function () {
     const xterm = makeXterm()
     instances.push(xterm)
     return xterm
   })
 }))
-vi.mock('@xterm/addon-fit', () => ({ FitAddon: vi.fn().mockImplementation(() => ({ fit: vi.fn() })) }))
-vi.mock('@xterm/addon-web-links', () => ({ WebLinksAddon: vi.fn().mockImplementation(() => ({})) }))
+vi.mock('@xterm/addon-fit', () => ({ FitAddon: vi.fn().mockImplementation(function () { return ({ fit: vi.fn() }) }) }))
+vi.mock('@xterm/addon-web-links', () => ({ WebLinksAddon: vi.fn().mockImplementation(function () { return ({}) }) }))
 vi.mock('@xterm/addon-webgl', () => ({
-  WebglAddon: vi.fn().mockImplementation(() => ({ onContextLoss: vi.fn(), dispose: vi.fn() }))
+  WebglAddon: vi.fn().mockImplementation(function () { return ({ onContextLoss: vi.fn(), dispose: vi.fn() }) })
 }))
 vi.mock('../../utils/domUtils', () => ({ isElementVisible: vi.fn().mockReturnValue(true) }))
 

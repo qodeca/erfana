@@ -20,7 +20,7 @@
  *   renderer asked for against an older list can be recognised and refused.
  * - The entry the tab already shows is never recorded twice in a row.
  *
- * @see docs/design/design-issue-124-part3.md §3.5
+ * @see docs/designs/design-issue-124-part3.md §3.5
  */
 import type { PreviewHistoryState, PreviewPageTarget } from '../../../shared/ipc/preview-types'
 import { PREVIEW_LIMITS } from '../../../shared/preview-limits'

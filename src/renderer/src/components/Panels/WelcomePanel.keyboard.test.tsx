@@ -9,7 +9,7 @@
  * every Remove button announced the same name.
  *
  * The contract tested here is the decided Rows & lists card
- * (design/system/components/row/index.html): the list is ONE Tab stop, ↑/↓
+ * (docs/design-system/system/components/row/index.html): the list is ONE Tab stop, ↑/↓
  * move between rows, Home/End jump to the ends, Enter opens. Space opens too,
  * because the row's control is a native button.
  */

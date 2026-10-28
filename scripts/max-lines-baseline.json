@@ -43,7 +43,7 @@
     "src/renderer/src/hooks/useTerminalFileLinks.ts": 643,
     "src/renderer/src/utils/filePathLinks.logic.ts": 683,
     "src/shared/constants.ts": 719,
-    "src/shared/errors.ts": 711,
+    "src/shared/errors.ts": 749,
     "src/shared/ipc/graph-schema.ts": 527
   }
 }

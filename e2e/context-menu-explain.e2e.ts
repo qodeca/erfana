@@ -16,6 +16,7 @@
 import { IS_LINUX_CONTAINER } from './utils/linux-container'
 import { test, expect, _electron as electron, type Page } from '@playwright/test'
 import * as path from 'path'
+import { E2E_CHROMIUM_ARGS } from './fixtures/isolation'
 import {
   TEST_IDS,
   byTestId,
@@ -93,7 +94,7 @@ test.describe('Context Menu – Explain prompt', () => {
     )
 
     const electronApp = await electron.launch({
-      args: [path.join(__dirname, '..'), `--user-data-dir=${userDataDir}`],
+      args: [path.join(__dirname, '..'), `--user-data-dir=${userDataDir}`, ...E2E_CHROMIUM_ARGS],
       env: {
         ...process.env,
         NODE_ENV: 'development'
@@ -183,7 +184,7 @@ test.describe('Context Menu – Explain prompt', () => {
     )
 
     const electronApp = await electron.launch({
-      args: [path.join(__dirname, '..'), `--user-data-dir=${userDataDir}`],
+      args: [path.join(__dirname, '..'), `--user-data-dir=${userDataDir}`, ...E2E_CHROMIUM_ARGS],
       env: {
         ...process.env,
         NODE_ENV: 'development'

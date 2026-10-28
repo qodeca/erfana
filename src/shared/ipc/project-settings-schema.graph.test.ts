@@ -16,8 +16,8 @@
  * `ProjectSettingsService.test.ts` — §11 items 4 and 5 respectively.
  *
  * @see Issue #21 - graph R1 architecture
- * @see specs/designs/sd-021-errata-and-risks.md §11 item 4
- * @see specs/designs/sd-021-cross-cutting.md §9.1 rows 1-2, 6a
+ * @see docs/designs/sd-021-errata-and-risks.md §11 item 4
+ * @see docs/designs/sd-021-cross-cutting.md §9.1 rows 1-2, 6a
  */
 import { describe, it, expect } from 'vitest'
 import { GlobalSettingsSchema, GraphGlobalSettingsSchema } from './global-settings-schema'

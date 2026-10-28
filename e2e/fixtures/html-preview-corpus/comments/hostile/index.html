@@ -1,0 +1,65 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>-HPC-HOSTILE-</title>
+  <style>
+    body { font: 16px/1.5 sans-serif; margin: 40px; background: #fff; color: #111; }
+    p, button { width: 320px; }
+    /* Hide-all CSS: everything an overlay host could be, and the top layer. */
+    html > div, [popover], :popover-open, ::backdrop { display: none !important; visibility: hidden !important; opacity: 0 !important; }
+    /* A fake pin, drawn by the page where a real one would go. */
+    .fake-pin { position: absolute; width: 20px; height: 16px; background: #a0a8ff; cursor: pointer; }
+  </style>
+  <script>
+    // Prototype overrides, before anything else runs: the page tries to see
+    // and to steer every listener, every geometry read and every event.
+    window.__hostile = { forged: 0, listeners: 0, fakePinClicks: 0, removed: 0 }
+    var add = EventTarget.prototype.addEventListener
+    EventTarget.prototype.addEventListener = function (type, fn, options) {
+      window.__hostile.listeners += 1
+      return add.call(this, type, fn, options)
+    }
+    Event.prototype.stopImmediatePropagation = function () {}
+    Event.prototype.stopPropagation = function () {}
+    Element.prototype.getBoundingClientRect = function () {
+      return { x: 0, y: 0, left: 0, top: 0, right: 99999, bottom: 99999, width: 99999, height: 99999 }
+    }
+    try { Object.defineProperty(Event.prototype, 'isTrusted', { get: function () { return true } }) } catch (e) {}
+    window.HTMLElement.prototype.attachShadow = function () { throw new Error('no shadow roots here') }
+  </script>
+</head>
+<body>
+  <h1 id="title">A page that fights back</h1>
+  <p id="target">The element the page keeps forging events on.</p>
+  <button id="buy" type="button">Buy now</button>
+  <div class="fake-pin" id="fake-pin" style="left: 360px; top: 80px" title="1 comment – click to open"></div>
+  <script>
+    // A node-deleting observer: anything put on <html> beside <head>/<body> goes.
+    new MutationObserver(function () {
+      Array.prototype.slice.call(document.documentElement.children).forEach(function (el) {
+        if (el.localName !== 'head' && el.localName !== 'body') { el.remove(); window.__hostile.removed += 1 }
+      })
+    }).observe(document.documentElement, { childList: true })
+    document.getElementById('fake-pin').addEventListener('click', function () { window.__hostile.fakePinClicks += 1 })
+    // Forged events, over and over: pointer, mouse, context menu, clicks and
+    // the picker's keys – none is trusted, so none may open anything.
+    function forge() {
+      var el = document.getElementById('target')
+      var opts = { bubbles: true, cancelable: true, composed: true, clientX: 20, clientY: 20, button: 2 }
+      ;['pointerdown', 'mousedown', 'mouseup', 'contextmenu', 'click', 'auxclick', 'dblclick'].forEach(function (type) {
+        el.dispatchEvent(type.indexOf('pointer') === 0 ? new PointerEvent(type, opts) : new MouseEvent(type, opts))
+      })
+      el.click()
+      document.getElementById('buy').click()
+      ;['Enter', 'Tab', 'F10', 'ContextMenu', 'Escape'].forEach(function (key) {
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: key, code: key, shiftKey: key === 'F10', bubbles: true }))
+      })
+      window.__hostile.forged += 1
+    }
+    setInterval(forge, 20)
+  </script>
+</body>
+</html>

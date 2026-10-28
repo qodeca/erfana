@@ -525,7 +525,7 @@ If a real decision comes up, write BLOCKED with the options.
 Use when the change alters what a person sees on a screen.
 
 ```text
-Implement <settled UI behaviour> from <design/accepted criteria>.
+Implement <settled UI behaviour> from <design or accepted criteria>.
 
 Owned paths: <UI implementation, tests, and direct docs>.
 Do not touch: <design source, unrelated surfaces, or parallel-task paths>.

@@ -60,7 +60,8 @@ Cannot drag the project root folder itself.
 | Validation Rule | Check | Error Message |
 |----------------|-------|--------------|
 | Circular move | `isDescendant(targetPath, sourcePath)` | "Cannot move folder into its own subfolder" |
-| Same location | `sourcePath === targetPath` | "Source and target paths are the same" |
+| Drop in its own folder | `isSameFolderMove(sourcePath, targetParent)` (renderer, `ProjectTree/dropTarget.ts`) | None – the drop ends quietly, no toast |
+| Same location | `sourcePath === targetPath` (main) | "Source and target paths are the same" |
 | Root protection | `sourcePath === projectPath` | "Cannot move the project root directory" |
 | Move conflict | `checkNameConflict()` | Confirm dialog shown |
 | Copy conflict | `checkNameConflict()` | Auto-numbered name |
@@ -71,7 +72,7 @@ Cannot drag the project root folder itself.
 ### Same-Location Drop
 
 **Problem**: Drag file and drop in same location
-**Solution**: Early validation check, no operation performed
+**Solution**: Since v0.22.0 the renderer catches this first. Hovering a file lands in that file's folder, so a drop on a sibling file of the dragged item, or on the folder it already sits in, is a no-op: `isSameFolderMove` (`src/renderer/src/components/ProjectTree/dropTarget.ts`) ends the drag quietly, with no move request, no confirm dialog and no toast, and no folder is highlighted while hovering there. Before v0.22.0 such a drop asked to move the item where it already was. Main keeps its own check as a backstop
 
 ```typescript
 // FileService.ts – moveItem

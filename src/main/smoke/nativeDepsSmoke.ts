@@ -20,7 +20,7 @@
  * It requires the worker's explicit {@link SQLITE_SMOKE_SUCCESS_TOKEN} and
  * asserts that *every* expected check ran and passed before returning 0.
  *
- * @see specs/designs/sd-019-native-dep-spike.md §5
+ * @see docs/designs/sd-019-native-dep-spike.md §5
  */
 
 import { Worker } from 'worker_threads'

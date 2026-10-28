@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Pointer targets of at least 24 x 24 (#96, WCAG 2.2 SC 2.5.8,
- * design/system/foundations/surfaces.html and components/icon).
+ * docs/design-system/system/foundations/surfaces.html and components/icon).
  *
  * The editor and image tabs' close buttons and the settings checkboxes are
  * measured in the real UI. The other listed controls – the HTML preview tab's
@@ -152,8 +152,8 @@ test.describe('Target size', () => {
   test('every settings checkbox is a full 24 x 24 target', async ({ window: page }) => {
     await openSettings(page)
     const boxes = page.locator('.settings-checkbox')
-    // Editor, git polling and HTML preview toggles; an empty list would prove nothing
-    await expect(boxes).toHaveCount(3)
+    // Editor, git polling, HTML preview and HTML Preview comments toggles; an empty list would prove nothing
+    await expect(boxes).toHaveCount(4)
     for (const box of await boxes.all()) {
       expectTarget(await measureLocator(box, `settings checkbox ${await box.getAttribute('id')}`))
     }

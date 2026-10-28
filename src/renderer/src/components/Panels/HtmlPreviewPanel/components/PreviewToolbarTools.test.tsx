@@ -110,8 +110,8 @@ describe('PreviewToolbarTools', () => {
     expect(onOpenInBrowser).not.toHaveBeenCalled()
   })
 
-  it('names Find and Export to PDF exactly as the minimal tier of PreviewNavControls.css matches them', () => {
-    // That tier hides the two by `[aria-label='…']`, so rewording either button
+  it('names Export to PDF and Find exactly as the narrow and minimal tiers of PreviewNavControls.css match them', () => {
+    // Those tiers hide the buttons by `[aria-label='…']`, so rewording either
     // would silently leave it on a row too narrow for it. Read the names off
     // the rendered buttons, not from a copy here, so the test follows the code.
     render(
@@ -120,17 +120,24 @@ describe('PreviewToolbarTools', () => {
         <PreviewToolbarTools onExportPdf={vi.fn()} />
       </>
     )
-    const names = [screen.getByTestId('preview-band-find'), screen.getByTestId(EXPORT)].map((b) =>
-      b.getAttribute('aria-label')
-    )
+    const find = screen.getByTestId('preview-band-find').getAttribute('aria-label')
+    const exportPdf = screen.getByTestId(EXPORT).getAttribute('aria-label')
+    expect(find).toBeTruthy()
+    expect(exportPdf).toBeTruthy()
 
     const css = readFileSync(resolve(__dirname, 'PreviewNavControls.css'), 'utf8')
-    const minimal = /@container \(width < 293px\) \{([\s\S]*?)\n\}/.exec(css)?.[1]
-    expect(minimal, 'the width < 293px block is missing').toBeDefined()
-    for (const name of names) {
-      expect(name).toBeTruthy()
-      expect(minimal).toContain(`.erf-band__tool[aria-label='${name}']`)
-    }
+    const tier = (width: number): string | undefined =>
+      new RegExp(`@container \\(width < ${width}px\\) \\{([\\s\\S]*?)\\n\\}`).exec(css)?.[1]
+    const narrow = tier(446)
+    const minimal = tier(378)
+    expect(narrow, 'the width < 446px block is missing').toBeDefined()
+    expect(minimal, 'the width < 378px block is missing').toBeDefined()
+    expect(narrow).toContain(`.erf-band__tool[aria-label='${exportPdf}']`)
+    // Find outlasts the comment tools: it stays at every width the editor area
+    // can have (minimum 400px), and leaves only in the minimal tier (P7 e2e,
+    // html-preview-bounds.e2e.ts clicks it at the minimum width).
+    expect(narrow).not.toContain(`aria-label='${find}'`)
+    expect(minimal).toContain(`.erf-band__tool[aria-label='${find}']`)
   })
 })
 

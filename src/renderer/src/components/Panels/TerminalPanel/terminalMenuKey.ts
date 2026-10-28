@@ -9,7 +9,7 @@
  * Trade-off, stated: a program running in the terminal no longer receives
  * Shift+F10 (xterm would send `ESC [21;2~`). Agent CLIs do not bind it, and it
  * is the platform's standard way to reach a context menu from the keyboard
- * (design/system/components/menu). The Menu key has no terminal encoding, so
+ * (docs/design-system/system/components/menu). The Menu key has no terminal encoding, so
  * nothing is lost there.
  */
 import { isContextMenuKey, markKeyboardMenuOpen } from '../../ContextMenu/contextMenuKey'

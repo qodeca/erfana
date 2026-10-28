@@ -1,0 +1,42 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>-HPC-VUE-</title>
+  <style>
+    body { font: 16px/1.5 sans-serif; margin: 40px; background: #fff; color: #111; }
+    .card { width: 360px; padding: 16px; border: 1px solid #ccc; }
+    .price { width: 200px; margin: 32px 0 8px; padding: 8px; border: 1px solid #ccc; }
+  </style>
+</head>
+<body>
+  <header id="site"><h1 id="site-title">Shop</h1></header>
+  <div id="app" data-v-app=""><!--[--><section class="card" data-v-ssr="" id="product"><h2 id="product-name">Coffee grinder</h2>
+<p class="price" id="price">49 EUR</p>
+<button id="add" type="button">Add to cart</button></section><!--]--></div>
+  <script>
+    // A stand-in for Vue's hydration (R3-11): walk the server-rendered
+    // children of #app exactly as they were sent, and say whether the tree
+    // still matches. A comment node or a whitespace text node left inside
+    // #app before an element would be a mismatch.
+    (function () {
+      var app = document.getElementById('app')
+      var nodes = app.childNodes
+      var ok =
+        nodes.length === 3 &&
+        nodes[0].nodeType === 8 && nodes[0].data === '[' &&
+        nodes[1].nodeType === 1 && nodes[1].id === 'product' &&
+        nodes[2].nodeType === 8 && nodes[2].data === ']'
+      var product = document.getElementById('product')
+      var kids = product ? product.childNodes : []
+      ok = ok && kids.length === 5 &&
+        kids[0].nodeType === 1 && kids[0].id === 'product-name' &&
+        kids[2].nodeType === 1 && kids[2].id === 'price' &&
+        kids[4].nodeType === 1 && kids[4].id === 'add'
+      document.body.dataset.hydrated = ok ? 'ok' : 'mismatch'
+    })()
+  </script>
+</body>
+</html>

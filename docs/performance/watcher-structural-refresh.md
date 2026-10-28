@@ -6,6 +6,7 @@ SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 # Content-only saves no longer re-read the tree (finding [29])
 
 - **Finding:** [29] "Content-only change triggers a full tree re-read and resend" (lens review of v0.21.0, v0.22.0). Branch `perf/watcher-structural-refresh`, PR #316.
+- **Shipped:** in v0.22.0 (2026-10-25) – see the [changelog](../CHANGELOG.md#0220).
 - **Date:** 2026-10-22. **Host:** Apple M5 Max, 128 GB, macOS 26.6.2, production build (`npx electron-vite build`), the native recursive watcher (the macOS default). Other agents were working on the machine; 1-minute load average 2.6–7.3 across the runs.
 - **Benchmark:** [`e2e/watcher-structural.bench.ts`](../../e2e/watcher-structural.bench.ts), 3 runs per row, each a fresh app launch. "Before" is the same branch with the changed watcher sources checked out from `develop` (`13e80a23`).
 

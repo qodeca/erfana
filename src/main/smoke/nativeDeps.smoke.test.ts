@@ -13,7 +13,7 @@
  * The worker_thread + packaged-load authority lives in the packaged mac/win
  * smoke and the Node harness (#4); this file asserts the logic, not the ABI.
  *
- * @see specs/designs/sd-019-native-dep-spike.md §5, §12
+ * @see docs/designs/sd-019-native-dep-spike.md §5, §12
  */
 
 import { describe, it, expect } from 'vitest'

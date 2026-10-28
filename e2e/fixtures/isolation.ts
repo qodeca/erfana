@@ -30,6 +30,18 @@ import { LOGS_DIR_RELATIVE } from '../../src/shared/constants'
 export const E2E_TEMP_DIR = path.join(__dirname, '..', '..', '.e2e-temp')
 
 /**
+ * Chromium switches every e2e launch passes. On Windows, Chromium stops
+ * rendering a window that another window covers – no frames, no
+ * ResizeObserver callbacks, no `requestAnimationFrame`. With two workers the
+ * two app windows overlap, so the covered one froze mid-test: the HTML preview
+ * never pushed its new bounds and Monaco never finished its layout (seen
+ * 2026-10-25; the same files passed 30/30 with this switch). A user has one
+ * window in front, so this only removes a test-run artefact.
+ */
+export const E2E_CHROMIUM_ARGS: readonly string[] =
+  process.platform === 'win32' ? ['--disable-features=CalculateNativeWinOcclusion'] : []
+
+/**
  * Variables the app, Electron and the shells it spawns need to run. Anything
  * not listed here (or matching {@link APP_ENV_PREFIXES}) is NOT passed on.
  */

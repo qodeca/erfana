@@ -30,6 +30,39 @@ export class MonacoPage {
     // has not laid out yet lands nowhere. Wait for it explicitly: on a slow host
     // (Linux container) it takes longer than the click needs to arrive.
     await expect(editor).toBeVisible({ timeout: 4000 })
+    // Visible is not laid out. Right after a view-mode switch Monaco is still
+    // building its text area, and on a slow Windows host a click that lands then
+    // presses on the bare frame and releases over the freshly laid-out lines,
+    // and Monaco turns that into a selection of all of line 1. Wait until
+    // the text area exists and holds still for two rendered frames – the frames
+    // in which Monaco applies its own layout. A window covered by another one
+    // renders no frames on Windows, so bring it to the front first, and give
+    // up on a check after 1 s so the poll retries instead of hanging.
+    await this.page.bringToFront()
+    await expect
+      .poll(
+        () =>
+          editor.evaluate(
+            (el) =>
+              new Promise<boolean>((resolve) => {
+                const lines = el.querySelector('.view-lines')
+                if (!lines) return resolve(false)
+                const a = lines.getBoundingClientRect()
+                setTimeout(() => resolve(false), 1000)
+                requestAnimationFrame(() =>
+                  requestAnimationFrame(() => {
+                    const b = lines.getBoundingClientRect()
+                    resolve(
+                      a.width > 0 && a.height > 0 &&
+                        a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height
+                    )
+                  })
+                )
+              })
+          ),
+        { timeout: 10_000 }
+      )
+      .toBe(true)
     // `focused` is Monaco's own focus class. The cursor element is not a stable
     // signal: it blinks (visibility toggles every ~500 ms), and on Linux/xvfb a
     // 2 s `toBeVisible` poll can land only on hidden phases. A click that arrives

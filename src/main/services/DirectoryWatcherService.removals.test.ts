@@ -18,7 +18,7 @@
  * mocks, hence a file of its own per the test-file split policy).
  */
 import path from 'path'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import type { WebContents } from 'electron'
 
 const harness = vi.hoisted(() => ({
@@ -218,8 +218,8 @@ describe('DirectoryWatcherService.onPathsRemoved', () => {
 describe('DirectoryWatcherService removals during a pause (#252)', () => {
   async function startListening(): Promise<{
     svc: DirectoryWatcherService
-    removed: ReturnType<typeof vi.fn>
-    lost: ReturnType<typeof vi.fn>
+    removed: Mock
+    lost: Mock
   }> {
     const svc = await start('native-recursive')
     const removed = vi.fn()

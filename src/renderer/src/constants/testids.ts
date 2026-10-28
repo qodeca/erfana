@@ -7,8 +7,7 @@
  * These constants ensure consistent, compile-time checked testid usage
  * across the entire application.
  *
- * @see Spec #011 - Automated UI testing compatibility
- * @see docs/testing/e2e-testing.md - Testing documentation
+ * @see Spec #011 (automated UI testing) and docs/testing/e2e-testing.md
  *
  * @example Static testid usage
  * ```tsx
@@ -28,6 +27,7 @@
  * </div>
  * ```
  */
+import { COMMENT_TEST_IDS } from './commentTestids'
 
 /**
  * All static test ID values organized by component.
@@ -37,9 +37,8 @@
  * - Buttons use `-btn-` short form
  * - All values are lowercase with hyphens
  *
- * NOTE: Component counts in comments (e.g., "// Activity Bar (5)") are validated
- * by automated tests in testids.test.ts. If a count comment becomes stale, the
- * tests will fail and prompt an update.
+ * NOTE: section counts ("// Activity Bar (4)") are checked by testids.test.ts.
+ * The HTML Preview comment ids live in commentTestids.ts, spread in below.
  */
 export const TEST_IDS = {
   // =========================================================================
@@ -790,7 +789,8 @@ export const TEST_IDS = {
   /** Export to PDF button */
   TOOLBAR_BTN_EXPORT_PDF: 'toolbar-btn-export-pdf',
   /** Export to DOCX button */
-  TOOLBAR_BTN_EXPORT_DOCX: 'toolbar-btn-export-docx'
+  TOOLBAR_BTN_EXPORT_DOCX: 'toolbar-btn-export-docx',
+  ...COMMENT_TEST_IDS
 } as const
 
 /**

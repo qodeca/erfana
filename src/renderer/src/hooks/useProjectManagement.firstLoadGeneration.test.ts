@@ -8,7 +8,7 @@
  * started it so main can refuse it as superseded instead of as a confinement
  * error.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import { useProjectManagement } from './useProjectManagement'
 
@@ -23,7 +23,7 @@ vi.mock('../components/Dialog', () => ({
 type Listener = (data: { oldPath: string | null; newPath: string | null; generation?: number }) => unknown
 
 let listener: Listener | null
-let readDirectory: ReturnType<typeof vi.fn>
+let readDirectory: Mock
 
 beforeEach(() => {
   listener = null

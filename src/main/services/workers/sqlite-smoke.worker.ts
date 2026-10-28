@@ -16,7 +16,7 @@
  * Node-ABI harness (#4) can import {@link SQLITE_SMOKE_SUCCESS_TOKEN} and
  * the message types without executing worker logic.
  *
- * @see specs/designs/sd-019-native-dep-spike.md §5
+ * @see docs/designs/sd-019-native-dep-spike.md §5
  * @see GitStatusWorkerAdapter for the fail-closed worker pattern this mirrors
  */
 

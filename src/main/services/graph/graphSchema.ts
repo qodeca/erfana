@@ -14,8 +14,8 @@
  * Contract-only for #21: no `new Database(...)` executes any of this yet (#23).
  *
  * @see Issue #21 - graph R1 architecture
- * @see specs/designs/sd-021-db-schema.md §6.3-§6.6 - DDL, constants, queries, gate
- * @see specs/designs/sd-021-graph-architecture.md §4.5 - the zero-import rule
+ * @see docs/designs/sd-021-db-schema.md §6.3-§6.6 - DDL, constants, queries, gate
+ * @see docs/designs/sd-021-graph-architecture.md §4.5 - the zero-import rule
  */
 
 /**
@@ -29,7 +29,7 @@ export const GRAPH_SCHEMA_VERSION = 1
 /**
  * Beta notice, exported verbatim for the Settings panel.
  *
- * @see specs/designs/sd-021-db-schema.md §6.1
+ * @see docs/designs/sd-021-db-schema.md §6.1
  */
 export const GRAPH_SCHEMA_BETA_NOTICE =
   'The on-disk graph index schema is beta and carries no stability guarantee. ' +

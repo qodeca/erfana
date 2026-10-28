@@ -58,7 +58,7 @@
  *   first-occurrence order for determinism. Term order does not affect an
  *   implicit-AND / `OR` FTS5 match, but a stable order keeps the output testable.
  *
- * @see specs/designs/sd-021-cross-cutting.md §9.6 - the single normative definition
+ * @see docs/designs/sd-021-cross-cutting.md §9.6 - the single normative definition
  * @see Issue #21 - graph R1 architecture (owner reassigned from #26 per D7)
  */
 import { GRAPH } from './graph-constants'

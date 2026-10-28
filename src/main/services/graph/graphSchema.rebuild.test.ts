@@ -25,9 +25,9 @@
  * ingredients for it.
  *
  * @see Issue #21 - graph R1 architecture
- * @see specs/designs/sd-021-errata-and-risks.md §11 item 7
- * @see specs/designs/sd-021-db-contracts.md C2, C3
- * @see specs/designs/sd-021-db-schema.md §6.6
+ * @see docs/designs/sd-021-errata-and-risks.md §11 item 7
+ * @see docs/designs/sd-021-db-contracts.md C2, C3
+ * @see docs/designs/sd-021-db-schema.md §6.6
  */
 import { randomBytes } from 'node:crypto'
 import { mkdtempSync, rmSync, statSync } from 'node:fs'

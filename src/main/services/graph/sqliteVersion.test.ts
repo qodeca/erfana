@@ -7,7 +7,7 @@
  * `'3.4.0' > '3.35.0'` and `'3.9.0' > '3.35.0'` are both true as strings.
  *
  * @see Issue #21 - graph R1 architecture
- * @see specs/designs/sd-021-errata-and-risks.md §11 item 9
+ * @see docs/designs/sd-021-errata-and-risks.md §11 item 9
  */
 import { describe, expect, it } from 'vitest'
 import { GRAPH_MIN_SQLITE, sqliteVersionAtLeast } from './graphSchema'

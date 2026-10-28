@@ -20,8 +20,8 @@
  *   detector that exists.
  *
  * @see Issue #21 - graph R1 architecture
- * @see specs/designs/sd-021-errata-and-risks.md §11 item 6
- * @see specs/designs/sd-021-db-schema.md §6.5, §6.6, §6.7
+ * @see docs/designs/sd-021-errata-and-risks.md §11 item 6
+ * @see docs/designs/sd-021-db-schema.md §6.5, §6.6, §6.7
  */
 import Database from 'better-sqlite3'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'

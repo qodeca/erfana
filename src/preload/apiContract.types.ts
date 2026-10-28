@@ -19,6 +19,7 @@ import type { ImportBridge } from '../shared/ipc/import-schema'
 import type { MarkdownImageBridge } from '../shared/ipc/markdown-image-schema'
 import type { PdfBridge } from '../shared/ipc/pdf-schema'
 import type { PreviewBridge } from '../shared/ipc/preview-bridge-types'
+import type { PreviewCommentsBridge } from '../shared/ipc/preview-comment-schema'
 import type { TranscriptionBridge, WhisperBridge } from '../shared/ipc/transcription-schema'
 import type { DirectoryWatchBridge } from '../shared/ipc/directory-watch-schema'
 import type { FileBridge } from '../shared/ipc/file-schema'
@@ -90,6 +91,7 @@ export type ApiContractChecks = [
   Assert<Equal<Api['browser'], BrowserBridge>>,
   Assert<Equal<Api['markdownImage'], MarkdownImageBridge>>,
   Assert<Equal<Api['preview'], PreviewBridge>>,
+  Assert<Equal<Api['previewComments'], PreviewCommentsBridge>>,
   Assert<Equal<Api['claudeStatus'], ClaudeStatusBridge>>,
   Assert<Equal<Api['screenshot'], ScreenshotBridge>>,
   // A bridge method that returns the unchecked `ipcRenderer.invoke` result would put `any` in the renderer

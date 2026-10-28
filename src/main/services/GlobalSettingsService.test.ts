@@ -336,6 +336,23 @@ describe('GlobalSettingsService', () => {
       vi.clearAllMocks() // Clear init calls
     })
 
+    it('L6 refuses a comment identity with a control or invisible character, with a message naming the field', async () => {
+      const bidi = `Ada${String.fromCodePoint(0x202e)}x`
+      await expect(
+        service.setSetting('comments', { authorName: bidi, identityNoticeSeen: true })
+      ).rejects.toMatchObject({
+        code: ErrorCode.GLOBAL_SETTINGS_VALIDATION_FAILED,
+        message: expect.stringContaining('comments.authorName: The name contains a control or invisible character.')
+      })
+      await expect(
+        service.setSetting('comments', { authorName: 'Ada', authorEmail: `ada${String.fromCodePoint(0x200b)}@example.com`, identityNoticeSeen: true })
+      ).rejects.toMatchObject({ message: expect.stringContaining('comments.authorEmail') })
+      expect(writeFile).not.toHaveBeenCalled()
+
+      await service.setSetting('comments', { authorName: 'Ada Lovelace', authorEmail: 'ada@example.com', identityNoticeSeen: true })
+      expect(service.getSetting('comments')).toEqual({ authorName: 'Ada Lovelace', authorEmail: 'ada@example.com', identityNoticeSeen: true })
+    })
+
     it('validates value against schema', async () => {
       vi.mocked(writeFile).mockResolvedValue(undefined)
 

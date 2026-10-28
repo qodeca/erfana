@@ -26,10 +26,10 @@
  *
  * Styles live in `src/renderer/src/styles/hostName.css` rather than beside this
  * file: it is a design-system primitive that `scripts/design-sync.mjs` copies back
- * into `design/`, so its path is part of that contract.
+ * into `docs/design-system/`, so its path is part of that contract.
  *
- * @see design/system/components/row/index.html - the card that decides this
- * @see design/system/components/permission-band/index.html - its consumer
+ * @see docs/design-system/system/components/row/index.html - the card that decides this
+ * @see docs/design-system/system/components/permission-band/index.html - its consumer
  */
 import { Fragment } from 'react'
 

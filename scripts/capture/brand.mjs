@@ -2,9 +2,9 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Renders the README banner and the social preview from their design card
- * (design/product/github-presentation/index.html; #139 design, step 3).
+ * (docs/design-system/product/github-presentation/index.html; #139 design, step 3).
  *
- * The card is the source of truth: it is built only from design/tokens.css
+ * The card is the source of truth: it is built only from docs/design-system/tokens.css
  * and the bundled Cascadia Mono, so these PNGs are the shipping tokens, and a
  * token change is one `npm run docs:brand` away from new artwork.
  *
@@ -21,7 +21,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { chromium } from '@playwright/test'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
-const CARD = path.join(ROOT, 'design/product/github-presentation/index.html')
+const CARD = path.join(ROOT, 'docs/design-system/product/github-presentation/index.html')
 const OUT_DIR = path.join(ROOT, 'docs/assets/readme')
 
 /** Element id in the card → output file, expected pixel size and byte budget. */

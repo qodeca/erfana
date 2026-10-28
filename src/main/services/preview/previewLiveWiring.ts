@@ -22,6 +22,11 @@
  * the commit, the link bridge reads the page per click, the pipeline reads it
  * per run, and the still picture is dropped. Paths leave main in project space
  * – `toProjectPath` (`previewUrl.ts`) – the tree's spelling.
+ *
+ * HTML Preview comments (`previewLiveComments.ts`) are built last, when the
+ * session has them. They hear every reload this view starts, every load end
+ * and `did-finish-load`, and every watcher change before it is recorded – one
+ * write is one reload, and the reader's place comes back after it.
  */
 
 import type { PreviewFailureInput } from '../../../shared/ipc/preview-types'
@@ -57,6 +62,9 @@ import {
   attachStillFrameFreshness,
   type PreviewStillFrameFreshness
 } from './previewStillFrameFreshness'
+import { PREVIEW_COMMENT_TOGGLE } from './previewInputForward'
+import { createPreviewLiveComments } from './previewLiveComments'
+import type { PreviewCommentService } from './comments/PreviewCommentService'
 
 /** What the wiring needs from the view it builds the parts for. */
 export interface PreviewLiveWiringOwner {
@@ -104,6 +112,8 @@ export interface PreviewLiveParts {
    * (QG-7 S1, QG-8 T1).
    */
   readonly freshness: PreviewStillFrameFreshness
+  /** HTML Preview comments, when the session was built with them. */
+  readonly comments?: PreviewCommentService
 }
 
 /**
@@ -146,6 +156,8 @@ export function wirePreviewLiveView(owner: PreviewLiveWiringOwner): PreviewLiveP
     lastCssSize: () => bounds.lastCssSize()
   })
   const backdrop = createPreviewLiveBackdrop(core)
+  // Built last (below); every callback that reaches it reads it when it runs.
+  const late: { comments?: PreviewCommentService } = {}
   // The page on screen and the one load main has started. It only attaches
   // listeners to the page's own contents; the unwind below still detaches them.
   // Its ends feed the navigator first, then the collaborators (issue #124).
@@ -161,19 +173,26 @@ export function wirePreviewLiveView(owner: PreviewLiveWiringOwner): PreviewLiveP
   let watchCoordinator!: IPreviewWatchCoordinator
   let reloadPolicy!: IPreviewReloadPolicy
   let entryWatch: PreviewEntryWatch | undefined
+  /** A watcher change, unless it is this view's own comment write echoing. */
+  const recordChange = (path: string): void => {
+    if (late.comments === undefined) reloadPolicy.record(path)
+    else late.comments.filterChange(path, () => reloadPolicy.record(path))
+  }
   const pipeline = createPreviewLivePipeline({
     ...core,
     now: () => deps.now(),
     readEntryHtml: deps.readEntryHtml,
+    linkScanner: deps.linkScanner,
     currentPage: () => page.currentPage(),
     urlFor,
     // Frame documents are read for links only inside it (WI-15, fail closed).
     realRoot,
-    setWatchSet: (candidates) => watchCoordinator.setWatchSet(candidates),
-    recordChange: (path) => reloadPolicy.record(path),
+    setWatchSet: (candidates, options) => watchCoordinator.setWatchSet(candidates, options),
+    recordChange,
     // How this view reloads; the pipeline decides when, and guards it. A reload
     // is a page load like any other, so it goes through `startPageLoad` (WI-29).
     reloadPage: (ignoreCache) => {
+      late.comments?.reloadStarting()
       void page.startPageLoad(page.currentPage(), 'reload', () =>
         ignoreCache ? wc.reloadIgnoringCache() : wc.reload()
       )
@@ -221,6 +240,7 @@ export function wirePreviewLiveView(owner: PreviewLiveWiringOwner): PreviewLiveP
     if (move || committed) {
       pipeline.resume({ replaced: committed, failed: move && end.failed })
     }
+    late.comments?.pageLoadEnded(end)
   }
 
   let findController!: IPreviewFindController
@@ -287,29 +307,48 @@ export function wirePreviewLiveView(owner: PreviewLiveWiringOwner): PreviewLiveP
       panelId,
       initialPath: page.currentPage(),
       createEntryWatcher: deps.createEntryWatcher,
-      onChange: () => reloadPolicy.record(page.currentPage()),
+      onChange: () => recordChange(page.currentPage()),
       onDeleted: () => owner.onEntryDeleted()
     })
 
     lifecycle = wirePreviewLifecycle(
-      { webContents: wc, platform: deps.platform },
+      {
+        webContents: wc,
+        platform: deps.platform,
+        comments: {
+          enabled: () => late.comments?.acceptsToggle() ?? false,
+          modeOn: () => late.comments?.isModeOn() ?? false
+        }
+      },
       {
         onRenderProcessGone: (reason) => {
           backdrop.move('crashed')
           owner.onCrash(reason ?? 'crashed')
         },
         onUnresponsive: () => owner.onCrash('unresponsive'),
-        onDidFinishLoad: () => pipeline.schedule(),
+        onDidFinishLoad: () => {
+          pipeline.schedule()
+          late.comments?.didFinishLoad()
+        },
         // Backdrop transitions are SIBLINGS of the post-load pipeline, never
         // routed through it: `schedule` is rate-limited and drops events
         // during a save burst, and a dropped transition leaves the page
-        // unreadable.
-        onDidStartLoading: () => backdrop.move('start-loading'),
+        // unreadable. The pipeline only notes the time: a file saved from
+        // now on may be one this load does not show.
+        onDidStartLoading: () => {
+          backdrop.move('start-loading')
+          pipeline.loadStarted()
+        },
         onDidStopLoading: () => void backdrop.settle(),
         onDidFailLoad: () => void backdrop.settle('fail-load'),
         // Focus-moving keys hand native focus to the host window first, or the
         // renderer's DOM focus cannot take the keyboard back (QG-11a H1).
         onForwardedShortcut: (key) => {
+          // The comment toggle is the view's own; it never reaches the renderer.
+          if (key === PREVIEW_COMMENT_TOGGLE.key) {
+            late.comments?.toggleMode()
+            return
+          }
           const forward = deps.onForwardedShortcut
           if (forward !== undefined) {
             forwardWithHostFocus(params.window, key, (forwarded) => forward(panelId, forwarded))
@@ -372,6 +411,9 @@ export function wirePreviewLiveView(owner: PreviewLiveWiringOwner): PreviewLiveP
     refresh: () => visibility.captureWhileVisible(),
     now: () => deps.now()
   })
+  // Last: it never throws (a failure leaves the view without comments).
+  const comments = createPreviewLiveComments(params, { page, pipeline, bounds, visibility })
+  late.comments = comments
 
   return {
     bounds,
@@ -386,6 +428,7 @@ export function wirePreviewLiveView(owner: PreviewLiveWiringOwner): PreviewLiveP
     entryWatch,
     lifecycle,
     frameEvents,
-    freshness
+    freshness,
+    ...(comments === undefined ? {} : { comments })
   }
 }

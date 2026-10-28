@@ -18,6 +18,7 @@ import { closePanel } from '../../Tabs/tabOperations'
 import { useOptionalDialog } from '../../Dialog/DialogContext'
 import { getOverlayGuard } from '../../../services/preview/OverlayGuardService'
 import { mountPreviewLinkRouter } from '../../../services/preview/PreviewLinkRouter'
+import { useUnsavedSourcesFeed } from '../../../hooks/useUnsavedSourcesFeed'
 import { useActivityBarStore } from '../../../stores/useActivityBarStore'
 import { useProjectStore } from '../../../stores/useProjectStore'
 import { usePreviewTabStore } from '../../../stores/usePreviewTabStore'
@@ -115,6 +116,10 @@ export const EditorAreaSplitPanel = (props: ISplitviewPanelProps): JSX.Element =
     const router = mountPreviewLinkRouter({ prompt, closePanel: closeTabById })
     return () => router.dispose()
   }, [prompt])
+
+  // HTML Preview comments (decision 13): main refuses a comment write into a
+  // file this window holds unsaved editor changes for. Once per window.
+  useUnsavedSourcesFeed()
 
   const onEditorReady = (event: DockviewReadyEvent) => {
     logger.info('📝 Editor DockView ready')

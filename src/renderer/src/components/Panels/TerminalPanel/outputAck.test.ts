@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi, type Mock } from 'vitest'
 import { createOutputAcker } from './outputAck'
 import { TERMINAL_OUTPUT_ACK_STEP_CHARS } from '../../../../../shared/ipc/terminal-schema'
 
 const STEP = TERMINAL_OUTPUT_ACK_STEP_CHARS
 
 /** Total characters acknowledged so far. */
-const total = (send: ReturnType<typeof vi.fn>) =>
+const total = (send: Mock) =>
   send.mock.calls.reduce((sum, call) => sum + (call[1] as number), 0)
 
 describe('createOutputAcker', () => {

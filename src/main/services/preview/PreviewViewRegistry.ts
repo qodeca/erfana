@@ -27,7 +27,7 @@
  * one window today, so this is latent, but the entry carries `windowId` and the
  * service refuses a cross-window collision rather than silently replacing.
  *
- * @see specs/designs/sd-074b-preview-navigation-and-multiview.md §4.2, §4.3
+ * @see docs/designs/sd-074b-preview-navigation-and-multiview.md §4.2, §4.3
  */
 import type { PreviewLiveView } from './PreviewLiveView'
 

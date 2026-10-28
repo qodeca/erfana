@@ -25,6 +25,7 @@ import { HtmlPreviewPanel, type HtmlPreviewPanelParams } from './HtmlPreviewPane
 import { installHtmlPreviewPanelHarness } from './__test__/panelHarness'
 import { ErrorCode } from '../../../../../shared/errors'
 import { useOverlayOccluderStore } from '../../../stores/useOverlayOccluderStore'
+import { usePreviewCoveredStore } from '../../../stores/usePreviewCoveredStore'
 
 // The bounds hook logs its drop lines through the renderer logger, which has no
 // bridge here; mocked, as in the other renderer suites, so a run stays quiet.
@@ -53,6 +54,7 @@ beforeEach(() => {
 
 afterEach(() => {
   useOverlayOccluderStore.getState().reset()
+  usePreviewCoveredStore.setState({ covered: new Set() })
 })
 
 /**
@@ -208,6 +210,12 @@ describe('HtmlPreviewPanel – the keyboard route into the page', () => {
       async () => {
         act(() => listeners.resizeHold?.({ panelId: 'preview-1', held: true }))
       }
+    ],
+    [
+      'its own comments drawer covers the page as a full-width sheet',
+      async () => {
+        act(() => usePreviewCoveredStore.getState().setCovered('preview-1'))
+      }
     ]
   ])('is not a keyboard target while %s', async (_label, hide) => {
     const placeholder = await renderLive()
@@ -219,6 +227,15 @@ describe('HtmlPreviewPanel – the keyboard route into the page', () => {
     fireEvent.keyDown(placeholder, { key: 'Enter' })
 
     expect(preview.focusPage).not.toHaveBeenCalled()
+  })
+
+  it("stays a keyboard target while ANOTHER tab's drawer is a sheet – that hide is not this page's", async () => {
+    const placeholder = await renderLive()
+
+    act(() => usePreviewCoveredStore.getState().setCovered('preview-other'))
+
+    expect(placeholder.getAttribute('tabindex')).toBe('0')
+    expect(placeholder.getAttribute('aria-label')).toBe(LIVE_NAME)
   })
 
   // `pageLive`'s other terms: a load state that has no view behind it, and the

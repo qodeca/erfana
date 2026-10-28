@@ -15,7 +15,7 @@
  * run `setInterval(() => location.href = …)` and reach `shell.openExternal` at
  * ten dialogs a second with nobody touching the mouse.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 
 import { ErrorCode } from '../../../shared/errors'
 import { createPreviewLinkBridge, type PreviewLinkBridge } from './previewLinkBridge'
@@ -37,10 +37,10 @@ const CONTEXT: PreviewLinkContext = {
 }
 
 type SpiedDeps = PreviewLinkNavigationDeps & {
-  requestOpenFile: ReturnType<typeof vi.fn>
-  openExternal: ReturnType<typeof vi.fn>
-  recordFailure: ReturnType<typeof vi.fn>
-  confine: ReturnType<typeof vi.fn>
+  requestOpenFile: Mock
+  openExternal: Mock
+  recordFailure: Mock
+  confine: Mock
   now: () => number
 }
 

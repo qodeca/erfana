@@ -4,7 +4,7 @@
  * PreviewSessionFactory tests: partition recycling (Issue #74, work item 38).
  * Split from `PreviewSessionFactory.test.ts` by topic.
  */
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi, type Mock } from 'vitest'
 import { PREVIEW } from '../../../shared/constants'
 import { logger } from '../LoggingService'
 
@@ -26,14 +26,14 @@ describe('PreviewSessionFactory — partition recycling', () => {
   // a bounded purge and reused after another; a purge that fails or overruns
   // on either side drops the name, so nothing is ever reused un-purged.
   function makeFactory(overrides: {
-    purge?: ReturnType<typeof vi.fn>
-    nextPartitionName?: ReturnType<typeof vi.fn>
-    createSession?: ReturnType<typeof vi.fn>
+    purge?: Mock
+    nextPartitionName?: Mock
+    createSession?: Mock
   } = {}): {
     factory: PreviewSessionFactory
-    purge: ReturnType<typeof vi.fn>
-    nextPartitionName: ReturnType<typeof vi.fn>
-    createSession: ReturnType<typeof vi.fn>
+    purge: Mock
+    nextPartitionName: Mock
+    createSession: Mock
   } {
     let minted = 0
     const nextPartitionName =

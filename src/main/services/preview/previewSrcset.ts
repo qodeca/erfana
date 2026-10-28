@@ -22,6 +22,15 @@ function isAsciiWhitespace(ch: string): boolean {
   return ch === ' ' || ch === '\t' || ch === '\n' || ch === '\f' || ch === '\r'
 }
 
+/** Where the run of commas that ends `value` starts (`value.length` if none does). */
+function trailingCommasStart(value: string): number {
+  let end = value.length
+  while (end > 0 && value[end - 1] === ',') {
+    end--
+  }
+  return end
+}
+
 /**
  * Parse a `srcset` attribute value into its ordered list of candidate URLs.
  *
@@ -56,7 +65,10 @@ export function parseSrcset(value: string): string[] {
 
     if (url.endsWith(',')) {
       // 3a. A URL ending in commas has no descriptor; strip the trailing commas.
-      url = url.replace(/,+$/, '')
+      //     A loop, not `/,+$/`: that regex reads an inner run of commas again
+      //     from each of them, so `x`, 80,000 commas, `y,` took 2.9 s on the
+      //     main thread (#124).
+      url = url.slice(0, trailingCommasStart(url))
     } else {
       // 3b. Consume the descriptor up to the next top-level comma. Parentheses
       //     are tracked so a comma inside a media-condition cannot end it early.

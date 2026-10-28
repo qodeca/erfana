@@ -38,11 +38,17 @@ stylesheet is loaded.
 - And 12 more (see full list below)
 
 Erfana passes every `mermaid` fenced block straight to `mermaid.render` and filters nothing, so
-any type the bundled Mermaid version supports will render. Verified against Mermaid 11.16.1,
+any type the bundled Mermaid version supports will render. Verified against Mermaid 11.16.1
+(each keyword is still registered in the bundled 12.2.0, which adds UML `usecase` diagrams),
 that also includes `info`, `flowchart-elk`, `C4Container` / `C4Component` / `C4Dynamic` /
 `C4Deployment`, `wardley-beta`, `cynefin-beta`, `ishikawa`, `treeView-beta`,
 `railroad-beta` (and its `-ebnf` / `-peg` variants), `venn-beta`, `swimlane-beta` and
 `eventmodeling`. The list of 22 is the documented, supported set – not a technical limit.
+
+Mermaid 12 changed its defaults to the `neo` look and the ELK layout. Erfana pins
+`look: 'classic'` and `layout: 'dagre'` in `src/renderer/src/utils/mermaidThemes.ts`, so existing
+diagrams keep their shape; a diagram can still opt in through its own front matter
+(`layout: elk`, `look: neo`).
 
 **`zenuml` is a known exception.** `src/renderer/src/utils/mermaidDirections.ts` lists it as
 a known chart type, but `@mermaid-js/mermaid-zenuml` is not a dependency, so a `zenuml`
@@ -192,6 +198,30 @@ GitHub-inspired professional design:
 - Max width: 860px centered
 - Dark theme with `var(--color-bg-preview)` background (`MarkdownPreview.css`)
 
+## When the preview updates (deferred preview)
+
+Until v0.22.0 the preview re-parsed the whole document on every keystroke; in a 3,000-line file that blocked the editor long enough to drop typed keys. `MarkdownPreview.tsx` now schedules the body render in two layers (lens review finding [31]):
+
+- **Debounce, only for slow documents.** The preview stays live per keystroke while a body render fits in one frame (`PREVIEW_FRAME_BUDGET_MS`, 16 ms). After two slow renders in a row (`PREVIEW_MODE_SWITCH_STREAK`), and only for a document of at least 2,000 characters (`PREVIEW_DEBOUNCE_MIN_CHARS`), it waits for a 150 ms pause in typing (`PREVIEW_IDLE_DELAY_MS`), and at most 1 s (`PREVIEW_MAX_WAIT_MS`), before it re-renders. As many fast renders in a row switch it back to live.
+- **`useDeferredValue`.** Whatever is released renders at transition priority, so a keystroke that arrives meanwhile is handled first. A release forced by the 1 s limit, or by `flush()`, renders at normal priority so the limit holds.
+- **Diagrams** redraw only after 300 ms without edits to their code (`MERMAID_IDLE_DELAY_MS` in `MermaidDiagram.tsx`); the first draw is never delayed.
+- **Exports** call the preview's `flush()` first (`useExportHandlers.ts`), so a PDF or Word export shows the latest text. Each wait inside `flush()` is capped at 5 s (`PREVIEW_FLUSH_TIMEOUT_MS`).
+- The first render is never delayed.
+
+Measurements: [docs/performance/2026-10-21-deferred-preview.md](../performance/2026-10-21-deferred-preview.md).
+
+## Broken-link checks
+
+A relative link whose target does not exist gets the broken-link styling. The preview asks the main process (`file.exists`) once per target and remembers the answer per preview panel (`components/Editor/linkTargetCache.ts`):
+
+- Editing one link asks about that link only, not every link in the document. Typing prose asks nothing.
+- Remembered answers are forgotten all at once when the file structure changes – a structural `directory-watch:changed` event, a `catchUp` refresh, or one of this window's own create, delete, rename, move or copy operations (`services/fileStructureSignal.ts`) – and the preview then re-checks its links 400 ms after the burst settles, at most 2 s after it began (`LINK_TARGET_SETTLE_MS`, `LINK_TARGET_MAX_WAIT_MS`).
+- Each answer also expires after 30 s (`LINK_TARGET_TTL_MS`), so a change no event reports (a folder the watcher skips) still shows up.
+- A hidden tab does not re-check; it re-checks once when shown, if anything changed meanwhile.
+- Clicking a link always asks the disk, so a stale "found" never opens a missing file.
+
+Design and measurements: [docs/performance/deferred-markdown-preview.md](../performance/deferred-markdown-preview.md). Link resolution itself (percent-escapes, backslashes, links that leave the project) is in `utils/markdownLinkResolver.ts`.
+
 ## Line Tracking
 
 All elements have line attributes for:
@@ -205,7 +235,8 @@ Attributes:
 - `data-line` - Legacy start line
 
 ## Implementation
-- Component: `MarkdownPreview.tsx`
+- Component: `MarkdownPreview.tsx` (render scheduling: `PREVIEW_*` constants)
+- Link checks: `linkTargetCache.ts`, `utils/markdownLinkResolver.ts`, `services/fileStructureSignal.ts`
 - Mermaid: `MermaidDiagram.tsx`
 - Images: `MarkdownImage.tsx`, `markdownImageSource.ts`, `markdownImageStore.ts`; main side `src/main/ipc/markdown-image-handlers.ts`
 - Line tracking: `extractLineRange()` and `withLineRange()` in `MarkdownPreview.tsx`

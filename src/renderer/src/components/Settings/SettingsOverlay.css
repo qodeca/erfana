@@ -196,7 +196,7 @@
 /* Settings Checkbox - Custom checkbox styling
  *
  * The visible box is the decided Form card's 16px checkbox
- * (design/system/components/form). The element itself is 24 x 24, the WCAG 2.2
+ * (docs/design-system/system/components/form). The element itself is 24 x 24, the WCAG 2.2
  * SC 2.5.8 minimum target (#96): the outer --space-2 is a transparent border,
  * which takes the pointer but paints nothing (background-clip: padding-box).
  * The box's 1px edge is an inset shadow inside that border, in
@@ -232,7 +232,7 @@
   box-shadow: inset 0 0 0 var(--border-width) var(--color-text-tertiary);
 }
 
-/* deviates: design/system/foundations/focus.html — the ring is drawn inward,
+/* deviates: docs/design-system/system/foundations/focus.html — the ring is drawn inward,
    into the transparent --space-2 border, so it lands --space-1 outside the
    visible 16px box exactly as the Focus and Form cards draw it; outward it
    would float --space-2 further off. */

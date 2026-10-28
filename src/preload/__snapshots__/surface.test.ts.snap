@@ -20,6 +20,7 @@ exports[`preload surface > window.api has the expected top-level groups 1`] = `
   "markdownImage",
   "pdf",
   "preview",
+  "previewComments",
   "projectLock",
   "quit",
   "screenshot",
@@ -253,6 +254,21 @@ exports[`preload surface > window.api.preview exposes the expected members 1`] =
   "setBounds",
   "setVisibility",
   "stopFind",
+]
+`;
+
+exports[`preload surface > window.api.previewComments exposes the expected members 1`] = `
+[
+  "list",
+  "onAnchorStatus",
+  "onCommentsChanged",
+  "onDraftOpened",
+  "onModeChanged",
+  "onSaveSettled",
+  "reveal",
+  "save",
+  "setMode",
+  "setUnsavedSources",
 ]
 `;
 

@@ -6,7 +6,7 @@
  * event comes after the last of them; a paused PTY is resumed before any kill;
  * Windows terminals are batched but never paused.
  */
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { EventEmitter } from 'events'
 import { tmpdir } from 'node:os'
 import {
@@ -17,11 +17,11 @@ import {
 
 interface MockPTY extends EventEmitter {
   pid: number
-  write: ReturnType<typeof vi.fn>
-  resize: ReturnType<typeof vi.fn>
-  kill: ReturnType<typeof vi.fn>
-  pause: ReturnType<typeof vi.fn>
-  resume: ReturnType<typeof vi.fn>
+  write: Mock
+  resize: Mock
+  kill: Mock
+  pause: Mock
+  resume: Mock
   onData: (cb: (d: string) => void) => void
   onExit: (cb: (event: { exitCode: number; signal?: number }) => void) => void
 }

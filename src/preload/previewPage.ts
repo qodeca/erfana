@@ -3,13 +3,17 @@
 /**
  * Preload for the SEALED preview page (sd-074b §5.1).
  *
- * It has two jobs, and it exposes NOTHING for either: there is no
- * `contextBridge` call in this file, so the page's own JavaScript gains no new
- * capability and cannot reach `ipcRenderer` — that lives in the isolated preload
- * world, which `contextIsolation: true` keeps separate.
+ * It has three jobs, and it exposes NOTHING for any of them: there is no
+ * `contextBridge` call in this preload, so the page's own JavaScript gains no
+ * new capability and cannot reach `ipcRenderer` — that lives in the isolated
+ * preload world, which `contextIsolation: true` keeps separate.
  *
  *  1. Notice that a link was clicked and tell main.
  *  2. Notice that the page's CSP refused a remote subresource and tell main.
+ *  3. Host the HTML Preview comment overlay (`./previewPageComments`): token
+ *     capture, outline, pins and picks. Its `preview-page:commentState`
+ *     listener is the preload's ONE receive channel; jobs 1 and 2 stay
+ *     send-only.
  *
  * WHY (2) IS HERE RATHER THAN AT THE NETWORK LAYER. Erfana gates remote hosts
  * twice: the CSP built from the project allowlist, and an independent
@@ -51,18 +55,32 @@
  * BUILD CONSTRAINT: preload entries must be self-contained. Importing a shared
  * module BY VALUE makes Rollup hoist a chunk that a sandboxed preload cannot
  * `require`, and the packaged app then opens on the root error screen (#73).
- * The channel names are therefore inlined here rather than imported.
+ * The channel names are therefore inlined here rather than imported. The one
+ * relative import, `./previewPageComments`, is part of this entry alone, so
+ * it is bundled into it rather than split into a chunk.
+ *
+ * FRAMES (HTML Preview comments). With `htmlPreview.comments.enabled` on, this
+ * preload also runs in every sub-frame (`nodeIntegrationInSubFrames`, see
+ * docs/adrs/0005-sub-frame-preload-one-receive-channel.md), and main passes
+ * the `--erfana-hpc` renderer argument. Only then does the comment overlay
+ * install – in every frame; with the flag off nothing of it runs. The link and
+ * CSP listeners below install in the MAIN frame only (`window ===
+ * window.top`), so a frame never reports for the page, and frame CSP refusals
+ * keep their own path (`previewFrameCspConsole.ts`) without being counted twice.
  *
  * @see src/main/services/preview/PreviewNavigationPolicy.ts - what main does with this
  */
 import { ipcRenderer } from 'electron'
+import { commentsRequested, installPreviewPageComments } from './previewPageComments'
 
 /**
  * Page → main channel for an activated link.
  *
- * INLINED, not imported: see the build constraint above. It is registered with
- * `webContents.ipc`, never on the global `ipcMain`, so it is invisible to every
- * other handler in the app.
+ * INLINED, not imported: see the build constraint above. Main listens for it on
+ * this view's `webContents.ipc`. Electron also emits the send on the global
+ * `ipcMain`, where nothing listens on a `preview-page:` channel and every
+ * listener refuses a preview page's frames (`registry.ts`), so no other
+ * handler in the app can be reached through it.
  */
 const LINK_ACTIVATED_CHANNEL = 'preview-page:linkActivated'
 
@@ -223,11 +241,19 @@ function onCspViolation(event: SecurityPolicyViolationEvent): void {
   })
 }
 
-// Bubble phase on `document`: ancestors of the link get their turn first, and
-// the deferred report above covers listeners that run after this one.
-document.addEventListener('click', onLinkActivation)
-document.addEventListener('auxclick', onLinkActivation)
+// Every frame, when main built the view with comments on: the comment overlay
+// (token capture starts here, at document start, before any page script).
+if (commentsRequested()) installPreviewPageComments()
 
-// CAPTURE phase, so a page listener that calls `stopPropagation()` on its own
-// violation events cannot hide its remote hosts from Erfana.
-document.addEventListener('securitypolicyviolation', onCspViolation, true)
+// The main frame only: a sub-frame does not speak for the page, and main
+// refuses its link and CSP reports anyway (`previewViewLifecycle.ts`).
+if (window === window.top) {
+  // Bubble phase on `document`: ancestors of the link get their turn first, and
+  // the deferred report above covers listeners that run after this one.
+  document.addEventListener('click', onLinkActivation)
+  document.addEventListener('auxclick', onLinkActivation)
+
+  // CAPTURE phase, so a page listener that calls `stopPropagation()` on its own
+  // violation events cannot hide its remote hosts from Erfana.
+  document.addEventListener('securitypolicyviolation', onCspViolation, true)
+}

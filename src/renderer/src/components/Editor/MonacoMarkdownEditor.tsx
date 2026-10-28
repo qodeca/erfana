@@ -305,7 +305,7 @@ export const MonacoMarkdownEditor = forwardRef<MonacoEditorHandle, MonacoMarkdow
       // with two editors open the last-mounted one would answer the key, act
       // on a hidden file, and go dead when that editor closes. An action is
       // scoped to its editor and disposed with it.
-      /* deviates: design/system/components/menu/index.html — no aria-haspopup /
+      /* deviates: docs/design-system/system/components/menu/index.html — no aria-haspopup /
          aria-expanded on the opener: Monaco owns its input textarea and its
          ARIA. See the card's Exceptions. */
       editor.addAction({

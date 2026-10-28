@@ -15,8 +15,8 @@
  * @see GraphIndexWorkerAdapter for implementation (#23)
  * @see IGitStatusWorker for the shape this mirrors
  * @see Issue #21 - graph R1 architecture
- * @see specs/designs/sd-021-db-contracts.md §5.5 - data-layer interfaces
- * @see specs/designs/sd-021-worker-contracts.md §8.3 - the fail-closed contract
+ * @see docs/designs/sd-021-db-contracts.md §5.5 - data-layer interfaces
+ * @see docs/designs/sd-021-worker-contracts.md §8.3 - the fail-closed contract
  */
 import type {
   GraphWorkerCloseRequest,

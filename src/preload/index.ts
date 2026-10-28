@@ -23,6 +23,7 @@ import { imageExportBridge } from './imageExportBridge'
 import { browserBridge } from './browserBridge'
 import { screenshotBridge } from './screenshotBridge'
 import { claudeStatusBridge } from './claudeStatusBridge'
+import { previewCommentsBridge } from './previewCommentsBridge'
 import type { FileNode, FileStats } from '../shared/ipc/file-schema'
 
 export type { FileNode, FileStats }
@@ -139,6 +140,13 @@ const api = {
   // Running HTML preview bridge (#74): WebContentsView-backed preview control
   preview: previewBridge,
 
+  /**
+   * HTML Preview comments (see previewCommentsBridge.ts): mode, list, Show on
+   * page, Save, the window's unsaved files. Keys and panel ids only – never a
+   * path to write or an author.
+   */
+  previewComments: previewCommentsBridge,
+
   // Quit confirmation operations (see quitBridge.ts)
   quit: quitBridge,
 
@@ -216,7 +224,7 @@ const electron = {
  * Exposed ONLY when true — absent (`undefined`) in every normal run, so a
  * `=== true` check in the renderer is the whole contract.
  *
- * @see docs/design/design-issue-60.md §2.8
+ * @see docs/designs/design-issue-60.md §2.8
  */
 const forceCrash = process.argv.includes(FORCE_CRASH_ARG)
 

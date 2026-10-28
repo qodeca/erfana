@@ -21,8 +21,8 @@
  * final describe block) — the assertion its header comment promises.
  *
  * @see Issue #21 - graph R1 architecture
- * @see specs/designs/sd-021-db-schema.md §6.3, §6.5
- * @see specs/designs/sd-021-cross-cutting.md §9.10 - the rebuild budget
+ * @see docs/designs/sd-021-db-schema.md §6.3, §6.5
+ * @see docs/designs/sd-021-cross-cutting.md §9.10 - the rebuild budget
  */
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -86,7 +86,7 @@ describe('meta reads', () => {
  * against a build-tool upgrade, and it costs one file read. #23 is the first
  * issue that will want an import here — it must move the constant instead.
  *
- * @see specs/designs/sd-021-graph-architecture.md §4.5 - the zero-import rule
+ * @see docs/designs/sd-021-graph-architecture.md §4.5 - the zero-import rule
  */
 describe('graphSchema.ts bundle boundary (§4.5)', () => {
   it('has zero top-level import statements', () => {

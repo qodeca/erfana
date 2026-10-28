@@ -20,7 +20,7 @@
  * than treated as a fence.
  *
  * @see Issue #21 - graph R1 architecture
- * @see specs/designs/sd-021-worker-contracts.md §8.2, §8.8
+ * @see docs/designs/sd-021-worker-contracts.md §8.2, §8.8
  */
 import { describe, it, expect } from 'vitest'
 import { ErrorCode } from '../errors'

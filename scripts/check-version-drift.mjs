@@ -42,7 +42,6 @@ export const CLAIMS = [
   { file: 'CONTRIBUTING.md', source: 'electron', pattern: /\(Electron (\d+) bundles Node\.js/ },
   { file: 'docs/getting-started.md', source: 'locked', pattern: /\(Electron (\d+\.\d+\.\d+) bundles Node\.js/ },
   { file: 'docs/security.md', source: 'electron', pattern: /^\*\*Last Updated\*\*: [^\n(]*\(Electron (\d+)\)/m },
-  { file: 'docs/security.md', source: 'electron', pattern: /the app now runs Electron (\d+)\b/ },
   { file: 'docs/security.md', source: 'electron', pattern: /Full support for Electron (\d+)\.x/ },
   { file: 'docs/security.md', source: 'range', pattern: /\(`([\^~]?\d+\.\d+\.\d+)` in `package\.json`/ },
   { file: 'docs/security.md', source: 'locked', pattern: /, (\d+\.\d+\.\d+) in the lockfile\)/ },

@@ -50,7 +50,7 @@ export type TreeSettings = z.infer<typeof TreeSettingsSchema>
  * chokidar's file-descriptor budget and are over-broad for indexing.
  *
  * @see Issue #21 - graph R1 architecture
- * @see specs/designs/sd-021-cross-cutting.md §9.1 rows 1-2
+ * @see docs/designs/sd-021-cross-cutting.md §9.1 rows 1-2
  */
 export const GraphSettingsSchema = z.object({
   excludeFolders: PatternConfigSchema.optional()

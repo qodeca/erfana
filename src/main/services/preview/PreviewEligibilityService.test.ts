@@ -7,7 +7,7 @@
  * plus the "first failure wins" ordering.
  */
 import { join } from 'node:path'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 
 import { getDefaultGlobalSettings } from '../../../shared/ipc/global-settings-schema'
 import type { GlobalSettings } from '../../../shared/ipc/global-settings-schema'
@@ -24,7 +24,7 @@ function makeSettings(enabled: boolean): GlobalSettings {
 }
 
 describe('PreviewEligibilityService', () => {
-  let gitignore: { isIgnored: ReturnType<typeof vi.fn>; clearCache: ReturnType<typeof vi.fn> }
+  let gitignore: { isIgnored: Mock; clearCache: Mock }
   let enabled: boolean
 
   function build(): IPreviewEligibilityService {

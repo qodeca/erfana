@@ -19,8 +19,8 @@
  * from outside the trust boundary, so the request shape is the cheapest bound.
  *
  * @see Issue #21 - graph R1 architecture
- * @see specs/designs/sd-021-ipc-contracts.md §7.10
- * @see specs/designs/sd-021-cross-cutting.md §9.3, §9.4, §9.5
+ * @see docs/designs/sd-021-ipc-contracts.md §7.10
+ * @see docs/designs/sd-021-cross-cutting.md §9.3, §9.4, §9.5
  */
 import { describe, it, expect } from 'vitest'
 import { z } from 'zod'

@@ -15,7 +15,7 @@ SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 
 ## Design
 
-<!-- UI in scope = the renderer's screens, panels, dialogs and the preview, the words users read in them, the design system in design/, or anything under docs/designs/. SDLC.md § The design gate. -->
+<!-- UI in scope = the renderer's screens, panels, dialogs and the preview, the words users read in them, the design system in docs/design-system/, or anything under docs/designs/. SDLC.md § The design gate. -->
 - [ ] Not UI in scope
 - [ ] UI in scope – `needs-design` applied (outside contributors: a maintainer applies it). Design: `docs/designs/<feature>/` or "fix-sized"
 - [ ] `skip-design`, because: <rendered output unchanged – say why>

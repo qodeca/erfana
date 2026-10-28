@@ -12,9 +12,10 @@ required by their licenses. Development-only dependencies are not distributed wi
 the application and are not listed here.
 
 The per-dependency section below is generated from the production dependency tree
-(`npx generate-license-file --input package.json`); last generated 2026-10-18, with the
-`@noble/hashes` entry added by hand afterwards (same format). Regenerate it whenever production
-dependencies change.
+(`npx generate-license-file --input package.json`); last generated 2026-10-25. The tool lists only the
+liteparse native package for the host it runs on, so the entry for the other shipped build
+(macOS arm64 or Windows x64) is added by hand in the same format. Regenerate it whenever
+production dependencies change.
 
 ## Bundled binaries and assets (notable)
 
@@ -2174,8 +2175,9 @@ END OF TERMS AND CONDITIONS
 
 The following npm packages may be included in this product:
 
- - @llamaindex/liteparse-darwin-arm64@2.14.7
- - @llamaindex/liteparse@2.14.7
+ - @llamaindex/liteparse-darwin-arm64@2.15.1
+ - @llamaindex/liteparse-win32-x64-msvc@2.15.1
+ - @llamaindex/liteparse@2.15.1
  - clean-git-ref@2.0.1
 
 These packages each contain the following license:
@@ -2351,7 +2353,7 @@ THE SOFTWARE.
 
 The following npm package may be included in this product:
 
- - fast-uri@3.1.8
+ - fast-uri@3.1.9
 
 This package contains the following license:
 
@@ -2892,7 +2894,7 @@ OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 
 The following npm package may be included in this product:
 
- - electron@44.9.0
+ - electron@44.9.3
 
 This package contains the following license:
 
@@ -3079,7 +3081,7 @@ SUCH DAMAGE.
 
 The following npm package may be included in this product:
 
- - follow-redirects@1.16.0
+ - follow-redirects@1.16.1
 
 This package contains the following license:
 
@@ -3106,7 +3108,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 The following npm package may be included in this product:
 
- - isomorphic-git@1.42.2
+ - isomorphic-git@1.44.3
 
 This package contains the following license:
 
@@ -3152,7 +3154,7 @@ The following npm packages may be included in this product:
 
  - @jridgewell/gen-mapping@0.3.13
  - @jridgewell/source-map@0.3.11
- - @jridgewell/sourcemap-codec@1.5.5
+ - @jridgewell/sourcemap-codec@1.6.0
  - @jridgewell/trace-mapping@0.3.31
 
 These packages each contain the following license:
@@ -4689,11 +4691,11 @@ SOFTWARE.
 
 -----------
 
-The following npm packages may be included in this product:
+The following npm package may be included in this product:
 
  - @electron-toolkit/utils@3.0.0
 
-These packages each contain the following license:
+This package contains the following license:
 
 MIT License
 
@@ -4818,7 +4820,7 @@ SOFTWARE.
 
 The following npm package may be included in this product:
 
- - zod@4.6.5
+ - zod@4.6.7
 
 This package contains the following license:
 
@@ -6021,36 +6023,6 @@ THE SOFTWARE.
 
 The following npm package may be included in this product:
 
- - @noble/hashes@1.8.0
-
-This package contains the following license:
-
-The MIT License (MIT)
-
-Copyright (c) 2022 Paul Miller (https://paulmillr.com)
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the “Software”), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
-
------------
-
-The following npm package may be included in this product:
-
  - ms@2.1.3
 
 This package contains the following license:
@@ -6106,6 +6078,36 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
+
+-----------
+
+The following npm package may be included in this product:
+
+ - @noble/hashes@1.8.0
+
+This package contains the following license:
+
+The MIT License (MIT)
+
+Copyright (c) 2022 Paul Miller (https://paulmillr.com)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the “Software”), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
 
 -----------
 

@@ -16,7 +16,7 @@
  * `false`, which drops every CSS background colour and image from the output —
  * exactly what a previewed page relies on (design §1.7).
  *
- * @see specs/designs/sd-074-html-preview.md §1.7
+ * @see docs/designs/sd-074-html-preview.md §1.7
  */
 import { writeFile } from 'node:fs/promises'
 import { basename, extname } from 'node:path'
@@ -57,6 +57,13 @@ export interface PreviewPrintContents {
   printToPDF(options: PreviewPrintToPdfOptions): Promise<Buffer>
 }
 
+/**
+ * Runs the print with HTML Preview comments' overlay hidden in every frame,
+ * and shows it again after, whatever the print did (html-preview-comments.md
+ * §10.2, M-064).
+ */
+export type PreviewAroundPrint = (print: () => Promise<Buffer>) => Promise<Buffer>
+
 /** A save-dialog result subset (matches Electron's `SaveDialogReturnValue`). */
 export interface PreviewSaveDialogResult {
   canceled: boolean
@@ -87,12 +94,14 @@ export interface IPreviewExportController {
   /**
    * Show a save dialog, print `wc` to PDF with backgrounds on, and write it.
    * Returns a cancelled result if the user dismisses the dialog and a failed
-   * result on any print/write error; never throws.
+   * result on any print/write error; never throws. `aroundPrint` wraps the
+   * print alone – never the dialog, so the overlay stays while the reader picks.
    */
   exportToPdf(
     wc: PreviewPrintContents,
     suggestedName: string,
-    windowId?: number
+    windowId?: number,
+    aroundPrint?: PreviewAroundPrint
   ): Promise<PdfExportResult>
 }
 
@@ -117,7 +126,8 @@ export class PreviewExportController implements IPreviewExportController {
   async exportToPdf(
     wc: PreviewPrintContents,
     suggestedName: string,
-    windowId?: number
+    windowId?: number,
+    aroundPrint?: PreviewAroundPrint
   ): Promise<PdfExportResult> {
     // #161: app-derived name → silent transform (reserved basenames, invalid
     // chars, control/bidi) via the shared helper, then length-bounded.
@@ -143,7 +153,8 @@ export class PreviewExportController implements IPreviewExportController {
 
     try {
       // printBackground:true — default false drops CSS backgrounds/images.
-      const pdf = await wc.printToPDF({ printBackground: true })
+      const print = (): Promise<Buffer> => wc.printToPDF({ printBackground: true })
+      const pdf = await (aroundPrint === undefined ? print() : aroundPrint(print))
       await this.writeFile(filePath, pdf)
       return { ok: true, path: filePath }
     } catch {

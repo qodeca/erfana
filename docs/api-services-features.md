@@ -19,6 +19,7 @@ Orchestrates git status retrieval via worker thread, keeping the main Electron t
 - Strategy – always requests native git; the worker falls back to isomorphic-git only when no git binary is found, the binary fails to start (ENOENT/EACCES), or native git fails transiently three times in a row
 - Timing instrumentation with structured logging
 - Per-call fresh cache for isomorphic-git (no persistent state in worker)
+- Hardened native git (`src/main/utils/hardenedGit.ts`, shared with the HTML preview's ignore check): started from `os.tmpdir()` with `-C <root>`, an environment allowlist instead of the full process environment (it also sets `GIT_NO_LAZY_FETCH`, so git never fetches missing objects), and config overrides that turn off hooks, `core.fsmonitor` and every `filter.<name>` driver the repo declares. A partial clone (promisor remote), or a config that cannot be inspected, never runs native git: the worker falls back to isomorphic-git
 
 ### Known limitations
 - Global `.gitignore` not supported when the isomorphic-git fallback runs (isomorphic-git limitation); native git honours it
@@ -245,34 +246,41 @@ Handles external file operations for Spec #012 (external file drop to project tr
 ### Key Features
 - Security validation (symlinks, project boundary, special files)
 - Path traversal protection (sanitizes dangerous patterns from filenames)
-- Copy and move operations from external locations into project
+- Copy, move and batch move from external locations into the project
+- **A move asks first** (v0.22.0): the original is deleted only after the user answers Move in a native box, modal to the window that owns the project (`ExternalMoveConfirmer.ts`). The box names each file and its folder (home-relative), never a full path; at most ten files per box, and a batch's boxes are one decision – Cancel, or a box that cannot be shown, moves none of them. After the answer the source and target are checked again, and the original is removed only if it is still the entry the box showed
+- Files picked in the Add files dialog are recorded per window with their on-disk identity (`ExternalSourceGrants.ts`), so a move can name the whole pick in one box. A record is used once, lapses after a few minutes and is not consent on its own
+- A symbolic link can be copied but not moved; a source already inside the project is refused (move it from the project tree)
 - Conflict resolution (replace or auto-number)
 
 ### Public Methods
 
-All three take **positional** parameters — there is no options object.
+The target folder is checked against the open project in the IPC handler (`registerConfinedHandle`) and arrives as an `ExternalTarget` `{ real, requested }`: the service writes into `real` and answers with paths built from `requested`. There is no project-root parameter.
 
-#### `validateExternalFile(sourcePath: string, projectRoot: string): Promise<ExternalFileValidateResponse>`
+#### `validateExternalFile(sourcePath: string): Promise<ExternalFileValidateResponse>`
 Validate file before copy/move.
 
 **Returns:** `{ valid, isSymlink, isDirectory, exists, isRegularFile, error?, errorCode? }`
 
-#### `copyFromExternal(sourcePath: string, targetFolder: string, projectRoot: string, conflictResolution?: ConflictResolution): Promise<ExternalFileCopyResponse>`
+#### `copyFromExternal(sourcePath, target: ExternalTarget, conflictResolution?): Promise<ExternalFileCopyResponse>`
 Copy external file into project. Validates first, then delegates the copy to `FileService`.
 
-#### `moveFromExternal(sourcePath: string, targetFolder: string, projectRoot: string, conflictResolution?: ConflictResolution): Promise<ExternalFileMoveResponse>`
-Move external file (validates, copies, then deletes source).
+#### `moveFromExternal(sourcePath, target: ExternalTarget, senderId, conflictResolution?, recheckTarget?, decided?): Promise<ExternalFileMoveResponse>`
+Move one external file: validate, ask (`senderId` names the window the box is modal to), check again (`recheckTarget` answers `false` when the target no longer resolves the same), copy, then delete the source.
+
+#### `moveBatchFromExternal(items, target: ExternalTarget, senderId, recheckTarget?): Promise<ExternalFileMoveResponse[]>`
+Move up to 100 files (`EXTERNAL_MOVE_BATCH_MAX`, `src/shared/ipc/external-file-limits.ts`) after one decision; one result per item, in order. Backs `file:moveBatchFromExternal`.
 
 `ConflictResolution` is the zod enum `'replace' | 'keepBoth'` (optional).
-Both copy and move return `{ success: boolean, path?: string, isSymlink?: boolean, error?: string, errorCode?: string }`.
+Copy and move return `{ success: boolean, path?: string, isSymlink?: boolean, error?: string, errorCode?: string }`. The refusal codes are tabled in [Error codes § External file drop](./error-codes.md#external-file-drop-14-codes).
 
-The options-object shapes live only in the IPC layer — `ExternalFileCopyRequestSchema` / `ExternalFileMoveRequestSchema` in `src/shared/ipc/external-file-schema.ts` carry those same four fields as a validated request payload.
+The request shapes live in the IPC layer – `ExternalFileCopyRequestSchema`, `ExternalFileMoveRequestSchema` and `ExternalFileMoveBatchRequestSchema` in `src/shared/ipc/external-file-schema.ts`.
 
 ### Security validations
 Path traversal rejection, symlink detection, system directory blocking, project boundary enforcement, special file rejection (devices, pipes, sockets).
 
 ### Related Files
 - `src/main/ipc/external-file-handlers.ts` - IPC handlers
+- `src/main/services/ExternalMoveConfirmer.ts`, `src/main/services/ExternalSourceGrants.ts` - the move box and the dialog-pick record
 - `src/shared/ipc/external-file-schema.ts` - Zod schemas
 - `src/renderer/src/hooks/useExternalFileDrop.ts` - UI hook
 
@@ -374,7 +382,7 @@ Manages API key encryption/decryption using Electron's safeStorage API. Service-
 
 ### Key Features
 - Platform-native encryption via `safeStorage.encryptString()`
-- Falls back to plaintext with warning if safeStorage is unavailable
+- **Never writes plaintext** (v0.22.0): when the system cannot encrypt (for example Linux without a keyring), `storeKey` throws `ApiKeyEncryptionUnavailableError` and the Settings screen says the key was not saved. A plaintext key file left by an older version is still read
 - Keys stored as binary files in `~/.erfana/{serviceName}-api-key.enc`
 - Path traversal protection (validates service name format: `[a-z0-9-]+`)
 - In-memory cache for `hasKey()` checks
@@ -462,7 +470,7 @@ Document import converter for 50+ formats via `@llamaindex/liteparse` with local
 - Spatial text extraction preserving document layout
 - YAML frontmatter (source, format, pages, date, parser, ocr, truncated)
 - Optional page screenshots to temp directory
-- Two-phase extension registration (PDF always, Office/image conditional on system tools)
+- Two-phase extension registration: PDF and images at start-up (LiteParse reads both itself, no ImageMagick needed since #250); Office formats only once LibreOffice is `found`
 - Implements `IConfigurableConverter` for per-import options via `createConfigured()`
 - 60-second conversion timeout via `Promise.race` (NFR-005); 1000-page document limit (`MAX_PARSE_PAGES`)
 - Blocking size cap: rejects files above `IMPORT.SIZE_HARD_LIMIT` (250 MB) with `IMPORT_EXCEEDS_SIZE_LIMIT` before parsing
@@ -485,7 +493,7 @@ Document import converter for 50+ formats via `@llamaindex/liteparse` with local
 ### IPC layer (#133)
 - Channels: `import:document`, `import:documentCancel`, `import:getDocumentExtensions`, `import:documentProgress` (push), `import:dependenciesReady` (push)
 - Schemas: `src/shared/ipc/import-schema.ts` (Zod-validated request/options/progress/result types)
-- Preload: `api.import` namespace — 10 members in `src/preload/index.ts`: `selectFile`, `validate`, `process`, `getSupportedExtensions`, `isSupported`, `documentImport`, `cancelDocument`, `getDocumentExtensions`, plus the two subscription helpers `onDocumentProgress` and `onDependenciesReady` (each returns an unsubscribe function). The five listed channels back the document-import subset (`documentImport`, `cancelDocument`, `getDocumentExtensions`, and the two push events)
+- Preload: `api.import` namespace – 11 members in `src/preload/importBridge.ts` (typed as `ImportBridge`, reached through `importGateway`): `selectFile`, `validate`, `process`, `getSupportedExtensions`, `isSupported`, `documentImport`, `cancelDocument`, `getDocumentExtensions`, `toolStatus`, plus the two subscription helpers `onDocumentProgress` and `onDependenciesReady` (each returns an unsubscribe function). The five listed channels back the document-import subset (`documentImport`, `cancelDocument`, `getDocumentExtensions`, and the two push events); `toolStatus` is `import:toolStatus`
 - Error code: `IMPORT_BUSY` – returned when import is already in progress
 
 ### Related files
@@ -499,13 +507,13 @@ Document import converter for 50+ formats via `@llamaindex/liteparse` with local
 
 **File:** `src/main/services/import/DependencyDetector.ts`
 
-Runtime detection of LibreOffice, the one optional system tool document import uses. PDF and images need nothing extra: LiteParse 2.14.7 reads images with the Rust `image` crate and OCRs them itself (its native module contains no ImageMagick strings, and png/jpg/webp/bmp/tiff/gif imported with ImageMagick off PATH – #250), so their extensions are registered at startup.
+Runtime detection of LibreOffice, the one optional system tool document import uses. PDF and images need nothing extra: LiteParse (pinned at 2.15.1; this was read from 2.14.7) reads images with the Rust `image` crate and OCRs them itself (its native module contains no ImageMagick strings, and png/jpg/webp/bmp/tiff/gif imported with ImageMagick off PATH – #250), so their extensions are registered at startup.
 
 ### Key features
 - One resolver for detection and conversion (#250, `resolveLibreOffice` in `conversionToolGuard.ts`): it replays the lookup LiteParse's native module does – read from its 2.14.7 strings, since it takes no binary-path option. That is `which libreoffice-fresh` / `libreoffice` / `soffice` (only when `which` itself resolves), then the fixed `/Applications/LibreOffice.app/Contents/MacOS/soffice` and `.../libreoffice`, then the literal `C:\Program Files\Libreoffice\program\soffice.exe`. There is no `(x86)` fallback, because LiteParse never looks there. The result is `found` (with a path), `missing`, or `unsafe` (with the name and path that would run, and a reason: `project`, `temp`, `network`, `relative`, `unresolvable` or `ambiguous`)
 - Bare-name helpers (`which`, `powershell`) are checked as Rust's `Command` starts them: on Windows `<name>.exe` only, searched in the app folder, System32 and the Windows folder before PATH. On Windows a LibreOffice name is resolved both the `which` way (PATHEXT order) and the `.exe`-only way. LibreOffice's own program folder ships `soffice.com` next to `soffice.exe`, so the two differ on a normal install: when both land in the same trusted folder the result is `found` (the `.exe`). An untrusted copy on either side, a copy on one side only, or two different folders is `unsafe` (fail closed)
 - Safe lookup (`findOnPathEntries` in `src/main/utils/pathLookup.ts`): PATH is walked in-process – no lookup tool is spawned. UNC entries are never `stat`-ed, but a real spawn would search them: a UNC entry before the first local hit of a helper or LibreOffice name, or anywhere when that name has no local hit, makes the result `unsafe` (network share). Because LiteParse asks for `libreoffice-fresh` first, which is rarely installed, in practice any UNC entry on PATH while `which` is available gives `unsafe`. A hit is `unsafe` when it comes from a relative or empty PATH entry, or when its path or real path is inside the open project, the user temp folder or a shared temp folder (`/tmp`, `/private/tmp`, `/var/tmp`, `%SystemRoot%\Temp`), or when its real path cannot be resolved. At most four hits per name are examined
-- `unsafe` is never run. `found` is probed with `--version` (5-second timeout, `execFile`, no shell) from `os.tmpdir()` with a minimal environment; a candidate that fails the probe is `missing`
+- `unsafe` is never run. On macOS and Linux a candidate is probed with `--version` (headless, stdio ignored, private profile, 5-second timeout, process group killed on timeout or quit) from `os.tmpdir()` with a minimal environment; one that fails the probe is `missing`. **Windows never runs LibreOffice to detect it** (#329): the resolver's file check is the answer, because `soffice.bin --version` waits for "Press Enter" and the old probe left a LibreOffice process behind after every start
 - Pre-conversion guard: before each Office conversion `LiteParseConverter` runs the same resolver and refuses with `IMPORT_UNTRUSTED_TOOL` when it is `unsafe`. The message names the tool and the reason; the log line redacts the path. `untrustedToolMessage` (`src/shared/errors.ts`) is the single wording source: `import:toolStatus` and `import:dependenciesReady` carry `unsafe: { tool, reason }` (strict enums, never a path), and the Settings hint and the import refusal render the same sentence as main's refusal Not covered: a later LiteParse that changes its lookup order
 - Safe working directory (`src/main/utils/safeWorkingDirectory.ts`): a packaged app moves its cwd to the install folder (Windows) or the user-data folder (created first if missing; a failure logs a warning with the path redacted), so no bare-name spawn can resolve into the folder that launched it. Development keeps the repository as cwd
 - Session-level caching (single detection, concurrent calls share one promise)
@@ -516,7 +524,7 @@ Runtime detection of LibreOffice, the one optional system tool document import u
 - `clearCache(): void` – Reset cache, so the next `detect()` probes again ("Check again" via `ImportToolStatusService`, and tests)
 
 ### DependencyStatus
-`{ libreOffice: 'found' | 'missing' | 'unsafe' }`
+`{ libreOffice: 'found' | 'missing' | 'unsafe'; unsafe?: { tool, reason } | null }` (`src/main/services/import/types.ts`) – `unsafe` names the refused program and why, never its path
 
 ### Integration
 - Owned by `ImportToolStatusService` (`src/main/services/import/ImportToolStatusService.ts`, #250), which keeps the converter registry in step with the result: LibreOffice `found` adds the Office extensions (`updateConverterExtensions`); `missing` or `unsafe` removes them (`removeConverterExtensions`, which hands `.rtf` back to the text converter)
@@ -664,7 +672,7 @@ PNG / PDF / clipboard export for the image a viewer tab is showing (#73). The wh
 
 ### Order of operations
 1. Handler gates: `isTrustedSender` → Zod `.strict()` → parent window
-2. `assertInsideProject(filePath, projectPath)` — the same confinement guard `file:readImage` uses. The **destination** is deliberately not confined; it comes from the user's own save dialog, as with PDF and DOCX export
+2. `assertInsideProject(filePath, projectPath)` (`src/main/utils/projectConfinement.ts`) – the same lexical-then-canonical rule the `file:*` path checks apply. The **destination** is deliberately not confined; it comes from the user's own save dialog, as with PDF and DOCX export
 3. `stat` against `MAX_IMAGE_SIZE` (50 MB, imported from `file/imageRead.ts`, not redeclared)
 4. PNG / PDF only: suggested filename → native save dialog → forced extension → self-overwrite guard, which **fails closed** if `realpath` errors with anything other than ENOENT
 5. Acquire the lock; from here everything is inside it, released in `finally`

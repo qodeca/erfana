@@ -6,7 +6,7 @@
  *
  * - One Tab stop for the whole tree; arrows, Home/End, Enter, type-ahead and
  *   Shift+F10 operate it (the Rows card's contract,
- *   design/system/components/row/index.html).
+ *   docs/design-system/system/components/row/index.html).
  * - The focused row draws the standard focus ring, inset (Focus card).
  * - Rows are a flat, virtualised list: a big folder mounts a screenful, and
  *   pointer drag-and-drop still moves a file into a folder.
@@ -109,11 +109,17 @@ test.describe('Project tree keyboard (#87)', () => {
     await tabIntoTree(page)
     await page.keyboard.press('ArrowDown')
 
-    const ring = await page.evaluate(() => {
+    const { ring, dpr } = await page.evaluate(() => {
       const style = getComputedStyle(document.activeElement as Element)
-      return { style: style.outlineStyle, width: style.outlineWidth, offset: style.outlineOffset }
+      return {
+        ring: { style: style.outlineStyle, width: style.outlineWidth, offset: style.outlineOffset },
+        dpr: window.devicePixelRatio
+      }
     })
-    expect(ring).toEqual({ style: 'solid', width: '2px', offset: '-2px' })
+    // The design's 2 px, as Chromium computes it: snapped down to whole device
+    // pixels, so a 125 % Windows display reports 2.5 → 2 device px = 1.6px.
+    const px = (css: number): string => `${Math.sign(css) * Math.floor(Math.abs(css) * dpr) / dpr}px`
+    expect(ring).toEqual({ style: 'solid', width: px(2), offset: px(-2) })
   })
 
   test('Shift+F10 opens the focused row\'s menu', async ({ windowWithTestProject: page }) => {
@@ -176,10 +182,17 @@ test.describe('Project tree keyboard (#87)', () => {
 
   test('a right-click opens the menu at the pointer', async ({ windowWithTestProject: page }) => {
     const tree = new ProjectTreePage(page)
-    const box = (await tree.fileRow('notes.md').boundingBox())!
-    const at = { x: box.x + box.width - 10, y: box.y + box.height / 2 }
-
-    await page.mouse.click(at.x, at.y, { button: 'right' })
+    const row = tree.fileRow('notes.md')
+    // Far from the left edge, but well inside the row: the row narrows after
+    // the tree first paints (a late decoration takes its right end), so a point
+    // a few pixels from a box measured earlier can land past it, on the empty
+    // tree, and open no menu. `position` is resolved against the row at the
+    // moment of the click.
+    const first = (await row.boundingBox())!
+    const offset = { x: Math.round(first.width * 0.6), y: Math.round(first.height / 2) }
+    await row.click({ button: 'right', position: offset })
+    const box = (await row.boundingBox())!
+    const at = { x: box.x + offset.x, y: box.y + offset.y }
 
     await expect(tree.contextMenu()).toHaveCount(1)
     const menu = await tree.contextMenu().evaluate((el) => {

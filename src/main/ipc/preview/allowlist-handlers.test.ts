@@ -9,7 +9,7 @@
  * a store failure maps the AppError code into the result; an untrusted sender is
  * rejected.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import type { IpcMainInvokeEvent } from 'electron'
 import { AppError, ErrorCode } from '../../../shared/errors'
 import { PreviewChannels } from '../../../shared/ipc/preview-channels'
@@ -37,12 +37,12 @@ const event = {} as IpcMainInvokeEvent
 const APPROVED = ['https://cdn.example.com'] as const
 
 function setup(overrides?: {
-  approveOrigin?: ReturnType<typeof vi.fn>
-  applyApprovedHosts?: ReturnType<typeof vi.fn>
+  approveOrigin?: Mock
+  applyApprovedHosts?: Mock
   trusted?: boolean
 }): {
-  approveOrigin: ReturnType<typeof vi.fn>
-  applyApprovedHosts: ReturnType<typeof vi.fn>
+  approveOrigin: Mock
+  applyApprovedHosts: Mock
 } {
   const approveOrigin = overrides?.approveOrigin ?? vi.fn(async () => APPROVED)
   const applyApprovedHosts = overrides?.applyApprovedHosts ?? vi.fn(async () => undefined)

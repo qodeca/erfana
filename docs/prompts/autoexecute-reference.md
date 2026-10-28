@@ -127,7 +127,7 @@ See [Terminal Bootstrap Pattern](../terminal/bootstrap-pattern.md) for detailed 
 
 ## Implementation Files Reference
 
-The per-version modified-files tables (v0.3.3 and v0.3.4) are archived in [AutoExecute v0.3 history](../archive/autoexecute-v0.3-history.md#modified-files).
+The per-version modified-files tables (v0.3.3 and v0.3.4) are archived in [AutoExecute v0.3 history](https://github.com/qodeca/erfana/blob/1d814e05d98b3005e5c13c0624b09653708136f7/docs/archive/autoexecute-v0.3-history.md#modified-files).
 
 ---
 
@@ -254,7 +254,7 @@ await window.api.terminal.write(terminalId, '\r')
 
 ---
 
-The v0.3.2→v0.3.4 migration guide is archived in [AutoExecute v0.3 history](../archive/autoexecute-v0.3-history.md#migration-guide).
+The v0.3.2→v0.3.4 migration guide is archived in [AutoExecute v0.3 history](https://github.com/qodeca/erfana/blob/1d814e05d98b3005e5c13c0624b09653708136f7/docs/archive/autoexecute-v0.3-history.md#migration-guide).
 
 ---
 

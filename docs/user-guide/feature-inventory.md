@@ -16,6 +16,8 @@ cover it. The final column links to the section covering that feature (acceptanc
 - Code swept: `src/renderer/src/` and `src/main/`.
 - Checked in code: every setting, every context menu, `src/main/menu.ts`, every keyboard handler,
   every dialog, and every panel toolbar.
+- Refreshed 2026-10-25 for v0.22.0: rows APP-19 to APP-21, TREE-17, TERM-12, TERM-13, SET-13 to
+  SET-15, KEY-26 and KEY-27 were added, and APP-02, APP-16, TREE-07 and IMP-03 were updated.
 
 **Out of scope, on purpose:** the spec registry has only one kind of user-facing entry – `draft`
 specs for work not yet shipped. Those are the graph engine (004–008), multi-CLI prompt optimisation
@@ -32,7 +34,7 @@ Source paths are relative to `src/renderer/src/` (**R/**), `src/main/` (**M/**) 
 | ID | Feature | Platforms | Source | Guide section |
 |---|---|---|---|---|
 | APP-01 | Welcome screen: version, "Open a project folder to start editing", Open / Change project | all | R/components/Panels/WelcomePanel.tsx | [reference/the-erfana-window](./reference/the-erfana-window.md#welcome-and-home) |
-| APP-02 | Recent projects: up to 5, open, remove from list | all | WelcomePanel.tsx, S/constants.ts | [how-to/open-a-project](./how-to/open-a-project.md#open-a-folder) |
+| APP-02 | Recent projects: up to 5, open, remove from list; keyboard: one Tab stop, arrows, Home/End, Enter or Space | all | WelcomePanel.tsx, S/constants.ts | [how-to/open-a-project](./how-to/open-a-project.md#open-a-folder) |
 | APP-03 | Home tab | all | R/components/Panels/WelcomeTab.tsx | [reference/the-erfana-window](./reference/the-erfana-window.md#welcome-and-home) |
 | APP-04 | Open, change and close a project (project panel header) | all | R/components/ProjectTree/ProjectTree.tsx | [how-to/open-a-project](./how-to/open-a-project.md#open-a-folder) |
 | APP-05 | Terminal opens on each project load; may stay closed after user closes it during that project | all | R/hooks/useAutoOpenTerminal.ts | [reference/terminal](./reference/terminal.md#opening-and-session-state) |
@@ -46,9 +48,12 @@ Source paths are relative to `src/renderer/src/` (**R/**), `src/main/` (**M/**) 
 | APP-13 | File changed on disk: Reload from Disk / Keep My Version | all | R/components/FileConflictNotification/ | [how-to/edit-and-preview-markdown](./how-to/edit-and-preview-markdown.md#choose-a-view) |
 | APP-14 | Crash screen: Restart Erfana, Open logs folder, error details, copy | all | R/components/RootErrorBoundary/RootErrorFallback.tsx | [reference/troubleshooting](./reference/troubleshooting.md#erfana-stopped-unexpectedly) |
 | APP-15 | Panel "unavailable" state after a panel error | all | PanelErrorBoundary | [reference/troubleshooting](./reference/troubleshooting.md#panel-unavailable) |
-| APP-16 | Logs in `~/.erfana/logs/`, kept 7 days; Open from Settings | all | M/services/LoggingService.ts | [reference/files-erfana-keeps](./reference/files-erfana-keeps.md#logs) |
+| APP-16 | Logs in `~/.erfana/logs/`, kept 7 days, at most 5 older files per log; `crash.log`; Open from Settings | all | M/services/LoggingService.ts | [reference/files-erfana-keeps](./reference/files-erfana-keeps.md#logs) |
 | APP-17 | Tabs: close, middle-click close, unsaved marker, "(deleted)" | all | R/components/Tabs/ | [reference/the-erfana-window](./reference/the-erfana-window.md#tabs) |
 | APP-18 | No auto-update: new versions come from GitHub Releases | all | (no updater in M/) | [reference/files-erfana-keeps](./reference/files-erfana-keeps.md#new-versions) |
+| APP-19 | Toasts: errors and actionable toasts stay until closed, warnings at least 8 s, pause on hover or focus, Esc closes, repeats show "×N", at most 5 sticky | all | R/components/Toast/toastDwell.ts, toastStack.ts | [reference/troubleshooting](./reference/troubleshooting.md#error-messages) |
+| APP-20 | Project switch or close saves edited tabs first; asks only about tabs that could not be saved | all | R/components/ProjectTree/switchHelpers.ts | [reference/the-erfana-window](./reference/the-erfana-window.md#welcome-and-home) |
+| APP-21 | Drive roots, network-share roots, system and credential folders refused as projects | all | M/utils/pathSecurity.ts, M/utils/systemPathBlock.ts | [reference/troubleshooting](./reference/troubleshooting.md#a-folder-cannot-be-opened-as-a-project) |
 
 ## Project tree
 
@@ -60,7 +65,7 @@ Source paths are relative to `src/renderer/src/` (**R/**), `src/main/` (**M/**) 
 | TREE-04 | Git status bar: branch, "Clean", detached HEAD, 10,000-file cap | all | ProjectTree/GitStatusBar.tsx | [reference/project-tree](./reference/project-tree.md#git-badges-and-status) |
 | TREE-05 | Sensitive-file and symlink icons | all | ProjectTreeNode.tsx | [reference/project-tree](./reference/project-tree.md#special-files-and-visibility) |
 | TREE-06 | Drag to move between folders | all | R/hooks/useDragDropTree.ts | [how-to/organise-project-files](./how-to/organise-project-files.md#manage-files) |
-| TREE-07 | Drop from Finder/Explorer: Move / Copy / Import | all | Dialog/DropModeDialog.tsx | [how-to/organise-project-files](./how-to/organise-project-files.md#manage-files) |
+| TREE-07 | Drop from Finder/Explorer: Move / Copy / Import; over 100 files refused first; Move confirmed in a native box (groups of 10) | all | Dialog/DropModeDialog.tsx, M/services/ExternalMoveConfirmer.ts | [how-to/organise-project-files](./how-to/organise-project-files.md#manage-files) |
 | TREE-08 | Name clash: Skip / Keep both / Replace | all | Dialog/ConflictDialog.tsx | [how-to/organise-project-files](./how-to/organise-project-files.md#manage-files) |
 | TREE-09 | Cut / copy / paste files | all | ProjectTree.tsx | [how-to/organise-project-files](./how-to/organise-project-files.md#manage-files) |
 | TREE-10 | Folder right-click menu (Cut, Copy, Paste, New File, New Folder, Rename, Import…, Delete, Reveal) | all | ProjectTree/context-menu/strategies.tsx, commands.tsx | [reference/menus](./reference/menus.md#project-tree-context-menus) |
@@ -70,6 +75,7 @@ Source paths are relative to `src/renderer/src/` (**R/**), `src/main/` (**M/**) 
 | TREE-14 | Keyboard navigation: one Tab stop, arrows, Home/End, Enter, type-ahead, Shift+F10 (#88) | all | ProjectTree/treeKeyboard.ts | [reference/project-tree](./reference/project-tree.md#keyboard-navigation) |
 | TREE-15 | Hidden patterns and watcher ignore list (per-project settings) | all | S/ipc/project-settings-schema.ts | [reference/settings](./reference/settings.md#per-project-settings) |
 | TREE-16 | Excluded folders: `files.exclude` in the global and the project settings file (project adds to global); excluded paths are not shown, read or watched; `.erfana` is never excluded; git status unaffected | all | S/ipc/files-exclude-schema.ts, M/utils/excludeMatcher.ts | [reference/settings](./reference/settings.md#excluded-folders) |
+| TREE-17 | Large folders: only visible rows drawn; ignored build folders and folders past 50,000 entries read on expand; Loading… / Could not read this folder | all | ProjectTree/visibleRows.ts, TreePlaceholderRow.tsx, M/services/FileService.ts | [reference/project-tree](./reference/project-tree.md#large-projects) |
 
 ## Editor
 
@@ -143,6 +149,8 @@ Source paths are relative to `src/renderer/src/` (**R/**), `src/main/` (**M/**) 
 | TERM-09 | Right-click menu: Copy, Paste | all | ContextMenu/TerminalContextMenu.tsx | [reference/menus](./reference/menus.md#terminal-and-text-box-context-menus) |
 | TERM-10 | "Terminal not available": Recheck, Copy fix command | all | TerminalStatusContent.tsx | [reference/troubleshooting](./reference/troubleshooting.md#terminal-not-available) |
 | TERM-11 | Clean agent environment: Claude Code runs as a top-level session | all | M/services/TerminalService.ts | [Start your own agent](./how-erfana-works-with-agents.md#start-your-own-agent) |
+| TERM-12 | Restart terminal asks first while Claude Code runs, output follows input, or (macOS) a program runs | all | TerminalPanel/restartGuard.ts | [reference/terminal](./reference/terminal.md#header-controls) |
+| TERM-13 | Screen-reader mode: Auto / On / Off | all | R/hooks/useTerminalScreenReaderMode.ts | [reference/terminal](./reference/terminal.md#screen-readers) |
 
 ## Claude Code status bar
 
@@ -174,7 +182,7 @@ Source paths are relative to `src/renderer/src/` (**R/**), `src/main/` (**M/**) 
 |---|---|---|---|---|
 | IMP-01 | Import dialog: OCR on/off, 31 languages, page screenshots, DPI 72/150/300; parse at most 1,000 pages, screenshot first 100; options kept for the session | all | R/components/DocumentImport/DocumentImportDialog.tsx | [how-to/import-a-document](./how-to/import-a-document.md#import-a-file) |
 | IMP-02 | Supported formats (LiteParse; the "50+" list to confirm while writing) | all | M/services import | [reference/import-and-transcription](./reference/import-and-transcription.md#import-documents) |
-| IMP-03 | LibreOffice required dialog | all | R/hooks/useImport.ts | [how-to/import-a-document](./how-to/import-a-document.md#import-a-file) |
+| IMP-03 | LibreOffice required / unsafe location dialog with Open import tools | all | R/hooks/useImport.ts | [how-to/import-a-document](./how-to/import-a-document.md#import-a-file) |
 | IMP-04 | Large-file warning: Import anyway / Skip | all | useImport.ts | [reference/import-and-transcription](./reference/import-and-transcription.md#import-documents) |
 | IMP-05 | After import: file opens and the organize-import prompt runs | all | DocumentImportDialog.tsx | [how-to/import-a-document](./how-to/import-a-document.md#import-a-file) |
 | TR-01 | Transcription dialog: 31 languages incl. auto-detect, progress, retry | all | R/components/Transcription/TranscriptionDialog.tsx | [how-to/transcribe-audio-or-video](./how-to/transcribe-audio-or-video.md#transcribe-media) |
@@ -201,6 +209,9 @@ Source paths are relative to `src/renderer/src/` (**R/**), `src/main/` (**M/**) 
 | SET-10 | HTML preview > Run HTML files | checkbox, on | [reference/settings](./reference/settings.md#html-preview) |
 | SET-11 | Per project `.erfana/settings.json`: `watcher.ignoreList`, `tree.hiddenPatterns` (extend/replace), `htmlPreview.allowlist.origins` | JSON file | [reference/settings](./reference/settings.md#per-project-settings) |
 | SET-12 | Settings overlay: gear icon, Esc closes, no shortcut | – | [reference/settings](./reference/settings.md#editor) |
+| SET-13 | Import tools: PDF, images, Office (LibreOffice found / not found / unsafe), install hint per OS, Check again | status list + button | [reference/settings](./reference/settings.md#import-tools) |
+| SET-14 | Terminal > Screen reader mode | Auto / On / Off, Auto | [reference/settings](./reference/settings.md#terminal) |
+| SET-15 | Transcription > Cancel a model download | button while downloading | [reference/settings](./reference/settings.md#transcription) |
 
 ## Keyboard shortcuts
 
@@ -233,6 +244,8 @@ Every row goes into `reference/keyboard-shortcuts.md` with macOS and Windows col
 | KEY-23 | Cmd+Shift+N / Ctrl+Shift+N | New Window | menu | [Shortcuts](./reference/keyboard-shortcuts.md#app-and-windows) |
 | KEY-24 | Cmd+0, Cmd+Plus, Cmd+- / Ctrl+… | Actual size, zoom in, zoom out | menu | [Shortcuts](./reference/keyboard-shortcuts.md#app-and-windows) |
 | KEY-25 | Cmd+M, Cmd+H, Cmd+Q (macOS); Ctrl+M, Alt+F4, F11 (Windows) | Window management | OS | [Shortcuts](./reference/keyboard-shortcuts.md#app-and-windows) |
+| KEY-26 | Shift+F10 / Shift+F10 or Menu key; then arrows, Home/End, Enter/Space, type-ahead, Esc or Tab | Open and use any right-click menu | menus | [Shortcuts](./reference/keyboard-shortcuts.md#menus) |
+| KEY-27 | Esc on a focused toast | Close the message | toasts | [Shortcuts](./reference/keyboard-shortcuts.md#app-and-windows) |
 
 
 ## Menus and dialogs

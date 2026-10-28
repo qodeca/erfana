@@ -1,0 +1,49 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Placement contexts</title>
+</head>
+<body>
+  <header>
+    <nav><a href="#a">A</a> | <a href="#b">B</a></nav>
+  </header>
+  <main>
+    <h1>Placement <em>contexts</em></h1>
+    <p>Inline flow with <strong>bold</strong>, <code>code</code> and
+      <a href="#c">a link that starts its own line</a> in the middle.</p>
+    <p>
+      <span class="badge">line-start inline</span>
+    </p>
+    <pre>
+<b>bold at the start of a pre line</b>
+  <i>indented italic in pre</i>
+</pre>
+    <listing>
+<u>listing child</u>
+</listing>
+    <textarea>
+  not a tag in a textarea
+</textarea>
+    <ul>
+      <li>one</li>
+      <li>two <em>emphasis</em></li>
+    </ul>
+    <table>
+      <tr><th>Plan</th><th>Price</th></tr>
+      <tr>
+        <td>Basic</td>
+        <td>10 EUR</td>
+      </tr>
+    </table>
+    <svg viewBox="0 0 100 20">
+      <text x="0" y="15">svg text</text>
+      <rect width="10" height="10"/>
+    </svg>
+    <div><span>a</span><span>b</span><span>c</span></div>
+  </main>
+  <footer><p>Footer <small>small print</small></p></footer>
+</body>
+</html>

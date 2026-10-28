@@ -195,7 +195,7 @@ npm run test:renderer -- useTerminalStore.autoExecute
 npm run test:cov
 ```
 
-The v0.3.4 coverage snapshot, its missing-branch note and test-performance figures are archived in [AutoExecute v0.3 history](../archive/autoexecute-v0.3-history.md#coverage-results-v034).
+The v0.3.4 coverage snapshot, its missing-branch note and test-performance figures are archived in [AutoExecute v0.3 history](https://github.com/qodeca/erfana/blob/1d814e05d98b3005e5c13c0624b09653708136f7/docs/archive/autoexecute-v0.3-history.md#coverage-results-v034).
 
 ---
 

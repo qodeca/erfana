@@ -13,6 +13,7 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { PREVIEW } from '../../../shared/constants'
+import { inProcessLinkScanner } from './__test-helpers__/inProcessLinkScanner'
 import type { WatchSetResult } from './PreviewWatchCoordinator'
 import { createPreviewLivePipeline } from './previewLivePipeline'
 
@@ -76,6 +77,7 @@ describe('frame sources in the post-load pipeline', () => {
       stillFrameCache: { invalidate: vi.fn() },
       now: () => state.now,
       readEntryHtml: fakes.readEntryHtml,
+      linkScanner: inProcessLinkScanner,
       currentPage: () => inDir('index.html'),
       urlFor: absPath => `erfana-preview://token/${absPath}`,
       realRoot: dir,
@@ -99,7 +101,8 @@ describe('frame sources in the post-load pipeline', () => {
     await ready(h)
 
     expect(h.setWatchSet).toHaveBeenCalledWith(
-      ['shared.css', 'top.css', 'child.html', 'child.png'].map(inDir)
+      ['shared.css', 'top.css', 'child.html', 'child.png'].map(inDir),
+      { changedSince: expect.any(Number) }
     )
     expect(h.loadStateChanged).toHaveBeenCalledWith('panel-A', 'ready', 0)
   })

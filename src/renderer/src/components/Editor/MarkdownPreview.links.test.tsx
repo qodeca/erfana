@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import { render, act } from '@testing-library/react'
 import { MarkdownPreview } from './MarkdownPreview'
 import { ToastProvider } from '../Toast/ToastContext'
@@ -270,7 +270,7 @@ describe('MarkdownPreview Link Features', () => {
       const { container } = await renderWithToastAsync(
         <MarkdownPreview content={markdown} filePath="/test/project/file.md" />
       )
-      const checked = (fileMock().exists as ReturnType<typeof vi.fn>).mock.calls.map(
+      const checked = (fileMock().exists as Mock).mock.calls.map(
         ([request]) => (request as { filePath: string }).filePath
       )
       expect(checked).toContain('/test/project/raw.md')
@@ -283,7 +283,7 @@ describe('MarkdownPreview Link Features', () => {
       const { rerender } = await renderWithToastAsync(
         <MarkdownPreview content="[a](./x.md)" filePath="/test/project/one.md" />
       )
-      ;(fileMock().exists as ReturnType<typeof vi.fn>).mockClear()
+      ;(fileMock().exists as Mock).mockClear()
       await act(async () => {
         rerender(
           <ToastProvider>
@@ -291,7 +291,7 @@ describe('MarkdownPreview Link Features', () => {
           </ToastProvider>
         )
       })
-      const checked = (fileMock().exists as ReturnType<typeof vi.fn>).mock.calls.map(
+      const checked = (fileMock().exists as Mock).mock.calls.map(
         ([request]) => (request as { filePath: string }).filePath
       )
       expect(checked).toEqual(['/test/project/docs/x.md'])

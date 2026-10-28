@@ -18,18 +18,22 @@ npm run build:win        # Windows package (NSIS .exe; needs Developer Mode)
 
 # Quality
 npm run typecheck        # Type checking (node + web, and their tests + e2e)
-npm run lint             # Linting (eslint, JS/TS only)
-npm run lint:css         # stylelint: src/ CSS + the design/ cards' inline styles
-npm run design           # Rebuild design/ (index, token copy, claims)
-npm run design -- --check # Fail if a generated file under design/ is stale
-npm run test             # All tests (vitest workspace: main + renderer + preload)
-npm run test:main        # vitest.main.ts config: src/main + src/shared + scripts
-npm run test:renderer    # vitest.renderer.ts config: src/renderer/src only (jsdom)
-npm run test:preload     # vitest.preload.ts config: preload tests
+npm run lint             # eslint (JS/TS) + shebang check + 500-line file limit
+npm run lint:css         # stylelint: src/ CSS + the docs/design-system/ cards' inline styles
+npm run design           # Rebuild docs/design-system/ (index, token copy, claims)
+npm run design -- --check # Fail if a generated file under docs/design-system/ is stale
+npm run test             # All tests (vitest projects: main + main-perf + renderer + preload)
+npm run test:main        # vitest.main.config.ts config: src/main + src/shared + scripts (main-perf last)
+npm run test:renderer    # vitest.renderer.config.ts config: src/renderer/src only (jsdom)
+npm run test:preload     # vitest.preload.config.ts config: preload tests
 npm run test:cov         # Coverage report (all 3 projects)
 npm run test:e2e         # E2E tests (Playwright + Electron)
 npm run test:e2e:visual            # Visual regression baselines
 npm run test:e2e:update-screenshots # Refresh visual baselines
+
+# Docs
+npm run check:links          # Relative links and heading anchors in docs
+npm run check:version-drift  # Docs that state a stale version
 ```
 
 ## Keyboard Shortcuts
@@ -59,7 +63,7 @@ See the complete [user shortcut reference](./user-guide/reference/keyboard-short
 --text-sm   /* 11px */
 ```
 
-Full guide: the [design system](../design/index.html) — open it in a browser. [UI Style Guide](./ui-style-guide.md) keeps the text-selection policy.
+Full guide: the [design system](design-system/index.html) — open it in a browser. [UI Style Guide](./ui-style-guide.md) keeps the text-selection policy.
 
 ## Project Structure
 
@@ -105,7 +109,7 @@ Schemas: `src/shared/ipc/*.ts`
 
 ## UI Rules (Non-negotiable)
 
-Open [`design/index.html`](../design/index.html) first — the cards decide these, and
+Open [`docs/design-system/index.html`](design-system/index.html) first — the cards decide these, and
 render each rule live.
 
 Machine-enforced by `npm run lint:css` in the required `Lint` job:

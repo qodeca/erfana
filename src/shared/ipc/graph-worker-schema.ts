@@ -12,8 +12,8 @@
  * Contract-only for #21: no worker is spawned and no adapter exists yet (#23).
  *
  * @see Issue #21 - graph R1 architecture
- * @see specs/designs/sd-021-worker-contracts.md §8.2 - the normative message union
- * @see specs/designs/sd-021-worker-contracts.md §8.8 - phase durations
+ * @see docs/designs/sd-021-worker-contracts.md §8.2 - the normative message union
+ * @see docs/designs/sd-021-worker-contracts.md §8.8 - phase durations
  */
 import { z } from 'zod'
 import { GRAPH } from '../graph-constants'
@@ -306,7 +306,7 @@ export type GraphWorkerClosed = z.output<typeof GraphWorkerClosedMessageSchema>
  * `jobVersion` is absent from `open`, `rebuild`, `close` and `closed` for the
  * same reason: they are lifecycle verbs, scoped by `sessionVersion`, not by a job.
  *
- * @see specs/designs/sd-021-worker-contracts.md §8.2 - the normative union
+ * @see docs/designs/sd-021-worker-contracts.md §8.2 - the normative union
  */
 export const GraphWorkerMessageSchema = z.discriminatedUnion('type', [
   GraphWorkerIndexResultMessageSchema,

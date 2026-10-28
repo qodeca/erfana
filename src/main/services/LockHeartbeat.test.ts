@@ -19,7 +19,7 @@
  * - isDisposing re-check before write (dispose-race guard)
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
 import { EventEmitter } from 'node:events'
 import type { LockInfo } from '../../shared/ipc/project-lock-schema'
 import type { Clock } from '../utils/Clock'
@@ -74,9 +74,9 @@ function makeDefaultLockInfo(overrides: Partial<LockInfo> = {}): LockInfo {
 interface TestBed {
   clock: ReturnType<typeof makeFakeClock>
   powerMonitor: EventEmitter
-  readLockFile: ReturnType<typeof vi.fn>
-  onOwnershipLost: ReturnType<typeof vi.fn>
-  onFocusRequest: ReturnType<typeof vi.fn>
+  readLockFile: Mock
+  onOwnershipLost: Mock
+  onFocusRequest: Mock
   deps: LockHeartbeatDeps
 }
 

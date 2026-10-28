@@ -42,11 +42,16 @@
 import { createRequire } from 'node:module'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 
-const { send } = vi.hoisted(() => ({ send: vi.fn() }))
+const { send, on, removeListener } = vi.hoisted(() => ({
+  send: vi.fn(),
+  on: vi.fn(),
+  removeListener: vi.fn()
+}))
 
 // The preload imports only `ipcRenderer`; anything else it reached for would be
-// undefined here and throw.
-vi.mock('electron', () => ({ ipcRenderer: { send } }))
+// undefined here and throw. `on` is the comment overlay's one receive channel
+// (previewPageComments/index.ts); its behaviour is tested there.
+vi.mock('electron', () => ({ ipcRenderer: { send, on, removeListener } }))
 
 const LINK_CHANNEL = 'preview-page:linkActivated'
 const NOTE_CHANNEL = 'preview-page:linkNote'
@@ -118,10 +123,25 @@ const resolved = (href: string): string => new URL(href, document.baseURI).href
 
 const NO_MODIFIERS = { meta: false, ctrl: false, shift: false, alt: false }
 
+/** What the module asked `ipcRenderer.on` for, and sent, while it loaded (mock calls clear before each test). */
+let listenedAtLoad: unknown[][] = []
+let sentAtLoad: unknown[][] = []
+/** The event types the module listened for on `window` and `document` while it loaded. */
+let windowListenersAtLoad: string[] = []
+let documentListenersAtLoad: string[] = []
+
 beforeAll(async () => {
   // Loaded once: the module adds its document listeners as a side effect, and
   // loading it again would add a second set.
+  const windowAdds = vi.spyOn(window, 'addEventListener')
+  const documentAdds = vi.spyOn(document, 'addEventListener')
   await import('./previewPage')
+  listenedAtLoad = [...on.mock.calls]
+  sentAtLoad = [...send.mock.calls]
+  windowListenersAtLoad = windowAdds.mock.calls.map(([type]) => type)
+  documentListenersAtLoad = documentAdds.mock.calls.map(([type]) => type)
+  windowAdds.mockRestore()
+  documentAdds.mockRestore()
 })
 
 beforeEach(() => {
@@ -506,5 +526,19 @@ describe('previewPage preload – CSP refusals', () => {
     document.body.dispatchEvent(cspEvent('https://never-referenced.example/', 'img-src'))
 
     expect(send).not.toHaveBeenCalled()
+  })
+})
+
+describe('previewPage preload – comment overlay', () => {
+  it('SEC-22 installs nothing of the overlay without the comments argument (flag off is a kill switch)', () => {
+    // This process was started without `--erfana-hpc`, as a view built with
+    // `htmlPreview.comments.enabled` off is: no listener on main, no hello,
+    // and no token capture.
+    expect(process.argv).not.toContain('--erfana-hpc')
+    expect(listenedAtLoad).toEqual([])
+    expect(sentAtLoad).toEqual([])
+    // Only the link and CSP reporter listens: no comment-mode guard at all.
+    expect(windowListenersAtLoad).toEqual([])
+    expect(documentListenersAtLoad).toEqual(['click', 'auxclick', 'securitypolicyviolation'])
   })
 })

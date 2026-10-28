@@ -1,6 +1,6 @@
 # E2E selector catalog
 
-All `data-testid` attributes available for E2E testing – **259 testids** across 37 sections.
+All `data-testid` attributes available for E2E testing – **350 testids** across 38 sections (counted against `testids.ts` on 2026-10-26).
 
 **Related documentation**:
 - [E2E Testing Guide](./e2e-testing.md) – Main E2E documentation
@@ -22,7 +22,7 @@ All `data-testid` attributes available for E2E testing – **259 testids** acros
 
 ---
 
-## Project tree (16 testids)
+## Project tree (17 testids)
 
 | Testid | Element | Type |
 |--------|---------|------|
@@ -42,6 +42,7 @@ All `data-testid` attributes available for E2E testing – **259 testids** acros
 | `project-tree-error` | Error state container | static |
 | `project-tree-loading` | Loading spinner | static |
 | `project-tree-drop-target-{hash}` | Folder drop target | dynamic |
+| `project-tree-placeholder-{hash}` | "Loading…" or "Could not read this folder" line under an expanded folder whose contents are read on expand (#320) | dynamic |
 
 **Dynamic testid example**:
 ```typescript
@@ -284,7 +285,7 @@ Full-window crash recovery screen (issue #60). Action buttons are capability-gat
 
 ---
 
-## Dialogs – file picker (5 testids)
+## Dialogs – file picker (6 testids)
 
 | Testid | Element | Type |
 |--------|---------|------|
@@ -293,6 +294,7 @@ Full-window crash recovery screen (issue #60). Action buttons are capability-gat
 | `file-picker-item-{hash}` | File item | dynamic |
 | `file-picker-btn-select` | Select button | static |
 | `file-picker-btn-cancel` | Cancel button | static |
+| `file-picker-incomplete` | Note that the project is too large to list in full, so other files of this name may be missing (#320) | static |
 
 ---
 
@@ -441,7 +443,7 @@ Full-window crash recovery screen (issue #60). Action buttons are capability-gat
 
 ---
 
-## Toast notifications (7 testids)
+## Toast notifications (8 testids)
 
 | Testid | Element | Type |
 |--------|---------|------|
@@ -452,10 +454,11 @@ Full-window crash recovery screen (issue #60). Action buttons are capability-gat
 | `toast-btn-action` | Action button (present only on a toast carrying an action; such a toast never auto-dismisses) | static |
 | `toast-live-polite` | Persistent visually-hidden polite live region (info/success/warning) | static |
 | `toast-live-alert` | Persistent visually-hidden alert live region (errors) | static |
+| `toast-count` | Repeat count ("×3") on a toast that merged identical repeats | static |
 
 ---
 
-## Settings overlay (22 testids)
+## Settings overlay (33 testids)
 
 | Testid | Element | Type |
 |--------|---------|------|
@@ -481,6 +484,17 @@ Full-window crash recovery screen (issue #60). Action buttons are capability-gat
 | `settings-whisper-download-error` | Whisper download error | static |
 | `settings-section-html-preview` | HTML preview settings section | static |
 | `settings-toggle-html-preview` | HTML preview enabled toggle | static |
+| `settings-api-key-error` | API key error message | static |
+| `settings-btn-whisper-cancel` | Cancel button shown while the Whisper binary or model downloads | static |
+| `settings-whisper-download-live` | Always-mounted, visually hidden status region announcing download progress | static |
+| `settings-whisper-download-alert` | Always-mounted, visually hidden alert region announcing a failed download | static |
+| `settings-section-terminal` | Terminal settings section (lens review [23]) | static |
+| `settings-select-screen-reader-mode` | Terminal screen-reader mode select: Auto / On / Off | static |
+| `settings-screen-reader-status` | What Auto currently detects (screen reader reported or not) | static |
+| `settings-section-import-tools` | Import tools section (#250) | static |
+| `settings-import-tool-status` | One format row's status; the row carries `data-format` and `data-state` | static |
+| `settings-btn-import-tools-recheck` | "Check again" button (#250) | static |
+| `settings-import-tools-live` | Polite live region announcing the outcome of "Check again" | static |
 
 ---
 
@@ -520,7 +534,7 @@ Full-window crash recovery screen (issue #60). Action buttons are capability-gat
 
 ---
 
-## Welcome panel (5 testids)
+## Welcome panel (6 testids)
 
 | Testid | Element | Type |
 |--------|---------|------|
@@ -529,6 +543,7 @@ Full-window crash recovery screen (issue #60). Action buttons are capability-gat
 | `welcome-recent-projects` | Recent projects list | static |
 | `welcome-recent-project-{hash}` | Recent project item | dynamic |
 | `welcome-recent-project-btn-remove-{hash}` | Remove recent project | dynamic |
+| `welcome-recent-project-btn-open-{hash}` | Keyboard "open" button of a recent project row | dynamic |
 
 ---
 
@@ -542,3 +557,125 @@ Full-window crash recovery screen (issue #60). Action buttons are capability-gat
 | `stats-lines` | Line count | static |
 | `stats-reading-time` | Reading time | static |
 | `stats-selection` | Selection stats | static |
+
+---
+
+## HTML Preview comments (76 testids)
+
+Constants: `TEST_IDS.COMMENT_*` (defined in `src/renderer/src/constants/commentTestids.ts`, spread into `TEST_IDS`). Rows, messages, threads and tags repeat – scope them with a parent locator (`drawer.getByTestId(…)`, `.nth(i)`).
+
+**Toolbar**
+
+| Testid | Element | Type |
+|--------|---------|------|
+| `preview-band-comment-mode` | Comment mode toggle in the preview toolbar | static |
+| `preview-band-comments` | Comments list button (opens the drawer) in the preview toolbar | static |
+| `preview-band-comment-icons` | Show comment icons toggle in the preview toolbar | static |
+
+**Element menu and live regions**
+
+| Testid | Element | Type |
+|--------|---------|------|
+| `comment-context-menu` | The element menu (right-click in comment mode) | static |
+| `comment-menu-add` | Element menu: Add comment | static |
+| `comment-menu-disabled` | Element menu: disabled Can't comment here | static |
+| `comment-announce` | The tab's polite live region | static |
+| `comment-alert` | The tab's assertive live region | static |
+
+**Comment window**
+
+| Testid | Element | Type |
+|--------|---------|------|
+| `comment-window` | The comment window (data-view: identity / new / threads) | static |
+| `comment-window-title` | Window title (takes focus in the threads view) | static |
+| `comment-window-close` | Close (x) in the window head | static |
+| `comment-window-alert` | The window's own assertive live region | static |
+| `comment-window-read-error` | Couldn't read comments – the list failed | static |
+| `comment-window-retry` | Try again after a failed list read | static |
+| `comment-close` | Close in the window foot | static |
+| `comment-save-error` | Banner for a refused (or still pending) write | static |
+
+**Identity**
+
+| Testid | Element | Type |
+|--------|---------|------|
+| `comment-identity-name` | Identity step: name field | static |
+| `comment-identity-email` | Identity step: email field | static |
+| `comment-identity-continue` | Identity step: Continue | static |
+| `comment-identity-cancel` | Identity step: Cancel | static |
+| `comment-identity-error` | Identity step: always-mounted save-error line | static |
+| `comment-identity-line` | "Commenting as …" line under the comment field | static |
+| `comment-identity-change` | Change, next to "Commenting as …" | static |
+| `comment-identity-edit-name` | Inline identity editor: name field | static |
+| `comment-identity-edit-email` | Inline identity editor: email field | static |
+
+**New comment**
+
+| Testid | Element | Type |
+|--------|---------|------|
+| `comment-new-field` | New comment text field | static |
+| `comment-save` | Save the new comment | static |
+| `comment-cancel` | Cancel the new comment (text kept) | static |
+| `comment-unsaved-banner` | Unsaved-source banner (Save blocked) | static |
+| `comment-unsaved-save` | Unsaved-source banner: Save {file} | static |
+| `comment-unsaved-go-to-tab` | Unsaved-source banner: Go to tab | static |
+| `comment-unsaved-cleared` | The banner after the source tab became clean | static |
+
+**Threads**
+
+| Testid | Element | Type |
+|--------|---------|------|
+| `comment-thread` | An open thread | static |
+| `comment-resolved-thread` | A resolved thread, folded | static |
+| `comment-message` | One message | static |
+| `comment-message-text` | A message's text | static |
+| `comment-message-actions` | A message's … (actions) button | static |
+| `comment-edit-field` | Edit field of a message | static |
+| `comment-edit-save` | Save changes to a message | static |
+| `comment-edit-cancel` | Cancel an edit | static |
+| `comment-delete-confirm` | Confirm deleting a comment or thread | static |
+| `comment-delete-cancel` | Cancel a delete | static |
+| `comment-reply-field` | Reply field | static |
+| `comment-reply` | Reply button | static |
+| `comment-resolve` | Resolve a thread | static |
+| `comment-reopen` | Re-open a resolved thread | static |
+| `comment-new-on-element` | New comment on the pin's element | static |
+| `comment-open-in-source` | Open in source (window foot) | static |
+| `comment-read-only` | Read-only file banner | static |
+| `comment-not-visible` | Not-visible-now banner | static |
+| `comment-not-found` | Element-not-found banner | static |
+| `comment-not-found-quote` | The lost element's stored quote | static |
+| `comment-damaged` | A damaged block | static |
+| `comment-damaged-raw` | A damaged block's raw text | static |
+| `comment-delete-block` | Delete block… | static |
+| `comment-delete-block-confirm` | Confirm deleting a damaged block | static |
+| `comment-newer` | A newer-format block | static |
+| `comment-control-token` | A visible token for an invisible control character | static |
+
+**Drawer**
+
+| Testid | Element | Type |
+|--------|---------|------|
+| `comment-drawer` | The comments drawer | static |
+| `comment-drawer-close` | Close the drawer | static |
+| `comment-filter-open` | Filter: Open | static |
+| `comment-filter-resolved` | Filter: Resolved | static |
+| `comment-filter-attention` | Filter: Needs attention | static |
+| `comment-drawer-show-icons` | Show comment icons checkbox | static |
+| `comment-drawer-list` | The row list | static |
+| `comment-drawer-row` | A row | static |
+| `comment-drawer-row-main` | A row's main action (Show on page / Open in source) | static |
+| `comment-drawer-row-open` | A row's Open (the comment window) | static |
+| `comment-drawer-tag` | A tag on a row | static |
+| `comment-drawer-error` | List read error with Try again | static |
+
+**Settings**
+
+| Testid | Element | Type |
+|--------|---------|------|
+| `settings-section-comments` | Settings › Comments section | static |
+| `settings-toggle-html-comments` | Feature flag: Comments in HTML preview | static |
+| `settings-comment-name` | Your name | static |
+| `settings-comment-email` | Your email | static |
+| `settings-comment-notice` | Visibility notice | static |
+| `settings-comment-alert` | Assertive region for blur-save errors | static |

@@ -75,7 +75,27 @@ export class HtmlPreviewPage {
     const tree = new ProjectTreePage(this.page)
     const segments = relPath.split('/')
     if (segments.length > 1) {
-      await tree.expandTo([segments[0]])
+      // Every ancestor folder, outermost first (`a`, `a/b`, …).
+      await tree.expandTo(segments.slice(0, -1).map((_, i) => segments.slice(0, i + 1).join('/')))
+      // A file a test wrote a moment ago reaches the tree through the directory
+      // watcher, which on Windows can lag (known-flakes.md, directory-watcher row)
+      // or miss the event (the watch-start gap is now closed by a catch-up
+      // refresh). As a last resort the retry presses the tree's Refresh (a
+      // disk re-read), re-opens the ancestors and repeats until the row shows.
+      const row = tree.fileRow(relPath)
+      if (!(await row.isVisible().catch(() => false))) {
+        const appeared = await row
+          .waitFor({ state: 'visible', timeout: 10_000 })
+          .then(() => true)
+          .catch(() => false)
+        if (!appeared) {
+          await expect(async () => {
+            await tree.refreshButton().click()
+            await tree.expandTo(segments.slice(0, -1).map((_, i) => segments.slice(0, i + 1).join('/')))
+            await expect(row).toBeVisible({ timeout: 3_000 })
+          }).toPass({ timeout: 30_000 })
+        }
+      }
     }
     await tree.fileRow(relPath).click()
     // Actual page readiness (title sentinel, script effects) is asserted by each

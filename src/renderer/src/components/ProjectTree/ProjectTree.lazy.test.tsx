@@ -50,12 +50,14 @@ const baseTree = (): FileNode[] => [
   }
 ]
 
-/** What a shallow read of each lazy folder lists, by path */
+/** What a shallow read of each folder lists, by path */
 let listing: Record<string, FileNode[]>
+/** What a full read of the project answers instead of `baseTree()`, when set */
+let rootListing: FileNode[] | null
 
 const fileApi = {
   readDirectory: vi.fn(async ({ dirPath }: { dirPath: string }) =>
-    dirPath === PROJECT ? baseTree() : (listing[dirPath] ?? [])
+    dirPath === PROJECT ? (rootListing ?? baseTree()) : (listing[dirPath] ?? [])
   ),
   onProjectChanged: vi.fn(),
   closeProject: vi.fn(async () => undefined),
@@ -153,8 +155,11 @@ beforeEach(() => {
   onProjectChangedCallback = null
   listing = {
     [`${PROJECT}/dist`]: [{ name: 'bundle.js', path: `${PROJECT}/dist/bundle.js`, type: 'file', extension: '.js' }],
-    [`${PROJECT}/big`]: [{ name: 'notes.txt', path: `${PROJECT}/big/notes.txt`, type: 'file', extension: '.txt' }]
+    [`${PROJECT}/big`]: [{ name: 'notes.txt', path: `${PROJECT}/big/notes.txt`, type: 'file', extension: '.txt' }],
+    // docs/ on disk is what the tree shows, unless a test says otherwise
+    [`${PROJECT}/docs`]: baseTree()[2].children ?? []
   }
+  rootListing = null
   useLazyFolderStore.getState().reset()
   setupMockApi()
 })
@@ -240,10 +245,53 @@ describe('ProjectTree – what is in view decides what is read (round 3, item 5)
 
   it('hands the hook the root row and, in Markdown mode, the Markdown filter', async () => {
     const setFilterMode = await openTree('all')
-    expect(lastView()).toEqual({ rootPath: PROJECT, filter: undefined })
+    // onFolderStale: the tree's refresh, for the check of an opened folder (useExpandReconcile)
+    expect(lastView()).toEqual({ rootPath: PROJECT, filter: undefined, onFolderStale: expect.any(Function) })
 
     act(() => setFilterMode('markdown'))
-    expect(lastView()).toEqual({ rootPath: PROJECT, filter: filterMarkdownTree })
+    expect(lastView()).toEqual({ rootPath: PROJECT, filter: filterMarkdownTree, onFolderStale: expect.any(Function) })
+  })
+})
+
+// A file the watcher never reported (design #211 risk R4): collapsing and
+// opening its folder used to serve the same cached listing (useExpandReconcile)
+describe('ProjectTree – an opened folder is checked against the disk', () => {
+  const docs = `${PROJECT}/docs`
+  const missed: FileNode = { name: 'b.md', path: `${docs}/b.md`, type: 'file', extension: '.md' }
+
+  it('shows a file the tree missed once its folder is collapsed and opened again', async () => {
+    await openTree()
+    fireEvent.click(screen.getByText('docs'))
+    await waitFor(() => expect(screen.getByText('a.md')).toBeInTheDocument())
+    await waitFor(() => expect(readsOf(docs)).toHaveLength(1))
+
+    // The file lands on disk; no watcher event reports it
+    listing[docs] = [...listing[docs], missed]
+    rootListing = baseTree().map((node) =>
+      node.path === docs ? { ...node, children: [...(node.children ?? []), missed] } : node
+    )
+    fireEvent.click(screen.getByText('docs'))
+    expect(screen.queryByText('a.md')).toBeNull()
+    fireEvent.click(screen.getByText('docs'))
+
+    await waitFor(() => expect(screen.getByText('b.md')).toBeInTheDocument())
+    expect(readsOf(docs)).toEqual([
+      { dirPath: docs, shallow: true },
+      { dirPath: docs, shallow: true }
+    ])
+  })
+
+  it('reads only that folder – not the whole tree – when the disk matches', async () => {
+    await openTree()
+    const fullReads = readsOf(PROJECT).length
+
+    fireEvent.click(screen.getByText('docs'))
+
+    await waitFor(() => expect(readsOf(docs)).toHaveLength(1))
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    expect(readsOf(PROJECT)).toHaveLength(fullReads)
   })
 })
 

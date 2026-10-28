@@ -6,6 +6,7 @@ SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 # Typing in a large Markdown file: the deferred preview (finding [31])
 
 - **Finding:** [31] "The preview is rebuilt on every keystroke" (lens review of v0.21.0, Wave 4 of v0.22.0). Branch `perf/deferred-preview`, PR #290.
+- **Shipped:** in v0.22.0 (2026-10-25) – see the [changelog](../CHANGELOG.md#0220).
 - **Date:** 2026-10-21. **Host:** Apple M5 Max, 128 GB, macOS 26.6.2, production build (`npx electron-vite build`), Electron 44.9.0. The machine was **heavily loaded** – a VM and other agents' Electron test runs were active, 1-minute load average 24–41 (recorded per run). Before and after were run interleaved (B, A, B, A) so drift hits both; absolute numbers are inflated, the before/after gap is the signal.
 - **Data:** 6 runs before, 6 after, each a fresh app launch on a fresh project. Raw per-run data: [`2026-10-21-deferred-preview.raw.json`](2026-10-21-deferred-preview.raw.json). These numbers are for the code after the PR #290 review fixes; a first round on the pre-review code (load 12–13) gave the same picture: 23.5 → 0 lost keystrokes, total blocking time 1,350 → 75 ms, 52 → 6 renders.
 

@@ -159,6 +159,32 @@ describe('createPreviewWatchCoordinator.setWatchSet', () => {
     expect(pool.log).not.toContain('release-start:/proj/b.css')
   })
 
+  it("hands the load's start to the watches it adds, never to one it keeps", async () => {
+    // A kept watch was listening all along; only an added one can have missed
+    // a save made while the page's files were being found.
+    const pool = makeFakePool()
+    const acquire = pool.acquire.bind(pool)
+    const handed: Array<[string, unknown]> = []
+    pool.acquire = (filePath, onChange, options) => {
+      handed.push([filePath, options])
+      return acquire(filePath, onChange)
+    }
+    const coord = createPreviewWatchCoordinator({
+      realRoot: REAL_ROOT,
+      pool,
+      onChanged: () => {},
+      confine: makeConfine()
+    })
+
+    await coord.setWatchSet(['/proj/a.css'])
+    await coord.setWatchSet(['/proj/a.css', '/proj/b.css'], { changedSince: 1_000 })
+
+    expect(handed).toEqual([
+      ['/proj/a.css', undefined],
+      ['/proj/b.css', { changedSince: 1_000 }]
+    ])
+  })
+
   it('awaits releases before acquiring new watches', async () => {
     const pool = makeFakePool(true)
     const coord = createPreviewWatchCoordinator({

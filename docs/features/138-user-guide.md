@@ -11,7 +11,7 @@ SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 - **Status:** proposed – design review by a reviewer agent on a different model, not the owner
   (owner's decision, 2026-09-25).
 - **Design:** [docs/designs/138-user-guide/](../designs/138-user-guide/README.md), with the
-  [feature inventory](../designs/138-user-guide/feature-inventory.md) and
+  [feature inventory](../user-guide/feature-inventory.md) (moved there in #158) and
   [research notes](../designs/138-user-guide/research.md).
 
 This page is the build contract. The design explains *what* and *why*; this page says *in which
@@ -190,8 +190,8 @@ through `.xezar/checks/repository-checks.sh`). Each threat and what bounds it:
 | Unbounded recursion | None: a flat loop over the `git ls-files` list. No include-following. |
 | Input size | Files over 2 MB are reported and skipped. The file count is whatever `git ls-files` returns for `*.md` (about 400 today). |
 
-Tests: `scripts/check-links.test.mjs` (run by `test:ci` through `vitest.main.ts`, which already
-includes `scripts/**/*.test.mjs`). A per-file coverage floor of 90 % is added to `vitest.main.ts`,
+Tests: `scripts/check-links.test.mjs` (run by `test:ci` through `vitest.main.config.ts`, which already
+includes `scripts/**/*.test.mjs`). A per-file coverage floor of 90 % is added to `vitest.main.config.ts`,
 as for the other trust-chain modules.
 
 ### 3.5 E2E helper export (the only change to existing code)
@@ -300,7 +300,7 @@ Create `scripts/capture/demo-project/harbour-garden/` as listed in the design:
 ### Step 3 – Checker
 
 Write `scripts/check-links.mjs` and `scripts/check-links.test.mjs`, add `check:links` to
-`package.json`, and add the coverage floor to `vitest.main.ts`.
+`package.json`, and add the coverage floor to `vitest.main.config.ts`.
 
 Tests name their break. Examples:
 
@@ -457,7 +457,7 @@ The PR body carries:
 
 - `package.json` (two scripts);
 - `eslint.config.mjs` (one block);
-- `vitest.main.ts` (one floor);
+- `vitest.main.config.ts` (one floor);
 - `e2e/fixtures/index.ts` (imports);
 - `docs/README.md`, `docs/keyboard-shortcuts.md`, `docs/troubleshooting.md`, `docs/settings.md`,
   `docs/quick-reference.md`, `docs/getting-started.md`, `docs/features/README.md`,

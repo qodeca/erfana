@@ -4,7 +4,7 @@
  * Tests for {@link PreviewNavControls}: Back and the link-mode toggle that lead
  * the preview toolbar (issue #124, UX spec §1.2, §1.3; part 3 §3.8).
  *
- * @see design/system/components/permission-band/index.html - status="decided"
+ * @see docs/design-system/system/components/permission-band/index.html - status="decided"
  */
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'

@@ -5,15 +5,15 @@
  * after one awaited taskkill; one tab or a restart ends just the shell; a quit
  * stays inside its bound.
  */
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { EventEmitter } from 'events'
 import { tmpdir } from 'node:os'
 
 interface MockPTY extends EventEmitter {
   pid: number
-  write: ReturnType<typeof vi.fn>
-  resize: ReturnType<typeof vi.fn>
-  kill: ReturnType<typeof vi.fn>
+  write: Mock
+  resize: Mock
+  kill: Mock
   onData: (cb: (d: string) => void) => void
   onExit: (cb: (event: { exitCode: number; signal?: number }) => void) => void
 }

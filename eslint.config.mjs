@@ -272,15 +272,15 @@ export default [
       'playwright-report/**',
       'test-results/**',
       'coverage/**',
-      // design/claims.js is GENERATED (scripts/design-sync.mjs) and runs in a
+      // docs/design-system/claims.js is GENERATED (scripts/design-sync.mjs) and runs in a
       // browser over file://, so it uses `window`/`document` and would fail
       // `no-undef` under this Node-flavoured config. It is not hand-edited and
       // it is not shipped. What actually guards it: `npm run design -- --check`
       // fails when it is stale, and scripts/design-claims.test.mjs re-derives
       // every value in it on each CI run. The authored cards' JS is inline in
-      // HTML, which ESLint does not read either — CSS in design/ is covered by
+      // HTML, which ESLint does not read either — CSS in docs/design-system/ is covered by
       // stylelint via postcss-html.
-      'design/claims.js',
+      'docs/design-system/claims.js',
       // Scratch project trees Playwright creates per e2e run. Already in
       // .gitignore, but ESLint reads the working tree, not the index: on
       // Windows a teardown can fail with EBUSY (the app still holds a handle),
@@ -806,6 +806,15 @@ export default [
     files: RENDERER_PATTERN_OWNERS,
     rules: {
       'no-restricted-syntax': ['error', ...RENDERER_GATEWAY_SELECTORS]
+    }
+  },
+  // HTML Preview comments render page and file text, so raw HTML is banned there
+  // (docs/designs/html-preview-comments.md SEC-25). A separate rule from
+  // `no-restricted-syntax`, so it adds to the blocks above instead of replacing them.
+  {
+    files: ['src/renderer/src/components/Panels/HtmlPreviewPanel/comments/**/*.{ts,tsx}'],
+    rules: {
+      'react/no-danger': 'error'
     }
   },
   // The max-lines ratchet (see MAX_LINES_BASELINE above). Last, so nothing

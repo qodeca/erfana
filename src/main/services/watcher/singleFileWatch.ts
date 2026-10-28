@@ -46,6 +46,11 @@ export interface SingleFileWatchHandlers {
   onChange: () => void
   onUnlink: () => void
   onError: (error: unknown) => void
+  /**
+   * The watcher is listening: a write from now on is reported (chokidar's
+   * `ready`, emitted once its file watch is open). A write before it is not.
+   */
+  onReady?: () => void
 }
 
 /**
@@ -73,6 +78,10 @@ export function createSingleFileWatcher(
   watcher.on('change', handlers.onChange)
   watcher.on('unlink', handlers.onUnlink)
   watcher.on('error', handlers.onError)
+  // chokidar emits `ready` on a later tick, so a listener added here hears it.
+  if (handlers.onReady !== undefined) {
+    watcher.once('ready', handlers.onReady)
+  }
 
   return watcher
 }

@@ -14,7 +14,7 @@
  * Usage: run after `electron-vite build`.
  *   node scripts/smoke/sqlite-worker-smoke.mjs
  *
- * @see specs/designs/sd-019-native-dep-spike.md §5 (verification matrix), §6 #4
+ * @see docs/designs/sd-019-native-dep-spike.md §5 (verification matrix), §6 #4
  */
 
 import { Worker } from 'node:worker_threads'

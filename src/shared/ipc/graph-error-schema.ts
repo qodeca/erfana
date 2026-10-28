@@ -28,8 +28,8 @@
  * Everything here is re-exported from `graph-schema.ts` — import from either.
  *
  * @see Issue #21 - graph R1 architecture
- * @see specs/designs/sd-021-cross-cutting.md §9.2 - the code table with user copy
- * @see specs/designs/sd-021-graph-architecture.md §4.2 - the split point
+ * @see docs/designs/sd-021-cross-cutting.md §9.2 - the code table with user copy
+ * @see docs/designs/sd-021-graph-architecture.md §4.2 - the split point
  */
 import { z } from 'zod'
 import { ErrorCode } from '../errors'
@@ -44,7 +44,7 @@ import { WIN32_RESERVED_BASENAMES } from '../win32-reserved'
  * `ErrorCode` itself is too broad for this boundary: a `WHISPER_*` code would
  * validate on `graph:search` and the renderer would get no exhaustive switch.
  *
- * @see specs/designs/sd-021-cross-cutting.md §9.2 - the code table with user copy
+ * @see docs/designs/sd-021-cross-cutting.md §9.2 - the code table with user copy
  */
 export const GRAPH_ERROR_CODES = [
   ErrorCode.GRAPH_DB_OPEN_FAILED,
@@ -291,7 +291,7 @@ function hasConfinedPrefix(p: string): boolean {
  *
  * Display/validation only. Real confinement stays main-side via `realpath`.
  *
- * @see specs/designs/sd-021-cross-cutting.md §9.5 (c) - path confinement
+ * @see docs/designs/sd-021-cross-cutting.md §9.5 (c) - path confinement
  */
 export function isConfinedRelativePath(p: string): boolean {
   if (!hasConfinedPrefix(p)) return false
@@ -342,7 +342,7 @@ const CONFINED_PATH_MESSAGE =
  * appends a trailing `/` must sit between `.max()` and the confinement refine —
  * so it applies {@link isConfinedRelativePath} directly, in the correct order.
  *
- * @see specs/designs/sd-021-ipc-contracts.md §7 - the confined fields
+ * @see docs/designs/sd-021-ipc-contracts.md §7 - the confined fields
  */
 export function ConfinedRelativePathSchema(n: number, options?: { truncatable?: boolean }) {
   const predicate = options?.truncatable ? isConfinedTruncatedPath : isConfinedRelativePath

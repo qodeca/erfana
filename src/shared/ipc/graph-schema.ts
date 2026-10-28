@@ -36,7 +36,7 @@
  *    downstream of `safeParse` against the resolved `…Request`.
  *
  * @see Issue #21 - graph R1 architecture
- * @see specs/designs/sd-021-ipc-contracts.md §7 - the normative contract
+ * @see docs/designs/sd-021-ipc-contracts.md §7 - the normative contract
  */
 import { z } from 'zod'
 import { GRAPH } from '../graph-constants'

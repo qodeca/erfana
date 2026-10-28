@@ -15,7 +15,7 @@
  * - Worker lifecycle (lazy creation, reuse, teardown) is correct
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
 import { GIT_STATUS } from '../../shared/constants'
 
 // ---------------------------------------------------------------------------
@@ -66,8 +66,8 @@ import type { GitStatusResponse } from '../../shared/ipc/git-schema'
 // ---------------------------------------------------------------------------
 
 type MockWorkerInstance = {
-  postMessage: ReturnType<typeof vi.fn>
-  terminate: ReturnType<typeof vi.fn>
+  postMessage: Mock
+  terminate: Mock
   emit: (event: string, ...args: unknown[]) => boolean
 }
 

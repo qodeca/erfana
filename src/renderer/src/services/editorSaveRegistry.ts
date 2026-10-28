@@ -28,7 +28,7 @@
  * project being left.
  *
  * @module editorSaveRegistry
- * @see docs/design/design-issue-124-part3.md §3.6 "Saving an editor tab by its id"
+ * @see docs/designs/design-issue-124-part3.md §3.6 "Saving an editor tab by its id"
  */
 import { useProjectStore } from '../stores/useProjectStore'
 

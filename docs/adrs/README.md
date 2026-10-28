@@ -40,6 +40,7 @@ ADRs are **not** retrofitted for every historical choice — only for decisions 
 | [0002](./0002-minisign-over-cosign-sigstore.md) | Minisign Ed25519 for manifest signatures, not cosign/Sigstore | accepted | 2026-04-23 |
 | [0003](./0003-dual-pubkey-trust-primary-rotation.md) | Dual-pubkey trust chain (primary + offline rotation) | accepted | 2026-04-23 |
 | [0004](./0004-per-spawn-toctou-rehash.md) | Per-spawn re-hash for TOCTOU close (5-tuple spawn log) | accepted | 2026-04-23 |
+| [0005](./0005-sub-frame-preload-one-receive-channel.md) | Sub-frame preload with one receive channel (HTML Preview comments) | accepted | 2026-10-26 |
 
 ## When to write an ADR
 

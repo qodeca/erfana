@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
 
 vi.mock('../LoggingService', () => ({
   logger: {
@@ -75,7 +75,7 @@ describe('isTranscriptEventName', () => {
 })
 
 describe('ClaudeTranscriptWatcher', () => {
-  let watchFn: ReturnType<typeof vi.fn>
+  let watchFn: Mock
   let createdWatchers: MockWatcher[]
 
   beforeEach(() => {

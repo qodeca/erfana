@@ -173,6 +173,10 @@ export default defineConfig({
           // SD-019 (#19) native-dependency spike: emits out/main/sqlite-smoke.worker.js,
           // loaded by nativeDepsSmoke.ts via join(__dirname, ...) like the git worker.
           'sqlite-smoke.worker': resolve('src/main/services/workers/sqlite-smoke.worker.ts'),
+          // HTML Preview comments: the persistent parse worker (design §19 R3-12).
+          'comment-parse.worker': resolve('src/main/services/preview/comments/commentParseWorker.ts'),
+          // HTML Preview auto-refresh: the link scan worker, so no page is scanned on main (#124 audit).
+          'preview-link-scan.worker': resolve('src/main/services/preview/previewLinkScanWorker.ts'),
           // DOCX conversion runs in a killable utilityProcess child (#1 lens-review).
           'docx/docx-convert.process': resolve('src/main/services/docx/docx-convert.process.ts')
         },

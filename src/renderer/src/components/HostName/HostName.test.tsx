@@ -18,7 +18,7 @@
  *      like a readability improvement.
  *
  * @see HostName.tsx
- * @see design/system/components/row/index.html - the card that decides this
+ * @see docs/design-system/system/components/row/index.html - the card that decides this
  */
 
 import { describe, it, expect, afterEach } from 'vitest'

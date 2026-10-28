@@ -7,7 +7,7 @@
  * the terminal store are stood in for.
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { prepareProjectTransition, type ConfirmFn } from './switchHelpers'
 import { editorSaveRegistry } from '../../services/editorSaveRegistry'
 import { noteProjectGeneration } from '../../services/projectGeneration'
@@ -28,9 +28,9 @@ vi.mock('../../stores/useTerminalStore', () => ({
 }))
 
 interface FakeTab {
-  save: ReturnType<typeof vi.fn>
-  release: ReturnType<typeof vi.fn>
-  hold: ReturnType<typeof vi.fn>
+  save: Mock
+  release: Mock
+  hold: Mock
 }
 
 /** Register a dirty tab; a successful save cleans it, as the real panel does. */
@@ -48,7 +48,7 @@ function registerTab(id: string, options: { saves?: boolean; conflict?: boolean 
 }
 
 describe('prepareProjectTransition', () => {
-  let confirm: ReturnType<typeof vi.fn> & ConfirmFn
+  let confirm: Mock & ConfirmFn
   let generation = 100
 
   beforeEach(() => {

@@ -11,7 +11,7 @@
  * restore, and the silent no-ops.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import { renderHook, act, waitFor } from '@testing-library/react'
 import { useTextareaClipboard } from './useTextareaClipboard'
 import { showErrorToast } from '../utils/toastHelpers'
@@ -34,7 +34,7 @@ vi.mock('../utils/toastHelpers', () => ({
 
 describe('useTextareaClipboard', () => {
   let mockRef: { current: HTMLTextAreaElement | HTMLInputElement | null }
-  let mockSetValue: ReturnType<typeof vi.fn>
+  let mockSetValue: Mock
 
   beforeEach(() => {
     vi.clearAllMocks()

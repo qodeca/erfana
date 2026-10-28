@@ -1,0 +1,378 @@
+<!-- @card group="HTML preview" name="Comment overlay in the page" subtitle="Hover outline, tag label, the speech-bubble pin and the comment-mode frame – drawn inside the page from resolved tokens" status="decided" reviewed="2026-10-26" -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Erfana — comment overlay in the page</title>
+<link rel="stylesheet" href="../../tokens.css">
+<link rel="stylesheet" href="../../ds.css">
+<script src="../../claims.js"></script>
+<link rel="stylesheet" href="./demo.css">
+<link rel="stylesheet" href="./overlay.css">
+<script src="./demo.js"></script>
+<style>
+  .scene { position: relative; inline-size: 300px; block-size: 150px;
+           border: var(--border-width) solid var(--color-border-subtle); }
+  .scene--wide { inline-size: 560px; block-size: 260px; }
+  .swatch { display: inline-block; inline-size: var(--space-12); block-size: var(--space-8); vertical-align: middle;
+            border: var(--border-width) solid var(--color-border-subtle); margin-inline-end: var(--space-4); }
+  .map td:nth-child(3) { font-family: var(--font-mono); font-size: var(--text-sm); }
+</style>
+</head>
+<body>
+
+<h1>Comment overlay in the page</h1>
+<p class="ds-lede">
+  Everything on this card is drawn <strong>inside the previewed page</strong>, in a closed shadow root, by the
+  preview preload. It is the only part of the comments feature Erfana cannot style with its own stylesheet –
+  so this card shows where every colour comes from.
+</p>
+
+<div class="ds-note">
+  <strong>What is fixed by the plan, and what is still a value.</strong> The rules come from locked decisions
+  and §10.2 / §10.5 of <code>docs/designs/html-preview-comments.md</code>: the pin is a <strong>speech
+  bubble</strong> at the element's <strong>top-right</strong> (decision 33); several threads on one element are
+  <strong>one numbered pin</strong>; <strong>resolved threads hide their pin</strong>; pins are <strong>always
+  visible</strong>, also outside comment mode, and can be hidden per tab (decision 20). Those are not
+  re-opened here. The card is <em>proposed</em> because the sizes and fills below are still values being
+  chosen, and the plan (§10.11) files the whole HTML-comments set as proposed.
+  <br><br>
+  <strong>The source.</strong> <code>src/preload/previewPageComments/overlayStyles.ts</code> (the rules) and
+  <code>src/main/services/preview/comments/commentOverlayTheme.ts</code> (the values). This card renders a
+  mirror, <code>overlay.css</code>, with each value written back as its token.
+</div>
+
+<h2>The mapping: tokens resolved for the page</h2>
+
+<p style="max-width: 76ch; color: var(--color-text-tertiary)">
+  The page cannot see <code>design-tokens.css</code>, and must not: a <code>var()</code> in the page would read
+  the <em>page's</em> custom properties, which the page controls. So main sends each value resolved, in
+  <code>commentState.theme</code>, and <code>commentOverlayTheme.test.ts</code> pins each field to its token
+  (R-012). The third column is read from this page's token file as it loads – nothing is typed.
+</p>
+
+<table class="map">
+  <thead><tr><th>Theme field</th><th>Token</th><th>Resolves to</th><th>What it draws</th></tr></thead>
+  <tbody id="mapping"></tbody>
+</table>
+
+<div class="ds-note" style="margin-top: var(--space-8)">
+  <strong>Contrast, derived.</strong> The pin's fill against its ink stroke and content, the label's tag on its
+  ink ground and the mode tab's text are all one pair: <strong><span data-claim="hpc-accent-ink"></span>:1</strong>.
+  Hover keeps the ink: <strong><span data-claim="hpc-hover-ink"></span>:1</strong>. A damaged pin's ink
+  <code>!</code> on the warning fill: <strong><span data-claim="hpc-warning-ink"></span>:1</strong>. The label's
+  text: <strong><span data-claim="hpc-label-paper"></span>:1</strong>, and its size in the muted grey:
+  <strong><span data-claim="hpc-label-size"></span>:1</strong>. All clear the 4.5:1 small text needs.
+  <br><br>
+  <strong>Why the ring is two-tone.</strong> The accent alone on a white page is
+  <strong><span data-claim="hpc-accent-on-white"></span>:1</strong> – under the 3:1 a focus or selection
+  indicator needs (SC 1.4.11). The 1px ink line on both sides of it is
+  <strong><span data-claim="hpc-ink-on-white"></span>:1</strong> there; on a black page the accent carries it
+  instead. Whatever the page paints, one of the two edges clears 3:1. The pin's focus ring uses the same
+  trick: an accent ring with an ink halo between it and the bubble.
+</div>
+
+<h2>Outline and label</h2>
+
+<div class="ds-note">
+  <strong>Border box only</strong>, drawn instantly with no tween: a 2px accent ring with a 1px ink line on both
+  sides. <strong>Selected</strong> – the element a menu or window is open for – adds a 12% accent fill. The
+  label <code>tag#id.class1.class2… 120×40</code> sits above the element's top-left, flips below it at the page
+  top, and is clamped sideways. Tag in accent, the rest in paper, the size in grey, always
+  <code>dir="ltr"</code> so a right-to-left page cannot reorder a selector. Two classes at most, then
+  <code>…</code>, 40 characters at most, then a suffix.
+</div>
+
+<div class="gallery" id="outlines"></div>
+
+<h2>The pin</h2>
+
+<div class="ds-note">
+  A self-drawn square-cornered bubble, <code>M2 2H22V17H7L2 22Z</code> in a 24 × 24 hit box (WCAG 2.5.8). The
+  tail tip sits on the element's top-right corner, 4px outward, so the bubble floats above the element rather
+  than covering it. <strong>Near an edge it stays on the page:</strong> it is clamped to the page's visible
+  area – never under its scrollbar – and keeps 4px inside it, so an element as wide as the page has its pin
+  just inside the right edge. <strong>Only open threads are counted.</strong> One open thread shows two ink "text lines";
+  2–9 the number in bold mono; ten or more <code>9+</code>. A state is never colour alone: hover changes the
+  fill and the cursor and adds a tooltip, selected inverts the whole bubble, damaged swaps the content for
+  <code>!</code>. Pins are never animated.
+  <br><br>
+  <strong>Not drawn</strong> – and this is a state too: every thread resolved, the element not visible now (a
+  hidden slide or tab), the element not found in the file, or pins hidden for this tab. Each of those threads is
+  still reachable from the drawer, which is the guaranteed route to every comment.
+</div>
+
+<div class="gallery" id="pins"></div>
+
+<div class="ds-note">
+  <strong>A defect this card found on its first render, fixed.</strong> The number and the <code>!</code> sat low,
+  touching the bubble's bottom edge: <code>pins.ts</code> centred the text at <code>y="13"</code> with
+  <code>dominant-baseline: middle</code>, but the bubble's body runs from 2 to 17 in the view box. They are now HTML
+  text in a <code>foreignObject</code> over the body (<code>PIN_BODY</code>), centred by flex, and the text is CSS generated
+  content so Find in page never counts it (E-022); the card draws them the same way.
+  <br><br>
+  <strong>Damaged and selected.</strong> A selected damaged pin keeps its warning fill under the selected accent
+  stroke, so its <code>!</code> stays ink – the selected accent on the warning fill would be about 1.05:1.
+  Hover recolours an open pin only, never a selected or damaged one.
+</div>
+
+<h2>Comment mode</h2>
+
+<div class="ds-note">
+  <strong>Three signals, never one:</strong> the toolbar toggle is pressed, a 2px accent frame runs inside the
+  page edge, and a tab at the top centre says <strong>“Comment mode – Esc to leave”</strong>. The tab moves to
+  the bottom while the pointer is within 48px of the top, so it never sits on what you are trying to pick. The
+  cursor is the system crosshair. The band's height never changes.
+  <br><br>
+  <strong>Try it:</strong> move the pointer over the page below. Elements outline as you pass; near the top
+  edge the tab jumps down. Frames that cannot be commented inside – a refused or <code>srcdoc</code> frame –
+  get a transparent shield, so a click selects the <code>&lt;iframe&gt;</code> element itself (§19 R3-3).
+</div>
+
+<div class="scene scene--wide page-area" id="live"><div class="page">
+  <h4>Pricing</h4>
+  <p id="lead">Start free, then pay for what you use. Every plan includes the editor and the terminal.</p>
+  <button class="cta" id="buy" type="button" tabindex="-1">Start free trial</button>
+  <p style="margin-top: 14px">Embedded report:</p>
+  <div class="frame" id="frame">iframe (refused frame)</div>
+</div></div>
+<div class="readout" id="liveOut">move the pointer over the page</div>
+
+<h2>A reveal from the drawer</h2>
+
+<div class="ds-note">
+  “Show on page” in the drawer scrolls the element to the centre and draws a <strong>static</strong> highlight
+  for 1.5 s – the ring plus a 24% fill. It is not an animation, so reduced motion needs no second version, and
+  the plan's “flash once” is the same box appearing and going away. A new pin after Save gets the same
+  highlight once.
+  <br><br>
+  <button class="erf-comment-action" type="button" id="revealBtn">Show on page</button>
+</div>
+<div class="scene page-area" id="reveal"><div class="page">
+  <h4>Team</h4>
+  <p id="revealTarget">Our support team answers within a day, in English and Polish.</p>
+</div></div>
+
+<h2>Exceptions</h2>
+<p style="max-width: 72ch; color: var(--color-text-tertiary)">
+  Where the overlay departs from the system, with the reason. Each has a <code>deviates:</code> marker at its
+  site in <code>overlayStyles.ts</code> – the stylesheet as a whole, the pin focus rule and the forced-colours
+  block – and the same marker in the card's mirror, <code>overlay.css</code>.
+</p>
+<table>
+  <thead><tr><th>Where</th><th>The system</th><th>The overlay, and why</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>Every colour and size</td>
+      <td>Tokens only, as <code>var()</code>.</td>
+      <td>Literals interpolated from <code>commentState.theme</code>. A <code>var()</code> inside the page would
+        resolve against the page's own custom properties, which a hostile page sets. The literals come from the
+        tokens through one table, pinned by a test (R-012).</td>
+    </tr>
+    <tr>
+      <td>Literals with no theme field</td>
+      <td>Every value from the theme.</td>
+      <td>The hairline, the spaces and the line height now come through the theme
+        (<code>hairline</code>, <code>space1</code>, <code>space2</code>, <code>space4</code>, <code>leading</code>);
+        the line height moved from a typed 1.4 to <code>--leading-snug</code>, 1.375. Still written as literals,
+        each with no token of its own: the 12% selected and 24% flash fill mixes; the pin's SVG stroke widths 1.5
+        and 2 (selected), in view-box units; the label's <code>1ch</code> gap before the size; the count's weight
+        700 (the value of <code>--font-bold</code>, which the theme does not carry); the geometry percentages
+        (<code>50%</code> centring and clip, <code>100%</code> SVG size);. The page has no live region any more: the panel speaks the picker's sentences (E-022). The R-012 test lists exactly these.</td>
+    </tr>
+    <tr>
+      <td>Pin focus</td>
+      <td>Focus card: the violet ring, and every control in the Tab order.</td>
+      <td>The ring uses the passed-in accent with an ink halo, and pins are focusable but
+        <code>tabindex="-1"</code>: a page can carry hundreds, and the keyboard route to every thread is the
+        drawer (§10.8). Recorded in the Focus card's Exceptions.</td>
+    </tr>
+    <tr>
+      <td>Forced colours</td>
+      <td>System colours where the theme is replaced.</td>
+      <td>Matches: outline, frame and flash take <code>Highlight</code>; label, tab and pin take
+        <code>Highlight</code> / <code>HighlightText</code>. A selected pin inverts – <code>Canvas</code> body,
+        <code>Highlight</code> stroke, line and count – so it still differs from an open one, and hover does not
+        recolour a pin there. Listed so nobody “fixes” the literals in that block.</td>
+    </tr>
+  </tbody>
+</table>
+
+<script>
+const H = window.HPC;
+
+/* ---------- the mapping table, resolved live ---------- */
+const MAP = [
+  ['accent', '--color-accent-primary', 'Ring, pin fill, label tag, frame, tab ground'],
+  ['accentHover', '--color-brand-violet-hover', 'Pin fill on hover'],
+  ['ink', '--color-brand-black', 'Ring lines, pin stroke and content, label ground, tab text'],
+  ['paper', '--color-brand-white', 'Label text'],
+  ['muted', '--color-text-primary', 'The size in the label'],
+  ['warning', '--color-warning', 'Damaged pin fill'],
+  ['font', '--font-mono', 'Label, tab and pin number'],
+  ['size', '--text-sm', 'Label, tab and pin number'],
+  ['ring', '--border-width-thick', 'Ring, frame and flash width'],
+  ['pinTarget', '--btn-height-sm', 'The pin hit box'],
+  ['hairline', '--border-width', 'The ink lines of the ring, the label border'],
+  ['space1', '--space-1', 'Tab block padding, pin focus offset'],
+  ['space2', '--space-2', 'Label inline padding, pin focus halo'],
+  ['space4', '--space-4', 'Tab inline padding'],
+  ['leading', '--leading-snug', 'Line height of the label and the tab']
+];
+function resolved(token) {
+  const probe = document.createElement('span');
+  probe.style.setProperty('--probe', `var(${token})`);
+  document.body.appendChild(probe);
+  const v = getComputedStyle(probe).getPropertyValue('--probe').trim();
+  probe.remove();
+  return v;
+}
+const body = document.getElementById('mapping');
+for (const [field, token, use] of MAP) {
+  const tr = document.createElement('tr');
+  const value = resolved(token);
+  const isColour = token.startsWith('--color');
+  tr.innerHTML = `<td><code>${field}</code></td><td><code>${token}</code></td>` +
+    `<td>${isColour ? `<span class="swatch" style="background: var(${token})"></span>` : ''}</td><td></td>`;
+  tr.children[2].append(value.length > 40 ? `${value.slice(0, 38)}…` : value);
+  tr.children[2].title = value;
+  tr.children[3].textContent = use;
+  body.appendChild(tr);
+}
+
+/* ---------- scenes ---------- */
+function scene(host, caption, html, draw, opts = {}) {
+  const fig = document.createElement('figure');
+  fig.className = 'state';
+  fig.innerHTML = `<figcaption>${caption}</figcaption>
+    <div class="scene page-area"${opts.style ? ` style="${opts.style}"` : ''}><div class="page${opts.dark ? ' page--dark' : ''}">${html}</div></div>`;
+  host.appendChild(fig);
+  const area = fig.querySelector('.page-area');
+  requestAnimationFrame(() => draw(area, (sel) => area.querySelector(sel)));
+}
+
+const outlines = document.getElementById('outlines');
+const BTN = '<h4>Plans</h4><p>Billed monthly. Cancel any time.</p><button class="cta primary" id="buy" type="button" tabindex="-1">Buy now</button>';
+scene(outlines, '<strong>hover</strong> – white page: the ink lines carry the contrast', BTN,
+  (a, q) => H.drawOutline(a, H.boxIn(a, q('#buy')), H.labelOf(q('#buy'))));
+scene(outlines, '<strong>hover</strong> – dark page: the accent carries it', BTN,
+  (a, q) => H.drawOutline(a, H.boxIn(a, q('#buy')), H.labelOf(q('#buy'))), { dark: true });
+scene(outlines, '<strong>selected</strong> – menu or window open for it: + 12% fill', BTN,
+  (a, q) => H.drawOutline(a, H.boxIn(a, q('#buy')), H.labelOf(q('#buy')), true));
+scene(outlines, '<strong>tiny</strong> (&lt; 8px) – the ring is pushed out 2px',
+  '<h4>Status</h4><p>Live <span class="tiny" id="dot"></span> since 09:00.</p>',
+  (a, q) => H.drawOutline(a, H.boxIn(a, q('#dot')), H.labelOf(q('#dot'))));
+scene(outlines, '<strong>page top</strong> – the label flips below',
+  '<button class="cta" id="top" type="button" tabindex="-1" style="margin-top:-10px">Sign in</button>',
+  (a, q) => H.drawOutline(a, H.boxIn(a, q('#top')), H.labelOf(q('#top'))));
+scene(outlines, '<strong>long selector</strong> – two classes, then …, 40 characters at most',
+  '<h4>Offer</h4><button class="cta cta-primary cta-large tracking-hero" id="hero-cta-button-main" type="button" tabindex="-1">Get started</button>',
+  (a, q) => H.drawOutline(a, H.boxIn(a, q('.cta')), H.labelOf(q('.cta'))));
+const SUFFIXES = [
+  [' · script', 'built by a script – anchors to its nearest in-file ancestor'],
+  [' · frame other.html', 'inside a same-project frame – saved in that frame’s file'],
+  [' · 2 comments', 'already has open threads']
+];
+for (const [suffix, why] of SUFFIXES) {
+  scene(outlines, `<strong>suffix</strong> “${suffix.trim()}” – ${why}`,
+    '<div class="card" id="card"><b>Pro</b> – 12 € a month</div>',
+    (a, q) => H.drawOutline(a, H.boxIn(a, q('#card')), H.labelOf(q('#card'), suffix)));
+}
+scene(outlines, '<strong>refused frame</strong> – the &lt;iframe&gt; itself, under a click shield',
+  '<div class="frame" id="f">https://example.com (refused)</div>',
+  (a, q) => H.drawOutline(a, H.boxIn(a, q('#f')), { tag: 'iframe', rest: ' · refused frame', size: '' }));
+scene(outlines, '<strong>srcdoc frame</strong> – not commentable inside',
+  '<div class="frame" id="f">inline frame</div>',
+  (a, q) => H.drawOutline(a, H.boxIn(a, q('#f')), { tag: 'iframe', rest: ' · inline frame', size: '' }));
+
+/* ---------- pins ---------- */
+const pins = document.getElementById('pins');
+const PIN_PAGE = '<h4>Plans</h4><p>Billed monthly.</p><button class="cta" id="buy" type="button" tabindex="-1">Buy now</button>';
+const pinScene = (caption, spec, opts) => scene(pins, caption, PIN_PAGE, (a, q) => {
+  const box = H.boxIn(a, q('#buy'));
+  const els = H.drawPins(a, [{ box, name: spec.name, count: spec.count, damaged: spec.damaged,
+    selected: spec.selected, cls: spec.cls }]);
+  if (spec.outline) H.drawOutline(a, box, H.labelOf(q('#buy')), spec.selected);
+  if (spec.focus) els[0].classList.add('erf-hpc-pin--focus');
+}, opts);
+pinScene('<strong>1 open thread</strong> – two ink text lines', { count: 1, name: '1 comment on button.cta. Open.' });
+pinScene('<strong>3 open threads</strong> – the number', { count: 3, name: '3 comments on button.cta. Open.' });
+pinScene('<strong>10 or more</strong> – 9+', { count: 12, name: '12 comments on button.cta. Open.' });
+pinScene('<strong>hover</strong> – hover fill, pointer, tooltip; in comment mode it also outlines its element',
+  { count: 2, name: '2 comments on button.cta. Open.', cls: 'erf-hpc-pin--hover', outline: true });
+pinScene('<strong>selected</strong> – window open or drawer row active: inverted',
+  { count: 2, name: '2 comments on button.cta. Open.', selected: true });
+pinScene('<strong>focus</strong> – accent ring 2px out, ink halo between', { count: 2, name: '2 comments on button.cta. Open.', focus: true });
+pinScene('<strong>damaged</strong> – warning fill, ink !', { count: 1, damaged: true, name: 'Damaged comment on button.cta. Open.' });
+pinScene('<strong>damaged, selected</strong> – warning fill, accent stroke, the ! stays ink',
+  { count: 1, damaged: true, selected: true, name: 'Damaged comment on button.cta. Open.' });
+pinScene('<strong>on a dark page</strong> – the ink stroke still separates it', { count: 2, name: '2 comments on button.cta. Open.' }, { dark: true });
+scene(pins, '<strong>overlap</strong> – the ancestor keeps the corner, the child steps left 22px',
+  '<div class="card" id="outer" style="max-width:240px;margin-top:20px"><b id="inner" style="display:block;text-align:right">Pro plan</b> 12 € a month</div>',
+  (a, q) => H.drawPins(a, [
+    { box: H.boxIn(a, q('#outer')), count: 2, name: '2 comments on div.card. Open.' },
+    { box: H.boxIn(a, q('#inner')), count: 1, name: '1 comment on b#inner. Open.' }
+  ]));
+scene(pins, '<strong>at the page edge</strong> – an element as wide as the page: the pin stays 4px inside the visible area, left of the scrollbar',
+  '<div class="card" id="doc" style="max-width:none;margin:0 -22px;height:320px"><b>div.doc</b> – the whole page width</div>',
+  (a, q) => {
+    const page = a.querySelector('.page');
+    page.style.overflowY = 'scroll';
+    H.drawPins(a, [{ box: H.boxIn(a, q('#doc')), count: 1, name: '1 comment on div.doc. Open.' }],
+      { width: page.clientWidth, height: page.clientHeight });
+  });
+scene(pins, '<strong>not drawn</strong> – all resolved, not visible now, not found, or hidden for this tab',
+  PIN_PAGE, () => {});
+
+/* ---------- live comment mode ---------- */
+const live = document.getElementById('live');
+const liveOut = document.getElementById('liveOut');
+H.drawMode(live, true, false);
+live.style.cursor = 'crosshair';
+const shieldBox = () => H.boxIn(live, live.querySelector('#frame'));
+const shield = document.createElement('div');
+shield.className = 'erf-hpc-shield';
+live.querySelector('.erf-hpc-root').appendChild(shield);
+const placeShield = () => { const b = shieldBox(); Object.assign(shield.style, { left: `${b.left}px`, top: `${b.top}px`, width: `${b.width}px`, height: `${b.height}px` }); };
+placeShield();
+live.addEventListener('pointermove', (event) => {
+  const area = live.getBoundingClientRect();
+  H.drawMode(live, true, event.clientY - area.top < 48);
+  const b = shieldBox();
+  const x = event.clientX - area.left;
+  const y = event.clientY - area.top;
+  if (x >= b.left && x <= b.left + b.width && y >= b.top && y <= b.top + b.height) {
+    H.drawOutline(live, b, { tag: 'iframe', rest: ' · refused frame', size: '' });
+    liveOut.innerHTML = 'over the shield – a click picks <b>the iframe element</b>, never its content';
+    return;
+  }
+  const page = live.querySelector('.page');
+  shield.style.pointerEvents = 'none';
+  const hit = document.elementFromPoint(event.clientX, event.clientY);
+  shield.style.pointerEvents = '';
+  const target = hit && page.contains(hit) && hit !== page ? hit : null;
+  if (!target) { H.clearOutline(live); liveOut.textContent = 'over the page body'; return; }
+  H.drawOutline(live, H.boxIn(live, target), H.labelOf(target));
+  liveOut.innerHTML = `outlining <b>${H.esc(H.labelOf(target).tag + H.labelOf(target).rest)}</b>` +
+    (event.clientY - area.top < 48 ? ' · the tab moved to the bottom' : '');
+});
+live.addEventListener('pointerleave', () => { H.clearOutline(live); H.drawMode(live, true, false); });
+live.addEventListener('click', (event) => event.preventDefault(), true);
+
+/* ---------- the reveal ---------- */
+document.getElementById('revealBtn').addEventListener('click', () => {
+  const area = document.getElementById('reveal');
+  const root = area.querySelector('.erf-hpc-root') || (() => { const r = document.createElement('div'); r.className = 'erf-hpc-root'; area.appendChild(r); return r; })();
+  const flash = document.createElement('div');
+  flash.className = 'erf-hpc-flash';
+  const b = H.boxIn(area, area.querySelector('#revealTarget'));
+  Object.assign(flash.style, { left: `${b.left}px`, top: `${b.top}px`, width: `${b.width}px`, height: `${b.height}px` });
+  root.appendChild(flash);
+  setTimeout(() => flash.remove(), 1500);
+});
+</script>
+</body>
+</html>

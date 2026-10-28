@@ -33,7 +33,7 @@ import type { PreviewWebContentsHandle } from './PreviewSessionFactory'
 import { PREVIEW_PAGE_LINK_CHANNEL, PREVIEW_PAGE_LINK_NOTE_CHANNEL } from './previewLinkBridge'
 import { PREVIEW_PAGE_CSP_VIOLATION_CHANNEL } from './previewCspViolationBridge'
 import { classifyConsoleMessage } from './previewConsoleClassify'
-import { attachInputForwarding } from './previewInputForward'
+import { attachInputForwarding, type CommentKeyState } from './previewInputForward'
 
 /** The disposable single-file watcher the service uses for the page's HTML (`previewEntryWatch.ts`). */
 export interface PreviewFileWatcherHandle {
@@ -116,6 +116,8 @@ const CONSOLE_LEVEL_TO_NUMBER: Readonly<Record<string, number>> = {
 export interface PreviewLifecycleParams {
   readonly webContents: PreviewWebContentsHandle
   readonly platform?: NodeJS.Platform
+  /** The view's comments, for the toggle and Esc (`previewInputForward.ts`); absent: neither. */
+  readonly comments?: CommentKeyState
 }
 
 /** A `will-navigate`-style event carrying `preventDefault`. */
@@ -194,10 +196,17 @@ export function wirePreviewLifecycle(
   // and needs no sender predicate, because only this WebContents can reach it.
   // WebContents-scoped rather than frame-scoped because a `WebFrameMain` is
   // replaced when a navigated page replaces it (sd-074b §5.3).
-  /** Sub-frames are not trusted to speak for the page. */
+  /**
+   * Sub-frames are not trusted to speak for the page, and a message whose
+   * sender frame is unknown is refused (fails closed). `undefined` used to
+   * count as the main frame, which was safe only while frames had no preload;
+   * with HTML Preview comments every frame runs it (SEC-27,
+   * docs/adrs/0005-sub-frame-preload-one-receive-channel.md). `null` – a
+   * frame that navigated away or was destroyed – was already refused.
+   */
   const fromMainFrame = (event: unknown): boolean => {
-    const senderFrame = (event as { senderFrame?: unknown })?.senderFrame
-    return senderFrame === undefined || senderFrame === wc.mainFrame
+    const senderFrame = (event as { senderFrame?: unknown } | null | undefined)?.senderFrame
+    return senderFrame !== undefined && senderFrame !== null && senderFrame === wc.mainFrame
   }
   const onLinkActivated = (event: unknown, payload: unknown): void => {
     if (!fromMainFrame(event)) return
@@ -224,7 +233,8 @@ export function wirePreviewLifecycle(
   const detachInput = attachInputForwarding(
     wc as never,
     hooks.onForwardedShortcut,
-    params.platform
+    params.platform,
+    params.comments
   )
 
   return {

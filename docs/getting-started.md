@@ -11,8 +11,8 @@ Quick onboarding guide for new developers working on Erfana.
 
 ## Prerequisites
 
-- **Node.js**: 24+ — pinned in [`.nvmrc`](../.nvmrc), so `nvm use` in the repo root selects it (Electron 44.9.0 bundles Node.js 24.22.0)
-- **Python**: 3.12 (node-pty fails on 3.13)
+- **Node.js**: 24+ — pinned in [`.nvmrc`](../.nvmrc), so `nvm use` in the repo root selects it (Electron 44.9.3 bundles Node.js 24.22.0)
+- **Python**: 3.12, or 3.14.x (3.14.3 verified) – node-pty fails to build on 3.13
 - **Git**: For version control
 - **On Windows**: VS 2022 Build Tools, Developer Mode enabled, Win32 long paths enabled. Skipping these breaks `node-pty` build + `npm run build:win`. Full setup: [`docs/build/windows.md`](./build/windows.md).
 
@@ -41,7 +41,7 @@ Read these docs in order:
 
 1. [Architecture](./architecture.md) - System design patterns
 2. [IPC Patterns](./ipc-patterns.md) - Main ↔ Renderer communication
-3. [Design system](../design/index.html) - the cards that decide every visual rule (MANDATORY for UI changes)
+3. [Design system](design-system/index.html) - the cards that decide every visual rule (MANDATORY for UI changes)
 
 ### 4. Familiarize with project structure
 
@@ -82,7 +82,7 @@ src/
 
 ### Making UI changes
 
-**MANDATORY**: Open the [design system](../design/index.html) before any UI work. `npm run lint:css` enforces the token rules in CI.
+**MANDATORY**: Open the [design system](design-system/index.html) before any UI work. `npm run lint:css` enforces the token rules in CI.
 
 - Use design tokens from `src/renderer/src/styles/design-tokens.css`
 - No hardcoded colors, spacing, or fonts
@@ -100,7 +100,7 @@ The npm scripts, keyboard shortcuts and key source locations are in [Quick Refer
 | Architecture | [docs/architecture.md](./architecture.md) |
 | Build system | [docs/build/README.md](./build/README.md) |
 | Testing | [docs/testing/README.md](./testing/README.md) |
-| Design system | [design/index.html](../design/index.html) |
+| Design system | [docs/design-system/index.html](design-system/index.html) |
 | UI Style Guide (text-selection policy) | [docs/ui-style-guide.md](./ui-style-guide.md) |
 | Keyboard shortcuts | [docs/keyboard-shortcuts.md](./keyboard-shortcuts.md) |
 | Known issues | [docs/known-issues.md](./known-issues.md) |

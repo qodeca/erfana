@@ -16,11 +16,12 @@
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
-import { vi } from 'vitest'
+import { vi, type Mock } from 'vitest'
 
 import { PREVIEW } from '../../../../shared/constants'
 import type { PreviewFailureInput, PreviewStillFrame } from '../../../../shared/ipc/preview-types'
 import { createPreviewFailureLog, type IPreviewFailureLog } from '../PreviewFailureLog'
+import { inProcessLinkScanner } from './inProcessLinkScanner'
 import type { ReloadDecision } from '../PreviewReloadPolicy'
 import type {
   PreviewSession,
@@ -179,7 +180,7 @@ function makePage() {
 }
 
 export type FakePage = ReturnType<typeof makePage>
-type SpiedLog = IPreviewFailureLog & { drop: ReturnType<typeof vi.fn> }
+type SpiedLog = IPreviewFailureLog & { drop: Mock }
 
 /** The service over fake sessions for a real project directory. */
 export function makeHarness(
@@ -194,7 +195,7 @@ export function makeHarness(
   const contexts: PreviewSessionCreateContext[] = []
   const logs: SpiedLog[] = []
   const decisions: Array<(decision: ReloadDecision) => void> = []
-  const entryWatchers: Array<{ filePath: string; close: ReturnType<typeof vi.fn> }> = []
+  const entryWatchers: Array<{ filePath: string; close: Mock }> = []
   const frames = new Map<string, PreviewStillFrame>()
   let clock = 0
   /** The host window's own page: a forwarded focus-moving key focuses it (QG-11a H1). */
@@ -296,6 +297,7 @@ export function makeHarness(
     getZoomFactor: () => 1,
     now: () => clock,
     readEntryHtml,
+    linkScanner: inProcessLinkScanner,
     platform: 'darwin',
     checkEligibility,
     onForwardedShortcut: options.onForwardedShortcut

@@ -10,7 +10,7 @@
 import type { ElectronApplication } from '@playwright/test'
 import * as path from 'path'
 
-import { buildAppEnv, closeAppAndWait } from './isolation'
+import { buildAppEnv, closeAppAndWait, E2E_CHROMIUM_ARGS } from './isolation'
 
 const PROJECT_ROOT = path.join(__dirname, '..', '..')
 
@@ -23,7 +23,7 @@ export function buildVisualLaunchOptions(
   env: Record<string, string>
   recordVideo?: { dir: string; size: { width: number; height: number } }
 } {
-  const args = [PROJECT_ROOT, '--force-device-scale-factor=1', `--user-data-dir=${userDataDir}`]
+  const args = [PROJECT_ROOT, '--force-device-scale-factor=1', `--user-data-dir=${userDataDir}`, ...E2E_CHROMIUM_ARGS]
   if (projectPath) {
     args.splice(1, 0, projectPath)
   }

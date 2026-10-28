@@ -10,7 +10,7 @@
 import { rm } from 'fs/promises'
 import { join } from 'path'
 import { tmpdir } from 'os'
-import { afterAll, vi } from 'vitest'
+import { afterAll, vi, type Mock } from 'vitest'
 import { installFlakeGuard } from './flakeGuard'
 
 // Global default mock for the `electron` module.
@@ -24,7 +24,7 @@ import { installFlakeGuard } from './flakeGuard'
 // flake. Test files that declare their own `vi.mock('electron', …)` still override
 // this per-file default.
 vi.mock('electron', () => {
-  const fn = (): ReturnType<typeof vi.fn> => vi.fn()
+  const fn = (): Mock => vi.fn()
   return {
     app: {
       isPackaged: false,

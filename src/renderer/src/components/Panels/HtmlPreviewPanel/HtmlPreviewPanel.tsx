@@ -43,6 +43,7 @@ import { usePreviewStore } from '../../../stores/usePreviewStore'
 import { usePreviewTabStore, type PreviewLinkMode } from '../../../stores/usePreviewTabStore'
 import { useSearchStore } from '../../../stores/useSearchStore'
 import { useOverlayOccluderStore } from '../../../stores/useOverlayOccluderStore'
+import { usePreviewCoveredStore } from '../../../stores/usePreviewCoveredStore'
 import { DOCKVIEW_PANEL_VISIBLE, useDockviewValue } from '../../../hooks/useDockviewValue'
 import { SearchBar } from '../../Search/SearchBar'
 import { PreviewChromeBand } from './components/PreviewChromeBand'
@@ -52,14 +53,20 @@ import { PreviewBanner, PreviewFallback, PreviewFindTool, PreviewNavControls } f
 import {
   usePreviewBounds,
   usePreviewEvents,
+  usePreviewGroupKeys,
   usePreviewLifecycle,
   usePreviewNavigation,
   usePreviewPageEntry,
-  usePreviewPanelActions
+  usePreviewPanelActions,
+  type PreviewKeyEventLike
 } from './hooks'
 import { previewPlaceholderLabel, selectFallback, selectPanelView } from './htmlPreview.logic'
 import './HtmlPreviewPanel.css'
 import { previewGateway } from '../../../services/previewGateway'
+import { usePreviewComments } from './comments/usePreviewComments'
+import { CommentToolbarTools } from './comments/CommentToolbarTools'
+import { CommentDrawer } from './comments/CommentDrawer'
+import { PreviewCommentsLayer } from './comments/PreviewCommentsLayer'
 
 /** Parameters passed to {@link HtmlPreviewPanel} via dockview. */
 export interface HtmlPreviewPanelParams {
@@ -208,7 +215,11 @@ export function HtmlPreviewPanel(props: IDockviewPanelProps<HtmlPreviewPanelPara
     panelRef: panelRootRef
   })
 
-  const isViewHidden = isViewHiddenBase || gate !== null || resizeHeld
+  // This panel's comments drawer as a full-width sheet: a gate term of its own
+  // (never the window's occluder), so only this page counts as hidden.
+  const covered = usePreviewCoveredStore((s) => s.covered.has(panelId))
+
+  const isViewHidden = isViewHiddenBase || gate !== null || resizeHeld || covered
 
   // The hook owns every push, including the one on becoming visible: a tab
   // switch changes no size, so the `ResizeObserver` alone would not re-emit.
@@ -254,6 +265,36 @@ export function HtmlPreviewPanel(props: IDockviewPanelProps<HtmlPreviewPanelPara
 
   // After `view`: focus goes to Back only once the band that holds it exists.
   const navigation = usePreviewNavigation({ panelId, filePath, view, containerApi })
+
+  // HTML Preview comments: toolbar tools, drawer, menu and window (all off
+  // with the feature flag). The page area bounds the window.
+  const pageAreaRef = useRef<HTMLDivElement>(null)
+  const comments = usePreviewComments({
+    panelId,
+    filePath,
+    ready: loadState === 'ready',
+    pageAreaRef,
+    panelRootRef,
+    containerApi,
+    // The window belongs to this tab: it is not drawn while another tab is shown.
+    visible: isVisible
+  })
+  // The panel's key chain, comments first: the mode toggle claims its chord
+  // before navigation reads the same event. Shared by both key routes below.
+  const onPanelKey = (event: PreviewKeyEventLike): void => {
+    comments.onRootKeyDown(event)
+    if (!event.defaultPrevented) navigation.onRootKeyDown(event)
+  }
+  // Keys from a portalled overlay (the comment window, a menu) bubble through
+  // React to this root; only keys typed in the panel's own DOM are its.
+  const onRootKeyDown = (event: React.KeyboardEvent<HTMLDivElement>): void => {
+    if (!(event.target instanceof Node) || !event.currentTarget.contains(event.target)) return
+    onPanelKey(event)
+  }
+  // A tab switch leaves focus on dockview's group element, outside this root
+  // (the panel renders in the overlay layer), so neither the root nor main's
+  // page forwarder hears a key there. The active panel takes it from the group.
+  usePreviewGroupKeys({ api, rootRef: panelRootRef, onKey: onPanelKey })
 
   // ========================================
   // Find provider (X15b: memoised on panelId)
@@ -316,7 +357,7 @@ export function HtmlPreviewPanel(props: IDockviewPanelProps<HtmlPreviewPanelPara
   return (
     // Back/Forward keys with focus anywhere in THIS panel's chrome – a React
     // handler on the root, so another panel's keys never reach it (§3.7).
-    <div className="html-preview-panel" ref={panelRootRef} onKeyDown={navigation.onRootKeyDown}>
+    <div className="html-preview-panel" ref={panelRootRef} onKeyDown={onRootKeyDown}>
       {/* Move announcements (part 3 §3.8, RU3-1). On the ROOT, mounted in every
           view: a move started from the failed banner mounts the band in the
           same render it lands, and a live region created with its text is not
@@ -375,6 +416,7 @@ export function HtmlPreviewPanel(props: IDockviewPanelProps<HtmlPreviewPanelPara
               <>
                 <PreviewNavControls {...navigation.controls} />
                 <PreviewFindTool onFind={openSearch} />
+                {comments.enabled && <CommentToolbarTools {...comments.toolbar} />}
               </>
             }
           />
@@ -383,7 +425,10 @@ export function HtmlPreviewPanel(props: IDockviewPanelProps<HtmlPreviewPanelPara
               strip — it used to be positioned against the panel root, which put
               it over the strip's right-hand end the moment the strip grew tall
               enough to hold a control. */}
-          <div className="html-preview-page-area">
+          <div
+            ref={pageAreaRef}
+            className={`html-preview-page-area${comments.drawer ? ' html-preview-page-area--drawer' : ''}`}
+          >
             {/* Find-in-page overlay; only the active tab shows it. Now scoped to
                 the normal view: in the failed and limit-reached views it was
                 talking to a WebContentsView that does not exist. */}
@@ -420,7 +465,11 @@ export function HtmlPreviewPanel(props: IDockviewPanelProps<HtmlPreviewPanelPara
             >
               <PreviewFallback kind={fallbackKind} stillFrame={stillFrame} dragLatched={dragHideLatched} />
             </div>
+            {/* A flow sibling of the placeholder, never over it: the native
+                page shrinks beside the drawer instead of covering it. */}
+            {comments.drawer && <CommentDrawer {...comments.drawer} />}
           </div>
+          {comments.enabled && <PreviewCommentsLayer {...comments.layer} />}
         </div>
       )}
     </div>

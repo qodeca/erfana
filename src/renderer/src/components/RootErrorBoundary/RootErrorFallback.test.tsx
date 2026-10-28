@@ -28,11 +28,11 @@
  * `vi.stubGlobal('window', …)` — that replaces the whole window object and
  * destroys React's DOM internals.
  *
- * @see docs/design/design-issue-60.md §2.3, §2.7, §5
+ * @see docs/designs/design-issue-60.md §2.3, §2.7, §5
  */
 
 import { act } from 'react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { CLOSE_PROJECT_TIMEOUT_MS, RootErrorFallback } from './RootErrorFallback'
@@ -49,9 +49,9 @@ const RESTART_STALLED_MS = 3000
 
 /** Bridge doubles installed on `window.api` for a test. */
 interface BridgeDoubles {
-  relaunchApp: ReturnType<typeof vi.fn>
-  closeProject: ReturnType<typeof vi.fn>
-  openLogsFolder: ReturnType<typeof vi.fn>
+  relaunchApp: Mock
+  closeProject: Mock
+  openLogsFolder: Mock
 }
 
 /**

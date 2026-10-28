@@ -60,3 +60,18 @@ path = "patches/node-pty+1.1.0.patch"
 precedence = "override"
 SPDX-FileCopyrightText = ["2017 Daniel Imms", "2018 Microsoft Corporation"]
 SPDX-License-Identifier = "MIT"
+
+# HTML Preview comment fixtures (docs/designs/html-preview-comments.md § 12.3):
+# golden blocks, compat pages, their .expected.json results, the SHA-256 lock
+# and the agent-review pages. Most are byte-exact text that cannot carry an
+# inline header without changing what they test (a .block.txt is exactly one
+# serialized block; a .json file has no comment syntax), so this block records
+# their licence. The blanket block above already covers them.
+[[annotations]]
+path = [
+  "src/shared/htmlComments/__fixtures__/**",
+  "e2e/fixtures/html-preview-corpus/comments/**",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2025-2026 Qodeca sp. z o.o."
+SPDX-License-Identifier = "GPL-3.0-only"

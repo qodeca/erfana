@@ -12,7 +12,8 @@ Scope: full Windows parity with macOS (renderer + main + build + tests + docs)
 different things depending on its status:
 
 - **Live rows** (no status suffix) and the "Confirmed **not** broken" list point at *current*
-  source. Those refs were re-read and corrected on 2026-08-07.
+  source. Those refs were re-read and corrected on 2026-08-07, and the "Confirmed **not** broken"
+  list again on 2026-10-25 against v0.22.0.
 - **✅ Resolved / ⏸ Deferred rows** point at where the gap sat *when it was found*. The fix
   moved or deleted that code, so the line numbers do not resolve against today's tree and are
   not maintained — they are provenance. Such refs are tagged `(pre-fix location)`.
@@ -55,29 +56,29 @@ different things depending on its status:
 | m2 | No `cross-env` / `shx` / `rimraf` in devDependencies | `package.json` | Required once B4/B5 are fixed properly. ✅ Resolved in v0.9.3 (#153) — `rimraf` + `shx` added to `devDependencies` alongside the cross-platform `scripts/test-cov.mjs` + `scripts/prebuild.mjs`. |
 | m3 | Known-issues doc has no Windows section | `docs/known-issues.md` | ✅ Resolved 2026-06-05 (`feature/windows-phase-6-polish`, Phase 6 item 4) — OneDrive/antivirus EPERM-storm subsection added to `docs/known-issues.md` (SmartScreen + long-path opt-in already covered there). |
 | m4 | Tesseract `tessdata` path resolution on packaged Windows build | `electron-builder.yml` `extraResources:` block (line 21; the allowlist comment above it starts at line 6) + `LiteParseConverter` | Bundled as `extraResources`; needs manual verification that `process.resourcesPath` resolves correctly in the NSIS install layout. |
-| m5 | Chokidar EPERM storms on OneDrive/AV-synced folders (Windows) | `DirectoryWatcherService.ts` | Already mitigated by `scheduleRestart()` debouncer. Keep in mind during manual test with OneDrive-synced folders. |
+| m5 | Chokidar EPERM storms on OneDrive/AV-synced folders (Windows) | `DirectoryWatcherService.ts` (restart logic now in `watcher/DirectoryWatcherRecovery.ts`) | Already mitigated by `scheduleRestart()` debouncer; since v0.20.1 Windows watches project folders with the native `fs.watch` backend, not chokidar. Keep in mind during manual test with OneDrive-synced folders. |
 | m6 | Visual regression baselines are darwin-only (`*-darwin.png`) | `e2e/screenshots/` | ✅ Resolved 2026-09-04 — all six cases now have a committed `*-win32.png` beside the `*-darwin.png`. Note the standing trap: a capture-geometry change invalidates **every** platform's baselines, and only the host you are on can regenerate its own set, so such a change is finished only once each platform has been visited (see [`known-flakes.md`](known-flakes.md) § visual). |
 | m7 | Camera permission-denied copy is OS-agnostic | `src/renderer/src/hooks/useCameraCapture.ts:241-244` | `NotAllowedError` shows "Please grant camera permission in your system settings." on both OSes. macOS path: `System Settings → Privacy & Security → Camera`. Windows path: `Settings → Privacy & Security → Camera` (requires app restart for grant to take effect). Branch the copy on `window.api.utils.getPlatform()`; consider `systemPreferences.getMediaAccessStatus('camera')` for a macOS pre-flight. |
 | m8 | No `fileAssociations` block in `electron-builder.yml` | `electron-builder.yml` | `.md` "Open with Erfana" missing on both OSes — double-click does not launch the app even after install. electron-builder handles per-OS registration (macOS `CFBundleDocumentTypes`, Windows NSIS shell-protocol) via one config block. |
 | m9 | No custom-protocol handler (`erfana://…`) | n/a (absent — no call to `app.setAsDefaultProtocolClient('erfana')`) | Blocks deep-linking from external apps (email, Slack, browser). Per-OS registration paths: macOS `CFBundleURLTypes` in `Info.plist`, Windows NSIS shell-protocol registry entries. Defer until prioritized. |
 | m10 | No `app.setLoginItemSettings` for auto-start on boot | n/a (absent) | Electron abstracts the divergence (Windows HKCU `Run` registry vs macOS LaunchAgents). Low priority; add when there's user demand. |
-| m11 | `useScreenshotCapture` hook is exported + tested but unused | `src/renderer/src/components/Panels/TerminalPanel/hooks/useScreenshotCapture.ts` (defined + 25+ test cases) ↔ `src/renderer/src/components/Panels/TerminalPanel.tsx:70-74,282-292,1146-1200` (parallel implementation; *pre-fix locations* — that code is gone) | The hook owns `isMacOS` / `displays` / `capturingMode` / `showScreenSelectDialog` state, an initial-displays effect, and `handleScreenshot` / `refreshDisplays` callbacks; the panel reimplements all of them inline. Was verified 2026-06-03 as unused. ✅ Resolved in v0.12.0 (#164) — the decision went the "wire the hook" way: `TerminalPanel.tsx:40` imports it and `:107` calls it (`useScreenshotCapture({ terminalIdRef, shellKindRef, xtermRef })`), and the parallel inline implementation is gone. |
+| m11 | `useScreenshotCapture` hook is exported + tested but unused | `src/renderer/src/components/Panels/TerminalPanel/hooks/useScreenshotCapture.ts` (defined + 25+ test cases) ↔ `src/renderer/src/components/Panels/TerminalPanel.tsx:70-74,282-292,1146-1200` (parallel implementation; *pre-fix locations* — that code is gone) | The hook owns `isMacOS` / `displays` / `capturingMode` / `showScreenSelectDialog` state, an initial-displays effect, and `handleScreenshot` / `refreshDisplays` callbacks; the panel reimplements all of them inline. Was verified 2026-06-03 as unused. ✅ Resolved in v0.12.0 (#164) — the decision went the "wire the hook" way: `TerminalPanel.tsx:45` imports it and `:221` calls it (`useScreenshotCapture({ terminalIdRef, shellKindRef, xtermRef })`), and the parallel inline implementation is gone. |
 
 ## Tech debt note (added 2026-06-03)
 
-`docs/windows/implementation-plan.md` §"Critical files to modify" lists `WhisperModelManager.ts` for cross-platform arch but omitted `whisper-assets.ts` — the canonical `classifyPlatform()` lives there; corrected 2026-06-03. The renderer mirror at `SettingsOverlay.tsx:81-86` is policed by a comment, not an IPC channel; lens-review suggested `api.whisper.isSupported()` channel, deferred until Whisper support widens (Linux or Windows ARM64).
+`docs/windows/implementation-plan.md` §"Critical files to modify" lists `WhisperModelManager.ts` for cross-platform arch but omitted `whisper-assets.ts` — the canonical `classifyPlatform()` lives there; corrected 2026-06-03. The renderer mirror at `SettingsOverlay.tsx:114-126` is policed by a comment, not an IPC channel; lens-review suggested `api.whisper.isSupported()` channel, deferred until Whisper support widens (Linux or Windows ARM64).
 
 ## Confirmed **not** broken (don't spend time here)
 
-- `menu.ts:45` — `CmdOrCtrl+Shift+N` accelerators (Electron maps correctly)
+- `menu.ts:103` — `CmdOrCtrl+Shift+N` accelerators (Electron maps correctly)
 - Menu `role:` strings (cut/copy/paste/undo/redo)
 - `ffmpeg-static` / `ffprobe-static` (ship Windows binaries)
-- `PlatformConfig.ts:107-115` — Windows chokidar config (caseSensitive: false, nativeWatchingReliable: true)
-- `ProjectService.ts:61-63` — Windows case-folding in project path comparison
-- `file-handlers.ts:555-560` — Windows system-path blocklist (case-insensitive)
-- `TerminalService.ts:641-646` (`resolveWindowsShell`) — Windows shell picker (exists and works for PowerShell)
-- `git-status.worker.ts:417` — `where` vs `which` command selection
+- `PlatformConfig.ts:107-115` — Windows watcher config (caseSensitive: false, nativeWatchingReliable: true); the directory watcher itself is the native `fs.watch` backend on Windows since v0.20.1
+- `ProjectService.ts:86-88` (`foldCase`) — Windows case-folding in project path comparison
+- `src/main/utils/pathSecurity.ts:62-72` — Windows system-path blocklist (case-insensitive; moved out of `file-handlers.ts`)
+- `TerminalService.ts:1386` (`resolveWindowsShell`) — Windows shell picker (exists and works for PowerShell)
+- `src/main/utils/hardenedGit.ts` (`findOnPath`) — absolute `where.exe` vs `which` selection (moved out of `git-status.worker.ts`)
 - `app.getPath('userData')` — Electron handles `%APPDATA%` natively
 - Renderer keyboard hooks — `metaKey`/`ctrlKey` branches are correct and tested
-- `filePathLinks.logic.ts:130-140` — has a Windows `C:\...` regex variant
+- `filePathLinks.logic.ts:159-162` — has a Windows `C:\...` regex variant
 - `getPlatform` in `src/preload/index.ts` — already exposed; since v0.13.0 the renderer routes every call through it via `src/renderer/src/utils/platform.ts`

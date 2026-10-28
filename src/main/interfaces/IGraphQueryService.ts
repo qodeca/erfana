@@ -18,7 +18,7 @@
  *
  * @see GraphEngineService for implementation (#23)
  * @see Issue #21 - graph R1 architecture
- * @see specs/designs/sd-021-graph-architecture.md §4.4 - interfaces
+ * @see docs/designs/sd-021-graph-architecture.md §4.4 - interfaces
  */
 import type {
   GraphCancelReindexRequestInput,

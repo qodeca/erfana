@@ -4,9 +4,11 @@
  * Blocked hosts inside frames reach the permission band (issue #124, WI-14;
  * design part 2 §2.8, spike S9).
  *
- * Frames get no preload – `nodeIntegrationInSubFrames` stays false – so a
- * frame's CSP refusal never reaches the preload's `securitypolicyviolation`
- * report. Chromium does print it as a `console-message` credited to the real
+ * A frame's CSP refusal never reaches the preload's `securitypolicyviolation`
+ * report: with HTML Preview comments off frames get no preload at all, and
+ * with them on the preload runs in frames but registers its CSP listener in
+ * the main frame only (`previewPage.ts`), and main refuses a frame's report
+ * anyway (`previewViewLifecycle.ts`; ADR 0005). Chromium does print it as a `console-message` credited to the real
  * subframe (S9), and this module turns that line back into the report the
  * preload would have sent, `{ blockedURI, effectiveDirective }`. The page
  * scope's CSP-violation bridge then applies the same dedupe, caps and budgets
