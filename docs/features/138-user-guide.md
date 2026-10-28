@@ -207,8 +207,8 @@ args, the same `recordVideo` on CI, the same 1280×800 size). Verified by runnin
 ### 3.6 Requirements from #139 (R138-1…11)
 
 #139's README demo is recorded by this script, not by a second one. Its spec
-([`docs/designs/readme/README.md`](https://github.com/qodeca/erfana/pull/140), draft
-PR #140) hands these requirements to #138; the numbering is #140's, so both specs name the same
+([`docs/designs/readme/README.md`](../designs/readme/README.md), first drafted in PR #140 and
+implemented in #139) hands these requirements to #138; the numbering is #140's, so both specs name the same
 row. Leader decisions of 2026-09-25 apply to both: one 1280×800 content size, WebP from this
 script's `encode.mjs`, and the privacy pass over the demo's frames. #139 ticks each row against
 #138's merged code before it builds on it.

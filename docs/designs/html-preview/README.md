@@ -7,7 +7,7 @@ SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 
 ## Purpose
 
-The HTML preview: running a page's CSS and JavaScript, link navigation and preview tabs, and what Chromium does with `http://` and IPv6. The multi-page preview (#124) is in [`multi-page/`](multi-page/README.md). Comments in the preview are in [`../comments/`](../comments/README.md).
+The HTML preview: running a page's CSS and JavaScript, link navigation and preview tabs, and what Chromium does with `http://` and IPv6. The multi-page preview (#124) is in [`multi-page/`](multi-page/README.md). Comments in the preview are in [`../comments/`](../comments/README.md); approving a remote host and the loading states are drawn in [`../html-approval/`](../html-approval/README.md) and [`../html-waiting/`](../html-waiting/README.md).
 
 ## Documents
 

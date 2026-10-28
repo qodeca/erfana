@@ -85,7 +85,7 @@ Design: [docs/designs/comments/html-preview-comments.md](../../../../../../docs/
 - **The drawer is windowed above 200 rows** (`VIRTUALISE_ABOVE` in `CommentDrawer.tsx`; `@tanstack` virtualizer, `.erf-comment-list--windowed`). Below that every row is mounted. Anything that focuses or scrolls to a row must go through the virtualizer in the windowed case (`scrollToIndex`), because the row may not exist.
 - **Dirty guard.** `useCommentDirtyGuard` (`hooks/`) blocks Save while an editor tab shows the same file with unsaved changes, matched by the **project-space** path main returns (`CommentFileView.filePath`), not the real path. In the "changed on disk" conflict state it offers **Go to tab** only. `useUnsavedSourcesFeed` sends the same dirty list to main, which refuses the write (`COMMENT_UNSAVED_SOURCE`) even if this check races.
 - **Copy has one home.** Every string is in `commentCopy.ts`; §10.10 of the design is its source of truth and `src/shared/errors.comments.test.ts` pins the error sentences to it. Change both together.
-- **Design-system cards first.** The comment UI follows the cards under `docs/designs/comments/html-comments/`; read the card's `status` (`decided` is binding) and change the card before code that departs from it.
+- **Design screens first.** The comment UI follows the feature screens under `docs/designs/comments/html-comments/` (a feature design, not the design system); read each screen's `status` (`decided` is approved for build) and change the screen before code that departs from it. System rules (buttons, menus, focus) come from the cards in `docs/design-system/`.
 
 ## The backdrop is a state machine, not a constant
 

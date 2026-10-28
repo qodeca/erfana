@@ -873,7 +873,7 @@ One extra obstacle found since: `PreviewViewService.applyApprovedHosts` returns 
 
 **Impact**: The preview toolbar (`PreviewChromeBand.tsx`) puts its controls in a `role="toolbar"` with one tab stop each and no arrow-key navigation – as do `ActivityBar.tsx`, `MarkdownToolbar.tsx`, `MermaidToolbar.tsx`, `ImageViewerToolbar.tsx` and `ChatBubble.tsx`. The ARIA toolbar pattern expects one tab stop plus arrow keys.
 
-**Recommended Solution**: one shared roving-tabindex hook applied to all of them, or downgrade the role to `group` everywhere. Changing only the preview toolbar would make the app inconsistent.
+**Recommended Solution**: one shared roving-tabindex hook applied to all of them, or downgrade the role to `group` everywhere. Changing only the preview toolbar would make the app inconsistent. The target contract is drawn on the [Toolbar card](design-system/system/components/toolbar/index.html) (proposed), whose defects list names `MarkdownToolbar.tsx`, `MermaidToolbar.tsx` and `ImageViewerToolbar.tsx`.
 
 **Status**: Accepted at #124 QG-8 (U3) – a repo-wide task.
 
@@ -1113,7 +1113,8 @@ Amendment discipline + promotion-rule conventions in [`windows/contributing.md`]
 - [Troubleshooting](./troubleshooting.md) - Common problems and fixes
 - [Architecture](./architecture.md) - System design and patterns
 - [Testing](./testing/README.md) - Test coverage and strategies
-- [ADRs](./adrs/README.md) - Architecture Decision Records (Phase 4: 0001 self-host whisper, 0002 minisign, 0003 dual-pubkey, 0004 TOCTOU close)
+- [ADRs](./adrs/README.md) - Architecture Decision Records (index in the README)
+- [Design system defects](./design-system/README.md#defects-the-cards-name) - App defects a design-system card names, kept with the cards
 
 ---
 

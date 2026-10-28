@@ -5,7 +5,7 @@
 > Branch: `feature/markdown-preview-comments` (off `develop`). No GitHub issue yet.
 > Changes: HTML Preview comments [decision 14](html-preview-comments.md#2-locked-decisions) ("area / text-selection comments" out of v1) is lifted for **text selection** by this design; area comments stay out.
 > Related: [Markdown Preview comments](markdown-preview-comments.md) (owner decisions M1 "one format" and M2 "text selection included", 2026-10-28). This document owns everything about selected text in **both** previews; the Markdown document points here.
-> Design card (proposed, plain HTML and CSS): [`docs/designs/comments/selection-comments/`](selection-comments/index.html).
+> Screen (proposed, plain HTML and CSS, no script): [`docs/designs/comments/selection-comments/`](selection-comments/index.html).
 
 ## 1. Summary
 
@@ -231,4 +231,4 @@ H1 can ship before the Markdown work if the format phase goes first. Inferred si
 - `docs/designs/comments/html-preview-comments.md` – decision 14 row points here.
 - `docs/security.md` – page-supplied selection text and its verification.
 - `docs/html-preview/README.md`, `docs/editor/markdown-preview.md`, user guide.
-- Card: [`docs/designs/comments/selection-comments/index.html`](selection-comments/index.html) (proposed).
+- Screen: [`docs/designs/comments/selection-comments/index.html`](selection-comments/index.html) (proposed).

@@ -68,8 +68,8 @@ Run the same checks CI runs before opening a PR:
 
 ```bash
 npm run lint            # eslint --fix, then the no-shebang check (lint:shebang) and the max-lines baseline check (lint:max-lines)
-npm run lint:css        # stylelint over src/ CSS and the docs/design-system/ cards
-npm run design -- --check   # fails if a generated file under docs/design-system/ is stale
+npm run lint:css        # stylelint over src/ CSS, the docs/design-system/ cards and the docs/designs/ screens
+npm run design -- --check   # stale generated files or baked values, plus the design guards (no JavaScript, links, deviation markers, card anatomy, 13px text floor)
 npm run typecheck       # tsc (node + web projects, their tests, and e2e)
 npm run test:cov        # every unit test once, plus the coverage floors (the Unit tests and Coverage jobs)
 npx electron-vite build # production build
@@ -143,7 +143,7 @@ Never commit a real secret, even to history – rewrite it out and rotate the cr
 
 - TypeScript strict mode; React functional components with hooks; Zustand for state.
 - IPC pattern: `shared/ipc` schemas → `main/services` → `main/ipc` handlers → preload bridge → renderer.
-- UI: open the design system first – [`docs/design-system/index.html`](docs/design-system/index.html) – and use design tokens (`var(--color-*)`, `var(--space-*)`, `var(--text-*)`); `border-radius: 0` always. `npm run lint:css` enforces the token rules. (`docs/design-system/` is the design system; `docs/designs/` holds per-issue notes.)
+- UI: open the design system first – [`docs/design-system/index.html`](docs/design-system/index.html) – read the card for what you change, and use design tokens (`var(--color-*)`, `var(--space-*)`, `var(--text-*)`); `border-radius: 0` always. `npm run lint:css` enforces the token rules. A departure from a card needs `/* deviates: docs/design-system/<card>.html – why */` at the site and a row in that card's Exceptions; design pages are HTML, CSS and images only. Full contract: [`docs/design-system/README.md`](docs/design-system/README.md). (`docs/design-system/` is the design system; `docs/designs/<functionality>/` holds one feature's design.)
 - Prose: **sentence case**, en dashes (not em dashes).
 - New source files must carry the SPDX header (`npm run check:headers` enforces it; the Xezar kit under `.xezar/` is MIT and exempt, see `REUSE.toml`); new binary assets are covered by the `REUSE.toml` catch-all – add a `.license` sidecar only to *override* it (e.g. a third-party asset). `reuse lint` must pass.
 

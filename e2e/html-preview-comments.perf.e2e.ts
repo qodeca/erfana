@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * HTML Preview comments – performance records (docs/designs/html-preview-
- * comments.md §12.2 F-001 – F-003, §5.8, §19 R3-6, R3-12).
+ * HTML Preview comments – performance records (docs/designs/comments/
+ * html-preview-comments.md §12.2 F-001 – F-003, §5.8, §19 R3-6, R3-12).
  *
  * Each test RECORDS its numbers – as a `HPC-PERF {…}` line on stdout and as a
  * test annotation – and asserts that every sample was taken. Only F-001 is

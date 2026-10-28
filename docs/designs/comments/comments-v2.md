@@ -5,7 +5,7 @@
 > Inputs: six specialist reviews (interaction, accessibility, visual, benchmark of collaborative review tools, content design, state model and information architecture) and one design-lead synthesis, run 2026-10-28 over the shipped HTML Preview comments and the proposed Markdown and selection designs; then the owner's eight decisions (§2).
 > Builds on and, **where they conflict, overrides**: [html-preview-comments.md](html-preview-comments.md) (shipped v0.23.1), [markdown-preview-comments.md](markdown-preview-comments.md), [selection-comments.md](selection-comments.md).
 > Plan: both previews are built at the same time (owner, 2026-10-28).
-> Design cards (proposed, plain HTML and CSS, no script): [`docs/designs/comments/comments-v2/`](comments-v2/index.html).
+> Screens (proposed, plain HTML and CSS, no script): [`docs/designs/comments/comments-v2/`](comments-v2/index.html).
 
 ## 1. Verdict
 
@@ -151,9 +151,9 @@ The stored item is always 'comment', in both previews:
 
 HTML keeps selectors in the visible label. 'Block' stays only in format-v1.md, which is for tool authors.
 
-Add a unit test that renders every Markdown-path string and fails on 'element', 'page', 'block' or a bare tag name. Add a glossary to the design system index: comment, thread, reply, icon, underline, selection, comment mode. Banned in UI: block, pin, pick as a noun, element in Markdown.
+Add a unit test that renders every Markdown-path string and fails on 'element', 'page', 'block' or a bare tag name. Add a glossary to the Writing card (`docs/design-system/system/foundations/writing.html`, proposed): comment, thread, reply, icon, underline, selection, comment mode. Banned in UI: block, pin, pick as a noun, element in Markdown.
 
-Cards: docs/designs/comments/markdown-comments/states.html; docs/designs/comments/markdown-comments/index.html; docs/designs/comments/selection-comments/index.html (Markdown frame); docs/designs/comments/html-comments/window.html (damaged state strings); docs/design-system/index.html (glossary).
+Cards: docs/designs/comments/markdown-comments/states.html; docs/designs/comments/markdown-comments/index.html; docs/designs/comments/selection-comments/index.html (Markdown frame); docs/designs/comments/html-comments/window.html (damaged state strings); docs/design-system/system/foundations/writing.html (glossary).
 
 ### C-04
 
@@ -376,9 +376,9 @@ The mark never uses `--color-bg-selected`. MarkdownPreview.css sets `::selection
 
 Forced colours: Mark/MarkText fill plus a 2px CanvasText bottom edge; active = 4px edge. Highlight/HighlightText is reserved for the live selection.
 
-Cards: a new 'Comment mark' card (to be created) in docs/design-system/system/components/comment-mark/index.html, rendered on white, #f5f5f5 and #0f1720 grounds, next to a real link, and overlapping a live selection. Remove the per-surface fills from selection.css and markdown-comments.css. Also replace the literals in markdown-comments.css: 28px → new `--toolbar-tool-height` token shared with the HTML band; the 22px pin step → the C-17 value; drop letter-spacing 0.2px in comments.css or tokenise it.
+Cards: a 'Comment mark' card, deferred by R-03 (§7): until it is adopted the mark lives on docs/designs/comments/comments-v2/marks.html, then moves to docs/design-system/system/components/comment-mark/index.html. Rendered on white, #f5f5f5 and #0f1720 grounds, next to a real link, and overlapping a live selection. Remove the per-surface fills from selection.css and markdown-comments.css. Also replace the literals in markdown-comments.css: 28px → new `--toolbar-tool-height` token shared with the HTML band; the 22px pin step → the C-17 value; drop letter-spacing 0.2px in comments.css or tokenise it.
 
-Cards: docs/design-system/system/components/comment-mark/index.html (to be created); docs/designs/comments/selection-comments/index.html + selection.css; docs/designs/comments/markdown-comments/states.html + markdown-comments.css; docs/designs/comments/html-comments/comments.css.
+Cards: docs/designs/comments/comments-v2/marks.html (system card deferred, R-03); docs/designs/comments/selection-comments/index.html + selection.css; docs/designs/comments/markdown-comments/states.html + markdown-comments.css; docs/designs/comments/html-comments/comments.css.
 
 ### C-13
 
@@ -450,7 +450,7 @@ Sort: a menu button in the drawer header, 'Sort: File order' (default) / 'Change
 
 **Owner decision OD-04 applied (2026-10-28):** the third segment is **Can't edit** (damaged and newer-format comments), not Attention. Not-found comments count as Open with a 'Not found' tag. The ▲ badge counts damaged comments only: toolbar '7 comments · ▲1'. Filter: 'Open 7' · 'Resolved 2' · 'Can't edit 1'.
 
-Cards: docs/design-system/system/components/feedback/index.html (new badge); docs/designs/comments/html-comments/drawer.html; docs/designs/comments/html-comments/toolbar.html; docs/designs/comments/markdown-comments/states.html (drawer, toolbar).
+Cards: docs/design-system/system/components/badge/index.html (new badge); docs/designs/comments/html-comments/drawer.html; docs/designs/comments/html-comments/toolbar.html; docs/designs/comments/markdown-comments/states.html (drawer, toolbar).
 
 ### C-16
 

@@ -636,7 +636,7 @@ Contrast numbers quoted in design-system cards go into `docs/design-system/claim
 
 | Card (status) | Change |
 |---|---|
-| New `docs/designs/comments/html-comments/` (proposed) | The whole journey and every state of §10 on a fake page |
+| `docs/designs/comments/html-comments/` screens (decided) | The whole journey and every state of §10 on a fake page |
 | Permission band (decided) | Three new tools after Find; re-measure `nav.css` tier thresholds |
 | Focus (decided) | Exceptions: in-page ring uses passed-in colours; close returns native focus to the page; pins focusable but not in the Tab order |
 | Menu (decided) | Exception: the opener is page content, so no `aria-haspopup` |
@@ -644,7 +644,7 @@ Contrast numbers quoted in design-system cards go into `docs/design-system/claim
 | Form (decided) | New textarea entry: multi-line, counter, Cmd/Ctrl+Enter |
 | Colours, Layering, Motion, Icons, Buttons, Feedback (proposed) | In-page literals resolved from tokens; top-layer rung + dialog rung; one-shot flash; bubble pin + three lucide glyphs; inline destructive confirmation; banners inside the window |
 
-Each code site that deviates carries `/* deviates: docs/design-system/<card> — why */` plus a row in that card's Exceptions section.
+Each code site that deviates carries `/* deviates: docs/design-system/<card>.html – why */` plus a row in that card's `#exceptions` section.
 
 ## 11. Cross-OS
 

@@ -17,13 +17,28 @@ Markdown Preview, including comments on selected text. The written designs:
 | [`markdown-preview-comments.md`](markdown-preview-comments.md) | Markdown Preview comments |
 | [`selection-comments.md`](selection-comments.md) | Comments on selected text |
 
+## Cards it builds on
+
+| Card | Status | What this design takes from it |
+| --- | --- | --- |
+| [Permission band](../../design-system/system/components/permission-band/index.html) | `decided` | The comment tools in the HTML band, after Find |
+| [Focus and keyboard](../../design-system/system/foundations/focus.html) | `decided` | Focus rings and Tab order, with the exceptions listed in [`html-preview-comments.md`](html-preview-comments.md) §10.11 |
+| [Menu](../../design-system/system/components/menu/index.html) | `decided` | The comment menus |
+| [Rows and lists](../../design-system/system/components/row/index.html) | `decided` | The drawer's list of comments |
+| [Form controls](../../design-system/system/components/form/index.html) | `decided` | The comment textarea: multi-line, counter, Cmd/Ctrl+Enter |
+| [Colours](../../design-system/system/foundations/colors.html), [Layering](../../design-system/system/foundations/layering.html), [Motion](../../design-system/system/foundations/motion.html) | `proposed` | Colour pairings, the top-layer and dialog rungs, the one-shot flash |
+| [Icons](../../design-system/system/components/icon/index.html), [Buttons](../../design-system/system/components/button/index.html), [Feedback](../../design-system/system/components/feedback/index.html), [Badges, chips and keys](../../design-system/system/components/badge/index.html) | `proposed` | The pin and glyphs, inline destructive confirmation, banners inside the window, the drawer's badge |
+| [Writing](../../design-system/system/foundations/writing.html), [Forced colours](../../design-system/system/foundations/forced-colors.html) | `proposed` | The comment glossary; how marks look in forced colours |
+
+The comment mark has no system card yet: it stays on [`comments-v2/marks.html`](comments-v2/marks.html) until it is adopted ([`comments-v2.md`](comments-v2.md) R-03).
+
 ## Screens
 
 Plain HTML and CSS, no script. Open them in a browser.
 
 | Folder | What it draws |
 | --- | --- |
-| [`html-comments/`](html-comments/index.html) | v1, as shipped: the overlay, comment window, drawer, toolbar and identity step. Decided cards – the app's code follows them |
+| [`html-comments/`](html-comments/index.html) | v1, as shipped: the overlay, comment window, drawer, toolbar and identity step. Decided screens – the app's code follows them |
 | [`comments-v2/`](comments-v2/index.html) | The v2 overview and journey, the comment window, drawer, marks, menus and toolbar |
 | [`markdown-comments/`](markdown-comments/index.html) | The Markdown journey, every Markdown state, and where comment blocks go in the source |
 | [`selection-comments/`](selection-comments/index.html) | Comments on selected text in both previews |

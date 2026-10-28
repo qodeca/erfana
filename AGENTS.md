@@ -54,7 +54,7 @@ commit what it changes. Install with `npm ci`, never
 - Code: `src/main/` (main process), `src/preload/`, `src/renderer/` (React UI), `src/shared/` (IPC schemas).
 - Tests: `*.test.ts(x)` beside the code (Vitest); e2e in `e2e/` (Playwright with Electron).
 - Documents: `docs/`, by subject; the index is `docs/README.md`. Specs: `specs/` (`specs/registry.json`).
-- The design system: `docs/design-system/` (open `docs/design-system/index.html`).
+- The design system: `docs/design-system/` (open `index.html`; the contract is its `README.md`). Feature designs: `docs/designs/<functionality>/`. Both are HTML, CSS and images only. Where the kit design skills disagree with this, follow SDLC.md § Design system in this project.
 - The pipeline: `.xezar/` (workflows, checks, role skills, routing). `SDLC.md` says how work moves.
 
 ## Changing a mechanism that already works

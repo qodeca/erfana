@@ -45,7 +45,6 @@ export const CLAIMS = [
   { file: 'docs/security.md', source: 'electron', pattern: /Full support for Electron (\d+)\.x/ },
   { file: 'docs/security.md', source: 'range', pattern: /\(`([\^~]?\d+\.\d+\.\d+)` in `package\.json`/ },
   { file: 'docs/security.md', source: 'locked', pattern: /, (\d+\.\d+\.\d+) in the lockfile\)/ },
-  { file: 'docs/ui-style-guide.md', source: 'electron', pattern: /via Electron (\d+)\.x\b/ },
   { file: 'docs/terminal/flickering-prevention.md', source: 'electron', pattern: /The app now runs Electron (\d+)\b/ },
 ]
 

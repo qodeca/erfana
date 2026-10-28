@@ -52,8 +52,8 @@ Erfana is an agent-native Markdown workspace – an Electron app that runs a ter
 - [Settings](./settings.md) - Settings overlay implementation notes: storage and parse rules, API-key and model storage, the `files.exclude` list, terminal screen-reader mode. The user-facing list of settings is the [settings reference](./user-guide/reference/settings.md)
 
 ### UI/UX
-- **[Design system](design-system/index.html)** - the cards that decide colours, type, spacing, surfaces, focus, motion, layering and each component (MANDATORY for UI changes; open it in a browser)
-- [UI Style Guide](./ui-style-guide.md) - text-selection policy and the dark-only stance; its visual sections are stubs pointing at the cards
+- **[Design system](design-system/index.html)** - the cards that decide the foundations, each component and each pattern (MANDATORY for UI changes; open it in a browser). How to use and change it: [`design-system/README.md`](design-system/README.md); every `deviates:` marker in the code: the [deviation register](design-system/deviations.html)
+- [UI Style Guide](./ui-style-guide.md) - the `erf-` class namespace and token-discipline notes; every other section is a stub pointing at a card (text selection and dark-only are on the [Theme card](design-system/system/foundations/theme.html))
 - [UI Style Guide Reference](./ui-style-guide-reference.md) - common token gotchas left over from the v0.5.3 token migration
 - [UI Components](./ui-components.md) - React component architecture
 - [Keyboard Shortcuts](./keyboard-shortcuts.md) - Application keyboard shortcuts
@@ -115,7 +115,7 @@ Erfana is an agent-native Markdown workspace – an Electron app that runs a ter
 
 ### Design records and plans
 
-Not to be confused with **[`docs/design-system/`](design-system/index.html)**, which is the design system. All design *notes* live in `docs/designs/`. They mix three file-naming conventions (`<issue>-<slug>.md`, `issue-<issue>-<slug>.md` and the older `design-issue-<n>.md`), because two folders were merged into one; spec design notes use `sd-<spec>-<slug>.md`.
+Not to be confused with **[`docs/design-system/`](design-system/index.html)**, which is the design system – rules for the whole app. Every feature design lives in `docs/designs/<functionality>/`, one folder per functionality with its own `README.md`; a design there cites cards and never decides a system rule. The full list, screens included, is the generated [`designs/index.html`](designs/index.html) (folder rules: [`designs/README.md`](designs/README.md)); the entries below are the most-linked notes.
 
 - [Packaging guards for `extraFiles` / `extraResources`](./designs/packaging/design-issue-55.md) - Build-time leak guards beyond the `files:` allowlist (issue #55)
 - [Renderer crash on very large projects](./designs/large-projects/design-issue-60.md) - `flattenTree` stack overflow, error containment (root + panel boundaries), crash trail (issue #60)
@@ -170,13 +170,13 @@ Archived documentation was removed from the tree on 2026-10-25. It stays in git 
 
 ## Folders added by the Xezar pipeline
 
-The pipeline's process documents sit at the repository root: [SDLC.md](../SDLC.md) (how work moves), [AGENTS.md](../AGENTS.md) (what every agent runs), [CODE_REVIEW.md](../CODE_REVIEW.md) and [BACKWARD_COMPATIBILITY.md](../BACKWARD_COMPATIBILITY.md). New pipeline designs go in `designs/<feature>/`; the single-file notes already in `designs/` stay as they are.
+The pipeline's process documents sit at the repository root: [SDLC.md](../SDLC.md) (how work moves), [AGENTS.md](../AGENTS.md) (what every agent runs), [CODE_REVIEW.md](../CODE_REVIEW.md) and [BACKWARD_COMPATIBILITY.md](../BACKWARD_COMPATIBILITY.md). Every design goes in `designs/<functionality>/` – no single-file notes are left loose in `designs/`.
 
 A folder appears when its first document does, so some of these do not exist yet.
 
 | Path | What lands there | Who it is for |
 |---|---|---|
-| `designs/` | one folder per designed feature, and the [index](designs/README.md) | whoever builds or reviews a screen |
+| `designs/` | one folder per functionality, each with a `README.md`; the [folder rules](designs/README.md) and the generated [index](designs/index.html) | whoever builds or reviews a screen |
 | `adrs/` | decision records and architecture pages (shared with the records above) | anyone about to reverse a choice |
 | `spikes/` | the findings page of a spike, never its prototype code | whoever decides after the spike |
 | `runbooks/` | what to do when an alert fires, how a release is rolled back | whoever is on call |

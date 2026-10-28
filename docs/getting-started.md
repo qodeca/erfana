@@ -70,7 +70,7 @@ src/
    - Preload bridge: `src/preload/`
    - UI component: `src/renderer/src/components/`
 4. Add tests
-5. Run quality gates: `npm run typecheck && npm run lint && npm run lint:css && npm run test`
+5. Run quality gates: `npm run typecheck && npm run lint && npm run lint:css && npm run design -- --check && npm run test`
 
 ### Fixing a bug
 
@@ -82,12 +82,14 @@ src/
 
 ### Making UI changes
 
-**MANDATORY**: Open the [design system](design-system/index.html) before any UI work. `npm run lint:css` enforces the token rules in CI.
+**MANDATORY**: Open the [design system](design-system/index.html) before any UI work and read the card for what you change – `decided` is binding, `proposed` is a direction. `npm run lint:css` enforces the token rules in CI.
 
 - Use design tokens from `src/renderer/src/styles/design-tokens.css`
 - No hardcoded colors, spacing, or fonts
 - No rounded corners (`border-radius: 0`)
 - Test focus states for accessibility
+- A departure from a card: `/* deviates: docs/design-system/<card>.html – why */` at the site plus a row in the card's Exceptions
+- A new feature's design goes in `docs/designs/<functionality>/`; changing the design system itself: [`docs/design-system/README.md`](design-system/README.md)
 
 ## Commands and file locations
 
@@ -101,7 +103,7 @@ The npm scripts, keyboard shortcuts and key source locations are in [Quick Refer
 | Build system | [docs/build/README.md](./build/README.md) |
 | Testing | [docs/testing/README.md](./testing/README.md) |
 | Design system | [docs/design-system/index.html](design-system/index.html) |
-| UI Style Guide (text-selection policy) | [docs/ui-style-guide.md](./ui-style-guide.md) |
+| Text selection and dark-only (Theme card) | [docs/design-system/system/foundations/theme.html](design-system/system/foundations/theme.html) |
 | Keyboard shortcuts | [docs/keyboard-shortcuts.md](./keyboard-shortcuts.md) |
 | Known issues | [docs/known-issues.md](./known-issues.md) |
 | Changelog | [docs/CHANGELOG.md](./CHANGELOG.md) |

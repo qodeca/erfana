@@ -12,7 +12,7 @@ An audit of the renderer on 2026-08-31 found nine defects. They share a cause: a
 role or an ARIA attribute was declared without the behaviour it promises, which is
 worse than declaring nothing – a screen reader changes its own behaviour on the
 strength of that promise and then gets nothing back. The design system decides the
-correct pattern for each; see [`docs/design-system/README.md`](design-system/README.md) for which
+correct pattern for each; see [`docs/design-system/README.md` § Defects the cards name](design-system/README.md#defects-the-cards-name) for which
 card governs which defect.
 
 **Fixed in v0.22.0:** the project tree works with the keyboard and announces each

@@ -106,7 +106,7 @@ dark-only stance moved to the [Theme card](design-system/system/foundations/them
 
 ## CSS class namespacing (`erf-`)
 
-Component CSS that belongs to the design system is namespaced `erf-`, and `.stylelintrc.json` enforces it with `selector-class-pattern` – every class must match `^erf-[a-z0-9]+(-[a-z0-9]+)*(__[a-z0-9]+(-[a-z0-9]+)*)?(--[a-z0-9]+(-[a-z0-9]+)*)?$`, i.e. an `erf-` prefix, kebab-case words, an optional BEM `__element` and an optional `--modifier` (`erf-band`, `erf-band__row`, `erf-band--open`). The rule applies to `docs/design-system/system/components/**/*.css` and follows a file when it is adopted into `src/`: today that is `src/renderer/src/styles/hostName.css` and `src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewChromeBand.css`, listed by path in the config. When a design-system stylesheet moves into `src/`, add its new path to that override – scoping the rule to `docs/design-system/` alone would switch the guard off at the exact moment the CSS became shipping code.
+Component CSS that belongs to the design system is namespaced `erf-`, and `.stylelintrc.json` enforces it with `selector-class-pattern` – every class must match `^erf-[a-z0-9]+(-[a-z0-9]+)*(__[a-z0-9]+(-[a-z0-9]+)*)?(--[a-z0-9]+(-[a-z0-9]+)*)?$`, i.e. an `erf-` prefix, kebab-case words, an optional BEM `__element` and an optional `--modifier` (`erf-band`, `erf-band__row`, `erf-band--open`). The rule applies to `docs/design-system/system/components/**/*.css` and `docs/design-system/system/patterns/**/*.css`, and follows a file when it is adopted into `src/`: today that is `src/renderer/src/styles/hostName.css`, `src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewChromeBand.css` and `PreviewNavControls.css` beside it, listed by path in the config (a guard in `npm run design -- --check` fails if an adopted path is missing). When a design-system stylesheet moves into `src/`, add its new path to that override – scoping the rule to `docs/design-system/` alone would switch the guard off at the exact moment the CSS became shipping code.
 
 The prefix is not cosmetic. Mermaid emits `class="row"` on gitGraph commit labels and on its generic label path, and the app injects that SVG with `innerHTML`, so a bare global `.row` reaches into diagram labels in the Markdown preview and in exported images. That collision was found by luck, not by review; the namespace makes it impossible. The cards' own documentation chrome under `docs/design-system/` (`.stage`, `.list-frame`, `.readout`) is not shipped UI and is exempt from the naming rule, though not from the token rules.
 
@@ -116,8 +116,8 @@ The prefix is not cosmetic. Mermaid emits `class="row"` on gitGraph commit label
 
 > **Colour, border-radius and z-index examples are gone from this list** because
 > `npm run lint:css` enforces them (see the checklist below). What is left is not
-> linted: `padding: 11px`, `font-size: 13px` and a hardcoded transition all pass,
-> so review for them by hand.
+> linted in `src/`: `padding: 11px`, `font-size: 13px` and a hardcoded transition all pass
+> there, so review for them by hand. In `docs/design-system/` and `docs/designs/` they fail lint.
 
 ### Spacing
 
@@ -168,7 +168,7 @@ which runs in the required `Lint` job:
 - Colours use tokens; no raw hex outside `design-tokens.css`
 - No bare `z-index`
 - No `border-radius` other than `0` or `var(--border-radius-circle)`
-- No retired token reaches `docs/design-system/`
+- No retired token reaches `docs/design-system/` or `docs/designs/`
 
 **Nobody checks these but you.** They are the ones that actually break for
 people, and none of them is expressible as a lint rule:
@@ -180,6 +180,7 @@ people, and none of them is expressible as a lint rule:
 - [ ] Any error is linked to its field with `aria-invalid` + `aria-describedby`
 - [ ] A role you declare is a promise: `role="tree"` means arrow keys work
 - [ ] It works keyboard-only, start to finish
+- [ ] Any departure from a card carries `/* deviates: docs/design-system/<card>.html – why */` at the site and a row in that card's Exceptions – nothing detects a departure that has no marker
 
 ---
 

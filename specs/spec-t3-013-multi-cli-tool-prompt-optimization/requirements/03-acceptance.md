@@ -257,7 +257,7 @@
 - [ ] Terminal store exposes current tool selection
 - [ ] Performance overhead under 50ms vs baseline
 - [ ] Claude Code templates produce output identical to current system behavior
-- [ ] UI follows design tokens and style guide
+- [ ] UI follows the design-system cards it uses (Toolbar, Form controls or Menu) and their tokens
 - [ ] Dropdown logs tool selection changes for debugging
 - [ ] Unit tests cover template selection logic, registry, and fallback behavior
 - [ ] Test coverage ≥ 80% for new code

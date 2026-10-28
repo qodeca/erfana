@@ -1,5 +1,7 @@
 # UI Components & Behavior
 
+This page describes behaviour and where the code is. The visual and keyboard rules are decided by the [design system](design-system/index.html) cards – for the parts below, see Tabs, Menu, Feedback (toasts), Splitter, Toolbar, Tooltip, the Dialog pattern and the Terminal and code colours card. Read the card before changing a component.
+
 ## Activity Bars
 
 **Location**: `src/renderer/src/components/ActivityBar/`
@@ -272,7 +274,7 @@ Home icon tab (41px fixed, non-draggable, no scaling).
 
 ### Active Indicator
 
-2px Qodeca **Lime** bottom border via an `::after` pseudo-element, matching the activity bar's active-panel edge (`AppDockLayout.css:93` and `:115`, `var(--color-brand-lime)`). This paragraph said *Violet* until 2026-09-01, contradicting both the shipped code and this same document five sections above. Decided by [`docs/design-system/system/components/row/index.html`](design-system/system/components/row/index.html), which cites this edge as the precedent for the selected-row rule.
+2px Qodeca **Lime** bottom border via an `::after` pseudo-element, matching the activity bar's active-panel edge (`AppDockLayout.css:93` and `:115`, `var(--color-brand-lime)`). This paragraph said *Violet* until 2026-09-01, contradicting both the shipped code and this same document five sections above. Decided by [`docs/design-system/system/components/row/index.html`](design-system/system/components/row/index.html), which cites this edge as the precedent for the selected-row rule; the tab strip itself is drawn on the proposed [Tabs card](design-system/system/components/tabs/index.html).
 
 ### Focus
 

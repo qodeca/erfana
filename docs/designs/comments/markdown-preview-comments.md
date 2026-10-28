@@ -5,7 +5,7 @@
 > Branch: `feature/markdown-preview-comments` (off `develop`). No GitHub issue yet.
 > Builds on: [HTML Preview comments](html-preview-comments.md) (shipped in v0.23.1) and its public format [format-v1.md](../../html-comments/format-v1.md). That design's decision 14 left Markdown out of v1; this document is the follow-up.
 > Selected text: comments on selected words in **both** previews are designed in [selection-comments.md](selection-comments.md), which owns `anchor.sel`, the word finder and the selection menu; where this document and that one differ, that one wins.
-> Design cards (proposed, plain HTML and CSS, no script): [`docs/designs/comments/markdown-comments/`](markdown-comments/index.html).
+> Screens (proposed, plain HTML and CSS, no script): [`docs/designs/comments/markdown-comments/`](markdown-comments/index.html).
 
 ## 1. Summary
 
