@@ -699,6 +699,28 @@ Failure recovery: `docs/build/release.md`. Incident notes: `docs/release-inciden
   (a deferred finding, a hotfix follow-up).
 - Install with `npm ci`; never commit a `package-lock.json` that `npm install` rewrote.
 
+### Design system in this project
+
+The rules themselves live in `CLAUDE.md` (§ Design system) and
+[`docs/design-system/README.md`](docs/design-system/README.md); this section says when an agent uses
+them. The design system is the rules for the whole app. `docs/designs/` holds the design for one
+feature, and a design there cites cards – it never decides a system rule.
+
+- **Designing.** Before drawing, read the card for every part the change touches. Save the design in
+  `docs/designs/<functionality>/` and list the cards it builds on, with their status. A part the app
+  needs and no card covers gets a new card marked `proposed`, in the same pull request.
+- **Building.** Use the tokens and the component CSS the cards name. A departure from a card is
+  allowed only with a `/* deviates: … */` comment at the site and a row in that card's Exceptions; an
+  undocumented one is a review finding. An app defect a card names goes in the README defects list.
+- **Who decides.** An agent may create and edit `proposed` cards. Owner-only, adding to § Owner-only
+  decisions: promoting a card to `decided`, changing what a `decided` card requires, and superseding
+  one. An agent that edits a `decided` card for any other reason (a fact, a link, a typo) says so in
+  the pull request, and the owner re-dates the card's `reviewed` field after reading it.
+- **Checks.** Design pages are HTML, CSS and images only – no JavaScript. `npm run design -- --check`
+  and `npm run lint:css` run in the required `Lint` job; run both before pushing a design change.
+- **Review.** The design review checks that the change follows every card its design cites, and that
+  each deviation is recorded. A screenshot of the changed screen is part of the evidence.
+
 ### Guards in this project
 
 The core asks for these guards (§ Agent permissions and guards, § Untrusted input, § Security
