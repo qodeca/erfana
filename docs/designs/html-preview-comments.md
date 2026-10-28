@@ -1,6 +1,7 @@
 # Design – HTML Preview comments (v1)
 
 > Status: shipped in v0.23.1 (2026-10-28; v0.23.0 carried it but was tagged and never published). Planned 2026-10-25 as the implementation plan for comments on elements in the HTML Preview.
+> **Superseded in part (2026-10-28):** [comments-v2.md](comments-v2.md) holds the enhanced design from a six-specialist UX/UI review and the owner's decisions OD-01…OD-08. Where the two disagree, comments-v2.md wins.
 > Branch: `feature/html-preview-comments` (off `develop`). No GitHub issue yet.
 > Inputs: owner interview (grill-me, depth full, 35 locked decisions), an online survey of 20+ commenting tools, and four specialist designs (architecture, UX, security, test strategy). Conflicts between those designs are resolved in §3.
 > Revision 2 (2026-10-25): folds in three plan reviews – correctness against the code, coverage of the decisions, and risk/sequencing. Their blockers are fixed in place; §18 lists what changed.
@@ -31,7 +32,7 @@ The one deep change: same-project iframes (decision 15) require the preview prel
 | 11 | Format: readable text + one `@data {json}` line; sequences that would end the HTML comment are escaped. |
 | 12 | A block Erfana cannot read is "damaged": read-only, never overwritten; the user can delete it or fix it in source. |
 | 13 | If the same file is open via "Open as source" with unsaved changes, commenting is blocked until it is saved. |
-| 14 | Out of v1: Markdown Preview comments; area / text-selection comments; live sync; agent replies/status; "Send to agent"; menu items other than "Add comment". |
+| 14 | Out of v1: Markdown Preview comments; area / text-selection comments; live sync; agent replies/status; "Send to agent"; menu items other than "Add comment". *Follow-ups (proposed, 2026-10-28): Markdown Preview comments – [markdown-preview-comments.md](markdown-preview-comments.md); text-selection comments in both previews – [selection-comments.md](selection-comments.md).* |
 | 15 | Same-project iframes are in v1; the comment is written into the frame's own file. Remote and `srcdoc` frames are not commentable inside. |
 | 16–17 | Full `outerHTML` snapshot only for JS-built elements; in-file elements get no copy. Snapshot = state at comment time, never updated, nested erfana blocks stripped. |
 | 18 | Priorities: 1) easy flow, 2) file safety, 3) polish. Decisions 12 and 13 stay safety-first. |
