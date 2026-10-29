@@ -99,10 +99,13 @@ test.describe('Guide: import a document', () => {
       // "Start your agent first: with only a shell running, the shell runs the prompt as a command."
       // No agent runs here, so the plain shell receives the prompt text.
       // The terminal draws to a canvas, so read its buffer; join wrapped rows before matching.
+      // zsh redraws a long pasted line, so how much of the prompt stays in the
+      // buffer depends on the terminal size an earlier test left; either line
+      // of the Organize Import prompt proves it arrived.
       const terminal = new TerminalPage(window)
       await expect
         .poll(async () => (await terminal.readScreen()).lines.join(''), { timeout: 15_000 })
-        .toContain('Where should this file be placed?')
+        .toMatch(/Where should this file be placed\?|Phase 3: File Name Decision/)
     })
   })
 

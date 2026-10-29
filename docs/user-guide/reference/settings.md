@@ -85,7 +85,7 @@ A copy found in the open project, a temporary folder, a network share or through
 | --- | --- | --- |
 | **Run HTML files** | On | When off, HTML files open as source only; live previews stop and no preview process is started. |
 
-Remote-host approvals belong to each project. An approved host is saved to `.erfana/settings.json`; the app currently has no remove-approval control. See [HTML preview](html-preview.md#remote-host-permission).
+Remote-host approvals belong to each project. An approved host is saved to `.erfana/settings.json`. See [HTML preview](html-preview.md#remote-host-permission).
 
 ## Comments
 

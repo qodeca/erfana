@@ -23,7 +23,7 @@ User controls, defaults and project options are in the [settings reference](./us
 
 ## Storage
 
-Settings persist to `~/.erfana/settings.json` via GlobalSettingsService. The file is read once, in `initialize()` at app start, and cached; every `setSetting` validates the whole cached object and writes it back in full, so a hand edit made while Erfana runs is overwritten by the next save. There is no file watcher on it.
+Settings persist to `~/.erfana/settings.json` via GlobalSettingsService. The file is read once, in `initialize()` at app start, and cached; every `setSetting` validates the whole cached object and writes it back in full, so a hand edit made while Erfana runs is overwritten by the next save.
 
 **Parse strictness.** A global file that is not valid JSON, or that fails `GlobalSettingsSchema`, is treated as corrupt: it is copied to `settings.json.bak` and **every** setting is reset to its default. A project's `.erfana/settings.json` is read by `ProjectSettingsService` on every project open, and any failure there blocks the project from opening. Four blocks are therefore parsed leniently so that a mistake in them can do neither:
 

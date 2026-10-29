@@ -30,7 +30,7 @@ Project documents stay in the folder you open. Erfana also keeps app settings an
 
 ## Logs
 
-**What it does:** Erfana writes logs under `~/.erfana/logs/` and keeps them for seven days, with at most five older files per log. Start-up problems and crashes are also written to `crash.log` in the same folder, with file paths and user names removed. Logs record terminal output only by its size, not its text. **How to reach it:** **Settings > Logging > Open** opens the logs folder. The log level defaults to **Info**.
+**What it does:** Erfana writes logs under `~/.erfana/logs/` and keeps them for seven days, with at most five older files per log. Start-up problems and crashes are also written to `crash.log` in the same folder, with file paths and user names removed. Logs never record the text of terminal output. **How to reach it:** **Settings > Logging > Open** opens the logs folder. The log level defaults to **Info**.
 
 **Log files:** `combined.log` holds every entry. `main.log` holds only the app's main process and `renderer.log` only the window. Older files are renamed `main.1.log`, `main.2.log` and so on, newest first.
 

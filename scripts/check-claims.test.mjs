@@ -295,6 +295,20 @@ describe('checkLedger', () => {
   })
 })
 
+describe('checkLedger – reviewed pages', () => {
+  it('accepts a reviewed page with a kind and a note, and flags a bad or missing one', () => {
+    plant(ledgerWith([]))
+    write({ 'docs/future/plan.md': '# Plan\n' })
+    const good = { ...ledgerWith([]), reviewed: { 'docs/future/plan.md': { kind: 'proposal', note: 'unshipped graph engine' } } }
+    expect(checkLedger(good, { root }).findings).toEqual([])
+    const bad = { ...ledgerWith([]), reviewed: { 'docs/future/plan.md': { kind: 'vibes' }, 'docs/gone.md': { kind: 'index', note: 'x' } } }
+    expect(checkLedger(bad, { root }).findings.map((f) => f.message)).toEqual([
+      'reviewed page needs a kind (proposal, index, record) and a note',
+      'reviewed page: docs/gone.md does not exist'
+    ])
+  })
+})
+
 describe('run', () => {
   it('exits 0 with the counts when nothing drifted', () => {
     plant(ledgerWith([OPEN_FOLDER]))

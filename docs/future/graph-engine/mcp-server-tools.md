@@ -1,5 +1,7 @@
 # MCP server – overview and tools
 
+> **Status:** proposal, not shipped – no graph-engine code exists in `src/` on `develop`, and spec 004 (graph foundation) is still `draft` in `specs/registry.json`.
+
 > This is part 1 of the MCP server documentation, split for readability.
 >
 > **Other parts:**

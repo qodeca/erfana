@@ -13,7 +13,7 @@ Prompt templates send the selected text, with instructions, to the CLI agent run
 1. Right-click selected text in preview or editor
 2. Choose action: **Explain**, **Modify**, **Ask**, **Visualize**, or custom template
 3. Prompt sent to Terminal panel
-4. The prompt runs immediately: every shipped template sets `autoExecute: true`, so Erfana pastes it into the terminal and presses Enter
+4. The prompt runs immediately: the preview context-menu templates all set `autoExecute: true`, so Erfana pastes it into the terminal and presses Enter
 
 Templates split into two categories: **read-only** prompts (Explain, Ask, Prompt) produce a terminal response and leave the document untouched, and **mutation** prompts (Modify, Visualize, the three Mermaid templates) edit the file in place via the CLI agent's Edit tool — see [Mutation prompts and the apply-to-document footer](#mutation-prompts-and-the-apply-to-document-footer) (v0.10.0).
 

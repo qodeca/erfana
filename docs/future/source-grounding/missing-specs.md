@@ -1,5 +1,7 @@
 # Source grounding – missing specs and recommendations
 
+> **Status:** research proposal, not shipped – none of the search, embedding, MCP or verification features named here exist in `src/`; "the current system" below means the draft graph-engine specs, not the app.
+
 > Part of [Source grounding research](README.md)
 > Related: [Gap analysis](gap-analysis.md) | [Implementation roadmap](implementation-roadmap.md)
 

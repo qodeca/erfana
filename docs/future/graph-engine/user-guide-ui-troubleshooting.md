@@ -1,5 +1,7 @@
 # User guide – UI, Claude Code, and troubleshooting
 
+> **Status:** proposal, not shipped – no graph-engine code exists in `src/` on `develop`, and spec 004 (graph foundation) is still `draft` in `specs/registry.json`.
+
 > This is part 2 of the user guide, split for readability.
 >
 > **Other parts:**

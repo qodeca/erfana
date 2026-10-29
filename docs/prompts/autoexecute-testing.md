@@ -13,7 +13,7 @@
 
 ### Test File: `useTerminalStore.autoExecute.test.ts`
 
-**17 tests** covering core autoExecute functionality, error handling, bracketed paste, timing and recent-input marking. The store is built with `createTerminalStore(mockTerminalOps)`, and the 200ms delay is driven with fake timers.
+The tests cover core autoExecute functionality, error handling, bracketed paste, timing and recent-input marking. The store is built with `createTerminalStore(mockTerminalOps)`, and the 200ms delay is driven with fake timers.
 
 ### Test Categories
 

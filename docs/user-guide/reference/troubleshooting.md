@@ -28,7 +28,7 @@ Erfana shows a recovery screen or a local panel message when a part of the inter
 
 ## A folder cannot be opened as a project
 
-**What it does:** Erfana refuses a folder that would put too much of the computer inside the project, and says why in plain words. **How to reach it:** It appears when you open a folder from the dialog, the recent list or by dropping it. The top of a drive or volume (such as `/` or `C:\`), the top of a network share, system folders (on Windows the Windows, Program Files and ProgramData folders) and folders such as `.ssh` or `.aws` are refused, and so is a link (a symlink or junction) that leads to one. A folder inside a network share still opens. Open the subfolder that holds your work instead.
+**What it does:** Erfana refuses a folder that would put too much of the computer inside the project, and says why in plain words. **How to reach it:** It appears when you open a folder from the dialog or the recent list. The top of a drive or volume (such as `/` or `C:\`), the top of a network share, system folders (on Windows the Windows, Program Files and ProgramData folders) and folders such as `.ssh` or `.aws` are refused, and so is a link (a symlink or junction) that leads to one. A folder inside a network share still opens. Open the subfolder that holds your work instead.
 
 ## Project tree unavailable
 

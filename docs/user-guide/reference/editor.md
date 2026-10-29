@@ -24,7 +24,7 @@ Erfana uses a Monaco text editor with Markdown formatting, a separate Find bar, 
 
 ## View modes and scroll sync
 
-**What they do:** **Editor Only**, **Split Horizontal**, **Split Vertical** and **Preview Only** change the panes. Both split views keep editor and preview scrolling together. **How to reach them:** the Markdown toolbar; the view modes have no dedicated shortcut.
+**What they do:** **Editor Only**, **Split Horizontal**, **Split Vertical** and **Preview Only** change the panes. Both split views keep editor and preview scrolling together. **How to reach them:** the Markdown toolbar.
 
 ## Formatting toolbar
 

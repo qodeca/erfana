@@ -19,7 +19,7 @@ The Erfana client (`src/main/services/whisper-assets.ts`) pins a specific `whisp
 
 ## Retention policy
 
-**Never delete** a `whisper-build-*` release if any shipped Erfana app version pins it. GitHub's release UI makes deletion one-click; the `protect-whisper-build-tags` tag ruleset blocks deleting or force-moving the `whisper-build-*` tag itself. Each release body carries a "Do not delete" retention note, but it does not list which Erfana versions pin the release – `RELEASE_TAG` in `whisper-assets.ts` is the record of the current pin.
+**Never delete** a `whisper-build-*` release if any shipped Erfana app version pins it. GitHub's release UI makes deletion one-click. Each release body carries a "Do not delete" retention note, but it does not list which Erfana versions pin the release – `RELEASE_TAG` in `whisper-assets.ts` is the record of the current pin.
 
 Support window: keep releases reachable for **3 months** past the last shipped Erfana app version that pinned them.
 
@@ -34,7 +34,7 @@ Requires an active [Apple Developer Program](https://developer.apple.com/program
 1. Enroll / confirm active.
 2. In "Certificates, Identifiers & Profiles" → create a **Developer ID Application** certificate. Download the .cer, add to Keychain Access, then export the combined cert + private key as a `.p12` file (with a strong password).
 3. Generate an App-Specific password at https://appleid.apple.com → Sign-In & Security → App-Specific Passwords → label it "Erfana notarytool CI".
-4. Add GitHub repository secrets (Settings → Secrets and variables → Actions → New repository secret). The `production-signing` environment holds no secrets of its own; it only gates the jobs that read them:
+4. Add GitHub repository secrets (Settings → Secrets and variables → Actions → New repository secret). They cannot be environment secrets, because `release.yml` reads the same names from jobs with no environment; the `production-signing` environment only gates the jobs that read them:
    - `MAC_CERT_P12_BASE64` — base64 of the .p12 file: `base64 -w0 DeveloperID.p12` (macOS: `base64 -i DeveloperID.p12 | tr -d '\n'`)
    - `MAC_CERT_PASSWORD` — the .p12 export password
    - `APPLE_ID` — your Apple ID email
@@ -84,9 +84,9 @@ Then:
 
 ### 4. GitHub Environment: `production-signing`
 
-Environment exists (created 2026-06-17). The `whisper-binaries.yml` workflow references it via `environment: production-signing` on the `build-macos`, `build-windows` and `publish-release` jobs. The environment itself holds no secrets: the signing / notarization / manifest secrets are repository secrets, so the environment's job is the approval gate below, not scoping.
+The `whisper-binaries.yml` workflow references it via `environment: production-signing` on the `build-macos`, `build-windows` and `publish-release` jobs. The signing / notarization / manifest secrets cannot be environment secrets – `release.yml` reads the same names from jobs with no environment – so the environment's job is the approval gate below, not scoping.
 
-**Required-reviewer gate**: **live**. The environment carries a `required_reviewers` protection rule with `marcinobel` as the sole reviewer (`prevent_self_review: false`). Every whisper build therefore waits for an explicit approval in the Actions UI before any job that reads a signing secret starts.
+**Required-reviewer gate**: **live**. The environment carries a required-reviewer protection rule, set in repo settings rather than in the workflow; the verify call below names the reviewers. Every whisper build therefore waits for an explicit approval in the Actions UI before any job that reads a signing secret starts.
 
 Verify anytime:
 
@@ -94,16 +94,11 @@ Verify anytime:
 gh api repos/qodeca/erfana/environments/production-signing --jq '.protection_rules'
 ```
 
-`can_admins_bypass` is `true`, so a repo admin can still skip the wait — the gate is an anti-mistake control, not a defence against a compromised admin account. The underlying trust boundary is unchanged: only repo admins can edit `.github/workflows/`, the same trust model as every other repo secret (e.g. `MINISIGN_KEY_PASSWORD`).
+Read `can_admins_bypass` from the same call to see whether a repo admin can skip the wait. The gate is an anti-mistake control, not a defence against a compromised admin account. The underlying trust boundary is unchanged: only repo admins can edit `.github/workflows/`, the same trust model as every other repo secret (e.g. `MINISIGN_KEY_PASSWORD`).
 
 ### 5. Tag protection on whisper-build-* tags
 
-**Enabled** via Rulesets — ruleset `protect-whisper-build-tags`, ID `17762301`, created 2026-06-16 (a sibling ruleset, `17762300`, covers the `v*.*.*` app-release tags):
-- `target: tag`, `include: refs/tags/whisper-build-*`
-- `rules: [deletion, non_fast_forward]` — prevents deletion or force-push of any `whisper-build-*` tag.
-- `enforcement: active`, `bypass_actors: []` (no bypass; even admins must delete via a ruleset edit).
-
-Verify anytime via `gh api repos/qodeca/erfana/rulesets/17762301`.
+Tag protection is a repository ruleset in GitHub settings, not in this repo, so read its live state instead of a copy here: `gh api repos/qodeca/erfana/rulesets` lists the rulesets. The one that targets `refs/tags/whisper-build-*` is meant to block deletion and force-push (`deletion`, `non_fast_forward`).
 
 ## Triggering a build
 

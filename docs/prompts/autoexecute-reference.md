@@ -166,7 +166,7 @@ The per-version modified-files tables (v0.3.3 and v0.3.4) are archived in [AutoE
 - `src/renderer/src/prompts/registry.ts` - Prompt template registration (auto-discovers `templates/*.md`)
 
 **Test Suite**:
-- `src/renderer/src/stores/useTerminalStore.autoExecute.test.ts` - 17 tests
+- `src/renderer/src/stores/useTerminalStore.autoExecute.test.ts` - Unit tests for autoExecute
 
 ---
 

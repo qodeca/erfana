@@ -482,7 +482,7 @@ Opens when clicking image files (PNG, JPG, GIF, WebP, SVG, BMP, ICO) in the proj
 - `imageViewer.logic.ts` - Pure functions for zoom, pan, keyboard actions
 - `imageViewerStatus.logic.ts` - Status precedence, clock formatting, all copy constants — including the export copy deck (tooltips, accessible names, busy names, announcements, toast titles)
 - `imageExportToast.logic.ts` - Pure `formatExportToast` plus the qualifier builders (#73). It composes, it does not author: every qualifier — which GIF frame, which ICO size, the SVG's 2x factor — is built from the structured `selection` the main process reported *after* the export, never from a guess about the file, so the toast cannot claim something the export did not do. A cancelled export produces no toast and no announcement at all. Basenames are middle-truncated, because `.toast-message` has a max width and no `overflow-wrap`
-- `ImageViewerPanel.module.css` - The one remaining CSS module in the app
+- `ImageViewerPanel.module.css` - The panel's styles, as a CSS module
 - `imageUtils.ts` (in `utils/`) - Image format detection, MIME types
 - Watch subscription comes from `src/renderer/src/hooks/useFileChangeSubscription.ts` — see [File Watching](./file-watching/README.md#single-file-watch-internals-70)
 

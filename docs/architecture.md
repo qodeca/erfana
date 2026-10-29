@@ -122,14 +122,14 @@ src/
 │   │   ├── file/                # imageRead, readDocumentImage, findByName (bounded name search), restoreParentDirectory
 │   │   ├── imageExport/         # ImageExportService, ImageRasterizeWindow, rasterizeSession, exportSinks,
 │   │   │                        #   exportPaths, imageMetadata, declaredDimensions, pdfGeometry
-│   │   ├── preview/             # HTML preview engine (80 modules, counted 2026-10-28): PreviewViewService, PreviewViewRegistry,
+│   │   ├── preview/             # HTML preview engine: PreviewViewService, PreviewViewRegistry,
 │   │   │                        #   PreviewLiveView, PreviewSessionFactory, PreviewProtocolHandler, previewCsp,
 │   │   │                        #   PreviewAllowlistStore, PreviewWatchCoordinator, PreviewFindController,
 │   │   │                        #   previewPageNavigator, previewTabHistory, previewLinkDisposition,
 │   │   │                        #   previewFrameGuard, previewResizeHold, previewHostFocus (#124),
 │   │   │                        #   PreviewLinkScanWorkerAdapter + previewLinkScanWorker/Core/Protocol (link scan
 │   │   │                        #   off the main thread, v0.23.0), previewLiveComments, …
-│   │   │   └── comments/        # HTML Preview comments (37 modules, v0.23.0): PreviewCommentService (per-view façade),
+│   │   │   └── comments/        # HTML Preview comments (v0.23.0): PreviewCommentService (per-view façade),
 │   │   │                        #   CommentWriter + commentFileLock + commentFileAccess (the one write path),
 │   │   │                        #   CommentParseWorkerAdapter + commentParseWorker + commentFileJobs (parse off main),
 │   │   │                        #   commentInstrumentation + ElementTokenTable (served copy), commentKeyStore, …
@@ -145,7 +145,7 @@ src/
 │   │   └── import/              # ImportService, ConverterRegistry, DependencyDetector, ImportToolStatusService,
 │   │                            #   conversionToolGuard (LibreOffice lookup, #250), extensions,
 │   │                            #   converters/ (LiteParseConverter, Audio/VideoConverter, TextConverter – IConverter)
-│   ├── interfaces/              # 9 service interfaces (DIP seams)
+│   ├── interfaces/              # service interfaces (DIP seams)
 │   │   ├── IFileService.ts, IFileWatcherService.ts, IDirectoryWatcherService.ts
 │   │   ├── IGitStatusWorker.ts, IGitWatcherService.ts, IGitPollingService.ts
 │   │   └── IProjectLockService.ts, IProjectSettingsService.ts, ISettingsService.ts
@@ -401,7 +401,7 @@ The v0.3.7 refactoring split `ProjectTree.tsx` using Strategy + Command + Factor
 
 **Architecture Components**:
 - **Custom Hooks**: useProjectManagement (project lifecycle), useFileOperations (CRUD), useDirectoryWatcher (monitoring)
-- **Context Menu**: 13 command classes, node-type strategies, factory selection
+- **Context Menu**: command classes, node-type strategies, factory selection
 - **Helper Functions**: switchHelpers (terminal activity tracking), withWatcherPause (race prevention), constants
 - **Pure Logic**: functions extracted to `.logic.ts` files for fast, deterministic testing
 

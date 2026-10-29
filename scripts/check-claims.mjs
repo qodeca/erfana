@@ -20,7 +20,9 @@
  * - an `app` entry names an e2e test that does not exist.
  *
  * Entries with status "removed" record a claim taken off a page; they are kept
- * as history and not checked.
+ * as history and not checked. The `reviewed` map names pages that were read and
+ * hold no current-state claim (a proposal, an index, a dated record), each with
+ * a kind and a note; a listed page that no longer exists is a finding.
  *
  * Paths come from the ledger, which is contributor-controlled: a path that is
  * absolute, uses a backslash or resolves outside the repository is reported
@@ -36,6 +38,8 @@ export const LEDGER = 'docs/user-guide/claims.json'
 export const STATUSES = ['verified', 'fixed', 'removed']
 export const EVIDENCE = ['source', 'app']
 export const DIATAXIS = ['tutorial', 'how-to', 'reference', 'explanation', 'index']
+/** Why a reviewed page has no claim entries: a plan for unshipped work, a link index, or a dated record. */
+export const REVIEWED_KINDS = ['proposal', 'index', 'record']
 export const MAX_FILE_BYTES = 4 * 1024 * 1024
 
 /** Split "src/a.ts:12" into its path and 1-based line, or null when malformed. */
@@ -137,6 +141,14 @@ export function checkLedger(ledger, { root, fsApi = nodeFs }) {
     }
     const lines = readLines(root, page, fsApi, cache)
     if (typeof lines === 'string') findings.push({ id: page, message: `listed page: ${lines}` })
+  }
+
+  for (const [page, info] of Object.entries(ledger.reviewed ?? {})) {
+    if (!info || !REVIEWED_KINDS.includes(info.kind) || typeof info.note !== 'string' || info.note === '') {
+      findings.push({ id: page, message: `reviewed page needs a kind (${REVIEWED_KINDS.join(', ')}) and a note` })
+    }
+    const lines = readLines(root, page, fsApi, cache)
+    if (typeof lines === 'string') findings.push({ id: page, message: `reviewed page: ${lines}` })
   }
 
   ledger.claims.forEach((entry, index) => {

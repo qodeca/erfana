@@ -191,12 +191,12 @@
       "id": "docs-architecture.md/07",
       "audience": "developer",
       "doc": "docs/architecture.md",
-      "quote": "├── interfaces/              # 9 service interfaces (DIP seams)",
-      "status": "verified",
-      "evidence": "app",
-      "source": "src/main/interfaces/ISettingsService.ts:1",
-      "match": "SPDX-License-Identifier",
-      "note": "Count or behaviour not proven by one line; checked by listing the files/entries"
+      "quote": "# service interfaces (DIP seams)",
+      "status": "fixed",
+      "evidence": "source",
+      "source": "src/main/interfaces/ISettingsService.ts:7",
+      "match": "export interface ISettingsService",
+      "note": "Said \"9 service interfaces\"; a count no single line pins, so the number was dropped (src/main/interfaces/ holds 9 files today)."
     },
     {
       "id": "docs-architecture.md/08",
@@ -212,23 +212,23 @@
       "id": "docs-architecture.md/09",
       "audience": "developer",
       "doc": "docs/architecture.md",
-      "quote": "HTML preview engine (80 modules, counted 2026-10-28)",
-      "status": "verified",
-      "evidence": "app",
-      "source": "src/main/services/preview/PreviewViewService.ts:1",
-      "match": "SPDX-License-Identifier",
-      "note": "Count or behaviour not proven by one line; checked by listing the files/entries"
+      "quote": "# HTML preview engine: PreviewViewService",
+      "status": "fixed",
+      "evidence": "source",
+      "source": "src/main/services/preview/PreviewViewService.ts:58",
+      "match": "export class PreviewViewService",
+      "note": "Said \"80 modules, counted 2026-10-28\"; a file count no single line pins, so it was dropped (80 non-test files outside comments/ today)."
     },
     {
       "id": "docs-architecture.md/10",
       "audience": "developer",
       "doc": "docs/architecture.md",
-      "quote": "# HTML Preview comments (37 modules, v0.23.0)",
-      "status": "verified",
-      "evidence": "app",
-      "source": "src/main/services/preview/comments/PreviewCommentService.ts:1",
-      "match": "SPDX-License-Identifier",
-      "note": "Count or behaviour not proven by one line; checked by listing the files/entries"
+      "quote": "# HTML Preview comments (v0.23.0): PreviewCommentService",
+      "status": "fixed",
+      "evidence": "source",
+      "source": "src/main/services/preview/comments/PreviewCommentService.ts:99",
+      "match": "export class PreviewCommentService",
+      "note": "Said \"37 modules\"; a file count no single line pins, so it was dropped (37 non-test files today)."
     },
     {
       "id": "docs-architecture.md/11",
@@ -389,10 +389,10 @@
       "doc": "docs/architecture.md",
       "quote": "`useProjectManagement.noAutoLoad.test.ts` pins that",
       "status": "verified",
-      "evidence": "app",
-      "source": "src/renderer/src/hooks/useProjectManagement.ts:183",
-      "match": "reopen the last project on mount (#60)",
-      "note": "Count or behaviour not proven by one line; checked by listing the files/entries"
+      "evidence": "source",
+      "source": "src/renderer/src/hooks/useProjectManagement.noAutoLoad.test.ts:77",
+      "match": "it('opens no project on mount'",
+      "note": "The named test exists and asserts no project opens on mount."
     },
     {
       "id": "docs-architecture.md/27",
@@ -472,12 +472,12 @@
       "id": "docs-architecture.md/34",
       "audience": "developer",
       "doc": "docs/architecture.md",
-      "quote": "**Context Menu**: 13 command classes",
-      "status": "verified",
-      "evidence": "app",
-      "source": "src/renderer/src/components/ProjectTree/context-menu/commands.tsx:452",
-      "match": "export class RevealInFileManagerCommand",
-      "note": "Count or behaviour not proven by one line; checked by listing the files/entries"
+      "quote": "**Context Menu**: command classes, node-type strategies, factory selection",
+      "status": "fixed",
+      "evidence": "source",
+      "source": "src/renderer/src/components/ProjectTree/context-menu/commands.tsx:52",
+      "match": "export class CutCommand extends CommandBase",
+      "note": "Said \"13 command classes\"; a count no single line pins, so the number was dropped (13 today)."
     },
     {
       "id": "docs-architecture.md/35",
@@ -803,12 +803,12 @@
       "id": "docs-ipc-patterns.md/27",
       "audience": "developer",
       "doc": "docs/ipc-patterns.md",
-      "quote": "The 12 control channels (`checkEligibility`, `open`, `close`, `reload`,",
-      "status": "verified",
-      "evidence": "app",
-      "source": "src/shared/ipc/preview-channels.ts:1",
-      "match": "SPDX-License-Identifier",
-      "note": "Count or behaviour not proven by one line; checked by listing the files/entries"
+      "quote": "The control channels (`checkEligibility`, `open`, `close`, `reload`,",
+      "status": "fixed",
+      "evidence": "source",
+      "source": "src/shared/ipc/preview-channels.ts:20",
+      "match": "export const PreviewChannels = {",
+      "note": "Said \"The 12 control channels\"; the count is not pinned by any line or test, so it was dropped – the sentence still lists all twelve."
     },
     {
       "id": "docs-ipc-patterns.md/28",
@@ -816,10 +816,10 @@
       "doc": "docs/ipc-patterns.md",
       "quote": "`navigate` and `focusPage` (#124) run the sender gate before the payload is read",
       "status": "verified",
-      "evidence": "app",
-      "source": "src/shared/ipc/preview-channels.ts:1",
-      "match": "SPDX-License-Identifier",
-      "note": "Count or behaviour not proven by one line; checked by listing the files/entries"
+      "evidence": "source",
+      "source": "src/main/ipc/preview/navigation-handlers.test.ts:116",
+      "match": "it('rejects an untrusted sender before reading the payload'",
+      "note": "Unit test pins the gate-before-parse order for navigate; focus-handlers.ts checks isTrustedSender before safeParse the same way."
     },
     {
       "id": "docs-ipc-patterns.md/29",
@@ -4854,11 +4854,12 @@
       "id": "docs-ui-components/108",
       "audience": "developer",
       "doc": "docs/ui-components.md",
-      "quote": "- `ImageViewerPanel.module.css` - The one remaining CSS module in the app",
-      "status": "verified",
-      "evidence": "app",
-      "source": "src/renderer/src/components/Panels/ImageViewerPanel/ImageViewerPanel.module.css:117",
-      "match": "user-select: text;"
+      "quote": "- `ImageViewerPanel.module.css` - The panel's styles, as a CSS module",
+      "status": "fixed",
+      "evidence": "source",
+      "source": "src/renderer/src/components/Panels/ImageViewerPanel/ImageViewerPanel.tsx:59",
+      "match": "import styles from './ImageViewerPanel.module.css'",
+      "note": "Said \"The one remaining CSS module in the app\" – an absence claim no line proves; reworded to what the import shows."
     },
     {
       "id": "docs-ui-components/109",
@@ -4916,9 +4917,10 @@
       "doc": "docs/ui-components.md",
       "quote": "`LanguageSelect.tsx` – Dropdown with 30 languages plus an auto-detect option (31 entries total)",
       "status": "verified",
-      "evidence": "app",
-      "source": "src/renderer/src/components/Transcription/LanguageSelect.tsx:30",
-      "match": "{ value: 'auto', label: 'Auto-detect' },"
+      "evidence": "source",
+      "source": "src/renderer/src/components/Transcription/LanguageSelect.test.tsx:47",
+      "match": "expect(select.options).toHaveLength(31)",
+      "note": "Unit test pins 31 options (30 languages plus auto-detect)."
     },
     {
       "id": "docs-ui-components/115",
@@ -4956,9 +4958,10 @@
       "doc": "docs/ui-components.md",
       "quote": "`OcrLanguageSelect.tsx` – Dropdown with 31 Tesseract ISO 639-3 languages",
       "status": "verified",
-      "evidence": "app",
-      "source": "src/renderer/src/components/DocumentImport/OcrLanguageSelect.tsx:30",
-      "match": "export const OCR_LANGUAGE_OPTIONS: OcrLanguageOption[] = ["
+      "evidence": "source",
+      "source": "src/renderer/src/components/DocumentImport/OcrLanguageSelect.test.tsx:30",
+      "match": "expect(select.options).toHaveLength(31)",
+      "note": "Unit test pins 31 OCR language options."
     },
     {
       "id": "docs-ui-components/119",
@@ -5409,11 +5412,13 @@
       "id": "docs-design-system-README/40",
       "audience": "developer",
       "doc": "docs/design-system/README.md",
-      "quote": "No renderer stylesheet declares `::selection`",
-      "status": "verified",
+      "quote": "No Erfana stylesheet declares `::selection`",
+      "status": "fixed",
       "evidence": "app",
-      "source": "src/renderer/src/styles/utilities.css:26",
-      "match": "Two surfaces"
+      "source": "src/renderer/src/components/Panels/TerminalPanel.tsx:56",
+      "match": "import '@xterm/xterm/css/xterm.css'",
+      "test": "e2e/guide-tasks/claims-dev-0.guide.ts",
+      "note": "Said \"No renderer stylesheet declares ::selection\"; the running renderer does load one – xterm.css hides selected text in its screen-reader tree. The guide test walks every loaded stylesheet and finds only that xterm rule."
     },
     {
       "id": "docs-design-system-README/41",
@@ -5659,12 +5664,12 @@
       "id": "docs-adrs-0001-self-host-whisper-binaries/08",
       "audience": "developer",
       "doc": "docs/adrs/0001-self-host-whisper-binaries.md",
-      "quote": "`.github/workflows/whisper-binaries.yml` — the 4-job workflow",
-      "status": "verified",
-      "evidence": "app",
+      "quote": "`.github/workflows/whisper-binaries.yml` – the workflow that builds and publishes the binaries",
+      "status": "fixed",
+      "evidence": "source",
       "source": ".github/workflows/whisper-binaries.yml:447",
       "match": "  publish-release:",
-      "note": "Four jobs: validate-inputs, build-macos, build-windows, publish-release; this line is the fourth."
+      "note": "Said \"the 4-job workflow\" (a job count no single line pins, and an em dash); reworded to the workflow's role."
     },
     {
       "id": "docs-adrs-0001-self-host-whisper-binaries/09",
@@ -5714,10 +5719,10 @@
       "doc": "docs/adrs/0002-minisign-over-cosign-sigstore.md",
       "quote": "`verifyManifest.ts` is about 260 lines;",
       "status": "fixed",
-      "evidence": "app",
-      "source": "src/main/utils/verifyManifest.ts:147",
-      "match": "'no-trusted-pubkey',",
-      "note": "Was ~170 lines; the file is now 258 lines."
+      "evidence": "source",
+      "source": "src/main/utils/verifyManifest.ts:257",
+      "match": "return diff === 0",
+      "note": "Was ~170 lines; the file is now 258 lines – its final statement sits at the line this source names."
     },
     {
       "id": "docs-adrs-0002-minisign-over-cosign-sigstore/04",
@@ -6219,10 +6224,10 @@
       "doc": "docs/features/README.md",
       "quote": "language selection (31 languages)",
       "status": "verified",
-      "evidence": "app",
-      "source": "src/renderer/src/components/DocumentImport/OcrLanguageSelect.tsx:31",
-      "match": "{ value: 'eng', label: 'English' },",
-      "note": "31 language entries in the list; this is the first."
+      "evidence": "source",
+      "source": "src/renderer/src/components/DocumentImport/OcrLanguageSelect.test.tsx:30",
+      "match": "expect(select.options).toHaveLength(31)",
+      "note": "Unit test pins the 31 OCR languages offered in the import dialog."
     },
     {
       "id": "docs-features-README/15",
@@ -6582,12 +6587,12 @@
       "id": "docs-prompts-README/01",
       "audience": "developer",
       "doc": "docs/prompts/README.md",
-      "quote": "every shipped template sets `autoExecute: true`",
-      "status": "verified",
-      "evidence": "app",
+      "quote": "the preview context-menu templates all set `autoExecute: true`",
+      "status": "fixed",
+      "evidence": "source",
       "source": "src/renderer/src/prompts/existing-commands.test.ts:271",
       "match": "it('should have autoExecute=true for all prompts",
-      "note": "All 14 files in templates/ set autoExecute: true (checked by reading each); the test covers the preview context menu."
+      "note": "Said \"every shipped template\"; true today (all 14 files set it) but only the preview context-menu set is pinned by a test, so the sentence now says that."
     },
     {
       "id": "docs-prompts-README/02",
@@ -6595,10 +6600,10 @@
       "doc": "docs/prompts/README.md",
       "quote": "├── templates/       # Template markdown files (14 templates)",
       "status": "verified",
-      "evidence": "app",
-      "source": "src/renderer/src/prompts/registry.ts:18",
-      "match": "import.meta.glob<string>('./templates/*.md'",
-      "note": "14 .md files in templates/, loaded by this glob."
+      "evidence": "source",
+      "source": "src/renderer/src/prompts/registry.test.ts:16",
+      "match": "it('should load all 14 templates",
+      "note": "Unit test asserts the registry loads exactly 14 templates."
     },
     {
       "id": "docs-prompts-README/03",
@@ -6636,10 +6641,10 @@
       "doc": "docs/prompts/README.md",
       "quote": "- `ask.md` and `editor-ask.md`: \"Think about the question...\"",
       "status": "verified",
-      "evidence": "app",
-      "source": "src/renderer/src/prompts/registry.ts:18",
-      "match": "import.meta.glob<string>('./templates/*.md'",
-      "note": "Text is in templates/ask.md:24 and editor-ask.md:26, bundled through this glob."
+      "evidence": "source",
+      "source": "src/renderer/src/prompts/templates/ask.md:24",
+      "match": "Think about the question, then answer:",
+      "note": "Shipped template text; editor-ask.md:26 carries the same line."
     },
     {
       "id": "docs-prompts-README/07",
@@ -6647,10 +6652,10 @@
       "doc": "docs/prompts/README.md",
       "quote": "- `visualize.md` and `editor-visualize.md`: \"Think hard about how to best represent...\"",
       "status": "verified",
-      "evidence": "app",
-      "source": "src/renderer/src/prompts/registry.ts:18",
-      "match": "import.meta.glob<string>('./templates/*.md'",
-      "note": "Text is in templates/visualize.md:75 and editor-visualize.md:76, bundled through this glob."
+      "evidence": "source",
+      "source": "src/renderer/src/prompts/templates/visualize.md:75",
+      "match": "Think hard about how to best represent this content visually",
+      "note": "Shipped template text; editor-visualize.md:76 carries the same line."
     },
     {
       "id": "docs-prompts-README/08",
@@ -6865,12 +6870,12 @@
       "id": "docs-prompts-template-syntax/14",
       "audience": "developer",
       "doc": "docs/prompts/template-syntax.md",
-      "quote": "Only the 28 names in `src/renderer/src/utils/iconRegistry.tsx` render their own icon",
+      "quote": "Only the names in `src/renderer/src/utils/iconRegistry.tsx` render their own icon",
       "status": "fixed",
-      "evidence": "app",
-      "source": "src/renderer/src/utils/iconRegistry.tsx:105",
-      "match": "const ICON_REGISTRY: Record<IconName, ComponentType<LucideProps>> = {",
-      "note": "Said 16 names; the registry now has 28. List updated."
+      "evidence": "source",
+      "source": "src/renderer/src/utils/iconRegistry.tsx:139",
+      "match": "const FALLBACK_ICON = Sparkles",
+      "note": "Said 16, then 28 names; a count no single line pins, so the number was dropped – the page lists the names and this line is the sparkles fallback."
     },
     {
       "id": "docs-prompts-template-syntax/15",
@@ -7010,12 +7015,12 @@
       "id": "docs-prompts-autoexecute-testing/01",
       "audience": "developer",
       "doc": "docs/prompts/autoexecute-testing.md",
-      "quote": "**17 tests** covering core autoExecute functionality",
+      "quote": "The tests cover core autoExecute functionality",
       "status": "fixed",
-      "evidence": "app",
-      "source": "src/renderer/src/stores/useTerminalStore.autoExecute.test.ts:328",
-      "match": "it('does not mark input when the write fails'",
-      "note": "Said 15 tests; the file has 17 (two recent-input tests added)."
+      "evidence": "source",
+      "source": "src/renderer/src/stores/useTerminalStore.autoExecute.test.ts:29",
+      "match": "describe('useTerminalStore.sendToTerminal with autoExecute'",
+      "note": "Said 15, then 17 tests; a test count drifts and no line pins it, so it was dropped."
     },
     {
       "id": "docs-prompts-autoexecute-testing/02",
@@ -7094,12 +7099,12 @@
       "id": "docs-prompts-autoexecute-reference/03",
       "audience": "developer",
       "doc": "docs/prompts/autoexecute-reference.md",
-      "quote": "`src/renderer/src/stores/useTerminalStore.autoExecute.test.ts` - 17 tests",
+      "quote": "`src/renderer/src/stores/useTerminalStore.autoExecute.test.ts` - Unit tests for autoExecute",
       "status": "fixed",
-      "evidence": "app",
-      "source": "src/renderer/src/stores/useTerminalStore.autoExecute.test.ts:328",
-      "match": "it('does not mark input when the write fails'",
-      "note": "Said 15 tests; the file has 17."
+      "evidence": "source",
+      "source": "src/renderer/src/stores/useTerminalStore.autoExecute.test.ts:29",
+      "match": "describe('useTerminalStore.sendToTerminal with autoExecute'",
+      "note": "Said 15, then 17 tests; a test count drifts and no line pins it, so it was dropped."
     },
     {
       "id": "docs-prompts-autoexecute-reference/04",
@@ -7147,10 +7152,10 @@
       "doc": "docs/prompts/examples.md",
       "quote": "inputLabel: How should this be modified?",
       "status": "verified",
-      "evidence": "app",
-      "source": "src/renderer/src/prompts/registry.ts:18",
-      "match": "import.meta.glob<string>('./templates/*.md'",
-      "note": "Compared byte for byte with templates/explain.md, modify.md and mermaid-bug-report.md, which this glob bundles."
+      "evidence": "source",
+      "source": "src/renderer/src/prompts/templates/modify.md:9",
+      "match": "inputLabel: How should this be modified?",
+      "note": "Shipped modify template frontmatter."
     },
     {
       "id": "docs-prompts-examples/02",
@@ -7259,9 +7264,10 @@
       "doc": "docs/designs/comments/README.md",
       "quote": "Banners inside the window (`.erf-banner`) with the spoken severity word – which the shipped `CommentBanner` still lacks",
       "status": "verified",
-      "evidence": "app",
+      "evidence": "source",
       "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/CommentParts.tsx:77",
-      "match": "renderIcon('alert-triangle', { size: 16, 'aria-hidden': true })"
+      "match": "renderIcon('alert-triangle', { size: 16, 'aria-hidden': true })",
+      "note": "The banner renders only its icon, hidden from assistive tech, before the text – no spoken severity word."
     },
     {
       "id": "designs-comments-README/02",
@@ -9461,10 +9467,10 @@
       "doc": "docs/future/graph-engine/implementation-guide/m3-graph.md",
       "quote": "**File:** `src/main/services/EntityExtractor.ts`",
       "status": "verified",
-      "evidence": "app",
-      "source": "src/main/index.ts:76",
-      "match": "app.whenReady()",
-      "note": "Proposed file; confirmed absent from src/ (find src -name EntityExtractor*), consistent with the page status line"
+      "evidence": "source",
+      "source": "specs/registry.json:54",
+      "match": "\"status\": \"draft\"",
+      "note": "A proposed path in a proposal page; spec 006 (milestone M3) is still a draft in the registry."
     },
     {
       "id": "docs-future-graph-engine-implementation-guide-m4-temporal/01",
@@ -9472,10 +9478,10 @@
       "doc": "docs/future/graph-engine/implementation-guide/m4-temporal.md",
       "quote": "> **Status:** proposal, not shipped – none of the graph-engine files named on this page",
       "status": "fixed",
-      "evidence": "app",
-      "source": "src/main/index.ts:76",
-      "match": "app.whenReady()",
-      "note": "Page had no status line; EdgeService.ts, TimelineSlider.tsx, MCPServerService.ts are absent from src/"
+      "evidence": "source",
+      "source": "specs/registry.json:75",
+      "match": "\"status\": \"draft\"",
+      "note": "Page had no status line; spec 007 (milestone M4) is still a draft in the registry, so nothing on the page has shipped."
     },
     {
       "id": "docs-future-graph-engine-implementation-guide-m5-advanced/01",
@@ -9483,10 +9489,10 @@
       "doc": "docs/future/graph-engine/implementation-guide/m5-advanced.md",
       "quote": "> **Status:** proposal, not shipped – none of the graph-engine files named on this page",
       "status": "fixed",
-      "evidence": "app",
-      "source": "src/main/index.ts:76",
-      "match": "app.whenReady()",
-      "note": "Page had no status line; ReindexService.ts, HealthCheckService.ts, graph-handlers.ts are absent from src/"
+      "evidence": "source",
+      "source": "specs/registry.json:96",
+      "match": "\"status\": \"draft\"",
+      "note": "Page had no status line; spec 008 (milestone M5) is still a draft in the registry, so nothing on the page has shipped."
     },
     {
       "id": "docs-future-graph-engine-mcp-server-implementation/01",
@@ -9598,10 +9604,10 @@
       "doc": "docs/future/graph-engine/user-guide-features.md",
       "quote": "It adds no built-in AI – it feeds the CLI agent you run in Erfana's terminal.",
       "status": "fixed",
-      "evidence": "app",
-      "source": "src/main/index.ts:76",
-      "match": "app.whenReady()",
-      "note": "Said the engine provides \"AI-powered search\"; Erfana has no built-in AI, the engine is proposed local search for the hosted CLI agent"
+      "evidence": "source",
+      "source": "specs/registry.json:14",
+      "match": "BM25 keyword search",
+      "note": "Said the engine provides \"AI-powered search\"; Erfana has no built-in AI – the draft spec 004 describes keyword search served to the agent over MCP."
     },
     {
       "id": "docs-future-graph-engine-user-guide-features/02",
@@ -9609,10 +9615,10 @@
       "doc": "docs/future/graph-engine/user-guide-features.md",
       "quote": "the CLI agent in Erfana's terminal gets structured project knowledge through the MCP server",
       "status": "fixed",
-      "evidence": "app",
-      "source": "src/main/index.ts:76",
-      "match": "app.whenReady()",
-      "note": "Said \"AI-powered research assistance built into your IDE\" – an overclaim of built-in AI"
+      "evidence": "source",
+      "source": "specs/registry.json:14",
+      "match": "MCP server with `erfana_graph_search` tool for Claude Code integration",
+      "note": "Said \"AI-powered research assistance built into your IDE\" – an overclaim of built-in AI; draft spec 004 feeds the agent through an MCP server."
     },
     {
       "id": "docs-future-source-grounding-strategy/01",
@@ -9756,10 +9762,10 @@
       "doc": "docs/future/source-grounding/technical-reference.md",
       "quote": "| Vector DB | SQLite + sqlite-vec (planned in Graph Engine M2, not in erfana today) |",
       "status": "fixed",
-      "evidence": "app",
-      "source": "package.json:58",
-      "match": "\"dependencies\": {",
-      "note": "Said \"erfana native\"; no sqlite/sqlite-vec dependency in package.json"
+      "evidence": "source",
+      "source": "specs/registry.json:33",
+      "match": "\"status\": \"draft\"",
+      "note": "Said \"erfana native\"; sqlite-vec belongs to spec 005 (milestone M2), still a draft in the registry, and package.json has no sqlite dependency."
     },
     {
       "id": "docs-future-source-grounding-technical-reference/02",
@@ -9767,10 +9773,10 @@
       "doc": "docs/future/source-grounding/technical-reference.md",
       "quote": "| Full-text search | SQLite FTS5 (planned in Graph Engine M1, not in erfana today) |",
       "status": "fixed",
-      "evidence": "app",
-      "source": "package.json:58",
-      "match": "\"dependencies\": {",
-      "note": "Said \"erfana native\"; no SQLite dependency in package.json"
+      "evidence": "source",
+      "source": "specs/registry.json:14",
+      "match": "SQLite database layer (FTS5, WAL mode)",
+      "note": "Said \"erfana native\"; no SQLite dependency in package.json The plan (spec 004, milestone M1, FTS5) is proven by the registry line; the absence half is unchanged from the earlier fix."
     },
     {
       "id": "docs-future-source-grounding-technical-reference/03",
@@ -13167,9 +13173,9 @@
       "doc": "docs/development-tasks.md",
       "quote": "`PanelErrorBoundary` lives in `src/renderer/src/components/Panels/PanelErrorBoundary.tsx`",
       "status": "verified",
-      "evidence": "app",
-      "source": "src/renderer/src/components/Panels/ProjectPanel.tsx:124",
-      "match": "<PanelErrorBoundary key={projectPath ?? 'none'} componentName=\"Project tree\">"
+      "evidence": "source",
+      "source": "src/renderer/src/components/Panels/PanelErrorBoundary.tsx:115",
+      "match": "export class PanelErrorBoundary"
     },
     {
       "id": "development-tasks/11",
@@ -13713,7 +13719,8 @@
       "status": "verified",
       "evidence": "app",
       "source": "playwright.config.ts:68",
-      "match": "testMatch: '**/*.e2e.ts',"
+      "match": "testMatch: '**/*.e2e.ts',",
+      "test": "e2e/guide-tasks/claims-dev-1.guide.ts"
     },
     {
       "id": "testing-README/19",
@@ -13813,7 +13820,8 @@
       "status": "verified",
       "evidence": "app",
       "source": "e2e/visual-regression.e2e.ts:72",
-      "match": "function assertBaselineExists(screenshotName: string, testInfo: import('@playwright/test').TestInfo): void {"
+      "match": "function assertBaselineExists(screenshotName: string, testInfo: import('@playwright/test').TestInfo): void {",
+      "test": "e2e/guide-tasks/claims-dev-1.guide.ts"
     },
     {
       "id": "testing-README/29",
@@ -18785,7 +18793,8 @@
       "evidence": "app",
       "source": "src/main/services/FileService.moveItem.test.ts:9",
       "match": "describe(",
-      "note": "Count was 20; vitest reports 18."
+      "note": "Count was 20; vitest reports 18.",
+      "test": "e2e/guide-tasks/claims-dev-1.guide.ts"
     },
     {
       "id": "docs-drag-drop-testing/02",
@@ -18796,7 +18805,8 @@
       "evidence": "app",
       "source": "src/main/services/FileService.copyItem.test.ts:9",
       "match": "describe(",
-      "note": "Count was 13; vitest reports 11."
+      "note": "Count was 13; vitest reports 11.",
+      "test": "e2e/guide-tasks/claims-dev-1.guide.ts"
     },
     {
       "id": "docs-drag-drop-testing/03",
@@ -18807,7 +18817,8 @@
       "evidence": "app",
       "source": "src/renderer/src/components/ProjectTree/ProjectTree.lookup.test.tsx:273",
       "match": "describe(",
-      "note": "Count was 13; vitest reports 15."
+      "note": "Count was 13; vitest reports 15.",
+      "test": "e2e/guide-tasks/claims-dev-1.guide.ts"
     },
     {
       "id": "docs-drag-drop-testing/04",
@@ -18817,7 +18828,8 @@
       "status": "verified",
       "evidence": "app",
       "source": "src/renderer/src/hooks/useDragDropTree.test.ts:101",
-      "match": "describe("
+      "match": "describe(",
+      "test": "e2e/guide-tasks/claims-dev-1.guide.ts"
     },
     {
       "id": "docs-drag-drop-testing/05",
@@ -18827,7 +18839,8 @@
       "status": "verified",
       "evidence": "app",
       "source": "src/renderer/src/stores/useClipboardStore.test.ts:33",
-      "match": "describe("
+      "match": "describe(",
+      "test": "e2e/guide-tasks/claims-dev-1.guide.ts"
     },
     {
       "id": "docs-drag-drop-testing/06",
@@ -19456,7 +19469,8 @@
       "status": "verified",
       "evidence": "app",
       "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1697",
-      "match": "<DragOverlay dropAnimation={null}>"
+      "match": "<DragOverlay dropAnimation={null}>",
+      "test": "e2e/guide-tasks/claims-dev-1.guide.ts"
     },
     {
       "id": "docs-file-watching-README/01",
@@ -19654,9 +19668,9 @@
       "doc": "docs/file-watching/README.md",
       "quote": "`native-recursive` on `win32` and `darwin`, `chokidar` on Linux",
       "status": "verified",
-      "evidence": "app",
-      "source": "src/main/services/watcher/directoryWatchBackend.ts:61",
-      "match": "export function selectDirectoryWatchBackend"
+      "evidence": "source",
+      "source": "src/main/services/watcher/directoryWatchBackend.ts:77",
+      "match": "return platform === 'win32' || platform === 'darwin' ? 'native-recursive' : 'chokidar'"
     },
     {
       "id": "docs-file-watching-README/21",
@@ -19898,7 +19912,8 @@
       "status": "verified",
       "evidence": "app",
       "source": "src/main/services/DirectoryWatcherService.pipeline.test.ts:424",
-      "match": "describe('#210 catch-up after a pause', () => {"
+      "match": "describe('#210 catch-up after a pause', () => {",
+      "test": "e2e/guide-tasks/claims-dev-1.guide.ts"
     },
     {
       "id": "docs-file-watching-README/45",
@@ -20172,7 +20187,8 @@
       "evidence": "app",
       "source": "src/renderer/src/hooks/useProjectManagement.refreshSingleFlight.test.ts:168",
       "match": "describe(",
-      "note": "Count was 19; vitest reports 21."
+      "note": "Count was 19; vitest reports 21.",
+      "test": "e2e/guide-tasks/claims-dev-1.guide.ts"
     },
     {
       "id": "docs-file-watching-patterns-and-testing/17",
@@ -20183,7 +20199,8 @@
       "evidence": "app",
       "source": "src/main/services/DirectoryWatcherService.health.test.ts:60",
       "match": "describe(",
-      "note": "Count was 3; vitest reports 6."
+      "note": "Count was 3; vitest reports 6.",
+      "test": "e2e/guide-tasks/claims-dev-1.guide.ts"
     },
     {
       "id": "docs-file-watching-patterns-and-testing/18",
@@ -20194,7 +20211,8 @@
       "evidence": "app",
       "source": "src/main/services/watcher/PauseEpisode.test.ts:15",
       "match": "describe(",
-      "note": "Count was 10; vitest reports 27."
+      "note": "Count was 10; vitest reports 27.",
+      "test": "e2e/guide-tasks/claims-dev-1.guide.ts"
     },
     {
       "id": "docs-file-watching-patterns-and-testing/19",
@@ -20205,7 +20223,8 @@
       "evidence": "app",
       "source": "src/main/ipc/file-handlers.test.ts:532",
       "match": "#210 watcher catch-up hooks",
-      "note": "Count was 18; vitest reports 20 in that describe block."
+      "note": "Count was 18; vitest reports 20 in that describe block.",
+      "test": "e2e/guide-tasks/claims-dev-1.guide.ts"
     },
     {
       "id": "docs-file-watching-patterns-and-testing/20",
@@ -20215,7 +20234,8 @@
       "status": "verified",
       "evidence": "app",
       "source": "src/shared/coalescingRunner.test.ts:70",
-      "match": "describe("
+      "match": "describe(",
+      "test": "e2e/guide-tasks/claims-dev-1.guide.ts"
     },
     {
       "id": "docs-file-watching-patterns-and-testing/21",
@@ -20225,7 +20245,8 @@
       "status": "verified",
       "evidence": "app",
       "source": "src/main/services/FileService.readDirectory.singleFlight.test.ts:141",
-      "match": "describe("
+      "match": "describe(",
+      "test": "e2e/guide-tasks/claims-dev-1.guide.ts"
     },
     {
       "id": "docs-file-watching-patterns-and-testing/22",
@@ -20245,7 +20266,8 @@
       "status": "verified",
       "evidence": "app",
       "source": "src/main/services/watcher/NativeRecursiveWatcher.win32.test.ts:200",
-      "match": "describe.runIf("
+      "match": "describe.runIf(",
+      "test": "e2e/guide-tasks/claims-dev-1.guide.ts"
     },
     {
       "id": "docs-file-watching-patterns-and-testing/24",
@@ -20619,7 +20641,8 @@
       "status": "verified",
       "evidence": "app",
       "source": "src/renderer/src/components/ProjectTree/context-menu/commands.tsx:452",
-      "match": "export class RevealInFileManagerCommand"
+      "match": "export class RevealInFileManagerCommand",
+      "test": "e2e/guide-tasks/claims-dev-1.guide.ts"
     },
     {
       "id": "docs-project-panel/33",
@@ -20973,9 +20996,9 @@
       "doc": "docs/known-issues.md",
       "quote": "and Cmd/Ctrl+Alt+R forces a manual refresh",
       "status": "verified",
-      "evidence": "app",
+      "evidence": "source",
       "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:1341",
-      "match": "e.altKey && e.key.toLowerCase() === 'r'"
+      "match": "(e.metaKey || e.ctrlKey) && e.altKey && e.key.toLowerCase() === 'r'"
     },
     {
       "id": "docs-known-issues/19",
@@ -21521,7 +21544,8 @@
       "status": "verified",
       "evidence": "app",
       "source": "scripts/fuses.js:2326",
-      "match": "module.exports"
+      "match": "module.exports",
+      "test": "e2e/guide-tasks/claims-dev-1.guide.ts"
     },
     {
       "id": "docs-technical-debt/15",
@@ -21856,7 +21880,8 @@
       "evidence": "app",
       "source": "src/main/services/preview/previewLiveVisibility.ts:1",
       "match": "SPDX-License-Identifier",
-      "note": "Sizes were stated as current; re-measured with wc -l"
+      "note": "Sizes were stated as current; re-measured with wc -l",
+      "test": "e2e/guide-tasks/claims-dev-1.guide.ts"
     },
     {
       "id": "docs-technical-debt/48",
@@ -24367,7 +24392,8 @@
       "evidence": "app",
       "source": "package-lock.json:7407",
       "match": "\"version\": \"44.9.3\"",
-      "note": "Ledger cited package-lock.json:7399 (an ejs entry); the electron 44.9.3 lock entry is line 7407. Node.js 24.22.0 confirmed by running the installed Electron with ELECTRON_RUN_AS_NODE=1 (prints 24.22.0 44.9.3). Page text was right."
+      "test": "e2e/guide-tasks/claims-user-0.guide.ts",
+      "note": "Ledger cited package-lock.json:7399 (an ejs entry); the electron 44.9.3 lock entry is line 7407. Proven in the real app: process.versions in the main process reports node 24.22.0 and electron 44.9.3. Page text was right."
     },
     {
       "id": "getting-started/03",
@@ -25113,10 +25139,10 @@
       "doc": "docs/keyboard-shortcuts.md",
       "quote": "`optimizer.watchWindowShortcuts` from `@electron-toolkit/utils`, attached to every window in `src/main/index.ts`",
       "status": "verified",
-      "evidence": "app",
+      "evidence": "source",
       "source": "src/main/index.ts:451",
       "match": "optimizer.watchWindowShortcuts(window)",
-      "note": "F12-in-dev and Cmd/Ctrl+R block in packaged builds come from the helper's implementation in node_modules/@electron-toolkit/utils, not src. Observed while checking: the same helper, called without options, also swallows Cmd/Ctrl+Minus and Cmd/Ctrl+Shift+Equal on the app window in every build (its zoom option defaults to false); not stated on this page."
+      "note": "The call sits inside app.on('browser-window-created') (line 450), so every window gets it. Observed while checking: the same helper, called without options, also swallows Cmd/Ctrl+Minus and Cmd/Ctrl+Shift+Equal on the app window in every build (its zoom option defaults to false); not stated on this page."
     },
     {
       "id": "keyboard-shortcuts/48",
@@ -25319,7 +25345,8 @@
       "evidence": "app",
       "source": "src/main/index.ts:448",
       "match": "ignore CommandOrControl + R in production",
-      "note": "Behaviour lives in @electron-toolkit/utils optimizer.watchWindowShortcuts (not in src); src/main/index.ts:448 is the call-site comment. No e2e test exercises it."
+      "test": "e2e/guide-tasks/claims-user-0.guide.ts",
+      "note": "Behaviour lives in @electron-toolkit/utils (not in src). Real-app test: unpackaged, F12 toggles DevTools (helper attached); then the test flips the loaded helper's is.dev (= !app.isPackaged) to false and sends native key input – F12 is not prevented and DevTools stays closed, Cmd/Ctrl+R is prevented and the page does not reload. The packaged branch is reached by that flip, not by a packaged build."
     },
     {
       "id": "keyboard-shortcuts/68",
@@ -25380,7 +25407,8 @@
       "evidence": "app",
       "source": "src/renderer/src/components/Dialog/CameraDialog.tsx:317",
       "match": "Cancel button — was swallowed into a capture.",
-      "note": "BaseDialog has no Enter handler, so Enter reaches the focused control natively; the cited line is the CameraDialog guard that stopped stealing Enter from a focused Cancel."
+      "test": "e2e/guide-tasks/claims-user-0.guide.ts",
+      "note": "Real-app test: in the New file dialog with a name typed, focusing Cancel and pressing Enter closes the dialog and creates no file."
     },
     {
       "id": "quick-reference/01",
@@ -26219,7 +26247,8 @@
       "evidence": "app",
       "source": "src/renderer/src/components/ProjectTree/treeKeyboard.ts:45",
       "match": "export function resolveTreeKey(",
-      "note": "Git status: src/main/services/GitStatusService.ts:35; drop: ProjectTree.tsx:1496."
+      "test": "e2e/guide-tasks/claims-user-0.guide.ts",
+      "note": "Real-app test in a git repo: an edit made outside the app shows the Modified badge without a refresh; arrows, End and Enter move through the tree and open a file; dragging a file onto a folder moves it on disk."
     },
     {
       "id": "readme/15",
@@ -26230,7 +26259,8 @@
       "evidence": "app",
       "source": "src/main/services/import/converters/LiteParseConverter.ts:157",
       "match": "const ocrEnabled = this.options.ocr !== false",
-      "note": "50+: TEXT_EXTENSIONS alone lists 39 (extensions.ts:15-59), plus PDF, Office, image, audio and video converters."
+      "test": "e2e/guide-tasks/claims-user-0.guide.ts",
+      "note": "Real-app test: Import a file opens the picker with an All Importable Files filter of 50+ distinct extensions (on this machine, with the tools present; formats whose tool is missing are left out); importing a scanned PDF with no text layer yields its recognised text, using the bundled resources/tessdata."
     },
     {
       "id": "readme/16",
@@ -26385,7 +26415,8 @@
       "evidence": "app",
       "source": "src/main/services/TerminalService.ts:355",
       "match": "/^CLAUDECODE$/,",
-      "note": "The terminal spawns the user's shell; Erfana never launches claude itself."
+      "test": "e2e/guide-tasks/run-an-agent.guide.ts",
+      "note": "The guide task types `claude` at the shell prompt in the integrated terminal and the real Claude Code CLI starts and edits a file; Erfana never launches claude itself."
     },
     {
       "id": "readme/31",
@@ -26394,8 +26425,10 @@
       "quote": "Erfana hosts the agent; it has no AI of its own.",
       "status": "verified",
       "evidence": "app",
-      "source": "src/renderer/src/prompts/applyFooter.ts:7",
-      "match": "composed onto the rendered prompt so the CLI coding agent edits the file"
+      "source": "src/main/services/TerminalService.ts:531",
+      "match": "const ptyProcess = pty.spawn(shell, shellArgs, {",
+      "test": "e2e/guide-tasks/run-an-agent.guide.ts",
+      "note": "Product rule (CLAUDE.md: Erfana hosts the agent, never claim built-in AI). Shown in the real app by run-an-agent.guide.ts: the agent is a separate CLI the user starts in the terminal."
     },
     {
       "id": "readme/32",
@@ -26857,11 +26890,9 @@
       "audience": "user",
       "doc": "docs/settings.md",
       "quote": "There is no file watcher on it.",
-      "status": "verified",
+      "status": "removed",
       "evidence": "app",
-      "source": "src/main/services/GlobalSettingsService.ts:228",
-      "match": "const content = await readFile(this.settingsPath, 'utf-8')",
-      "note": "Absence claim: the file is read only in loadSettings, called from initialize()."
+      "note": "Absence claim that cannot be proven from one source line or a deterministic test. Removed; the preceding sentences (read once at start, cached, a hand edit is overwritten by the next save) already state the behaviour."
     },
     {
       "id": "settings/32",
@@ -28570,7 +28601,8 @@
       "evidence": "app",
       "source": "src/renderer/src/components/Editor/MonacoMarkdownEditor.tsx:553",
       "match": "<Editor",
-      "note": "Monaco defaults; Erfana does not rebind F1."
+      "note": "Monaco defaults; Erfana does not rebind F1. Real-app test: F1 palette runs Delete Line, Cmd+D and Alt+click give two cursors.",
+      "test": "e2e/guide-tasks/claims-user-1.guide.ts"
     },
     {
       "id": "user-guide-feature-inventory/51",
@@ -29867,7 +29899,8 @@
       "evidence": "app",
       "source": "src/renderer/src/components/Editor/MonacoMarkdownEditor.tsx:553",
       "match": "<Editor",
-      "note": "Monaco default keybindings; Erfana only rebinds B, I, K, F, G and the clipboard keys."
+      "note": "Monaco default keybindings; Erfana only rebinds B, I, K, F, G and the clipboard keys. Real-app test drives F1, Cmd+/, Alt+Up/Down, Cmd+D and Alt+click.",
+      "test": "e2e/guide-tasks/claims-user-1.guide.ts"
     },
     {
       "id": "user-guide-feature-inventory/177",
@@ -29990,7 +30023,8 @@
       "evidence": "app",
       "source": "src/main/menu.ts:148",
       "match": "{ role: 'minimize' },",
-      "note": "Electron role defaults and OS keys."
+      "note": "Electron role defaults and OS keys. Real-app test reads the app menu: minimize, hide, quit and togglefullscreen roles carry the OS-default accelerators (macOS run; Windows keys unverified on this host).",
+      "test": "e2e/guide-tasks/claims-user-1.guide.ts"
     },
     {
       "id": "user-guide-feature-inventory/189",
@@ -30205,7 +30239,9 @@
       "status": "verified",
       "evidence": "app",
       "source": "src/renderer/src/hooks/useDragDropTree.ts:283",
-      "match": "Validate if a move operation is allowed"
+      "match": "Validate if a move operation is allowed",
+      "test": "e2e/tree-keyboard.e2e.ts",
+      "note": "Existing test drags notes.md onto docs/ by pointer and asserts it moved on disk and in the tree."
     },
     {
       "id": "user-guide-feature-inventory/210",
@@ -30247,7 +30283,8 @@
       "evidence": "app",
       "source": "src/main/services/workers/git-status.worker.ts:292",
       "match": "'status', '--porcelain=v1'",
-      "note": "git status runs over the whole repository; the worker applies no files.exclude filter."
+      "note": "git status runs over the whole repository; the worker applies no files.exclude filter. Real-app test: excluded scratch/ is absent from the tree while the git status bar shows U1.",
+      "test": "e2e/guide-tasks/claims-user-1.guide.ts"
     },
     {
       "id": "user-guide-feature-inventory/214",
@@ -30349,7 +30386,9 @@
       "status": "verified",
       "evidence": "app",
       "source": "src/main/services/TerminalService.ts:498",
-      "match": "exec -l \"$SHELL\" -i"
+      "match": "exec -l \"$SHELL\" -i",
+      "test": "e2e/guide-tasks/claims-user-1.guide.ts",
+      "note": "Real-app test: ps in the terminal reports the login shell named by SHELL, and an interactive stand-in CLI program reads input and writes a file. The real Claude Code run is in e2e/guide-tasks/run-an-agent.guide.ts."
     },
     {
       "id": "user-guide-feature-inventory/224",
@@ -30409,7 +30448,9 @@
       "status": "verified",
       "evidence": "app",
       "source": "src/renderer/src/components/Panels/ImageViewerPanel/hooks/useImageViewerTransform.ts:415",
-      "match": "onEscapeRef.current()"
+      "match": "onEscapeRef.current()",
+      "test": "e2e/guide-tasks/claims-user-1.guide.ts",
+      "note": "Real-app test: every viewer key (f, F, +, =, -, 0, arrows, Esc, Home) leaves the full-screen dialog closed; Enter full screen opens it and Esc closes it."
     },
     {
       "id": "user-guide-feature-inventory/230",
@@ -31141,7 +31182,8 @@
       "evidence": "app",
       "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/hooks/useExportHandlers.ts:201",
       "match": "message: `Saved as ${savedFileName}`",
-      "note": "Success path only shows a toast; PdfService and DocxService contain no shell.openPath or showItemInFolder call."
+      "note": "Success path only shows a toast. Real-app test stubs shell.openPath, openExternal and showItemInFolder, exports PDF and Word, and asserts none was called and no window opened.",
+      "test": "e2e/guide-tasks/claims-user-1.guide.ts"
     },
     {
       "id": "user-guide-how-to-export-to-pdf-or-word/13",
@@ -31149,10 +31191,10 @@
       "doc": "docs/user-guide/how-to/export-to-pdf-or-word.md",
       "quote": "Windows uses the same controls but a different save dialog.",
       "status": "verified",
-      "evidence": "app",
+      "evidence": "source",
       "source": "src/main/services/PdfService.ts:778",
       "match": "dialog.showSaveDialog",
-      "note": "The save dialog is Electron's native OS dialog, so its look follows the platform."
+      "note": "Export calls Electron dialog.showSaveDialog, the native OS save dialog, so its look follows the platform; the toolbar controls are not platform-specific."
     },
     {
       "id": "user-guide-how-to-export-to-pdf-or-word/14",
@@ -31852,7 +31894,8 @@
       "status": "verified",
       "evidence": "app",
       "source": "src/renderer/src/components/ProjectTree/ProjectTree.tsx:778",
-      "match": "fileGateway.moveItem({ sourcePath, targetParentPath: targetParent })"
+      "match": "fileGateway.moveItem({ sourcePath, targetParentPath: targetParent })",
+      "test": "e2e/tree-keyboard.e2e.ts"
     },
     {
       "id": "user-guide-how-to-organise-project-files/15",
@@ -33594,7 +33637,8 @@
       "status": "verified",
       "evidence": "app",
       "source": "src/renderer/src/components/RootErrorBoundary/RootErrorFallback.tsx:77",
-      "match": "LABEL_RESTART = 'Restart Erfana'"
+      "match": "LABEL_RESTART = 'Restart Erfana'",
+      "test": "e2e/root-error-boundary.e2e.ts"
     },
     {
       "id": "user-guide-how-to-work-in-several-windows/15",
@@ -33899,10 +33943,10 @@
       "doc": "docs/user-guide/maintaining-this-guide.md",
       "quote": "regenerates all 52 guide images plus the four README demo outputs",
       "status": "verified",
-      "evidence": "app",
-      "source": "scripts/capture/shots.json:53",
-      "match": "\"file\": \"docs/user-guide/images/",
-      "note": "Manifest rows 2-53 are the 52 docs/user-guide images; rows 54-57 are the four docs/assets/readme demo outputs (counted with node). Line 53 is the last docs/user-guide/images row (crash-screen)."
+      "evidence": "source",
+      "source": "scripts/capture/manifest.test.mjs:76",
+      "match": ".length).toBe(52)",
+      "note": "The manifest test pins 52 docs/user-guide/images rows in shots.json; the next line allows the four readme-demo rows (shots.json has exactly 4 docs/assets/readme rows)."
     },
     {
       "id": "user-guide-maintaining-this-guide/07",
@@ -34630,12 +34674,13 @@
       "id": "user-guide-reference-editor/26",
       "audience": "user",
       "doc": "docs/user-guide/reference/editor.md",
-      "quote": "the Markdown toolbar; the view modes have no dedicated shortcut",
-      "status": "verified",
+      "quote": "**How to reach them:** the Markdown toolbar.",
+      "status": "fixed",
       "evidence": "app",
       "source": "src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.tsx:292",
       "match": "onClick={() => onViewModeChange('editor')}",
-      "note": "View modes are set only by toolbar buttons; no keyboard or menu binding for viewMode found in src/main or src/renderer hooks."
+      "note": "Removed the unprovable absence claim (no dedicated shortcut); kept the toolbar route, which markdown-toolbar.e2e.ts View modes tests exercise by clicking each mode button.",
+      "test": "e2e/markdown-toolbar.e2e.ts"
     },
     {
       "id": "user-guide-reference-editor/27",
@@ -35054,7 +35099,8 @@
       "evidence": "app",
       "source": "src/main/services/ProjectLockService.ts:149",
       "match": "const focused = await focusWindow(mainWindow)",
-      "note": "Reworded for clarity only."
+      "note": "Reworded for clarity only.",
+      "test": "e2e/guide-tasks/claims-user-2.guide.ts"
     },
     {
       "id": "user-guide-reference-files-erfana-keeps/18",
@@ -35121,12 +35167,13 @@
       "id": "user-guide-reference-files-erfana-keeps/24",
       "audience": "user",
       "doc": "docs/user-guide/reference/files-erfana-keeps.md",
-      "quote": "Logs record terminal output only by its size, not its text.",
-      "status": "verified",
+      "quote": "Logs never record the text of terminal output.",
+      "status": "fixed",
       "evidence": "app",
       "source": "src/main/services/TerminalService.ts:730",
       "match": "length=${data.length}",
-      "note": "Kept the terminal-output part, reworded."
+      "note": "In the real app at Trace level no terminal-output size line was written (steady-state output is not logged at all), so the size half was dropped; the test proves the output text never reaches the log files.",
+      "test": "e2e/guide-tasks/claims-user-2.guide.ts"
     },
     {
       "id": "user-guide-reference-files-erfana-keeps/25",
@@ -36413,7 +36460,8 @@
       "status": "verified",
       "evidence": "app",
       "source": "src/renderer/src/utils/panelUtils.ts:138",
-      "match": "panelManager.setActivePanel(panel, location)"
+      "match": "panelManager.setActivePanel(panel, location)",
+      "test": "e2e/guide-tasks/claims-user-2.guide.ts"
     },
     {
       "id": "user-guide-reference-import-and-transcription/48",
@@ -36424,7 +36472,8 @@
       "evidence": "app",
       "source": "src/renderer/src/utils/panelUtils.ts:158",
       "match": "terminalManager.sendToTerminal(content, autoExecute)",
-      "note": "Ledger repair: the text is typed into the active terminal with Enter (autoExecute), whatever is running there."
+      "note": "Ledger repair: the text is typed into the active terminal with Enter (autoExecute), whatever is running there.",
+      "test": "e2e/guide-tasks/claims-user-2.guide.ts"
     },
     {
       "id": "user-guide-reference-import-and-transcription/49",
@@ -36586,7 +36635,8 @@
       "evidence": "app",
       "source": "src/main/menu.ts:148",
       "match": "{ role: 'minimize' }",
-      "note": "Electron role defaults: minimize Cmd/Ctrl+M, hide only in the macOS app menu, quit is File > Exit on Windows (no accelerator)."
+      "note": "Electron role defaults: minimize Cmd/Ctrl+M, hide only in the macOS app menu, quit is File > Exit on Windows (no accelerator).",
+      "test": "e2e/guide-tasks/claims-user-2.guide.ts"
     },
     {
       "id": "user-guide-reference-keyboard-shortcuts/10",
@@ -36597,7 +36647,8 @@
       "evidence": "app",
       "source": "src/main/menu.ts:111",
       "match": "{ role: 'quit' as const }",
-      "note": "Windows File menu carries the quit role, which Electron labels Exit."
+      "note": "Test reads the installed menu: Window > Minimize has CommandOrControl+M on every system; its win32 branch asserts no hide role and the quit role labelled Exit under File. Run here on macOS, so only the macOS branch executed; the Windows column is proven when the guide project runs on Windows.",
+      "test": "e2e/guide-tasks/claims-user-3.guide.ts"
     },
     {
       "id": "user-guide-reference-keyboard-shortcuts/11",
@@ -36608,7 +36659,8 @@
       "evidence": "app",
       "source": "src/main/menu.ts:141",
       "match": "{ role: 'togglefullscreen' }",
-      "note": "Electron role default: Ctrl+Cmd+F on macOS, F11 elsewhere; Alt+F4 is the Windows system close."
+      "note": "Test reads the installed menu: on macOS no close role (no Cmd+W, so the window close control) and Toggle Full Screen = Control+Command+F (executed here); its win32 branch asserts F11. Alt+F4 is the Windows system close, not asserted.",
+      "test": "e2e/guide-tasks/claims-user-3.guide.ts"
     },
     {
       "id": "user-guide-reference-keyboard-shortcuts/12",
@@ -36887,7 +36939,8 @@
       "evidence": "app",
       "source": "src/renderer/src/components/Editor/MonacoMarkdownEditor.tsx:224",
       "match": "editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyB, () => {",
-      "note": "Page said which handler wins was unverified. Monaco stops propagation of a handled key (node_modules/monaco-editor standaloneServices.js keyEvent.stopPropagation), so the window-level sidebar listener in AppDockLayout never sees Cmd/Ctrl+B from the editor."
+      "note": "Real-app test: Cmd/Ctrl+B with the editor focused wraps the selection in ** and the Project sidebar stays; with the tree focused the same keys hide and show the sidebar.",
+      "test": "e2e/guide-tasks/claims-user-3.guide.ts"
     },
     {
       "id": "user-guide-reference-keyboard-shortcuts/39",
@@ -37896,11 +37949,9 @@
       "audience": "user",
       "doc": "docs/user-guide/reference/menus.md",
       "quote": "Reloading can discard unsaved in-memory edits.",
-      "status": "verified",
+      "status": "removed",
       "evidence": "app",
-      "source": "src/main/menu.ts:133",
-      "match": "{ role: 'reload' },",
-      "note": "No beforeunload / will-prevent-unload guard exists in src, so a reload is not intercepted."
+      "note": "Not shown by the real app: with a project open, View > Reload (menu role clicked on the main window, did-finish-load fired) left the unsaved edit in the editor and autosave then wrote it to disk. Sentence removed."
     },
     {
       "id": "user-guide-reference-menus/17",
@@ -39493,11 +39544,13 @@
       "id": "user-guide-reference-settings/37",
       "audience": "user",
       "doc": "docs/user-guide/reference/settings.md",
-      "quote": "An approved host is saved to `.erfana/settings.json`; the app currently has no remove-approval control.",
-      "status": "verified",
+      "quote": "An approved host is saved to `.erfana/settings.json`.",
+      "status": "fixed",
       "evidence": "app",
       "source": "src/main/services/preview/PreviewAllowlistStore.ts:74",
-      "match": "approveOrigin(origin: string): Promise<readonly string[]>"
+      "match": "approveOrigin(origin: string): Promise<readonly string[]>",
+      "test": "e2e/html-preview-approval.e2e.ts",
+      "note": "Dropped the unprovable absence clause \"the app currently has no remove-approval control\". html-preview-approval.e2e.ts approves an origin in the real app and reads it back from .erfana/settings.json."
     },
     {
       "id": "user-guide-reference-settings/38",
@@ -39909,7 +39962,8 @@
       "status": "verified",
       "evidence": "app",
       "source": "src/main/services/workers/git-status.worker.ts:292",
-      "match": "'status', '--porcelain=v1', '--branch', '-z', '--no-renames', '-uall'"
+      "match": "'status', '--porcelain=v1', '--branch', '-z', '--no-renames', '-uall'",
+      "test": "e2e/guide-tasks/claims-user-3.guide.ts"
     },
     {
       "id": "user-guide-reference-settings/79",
@@ -39919,7 +39973,9 @@
       "status": "verified",
       "evidence": "app",
       "source": "src/main/services/FileWatcherService.ts:200",
-      "match": "return createSingleFileWatcher(filePath, {"
+      "match": "return createSingleFileWatcher(filePath, {",
+      "test": "e2e/guide-tasks/claims-user-3.guide.ts",
+      "note": "Real-app test: scratch/ excluded, scratch/note.md opened from a Markdown preview link, rewritten on disk, the tab shows the new text."
     },
     {
       "id": "user-guide-reference-settings/80",
@@ -39927,9 +39983,10 @@
       "doc": "docs/user-guide/reference/settings.md",
       "quote": "Path entries such as `.local/test-tmp` are not affected.",
       "status": "verified",
-      "evidence": "app",
-      "source": "src/main/utils/projectPathFilter.ts:136",
-      "match": "return capSplitList(this.excludeMatcher.pathEntries, MAX_SPLIT_PATHS, this.caseSensitive).list"
+      "evidence": "source",
+      "source": "src/main/services/watcher/directoryWatchBuilders.ts:75",
+      "match": "const pathEntries = filter.splitPaths().map(intoWatch).filter(isPresent)",
+      "note": "Every path entry goes into the native watcher split plan when the watch starts, whether or not the folder exists yet, so the late-matching limit applies only to pattern entries."
     },
     {
       "id": "user-guide-reference-settings/81",
@@ -41507,12 +41564,13 @@
       "id": "user-guide-reference-troubleshooting/52",
       "audience": "user",
       "doc": "docs/user-guide/reference/troubleshooting.md",
-      "quote": "It appears when you open a folder from the dialog, the recent list or by dropping it.",
-      "status": "verified",
+      "quote": "It appears when you open a folder from the dialog or the recent list.",
+      "status": "fixed",
       "evidence": "app",
       "source": "src/main/services/ProjectService.ts:411",
       "match": "assertAcceptableProjectRoot(realRoot)",
-      "note": "All open routes go through ProjectService project switch, which runs the root check."
+      "note": "No drop-a-folder-to-open-project route exists (folder drops on the tree are ignored), so \"or by dropping it\" was removed. Real-app test: dialog with the drive root shows \"System directories cannot be opened as projects\"; a recent project replaced by a link to the drive root shows \"This directory link points to a protected location\".",
+      "test": "e2e/guide-tasks/claims-user-3.guide.ts"
     },
     {
       "id": "user-guide-reference-troubleshooting/53",
@@ -47875,7 +47933,8 @@
       "evidence": "app",
       "source": ".github/workflows/checks.yml:36",
       "match": "merge_group:",
-      "note": "GitHub state read with gh api on 2026-10-29 (the ledger cannot re-read GitHub; re-check with gh before trusting): GraphQL mergeQueue(branch:\"develop\") returns https://github.com/qodeca/erfana/queue/develop"
+      "note": "GitHub state read with gh api on 2026-10-29 (the ledger cannot re-read GitHub; re-check with gh before trusting): GraphQL mergeQueue(branch:\"develop\") returns https://github.com/qodeca/erfana/queue/develop",
+      "test": "e2e/guide-tasks/claims-dev-1.guide.ts"
     },
     {
       "id": "docs-ci/t02",
@@ -47886,7 +47945,8 @@
       "evidence": "app",
       "source": ".github/workflows/secret-scan.yml:34",
       "match": "name: Secret scan",
-      "note": "GitHub state read with gh api on 2026-10-29 (the ledger cannot re-read GitHub; re-check with gh before trusting): Secret scan is a required context on main and develop; gh workflow list shows Secret Scan active"
+      "note": "GitHub state read with gh api on 2026-10-29 (the ledger cannot re-read GitHub; re-check with gh before trusting): Secret scan is a required context on main and develop; gh workflow list shows Secret Scan active",
+      "test": "e2e/guide-tasks/claims-dev-1.guide.ts"
     },
     {
       "id": "docs-ci/t03",
@@ -47897,7 +47957,8 @@
       "evidence": "app",
       "source": ".github/workflows/e2e.yml:3",
       "match": "# DISABLED 2026-04-25",
-      "note": "GitHub state read with gh api on 2026-10-29 (the ledger cannot re-read GitHub; re-check with gh before trusting): gh workflow list --all shows E2E Tests disabled_manually"
+      "note": "GitHub state read with gh api on 2026-10-29 (the ledger cannot re-read GitHub; re-check with gh before trusting): gh workflow list --all shows E2E Tests disabled_manually",
+      "test": "e2e/guide-tasks/claims-dev-1.guide.ts"
     },
     {
       "id": "docs-ci/t04",
@@ -47908,7 +47969,8 @@
       "evidence": "app",
       "source": ".github/workflows/e2e-linux.yml:1",
       "match": "name: E2E (Linux, xvfb)",
-      "note": "GitHub state read with gh api on 2026-10-29 (the ledger cannot re-read GitHub; re-check with gh before trusting): workflow active; not in the required contexts of main or develop"
+      "note": "GitHub state read with gh api on 2026-10-29 (the ledger cannot re-read GitHub; re-check with gh before trusting): workflow active; not in the required contexts of main or develop",
+      "test": "e2e/guide-tasks/claims-dev-1.guide.ts"
     },
     {
       "id": "docs-ci/t05",
@@ -47919,7 +47981,8 @@
       "evidence": "app",
       "source": ".github/workflows/build_mac.yml:44",
       "match": "environment: production-signing",
-      "note": "GitHub state read with gh api on 2026-10-29 (the ledger cannot re-read GitHub; re-check with gh before trusting): environment production-signing has a required_reviewers rule"
+      "note": "GitHub state read with gh api on 2026-10-29 (the ledger cannot re-read GitHub; re-check with gh before trusting): environment production-signing has a required_reviewers rule",
+      "test": "e2e/guide-tasks/claims-dev-1.guide.ts"
     },
     {
       "id": "docs-ci/t06",
@@ -47927,7 +47990,7 @@
       "doc": "docs/ci.md",
       "quote": "| `lint` (Lint) |",
       "status": "verified",
-      "evidence": "app",
+      "evidence": "source",
       "source": ".github/workflows/checks.yml:49",
       "match": "name: Lint",
       "note": "GitHub state read with gh api on 2026-10-29 (the ledger cannot re-read GitHub; re-check with gh before trusting): Lint is a required context on main; main: strict, contexts Lint/Typecheck/Unit tests/Build/License compliance/Secret scan/Coverage, enforce_admins true, no review rule, force pushes and deletions off, conversation resolution off; develop: same seven, strict, enforce_admins false"
@@ -48037,10 +48100,10 @@
       "doc": "docs/ci.md",
       "quote": "**Disabled 2026-04-25** via `gh workflow disable \"E2E Tests\"`",
       "status": "verified",
-      "evidence": "app",
-      "source": ".github/workflows/e2e.yml:1",
-      "match": "name: E2E Tests",
-      "note": "GitHub state read with gh api on 2026-10-29 (the ledger cannot re-read GitHub; re-check with gh before trusting): gh workflow list --all shows E2E Tests disabled_manually"
+      "evidence": "source",
+      "source": ".github/workflows/e2e.yml:3",
+      "match": "# DISABLED 2026-04-25 via `gh workflow disable \"E2E Tests\"`.",
+      "note": "the workflow file records the dated disable; live state re-read with gh workflow list --all on 2026-10-29: E2E Tests disabled_manually"
     },
     {
       "id": "docs-ci/t17",
@@ -48103,10 +48166,10 @@
       "doc": "docs/build/release.md",
       "quote": "| `AZURE_PUBLISHER_NAME` | variable |",
       "status": "verified",
-      "evidence": "app",
+      "evidence": "source",
       "source": ".github/workflows/build_win.yml:54",
       "match": "AZURE_PUBLISHER_NAME: ${{ vars.AZURE_PUBLISHER_NAME }}",
-      "note": "GitHub state read with gh api on 2026-10-29 (the ledger cannot re-read GitHub; re-check with gh before trusting): gh variable list shows AZURE_PUBLISHER_NAME as a repo variable"
+      "note": "read through the vars context, which only resolves Actions variables, not secrets"
     },
     {
       "id": "docs-build-release/t05",
@@ -48125,10 +48188,9 @@
       "doc": "docs/build/release.md",
       "quote": "The same environment gates `whisper-binaries.yml`",
       "status": "verified",
-      "evidence": "app",
+      "evidence": "source",
       "source": ".github/workflows/whisper-binaries.yml:114",
-      "match": "environment: production-signing",
-      "note": "GitHub state read with gh api on 2026-10-29 (the ledger cannot re-read GitHub; re-check with gh before trusting): environment production-signing exists"
+      "match": "environment: production-signing"
     },
     {
       "id": "docs-build-release/t07",
@@ -48257,10 +48319,10 @@
       "doc": "docs/build/release.md",
       "quote": "The workflow is currently `disabled_manually`",
       "status": "verified",
-      "evidence": "app",
-      "source": ".github/workflows/e2e.yml:1",
-      "match": "name: E2E Tests",
-      "note": "GitHub state read with gh api on 2026-10-29 (the ledger cannot re-read GitHub; re-check with gh before trusting): gh workflow list --all: E2E Tests disabled_manually"
+      "evidence": "source",
+      "source": ".github/workflows/e2e.yml:3",
+      "match": "DISABLED 2026-04-25 via `gh workflow disable \"E2E Tests\"`",
+      "note": "Proven by the workflow file header recording the manual disable (gh workflow disable sets disabled_manually); live state was also read with gh on 2026-10-29"
     },
     {
       "id": "docs-build-release/t19",
@@ -48268,10 +48330,10 @@
       "doc": "docs/build/release.md",
       "quote": "`develop` requires a merge queue, so a PR lands by being **added to the queue**",
       "status": "verified",
-      "evidence": "app",
-      "source": ".github/workflows/checks.yml:36",
-      "match": "merge_group:",
-      "note": "GitHub state read with gh api on 2026-10-29 (the ledger cannot re-read GitHub; re-check with gh before trusting): mergeQueue(branch:\"develop\") present"
+      "evidence": "source",
+      "source": ".github/workflows/checks.yml:12",
+      "match": "merge_group: the develop merge queue (#173)",
+      "note": "checks.yml records the develop merge queue (#173) and runs on merge_group"
     },
     {
       "id": "claude/t01",
@@ -48279,32 +48341,30 @@
       "doc": "CLAUDE.md",
       "quote": "Protected (required status checks, `enforce_admins`, signed `v*.*.*` tags)",
       "status": "verified",
-      "evidence": "app",
-      "source": ".github/workflows/checks.yml:49",
-      "match": "name: Lint",
-      "note": "GitHub state read with gh api on 2026-10-29 (the ledger cannot re-read GitHub; re-check with gh before trusting): main: strict, contexts Lint/Typecheck/Unit tests/Build/License compliance/Secret scan/Coverage, enforce_admins true, no review rule, force pushes and deletions off, conversation resolution off; develop: same seven, strict, enforce_admins false; ruleset 17762300 requires signatures on v*.*.* tags"
+      "evidence": "source",
+      "source": ".github/workflows/e2e-linux.yml:6",
+      "match": "required check (Lint, Typecheck, Unit tests, Build, Coverage,",
+      "note": "GitHub-side state, read with gh api on 2026-10-29: main requires 7 checks in strict mode, enforce_admins true; the v*.*.* tag ruleset 17762300 is active. The ledger cannot re-read GitHub; source points at the workflow that defines the checks."
     },
     {
       "id": "claude/t02",
       "audience": "developer",
       "doc": "CLAUDE.md",
       "quote": "GitHub's **default branch**",
-      "status": "verified",
+      "status": "removed",
       "evidence": "app",
-      "source": ".github/workflows/checks.yml:36",
-      "match": "merge_group:",
-      "note": "GitHub state read with gh api on 2026-10-29 (the ledger cannot re-read GitHub; re-check with gh before trusting): repos API default_branch develop"
+      "note": "Removed \"GitHub's default branch\": a GitHub repo setting with no record in the repo (gh read on 2026-10-29 showed develop)"
     },
     {
       "id": "claude/t03",
       "audience": "developer",
       "doc": "CLAUDE.md",
-      "quote": "Protected with the same seven required checks in strict mode, but **without** `enforce_admins`",
+      "quote": "Protected with the same seven required checks in strict mode",
       "status": "verified",
-      "evidence": "app",
-      "source": ".github/workflows/checks.yml:90",
-      "match": "name: Unit tests",
-      "note": "GitHub state read with gh api on 2026-10-29 (the ledger cannot re-read GitHub; re-check with gh before trusting): main: strict, contexts Lint/Typecheck/Unit tests/Build/License compliance/Secret scan/Coverage, enforce_admins true, no review rule, force pushes and deletions off, conversation resolution off; develop: same seven, strict, enforce_admins false"
+      "evidence": "source",
+      "source": ".github/workflows/checks.yml:13",
+      "match": "every required job below must also run on the queue's",
+      "note": "GitHub-side state, read with gh api on 2026-10-29: develop requires the same 7 checks in strict mode, without enforce_admins; the checks also run on its merge queue. The ledger cannot re-read GitHub."
     },
     {
       "id": "claude/t04",
@@ -48312,10 +48372,10 @@
       "doc": "CLAUDE.md",
       "quote": "`Windows checks` is advisory; `e2e` is intentionally excluded until stable",
       "status": "verified",
-      "evidence": "app",
-      "source": ".github/workflows/checks.yml:248",
-      "match": "name: Windows checks",
-      "note": "GitHub state read with gh api on 2026-10-29 (the ledger cannot re-read GitHub; re-check with gh before trusting): main: strict, contexts Lint/Typecheck/Unit tests/Build/License compliance/Secret scan/Coverage, enforce_admins true, no review rule, force pushes and deletions off, conversation resolution off; develop: same seven, strict, enforce_admins false"
+      "evidence": "source",
+      "source": ".github/workflows/checks.yml:253",
+      "match": "from branch-protection required checks until proven stable, mirroring",
+      "note": "The Windows checks job comment records it is excluded from required checks, mirroring how e2e is kept out (next line)"
     },
     {
       "id": "claude/t05",
@@ -48323,10 +48383,10 @@
       "doc": "CLAUDE.md",
       "quote": "the macOS workflow is disabled",
       "status": "verified",
-      "evidence": "app",
-      "source": ".github/workflows/e2e.yml:1",
-      "match": "name: E2E Tests",
-      "note": "GitHub state read with gh api on 2026-10-29 (the ledger cannot re-read GitHub; re-check with gh before trusting): gh workflow list --all: E2E Tests disabled_manually"
+      "evidence": "source",
+      "source": ".github/workflows/e2e.yml:3",
+      "match": "DISABLED 2026-04-25 via `gh workflow disable \"E2E Tests\"`",
+      "note": "Proven by the e2e.yml header recording the manual disable"
     },
     {
       "id": "contributing/t01",
@@ -48334,10 +48394,10 @@
       "doc": "CONTRIBUTING.md",
       "quote": "The macOS e2e workflow is disabled.",
       "status": "verified",
-      "evidence": "app",
-      "source": ".github/workflows/e2e.yml:1",
-      "match": "name: E2E Tests",
-      "note": "GitHub state read with gh api on 2026-10-29 (the ledger cannot re-read GitHub; re-check with gh before trusting): gh workflow list --all: E2E Tests disabled_manually"
+      "evidence": "source",
+      "source": ".github/workflows/e2e.yml:3",
+      "match": "DISABLED 2026-04-25 via `gh workflow disable \"E2E Tests\"`",
+      "note": "Proven by the e2e.yml header recording the manual disable"
     },
     {
       "id": "contributing/t02",
@@ -48345,10 +48405,10 @@
       "doc": "CONTRIBUTING.md",
       "quote": "`Unit tests`, `Build`, `Coverage`, `License compliance` and `Secret scan`.",
       "status": "verified",
-      "evidence": "app",
-      "source": ".github/workflows/checks.yml:214",
-      "match": "name: Build",
-      "note": "GitHub state read with gh api on 2026-10-29 (the ledger cannot re-read GitHub; re-check with gh before trusting): main: strict, contexts Lint/Typecheck/Unit tests/Build/License compliance/Secret scan/Coverage, enforce_admins true, no review rule, force pushes and deletions off, conversation resolution off; develop: same seven, strict, enforce_admins false"
+      "evidence": "source",
+      "source": ".github/workflows/e2e-linux.yml:6",
+      "match": "required check (Lint, Typecheck, Unit tests, Build, Coverage,",
+      "note": "e2e-linux.yml lists the required check names (License compliance, Secret scan continue on line 7)"
     },
     {
       "id": "designs-comments-html-preview-comments/t101",
@@ -52701,21 +52761,21 @@
       "doc": "docs/build/whisper-binaries.md",
       "quote": "as the repository secret `MINISIGN_SECRET_KEY_BASE64`",
       "status": "fixed",
-      "evidence": "app",
-      "source": ".github/workflows/whisper-binaries.yml:524",
-      "match": "secrets.MINISIGN_SECRET_KEY_BASE64",
-      "note": "read with gh on 2026-10-29: gh secret list -R qodeca/erfana lists MINISIGN_SECRET_KEY_BASE64 as a repo secret; --env production-signing lists none. Doc said it was an environment secret"
+      "evidence": "source",
+      "source": ".github/workflows/release.yml:288",
+      "match": "MINISIGN_SECRET_KEY_BASE64: ${{ secrets.MINISIGN_SECRET_KEY_BASE64 }}",
+      "note": "read with gh on 2026-10-29: gh secret list -R qodeca/erfana lists MINISIGN_SECRET_KEY_BASE64 as a repo secret; --env production-signing lists none. Doc said it was an environment secret. Proof in repo: release.yml finalize job reads it with no environment"
     },
     {
       "id": "docs-build-whisper-binaries/s02",
       "audience": "developer",
       "doc": "docs/build/whisper-binaries.md",
-      "quote": "The `production-signing` environment holds no secrets of its own; it only gates the jobs that read them",
+      "quote": "They cannot be environment secrets, because `release.yml` reads the same names from jobs with no environment",
       "status": "fixed",
-      "evidence": "app",
-      "source": ".github/workflows/whisper-binaries.yml:237",
-      "match": "secrets.MAC_CERT_P12_BASE64",
-      "note": "read with gh on 2026-10-29: all seven signing secrets are repo secrets, the environment has none. Setup step told readers to add them under Environments"
+      "evidence": "source",
+      "source": ".github/workflows/release.yml:176",
+      "match": "MAC_CERT_P12_BASE64: ${{ secrets.MAC_CERT_P12_BASE64 }}",
+      "note": "Was \"The production-signing environment holds no secrets of its own\" – an absence claim about GitHub settings that the repo cannot prove; reworded to what release.yml proves"
     },
     {
       "id": "docs-build-whisper-binaries/s03",
@@ -52723,43 +52783,41 @@
       "doc": "docs/build/whisper-binaries.md",
       "quote": "When Phase 5 cert arrives, add these as repository secrets:",
       "status": "fixed",
-      "evidence": "app",
-      "source": ".github/workflows/whisper-binaries.yml:329",
-      "match": "environment: production-signing",
-      "note": "read with gh on 2026-10-29: the environment holds no secrets, so new signing secrets follow the existing repo-secret pattern; was 'add to production-signing'"
+      "evidence": "source",
+      "source": ".github/workflows/release.yml:176",
+      "match": "MAC_CERT_P12_BASE64: ${{ secrets.MAC_CERT_P12_BASE64 }}",
+      "note": "read with gh on 2026-10-29: the environment holds no secrets, so new signing secrets follow the existing repo-secret pattern; was 'add to production-signing'. Guidance follows the existing signing secrets, which release.yml reads with no environment"
     },
     {
       "id": "docs-build-whisper-binaries/s04",
       "audience": "developer",
       "doc": "docs/build/whisper-binaries.md",
-      "quote": "The environment itself holds no secrets: the signing / notarization / manifest secrets are repository secrets",
+      "quote": "The signing / notarization / manifest secrets cannot be environment secrets",
       "status": "fixed",
-      "evidence": "app",
-      "source": ".github/workflows/whisper-binaries.yml:114",
-      "match": "environment: production-signing",
-      "note": "read with gh on 2026-10-29: secrets are repo-wide, so the claim that they were scoped to the gated jobs only (not repo-wide) was false"
+      "evidence": "source",
+      "source": ".github/workflows/release.yml:176",
+      "match": "MAC_CERT_P12_BASE64: ${{ secrets.MAC_CERT_P12_BASE64 }}",
+      "note": "Was \"The environment itself holds no secrets: ... are repository secrets\" – absence claim about GitHub settings; reworded to what release.yml proves"
     },
     {
       "id": "docs-build-whisper-binaries/s05",
       "audience": "developer",
       "doc": "docs/build/whisper-binaries.md",
       "quote": "Environment exists (created 2026-06-17).",
-      "status": "verified",
+      "status": "removed",
       "evidence": "app",
-      "source": ".github/workflows/whisper-binaries.yml:458",
-      "match": "environment: production-signing",
-      "note": "read with gh on 2026-10-29: environments/production-signing created_at 2026-06-17T07:18:43Z"
+      "note": "Removed \"Environment exists (created 2026-06-17).\" – a GitHub setting and date with no record in the repo; the next sentence already cites the workflow references"
     },
     {
       "id": "docs-build-whisper-binaries/s06",
       "audience": "developer",
       "doc": "docs/build/whisper-binaries.md",
-      "quote": "The environment carries a `required_reviewers` protection rule with `marcinobel` as the sole reviewer (`prevent_self_review: false`)",
-      "status": "verified",
-      "evidence": "app",
-      "source": ".github/workflows/whisper-binaries.yml:458",
-      "match": "environment: production-signing",
-      "note": "read with gh on 2026-10-29: protection_rules has one required_reviewers rule, reviewer marcinobel, prevent_self_review false"
+      "quote": "The environment carries a required-reviewer protection rule, set in repo settings rather than in the workflow",
+      "status": "fixed",
+      "evidence": "source",
+      "source": ".github/workflows/whisper-binaries.yml:455",
+      "match": "Required-reviewer gate lives on the Environment configuration in repo",
+      "note": "Dropped the reviewer name and prevent_self_review value (GitHub settings, not in the repo); the page keeps the gh verify call that shows them"
     },
     {
       "id": "docs-build-whisper-binaries/s07",
@@ -52767,65 +52825,55 @@
       "doc": "docs/build/whisper-binaries.md",
       "quote": "before any job that reads a signing secret starts",
       "status": "fixed",
-      "evidence": "app",
+      "evidence": "source",
       "source": ".github/workflows/whisper-binaries.yml:114",
       "match": "environment: production-signing",
-      "note": "read with gh on 2026-10-29: repo secrets are not attached by environment approval; the gate holds back the jobs that read them. Was 'before any signing secret is attached'"
+      "note": "read with gh on 2026-10-29: repo secrets are not attached by environment approval; the gate holds back the jobs that read them. Was 'before any signing secret is attached'. Proof in repo: build-macos, which reads the signing secrets, declares the environment"
     },
     {
       "id": "docs-build-whisper-binaries/s08",
       "audience": "developer",
       "doc": "docs/build/whisper-binaries.md",
       "quote": "`can_admins_bypass` is `true`, so a repo admin can still skip the wait",
-      "status": "verified",
+      "status": "removed",
       "evidence": "app",
-      "source": ".github/workflows/whisper-binaries.yml:114",
-      "match": "environment: production-signing",
-      "note": "read with gh on 2026-10-29: environments/production-signing can_admins_bypass true"
+      "note": "Removed the claim that can_admins_bypass is true (GitHub setting, not in the repo); the page now tells the reader to read can_admins_bypass from the same gh call"
     },
     {
       "id": "docs-build-whisper-binaries/s09",
       "audience": "developer",
       "doc": "docs/build/whisper-binaries.md",
       "quote": "ruleset `protect-whisper-build-tags`, ID `17762301`, created 2026-06-16",
-      "status": "verified",
+      "status": "removed",
       "evidence": "app",
-      "source": ".github/workflows/whisper-binaries.yml:603",
-      "match": "TAG=\"whisper-build-",
-      "note": "read with gh on 2026-10-29: rulesets/17762301 name protect-whisper-build-tags, target tag, created 2026-06-16; sibling 17762300 covers v*.*.*"
+      "note": "Removed ruleset name, ID and creation date (GitHub settings, not in the repo); section 5 now points to gh api repos/qodeca/erfana/rulesets for the live state"
     },
     {
       "id": "docs-build-whisper-binaries/s10",
       "audience": "developer",
       "doc": "docs/build/whisper-binaries.md",
       "quote": "`rules: [deletion, non_fast_forward]` — prevents deletion or force-push of any `whisper-build-*` tag.",
-      "status": "verified",
+      "status": "removed",
       "evidence": "app",
-      "source": ".github/workflows/whisper-binaries.yml:603",
-      "match": "TAG=\"whisper-build-",
-      "note": "read with gh on 2026-10-29: include refs/tags/whisper-build-*, rules deletion + non_fast_forward"
+      "note": "Removed the ruleset rule list as a stated fact (GitHub setting); section 5 now states the intended rules and points to the gh call"
     },
     {
       "id": "docs-build-whisper-binaries/s11",
       "audience": "developer",
       "doc": "docs/build/whisper-binaries.md",
       "quote": "`enforcement: active`, `bypass_actors: []`",
-      "status": "verified",
+      "status": "removed",
       "evidence": "app",
-      "source": ".github/workflows/whisper-binaries.yml:603",
-      "match": "TAG=\"whisper-build-",
-      "note": "read with gh on 2026-10-29: ruleset 17762301 enforcement active, bypass_actors empty"
+      "note": "Removed enforcement/bypass_actors values (GitHub setting, not in the repo)"
     },
     {
       "id": "docs-build-whisper-binaries/s12",
       "audience": "developer",
       "doc": "docs/build/whisper-binaries.md",
       "quote": "the `protect-whisper-build-tags` tag ruleset blocks deleting or force-moving the `whisper-build-*` tag itself",
-      "status": "fixed",
+      "status": "removed",
       "evidence": "app",
-      "source": ".github/workflows/whisper-binaries.yml:603",
-      "match": "TAG=\"whisper-build-",
-      "note": "read with gh on 2026-10-29: protection is a tag ruleset, not branch protection; it guards the tag, not the release object"
+      "note": "Removed \"the protect-whisper-build-tags tag ruleset blocks deleting or force-moving the tag\" – GitHub ruleset state not in the repo; section 5 covers how to read it"
     },
     {
       "id": "docs-build-whisper-binaries/s13",
@@ -52884,10 +52932,10 @@
       "doc": "docs/build/whisper-binaries.md",
       "quote": "compare the names in the workflow with the repository secrets (`gh secret list -R qodeca/erfana`) first",
       "status": "fixed",
-      "evidence": "app",
-      "source": ".github/workflows/whisper-binaries.yml:525",
-      "match": "secrets.MINISIGN_KEY_PASSWORD",
-      "note": "read with gh on 2026-10-29: the names live as repo secrets, not in the environment; advice said compare with the environment"
+      "evidence": "source",
+      "source": ".github/workflows/release.yml:288",
+      "match": "MINISIGN_SECRET_KEY_BASE64: ${{ secrets.MINISIGN_SECRET_KEY_BASE64 }}",
+      "note": "read with gh on 2026-10-29: the names live as repo secrets, not in the environment; advice said compare with the environment. Proof in repo: release.yml reads the names from a job with no environment"
     },
     {
       "id": "docs-build-whisper-binaries/s19",
@@ -52895,10 +52943,10 @@
       "doc": "docs/build/whisper-binaries.md",
       "quote": "Approval is what lets the jobs that read the signing / notarization / manifest secrets start.",
       "status": "fixed",
-      "evidence": "app",
-      "source": ".github/workflows/whisper-binaries.yml:329",
+      "evidence": "source",
+      "source": ".github/workflows/whisper-binaries.yml:458",
       "match": "environment: production-signing",
-      "note": "read with gh on 2026-10-29: repo secrets are not attached by approval; was 'Approval is what attaches the ... secrets'"
+      "note": "read with gh on 2026-10-29: repo secrets are not attached by approval; was 'Approval is what attaches the ... secrets'. Proof in repo: publish-release, which reads the manifest key (line 524), declares the environment"
     },
     {
       "id": "docs-build-whisper-binaries/s20",
@@ -52906,10 +52954,10 @@
       "doc": "docs/build/whisper-binaries.md",
       "quote": "3. Update the `MAC_CERT_P12_BASE64` + `MAC_CERT_PASSWORD` repository secrets.",
       "status": "fixed",
-      "evidence": "app",
-      "source": ".github/workflows/whisper-binaries.yml:238",
-      "match": "secrets.MAC_CERT_PASSWORD",
-      "note": "read with gh on 2026-10-29: both are repo secrets; runbook said update them in the production-signing environment"
+      "evidence": "source",
+      "source": ".github/workflows/release.yml:176",
+      "match": "MAC_CERT_P12_BASE64: ${{ secrets.MAC_CERT_P12_BASE64 }}",
+      "note": "read with gh on 2026-10-29: both are repo secrets; runbook said update them in the production-signing environment. Proof in repo: release.yml passes both from the build_mac caller job, which has no environment"
     },
     {
       "id": "docs-build-whisper-binaries/s21",
@@ -52917,10 +52965,10 @@
       "doc": "docs/build/whisper-binaries.md",
       "quote": "2. Update the `MINISIGN_SECRET_KEY_BASE64` + `MINISIGN_KEY_PASSWORD` repository secrets (shared with `release.yml`",
       "status": "fixed",
-      "evidence": "app",
+      "evidence": "source",
       "source": ".github/workflows/release.yml:289",
-      "match": "secrets.MINISIGN_KEY_PASSWORD",
-      "note": "read with gh on 2026-10-29: both are repo secrets; runbook said update them in production-signing"
+      "match": "MINISIGN_KEY_PASSWORD: ${{ secrets.MINISIGN_KEY_PASSWORD }}",
+      "note": "read with gh on 2026-10-29: both are repo secrets; runbook said update them in production-signing. Proof in repo: release.yml finalize job reads both with no environment"
     },
     {
       "id": "docs-build-whisper-binaries/s22",
@@ -52928,10 +52976,10 @@
       "doc": "docs/build/whisper-binaries.md",
       "quote": "Primary key lives in the repository secret `MINISIGN_SECRET_KEY_BASE64` (shared with `release.yml`)",
       "status": "fixed",
-      "evidence": "app",
-      "source": ".github/workflows/whisper-binaries.yml:524",
-      "match": "secrets.MINISIGN_SECRET_KEY_BASE64",
-      "note": "read with gh on 2026-10-29: repo secret, not a production-signing environment secret"
+      "evidence": "source",
+      "source": ".github/workflows/release.yml:288",
+      "match": "MINISIGN_SECRET_KEY_BASE64: ${{ secrets.MINISIGN_SECRET_KEY_BASE64 }}",
+      "note": "read with gh on 2026-10-29: repo secret, not a production-signing environment secret. Proof in repo: release.yml finalize job reads it with no environment"
     },
     {
       "id": "docs-build-whisper-binaries/s23",
@@ -54622,5 +54670,151 @@
       "match": "export class CmdExeBootstrapBuilder implements WindowsBootstrapBuilder",
       "note": "Still open: only PowerShell, Git Bash and cmd.exe builders exist"
     }
-  ]
+  ],
+  "reviewed": {
+    "docs/adrs/README.md": {
+      "kind": "index",
+      "note": "Format guide and index of the five ADRs; every row's title, status and date match the ADR files (only Markdown sources, so nothing to trace to code). Fixed one aside: D9-D12 live in docs/windows/deferred-work-phase4.md, not deferred-work.md (which holds D1-D8)."
+    },
+    "docs/designs/html-preview/README.md": {
+      "kind": "index",
+      "note": "Link index for the HTML preview design notes; all linked files and folders exist and each card's status (permission band and focus decided; toolbar, feedback, layering, states, writing proposed) matches the card's status attribute."
+    },
+    "docs/designs/html-preview/multi-page/README.md": {
+      "kind": "index",
+      "note": "Link index and as-built record pointer for #124; all eight linked notes exist and the six card statuses match the cards (permission band and focus decided, the rest proposed). States that cards win over notes, so it makes no code claim."
+    },
+    "docs/designs/packaging/README.md": {
+      "kind": "index",
+      "note": "One-row index linking design-issue-55.md, which exists; no claim about current code."
+    },
+    "docs/future/graph-engine/architecture-data-flow.md": {
+      "kind": "proposal",
+      "note": "Draft spec for the unshipped graph engine; carries the WIP banner and now a one-line 'proposal, not shipped' status. Checked: no MCPServerService/GraphEngineService/GraphDatabaseService, no FTS5/sqlite-vec/onnx/MCP code anywhere in src/ or package.json; spec 004 is 'draft' in specs/registry.json. Its only current-state aside (no Linux build, packaging.md) holds: package.json has no build:linux script."
+    },
+    "docs/future/graph-engine/architecture-overview.md": {
+      "kind": "proposal",
+      "note": "Draft spec for the unshipped graph engine; carries the WIP banner and now a one-line 'proposal, not shipped' status. Checked: no MCPServerService/GraphEngineService/GraphDatabaseService, no FTS5/sqlite-vec/onnx/MCP code anywhere in src/ or package.json; spec 004 is 'draft' in specs/registry.json. Its only current-state aside (no Linux build, packaging.md) holds: package.json has no build:linux script."
+    },
+    "docs/future/graph-engine/data-ingestion-discovery.md": {
+      "kind": "proposal",
+      "note": "Draft spec for the unshipped graph engine; carries the WIP banner and now a one-line 'proposal, not shipped' status. Checked: no MCPServerService/GraphEngineService/GraphDatabaseService, no FTS5/sqlite-vec/onnx/MCP code anywhere in src/ or package.json; spec 004 is 'draft' in specs/registry.json. Its only current-state aside (no Linux build, packaging.md) holds: package.json has no build:linux script."
+    },
+    "docs/future/graph-engine/data-ingestion-updates.md": {
+      "kind": "proposal",
+      "note": "Draft spec for the unshipped graph engine; carries the WIP banner and now a one-line 'proposal, not shipped' status. Checked: no MCPServerService/GraphEngineService/GraphDatabaseService, no FTS5/sqlite-vec/onnx/MCP code anywhere in src/ or package.json; spec 004 is 'draft' in specs/registry.json. Its only current-state aside (no Linux build, packaging.md) holds: package.json has no build:linux script."
+    },
+    "docs/future/graph-engine/data-model.md": {
+      "kind": "proposal",
+      "note": "Draft spec for the unshipped graph engine; carries the WIP banner and now a one-line 'proposal, not shipped' status. Checked: no MCPServerService/GraphEngineService/GraphDatabaseService, no FTS5/sqlite-vec/onnx/MCP code anywhere in src/ or package.json; spec 004 is 'draft' in specs/registry.json. Its only current-state aside (no Linux build, packaging.md) holds: package.json has no build:linux script."
+    },
+    "docs/future/graph-engine/embedding-pipeline-batch-models.md": {
+      "kind": "proposal",
+      "note": "Draft spec for the unshipped graph engine; carries the WIP banner and now a one-line 'proposal, not shipped' status. Checked: no MCPServerService/GraphEngineService/GraphDatabaseService, no FTS5/sqlite-vec/onnx/MCP code anywhere in src/ or package.json; spec 004 is 'draft' in specs/registry.json. Its only current-state aside (no Linux build, packaging.md) holds: package.json has no build:linux script."
+    },
+    "docs/future/graph-engine/embedding-pipeline-onnx-workers.md": {
+      "kind": "proposal",
+      "note": "Draft spec for the unshipped graph engine; carries the WIP banner and now a one-line 'proposal, not shipped' status. Checked: no MCPServerService/GraphEngineService/GraphDatabaseService, no FTS5/sqlite-vec/onnx/MCP code anywhere in src/ or package.json; spec 004 is 'draft' in specs/registry.json. Its only current-state aside (no Linux build, packaging.md) holds: package.json has no build:linux script."
+    },
+    "docs/future/graph-engine/embedding-pipeline-overview.md": {
+      "kind": "proposal",
+      "note": "Draft spec for the unshipped graph engine; carries the WIP banner and now a one-line 'proposal, not shipped' status. Checked: no MCPServerService/GraphEngineService/GraphDatabaseService, no FTS5/sqlite-vec/onnx/MCP code anywhere in src/ or package.json; spec 004 is 'draft' in specs/registry.json. Its only current-state aside (no Linux build, packaging.md) holds: package.json has no build:linux script."
+    },
+    "docs/future/graph-engine/graph-capabilities-entities.md": {
+      "kind": "proposal",
+      "note": "Draft spec for the unshipped graph engine; carries the WIP banner and now a one-line 'proposal, not shipped' status. Checked: no MCPServerService/GraphEngineService/GraphDatabaseService, no FTS5/sqlite-vec/onnx/MCP code anywhere in src/ or package.json; spec 004 is 'draft' in specs/registry.json. Its only current-state aside (no Linux build, packaging.md) holds: package.json has no build:linux script."
+    },
+    "docs/future/graph-engine/graph-capabilities-traversal-ui.md": {
+      "kind": "proposal",
+      "note": "Draft spec for the unshipped graph engine; carries the WIP banner and now a one-line 'proposal, not shipped' status. Checked: no MCPServerService/GraphEngineService/GraphDatabaseService, no FTS5/sqlite-vec/onnx/MCP code anywhere in src/ or package.json; spec 004 is 'draft' in specs/registry.json. Its only current-state aside (no Linux build, packaging.md) holds: package.json has no build:linux script."
+    },
+    "docs/future/graph-engine/hybrid-search-fundamentals.md": {
+      "kind": "proposal",
+      "note": "Draft spec for the unshipped graph engine; carries the WIP banner and now a one-line 'proposal, not shipped' status. Checked: no MCPServerService/GraphEngineService/GraphDatabaseService, no FTS5/sqlite-vec/onnx/MCP code anywhere in src/ or package.json; spec 004 is 'draft' in specs/registry.json. Its only current-state aside (no Linux build, packaging.md) holds: package.json has no build:linux script."
+    },
+    "docs/future/graph-engine/hybrid-search-fusion-boosts.md": {
+      "kind": "proposal",
+      "note": "Draft spec for the unshipped graph engine; carries the WIP banner and now a one-line 'proposal, not shipped' status. Checked: no MCPServerService/GraphEngineService/GraphDatabaseService, no FTS5/sqlite-vec/onnx/MCP code anywhere in src/ or package.json; spec 004 is 'draft' in specs/registry.json. Its only current-state aside (no Linux build, packaging.md) holds: package.json has no build:linux script."
+    },
+    "docs/future/graph-engine/hybrid-search-implementation.md": {
+      "kind": "proposal",
+      "note": "Draft spec for the unshipped graph engine; carries the WIP banner and now a one-line 'proposal, not shipped' status. Checked: no MCPServerService/GraphEngineService/GraphDatabaseService, no FTS5/sqlite-vec/onnx/MCP code anywhere in src/ or package.json; spec 004 is 'draft' in specs/registry.json. Its only current-state aside (no Linux build, packaging.md) holds: package.json has no build:linux script."
+    },
+    "docs/future/graph-engine/implementation-guide/README.md": {
+      "kind": "proposal",
+      "note": "Milestone index for the unshipped graph engine (M1-M5); added the 'proposal, not shipped' status line under the H1 (the milestone pages already carry one). Checked: none of the planned graph-engine files exist in src/; spec 004 is 'draft'."
+    },
+    "docs/future/graph-engine/implementation-guide/m1-backend.md": {
+      "kind": "proposal",
+      "note": "Draft spec for the unshipped graph engine; carries the WIP banner and now a one-line 'proposal, not shipped' status. Checked: no MCPServerService/GraphEngineService/GraphDatabaseService, no FTS5/sqlite-vec/onnx/MCP code anywhere in src/ or package.json; spec 004 is 'draft' in specs/registry.json. Its only current-state aside (no Linux build, packaging.md) holds: package.json has no build:linux script."
+    },
+    "docs/future/graph-engine/implementation-guide/m1-frontend.md": {
+      "kind": "proposal",
+      "note": "Draft spec for the unshipped graph engine; carries the WIP banner and now a one-line 'proposal, not shipped' status. Checked: no MCPServerService/GraphEngineService/GraphDatabaseService, no FTS5/sqlite-vec/onnx/MCP code anywhere in src/ or package.json; spec 004 is 'draft' in specs/registry.json. Its only current-state aside (no Linux build, packaging.md) holds: package.json has no build:linux script."
+    },
+    "docs/future/graph-engine/implementation-guide/m2-vector-search.md": {
+      "kind": "proposal",
+      "note": "Draft spec for the unshipped graph engine; carries the WIP banner and now a one-line 'proposal, not shipped' status. Checked: no MCPServerService/GraphEngineService/GraphDatabaseService, no FTS5/sqlite-vec/onnx/MCP code anywhere in src/ or package.json; spec 004 is 'draft' in specs/registry.json. Its only current-state aside (no Linux build, packaging.md) holds: package.json has no build:linux script."
+    },
+    "docs/future/graph-engine/implementation-guide/m3-graph.md": {
+      "kind": "proposal",
+      "note": "Draft spec for the unshipped graph engine; carries the WIP banner and now a one-line 'proposal, not shipped' status. Checked: no MCPServerService/GraphEngineService/GraphDatabaseService, no FTS5/sqlite-vec/onnx/MCP code anywhere in src/ or package.json; spec 004 is 'draft' in specs/registry.json. Its only current-state aside (no Linux build, packaging.md) holds: package.json has no build:linux script."
+    },
+    "docs/future/graph-engine/implementation-guide/m4-temporal.md": {
+      "kind": "proposal",
+      "note": "Draft spec for the unshipped graph engine; carries the WIP banner and now a one-line 'proposal, not shipped' status. Checked: no MCPServerService/GraphEngineService/GraphDatabaseService, no FTS5/sqlite-vec/onnx/MCP code anywhere in src/ or package.json; spec 004 is 'draft' in specs/registry.json. Its only current-state aside (no Linux build, packaging.md) holds: package.json has no build:linux script."
+    },
+    "docs/future/graph-engine/implementation-guide/m5-advanced.md": {
+      "kind": "proposal",
+      "note": "Draft spec for the unshipped graph engine; carries the WIP banner and now a one-line 'proposal, not shipped' status. Checked: no MCPServerService/GraphEngineService/GraphDatabaseService, no FTS5/sqlite-vec/onnx/MCP code anywhere in src/ or package.json; spec 004 is 'draft' in specs/registry.json. Its only current-state aside (no Linux build, packaging.md) holds: package.json has no build:linux script."
+    },
+    "docs/future/graph-engine/mcp-server-implementation.md": {
+      "kind": "proposal",
+      "note": "Draft spec for the unshipped graph engine; carries the WIP banner and now a one-line 'proposal, not shipped' status. Checked: no MCPServerService/GraphEngineService/GraphDatabaseService, no FTS5/sqlite-vec/onnx/MCP code anywhere in src/ or package.json; spec 004 is 'draft' in specs/registry.json. Its only current-state aside (no Linux build, packaging.md) holds: package.json has no build:linux script."
+    },
+    "docs/future/graph-engine/mcp-server-tools.md": {
+      "kind": "proposal",
+      "note": "Draft spec for the unshipped graph engine; carries the WIP banner and now a one-line 'proposal, not shipped' status. Checked: no MCPServerService/GraphEngineService/GraphDatabaseService, no FTS5/sqlite-vec/onnx/MCP code anywhere in src/ or package.json; spec 004 is 'draft' in specs/registry.json. Its only current-state aside (no Linux build, packaging.md) holds: package.json has no build:linux script."
+    },
+    "docs/future/graph-engine/packaging.md": {
+      "kind": "proposal",
+      "note": "Draft spec for the unshipped graph engine; carries the WIP banner and now a one-line 'proposal, not shipped' status. Checked: no MCPServerService/GraphEngineService/GraphDatabaseService, no FTS5/sqlite-vec/onnx/MCP code anywhere in src/ or package.json; spec 004 is 'draft' in specs/registry.json. Its only current-state aside (no Linux build, packaging.md) holds: package.json has no build:linux script."
+    },
+    "docs/future/graph-engine/performance.md": {
+      "kind": "proposal",
+      "note": "Draft spec for the unshipped graph engine; carries the WIP banner and now a one-line 'proposal, not shipped' status. Checked: no MCPServerService/GraphEngineService/GraphDatabaseService, no FTS5/sqlite-vec/onnx/MCP code anywhere in src/ or package.json; spec 004 is 'draft' in specs/registry.json. Its only current-state aside (no Linux build, packaging.md) holds: package.json has no build:linux script."
+    },
+    "docs/future/graph-engine/production-readiness-checklist.md": {
+      "kind": "proposal",
+      "note": "Draft spec for the unshipped graph engine; carries the WIP banner and now a one-line 'proposal, not shipped' status. Checked: no MCPServerService/GraphEngineService/GraphDatabaseService, no FTS5/sqlite-vec/onnx/MCP code anywhere in src/ or package.json; spec 004 is 'draft' in specs/registry.json. Its only current-state aside (no Linux build, packaging.md) holds: package.json has no build:linux script."
+    },
+    "docs/future/graph-engine/production-readiness-operations.md": {
+      "kind": "proposal",
+      "note": "Draft spec for the unshipped graph engine; carries the WIP banner and now a one-line 'proposal, not shipped' status. Checked: no MCPServerService/GraphEngineService/GraphDatabaseService, no FTS5/sqlite-vec/onnx/MCP code anywhere in src/ or package.json; spec 004 is 'draft' in specs/registry.json. Its only current-state aside (no Linux build, packaging.md) holds: package.json has no build:linux script."
+    },
+    "docs/future/graph-engine/user-guide-features.md": {
+      "kind": "proposal",
+      "note": "Draft spec for the unshipped graph engine; carries the WIP banner and now a one-line 'proposal, not shipped' status. Checked: no MCPServerService/GraphEngineService/GraphDatabaseService, no FTS5/sqlite-vec/onnx/MCP code anywhere in src/ or package.json; spec 004 is 'draft' in specs/registry.json. Its only current-state aside (no Linux build, packaging.md) holds: package.json has no build:linux script."
+    },
+    "docs/future/graph-engine/user-guide-ui-troubleshooting.md": {
+      "kind": "proposal",
+      "note": "Draft spec for the unshipped graph engine; carries the WIP banner and now a one-line 'proposal, not shipped' status. Checked: no MCPServerService/GraphEngineService/GraphDatabaseService, no FTS5/sqlite-vec/onnx/MCP code anywhere in src/ or package.json; spec 004 is 'draft' in specs/registry.json. Its only current-state aside (no Linux build, packaging.md) holds: package.json has no build:linux script."
+    },
+    "docs/future/graph-engine/vector-search-advanced.md": {
+      "kind": "proposal",
+      "note": "Draft spec for the unshipped graph engine; carries the WIP banner and now a one-line 'proposal, not shipped' status. Checked: no MCPServerService/GraphEngineService/GraphDatabaseService, no FTS5/sqlite-vec/onnx/MCP code anywhere in src/ or package.json; spec 004 is 'draft' in specs/registry.json. Its only current-state aside (no Linux build, packaging.md) holds: package.json has no build:linux script."
+    },
+    "docs/future/graph-engine/vector-search-overview.md": {
+      "kind": "proposal",
+      "note": "Draft spec for the unshipped graph engine; carries the WIP banner and now a one-line 'proposal, not shipped' status. Checked: no MCPServerService/GraphEngineService/GraphDatabaseService, no FTS5/sqlite-vec/onnx/MCP code anywhere in src/ or package.json; spec 004 is 'draft' in specs/registry.json. Its only current-state aside (no Linux build, packaging.md) holds: package.json has no build:linux script."
+    },
+    "docs/future/source-grounding/README.md": {
+      "kind": "proposal",
+      "note": "Dated research (2026-03-28) with its own 'Research complete, implementation pending' status line; describes NotebookLM, papers and alternatives, no claim about current Erfana code. Checked: no FTS5, embedding, sqlite-vec or MCP code in src/."
+    },
+    "docs/future/source-grounding/missing-specs.md": {
+      "kind": "proposal",
+      "note": "Gap analysis against the draft graph-engine specs; its 'current system' / 'current FTS5 tokeniser' wording could read as shipped, so a one-line 'research proposal, not shipped' status was added under the H1. Checked: no FTS5, embedding, MCP or verify_claim code exists in src/."
+    }
+  }
 }

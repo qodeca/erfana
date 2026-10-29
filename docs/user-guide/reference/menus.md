@@ -33,7 +33,7 @@ The app menu provides window, editing and view commands. Right-click menus act o
 
 ## View menu
 
-**What it does:** **Reload** and **Force Reload** redraw the app; **Toggle Developer Tools** opens or closes developer tools; **Actual Size**, **Zoom In**, **Zoom Out** change zoom; **Toggle Full Screen** changes the window display. **How to reach it:** **View**. Zoom keys are <kbd>⌘0</kbd>, <kbd>⌘+</kbd>, <kbd>⌘-</kbd> / <kbd>Ctrl+0</kbd>, <kbd>Ctrl++</kbd>, <kbd>Ctrl+-</kbd>. When an HTML page has focus, zoom applies to that page first. Reloading can discard unsaved in-memory edits.
+**What it does:** **Reload** and **Force Reload** redraw the app; **Toggle Developer Tools** opens or closes developer tools; **Actual Size**, **Zoom In**, **Zoom Out** change zoom; **Toggle Full Screen** changes the window display. **How to reach it:** **View**. Zoom keys are <kbd>⌘0</kbd>, <kbd>⌘+</kbd>, <kbd>⌘-</kbd> / <kbd>Ctrl+0</kbd>, <kbd>Ctrl++</kbd>, <kbd>Ctrl+-</kbd>. When an HTML page has focus, zoom applies to that page first.
 
 ## Window menu
 
