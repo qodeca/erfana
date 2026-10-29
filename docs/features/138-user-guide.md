@@ -109,7 +109,7 @@ encoder output:
   "scene": "readme-demo", "kind": "loop", "agent": true, "native": false, "maxKB": 5120 }
 ```
 
-The `readme-demo` scene has four rows: `demo.webp`, `demo.gif`, `demo.mp4` and `demo-still.png`. Their
+The `readme-demo` scene had four rows: `demo.webp`, `demo.gif`, `demo.mp4` and `demo-still.png` (since spec 023 it has two, `demo.webp` and `demo-still.png`; see [`scripts/capture/README.md`](../../scripts/capture/README.md#readme-video---only-readme-demo)). Their
 `pages` stay empty until #139 embeds a file in `README.md` and adds it, so `--check` does not
 report a missing README link before #139 lands.
 

@@ -370,6 +370,8 @@ picked "GIF or WebP" for it, and #139's own spike checks that it plays on github
 
 #### Loop for #139
 
+> Superseded for the README video by [spec 023](../../../specs/spec-t3-023-readme-video/requirements/01-overview.md) (2026-10-29): the README now shows a 1920×1080 nine-step video at 880 px, recorded from the screen; `demo.gif` and `demo.mp4` are gone. This section is kept as the record of the #139 loop.
+
 The `readme-demo` scenario follows #139's storyboard (S0 open a project … S6 hold). It starts at
 Erfana's start screen, with the demo project as the only Recent projects entry (the sandbox opens
 it once with `openProjectByPath` and closes it before recording starts), and opens it from there –
