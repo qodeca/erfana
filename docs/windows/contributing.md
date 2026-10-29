@@ -92,7 +92,7 @@ Cross-platform workflow (stashing diffs, host switching) is documented in [`impl
 
 ### When `flakeGuard` fires in CI output
 
-If you see `[flakeGuard:<scope>] UNHANDLED REJECTION:` or `UNCAUGHT EXCEPTION:` in stderr, **fix the source** – do not retry. `flakeGuard` has a near-zero false-positive rate; a firing is a real post-teardown leak (dangling timer, unresolved promise, unclosed watcher). Pattern: track the handle, cancel it on unmount, mirror the fix from [#159](https://github.com/qodeca/erfana/issues/159).
+`tests/setup/flakeGuard.ts` is installed by the setup file of each vitest project (`main`, `renderer`, `preload`). It prints `[flakeGuard:<scope>] UNHANDLED REJECTION (#<n>):` or `[flakeGuard:<scope>] UNCAUGHT EXCEPTION (#<n>):` to stderr, followed by the stack, where `<scope>` is the project name and `<n>` counts the firings in that worker. If you see one, **fix the source** – do not retry. The guard only reports: it does not fail the run, and nothing reads the counters it keeps on `globalThis.__flakeGuardCount__` yet, so a green run can still carry a firing. A firing is a real unhandled rejection or uncaught exception, usually a post-teardown leak (dangling timer, unresolved promise, unclosed watcher). Pattern: track the handle, cancel it on unmount, mirror the fix from [#159](https://github.com/qodeca/erfana/issues/159).
 
 ### Cross-platform path fixtures
 
@@ -133,7 +133,7 @@ afterEach(() => {
 })
 ```
 
-`describe.runIf` gates on the *host* platform – which silently skips on macOS CI and hides regressions.
+`describe.runIf` gates on the *host* platform – which silently skips the case on the `ubuntu-latest` runners of the required checks (and on a macOS dev machine) and hides regressions. A reference for the per-test override is `src/main/utils/spawnNewInstance.test.ts`. Keep a host gate (`it.skipIf`) only where the test needs the real host, such as real symlinks or a `pwsh` on `PATH` (`src/main/utils/projectConfinement.test.ts`, `src/shared/powershellQuote.test.ts`).
 
 ---
 

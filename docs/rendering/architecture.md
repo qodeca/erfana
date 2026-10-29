@@ -5,7 +5,7 @@
 ```
 Markdown Input
     ↓
-remarkGfm (GitHub Flavored Markdown)
+remarkGfm (GitHub Flavored Markdown), plus remarkBreaks when editor.preserveLineBreaks is on
     ↓
 remark-rehype (Convert to HTML AST)
     ↓
@@ -119,7 +119,7 @@ not meant to be read – `<style>`, and likewise `<title>`, `<textarea>`, `<xmp>
 
 ## Line Tracking
 
-All elements include attributes for:
+The block elements `MarkdownPreview.tsx` overrides (paragraphs, lists, headings, tables, `div`, `details`, …) carry line-range attributes for:
 - Scroll synchronization
 - Context menu operations
 - Source mapping

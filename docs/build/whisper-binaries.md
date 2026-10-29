@@ -19,7 +19,7 @@ The Erfana client (`src/main/services/whisper-assets.ts`) pins a specific `whisp
 
 ## Retention policy
 
-**Never delete** a `whisper-build-*` release if any shipped Erfana app version pins it. GitHub's release UI makes deletion one-click; branch-protection on `whisper-build-*` tag refs prevents the destructive case. Each release body lists which Erfana versions pin it — update on every app-release bump that touches `whisper-assets.ts`.
+**Never delete** a `whisper-build-*` release if any shipped Erfana app version pins it. GitHub's release UI makes deletion one-click; the `protect-whisper-build-tags` tag ruleset blocks deleting or force-moving the `whisper-build-*` tag itself. Each release body carries a "Do not delete" retention note, but it does not list which Erfana versions pin the release – `RELEASE_TAG` in `whisper-assets.ts` is the record of the current pin.
 
 Support window: keep releases reachable for **3 months** past the last shipped Erfana app version that pinned them.
 
@@ -34,7 +34,7 @@ Requires an active [Apple Developer Program](https://developer.apple.com/program
 1. Enroll / confirm active.
 2. In "Certificates, Identifiers & Profiles" → create a **Developer ID Application** certificate. Download the .cer, add to Keychain Access, then export the combined cert + private key as a `.p12` file (with a strong password).
 3. Generate an App-Specific password at https://appleid.apple.com → Sign-In & Security → App-Specific Passwords → label it "Erfana notarytool CI".
-4. Add GitHub repo secrets (Settings → Environments → `production-signing` → Add secret):
+4. Add GitHub repository secrets (Settings → Secrets and variables → Actions → New repository secret). The `production-signing` environment holds no secrets of its own; it only gates the jobs that read them:
    - `MAC_CERT_P12_BASE64` — base64 of the .p12 file: `base64 -w0 DeveloperID.p12` (macOS: `base64 -i DeveloperID.p12 | tr -d '\n'`)
    - `MAC_CERT_PASSWORD` — the .p12 export password
    - `APPLE_ID` — your Apple ID email
@@ -45,7 +45,7 @@ Requires an active [Apple Developer Program](https://developer.apple.com/program
 
 **Phase 4 ships unsigned** — no OV/EV cert yet. Phase 5 procures one. Until then, the Windows whisper.exe relies on SHA-256 pinning + `Zone.Identifier` MOTW-strip on the Erfana client side. The CI workflow does NOT have a signtool step (add when Phase 5 cert is ready).
 
-When Phase 5 cert arrives, add these secrets to `production-signing`:
+When Phase 5 cert arrives, add these as repository secrets:
 - `WINDOWS_CERT_PFX` — base64 of the PFX file
 - `WINDOWS_CERT_PASSWORD` — PFX password
 
@@ -76,7 +76,7 @@ minisign -G -p rotation.pub -s rotation.key
 ```
 
 Then:
-- Upload the base64 of `primary.key` as `MINISIGN_SECRET_KEY_BASE64` in `production-signing` environment (`base64 -i primary.key | tr -d '\n'`); the workflow decodes it with `base64 -d`, as `release.yml` does.
+- Upload the base64 of `primary.key` as the repository secret `MINISIGN_SECRET_KEY_BASE64` (`base64 -i primary.key | tr -d '\n'`); the workflow decodes it with `base64 -d`, as `release.yml` does.
 - Upload the passphrase as `MINISIGN_KEY_PASSWORD`.
 - These are the same two secrets `release.yml` signs `SHA256SUMS` with: the whisper manifest primary key is the release key (key ID `4AEBCE8499845646`, also in [`docs/release-pubkey.txt`](../release-pubkey.txt)), so rotating it affects both workflows.
 - Commit **both** public keys (`primary.pub` + `rotation.pub`) to the Erfana repo at `src/main/services/whisper-pubkeys.ts` (embedded as constants; consumed by `verifyManifest.ts`).
@@ -84,9 +84,9 @@ Then:
 
 ### 4. GitHub Environment: `production-signing`
 
-Environment exists (created 2026-06-17). The `whisper-binaries.yml` workflow references it via `environment: production-signing` on the `build-macos`, `build-windows` and `publish-release` jobs, so the signing / notarization / manifest secrets are scoped to those jobs only (not repo-wide).
+Environment exists (created 2026-06-17). The `whisper-binaries.yml` workflow references it via `environment: production-signing` on the `build-macos`, `build-windows` and `publish-release` jobs. The environment itself holds no secrets: the signing / notarization / manifest secrets are repository secrets, so the environment's job is the approval gate below, not scoping.
 
-**Required-reviewer gate**: **live**. The environment carries a `required_reviewers` protection rule with `marcinobel` as the sole reviewer (`prevent_self_review: false`). Every whisper build therefore waits for an explicit approval in the Actions UI before any signing secret is attached.
+**Required-reviewer gate**: **live**. The environment carries a `required_reviewers` protection rule with `marcinobel` as the sole reviewer (`prevent_self_review: false`). Every whisper build therefore waits for an explicit approval in the Actions UI before any job that reads a signing secret starts.
 
 Verify anytime:
 
@@ -114,9 +114,9 @@ Verify anytime via `gh api repos/qodeca/erfana/rulesets/17762301`.
 - `erfana_revision` — integer, monotonic. Increment on rebuild (e.g. cert rotated; compiler pinned differently).
 - `skip_notarization` — debug only; the publish job refuses to create the release if this is true.
 
-The workflow reads the same secret names as `release.yml` (`MAC_CERT_P12_BASE64`, `MAC_CERT_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`, `MINISIGN_SECRET_KEY_BASE64`, `MINISIGN_KEY_PASSWORD`). Before v0.22.0 it asked for names that did not exist in `production-signing`, so a dispatch could not sign; if a run fails at a signing step with an empty secret, compare the names in the workflow with the environment first.
+The workflow reads the same secret names as `release.yml` (`MAC_CERT_P12_BASE64`, `MAC_CERT_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`, `MINISIGN_SECRET_KEY_BASE64`, `MINISIGN_KEY_PASSWORD`). Before v0.22.0 it asked for names that did not exist in `production-signing`, so a dispatch could not sign; if a run fails at a signing step with an empty secret, compare the names in the workflow with the repository secrets (`gh secret list -R qodeca/erfana`) first.
 
-Three of the workflow's four jobs — `build-macos`, `build-windows` and `publish-release` — declare `environment: production-signing`; only `validate-inputs` runs ungated. The approval prompt therefore appears within seconds of dispatch, as soon as input validation passes, and the run sits idle at the two build jobs until a reviewer approves. It does **not** build for ~25 minutes and then stop at publish. Approval is what attaches the signing / notarization / manifest secrets.
+Three of the workflow's four jobs — `build-macos`, `build-windows` and `publish-release` — declare `environment: production-signing`; only `validate-inputs` runs ungated. The approval prompt therefore appears within seconds of dispatch, as soon as input validation passes, and the run sits idle at the two build jobs until a reviewer approves. It does **not** build for ~25 minutes and then stop at publish. Approval is what lets the jobs that read the signing / notarization / manifest secrets start.
 
 Typical end-to-end time once approved: ~25–30 minutes (macOS build ~15 min + Windows build ~8 min + notary queue ~5–10 min).
 
@@ -163,7 +163,7 @@ This checklist and ["Security pre-check before the PR merge"](#security-pre-chec
 
 1. Revoke in [Apple developer portal](https://developer.apple.com/account/resources/certificates/list).
 2. Generate new Developer ID Application cert, export as .p12.
-3. Update `MAC_CERT_P12_BASE64` + `MAC_CERT_PASSWORD` in `production-signing` environment.
+3. Update the `MAC_CERT_P12_BASE64` + `MAC_CERT_PASSWORD` repository secrets.
 4. Trigger `whisper-binaries` workflow with `erfana_revision` bumped by 1 (e.g. `erfana2`).
 5. Update `src/main/services/whisper-assets.ts` in a hot-fix Erfana release pointing at the new `whisper-build-*` tag.
 6. **Time budget**: ~6 hours end-to-end (cert provisioning is slow).
@@ -171,7 +171,7 @@ This checklist and ["Security pre-check before the PR merge"](#security-pre-chec
 ### Minisign primary key compromised
 
 1. Generate new primary keypair on Marcin's Mac.
-2. Update `MINISIGN_SECRET_KEY_BASE64` + `MINISIGN_KEY_PASSWORD` in `production-signing` (shared with `release.yml` – update `docs/release-pubkey.txt` too).
+2. Update the `MINISIGN_SECRET_KEY_BASE64` + `MINISIGN_KEY_PASSWORD` repository secrets (shared with `release.yml` – update `docs/release-pubkey.txt` too).
 3. Commit new `primary.pub` to `src/main/services/whisper-pubkeys.ts` (rotation pubkey remains unchanged). Existing installs still trust the rotation key, so there's no trust gap.
 4. Trigger `whisper-binaries` workflow with `erfana_revision` bumped. Manifest will be signed by the new primary.
 5. Ship hot-fix Erfana release with the updated pubkey file.
@@ -289,7 +289,7 @@ See [ADR 0002](../adrs/0002-minisign-over-cosign-sigstore.md) for the full decis
 
 ### Dual-pubkey architecture (primary + rotation)
 
-See [ADR 0003](../adrs/0003-dual-pubkey-trust-primary-rotation.md). Primary key lives in the `production-signing` GitHub Environment secret `MINISIGN_SECRET_KEY_BASE64` (shared with `release.yml`); rotation key lives **offline on a hardware token** and is only used during an incident. Both pubkeys are embedded in `src/main/services/whisper-pubkeys.ts`.
+See [ADR 0003](../adrs/0003-dual-pubkey-trust-primary-rotation.md). Primary key lives in the repository secret `MINISIGN_SECRET_KEY_BASE64` (shared with `release.yml`); rotation key lives **offline on a hardware token** and is only used during an incident. Both pubkeys are embedded in `src/main/services/whisper-pubkeys.ts`.
 
 ### Known minisign gotchas
 

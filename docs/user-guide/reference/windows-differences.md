@@ -40,6 +40,10 @@ The Erfana taskbar jump list also has **New Window**, which opens a separate ins
 
 **What it does:** **Local (whisper.cpp)** runs offline on Windows x64. On Windows ARM64 the option is greyed out and reads **Local (macOS / Windows x64 only – ARM64 not supported)**. **How to reach it:** **Settings > Transcription > Backend**. OpenAI remains an option when configured with a key; it sends audio to the API. See [transcription settings](settings.md#transcription).
 
+Local transcription on Windows needs the Microsoft Visual C++ 2015–2022 Redistributable (x64). Erfana does not install it, but most Windows PCs already have it. Without it, the local engine cannot start: the transcription dialog shows an error that starts with **Whisper process exited with code**, with no further hint. To fix it, install the x64 redistributable from Microsoft's [Visual C++ downloads](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist) page and transcribe again, or switch the backend to **OpenAI**.
+
+Related issues: [#398](https://github.com/qodeca/erfana/issues/398).
+
 ## Terminal and import
 
 **What it does:** A few terminal and import details differ on Windows. **How to reach it:** The terminal panel and **Settings > Import tools**.

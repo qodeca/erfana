@@ -694,7 +694,7 @@ PNG / PDF / clipboard export for the image a viewer tab is showing (#73). The wh
 
 ### Related files
 - `src/main/ipc/image-export-handlers.ts` – the single `image-export:run` handler
-- `src/renderer/imageExport.html` + `src/preload/imageExport.ts` + `src/renderer/src/imageExport/harness.ts` – the harness's own entry, preload and page. The preload exposes four verbs and deliberately **not** `imageExport.run`
+- `src/renderer/imageExport.html` + `src/preload/imageExport.ts` + `src/renderer/src/imageExport/harness.ts` – the harness's own entry, preload and page. The preload exposes three verbs (`ready`, `onRender`, `postResult`) and deliberately **not** `imageExport.run`
 - `src/renderer/src/components/Panels/ImageViewerPanel/hooks/useImageExportHandlers.ts` – the renderer side; see [UI components § Image Viewer Panel](./ui-components.md#image-viewer-panel)
 
 ---

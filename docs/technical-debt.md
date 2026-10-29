@@ -489,7 +489,7 @@ Resolved by the #73 image-export work. The canonical extension list, the MIME ma
 - **No way to open an image file as text.** Once file opens route through `utils/openFileInPanel.ts`, an SVG always opens in the viewer. Hand-editing an SVG beside an agent is plausible, so a context-menu "Open as text" is worth a follow-up issue; it becomes a prerequisite if the Markdown-preview link path is migrated to the router as well.
 - **Two visual artefacts on refresh.** The degraded-state banner mounts above the content, so it pushes the image down and the `ResizeObserver` refires in fit mode (a second, small jump); and an animated GIF restarts from frame 0 when the source object is replaced.
 - **No visual-regression coverage for the new surfaces.** The status slot and the banner are transient states; baselines would flake. Descoped deliberately.
-- **The end-to-end proof of the fix has no CI gate.** `e2e/preview-refresh.e2e.ts` and `e2e/preview-refresh-terminal.e2e.ts` only run locally (item #5 above). The atomic-replace case is covered deterministically on CI by two main-process suites instead — `FileWatcherService.atomicSave.test.ts` (mocked) and `watcher/singleFileWatch.rename.integration.test.ts` (real chokidar, real rename).
+- **The end-to-end proof of the fix has no CI gate.** `e2e/preview-refresh.e2e.ts` and `e2e/preview-refresh-terminal.e2e.ts` run on CI only in the advisory `E2E (Linux, xvfb)` job on pull requests, which blocks nothing (item #5 above). The atomic-replace case is covered deterministically on CI by two main-process suites instead – `FileWatcherService.atomicSave.test.ts` (mocked) and `watcher/singleFileWatch.rename.integration.test.ts` (real chokidar, real rename).
 
 **Status**: Accepted; recorded by the #70 design (§9) and its review rounds.
 
@@ -535,7 +535,7 @@ Resolved by the #73 image-export work. The canonical extension list, the MIME ma
 
 **Impact**: `isTrustedSender` accepts the packaged app's exact `file://` renderer URL in production, but in development it accepts **any** URL on the dev-server origin. The image-export rasterize harness is served from that same origin (`${ELECTRON_RENDERER_URL}/imageExport.html`), so during development the harness page counts as a trusted sender for **every** gated channel, not just its own.
 
-**Problem**: Nothing reachable follows from it. The harness runs its own preload, which exposes four verbs (`ready`, `onRender`, `postResult`, `log`) and no `ipcRenderer` handle to build a fifth with, so there is no bridge from that page to a gated channel; and production pins the exact file URL, so the widening does not ship. It is recorded because the *reason* it is safe lives in a different file from the check itself, and a future harness preload that exposed one more verb would silently remove the only thing holding the line.
+**Problem**: Nothing reachable follows from it. The harness runs its own preload, which exposes three verbs (`ready`, `onRender`, `postResult` – `logging:log` is deliberately left out) and no `ipcRenderer` handle to build a fourth with, so there is no bridge from that page to a gated channel; and production pins the exact file URL, so the widening does not ship. It is recorded because the *reason* it is safe lives in a different file from the check itself, and a future harness preload that exposed one more verb would silently remove the only thing holding the line.
 
 **Recommended Solution**: tighten the dev branch of the predicate to compare the full URL, not the origin. Not done in #73 because the shared predicate guards every gated channel: narrowing it would ripple into all of them, in dev, for a path with no caller. If it is ever done, the harness needs its own allowance rather than an implicit one.
 
@@ -590,7 +590,7 @@ Resolved by the #73 image-export work. The canonical extension list, the MIME ma
 
 **Severity**: Low
 
-**Impact**: `PreviewRootRegistry.ts` calls `buildPreviewCsp(hosts)` without an `onReject` badge sink, so a host rejected at CSP-build time **on the registry path** emits no `allowlist-invalid` badge.
+**Impact**: `PreviewRootRegistry.ts` passes `buildPreviewCsp` an `onReject` sink (`reportCspRejection`) that only logs an unusable own token and ignores a rejected host, so a host rejected at CSP-build time **on the registry path** emits no `allowlist-invalid` badge.
 
 **Problem**: Unreachable in practice — the `PreviewAllowlistStore` validation gate already rejects such hosts before they reach the registry, so this is belt-and-braces only. Recorded as unreachable rather than fixed.
 
@@ -620,7 +620,7 @@ Resolved by the #73 image-export work. The canonical extension list, the MIME ma
 
 **Impact**: `previewFilterDecision.decideRequest` allows the `about:` scheme for every request type.
 
-**Problem**: Defense-in-depth only. When filed, the reason it was not exploitable was `frame-src 'none'`, the `will-navigate` handler and the sandbox. **#124 removed the first of those**: `frame-src` now names the page's own root token, so frames load. The reason must be re-verified rather than assumed – what still holds, read in code: `frame-src` admits no `about:` source, the frame guard allows only `about:blank` and `about:srcdoc` (documents the page itself writes, which carry nothing from outside it), and the sandbox and the `will-navigate` handler are unchanged. Narrowing to `data:`/`blob:` only was judged not worth churning security-critical filter code.
+**Problem**: Defense-in-depth only. When filed, the reason it was not exploitable was `frame-src 'none'`, the `will-navigate` handler and the sandbox. **#124 removed the first of those**: `frame-src` now names the page's own root token, so frames load. The reason must be re-verified rather than assumed – what still holds, read in code: `frame-src` admits no `about:` source, the frame guard (`subFrameRefusal` in `PreviewRequestFilter.ts`) lets any `about:` frame through – in practice `about:blank` and `about:srcdoc`, documents the page itself writes, which carry nothing from outside it, and the sandbox and the `will-navigate` handler are unchanged. Narrowing to `data:`/`blob:` only was judged not worth churning security-critical filter code.
 
 **Recommended Solution** (optional): narrow the allowed schemes if this filter is next opened for other reasons.
 
@@ -632,7 +632,7 @@ Resolved by the #73 image-export work. The canonical extension list, the MIME ma
 
 **Severity**: Low
 
-**Impact**: The post-load pipeline (`runPipeline`) can overlap itself when `did-finish-load` events arrive faster than a run completes, despite the reload-interval rate limit.
+**Impact**: The post-load pipeline (`run` in `previewLivePipeline.ts`, `runPipeline` when filed) can overlap itself when `did-finish-load` events arrive faster than a run completes, despite the reload-interval rate limit. The `runSerial` counter only keeps a superseded run from overwriting the frame-asset set; it does not stop the second run.
 
 **Recommended Solution**: add a single-flight guard so a run in progress absorbs a trailing request rather than starting a second concurrent run.
 
@@ -766,6 +766,8 @@ One extra obstacle found since: `PreviewViewService.applyApprovedHosts` returns 
 
 (all under `src/renderer/src/components/Panels/HtmlPreviewPanel/`)
 
+**Re-measured 2026-10-29**: five files have grown since the tables above – `PreviewViewService.pageScope.test.ts` is 504 lines, `PreviewSessionFactory.ts` 500, `PreviewViewService.ts` 472, `PreviewChromeBand.css` 509 and `HtmlPreviewPanel.tsx` 477. `usePreviewStillStore.ts` has not been split out.
+
 **Recommended Solution**: split on the next behaviour change, as planned above; do not grow the band stylesheet further without moving a block (the nav controls already live in `PreviewNavControls.css`).
 
 **Status**: Accepted for #124 (QG-6 A4, refreshed at Phase 10).
@@ -790,7 +792,7 @@ One extra obstacle found since: `PreviewViewService.applyApprovedHosts` returns 
 
 **Severity**: Low
 
-**Impact**: The rule "log an error's name and code, never its message" (a Node error quotes the path or URL it failed on) is correct at every site #124 touched, but each module writes its own helper: local `nameOf` / `codeOf` / `messageOf` / `errorFieldsOf`-style functions in `externalLinkConsent.ts`, `previewLivePipeline.ts`, `previewFrameEvents.ts`, `previewLiveTeardown.ts`, `PreviewLiveView.ts`, `previewLivePage.ts`, `previewViewEviction.ts`, `PreviewStillFrameCache.ts`, `PreviewSessionFactory.ts` and `previewEntryWatch.ts` (main), plus `previewTabMove.ts` (renderer). A new site copies whichever neighbour it lands next to.
+**Impact**: The rule "log an error's name and code, never its message" (a Node error quotes the path or URL it failed on) is correct at every site #124 touched, but each module writes its own helper: local `nameOf` / `codeOf` / `messageOf` / `errorFieldsOf`-style functions in `externalLinkConsent.ts`, `previewLivePipeline.ts`, `previewFrameEvents.ts`, `previewLiveTeardown.ts`, `PreviewLiveView.ts`, `previewLivePage.ts`, `previewViewEviction.ts`, `PreviewStillFrameCache.ts`, `PreviewSessionFactory.ts` and `previewEntryWatch.ts` (main), plus inline `error.name` reads in `previewTabMove.ts` (renderer). A new site copies whichever neighbour it lands next to.
 
 **Problem**: `redactedLogError` (`src/main/utils/redactUserInput.ts`) is not the shared answer as it stands: it rewrites only `INVALID_FILENAME` app errors and syscall-shaped errors with a quoted absolute path, and leaves a plain `Error` message untouched.
 
@@ -941,9 +943,9 @@ One extra obstacle found since: `PreviewViewService.applyApprovedHosts` returns 
 
 **Severity**: Low
 
-**Impact**: Nothing lint-blocks `src/shared/**` from importing `src/main`, `src/renderer` or `electron`, or `src/main/ipc/**` from reaching preview internals past the `PreviewViewService` facade. No violation exists today.
+**Impact**: Half closed. The layer rules in `eslint.config.mjs` now lint-block `src/shared/**` from importing `src/main`, `src/renderer`, `src/preload` or `electron`, and `src/main` from importing the renderer or preload. Nothing yet lint-blocks `src/main/ipc/**` from reaching preview internals past the `PreviewViewService` facade, and some files do: `emit.ts` imports `previewInputForward` and `lifecycle-handlers.ts` imports `previewBoundsDropLog` by value.
 
-**Recommended Solution**: `@typescript-eslint/no-restricted-imports` blocks. The `src/main/ipc/**` block must repeat the existing `ipcMain` rule, because flat config replaces a rule per file – which means restructuring the config against the warning in `eslint.config.mjs`.
+**Recommended Solution**: a `@typescript-eslint/no-restricted-imports` pattern for preview internals in the `src/main/**` block, which already carries the `ipcMain` rule and the layer patterns (flat config replaces a rule per file, so it cannot be a separate block). The composition root `buildPreviewGraph.ts` needs an exception.
 
 **Status**: Accepted at #124 QG-6 (A9) – a repo-wide lint policy.
 

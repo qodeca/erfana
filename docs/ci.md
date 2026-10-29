@@ -123,7 +123,7 @@ Notes:
 
 ## Secret scan (`secret-scan.yml`)
 
-Runs gitleaks over the **full git history**, then trufflehog for verified secrets. Both binaries are version-pinned and SHA-256-checksum-verified rather than pulled through third-party actions. `Secret scan` is a branch-protection required check on `main`.
+Runs gitleaks over the **full git history**, then trufflehog for verified secrets. Both binaries are version-pinned and SHA-256-checksum-verified rather than pulled through third-party actions. `Secret scan` is a branch-protection required check on `main` and `develop`.
 
 **The scan is repo-wide, not branch-wide.** gitleaks runs with `--log-opts="--all"`, so it walks every ref in the repository — not just the branch being tested. Two consequences that are easy to get wrong:
 

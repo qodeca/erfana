@@ -40,12 +40,13 @@ Only a page that runs as a preview can open in place. A link to anything else �
 | `#section` on the same page | scrolls, as normal |
 | another `.html` in the project | opens as a running preview – in a new tab, or in this tab per the rules above |
 | a `.md`, an image, any other project file | opens in its usual panel |
-| a file under `node_modules/`, `dist/`, `out/`, `coverage/`, `.git/`, or gitignored | opens as **source** |
+| a file under `node_modules/`, `dist/`, `out/` or `coverage/`, or gitignored | opens as **source** |
+| a dot-path – anything under `.git/`, a `.env` file | refused, and listed in the failure badge as an excluded path |
 | a path outside the project, or a missing file | refused, and listed in the failure badge |
 | `https:`, `http:`, `mailto:`, `tel:` | Erfana shows you the destination and asks before handing it to the operating system (your browser, mail or phone app) |
 | anything else, and `<a download>` | blocked, and listed in the failure badge |
 
-That question is a native message box **owned by the window whose preview asked**, so it is modal to that window and raised with it, and only one such question is open per window at a time — a second external link clicked while the first is still waiting is refused rather than queued, and listed in the failure badge as a blocked link.
+That question is a native message box **owned by the window whose preview asked**, so it is modal to that window and raised with it, and only one such question is open per window at a time – a second external link clicked while the first is still waiting is refused rather than queued, and listed in the failure badge as a blocked link.
 
 Every path is re-checked by Erfana itself before anything opens: the page's own idea of where a link points is never trusted.
 
@@ -95,7 +96,7 @@ A page can show other pages from the same project in an `<iframe>`.
 
 **A file that is itself a symlink is not served.** A frame whose `src` names a symlink is refused either way, and a stylesheet, script or image the page asks for by a symlinked name does not load either. A symlinked *folder* inside the project works, and one that leads out of the project is still refused as an escape.
 
-**The label differs by platform, and both are correct.** On macOS, `O_NOFOLLOW` stops the open outright, so the frame is listed as a **Missing local file** whichever way the link points and the target is never read. Windows has no `O_NOFOLLOW`: it follows the link, resolves the target, and measures it against the project root — so a leaf symlink pointing OUT of the project is listed as **Frame escaped the project**, which names the real problem more accurately. Confirmed on both platforms on 2026-09-15; `previewFrames.integration.test.ts` asserts the macOS labelling and skips that one case on win32 for this reason. The in-project leaf-symlink case on Windows has not been checked.
+**The label differs by platform, and both are correct.** On macOS, `O_NOFOLLOW` stops the open outright, so the frame is listed as a **Missing local file** whichever way the link points and the target is never read. Windows has no `O_NOFOLLOW`: it follows the link, resolves the target, and measures it against the project root – so a leaf symlink pointing OUT of the project is listed as **Frame escaped the project**, which names the real problem more accurately. Confirmed on both platforms on 2026-09-15; `previewFrames.integration.test.ts` asserts the macOS labelling and skips that one case on win32 for this reason. The in-project leaf-symlink case on Windows has not been checked.
 
 Markdown previews still show no frames at all.
 
@@ -103,11 +104,11 @@ Markdown previews still show no frames at all.
 
 Remote subresources – scripts, CSS, fonts, images from other addresses – are **blocked by default**. A page that references an address absent from the project's allowlist has that subresource blocked, and the address is listed in the **permission band** along the top of the preview, with an **Allow** button on its row.
 
-The unit of a permission is an **origin**: scheme, host and port together. `https://cdn.example.com`, `https://cdn.example.com:8443` and `http://cdn.example.com` are three different permissions, because they are three different things to reach. `http://` is allowable and works, and the confirm step says what it costs — the connection is not encrypted, so anyone in between can change what the page loads.
+The unit of a permission is an **origin**: scheme, host and port together. `https://cdn.example.com`, `https://cdn.example.com:8443` and `http://cdn.example.com` are three different permissions, because they are three different things to reach. `http://` is allowable and works, and the confirm step says what it costs – the connection is not encrypted, so anyone in between can change what the page loads.
 
-Every blocked address gets a button, `localhost` and IP literals included — including a hostname ending in a dot, which is a *different* grant from the same name without one (measured: a CSP host-source matches only its own spelling), so the row draws the dot rather than hiding it.
+Every blocked address gets a button, `localhost` and IP literals included – including a hostname ending in a dot, which is a *different* grant from the same name without one (measured: a CSP host-source matches only its own spelling), so the row draws the dot rather than hiding it.
 
-A row without a button says **why**, and the reason is derived from the address rather than assumed. Two shapes reach it. An **IPv6 literal** cannot be allowed at all, because the browser's Content-Security-Policy grammar has no way to write one (`host-char` is `ALPHA / DIGIT / "-"`). A name that is **not a valid host name** — an underscore, an empty part — cannot have a permission written for it either. The row used to give the IPv6 reason for both.
+A row without a button says **why**, and the reason is derived from the address rather than assumed. Two shapes reach it. An **IPv6 literal** cannot be allowed at all, because the browser's Content-Security-Policy grammar has no way to write one (`host-char` is `ALPHA / DIGIT / "-"`). A name that is **not a valid host name** – an underscore, an empty part – cannot have a permission written for it either. The row used to give the IPv6 reason for both.
 
 - **Approving records the origin** in `.erfana/settings.json` inside the open project, under `htmlPreview.allowlist.origins`. (An older `hosts` field may sit beside it: it is a projection kept for builds that predate origins, and `origins` is the truth.) That file is the only source of truth for what is allowed. The preview reloads and the approved origin's subresource loads.
 - **You can see what is approved, but not yet revoke it in-app.** The permission band lists every origin the project has already allowed alongside the blocked ones, so a cloned repository that arrives with approvals shows them. Removing one is still a manual edit – open `.erfana/settings.json` and delete the entry. In-app revoke is tracked as [#86](https://github.com/qodeca/erfana/issues/86) (see also [Security § HTML preview](../security.md#html-preview) and the technical-debt ledger).
@@ -182,7 +183,7 @@ You can leave comments on the elements of a previewed page. A comment is saved *
 | Reason | What happens |
 |---|---|
 | The file is over **25 MB** | The preview does not show a file that large, so there is nothing to comment on. A file that grows past 25 MB while it is open keeps its comments read-only |
-| The file is not UTF-8 | Existing comments are shown read-only; no new ones |
+| The file is not UTF-8 | Comments are unavailable: existing ones are not listed and no new ones can be added |
 | The file holds an unresolved git conflict | Read-only until you resolve it |
 | The file is a link to another file, or has other hard links | Erfana will not write to it |
 | The page has too many elements (over 640,000) | Comments are unavailable for that page |

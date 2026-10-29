@@ -197,7 +197,7 @@ A damaged block is shown with a warning and its text as written. Erfana does not
 
 ### Read-only files
 
-Erfana shows a file's comments but writes none when: the file is not UTF-8 (UTF-8 with or without a BOM is fine; a `<meta charset>` naming another encoding counts as not UTF-8); it holds a complete git conflict (`<<<<<<<` … `=======` … `>>>>>>>`); a block is unterminated; it has more than 500 blocks (at exactly 500, threads can still be edited, but no new one is added); or it is larger than 25 MB or has more than 640,000 elements (then blocks are not read either).
+Erfana shows a file's comments but writes none when: it holds a complete git conflict (`<<<<<<<` … `=======` … `>>>>>>>`); a block is unterminated; or it has more than 500 blocks (at exactly 500, threads can still be edited, but no new one is added). It writes none and reads no blocks either, so it shows none, when the file is not UTF-8 (UTF-8 with or without a BOM is fine; a `<meta charset>` in the first 1,024 bytes naming a legacy encoding counts as not UTF-8), is larger than 25 MB, or has more than 640,000 elements.
 
 ## Limits
 

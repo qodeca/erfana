@@ -336,7 +336,7 @@ Phase 4's ~55 new tests span 8 files. Table below is the authoritative coverage 
 
 ## Phase 6 — Polish & DX
 
-**Tracking:** [#167](https://github.com/qodeca/erfana/issues/167) — **partially shipped in [v0.13.0](https://github.com/qodeca/erfana/releases/tag/v0.13.0)** (tag 2026-06-05): items 1, 4 and 7, plus the renderer platform-detection bridge, PII log redaction and D5/D7. Items 5 and 6 remain unreleased; item 3's `ProjectLockService` scope was closed later, in v0.15.0. Per-item status as of the v0.13.0 cut is below.
+**Tracking:** [#167](https://github.com/qodeca/erfana/issues/167) — **partially shipped in [v0.13.0](https://github.com/qodeca/erfana/releases/tag/v0.13.0)** (tag 2026-06-05): items 1, 4 and 7, plus the renderer platform-detection bridge, PII log redaction and D5/D7. Item 5 is still open; item 6 was not in v0.13.0 and landed later, on 2026-09-04; item 3's `ProjectLockService` scope was closed later, in v0.15.0. Per-item status as of the v0.13.0 cut is below.
 
 Changes:
 
