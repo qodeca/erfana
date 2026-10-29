@@ -13,7 +13,7 @@ import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { CaptureError } from './manifest.mjs'
-import { EXIT, parseArgs, readLogin, reportLines, runCheck, safeTarget, showsStartupHeader } from './run.mjs'
+import { approveReadmeVideo, EXIT, parseArgs, readLogin, reportLines, runCheck, safeTarget, storyReportLines } from './run.mjs'
 import { MARKER, VOLUME_ROOT, attachedImages, claudeJson, findClaude, layout, projectClaudeSettings, sandboxProblem, shellQuote, userClaudeSettings, volumeProblem } from './sandbox.mjs'
 import { capitalHeight, judgeFrame, normalise } from './legibility.mjs'
 
@@ -140,20 +140,50 @@ describe('runCheck', () => {
   })
 })
 
+const STORY_DEMO = {
+  duration: 61.2,
+  pages: 412,
+  quality: 85,
+  window: { width: 1920, height: 1080 },
+  columns: 86,
+  results: { open: 'the tree lists the project', edit: 'the preview shows the table the agent wrote' },
+  steps: [
+    { id: 'open', from: 0, to: 4.1 },
+    { id: 'edit', from: 4.1, to: 20 }
+  ],
+  segments: [
+    { from: 0, to: 30, speed: 1 },
+    { from: 30, to: 90, speed: 12 }
+  ],
+  layout: [{ step: 'edit', window: 1920, tree: 288, preview: 998, terminal: 634, editorVisible: false }],
+  editLatencyMs: 640,
+  screenshot: { width: 1920, height: 1080, expected: { width: 1920, height: 1080 } },
+  legibility: [{ what: 'label "Open a project" at 880 px', capPx: 7.6, samples: 2, readBack: true }]
+}
+
 describe('reportLines', () => {
-  it('lists each file, the totals and the demo legibility', () => {
+  it('lists each file and the totals, and the README video checks when it ran', () => {
     const rows = [{ id: 'a/b', file: 'docs/user-guide/images/a/b.png', agent: true }]
-    const lines = reportLines({
-      rows,
-      sizes: new Map([['a/b', 2048]]),
-      partial: true,
-      version: '2.1.282 (Claude Code)',
-      guideTotal: 2048,
-      demo: { duration: 18.3, zoom: 1.25, framesRead: 53, legibility: [{ file: 'demo.webp', frame: 'hand-off', capPx: 7.3, samples: 8, readBack: true }] }
-    })
-    expect(lines.join('\n')).toMatch(/partial run/)
-    expect(lines.join('\n')).toMatch(/2 KB {2}docs\/user-guide\/images\/a\/b\.png {2}\(agent\)/)
-    expect(lines.join('\n')).toMatch(/capital height 7\.3 px/)
+    const lines = reportLines({ rows, sizes: new Map([['a/b', 2048]]), partial: true, version: '2.1.282 (Claude Code)', guideTotal: 2048, demo: STORY_DEMO }).join('\n')
+    expect(lines).toMatch(/partial run/)
+    expect(lines).toMatch(/2 KB {2}docs\/user-guide\/images\/a\/b\.png {2}\(agent\)/)
+    expect(lines).toMatch(/README video: every check passed/)
+  })
+})
+
+describe('storyReportLines (spec 023)', () => {
+  it('names the evidence for each check (break: a check that passes without a line in the report)', () => {
+    const t = storyReportLines(STORY_DEMO).join('\n')
+    expect(t).toMatch(/length: 61\.2 s \(50–70 s\), 412 WebP pages, quality 85, loop 0/)
+    expect(t).toMatch(/window: 1920×1080; terminal 86 columns/)
+    expect(t).toMatch(/step 2 edit at 4\.1–20\.0 s: the preview shows the table/)
+    expect(t).toMatch(/sped up ×12: 60\.0 s of recording/)
+    expect(t).not.toMatch(/×1:/)
+    expect(t).toMatch(/layout at edit: tree 15\.0 %, preview 52\.0 %, terminal 33\.0 %, editor hidden/)
+    expect(t).toMatch(/edit to preview: 640 ms/)
+    expect(t).toMatch(/window screenshot: 1920×1080 \(window 1920×1080\)/)
+    expect(t).toMatch(/capital height 7\.6 px/)
+    expect(t).toMatch(/privacy: 412 pages read, 0 hits/)
   })
 })
 
@@ -234,11 +264,49 @@ describe('demo drive (B-7)', () => {
   })
 })
 
-describe('start-up header check (NB-4)', () => {
-  it('finds Claude Code\'s header in OCR text, and nothing else (break: a check that never fires)', () => {
-    expect(showsStartupHeader('▐▛███▜▌ Claude Code v2.1.282\nSonnet 5 · Claude API')).toBe(true)
-    expect(showsStartupHeader('Claude Code  v 2.1')).toBe(true)
-    expect(showsStartupHeader('Read 1 file\nUpdate(handbook/open-day-plan.md)')).toBe(false)
+describe('--approve-readme-video (023-FR-015)', () => {
+  const rows = [
+    { id: 'readme/demo-webp', file: 'docs/assets/readme/demo.webp', scene: 'readme-demo' },
+    { id: 'readme/demo-still', file: 'docs/assets/readme/demo-still.png', scene: 'readme-demo' },
+    { id: 'x/y', file: 'docs/user-guide/images/x/y.png', scene: 'x' }
+  ]
+  const setup = (report = 'README video: every check passed\n') => {
+    const root = path.join(tmp, 'repo')
+    const draftDir = path.join(tmp, 'draft')
+    fs.mkdirSync(path.join(root, 'docs', 'assets', 'readme'), { recursive: true })
+    fs.mkdirSync(draftDir, { recursive: true })
+    for (const f of ['demo.gif', 'demo.mp4', 'demo.webp']) fs.writeFileSync(path.join(root, 'docs', 'assets', 'readme', f), 'old')
+    fs.writeFileSync(path.join(draftDir, 'demo.webp'), 'new video')
+    fs.writeFileSync(path.join(draftDir, 'demo-still.png'), 'new still')
+    if (report !== null) fs.writeFileSync(path.join(draftDir, 'report.txt'), report)
+    return { root, draftDir }
+  }
+
+  it('puts the passed draft in place and removes the GIF and MP4 (break: the old files stay)', () => {
+    const { root, draftDir } = setup()
+    expect(approveReadmeVideo({ root, draftDir, rows, log: () => {} })).toBe(EXIT.OK)
+    const dir = path.join(root, 'docs', 'assets', 'readme')
+    expect(fs.readFileSync(path.join(dir, 'demo.webp'), 'utf8')).toBe('new video')
+    expect(fs.readFileSync(path.join(dir, 'demo-still.png'), 'utf8')).toBe('new still')
+    expect(fs.existsSync(path.join(dir, 'demo.gif'))).toBe(false)
+    expect(fs.existsSync(path.join(dir, 'demo.mp4'))).toBe(false)
+  })
+
+  it('refuses a draft whose report did not pass, or a draft without its files (break: an unchecked video lands)', () => {
+    let { root, draftDir } = setup('README video: 2 checks failed\n')
+    expect(() => approveReadmeVideo({ root, draftDir, rows, log: () => {} })).toThrow(/no passed README video draft/)
+    fs.rmSync(path.join(tmp, 'draft'), { recursive: true })
+    ;({ root, draftDir } = setup(null))
+    expect(() => approveReadmeVideo({ root, draftDir, rows, log: () => {} })).toThrow(/no passed README video draft/)
+    fs.writeFileSync(path.join(draftDir, 'report.txt'), 'README video: every check passed\n')
+    fs.rmSync(path.join(draftDir, 'demo-still.png'))
+    expect(() => approveReadmeVideo({ root, draftDir, rows, log: () => {} })).toThrow(/has no demo-still\.png/)
+    expect(fs.readFileSync(path.join(root, 'docs', 'assets', 'readme', 'demo.webp'), 'utf8')).toBe('old')
+  })
+
+  it('takes no other option', () => {
+    expect(parseArgs(['--approve-readme-video']).approve).toBe(true)
+    expect(() => parseArgs(['--approve-readme-video', '--only', 'x'])).toThrow(CaptureError)
   })
 })
 

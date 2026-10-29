@@ -17,7 +17,7 @@ Images are generated from the fictional Harbour Garden project by `scripts/captu
 
 ## Regenerate and validate
 
-Follow the [capture runbook](../../scripts/capture/README.md) on macOS with a real Claude Code login. A full `npm run docs:screenshots` regenerates all 52 guide images plus the four README demo outputs in the isolated `/Users/Shared/erfana-capture/` sandbox; the demo project appears under `/Volumes/HarbourGarden` in captures. Inspect every image and the capture report before committing. Then run:
+Follow the [capture runbook](../../scripts/capture/README.md) on macOS with a real Claude Code login. A full `npm run docs:screenshots` regenerates all 52 guide images plus a draft of the README video in the isolated `/Users/Shared/erfana-capture/` sandbox; the demo project appears under `/Volumes/HarbourGarden` in captures. Inspect every image and the capture report before committing. Then run:
 
 ```sh
 npm run docs:screenshots -- --check

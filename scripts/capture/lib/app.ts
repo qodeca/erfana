@@ -42,6 +42,7 @@ export interface Capture {
   page: Page
   sandbox: Sandbox
   close: () => Promise<void>
+  placement?: Placement
 }
 
 export interface LaunchOptions {
@@ -61,6 +62,22 @@ export interface LaunchOptions {
   zoom?: number
   /** Test id that proves the window is up (default: the activity bar). */
   readyTestId?: string
+  /** Device scale factor (default SCALE). The README video uses the screen's own, 1 (spec 023). */
+  scale?: number
+  /** Content size in CSS px (default WIDTH × HEIGHT). */
+  size?: { width: number; height: number }
+  /**
+   * Move the window, before it is sized, to the top-left of a screen whose
+   * work area holds it with its title bar: a 2× screen if one does, else the
+   * smallest that does (the README video, spec 023).
+   */
+  onLargeScreen?: boolean
+}
+
+/** The screen the window was placed on, in global points (`launch({ onLargeScreen })`). */
+export interface Placement {
+  bounds: { x: number; y: number; width: number; height: number }
+  scaleFactor: number
 }
 
 export function sandbox(): Sandbox {
@@ -107,7 +124,9 @@ export async function launch(opts: LaunchOptions = {}): Promise<Capture> {
   }
   fs.mkdirSync(sb.userData, { recursive: true })
   const base = buildVisualLaunchOptions(sb.userData)
-  const args = base.args.map((a) => (a.startsWith('--force-device-scale-factor=') ? `--force-device-scale-factor=${SCALE}` : a))
+  const scale = opts.scale ?? SCALE
+  const size = opts.size ?? { width: WIDTH, height: HEIGHT }
+  const args = base.args.map((a) => (a.startsWith('--force-device-scale-factor=') ? `--force-device-scale-factor=${scale}` : a))
   args.push('--force-color-profile=srgb', '--force-prefers-reduced-motion', ...(opts.extraArgs ?? []))
   const app = await electron.launch({
     args,
@@ -132,7 +151,20 @@ export async function launch(opts: LaunchOptions = {}): Promise<Capture> {
     const page = await app.firstWindow()
     await page.waitForLoadState('domcontentloaded')
     await expect(page.getByTestId(opts.readyTestId ?? TEST_IDS.ACTIVITY_BAR).first()).toBeVisible({ timeout: 20_000 })
-    await resizeBrowserWindow(app, WIDTH, HEIGHT)
+    let placement: Placement | undefined
+    if (opts.onLargeScreen) {
+      placement = await app.evaluate(({ BrowserWindow, screen }, want) => {
+        const win = BrowserWindow.getAllWindows()[0]
+        const frame = win.getBounds().height - win.getContentBounds().height
+        const fits = screen.getAllDisplays().filter((d) => d.workArea.width >= want.width && d.workArea.height >= want.height + frame)
+        const pick = fits.find((d) => d.scaleFactor >= 2) ?? fits.sort((a, b) => a.bounds.width * a.bounds.height - b.bounds.width * b.bounds.height)[0]
+        if (!pick) return undefined
+        win.setPosition(pick.workArea.x, pick.workArea.y)
+        return { bounds: pick.bounds, scaleFactor: pick.scaleFactor }
+      }, size)
+      if (!placement) throw new Error(`no screen holds a ${size.width}×${size.height} window with its title bar`)
+    }
+    await resizeBrowserWindow(app, size.width, size.height)
     if (zoom !== 1) {
       await app.evaluate(({ BrowserWindow }, z) => BrowserWindow.getAllWindows()[0].webContents.setZoomFactor(z), zoom)
       // Reload so the layout is built for the zoomed viewport from the start.
@@ -142,9 +174,9 @@ export async function launch(opts: LaunchOptions = {}): Promise<Capture> {
     await installPtyRecorder(page)
     await page.waitForFunction(
       ({ w, h }) => Math.abs(window.innerWidth - w) <= 1 && Math.abs(window.innerHeight - h) <= 1,
-      { w: WIDTH / zoom, h: HEIGHT / zoom }
+      { w: size.width / zoom, h: size.height / zoom }
     )
-    return { app, page, sandbox: sb, close }
+    return { app, page, sandbox: sb, close, placement }
   } catch (e) {
     await close()
     throw e

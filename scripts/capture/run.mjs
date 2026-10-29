@@ -11,7 +11,12 @@
  * the end, so a failed run leaves the committed tree as it was.
  *
  * Exit codes (spec § 3.1): 0 ok · 1 scene failed · 2 not macOS · 3 no agent
- * login · 4 unsafe sandbox path · 5 privacy hit · 6 over budget · 7 drift.
+ * login · 4 unsafe sandbox path · 5 privacy hit · 6 over budget · 7 drift ·
+ * 8 README video prerequisite missing (spec 023, 023-FR-018).
+ *
+ * The README video (spec 023) never reaches `docs/` from a run: its draft
+ * goes to .local/capture/readme-video/ for the owner to watch, and only
+ * `--approve-readme-video` puts an approved draft in place (023-FR-015).
  *
  * The runbook is scripts/capture/README.md.
  */
@@ -22,22 +27,12 @@ import { spawn, execFileSync } from 'node:child_process'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import { CaptureError, checkBudget, checkDrift, formatKB, GUIDE_IMAGES_DIR, loadManifest, OUTPUT_ALLOW_LIST, resolveOnly } from './manifest.mjs'
-import { buildDenyList, createOcr, resolveTesseract, sampleTimes, scanText, stripAnsi } from './privacy.mjs'
-import {
-  contactSheetArgs,
-  demoSourceArgs,
-  findSyncTime,
-  frameAtArgs,
-  loopArgs,
-  planDemoEdit,
-  runFfmpeg,
-  stillArgs,
-  syncScanArgs,
-  webpPageAt,
-  webpSamplePages
-} from './encode.mjs'
-import { DISPLAY_WIDTH, judgeFrame, resolveSharp, terminalCrop } from './legibility.mjs'
+import { buildDenyList, createOcr, resolveTesseract, scanText, stripAnsi } from './privacy.mjs'
+import { contactSheetArgs, findSyncTime, frameAtArgs, runFfmpeg, stillArgs, storyArgs, storyWebpArgs, syncScanArgs, WEBP_QUALITIES, webpPageAt } from './encode.mjs'
+import { darkSpan, firstLetterHeight, judgeFrame, MIN_CAP_PX, regionCrop, resolveSharp } from './legibility.mjs'
 import { findClaude, prepareSandbox, removeSandbox, SANDBOX_ROOT, sandboxProblem } from './sandbox.mjs'
+import { layoutProblems, lengthProblem, planStory, STORY, VIDEO } from './demo-story.mjs'
+import { videoPrerequisiteProblems } from './macos.mjs'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 export const REPO_ROOT = path.resolve(HERE, '..', '..')
@@ -45,28 +40,39 @@ const MANIFEST = path.join(HERE, 'shots.json')
 const SCENES_DIR = path.join(HERE, 'scenes')
 const require = createRequire(import.meta.url)
 
-export const EXIT = { OK: 0, SCENE: 1, NOT_MACOS: 2, NO_LOGIN: 3, UNSAFE_SANDBOX: 4, PRIVACY: 5, BUDGET: 6, DRIFT: 7 }
+export const EXIT = { OK: 0, SCENE: 1, NOT_MACOS: 2, NO_LOGIN: 3, UNSAFE_SANDBOX: 4, PRIVACY: 5, BUDGET: 6, DRIFT: 7, VIDEO_PREREQUISITE: 8 }
+
+/** Where a README video draft waits for the owner (git-ignored; 023-FR-015). */
+export const DRAFT_DIR = path.join(REPO_ROOT, '.local', 'capture', 'readme-video')
+/** The README video's scene. */
+const VIDEO_SCENE = 'readme-demo'
+/** Files the README video replaces, removed when a draft is approved (023-FR-010). */
+const RETIRED_README_FILES = ['docs/assets/readme/demo.gif', 'docs/assets/readme/demo.mp4']
 
 /** A token file larger than this is not a token. */
 const MAX_TOKEN_BYTES = 16 * 1024
 
 const HELP = `Usage: npm run docs:screenshots [-- --only <id,...>] [-- --check] [-- --skip-build]
+       npm run docs:screenshots -- --approve-readme-video
 
   --only <ids>   Capture only these rows; each id is a row id or a scene id
                  (e.g. --only readme-demo). The report says "partial run".
   --check        No capture: manifest rows, files, the design's list and the
                  guide's image links agree, and the size budget holds.
   --skip-build   Use the existing out/ build (only when it is from this checkout).
+  --approve-readme-video
+                 Put the README video draft the owner approved in place.
 
 Agent login: ERFANA_CAPTURE_CLAUDE_TOKEN_FILE (a file holding a token from
 \`claude setup-token\`) or ANTHROPIC_API_KEY. Runbook: scripts/capture/README.md`
 
 export function parseArgs(argv) {
-  const opts = { only: undefined, check: false, skipBuild: false, help: false }
+  const opts = { only: undefined, check: false, skipBuild: false, help: false, approve: false }
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
     if (a === '--check') opts.check = true
     else if (a === '--skip-build') opts.skipBuild = true
+    else if (a === '--approve-readme-video') opts.approve = true
     else if (a === '--help' || a === '-h') opts.help = true
     else if (a === '--only') {
       if (i + 1 >= argv.length) throw new CaptureError('--only needs a value')
@@ -75,7 +81,34 @@ export function parseArgs(argv) {
     else throw new CaptureError(`unknown argument: ${a}`)
   }
   if (opts.check && opts.only !== undefined) throw new CaptureError('--check and --only cannot be combined')
+  if (opts.approve && (opts.check || opts.only !== undefined || opts.skipBuild)) throw new CaptureError('--approve-readme-video takes no other option')
   return opts
+}
+
+/**
+ * `--approve-readme-video`: copy the approved draft into docs/assets/readme/
+ * and remove the files the video replaces. The draft must hold every file its
+ * rows name and the report of a run whose checks all passed.
+ */
+export function approveReadmeVideo({ root = REPO_ROOT, draftDir = DRAFT_DIR, rows, log = console.log } = {}) {
+  const videoRows = rows.filter((r) => r.scene === VIDEO_SCENE)
+  const report = readText(path.join(draftDir, 'report.txt'))
+  if (report === null || !report.includes('README video: every check passed')) {
+    throw new CaptureError(`no passed README video draft in ${draftDir}; run \`npm run docs:screenshots -- --only ${VIDEO_SCENE}\` first`)
+  }
+  const staged = []
+  for (const row of videoRows) {
+    const from = path.join(draftDir, path.basename(row.file))
+    if (!fs.existsSync(from)) throw new CaptureError(`the draft has no ${path.basename(row.file)}`)
+    const target = safeTarget(root, row.file)
+    const tmp = `${target}.tmp-${process.pid}`
+    fs.copyFileSync(from, tmp)
+    staged.push([tmp, target])
+  }
+  for (const [tmp, target] of staged) fs.renameSync(tmp, target)
+  for (const rel of RETIRED_README_FILES) fs.rmSync(path.join(root, ...rel.split('/')), { force: true })
+  log(`approved: ${videoRows.map((r) => r.file).join(', ')} in place; ${RETIRED_README_FILES.join(' and ')} removed. Update README.md's <picture> and alt text next (023-FR-010, 023-FR-017).`)
+  return EXIT.OK
 }
 
 /** `--check`: the drift and budget report, and its exit code. */
@@ -185,12 +218,20 @@ async function main(argv) {
   }
   const rows = loadManifest(MANIFEST)
   if (opts.check) return runCheck({ rows })
+  if (opts.approve) return approveReadmeVideo({ rows })
 
   // 1. Preflight
   if (process.platform !== 'darwin') throw new CaptureError('docs:screenshots runs on macOS only.', EXIT.NOT_MACOS)
   const { rows: selected, partial } = resolveOnly(rows, opts.only)
   const needsAgent = selected.some((r) => r.agent)
   const secrets = readLogin(process.env, fs, { required: needsAgent })
+  // The scenes' shells start in the project folder: a relative token path would not resolve there.
+  if (process.env.ERFANA_CAPTURE_CLAUDE_TOKEN_FILE) process.env.ERFANA_CAPTURE_CLAUDE_TOKEN_FILE = path.resolve(process.env.ERFANA_CAPTURE_CLAUDE_TOKEN_FILE)
+  const video = selected.some((r) => r.scene === VIDEO_SCENE)
+  if (video) {
+    const problems = videoPrerequisiteProblems()
+    if (problems.length) throw new CaptureError(`the README video cannot be recorded: ${problems.join('; ')}. Nothing was recorded.`, EXIT.VIDEO_PREREQUISITE)
+  }
   const claudeBin = findClaude()
   if (needsAgent && !claudeBin) throw new CaptureError('`claude` (Claude Code) was not found; install it or set ERFANA_CAPTURE_CLAUDE_BIN.', EXIT.NO_LOGIN)
   resolveTesseract(REPO_ROOT)
@@ -241,7 +282,7 @@ async function main(argv) {
   const privacy = [] // { id, layer, kinds }
   const report = { demo: null }
   try {
-    for (const row of selected.filter((r) => r.kind === 'still')) {
+    for (const row of selected.filter((r) => r.kind === 'still' && r.scene !== VIDEO_SCENE)) {
       const meta = JSON.parse(readText(path.join(sb.raw, `${stemOf(row.id)}.json`)) ?? 'null')
       if (!meta) throw new CaptureError(`${row.id}: the scene wrote no shot`, EXIT.SCENE)
       checkTexts(row.id, sb, denyList, privacy)
@@ -260,8 +301,7 @@ async function main(argv) {
       }
       out.set(row.id, target)
     }
-    const loops = selected.filter((r) => r.kind === 'loop')
-    if (loops.length) report.demo = await processDemo(loops, sb, encodedDir, ocr, denyList, privacy, out)
+    if (video) report.demo = await processStory(selected.filter((r) => r.scene === VIDEO_SCENE), sb, encodedDir, ocr, denyList, privacy, out)
   } finally {
     await ocr.close()
   }
@@ -288,10 +328,15 @@ async function main(argv) {
     throw new CaptureError('over budget; nothing copied', EXIT.BUDGET)
   }
 
-  // 6. Copy: every file to a temp name next to its target, then rename.
+  // 6. Copy: every file to a temp name next to its target, then rename. The
+  // README video goes to its draft folder, never to docs/ (023-FR-015).
   const staged = []
+  if (video) {
+    fs.rmSync(DRAFT_DIR, { recursive: true, force: true })
+    fs.mkdirSync(DRAFT_DIR, { recursive: true })
+  }
   for (const row of selected) {
-    const target = safeTarget(REPO_ROOT, row.file)
+    const target = row.scene === VIDEO_SCENE ? path.join(DRAFT_DIR, path.basename(row.file)) : safeTarget(REPO_ROOT, row.file)
     const tmp = `${target}.tmp-${process.pid}`
     fs.copyFileSync(out.get(row.id), tmp)
     staged.push([tmp, target])
@@ -303,6 +348,11 @@ async function main(argv) {
   const lines = reportLines({ rows: selected, sizes, partial, version, demo: report.demo, guideTotal: budget.guideTotal, masked })
   console.log(lines.join('\n'))
   keepEvidence(sb, lines)
+  if (video) {
+    fs.writeFileSync(path.join(DRAFT_DIR, 'report.txt'), `${lines.join('\n')}\n`)
+    for (const f of ['demo-contact-sheet.png']) if (fs.existsSync(path.join(sb.raw, f))) fs.copyFileSync(path.join(sb.raw, f), path.join(DRAFT_DIR, f))
+    console.log(`README video draft in ${DRAFT_DIR}: watch demo.webp, then approve with \`npm run docs:screenshots -- --approve-readme-video\``)
+  }
   removeSandbox(sb.root)
   return EXIT.OK
 }
@@ -319,117 +369,133 @@ function checkTexts(id, sb, denyList, privacy, stem = stemOf(id)) {
 }
 
 /**
- * The README demo: sync, edit, encode, legibility, privacy over frames,
- * contact sheet (design § Loop for #139).
+ * The README video (spec 023): plan the edit from the scene's log, check the
+ * story, encode the WebP at the best quality under the size limit, take the
+ * still, then check legibility and privacy on the output. Any failed check
+ * stops the run before a draft is written (023-FR-013, 023-FR-014).
  */
-async function processDemo(loops, sb, encodedDir, ocr, denyList, privacy, out) {
+async function processStory(rows, sb, encodedDir, ocr, denyList, privacy, out) {
   const sharp = resolveSharp(REPO_ROOT)
-  const demo = JSON.parse(readText(path.join(sb.raw, 'readme-demo.json')) ?? 'null')
-  if (!demo) throw new CaptureError('readme-demo: the scene wrote no recording', EXIT.SCENE)
-  const syncVideo = findSyncTime(await runFfmpeg(syncScanArgs(demo.video), { stdout: true }))
-  if (syncVideo === null) throw new CaptureError('readme-demo: the sync flash was not found in the recording', EXIT.SCENE)
-  const marks = Object.fromEntries(Object.entries(demo.marks).map(([k, wall]) => [k, (wall - demo.syncWall) / 1000 + syncVideo]))
-  const plan = planDemoEdit(marks)
-  if (plan.duration < 10 || plan.duration > 20) {
-    throw new CaptureError(`readme-demo: the edit is ${plan.duration.toFixed(1)} s, outside 10–20 s`, EXIT.SCENE)
-  }
-  const source = path.join(encodedDir, 'demo-source.mkv')
-  await runFfmpeg(demoSourceArgs({ input: demo.video, segments: plan.segments, output: source }))
+  const log = JSON.parse(readText(path.join(sb.raw, 'readme-demo.json')) ?? 'null')
+  if (!log || !fs.existsSync(log.recording ?? '')) throw new CaptureError('readme-demo: the scene wrote no recording', EXIT.SCENE)
+  const problems = []
+  const missing = STORY.filter((s) => !log.results?.[s.id])
+  if (missing.length) throw new CaptureError(`readme-demo: step(s) without a result: ${missing.map((s) => s.id).join(', ')}; the whole run is discarded`, EXIT.SCENE)
 
+  const syncVideo = findSyncTime(await runFfmpeg(syncScanArgs(log.recording), { stdout: true }))
+  if (syncVideo === null) throw new CaptureError('readme-demo: the sync flash was not found in the recording', EXIT.SCENE)
+  const toVideo = (wall) => (wall - log.syncWall) / 1000 + syncVideo
+  const plan = planStory({
+    steps: log.steps.map((s) => ({ id: s.id, start: toVideo(s.start), end: toVideo(s.end) })),
+    waits: log.waits.map((w) => ({ from: toVideo(w.from), to: toVideo(w.to) }))
+  })
+  const length = lengthProblem(plan.duration)
+  if (length) problems.push(length)
+  if (log.window.width !== VIDEO.width || log.window.height !== VIDEO.height) {
+    problems.push(`the window recorded is ${log.window.width}×${log.window.height}, not ${VIDEO.width}×${VIDEO.height}`)
+  }
+  for (const m of log.layout) for (const p of layoutProblems({ ...m, columns: log.columns })) problems.push(`layout at "${m.step}": ${p}`)
+  if (log.editLatencyMs === null || log.editLatencyMs > 2000) problems.push(`the preview showed the agent's edit ${log.editLatencyMs ?? '?'} ms after the write, over 2000 ms`)
+  const shot = log.screenshot
+  if (!shot) problems.push('the window screenshot was not found')
+  else if (Math.abs(shot.width - shot.expected.width) > 4 || Math.abs(shot.height - shot.expected.height) > 4) {
+    problems.push(`the window screenshot is ${shot.width}×${shot.height}, not the window's ${shot.expected.width}×${shot.expected.height}`)
+  }
+
+  // Edit: captions as text files, one lossless source with hold and fade.
+  const capDir = path.join(sb.raw, 'captions')
+  fs.mkdirSync(capDir, { recursive: true })
+  const captions = plan.captions.map((c, i) => {
+    const file = path.join(capDir, `${i}.txt`)
+    fs.writeFileSync(file, c.text)
+    return { ...c, file }
+  })
+  const source = path.join(encodedDir, 'story-source.mkv')
+  await runFfmpeg(storyArgs({ input: log.recording, segments: plan.segments, captions, hold: VIDEO.holdSeconds, fade: VIDEO.fadeSeconds, content: plan.content, video: VIDEO, output: source }))
+
+  // The best quality that fits (023-NFR-002).
+  const webp = path.join(encodedDir, 'demo.webp')
+  let quality = null
+  for (const q of WEBP_QUALITIES) {
+    await runFfmpeg(storyWebpArgs(source, webp, q))
+    if (fs.statSync(webp).size <= VIDEO.maxBytes) {
+      quality = q
+      break
+    }
+  }
+  if (quality === null) problems.push(`demo.webp is over ${formatKB(VIDEO.maxBytes)} even at quality ${WEBP_QUALITIES[WEBP_QUALITIES.length - 1]}`)
+  const { delay, pages, loop } = await sharp(webp, { animated: true, limitInputPixels: false }).metadata()
+  const duration = delay.reduce((a, d) => a + d, 0) / 1000
+  if (loop !== 0) problems.push(`demo.webp loops ${loop} times, not endlessly`)
+  const outputLength = lengthProblem(duration)
+  if (outputLength) problems.push(outputLength)
+
+  // The still: the last frame of the story, before the hold.
+  const stillRaw = path.join(encodedDir, 'still-raw.png')
+  await runFfmpeg(frameAtArgs(source, plan.content - 0.05, stillRaw))
+  const still = path.join(encodedDir, 'demo-still.png')
+  await runFfmpeg(stillArgs({ input: stillRaw, output: still }))
+
+  // Legibility (023-NFR-004): each step's label at 880 px; the app's text at full size.
+  const page = (t) => sharp(webp, { page: webpPageAt(delay, t), limitInputPixels: false }).png().toBuffer()
   const legDir = path.join(sb.raw, 'legibility')
   fs.mkdirSync(legDir, { recursive: true })
   const legibility = []
-  const files = []
-  for (const row of loops) {
-    const ext = path.extname(row.file).slice(1)
-    const file = path.join(encodedDir, `demo.${ext}`)
-    await runFfmpeg(loopArgs(ext, source, file))
-    out.set(row.id, file)
-    files.push({ row, ext, file })
-  }
-  // Legibility: the hand-off frame and the end of the agent's work, from each file.
-  for (const { ext, file } of files) {
-    for (const [name, t, known] of [
-      ['hand-off', plan.times.handOff, demo.knownLine],
-      ['agent-end', plan.times.agentEnd, null]
-    ]) {
-      const frame = await frameAt(sharp, ext, file, t)
-      const { display, upscaled } = await terminalCrop(sharp, frame, demo.terminalRect, 1280)
-      fs.writeFileSync(path.join(legDir, `${ext}-${name}-800.png`), display)
-      fs.writeFileSync(path.join(legDir, `${ext}-${name}-terminal-ocr.png`), upscaled)
-      const verdict = judgeFrame(await ocr.read(upscaled), known)
-      legibility.push({ file: `demo.${ext}`, frame: name, ...verdict })
+  for (const step of plan.steps) {
+    const label = STORY.find((s) => s.id === step.id).label
+    const frame = await page((step.from + step.to) / 2)
+    // Only the caption's own box: the light title bar and the window title around it are not the label.
+    // The top row: the box's own edge, above the letters. The crop leaves out the
+    // box's soft edges and the light title bar around it, which OCR reads as "|".
+    const row = await sharp(frame).extract({ left: 0, top: 0, width: VIDEO.width, height: 1 }).greyscale().raw().toBuffer()
+    const box = darkSpan(row, 200, VIDEO.width - 200)
+    if (!box) {
+      legibility.push({ what: `label "${label}" at ${VIDEO.displayWidth} px`, ok: false, capPx: null, samples: 0, readBack: false, reasons: ['no caption box in the title bar'] })
+      continue
     }
+    // And its height: a column just inside its left side, where no letter is.
+    const column = await sharp(frame).extract({ left: box.x + 2, top: 0, width: 1, height: VIDEO.titleBar }).greyscale().raw().toBuffer()
+    const boxHeight = darkSpan(column)?.width ?? VIDEO.titleBar - 2
+    const { crop, upscaled } = await regionCrop(sharp, frame, { x: box.x + 3, y: 0, width: box.width - 6, height: boxHeight - 1 }, VIDEO.width, VIDEO.displayWidth)
+    fs.writeFileSync(path.join(legDir, `label-${step.id}.png`), upscaled)
+    // OCR must read the label back; its capital height comes from the first letter's pixels.
+    const judged = judgeFrame(await ocr.read(upscaled), label)
+    const { data, info } = await sharp(crop).greyscale().raw().toBuffer({ resolveWithObject: true })
+    const capPx = firstLetterHeight({ data, width: info.width, height: info.height })
+    const reasons = judged.reasons.filter((r) => !r.startsWith('capital height') && !r.startsWith('no capital-height'))
+    if (capPx === null) reasons.push('no letter found in the caption box')
+    else if (capPx < MIN_CAP_PX) reasons.push(`capital height ${capPx} px < ${MIN_CAP_PX} px`)
+    legibility.push({ what: `label "${label}" at ${VIDEO.displayWidth} px`, ok: reasons.length === 0, capPx, samples: 1, readBack: judged.readBack, reasons })
   }
-  fs.writeFileSync(path.join(legDir, 'result.json'), `${JSON.stringify({ zoom: demo.zoom, displayWidth: DISPLAY_WIDTH, legibility }, null, 2)}\n`)
-  const illegible = legibility.filter((l) => !l.ok)
-  if (illegible.length) {
-    for (const l of illegible) console.error(`legibility: ${l.file} ${l.frame}: ${l.reasons.join('; ')}`)
-    throw new CaptureError(`demo not legible at ${DISPLAY_WIDTH} px; frames kept in ${legDir}`, EXIT.SCENE)
-  }
+  const edit = plan.steps.find((s) => s.id === 'edit')
+  const { upscaled: terminal } = await regionCrop(sharp, await page(edit.to - 0.5), log.terminalRect, VIDEO.width, VIDEO.width)
+  fs.writeFileSync(path.join(legDir, 'terminal-1920.png'), terminal)
+  legibility.push({ what: `terminal text at ${VIDEO.width} px`, ...judgeFrame(await ocr.read(terminal), null) })
+  for (const l of legibility.filter((x) => !x.ok)) problems.push(`legibility: ${l.what}: ${l.reasons.join('; ')}`)
 
-  // Privacy over the frames: at least one per second, plus the first and last.
+  // Privacy (023-NFR-005): every page of the WebP, read at full size, plus the scene's text.
   const framesDir = path.join(sb.raw, 'demo-frames')
   fs.mkdirSync(framesDir, { recursive: true })
-  let framesRead = 0
-  const headerFrames = []
-  for (const { row, ext, file } of files) {
-    const frames = await extractSampledFrames(sharp, ext, file, framesDir, plan.duration)
-    for (const f of frames) {
-      const text = (await ocr.read(f)).text
-      const kinds = scanText(text, denyList)
-      framesRead++
-      if (kinds.length) privacy.push({ id: row.id, layer: `frame ${path.basename(f)}`, kinds })
-      if (showsStartupHeader(text)) headerFrames.push(`demo.${ext} ${path.basename(f)}`)
-    }
+  const [webpRow, stillRow] = [rows.find((r) => r.file.endsWith('.webp')), rows.find((r) => r.file.endsWith('.png'))]
+  for (let i = 0; i < pages; i++) {
+    const f = path.join(framesDir, `${String(i).padStart(4, '0')}.png`)
+    await sharp(webp, { page: i, limitInputPixels: false }).png().toFile(f)
+    const kinds = scanText((await ocr.read(f)).text, denyList)
+    if (kinds.length) privacy.push({ id: webpRow.id, layer: `page ${i}`, kinds })
   }
-  // NB-4: Claude Code's start-up header must not survive the S0→S1 cut.
-  if (headerFrames.length) {
-    throw new CaptureError(`readme-demo: Claude Code's start-up header is visible after the cut in ${headerFrames.length} frame(s): ${headerFrames.slice(0, 5).join(', ')}`, EXIT.SCENE)
-  }
-  // The DOM text at the end and the whole PTY stream of the recording.
-  for (const { row } of files) checkTexts(row.id, sb, denyList, privacy, 'readme-demo')
+  const stillKinds = scanText((await ocr.read(still)).text, denyList)
+  if (stillKinds.length) privacy.push({ id: stillRow.id, layer: 'image OCR', kinds: stillKinds })
+  checkTexts(webpRow.id, sb, denyList, privacy, 'readme-demo')
   const sheet = path.join(sb.raw, 'demo-contact-sheet.png')
-  await runFfmpeg(contactSheetArgs(files.find((f) => f.ext === 'mp4')?.file ?? source, sheet))
-  return { duration: plan.duration, zoom: demo.zoom, legibility, framesRead, contactSheet: sheet, syncVideo }
-}
+  await runFfmpeg(contactSheetArgs(source, sheet, 8, 8))
 
-/** Claude Code's start-up header reads "Claude Code v<version>". */
-export function showsStartupHeader(ocrText) {
-  return /claude\s*code\s*v\s*\d/i.test(ocrText)
-}
-
-async function frameAt(sharp, ext, file, t) {
-  if (ext === 'webp') {
-    const { delay } = await sharp(file, { animated: true }).metadata()
-    return sharp(file, { page: webpPageAt(delay, t) }).png().toBuffer()
+  if (problems.length) {
+    for (const p of problems) console.error(`README video: ${p}`)
+    throw new CaptureError(`the README video failed ${problems.length} check(s); no draft was written, the sandbox stays at ${sb.root}`, EXIT.SCENE)
   }
-  const tmp = path.join(path.dirname(file), `frame-${ext}-${Math.round(t * 1000)}.png`)
-  await runFfmpeg(frameAtArgs(file, t, tmp))
-  return fs.readFileSync(tmp)
-}
-
-async function extractSampledFrames(sharp, ext, file, dir, duration) {
-  const files = []
-  if (ext === 'webp') {
-    const { delay } = await sharp(file, { animated: true }).metadata()
-    for (const i of webpSamplePages(delay)) {
-      const f = path.join(dir, `webp-${String(i).padStart(4, '0')}.png`)
-      await sharp(file, { page: i }).png().toFile(f)
-      files.push(f)
-    }
-    return files
-  }
-  // GIF and MP4: the frame on screen at every whole second, plus the last.
-  // All three files are encoded from the one edited source, so they share
-  // its duration. (The bundled ffprobe-static is not an arm64 binary.)
-  for (const t of sampleTimes(duration)) {
-    const f = path.join(dir, `${ext}-${String(Math.round(t * 1000)).padStart(6, '0')}.png`)
-    await runFfmpeg(frameAtArgs(file, t, f))
-    if (!fs.existsSync(f)) throw new CaptureError(`readme-demo: could not read the frame at ${t} s of demo.${ext}`, EXIT.SCENE)
-    files.push(f)
-  }
-  return files
+  out.set(webpRow.id, webp)
+  out.set(stillRow.id, still)
+  return { duration, pages, quality, legibility, results: log.results, segments: plan.segments, steps: plan.steps, editLatencyMs: log.editLatencyMs, screenshot: shot, layout: log.layout, columns: log.columns, window: log.window }
 }
 
 /**
@@ -463,12 +529,28 @@ export function reportLines({ rows, sizes, partial, version, demo, guideTotal, m
   }
   const guide = rows.filter((r) => r.file.startsWith(GUIDE_IMAGES_DIR)).length
   out.push(`${guide} guide image(s), ${rows.length - guide} README demo file(s); this run ${formatKB(total)}; all guide images ${formatKB(guideTotal)} of 12288 KB`)
-  if (demo) {
-    out.push(`demo: ${demo.duration.toFixed(1)} s, zoom ${demo.zoom}, ${demo.framesRead} frames read by the privacy pass`)
-    for (const l of demo.legibility) {
-      out.push(`  legibility ${l.file} ${l.frame} at ${DISPLAY_WIDTH} px: capital height ${l.capPx} px (${l.samples} words)${l.readBack === null ? '' : `, known line read back: ${l.readBack}`}`)
-    }
+  if (demo) out.push(...storyReportLines(demo))
+  return out
+}
+
+/**
+ * The README video's part of the report (spec 023): one line per check, so
+ * the evidence for each acceptance criterion is in the report and the draft.
+ */
+export function storyReportLines(demo) {
+  const out = ['README video: every check passed']
+  out.push(`  length: ${demo.duration.toFixed(1)} s (${VIDEO.minSeconds}–${VIDEO.maxSeconds} s), ${demo.pages} WebP pages, quality ${demo.quality}, loop 0 (endless)`)
+  out.push(`  window: ${demo.window.width}×${demo.window.height}; terminal ${demo.columns} columns`)
+  for (const [i, s] of demo.steps.entries()) out.push(`  step ${i + 1} ${s.id} at ${s.from.toFixed(1)}–${s.to.toFixed(1)} s: ${demo.results[s.id]}`)
+  for (const s of demo.segments.filter((x) => x.speed > 1)) out.push(`  sped up ×${s.speed}: ${(s.to - s.from).toFixed(1)} s of recording`)
+  for (const m of demo.layout) {
+    const pct = (n) => `${((100 * n) / m.window).toFixed(1)} %`
+    out.push(`  layout at ${m.step}: tree ${pct(m.tree)}, preview ${pct(m.preview)}, terminal ${pct(m.terminal)}, editor ${m.editorVisible ? 'visible' : 'hidden'}`)
   }
+  out.push(`  edit to preview: ${demo.editLatencyMs} ms after the write`)
+  out.push(`  window screenshot: ${demo.screenshot.width}×${demo.screenshot.height} (window ${demo.screenshot.expected.width}×${demo.screenshot.expected.height})`)
+  for (const l of demo.legibility) out.push(`  legibility ${l.what}: capital height ${l.capPx} px (${l.samples} words)${l.readBack === null ? '' : `, read back: ${l.readBack}`}`)
+  out.push(`  privacy: ${demo.pages} pages read, 0 hits`)
   return out
 }
 
