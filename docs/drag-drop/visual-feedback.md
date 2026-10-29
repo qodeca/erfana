@@ -61,7 +61,7 @@ from the OS, drawn with a dashed edge):
 
 **Note**: The `::before` pseudo-element approach ensures the 2px border indicator doesn't cause layout shifts. Previous implementation used `border-left: 2px`, `margin-left: 8px`, `padding-left: 8px` which added 18px total and caused visible horizontal movement.
 
-**Invalid drop** (red background):
+**Invalid drop** (red background). The rule exists, but `ProjectTree.tsx` never passes `isDropInvalid` to `ProjectTreeNode`, so `data-drop-invalid` is always `false` today – an invalid drag is refused at drop time with a toast instead:
 ```css
 /* ProjectTree.css – "Invalid drop target" */
 .project-tree-item[data-drop-invalid="true"] {
@@ -169,39 +169,23 @@ Ghost element following the cursor during drag. It is rendered inline in `Projec
 
 ### Auto-Scroll Behavior
 
-Smooth scrolling when dragging near edges:
-
-```typescript
-// ProjectTree.tsx – startAutoScroll (constants from ProjectTree/constants.ts AUTO_SCROLL)
-const startAutoScroll = (direction: 'up' | 'down') => {
-  if (autoScrollIntervalRef.current) return // Already scrolling
-  // ...
-  autoScrollIntervalRef.current = window.setInterval(() => {
-    const scrollAmount = direction === 'up' ? -AUTO_SCROLL.SCROLL_AMOUNT : AUTO_SCROLL.SCROLL_AMOUNT
-    container.scrollTop += scrollAmount
-  }, AUTO_SCROLL.SCROLL_INTERVAL) // ~60fps
-}
-```
-
-**Parameters**:
-- **Threshold**: 50px from top/bottom edge
-- **Speed**: 5px per frame (~60fps = 300px/sec)
-- **Activation**: Automatic when cursor enters threshold zone
-- **Deactivation**: Stops when cursor leaves threshold zone
+Scrolling while dragging near the tree's top or bottom edge is dnd-kit's own `DndContext` auto-scroll (on by default), driven by the live pointer. The tree's former `startAutoScroll` interval read the pointer position from when the drag *started*, so it scrolled on a stale position, and was removed. The `AUTO_SCROLL` constants in `ProjectTree/constants.ts` (50 px trigger distance, 5 px per 16 ms step) are left over from it and no longer used. `e2e/tree-keyboard.e2e.ts` ("dragging to the edge scrolls the list…") holds the pointer at the list's bottom edge and checks that a folder below the visible rows scrolls into view and takes the drop.
 
 ## Accessibility
 
 ### Operation feedback (toasts, not ARIA announcements)
 
-There is **no** screen-reader announcer for drag-drop: no `announceToScreenReader` helper, no `#drag-drop-announcer` element and no `aria-live` region are rendered by `ProjectTree.tsx`. The only remnant of that design is an orphan `.drag-announcements` rule in `ProjectTree.css` that nothing references.
+Erfana adds **no** screen-reader announcer of its own for drag-drop: no announcer helper and no `aria-live` element of its own in `ProjectTree.tsx`. dnd-kit's default live region and drag instructions are still rendered – `DndContext` gets `accessibility={TREE_DND_ACCESSIBILITY}`, which puts them at `document.body` because inside `role="tree"` they would be children a tree may not own. The orphan `.drag-announcements` rule in `ProjectTree.css` is a remnant of an older design that nothing references.
 
 Feedback goes through the global toast service (`showGlobalToast` from `components/Toast/toastService`), from `ProjectTree.tsx` and the context-menu commands:
 
 - "Cut" – `"<name>" ready to move` (keyboard cut and `CutCommand`)
 - "Copied" – `"<name>" ready to paste` (keyboard copy and `CopyCommand`)
-- "Success" – `Moved N file(s)` / `Copied N file(s)` after a drop, with `(N failed)` appended and a warning type when part of the batch failed
-- "Symlink Moved" / "Symlink Copied" – info toast when the operated item was a symlink
-- "Move failed" and other error toasts carry the `FileService` error message
+- "Success" – `Item moved successfully` after a drag inside the tree; `Item moved` / `Item copied` (plus ` and replaced existing item`) after a paste
+- "Success" – `Moved 1 file` / `Moved N files` / `Copied …` after a drop from the OS, with `(N failed)` appended and a warning type when part of the batch failed
+- "Symlink Moved" / "Symlink Copied" – warning toast when the operated item was a symlink
+- "Invalid Move" – a folder dropped into its own subfolder, or the project root dragged
+- "Error" – other failures; after a drag the message goes through `formatFileOperationError`
 
 ### Keyboard Navigation
 
@@ -209,17 +193,15 @@ Keyboard support matching mouse operations:
 - `Ctrl+X` / `Cmd+X` - Cut (toast "Cut")
 - `Ctrl+C` / `Cmd+C` - Copy (toast "Copied")
 - `Ctrl+V` / `Cmd+V` - Paste into the selected folder
-- `Escape` - Cancel drag or close dialog
+- `Escape` - Close the "Replace Item" dialog
 
 See [clipboard.md](./clipboard.md) for keyboard shortcut details.
 
 ### Focus Management
 
 Focus handling during operations:
-- Focus remains on dragged item during drag
-- Focus moves to destination folder after successful drop
-- Focus returns to original item on cancel
-- Dialog focus trapped during confirmation
+- When the focused row disappears (moved, deleted, renamed, filtered out), focus moves to the row with the same path, else its nearest ancestor, else the first row (`ProjectTree/useTreeFocusRecovery.ts`)
+- Dialog focus trapped during confirmation (`BaseDialog`; the "Replace Item" dialog opens with Cancel focused because it is a danger prompt)
 
 ## VS Code UX Patterns
 
@@ -238,15 +220,12 @@ Implementation matches VS Code Explorer behavior:
 - Same highlight held during the auto-expand countdown (no pulse animation ships)
 
 ### Auto-Expand
-- 1 second hover delay before auto-expand
+- 1 second hover delay before auto-expand (`AUTO_EXPAND.HOVER_DELAY`)
 - Folder highlight indicates the countdown
 - Prevents accidental expansions on quick drags
-- Matches VS Code timing
 
 ### Auto-Scroll
-- 50px threshold from edges
-- Smooth scrolling at 60fps
-- Works during both mouse drag and keyboard operations
+- dnd-kit's built-in auto-scroll near the list's edges during a pointer drag (see [Auto-Scroll Behavior](#auto-scroll-behavior))
 
 ## Visual States Summary
 
@@ -254,14 +233,14 @@ Implementation matches VS Code Explorer behavior:
 |-------|-----------------|-----------|-------------|
 | Dragging | 40% opacity, grabbing cursor | `data-dragging="true"` | Drag started |
 | Drop target | Accent-drag background | `data-drop-target="true"` | Hovering over valid folder |
-| Invalid drop | Red background, not-allowed cursor | `data-drop-invalid="true"` | Hovering over invalid location |
+| Invalid drop | Red background, not-allowed cursor (rule only – never set today) | `data-drop-invalid="true"` | – |
 | Cut | 60% opacity, dashed underline | `data-clipboard-cut="true"` | Ctrl+X pressed |
 | Auto-expand | Accent-drag background during the 1s countdown | `data-drop-highlight="true"` | Hovering over folder for 1s |
-| Children highlight | Light blue background, left border | `data-drop-highlight="true"` | Folder expanded during drag |
+| Children highlight | Subtle accent-drag background, left border | `data-in-drop-zone="internal"` (`"external"` for an OS drag) | Rows inside the target folder during a drag |
 
 ## Related Files
 
 - **CSS**: [src/renderer/src/components/ProjectTree/ProjectTree.css](../../src/renderer/src/components/ProjectTree/ProjectTree.css)
 - **Drag Overlay**: [src/renderer/src/components/ProjectTree/ProjectTree.tsx](../../src/renderer/src/components/ProjectTree/ProjectTree.tsx) (inline `<DragOverlay>`; `DropIndicator.tsx` / `FolderDropHighlight.tsx` are unused)
-- **Auto-Scroll**: [src/renderer/src/components/ProjectTree/ProjectTree.tsx](../../src/renderer/src/components/ProjectTree/ProjectTree.tsx) (`startAutoScroll`) and [constants.ts](../../src/renderer/src/components/ProjectTree/constants.ts) (`AUTO_SCROLL`)
+- **Auto-Scroll**: dnd-kit's `DndContext` default, set up in [src/renderer/src/components/ProjectTree/ProjectTree.tsx](../../src/renderer/src/components/ProjectTree/ProjectTree.tsx) (the unused `AUTO_SCROLL` constants remain in [constants.ts](../../src/renderer/src/components/ProjectTree/constants.ts))
 - **Feedback toasts**: [src/renderer/src/components/ProjectTree/ProjectTree.tsx](../../src/renderer/src/components/ProjectTree/ProjectTree.tsx) and [context-menu/commands.tsx](../../src/renderer/src/components/ProjectTree/context-menu/commands.tsx)

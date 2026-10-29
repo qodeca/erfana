@@ -8,14 +8,14 @@ See also: testing/README.md, terminal.md, file-watching.md.
 
 - Availability
   - Renderer DevTools: `await window.api.terminal.isAvailable()`
-  - If unavailable, Terminal panel shows "Terminal Not Available" with actions (Recheck, Copy Fix Command)
+  - If unavailable, Terminal panel shows "Terminal not available" with actions (Recheck, Copy fix command)
 
 - CWD correctness
   - Open Terminal panel; run `pwd` (POSIX) or `cd` (cmd) / `(Get-Location).Path` (PowerShell)
   - Should match current project path from `await window.api.file.getProjectPath()`
 
 - Restart behavior
-  - Click Restart in panel header; prompt reappears, terminal ID changes, previous activity cleared
+  - Click the "Restart terminal" button in the panel toolbar (it asks "Restart terminal?" first when the terminal looks busy); prompt reappears, terminal ID changes, previous activity cleared
 
 ## Watchers
 

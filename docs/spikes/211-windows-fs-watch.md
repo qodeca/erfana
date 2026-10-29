@@ -8,6 +8,7 @@ SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 - **Issue:** [#211](https://github.com/qodeca/erfana/issues/211). **Design:** [D0 and W0](../designs/large-projects/211-large-project-windows-watcher.md#3-decisions).
 - **Date:** 2026-09-29. **Host:** Windows 11 Pro 10.0.26200, NTFS, Developer Mode on, 8.3 names on for the temp volume.
 - **Method:** throwaway scripts (not committed) under Electron's own Node (`ELECTRON_RUN_AS_NODE=1`) and plain Node, in fresh folders under the OS temp folder (`<tmp>` below), removed afterwards. Risky watches ran in child processes.
+- **Since then:** the app moved to Electron 44 and chokidar 5.0.0 (`package.json`); the Electron 39 and chokidar 3.6.0 figures below describe the build tested on that date.
 
 ## The answer
 

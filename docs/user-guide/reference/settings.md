@@ -46,7 +46,7 @@ Open **Settings** with the gear at the bottom of the left activity bar. <kbd>Esc
 | Option | Default | Effect |
 | --- | --- | --- |
 | **Log level** | Info | Choose Trace, Debug, Info, Warn, Error or Fatal. |
-| **Logs folder** and **Open** | `~/.erfana/logs/` | Shows the resolved path and opens it in Finder or File Explorer. Logs are kept for seven days, with at most five older files per log. |
+| **Logs folder** and **Open** | `~/.erfana/logs/` | Shows the resolved path and opens it in your system file manager. Logs are kept for seven days, with at most five older files per log. |
 
 ![Screenshot of Logging and HTML preview settings.](../images/settings/logging-and-html-preview.png)
 
@@ -56,9 +56,9 @@ Open **Settings** with the gear at the bottom of the left activity bar. <kbd>Esc
 
 | Option | Default | Effect |
 | --- | --- | --- |
-| **Backend** | OpenAI | Choose **OpenAI**, which sends audio to the OpenAI API, or **Local (whisper.cpp)**, which runs offline. Local is unavailable on Windows ARM64. |
+| **Backend** | OpenAI | Choose **OpenAI**, which sends audio to the OpenAI API, or **Local (whisper.cpp)**, which runs offline. Local works only on macOS and Windows x64; elsewhere it is greyed out. There it reads **Local (macOS / Windows x64 only)**, or **Local (macOS / Windows x64 only – ARM64 not supported)** on Windows ARM64. |
 | **OpenAI API key** | Empty | Enter a key for the OpenAI backend; **Remove key** deletes the stored key. The key is always stored encrypted: if the system cannot encrypt it (for example Linux without a keyring), Erfana says so and does not save it. |
-| **Whisper model** | Base | For Local, choose Tiny, Base, Small, Medium or Large. |
+| **Whisper model** | Base | For Local, choose Tiny, Base, Small, Medium or Large; each option shows its download size. |
 | **Model status** / **Download model** | Model not downloaded until installed | Shows Ready or download progress for the selected local model; download it before using Local. While it downloads, **Cancel** stops the download and leaves no partial file behind. |
 
 ![Screenshot of the Transcription settings section.](../images/transcribe/settings-transcription.png)
@@ -89,7 +89,7 @@ Remote-host approvals belong to each project. An approved host is saved to `.erf
 
 ## Comments
 
-**What it does:** Turns [HTML Preview comments](html-preview.md#comments) on or off and sets the name and email saved with each comment you write. **How to reach it:** **Settings > Comments**, right below HTML preview.
+**What it does:** Turns [comments in HTML preview](html-preview.md#comments) on or off and sets the name and email saved with each comment you write. **How to reach it:** **Settings > Comments**, right below HTML preview.
 
 | Option | Default | Effect |
 | --- | --- | --- |
@@ -161,7 +161,7 @@ For example, to leave out the scratch folder that test runs fill:
 - A trailing `/` or `/**`, and `./` segments, are ignored.
 - The `.erfana` folder, and everything in it, is never excluded – so the settings file that hides things stays in the tree.
 
-**Limits.** Each file can hold up to 256 entries and 4,096 characters of entries. One entry can be up to 256 characters, with at most 8 wildcards and 4 `**`. An entry is also refused when it is blank, is an absolute path (a drive letter such as `C:` or a `\\server` path), has a `..` step, contains one of `< > : " |` or a control character, or has nothing but wildcards (`*`, `**`). A refused entry is skipped, the rest of the list still applies, and the log gets a warning naming the file (`global` or `project`) and the entry's position in the list, counting from 0 – not its text. A malformed `files` section never stops a project from opening and never resets your other settings. Broken JSON anywhere in `~/.erfana/settings.json` is different: Erfana copies the file to `settings.json.bak` and resets every setting to its default. (Other mistakes in a project's `.erfana/settings.json`, such as broken JSON, still stop that project from opening, as before.)
+**Limits.** Each file can hold up to 256 entries and 4,096 characters of entries. One entry can be up to 256 characters, with at most 8 wildcards and 4 `**`. An entry is also refused when it is blank, is an absolute path (a drive letter such as `C:` or a `\\server` path), has a `..` step, contains one of `< > : " |` or a control character, or has nothing but wildcards (`*`, `**`). A refused entry is skipped, the rest of the list still applies, and the log gets a warning naming the file (`global` or `project`) and the entry's position in the list, counting from 0 – not its text. A malformed `files` section never stops a project from opening and never resets your other settings. Broken JSON, or an invalid value for another setting such as **Log level**, in `~/.erfana/settings.json` is different: Erfana copies the file to `settings.json.bak` and resets every setting to its default. (Other mistakes in a project's `.erfana/settings.json`, such as broken JSON, still stop that project from opening, as before.)
 
 **When changes apply.** A project's list is read each time the project opens: after editing it, close the project (or open another one) and open it again – choosing the project that is already open does not re-read its settings. The global file is read when Erfana starts: quit Erfana, edit `~/.erfana/settings.json`, then start Erfana again. Erfana saves that file from its own copy whenever you change a setting in the Settings overlay, so an edit made while Erfana is running can be overwritten.
 

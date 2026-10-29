@@ -1,0 +1,12 @@
+# CLAUDE.md: Erfana hosts CLI agents; it has no built-in AI. Only phrases that cannot be read as a
+# denial live here; the negation-aware list (built-in AI, AI assistant, AI prompts) is WORDING_RULES
+# in scripts/check-links.mjs, run by npm run check:links.
+extends: existence
+message: "'%s' claims Erfana has its own AI. Erfana hosts CLI agents in its terminal."
+level: error
+ignorecase: true
+tokens:
+  - AI-powered
+  - AI-driven
+  - Erfana's AI
+  - Erfana AI

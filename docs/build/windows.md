@@ -108,7 +108,7 @@ cd erfana
 npm ci
 ```
 
-`npm ci` runs the `postinstall` hook, which is `patch-package && electron-builder install-app-deps`. `patch-package` first applies the committed `patches/node-pty+1.1.0.patch`, then `electron-builder install-app-deps` rebuilds `node-pty` against Electron's bundled Node.js. If the rebuild step fails, you almost always have the wrong Python or are missing the C++ workload — re-check steps 2 and 3.
+`npm ci` runs the `postinstall` hook, which is `patch-package && install-electron && electron-builder install-app-deps`. `patch-package` first applies the committed `patches/node-pty+1.1.0.patch`, `install-electron` downloads the Electron binary, then `electron-builder install-app-deps` rebuilds `node-pty` against Electron's bundled Node.js. If the rebuild step fails, you almost always have the wrong Python or are missing the C++ workload — re-check steps 2 and 3.
 
 > **Why the patch?** A fresh `npm ci` on a default-hardened Windows 11 box used to fail in two ways during the `node-pty` build; `patch-package` now fixes both automatically. See the [node-pty build failures on Windows 11](#node-pty-build-failures-on-windows-11) note below.
 
@@ -174,9 +174,6 @@ A fresh `git clone && npm ci` on a default-hardened Windows 11 box previously fa
 
 **`build:win` fails with "Cannot create symbolic link : A required privilege is not held by the client"**
 - Developer Mode is not enabled. See step 4. Note this is now the *second* failure you would hit, not the first — the Azure signing error above stops the build earlier.
-
-**`npm run test:cov` complains about missing `out/` directory**
-- Run `npm run build` once first. The script preserves an existing `out/` between runs but expects either none or a valid one.
 
 ---
 

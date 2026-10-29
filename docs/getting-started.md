@@ -11,41 +11,41 @@ Quick onboarding guide for new developers working on Erfana.
 
 ## Prerequisites
 
-- **Node.js**: 24+ — pinned in [`.nvmrc`](../.nvmrc), so `nvm use` in the repo root selects it (Electron 44.9.3 bundles Node.js 24.22.0)
-- **Python**: 3.12, or 3.14.x (3.14.3 verified) – node-pty fails to build on 3.13
-- **Git**: For version control
-- **On Windows**: VS 2022 Build Tools, Developer Mode enabled, Win32 long paths enabled. Skipping these breaks `node-pty` build + `npm run build:win`. Full setup: [`docs/build/windows.md`](./build/windows.md).
+- **Node.js**: 24+ – pinned in [`.nvmrc`](../.nvmrc), so `nvm use` in the repo root selects it (Electron 44.9.3 bundles Node.js 24.22.0)
+- **Python**: needed to build native modules – `npm ci` runs `electron-builder install-app-deps`, which rebuilds `node-pty` for Electron. Reported by contributors, not checked by any script: the `node-pty` build fails on Python 3.13; 3.12 and 3.14.3 work (see [Troubleshooting](./troubleshooting.md#node-pty-build-failure))
+- **Git**: for version control
+- **On Windows**: a C++ build toolchain for the `node-pty` rebuild, and Developer Mode so tests can create symlinks. Full setup: [`docs/build/windows.md`](./build/windows.md).
 
-## Day 1 Checklist
+## Day 1 checklist
 
 ### 1. Clone and install
 
 ```bash
 git clone https://github.com/qodeca/erfana.git
 cd erfana
-npm ci   # not `npm install` — see CONTRIBUTING.md § Local setup
+npm ci   # not `npm install` – see CONTRIBUTING.md § Local setup
 ```
 
 ### 2. Verify setup
 
 ```bash
-npm run dev          # Start development server
-npm run test         # Run all tests (should pass)
+npm run dev          # Start the app in development mode
+npm run test         # Run all unit tests (should pass)
 npm run typecheck    # Type checking (should pass)
-npm run lint         # Linting (should pass)
+npm run lint         # Lint and auto-fix (should pass)
 ```
 
 ### 3. Understand the architecture
 
 Read these docs in order:
 
-1. [Architecture](./architecture.md) - System design patterns
-2. [IPC Patterns](./ipc-patterns.md) - Main ↔ Renderer communication
-3. [Design system](design-system/index.html) - the cards that decide every visual rule (MANDATORY for UI changes)
+1. [Architecture](./architecture.md) – System design patterns
+2. [IPC patterns](./ipc-patterns.md) – Main ↔ Renderer communication
+3. [Design system](design-system/index.html) – the cards that decide every visual rule (MANDATORY for UI changes)
 
 ### 4. Familiarize with project structure
 
-```
+```text
 src/
 ├── main/               # Electron main process
 │   ├── services/       # Business logic (FileService, TerminalService, etc.)
@@ -58,7 +58,7 @@ src/
     └── prompts/        # prompt templates sent to the CLI agent
 ```
 
-## Common Workflows
+## Common workflows
 
 ### Adding a new feature
 
@@ -74,7 +74,7 @@ src/
 
 ### Fixing a bug
 
-1. Check [Known Issues](./known-issues.md) for existing workarounds
+1. Check [Known issues](./known-issues.md) for existing workarounds
 2. Write a failing test first (TDD)
 3. Fix the bug
 4. Verify tests pass
@@ -82,20 +82,20 @@ src/
 
 ### Making UI changes
 
-**MANDATORY**: Open the [design system](design-system/index.html) before any UI work and read the card for what you change – `decided` is binding, `proposed` is a direction. `npm run lint:css` enforces the token rules in CI.
+**MANDATORY**: Open the [design system](design-system/index.html) before any UI work and read the card for what you change – `decided` is binding, `proposed` is a direction. `npm run lint:css` enforces the token rules in the CI `Lint` job.
 
 - Use design tokens from `src/renderer/src/styles/design-tokens.css`
 - No hardcoded colors, spacing, or fonts
-- No rounded corners (`border-radius: 0`)
+- No rounded corners (`border-radius: var(--border-radius)`, which is `0`)
 - Test focus states for accessibility
 - A departure from a card: `/* deviates: docs/design-system/<card>.html – why */` at the site plus a row in the card's Exceptions
 - A new feature's design goes in `docs/designs/<functionality>/`; changing the design system itself: [`docs/design-system/README.md`](design-system/README.md)
 
 ## Commands and file locations
 
-The npm scripts, keyboard shortcuts and key source locations are in [Quick Reference](./quick-reference.md).
+The npm scripts, keyboard shortcuts and key source locations are in [Quick reference](./quick-reference.md).
 
-## Documentation Index
+## Documentation index
 
 | Topic | Location |
 |-------|----------|
@@ -108,13 +108,13 @@ The npm scripts, keyboard shortcuts and key source locations are in [Quick Refer
 | Known issues | [docs/known-issues.md](./known-issues.md) |
 | Changelog | [docs/CHANGELOG.md](./CHANGELOG.md) |
 
-## Getting Help
+## Getting help
 
 - Check existing documentation in `docs/`
-- Review [Known Issues](./known-issues.md) for common problems
+- Review [Known issues](./known-issues.md) for common problems
 - Look at similar existing code for patterns
 - Run tests to verify changes don't break existing functionality
 
 ---
 
-See: [Architecture](./architecture.md) | [Development Tasks](./development-tasks.md) | [Testing](./testing/README.md)
+See: [Architecture](./architecture.md) | [Development tasks](./development-tasks.md) | [Testing](./testing/README.md)

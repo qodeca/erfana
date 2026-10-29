@@ -95,13 +95,7 @@ Expected response structure.
 
 ## Thinking Triggers
 
-Templates can include thinking triggers for Claude Code to enable deeper analysis:
-
-| Trigger | Token Budget | Usage |
-|---------|--------------|-------|
-| "think" | ~4,000 | Baseline analysis |
-| "think hard" | ~10,000 | Complex tasks |
-| "ultrathink" | ~32,000 | Very complex problems |
+Templates can include thinking phrases that ask the CLI agent for deeper analysis. How an agent responds to them is the agent's own behaviour, not Erfana's.
 
 **Applied in templates:**
 - `ask.md` and `editor-ask.md`: "Think about the question..."

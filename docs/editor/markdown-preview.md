@@ -17,7 +17,8 @@ Live preview rendering with GitHub-Flavored Markdown and extended features.
 
 Fenced code blocks render in a single flat colour. No highlighter is installed – the
 pipeline is `remarkGfm` (plus `remarkBreaks` when `editor.preserveLineBreaks` is on) →
-`rehypeRaw` → `rehypeSanitize`, with no `shiki`, `prismjs`, `highlight.js` or
+`rehypeRaw` → `rehypeSanitize` → Erfana's own `rehypeHeadingIds`, `rehypeShiftLines` and
+`rehypeCollectLinks` (`previewRehypePlugins.ts`), with no `shiki`, `prismjs`, `highlight.js` or
 `rehype-highlight` dependency. The `language-*` class **is** emitted onto both `<pre>` and
 `<code>` (the sanitizer allows `className` matching `/^language-./`), but no stylesheet
 consumes it. Monaco provides highlighting in the **editor** pane only.
@@ -37,13 +38,10 @@ stylesheet is loaded.
 - Pie Charts, Git Graphs, Mindmaps
 - And 12 more (see full list below)
 
-Erfana passes every `mermaid` fenced block straight to `mermaid.render` and filters nothing, so
-any type the bundled Mermaid version supports will render. Verified against Mermaid 11.16.1
-(each keyword is still registered in the bundled 12.2.0, which adds UML `usecase` diagrams),
-that also includes `info`, `flowchart-elk`, `C4Container` / `C4Component` / `C4Dynamic` /
-`C4Deployment`, `wardley-beta`, `cynefin-beta`, `ishikawa`, `treeView-beta`,
-`railroad-beta` (and its `-ebnf` / `-peg` variants), `venn-beta`, `swimlane-beta` and
-`eventmodeling`. The list of 22 is the documented, supported set – not a technical limit.
+Erfana passes every `mermaid` fenced block straight to `mermaid.render` (`MermaidDiagram.tsx`)
+and filters nothing, so any type the bundled Mermaid version (`mermaid` `^12.2.0` in
+`package.json`) registers will render. The list of 22 is the documented, supported set – not a
+technical limit.
 
 Mermaid 12 changed its defaults to the `neo` look and the ELK layout. Erfana pins
 `look: 'classic'` and `layout: 'dagre'` in `src/renderer/src/utils/mermaidThemes.ts`, so existing
@@ -65,7 +63,7 @@ graph TD
 
 **Error Handling:**
 - User-friendly error messages
-- Bug report button (🐛) sends to Terminal
+- Bug report button (🐛, "Report this error to Claude Code") sends the `mermaid-bug-report` prompt to the terminal
 - Links to documentation
 
 #### Full-Screen Diagram Viewer (v0.5.1)
@@ -73,15 +71,15 @@ graph TD
 Expand Mermaid diagrams to full-screen overlay for detailed examination.
 
 **Access:**
-- Expand button appears on hover over diagrams (always visible on touch devices)
-- Click expand button to open full-screen overlay
+- The diagram's toolbar (direction buttons and **View fullscreen**) appears on hover or keyboard focus, and is always visible on touch devices
+- Click **View fullscreen** to open the full-screen overlay
 
 **Zoom & Pan:**
-- Mouse wheel zoom (10% increments)
-- +/- toolbar buttons for zoom control
+- Mouse wheel zoom (10% per wheel step)
+- +/- buttons (20% steps) in the chat bubble's panel header
 - Click-drag to pan diagram around viewport
 - Zoom indicator displays current percentage (e.g., "125%")
-- Custom CSS transform-based implementation (no third-party library)
+- Own implementation, no third-party library: zoom resizes the SVG's `width`/`height` (so it stays sharp), pan is a CSS `translate`
 
 **Navigation:**
 - Fit-to-screen button: Scale diagram to fit viewport
@@ -103,8 +101,8 @@ Escape does not close the viewer (`diagramViewer.logic.ts` maps it to no action)
 **Accessibility:**
 - ARIA labels on all controls
 - `role="dialog"` with `aria-modal`
-- Focus management (trapped in overlay)
-- `aria-live` zoom indicator for screen readers
+- Focus moves to the close button on open and returns to the previously focused element on close (no focus trap)
+- `aria-live` zoom indicator (in the chat bubble's header) for screen readers
 
 **Architecture:**
 - Pure logic extraction: `diagramViewer.logic.ts` (testable)
@@ -240,7 +238,7 @@ Attributes:
 - Mermaid: `MermaidDiagram.tsx`
 - Images: `MarkdownImage.tsx`, `markdownImageSource.ts`, `markdownImageStore.ts`; main side `src/main/ipc/markdown-image-handlers.ts`
 - Line tracking: `extractLineRange()` and `withLineRange()` in `MarkdownPreview.tsx`
-- HTML support: `sanitizationSchema`, the `rehypePlugins` list and the `components` map in `MarkdownPreview.tsx`
+- HTML support: `sanitizationSchema`, `buildRehypePlugins()` and the `components` map in `MarkdownPreview.tsx`
 
 ## Complete Mermaid Diagram Types
 1. Flowcharts (`flowchart`)

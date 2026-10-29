@@ -43,7 +43,7 @@ Implements `IGitStatusWorker` by spawning a `worker_threads` Worker running `git
 
 ### Native git binary resolution
 
-`git-status.worker.ts` resolves the native git binary via a platform-aware allowlist before falling back to `where git` / `which git`. On Windows, `fs.access(X_OK)` is existence-only (no POSIX execute-bit), so each allowlist candidate is additionally verified via a `git --version` liveness probe to reject truncated or renamed files. POSIX retains full `X_OK` semantics and skips the liveness probe.
+`git-status.worker.ts` resolves the native git binary through `resolveGitBinary()` in `src/main/utils/hardenedGit.ts`: a platform-aware allowlist first, then the absolute finder (`%SystemRoot%\System32\where.exe` on Windows, `/usr/bin/which` elsewhere), accepting only an absolute hit. On Windows, `fs.access(X_OK)` is existence-only (no POSIX execute-bit), so each allowlist candidate is additionally verified via a `git --version` liveness probe to reject truncated or renamed files. POSIX retains full `X_OK` semantics and skips the liveness probe.
 
 **Windows probe order (#160):** `C:\Program Files\Git\cmd\git.exe` → `…\bin\git.exe` → `C:\Program Files (x86)\Git\cmd\git.exe` → `…\bin\git.exe` → `C:\ProgramData\chocolatey\bin\git.exe` → `%USERPROFILE%\scoop\apps\git\current\cmd\git.exe`.
 
@@ -112,7 +112,7 @@ File-based project locking for multi-instance support.
 
 ### Key Features
 - Multiple independent Erfana instances can run simultaneously
-- File-based locks in `~/.erfana/locks/` (SHA-256 hashed filenames)
+- File-based locks in `<userData>/locks/` (Electron's `app.getPath('userData')`; SHA-256 hashed filenames)
 - Atomic lock creation with O_EXCL flag (prevents race conditions)
 - Hybrid stale detection: PID check (same host) + 60-min timeout (cross-host)
 - Focus request polling for cross-instance window coordination
@@ -147,7 +147,7 @@ Request focus from the lock holder (triggers window focus via polling).
 Cleanup stale locks from dead processes or timed-out network locks.
 
 #### Also public
-- `getLocksDirectory(): string` – Resolved `~/.erfana/locks/` path
+- `getLocksDirectory(): string` – Resolved `<userData>/locks/` path
 - `computeLockHash(projectPath: string): Promise<string>` – SHA-256 lock filename derivation
 - `dispose(): Promise<void>` – Stop heartbeats/polling and release held locks on shutdown
 
@@ -248,7 +248,7 @@ Handles external file operations for Spec #012 (external file drop to project tr
 - Path traversal protection (sanitizes dangerous patterns from filenames)
 - Copy, move and batch move from external locations into the project
 - **A move asks first** (v0.22.0): the original is deleted only after the user answers Move in a native box, modal to the window that owns the project (`ExternalMoveConfirmer.ts`). The box names each file and its folder (home-relative), never a full path; at most ten files per box, and a batch's boxes are one decision – Cancel, or a box that cannot be shown, moves none of them. After the answer the source and target are checked again, and the original is removed only if it is still the entry the box showed
-- Files picked in the Add files dialog are recorded per window with their on-disk identity (`ExternalSourceGrants.ts`), so a move can name the whole pick in one box. A record is used once, lapses after a few minutes and is not consent on its own
+- Files picked in the Add files dialog are recorded per window with their on-disk identity (`ExternalSourceGrants.ts`), so a move can name the whole pick in one box. A record is used once, lapses after ten minutes (`SOURCE_GRANT_TTL_MS`) and is not consent on its own
 - A symbolic link can be copied but not moved; a source already inside the project is refused (move it from the project tree)
 - Conflict resolution (replace or auto-number)
 
@@ -303,7 +303,7 @@ Audio-to-text transcription using the OpenAI API. Handles chunking for long file
 ### Public Methods
 
 #### `transcribe(filePath, language, onProgress, signal?): Promise<TranscriptionResult>`
-Transcribe audio to text. Accepts MP3/WAV/M4A/OGG/FLAC, language code or `'auto'`, progress callback, optional AbortSignal. Returns `{ success, transcript, duration, language, error?, errorCode? }`.
+Transcribe audio to text. Accepts MP3/WAV/M4A/OGG/FLAC, language code or `'auto'`, progress callback, optional AbortSignal. Returns `{ success, transcript?, duration?, language?, error?, errorCode? }`.
 
 ### Related Files
 - `src/main/ipc/transcription-handlers.ts` – IPC handlers (import, cancel, validate, API key CRUD)
@@ -366,7 +366,7 @@ Local audio transcription via whisper.cpp child process. Offline, no API depende
 - `validateAudioPath(filePath)` returns canonical realpath; `checkCpuSupport()` returns `{ok} | {ok:false, reason}` memoised; `__resetCpuProbeForTests()` test hook.
 
 ### Public method
-`transcribe({ filePath, language, model, signal?, onProgress? }): Promise<TranscriptionResult>` — returns `{ success, transcript, duration, language, error?, errorCode? }`.
+`transcribe({ filePath, language, model, signal?, onProgress? }): Promise<TranscriptionResult>` — returns `{ success, transcript?, duration?, language?, error?, errorCode? }`.
 
 ### Related files
 - `WhisperModelManager.ts` (install + verify), `transcription-handlers.ts` (backend routing), `whisper-assets.ts` (pinned release), `whisper-pubkeys.ts` (trust keys).
@@ -381,7 +381,7 @@ Local audio transcription via whisper.cpp child process. Offline, no API depende
 Manages API key encryption/decryption using Electron's safeStorage API. Service-agnostic design supports multiple API providers.
 
 ### Key Features
-- Platform-native encryption via `safeStorage.encryptString()`
+- Platform-native encryption via `safeStorage.encryptStringAsync()`
 - **Never writes plaintext** (v0.22.0): when the system cannot encrypt (for example Linux without a keyring), `storeKey` throws `ApiKeyEncryptionUnavailableError` and the Settings screen says the key was not saved. A plaintext key file left by an older version is still read
 - Keys stored as binary files in `~/.erfana/{serviceName}-api-key.enc`
 - Path traversal protection (validates service name format: `[a-z0-9-]+`)
@@ -546,7 +546,7 @@ Central Strategy-pattern registry mapping file extensions to `IConverter` implem
 - `isSupported(extension: string): boolean`
 - `getSupportedExtensions(): string[]` / `getExtensionsByConversionType()` / `getCategories(): FileTypeCategory[]`
 - `mightBeTextFile(extension: string): boolean`
-- `updateConverterExtensions(category: FileTypeCategory, extensions: string[]): void` – Two-phase registration hook consumed by `DependencyDetector`; remembers the converter an extension was taken from
+- `updateConverterExtensions(category: FileTypeCategory, extensions: string[]): void` – Two-phase registration hook called by `ImportToolStatusService` with the `DependencyDetector` result; remembers the converter an extension was taken from
 - `removeConverterExtensions(category: FileTypeCategory, extensions: readonly string[]): void` – The reverse, for a tool that is no longer found (#250); never removes a converter's native extensions
 
 Exports both the class and a shared `converterRegistry` singleton.

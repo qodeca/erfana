@@ -129,6 +129,11 @@ export default defineConfig({
         // trust-chain floor (spec: 90). measured 99.52/100/94.65/99.52.
         // See: docs/features/138-user-guide.md § 3.4
         'scripts/check-links.mjs': { lines: 90, functions: 90, branches: 90, statements: 90 },
+        // Claim-ledger drift check (docs/user-guide/claims.json). It reads
+        // contributor-controlled paths, and safeResolve is what keeps a ledger
+        // entry from reading outside the repository, so it carries the same
+        // floor as check-links. measured 98.68/100/98.5/98.36.
+        'scripts/check-claims.mjs': { lines: 90, functions: 90, branches: 90, statements: 90 },
         // HTML Preview comments – format core (docs/designs/comments/html-preview-comments.md
         // § 12.5). These modules write into the user's own .html files: the
         // serializer, escaping, splice and its verification decide whether a

@@ -65,16 +65,14 @@ After clicking "Quit" in a dialog, the page becomes invalid. Any subsequent oper
 **Lesson**: Wrap post-close operations in try-catch. This error is success, not failure.
 
 ```typescript
-try {
-  // KNOWN_WAIT: Inter-dialog pause during quit – page may be destroyed
-  await page.waitForTimeout(300)
-} catch {
-  // Page closed - this is expected after quit
-  break
-}
+// From the quit loop in closeApp() (e2e/utils/helpers.ts)
+const clicked = await confirmBtn.elementHandle()
+await confirmBtn.click()
+// A destroyed page or a reused node ends the wait – both are fine here
+await clicked?.waitForElementState('hidden', { timeout: 1500 }).catch(() => undefined)
 ```
 
-> **Do not copy that `waitForTimeout` into a test.** The project rule is condition-based waits only – use a POM wait, `waitForIpcComplete`, or an auto-retrying `expect`. This snippet is the documented exception, quoted from the quit loop in `closeApp()` (`e2e/utils/helpers.ts`): it is a teardown path with no assertion, and the thing it waits on is the next dialog on a page that may already be destroyed, so there is no observable state left to poll. The exception mechanism is defined in [E2E Testing § Condition-based waits](./e2e-testing.md#condition-based-waits) – a genuinely necessary timeout carries a `// KNOWN_WAIT: <reason>` annotation, as it does in the source.
+> **No fixed sleep is needed even here.** The quit loop used to pause with `waitForTimeout(300)` between dialogs; it now waits for the clicked dialog to hide and swallows the error a destroyed page throws. The project rule is condition-based waits only – use a POM wait, `waitForIpcComplete`, or an auto-retrying `expect`. The exception mechanism is defined in [E2E Testing § Condition-based waits](./e2e-testing.md#condition-based-waits) – a genuinely necessary timeout carries a `// KNOWN_WAIT: <reason>` annotation, as the 100 ms log-flush pause before `electronApp.close()` in `closeApp()` does.
 
 ---
 

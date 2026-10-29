@@ -1,0 +1,60 @@
+# Writing card and maintaining-this-guide.md: sentence case everywhere. Proper nouns stay capitalised.
+extends: capitalization
+message: "Use sentence case in the heading '%s'."
+level: error
+scope: heading
+match: $sentence
+indicators:
+  - ':'
+exceptions:
+  - Erfana
+  - Claude
+  - Claude Code
+  - Markdown
+  - Mermaid
+  - GitHub
+  - macOS
+  - Linux
+  - PDF
+  - HTML
+  - CSS
+  - JSON
+  - Monaco
+  - Electron
+  - Playwright
+  - LibreOffice
+  - Pandoc
+  - Whisper
+  - FFmpeg
+  - Node.js
+  - npm
+  - Diátaxis
+  - Diataxis
+  - Harbour Garden
+  - URL
+  - URLs
+  - UI
+  - IPC
+  - API
+  - AI
+  - CLI
+  - FAQ
+  - DOCX
+  - SVG
+  - PNG
+  - JPEG
+  - WSL
+  - PowerShell
+  - Homebrew
+  - Codex
+  - Gemini
+  - Xcode
+  - I
+  - Qodeca
+  - DevTools
+  - node-pty
+  - electron-store
+  - Dockview
+  - on Windows
+  - for Windows
+  - Windows differences

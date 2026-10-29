@@ -24,19 +24,21 @@ Supports both minisign variants:
 - **`Ed` legacy** — raw Ed25519 signature over the manifest bytes.
 - **`ED` prehashed** — BLAKE2b-512 prehash, then Ed25519 over the 64-byte digest. Detected via magic bytes `0x45 0x44` in the signature file header; selected automatically by the verifier.
 
+> **Current state:** the verifier no longer accepts the legacy `Ed` form. `parseSignature()` accepts only prehashed `ED` signatures and refuses anything else with `unsupported-algorithm`; it also checks the global signature over the trusted comment.
+
 ## Consequences
 
 **What we get**
 
 - **No online infrastructure dependency.** Verification is a pure function: `(manifest_bytes, signature_bytes, pubkey) → bool`. No Rekor, no OCSP, no transparency log. Works if `github.com` is down, works on air-gapped machines (theoretically).
-- **Tiny verifier surface.** `verifyManifest.ts` is ~170 lines; `@noble/ed25519` is audited and pure JS. Total attack surface smaller than a cosign integration.
+- **Tiny verifier surface.** `verifyManifest.ts` is about 260 lines; `@noble/ed25519` is audited and pure JS. Total attack surface smaller than a cosign integration.
 - **No CA / chain-of-trust.** The pubkey is embedded in `src/main/services/whisper-pubkeys.ts` at compile time. Client trust = "did the shipped app's compiled pubkey verify this?" No intermediate CA to compromise.
 - **Fast.** Ed25519 verify is ~100µs on modern hardware. Even the prehashed `ED` variant adds only a single BLAKE2b-512 pass over typical ~1 KB manifests.
 
 **What we accept**
 
 - **No transparency log.** An attacker who compromises the primary key can sign a back-dated manifest and we have no out-of-band way to detect the forgery. Mitigated by [ADR 0003](0003-dual-pubkey-trust-primary-rotation.md) dual-pubkey rotation + monotonic `revisionIndex` anti-replay.
-- **Key-ID endianness quirk.** Minisign displays key IDs with bytes reversed vs the on-wire encoding. The verifier documents this at `verifyManifest.ts:87-92` but a future maintainer comparing hex dumps may re-discover it painfully.
+- **Key-ID endianness quirk.** Minisign displays key IDs with bytes reversed vs the on-wire encoding. The verifier documents this at `verifyManifest.ts:88-95` but a future maintainer comparing hex dumps may re-discover it painfully.
 - **No OIDC / keyless.** Every rebuild requires the primary key secret attached to the CI job. If we ever want GitHub OIDC-backed signing, that's a migration.
 
 ## Alternatives considered
@@ -71,7 +73,7 @@ Every future security-minded contributor will ask "why not cosign / Sigstore, it
 
 ## References
 
-- `src/main/utils/verifyManifest.ts` — the verifier implementation (`detectAlg()` distinguishes the legacy `Ed` and prehashed `ED` variants; `verifyManifest()` reverses the key-ID bytes into `sigKeyIdHex` and, for `ed-prehashed` signatures, verifies over BLAKE2b-512 of the content in `signedMessage`)
+- `src/main/utils/verifyManifest.ts` — the verifier implementation (`parseSignature()` accepts only the prehashed `ED` form; `verifyManifest()` reverses the key-ID bytes into `sigKeyIdHex`, verifies over BLAKE2b-512 of the content in `signedMessage`, then checks the global signature)
 - `src/main/utils/verifyManifest.test.ts` — test file uses a real published `manifest.json` + signature as fixture (see "crypto fixture pattern" note in `docs/testing/README.md`)
 - `src/main/services/whisper-pubkeys.ts` — embedded primary + rotation pubkeys
 - [minisign reference](https://jedisct1.github.io/minisign/) — Frank Denis' original C implementation

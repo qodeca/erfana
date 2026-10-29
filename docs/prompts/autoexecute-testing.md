@@ -13,7 +13,7 @@
 
 ### Test File: `useTerminalStore.autoExecute.test.ts`
 
-**15 tests** covering core autoExecute functionality, error handling, bracketed paste and timing. The store is built with `createTerminalStore(mockTerminalOps)`, and the 200ms delay is driven with fake timers.
+**17 tests** covering core autoExecute functionality, error handling, bracketed paste, timing and recent-input marking. The store is built with `createTerminalStore(mockTerminalOps)`, and the 200ms delay is driven with fake timers.
 
 ### Test Categories
 
@@ -43,6 +43,10 @@
 
 #### 6. Getters (1 test)
 - `getActiveTerminalId()` returns correct terminal ID
+
+#### 7. Recent-input marking (2 tests)
+- A programmatic send counts as recent user input for the restart and quit guards
+- A failed write does not mark input
 
 ### Representative Tests
 

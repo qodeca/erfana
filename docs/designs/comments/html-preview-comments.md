@@ -106,6 +106,8 @@ Rules that follow from the diagram:
 
 ### 4.2 Module map
 
+> **As shipped (checked 2026-10-29):** a few planned files landed under other names. Drafts and keys live in `commentKeyStore.ts` (not `commentDraftStore.ts`); the IPC bundle is `src/main/ipc/preview/comment-handlers.ts`; the three toolbar toggles are one `CommentToolbarTools.tsx`; the "Add comment" menu is a `ContextMenu` inside `PreviewCommentsLayer.tsx` (no `CommentContextMenu.tsx`); and the page overlay is the folder `src/preload/previewPageComments/` (entry `index.ts`), not one file. The main-process comment work is split across many more `comment*.ts` modules than listed here.
+
 **Shared – `src/shared/htmlComments/`** (pure; no Electron, no `fs`; parse5 allowed). Not imported by the preload (preloads must be self-contained, `electron.vite.config.ts:22-45`).
 
 | File | Responsibility |

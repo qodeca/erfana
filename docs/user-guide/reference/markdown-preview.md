@@ -5,7 +5,7 @@ SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 
 # Read the Markdown preview
 
-Preview renders GitHub-style Markdown, frontmatter, links and Mermaid diagrams beside or instead of the editor. Raw HTML is handled by the Markdown renderer's safety rules.
+Preview renders GitHub-style Markdown, frontmatter, links and Mermaid diagrams beside or instead of the editor. Raw HTML is shown after unsafe parts are removed.
 
 **On this page**
 
@@ -18,7 +18,7 @@ Preview renders GitHub-style Markdown, frontmatter, links and Mermaid diagrams b
 
 **What it does:** Headings, tables, lists, code and other GitHub-style Markdown are rendered. YAML frontmatter at the top becomes a table rather than document prose. **How to reach it:** Open a Markdown file and choose **Preview Only** or a Split mode from the toolbar. **Preserve line breaks** in [Settings](settings.md#editor) is off by default and can show single newlines as breaks.
 
-![Screenshot of YAML frontmatter rendered as a table.](../images/edit-and-preview/frontmatter.png)
+![Screenshot of the Markdown preview showing YAML frontmatter rendered as a table.](../images/edit-and-preview/frontmatter.png)
 
 ## Links
 
@@ -26,8 +26,8 @@ Preview renders GitHub-style Markdown, frontmatter, links and Mermaid diagrams b
 
 ## Images
 
-**What they do:** An image inside the project, referenced by a path relative to the document (`![logo](./assets/logo.svg)`), is shown in the preview and updates within about a second when the image file changes on disk – no need to reopen the tab. PNG, JPEG, GIF, WebP and SVG images up to 16 MB are shown, up to 64 per document. Web images (`https://…`) behave as before. An image outside the project, an absolute path or a `file:` address is not loaded: the preview shows its alt text in a box instead, and hovering the box says why. **How to reach them:** Open a Markdown file with images in Preview.
+**What they do:** An image inside the project, referenced by a path relative to the document (`![logo](./assets/logo.svg)`), is shown in the preview. It updates on its own shortly after the image file changes on disk – no need to reopen the tab. PNG, JPEG, GIF, WebP and SVG images up to 16 MB are shown, up to 64 per document. Web images (`http://` or `https://` addresses) load directly from the web. An image outside the project, an absolute path or a `file:` address is not loaded: the preview shows its alt text in a box instead, and hovering the box says why. **How to reach them:** Open a Markdown file with images in Preview.
 
 ## Mermaid diagrams
 
-**What they do:** Fenced Mermaid code renders as a diagram. Its toolbar changes direction and opens the full-screen viewer, where you can zoom, fit, reset and use **Edit diagram** chat with a terminal agent. **How to reach them:** Open a file containing a Mermaid block in Preview; see [the walkthrough](../how-to/work-with-mermaid-diagrams.md). Invalid syntax shows an error box with a bug-report action; see [troubleshooting](troubleshooting.md#mermaid-diagram-rendering-error).
+**What they do:** Fenced Mermaid code renders as a diagram. Its toolbar changes direction and opens the full-screen viewer, where you can zoom, fit, reset and use the **Edit diagram** chat to ask a terminal agent to change it. **How to reach them:** Open a file containing a Mermaid block in Preview; see [the walkthrough](../how-to/work-with-mermaid-diagrams.md). Invalid syntax shows an error box with a bug-report action; see [troubleshooting](troubleshooting.md#mermaid-diagram-rendering-error).

@@ -1,0 +1,7 @@
+# Writing card: one ellipsis character (…), not three dots.
+extends: existence
+message: "Use the ellipsis character (…), not three dots."
+level: error
+nonword: true
+tokens:
+  - '\.\.\.'

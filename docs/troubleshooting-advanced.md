@@ -31,7 +31,7 @@ This guide covers advanced troubleshooting topics. For basic troubleshooting (In
 1. Close unused editor tabs
 2. Clear terminal buffers:
    ```typescript
-   xterm.clear()  // TerminalPanel.tsx – the xterm.js Terminal instance
+   xterm.clear()  // TerminalPanel/hooks/useXtermSession.ts – the xterm.js Terminal instance
    ```
 3. Restart Erfana if memory continues to grow
 
@@ -171,18 +171,6 @@ Open DevTools in app with F12 (development builds only) or **View > Toggle Devel
 
 ---
 
-**File Watcher Logs:**
-```bash
-# Enable debug logging in FileWatcherService.ts
-const watcher = chokidar.watch(filePath, {
-  // ...
-}).on('all', (event, path) => {
-  console.log(`📝 Chokidar event: ${event} - ${path}`)
-})
-```
-
----
-
 ### Reporting Issues
 
 When reporting bugs, include:
@@ -190,7 +178,7 @@ When reporting bugs, include:
 2. **Environment:** macOS or Windows version; for a source build also the Node and Python versions
 3. **Steps to reproduce:** Detailed steps
 4. **Expected vs actual behavior**
-5. **Logs:** `~/.erfana/logs/combined.log` (the relevant excerpt, not the whole file) — or, if a recovery screen appeared, press **Copy error details** on it and paste the report: it carries the version, timestamp, error name and message, the stack and the React component stack, capped at ~16 KB
+5. **Logs:** `~/.erfana/logs/combined.log` (the relevant excerpt, not the whole file) — or, if a recovery screen appeared, press **Copy error details** on it and paste the report: it carries the version, timestamp, error name and message, the stack and the React component stack, capped at 16,384 characters
 6. **Screenshots:** If UI-related
 
 **Submit to:** https://github.com/qodeca/erfana/issues

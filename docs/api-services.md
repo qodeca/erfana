@@ -93,7 +93,7 @@ Flow control (`terminal:ackOutput`): the owning window has parsed `chars` more U
 |---|---|---|
 | `'data'` | `{ terminalId: string; data: string; webContentsId: number }` | PTY output (after marker handshake + clear confirm), batched per terminal by `TerminalOutputFlow` (8 ms or 64 KiB) and always sent before that terminal's `'exit'` |
 | `'exit'` | `{ terminalId: string; exitCode: number; signal?: number; webContentsId: number }` | PTY process exit |
-| `'clearTerminal'` | `{ terminalId: string; webContentsId: number }` | Bootstrap marker detected; renderer should clear and call `markClearComplete()` |
+| `'clearTerminal'` | `{ terminalId: string; webContentsId: number }` | Bootstrap marker detected; the renderer clears and sends `terminal:clearComplete`, which calls `markInitializationComplete()` |
 | `'error'` | `{ terminalId: string; error: string; webContentsId: number }` | cwd deny-list rejection (Windows), shell resolution failure, or spawn failure |
 
 `webContentsId` names the window that created the terminal (`-1` for none). `terminal-handlers.ts` sends each event only to that window, so an exit that arrives after the terminal left the service's table still reaches its owner.
@@ -293,7 +293,7 @@ Emitted when files or folders change anywhere in the watched project tree. Main 
 
 **File:** `src/main/services/FileService.ts`
 
-**Filename validation (#161, Phase 2)**: since v0.22.0 a name that holds `/`, `\` or NUL is refused at the IPC boundary (`entryNameField` in `src/shared/ipc/file-schema.ts`), so the name the user typed is the name that is used; `.` and `..` are refused too. Behind that, `createFile`, `createFolder`, and `rename` still strip separators as a second line, then invoke `assertValidUserFilename` from `src/main/utils/validateFilename.ts`. Throws `AppError(INVALID_FILENAME)` for Windows-reserved names (`CON`, `PRN`, `COM1-9`, `LPT1-9`), forbidden chars (`<>:"/\|?*` on Windows), trailing dots/spaces (Windows), control chars, Unicode bidi overrides (security), empty, or > 255 chars. POSIX-only checks (control + bidi + length + empty) run on every platform.
+**Filename validation (#161, Phase 2)**: since v0.22.0 a name that holds `/`, `\` or NUL is refused at the IPC boundary (`entryNameField` in `src/shared/ipc/file-schema.ts`), so the name the user typed is the name that is used; `.` and `..` are refused too. Behind that, `createFile`, `createFolder`, and `rename` still strip separators as a second line, then invoke `assertValidUserFilename` from `src/main/utils/validateFilename.ts`. Throws `AppError(INVALID_FILENAME)` for Windows-reserved names (`CON`, `PRN`, `AUX`, `NUL`, `COM1-9`, `LPT1-9`), forbidden chars (`<>:"/\|?*` on Windows), trailing dots/spaces (Windows), control chars, Unicode bidi overrides (security), empty, or > 255 chars. POSIX-only checks (control + bidi + length + empty) run on every platform.
 
 `PdfService.getSavePath` and `DocxService.sanitizeFilename` use the sister `deriveSafeFilename(name, fallback?)` total function (silent transform, never throws). See `src/main/utils/validateFilename.ts` JSDoc for full pipeline order.
 
@@ -712,7 +712,7 @@ Opens the macOS Screen Recording privacy pane via `shell.openExternal` on a fixe
 ### `api.system.relaunchApp(): Promise<void>`
 `app.relaunch()` + `app.quit()`. Required because macOS applies a fresh Screen Recording grant **only to a newly-launched process** — an existing process keeps the old denial for its lifetime, so "grant then retry" cannot work without a restart. Payload-free and deliberately **not** platform-gated. Uses `app.quit()` rather than `app.exit()` so the `before-quit` path still releases the project lock, watchers and PTYs.
 
-Second caller (#60): the crash recovery screen's **Restart** button (`src/renderer/src/components/RootErrorBoundary/RootErrorFallback.tsx`), on every platform. It is capability-probed — `typeof window.api?.system?.relaunchApp === 'function'`, so a missing or partially-exposed bridge hides the button instead of rendering a dead control — and bounded by a stall timer that tells the user to quit and reopen manually if the relaunch has not happened in 3 s. The screen also calls `file.closeProject()` best-effort first (raced against a 1.5 s timeout) so a crash caused by the open project cannot be reopened into a loop.
+Second caller (#60): the crash recovery screen's **Restart** button (`src/renderer/src/components/RootErrorBoundary/RootErrorFallback.tsx`), on every platform. It is capability-probed — `hasBridgeMethod('system', 'relaunchApp')` (`services/bridgePresence.ts`), so a missing or partially-exposed bridge hides the button instead of rendering a dead control — and bounded by a stall timer that tells the user to quit and reopen manually if the relaunch has not happened in 3 s. The screen also calls `file.closeProject()` best-effort first (raced against a 1.5 s timeout) so a crash caused by the open project cannot be reopened into a loop.
 
 Both handlers validate `event.senderFrame` (`isTrustedSender`) — a compromised child frame must not be able to quit the app or fire OS-level navigations.
 

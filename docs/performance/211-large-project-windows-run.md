@@ -94,7 +94,7 @@ Tester's tally per 2-minute window (git status max in the 21:35 window: 2.9 s):
 | Main thread | change batches and git answers kept being logged throughout (longest gap about 2 s) – no stall |
 | Git status meanwhile | 0.2–1.9 s end to end |
 
-Cause, inferred: disk and antivirus contention from the test suite creating and deleting folders under `.local/test-tmp` while the walk was inside it. The walk is sequential, as it was before this branch (assumed, not re-checked), so this is not a regression. Excluding `.local/test-tmp` should remove it; the pending run checks that.
+Cause, inferred: disk and antivirus contention from the test suite creating and deleting folders under `.local/test-tmp` while the walk was inside it. The walk was sequential in that build, as it was before this branch (assumed, not re-checked), so this is not a regression. Since v0.22.0 the walk keeps up to `WALK_READ_CONCURRENCY` (24) file-system calls in flight ([lazy tree walk](./2026-10-22-lazy-tree-walk.md)); not re-run on this project. Excluding `.local/test-tmp` should remove it; the pending run checks that.
 
 ## Acceptance criteria in this run
 

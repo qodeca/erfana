@@ -112,9 +112,11 @@ Templates use custom regex-based rendering (no eval):
 
 ## Icon Selection
 
-Only the 16 names in `src/renderer/src/utils/iconRegistry.tsx` render their own icon; any other name silently falls back to `sparkles`:
+Only the 28 names in `src/renderer/src/utils/iconRegistry.tsx` render their own icon; any other name silently falls back to `sparkles`:
 
-`maximize2`, `minimize2`, `refresh`, `sparkles`, `copy`, `edit-3`, `help-circle`, `message-circle`, `file-text`, `alert-circle`, `alert-triangle`, `arrow-right`, `arrow-down`, `arrow-up`, `arrow-left`, `mouse-pointer-click`
+`maximize2`, `minimize2`, `refresh`, `sparkles`, `copy`, `edit-3`, `help-circle`, `message-circle`, `file-text`, `alert-circle`, `alert-triangle`, `check-circle`, `arrow-right`, `arrow-down`, `arrow-up`, `arrow-left`, `mouse-pointer-click`, `check`, `chevron-down`, `chevron-up`, `circle-x`, `ellipsis`, `info`, `message-square`, `message-square-off`, `message-square-plus`, `messages-square`, `x`
+
+Some shipped templates name icons outside this list (`layout-grid`, `bug`, `file-import`), so they show `sparkles`.
 
 ## Advanced Features
 

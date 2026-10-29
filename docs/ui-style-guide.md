@@ -167,7 +167,7 @@ which runs in the required `Lint` job:
 
 - Colours use tokens; no raw hex outside `design-tokens.css`
 - No bare `z-index`
-- No `border-radius` other than `0` or `var(--border-radius-circle)`
+- No `border-radius` other than `0` or a `var(--border-radius…)` token
 - No retired token reaches `docs/design-system/` or `docs/designs/`
 
 **Nobody checks these but you.** They are the ones that actually break for

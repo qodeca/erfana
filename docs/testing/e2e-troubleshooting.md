@@ -17,7 +17,7 @@ npx electron-vite build
 npm run test:e2e
 ```
 
-Or increase timeout in `playwright.config.ts`:
+Or raise the per-test timeout in `playwright.config.ts` (it is `timeout: 60000`, one minute, today):
 
 ```typescript
 export default defineConfig({
@@ -32,10 +32,10 @@ export default defineConfig({
 Use test build for debugging:
 
 ```bash
-ERFANA_TEST_BUILD=true npm run build:mac
+npm run build:mac:test
 ```
 
-This enables the `--inspect` flag which is disabled in production builds.
+The script sets `ERFANA_TEST_BUILD=true`, so afterPack (`scripts/fuses.js`) leaves the `EnableNodeCliInspectArguments` fuse on – `--inspect` works – and names the app "Erfana (TEST BUILD)". Production builds turn that fuse off. Never distribute a test build.
 
 ---
 
@@ -71,20 +71,20 @@ import { monaco } from './utils/helpers'
 // Wait for Monaco to be fully ready (Playwright auto-retry, no fixed timeout)
 await monaco.waitForReady(page)
 
-// Focus using force click and verify cursor visibility
+// Focus using force click, retried until Monaco reports focus
 await monaco.focus(page)
 
-// Now keyboard input works reliably
-await page.keyboard.type('Hello')
+// Now keyboard input works reliably – insertText, never keyboard.type (#129)
+await page.keyboard.insertText('Hello')
 
 // Or use the combined helper
 await monaco.setContent(page, '# Hello World')
 ```
 
 **Why this works**:
-- `waitForReady()` uses Playwright's auto-retry to wait for `.monaco-editor` container
+- `waitForReady()` uses Playwright's auto-retry to wait for the `editor-monaco` testid and Monaco's internal textarea
 - `focus()` clicks with `force: true` to handle Monaco's overlapping DOM layers
-- Focus is verified by checking cursor visibility before returning
+- Focus is verified by Monaco's own `focused` class on the editor – the cursor blinks, so its visibility is not a stable signal
 
 **Common mistakes**:
 - Using fixed `waitForTimeout()` instead of auto-retry assertions
@@ -179,11 +179,9 @@ await window.keyboard.press('Meta+A')  // Fails on Windows/Linux
 ### macOS
 
 - Use `Meta` key for keyboard shortcuts (Cmd)
-- DMG builds are signed and notarized in production
-- Test builds skip notarization for faster iteration
+- DMG builds are signed and notarized in production (`notarize: true` in `electron-builder.yml`)
 
 ### Windows
 
 - Use `Control` key for keyboard shortcuts
-- UAC prompts may appear for certain operations
-- File paths use backslashes (but testid hashes normalize paths)
+- File paths use backslashes, and `getPathHash()` hashes the path string exactly as given (no normalisation), so `src\main\index.ts` and `src/main/index.ts` produce different testids – pass the same spelling the component uses

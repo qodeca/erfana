@@ -34,9 +34,9 @@ This ledger covers **D1-D8** (Phase 2 review aftermath). **D9-D12** (Phase 4 aud
 **Severity:** MEDIUM (architecture-reviewer M1, solution-reviewer SR-005)
 **Source:** Architecture — "Extract `resolvePlatformBinary` NOW, not in Phase 4"
 **Files implicated:**
-- `src/main/services/workers/git-status.worker.ts:38-54` (`buildWin32GitPaths` + `WIN32_GIT_PATHS` + `POSIX_GIT_PATHS`) + `:377-409` (`isExecutableGit` + call site)
-- `src/main/services/import/DependencyDetector.ts:19-22` (`WIN32_LIBREOFFICE_PATHS`)
-- `src/main/services/watcher/PlatformConfig.ts:196-201` (Phase 4 OCP comment block)
+- `src/main/utils/hardenedGit.ts:317-333` (`buildWin32GitPaths` + `WIN32_GIT_PATHS` + `POSIX_GIT_PATHS`) + `:341-367` (`isExecutableGit` + call site) – moved here from `workers/git-status.worker.ts`
+- `src/main/services/import/conversionToolGuard.ts:85` (`resolveLibreOffice`, which replays LiteParse's lookup; the old `WIN32_LIBREOFFICE_PATHS` list in `DependencyDetector.ts` is gone)
+- `src/main/services/watcher/PlatformConfig.ts:198-203` (Phase 4 OCP comment block)
 
 ### What
 
@@ -57,7 +57,7 @@ export async function resolvePlatformBinary(opts: {
 The two current callers diverge in non-trivial ways:
 
 - **git resolver**: 60-second cooldown cache, `--version` liveness probe, FD-pressure-aware error handling
-- **LibreOffice detector**: per-app-launch cache, `--version` liveness probe (added in review fix), shared resolver with the conversion guard (#250)
+- **LibreOffice detector**: per-app-launch cache, `--version` liveness probe (added in review fix; never run on Windows since #329), shared resolver with the conversion guard (#250)
 
 Premature extraction risks a leaky abstraction where the helper grows ad-hoc options. The Rule of Three says extract on the **third** caller.
 
@@ -103,8 +103,8 @@ These are the three load-bearing features `resolvePlatformBinary` was designed f
 **Source:** Architecture — "MAX_FILENAME_LENGTH in three places with three values"
 **Files:**
 - `src/main/utils/validateFilename.ts:71` → `255` (filesystem byte/char limit)
-- `src/main/services/DocxService.ts:100` → `200` (`.docx` extension headroom)
-- `src/main/services/PdfService.ts:631` → `200` (`.pdf` extension headroom)
+- `src/main/services/DocxService.ts:101` → `200` (`.docx` extension headroom)
+- `src/main/services/PdfService.ts:665` → `200` (`.pdf` extension headroom)
 
 ### What
 
@@ -191,7 +191,7 @@ LOW → **MEDIUM**. While there were two copies they stayed in sync by symmetry.
 ### 2026-06-05 design-review findings
 
 - **Recommended transport is Option B (return-object), not a message-string prefix.** The 3 filename handlers (`createFile` / `createFolder` / `rename`) should **return** a structured `{ ok, data, error: { code } }` object instead of throwing — `invoke` resolves objects with their props intact, and the renderer reads `result.error.code`. A message-string prefix would just re-introduce a string sentinel (the very thing this item exists to retire). This narrows Option B's original "~50 handlers, breaking change" framing to the 3 filename handlers as the first slice.
-- **`INVALID_FILENAME_MARKER` has a wider consumer list than the H3 fix suggested.** The marker is also used to *build the thrown message* in `validateFilename.ts:56,219` and is asserted by tests in `validateFilename.test.ts`. Full consumer list spans **~8 code files plus docs** (`docs/glossary.md`, `docs/error-codes.md`, `docs/windows/implementation-plan.md`, `docs/archive/phase2-closure-2026-04.md`). Any retirement must update all of these in lockstep.
+- **`INVALID_FILENAME_MARKER` has a wider consumer list than the H3 fix suggested.** The marker is also used to *build the thrown message* in `validateFilename.ts:56,222` and is asserted by tests in `validateFilename.test.ts`. Full consumer list spans **~8 code files plus docs** (`docs/glossary.md`, `docs/error-codes.md`, `docs/windows/implementation-plan.md`, `docs/archive/phase2-closure-2026-04.md`). Any retirement must update all of these in lockstep.
 
 ### What
 
@@ -302,7 +302,7 @@ Audit log calls that propagate `AppError` objects derived from user input. Add a
 
 **Severity:** LOW (security-auditor + solution-reviewer)
 **Source:** Security + solution — "Cache is permanent for the session"
-**File:** `src/main/services/import/DependencyDetector.ts:40,53` (`cachedResult` field at `:40`; the cache check is in `detect()` at `:53` — there is no `detectDependencies` method)
+**File:** `src/main/services/import/DependencyDetector.ts:59,76` (`cachedResult` field at `:59`; the cache check is in `detect()` at `:76` — there is no `detectDependencies` method)
 
 ### What
 
@@ -339,7 +339,7 @@ Today, `cachedResult` lives forever once set. If LibreOffice is uninstalled mid-
 
 **Severity:** LOW (security-auditor)
 **Source:** Security
-**File:** `src/main/utils/validateFilename.ts:217` (`name.slice(0, 37)`)
+**File:** `src/main/utils/validateFilename.ts:220` (`name.slice(0, 37)`)
 
 ### What
 

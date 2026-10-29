@@ -65,6 +65,7 @@ Renderer code never reads `window.api`: every bridge has a gateway, and only the
 | `browser` | `BrowserBridge` (`browser-schema.ts`) | `browserBridge.ts` | `browserGateway` |
 | `markdownImage` | `MarkdownImageBridge` (`markdown-image-schema.ts`) | `markdownImageBridge.ts` | `markdownImageGateway` |
 | `preview` | `PreviewBridge` (`preview-bridge-types.ts`) | `previewBridge.ts` | `previewGateway` – `setVisibility` only from `services/preview/OverlayGuardService` (lint-enforced) |
+| `previewComments` | `PreviewCommentsBridge` (`preview-comment-schema.ts`) | `previewCommentsBridge.ts` | `previewCommentsGateway` (`previewGateway.ts`), wrapped for the comment UI by `services/preview/commentGateway.ts` |
 | `claudeStatus` | `ClaudeStatusBridge` (`claude-status-schema.ts`) | `claudeStatusBridge.ts` | `claudeStatusGateway` |
 | `screenshot` | `ScreenshotBridge` (`screenshot-schema.ts`) | `screenshotBridge.ts` (the overlay-only verbs are in `screenshotOverlay.ts`) | `screenshotGateway` |
 | `utils` | `Api['utils']` – answered by the preload itself (`webUtils.getPathForFile`, `process.platform`, `process.arch`), no IPC | inline in `index.ts` | `utilsGateway` – for the platform, prefer `isMacOS()` / `isWindows()` from `utils/platform` |

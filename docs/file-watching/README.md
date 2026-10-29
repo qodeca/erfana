@@ -323,7 +323,7 @@ Recommended:
 
 | Scenario | Behavior |
 |----------|----------|
-| Create file externally | Tree updates automatically within 500ms |
+| Create file externally | Tree updates automatically, after the 75 ms collection window and the renderer's 250 ms debounce (`DIRECTORY_WATCHER.DEBOUNCE_DELAY`) |
 | Delete folder externally | Tree updates, expanded folder state preserved |
 | Edit file content (Monaco autosave or external edit) | Git status badge refreshes after autosave settles (~2.5–3 s total) |
 | Git checkout (bulk changes) | Debounced to single refresh after changes settle |
@@ -576,11 +576,11 @@ Located in `src/main/services/watcher/`:
 
 **EventCoalescer** (`EventCoalescer.ts`)
 - Deduplicates and collapses redundant events
-- 5 coalescing rules:
+- 4 coalescing rules, plus cascade prevention (a deleted folder drops its children's events):
   - CREATE + DELETE → ∅ (cancel out)
   - DELETE + CREATE → CHANGE
+  - CREATE + CHANGE → CREATE only
   - Multiple CHANGEs → single CHANGE
-  - etc.
 - Prevents cascade effects from atomic save operations
 
 **ThrottledWorker** (`ThrottledWorker.ts`)
@@ -602,9 +602,8 @@ Located in `src/main/services/watcher/`:
 - Useful for debugging and performance monitoring
 
 **PlatformConfig** (`PlatformConfig.ts`)
-- Platform-specific handling (macOS, Linux, Windows)
-- FSEvents configuration on macOS
-- inotify handling on Linux
+- Platform-specific settings (`getPlatformConfig()`): case sensitivity (Linux sensitive, macOS and Windows not), platform excludes, recommended buffer and chunk sizes
+- Also exports `isWindowsLongPath`; the case rule is read by `FileService`, `ProjectService` and `DirectoryWatcherCore`
 
 ### DirectoryWatcherService Integration
 

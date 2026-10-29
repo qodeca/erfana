@@ -153,10 +153,12 @@ async moveItem(
   newName?: string,
   replaceExisting?: boolean
 ): Promise<{ path: string; isSymlink?: boolean }> {
-  // Validation: source stats, symlink probe, target is a directory, same-path
-  // guard, project-root guard, in-project guards, circular-move guard, and a
-  // case-insensitive conflict check that only deletes when `replaceExisting`.
-  const targetPath = join(targetParentPath, finalName)
+  // Validation: source stats, symlink probe, name check, target is a directory,
+  // same-path guard, project-root guard (`isProjectRoot`), circular-move guard,
+  // and a case-insensitive conflict check that only deletes when `replaceExisting`.
+  // Project confinement is not here: the `file:moveItem` handler resolves both
+  // paths inside the project first (`registerConfinedHandle`).
+  const targetPath = childPath(targetParentPath, finalName)
 
   // Try fs.rename first (fast, atomic for same filesystem)
   try {

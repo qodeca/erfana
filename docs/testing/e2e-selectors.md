@@ -1,6 +1,6 @@
 # E2E selector catalog
 
-All `data-testid` attributes available for E2E testing – **350 testids** across 38 sections (counted against `testids.ts` on 2026-10-26).
+All `data-testid` attributes available for E2E testing – **351 testids** across 38 sections (counted against `testids.ts` and `commentTestids.ts` on 2026-10-29).
 
 **Related documentation**:
 - [E2E Testing Guide](./e2e-testing.md) – Main E2E documentation
@@ -560,7 +560,7 @@ Full-window crash recovery screen (issue #60). Action buttons are capability-gat
 
 ---
 
-## HTML Preview comments (76 testids)
+## HTML Preview comments (77 testids)
 
 Constants: `TEST_IDS.COMMENT_*` (defined in `src/renderer/src/constants/commentTestids.ts`, spread into `TEST_IDS`). Rows, messages, threads and tags repeat – scope them with a parent locator (`drawer.getByTestId(…)`, `.nth(i)`).
 
@@ -668,6 +668,7 @@ Constants: `TEST_IDS.COMMENT_*` (defined in `src/renderer/src/constants/commentT
 | `comment-drawer-row-open` | A row's Open (the comment window) | static |
 | `comment-drawer-tag` | A tag on a row | static |
 | `comment-drawer-error` | List read error with Try again | static |
+| `comment-drawer-unread` | Note that main left files out of the list (its file count or byte budget) | static |
 
 **Settings**
 

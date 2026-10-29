@@ -57,7 +57,7 @@ Plan §"LocalWhisperService" §"Modified modules" commits to logging `{url, expe
 
 ### What
 
-`src/main/services/whisper-assets.ts:52` declares `type WhisperPlatform = 'darwin-universal' | 'win32-x64'` — a concatenated-string enum. The architecture review flagged that the original plan prescribed `{platform: NodeJS.Platform, arch: NodeJS.Architecture | 'universal'}` as a structural tuple. `WhisperModelManager.ts:337-338` further uses substring-sniffing (`spec.filename.includes('macos')`) to pick a manifest key, which is fragile across future filename renames.
+`src/main/services/whisper-assets.ts:52` declares `type WhisperPlatform = 'darwin-universal' | 'win32-x64'` — a concatenated-string enum. The architecture review flagged that the original plan prescribed `{platform: NodeJS.Platform, arch: NodeJS.Architecture | 'universal'}` as a structural tuple. `WhisperModelManager.ts:486` further uses substring-sniffing (`spec.filename.includes('macos')`) to pick a manifest key, which is fragile across future filename renames.
 
 ### Why deferred
 
@@ -91,7 +91,7 @@ Plan §"LocalWhisperService" §"Modified modules" commits to logging `{url, expe
 
 ### What
 
-`IWhisperModelManager` has 11 methods spanning binary-management (`ensureBinary`, `verifyInstalledBinary`, `isBinaryInstalled`), model-management (`ensureModel`, `isModelInstalled`, `listInstalledModels`, `deleteModel`, `getModelInfo`, `getModelPath`), and directory helpers (`getWhisperDir`, `getBinaryPath`). `LocalWhisperService` consumes 3 (`ensureBinary`, `ensureModel`, `verifyInstalledBinary`); renderer IPC handlers consume a disjoint set.
+`IWhisperModelManager` has 15 methods spanning binary-management (`ensureBinary`, `verifyInstalledBinary`, `isBinaryInstalled`), model-management (`ensureModel`, `isModelInstalled`, `listInstalledModels`, `deleteModel`, `getModelInfo`, `getModelPath`, `verifyInstalledModelFile`, `assertVerifiedModelUnchanged`), lifecycle (`dispose`, `cancelDownloads`), and directory helpers (`getWhisperDir`, `getBinaryPath`). `LocalWhisperService` consumes 5 (`ensureBinary`, `ensureModel`, `verifyInstalledBinary`, `verifyInstalledModelFile`, `assertVerifiedModelUnchanged`); renderer IPC handlers consume a disjoint set.
 
 ### Why deferred
 

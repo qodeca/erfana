@@ -5,7 +5,7 @@
 Erfana supports automated E2E testing using Playwright with Electron. This guide covers setup, configuration, and test patterns.
 
 **Related documentation**:
-- [E2E Selectors](./e2e-selectors.md) – Complete testid catalog (274 testids)
+- [E2E Selectors](./e2e-selectors.md) – Complete testid catalog (351 testids)
 - [E2E Third-Party](./e2e-third-party.md) – Monaco, xterm.js, Mermaid testing
 - [E2E Helpers](./e2e-helpers.md) – Test utilities and patterns (backward-compatible adapter)
 - [E2E Debugging](./e2e-debugging.md) – Debugging and CI/CD
@@ -54,8 +54,8 @@ Erfana uses Electron fuses for security hardening. For E2E testing with debuggin
 # Production build (inspector disabled - secure)
 npm run build:mac
 
-# Test build (inspector enabled - for Playwright debugging)
-ERFANA_TEST_BUILD=true npm run build:mac
+# Test build (inspector enabled - for Playwright debugging); sets ERFANA_TEST_BUILD=true
+npm run build:mac:test
 ```
 
 > **Security note**: Test builds have reduced security (inspector enabled). Only use for testing, never distribute.
@@ -126,9 +126,7 @@ One test helper was changed for the container, safely for macOS and Windows too:
 
 ## Playwright configuration
 
-Create `playwright.config.ts` in the project root:
-
-Four Playwright projects are configured:
+`playwright.config.ts` in the project root configures four Playwright projects:
 
 | Project | Test match | Retries | Purpose |
 |---------|-----------|---------|---------|
@@ -426,22 +424,12 @@ test.describe('Erfana E2E', () => {
 
 ### Test with project loaded
 
+The main process does not read a project path from argv, so open the project over IPC – which is what the `appWithTestProject` / `windowWithTestProject` fixtures do for you:
+
 ```typescript
-import { test, expect, _electron as electron } from '@playwright/test'
-import path from 'path'
+import { test, expect } from '../fixtures'
 
-test('should open project and display files', async () => {
-  const app = await electron.launch({
-    args: [
-      path.join(__dirname, '..'),
-      // Pass project path as argument
-      '/path/to/test/project',
-    ],
-  })
-
-  const window = await app.firstWindow()
-  await window.waitForLoadState('domcontentloaded')
-
+test('should open project and display files', async ({ windowWithTestProject: window }) => {
   // Wait for project tree to populate
   const projectTree = window.locator('[data-testid="project-tree"]')
   await expect(projectTree).toBeVisible()
@@ -449,10 +437,10 @@ test('should open project and display files', async () => {
   // Verify files are shown (not empty state)
   const emptyState = window.locator('[data-testid="project-tree-empty"]')
   await expect(emptyState).not.toBeVisible()
-
-  await app.close()
 })
 ```
+
+Outside the fixtures, call `window.api.file.openProjectByPath({ projectPath })` from `page.evaluate`, as `openProject()` in `e2e/utils/helpers.ts` does.
 
 ### Test fixture pattern
 
@@ -522,14 +510,16 @@ Some E2E tests require external API credentials:
 
 ### Erfana-specific environment variables
 
-Four `ERFANA_E2E_*` variables change app behaviour for tests. They are read by the app, not by Playwright, so they belong in the environment of the launched Electron process (`ERFANA_E2E_FORCE_CRASH`, `ERFANA_E2E_FAST_SHELL`, `ERFANA_E2E_BROWSER_SEAM`) or of the Playwright run itself (`ERFANA_E2E_TRANSCRIPTION`, a project gate):
+These `ERFANA_E2E_*` variables change behaviour for tests. Most are read by the app, so they belong in the environment of the launched Electron process (`ERFANA_E2E_FORCE_CRASH`, `ERFANA_E2E_FAST_SHELL`, `ERFANA_E2E_BROWSER_SEAM`, and `ERFANA_E2E_TEST_HOOKS`, which `buildAppEnv()` sets for every fixture launch); `ERFANA_E2E_TRANSCRIPTION` and `ERFANA_E2E_BENCH` are Playwright project gates read by `playwright.config.ts`, and `ERFANA_E2E_LINUX_CONTAINER` is set by `scripts/e2e-linux.sh` and read only by tests:
 
 | Variable | Effect |
 |----------|--------|
 | `ERFANA_E2E_FORCE_CRASH=1` | Launcher-only crash injection for `root-error-boundary.e2e.ts`: main appends `--erfana-force-crash` to `webPreferences.additionalArguments`, the preload re-exposes it as `window.__ERFANA_FORCE_CRASH__`, and `ForcedCrash` in `App.tsx` throws during render. Gated on `!app.isPackaged`, so packaged builds ignore it; the renderer can never set it |
-| `ERFANA_E2E_BROWSER_SEAM=1` | #124: in an unpackaged build only, a function at `globalThis.__erfanaE2eBrowserLaunch` in the main process replaces the real browser launch and receives `{ via, appPath, filePath }` (`browserLauncher.ts`; `app.isPackaged` is checked first). `html-preview-open-in-browser.e2e.ts` sets the variable in `test.beforeAll` (the fixtures launch Electron with `{ ...process.env }`) and restores the worker's value in `test.afterAll`; each test then arms a recording seam (`armBrowserSeam`), which refuses to arm unless the variable really reached an unpackaged app, and stubs the default-browser lookup, so no test ever starts a browser |
+| `ERFANA_E2E_BROWSER_SEAM=1` | #124: in an unpackaged build only, a function at `globalThis.__erfanaE2eBrowserLaunch` in the main process replaces the real browser launch and receives `{ via, appPath, filePath }` (`browserLauncher.ts`; `app.isPackaged` is checked first). `html-preview-open-in-browser.e2e.ts` sets the variable in `test.beforeAll` (the fixtures' `buildAppEnv()` passes every `ERFANA_*` variable through to the app) and restores the worker's value in `test.afterAll`; each test then arms a recording seam (`armBrowserSeam`), which refuses to arm unless the variable really reached an unpackaged app, and stubs the default-browser lookup, so no test ever starts a browser |
 | `ERFANA_E2E_FAST_SHELL=1` | POSIX only: the PTY bootstrap execs `/bin/sh -i` instead of `exec -l "$SHELL" -i`, skipping user rc files so terminal specs start in tens of milliseconds rather than seconds |
 | `ERFANA_E2E_TRANSCRIPTION=1` | Enables the `transcription` Playwright project (real, paid OpenAI calls; also needs `OPENAI_API_KEY`). Without it the project matches nothing and the `capability-summary` reporter prints a `SKIPPED CAPABILITIES` line |
+| `ERFANA_E2E_TEST_HOOKS=1` | In an unpackaged build only, installs the e2e test hooks – `window.__erfanaTest` (terminal screen, editor value) and main's `globalThis.__erfanaE2eComments`. Set by `buildAppEnv()` for every fixture launch |
+| `ERFANA_E2E_BENCH=1` | Enables the `bench` Playwright project (`*.bench.ts`); without it the project matches nothing |
 
 `ERFANA_TEST_BUILD=true` is a *build*-time variable, not a test-time one – see [Test build vs production build](#test-build-vs-production-build) above. Canonical table: [Testing overview § E2E environment variables](./README.md#e2eui-playwright-electron).
 

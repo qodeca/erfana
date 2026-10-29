@@ -123,6 +123,8 @@ The labels below exist on `qodeca/erfana` (read live with `gh label list --repo 
 | `graph-engine` | #5319e7 | Graph engine (spec 004 / R1) work |
 | `canary` | #fbca04 | Scheduled canary-run failures; applied by `whisper-binaries-canary.yml` notify-on-failure |
 | `windows` | #1d76db | Windows platform enablement; session-start filter named in `docs/windows/README.md` |
+| `release-0.21.0` | #0E8A16 | In scope for the 0.21.0 campaign |
+| `release-0.22.0` | #0E8A16 | In scope for the 0.22.0 campaign |
 
 `gh label list` is the authority — this table is a snapshot and can go stale.
 
@@ -150,7 +152,7 @@ explains how reports are handled; and questions and open-ended ideas go to
 |---|---|---|
 | What happened? | textarea — description plus what you expected | **yes** |
 | Steps to reproduce | textarea — minimal ordered steps | **yes** |
-| Erfana version | input — from Help → About | **yes** |
+| Erfana version | input — shown in the window title as `ERFANA v<version>` (macOS also: Erfana → About Erfana) | **yes** |
 | Operating system | dropdown — `macOS` or `Windows` | **yes** |
 | Logs or screenshots | textarea — redact anything sensitive | no |
 

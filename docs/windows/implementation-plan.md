@@ -165,7 +165,8 @@ Three of the four rows that used to sit here have shipped and moved to the ✅ t
 
 1. **cmd.exe bootstrap** (fixes B3) — `TerminalService.ts` win32 branch
    - Spawns with `['/D', '/K', '@echo off && cd /d "<cwd>" && cd && echo <marker>']`. `/D` disables AutoRun; `/K` keeps cmd.exe interactive. **`@echo off` is critical**: without it, cmd.exe echoes the bootstrap commands back into the PTY and `markerDetector` mis-parses the echoed `echo <marker>` line as the cwd.
-   - Bare `cd` (no args) prints the working directory — the cmd.exe analog of `pwd`. The marker triggers the same handshake at `TerminalService.ts:292-332`.
+   - Bare `cd` (no args) prints the working directory — the cmd.exe analog of `pwd`. The marker triggers the same handshake (`markerDetector` in `TerminalService.ts`).
+   - *Superseded by #335 (v0.22.0):* `CmdExeBootstrapBuilder` now returns one command-line string, `/D /S /K "@echo off && cd && echo <marker> … & echo on"`, and the cwd comes from `pty.spawn` rather than `cd /d`.
 2. **PowerShell `-LiteralPath`** (fixes M4) — `TerminalService.ts` PS branch
    - `Set-Location -LiteralPath '<single-quote-doubled cwd>'`. `-LiteralPath` disables wildcard and variable expansion; single quotes disable `$` interpolation. Marker is also single-quoted defensively (`Write-Output '<marker>'`).
    - Shell-kind detection regex: `/(?:^|[/\\])(pwsh(?:-preview)?|powershell)(?:\.exe)?$/i` — covers forward-slash Git Bash paths and `pwsh-preview.exe`.
@@ -208,7 +209,7 @@ Three of the four rows that used to sit here have shipped and moved to the ✅ t
    - Optional registry probe (`reg query HKLM\SOFTWARE\LibreOffice\UNO\InstallPath`) deferred unless filesystem probe proves insufficient.
    - **Landed:** `13bd3b8` (5 new DependencyDetector tests).
 4. **[#163](https://github.com/qodeca/erfana/issues/163) — `isWindowsLongPath`** (P2, decision-deferred) — `PlatformConfig.ts:205`
-   - Decision recorded inline at `PlatformConfig.ts:188` (comment block) with promotion criteria: re-activate as P1 if any real >260-char path victim surfaces in UAT, OR any Phase 3+ feature produces >200-char default paths.
+   - Decision recorded inline at `PlatformConfig.ts:190` (comment block) with promotion criteria: re-activate as P1 if any real >260-char path victim surfaces in UAT, OR any Phase 3+ feature produces >200-char default paths.
    - **Decision deferred to Phase 6** (`a2b5bd0`); helper kept in source (deletion would be worse churn).
 
 ### Post-Phase-2 review
@@ -444,7 +445,7 @@ All items below were satisfied before the `windows` → `develop` merge (`c1e085
 - `src/main/services/watcher/PlatformConfig.ts` — Phase 2 (#163 wire up `isWindowsLongPath`)
 - `src/main/services/FileService.ts`, `DocxService.ts`, `PdfService.ts` — Phase 2 (#161 filename validation, #163 long-path prefix)
 - `src/main/utils/validateFilename.ts` — Phase 2 (#161 new file)
-- `src/shared/constants.ts` — Phase 4 (`LOCAL_WHISPER.BINARY_NAME` per-platform)
+- `src/shared/constants.ts` — Phase 4 (`LOCAL_WHISPER` folder names; the per-platform binary filenames live in `ARTIFACTS` in `whisper-assets.ts`)
 - `package.json` — Phase 0 (landed)
 - `scripts/test-cov.mjs`, `scripts/prebuild.mjs` — Phase 0 (landed; new files)
 - `electron-builder.yml` — Phase 5 NSIS UX only (publish URL + signing already shipped via #174 in v0.9.5)
@@ -456,7 +457,7 @@ All items below were satisfied before the `windows` → `develop` merge (`c1e085
 ## Existing utilities to reuse
 
 - `window.api.utils.getPlatform()` preload bridge (`getPlatform` in `src/preload/index.ts`) — already exists; renderer usage is consolidated on it via `src/renderer/src/utils/platform.ts`
-- `PlatformConfig.isWindowsLongPath()` (`PlatformConfig.ts:207`) — exists as dead code, activate it in #163
+- `PlatformConfig.isWindowsLongPath()` (`PlatformConfig.ts:207`) — since v0.19.0 `TerminalService` uses it to refuse a terminal cwd over 260 chars; wiring it into file I/O is the deferred #163 work
 - `foldCase` in `ProjectService.ts:86-88` — case-insensitive path comparison pattern; reuse in any new path equality check
 - `WINDOWS_SYSTEM_ENV` / `WINDOWS_SYSTEM_FALLBACK` in `src/main/utils/pathSecurity.ts:62-72` — Windows system-folder blocklist (it used to live in `file-handlers.ts`); reuse its shape for any new path deny-list
 - `AppError` + `ErrorCode` — all new errors go through this

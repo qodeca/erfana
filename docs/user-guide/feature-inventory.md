@@ -18,6 +18,7 @@ cover it. The final column links to the section covering that feature (acceptanc
   every dialog, and every panel toolbar.
 - Refreshed 2026-10-25 for v0.22.0: rows APP-19 to APP-21, TREE-17, TERM-12, TERM-13, SET-13 to
   SET-15, KEY-26 and KEY-27 were added, and APP-02, APP-16, TREE-07 and IMP-03 were updated.
+- Re-checked against the code 2026-10-29: labels, defaults, limits and source paths.
 
 **Out of scope, on purpose:** the spec registry has only one kind of user-facing entry – `draft`
 specs for work not yet shipped. Those are the graph engine (004–008), multi-CLI prompt optimisation
@@ -59,8 +60,8 @@ Source paths are relative to `src/renderer/src/` (**R/**), `src/main/` (**M/**) 
 
 | ID | Feature | Platforms | Source | Guide section |
 |---|---|---|---|---|
-| TREE-01 | Toolbar: New markdown file, New folder, Import, Refresh | all | ProjectTree.tsx | [reference/project-tree](./reference/project-tree.md#toolbar-and-filter) |
-| TREE-02 | Filter: All Files / Markdown Only | all | R/components/Panels/ProjectPanel.tsx | [how-to/organise-project-files](./how-to/organise-project-files.md#manage-files) |
+| TREE-01 | Toolbar: Create new markdown file, Create new folder, Import a file, Refresh | all | ProjectTree.tsx | [reference/project-tree](./reference/project-tree.md#toolbar-and-filter) |
+| TREE-02 | Filter: All Files / Markdown Only | all | R/components/ProjectTree/ProjectTree.tsx | [how-to/organise-project-files](./how-to/organise-project-files.md#manage-files) |
 | TREE-03 | Git badges on files and folders | all | ProjectTree/GitStatusBadge.tsx | [reference/project-tree](./reference/project-tree.md#git-badges-and-status) |
 | TREE-04 | Git status bar: branch, "Clean", detached HEAD, 10,000-file cap | all | ProjectTree/GitStatusBar.tsx | [reference/project-tree](./reference/project-tree.md#git-badges-and-status) |
 | TREE-05 | Sensitive-file and symlink icons | all | ProjectTreeNode.tsx | [reference/project-tree](./reference/project-tree.md#special-files-and-visibility) |
@@ -68,14 +69,14 @@ Source paths are relative to `src/renderer/src/` (**R/**), `src/main/` (**M/**) 
 | TREE-07 | Drop from Finder/Explorer: Move / Copy / Import; over 100 files refused first; Move confirmed in a native box (groups of 10) | all | Dialog/DropModeDialog.tsx, M/services/ExternalMoveConfirmer.ts | [how-to/organise-project-files](./how-to/organise-project-files.md#manage-files) |
 | TREE-08 | Name clash: Skip / Keep both / Replace | all | Dialog/ConflictDialog.tsx | [how-to/organise-project-files](./how-to/organise-project-files.md#manage-files) |
 | TREE-09 | Cut / copy / paste files | all | ProjectTree.tsx | [how-to/organise-project-files](./how-to/organise-project-files.md#manage-files) |
-| TREE-10 | Folder right-click menu (Cut, Copy, Paste, New File, New Folder, Rename, Import…, Delete, Reveal) | all | ProjectTree/context-menu/strategies.tsx, commands.tsx | [reference/menus](./reference/menus.md#project-tree-context-menus) |
+| TREE-10 | Folder right-click menu (**Cut**, **Copy**, **Paste**, **New File**, **New Folder**, **Rename**, **Import...**, **Delete**, **Reveal in Finder** or its platform equivalent) | all | ProjectTree/context-menu/strategies.tsx, commands.tsx | [reference/menus](./reference/menus.md#project-tree-context-menus) |
 | TREE-11 | File right-click menu; HTML files add Open as source, Open in default browser | all | same | [reference/menus](./reference/menus.md#project-tree-context-menus) |
 | TREE-12 | Reveal in Finder / Reveal in Explorer | all (label per OS) | commands.tsx | [reference/project-tree](./reference/project-tree.md#file-actions) |
 | TREE-13 | Delete confirmation ("cannot be undone") | all | commands.tsx | [how-to/organise-project-files](./how-to/organise-project-files.md#manage-files) |
 | TREE-14 | Keyboard navigation: one Tab stop, arrows, Home/End, Enter, type-ahead, <kbd>⇧F10</kbd> / <kbd>Shift+F10</kbd> (#88) | all | ProjectTree/treeKeyboard.ts | [reference/project-tree](./reference/project-tree.md#keyboard-navigation) |
 | TREE-15 | Hidden patterns and watcher ignore list (per-project settings) | all | S/ipc/project-settings-schema.ts | [reference/settings](./reference/settings.md#per-project-settings) |
 | TREE-16 | Excluded folders: `files.exclude` in the global and the project settings file (project adds to global); excluded paths are not shown, read or watched; `.erfana` is never excluded; git status unaffected | all | S/ipc/files-exclude-schema.ts, M/utils/excludeMatcher.ts | [reference/settings](./reference/settings.md#excluded-folders) |
-| TREE-17 | Large folders: only visible rows drawn; ignored build folders and folders past 50,000 entries read on expand; Loading… / Could not read this folder | all | ProjectTree/visibleRows.ts, TreePlaceholderRow.tsx, M/services/FileService.ts | [reference/project-tree](./reference/project-tree.md#large-projects) |
+| TREE-17 | Large folders: only visible rows drawn; ignored build folders and folders beyond the first 50,000 rows read on expand; Loading… / Could not read this folder | all | ProjectTree/visibleRows.ts, TreePlaceholderRow.tsx, M/services/FileService.ts | [reference/project-tree](./reference/project-tree.md#large-projects) |
 
 ## Editor
 
@@ -83,12 +84,12 @@ Source paths are relative to `src/renderer/src/` (**R/**), `src/main/` (**M/**) 
 |---|---|---|---|---|
 | ED-01 | Monaco editor: F1 command palette, multi-cursor, standard commands | all | R/components/Editor/MonacoMarkdownEditor.tsx | [reference/editor](./reference/editor.md#editor-commands) |
 | ED-02 | View modes: Editor Only, Split Horizontal, Split Vertical, Preview Only; new tabs open in Preview | all | MarkdownToolbar.tsx | [how-to/edit-and-preview-markdown](./how-to/edit-and-preview-markdown.md#choose-a-view) |
-| ED-03 | Formatting toolbar: Bold, Italic, Strikethrough, Inline Code, Link, Image, Heading 1, lists, Find | all | MarkdownToolbar.tsx | [reference/editor](./reference/editor.md#formatting-toolbar) |
+| ED-03 | Formatting toolbar: Bold, Italic, Strikethrough, Inline Code, Insert Link, Insert Image, Heading 1, Bullet List, Numbered List, Find | all | MarkdownToolbar.tsx | [reference/editor](./reference/editor.md#formatting-toolbar) |
 | ED-04 | Find bar: next/previous, case sensitive, whole word | all | R/components/Search/SearchBar.tsx | [how-to/edit-and-preview-markdown](./how-to/edit-and-preview-markdown.md#choose-a-view) |
 | ED-05 | Statistics bar: words, characters, lines, reading time, selection | all | R/components/Panels/DocumentStatsBar.tsx | [reference/editor](./reference/editor.md#statistics-bar) |
 | ED-06 | Editor right-click menu: prompt templates, Cut, Copy, Paste | all | R/components/ContextMenu/EditorContextMenu.tsx | [reference/menus](./reference/menus.md#editor-and-preview-context-menus) |
 | ED-07 | Scroll sync between editor and preview | all | hooks/useScrollSync.ts | [reference/editor](./reference/editor.md#view-modes-and-scroll-sync) |
-| ED-08 | Unsaved-changes prompt on closing a tab | all | Dialog/UnsavedChangesDialog.tsx | [how-to/edit-and-preview-markdown](./how-to/edit-and-preview-markdown.md#choose-a-view) |
+| ED-08 | Unsaved-changes prompt on closing a tab | all | R/components/Tabs/EditorTab.tsx | [how-to/edit-and-preview-markdown](./how-to/edit-and-preview-markdown.md#choose-a-view) |
 
 ## Markdown preview and Mermaid
 
@@ -98,7 +99,7 @@ Source paths are relative to `src/renderer/src/` (**R/**), `src/main/` (**M/**) 
 | PV-02 | Frontmatter shown as a table | all | FrontmatterTable.tsx | [reference/markdown-preview](./reference/markdown-preview.md#markdown-and-frontmatter) |
 | PV-03 | Preserve line breaks option | all | Settings | [reference/settings](./reference/settings.md#editor) |
 | PV-04 | Links: anchors, project files inside the app, external links to the OS, unsafe links blocked | all | MarkdownPreview.tsx | [reference/markdown-preview](./reference/markdown-preview.md#links) |
-| PV-05 | Preview right-click menu: prompt templates, Copy | all | ContextMenu/PreviewContextMenu.tsx | [reference/menus](./reference/menus.md#editor-and-preview-context-menus) |
+| PV-05 | Preview right-click menu: prompt templates, Copy selection | all | ContextMenu/PreviewContextMenu.tsx | [reference/menus](./reference/menus.md#editor-and-preview-context-menus) |
 | PV-06 | Project images (relative path) shown and refreshed on change; outside, absolute and `file:` images show alt text (#71) | all | Editor/MarkdownImage.tsx | [reference/markdown-preview](./reference/markdown-preview.md#images) |
 | MM-01 | Mermaid diagrams with a toolbar: direction buttons, View fullscreen | all | MermaidToolbar.tsx | [how-to/work-with-mermaid-diagrams](./how-to/work-with-mermaid-diagrams.md#view-a-diagram) |
 | MM-02 | Mermaid error box with "Report this error to Claude Code" | all | MermaidDiagram.tsx | [how-to/work-with-mermaid-diagrams](./how-to/work-with-mermaid-diagrams.md#view-a-diagram) |
@@ -115,25 +116,25 @@ Source paths are relative to `src/renderer/src/` (**R/**), `src/main/` (**M/**) 
 | IMG-04 | Export as PNG, as PDF, copy to clipboard | all | ImageViewerExportControls.tsx | [how-to/view-and-export-images](./how-to/view-and-export-images.md#view-and-export-an-image) |
 | IMG-05 | Live refresh, "Reloaded from disk"; deleted-file banner with Reload; 100-file watch cap | all | ImageViewerPanel.tsx, ImageViewerBanner.tsx | [how-to/view-and-export-images](./how-to/view-and-export-images.md#view-and-export-an-image) |
 | IMG-06 | Mouse and keys: wheel, drag, double-click, + = - 0 F arrows Esc | all | imageViewer.logic.ts | [reference/keyboard-shortcuts](./reference/keyboard-shortcuts.md#image-and-diagram-viewers) |
-| IMG-07 | Image paths clicked in the terminal open in the viewer | all | useTerminalFileLinks.ts | [reference/terminal](./reference/terminal.md#file-links-and-dropped-files) |
+| IMG-07 | Image paths selected in the terminal open in the viewer | all | R/components/Panels/TerminalPanel.tsx | [reference/terminal](./reference/terminal.md#file-links-and-dropped-files) |
 
 ## HTML preview
 
 | ID | Feature | Platforms | Source | Guide section |
 |---|---|---|---|---|
-| HP-01 | Live page with CSS and JavaScript; 3 run at once, others freeze to a still | all | M/services/preview/, docs/html-preview/README.md | [how-to/preview-an-html-page](./how-to/preview-an-html-page.md#open-and-navigate-a-page) |
-| HP-02 | Files in node_modules, dist, out, coverage, .git or gitignored open as source | all | same | [reference/html-preview](./reference/html-preview.md#opening-and-limits) |
+| HP-01 | Live page with CSS and JavaScript; 3 run at once, others freeze to a still | all | M/services/preview/, S/constants.ts | [how-to/preview-an-html-page](./how-to/preview-an-html-page.md#open-and-navigate-a-page) |
+| HP-02 | Files in node_modules, dist, out, coverage, .git or gitignored open as source | all | M/services/preview/previewExclusion.ts | [reference/html-preview](./reference/html-preview.md#opening-and-limits) |
 | HP-03 | Toolbar: Back, Open links in this tab, Find, permission chip, Open in default browser, Export to PDF | all | HtmlPreviewPanel/components/ | [reference/html-preview](./reference/html-preview.md#toolbar-and-navigation) |
 | HP-04 | Remote-host permission: Allow → Confirm; saved per project; cannot be removed in the app (#86) | all | PreviewBandRow.tsx, PreviewBandConfirm.tsx | [how-to/preview-an-html-page](./how-to/preview-an-html-page.md#open-and-navigate-a-page) |
 | HP-05 | Preview issues list (script errors, blocked hosts, links, frames) | all | PreviewFailureBadge.tsx | [reference/html-preview](./reference/html-preview.md#find-issues-and-stopped-state) |
-| HP-06 | Links in place or new tab; 50-entry history; external links ask first | all | docs/html-preview/README.md | [how-to/preview-an-html-page](./how-to/preview-an-html-page.md#open-and-navigate-a-page) |
-| HP-07 | Frames from the same project, 3 levels, 50 per page | all | same | [reference/html-preview](./reference/html-preview.md#live-refresh-and-frames) |
-| HP-08 | Auto-refresh: CSS in place, HTML/JS reload; 16 watched files per preview | all | same | [reference/html-preview](./reference/html-preview.md#live-refresh-and-frames) |
+| HP-06 | Links in place or new tab; 50-entry history; external links ask first | all | S/preview-limits.ts, M/ipc/preview/externalLinkConsent.ts | [how-to/preview-an-html-page](./how-to/preview-an-html-page.md#open-and-navigate-a-page) |
+| HP-07 | Frames from the same project, 3 levels, 50 per page | all | S/preview-limits.ts | [reference/html-preview](./reference/html-preview.md#live-refresh-and-frames) |
+| HP-08 | Auto-refresh: CSS in place, HTML/JS reload; 16 watched files per preview | all | M/services/preview/PreviewReloadPolicy.ts, S/constants.ts | [reference/html-preview](./reference/html-preview.md#live-refresh-and-frames) |
 | HP-09 | Page zoom (View menu, <kbd>⌘+</kbd> <kbd>⌘-</kbd> <kbd>⌘0</kbd> / <kbd>Ctrl++</kbd> <kbd>Ctrl+-</kbd> <kbd>Ctrl+0</kbd>) | all | M/menu.ts | [reference/html-preview](./reference/html-preview.md#zoom-and-pdf) |
-| HP-10 | Stopped preview with Reload | all | PreviewFallback.tsx | [reference/troubleshooting](./reference/troubleshooting.md#html-preview-stopped-or-reports-issues) |
+| HP-10 | Stopped preview with Reload | all | HtmlPreviewPanel/hooks/usePreviewPanelActions.ts | [reference/troubleshooting](./reference/troubleshooting.md#html-preview-stopped-or-reports-issues) |
 | HP-11 | Keyboard into and out of the page (Enter/Space, Esc); Back/Forward keys | all (keys differ) | S/previewNavKeys.ts | [reference/keyboard-shortcuts](./reference/keyboard-shortcuts.md#html-preview) |
 | HP-12 | Off-switch: **Run HTML files** setting | all | Settings/sections/HtmlPreviewSection.tsx | [reference/settings](./reference/settings.md#html-preview) |
-| HP-13 | Comments on page elements, saved in the `.html` file: comment mode, pins, the Comments drawer, threads (v0.23.0) | all | M/services/preview/comments/, HtmlPreviewPanel/comments/, docs/html-preview/README.md | [reference/html-preview](./reference/html-preview.md#comments) |
+| HP-13 | Comments on page elements, saved in the `.html` file: comment mode, pins, the Comments drawer, threads | all | M/services/preview/comments/, HtmlPreviewPanel/comments/ | [reference/html-preview](./reference/html-preview.md#comments) |
 
 ## Terminal
 
@@ -160,7 +161,7 @@ Source paths are relative to `src/renderer/src/` (**R/**), `src/main/` (**M/**) 
 | CC-01 | Context meter while `claude` runs: model, 200k/1M badge, %, coloured bar (under 30 %, 30–60 %, 60 %+) | M, W | TerminalPanel/components/ClaudeStatusBar.tsx | [reference/claude-code-status-bar](./reference/claude-code-status-bar.md#model-and-context-meter) |
 | CC-02 | Tooltip: exact tokens, "(inferred)" window | M, W | same | [reference/claude-code-status-bar](./reference/claude-code-status-bar.md#tooltip-and-limits) |
 | CC-03 | Reads Claude Code's own transcripts only; never writes its config | M, W | M/services/claudeStatus/ | [Read Claude Code status](./how-erfana-works-with-agents.md#read-claude-code-status) |
-| CC-04 | Limits: capped 1M deployments are badged 1M (#48); on Windows it hides after `cd` before `claude` | M, W | docs/features/README.md #14 | [reference/claude-code-status-bar](./reference/claude-code-status-bar.md#tooltip-and-limits) |
+| CC-04 | Limits: a deployment that caps a 1M model lower is still badged 1M (#48); on Windows the meter uses the terminal's start folder, so it hides after `cd` before `claude` | M, W | M/services/claudeStatus/ClaudeWindowDetector.ts, process/WinClaudeProcessDetector.ts | [reference/claude-code-status-bar](./reference/claude-code-status-bar.md#tooltip-and-limits) |
 
 ## Prompt templates
 
@@ -170,11 +171,11 @@ Source paths are relative to `src/renderer/src/` (**R/**), `src/main/` (**M/**) 
 | PT-02 | Modify | **yes** | modify.md, editor-modify.md | [reference/prompt-templates](./reference/prompt-templates.md#modify) |
 | PT-03 | Ask | no | ask.md, editor-ask.md | [reference/prompt-templates](./reference/prompt-templates.md#ask) |
 | PT-04 | Visualize (22 diagram types) | **yes** | visualize.md, editor-visualize.md | [reference/prompt-templates](./reference/prompt-templates.md#visualize) |
-| PT-05 | Prompt (free text) | no | prompt.md, editor-prompt.md | [reference/prompt-templates](./reference/prompt-templates.md#prompt) |
+| PT-05 | Prompt (free text) | depends on your text | prompt.md, editor-prompt.md | [reference/prompt-templates](./reference/prompt-templates.md#prompt) |
 | PT-06 | Mermaid bug report | **yes** | mermaid-bug-report.md | [reference/prompt-templates](./reference/prompt-templates.md#mermaid-bug-report) |
 | PT-07 | Change Mermaid direction | **yes** | mermaid-change-direction.md | [reference/prompt-templates](./reference/prompt-templates.md#change-mermaid-direction) |
 | PT-08 | Diagram chat | **yes** | mermaid-chat.md | [reference/prompt-templates](./reference/prompt-templates.md#diagram-chat) |
-| PT-09 | Organize import (runs after import and transcription) | to confirm while writing | organize-import.md | [reference/prompt-templates](./reference/prompt-templates.md#organize-import) |
+| PT-09 | Organize import (runs after import and transcription) | **yes** (moves and renames it) | organize-import.md | [reference/prompt-templates](./reference/prompt-templates.md#organize-import) |
 | PT-10 | Templates are sent to the terminal and run at once | – | template frontmatter `autoExecute: true` | [Send selected text](./how-erfana-works-with-agents.md#send-selected-text) |
 
 ## Import, transcription, export
@@ -182,14 +183,14 @@ Source paths are relative to `src/renderer/src/` (**R/**), `src/main/` (**M/**) 
 | ID | Feature | Platforms | Source | Guide section |
 |---|---|---|---|---|
 | IMP-01 | Import dialog: OCR on/off, 31 languages, page screenshots, DPI 72/150/300; parse at most 1,000 pages, screenshot first 100; options kept for the session | all | R/components/DocumentImport/DocumentImportDialog.tsx | [how-to/import-a-document](./how-to/import-a-document.md#import-a-file) |
-| IMP-02 | Supported formats (LiteParse; the "50+" list to confirm while writing) | all | M/services import | [reference/import-and-transcription](./reference/import-and-transcription.md#import-documents) |
+| IMP-02 | Supported formats: PDF, images and Office documents (LiteParse; Office needs LibreOffice), text and code files, audio and video | all | M/services/import/converters/ | [reference/import-and-transcription](./reference/import-and-transcription.md#import-documents) |
 | IMP-03 | LibreOffice required / unsafe location dialog with Open import tools | all | R/hooks/useImport.ts | [how-to/import-a-document](./how-to/import-a-document.md#import-a-file) |
 | IMP-04 | Large-file warning: Import anyway / Skip | all | useImport.ts | [reference/import-and-transcription](./reference/import-and-transcription.md#import-documents) |
 | IMP-05 | After import: file opens and the organize-import prompt runs | all | DocumentImportDialog.tsx | [how-to/import-a-document](./how-to/import-a-document.md#import-a-file) |
 | TR-01 | Transcription dialog: 31 languages incl. auto-detect, progress, retry | all | R/components/Transcription/TranscriptionDialog.tsx | [how-to/transcribe-audio-or-video](./how-to/transcribe-audio-or-video.md#transcribe-media) |
 | TR-02 | Audio mp3 wav m4a ogg flac; video mp4 mov avi mkv webm flv wmv | all | S/constants.ts | [reference/import-and-transcription](./reference/import-and-transcription.md#transcribe-audio-or-video) |
 | TR-03 | Backends: OpenAI API (audio leaves the machine) or local whisper.cpp (offline) | local: M, W x64 | Settings | [how-to/transcribe-audio-or-video](./how-to/transcribe-audio-or-video.md#transcribe-media) |
-| TR-04 | Long recordings are split into chunks | all | docs/features/README.md #13 | [reference/import-and-transcription](./reference/import-and-transcription.md#transcribe-audio-or-video) |
+| TR-04 | Recordings over 8 minutes are split into chunks | all | S/constants.ts | [reference/import-and-transcription](./reference/import-and-transcription.md#transcribe-audio-or-video) |
 | EX-01 | Markdown to PDF and Word; disabled in Editor Only | all | MarkdownToolbar.tsx, M/services/PdfService.ts | [how-to/export-to-pdf-or-word](./how-to/export-to-pdf-or-word.md#export-markdown) |
 | EX-02 | HTML page to PDF (toolbar or <kbd>⌘S</kbd> / <kbd>Ctrl+S</kbd>) | all | HtmlPreviewPanel | [how-to/export-to-pdf-or-word](./how-to/export-to-pdf-or-word.md#export-markdown) |
 | EX-03 | Image to PNG / PDF / clipboard | all | ImageViewerExportControls.tsx | [how-to/view-and-export-images](./how-to/view-and-export-images.md#view-and-export-an-image) |
@@ -221,7 +222,7 @@ Every row goes into `reference/keyboard-shortcuts.md` with macOS and Windows col
 
 | ID | Keys (macOS / Windows) | Action | Scope | Guide section |
 |---|---|---|---|---|
-| KEY-01 | <kbd>⌘B</kbd> / <kbd>Ctrl+B</kbd> | Show or hide the Project sidebar (in the editor, Bold may win – to observe) | global | [Shortcuts](./reference/keyboard-shortcuts.md#app-and-windows) |
+| KEY-01 | <kbd>⌘B</kbd> / <kbd>Ctrl+B</kbd> | Show or hide the Project sidebar (in the editor it makes text bold instead) | global | [Shortcuts](./reference/keyboard-shortcuts.md#app-and-windows) |
 | KEY-02 | <kbd>⌘J</kbd> / <kbd>Ctrl+J</kbd> | Show or hide the terminal | global | [Shortcuts](./reference/keyboard-shortcuts.md#app-and-windows) |
 | KEY-03 | <kbd>⇧⌘M</kbd> / <kbd>Ctrl+Shift+M</kbd> | Maximize the terminal | global | [Shortcuts](./reference/keyboard-shortcuts.md#app-and-windows) |
 | KEY-04 | <kbd>⌥⌘R</kbd> / <kbd>Ctrl+Alt+R</kbd> | Refresh the project tree | global | [Shortcuts](./reference/keyboard-shortcuts.md#app-and-windows) |
@@ -234,7 +235,7 @@ Every row goes into `reference/keyboard-shortcuts.md` with macOS and Windows col
 | KEY-11 | <kbd>Enter</kbd>, <kbd>⇧Enter</kbd> / <kbd>Shift+Enter</kbd>, <kbd>Esc</kbd>; <kbd>⌥⌘C</kbd> <kbd>⌥⌘W</kbd> / <kbd>Alt+C</kbd> <kbd>Alt+W</kbd> | Next, previous, close, case-sensitive and whole-word toggles in the find bar | find bar | [Shortcuts](./reference/keyboard-shortcuts.md#editor-and-markdown-preview) |
 | KEY-12 | <kbd>⌘I</kbd> <kbd>⌘K</kbd> / <kbd>Ctrl+I</kbd> <kbd>Ctrl+K</kbd> | Italic, insert link | editor | [Shortcuts](./reference/keyboard-shortcuts.md#editor-and-markdown-preview) |
 | KEY-13 | <kbd>⌘C</kbd> <kbd>⌘X</kbd> <kbd>⌘V</kbd> / <kbd>Ctrl+C</kbd> <kbd>Ctrl+X</kbd> <kbd>Ctrl+V</kbd> | Copy, cut, paste text | editor | [Shortcuts](./reference/keyboard-shortcuts.md#editor-and-markdown-preview) |
-| KEY-14 | <kbd>F1</kbd>; <kbd>⌘/</kbd> / <kbd>Ctrl+/</kbd>; <kbd>⌥↑</kbd> <kbd>⌥↓</kbd> / <kbd>Alt+↑</kbd> <kbd>Alt+↓</kbd>; <kbd>⌘D</kbd> / <kbd>Ctrl+D</kbd>; hold <kbd>⌥</kbd> / <kbd>Alt</kbd> and click | Monaco commands | editor | [Shortcuts](./reference/keyboard-shortcuts.md#editor-and-markdown-preview) |
+| KEY-14 | <kbd>F1</kbd>; <kbd>⌘/</kbd> / <kbd>Ctrl+/</kbd>; <kbd>⌥↑</kbd> <kbd>⌥↓</kbd> / <kbd>Alt+↑</kbd> <kbd>Alt+↓</kbd>; <kbd>⌘D</kbd> / <kbd>Ctrl+D</kbd>; hold <kbd>⌥</kbd> / <kbd>Alt</kbd> and select | Monaco commands | editor | [Shortcuts](./reference/keyboard-shortcuts.md#editor-and-markdown-preview) |
 | KEY-15 | <kbd>⌘C</kbd> / <kbd>Ctrl+C</kbd> with a selection; <kbd>⌃⇧C</kbd> <kbd>⌃⇧V</kbd> / <kbd>Ctrl+Shift+C</kbd> <kbd>Ctrl+Shift+V</kbd> | Terminal copy and paste (<kbd>⌃C</kbd> / <kbd>Ctrl+C</kbd> without a selection interrupts) | terminal | [Shortcuts](./reference/keyboard-shortcuts.md#terminal) |
 | KEY-16 | <kbd>⌘[</kbd> <kbd>⌘]</kbd> / <kbd>Alt+←</kbd> <kbd>Alt+→</kbd> | HTML preview Back / Forward | HTML preview | [Shortcuts](./reference/keyboard-shortcuts.md#html-preview) |
 | KEY-17 | <kbd>Enter</kbd> or <kbd>Space</kbd>, then <kbd>Esc</kbd> | Into the HTML page and back out | HTML preview | [Shortcuts](./reference/keyboard-shortcuts.md#html-preview) |
@@ -249,7 +250,6 @@ Every row goes into `reference/keyboard-shortcuts.md` with macOS and Windows col
 | KEY-26 | <kbd>⇧F10</kbd> / <kbd>Shift+F10</kbd> or <kbd>Menu</kbd>; then arrows, <kbd>Home</kbd> <kbd>End</kbd>, <kbd>Enter</kbd> or <kbd>Space</kbd>, type-ahead, <kbd>Esc</kbd> or <kbd>Tab</kbd> | Open and use any right-click menu | menus | [Shortcuts](./reference/keyboard-shortcuts.md#menus) |
 | KEY-27 | <kbd>Esc</kbd> on a focused toast | Close the message | toasts | [Shortcuts](./reference/keyboard-shortcuts.md#app-and-windows) |
 | KEY-28 | <kbd>⌥⌘M</kbd> / <kbd>Ctrl+Alt+M</kbd>; <kbd>Esc</kbd> | Turn HTML Preview comment mode on or off; leave it | HTML preview | [Shortcuts](./reference/keyboard-shortcuts.md#html-preview) |
-
 
 ## Menus and dialogs
 
@@ -271,7 +271,7 @@ Found while building the inventory. The guide documents what the **code** does. 
 were resolved in [#142](https://github.com/qodeca/erfana/issues/142) and
 [#143](https://github.com/qodeca/erfana/issues/143); items 2–5, 7 and 8 in
 [#144](https://github.com/qodeca/erfana/issues/144). The guide itself uses
-current source behavior. Item 9 remains unverified.
+current source behavior. Item 9 is answered from the code.
 
 1. **Find bar keys** (#142, resolved). `R/components/Search/SearchBar.tsx` now handles the
    platform-specific case-sensitive and whole-word chords named by its tooltips.
@@ -293,5 +293,5 @@ current source behavior. Item 9 remains unverified.
 8. **Agent wording** (#144, resolved). `docs/features/README.md` items 1 and 4, `docs/prompts/README.md`
    and the other contributor pages now send prompt templates to the CLI agent in the terminal rather
    than claiming AI text operations. The guide attributes prompts to the CLI agent in the terminal.
-9. **<kbd>⌘B</kbd> / <kbd>Ctrl+B</kbd> in the editor.** Whether it makes text bold or toggles the sidebar is unverified. A
-   capture scene observes it, and the guide states what happens.
+9. **<kbd>⌘B</kbd> / <kbd>Ctrl+B</kbd> in the editor.** It makes the selection bold. The editor binds the key in
+   `R/components/Editor/MonacoMarkdownEditor.tsx`, so the sidebar does not toggle there.

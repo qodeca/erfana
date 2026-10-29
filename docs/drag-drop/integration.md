@@ -13,24 +13,27 @@
 ```typescript
 // ProjectTree.tsx – handleDragEnd (shape; the pause/resume pair lives in withWatcherPause.ts)
 const handleDragEnd = async (event: DragEndEvent) => {
-  // Calculate target and validate...
-
-  const result = await withWatcherPause(projectPath, isInternalOperation, setFileOperationLoading, async () => {
-    // Execute move operation
-    return window.api.file.moveItem(sourcePath, targetParent)
-  })
-  // withWatcherPause pauses the directory watcher before `op`, marks the mutation as
-  // internal, and always resumes in its own finally block.
-
-  // Refresh tree from disk, then report through the toast service – there is no
-  // screen-reader announcer (see visual-feedback.md § Accessibility)
-  await refreshProjectTree()
-  showGlobalToast({ title: 'Success', message: 'Moved 1 file', type: 'success' })
-  // failures: showGlobalToast({ title: 'Move failed', message: error.message, type: 'error' })
-
+  cancelAutoExpandTimer()
   setActiveId(null)
   setOverId(null)
+  // Drop on the terminal → insert the path; same-folder drop → end quietly;
+  // descendant / project-root drops → "Invalid Move" toast...
+
+  try {
+    const result = await withWatcherPause(projectPath, isInternalOperation, setFileOperationLoading, async () => {
+      const moveResult = await fileGateway.moveItem({ sourcePath, targetParentPath: targetParent })
+      await refreshProjectTree() // refresh inside the pause
+      return moveResult
+    })
+    refreshGitStatus()
+    showGlobalToast({ title: 'Success', message: 'Item moved successfully', type: 'success' })
+    // a symlink gets a 'Symlink Moved' warning toast instead
+  } catch (err) {
+    showGlobalToast({ title: 'Error', message: formatFileOperationError(err, 'move'), type: 'error' })
+  }
 }
+// withWatcherPause pauses the directory watcher before the operation, marks it as
+// internal, and resumes on both the success and the error path.
 ```
 
 **Pattern used for**:
@@ -74,44 +77,38 @@ export class PauseController {
 All file operations go through secure IPC handlers with input sanitization:
 
 ```typescript
-// src/main/ipc/file-handlers.ts – the 'file:moveItem' handler (registered via registerHandle)
-registerHandle('file:moveItem', async (_event, sourcePath: string, targetParentPath: string, newName?: string, replaceExisting?: boolean) => {
-  // Validate inputs: sourcePath / targetParentPath must be non-empty strings,
-  // newName a string if present, replaceExisting a boolean if present
-
-  // Sanitize new name - prevent path traversal
-  let sanitizedNewName: string | undefined = newName
-  if (newName) {
-    sanitizedNewName = newName.replace(/[/\\]/g, '')
-    if (!sanitizedNewName) {
-      throw new Error('Invalid new name')
+// src/main/ipc/file-handlers.ts – the 'file:moveItem' handler
+registerConfinedHandle(
+  FILE_CHANNELS.moveItem,
+  {
+    // One strict object: { sourcePath, targetParentPath, newName?, replaceExisting? }
+    schema: payloadArgs(MoveItemRequestSchema),
+    paths: {
+      sourcePath: { arg: 0, key: 'sourcePath', mode: 'project-entry', access: 'change' },
+      targetParentPath: { arg: 0, key: 'targetParentPath', mode: 'project', mustExist: true, kind: 'directory', access: 'change' }
+    },
+    handler: async (_ctx, [{ newName, replaceExisting }], { sourcePath, targetParentPath }) => {
+      const moved = await fileService.moveItem(sourcePath.real, targetParentPath.real, newName, replaceExisting)
+      // ... noteInternalChange(...) for the watcher's pause episode, then return the new path
     }
-  }
-  // ... fileService.moveItem(sourcePath, targetParentPath, sanitizedNewName, replaceExisting)
-})
+  },
+  session
+)
 ```
 
 **Security measures**:
-- Strip path separators (`/` and `\`) from user-provided names
-- Validate all paths stay within project directory (`FileService.moveItem` / `copyItem` guards, below)
+- `newName` is an `entryNameField` in `src/shared/ipc/file-schema.ts`: a name containing `/`, `\` or a NUL byte, or equal to `.` / `..`, is refused with "Invalid new name" (it is refused, not stripped), and `FileService` checks it again with `assertValidUserFilename`
+- Both paths are resolved inside the open project by `registerConfinedHandle` (`src/main/ipc/confinement/registerConfinedHandle.ts`) before `FileService` runs
 - No direct filesystem access from renderer process
 - All operations go through contextBridge API
 
 ### Path Traversal Prevention
 
-```typescript
-// src/main/services/FileService.ts – moveItem guards (copyItem has the same pair with "copy" wording)
-if (this.projectPath && !sourcePath.startsWith(this.projectPath)) {
-  throw new Error('Cannot move items outside the project directory')
-}
-if (this.projectPath && !targetParentPath.startsWith(this.projectPath)) {
-  throw new Error('Cannot move items to outside the project directory')
-}
-```
+`FileService.moveItem` and `copyItem` no longer carry their own `startsWith` project checks. Confinement happens one layer up, in the IPC handler: each path in the `paths` map of `registerConfinedHandle` is resolved against the open project (links followed for `mode: 'project'`, the entry itself for `mode: 'project-entry'`), and a path outside the project is refused before `FileService` sees it. `FileService` receives the resolved `real` paths.
 
 **Validation ensures**:
 - Both source and target parent must be within project directory
-- The check is a plain `startsWith` on the paths as received – there is no `path.normalize()` step here, so it is a boundary check rather than a `../` canonicaliser. Real filesystem confinement (with `realpath`) lives main-side in `ExternalFileService`; see [CLAUDE.md § Renderer path handling](../../CLAUDE.md)
+- The target parent must exist and be a directory (`mustExist: true`, `kind: 'directory'`)
 - Project boundary enforced at multiple layers
 
 ## Context Menu Integration
@@ -131,18 +128,18 @@ The menu is assembled by `ContextMenuFactory` (`context-menu/`) from these comma
 ### FileService (Backend)
 - **Location**: `src/main/services/FileService.ts`
 - **New Methods**: `moveItem()`, `copyItem()`, `checkNameConflict()`
-- **Validation**: Project boundary checks, circular move prevention, path sanitization
+- **Validation**: circular move prevention, project-root guard, name check (`assertValidUserFilename`); project boundary checks are in the IPC layer
 - **Dependencies**: RollbackHandler, SymlinkDetector
 
 ### IPC Layer
 - **Location**: `src/main/ipc/file-handlers.ts`
 - **Handlers**: `file:moveItem`, `file:copyItem`, `file:checkConflict`
-- **Security**: Input sanitization, error handling
+- **Security**: zod request schemas (`src/shared/ipc/file-schema.ts`) and path confinement (`registerConfinedHandle`)
 - **Error propagation**: Errors serialized to renderer
 
 ### Preload Bridge
-- **Location**: `src/preload/index.ts`, `src/preload/index.d.ts`
-- **APIs**: `window.api.file.moveItem()`, `copyItem()`, `checkConflict()`
+- **Location**: `src/preload/fileBridge.ts` (assembled into `window.api` by `src/preload/index.ts`; types in `src/preload/index.d.ts`)
+- **APIs**: `window.api.file.moveItem({ sourcePath, targetParentPath, newName?, replaceExisting? })`, `copyItem()`, `checkConflict()` – each takes one request object; renderer code reaches them through `fileGateway`
 - **Type Safety**: Full TypeScript definitions
 - **Context Bridge**: Secure IPC boundary
 
@@ -174,12 +171,12 @@ User drags file
   → handleDragOver calculates projection, validates
   → Drop indicator shows target location
   → handleDragEnd executes:
-      1. Pause watcher
-      2. Call IPC moveItem handler
-      3. FileService.moveItem executes
-      4. Refresh tree from disk
-      5. Resume watcher
-      6. Clear drag state
+      1. Clear drag state
+      2. Pause watcher
+      3. Call IPC moveItem handler
+      4. FileService.moveItem executes
+      5. Refresh tree from disk
+      6. Resume watcher
 ```
 
 ### Keyboard Cut/Paste Operation
@@ -189,13 +186,13 @@ User presses Ctrl+X
   → Visual feedback (dimmed, dashed underline)
   → User selects target folder
   → User presses Ctrl+V
-  → clipboard.paste(targetPath)
-  → handlePaste executes:
+  → handlePaste: for a cut, checkConflict → "Replace Item" dialog if needed
+  → executePaste executes:
       1. Pause watcher
-      2. Call IPC moveItem handler
+      2. clipboard.paste(targetPath, replaceExisting) → IPC moveItem handler
       3. FileService.moveItem executes
-      4. Refresh tree from disk
-      5. Clear clipboard
+      4. Clear clipboard (in the store, after a successful move)
+      5. Refresh tree from disk
       6. Resume watcher
 ```
 
@@ -216,24 +213,26 @@ Errors propagate through layers:
 3. **Renderer** receives error, shows toast notification
 4. **Watcher** always resumes in finally block
 
-**User-facing errors** (verbatim from `FileService.moveItem`):
+**Errors thrown by `FileService.moveItem`** (after a drag, the renderer passes them through `formatFileOperationError` in `src/renderer/src/utils/errorUtils.ts` before the toast):
 - "Cannot move a folder into its own subfolder"
-- "An item named "<name>" already exists in the target location"
-- "Cannot move items outside the project directory" / "Cannot move items to outside the project directory"
+- "An item named "<name>" already exists in the target location" – the toast reads "An item with this name already exists"
 - "Cannot move the project root directory"
 - "Source and target paths are the same"
+- "Target must be a directory"
 - "Move failed: Could not delete source file. Operation rolled back." (cross-filesystem copy+delete, from `RollbackHandler`)
-- Permission errors surface as the raw Node `EACCES` message
+- After a drag, permission errors (`EACCES` / `EPERM`) become "Permission denied: cannot move item" and a missing item "Item not found"; a paste shows the error message as thrown (the clipboard store catches it and the toast shows `result.error`)
+- A path outside the project is refused by the IPC confinement layer before `FileService` runs
 
 ## Document import integration
 
-External file drops of document formats (PDF, Office, images) route through the LiteParse import pipeline instead of the standard move/copy flow:
+Document formats (PDF, Office, images) go through the LiteParse import pipeline. The dialog opens from the Import command (`importFile` in `useImport`), not from a drop:
 
 ```
-External file drop
-  → useImport checks extension against cached document extension list
+Import command (toolbar button or a folder's "Import..." menu item)
+  → importFile: native picker, one file
+  → useImport checks the extension against the cached document extension list
   → Document file? → Open DocumentImportDialog (OCR, language, screenshots, DPI)
-  → DependencyDetector ran at startup? → Show dependency-missing modal if LibreOffice absent or unsafe
+  → Office file and LibreOffice absent or unsafe? → prompt pointing to Settings → Import tools
   → User confirms → import:document IPC → LiteParseConverter processes file
   → Progress streamed via import:documentProgress
   → Cancellation via import:documentCancel
@@ -241,7 +240,7 @@ External file drop
 
 **Key integration points**:
 - `useImport` hook routes files by extension (calls `import:getDocumentExtensions` once, caches result)
-- Batch drops filter document files out with a warning toast – only individual drops trigger the dialog
+- An external drop added with Import goes through `processFiles`, which skips document files with a warning toast ("Document files skipped", or "Document files not supported in batch" when nothing else is left); Move and Copy do not filter by type
 - `import:dependenciesReady` event fires after startup dependency detection completes
 - DocumentImportDialog state managed by `useDocumentImportStore` (Zustand, session-persistent options)
 

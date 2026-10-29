@@ -95,6 +95,16 @@ export default defineConfig({
       grepInvert: process.env.ERFANA_E2E_BENCH === '1' ? undefined : /./,
     },
     {
+      // Guide task runs (`e2e/guide-tasks/*.guide.ts`). Each spec follows one
+      // docs/user-guide how-to page step by step, finding controls by the
+      // labels the page names, to prove the page still gets a reader to the
+      // result. Run: npx playwright test --project=guide
+      name: 'guide',
+      testMatch: '**/guide-tasks/*.guide.ts',
+      fullyParallel: false,
+      retries: 0,
+    },
+    {
       name: 'visual',
       testMatch: '**/visual-regression.e2e.ts',
       retries: 0, // Visual diffs must be investigated, not retried (spec 019-FR-003)

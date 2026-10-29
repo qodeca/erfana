@@ -81,7 +81,7 @@ Pre-defined test scenarios for Erfana using Circuit Electron MCP. For full MCP A
 - Indicator clears
 - File persisted on disk
 
-**MCP**: `app_launch` → open file → `type` changes → wait 600ms → `evaluate` dirty state → `fs_read_file` verify content
+**MCP**: `app_launch` → open file → `type` changes → `evaluate` dirty state → wait past the 2000 ms debounce (about 2.5 s) → `evaluate` the indicator cleared → `fs_read_file` verify content
 
 ## Interaction Scenarios
 
@@ -130,10 +130,10 @@ Pre-defined test scenarios for Erfana using Circuit Electron MCP. For full MCP A
 
 *Automated: `e2e/markdown-toolbar.e2e.ts`*
 
-**Goal**: Verify stats in header (word/char count)
+**Goal**: Verify the document statistics bar under the editor (word/char count)
 
 **Verify**:
-- Stats appear in editor header
+- Stats appear in the `DocumentStatsBar` footer of the editor panel
 - Update on typing
 - Accurate counts
 

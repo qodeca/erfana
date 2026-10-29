@@ -10,6 +10,8 @@ SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 - **Campaign:** `release-0.21.0`.
 - **Status:** proposed – design review by a reviewer agent on a different model, not the owner
   (owner's decision, 2026-09-25).
+- **Implementation:** shipped – `docs/user-guide/`, `scripts/capture/`, `scripts/check-links.mjs` and the
+  `docs:screenshots` and `check:links` npm scripts exist in the repository. The rest of this page is the plan as written.
 - **Design:** [docs/designs/user-guide/](../designs/user-guide/README.md), with the
   [feature inventory](../user-guide/feature-inventory.md) (moved there in #158) and
   [research notes](../designs/user-guide/research.md).

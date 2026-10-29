@@ -7,17 +7,17 @@
 ## Automated coverage
 
 All of the suites below are implemented and green. Counts were measured with
-`npx vitest run <file>`; re-measure rather than trusting them if the code has
+`npx vitest run <file>` on 2026-10-29; re-measure rather than trusting them if the code has
 moved on.
 
 | Suite | Tests | Covers |
 |---|---|---|
-| `src/main/services/FileService.moveItem.test.ts` | 20 | Basic move operations, validation constraints, rename during move, name-conflict handling, error handling, cross-filesystem (EXDEV) fallback, `replaceExisting` |
-| `src/main/services/FileService.copyItem.test.ts` | 13 | Basic copy operations, auto-numbering for name conflicts, validation constraints, error handling, copy to the same location |
+| `src/main/services/FileService.moveItem.test.ts` | 18 | Basic move operations, validation constraints, rename during move, name-conflict handling, error handling, cross-filesystem (EXDEV) fallback, `replaceExisting` |
+| `src/main/services/FileService.copyItem.test.ts` | 11 | Basic copy operations, auto-numbering for name conflicts, validation constraints, error handling, copy to the same location |
 | `src/main/services/FileService.copyItem.limit.test.ts` | 2 | `MAX_COPY_ATTEMPTS` overflow guard |
 | `src/renderer/src/hooks/useDragDropTree.test.ts` | 46 | `flattenTree` (incl. invariant guard and at-scale behaviour, #60), `buildTree`, `isDescendant`, `getProjection` (with and without the optional node index), the node index itself, flatten timing instrumentation, `canMoveItem` |
 | `src/renderer/src/stores/useClipboardStore.test.ts` | 21 | `cut`, `copy`, `paste` (incl. the `replaceExisting` parameter), `clear`, `hasClipboard`, `getOperation` |
-| `src/renderer/src/components/ProjectTree/ProjectTree.lookup.test.tsx` | 13 | Node lookup used by the tree's drag targets |
+| `src/renderer/src/components/ProjectTree/ProjectTree.lookup.test.tsx` | 15 | Node lookup used by the tree's drag targets |
 
 The overflow guard lives in its own file because its mocks hoist to module
 scope; see the test-file split policy in
@@ -37,10 +37,12 @@ npx vitest run \
 
 ## Gaps
 
-- **No end-to-end drag-drop spec.** None of the 37 spec files in `e2e/` drives an
-  actual drag gesture over the project tree, so the pointer-level interaction
-  (folder highlight, drag overlay, result toasts) is only covered by the unit
-  tests behind it. The scenarios below therefore stay manual.
+- **End-to-end coverage is narrow.** `e2e/tree-keyboard.e2e.ts` drives real
+  pointer drags in two tests – "dragging a file onto a folder still moves it"
+  and "dragging to the edge scrolls the list, and a row that was not rendered
+  takes the drop" – and checks the folder's `data-drop-target` highlight. The
+  drag overlay, result toasts, conflict handling and drops from the OS have no
+  end-to-end test, so the scenarios below stay manual.
 - **Terminal drag-drop** (dropping paths into the terminal) is a separate
   feature with its own coverage in
   `src/renderer/src/components/Panels/TerminalPanel/hooks/useTerminalDragDrop.test.ts`

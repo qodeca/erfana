@@ -35,7 +35,7 @@ Each box is one key combination, written the way the system shows it: on macOS w
 | Move through recent projects on the Welcome tab; open one | <kbd>↑</kbd>; <kbd>↓</kbd>; <kbd>Home</kbd>; <kbd>End</kbd>; <kbd>Enter</kbd> or <kbd>Space</kbd> | Same |
 | Close a message (toast) that has focus | <kbd>Esc</kbd> | Same |
 
-The View zoom commands zoom a focused HTML page first; otherwise they zoom the Erfana window. **Settings** has no opening shortcut: select the gear. <kbd>Esc</kbd> closes it. <kbd>Tab</kbd> reaches the recent-projects list as one stop. Closing a message puts focus back where it was.
+The terminal shortcuts do nothing until a project is open. While the editor has focus, <kbd>⌘B</kbd> / <kbd>Ctrl+B</kbd> makes text bold instead of toggling the sidebar. The View zoom commands zoom a focused HTML page first; otherwise they zoom the Erfana window. **Settings** has no opening shortcut: select the gear. <kbd>Esc</kbd> closes it. <kbd>Tab</kbd> reaches the recent-projects list as one stop. Closing a message puts focus back where it was.
 
 ## Project tree
 
@@ -49,9 +49,9 @@ The View zoom commands zoom a focused HTML page first; otherwise they zoom the E
 | Close an open folder; otherwise move to the parent folder | <kbd>←</kbd> | Same |
 | Open a file; open or close and select a folder | <kbd>Enter</kbd> | Same |
 | Jump to a row by name | Type its first letters | Same |
-| Open the row's menu | <kbd>⇧F10</kbd> | <kbd>Shift+F10</kbd> or the <kbd>Menu</kbd> key |
+| Open the row's menu | <kbd>⇧F10</kbd> or the <kbd>Menu</kbd> key | <kbd>Shift+F10</kbd> or the <kbd>Menu</kbd> key |
 
-Cut, copy and paste act on the tree only while the tree has focus, so they never copy a folder you clicked earlier when you meant the text selected elsewhere. The whole tree is a single <kbd>Tab</kbd> stop: <kbd>Tab</kbd> enters it on the last row you used, and the next <kbd>Tab</kbd> leaves it. The arrow keys move focus without changing the selected folder; <kbd>Enter</kbd> or a click selects one. The row menu works like every other menu – see [Menus](#menus). Refresh and import are ignored while typing in a text field; import also needs a selected folder.
+Cut, copy and paste act on the tree only while the tree has focus, so they never copy a folder you picked earlier when you meant the text selected elsewhere. The whole tree is a single <kbd>Tab</kbd> stop: <kbd>Tab</kbd> enters it on the last row you used, and the next <kbd>Tab</kbd> leaves it. The arrow keys move focus without changing the selected folder; <kbd>Enter</kbd> or the pointer selects one. The row menu works like every other menu – see [Menus](#menus). Refresh and import are ignored while typing in a text field; import also needs a selected folder.
 
 ## Editor and Markdown preview
 
@@ -65,7 +65,9 @@ Cut, copy and paste act on the tree only while the tree has focus, so they never
 | Move line; select next match; add cursor | <kbd>⌥↑</kbd> or <kbd>⌥↓</kbd>; <kbd>⌘D</kbd>; hold <kbd>⌥</kbd> and select | <kbd>Alt+↑</kbd> or <kbd>Alt+↓</kbd>; <kbd>Ctrl+D</kbd>; hold <kbd>Alt</kbd> and select |
 | Command palette | <kbd>F1</kbd> | <kbd>F1</kbd> |
 
-<kbd>⌘B</kbd> / <kbd>Ctrl+B</kbd> is also the global sidebar shortcut. Both handlers exist; which wins with the editor focused is unverified. Use the **Bold** toolbar button if needed.
+Undo, redo, toggle comment, move line, select next match, add cursor and the command palette are built into the Monaco editor component, not defined by Erfana.
+
+<kbd>⌘B</kbd> / <kbd>Ctrl+B</kbd> makes text bold while the editor has focus. Anywhere else it shows or hides the Project sidebar. Find next and previous with <kbd>⌘G</kbd> and <kbd>⇧⌘G</kbd> also work only while the editor has focus; in the find bar, use the keys below.
 
 In the find bar, <kbd>Enter</kbd> moves to the next match, <kbd>⇧Enter</kbd> / <kbd>Shift+Enter</kbd> to the previous match, and <kbd>Esc</kbd> closes it. These option keys work while the find bar has focus:
 
@@ -84,7 +86,7 @@ In the find bar, <kbd>Enter</kbd> moves to the next match, <kbd>⇧Enter</kbd> /
 | Explicit copy; paste | <kbd>⌃⇧C</kbd>; <kbd>⌃⇧V</kbd> | <kbd>Ctrl+Shift+C</kbd>; <kbd>Ctrl+Shift+V</kbd> |
 | Interrupt without selected text | <kbd>⌃C</kbd> | <kbd>Ctrl+C</kbd> |
 
-On macOS the explicit copy and paste keys and the interrupt key use the Control key (⌃), not Command (⌘). Your shell also handles <kbd>⌃D</kbd> / <kbd>Ctrl+D</kbd> (EOF), <kbd>⌃L</kbd> / <kbd>Ctrl+L</kbd> (clear), <kbd>⌃A</kbd> and <kbd>⌃E</kbd> / <kbd>Ctrl+A</kbd> and <kbd>Ctrl+E</kbd> (line ends), <kbd>⌃U</kbd> and <kbd>⌃K</kbd> / <kbd>Ctrl+U</kbd> and <kbd>Ctrl+K</kbd> (delete to line ends), arrows (history), and <kbd>Tab</kbd> (completion); exact behaviour depends on the shell.
+On macOS the explicit copy and paste keys and the interrupt key use the Control key (⌃), not Command (⌘). Other keys go to the shell or program running in the terminal, so what they do depends on that program.
 
 ## HTML preview
 
@@ -119,10 +121,10 @@ In ordinary dialogs, <kbd>Enter</kbd> activates the focused button, even when it
 
 | Action | macOS | Windows |
 | --- | --- | --- |
-| Open the menu of the focused row, tab, editor, terminal or text field | <kbd>⇧F10</kbd> | <kbd>Shift+F10</kbd> or the <kbd>Menu</kbd> key |
+| Open the menu of the focused row, tab, editor, terminal or text field | <kbd>⇧F10</kbd> or the <kbd>Menu</kbd> key | <kbd>Shift+F10</kbd> or the <kbd>Menu</kbd> key |
 | Move to the previous or next item; first or last item | <kbd>↑</kbd>; <kbd>↓</kbd>; <kbd>Home</kbd>; <kbd>End</kbd> | Same |
 | Choose the focused item | <kbd>Enter</kbd> or <kbd>Space</kbd> | Same |
 | Jump to an item by name | Type its first letters | Same |
 | Close the menu | <kbd>Esc</kbd> or <kbd>Tab</kbd> | Same |
 
-A menu opens with focus on its first item, and closing it puts focus back where it was. Greyed-out items can be reached but do nothing. In the editor the menu opens under the text cursor, in the terminal at the terminal cursor. While the terminal has focus, <kbd>⇧F10</kbd> / <kbd>Shift+F10</kbd> opens the menu and is not sent to the program running there.
+The <kbd>Menu</kbd> key works on every platform, on keyboards that have one. A menu opens with focus on its first item, and closing it puts focus back where it was. Greyed-out items can be reached but do nothing. In the editor the menu opens under the text cursor, in the terminal at the terminal cursor. While the terminal has focus, <kbd>⇧F10</kbd> / <kbd>Shift+F10</kbd> opens the menu and is not sent to the program running there.

@@ -5,9 +5,10 @@ SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 
 # Illustrated user guide with automated screenshots (#138)
 
-Status: **proposed** – round 1 of the design review (a reviewer agent on a different model) is
-addressed, waiting for re-review (the owner waived owner approval for this issue; the record was in
-the release 0.21.0 campaign decisions, which left the repository with the agent pipeline).
+Status: **implemented** – the guide is in `docs/user-guide/` and the capture script ships as
+`npm run docs:screenshots` (`scripts/capture/run.mjs`). The text below is the design record as
+reviewed (the owner waived owner approval for this issue; the record was in the release 0.21.0
+campaign decisions, which left the repository with the agent pipeline).
 
 Companion documents:
 
@@ -302,7 +303,7 @@ The default path regenerates **all** rows, the #139 rows included; there is no d
 3. **Sandbox.** Recreate `/Users/Shared/erfana-capture/`: `home/` (a fake `HOME`),
    `user-data/`, and `raw/`. Copy the demo project to the `/Volumes/HarbourGarden` disk image,
    then run `git init` in that copy. The fake home holds a `.zshrc` that sets a
-   neutral prompt (`%~ %# `, no user or host name) and a `.claude/settings.json` whose only content
+   neutral prompt (`%1~ %# `: the folder name only, no user or host name) and a `.claude/settings.json` whose only content
    is a `Stop` hook that touches a marker file, used as the "agent finished" condition – so the
    operator's own status line, hooks and plugins are never loaded. The `.zshrc` also unsets
    `CLAUDE_CONFIG_DIR`, which would otherwise point Claude Code back at the operator's real
@@ -314,7 +315,7 @@ The default path regenerates **all** rows, the #139 rows included; there is no d
    group under `scripts/capture/scenes/`; the rows come from `scripts/capture/shots.json`, the
    single manifest (id, file, page, state description, crop, agent, native).
 5. **Post-process.** Encode, check privacy, check budget, then copy into the row's folder – one of
-   the two on the output allow-list at the top of `run.mjs`: `docs/user-guide/images/` and
+   the two on the output allow-list (`OUTPUT_ALLOW_LIST` in `manifest.mjs`): `docs/user-guide/images/` and
    `docs/assets/readme/`. Nothing reaches `docs/` unless every check passed for that file; for the
    loop, every check on every one of its files.
 6. **Report.** Per-image size, total size, which shots needed the agent, and the Claude Code
@@ -331,9 +332,10 @@ also isolates `~/.erfana` settings and logs, and points the context meter at the
 `--force-prefers-reduced-motion` and, for row 45 only, `--use-fake-device-for-media-stream`.
 
 **Waits – condition-based only.** No `waitForTimeout` anywhere under `scripts/capture/`; an ESLint
-`no-restricted-properties` rule scoped to that folder enforces it. That rules out
-`TerminalPage.waitForPrompt()` (it ends with a fixed 1500 ms wait) and `waitForOutput()` (the WebGL
-terminal puts no text in the DOM). The script uses instead:
+`no-restricted-properties` rule scoped to that folder enforces it. At design time that ruled out
+`TerminalPage.waitForPrompt()` (it then ended with a fixed 1500 ms wait) and `waitForOutput()` (it
+then read the DOM, where the WebGL terminal puts no text); both now poll xterm's own screen buffer
+(`readScreen()` in `e2e/pages/terminal.page.ts`). The script uses instead:
 
 | Need | Condition |
 |---|---|

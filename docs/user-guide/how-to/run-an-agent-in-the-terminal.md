@@ -11,11 +11,11 @@ Use the terminal to run Claude Code or another CLI agent in your project. Review
 
 ## Start an agent
 
-1. Select **Terminal** in the right activity bar.
+1. A terminal opens when the project loads. If it is closed, select **Terminal** in the right activity bar.
 2. Select the terminal and type the command for your CLI agent.
 3. Tell the agent which file to inspect or change.
 
-By default, Claude Code asks before an edit. These capture screenshots used an isolated demo project configured to accept edits automatically.
+The screenshots below were captured in an isolated demo project set to accept Claude Code edits automatically.
 
 ![Screenshot of the terminal with a neutral shell prompt.](../images/run-an-agent/shell-prompt.png)
 ![Screenshot of Claude Code waiting for input in the terminal.](../images/run-an-agent/claude-started.png)
@@ -27,11 +27,11 @@ By default, Claude Code asks before an edit. These capture screenshots used an i
 3. Select **Maximize terminal** when you need more terminal space.
 
 ![Screenshot of an agent edit landing in the preview beside its terminal summary.](../images/run-an-agent/edit-lands.png)
-![Screenshot of the maximised terminal over the editor.](../images/run-an-agent/terminal-maximized.png)
+![Screenshot of the maximized terminal over the editor.](../images/run-an-agent/terminal-maximized.png)
 
 ## What happens next / If something goes wrong
 
-Use **Restart terminal** if a shell is stuck. If Claude Code or another program is still running, Erfana asks before it ends it. For a terminal availability message, use [troubleshooting](../reference/troubleshooting.md).
+Use **Restart terminal** if a shell is stuck. If Claude Code or another program is still running, Erfana asks before it ends it. If the panel shows **Terminal not available**, use [troubleshooting](../reference/troubleshooting.md).
 
 ## Related
 

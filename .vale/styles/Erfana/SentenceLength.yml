@@ -1,0 +1,7 @@
+# Output and guide style: short sentences. A warning, so a long table cell does not block the check.
+extends: occurrence
+message: "Try to keep sentences under 32 words."
+level: warning
+scope: sentence
+max: 32
+token: \b(\w+)\b

@@ -1,3 +1,5 @@
+> **Status:** proposal, not shipped – none of the graph-engine files named on this page exist in `src/` on `develop`; see the warning in the [implementation guide](./README.md).
+
 ## Milestone 2: Vector Search (Hybrid Retrieval)
 
 **Goal:** Add semantic search, combine with BM25 using configurable weights.

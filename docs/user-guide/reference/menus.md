@@ -5,7 +5,7 @@ SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 
 # Use menus
 
-The app menu provides window, editing and view commands. Right-click menus act on the tab, tree item or selected text beneath the pointer; unavailable actions are disabled. Every right-click menu also opens from the keyboard: press <kbd>⇧F10</kbd> / <kbd>Shift+F10</kbd> (Windows: also the <kbd>Menu</kbd> key) on the focused tab, tree row, editor, terminal or text field, then use the arrow keys and <kbd>Enter</kbd> – see [keyboard shortcuts](keyboard-shortcuts.md#menus).
+The app menu provides window, editing and view commands. Right-click menus act on the tab, tree item or selected text beneath the pointer; unavailable actions are disabled. Most right-click menus also open from the keyboard: press <kbd>⇧F10</kbd> / <kbd>Shift+F10</kbd>, or the <kbd>Menu</kbd> key, on the focused tab, tree row, editor, terminal or text field, then use the arrow keys and <kbd>Enter</kbd> – see [keyboard shortcuts](keyboard-shortcuts.md#menus).
 
 **On this page**
 
@@ -21,11 +21,11 @@ The app menu provides window, editing and view commands. Right-click menus act o
 
 ## Erfana menu (macOS)
 
-**What it does:** **About** shows app information; **Hide**, **Hide Others**, **Show All**, and **Quit** use macOS window management. **How to reach it:** the **Erfana** menu in the system menu bar. **Limits:** macOS only; Windows puts **Exit** in **File**.
+**What it does:** **About** shows app information; **Hide**, **Hide Others** and **Show All** use macOS window management, and **Quit** quits the app. **How to reach it:** the **Erfana** menu in the system menu bar. **Limits:** macOS only; Windows puts **Exit** in **File**.
 
 ## File menu
 
-**What it does:** **New Window** opens another Erfana window; on Windows, **Exit** quits the app. **How to reach it:** **File > New Window**, <kbd>⇧⌘N</kbd> / <kbd>Ctrl+Shift+N</kbd>. A project already open in another window focuses that window.
+**What it does:** **New Window** opens another Erfana window; on Windows, **Exit** quits the app. **How to reach it:** **File > New Window**, <kbd>⇧⌘N</kbd> / <kbd>Ctrl+Shift+N</kbd>. Opening a project that is already open in another window focuses that window instead.
 
 ## Edit menu
 
@@ -43,14 +43,16 @@ The app menu provides window, editing and view commands. Right-click menus act o
 
 **What it does:** **Close** closes this tab, **Close Others** closes the other tabs, and **Close All** closes all tabs. **How to reach it:** right-click a tab. Tabs with unsaved changes show a confirmation before closing.
 
-![Screenshot of the tab context menu.](../images/the-window/tab-menu.png)
+![Screenshot of the tab context menu with Close, Close Others and Close All.](../images/the-window/tab-menu.png)
 
 ## Project tree context menus
 
-**What they do:** Folder menus offer **Cut**, **Copy**, **Paste** (when the clipboard has items), **New File**, **New Folder**, **Rename**, **Import…**, **Delete**, and **Reveal in Finder** or **Reveal in Explorer**. File menus offer **Cut**, **Copy**, **Rename**, **Delete**, and the same platform-specific **Reveal** action. The HTML-file menu also offers **Open as source** and **Open in default browser**. **How to reach them:** right-click a file or folder in the tree. **Delete** asks for confirmation because it cannot be undone.
+**What they do:** Folder menus offer **Cut**, **Copy**, **Paste** (when the clipboard has items), **New File**, **New Folder**, **Rename**, **Import...**, **Delete**, and **Reveal in Finder** or **Reveal in Explorer**. File menus offer **Cut**, **Copy**, **Rename**, **Delete**, and the same platform-specific **Reveal** action. The HTML-file menu also offers **Open as source** and **Open in default browser**. **How to reach them:** right-click a file or folder in the tree. **Delete** asks for confirmation because it cannot be undone. Erfana removes the item from disk straight away; it does not go to the Trash on macOS or the Recycle Bin on Windows. Deleting a folder also removes everything inside it.
 
-![Screenshot of the folder context menu.](../images/organise-files/folder-menu.png)
-![Screenshot of the HTML-file context menu.](../images/organise-files/html-file-menu.png)
+![Screenshot of the folder context menu in the project tree, from Cut to Reveal in Finder.](../images/organise-files/folder-menu.png)
+![Screenshot of the HTML-file context menu with Open as source and Open in default browser.](../images/organise-files/html-file-menu.png)
+
+Related issues: [#431](https://github.com/qodeca/erfana/issues/431).
 
 ## Editor and preview context menus
 

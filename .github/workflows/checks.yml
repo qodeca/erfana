@@ -68,6 +68,10 @@ jobs:
       # deviations, token ownership, card anatomy).
       - name: Design system is in sync
         run: npm run design -- --check
+      # Each docs/user-guide/claims.json entry ties a doc sentence to the source line that
+      # proves it; this fails when a label, default or shortcut changes under the docs.
+      - name: Doc claims match the code
+        run: npm run check:claims
 
   typecheck:
     name: Typecheck

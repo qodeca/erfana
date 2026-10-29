@@ -80,7 +80,7 @@ Resolved – `LanguageSelect` accepts an optional `id` prop and renders it on th
 ### 5. E2E workflow disabled on CI
 
 **Severity**: Medium
-**Impact**: The entire `e2e.yml` workflow is disabled (2026-04-25, commit `997ba65` – pre-migration; no longer resolvable, that history was rewritten at the 2026-06 migration). Neither the functional `electron` suite nor the 5 visual screenshot tests run on CI; both regression classes can merge undetected until a developer runs `npm run test:e2e` / `npm run test:e2e:visual` locally. E2E was already excluded from branch-protection required checks, so disabling does not block any merges or releases — but it removes a safety net.
+**Impact**: The entire `e2e.yml` workflow is disabled (2026-04-25, commit `997ba65` – pre-migration; no longer resolvable, that history was rewritten at the 2026-06 migration). Neither the functional `electron` suite nor the 6 visual screenshot tests (`e2e/visual-regression.e2e.ts`) run on CI; both regression classes can merge undetected until a developer runs `npm run test:e2e` / `npm run test:e2e:visual` locally. E2E was already excluded from branch-protection required checks, so disabling does not block any merges or releases – but it removes a safety net.
 
 **Problem**: The visual suite was the original blocker — all 5 tests time out at `page.waitForLoadState('domcontentloaded')` (30s) on GitHub `macos-latest` runners while passing 5/5 locally (including with `CI=true`). The earlier workaround scoped CI to `--project=electron` only, but the functional suite is also unstable on hosted runners; full disable is now the working state until the root cause is isolated.
 
@@ -101,16 +101,9 @@ Resolved – `LanguageSelect` accepts an optional `id` prop and renders it on th
 
 ---
 
-### 6. Monaco cursor-blink flake in `third-party-components.e2e.ts`
+### 6. Monaco cursor-blink flake in `third-party-components.e2e.ts` ✅ Resolved
 
-**Severity**: Low
-**Impact**: `third-party-components.e2e.ts:38` (Monaco keyboard test) fails first attempt ~10% of runs with `expect(cursor).toBeVisible() – received "hidden"`. Passes on retry #1 reliably; classified as flaky, not failing.
-
-**Root cause**: Monaco's `.cursor` element blinks every 500ms by default. A 2s `toBeVisible` timeout can miss the visible half-cycle under CPU contention.
-
-**Fix pattern exists in codebase**: the `disableCursorBlink()` helper in `e2e/visual-regression.e2e.ts` patches `cursorBlinking: 'solid'`. Apply the same helper to the third-party-components test.
-
-**Files**: `e2e/pages/monaco.page.ts` (the `expect(cursor).toBeVisible({ timeout: 2000 })` in `MonacoPage.focus()`), `e2e/third-party-components.e2e.ts` (the `Monaco editor: Set content via keyboard and verify in preview` test).
+Resolved – `MonacoPage.focus()` (`e2e/pages/monaco.page.ts`) no longer waits for the blinking `.cursor` element to be visible. It clicks the editor and checks Monaco's own `focused` class, clicking again until it takes (`toPass({ timeout: 4000 })`), so a hidden blink phase can no longer fail the `Monaco editor: Set content via keyboard and verify in preview` test. The number is kept so existing references to "item #6" stay valid.
 
 ---
 
@@ -125,7 +118,7 @@ Resolved – `LanguageSelect` accepts an optional `id` prop and renders it on th
 - `.claude/skills/releasing-erfana/phases/phase-4-verify.md` § 4.3 Verify minisign signature — operator-facing canonical-source note
 - `README.md` § Release verification — direct `#release-signing-v095-174` anchor into `docs/security.md`
 
-(Citations de-numbered 2026-08-23: the two line references here had already drifted — Guard 5 sits at `:341–372` today, its step name at `:349`, not the `:298–330` / `:306` recorded when the item was filed. Section and step names are stable; line numbers in this item are not.)
+(Citations de-numbered 2026-08-23: the two line references here had already drifted – Guard 5 sat at `:341–372` then, its step name at `:349` (`:418` on 2026-10-29), not the `:298–330` / `:306` recorded when the item was filed. Section and step names are stable; line numbers in this item are not.)
 
 Moving the block would require synchronized edits to checks.yml + skill + README anchor. High blast-radius for cosmetic gain.
 
@@ -161,7 +154,7 @@ Moving the block would require synchronized edits to checks.yml + skill + README
 
 **Fix**: Extract the arrow background (image + size) to a shared utility class or design token so the size lives in one place.
 
-**Files** (re-verified 2026-09-05): `Settings/SettingsOverlay.css:171`, `DocumentImport/DocumentImportDialog.css:117`, `Transcription/TranscriptionDialog.css:71`, `Dialog/CameraDialog.css:56`, `Dialog/Dialog.css:573` — all under `src/renderer/src/components/`. Note `LanguageSelect.tsx`, named here originally, carries no such rule; the language select is styled by `TranscriptionDialog.css`. `SettingsOverlay.css:240` also sets `background-size: 12px` but for the checkbox tick, a different icon — out of scope for this item.
+**Files** (re-verified 2026-10-29): `Settings/SettingsOverlay.css:171`, `DocumentImport/DocumentImportDialog.css:121`, `Transcription/TranscriptionDialog.css:71`, `Dialog/CameraDialog.css:56`, `Dialog/Dialog.css:573` – all under `src/renderer/src/components/`. Note `LanguageSelect.tsx`, named here originally, carries no such rule; the language select is styled by `TranscriptionDialog.css`. `SettingsOverlay.css:252` sizes the checkbox tick, a different icon, through the `var(--space-6)` token – out of scope for this item.
 
 ---
 
@@ -290,7 +283,7 @@ After the heartbeat hardening (Phase A4 resume-refresh, B1 symlink defense, D3 H
 
 **Impact (when filed)**: The renderer project had **no enforced coverage thresholds**. `vitest.renderer.ts` declared `coverage` as a sibling of `test` rather than inside it, and vitest ignores a top-level `coverage` key — so the provider, the report directory, the exclude list and the thresholds were all dead configuration.
 
-**Resolved (#124, QG-8).** The same misplacement turned out to affect `vitest.preload.ts` as well. In both configs the `coverage` block now sits inside `test`, like `vitest.main.ts`, so the thresholds, includes and reporters apply; per-file floors were added for the #124 modules, and `__test__/` and `__test-helpers__/` joined `coverage.exclude` in all three configs. `npm run test:cov` passes with them. **CI enforces them too (#124, QG-11a):** the required `Coverage` job in `.github/workflows/checks.yml` originally ran only `--project main`, so the new renderer and preload floors fired only locally; it now runs two more steps, `npx vitest --run --config vitest.preload.ts --project preload --coverage` and `npx vitest --run --config vitest.renderer.ts --project renderer --coverage`, so a breach of either fails a required check. The number is kept so existing references to "item #19" stay valid.
+**Resolved (#124, QG-8).** The same misplacement turned out to affect `vitest.preload.ts` as well. In both configs the `coverage` block now sits inside `test`, like `vitest.main.ts`, so the thresholds, includes and reporters apply; per-file floors were added for the #124 modules, and `__test__/` and `__test-helpers__/` joined `coverage.exclude` in all three configs. `npm run test:cov` passes with them. **CI enforces them too (#124, QG-11a):** the required `Coverage` job in `.github/workflows/checks.yml` originally ran only `--project main`, so the new renderer and preload floors fired only locally; it now runs two more steps, `npx vitest --run --config vitest.preload.config.ts --project preload --coverage` and `npx vitest --run --config vitest.renderer.config.ts --project renderer --coverage` (the configs have since been renamed from `vitest.*.ts` to `vitest.*.config.ts`), so a breach of either fails a required check. The number is kept so existing references to "item #19" stay valid.
 
 ---
 
@@ -305,7 +298,7 @@ After the heartbeat hardening (Phase A4 resume-refresh, B1 symlink defense, D3 H
 
 **Files**: `scripts/test-cov.mjs` (the three `run(...)` calls), `vitest.workspace.ts`, `.github/workflows/checks.yml` (Coverage job).
 
-**Resolved ([#133](https://github.com/qodeca/erfana/issues/133), closed).** `scripts/test-cov.mjs` now runs each config scoped with `--project main|preload|renderer`, as the CI `Coverage` job does (the three projects live in `scripts/lib/test-cov-projects.mjs`), so each suite runs once. It runs all three passes before it exits and names every project that missed a floor, and it starts vitest through `process.execPath` rather than `npx`, so its output reaches a redirected log on Windows too. See [CI § Coverage](./ci.md). The number is kept so existing references to "item #20" stay valid.
+**Resolved ([#133](https://github.com/qodeca/erfana/issues/133), closed).** `scripts/test-cov.mjs` now runs each config scoped with `--project main|preload|renderer` (the main pass adds `--project main-perf`), as the CI `Coverage` job does (the three passes live in `scripts/lib/test-cov-projects.mjs`), so each suite runs once. It runs all three passes before it exits and names every project that missed a floor, and it starts vitest through `process.execPath` rather than `npx`, so its output reaches a redirected log on Windows too. See [CI § Coverage](./ci.md). The number is kept so existing references to "item #20" stay valid.
 
 **History**: recorded by the #60 change-set review. **Observed directly on 2026-09-15** and promoted to [#133](https://github.com/qodeca/erfana/issues/133): `vitest --run --config vitest.main.ts --coverage` reports 562 files / 13,847 tests (the whole workspace), while adding `--project main` gives 287 files / 6,972 tests. The same issue carries a second defect this entry did not know about — the script's `spawnSync(…, {stdio: 'inherit'})` output never reaches a redirected log on Windows, so a failing run prints only `Command failed (1): …` and never names the floor that missed.
 
@@ -362,7 +355,7 @@ After the heartbeat hardening (Phase A4 resume-refresh, B1 symlink defense, D3 H
 
 **Severity**: Medium — it is a main-process security boundary, though a notification-only one.
 
-**Impact**: `watchFile` gates on `filePath.startsWith(this.projectPath)` (`FileWatcherService.ts:112`) — no `path.resolve`, no trailing separator, and no `fs.realpath`. It is wrong in both directions: `/proj-evil/x.png` **passes** when the project is `/proj` (prefix match without a separator), and `/proj/../p2/x.png` fails closed. The read handlers next to it (`file:readFile`, `file:readImage`) went through `assertInsideProject` in #70 and now do the two-stage lexical + canonical check.
+**Impact**: `watchFile` gates on `filePath.startsWith(this.projectPath)` (`FileWatcherService.ts:126`) – no `path.resolve`, no trailing separator, and no `fs.realpath`. It is wrong in both directions: `/proj-evil/x.png` **passes** when the project is `/proj` (prefix match without a separator), and `/proj/../p2/x.png` fails closed. The read handlers next to it (`file:readFile`, `file:readImage`) went through `assertInsideProject` in #70 and now do the two-stage lexical + canonical check.
 
 **Why it was left alone in #70**: it is a shared boundary used by every watcher consumer and deserves its own tests and review pass rather than a drive-by edit inside a bugfix. The exposure is bounded — watching is a notification side channel, the *content* read behind it goes through the stricter guard, and the atomic re-arm path already re-validates the path with `classifyConfinement` before rebuilding a watcher (`watcher/atomicRearm.ts` → `AtomicRearmDeps.isPathConfined`).
 
@@ -444,7 +437,7 @@ The policy before the ratchet, as practised: *a file a change adds behaviour to 
 | `src/main/services/workers/git-status.worker.ts` | 520 | Pre-existing |
 | `src/renderer/src/hooks/useExternalFileDrop.ts` | 518 | Pre-existing |
 
-`FileWatcherService.ts` deliberately stayed under the cap (498 lines at the #70 measurement) by moving the watch factory, the unlink branch, the send loop and the subscriber counting into `src/main/services/watcher/`.
+`FileWatcherService.ts` deliberately stayed under the cap (498 lines at the #70 measurement) by moving the watch factory, the unlink branch, the send loop and the subscriber counting into `src/main/services/watcher/`. It has since grown past it: 581 lines, frozen there in `scripts/max-lines-baseline.json`.
 
 **Recommended Solution**: (#124 made the split below for both preview files; the rest stands.) `PreviewLiveView.ts` and `PreviewViewService.ts` were the entries gaining code fastest and the ones to split first – the lifecycle wiring, teardown and still-frame paths in the former and the suspend/resume policy in the latter are separable. `file-handlers.ts` remains a candidate: the project/file/stat/CRUD handler groups are independent. The `imageViewer.logic.ts` file is a candidate for the next pass that genuinely changes it.
 
@@ -823,7 +816,7 @@ One extra obstacle found since: `PreviewViewService.applyApprovedHosts` returns 
 
 **Severity**: Low
 
-**Impact**: `src/main/services/preview/previewLiveVisibility.ts` (334 lines) and `previewLiveWiring.ts` (371) are reached only through the `PreviewLiveView` / `PreviewViewService` tests and e2e. `previewLiveVisibility.ts` owns the synchronous-hide invariant that keeps an untrusted page from covering Erfana's own permission prompt.
+**Impact**: `src/main/services/preview/previewLiveVisibility.ts` (334 lines when filed, 342 on 2026-10-29) and `previewLiveWiring.ts` (371 then, 434 now) are reached only through the `PreviewLiveView` / `PreviewViewService` tests and e2e. `previewLiveVisibility.ts` owns the synchronous-hide invariant that keeps an untrusted page from covering Erfana's own permission prompt.
 
 **Recommended Solution**: a direct test file for each, behind a per-file coverage floor.
 
@@ -960,13 +953,13 @@ One extra obstacle found since: `PreviewViewService.applyApprovedHosts` returns 
 
 **Severity**: Low (the preload coverage gap: Medium)
 
-- **`src/preload/index.ts` is barely covered.** Measured at #124 QG-8: 54 % lines, 12.5 % functions. The preload project as a whole is at 64.45 % lines / 30.40 % functions, below the 80 % line target, entirely because of this file; #124's own `previewBridge.ts` is at 100 %. The preload floors were raised only to what is met today. **Update (v0.22.0)**: the project-wide preload floors are now the measured values rounded down, minus one point: 74 % lines, 53 % functions, 97 % branches and 74 % statements (`vitest.preload.config.ts`), so functions are still well under the target.
+- **`src/preload/index.ts` is barely covered.** Measured at #124 QG-8: 54 % lines, 12.5 % functions. The preload project as a whole is at 64.45 % lines / 30.40 % functions, below the 80 % line target, entirely because of this file; #124's own `previewBridge.ts` is at 100 %. The preload floors were raised only to what is met today. **Update (v0.22.0)**: the project-wide preload floors were set to the measured values rounded down, minus one point: 74 % lines, 53 % functions, 97 % branches and 74 % statements. **Update (2026-10-25)**: re-measured after the vitest 3 → 5 upgrade, which counts `index.ts` very differently; the floors in `vitest.preload.config.ts` are now 97 % lines, 97 % functions, 97 % branches and 98 % statements, so this gap is closed as measured.
 - **Prettier config and code disagree on arrow parentheses.** `.prettierrc.json` says `"arrowParens": "avoid"`, while most single-parameter arrows in `src/` are written with parentheses. Nothing runs `prettier --check` in CI, so the mismatch is invisible until someone runs `npm run format`, which would rewrite a large share of the tree. Decide which way, then either change the setting or reformat in one commit.
-- **The vitest advisory** (GHSA-82fw-gwwq-j7x9, three moderate dev-only findings in `vitest`, `@vitest/mocker` and `@vitest/coverage-v8`) needs a major upgrade and is tracked in [#126](https://github.com/qodeca/erfana/issues/126). Not shipped in the app.
-- ~~**electron-builder 26.16.1**, a non-major release after the pinned 26.15.3, was flagged by the #124 audit and not yet evaluated.~~ ✅ Done: `package.json` pins `electron-builder` 26.16.1, which ships with v0.22.0 (prepared for 0.21.0, [#163](https://github.com/qodeca/erfana/issues/163)) and cleared the nine build-time advisories the old `@electron/rebuild` pin held in place.
-- **`MonacoPage.focus()` clicks once, too early after mount** (`e2e/pages/monaco.page.ts`), so focus can land on the panel instead of the editor – the root cause of the pre-existing `markdown-toolbar.e2e.ts` flake. #124 fixed that spec locally (a `focusEditor()` retry); the shared page object still lacks the retry.
+- ~~**The vitest advisory** (GHSA-82fw-gwwq-j7x9, three moderate dev-only findings in `vitest`, `@vitest/mocker` and `@vitest/coverage-v8`) needs a major upgrade~~ – the major upgrade has landed: `package.json` now pins `vitest` and `@vitest/coverage-v8` at `^5.0.5` (tracked in [#126](https://github.com/qodeca/erfana/issues/126); that it clears the advisory is inferred, not re-audited here). Not shipped in the app.
+- ~~**electron-builder 26.16.1**, a non-major release after the pinned 26.15.3, was flagged by the #124 audit and not yet evaluated.~~ ✅ Done: `electron-builder` 26.16.1 (prepared for 0.21.0, [#163](https://github.com/qodeca/erfana/issues/163)) shipped with v0.22.0 and cleared the nine build-time advisories the old `@electron/rebuild` pin held in place; `package.json` now pins 26.18.0.
+- ~~**`MonacoPage.focus()` clicks once, too early after mount**~~ ✅ Done: `MonacoPage.focus()` (`e2e/pages/monaco.page.ts`) now clicks again until Monaco reports focus (`toPass({ timeout: 4000 })`).
 - **Four small review carry-overs:** `createMockMenuContext` (`ProjectTree/__test__/testUtils.ts`) has no `openInBrowser`, so tests pass an override; the `suggestedName` parameter of `exportPdf` in `PreviewViewService.ts` / `previewViewTypes.ts` is now a fallback and should be renamed `fallbackName`; the same-tab Find e2e checks the match total, not the "1 of 1" text; `e2e/pages/html-preview.navigation.ts` keeps its own `dismissAllToasts` copy instead of importing the shared one from `html-preview.browser.ts`.
-- **Main coverage instruments one shared file** (QG-11a Q10). The `vitest.main.config.ts` coverage `include` names `src/shared/ipc/browser-schema.ts` and no other `src/shared` module, so #124's shared modules (`src/shared/ipc/preview-navigation-schema.ts`, `dropReporter.ts`, `stablePathDigest.ts`, `previewNavKeys.ts`) cannot carry per-file floors. Fix: include `src/shared/**/*.ts` and add floors for those modules.
+- **Main coverage floors for shared modules** (QG-11a Q10). The `vitest.main.config.ts` coverage `include` now instruments all of `src/shared/**/*.{ts,tsx}`, but #124's shared modules (`src/shared/ipc/preview-navigation-schema.ts`, `dropReporter.ts`, `stablePathDigest.ts`, `previewNavKeys.ts`) still carry no per-file floor. Fix: add floors for those modules.
 
 **Status**: Open — recorded at #124 Phases 8–10 and QG-11a.
 
