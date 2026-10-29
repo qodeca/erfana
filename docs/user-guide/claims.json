@@ -26139,12 +26139,12 @@
       "id": "readme/04",
       "audience": "user",
       "doc": "README.md",
-      "quote": "Screenshot of the Visualize prompt: a Markdown list goes to Claude Code in the terminal",
+      "quote": "Animation of Erfana: open project, start Claude Code, import PDF",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/prompts/templates/editor-visualize.md:5",
-      "match": "name: Visualize",
-      "note": "Alt text was about 200 chars and did not start with 'Screenshot of'; shortened to 138 chars."
+      "source": "scripts/capture/demo-story.mjs:17",
+      "match": "{ id: 'open', label: 'Open a project' },",
+      "note": "README video replaced (spec 023): the alt text names the nine steps of STORY in order, 155 characters at most (023-FR-017)."
     },
     {
       "id": "readme/05",
