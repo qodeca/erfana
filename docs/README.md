@@ -86,10 +86,7 @@ Erfana is an agent-native Markdown workspace – an Electron app that runs a ter
   - [ASAR packaging with integrity enforcement](./spikes/2026-10-22-asar-integrity.md) - the v0.22.0 `app.asar` integrity check
   - [How `fs.watch` behaves on Windows](./spikes/211-windows-fs-watch.md) - #211, W0
   - [What the #138 capture design assumes](./spikes/138-capture-spike.md) - user-guide screenshots
-  - [Posting review verdicts without a model Bash call](./spikes/172-verdict-posting.md) - Xezar pipeline, #172
-  - [Leader liveness and a 30-minute silence alert](./spikes/179-leader-liveness.md) - Xezar pipeline, #179
   - [HTML Preview comments, phase P0](./spikes/html-preview-comments.md) - the probes that revision 3 of the comments design rests on
-- [Leader-silence alert runbook](./runbooks/leader-watch.md) - the macOS notification when the Xezar project leader goes quiet (#179)
 - [Testing](./testing/README.md) - Testing strategies and coverage
   - [E2E Testing](./testing/e2e-testing.md) - Playwright/Electron E2E guide
   - [E2E Selectors](./testing/e2e-selectors.md) - `data-testid` catalog (`testids.ts` is the source of truth)
@@ -168,9 +165,9 @@ Archived documentation was removed from the tree on 2026-10-25. It stays in git 
 - [Video import fixes (2026-03-07)](https://github.com/qodeca/erfana/blob/1d814e05d98b3005e5c13c0624b09653708136f7/docs/archive/2026-03-07-video-import-fixes.md) – Completed implementation plan for video import (#110)
 - [Phase 2 closure (2026-04)](https://github.com/qodeca/erfana/blob/1d814e05d98b3005e5c13c0624b09653708136f7/docs/archive/phase2-closure-2026-04.md) – Seven-stream closure plan for Windows enablement Phase 2, archived 2026-08-07
 
-## Folders added by the Xezar pipeline
+## Process documents and folders
 
-The pipeline's process documents sit at the repository root: [SDLC.md](../SDLC.md) (how work moves), [AGENTS.md](../AGENTS.md) (what every agent runs), [CODE_REVIEW.md](../CODE_REVIEW.md) and [BACKWARD_COMPATIBILITY.md](../BACKWARD_COMPATIBILITY.md). Every design goes in `designs/<functionality>/` – no single-file notes are left loose in `designs/`.
+The process documents sit at the repository root: [SDLC.md](../SDLC.md) (how work moves), [AGENTS.md](../AGENTS.md) (what every agent runs), [CODE_REVIEW.md](../CODE_REVIEW.md) and [BACKWARD_COMPATIBILITY.md](../BACKWARD_COMPATIBILITY.md). Every design goes in `designs/<functionality>/` – no single-file notes are left loose in `designs/`.
 
 A folder appears when its first document does, so some of these do not exist yet.
 

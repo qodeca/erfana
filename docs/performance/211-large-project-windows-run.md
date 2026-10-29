@@ -7,7 +7,7 @@ SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 
 - **Issue:** [#211](https://github.com/qodeca/erfana/issues/211). **Design:** [W17 and AC8](../designs/large-projects/211-large-project-windows-watcher.md#9-acceptance-criteria-traceability); spike: [W0](../spikes/211-windows-fs-watch.md).
 - **Date:** 2026-09-29, times local. **Host:** Windows 11 Pro 10.0.26200, NTFS – the W0 host. **Build:** dev build of `fix/211-large-project-windows-stall`.
-- **Project:** `<project>`, the Xezar repository – the ~222k-entry project from the issue. Its test suite kept creating and deleting folders under `.local/test-tmp` for most of the run; that is the churn measured below.
+- **Project:** `<project>`, a large external repository – the ~222k-entry project from the issue. Its test suite kept creating and deleting folders under `.local/test-tmp` for most of the run; that is the churn measured below.
 - **Data:** the main-process log (`<home>/.erfana/logs/main.log`, plus `main.1.log` for the part before it rotated at 21:05), this dev instance's lines only, and the tester's run notes where marked. Two older Erfana builds were running on other projects (about 34k chokidar handles between them); their lines were ignored, but they shared the disk.
 - **Scope:** **no exclude list** – `excludePatternCount: 0` on every read. This run measures the root-cause fixes alone (the native watcher, and the watcher starting after the first read). The run with `.local/test-tmp` excluded is still to do – see "With the exclusion – pending".
 
@@ -107,7 +107,7 @@ Cause, inferred: disk and antivirus contention from the test suite creating and 
 | AC5 | reads and git status do not wait for the watcher | watcher started after read 1; git answered during it | met |
 | AC8 | documented manual run | this page | partial |
 
-**Is `.local/` gitignored in Xezar?** Yes – `<project>/.gitignore` has `/.local/`, so the D10 assumption behind AC2 holds for this exclusion. Git status listed 97–114 files throughout the run.
+**Is `.local/` gitignored in that project?** Yes – `<project>/.gitignore` has `/.local/`, so the D10 assumption behind AC2 holds for this exclusion. Git status listed 97–114 files throughout the run.
 
 ## With the exclusion – pending
 

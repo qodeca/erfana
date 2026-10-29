@@ -179,8 +179,8 @@ misleading sentence.
 
 External URLs are not fetched: the check makes no network calls.
 
-**This is a trust boundary** (it reads contributor-controlled Markdown, and the local gate runs it
-through `.xezar/checks/repository-checks.sh`). Each threat and what bounds it:
+**This is a trust boundary** (it reads contributor-controlled Markdown, and the local checks run it
+as `npm run check:links`). Each threat and what bounds it:
 
 | Threat | Bound |
 |---|---|
@@ -465,7 +465,7 @@ The PR body carries:
 
 **Not changed:**
 
-- `src/**`, `.github/workflows/**`, `.xezar/**`;
+- `src/**`, `.github/workflows/**`;
 - `playwright.config.ts`;
 - `package-lock.json`;
 - `README.md` (it belongs to #139).
@@ -479,7 +479,7 @@ Every stage has an exit, and a failed run leaves the committed tree as it was:
 - **Electron is closed in a `finally`** through `forceCloseApp` (destroys the windows, skips the
   quit prompt). Closing the app kills the PTY, and with it `claude`.
 - **The script kills only child PIDs it started itself.** It never matches processes by
-  command-line pattern (`.xezar/CLAUDE.md`).
+  command-line pattern (`CLAUDE.md` § Process).
 - **Agent scenes have a 5-minute timeout each.** A timeout is a scene failure (exit 1), never a
   screenshot of a half-finished state.
 - **Nothing is retried silently.** `--only` exists so a failed row can be re-run on purpose.

@@ -31,18 +31,11 @@ lint run does not catch:
 
 ## Trust boundaries
 
-A change to any of these is routed to the security-review row by machine (`.xezar/checks/security-scan.sh`
-sets `reviewerRequired`), not by memory:
+A change to any of these gets a security review (SDLC.md § Security review):
 
 - `.github/workflows/` - what builds, signs and releases.
-- `.xezar/pipeline/config.json`, `.xezar/config.json`, `.xezar/routing.json`, `.xezar/routing.schema.json`,
-  `.xezar/loops.json`, `.xezar/workflows/`, `.xezar/checks/`, `.xezar/docs/`, `.xezar/skills/`.
-- `.claude/settings.json` and the **SessionStart hook** in it, and its loader
-  `.xezar/checks/leader-context.sh`: they decide what every leader session reads at start. A change to
-  either can change the leader's instructions without touching the leader guide.
-- `.claude/settings.local.json`, `.codex/` and `.env.example` files.
-- A change to `deploy.*`, to the base branch, to a workflow file, to a check script or to the routing
-  file goes to security review.
-
-By judgement, not by machine: the preload bridge (`src/preload/`), IPC sender validation, the HTML
-preview sandbox, the Whisper and release trust chains (`SECURITY.md` § Scope) also get security review.
+- `.claude/settings.json`, `.claude/settings.local.json`, `.mcp.json`, `.codex/` and `.env.example`:
+  they decide which tools, hooks and MCP servers every agent session gets.
+- A change to the base branch, to a workflow file or to a check script.
+- The preload bridge (`src/preload/`), IPC sender validation, the HTML preview sandbox, the
+  terminal/PTY, and the Whisper and release trust chains (`SECURITY.md` § Scope).

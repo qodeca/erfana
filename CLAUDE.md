@@ -9,7 +9,7 @@ An agent-native Markdown workspace (Electron): integrated terminal for CLI codin
 
 ## Branching model
 - `main` — released code only. Protected (required status checks, `enforce_admins`, signed `v*.*.*` tags); direct push is the intended solo-dev workflow, no PR required. The checks are enforced **on push**, so a commit whose checks have not yet finished green for that SHA is rejected with `GH006` — push it to `develop` first, wait for the run, then push `main` ([release.md § Branch protection](docs/build/release.md#branch-protection-phase-i--done-2026-04-25)).
-- `develop` — the day-to-day integration branch, the base for small features and bugfixes, GitHub's **default branch**, and the Xezar pipeline's base branch (the kit's config guard refuses a base that is not the remote default). Branch general work off `develop`, **not** `main` (main lags). Protected with the same seven required checks in strict mode, but **without** `enforce_admins`, so an admin's direct push (the develop-first step above) still lands.
+- `develop` — the day-to-day integration branch, the base for small features and bugfixes, GitHub's **default branch**. Branch general work off `develop`, **not** `main` (main lags). Protected with the same seven required checks in strict mode, but **without** `enforce_admins`, so an admin's direct push (the develop-first step above) still lands.
 - `graph` — "develop for the graph engine": the integration branch for spec 004 and the [#21](https://github.com/qodeca/erfana/issues/21) contract chain (#22–#32) plus related functionality. Do **not** start graph-engine work from `develop`; branch off `graph` (`git checkout -b feature/<name> graph`) or the already-frozen R1 contracts will be re-implemented from scratch. Inventory of what is frozen there: [ROADMAP.md](ROADMAP.md) § Graph engine chain.
 - Graph-engine work merges back into `graph`; `graph` merges into `develop` only when the engine is shippable. Merge `develop` **into** `graph` periodically to limit drift — never the reverse until the chain lands.
 - Feature branches: `feature/<name>`, off whichever integration branch owns the work. Commits follow Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`).
@@ -76,9 +76,7 @@ The full channel index is [docs/ipc-patterns.md](docs/ipc-patterns.md) § Curren
 ## Important Notes
 - node-pty may fail to build on Python 3.13 (use 3.12; 3.14.3 also verified) — this one is worth keeping here because it fails at install time, before any doc gets read
 
-## Xezar pipeline
+## Process
 How work moves: [SDLC.md](SDLC.md); what every agent runs: [AGENTS.md](AGENTS.md); review rules: [CODE_REVIEW.md](CODE_REVIEW.md).
-- The project leader is started with `./scripts/xezar-leader.sh`; only that session leads. Every other Claude Code session here is an ordinary session.
-- The pipeline's base branch is `develop`. Graph-engine work stays on `graph` and is started by the owner, not dispatched by the leader.
-- The pipeline adds these `docs/` folders, each created with its first document: `spikes/`, `runbooks/`, `deprecations/`, `performance/`, `migrations/`. Designs go in `docs/designs/<functionality>/`, decision records in `docs/adrs/`, and the design system stays in `docs/design-system/`.
-- Pipeline files: `.xezar/` (kit files are MIT, see `REUSE.toml`). Agent-kit rules: @.xezar/CLAUDE.md
+- Never stop a process by command-line pattern (`pkill -f`): it matches every peer agent on this machine. Stop only a PID you started.
+- Documents go under `docs/` by subject ([docs/README.md](docs/README.md) lists the folders). Designs go in `docs/designs/<functionality>/`, decision records in `docs/adrs/`, and the design system stays in `docs/design-system/`.

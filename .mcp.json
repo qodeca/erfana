@@ -8,14 +8,6 @@
         "@snowfort/circuit-electron@0.0.18"
       ]
     },
-    "xezar": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@qodeca/xezar",
-        "mcp"
-      ]
-    },
     "chrome-devtools": {
       "command": "npx",
       "args": [
