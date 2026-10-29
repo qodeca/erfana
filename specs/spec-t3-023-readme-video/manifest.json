@@ -1,0 +1,437 @@
+{
+  "spec_id": 23,
+  "slug": "readme-video",
+  "tier": "T3",
+  "version": "0.3.0",
+  "created": "2026-10-29T11:20:00.000Z",
+  "updated": "2026-10-29T12:00:00.000Z",
+  "application": {
+    "name": "README showcase video",
+    "domain": null,
+    "tech_stack": [
+      "Playwright",
+      "Electron",
+      "macOS screen recording",
+      "ffmpeg",
+      "libwebp"
+    ]
+  },
+  "scope": {
+    "type": "feature",
+    "name": "README showcase video"
+  },
+  "sections": [
+    {
+      "id": "01",
+      "file": "requirements/01-overview.md",
+      "title": "Overview",
+      "word_count": 583
+    },
+    {
+      "id": "02",
+      "file": "requirements/02-requirements.md",
+      "title": "Requirements",
+      "word_count": 1957
+    },
+    {
+      "id": "03",
+      "file": "requirements/03-acceptance.md",
+      "title": "Acceptance",
+      "word_count": 1415
+    }
+  ],
+  "requirements_index": {
+    "023-FR-001": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "023-FR-002": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "023-FR-003": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "023-FR-004": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "023-FR-005": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "023-FR-006": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "023-FR-007": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "023-FR-008": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "023-FR-009": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "023-FR-010": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "023-FR-011": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "023-FR-012": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "023-FR-013": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "023-FR-014": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "023-FR-015": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "023-FR-016": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "023-FR-017": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "023-FR-018": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "023-NFR-001": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "023-NFR-002": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "023-NFR-003": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "023-NFR-004": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "023-NFR-005": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "023-NFR-006": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "023-AC-001": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "023-AC-002": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "023-AC-003": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "023-AC-004": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "023-AC-005": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "023-AC-006": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "023-AC-007": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "023-AC-008": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "023-AC-009": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "023-AC-010": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "023-AC-011": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "023-AC-012": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "023-AC-013": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "023-AC-014": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "023-AC-015": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "023-AC-016": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "023-AC-017": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "023-AC-018": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "023-AC-019": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "023-AC-020": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "023-AC-021": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "023-AC-022": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "023-AC-023": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "023-AC-024": {
+      "section": "03-acceptance",
+      "status": "active"
+    }
+  },
+  "requirement_sequences": {
+    "FR": 18,
+    "NFR": 6,
+    "AC": 24
+  },
+  "cross_references": [
+    {
+      "from": "023-FR-001",
+      "to": [
+        "023-AC-001"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "023-FR-002",
+      "to": [
+        "023-AC-002"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "023-FR-003",
+      "to": [
+        "023-AC-003"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "023-FR-004",
+      "to": [
+        "023-AC-004"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "023-FR-005",
+      "to": [
+        "023-AC-005"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "023-FR-006",
+      "to": [
+        "023-AC-006"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "023-FR-007",
+      "to": [
+        "023-AC-007"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "023-FR-008",
+      "to": [
+        "023-AC-008"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "023-FR-009",
+      "to": [
+        "023-AC-009"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "023-FR-010",
+      "to": [
+        "023-AC-010"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "023-FR-011",
+      "to": [
+        "023-AC-011"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "023-FR-012",
+      "to": [
+        "023-AC-012"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "023-FR-013",
+      "to": [
+        "023-AC-013"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "023-FR-014",
+      "to": [
+        "023-AC-014"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "023-FR-015",
+      "to": [
+        "023-AC-015"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "023-FR-016",
+      "to": [
+        "023-AC-016"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "023-FR-017",
+      "to": [
+        "023-AC-017"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "023-FR-018",
+      "to": [
+        "023-AC-018"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "023-NFR-001",
+      "to": [
+        "023-AC-019"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "023-NFR-002",
+      "to": [
+        "023-AC-020"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "023-NFR-003",
+      "to": [
+        "023-AC-021"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "023-NFR-004",
+      "to": [
+        "023-AC-022"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "023-NFR-005",
+      "to": [
+        "023-AC-023"
+      ],
+      "type": "traces"
+    },
+    {
+      "from": "023-NFR-006",
+      "to": [
+        "023-AC-024"
+      ],
+      "type": "traces"
+    }
+  ],
+  "statistics": {
+    "total_sections": 3,
+    "total_requirements": 24,
+    "total_words": 3955
+  },
+  "change_history": [
+    {
+      "version": "0.1.0",
+      "date": "2026-10-29T11:20:00.000Z",
+      "author": "Claude Code (erfana:spec)",
+      "changes": "Created from the 2026-10-29 grill session decisions; supersedes the #139 demo requirements in R138."
+    },
+    {
+      "version": "0.2.0",
+      "date": "2026-10-29T11:45:00.000Z",
+      "author": "Claude Code (erfana:spec)",
+      "changes": "Applied the 12 review findings (owner-approved): per-step results in FR-001, draft-then-approve order in FR-010, Preview Only and Capture window named, allowed edits moved into FR-011, thresholds moved from ACs into FR-004/FR-006, full IDs in the manifest."
+    },
+    {
+      "version": "0.3.0",
+      "date": "2026-10-29T12:00:00.000Z",
+      "author": "Claude Code (erfana:spec)",
+      "changes": "Applied the 8 second-review findings (owner-approved): 2 s measured from the logged file write in real time, 1 s fade, app text judged at full size (owner decision), draft folder named, screenshot size in pixels, tab switch before step 8, non-macOS exit condition."
+    }
+  ]
+}

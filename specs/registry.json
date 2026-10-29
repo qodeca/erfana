@@ -1,7 +1,7 @@
 {
   "sequence": {
-    "current": 22,
-    "next": 23
+    "current": 23,
+    "next": 24
   },
   "registry": [
     {
@@ -337,11 +337,35 @@
         "implemented": 0,
         "list": []
       }
+    },
+    {
+      "id": 23,
+      "tier": "T3",
+      "slug": "readme-video",
+      "name": "README showcase video",
+      "status": "active",
+      "scope": "feature",
+      "description": "1920x1080 showcase video for the GitHub README: nine features in one real, continuous run (tree, preview, terminal; real Claude Code and OS dialogs), recorded on macOS, sped-up parts marked, WebP plus still PNG under 30 MB, gated by automatic checks and owner approval. Replaces the #139 demo loop.",
+      "created": "2026-10-29T11:20:00.000Z",
+      "path": "spec-t3-023-readme-video",
+      "last_modified": "2026-10-29T12:00:00.000Z",
+      "sections_count": 3,
+      "requirements_count": 24,
+      "documents": {
+        "technical_adrs": [],
+        "solution_adrs": [],
+        "solution_specs": [],
+        "designs": [],
+        "ux": [],
+        "e2e_test_designs": [],
+        "issues": []
+      }
     }
   ],
   "metadata": {
-    "schema_version": "2.0.0",
+    "schema_version": "3.0.0",
     "created": "2025-12-22T00:00:00.000Z",
-    "last_updated": "2026-04-03T18:20:00.000Z"
+    "last_updated": "2026-10-29T12:00:00.000Z",
+    "version": 4
   }
 }
