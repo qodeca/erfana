@@ -1,0 +1,22 @@
+{
+  "algorithm": "sha256",
+  "source": "v0.23.1",
+  "files": {
+    "README.md": "2be15795b0b1aae2a3873621af9e18161aad7d6fafff27ad78777d35d55c209c",
+    "anchor.ts": "375dfa57193f9138ce4a93ac554453775c059f078e802ed21e095cacba463464",
+    "anchorEvidence.ts": "cbd180a21efba5be94d358707f84db48f7e136c1b194d97ab4bcf30a5029d243",
+    "anchorLookup.ts": "31d084532c81929899f16d2cb3a5841e1b11d02978b45b468e883907737b9696",
+    "blobs.txt": "1fec375274b122908a4d6fa0d97f94b67f63fe9a9034eaa5e60de04dc8aabebc",
+    "conflictMarkers.ts": "67c22c48fcf4d96875039738f8da31e699c842af7b5fbe241a8baa798d51778d",
+    "encoding.ts": "995a1a1ea3ca0eec48f3450aa8524451aefa1278b4985b475637ff24e853d65f",
+    "format.ts": "d6c583fbc7b1263f8ae92894e238ebe84e530b06860d0cf224ded15728d4ddc0",
+    "htmlIndex.ts": "d550619d9f3507308b261879dfdd733df58f2730a6dc2e2928370ab56458103b",
+    "parse.ts": "a72bbbd62e00327d24150ad9fea843151590f12912e69e25c1d6a56dbf09faa5",
+    "parseBounds.ts": "762e0c5e8ac8dd179652ae1625d1209a8a554d4643ef94cca6fb72bc088ec7ad",
+    "preview-limits.ts": "cb788ab015d27e1784b16a75f147ce0c8f76a7394b2cfad39f8e8d79fccf4757",
+    "quoteText.ts": "392b4ab7ea373346e8ade0e56a6d9bff14864ee599417c4b24414f87d881dd44",
+    "recorded.patch": "65ffa3ce23a3c49fb740dc41e37cd23e0323e5a3dd2434533b63d4f1fd61a836",
+    "splice.ts": "ab69614725f9663d6ea52fe6e0adb37f97df449258deae8fe34bc473ad4f197b",
+    "thread.ts": "a6f5a654bd465746da5c3f27a9cd77b9aa877e37c9bb42cd078411e1c9dbec34"
+  }
+}

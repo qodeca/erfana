@@ -121,6 +121,7 @@
     "markdownlint-cli2": "^0.24.0",
     "mermaid": "^12.2.0",
     "monaco-editor": "^0.55.1",
+    "parse5-v0.23.1": "npm:parse5@8.0.1",
     "patch-package": "^8.0.1",
     "path-browserify": "^1.0.1",
     "postcss-html": "^2.0.0",
@@ -141,7 +142,8 @@
     "typescript-eslint": "^8.72.0",
     "vite": "^6.4.1",
     "vitest": "^5.0.5",
-    "yazl": "^3.3.1"
+    "yazl": "^3.3.1",
+    "zod-v0.23.1": "npm:zod@4.6.7"
   },
   "overrides": {
     "chokidar": "5.0.0",
