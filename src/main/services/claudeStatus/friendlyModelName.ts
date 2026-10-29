@@ -33,7 +33,7 @@
  *
  * @see Issue #216 - Per-terminal Claude Code context status bar
  * @see Issue #41 - Context meter reads the 200k window for Opus 5 sessions
- * @see docs/designs/41-model-capability-registry.md §6.3, §11, §13
+ * @see docs/designs/context-meter/41-model-capability-registry.md §6.3, §11, §13
  */
 import { MAX_MODEL_ID_LENGTH } from '../../../shared/ipc/claude-status-schema'
 import {

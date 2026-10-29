@@ -68,7 +68,7 @@ Not one of the six issues above, but it landed in the same problem space and cha
 - **per-window entry-module capture** – renderer console errors (`error` level only) and preload errors, the only trace of a boot failure that leaves the window blank without killing the process. Every renderer-supplied string is length-bounded at 1 000 characters and the console trail is capped at 20 records per window per 10 s, followed by one summary line carrying the dropped count. Log-only, like the rest;
 - **flatten instrumentation** – `[ProjectTree] flatten completed` with `{ nodeCount, durationMs }`, at `info` above a 50 ms threshold and `debug` below.
 
-Design of record: [`docs/designs/design-issue-60.md`](./designs/design-issue-60.md).
+Design of record: [`docs/designs/large-projects/design-issue-60.md`](./designs/large-projects/design-issue-60.md).
 
 **Follow-up trigger.** Two `[ProjectTree] flatten completed` log lines within 3 s of opening a project ⇒ **file the tree-rebuild dedup against #149/#150**. A double build at open is suspected but unconfirmed; the instrumentation above exists so the next report carries evidence instead of a hunch.
 
@@ -119,7 +119,7 @@ The double tree *build* at open (the #60 follow-up trigger above) is a separate 
 - **A native recursive watcher on Windows** (macOS and Linux stayed on chokidar 3.6.0 at the time; since the chokidar 5.0.0 upgrade macOS uses this watcher too – see [File watching § Watch backends](./file-watching/README.md#watch-backends-211)): one watcher per project on Node's `fs.watch`, a bounded plan of at most 512 handles, and no handle at all for excluded, hidden or ignored folders it knows of – at the top level, along exclude paths, and wherever the last root tree walk met one. Lost events cost one debounced re-read per burst. `ERFANA_DIRECTORY_WATCHER=chokidar` forces the old backend for diagnosis.
 - **Nothing competes with the first read:** the directory watcher starts only after the project's first tree read settles, and a watcher batch whose paths are all excluded, hidden or ignored never reaches the renderer, so it starts neither a tree re-read nor a git refresh.
 
-Details: [File watching § Watch backends](./file-watching/README.md#watch-backends-211), [§ The Windows native watcher](./file-watching/technical-details.md#the-windows-native-watcher-211); log lines: [Logging § Large projects on Windows](./logging.md#large-projects-on-windows-211); limits: [Known issues § Excluded folders](./known-issues.md#excluded-folders-filesexclude-known-limits); design: [`docs/designs/211-large-project-windows-watcher.md`](./designs/211-large-project-windows-watcher.md); spike: [`docs/spikes/211-windows-fs-watch.md`](./spikes/211-windows-fs-watch.md).
+Details: [File watching § Watch backends](./file-watching/README.md#watch-backends-211), [§ The Windows native watcher](./file-watching/technical-details.md#the-windows-native-watcher-211); log lines: [Logging § Large projects on Windows](./logging.md#large-projects-on-windows-211); limits: [Known issues § Excluded folders](./known-issues.md#excluded-folders-filesexclude-known-limits); design: [`docs/designs/large-projects/211-large-project-windows-watcher.md`](./designs/large-projects/211-large-project-windows-watcher.md); spike: [`docs/spikes/211-windows-fs-watch.md`](./spikes/211-windows-fs-watch.md).
 
 **Left to #150 or to follow-ups** – deliberately out of scope for #211:
 

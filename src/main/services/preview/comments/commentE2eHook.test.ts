@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * The main-side comments e2e hook (docs/designs/html-preview-comments.md
+ * The main-side comments e2e hook (docs/designs/comments/html-preview-comments.md
  * §12.4): present only in an unpackaged build started with
  * `ERFANA_E2E_TEST_HOOKS=1`, and it aggregates every live view's loads.
  */

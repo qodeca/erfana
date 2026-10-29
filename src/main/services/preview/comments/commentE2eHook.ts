@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * The main-side e2e hook for HTML Preview comments
- * (docs/designs/html-preview-comments.md §12.4, §13 P3 exit).
+ * (docs/designs/comments/html-preview-comments.md §12.4, §13 P3 exit).
  *
  * An e2e spec reads comment state through `globalThis.__erfanaE2eComments`
  * from `app.evaluate`, so it never depends on the page's markup or on a

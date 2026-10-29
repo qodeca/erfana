@@ -5,7 +5,7 @@
  * `atomicWriteBytesStrict.test.ts` because the module-scope `rename` / `open`
  * mock hoists (docs/windows/contributing.md, test-file split policy).
  * Everything else is the real fs on a temp directory. Design:
- * docs/designs/html-preview-comments.md §7.6 step 9 (M-005, M-006, M-061).
+ * docs/designs/comments/html-preview-comments.md §7.6 step 9 (M-005, M-006, M-061).
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { mkdtemp, readFile, readdir, realpath, rm, writeFile } from 'node:fs/promises'

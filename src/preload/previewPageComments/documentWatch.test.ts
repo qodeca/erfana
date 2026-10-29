@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Noticing `document.open()` by its trace: `<html>` replaced
- * (docs/designs/html-preview-comments.md §9.1 S25; security review M1). The
+ * (docs/designs/comments/html-preview-comments.md §9.1 S25; security review M1). The
  * real-Chromium check – listeners actually erased, then back – is
  * e2e/html-preview-comments-preload.e2e.ts.
  */

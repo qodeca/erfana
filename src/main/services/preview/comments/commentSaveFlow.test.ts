@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * `preview:commentSave` for one view (docs/designs/html-preview-comments.md
+ * `preview:commentSave` for one view (docs/designs/comments/html-preview-comments.md
  * §7.5, §7.6; M-051, M-053, M-056, M-057, SEC-08).
  */
 import { describe, expect, it, vi } from 'vitest'

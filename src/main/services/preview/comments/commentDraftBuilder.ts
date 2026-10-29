@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * A draft from a pick, read from disk (docs/designs/html-preview-comments.md
+ * A draft from a pick, read from disk (docs/designs/comments/html-preview-comments.md
  * §6, §7.3 step 3, decisions 16–17, 34, §19 R3-8, R3-11; tests M-033, M-054,
  * M-055, SEC-04, SEC-09).
  *

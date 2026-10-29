@@ -19,7 +19,7 @@
  * against absolute binary paths, with a numeric-validated pid and a 5s timeout.
  * Every failure path is fail-closed (`{ running: false }` / `cwd` omitted).
  *
- * @see docs/designs/216-claude-status-bar.md §2, §4, §10
+ * @see docs/designs/context-meter/216-claude-status-bar.md §2, §4, §10
  */
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'

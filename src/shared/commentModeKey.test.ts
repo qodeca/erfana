@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * The one comment-mode shortcut rule both processes ask (review finding M3;
- * docs/designs/html-preview-comments.md §10.1, L14).
+ * docs/designs/comments/html-preview-comments.md §10.1, L14).
  */
 import { describe, expect, it } from 'vitest'
 import {

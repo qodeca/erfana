@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * The HTML Preview comment codes' fallback sentences are §10.10's own
- * (docs/designs/html-preview-comments.md §10.10 "Microcopy"), word for word,
+ * (docs/designs/comments/html-preview-comments.md §10.10 "Microcopy"), word for word,
  * `{file}` included where §10.10 names the file. The comment window shows
  * §10.10's sentence; a fallback that drifted from it would say something else
  * for the same refusal.
@@ -12,7 +12,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { ERROR_MESSAGES, ErrorCode } from './errors'
 
-const DESIGN = readFileSync(join(__dirname, '../../docs/designs/html-preview-comments.md'), 'utf8')
+const DESIGN = readFileSync(join(__dirname, '../../docs/designs/comments/html-preview-comments.md'), 'utf8')
 const MICROCOPY = DESIGN.slice(DESIGN.indexOf('### 10.10 Microcopy'), DESIGN.indexOf('### 10.11'))
 
 /** Every "quoted" string of §10.10. */

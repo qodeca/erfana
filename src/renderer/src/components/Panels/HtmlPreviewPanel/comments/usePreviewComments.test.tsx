@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * The panel's comment wiring (docs/designs/html-preview-comments.md §4.2,
+ * The panel's comment wiring (docs/designs/comments/html-preview-comments.md §4.2,
  * §7.3–§7.7, §10.1; R-010, R-013, R-018, R-023).
  */
 import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react'

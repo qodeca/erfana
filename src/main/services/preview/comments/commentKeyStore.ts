@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Draft tokens and the opaque keys of one preview view's comments
- * (docs/designs/html-preview-comments.md §3 "Editing existing comments", §7.5
+ * (docs/designs/comments/html-preview-comments.md §3 "Editing existing comments", §7.5
  * step 1, §8, §9.1 S23; tests M-051, M-053, M-057, SEC-08).
  *
  * The renderer never names a file, an offset or a block. A pick mints a

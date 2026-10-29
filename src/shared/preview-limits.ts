@@ -10,7 +10,7 @@
  * it is recorded debt). Main and the renderer both read these, so this module
  * imports nothing.
  *
- * @see docs/designs/design-issue-124.md §2 (New constants)
+ * @see docs/designs/html-preview/multi-page/design-issue-124.md §2 (New constants)
  */
 export const PREVIEW_LIMITS = {
   /**
@@ -65,7 +65,7 @@ export const PREVIEW_LIMITS = {
   /** Idle time after the last real input before the still picture is refreshed (ms). */
   STILL_FRAME_IDLE_REFRESH_MS: 500,
 
-  // HTML preview comments (docs/designs/html-preview-comments.md §5.8, §19 R3-13).
+  // HTML preview comments (docs/designs/comments/html-preview-comments.md §5.8, §19 R3-13).
   // The byte limits are measured on the serialised block – readable text plus
   // `@data`, after escaping – so a block Erfana writes always reads back `ok`.
 

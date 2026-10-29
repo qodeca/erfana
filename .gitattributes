@@ -16,13 +16,15 @@ src/main/utils/__fixtures__/manifest.fixture.json.minisig text eol=lf
 # is applied at install time by the postinstall hook).
 patches/*.patch text eol=lf
 
-# design-sync generated files must stay LF — scripts/design-sync.mjs builds
-# these two from template strings as LF and byte-compares them in --check
-# mode, so a CRLF checkout on Windows makes `npm run design -- --check` fail
-# on every run (#104). Every other generated file under docs/design-system/ is a byte
-# copy of a src/ file and follows that file's line endings.
-docs/design-system/claims.js text eol=lf
+# design-sync generated pages must stay LF – scripts/design-sync.mjs builds
+# these from template strings as LF and byte-compares them in --check mode, so a
+# CRLF checkout on Windows makes `npm run design -- --check` fail on every run
+# (#104). Every other generated file under docs/design-system/ is a byte copy of
+# a src/ file and follows that file's line endings, and the baked cards are
+# spliced in place, so they keep whatever endings the checkout gave them.
 docs/design-system/index.html text eol=lf
+docs/design-system/deviations.html text eol=lf
+docs/designs/index.html text eol=lf
 
 # The preload surface snapshot must stay LF — it is LF in the repo, and this
 # keeps a local Windows checkout (autocrlf) or a snapshot update run there from

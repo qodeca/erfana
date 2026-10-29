@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * The overlay's one host element (docs/designs/html-preview-comments.md
+ * The overlay's one host element (docs/designs/comments/html-preview-comments.md
  * §9.1 S4, S25, §10.2 "Isolation", §19 R3-7; tests SEC-21, SEC-28, SEC-31).
  *
  * A plain `<div>` – never a custom element name, which a page could define

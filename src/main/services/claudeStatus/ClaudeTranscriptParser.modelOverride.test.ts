@@ -12,7 +12,7 @@
  *
  * @see Issue #41 - Context meter reads the 200k window for Opus 5 sessions
  * @see Issue #49 - Model ids from Bedrock, Vertex and Foundry are not recognised
- * @see docs/designs/41-model-capability-registry.md §9.1, §11, §13 (decision (e))
+ * @see docs/designs/context-meter/41-model-capability-registry.md §9.1, §11, §13 (decision (e))
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { promises as fs } from 'node:fs'

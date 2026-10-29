@@ -16,25 +16,11 @@ precedence = "aggregate"
 SPDX-FileCopyrightText = "2025-2026 Qodeca sp. z o.o."
 SPDX-License-Identifier = "GPL-3.0-only"
 
-# Xezar pipeline kit (qodeca/xezar-skills), copied in by onboarding. It keeps the
-# collection's own licence, not the project's.
+# The Codex MCP configuration was copied in from an MIT-licensed agent kit. It
+# keeps that kit's licence, not the project's.
 [[annotations]]
 path = [
-  ".xezar/checks/**",
-  ".xezar/workflows/**",
-  ".xezar/skills/**",
-  ".xezar/docs/**",
-  ".xezar/pipeline/trackers/**",
-  ".xezar/pipeline/toolchains/**",
-  ".xezar/pipeline/browsers/**",
-  ".xezar/pipeline/security/**",
-  ".xezar/pipeline/labels.json",
-  ".xezar/routing.schema.json",
-  ".xezar/loops.json",
-  ".xezar/.gitignore",
   ".codex/config.toml",
-  "scripts/xezar-leader.sh",
-  "scripts/xezar-leader-settings.json",
 ]
 precedence = "override"
 SPDX-FileCopyrightText = ["2026 Qodeca", "2026 Open Mercato"]
@@ -61,7 +47,7 @@ precedence = "override"
 SPDX-FileCopyrightText = ["2017 Daniel Imms", "2018 Microsoft Corporation"]
 SPDX-License-Identifier = "MIT"
 
-# HTML Preview comment fixtures (docs/designs/html-preview-comments.md § 12.3):
+# HTML Preview comment fixtures (docs/designs/comments/html-preview-comments.md § 12.3):
 # golden blocks, compat pages, their .expected.json results, the SHA-256 lock
 # and the agent-review pages. Most are byte-exact text that cannot carry an
 # inline header without changing what they test (a .block.txt is exactly one

@@ -1,0 +1,363 @@
+<!-- @card group="Components" name="Status bar" subtitle="One display-only footer strip for a panel – identity, a spacer, values that are never dropped, and one polite announcement" status="proposed" reviewed="never" answers="Add a footer to a panel; Show a live value under a terminal; Show git status under the project tree" -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Status bar – Erfana design system</title>
+<link rel="stylesheet" href="../../../tokens.css">
+<link rel="stylesheet" href="../../../ds.css">
+<link rel="stylesheet" href="../badge/badge.css">
+<link rel="stylesheet" href="./status-bar.css">
+<style>
+  /* Documentation-only: the panel the bar closes off, and the widths it is drawn at. */
+  .sb-panel { display: flex; flex-direction: column; max-inline-size: 100%; }
+  .sb-panel__body { block-size: var(--space-24); background: var(--color-bg-primary); }
+  .sb-panel__body--tree { background: var(--color-bg-tertiary); }
+  .sb-w-480 { inline-size: calc(var(--space-24) * 10); }
+  .sb-w-220 { inline-size: calc(var(--space-10) * 11); }
+  .sb-w-170 { inline-size: calc(var(--space-10) * 8.5); }
+  .sb-w-120 { inline-size: calc(var(--space-10) * 6); }
+  .sb-frames-wide { grid-template-columns: repeat(auto-fill, minmax(min(520px, 100%), 1fr)); }
+  .sb-frames-narrow { grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); }
+  /* What ships today, approximated from the two stylesheets at app scale. The
+     Claude bar's amber and red use retired tokens; the drawing uses their
+     replacements and says so. */
+  .sb-today-claude { /* mockup: app scale */ display: flex; align-items: center; gap: var(--space-3); block-size: var(--header-height);
+                     box-sizing: border-box; padding-inline: var(--space-6); background: var(--color-bg-secondary);
+                     border-top: var(--border-width) solid var(--color-border-subtle); font-family: var(--font-sans); white-space: nowrap; }
+  .sb-today-claude__name { /* mockup: app scale */ font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--color-text-primary); }
+  .sb-today-claude__badge { /* mockup: app scale */ font-size: var(--text-xs); font-weight: var(--font-semibold); color: var(--color-text-primary);
+                            background: var(--color-bg-tertiary); padding: var(--space-1) var(--space-3); line-height: var(--leading-none); }
+  .sb-today-claude__meter { flex: 1 1 auto; block-size: var(--space-2); background: var(--color-bg-tertiary); }
+  .sb-today-claude__fill { block-size: 100%; inline-size: 48%; background: var(--color-warning); }
+  .sb-today-claude__pct { /* mockup: app scale */ font-size: var(--text-sm); font-weight: var(--font-semibold); color: var(--color-warning); }
+  .sb-today-git { /* mockup: app scale */ display: flex; align-items: center; justify-content: space-between; padding: var(--space-4);
+                  block-size: var(--header-height); box-sizing: border-box; font-size: var(--text-sm); color: var(--color-text-secondary);
+                  background: var(--color-bg-tertiary); border-top: var(--border-width) solid var(--color-border-default); white-space: nowrap; }
+  .sb-today-git__branch { display: flex; align-items: center; gap: var(--space-2); font-weight: var(--font-medium); }
+  .sb-today-git__branch svg { inline-size: var(--space-7); block-size: var(--space-7); }
+  .sb-today-git__counts { display: flex; gap: var(--space-4); font-weight: var(--font-semibold); }
+  .sb-today-git__m { color: var(--color-git-modified-light); }
+  .sb-today-git__u { color: var(--color-git-untracked-light); }
+  .sb-adopt td { vertical-align: top; }
+  .sb-adopt .sb-cell { inline-size: calc(var(--space-24) * 7); max-inline-size: 100%; }
+</style>
+</head>
+<body>
+<nav class="ds-crumbs" aria-label="Breadcrumb"><a href="../../../index.html">Erfana design system</a> <span aria-hidden="true">/</span> <a href="../../../index.html#components">Components</a> <span aria-hidden="true">/</span> <span aria-current="page">Status bar</span></nav>
+<main>
+<h1>Status bar</h1>
+<p class="ds-meta"><span class="ds-status" data-status="proposed">proposed</span> not yet reviewed</p>
+<p class="ds-lede" id="decision">
+  A panel that reports a live value gets one footer strip, <code>.erf-status-bar</code>: <code>--header-height</code> tall,
+  on <code>--color-bg-tertiary</code> with a <code>--border-width</code> top rule. Three slots – the leading identity, a
+  spacer, the trailing values. As the panel narrows the meter goes first, then the badge, then the name ellipsises;
+  <strong>the value is never dropped</strong>. It is display-only and never a tab stop. One polite live region
+  announces a change of band, and nothing else.
+</p>
+
+<div class="ds-note">
+  <strong>Why a card: two strips, one height, nothing else shared.</strong> The Claude Code bar under a terminal and
+  the git bar under the project tree both read <code>--header-height</code>, and their CSS says they should match. They
+  differ in surface (<code>--color-bg-secondary</code> against <code>--color-bg-tertiary</code>), in the top rule (a typed
+  <code>1px</code> against <code>--border-width</code>), and in text colour – and the git bar's
+  <code>--color-text-secondary</code> on its surface is under 4.5:1. Text follows the
+  <a href="../../foundations/type.html#roles">Typography</a> card's <strong>Status line</strong> role
+  (<code>--text-sm</code>, normal, snug, <code>--color-text-tertiary</code>); the name and the values step up to
+  <code>--color-text-primary</code>. A count or window size is the <a href="../badge/index.html">Badge</a> card's
+  <code>.erf-counter</code>.
+</div>
+
+<h2 id="states">Every state</h2>
+<p class="ds-muted">Drawn at the app's scale, under the panel each bar closes off. Percentages are examples, one per band.</p>
+<div class="ds-frames sb-frames-wide">
+
+<figure class="ds-frame">
+<div aria-hidden="true" class="sb-panel sb-w-480">
+  <div class="sb-panel__body"></div>
+  <div class="erf-status-bar">
+    <span class="erf-status-bar__lead"><span class="erf-status-bar__name">Opus 4.8</span><span class="erf-status-bar__badge"><span class="erf-counter">200k</span></span></span>
+    <span class="erf-status-bar__spacer"></span>
+    <span class="erf-status-bar__values"><span class="erf-status-bar__meter"><span class="erf-status-bar__fill" style="inline-size: 24%"></span></span><span class="erf-status-bar__value">24%</span></span>
+  </div>
+</div>
+<figcaption><strong>Claude Code, safe band</strong> – the model's name and window size lead; the meter and the
+percentage trail. The fill is <code>--color-context-safe</code>; the percentage is primary text.</figcaption>
+</figure>
+
+<figure class="ds-frame">
+<div aria-hidden="true" class="sb-panel sb-w-480">
+  <div class="sb-panel__body"></div>
+  <div class="erf-status-bar">
+    <span class="erf-status-bar__lead"><span class="erf-status-bar__name">Opus 4.8</span><span class="erf-status-bar__badge"><span class="erf-counter">200k</span></span></span>
+    <span class="erf-status-bar__spacer"></span>
+    <span class="erf-status-bar__values"><span class="erf-status-bar__meter"><span class="erf-status-bar__fill" data-band="warning" style="inline-size: 48%"></span></span><span class="erf-status-bar__value" data-band="warning">48%</span></span>
+  </div>
+</div>
+<figcaption><strong>Warning band</strong> – from <span data-claim="claude-status-amber-threshold" title="AMBER_THRESHOLD in thresholds.ts – the context percentage where the Claude status bar turns warning">30</span>% used, fill and percentage in <code>--color-warning</code>. The figure says it; the
+colour repeats it. Entering the band is announced once: “Context usage high: 48% used.”</figcaption>
+</figure>
+
+<figure class="ds-frame">
+<div aria-hidden="true" class="sb-panel sb-w-480">
+  <div class="sb-panel__body"></div>
+  <div class="erf-status-bar">
+    <span class="erf-status-bar__lead"><span class="erf-status-bar__name">Opus 4.8</span><span class="erf-status-bar__badge"><span class="erf-counter">200k</span></span></span>
+    <span class="erf-status-bar__spacer"></span>
+    <span class="erf-status-bar__values"><span class="erf-status-bar__meter"><span class="erf-status-bar__fill" data-band="danger" style="inline-size: 72%"></span></span><span class="erf-status-bar__value" data-band="danger">72%</span></span>
+  </div>
+</div>
+<figcaption><strong>Danger band</strong> – from <span data-claim="claude-status-red-threshold" title="RED_THRESHOLD in thresholds.ts – the context percentage where the Claude status bar turns danger">60</span>% used, <code>--color-error</code>. Announced once on entry: “Context almost full: 72%
+used.” Every percentage change in between is silent; the meter's <code>aria-valuetext</code> holds the exact counts for
+anyone who goes to read it.</figcaption>
+</figure>
+
+<figure class="ds-frame">
+<div aria-hidden="true" class="sb-panel sb-w-480">
+  <div class="sb-panel__body sb-panel__body--tree"></div>
+  <div class="erf-status-bar">
+    <span class="erf-status-bar__lead"><svg class="erf-status-bar__icon" data-icon="git-branch" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" x2="6" y1="3" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg><span class="erf-status-bar__name">feature/designs-alignment</span></span>
+    <span class="erf-status-bar__spacer"></span>
+    <span class="erf-status-bar__values"><span class="erf-status-bar__value" data-git="modified">M3</span><span class="erf-status-bar__value" data-git="untracked">U2</span><span class="erf-status-bar__value" data-git="deleted">D1</span></span>
+  </div>
+</div>
+<figcaption><strong>Git, with changes</strong> – the branch leads; the counts trail, each a git letter and a number in the
+tree's git colours. Each count also carries words for a screen reader (“3 modified”). No live region: counts change
+too often to announce, and the git bar has no bands.</figcaption>
+</figure>
+
+<figure class="ds-frame">
+<div aria-hidden="true" class="sb-panel sb-w-480">
+  <div class="sb-panel__body sb-panel__body--tree"></div>
+  <div class="erf-status-bar">
+    <span class="erf-status-bar__lead"><svg class="erf-status-bar__icon" data-icon="git-branch" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" x2="6" y1="3" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg><span class="erf-status-bar__name">develop</span></span>
+    <span class="erf-status-bar__spacer"></span>
+    <span class="erf-status-bar__values"><span class="erf-status-bar__value erf-status-bar__value--quiet">Clean</span></span>
+  </div>
+</div>
+<figcaption><strong>Git, clean</strong> – “Clean” in the status-line colour. No italic: a slanted 11px word is harder to
+read and says nothing more.</figcaption>
+</figure>
+
+<figure class="ds-frame">
+<div aria-hidden="true" class="sb-panel sb-w-480">
+  <div class="sb-panel__body sb-panel__body--tree"></div>
+  <div class="erf-status-bar">
+    <span class="erf-status-bar__lead"><svg class="erf-status-bar__icon" data-icon="git-branch" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" x2="6" y1="3" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg><span class="erf-status-bar__name">main</span></span>
+    <span class="erf-status-bar__spacer"></span>
+    <span class="erf-status-bar__values"><span class="erf-status-bar__value" data-git="modified">M3</span><span class="erf-status-bar__value" data-band="warning"><svg class="erf-status-bar__icon" data-icon="triangle-alert" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg> Partial</span></span>
+  </div>
+</div>
+<figcaption><strong>Git, partial</strong> – too many changes to count. Today that is an icon with a <code>title</code>,
+which neither the keyboard nor a screen reader reaches. Here it is the word “Partial” after a warning icon, with the full
+sentence (“Too many changes to count – showing some of them”) as visually hidden text beside it.</figcaption>
+</figure>
+
+</div>
+
+<h3 id="collapse">Collapse order</h3>
+<p class="ds-muted">The same bar as the panel narrows. Each step is a container query on the bar, so it follows the
+panel, not the window.</p>
+<div class="ds-frames sb-frames-narrow">
+<figure class="ds-frame">
+<div aria-hidden="true" class="sb-panel sb-w-220">
+  <div class="erf-status-bar">
+    <span class="erf-status-bar__lead"><span class="erf-status-bar__name">Opus 4.8</span><span class="erf-status-bar__badge"><span class="erf-counter">200k</span></span></span>
+    <span class="erf-status-bar__spacer"></span>
+    <span class="erf-status-bar__values"><span class="erf-status-bar__meter"><span class="erf-status-bar__fill" data-band="warning" style="inline-size: 48%"></span></span><span class="erf-status-bar__value" data-band="warning">48%</span></span>
+  </div>
+</div>
+<figcaption><span class="ds-frame__step">1</span><strong>Under 240px</strong> – the meter goes. The percentage still says
+everything the meter drew.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div aria-hidden="true" class="sb-panel sb-w-170">
+  <div class="erf-status-bar">
+    <span class="erf-status-bar__lead"><span class="erf-status-bar__name">Opus 4.8</span><span class="erf-status-bar__badge"><span class="erf-counter">200k</span></span></span>
+    <span class="erf-status-bar__spacer"></span>
+    <span class="erf-status-bar__values"><span class="erf-status-bar__meter"><span class="erf-status-bar__fill" data-band="warning" style="inline-size: 48%"></span></span><span class="erf-status-bar__value" data-band="warning">48%</span></span>
+  </div>
+</div>
+<figcaption><span class="ds-frame__step">2</span><strong>Under 180px</strong> – the badge goes. The window size stays in
+the meter's value text.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div aria-hidden="true" class="sb-panel sb-w-120">
+  <div class="erf-status-bar">
+    <span class="erf-status-bar__lead"><span class="erf-status-bar__name">Sonnet 5.5 (preview)</span><span class="erf-status-bar__badge"><span class="erf-counter">1M</span></span></span>
+    <span class="erf-status-bar__spacer"></span>
+    <span class="erf-status-bar__values"><span class="erf-status-bar__meter"><span class="erf-status-bar__fill" style="inline-size: 12%"></span></span><span class="erf-status-bar__value">12%</span></span>
+  </div>
+</div>
+<figcaption><span class="ds-frame__step">3</span><strong>Narrower still</strong> – the name ellipsises. The value is
+never dropped.</figcaption>
+</figure>
+</div>
+
+<h3 id="resize">Drag the corner</h3>
+<p class="ds-muted">Both bars in a frame you can resize by its bottom-right corner.</p>
+<div class="ds-frame ds-resize" aria-hidden="true">
+  <div class="sb-panel">
+    <div class="erf-status-bar">
+      <span class="erf-status-bar__lead"><span class="erf-status-bar__name">Opus 4.8</span><span class="erf-status-bar__badge"><span class="erf-counter">200k</span></span></span>
+      <span class="erf-status-bar__spacer"></span>
+      <span class="erf-status-bar__values"><span class="erf-status-bar__meter"><span class="erf-status-bar__fill" data-band="warning" style="inline-size: 48%"></span></span><span class="erf-status-bar__value" data-band="warning">48%</span></span>
+    </div>
+    <div class="sb-panel__body sb-panel__body--tree"></div>
+    <div class="erf-status-bar">
+      <span class="erf-status-bar__lead"><svg class="erf-status-bar__icon" data-icon="git-branch" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" x2="6" y1="3" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg><span class="erf-status-bar__name">feature/designs-alignment</span></span>
+      <span class="erf-status-bar__spacer"></span>
+      <span class="erf-status-bar__values"><span class="erf-status-bar__value" data-git="modified">M3</span><span class="erf-status-bar__value" data-git="untracked">U2</span></span>
+    </div>
+  </div>
+</div>
+
+<h2 id="contrast">Contrast</h2>
+<p class="ds-muted">On the strip's surface, <code>--color-bg-tertiary</code>. Text needs 4.5:1; the fill against its track
+is non-text and needs 3:1.</p>
+<table>
+  <thead><tr><th>Part</th><th>Pair</th><th>Ratio</th></tr></thead>
+  <tbody>
+    <tr><td>Status-line text, “Clean”</td><td><code>--color-text-tertiary</code> on <code>--color-bg-tertiary</code></td><td data-contrast="--color-text-tertiary on --color-bg-tertiary" data-min="4.5" data-result="pass">7.06:1 · pass</td></tr>
+    <tr><td>Name, value</td><td><code>--color-text-primary</code> on <code>--color-bg-tertiary</code></td><td data-contrast="--color-text-primary on --color-bg-tertiary" data-min="4.5" data-result="pass">9.53:1 · pass</td></tr>
+    <tr><td>Value, warning</td><td><code>--color-warning</code> on <code>--color-bg-tertiary</code></td><td data-contrast="--color-warning on --color-bg-tertiary" data-min="4.5" data-result="pass">6.63:1 · pass</td></tr>
+    <tr><td>Value, danger</td><td><code>--color-error</code> on <code>--color-bg-tertiary</code></td><td data-contrast="--color-error on --color-bg-tertiary" data-min="4.5" data-result="pass">6.23:1 · pass</td></tr>
+    <tr><td>Git modified</td><td><code>--color-git-modified-light</code> on <code>--color-bg-tertiary</code></td><td data-contrast="--color-git-modified-light on --color-bg-tertiary" data-min="4.5" data-result="pass">10.46:1 · pass</td></tr>
+    <tr><td>Git untracked</td><td><code>--color-git-untracked-light</code> on <code>--color-bg-tertiary</code></td><td data-contrast="--color-git-untracked-light on --color-bg-tertiary" data-min="4.5" data-result="pass">13.42:1 · pass</td></tr>
+    <tr><td>Git deleted</td><td><code>--color-git-deleted-light</code> on <code>--color-bg-tertiary</code></td><td data-contrast="--color-git-deleted-light on --color-bg-tertiary" data-min="4.5" data-result="pass">9.03:1 · pass</td></tr>
+    <tr><td>Git staged</td><td><code>--color-git-staged-light</code> on <code>--color-bg-tertiary</code></td><td data-contrast="--color-git-staged-light on --color-bg-tertiary" data-min="4.5" data-result="pass">11.06:1 · pass</td></tr>
+    <tr><td>Git renamed</td><td><code>--color-git-renamed-light</code> on <code>--color-bg-tertiary</code></td><td data-contrast="--color-git-renamed-light on --color-bg-tertiary" data-min="4.5" data-result="pass">5.27:1 · pass</td></tr>
+    <tr><td>Git conflicted</td><td><code>--color-git-conflicted-light</code> on <code>--color-bg-tertiary</code></td><td data-contrast="--color-git-conflicted-light on --color-bg-tertiary" data-min="4.5" data-result="pass">7.70:1 · pass</td></tr>
+    <tr><td>Fill, safe (3:1)</td><td><code>--color-context-safe</code> on the track, <code>--color-bg-secondary</code></td><td data-contrast="--color-context-safe on --color-bg-secondary" data-min="3" data-result="pass">5.40:1 · pass</td></tr>
+    <tr><td>Fill, warning (3:1)</td><td><code>--color-warning</code> on <code>--color-bg-secondary</code></td><td data-contrast="--color-warning on --color-bg-secondary" data-min="3" data-result="pass">5.94:1 · pass</td></tr>
+    <tr><td>Fill, danger (3:1)</td><td><code>--color-error</code> on <code>--color-bg-secondary</code></td><td data-contrast="--color-error on --color-bg-secondary" data-min="3" data-result="pass">5.59:1 · pass</td></tr>
+    <tr><td>Track against the strip (measured)</td><td><code>--color-bg-secondary</code> on <code>--color-bg-tertiary</code></td><td data-contrast="--color-bg-secondary on --color-bg-tertiary">1.11:1</td></tr>
+  </tbody>
+</table>
+
+<h2 id="keyboard">The keyboard contract</h2>
+<p class="ds-muted">There is nothing to operate, so there is no tab stop and no tooltip that only the pointer can open.
+Everything the bar shows is on screen as text, or in the meter's value text.</p>
+<table class="ds-keys">
+  <thead><tr><th>Key</th><th>Result</th><th>Focus ends on</th><th>Held by</th></tr></thead>
+  <tbody>
+    <tr><td><kbd>Tab</kbd></td><td>Skips the bar.</td><td>The next control after the panel.</td><td>No app test</td></tr>
+    <tr><td>Screen reader, reading</td><td>The bar is a <code>role="group"</code> named for its panel (“Claude Code status”). The meter is <code>role="meter"</code>, named “Claude Code context usage”, with <code>aria-valuetext</code> “Opus 4.8, 48% used, 96k of 200k tokens”. A git count reads as words (“3 modified”), not as “M3”.</td><td>–</td><td><code>ClaudeStatusBar.test.tsx</code> holds the meter's name and value text; no test for the git words</td></tr>
+    <tr><td>Screen reader, live</td><td>One <code>aria-live="polite"</code> region per bar, present and empty from the start. It speaks only when the band changes: “Context usage high: 48% used.”, “Context almost full: 72% used.”, “Context usage back to normal: 20% used.”</td><td>–</td><td>No app test – no live region ships today</td></tr>
+  </tbody>
+</table>
+
+<h2 id="markup">Markup</h2>
+<pre class="ds-code"><code>&lt;div class="erf-status-bar" role="group" aria-label="Claude Code status"&gt;
+  &lt;span class="erf-status-bar__lead"&gt;
+    &lt;span class="erf-status-bar__name"&gt;Opus 4.8&lt;/span&gt;
+    &lt;span class="erf-status-bar__badge"&gt;&lt;span class="erf-counter"&gt;200k&lt;/span&gt;&lt;/span&gt;
+  &lt;/span&gt;
+  &lt;span class="erf-status-bar__spacer"&gt;&lt;/span&gt;
+  &lt;span class="erf-status-bar__values"&gt;
+    &lt;span class="erf-status-bar__meter" role="meter" aria-label="Claude Code context usage"
+          aria-valuemin="0" aria-valuemax="100" aria-valuenow="48"
+          aria-valuetext="Opus 4.8, 48% used, 96k of 200k tokens"&gt;
+      &lt;span class="erf-status-bar__fill" data-band="warning" style="inline-size: 48%"&gt;&lt;/span&gt;
+    &lt;/span&gt;
+    &lt;span class="erf-status-bar__value" data-band="warning"&gt;48%&lt;/span&gt;
+  &lt;/span&gt;
+  &lt;span class="erf-visually-hidden" aria-live="polite"&gt;&lt;!-- set only on a band change --&gt;&lt;/span&gt;
+&lt;/div&gt;
+&lt;!-- A git count: the letter for the eye, the words for a screen reader.
+     &lt;span class="erf-status-bar__value" data-git="modified"&gt;
+       &lt;span aria-hidden="true"&gt;M3&lt;/span&gt;&lt;span class="erf-visually-hidden"&gt;3 modified&lt;/span&gt;
+     &lt;/span&gt; --&gt;</code></pre>
+
+<h2 id="tokens">Tokens</h2>
+<table class="ds-tokens">
+  <thead><tr><th>Part</th><th>Token</th></tr></thead>
+  <tbody>
+    <tr><td>Height</td><td><code>--header-height</code> (<code data-token="--header-height">41px</code>)</td></tr>
+    <tr><td>Surface · top rule</td><td><code>--color-bg-tertiary</code> · <code>--border-width</code> (<code data-token="--border-width">1px</code>) <code>--color-border-default</code></td></tr>
+    <tr><td>Padding · gap</td><td><code>--space-6</code> · <code>--space-4</code> (<code>--space-3</code> inside the lead)</td></tr>
+    <tr><td>Text</td><td>The Status line role: <code>--text-sm</code>, <code>--font-normal</code>, <code>--leading-snug</code>, <code>--color-text-tertiary</code>; name and value <code>--color-text-primary</code>, values <code>tabular-nums</code></td></tr>
+    <tr><td>Meter</td><td>Track <code>--color-bg-secondary</code>, <code>--space-2</code> tall, <code>calc(var(--space-16) * 2)</code> wide; fill <code>--color-context-safe</code>, <code>--color-warning</code>, <code>--color-error</code></td></tr>
+    <tr><td>Collapse widths</td><td>240px and 180px, written once in the container queries (a condition cannot read a custom property)</td></tr>
+  </tbody>
+</table>
+
+<h2 id="consolidation">Adoption: today and proposed</h2>
+<p class="ds-muted">Both shipping bars, as they look today and as this card would draw them. The “today” drawings are
+approximations of the shipping CSS.</p>
+<table class="sb-adopt">
+  <thead><tr><th>Bar</th><th>Today</th><th>Proposed</th><th>What changes</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><code>ClaudeStatusBar.css</code>, the bar rule</td>
+      <td><div aria-hidden="true" class="sb-cell"><div class="sb-today-claude"><span class="sb-today-claude__name">Opus 4.8</span><span class="sb-today-claude__badge">200k</span><span class="sb-today-claude__meter"><span class="sb-today-claude__fill"></span></span><span class="sb-today-claude__pct">48%</span></div></div></td>
+      <td><div aria-hidden="true" class="sb-cell"><div class="erf-status-bar"><span class="erf-status-bar__lead"><span class="erf-status-bar__name">Opus 4.8</span><span class="erf-status-bar__badge"><span class="erf-counter">200k</span></span></span><span class="erf-status-bar__spacer"></span><span class="erf-status-bar__values"><span class="erf-status-bar__meter"><span class="erf-status-bar__fill" data-band="warning" style="inline-size: 48%"></span></span><span class="erf-status-bar__value" data-band="warning">48%</span></span></div></div></td>
+      <td>
+        <ul>
+          <li>Surface: <code>--color-bg-secondary</code> → <code>--color-bg-tertiary</code>. Today's name on its surface: <span data-contrast="--color-text-primary on --color-bg-secondary" data-min="4.5" data-result="pass">8.54:1 · pass</span>.</li>
+          <li>The top rule <code>1px</code> → <code>--border-width</code>.</li>
+          <li>Band colours: the retired <code>--color-warning-bright</code> and <code>--color-error-bright</code> → <code>--color-warning</code> and <code>--color-error</code>.</li>
+          <li>The meter becomes a fixed slot; the spacer takes the free width.</li>
+          <li>The badge becomes an <code>.erf-counter</code>.</li>
+          <li><code>title</code> goes.</li>
+          <li>A live region is added.</li>
+        </ul>
+      </td>
+    </tr>
+    <tr>
+      <td><code>ProjectTree.css</code>, <code>.git-status-bar</code></td>
+      <td><div aria-hidden="true" class="sb-cell"><div class="sb-today-git"><span class="sb-today-git__branch"><svg data-icon="git-branch" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" x2="6" y1="3" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>feature/designs-alignment</span><span class="sb-today-git__counts"><span class="sb-today-git__m">M3</span><span class="sb-today-git__u">U2</span></span></div></div></td>
+      <td><div aria-hidden="true" class="sb-cell"><div class="erf-status-bar"><span class="erf-status-bar__lead"><svg class="erf-status-bar__icon" data-icon="git-branch" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" x2="6" y1="3" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg><span class="erf-status-bar__name">feature/designs-alignment</span></span><span class="erf-status-bar__spacer"></span><span class="erf-status-bar__values"><span class="erf-status-bar__value" data-git="modified">M3</span><span class="erf-status-bar__value" data-git="untracked">U2</span></span></div></div></td>
+      <td>
+        <ul>
+          <li>Text <code>--color-text-secondary</code> → <code>--color-text-tertiary</code>, the status-line colour. Today's pair: <span data-contrast="--color-text-secondary on --color-bg-tertiary" data-min="4.5" data-result="fail">4.15:1 · fail</span>.</li>
+          <li>The branch name ellipsises instead of pushing the counts.</li>
+          <li>Counts carry words.</li>
+          <li>The partial-count icon and its <code>title</code> become the word “Partial”.</li>
+          <li>“Clean” loses its italic.</li>
+        </ul>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<section id="open-defects">
+<h2>Open defects this card names</h2>
+<ul class="ds-muted">
+  <li><strong>Git bar text under 4.5:1.</strong> <code>.git-status-bar</code> sets <code>--color-text-secondary</code> on
+  <code>--color-bg-tertiary</code> (the ratio is in the adoption table above).</li>
+  <li><strong>Retired tokens in the Claude Code bar.</strong> Its amber and red bands read <code>--color-warning-bright</code>
+  and <code>--color-error-bright</code>, both retired (the <a href="../../foundations/colors.html">Colours</a> card).</li>
+  <li><strong>A typed rule.</strong> <code>.terminal-claude-statusbar</code> draws its top rule as <code>1px solid</code>, not
+  <code>--border-width</code>.</li>
+  <li><strong>Information only in <code>title</code>.</strong> The exact token counts and the git bar's partial-count warning
+  live in <code>title</code>, which the keyboard never shows.</li>
+  <li><strong>A band change is silent.</strong> Neither bar has a live region; crossing into the danger band is seen, not heard.</li>
+  <li><strong>No collapse order.</strong> Neither bar decides what goes first when its panel narrows; the git bar's branch
+  name pushes the counts.</li>
+</ul>
+<p class="ds-muted">The band thresholds live in <code>src/main/services/claudeStatus/thresholds.ts</code>; this card does not
+quote them, because a number typed here would drift from the code.</p>
+</section>
+
+<h2 id="related">Related</h2>
+<ul class="ds-muted">
+  <li><a href="../../foundations/type.html#roles">Typography – text styles</a>: the Status line role.</li>
+  <li><a href="../badge/index.html">Badges and counts</a>: the window-size badge and the git letters.</li>
+  <li><a href="../toolbar/index.html">Toolbar</a>: its status read-out is the same role in a different strip.</li>
+  <li><a href="../feedback/index.html">Feedback</a>: how a severity is spoken as a word, not only a colour.</li>
+  <li><a href="../../foundations/motion.html">Motion</a>: the fill's transition stops under reduced motion.</li>
+</ul>
+
+<section id="exceptions">
+<h2>Exceptions</h2>
+<p class="ds-muted">None recorded. A shipping status bar that departs from this card carries a
+<code>deviates:</code> marker at the site and gets a row here, naming the file.</p>
+</section>
+</main>
+</body>
+</html>

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * The comment parse worker's entry (docs/designs/html-preview-comments.md
+ * The comment parse worker's entry (docs/designs/comments/html-preview-comments.md
  * §19 R3-12): loaded in a thread whose `workerData` names its role, the module
  * starts answering on `parentPort` by itself. `node:worker_threads` is mocked
  * at module scope, hence a file of its own; the shell's behaviour on any port

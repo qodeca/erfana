@@ -9,7 +9,7 @@ The guide is Markdown in this repository. Each inventory row should link to the 
 
 ## Write a page
 
-Use an imperative, sentence-case title. Start with one paragraph that tells the reader what the feature does. A how-to page uses short numbered steps, a screenshot when location matters, a problem or result section, and related links. A reference page uses one H2 per feature with **What it does**, **How to reach it**, options and limits. Select controls; use their exact UI labels in bold. Write menu paths with `>` and macOS shortcuts first, followed by Windows. Keep command text in code blocks.
+Use an imperative, sentence-case title. Start with one paragraph that tells the reader what the feature does. A how-to page uses short numbered steps, a screenshot when location matters, a problem or result section, and related links. A reference page uses one H2 per feature with **What it does**, **How to reach it**, options and limits. Select controls; use their exact UI labels in bold. Write menu paths with `>`. Write keyboard shortcuts in the [Writing card](../design-system/system/foundations/writing.html#shortcuts) notation: one `<kbd>` per key combination, macOS symbols in the order ⌃ ⌥ ⇧ ⌘, Windows spelled out with +, macOS first and separated by a slash – `<kbd>⌥⌘M</kbd> / <kbd>Ctrl+Alt+M</kbd>`. In a table with macOS and Windows columns, each cell holds that platform's form. Keep command text in code blocks.
 
 ## Add an image
 

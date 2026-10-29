@@ -12,7 +12,7 @@ An audit of the renderer on 2026-08-31 found nine defects. They share a cause: a
 role or an ARIA attribute was declared without the behaviour it promises, which is
 worse than declaring nothing – a screen reader changes its own behaviour on the
 strength of that promise and then gets nothing back. The design system decides the
-correct pattern for each; see [`docs/design-system/README.md`](design-system/README.md) for which
+correct pattern for each; see [`docs/design-system/README.md` § Defects the cards name](design-system/README.md#defects-the-cards-name) for which
 card governs which defect.
 
 **Fixed in v0.22.0:** the project tree works with the keyboard and announces each
@@ -211,7 +211,7 @@ Pipeline contributors on Windows:
 
 **Workaround**: The percentage and color band remain accurate against the *displayed* window throughout; hover with the mouse (or read `aria-valuetext` via a screen reader) for exact tokens, and treat an `(inferred)` 1M badge as an estimate. There is no workaround for a capped-deployment over-statement — it is an accepted rare-enterprise trade-off (better to over-state for the rare 200k-capped deployment than under-warn the common 1M case).
 
-**Tracking**: Accepted residual limitations, consistent with the issue's degrade-gracefully philosophy. See [`docs/designs/41-model-capability-registry.md`](./designs/41-model-capability-registry.md) §5 (authoritative for model-id parsing and window sizing) and [`docs/designs/216-claude-status-bar.md`](./designs/216-claude-status-bar.md).
+**Tracking**: Accepted residual limitations, consistent with the issue's degrade-gracefully philosophy. See [`docs/designs/context-meter/41-model-capability-registry.md`](./designs/context-meter/41-model-capability-registry.md) §5 (authoritative for model-id parsing and window sizing) and [`docs/designs/context-meter/216-claude-status-bar.md`](./designs/context-meter/216-claude-status-bar.md).
 
 ---
 
@@ -377,7 +377,7 @@ Then close the project and open it again (after editing the global file, restart
 
 **Workaround**: close the project and open it again for items 1, 5, 6 and 8 (restart Erfana first after editing the global file); use `.gitignore` for item 2. Item 7 needs no workaround since v0.23.0.
 
-**Tracking**: [#211](https://github.com/qodeca/erfana/issues/211); design and the full list in [`docs/designs/211-large-project-windows-watcher.md`](./designs/211-large-project-windows-watcher.md) §9–§10; accepted debt in [technical debt § 65](./technical-debt.md#65-accepted-trade-offs-from-211-2026-09). Content-only changes no longer re-read the tree (only git status refreshes for them – see [watcher structural refresh](./performance/watcher-structural-refresh.md)); lazy loading stays with #150.
+**Tracking**: [#211](https://github.com/qodeca/erfana/issues/211); design and the full list in [`docs/designs/large-projects/211-large-project-windows-watcher.md`](./designs/large-projects/211-large-project-windows-watcher.md) §9–§10; accepted debt in [technical debt § 65](./technical-debt.md#65-accepted-trade-offs-from-211-2026-09). Content-only changes no longer re-read the tree (only git status refreshes for them – see [watcher structural refresh](./performance/watcher-structural-refresh.md)); lazy loading stays with #150.
 
 ---
 

@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * The overlay label and the geometry it sits on
- * (docs/designs/html-preview-comments.md §10.2; J-001).
+ * (docs/designs/comments/html-preview-comments.md §10.2; J-001).
  */
 import { afterEach, describe, expect, it } from 'vitest'
 import { clipToViewport, contains, outlineBox, overlaps, snap, viewportOf } from './geometry'

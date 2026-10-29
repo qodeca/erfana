@@ -36,7 +36,7 @@
  * CSP; the handler catches it, records a `csp-missing` failure entry and
  * returns 500 rather than shipping a page with no sandbox (design §1.1, §2.6).
  *
- * HTML Preview comments (docs/designs/html-preview-comments.md §4.2, §6): when
+ * HTML Preview comments (docs/designs/comments/html-preview-comments.md §4.2, §6): when
  * the session carries a comment context, step 12 asks it for the body. It
  * serves an instrumented COPY of a page – an element token on every eligible
  * start tag – only for a document load of an `.html` file that comments are

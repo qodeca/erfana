@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * HTML Preview comments' events go only to the window that owns the view, and
- * only after their schema (docs/designs/html-preview-comments.md §8; SEC-07,
+ * only after their schema (docs/designs/comments/html-preview-comments.md §8; SEC-07,
  * SEC-20).
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'

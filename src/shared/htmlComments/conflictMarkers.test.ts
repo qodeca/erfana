@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Git conflict markers (decision 32, docs/designs/html-preview-comments.md §3;
+ * Git conflict markers (decision 32, docs/designs/comments/html-preview-comments.md §3;
  * U-070–U-076): a marker inside a block damages it, a complete hunk anywhere
  * locks the file, and a lone marker-like line locks nothing.
  */

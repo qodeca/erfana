@@ -2,8 +2,8 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * HTML Preview comments – who is commenting
- * (docs/designs/html-preview-comments.md decision 3, §7.9, §10.7; R-008,
- * R-019; docs/design-system/product/html-comments/identity.html).
+ * (docs/designs/comments/html-preview-comments.md decision 3, §7.9, §10.7; R-008,
+ * R-019; docs/designs/comments/html-comments/identity.html).
  *
  * Two shapes of one form:
  *

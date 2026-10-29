@@ -10,9 +10,9 @@ SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 - **Campaign:** `release-0.21.0`.
 - **Status:** proposed – design review by a reviewer agent on a different model, not the owner
   (owner's decision, 2026-09-25).
-- **Design:** [docs/designs/138-user-guide/](../designs/138-user-guide/README.md), with the
+- **Design:** [docs/designs/user-guide/](../designs/user-guide/README.md), with the
   [feature inventory](../user-guide/feature-inventory.md) (moved there in #158) and
-  [research notes](../designs/138-user-guide/research.md).
+  [research notes](../designs/user-guide/research.md).
 
 This page is the build contract. The design explains *what* and *why*; this page says *in which
 order*, *which files*, and *how each step is proven*.
@@ -143,7 +143,7 @@ The exact Claude Code variable honoured for the token is fixed in step 1 (spike)
 - `docs/user-guide/**/*.md`;
 - the five folded pages;
 - `docs/README.md`, `CLAUDE.md`, `BACKWARD_COMPATIBILITY.md`, `docs/features/README.md`;
-- `docs/designs/138-user-guide/*.md`;
+- `docs/designs/user-guide/*.md`;
 - every tracked `.md` file that links into `docs/user-guide/`.
 
 `--all` reports on every tracked `.md` file but only warns, so existing debt elsewhere is measured
@@ -179,8 +179,8 @@ misleading sentence.
 
 External URLs are not fetched: the check makes no network calls.
 
-**This is a trust boundary** (it reads contributor-controlled Markdown, and the local gate runs it
-through `.xezar/checks/repository-checks.sh`). Each threat and what bounds it:
+**This is a trust boundary** (it reads contributor-controlled Markdown, and the local checks run it
+as `npm run check:links`). Each threat and what bounds it:
 
 | Threat | Bound |
 |---|---|
@@ -207,8 +207,8 @@ args, the same `recordVideo` on CI, the same 1280×800 size). Verified by runnin
 ### 3.6 Requirements from #139 (R138-1…11)
 
 #139's README demo is recorded by this script, not by a second one. Its spec
-([`docs/designs/139-readme-redesign/README.md`](https://github.com/qodeca/erfana/pull/140), draft
-PR #140) hands these requirements to #138; the numbering is #140's, so both specs name the same
+([`docs/designs/readme/README.md`](../designs/readme/README.md), first drafted in PR #140 and
+implemented in #139) hands these requirements to #138; the numbering is #140's, so both specs name the same
 row. Leader decisions of 2026-09-25 apply to both: one 1280×800 content size, WebP from this
 script's `encode.mjs`, and the privacy pass over the demo's frames. #139 ticks each row against
 #138's merged code before it builds on it.
@@ -368,7 +368,7 @@ Unit tests (`scripts/capture/*.test.mjs`):
 ### Step 5b – README demo scenario (for #139)
 
 Write `scenes/readme-demo.capture.ts` per #139's storyboard and the design's
-[Loop for #139](../designs/138-user-guide/README.md#loop-for-139), and its four manifest rows.
+[Loop for #139](../designs/user-guide/README.md#loop-for-139), and its four manifest rows.
 
 **Verify:**
 
@@ -465,7 +465,7 @@ The PR body carries:
 
 **Not changed:**
 
-- `src/**`, `.github/workflows/**`, `.xezar/**`;
+- `src/**`, `.github/workflows/**`;
 - `playwright.config.ts`;
 - `package-lock.json`;
 - `README.md` (it belongs to #139).
@@ -479,7 +479,7 @@ Every stage has an exit, and a failed run leaves the committed tree as it was:
 - **Electron is closed in a `finally`** through `forceCloseApp` (destroys the windows, skips the
   quit prompt). Closing the app kills the PTY, and with it `claude`.
 - **The script kills only child PIDs it started itself.** It never matches processes by
-  command-line pattern (`.xezar/CLAUDE.md`).
+  command-line pattern (`CLAUDE.md` § Process).
 - **Agent scenes have a 5-minute timeout each.** A timeout is a scene failure (exit 1), never a
   screenshot of a half-finished state.
 - **Nothing is retried silently.** `--only` exists so a failed row can be re-run on purpose.

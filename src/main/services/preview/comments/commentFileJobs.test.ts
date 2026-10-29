@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Comment file jobs and the document cache they share
- * (docs/designs/html-preview-comments.md §19 R3-12). The jobs themselves are
+ * (docs/designs/comments/html-preview-comments.md §19 R3-12). The jobs themselves are
  * exercised end to end by the draft, opener, list and writer suites through
  * the in-process runner; this suite pins the dispatcher, the cache rules and
  * the splice helpers main relies on.

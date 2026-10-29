@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * HTML Preview comments – screen-reader announcements and inner steps
- * (docs/designs/html-preview-comments.md §10.9; docs/design-system Feedback
+ * (docs/designs/comments/html-preview-comments.md §10.9; docs/design-system Feedback
  * card, "telling a screen reader").
  *
  * - {@link useLiveText}: the text for an ALWAYS-MOUNTED live region. Each

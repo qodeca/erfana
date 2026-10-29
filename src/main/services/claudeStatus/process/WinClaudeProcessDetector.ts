@@ -32,7 +32,7 @@
  * to the trusted System32 powershell dir to defeat current-directory DLL-planting.
  * Every failure path is fail-closed (`{ running: false }`).
  *
- * @see docs/designs/216-claude-status-bar.md §10
+ * @see docs/designs/context-meter/216-claude-status-bar.md §10
  */
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'

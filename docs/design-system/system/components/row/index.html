@@ -1,12 +1,13 @@
-<!-- @card group="Components" name="Rows & lists" subtitle="One selected state instead of four, and the arrow-key contract the tree is missing" status="decided" reviewed="2026-09-01" -->
+<!-- @card group="Components" name="Rows and lists" subtitle="One selected state instead of four, the arrow-key contract the file tree keeps, and a route that needs no drag" status="decided" reviewed="2026-10-28" answers="Build a list or tree row; Show a hostname" -->
 <!-- SPDX-License-Identifier: GPL-3.0-only -->
 <!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Erfana — rows and lists</title>
+<title>Rows and lists – Erfana design system</title>
 <link rel="stylesheet" href="../../../tokens.css">
 <link rel="stylesheet" href="../../../ds.css">
 <link rel="stylesheet" href="./row.css">
@@ -15,12 +16,14 @@
   .stage { display: flex; gap: var(--space-16); flex-wrap: wrap; align-items: flex-start; }
   .list-frame { width: 340px; background: var(--color-bg-tertiary);
                 border: var(--border-width) solid var(--color-border-default); padding: var(--space-4) 0; }
-  .notes { max-width: 42ch; }
+  /* The notes take the space beside the frame, up to the reading measure. */
+  .notes { flex: 1 1 32ch; max-width: var(--ds-measure); }
+  .ds-frame .list-frame { width: auto; }
   .states { display: flex; flex-direction: column; gap: var(--border-width);
             background: var(--color-border-default);
             border: var(--border-width) solid var(--color-border-default); width: 340px; }
   .state-demo { background: var(--color-bg-tertiary); padding: var(--space-2) 0; }
-  .state-name { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-tertiary);
+  .state-name { font-family: var(--font-mono); font-size: var(--ds-text-small); color: var(--color-text-tertiary);
                 padding: var(--space-2) var(--space-8) 0; }
   /* The host demo is deliberately squeezable: wrapping only shows when a host
      actually stops fitting, and the old elide survived unseen because no demo
@@ -30,90 +33,171 @@
   .host-frame { background: var(--color-bg-tertiary);
                 border: var(--border-width) solid var(--color-border-default); padding: var(--space-4) 0;
                 overflow-x: auto; }
-  .host-width { display: flex; align-items: center; gap: var(--space-4); margin-bottom: var(--space-8); }
-  .host-width input { flex: 1 1 auto; }
+  .host-frame.ds-resize { inline-size: 200px; }
+  /* A rough menu for the "Move to…" sketch – the Menu card owns the real one. */
+  .erf-menu-sketch { background: var(--color-bg-tertiary); border: var(--border-width) solid var(--color-border-subtle);
+                     padding: var(--space-2) 0; }
 </style>
 </head>
 <body>
-
+<nav class="ds-crumbs" aria-label="Breadcrumb"><a href="../../../index.html">Erfana design system</a> <span aria-hidden="true">/</span> <a href="../../../index.html#components">Components</a> <span aria-hidden="true">/</span> <span aria-current="page">Rows and lists</span></nav>
+<main>
 <h1>Rows and lists</h1>
-<p class="ds-lede">
-  The densest thing in Erfana. A file tree row, a picker option, a host in the permission band — all the
-  same primitive. <strong>Click into the list, then use the arrow keys.</strong>
+<p class="ds-meta"><span class="ds-status" data-status="decided">decided</span> reviewed 2026-10-28</p>
+<p class="ds-lede" id="decision">
+  The densest thing in Erfana. A file tree row, a picker option, a host in the permission band – all the
+  same primitive: one selected state, one keyboard contract, and no state carried by colour alone. The frames
+  below walk the keys one press at a time.
 </p>
 
 <div class="ds-note">
   <strong>The decision.</strong> Erfana has four different ways of showing that a row is selected: a lime
-  left border in the tree, an outline in the file picker, and a border-colour swap in two other pickers —
+  left border in the tree, an outline in the file picker, and a border-colour swap in two other pickers –
   where hover and selected are so close they are hard to tell apart.
   <strong>The tree's version wins:</strong> a filled background plus a 2px lime edge. It is the most used,
-  it survives losing focus, and the edge marker is Erfana's own signature — the activity bar uses the same
+  it survives losing focus, and the edge marker is Erfana's own signature – the activity bar uses the same
   idea for the active panel.
 </div>
 
 <div class="ds-note">
   <strong>Every class here is prefixed <code>erf-</code>.</strong> Not cosmetic. Mermaid puts
   <code>class="row"</code> on gitGraph commit labels and on its generic label path, and Erfana injects that
-  SVG with <code>innerHTML</code> — so a bare global <code>.row</code> would reach into diagram labels in
+  SVG with <code>innerHTML</code> – so a bare global <code>.row</code> would reach into diagram labels in
   the preview and in exported images. Nothing defines <code>.row</code> in the app today, which is the only
   reason this has never bitten.
 </div>
 
-<h2>Live — arrow keys work</h2>
+<h2 id="keyboard">The keyboard contract</h2>
+<p class="ds-muted">Where each key leaves focus in the tree. The shipping file tree is held to it by
+<code>ProjectTree</code>'s keyboard tests (#87, #88, #89).</p>
+<table class="ds-keys">
+  <thead><tr><th>Key</th><th>Result</th><th>Focus ends on</th></tr></thead>
+  <tbody>
+    <tr><td><kbd>Tab</kbd></td><td>Enters the list <strong>once</strong> – not once per row.</td><td>The remembered row.</td></tr>
+    <tr><td><kbd>↑</kbd> <kbd>↓</kbd></td><td>Move between visible rows.</td><td>The previous or next row.</td></tr>
+    <tr><td><kbd>→</kbd></td><td>On a closed folder, expand it; on an open one, step in.</td><td>The folder, then its first child.</td></tr>
+    <tr><td><kbd>←</kbd></td><td>On an open folder, collapse it; on a leaf, go to the parent.</td><td>The folder, or the parent.</td></tr>
+    <tr><td><kbd>Home</kbd> <kbd>End</kbd></td><td>First and last visible row.</td><td>That row.</td></tr>
+    <tr><td><kbd>Enter</kbd></td><td>Open the file.</td><td>The opened editor.</td></tr>
+  </tbody>
+</table>
 
-<div class="stage">
-  <div class="list-frame">
-    <ul class="erf-row-list" role="tree" aria-label="Project files" id="list" tabindex="0"></ul>
-  </div>
-  <div class="notes">
-    <h2 style="margin-top:0">The keyboard contract</h2>
-    <table>
-      <tbody>
-        <tr><td><code>Tab</code></td><td>Enters the list <strong>once</strong> — not once per row.</td></tr>
-        <tr><td><code>↑ ↓</code></td><td>Move between rows.</td></tr>
-        <tr><td><code>→ ←</code></td><td>Expand / collapse a folder. On a leaf, ← jumps to its parent.</td></tr>
-        <tr><td><code>Home End</code></td><td>First and last row.</td></tr>
-        <tr><td><code>Enter</code></td><td>Open.</td></tr>
-      </tbody>
-    </table>
-    <div class="ds-note" style="margin-top: var(--space-8)">
-      <strong>One Tab stop, not one per row.</strong> A tree of 400 files with a Tab stop each is
-      unusable — that is why the roving pattern exists: the list holds the tab stop and moves focus
-      internally with arrows.
-      <br><br>
-      <strong>The file tree now follows this contract</strong> (#87, #88, #89). It uses a
-      <strong>roving tabindex</strong>, not the <code>aria-activedescendant</code> this demo uses: the row
-      that has focus carries <code>tabIndex="0"</code> and every other row <code>-1</code>. The tree is
-      virtualised, so only the rows in view are in the DOM, and roving keeps real DOM focus on a row. That
-      is what dnd-kit, focus recovery after a rename, and the ring all key off. The focused row and the row
-      being dragged are always kept mounted. Each row states <code>aria-level</code>,
-      <code>aria-posinset</code> and <code>aria-setsize</code>, because assistive tech cannot count rows
-      that are not rendered.
-      <br><br>
-      Before that, the tree had the inverse. <code>ProjectTreeNode.tsx</code> spread dnd-kit's drag
-      attributes onto every row, and <code>useDraggable</code> defaults to <code>tabIndex: 0</code> plus
-      <code>role="button"</code>, so every row was a Tab stop that no key operated. The fix had to drop
-      those attributes first: they put <code>0</code> on every row, and roving needs <code>0</code> on
-      exactly one. The tree keeps only dnd-kit's pointer listeners.
-    </div>
-  </div>
+<h3 id="sequence">One pass through it, frame by frame</h3>
+<div class="ds-frames">
+<figure class="ds-frame">
+<div class="list-frame" aria-hidden="true">
+  <div class="erf-row erf-row--selected erf-row--focus" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">README.md</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"><svg data-icon="chevron-down" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="m6 9 6 6 6-6"/></svg></span><span class="erf-row__name">src</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 1 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">PreviewChromeBand.tsx</span><span class="erf-row__badge" data-git="untracked">U</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 1 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">usePreviewBounds.ts</span><span class="erf-row__badge" data-git="modified">M</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 1 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">toastService.ts</span><span class="erf-row__badge" data-git="deleted">D</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">package.json</span></div>
+</div>
+<figcaption><span class="ds-frame__step">1</span><strong><kbd>Tab</kbd></strong> – Enters the tree <strong>once</strong>. Focus lands on the remembered row – here the first.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div class="list-frame" aria-hidden="true">
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">README.md</span></div>
+  <div class="erf-row erf-row--selected erf-row--focus" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"><svg data-icon="chevron-down" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="m6 9 6 6 6-6"/></svg></span><span class="erf-row__name">src</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 1 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">PreviewChromeBand.tsx</span><span class="erf-row__badge" data-git="untracked">U</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 1 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">usePreviewBounds.ts</span><span class="erf-row__badge" data-git="modified">M</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 1 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">toastService.ts</span><span class="erf-row__badge" data-git="deleted">D</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">package.json</span></div>
+</div>
+<figcaption><span class="ds-frame__step">2</span><strong><kbd>↓</kbd></strong> – Next visible row.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div class="list-frame" aria-hidden="true">
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">README.md</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"><svg data-icon="chevron-down" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="m6 9 6 6 6-6"/></svg></span><span class="erf-row__name">src</span></div>
+  <div class="erf-row erf-row--selected erf-row--focus" style="padding-left: calc(var(--space-4) + 1 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">PreviewChromeBand.tsx</span><span class="erf-row__badge" data-git="untracked">U</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 1 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">usePreviewBounds.ts</span><span class="erf-row__badge" data-git="modified">M</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 1 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">toastService.ts</span><span class="erf-row__badge" data-git="deleted">D</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">package.json</span></div>
+</div>
+<figcaption><span class="ds-frame__step">3</span><strong><kbd>→</kbd> on an open folder</strong> – Steps into its first child.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div class="list-frame" aria-hidden="true">
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">README.md</span></div>
+  <div class="erf-row erf-row--selected erf-row--focus" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"><svg data-icon="chevron-down" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="m6 9 6 6 6-6"/></svg></span><span class="erf-row__name">src</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 1 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">PreviewChromeBand.tsx</span><span class="erf-row__badge" data-git="untracked">U</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 1 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">usePreviewBounds.ts</span><span class="erf-row__badge" data-git="modified">M</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 1 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">toastService.ts</span><span class="erf-row__badge" data-git="deleted">D</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">package.json</span></div>
+</div>
+<figcaption><span class="ds-frame__step">4</span><strong><kbd>←</kbd> on a leaf</strong> – Jumps to the parent folder.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div class="list-frame" aria-hidden="true">
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">README.md</span></div>
+  <div class="erf-row erf-row--selected erf-row--focus" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"><svg data-icon="chevron-right" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="m9 18 6-6-6-6"/></svg></span><span class="erf-row__name">src</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">package.json</span></div>
+</div>
+<figcaption><span class="ds-frame__step">5</span><strong><kbd>←</kbd> on an open folder</strong> – Collapses it. Focus stays on the folder.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div class="list-frame" aria-hidden="true">
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">README.md</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"><svg data-icon="chevron-right" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="m9 18 6-6-6-6"/></svg></span><span class="erf-row__name">src</span></div>
+  <div class="erf-row erf-row--selected erf-row--focus" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">package.json</span></div>
+</div>
+<figcaption><span class="ds-frame__step">6</span><strong><kbd>End</kbd></strong> – Last visible row.</figcaption>
+</figure>
 </div>
 
-<h2>An origin that does not fit wraps — nothing is ever cut</h2>
+<h3 id="markup">The markup</h3>
+<p class="ds-muted">Roving <code>tabindex</code>: exactly one row is <code>0</code>. A folder's children sit in a
+nested <code>role="group"</code> that is a sibling of the folder's row, never inside it – a treeitem that wraps
+its children makes the folder's name swallow its contents (#89). Every row states its level, position and set
+size, because the tree is virtualised and assistive tech cannot count rows that are not rendered. The git
+letter is drawn <code>aria-hidden</code> and spoken from visually hidden text (“, untracked”) – real text is read in
+order and survives translation, where an <code>aria-label</code> on a span may not be read at all.</p>
+<pre class="ds-code"><code>&lt;div role=&quot;tree&quot; aria-label=&quot;Project files&quot;&gt;
+  &lt;div role=&quot;treeitem&quot; tabindex=&quot;0&quot;  aria-level=&quot;1&quot; aria-posinset=&quot;1&quot; aria-setsize=&quot;3&quot;
+       aria-selected=&quot;true&quot;&gt;README.md&lt;/div&gt;
+  &lt;div role=&quot;treeitem&quot; tabindex=&quot;-1&quot; aria-level=&quot;1&quot; aria-posinset=&quot;2&quot; aria-setsize=&quot;3&quot;
+       aria-expanded=&quot;true&quot;&gt;src&lt;/div&gt;
+  &lt;div role=&quot;group&quot;&gt;
+    &lt;div role=&quot;treeitem&quot; tabindex=&quot;-1&quot; aria-level=&quot;2&quot; aria-posinset=&quot;1&quot; aria-setsize=&quot;3&quot;&gt;
+      PreviewChromeBand.tsx&lt;span aria-hidden=&quot;true&quot;&gt;U&lt;/span&gt;&lt;span class=&quot;erf-visually-hidden&quot;&gt;, untracked&lt;/span&gt;&lt;/div&gt;
+    …
+  &lt;/div&gt;
+  &lt;div role=&quot;treeitem&quot; tabindex=&quot;-1&quot; aria-level=&quot;1&quot; aria-posinset=&quot;3&quot; aria-setsize=&quot;3&quot;&gt;package.json&lt;/div&gt;
+&lt;/div&gt;</code></pre>
+
+<div class="ds-note">
+  <strong>One Tab stop, not one per row.</strong> A tree of 400 files with a Tab stop each is
+  unusable – that is why the roving pattern exists: the list holds the tab stop and moves focus
+  internally with arrows.
+  <br><br>
+  <strong>The file tree now follows this contract</strong> (#87, #88, #89). It uses a
+  <strong>roving tabindex</strong>, not the <code>aria-activedescendant</code> an earlier version of this card used: the row
+  that has focus carries <code>tabIndex="0"</code> and every other row <code>-1</code>. The tree is
+  virtualised, so only the rows in view are in the DOM, and roving keeps real DOM focus on a row. That
+  is what dnd-kit, focus recovery after a rename, and the ring all key off. The focused row and the row
+  being dragged are always kept mounted. Each row states <code>aria-level</code>,
+  <code>aria-posinset</code> and <code>aria-setsize</code>, because assistive tech cannot count rows
+  that are not rendered.
+  <br><br>
+  Before that, the tree had the inverse. <code>ProjectTreeNode.tsx</code> spread dnd-kit's drag
+  attributes onto every row, and <code>useDraggable</code> defaults to <code>tabIndex: 0</code> plus
+  <code>role="button"</code>, so every row was a Tab stop that no key operated. The fix had to drop
+  those attributes first: they put <code>0</code> on every row, and roving needs <code>0</code> on
+  exactly one. The tree keeps only dnd-kit's pointer listeners.
+</div>
+
+<h2>An origin that does not fit wraps – nothing is ever cut</h2>
 
 <div class="stage">
   <div>
-    <div class="host-width">
-      <label for="w">Width</label>
-      <input type="range" id="w" min="90" max="420" value="200">
-      <span id="wval" style="font-family: var(--font-mono); font-size: var(--text-sm)"></span>
-    </div>
-    <div class="host-frame" id="hostFrame"></div>
+    <p class="ds-muted">Drag the frame's bottom-right corner to narrow it.</p>
+    <div class="host-frame ds-resize" data-generated="host-elide"><div class="erf-row"><span class="erf-host" dir="ltr" aria-hidden="true">a-very-long-subdomain.<wbr>cdn.<wbr>evil.<wbr>com</span><span class="erf-host__announced">Host https://a-very-long-subdomain.cdn.evil.com</span></div><div class="erf-row"><span class="erf-host" dir="ltr" aria-hidden="true">cdn.<wbr>jsdelivr.<wbr>net</span><span class="erf-host__announced">Host https://cdn.jsdelivr.net</span></div><div class="erf-row"><span class="erf-host" dir="ltr" aria-hidden="true">evil.<wbr>com<span class="erf-host__port">:8443</span></span><span class="erf-host__announced">Host https://evil.com:8443</span></div><div class="erf-row"><span class="erf-host" dir="ltr" aria-hidden="true"><span class="erf-host__scheme">http://</span>localhost<span class="erf-host__port">:3000</span></span><span class="erf-host__announced">Host http://localhost:3000</span></div><div class="erf-row"><span class="erf-host" dir="ltr" aria-hidden="true">evil.<wbr>com</span><span class="erf-host__announced">Host https://evil.com</span></div><div class="erf-row"><span class="erf-host" dir="ltr" aria-hidden="true">xn--80ak6aa92e.<wbr>com</span><span class="erf-host__announced">Host https://xn--80ak6aa92e.com</span></div><div class="erf-row"><span class="erf-host" dir="ltr" aria-hidden="true">xn--mgbh0fb.<wbr>xn--kgbechtv.<wbr>evil.<wbr>com</span><span class="erf-host__announced">Host https://xn--mgbh0fb.xn--kgbechtv.evil.com</span></div><div class="erf-row"><span class="erf-host" dir="ltr" aria-hidden="true">averyveryverylongregistrabledomainname.<wbr>example</span><span class="erf-host__announced">Host https://averyveryverylongregistrabledomainname.example</span></div><div class="erf-row"><span class="erf-host" dir="ltr" aria-hidden="true">assets.<wbr>tracking.<wbr>eu-west-1.<wbr>metrics.<wbr>a-very-long-tenant-name.<wbr>example.<wbr>co.<wbr>uk</span><span class="erf-host__announced">Host https://assets.tracking.eu-west-1.metrics.a-very-long-tenant-name.example.co.uk</span></div><div class="erf-row"><span class="erf-host" dir="ltr" aria-hidden="true">onesingleunbreakablelabelwithnodotsatallthatcannotwrapatalabelboundary.<wbr>example</span><span class="erf-host__announced">Host https://onesingleunbreakablelabelwithnodotsatallthatcannotwrapatalabelboundary.example</span></div></div>
   </div>
   <div class="notes">
-    <div class="ds-note" style="margin-top:0">
-      <strong>Drag the slider until the hosts stop fitting.</strong> Every one must still end in its
-      registrable domain — the part that decides whether you are about to trust <code>evil.com</code>.
+    <div class="ds-note">
+      <strong>Narrow the frame until the hosts stop fitting.</strong> Every one must still end in its
+      registrable domain – the part that decides whether you are about to trust <code>evil.com</code>.
       If any row ends up reading <code>cdn.jsdelivr…</code>, the control is broken. Here none can:
       they wrap onto a second line instead of losing an end.
     </div>
@@ -130,21 +214,23 @@
       absence of one: a host that does not fit wraps. There is no truncated end, so there is no wrong end
       to truncate, and the rule needs to know nothing about the host's structure.
       <br><br>
-      A three-element flex front-elide was built first and did work — the prefix shrank and elided, the
+      A three-element flex front-elide was built first and did work – the prefix shrank and elided, the
       domain refused to. It is rejected for a different reason: it has to be told where the registrable
       domain begins, and only the Public Suffix List knows that. <code>Last two labels</code> is wrong for
       <code>example.co.uk</code>, and a front-elide cutting at the <em>wrong</em> boundary is worse than no
       invariant at all, because it looks like one. Erfana carries no PSL. If one ever arrives for another
-      reason, revisit — one-line rows read better than wrapped ones.
+      reason, revisit – one-line rows read better than wrapped ones.
     </div>
     <div class="ds-note">
-      <strong>A row grants an origin, so a row has to show one — without becoming unreadable.</strong>
+      <strong>A row grants an origin, so a row has to show one – without becoming unreadable.</strong>
       The scheme and the port are drawn <em>only when they are not the default</em>: the scheme when it
       is not <code>https</code>, the port when it is not the scheme's own. So the ordinary row is
       exactly what it always was, and <code>http://localhost:3000</code> is legible <em>because</em> it
-      looks different. Both parts are dimmed with <code>--color-text-tertiary</code> — never
-      <code>--color-text-secondary</code>, which measures 3.72:1 here and fails AA. De-emphasised is
-      not hard to read.
+      looks different. Both parts are dimmed with <code>--color-text-tertiary</code>
+      (<span data-contrast="--color-text-tertiary on --color-bg-tertiary" data-min="4.5" data-result="pass">7.06:1 · pass</span> on the tree) – never
+      <code>--color-text-secondary</code>, which measures
+      <span data-claim="contrast-secondary-on-tertiary" title="--color-text-secondary on --color-bg-tertiary, the sidebar and tree">4.15</span>:1 on the same
+      <code>--color-bg-tertiary</code> and fails AA for text this size. De-emphasised is not hard to read.
       <br><br>
       <strong>Neither gets a <code>&lt;wbr&gt;</code>.</strong> Break hints mark <em>preferred</em>
       break points, so a part with no hint beside it stays attached to the host unless the line
@@ -152,22 +238,24 @@
       two lines and reading as two separate things. Only the port carries
       <code>white-space: nowrap</code>, so the number itself never splits; the last label and the port
       are deliberately <em>not</em> wrapped together in a nowrap group, because that group could then
-      overflow the row instead of wrapping — and overflowing is how a host stops being fully visible.
+      overflow the row instead of wrapping – and overflowing is how a host stops being fully visible.
     </div>
     <div class="ds-note">
       <strong>A trailing dot is normalised away, not refused.</strong> <code>evil.com.</code> and
       <code>evil.com</code> are the same name to a resolver, and a CSP host-source has no empty-label
       production. Refusing it would produce a blocked row that gets an Allow button the boundary then
-      rejects — <strong>a button that lies, which is worse than no button</strong>. One trailing dot is
+      rejects – <strong>a button that lies, which is worse than no button</strong>. One trailing dot is
       stripped; <code>example.com..</code> is not a host and stays refused.
     </div>
     <div class="ds-note">
       <strong>Two things CSS cannot decide.</strong>
       Truncation is not the only way to lie about a host: <code>аpple.com</code> with a Cyrillic <code>а</code>
       truncates perfectly and is still a different domain. Render the punycode form when the label mixes
-      scripts. And the accessible name must carry the <em>full</em> host — <code>title</code> is unreachable
-      by keyboard and by touch, so it is not a substitute for <code>aria-label</code>. The
-      <code>&lt;wbr&gt;</code> break hints the component inserts after each dot must not reach that name.
+      scripts. And what a screen reader hears must be the <em>full</em> host, in real text: the row draws the
+      host <code>aria-hidden</code> and puts a visually hidden copy beside it (<code>.erf-host__announced</code>,
+      “Host https://evil.com”). Not <code>title</code> – unreachable by keyboard and by touch – and not
+      <code>aria-label</code> on the span – ARIA does not let a generic element be named, so a screen reader may
+      drop it. The <code>&lt;wbr&gt;</code> break hints after each dot stay in the drawn copy only.
     </div>
   </div>
 </div>
@@ -175,17 +263,43 @@
 <h2>Every state</h2>
 
 <div class="stage">
-  <div class="states" id="states"></div>
+  <div class="states" aria-hidden="true">
+  <div class="state-demo"><div class="state-name">resting</div><div class="erf-row "><span class="erf-row__glyph"></span><span class="erf-row__name">PreviewChromeBand.tsx</span></div></div>
+  <div class="state-demo"><div class="state-name">hover</div><div class="erf-row erf-row--hover"><span class="erf-row__glyph"></span><span class="erf-row__name">PreviewChromeBand.tsx</span></div></div>
+  <div class="state-demo"><div class="state-name">selected</div><div class="erf-row erf-row--selected"><span class="erf-row__glyph"></span><span class="erf-row__name">PreviewChromeBand.tsx</span></div></div>
+  <div class="state-demo"><div class="state-name">focused</div><div class="erf-row erf-row--focus"><span class="erf-row__glyph"></span><span class="erf-row__name">PreviewChromeBand.tsx</span></div></div>
+  <div class="state-demo"><div class="state-name">dragging</div><div class="erf-row erf-row--dragging"><span class="erf-row__glyph"></span><span class="erf-row__name">PreviewChromeBand.tsx</span></div></div>
+  <div class="state-demo"><div class="state-name">drop target</div><div class="erf-row erf-row--drop"><span class="erf-row__glyph"></span><span class="erf-row__name">PreviewChromeBand.tsx</span></div></div>
+  <div class="state-demo"><div class="state-name">drop rejected</div><div class="erf-row erf-row--drop-invalid"><span class="erf-row__glyph"></span><span class="erf-row__name">PreviewChromeBand.tsx</span></div></div>
+  <div class="state-demo"><div class="state-name">cut to clipboard</div><div class="erf-row erf-row--cut"><span class="erf-row__glyph"></span><span class="erf-row__name">PreviewChromeBand.tsx</span></div></div>
+  <div class="state-demo"><div class="state-name">cut + focused</div><div class="erf-row erf-row--cut erf-row--focus"><span class="erf-row__glyph"></span><span class="erf-row__name">PreviewChromeBand.tsx</span><span class="erf-row__badge" data-git="modified">M</span></div></div>
+</div>
   <div class="notes">
-    <div class="ds-note" style="margin-top:0">
-      <strong>Never colour alone.</strong> The git badge carries a letter, not just a hue. Cut rows get a
-      dashed underline as well as fading. Drop targets get a solid edge. Someone who cannot separate the
-      colours still sees every state.
+    <div class="ds-note">
+      <strong>Never colour alone.</strong> The git badge carries a letter, not just a hue. A cut row gets a
+      dashed underline as well as a dimmer name. A drop target gets a solid edge, a rejected drop a dashed one.
+      Someone who cannot separate the colours still sees every state.
     </div>
     <div class="ds-note">
       <strong>Hover and selected must not look alike.</strong> Hover is a flat background change.
       Selected adds the lime edge. In today's file picker they share one declaration, so a pointer
       passing over a row looks identical to the row you chose.
+    </div>
+    <div class="ds-note">
+      <strong>Cut dims the name, not the row.</strong> The name turns <code>--color-text-tertiary</code>
+      (<span data-contrast="--color-text-tertiary on --color-bg-tertiary" data-min="4.5" data-result="pass">7.06:1 · pass</span>) and gains the dashed
+      underline. An <code>opacity</code> fade would dim the badge and the focus ring with it – the “cut + focused”
+      frame keeps a full-strength ring. <code>ProjectTree.css</code> still ships the fade, at
+      <code>opacity: <span data-claim="tree-cut-opacity" title="opacity ProjectTree.css fades a cut row to">0.6</span></code>; adoption replaces it.
+    </div>
+    <div class="ds-note">
+      <strong>The drop edge is solid <code>--color-accent-drag</code>.</strong> It measures
+      <span data-contrast="--color-accent-drag on --color-bg-tertiary" data-min="3" data-result="pass">6.95:1 · pass</span> against the tree and
+      <span data-contrast="--color-accent-drag on --color-accent-drag-bg over --color-bg-tertiary" data-min="3" data-result="pass">4.68:1 · pass</span>
+      against the drop fill. The <code>--color-accent-drag-border</code> tint it replaces composites to
+      <span data-contrast="--color-accent-drag-border on --color-bg-tertiary over --color-bg-tertiary" data-min="3" data-result="fail">1.84:1 · fail</span> –
+      the one shape that says “drops here” was the faintest line on screen (WCAG 1.4.11 asks 3:1 of a state
+      indicator).
     </div>
   </div>
 </div>
@@ -193,19 +307,65 @@
 <h2>All six git states</h2>
 
 <div class="stage">
-  <div class="states" id="badges"></div>
+  <div class="states" aria-hidden="true">
+  <div class="state-demo"><div class="state-name">modified</div><div class="erf-row"><span class="erf-row__glyph"></span><span class="erf-row__name">usePreviewBounds.ts</span><span class="erf-row__badge" data-git="modified">M</span></div></div>
+  <div class="state-demo"><div class="state-name">untracked</div><div class="erf-row"><span class="erf-row__glyph"></span><span class="erf-row__name">usePreviewBounds.ts</span><span class="erf-row__badge" data-git="untracked">U</span></div></div>
+  <div class="state-demo"><div class="state-name">deleted</div><div class="erf-row"><span class="erf-row__glyph"></span><span class="erf-row__name">usePreviewBounds.ts</span><span class="erf-row__badge" data-git="deleted">D</span></div></div>
+  <div class="state-demo"><div class="state-name">staged</div><div class="erf-row"><span class="erf-row__glyph"></span><span class="erf-row__name">usePreviewBounds.ts</span><span class="erf-row__badge" data-git="staged">A</span></div></div>
+  <div class="state-demo"><div class="state-name">renamed</div><div class="erf-row"><span class="erf-row__glyph"></span><span class="erf-row__name">usePreviewBounds.ts</span><span class="erf-row__badge" data-git="renamed">R</span></div></div>
+  <div class="state-demo"><div class="state-name">conflicted</div><div class="erf-row"><span class="erf-row__glyph"></span><span class="erf-row__name">usePreviewBounds.ts</span><span class="erf-row__badge" data-git="conflicted">!</span></div></div>
+</div>
   <div class="notes">
-    <div class="ds-note" style="margin-top:0">
+    <div class="ds-note">
       <strong>Six, not four.</strong> This card used to paint backgrounds for four states and seed only
-      three, so a renamed or conflicted badge was a near-black label on a transparent row — measured
-      <strong>1.21:1</strong> against <code>--color-bg-tertiary</code>, which is invisible. Nothing rendered
+      three, so a renamed or conflicted badge was a near-black label on a transparent row – measured
+      <strong><span data-contrast="--color-text-on-accent on --color-bg-tertiary" data-min="4.5" data-result="fail">1.20:1 · fail</span></strong> against
+      <code>--color-bg-tertiary</code>, which is invisible. Nothing rendered
       them, so nobody saw it.
       <br><br>
       The app itself already ships all six. This was a defect in the <em>card</em>, and adopting the old
-      version would have made the app worse — which is the argument against the "copy this in verbatim"
+      version would have made the app worse – which is the argument against the "copy this in verbatim"
       note this file used to carry.
     </div>
   </div>
+</div>
+
+<h2 id="no-drag">Every drag has a route without one</h2>
+<p class="ds-muted">WCAG 2.2 SC 2.5.7 (Dragging movements): anything done by dragging can also be done with single
+clicks or the keyboard. Moving a file in the tree is a drag, so it needs a second route – and a screen-reader or
+switch user cannot drag at all.</p>
+<div class="ds-frames">
+<figure class="ds-frame">
+<div class="list-frame" aria-hidden="true">
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"><svg data-icon="chevron-down" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="m6 9 6 6 6-6"/></svg></span><span class="erf-row__name">src</span></div>
+  <div class="erf-row erf-row--cut erf-row--selected erf-row--focus" style="padding-left: calc(var(--space-4) + 1 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">toastService.ts</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"><svg data-icon="chevron-right" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="m9 18 6-6-6-6"/></svg></span><span class="erf-row__name">docs</span></div>
+</div>
+<figcaption><span class="ds-frame__step">1</span><strong><kbd>⌘</kbd>+<kbd>X</kbd>, or Cut in the row menu</strong> – The row is marked cut; nothing moves yet. Ships today.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div class="list-frame" aria-hidden="true">
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"><svg data-icon="chevron-down" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="m6 9 6 6 6-6"/></svg></span><span class="erf-row__name">src</span></div>
+  <div class="erf-row erf-row--cut" style="padding-left: calc(var(--space-4) + 1 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">toastService.ts</span></div>
+  <div class="erf-row erf-row--selected erf-row--focus" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"><svg data-icon="chevron-right" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="m9 18 6-6-6-6"/></svg></span><span class="erf-row__name">docs</span></div>
+</div>
+<figcaption><span class="ds-frame__step">2</span><strong><kbd>↓</kbd> to the folder, then <kbd>⌘</kbd>+<kbd>V</kbd> or Paste</strong> – The file moves into <em>docs</em>. Ships today.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div class="erf-menu-sketch" aria-hidden="true">
+  <div class="erf-row"><span class="erf-row__glyph"></span><span class="erf-row__name">Cut</span></div>
+  <div class="erf-row"><span class="erf-row__glyph"></span><span class="erf-row__name">Copy</span></div>
+  <div class="erf-row erf-row--hover"><span class="erf-row__glyph"></span><span class="erf-row__name">Move to…</span></div>
+  <div class="erf-row"><span class="erf-row__glyph"></span><span class="erf-row__name">Rename</span></div>
+</div>
+<figcaption><span class="ds-frame__step">3</span><strong>Proposed: Move to…</strong> – One menu item that opens the folder picker, so a move is one decision instead of a cut, a walk through the tree and a paste. The picker is a list of these same rows.</figcaption>
+</figure>
+</div>
+
+<div class="ds-note">
+  <strong>The drag stays; it stops being the only way.</strong> Cut and Paste already move a file with the keyboard
+  or two clicks, which is what SC 2.5.7 asks for. <em>Move to…</em> is the proposal on top: Cut and Paste make a
+  keyboard user walk focus to the target folder, which in a deep tree is most of the work.
 </div>
 
 <h2>Measurements</h2>
@@ -215,10 +375,14 @@
     <tr><td>Row height</td><td><code>28px</code> minimum</td><td>Dense enough for a tree, tall enough for a 24px target inside it.</td></tr>
     <tr><td>Indent step</td><td><code>16px</code> per level</td><td>Duplicated as raw arithmetic across several files, and again in this card's own demo. Proposed token: <code>--tree-indent</code>.</td></tr>
     <tr><td>Selected edge</td><td><code>2px</code> lime, left</td><td><code>--border-width-thick</code> + <code>--color-brand-lime</code>.</td></tr>
+    <tr><td>Drop edge</td><td><code>2px</code> solid violet, left; dashed coral when rejected</td><td><code>--border-width-thick</code> + <code>--color-accent-drag</code>, or <code>--color-error</code>.</td></tr>
+    <tr><td>Disclosure</td><td>Inline chevron SVG, <code data-token="--icon-size-sm">16px</code></td><td>Lucide <code>chevron-right</code> / <code>chevron-down</code> in <code>currentColor</code>, the size <code>ProjectTreeNode.tsx</code> draws.</td></tr>
+    <tr><td>Git badge text</td><td><code>--color-text-on-accent</code></td><td>Every badge fill is a light tint; this is the role that pairs with one (<span data-contrast="--color-text-on-accent on --color-git-renamed-light" data-min="4.5" data-result="pass">6.36:1 · pass</span> on renamed).</td></tr>
     <tr><td>Focus ring</td><td>Inset 2px</td><td>Rows scroll, so an outward ring gets clipped. See the Focus card.</td></tr>
   </tbody>
 </table>
 
+<section id="exceptions">
 <h2>Exceptions</h2>
 <p style="max-width: 72ch; color: var(--color-text-tertiary)">
   Where the shipping component departs from this card, with the reason. An undocumented deviation is a
@@ -229,7 +393,7 @@
   <tbody>
     <tr>
       <td>Welcome tab, recent projects</td>
-      <td>Tab enters the list once — not once per row.</td>
+      <td>Tab enters the list once – not once per row.</td>
       <td>The list is one Tab stop for opening, plus the active row's Remove button as a second stop.
         Removing a project then needs no extra shortcut to learn, and every other row's Remove stays out
         of the Tab order, so the cost does not grow with the list. Arrows, Home and End move between rows
@@ -237,239 +401,19 @@
     </tr>
     <tr>
       <td>HTML-preview comments drawer</td>
-      <td>Tab enters the list once — not once per row.</td>
-      <td>The same shape as the Welcome list: one Tab stop for the row (Enter = Show on page, or Open in source on a
-        lost or damaged comment), plus the active row's <strong>Open</strong> as a second stop. Planned for P6; see
-        the proposed <a href="../../../product/html-comments/drawer.html">Comments drawer</a> card.</td>
-    </tr>
-    <tr>
-      <td>Cut row (<code>row.css</code>)</td>
-      <td>Tokens only (<code>docs/design-system/README.md</code>).</td>
-      <td>The fade is a literal <code>opacity: 0.6</code> and the dashed underline sits at a literal
-        <code>3px</code> offset. No opacity token sits between <code>--opacity-disabled</code> and opaque,
-        and 3px is off the 2px spacing scale. The fade is the one <code>ProjectTree.css</code> ships, and
-        tokenising them is a visual decision for the adoption of this file, not a side effect.</td>
+      <td>Tab enters the list once – not once per row.</td>
+      <td>The same shape as the Welcome list, and it ships. The list is one Tab stop: ↑ ↓ Home End move between
+        rows, and Enter or a click is <strong>Show on page</strong> with focus staying in the list (<strong>Open in
+        source</strong> on a not-found, damaged or newer comment). Tab once more reaches the active row's
+        <strong>Open</strong>, which opens the comment window; every other row's Open stays out of the Tab order.
+        The rows scroll, so they draw the inset ring. See <code>CommentDrawer.tsx</code> and
+        <code>CommentDrawer.css</code>, and the <a href="../../../../designs/comments/html-comments/drawer.html">Comments
+        drawer</a> card.</td>
     </tr>
   </tbody>
 </table>
+</section>
 
-<script>
-const FILES = [
-  { name: 'README.md', git: null, kind: 'file' },
-  { name: 'src', git: null, kind: 'folder', open: true },
-  { name: 'PreviewChromeBand.tsx', git: 'U', gitName: 'Untracked', kind: 'file', depth: 1 },
-  { name: 'usePreviewBounds.ts', git: 'M', gitName: 'Modified', kind: 'file', depth: 1 },
-  { name: 'toastService.ts', git: 'D', gitName: 'Deleted', kind: 'file', depth: 1 },
-  { name: 'package.json', git: null, kind: 'file' }
-];
-
-let active = 0;
-const list = document.getElementById('list');
-
-function build() {
-  list.innerHTML = '';
-  FILES.forEach((f, i) => {
-    const li = document.createElement('li');
-    li.className = 'erf-row';
-    li.setAttribute('role', 'treeitem');
-    li.setAttribute('aria-selected', String(i === active));
-    if (f.kind === 'folder') li.setAttribute('aria-expanded', String(!!f.open));
-    li.id = `row-${i}`;
-    li.style.paddingLeft = `calc(var(--space-4) + ${(f.depth || 0)} * 16px)`;
-    if (i === active) li.classList.add('erf-row--selected');
-
-    const glyph = document.createElement('span');
-    glyph.className = 'erf-row__glyph';
-    glyph.setAttribute('aria-hidden', 'true');
-    glyph.textContent = f.kind === 'folder' ? (f.open ? '▾' : '▸') : '';
-
-    const name = document.createElement('span');
-    name.className = 'erf-row__name';
-    name.textContent = f.name;
-    // The full name goes in the accessible name, not only in a title: a title is
-    // unreachable by keyboard and by touch.
-    name.setAttribute('aria-label', f.name);
-
-    li.append(glyph, name);
-
-    if (f.git) {
-      const badge = document.createElement('span');
-      badge.className = 'erf-row__badge';
-      badge.dataset.git = f.gitName.toLowerCase();
-      badge.setAttribute('role', 'img');
-      badge.setAttribute('aria-label', f.gitName);
-      badge.textContent = f.git;
-      li.appendChild(badge);
-    }
-
-    li.addEventListener('click', () => { active = i; build(); list.focus(); });
-    list.appendChild(li);
-  });
-  list.setAttribute('aria-activedescendant', `row-${active}`);
-}
-
-const opened = document.createElement('div');
-opened.className = 'ds-note';
-opened.hidden = true;
-list.parentElement.appendChild(opened);
-
-list.addEventListener('keydown', (e) => {
-  const last = FILES.length - 1;
-  const current = FILES[active];
-  let next = active;
-
-  if (e.key === 'ArrowDown') next = Math.min(active + 1, last);
-  else if (e.key === 'ArrowUp') next = Math.max(active - 1, 0);
-  else if (e.key === 'Home') next = 0;
-  else if (e.key === 'End') next = last;
-  else if (e.key === 'ArrowRight') {
-    // On a closed folder, open it. On an open folder, step to its first child.
-    if (current.kind === 'folder' && !current.open) { current.open = true; build(); e.preventDefault(); return; }
-    if (current.kind === 'folder') next = Math.min(active + 1, last);
-  } else if (e.key === 'ArrowLeft') {
-    // On an open folder, close it. On a leaf, jump to the parent.
-    if (current.kind === 'folder' && current.open) { current.open = false; build(); e.preventDefault(); return; }
-    for (let i = active - 1; i >= 0; i -= 1) {
-      if ((FILES[i].depth || 0) < (current.depth || 0)) { next = i; break; }
-    }
-  } else if (e.key === 'Enter') {
-    opened.hidden = false;
-    opened.textContent = `Enter opened: ${current.name}`;
-    e.preventDefault();
-    return;
-  } else return;
-
-  e.preventDefault();
-  active = next;
-  build();
-});
-
-build();
-
-// The state gallery: one row per state, rendered from the same CSS the list uses.
-const STATES = [
-  ['resting', ''],
-  ['hover', 'erf-row--hover'],
-  ['selected', 'erf-row--selected'],
-  ['focused', 'erf-row--focus'],
-  ['dragging', 'erf-row--dragging'],
-  ['drop target', 'erf-row--drop'],
-  ['drop rejected', 'erf-row--drop-invalid'],
-  ['cut to clipboard', 'erf-row--cut']
-];
-const gallery = document.getElementById('states');
-for (const [label, cls] of STATES) {
-  const wrap = document.createElement('div');
-  wrap.className = 'state-demo';
-  wrap.innerHTML = `<div class="state-name">${label}</div>
-    <div class="erf-row ${cls}"><span class="erf-row__glyph" aria-hidden="true"></span><span class="erf-row__name">PreviewChromeBand.tsx</span></div>`;
-  gallery.appendChild(wrap);
-}
-
-// Every git state, including the two that were invisible.
-const GIT = [
-  ['modified', 'M', 'Modified'],
-  ['untracked', 'U', 'Untracked'],
-  ['deleted', 'D', 'Deleted'],
-  ['staged', 'A', 'Staged'],
-  ['renamed', 'R', 'Renamed'],
-  ['conflicted', '!', 'Conflicted']
-];
-const badges = document.getElementById('badges');
-for (const [state, letter, label] of GIT) {
-  const wrap = document.createElement('div');
-  wrap.className = 'state-demo';
-  wrap.innerHTML = `<div class="state-name">${state}</div>
-    <div class="erf-row"><span class="erf-row__glyph" aria-hidden="true"></span
-      ><span class="erf-row__name">usePreviewBounds.ts</span
-      ><span class="erf-row__badge" data-git="${state}" role="img" aria-label="${label}">${letter}</span></div>`;
-  badges.appendChild(wrap);
-}
-
-/* ---- the host elide, with the strings that actually break it ---- */
-
-const ORIGINS = [
-  'https://a-very-long-subdomain.cdn.evil.com',
-  'https://cdn.jsdelivr.net',
-  // A non-default port, and a plain-http origin. Both are drawn because both are
-  // NOT the default; neither would be drawn on an ordinary https row.
-  'https://evil.com:8443',
-  'http://localhost:3000',
-  // A trailing dot is NORMALISED AWAY, not refused. `evil.com.` and `evil.com`
-  // are the same name to the resolver, and CSP has no empty-label production —
-  // so refusing it would mean a blocked row that gets an Allow button the
-  // boundary then rejects. A button that lies is worse than no button.
-  'https://evil.com./',
-  'https://xn--80ak6aa92e.com',
-  // Enters as a U-label and comes out punycoded, by the parser rather than by
-  // any rule of ours. That is the homograph defence, rendered.
-  'https://مثال.إختبار.evil.com',
-  'https://averyveryverylongregistrabledomainname.example',
-  'https://assets.tracking.eu-west-1.metrics.a-very-long-tenant-name.example.co.uk',
-  'https://onesingleunbreakablelabelwithnodotsatallthatcannotwrapatalabelboundary.example'
-];
-
-/* Label boundaries are the PREFERRED break points, so a wrapped host breaks at a
-   dot whenever one fits. `overflow-wrap: anywhere` in row.css is the fallback for
-   the last host in the list, which has no dot to break at. There is no boundary
-   to compute and no list to consult.
-
-   The SCHEME and PORT are drawn only when they are not the default, and neither
-   gets a <wbr> beside it. Break hints mark preferred break points, so a part with
-   no hint next to it stays attached to the host unless the line genuinely cannot
-   fit — which is what stops `localhost` and `:3000` being read as two separate
-   things on two separate lines. */
-function originHtml(origin) {
-  const url = new URL(origin);
-  const scheme = url.protocol === 'https:'
-    ? ''
-    : `<span class="erf-host__scheme">${escapeHtml(url.protocol)}//</span>`;
-  const host = escapeHtml(stripTrailingDot(url.hostname)).replace(/\./g, '.<wbr>');
-  const port = url.port === ''
-    ? ''
-    : `<span class="erf-host__port">:${escapeHtml(url.port)}</span>`;
-  return scheme + host + port;
-}
-
-/* One trailing dot, and one only — `example.com..` is not a host. */
-function stripTrailingDot(hostname) {
-  return hostname.endsWith('.') ? hostname.slice(0, -1) : hostname;
-}
-
-/* What the row ANNOUNCES: the whole origin, including the parts not drawn. */
-function originLabel(origin) {
-  const url = new URL(origin);
-  const port = url.port === '' ? '' : ':' + url.port;
-  return `${url.protocol}//${stripTrailingDot(url.hostname)}${port}`;
-}
-
-function escapeHtml(text) {
-  return text.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
-}
-
-const frame = document.getElementById('hostFrame');
-const slider = document.getElementById('w');
-const wval = document.getElementById('wval');
-
-function buildHosts() {
-  frame.style.width = `${slider.value}px`;
-  wval.textContent = `${slider.value}px`;
-  frame.innerHTML = '';
-  for (const origin of ORIGINS) {
-    const row = document.createElement('div');
-    row.className = 'erf-row';
-    // aria-label carries the whole origin: the <wbr>s are a layout hint and must
-    // not reach the accessible name, and a part that is de-emphasised for
-    // scanning must still be announced in full.
-    row.innerHTML =
-      `<span class="erf-host" dir="ltr" aria-label="Host ${escapeHtml(originLabel(origin))}">${originHtml(origin)}</span>`;
-    frame.appendChild(row);
-  }
-}
-
-slider.addEventListener('input', buildHosts);
-buildHosts();
-</script>
-
+</main>
 </body>
 </html>

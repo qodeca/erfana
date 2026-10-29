@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * HTML Preview comments – fixtures and a fake `window.api.previewComments`
- * for the renderer's unit tests (docs/designs/html-preview-comments.md §12).
+ * for the renderer's unit tests (docs/designs/comments/html-preview-comments.md §12).
  *
  * Every builder returns a value that satisfies the shared zod schema, so a
  * test that passes here is not leaning on a shape main could never send.

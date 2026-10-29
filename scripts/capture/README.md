@@ -11,7 +11,7 @@ macOS only, with a real Claude Code login. Nothing is faked, and nothing reaches
 check has passed.
 
 - Spec: [docs/features/138-user-guide.md](../../docs/features/138-user-guide.md) (§ 3, § 7).
-- Design: [docs/designs/138-user-guide/](../../docs/designs/138-user-guide/README.md).
+- Design: [docs/designs/user-guide/](../../docs/designs/user-guide/README.md).
 - Spike findings this follows: `docs/spikes/138-capture-spike.md` (PR #149).
 
 ## Before the first run
@@ -154,7 +154,7 @@ A hit in any layer stops the run with exit 5 before anything is copied.
 ## README demo (`--only readme-demo`)
 
 The storyboard is #139's
-([design § Demo loop](../../docs/designs/139-readme-redesign/README.md#demo-loop)): open the project
+([design § Demo loop](../../docs/designs/readme/README.md#demo-loop)): open the project
 from Recent projects, then Claude Code idle, select the plan's list, Visualize > Flowcharts, the
 prompt reaches the terminal, the agent works (sped up), the Mermaid block lands and renders, then a
 hold.

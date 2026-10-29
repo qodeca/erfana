@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * The worker's instrumentation pipeline (docs/designs/html-preview-comments.md
+ * The worker's instrumentation pipeline (docs/designs/comments/html-preview-comments.md
  * §6, §19 R3-12, R3-13): one shared parse feeds the tokens and the blocks, and
  * every block resolves to the token of the element it sits on in the bytes
  * actually served. U-090–U-094 here are the served-copy halves of the P1 unit

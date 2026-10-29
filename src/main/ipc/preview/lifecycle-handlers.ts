@@ -19,7 +19,7 @@
  * Trust model: the project path is resolved main-side (`getProjectPath`); the
  * host `BrowserWindow` comes from the trusted sender, never from the payload.
  *
- * @see docs/designs/sd-074-html-preview.md §4.3, §5(a)
+ * @see docs/designs/html-preview/sd-074-html-preview.md §4.3, §5(a)
  */
 import { BrowserWindow, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron'
 import {

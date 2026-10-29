@@ -1,0 +1,125 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/**
+ * The segmented control – one of a few choices, all visible, in one row.
+ *
+ * PROPOSED – not adopted. The first shipping instance is the comment drawer's
+ * "Show" filter:
+ *   src/renderer/src/components/Panels/HtmlPreviewPanel/comments/CommentDrawer.css
+ *   (.erf-comment-filter, .erf-comment-filter__option, .erf-comment-filter__count)
+ *   src/renderer/src/components/Panels/HtmlPreviewPanel/comments/CommentWindow.css
+ *   (its forced-colours edge)
+ * Adopting is a MOVE: that rule set becomes this file, and
+ * scripts/design-sync.mjs syncs it back here. Classes are prefixed erf-.
+ *
+ * Semantics: the group is role="radiogroup", each cell role="radio" with
+ * aria-checked, one tab stop (roving tabindex). The Segmented control card
+ * holds the keyboard contract.
+ */
+
+/* The group. It holds an optional visible label above the cells. */
+.erf-segmented {
+  /* The width at which every cell fits one row at an equal share. Below it,
+     every cell takes a full row – a stack, never a ragged 2 + 1. An instance
+     whose labels are longer raises it (the card measures the comment filters). */
+  --erf-segmented-break: calc(var(--space-20) * 7);
+
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-inline-size: 0;
+}
+
+/* The visible group name – the Type card's hint role. When there is no
+   visible label the group carries aria-label instead and this is omitted. */
+.erf-segmented__label {
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+  color: var(--color-text-tertiary);
+}
+
+.erf-segmented__cells {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* One cell. The basis is 0 while the group is at least --erf-segmented-break
+   wide (every cell shares the row equally) and huge below it (every cell wraps
+   to its own row): the switch needs no media query and no script. */
+.erf-segmented__cell {
+  flex-grow: 1;
+  flex-basis: calc((var(--erf-segmented-break) - 100%) * 999);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  box-sizing: border-box;
+  block-size: var(--btn-height-sm);
+  padding: 0 var(--space-4);
+  margin: 0;
+  background: transparent;
+  border: var(--border-width) solid var(--color-border-subtle);
+  /* Every cell has its 2px bottom edge – quiet until checked, then lime – so
+     checking a cell changes a colour, not a height. */
+  border-block-end: var(--border-width-thick) solid var(--color-border-subtle);
+  border-radius: var(--border-radius);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  line-height: var(--leading-none);
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+
+.erf-segmented__cell:is(:hover, [class~='is-hover']) {
+  background: var(--color-bg-hover-solid);
+}
+.erf-segmented__cell:is(:active, [class~='is-active']) {
+  background: var(--color-bg-active);
+}
+
+/* Checked: a fill AND a 2px lime bottom edge (the Rows card's and the toggle
+   button's signature), plus the brightest text. Never colour alone. */
+.erf-segmented__cell[aria-checked='true'] {
+  background: var(--color-bg-selected);
+  border-block-end-color: var(--color-brand-lime);
+  color: var(--color-text-emphasis);
+}
+
+/* The one ring (Focus card): outward, 2px offset. The cells sit --space-2
+   apart, so the ring of one never hides under its neighbour. */
+.erf-segmented__cell:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
+}
+
+/* A choice that is not available now: still in the row and still named, so
+   the reader learns it exists; skipped by the arrow keys. */
+.erf-segmented__cell[aria-disabled='true'] {
+  color: var(--color-text-disabled);
+  cursor: default;
+}
+.erf-segmented__cell[aria-disabled='true']:is(:hover, [class~='is-hover'], :active, [class~='is-active']) {
+  background: transparent;
+}
+
+/* An optional count rides in the cell as an .erf-counter (Badge card). It is
+   part of the radio's name ("Open 12"), so it is plain text, not a live region. */
+.erf-segmented__cell .erf-counter {
+  flex: 0 0 auto;
+  line-height: var(--leading-snug);
+}
+
+/* A Windows contrast theme drops every fill: the checked cell keeps its edge,
+   in Highlight (Forced colours card, "Selected, checked, current"). */
+@media (forced-colors: active) {
+  .erf-segmented__cell[aria-checked='true'] {
+    border-block-end-color: Highlight;
+  }
+  .erf-segmented__cell[aria-disabled='true'] {
+    color: GrayText;
+  }
+}

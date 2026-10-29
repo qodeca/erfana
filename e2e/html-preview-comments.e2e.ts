@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * HTML Preview comments – the reviewer's path through the real UI
- * (docs/designs/html-preview-comments.md §13 P6 "e2e exit", §10.3, §10.4,
+ * (docs/designs/comments/html-preview-comments.md §13 P6 "e2e exit", §10.3, §10.4,
  * §10.7, §12.2 E-001).
  *
  * Real Chromium, real preload, real main, real renderer: no stub and no

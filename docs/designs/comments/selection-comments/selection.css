@@ -1,0 +1,112 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/**
+ * Comments on selected text – only what selection adds to the two previews.
+ *
+ * PROPOSED – not adopted. Builds on the Text highlights card (marks), the
+ * Feedback card (banners, feedback.css) and the Buttons card (button.css). Plan: docs/designs/comments/selection-comments.md §5.5, §7.
+ *
+ * Reused unchanged, not restated: the window, menu and drawer
+ * (../html-comments/comments.css, ../../system/components/menu/menu.css), the
+ * pin, outline, label and mode frame (../html-comments/overlay.css), and the
+ * Markdown underline and serif quote (../markdown-comments/markdown-comments.css).
+ *
+ * Adds:
+ *  1. `.erf-hpc-mark` – the HTML underline. Shipping: boxes from
+ *     Range.getClientRects() drawn in the overlay's closed shadow root, one per
+ *     line box, destined for src/preload/previewPageComments/overlayStyles.ts
+ *     (literals resolved from commentState.theme, like every overlay rule). Here
+ *     an inline span with `box-decoration-break: clone` gives the same one box
+ *     per line.
+ *  2. `.erf-sel-quote` – the selected words in the comment window, in the
+ *     system sans, because the HTML page's font is unknown. Markdown keeps its
+ *     serif `.erf-mdc-quote`. Destined for comments.css.
+ *  3. `.erf-sel-native` – the page's own selection, as Chromium paints it.
+ */
+
+/* ---------- 1. the HTML underline (overlay mirror) ---------- */
+
+/* The Text highlights card's comment mark (foundations/highlights.html): the
+   proposed --color-comment-mark fill (35% accent) and --color-comment-mark-bar
+   bar, read with the card's values as fallbacks until design-tokens.css has
+   them. The open thread is ONE value: the same fill with a doubled bar, never a
+   stronger fill (it was 22% and 40% here before).
+   The overlay draws boxes, not ::highlight(), so the bar is an inset shadow; an
+   ink line under it keeps one of the two edges readable on a white page and on
+   a black one (the outline's two-tone rule). */
+.erf-hpc-mark {
+  background-color: var(--color-comment-mark, color-mix(in srgb, var(--color-accent-primary) 35%, transparent));
+  box-shadow: inset 0 calc(var(--comment-mark-bar-width, var(--border-width-thick)) * -1) 0
+                var(--color-comment-mark-bar, var(--color-accent-primary)),
+              0 var(--border-width) 0 var(--color-brand-black);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+/* Double bar: bar, a gap of the fill, bar. */
+.erf-hpc-mark--active {
+  box-shadow: inset 0 calc(var(--comment-mark-bar-width, var(--border-width-thick)) * -1) 0
+                var(--color-comment-mark-bar, var(--color-accent-primary)),
+              inset 0 calc(var(--comment-mark-bar-width, var(--border-width-thick)) * -2) 0
+                var(--color-comment-mark, color-mix(in srgb, var(--color-accent-primary) 35%, transparent)),
+              inset 0 calc(var(--comment-mark-bar-width, var(--border-width-thick)) * -3) 0
+                var(--color-comment-mark-bar, var(--color-accent-primary)),
+              0 var(--border-width) 0 var(--color-brand-black);
+}
+
+/* Forced colours: the Text highlights card's mapping (highlights.html#forced) –
+   Mark and MarkText for comment marks, the bar repainted in CanvasText.
+   Highlight stays for the selection only. */
+@media (forced-colors: active) {
+  .erf-hpc-mark { background-color: Mark; color: MarkText;
+                  box-shadow: inset 0 calc(var(--border-width-thick) * -1) 0 CanvasText; }
+  .erf-hpc-mark--active { box-shadow: inset 0 calc(var(--border-width-thick) * -1) 0 CanvasText,
+                                      inset 0 calc(var(--border-width-thick) * -3) 0 CanvasText; }
+}
+@media print { .erf-hpc-mark { background: none; box-shadow: none; } }
+
+/* ---------- 2. the selected words in the window ---------- */
+
+.erf-sel-quote {
+  display: block;
+  margin: var(--space-4) 0 0;
+  padding-inline-start: var(--space-6);
+  border-inline-start: var(--border-width-thick) solid var(--color-accent-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-md);
+  line-height: var(--leading-snug);
+  color: var(--color-text-bright);
+  overflow-wrap: anywhere;
+}
+
+/* ---------- 3. the page's own selection (card only) ---------- */
+
+.erf-sel-native { background-color: Highlight; color: HighlightText; }
+
+/* ---------- card chrome (documentation only) ---------- */
+
+/* Overlay parts are children of a positioned page element in this static card;
+   shipping, they are measured into the overlay. */
+.sel-anchor { position: relative; }
+.sel-anchor > .erf-hpc-outline { inset: calc(var(--border-width-thick) * -2); }
+.sel-anchor > .erf-hpc-label {
+  inset-block-end: calc(100% + var(--border-width-thick) * 2);
+  inset-inline-start: calc(var(--border-width-thick) * -2);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+}
+.sel-anchor > .erf-hpc-pin {
+  inset-inline-start: calc(100% + var(--space-1));
+  inset-block-start: calc((var(--btn-height-sm) + var(--space-1)) * -1);
+}
+
+.sel-step { display: grid; grid-template-columns: minmax(0, 620px) minmax(220px, 1fr); gap: var(--space-16);
+            align-items: start; margin-block-end: var(--space-20); }
+.sel-panel { block-size: 300px; }
+.sel-panel--tall { block-size: 420px; }
+.sel-float { position: absolute; z-index: var(--z-modal); }
+/* Frames are the system's .ds-frames / .ds-frame (ds.css). A comment window is
+   at least 320px wide, so a frame here is at least 400px. */
+body > .ds-frames { grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); }
+.sel-frames--pair { margin: 0; }
+.sel-mini { block-size: 170px; }

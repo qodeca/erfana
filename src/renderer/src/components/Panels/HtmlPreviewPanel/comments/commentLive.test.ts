@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Live-region text and inner steps of the comment window
- * (docs/designs/html-preview-comments.md §10.9; round-3 H1, M6).
+ * (docs/designs/comments/html-preview-comments.md §10.9; round-3 H1, M6).
  */
 import { act, renderHook } from '@testing-library/react'
 import { createElement, type ReactNode } from 'react'

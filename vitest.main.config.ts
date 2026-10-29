@@ -82,14 +82,14 @@ export default defineConfig({
         // or grammar branch — the exact defect class #41 fixed. Declared as a
         // per-file floor rather than a manually-checked target (design F24 / §12);
         // measured at 100% statements / 98% branches when this entry landed.
-        // See: docs/designs/41-model-capability-registry.md §9.5
+        // See: docs/designs/context-meter/41-model-capability-registry.md §9.5
         'src/main/services/claudeStatus/modelId.ts': { lines: 95, functions: 95, branches: 95, statements: 95 },
         // Renderer / child-process crash + window-hang trail (#60). When the
         // renderer dies the window goes blank and no renderer-side boundary can
         // record it — these handlers are the only evidence the next incident
         // gets, so a silent coverage regression here is a diagnostics outage.
         // The module is small and fully unit-reachable; measured at 100% when
-        // this entry landed. See: docs/designs/design-issue-60.md §2.6, §5
+        // this entry landed. See: docs/designs/large-projects/design-issue-60.md §2.6, §5
         'src/main/utils/rendererCrashHandlers.ts': { lines: 90, functions: 90, branches: 90, statements: 90 },
         // Multi-page HTML preview (#124). These modules decide what the preview
         // BrowserView is allowed to load and where it may navigate — frame/scheme
@@ -129,7 +129,7 @@ export default defineConfig({
         // trust-chain floor (spec: 90). measured 99.52/100/94.65/99.52.
         // See: docs/features/138-user-guide.md § 3.4
         'scripts/check-links.mjs': { lines: 90, functions: 90, branches: 90, statements: 90 },
-        // HTML Preview comments – format core (docs/designs/html-preview-comments.md
+        // HTML Preview comments – format core (docs/designs/comments/html-preview-comments.md
         // § 12.5). These modules write into the user's own .html files: the
         // serializer, escaping, splice and its verification decide whether a
         // comment can turn into live markup or corrupt a byte outside its block

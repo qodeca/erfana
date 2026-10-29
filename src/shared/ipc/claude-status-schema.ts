@@ -9,7 +9,7 @@
  * only; the main process resolves the PTY pid from its own terminal record.
  *
  * @see Issue #216 - Per-terminal Claude Code context status bar
- * @see docs/designs/216-claude-status-bar.md §2, §4, §10
+ * @see docs/designs/context-meter/216-claude-status-bar.md §2, §4, §10
  */
 import { z } from 'zod'
 

@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Constants of the preview page's comment overlay
- * (docs/designs/html-preview-comments.md §5.8, §8).
+ * (docs/designs/comments/html-preview-comments.md §5.8, §8).
  *
  * INLINED, not imported: a preload entry must stay self-contained (#73, the
  * guard in `electron.vite.config.ts`), so the channel names and limits main

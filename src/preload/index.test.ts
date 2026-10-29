@@ -381,7 +381,7 @@ describe('utils.getPathForFile', () => {
  * `isPackaged` + `argv` gate in main is what keeps it unreachable in a shipped
  * app, and this test pins the argv half of it.
  *
- * @see docs/designs/design-issue-60.md §2.8
+ * @see docs/designs/large-projects/design-issue-60.md §2.8
  * @see Issue #60 - root error boundary
  */
 describe('__ERFANA_FORCE_CRASH__ exposure', () => {

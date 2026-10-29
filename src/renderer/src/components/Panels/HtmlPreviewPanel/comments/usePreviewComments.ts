@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * HTML Preview comments – everything one preview tab does with comments
- * (docs/designs/html-preview-comments.md §7, §10; R-010, R-015, R-018,
+ * (docs/designs/comments/html-preview-comments.md §7, §10; R-010, R-015, R-018,
  * R-021, R-023).
  *
  * The panel stays glue (`HtmlPreviewPanel.tsx`): this hook subscribes to

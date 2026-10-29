@@ -8,7 +8,7 @@
  * eviction cap (AC6). The parser-integration behaviour (T1–T8) lives in
  * `ClaudeTranscriptParser.fallbackGuard.test.ts`.
  *
- * @see docs/designs/47-context-meter-freeze.md §3.2, §4
+ * @see docs/designs/context-meter/47-context-meter-freeze.md §3.2, §4
  */
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { ParsedTurn } from './ClaudeTranscriptParser'

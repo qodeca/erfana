@@ -1,0 +1,230 @@
+<!-- @card group="HTML preview" name="Comment overlay in the page" subtitle="Hover outline, tag label, the speech-bubble pin and the comment-mode frame – drawn inside the page from resolved tokens" status="decided" reviewed="2026-10-26" -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark"><head>
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Erfana – comment overlay in the page</title>
+<link rel="stylesheet" href="../../../design-system/tokens.css">
+<link rel="stylesheet" href="../../../design-system/ds.css">
+<link rel="stylesheet" href="../../../design-system/system/components/button/button.css">
+<link rel="stylesheet" href="./demo.css">
+<link rel="stylesheet" href="./overlay.css">
+<style>
+  .scene { position: relative; inline-size: 300px; block-size: 150px;
+           border: var(--border-width) solid var(--color-border-subtle); }
+  .scene--wide { inline-size: 560px; block-size: 260px; }
+  .swatch { display: inline-block; inline-size: var(--space-12); block-size: var(--space-8); vertical-align: middle;
+            border: var(--border-width) solid var(--color-border-subtle); margin-inline-end: var(--space-4); }
+  .map td:nth-child(3) { font-family: var(--font-mono); font-size: var(--ds-text-small); }
+</style>
+</head>
+<body>
+
+<h1>Comment overlay in the page</h1>
+<p class="ds-lede">
+  Everything on this card is drawn <strong>inside the previewed page</strong>, in a closed shadow root, by the
+  preview preload. It is the only part of the comments feature Erfana cannot style with its own stylesheet –
+  so this card shows where every colour comes from.
+</p>
+
+<div class="ds-note">
+  <strong>What is fixed by the plan, and what is still a value.</strong> The rules come from locked decisions
+  and §10.2 / §10.5 of <code>docs/designs/comments/html-preview-comments.md</code>: the pin is a <strong>speech
+  bubble</strong> at the element's <strong>top-right</strong> (decision 33); several threads on one element are
+  <strong>one numbered pin</strong>; <strong>resolved threads hide their pin</strong>; pins are <strong>always
+  visible</strong>, also outside comment mode, and can be hidden per tab (decision 20). Those are not
+  re-opened here. Decided: the overlay shipped in v0.23.1 with the sizes and fills below, and changing one now
+  means changing <code>overlayStyles.ts</code>, its theme and this screen together.
+  <br><br>
+  <strong>The source.</strong> <code>src/preload/previewPageComments/overlayStyles.ts</code> (the rules) and
+  <code>src/main/services/preview/comments/commentOverlayTheme.ts</code> (the values). This card renders a
+  mirror, <code>overlay.css</code>, with each value written back as its token.
+</div>
+
+<h2>The mapping: tokens resolved for the page</h2>
+
+<p style="max-width: 76ch; color: var(--color-text-tertiary)">
+  The page cannot see <code>design-tokens.css</code>, and must not: a <code>var()</code> in the page would read
+  the <em>page's</em> custom properties, which the page controls. So main sends each value resolved, in
+  <code>commentState.theme</code>, and <code>commentOverlayTheme.test.ts</code> pins each field to its token
+  (R-012). The third column is baked from <code>design-tokens.css</code> by <code>npm run design</code> – nothing
+  is typed.
+</p>
+
+<table class="map">
+  <thead><tr><th>Theme field</th><th>Token</th><th>Resolves to</th><th>What it draws</th></tr></thead>
+  <tbody id="mapping"><tr><td><code>accent</code></td><td><code>--color-accent-primary</code></td><td><span class="swatch" style="background: var(--color-accent-primary)"></span><code data-token="--color-accent-primary">#A0A8FF</code></td><td>Ring, pin fill, label tag, frame, tab ground</td></tr><tr><td><code>accentHover</code></td><td><code>--color-brand-violet-hover</code></td><td><span class="swatch" style="background: var(--color-brand-violet-hover)"></span><code data-token="--color-brand-violet-hover">#8b94ff</code></td><td>Pin fill on hover</td></tr><tr><td><code>ink</code></td><td><code>--color-brand-black</code></td><td><span class="swatch" style="background: var(--color-brand-black)"></span><code data-token="--color-brand-black">#161312</code></td><td>Ring lines, pin stroke and content, label ground, tab text</td></tr><tr><td><code>paper</code></td><td><code>--color-brand-white</code></td><td><span class="swatch" style="background: var(--color-brand-white)"></span><code data-token="--color-brand-white">#F8FAF8</code></td><td>Label text</td></tr><tr><td><code>muted</code></td><td><code>--color-text-primary</code></td><td><span class="swatch" style="background: var(--color-text-primary)"></span><code data-token="--color-text-primary">#cccccc</code></td><td>The size in the label</td></tr><tr><td><code>warning</code></td><td><code>--color-warning</code></td><td><span class="swatch" style="background: var(--color-warning)"></span><code data-token="--color-warning">#cca700</code></td><td>Damaged pin fill</td></tr><tr><td><code>font</code></td><td><code>--font-mono</code></td><td><code data-token="--font-mono">&#x27;Cascadia Mono&#x27;, &#x27;SF Mono&#x27;, Monaco, &#x27;Cascadia Code&#x27;, &#x27;Roboto Mono&#x27;, Consolas, &#x27;Courier New&#x27;, monospace</code></td><td>Label, tab and pin number</td></tr><tr><td><code>size</code></td><td><code>--text-sm</code></td><td><code data-token="--text-sm">11px</code></td><td>Label, tab and pin number</td></tr><tr><td><code>ring</code></td><td><code>--border-width-thick</code></td><td><code data-token="--border-width-thick">2px</code></td><td>Ring, frame and flash width</td></tr><tr><td><code>pinTarget</code></td><td><code>--btn-height-sm</code></td><td><code data-token="--btn-height-sm">24px</code></td><td>The pin hit box</td></tr><tr><td><code>hairline</code></td><td><code>--border-width</code></td><td><code data-token="--border-width">1px</code></td><td>The ink lines of the ring, the label border</td></tr><tr><td><code>space1</code></td><td><code>--space-1</code></td><td><code data-token="--space-1">2px</code></td><td>Tab block padding, pin focus offset</td></tr><tr><td><code>space2</code></td><td><code>--space-2</code></td><td><code data-token="--space-2">4px</code></td><td>Label inline padding, pin focus halo</td></tr><tr><td><code>space4</code></td><td><code>--space-4</code></td><td><code data-token="--space-4">8px</code></td><td>Tab inline padding</td></tr><tr><td><code>leading</code></td><td><code>--leading-snug</code></td><td><code data-token="--leading-snug">1.375</code></td><td>Line height of the label and the tab</td></tr></tbody>
+</table>
+
+<div class="ds-note" style="margin-top: var(--space-8)">
+  <strong>Contrast, derived.</strong> The pin's fill against its ink stroke and content, the label's tag on its
+  ink ground and the mode tab's text are all one pair: <strong><span data-claim="hpc-accent-ink" title="--color-accent-primary against --color-brand-black: the pin fill against its ink stroke and content, the label tag, the mode tab text">8.39</span>:1</strong>.
+  Hover keeps the ink: <strong><span data-claim="hpc-hover-ink" title="--color-brand-violet-hover against --color-brand-black: a hovered pin against its ink">6.84</span>:1</strong>. A damaged pin's ink
+  <code>!</code> on the warning fill: <strong><span data-claim="hpc-warning-ink" title="--color-brand-black on --color-warning: the ink ! on a damaged pin">8.00</span>:1</strong>. The label's
+  text: <strong><span data-claim="hpc-label-paper" title="--color-brand-white on --color-brand-black: the element label text">17.62</span>:1</strong>, and its size in the muted grey:
+  <strong><span data-claim="hpc-label-size" title="--color-text-primary on --color-brand-black: the size in the element label">11.51</span>:1</strong>. All clear the 4.5:1 small text needs.
+  <br><br>
+  <strong>Why the ring is two-tone.</strong> The accent alone on a white page is
+  <strong><span data-claim="hpc-accent-on-white" title="--color-accent-primary on --color-brand-white: why the accent ring alone fails on a light page">2.09</span>:1</strong> – under the 3:1 a focus or selection
+  indicator needs (SC 1.4.11). The 1px ink line on both sides of it is
+  <strong><span data-claim="hpc-ink-on-white" title="--color-brand-black on --color-brand-white: the ink line that carries the ring on a light page">17.62</span>:1</strong> there; on a black page the accent carries it
+  instead. Whatever the page paints, one of the two edges clears 3:1. The pin's focus ring uses the same
+  trick: an accent ring with an ink halo between it and the bubble.
+</div>
+
+<h2>Outline and label</h2>
+
+<div class="ds-note">
+  <strong>Border box only</strong>, drawn instantly with no tween: a 2px accent ring with a 1px ink line on both
+  sides. <strong>Selected</strong> – the element a menu or window is open for – adds a 12% accent fill. The
+  label <code>tag#id.class1.class2… 120×40</code> sits above the element's top-left, flips below it at the page
+  top, and is clamped sideways. Tag in accent, the rest in paper, the size in grey, always
+  <code>dir="ltr"</code> so a right-to-left page cannot reorder a selector. Two classes at most, then
+  <code>…</code>, 40 characters at most, then a suffix.
+</div>
+
+<div class="gallery" id="outlines"><figure class="state"><figcaption><strong>hover</strong> – white page: the ink lines carry the contrast</figcaption>
+    <div class="scene page-area"><div class="page"><h4>Plans</h4><p>Billed monthly. Cancel any time.</p><button class="cta primary" id="buy" type="button" tabindex="-1">Buy now</button></div><div class="erf-hpc-root"><div class="erf-hpc-outline" style="--ds-left: 23px; left: var(--ds-left); --ds-top: 81.2344px; top: var(--ds-top); width: 85.5938px; height: 33.5938px;"></div><div class="erf-hpc-label" style="--ds-left: 23px; left: var(--ds-left); --ds-top: 62.2344px; top: var(--ds-top);"><span class="erf-hpc-label__tag">button</span><span class="erf-hpc-label__rest">#buy.cta.primary</span><span class="erf-hpc-label__size">86×34</span></div></div></div></figure><figure class="state"><figcaption><strong>hover</strong> – dark page: the accent carries it</figcaption>
+    <div class="scene page-area"><div class="page page--dark"><h4>Plans</h4><p>Billed monthly. Cancel any time.</p><button class="cta primary" id="buy" type="button" tabindex="-1">Buy now</button></div><div class="erf-hpc-root"><div class="erf-hpc-outline" style="--ds-left: 23px; left: var(--ds-left); --ds-top: 81.2344px; top: var(--ds-top); width: 85.5938px; height: 33.5938px;"></div><div class="erf-hpc-label" style="--ds-left: 23px; left: var(--ds-left); --ds-top: 62.2344px; top: var(--ds-top);"><span class="erf-hpc-label__tag">button</span><span class="erf-hpc-label__rest">#buy.cta.primary</span><span class="erf-hpc-label__size">86×34</span></div></div></div></figure><figure class="state"><figcaption><strong>selected</strong> – menu or window open for it: + 12% fill</figcaption>
+    <div class="scene page-area"><div class="page"><h4>Plans</h4><p>Billed monthly. Cancel any time.</p><button class="cta primary" id="buy" type="button" tabindex="-1">Buy now</button></div><div class="erf-hpc-root"><div class="erf-hpc-outline erf-hpc-outline--selected" style="--ds-left: 23px; left: var(--ds-left); --ds-top: 81.2344px; top: var(--ds-top); width: 85.5938px; height: 33.5938px;"></div><div class="erf-hpc-label" style="--ds-left: 23px; left: var(--ds-left); --ds-top: 62.2344px; top: var(--ds-top);"><span class="erf-hpc-label__tag">button</span><span class="erf-hpc-label__rest">#buy.cta.primary</span><span class="erf-hpc-label__size">86×34</span></div></div></div></figure><figure class="state"><figcaption><strong>tiny</strong> (&lt; 8px) – the ring is pushed out 2px</figcaption>
+    <div class="scene page-area"><div class="page"><h4>Status</h4><p>Live <span class="tiny" id="dot"></span> since 09:00.</p></div><div class="erf-hpc-root"><div class="erf-hpc-outline" style="--ds-left: 48.5312px; left: var(--ds-left); --ds-top: 56.9688px; top: var(--ds-top); width: 10px; height: 10px;"></div><div class="erf-hpc-label" style="--ds-left: 48.5312px; left: var(--ds-left); --ds-top: 37.9688px; top: var(--ds-top);"><span class="erf-hpc-label__tag">span</span><span class="erf-hpc-label__rest">#dot.tiny</span><span class="erf-hpc-label__size">6×6</span></div></div></div></figure><figure class="state"><figcaption><strong>page top</strong> – the label flips below</figcaption>
+    <div class="scene page-area"><div class="page"><button class="pg-raise cta" id="top" type="button" tabindex="-1">Sign in</button></div><div class="erf-hpc-root"><div class="erf-hpc-outline" style="--ds-left: 23px; left: var(--ds-left); --ds-top: 12px; top: var(--ds-top); width: 74.8281px; height: 33.5938px;"></div><div class="erf-hpc-label" style="--ds-left: 23px; left: var(--ds-left); --ds-top: 47.5938px; top: var(--ds-top);"><span class="erf-hpc-label__tag">button</span><span class="erf-hpc-label__rest">#top.cta</span><span class="erf-hpc-label__size">75×34</span></div></div></div></figure><figure class="state"><figcaption><strong>long selector</strong> – two classes, then …, 40 characters at most</figcaption>
+    <div class="scene page-area"><div class="page"><h4>Offer</h4><button class="cta cta-primary cta-large tracking-hero" id="hero-cta-button-main" type="button" tabindex="-1">Get started</button></div><div class="erf-hpc-root"><div class="erf-hpc-outline" style="--ds-left: 23px; left: var(--ds-left); --ds-top: 51.0938px; top: var(--ds-top); width: 103.703px; height: 33.5938px;"></div><div class="erf-hpc-label" style="--ds-left: 0px; left: var(--ds-left); --ds-top: 32.0938px; top: var(--ds-top);"><span class="erf-hpc-label__tag">button</span><span class="erf-hpc-label__rest">#hero-cta-button-main.cta.cta-pri…</span><span class="erf-hpc-label__size">104×34</span></div></div></div></figure><figure class="state"><figcaption><strong>suffix</strong> “· script” – built by a script – anchors to its nearest in-file ancestor</figcaption>
+    <div class="scene page-area"><div class="page"><div class="card" id="card"><b>Pro</b> – 12 € a month</div></div><div class="erf-hpc-root"><div class="erf-hpc-outline" style="--ds-left: 23px; left: var(--ds-left); --ds-top: 19px; top: var(--ds-top); width: 254px; height: 42.1406px;"></div><div class="erf-hpc-label" style="--ds-left: 23px; left: var(--ds-left); --ds-top: 0px; top: var(--ds-top);"><span class="erf-hpc-label__tag">div</span><span class="erf-hpc-label__rest">#card.card · script</span><span class="erf-hpc-label__size">254×42</span></div></div></div></figure><figure class="state"><figcaption><strong>suffix</strong> “· frame other.html” – inside a same-project frame – saved in that frame’s file</figcaption>
+    <div class="scene page-area"><div class="page"><div class="card" id="card"><b>Pro</b> – 12 € a month</div></div><div class="erf-hpc-root"><div class="erf-hpc-outline" style="--ds-left: 23px; left: var(--ds-left); --ds-top: 19px; top: var(--ds-top); width: 254px; height: 42.1406px;"></div><div class="erf-hpc-label" style="--ds-left: 23px; left: var(--ds-left); --ds-top: 0px; top: var(--ds-top);"><span class="erf-hpc-label__tag">div</span><span class="erf-hpc-label__rest">#card.card · frame other.html</span><span class="erf-hpc-label__size">254×42</span></div></div></div></figure><figure class="state"><figcaption><strong>suffix</strong> “· 2 comments” – already has open threads</figcaption>
+    <div class="scene page-area"><div class="page"><div class="card" id="card"><b>Pro</b> – 12 € a month</div></div><div class="erf-hpc-root"><div class="erf-hpc-outline" style="--ds-left: 23px; left: var(--ds-left); --ds-top: 19px; top: var(--ds-top); width: 254px; height: 42.1406px;"></div><div class="erf-hpc-label" style="--ds-left: 23px; left: var(--ds-left); --ds-top: 0px; top: var(--ds-top);"><span class="erf-hpc-label__tag">div</span><span class="erf-hpc-label__rest">#card.card · 2 comments</span><span class="erf-hpc-label__size">254×42</span></div></div></div></figure><figure class="state"><figcaption><strong>refused frame</strong> – the &lt;iframe&gt; itself, under a click shield</figcaption>
+    <div class="scene page-area"><div class="page"><div class="frame" id="f">https://example.com (refused)</div></div><div class="erf-hpc-root"><div class="erf-hpc-outline" style="--ds-left: 23px; left: var(--ds-left); --ds-top: 19px; top: var(--ds-top); width: 254px; height: 60px;"></div><div class="erf-hpc-label" style="--ds-left: 23px; left: var(--ds-left); --ds-top: 0px; top: var(--ds-top);"><span class="erf-hpc-label__tag">iframe</span><span class="erf-hpc-label__rest"> · refused frame</span><span class="erf-hpc-label__size"></span></div></div></div></figure><figure class="state"><figcaption><strong>srcdoc frame</strong> – not commentable inside</figcaption>
+    <div class="scene page-area"><div class="page"><div class="frame" id="f">inline frame</div></div><div class="erf-hpc-root"><div class="erf-hpc-outline" style="--ds-left: 23px; left: var(--ds-left); --ds-top: 19px; top: var(--ds-top); width: 254px; height: 60px;"></div><div class="erf-hpc-label" style="--ds-left: 23px; left: var(--ds-left); --ds-top: 0px; top: var(--ds-top);"><span class="erf-hpc-label__tag">iframe</span><span class="erf-hpc-label__rest"> · inline frame</span><span class="erf-hpc-label__size"></span></div></div></div></figure></div>
+
+<h2>The pin</h2>
+
+<div class="ds-note">
+  A self-drawn square-cornered bubble, <code>M2 2H22V17H7L2 22Z</code> in a 24 × 24 hit box (WCAG 2.5.8). The
+  tail tip sits on the element's top-right corner, 4px outward, so the bubble floats above the element rather
+  than covering it. <strong>Near an edge it stays on the page:</strong> it is clamped to the page's visible
+  area – never under its scrollbar – and keeps 4px inside it, so an element as wide as the page has its pin
+  just inside the right edge. <strong>Only open threads are counted.</strong> One open thread shows two ink "text lines";
+  2–9 the number in bold mono; ten or more <code>9+</code>. A state is never colour alone: hover changes the
+  fill and the cursor and adds a tooltip, selected inverts the whole bubble, damaged swaps the content for
+  <code>!</code>. Pins are never animated.
+  <br><br>
+  <strong>Not drawn</strong> – and this is a state too: every thread resolved, the element not visible now (a
+  hidden slide or tab), the element not found in the file, or pins hidden for this tab. Each of those threads is
+  still reachable from the drawer, which is the guaranteed route to every comment.
+</div>
+
+<div class="gallery" id="pins"><figure class="state"><figcaption><strong>1 open thread</strong> – two ink text lines</figcaption>
+    <div class="scene page-area"><div class="page"><h4>Plans</h4><p>Billed monthly.</p><button class="cta" id="buy" type="button" tabindex="-1">Buy now</button></div><div class="erf-hpc-root"><div class="erf-hpc-pin" role="button" tabindex="-1" aria-label="1 comment on button.cta. Open." title="1 comment – click to open" style="--ds-left: 110.594px; left: var(--ds-left); --ds-top: 55.2344px; top: var(--ds-top);"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="erf-hpc-pin__body" d="M2 2H22V17H7L2 22Z"></path><rect class="erf-hpc-pin__line" x="6" y="6" width="12" height="2"></rect><rect class="erf-hpc-pin__line" x="6" y="10" width="8" height="2"></rect></svg></div></div></div></figure><figure class="state"><figcaption><strong>3 open threads</strong> – the number</figcaption>
+    <div class="scene page-area"><div class="page"><h4>Plans</h4><p>Billed monthly.</p><button class="cta" id="buy" type="button" tabindex="-1">Buy now</button></div><div class="erf-hpc-root"><div class="erf-hpc-pin" role="button" tabindex="-1" aria-label="3 comments on button.cta. Open." title="3 comments – click to open" style="--ds-left: 110.594px; left: var(--ds-left); --ds-top: 55.2344px; top: var(--ds-top);"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="erf-hpc-pin__body" d="M2 2H22V17H7L2 22Z"></path><foreignObject x="2" y="2" width="20" height="15"><span xmlns="http://www.w3.org/1999/xhtml" class="erf-hpc-pin__count erf-hpc-text" data-text="3"></span></foreignObject></svg></div></div></div></figure><figure class="state"><figcaption><strong>10 or more</strong> – 9+</figcaption>
+    <div class="scene page-area"><div class="page"><h4>Plans</h4><p>Billed monthly.</p><button class="cta" id="buy" type="button" tabindex="-1">Buy now</button></div><div class="erf-hpc-root"><div class="erf-hpc-pin" role="button" tabindex="-1" aria-label="12 comments on button.cta. Open." title="12 comments – click to open" style="--ds-left: 110.594px; left: var(--ds-left); --ds-top: 55.2344px; top: var(--ds-top);"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="erf-hpc-pin__body" d="M2 2H22V17H7L2 22Z"></path><foreignObject x="2" y="2" width="20" height="15"><span xmlns="http://www.w3.org/1999/xhtml" class="erf-hpc-pin__count erf-hpc-text" data-text="9+"></span></foreignObject></svg></div></div></div></figure><figure class="state"><figcaption><strong>hover</strong> – hover fill, pointer, tooltip; in comment mode it also outlines its element</figcaption>
+    <div class="scene page-area"><div class="page"><h4>Plans</h4><p>Billed monthly.</p><button class="cta" id="buy" type="button" tabindex="-1">Buy now</button></div><div class="erf-hpc-root"><div class="erf-hpc-pin erf-hpc-pin--hover" role="button" tabindex="-1" aria-label="2 comments on button.cta. Open." title="2 comments – click to open" style="--ds-left: 110.594px; left: var(--ds-left); --ds-top: 55.2344px; top: var(--ds-top);"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="erf-hpc-pin__body" d="M2 2H22V17H7L2 22Z"></path><foreignObject x="2" y="2" width="20" height="15"><span xmlns="http://www.w3.org/1999/xhtml" class="erf-hpc-pin__count erf-hpc-text" data-text="2"></span></foreignObject></svg></div><div class="erf-hpc-outline" style="--ds-left: 23px; left: var(--ds-left); --ds-top: 81.2344px; top: var(--ds-top); width: 85.5938px; height: 33.5938px;"></div><div class="erf-hpc-label" style="--ds-left: 23px; left: var(--ds-left); --ds-top: 62.2344px; top: var(--ds-top);"><span class="erf-hpc-label__tag">button</span><span class="erf-hpc-label__rest">#buy.cta</span><span class="erf-hpc-label__size">86×34</span></div></div></div></figure><figure class="state"><figcaption><strong>selected</strong> – window open or drawer row active: inverted</figcaption>
+    <div class="scene page-area"><div class="page"><h4>Plans</h4><p>Billed monthly.</p><button class="cta" id="buy" type="button" tabindex="-1">Buy now</button></div><div class="erf-hpc-root"><div class="erf-hpc-pin erf-hpc-pin--selected" role="button" tabindex="-1" aria-label="2 comments on button.cta. Open." title="2 comments – click to open" style="--ds-left: 110.594px; left: var(--ds-left); --ds-top: 55.2344px; top: var(--ds-top);"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="erf-hpc-pin__body" d="M2 2H22V17H7L2 22Z"></path><foreignObject x="2" y="2" width="20" height="15"><span xmlns="http://www.w3.org/1999/xhtml" class="erf-hpc-pin__count erf-hpc-text" data-text="2"></span></foreignObject></svg></div></div></div></figure><figure class="state"><figcaption><strong>focus</strong> – accent ring 2px out, ink halo between</figcaption>
+    <div class="scene page-area"><div class="page"><h4>Plans</h4><p>Billed monthly.</p><button class="cta" id="buy" type="button" tabindex="-1">Buy now</button></div><div class="erf-hpc-root"><div class="erf-hpc-pin erf-hpc-pin--focus" role="button" tabindex="-1" aria-label="2 comments on button.cta. Open." title="2 comments – click to open" style="--ds-left: 110.594px; left: var(--ds-left); --ds-top: 55.2344px; top: var(--ds-top);"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="erf-hpc-pin__body" d="M2 2H22V17H7L2 22Z"></path><foreignObject x="2" y="2" width="20" height="15"><span xmlns="http://www.w3.org/1999/xhtml" class="erf-hpc-pin__count erf-hpc-text" data-text="2"></span></foreignObject></svg></div></div></div></figure><figure class="state"><figcaption><strong>damaged</strong> – warning fill, ink !</figcaption>
+    <div class="scene page-area"><div class="page"><h4>Plans</h4><p>Billed monthly.</p><button class="cta" id="buy" type="button" tabindex="-1">Buy now</button></div><div class="erf-hpc-root"><div class="erf-hpc-pin erf-hpc-pin--damaged" role="button" tabindex="-1" aria-label="Damaged comment on button.cta. Open." title="Damaged comment – click to open" style="--ds-left: 110.594px; left: var(--ds-left); --ds-top: 55.2344px; top: var(--ds-top);"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="erf-hpc-pin__body" d="M2 2H22V17H7L2 22Z"></path><foreignObject x="2" y="2" width="20" height="15"><span xmlns="http://www.w3.org/1999/xhtml" class="erf-hpc-pin__count erf-hpc-text" data-text="!"></span></foreignObject></svg></div></div></div></figure><figure class="state"><figcaption><strong>damaged, selected</strong> – warning fill, accent stroke, the ! stays ink</figcaption>
+    <div class="scene page-area"><div class="page"><h4>Plans</h4><p>Billed monthly.</p><button class="cta" id="buy" type="button" tabindex="-1">Buy now</button></div><div class="erf-hpc-root"><div class="erf-hpc-pin erf-hpc-pin--damaged erf-hpc-pin--selected" role="button" tabindex="-1" aria-label="Damaged comment on button.cta. Open." title="Damaged comment – click to open" style="--ds-left: 110.594px; left: var(--ds-left); --ds-top: 55.2344px; top: var(--ds-top);"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="erf-hpc-pin__body" d="M2 2H22V17H7L2 22Z"></path><foreignObject x="2" y="2" width="20" height="15"><span xmlns="http://www.w3.org/1999/xhtml" class="erf-hpc-pin__count erf-hpc-text" data-text="!"></span></foreignObject></svg></div></div></div></figure><figure class="state"><figcaption><strong>on a dark page</strong> – the ink stroke still separates it</figcaption>
+    <div class="scene page-area"><div class="page page--dark"><h4>Plans</h4><p>Billed monthly.</p><button class="cta" id="buy" type="button" tabindex="-1">Buy now</button></div><div class="erf-hpc-root"><div class="erf-hpc-pin" role="button" tabindex="-1" aria-label="2 comments on button.cta. Open." title="2 comments – click to open" style="--ds-left: 110.594px; left: var(--ds-left); --ds-top: 55.2344px; top: var(--ds-top);"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="erf-hpc-pin__body" d="M2 2H22V17H7L2 22Z"></path><foreignObject x="2" y="2" width="20" height="15"><span xmlns="http://www.w3.org/1999/xhtml" class="erf-hpc-pin__count erf-hpc-text" data-text="2"></span></foreignObject></svg></div></div></div></figure><figure class="state"><figcaption><strong>overlap</strong> – the ancestor keeps the corner, the child steps left 22px</figcaption>
+    <div class="scene page-area"><div class="page"><div class="pg-gap-lg card" id="outer" style="max-width:240px"><b id="inner" style="display:block;text-align:right">Pro plan</b> 12 € a month</div></div><div class="erf-hpc-root"><div class="erf-hpc-pin" role="button" tabindex="-1" aria-label="2 comments on div.card. Open." title="2 comments – click to open" style="--ds-left: 265px; left: var(--ds-left); --ds-top: 13px; top: var(--ds-top);"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="erf-hpc-pin__body" d="M2 2H22V17H7L2 22Z"></path><foreignObject x="2" y="2" width="20" height="15"><span xmlns="http://www.w3.org/1999/xhtml" class="erf-hpc-pin__count erf-hpc-text" data-text="2"></span></foreignObject></svg></div><div class="erf-hpc-pin" role="button" tabindex="-1" aria-label="1 comment on b#inner. Open." title="1 comment – click to open" style="--ds-left: 230px; left: var(--ds-left); --ds-top: 24px; top: var(--ds-top);"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="erf-hpc-pin__body" d="M2 2H22V17H7L2 22Z"></path><rect class="erf-hpc-pin__line" x="6" y="6" width="12" height="2"></rect><rect class="erf-hpc-pin__line" x="6" y="10" width="8" height="2"></rect></svg></div></div></div></figure><figure class="state"><figcaption><strong>at the page edge</strong> – an element as wide as the page: the pin stays 4px inside the visible area, left of the scrollbar</figcaption>
+    <div class="scene page-area"><div class="page" style="overflow-y: scroll;"><div class="pg-bleed card" id="doc" style="max-width:none;height:320px"><b>div.doc</b> – the whole page width</div></div><div class="erf-hpc-root"><div class="erf-hpc-pin" role="button" tabindex="-1" aria-label="1 comment on div.doc. Open." title="1 comment – click to open" style="--ds-left: 270px; left: var(--ds-left); --ds-top: 4px; top: var(--ds-top);"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="erf-hpc-pin__body" d="M2 2H22V17H7L2 22Z"></path><rect class="erf-hpc-pin__line" x="6" y="6" width="12" height="2"></rect><rect class="erf-hpc-pin__line" x="6" y="10" width="8" height="2"></rect></svg></div></div></div></figure><figure class="state"><figcaption><strong>not drawn</strong> – all resolved, not visible now, not found, or hidden for this tab</figcaption>
+    <div class="scene page-area"><div class="page"><h4>Plans</h4><p>Billed monthly.</p><button class="cta" id="buy" type="button" tabindex="-1">Buy now</button></div></div></figure></div>
+
+<div class="ds-note">
+  <strong>A defect this card found on its first render, fixed.</strong> The number and the <code>!</code> sat low,
+  touching the bubble's bottom edge: <code>pins.ts</code> centred the text at <code>y="13"</code> with
+  <code>dominant-baseline: middle</code>, but the bubble's body runs from 2 to 17 in the view box. They are now HTML
+  text in a <code>foreignObject</code> over the body (<code>PIN_BODY</code>), centred by flex, and the text is CSS generated
+  content so Find in page never counts it (E-022); the card draws them the same way.
+  <br><br>
+  <strong>Damaged and selected.</strong> A selected damaged pin keeps its warning fill under the selected accent
+  stroke, so its <code>!</code> stays ink – the selected accent on the warning fill would be
+  <span data-contrast="--color-accent-primary on --color-warning">1.04:1</span>, no step at all.
+  Hover recolours an open pin only, never a selected or damaged one.
+</div>
+
+<h2>Comment mode</h2>
+
+<div class="ds-note">
+  <strong>Three signals, never one:</strong> the toolbar toggle is pressed, a 2px accent frame runs inside the
+  page edge, and a tab at the top centre says <strong>“Comment mode – Esc to leave”</strong>. The tab moves to
+  the bottom while the pointer is within 48px of the top, so it never sits on what you are trying to pick. The
+  cursor is the system crosshair. The band's height never changes.
+  <br><br>
+  <strong>The picture below</strong> is the page in comment mode, at rest: the frame, the tab at the top
+  centre, and a shield over the refused frame. In the app, elements outline as the pointer passes and the tab
+  jumps down near the top edge; the outline frames above draw that state. Frames that cannot be commented inside – a refused or <code>srcdoc</code> frame –
+  get a transparent shield, so a click selects the <code>&lt;iframe&gt;</code> element itself (§19 R3-3).
+</div>
+
+<div class="scene scene--wide page-area" id="live" style="cursor: crosshair;"><div class="page">
+  <h4>Pricing</h4>
+  <p id="lead">Start free, then pay for what you use. Every plan includes the editor and the terminal.</p>
+  <button class="cta" id="buy" type="button" tabindex="-1">Start free trial</button>
+  <p>Embedded report:</p>
+  <div class="frame" id="frame">iframe (refused frame)</div>
+</div><div class="erf-hpc-root"><div class="erf-hpc-frame"></div><div class="erf-hpc-tab" aria-hidden="true">Comment mode – Esc to leave</div><div class="erf-hpc-shield" style="--ds-left: 23px; left: var(--ds-left); --ds-top: 179.109px; top: var(--ds-top); width: 280px; height: 60px;"></div></div></div>
+
+<h2>A reveal from the drawer</h2>
+
+<div class="ds-note">
+  “Show on page” in the drawer scrolls the element to the centre and draws a <strong>static</strong> highlight
+  for 1.5 s – the ring plus a 24% fill. It is not an animation, so reduced motion needs no second version, and
+  the plan's “flash once” is the same box appearing and going away. A new pin after Save gets the same
+  highlight once.
+  <br><br>
+  <button class="erf-button erf-button--secondary erf-button--sm" type="button" id="revealBtn" tabindex="-1"><span>Show on page</span></button>
+</div>
+<div class="scene page-area" id="reveal"><div class="page">
+  <h4>Team</h4>
+  <p id="revealTarget">Our support team answers within a day, in English and Polish.</p>
+</div></div>
+
+<h2>Exceptions</h2>
+<p style="max-width: 72ch; color: var(--color-text-tertiary)">
+  Where the overlay departs from the system, with the reason. Each has a <code>deviates:</code> marker at its
+  site in <code>overlayStyles.ts</code> – the stylesheet as a whole, the pin focus rule and the forced-colours
+  block – and the same marker in the card's mirror, <code>overlay.css</code>.
+</p>
+<table>
+  <thead><tr><th>Where</th><th>The system</th><th>The overlay, and why</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>Every colour and size</td>
+      <td>Tokens only, as <code>var()</code>.</td>
+      <td>Literals interpolated from <code>commentState.theme</code>. A <code>var()</code> inside the page would
+        resolve against the page's own custom properties, which a hostile page sets. The literals come from the
+        tokens through one table, pinned by a test (R-012).</td>
+    </tr>
+    <tr>
+      <td>Literals with no theme field</td>
+      <td>Every value from the theme.</td>
+      <td>The hairline, the spaces and the line height now come through the theme
+        (<code>hairline</code>, <code>space1</code>, <code>space2</code>, <code>space4</code>, <code>leading</code>);
+        the line height moved from a typed 1.4 to <code>--leading-snug</code>, 1.375. Still written as literals,
+        each with no token of its own: the 12% selected and 24% flash fill mixes; the pin's SVG stroke widths 1.5
+        and 2 (selected), in view-box units; the label's <code>1ch</code> gap before the size; the count's weight
+        700 (the value of <code>--font-bold</code>, which the theme does not carry); the geometry percentages
+        (<code>50%</code> centring and clip, <code>100%</code> SVG size). The page has no live region any more: the panel speaks the picker's sentences (E-022). The R-012 test lists exactly these.</td>
+    </tr>
+    <tr>
+      <td>Pin focus</td>
+      <td>Focus card: the violet ring, and every control in the Tab order.</td>
+      <td>The ring uses the passed-in accent with an ink halo, and pins are focusable but
+        <code>tabindex="-1"</code>: a page can carry hundreds, and the keyboard route to every thread is the
+        drawer (§10.8). Recorded in the Focus card's Exceptions.</td>
+    </tr>
+    <tr>
+      <td>Forced colours</td>
+      <td>System colours where the theme is replaced.</td>
+      <td>Matches: outline, frame and flash take <code>Highlight</code>; label, tab and pin take
+        <code>Highlight</code> / <code>HighlightText</code>. A selected pin inverts – <code>Canvas</code> body,
+        <code>Highlight</code> stroke, line and count – so it still differs from an open one, and hover does not
+        recolour a pin there. Listed so nobody “fixes” the literals in that block.</td>
+    </tr>
+  </tbody>
+</table>
+
+
+
+</body></html>

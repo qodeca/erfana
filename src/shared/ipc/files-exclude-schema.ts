@@ -15,7 +15,7 @@
  * it lives with the matcher in the main process, and the merged result is
  * resolved by `ProjectSettingsService`.
  *
- * @see Issue #211 – design D7 (docs/designs/211-large-project-windows-watcher.md)
+ * @see Issue #211 – design D7 (docs/designs/large-projects/211-large-project-windows-watcher.md)
  */
 import { z } from 'zod'
 

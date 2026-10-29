@@ -17,7 +17,7 @@ The guide shows macOS first. Windows has the same project and document workflow 
 
 ## Keyboard and menus
 
-**What it does:** Use <kbd>Ctrl</kbd> where a shortcut says <kbd>Cmd</kbd>; HTML preview Back and Forward use <kbd>Alt</kbd>+<kbd>←/→</kbd>. **How to reach it:** See the [shortcut table](keyboard-shortcuts.md). **File > Exit** replaces the macOS app-menu Quit; **Window > Close**, <kbd>Alt</kbd>+<kbd>F4</kbd>, and <kbd>F11</kbd> are Windows window controls. The Windows tooltip-glyph correction was completed in [#143](https://github.com/qodeca/erfana/issues/143).
+**What it does:** Every shortcut is written macOS first, then Windows: <kbd>⌘J</kbd> / <kbd>Ctrl+J</kbd>. On Windows, <kbd>Ctrl</kbd> takes the place of <kbd>⌘</kbd>, <kbd>Alt</kbd> of <kbd>⌥</kbd> and <kbd>Shift</kbd> of <kbd>⇧</kbd>; HTML preview Back and Forward use <kbd>Alt+←</kbd> and <kbd>Alt+→</kbd>. **How to reach it:** See the [shortcut table](keyboard-shortcuts.md). **File > Exit** replaces the macOS app-menu Quit; **Window > Close**, <kbd>Alt+F4</kbd>, and <kbd>F11</kbd> are Windows window controls. The Windows tooltip-glyph correction was completed in [#143](https://github.com/qodeca/erfana/issues/143).
 
 The Erfana taskbar jump list also has **New Window**, which opens a separate instance.
 
@@ -38,5 +38,5 @@ The Erfana taskbar jump list also has **New Window**, which opens a separate ins
 **What it does:** A few terminal and import details differ on Windows. **How to reach it:** The terminal panel and **Settings > Import tools**.
 
 - **Restart terminal** asks first while Claude Code runs or the terminal is still producing output, but Windows does not tell Erfana which program is running, so a silent program is ended without a question.
-- Open a row or terminal menu with <kbd>Shift</kbd>+<kbd>F10</kbd> or the <kbd>Menu</kbd> key.
+- Open a row or terminal menu with <kbd>Shift+F10</kbd> or the <kbd>Menu</kbd> key.
 - When LibreOffice is missing, [Import tools](settings.md#import-tools) offers a **Download LibreOffice** button; install it in its default folder, then choose **Check again**. Erfana finds it by its install location and does not start it to check.

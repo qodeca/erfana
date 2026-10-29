@@ -1,121 +1,295 @@
-<!-- @card group="Foundations" name="Typography" subtitle="Seven sizes, four weights, five line heights — rendered at real size" status="proposed" reviewed="2026-08-31" -->
+<!-- @card group="Foundations" name="Typography" subtitle="The type scale, its weights, line heights and text styles – rendered at real size" status="proposed" reviewed="2026-08-31" answers="Choose a font size or weight; Set code or paths in the mono face; Style a panel title, hint or column header; Make text survive zoom and text spacing" -->
 <!-- SPDX-License-Identifier: GPL-3.0-only -->
 <!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Erfana — typography</title>
+<title>Typography – Erfana design system</title>
 <link rel="stylesheet" href="../../tokens.css">
 <link rel="stylesheet" href="../../ds.css">
 <style>
-  .ty-row { display: grid; grid-template-columns: 140px 64px 1fr; gap: var(--space-8);
-            align-items: baseline; padding: var(--space-6) 0;
-            border-bottom: var(--border-width) solid var(--color-border-default); }
-  .ty-token { font-family: var(--font-mono); font-size: var(--text-sm);
-              color: var(--color-text-tertiary); }
-  .ty-px { font-family: var(--font-mono); font-size: var(--text-sm);
-           color: var(--color-text-secondary); }
-  .fam { padding: var(--space-8) 0;
-         border-bottom: var(--border-width) solid var(--color-border-default); }
-  .fam p { margin: var(--space-3) 0 0; font-size: var(--text-md); }
+  /* Documentation-only values. --ds-tracking-caps is the proposed
+     --tracking-caps, named here until the token exists. */
+  :root {
+    --ds-tracking-caps: 0.06em;
+    --ds-tracking-legacy: 0.5px;
+    --ds-sample-measure: 30ch;
+    --ds-prose-measure: 66ch;
+  }
+
+  /* A three-line paragraph over a line-box grid: one hairline at the foot of
+     every line box (1lh), so the leading is measured, not described. */
+  .ty-grid {
+    display: block;
+    max-width: var(--ds-sample-measure);
+    margin: 0;
+    font-size: var(--text-base);
+    color: var(--color-text-primary);
+    background-image: repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent calc(1lh - var(--border-width)),
+      var(--color-border-subtle) calc(1lh - var(--border-width)),
+      var(--color-border-subtle) 1lh
+    );
+    border-top: var(--border-width) solid var(--color-border-subtle);
+  }
+
+  .ty-sample { color: var(--color-text-primary); }
+
+  /* The text styles. Each class is the proposed role, built from tokens only.
+     mockup: app scale – the specimens render each role at the size it ships. */
+  .ty-role-panel-title { /* mockup: app scale */ font-family: var(--font-sans); font-size: var(--text-sm); font-weight: var(--font-semibold);
+                         line-height: var(--leading-none); text-transform: uppercase; letter-spacing: var(--ds-tracking-caps);
+                         color: var(--color-text-primary); }
+  .ty-role-dialog-title { font-family: var(--font-sans); font-size: var(--text-lg); font-weight: var(--font-semibold);
+                          line-height: var(--leading-tight); color: var(--color-text-emphasis); }
+  .ty-role-row { font-family: var(--font-sans); font-size: var(--text-base); font-weight: var(--font-normal);
+                 line-height: var(--leading-snug); color: var(--color-text-primary); }
+  .ty-role-hint { /* mockup: app scale */ font-family: var(--font-sans); font-size: var(--text-sm); font-weight: var(--font-normal);
+                  line-height: var(--leading-snug); color: var(--color-text-tertiary); }
+  .ty-role-colhead { /* mockup: app scale */ font-family: var(--font-sans); font-size: var(--text-sm); font-weight: var(--font-medium);
+                     line-height: var(--leading-none); text-transform: uppercase; letter-spacing: var(--ds-tracking-caps);
+                     color: var(--color-text-tertiary); }
+  .ty-role-code { /* mockup: app scale */ font-family: var(--font-mono); font-size: var(--text-sm); font-weight: var(--font-normal);
+                  line-height: var(--leading-normal); color: var(--color-text-primary); }
+  /* The status line: one sentence set inside a chrome bar or a toolbar
+     (.erf-toolbar__status). The sample cell is the toolbar's own surface. */
+  .ty-role-status { /* mockup: app scale */ font-family: var(--font-sans); font-size: var(--text-sm); font-weight: var(--font-normal);
+                    line-height: var(--leading-snug); color: var(--color-text-tertiary); }
+  .ty-role-status--warning { color: var(--color-warning); }
+  .ty-role-status svg { inline-size: var(--icon-size-xs); block-size: var(--icon-size-xs); margin-inline-end: var(--space-2); vertical-align: middle; }
+  .ty-role-prose { font-family: var(--font-serif); font-size: var(--text-prose); font-weight: var(--font-normal);
+                   line-height: var(--leading-relaxed); color: var(--color-text-primary); }
+  .ty-roles td:nth-child(2) { min-width: calc(var(--space-24) * 5); background: var(--color-bg-secondary);
+                              padding-left: var(--space-6); }
+
+  /* Tracking comparison. */
+  .ty-caps { /* mockup: app scale – a panel title */ font-size: var(--text-sm); font-weight: var(--font-semibold); text-transform: uppercase;
+             color: var(--color-text-primary); }
+  .ty-caps--none { letter-spacing: 0; }
+  .ty-caps--legacy { letter-spacing: var(--ds-tracking-legacy); }
+  .ty-caps--token { letter-spacing: var(--ds-tracking-caps); }
+
+  /* Text spacing (WCAG 1.4.12): the four overrides an assistive stylesheet
+     may apply, set on a frame so the result is visible without a bookmarklet. */
+  .ty-spaced { line-height: var(--leading-normal); letter-spacing: 0.12em; word-spacing: 0.16em; }
+  .ty-spaced p { margin-block-end: 2em; }
+  .ty-chip { display: block; width: calc(var(--space-24) * 3); padding: 0 var(--space-4);
+             border: var(--border-width) solid var(--color-border-subtle); background: var(--color-bg-secondary);
+             font-size: var(--text-base); color: var(--color-text-primary); }
+  .ty-chip--fixed { height: var(--btn-height-sm); overflow: hidden; white-space: nowrap; }
+  .ty-chip--fluid { min-height: var(--btn-height-sm); }
+  .ty-frame-body { min-height: calc(var(--space-24) * 2); }
+  /* The --leading-none sample sets its lines tighter than the row; pad the
+     cell so the descenders stay inside it. */
+  .ty-tight-cell { padding-block: var(--space-2); }
+
+  .ty-fam { display: flex; gap: var(--space-12); flex-wrap: wrap; }
+  .ty-fam figure { margin: 0; }
+  .ty-fam .ty-big { font-size: var(--text-2xl); color: var(--color-text-bright); }
 </style>
 </head>
 <body>
-
+<nav class="ds-crumbs" aria-label="Breadcrumb"><a href="../../index.html">Erfana design system</a> <span aria-hidden="true">/</span> <a href="../../index.html#foundations">Foundations</a> <span aria-hidden="true">/</span> <span aria-current="page">Typography</span></nav>
+<main>
 <h1>Typography</h1>
-<p class="ds-lede">
-  Erfana is a desktop editor, so the type scale is small and dense. The default body size is
-  <strong>13px</strong>, not 16px. Sizes below are rendered at their true size — what you see is
-  what the app shows.
+<p class="ds-meta"><span class="ds-status" data-status="proposed">proposed</span> reviewed 2026-08-31</p>
+<p class="ds-lede" id="decision">
+  Erfana is a desktop editor, so the type scale is small and dense: chrome text is
+  <code data-token="--text-base">13px</code>, not 16px. <strong>Text is set by role, not by size</strong> – pick
+  a row from <a href="#roles">Text styles</a> before you reach for a token. Every sample below is rendered at its
+  true size in the bundled face.
 </p>
 
-<h2>Size scale</h2>
-<div id="sizes"></div>
+<h2 id="roles">Text styles</h2>
+<p class="ds-muted">Proposed. Seven roles cover almost every string in the chrome. Each is a fixed bundle of
+family, size, weight, leading, case and colour; the contrast cell measures the role's colour on a panel
+(<code>--color-bg-secondary</code>) against the 4.5:1 that text needs.</p>
+<table class="ds-tokens ty-roles">
+<thead><tr><th>Role</th><th>Sample</th><th>Tokens</th><th>On a panel</th></tr></thead>
+<tbody>
+  <tr><td>Panel title</td><td><span class="ty-role-panel-title">Project</span></td>
+      <td><code>--text-sm</code> · <code>--font-semibold</code> · <code>--leading-none</code> · uppercase · <code>--tracking-caps</code> · <code>--color-text-primary</code></td>
+      <td data-contrast="--color-text-primary on --color-bg-secondary" data-min="4.5" data-result="pass">8.54:1 · pass</td></tr>
+  <tr><td>Dialog title</td><td><span class="ty-role-dialog-title">Delete this file?</span></td>
+      <td><code>--text-lg</code> · <code>--font-semibold</code> · <code>--leading-tight</code> · <code>--color-text-emphasis</code></td>
+      <td data-contrast="--color-text-emphasis on --color-bg-secondary" data-min="4.5" data-result="pass">13.72:1 · pass</td></tr>
+  <tr><td>Row label</td><td><span class="ty-role-row">design-tokens.css</span></td>
+      <td><code>--text-base</code> · <code>--font-normal</code> · <code>--leading-snug</code> · <code>--color-text-primary</code></td>
+      <td data-contrast="--color-text-primary on --color-bg-secondary" data-min="4.5" data-result="pass">8.54:1 · pass</td></tr>
+  <tr><td>Hint</td><td><span class="ty-role-hint">Applies to new terminals only.</span></td>
+      <td><code>--text-sm</code> · <code>--font-normal</code> · <code>--leading-snug</code> · <code>--color-text-tertiary</code></td>
+      <td data-contrast="--color-text-tertiary on --color-bg-secondary" data-min="4.5" data-result="pass">6.33:1 · pass</td></tr>
+  <tr><td>Column header</td><td><span class="ty-role-colhead">Modified</span></td>
+      <td><code>--text-sm</code> · <code>--font-medium</code> · <code>--leading-none</code> · uppercase · <code>--tracking-caps</code> · <code>--color-text-tertiary</code></td>
+      <td data-contrast="--color-text-tertiary on --color-bg-secondary" data-min="4.5" data-result="pass">6.33:1 · pass</td></tr>
+  <tr><td>Status line</td><td><span class="ty-role-status">Saved to plan.md</span></td>
+      <td><code>--text-sm</code> · <code>--font-normal</code> · <code>--leading-snug</code> · <code>--color-text-tertiary</code> · one sentence, one line, truncates with …</td>
+      <td data-contrast="--color-text-tertiary on --color-bg-secondary" data-min="4.5" data-result="pass">6.33:1 · pass</td></tr>
+  <tr><td>Status line, warning</td><td><span class="ty-role-status ty-role-status--warning"><svg data-icon="triangle-alert" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>Paused the page so this list cannot be covered.</span></td>
+      <td>As the status line, with <code>--color-warning</code> – and a warning icon or the word “Warning” before it, so the tone is not carried by colour alone</td>
+      <td data-contrast="--color-warning on --color-bg-secondary" data-min="4.5" data-result="pass">5.94:1 · pass</td></tr>
+  <tr><td>Code, paths, ids</td><td><span class="ty-role-code">src/renderer/index.css</span></td>
+      <td><code>--font-mono</code> · <code>--text-sm</code> · <code>--font-normal</code> · <code>--leading-normal</code> · <code>--color-text-primary</code></td>
+      <td data-contrast="--color-text-primary on --color-bg-secondary" data-min="4.5" data-result="pass">8.54:1 · pass</td></tr>
+  <tr><td>Prose (rendered document)</td><td><span class="ty-role-prose">A document is read for minutes.</span></td>
+      <td><code>--font-serif</code> · <code>--text-prose</code> · <code>--font-normal</code> · <code>--leading-relaxed</code> · measure about 66ch</td>
+      <td data-contrast="--color-text-primary on --color-bg-preview" data-min="4.5" data-result="pass">10.82:1 · pass</td></tr>
+</tbody>
+</table>
+<div class="ds-note">
+  <strong>Hints use tertiary text, never secondary.</strong> <code>--color-text-secondary</code> on a panel measures
+  <span data-contrast="--color-text-secondary on --color-bg-secondary" data-min="4.5" data-result="fail">3.72:1 · fail</span> – it is a label colour
+  for the darkest surface only. A hint is text someone has to read, so it takes the colour that passes everywhere.
+  <br><br>
+  <strong>A status line is <code>--text-sm</code>, never <code>--text-xs</code>.</strong> It is a sentence someone reads
+  – “Saved to plan.md”, “3 hosts blocked” – and <code>--text-xs</code> is for a label of a word or two: a count, a chip.
+  It sits in a toolbar (<code class="ds-nowrap">--color-bg-secondary</code>, measured above) or in the preview's chrome band
+  (<code class="ds-nowrap">--color-bg-primary</code>, where the same colour measures
+  <span data-contrast="--color-text-tertiary on --color-bg-primary" data-min="4.5" data-result="pass">8.52:1 · pass</span> and the warning tone
+  <span data-contrast="--color-warning on --color-bg-primary" data-min="4.5" data-result="pass">8.00:1 · pass</span>). It is announced through
+  <code>role="status"</code>, never by stealing focus – see <a href="../components/toolbar/index.html">Toolbar</a>.
+  <br><br>
+  <strong>Uppercase is for two roles only</strong> – panel titles and column headers – and always with tracking.
+  Never uppercase a sentence, a button label or anything longer than three words.
+</div>
+
+<h2 id="size">Size scale</h2>
+<table class="ds-tokens">
+<thead><tr><th>Token</th><th>Value</th><th>Sample</th><th>Use</th></tr></thead>
+<tbody>
+  <tr><td><code>--text-xs</code></td><td><code data-token="--text-xs">10px</code></td><td><span class="ty-sample" style="font-size: var(--text-xs) /* mockup: the step itself */">The quick brown fox</span></td><td>A count or a chip – a label, never a sentence</td></tr>
+  <tr><td><code>--text-sm</code></td><td><code data-token="--text-sm">11px</code></td><td><span class="ty-sample" style="font-size: var(--text-sm) /* mockup: the step itself */">The quick brown fox</span></td><td>Panel titles, column headers, hints, code in chrome</td></tr>
+  <tr><td><code>--text-base</code></td><td><code data-token="--text-base">13px</code></td><td><span class="ty-sample" style="font-size: var(--text-base)">The quick brown fox</span></td><td>Default chrome text – row labels, menu items, field values</td></tr>
+  <tr><td><code>--text-md</code></td><td><code data-token="--text-md">14px</code></td><td><span class="ty-sample" style="font-size: var(--text-md)">The quick brown fox</span></td><td>Dialog body and button labels</td></tr>
+  <tr><td><code>--text-lg</code></td><td><code data-token="--text-lg">16px</code></td><td><span class="ty-sample" style="font-size: var(--text-lg)">The quick brown fox</span></td><td>Dialog titles, section headings</td></tr>
+  <tr><td><code>--text-xl</code></td><td><code data-token="--text-xl">18px</code></td><td><span class="ty-sample" style="font-size: var(--text-xl)">The quick brown fox</span></td><td>Page headings (welcome, settings)</td></tr>
+  <tr><td><code>--text-2xl</code></td><td><code data-token="--text-2xl">20px</code></td><td><span class="ty-sample" style="font-size: var(--text-2xl)">The quick brown fox</span></td><td>The largest heading the chrome has</td></tr>
+</tbody>
+</table>
 
 <div class="ds-note">
-  <strong>10px and 11px are label sizes, not text sizes.</strong> Use them for a chip, a count or a
-  column header. Anything a reader has to actually read starts at <code>--text-base</code>.
+  <strong>10px and 11px are label sizes, not reading sizes.</strong> Use them for a chip, a count, a panel title or a
+  one-line hint. Anything a reader has to read as a sentence or more starts at <code>--text-base</code>.
 </div>
 
-<h2>Document size</h2>
-<div id="prose"></div>
+<h3 id="prose">Document size</h3>
+<table class="ds-tokens">
+<thead><tr><th>Token</th><th>Value</th><th>Sample</th><th>Use</th></tr></thead>
+<tbody>
+  <tr><td><code>--text-prose</code></td><td><code data-token="--text-prose">15px</code></td><td><span class="ty-sample" style="font-size: var(--text-prose); font-family: var(--font-serif)">The quick brown fox</span></td><td>Rendered document body – outside the UI scale</td></tr>
+</tbody>
+</table>
+<p class="ds-muted"><code>--text-prose</code> is not an eighth step of the scale. It is the body size of rendered
+<em>document</em> content – the Markdown preview – which a reader stays in for minutes. Headings inside the preview
+scale from it in <code>em</code>. Chrome never uses it.</p>
+
+<h2 id="weights">Weights</h2>
+<table class="ds-tokens">
+<thead><tr><th>Token</th><th>Value</th><th>Sample</th><th>Use</th></tr></thead>
+<tbody>
+  <tr><td><code>--font-normal</code></td><td><code data-token="--font-normal">400</code></td><td><span class="ty-sample" style="font-weight: var(--font-normal); font-size: var(--text-md)">The quick brown fox</span></td><td>Body copy, row labels, hints</td></tr>
+  <tr><td><code>--font-medium</code></td><td><code data-token="--font-medium">500</code></td><td><span class="ty-sample" style="font-weight: var(--font-medium); font-size: var(--text-md)">The quick brown fox</span></td><td>Column headers, emphasis inside a row</td></tr>
+  <tr><td><code>--font-semibold</code></td><td><code data-token="--font-semibold">600</code></td><td><span class="ty-sample" style="font-weight: var(--font-semibold); font-size: var(--text-md)">The quick brown fox</span></td><td>Titles, button labels</td></tr>
+  <tr><td><code>--font-bold</code></td><td><code data-token="--font-bold">700</code></td><td><span class="ty-sample" style="font-weight: var(--font-bold); font-size: var(--text-md)">The quick brown fox</span></td><td>Rare – reserve it for rendered documents</td></tr>
+</tbody>
+</table>
+
+<h2 id="leading">Line heights</h2>
+<p class="ds-muted">Each leading is drawn as the same three-line paragraph over a grid with one hairline at the foot
+of every line box, so the space a line takes is measured, not described.</p>
+<table class="ds-tokens">
+<thead><tr><th>Token</th><th>Value</th><th>Three lines over the line-box grid</th><th>Use</th></tr></thead>
+<tbody>
+  <tr><td><code>--leading-none</code></td><td><code data-token="--leading-none">1</code></td><td class="ty-tight-cell"><p class="ty-grid" style="line-height: var(--leading-none)">Single-line chrome only. Set a paragraph this tight and the descenders touch the next line's capitals.</p></td><td>Single-line chrome: titles, chips, tabs</td></tr>
+  <tr><td><code>--leading-tight</code></td><td><code data-token="--leading-tight">1.25</code></td><td><p class="ty-grid" style="line-height: var(--leading-tight)">Headings that may wrap to a second line. Tight enough to read as one block, loose enough to read.</p></td><td>Headings</td></tr>
+  <tr><td><code>--leading-snug</code></td><td><code data-token="--leading-snug">1.375</code></td><td><p class="ty-grid" style="line-height: var(--leading-snug)">Dense lists and hints. A row label that wraps keeps its two lines visibly together.</p></td><td>Rows, hints, menus</td></tr>
+  <tr><td><code>--leading-normal</code></td><td><code data-token="--leading-normal">1.5</code></td><td><p class="ty-grid" style="line-height: var(--leading-normal)">The default for any paragraph in the chrome. It is also the floor WCAG 1.4.12 asks text to survive.</p></td><td>Default – dialog and settings text</td></tr>
+  <tr><td><code>--leading-relaxed</code></td><td><code data-token="--leading-relaxed">1.6</code></td><td><p class="ty-grid" style="line-height: var(--leading-relaxed)">Long prose in a rendered document, read for minutes at a time, where the eye has to find the next line.</p></td><td>Rendered documents</td></tr>
+</tbody>
+</table>
+
+<h2 id="tracking">Tracking for uppercase labels</h2>
+<p class="ds-muted">Proposed: one token, <code>--tracking-caps: 0.06em</code>. Capitals set at 10–11px without tracking
+crowd into a block. The app adds tracking today as pixel literals, typed per stylesheet and not all the same
+value. In <code>em</code> it scales with the size it sits on, so one value serves both label sizes.</p>
+<div class="ds-frames">
+  <figure class="ds-frame"><div aria-hidden="true"><span class="ty-caps ty-caps--none">Project explorer</span></div>
+    <figcaption><strong>No tracking</strong> – capitals crowd.</figcaption></figure>
+  <figure class="ds-frame"><div aria-hidden="true"><span class="ty-caps ty-caps--legacy">Project explorer</span></div>
+    <figcaption><strong>A pixel literal (0.5px)</strong> – how the panel titles do it today. Does not scale with the size it sits on.</figcaption></figure>
+  <figure class="ds-frame"><div aria-hidden="true"><span class="ty-caps ty-caps--token">Project explorer</span></div>
+    <figcaption><strong>0.06em – proposed <code>--tracking-caps</code></strong>, about 0.66px at 11px.</figcaption></figure>
+</div>
+
+<h2 id="families">Font families</h2>
+<table class="ds-tokens">
+<thead><tr><th>Token</th><th>Value</th><th>Sample</th><th>Use</th></tr></thead>
+<tbody>
+  <tr><td><code>--font-sans</code></td><td><code data-token="--font-sans">-apple-system, BlinkMacSystemFont, &#x27;Segoe UI&#x27;, &#x27;Roboto&#x27;, &#x27;Oxygen&#x27;, &#x27;Ubuntu&#x27;, &#x27;Cantarell&#x27;, &#x27;Fira Sans&#x27;, &#x27;Droid Sans&#x27;, &#x27;Helvetica Neue&#x27;, sans-serif</code></td><td><span class="ty-sample" style="font-family: var(--font-sans); font-size: var(--text-md)">Erfana 0123 {}</span></td><td>All chrome text – the operating system face</td></tr>
+  <tr><td><code>--font-system</code></td><td><code data-token="--font-system">-apple-system, BlinkMacSystemFont, &#x27;Segoe UI&#x27;, Roboto, sans-serif</code></td><td><span class="ty-sample" style="font-family: var(--font-system); font-size: var(--text-md)">Erfana 0123 {}</span></td><td><strong>Proposed for retirement</strong> – see below</td></tr>
+  <tr><td><code>--font-mono</code></td><td><code data-token="--font-mono">&#x27;Cascadia Mono&#x27;, &#x27;SF Mono&#x27;, Monaco, &#x27;Cascadia Code&#x27;, &#x27;Roboto Mono&#x27;, Consolas, &#x27;Courier New&#x27;, monospace</code></td><td><span class="ty-sample" style="font-family: var(--font-mono); font-size: var(--text-md)">Erfana 0123 {}</span></td><td>Anything a machine produced: code, paths, hostnames, ids, the terminal</td></tr>
+  <tr><td><code>--font-serif</code></td><td><code data-token="--font-serif">Charter, Georgia, Cambria, &#x27;Times New Roman&#x27;, serif</code></td><td><span class="ty-sample" style="font-family: var(--font-serif); font-size: var(--text-md)">Erfana 0123 {}</span></td><td>Rendered document prose only</td></tr>
+</tbody>
+</table>
+
+<h3 id="font-system">One sans stack, not two</h3>
+<div class="ty-fam">
+  <figure class="ds-frame"><div aria-hidden="true"><span class="ty-big" style="font-family: var(--font-sans)">Rag 0123 Ilj</span></div>
+    <figcaption><strong><code>--font-sans</code></strong> – keep.</figcaption></figure>
+  <figure class="ds-frame"><div aria-hidden="true"><span class="ty-big" style="font-family: var(--font-system)">Rag 0123 Ilj</span></div>
+    <figcaption><strong><code>--font-system</code></strong> – retire.</figcaption></figure>
+</div>
 <div class="ds-note">
-  <strong><code>--text-prose</code> is not an eighth step of the scale above.</strong> It is the body
-  size of rendered <em>document</em> content — the Markdown preview — which a reader stays in for
-  minutes, not a label they glance at. It used to be typed by hand as a literal in
-  <code>MarkdownPreview.css</code>; naming it keeps the one size outside the UI scale visible instead of
-  hidden. Headings inside the preview scale from it in <code>em</code>. Chrome never uses it.
+  <strong>Proposed: retire <code>--font-system</code> and point its one reader at <code>--font-sans</code>.</strong>
+  Both stacks start with the same three faces (<code>-apple-system</code>, <code>BlinkMacSystemFont</code>,
+  <code>'Segoe UI'</code>), so on macOS and Windows they resolve to the same font and the two samples above are
+  identical. They can only differ on Linux, where <code>--font-system</code> skips the distribution faces and falls to
+  Roboto or the generic sans – the opposite of "the system face". A second name for the same intent is how a
+  scale grows a fourth member nobody chose. Today it is read in <code>MermaidToolbar.css</code>, so
+  the migration is a small change, then the token moves to the retired strip on this card.
 </div>
 
-<h2>Weights</h2>
-<div id="weights"></div>
+<h2 id="resize">Zoom, reflow and text spacing</h2>
+<p class="ds-muted">Three WCAG 2.2 criteria decide how text behaves when the reader changes it. None of them is
+satisfied by the type scale alone; each is a rule about the box the text sits in.</p>
+<table class="ds-tokens">
+<thead><tr><th>Criterion</th><th>What the reader does</th><th>The rule for Erfana</th></tr></thead>
+<tbody>
+  <tr><td>1.4.4 Resize text (AA)</td><td>Zooms the window to 200% with View → Zoom in (<kbd>⌘</kbd><kbd>+</kbd> / <kbd>Ctrl</kbd><kbd>+</kbd>)</td>
+      <td>Nothing is lost or clipped. Text sizes are pixel tokens and page zoom scales pixels, so the scale itself is fine;
+      what breaks is a <strong>fixed height</strong> around text. Size a text container with <code>min-height</code>
+      and padding, never <code>height</code>. Never disable zoom.</td></tr>
+  <tr><td>1.4.10 Reflow (AA)</td><td>Zooms until the window is the width of 320 CSS pixels</td>
+      <td>Chrome reflows into one column with no sideways scrolling: labels wrap or truncate with the full text
+      available (a tooltip is not enough – the accessible name carries it). <strong>Exempt by the criterion:</strong>
+      content that needs two dimensions to mean anything – the code editor, the terminal, a wide table, a diagram.
+      They may scroll both ways; the panel around them may not.</td></tr>
+  <tr><td>1.4.12 Text spacing (AA)</td><td>Applies a stylesheet setting line height 1.5, paragraph spacing 2em, letter spacing 0.12em and word spacing 0.16em</td>
+      <td>No text is clipped or overlaps. Same cause as 1.4.4: a fixed <code>height</code> with
+      <code>overflow: hidden</code> on a text box. A chip, a tab or a row grows; it does not crop.</td></tr>
+</tbody>
+</table>
 
-<h2>Line heights</h2>
-<div id="leading"></div>
-
-<h2>Font families</h2>
-
-<div class="fam">
-  <div class="ty-token">--font-sans</div>
-  <p style="font-family: var(--font-sans)">The system UI face. Everything chrome-side uses this.</p>
+<div class="ds-frames">
+  <figure class="ds-frame"><div class="ty-frame-body" aria-hidden="true"><span class="ty-chip ty-chip--fixed">Untitled document</span></div>
+    <figcaption><strong>Normal spacing, fixed height</strong> – looks fine until the reader changes anything.</figcaption></figure>
+  <figure class="ds-frame"><div class="ty-frame-body ty-spaced" aria-hidden="true"><span class="ty-chip ty-chip--fixed">Untitled document</span></div>
+    <figcaption><strong>1.4.12 spacing, fixed height</strong> – <span class="ds-verdict ds-fail">fail</span>: the label is cropped mid-word.</figcaption></figure>
+  <figure class="ds-frame"><div class="ty-frame-body ty-spaced" aria-hidden="true"><span class="ty-chip ty-chip--fluid">Untitled document</span></div>
+    <figcaption><strong>1.4.12 spacing, <code>min-height</code></strong> – <span class="ds-verdict ds-pass">pass</span>: the box grows and the label wraps.</figcaption></figure>
 </div>
 
-<div class="fam">
-  <div class="ty-token">--font-mono</div>
-  <p style="font-family: var(--font-mono)">
-    Cascadia Mono ships with the app, so code renders identically on macOS and Windows.
-    Use it for anything a machine produced: paths, hostnames, code, ids.
-    cdn.jsdelivr.net · xn--80ak6aa92e.com
-  </p>
-</div>
+<section id="exceptions">
+<h2>Exceptions</h2>
+<p class="ds-muted">None recorded. A shipping component that departs from this card carries a
+<code>deviates:</code> marker at the site and gets a row here, naming the file.</p>
+</section>
 
-<div class="fam">
-  <div class="ty-token">--font-serif</div>
-  <p style="font-family: var(--font-serif)">Charter / Georgia. Reserved for rendered document content.</p>
-</div>
-
-<script>
-const SIZES = [
-  ['--text-xs', 'Tiny labels'],
-  ['--text-sm', 'Small labels, hints'],
-  ['--text-base', 'Default body text'],
-  ['--text-md', 'Slightly larger body'],
-  ['--text-lg', 'Subheadings'],
-  ['--text-xl', 'Headings'],
-  ['--text-2xl', 'Large headings']
-];
-const WEIGHTS = [['--font-normal', 'Body copy'], ['--font-medium', 'Emphasis inside a row'],
-                 ['--font-semibold', 'Headings, button labels'], ['--font-bold', 'Rare — reserve it']];
-const LEADING = [['--leading-none', 'Single-line chrome'], ['--leading-tight', 'Headings'],
-                 ['--leading-snug', 'Dense lists'], ['--leading-normal', 'Default'],
-                 ['--leading-relaxed', 'Long prose']];
-
-function resolved(token) {
-  const probe = document.createElement('span');
-  probe.style.setProperty('--probe', `var(${token})`);
-  document.body.appendChild(probe);
-  const value = getComputedStyle(probe).getPropertyValue('--probe').trim();
-  probe.remove();
-  return value;
-}
-
-function row(host, token, note, style) {
-  const el = document.createElement('div');
-  el.className = 'ty-row';
-  el.innerHTML = `<div class="ty-token"></div><div class="ty-px"></div><div class="ty-sample"></div>`;
-  el.children[0].textContent = token;
-  el.children[1].textContent = resolved(token);
-  el.children[2].textContent = note;
-  Object.assign(el.children[2].style, style);
-  host.appendChild(el);
-}
-
-for (const [token, note] of SIZES) row(document.getElementById('sizes'), token, note, { fontSize: `var(${token})` });
-row(document.getElementById('prose'), '--text-prose', 'Rendered document body', { fontSize: 'var(--text-prose)', fontFamily: 'var(--font-serif)' });
-for (const [token, note] of WEIGHTS) row(document.getElementById('weights'), token, note, { fontWeight: `var(${token})`, fontSize: 'var(--text-md)' });
-for (const [token, note] of LEADING) row(document.getElementById('leading'), token, note, { lineHeight: `var(${token})`, fontSize: 'var(--text-base)' });
-</script>
+</main>
 </body>
 </html>

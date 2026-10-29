@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * The still-frame cache's capture order (docs/designs/html-preview-comments.md
+ * The still-frame cache's capture order (docs/designs/comments/html-preview-comments.md
  * §19 "Rev 3 notes – P7 bug round", test E-011).
  *
  * One counter orders every capture start and every load mark – no clock to

@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Comment file jobs: every parse a pick, a pin, a list or a write needs, run
- * on bytes main read (docs/designs/html-preview-comments.md §19 R3-12).
+ * on bytes main read (docs/designs/comments/html-preview-comments.md §19 R3-12).
  *
  * Four jobs: `draft` (a pick), `pin` (a pin click: its blocks and its draft
  * from one parse), `list` and `write`. Main reads and confines the file; the

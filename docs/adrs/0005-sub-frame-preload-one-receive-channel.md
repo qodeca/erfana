@@ -3,7 +3,7 @@
 - **Status**: accepted
 - **Date**: 2026-10-26
 - **Deciders**: Marcin Obel, Claude Code (HTML Preview comments plan rev 3, phase P4)
-- **Related**: [design](../designs/html-preview-comments.md) §4.2, §8, §9.2, §19 R3-2 – R3-7 · [spike results](../spikes/html-preview-comments.md) · [`src/preload/previewPage.ts`](../../src/preload/previewPage.ts) · [`src/preload/previewPageComments/`](../../src/preload/previewPageComments/index.ts) · [`previewSessionPolicy.ts`](../../src/main/services/preview/previewSessionPolicy.ts) · [`previewViewLifecycle.ts`](../../src/main/services/preview/previewViewLifecycle.ts) · [docs/security.md](../security.md) § Revised for in-page links
+- **Related**: [design](../designs/comments/html-preview-comments.md) §4.2, §8, §9.2, §19 R3-2 – R3-7 · [spike results](../spikes/html-preview-comments.md) · [`src/preload/previewPage.ts`](../../src/preload/previewPage.ts) · [`src/preload/previewPageComments/`](../../src/preload/previewPageComments/index.ts) · [`previewSessionPolicy.ts`](../../src/main/services/preview/previewSessionPolicy.ts) · [`previewViewLifecycle.ts`](../../src/main/services/preview/previewViewLifecycle.ts) · [docs/security.md](../security.md) § Revised for in-page links
 
 ## Context
 

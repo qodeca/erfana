@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * The listeners one view's comments put on its `webContents`
- * (docs/designs/html-preview-comments.md §4.2, §6 "Frames", §8).
+ * (docs/designs/comments/html-preview-comments.md §4.2, §6 "Frames", §8).
  *
  * - The page's three signals on the view's own `webContents.ipc` – the view's
  *   frames only, never global `ipcMain` – each checked in

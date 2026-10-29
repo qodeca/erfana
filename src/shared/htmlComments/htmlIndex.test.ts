@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * The shared parse (docs/designs/html-preview-comments.md §4.2, §5.5, §5.6):
+ * The shared parse (docs/designs/comments/html-preview-comments.md §4.2, §5.5, §5.6):
  * which elements may take a block, where they start, and their text.
  */
 import { defaultTreeAdapter, html as htmlSpec } from 'parse5'

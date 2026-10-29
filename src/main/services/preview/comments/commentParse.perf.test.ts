@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * F-002 – main-thread cost of comment instrumentation per load
- * (docs/designs/html-preview-comments.md §5.8, §12.2 F-002, §19 R3-12; spike
+ * (docs/designs/comments/html-preview-comments.md §5.8, §12.2 F-002, §19 R3-12; spike
  * S9).
  *
  * The real worker entry is bundled and started as a real `worker_threads`

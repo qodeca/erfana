@@ -62,7 +62,7 @@ A thin status bar pinned to the bottom of a terminal panel — its height matche
 - On any detection/parse failure the bar hides gracefully — no error, no stale data
 - macOS and Windows are both supported (Windows support was cut for 0.16.0, which was never tagged; it first reached users in v0.16.3 — pre-migration issue #217); on Linux the process detector is a no-op so the bar never appears there
 
-See the full design in [`docs/designs/216-claude-status-bar.md`](../designs/216-claude-status-bar.md); model-id parsing and window sizing are superseded by [`docs/designs/41-model-capability-registry.md`](../designs/41-model-capability-registry.md). IPC: `claude-status:register` / `:unregister` / `:nudge` (invoke) and `claude-status:changed` (main → renderer push).
+See the full design in [`docs/designs/context-meter/216-claude-status-bar.md`](../designs/context-meter/216-claude-status-bar.md); model-id parsing and window sizing are superseded by [`docs/designs/context-meter/41-model-capability-registry.md`](../designs/context-meter/41-model-capability-registry.md). IPC: `claude-status:register` / `:unregister` / `:nudge` (invoke) and `claude-status:changed` (main → renderer push).
 
 ### Auto-Open on Project Load (v0.6.3)
 

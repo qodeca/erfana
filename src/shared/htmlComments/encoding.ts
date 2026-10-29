@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Lossless text decoding for comment writes
- * (docs/designs/html-preview-comments.md §3 "Non-UTF-8 files", §7.6 step 4).
+ * (docs/designs/comments/html-preview-comments.md §3 "Non-UTF-8 files", §7.6 step 4).
  *
  * Erfana writes a comment by splicing decoded text and encoding it again, so
  * the decode must be exactly reversible or every byte outside the block would

@@ -10,7 +10,7 @@
  * returned unsubscribe removes the SAME listener reference (identity never
  * drifts), mirroring the `claudeStatus` bridge.
  *
- * @see docs/designs/sd-074-html-preview.md §4
+ * @see docs/designs/html-preview/sd-074-html-preview.md §4
  * @see src/preload/index.ts (the `claudeStatus` bridge this mirrors)
  */
 import { ipcRenderer } from 'electron'

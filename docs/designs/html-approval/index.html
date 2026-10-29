@@ -1,0 +1,449 @@
+<!-- @card group="HTML preview" name="Approving a remote host" subtitle="The whole journey – nine states, from a clean page to a page that will not yield" status="proposed" reviewed="2026-09-01" -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark"><head>
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Erfana – approving a remote host</title>
+<link rel="stylesheet" href="../../design-system/tokens.css">
+<link rel="stylesheet" href="../../design-system/ds.css">
+<!-- The host primitive (.erf-host), the band, and Back, the link toggle and the narrow tiers:
+     the same three stylesheets the Permission band card loads, synced from src/. -->
+<link rel="stylesheet" href="../../design-system/system/components/row/host.css">
+<link rel="stylesheet" href="../../design-system/system/components/permission-band/band.css">
+<link rel="stylesheet" href="../../design-system/system/components/permission-band/nav.css">
+<style>
+  /* Feature-specific layout only. The band, the host and the third-party page all come from the system. */
+
+  /* One state per row: the drawing on the left, its caption on the right. */
+  .ha-flow { display: flex; flex-direction: column; gap: var(--space-12); margin-bottom: var(--space-24); }
+  .ha-flow .ds-frame { display: grid; grid-template-columns: minmax(0, 560px) minmax(0, 1fr);
+                       gap: var(--space-16); align-items: start; }
+  .ha-flow .ds-frame > figcaption { margin-top: 0; }
+  .ha-flow .ds-frame > figcaption p { margin: var(--space-4) 0 0; max-width: 56ch; }
+
+  /* A preview panel, drawn to scale: the band, then the previewed page. min-height, not
+     height, so a confirm step's buttons are never clipped by the picture. */
+  .ha-panel { border: var(--border-width) solid var(--color-border-subtle); background: var(--color-bg-primary);
+              display: flex; flex-direction: column; min-height: 280px; overflow: hidden; }
+  .ha-panel > .ds-foreign-page { flex: 1 1 auto; }
+  /* Step 09: a panel shorter than the split threshold. */
+  .ha-panel--short { height: 300px; min-height: 0; }
+  /* Two blocked resources side by side on the third-party page. */
+  .ha-missing { display: flex; gap: var(--space-6); margin-bottom: var(--space-5); }
+  .ha-missing > .ds-foreign-page__missing { flex: 0 1 160px; min-height: var(--space-24); }
+
+  .ha-rule { border: 0; border-top: var(--border-width) solid var(--color-border-default); margin: var(--space-24) 0; }
+</style>
+</head>
+<body>
+<main>
+
+<h1>Approving a remote host</h1>
+<p class="ds-lede" id="decision">
+  A previewed HTML page asks for a font, a script, an image from somewhere on the internet. Erfana
+  blocks it and asks you. <strong>This is how that conversation goes</strong> – drawn as the band ships today
+  (<code>PreviewChromeBand</code>, <code>PreviewNavControls</code>, <code>PreviewToolbarTools</code>), on the
+  decided <a href="../../design-system/system/components/permission-band/index.html">Permission band</a> card's markup and CSS.
+</p>
+
+<div class="ds-note">
+  <strong>What this replaced.</strong> Each blocked host used to raise its own pop-up, capped at three.
+  A page reaching four hosts produced three stacked walls of identical text over your file tree – and
+  the fourth host could not be approved at all, because the app ran out of pop-ups. That cap was the only
+  thing bounding the list, so it was load-bearing by accident.
+</div>
+
+<h2>Four rules this design follows</h2>
+
+<div class="ds-note">
+  <strong>1 · The question lives on the thing it is about.</strong> A permission decision outlives the
+  message that raised it, so it belongs on the preview's own chrome – not floating over an unrelated
+  part of the app that happens to be free.
+  <br><br>
+  <strong>2 · One decision at a time, and never by accident.</strong> Allow only opens the question.
+  Confirm answers it, and is deliberately never focused for you, so pressing <kbd>Enter</kbd> twice cannot grant anything.
+  <br><br>
+  <strong>3 · Say what is actually being granted.</strong> Erfana cannot limit a host to the one thing
+  it was blocked for. Approving lets that host serve code and receive data, in every preview in the
+  project, for anyone who clones it. The confirm step says so in those words.
+  <br><br>
+  <strong>4 · Never draw a button a page could be sitting on top of.</strong> The previewed page is a
+  native layer above all of Erfana's own interface. Buttons appear only once the page has proved it
+  moved out of the way – see step 08.
+</div>
+
+<hr class="ha-rule">
+
+<h2 id="flow">The journey, one state per frame</h2>
+<p class="ds-muted">Each frame is a picture: nothing in it takes focus. The keyboard route is the table below.</p>
+<div class="ha-flow">
+<figure class="ds-frame">
+  <div class="ha-panel" inert aria-hidden="true">
+    <div class="erf-band">
+      <div class="erf-band__announce"></div>
+      <div class="erf-band__bar" aria-label="Preview">
+        <button class="erf-band__tool" type="button" aria-label="Back" aria-disabled="true" aria-keyshortcuts="Meta+[" title="Back – no earlier page in this tab"><svg data-icon="arrow-left" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg></button>
+        <button class="erf-band__tool erf-band__tool--toggle" type="button" aria-label="Open links in this tab" aria-pressed="false" title="Open links in this tab – off: links open a new tab"><svg data-icon="mouse-pointer-click" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4.1 12 6"/><path d="m5.1 8-2.9-.8"/><path d="m6 12-1.9 2"/><path d="M7.2 2.2 8 5.1"/><path d="M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z"/></svg></button>
+        <button class="erf-band__tool" type="button" aria-label="Find" aria-keyshortcuts="Meta+F" title="Find"><svg data-icon="search" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg></button>
+        <span class="erf-band__spacer"></span>
+        <button class="erf-band__chip" type="button" aria-expanded="false" aria-label="0 blocked · 0 allowed. Remote hosts in this preview. Press Escape in the previewed page to return here.">
+          <span><span>0 blocked</span><span class="erf-band__chip-allowed"> · 0 allowed</span></span>
+          <span class="erf-band__chip-caret" aria-hidden="true">▸</span>
+        </button>
+        <span class="erf-band__separator" aria-hidden="true"></span>
+        <button class="erf-band__tool" type="button" aria-label="Open in default browser" title="Open in default browser"><svg data-icon="external-link" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></button>
+        <button class="erf-band__tool" type="button" aria-label="Export to PDF" aria-keyshortcuts="Meta+S" title="Export to PDF"><svg data-icon="file-down" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M12 18v-6"/><path d="m9 15 3 3 3-3"/></svg></button>
+      </div>
+    </div>
+    <div class="ds-foreign-page">
+        <p class="ds-foreign-page__heading">Quarterly report</p>
+        <p class="ds-foreign-page__body">Revenue held steady across the period, with the strongest movement in the second half.</p>
+        <p class="ds-foreign-page__body">Costs tracked below forecast throughout.</p>
+      </div>
+  </div>
+  <figcaption><span class="ds-frame__step">01</span><strong>Nothing was asked for</strong>
+    
+    <p>A page with no remote content still gets the band. <strong>It is always present</strong> – a control that appears only when something is wrong is not one you can trust, and its place above the page is now the only thing separating Erfana from the page.</p>
+    <p>The chip always shows both counts, including two zeroes: silence is the one state a permission control must never have. Back is drawn <code>aria-disabled</code>, because a page just opened has no earlier page in its tab.</p>
+    <p>The bar once carried the words “Preview – content below is not Erfana”. They were removed by owner decision when it became a toolbar; see the <a href="../../design-system/system/components/permission-band/index.html#toolbar">Permission band</a> card.</p>
+  </figcaption>
+</figure>
+<figure class="ds-frame">
+  <div class="ha-panel" inert aria-hidden="true">
+    <div class="erf-band">
+      <div class="erf-band__announce"></div>
+      <div class="erf-band__bar" aria-label="Preview">
+        <button class="erf-band__tool" type="button" aria-label="Back" aria-disabled="true" aria-keyshortcuts="Meta+[" title="Back – no earlier page in this tab"><svg data-icon="arrow-left" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg></button>
+        <button class="erf-band__tool erf-band__tool--toggle" type="button" aria-label="Open links in this tab" aria-pressed="false" title="Open links in this tab – off: links open a new tab"><svg data-icon="mouse-pointer-click" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4.1 12 6"/><path d="m5.1 8-2.9-.8"/><path d="m6 12-1.9 2"/><path d="M7.2 2.2 8 5.1"/><path d="M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z"/></svg></button>
+        <button class="erf-band__tool" type="button" aria-label="Find" aria-keyshortcuts="Meta+F" title="Find"><svg data-icon="search" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg></button>
+        <span class="erf-band__spacer"></span>
+        <button class="erf-band__chip" type="button" aria-expanded="false" aria-label="4 blocked · 0 allowed. Remote hosts in this preview. Press Escape in the previewed page to return here.">
+          <span><span>4 blocked</span><span class="erf-band__chip-allowed"> · 0 allowed</span></span>
+          <span class="erf-band__chip-caret" aria-hidden="true">▸</span>
+        </button>
+        <span class="erf-band__separator" aria-hidden="true"></span>
+        <button class="erf-band__tool" type="button" aria-label="Open in default browser" title="Open in default browser"><svg data-icon="external-link" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></button>
+        <button class="erf-band__tool" type="button" aria-label="Export to PDF" aria-keyshortcuts="Meta+S" title="Export to PDF"><svg data-icon="file-down" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M12 18v-6"/><path d="m9 15 3 3 3-3"/></svg></button>
+      </div>
+    </div>
+    <div class="ds-foreign-page">
+        <p class="ds-foreign-page__heading">Quarterly report</p>
+        <p class="ds-foreign-page__body">Revenue held steady across the period.</p>
+        <div class="ha-missing"><div class="ds-foreign-page__missing">Chart not loaded</div><div class="ds-foreign-page__missing">Logo not loaded</div></div>
+        <p class="ds-foreign-page__body">Two images and a script could not load.</p>
+      </div>
+  </div>
+  <figcaption><span class="ds-frame__step">02</span><strong>Four hosts were blocked</strong>
+    
+    <p>The count changes. <strong>Nothing pops up.</strong> The page keeps rendering everything it can, and the parts that could not load are visibly missing – a truer signal than a notification the reader has already dismissed.</p>
+    <p>Four is the case that broke the old design. Here it is just a number.</p>
+  </figcaption>
+</figure>
+<figure class="ds-frame">
+  <div class="ha-panel" inert aria-hidden="true">
+    <div class="erf-band">
+      <div class="erf-band__announce"></div>
+      <div class="erf-band__bar" aria-label="Preview">
+        <button class="erf-band__tool" type="button" aria-label="Back" aria-disabled="true" aria-keyshortcuts="Meta+[" title="Back – no earlier page in this tab"><svg data-icon="arrow-left" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg></button>
+        <button class="erf-band__tool erf-band__tool--toggle" type="button" aria-label="Open links in this tab" aria-pressed="false" title="Open links in this tab – off: links open a new tab"><svg data-icon="mouse-pointer-click" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4.1 12 6"/><path d="m5.1 8-2.9-.8"/><path d="m6 12-1.9 2"/><path d="M7.2 2.2 8 5.1"/><path d="M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z"/></svg></button>
+        <button class="erf-band__tool" type="button" aria-label="Find" aria-keyshortcuts="Meta+F" title="Find"><svg data-icon="search" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg></button>
+        <span class="erf-band__spacer"></span>
+        <button class="erf-band__chip" type="button" aria-expanded="true" aria-label="4 blocked · 0 allowed. Remote hosts in this preview. Press Escape in the previewed page to return here.">
+          <span><span>4 blocked</span><span class="erf-band__chip-allowed"> · 0 allowed</span></span>
+          <span class="erf-band__chip-caret" aria-hidden="true">▾</span>
+        </button>
+        <span class="erf-band__separator" aria-hidden="true"></span>
+        <button class="erf-band__tool" type="button" aria-label="Open in default browser" title="Open in default browser"><svg data-icon="external-link" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></button>
+        <button class="erf-band__tool" type="button" aria-label="Export to PDF" aria-keyshortcuts="Meta+S" title="Export to PDF"><svg data-icon="file-down" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M12 18v-6"/><path d="m9 15 3 3 3-3"/></svg></button>
+      </div>
+      <div class="erf-band__list"><div class="erf-band__scroll"><div class="erf-band__section">Blocked on load</div><div class="erf-band__row"><span class="erf-host" dir="ltr" aria-label="https://fonts.googleapis.com">fonts.<wbr>googleapis.<wbr>com</span><span class="erf-band__kind"></span><button class="erf-band__allow" type="button" aria-label="Allow https://fonts.googleapis.com" aria-expanded="false">Allow</button></div><div class="erf-band__row"><span class="erf-host" dir="ltr" aria-label="https://cdn.jsdelivr.net">cdn.<wbr>jsdelivr.<wbr>net</span><span class="erf-band__kind"></span><button class="erf-band__allow" type="button" aria-label="Allow https://cdn.jsdelivr.net" aria-expanded="false">Allow</button></div><div class="erf-band__row"><span class="erf-host" dir="ltr" aria-label="https://cdnjs.cloudflare.com">cdnjs.<wbr>cloudflare.<wbr>com</span><span class="erf-band__kind"></span><button class="erf-band__allow" type="button" aria-label="Allow https://cdnjs.cloudflare.com" aria-expanded="false">Allow</button></div><div class="erf-band__row"><span class="erf-host" dir="ltr" aria-label="https://placehold.co">placehold.<wbr>co</span><span class="erf-band__kind"></span><button class="erf-band__allow" type="button" aria-label="Allow https://placehold.co" aria-expanded="false">Allow</button></div></div></div>
+    </div>
+    <div class="ds-foreign-page">
+        <p class="ds-foreign-page__heading">Quarterly report</p>
+        <p class="ds-foreign-page__body">Revenue held steady across the period.</p>
+        <div class="ha-missing"><div class="ds-foreign-page__missing">Chart not loaded</div><div class="ds-foreign-page__missing">Logo not loaded</div></div>
+        <p class="ds-foreign-page__body">Two images and a script could not load.</p>
+      </div>
+  </div>
+  <figcaption><span class="ds-frame__step">03</span><strong>You open the list</strong>
+    
+    <p>The page moves <strong>down</strong>, not behind. It stays live and scrollable, so you can still see what the page looks like while you decide whether to complete it.</p>
+    <p>Each row is a host and an Allow, and <strong>no row names a kind</strong>. Beside a host and a button, “image” or “style” would read as the scope of the block and of the grant, and neither is scoped – an approved host is added to every rule the preview builds. The kind is named once, in the confirm sentence (step 04), where the next clause takes the limit back.</p>
+    <p>The list is clamped to <span data-claim="band-list-max-height" title="host-list clamp in PreviewChromeBand.css, px">240</span>px and scrolls with a stable gutter.</p>
+  </figcaption>
+</figure>
+<figure class="ds-frame">
+  <div class="ha-panel" inert aria-hidden="true">
+    <div class="erf-band">
+      <div class="erf-band__announce">Approving https://placehold.co. This cannot be undone. Cancel or confirm.</div>
+      <div class="erf-band__bar" aria-label="Preview">
+        <button class="erf-band__tool" type="button" aria-label="Back" aria-disabled="true" aria-keyshortcuts="Meta+[" title="Back – no earlier page in this tab"><svg data-icon="arrow-left" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg></button>
+        <button class="erf-band__tool erf-band__tool--toggle" type="button" aria-label="Open links in this tab" aria-pressed="false" title="Open links in this tab – off: links open a new tab"><svg data-icon="mouse-pointer-click" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4.1 12 6"/><path d="m5.1 8-2.9-.8"/><path d="m6 12-1.9 2"/><path d="M7.2 2.2 8 5.1"/><path d="M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z"/></svg></button>
+        <button class="erf-band__tool" type="button" aria-label="Find" aria-keyshortcuts="Meta+F" title="Find"><svg data-icon="search" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg></button>
+        <span class="erf-band__spacer"></span>
+        <button class="erf-band__chip" type="button" aria-expanded="true" aria-label="4 blocked · 0 allowed. Remote hosts in this preview. Press Escape in the previewed page to return here.">
+          <span><span>4 blocked</span><span class="erf-band__chip-allowed"> · 0 allowed</span></span>
+          <span class="erf-band__chip-caret" aria-hidden="true">▾</span>
+        </button>
+        <span class="erf-band__separator" aria-hidden="true"></span>
+        <button class="erf-band__tool" type="button" aria-label="Open in default browser" title="Open in default browser"><svg data-icon="external-link" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></button>
+        <button class="erf-band__tool" type="button" aria-label="Export to PDF" aria-keyshortcuts="Meta+S" title="Export to PDF"><svg data-icon="file-down" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M12 18v-6"/><path d="m9 15 3 3 3-3"/></svg></button>
+      </div>
+      <div class="erf-band__list"><div class="erf-band__scroll"><div class="erf-band__section">Approving</div><div><div class="erf-band__row"><span class="erf-host" dir="ltr" aria-label="https://placehold.co">placehold.<wbr>co</span><span class="erf-band__kind"></span><button class="erf-band__allow" type="button" aria-label="Allow https://placehold.co" aria-expanded="true">Allow</button></div><div class="erf-band__confirm" tabindex="-1"><p class="erf-band__confirm-title">Let this page load from https://placehold.co?</p><p class="erf-band__confirm-body">It was blocked for an image, but Erfana cannot limit it to that – the host will also be able to run code and send data to it.</p><p class="erf-band__confirm-body">Saved in this project's .erfana/settings.json, so it applies to every preview here, survives restarts, and travels to anyone who clones the repository. Erfana cannot undo it.</p><div class="erf-band__confirm-actions"><button class="erf-band__allow" type="button">Cancel</button><button class="erf-band__allow erf-band__allow--primary" type="button">Confirm</button></div></div></div></div></div>
+    </div>
+    <div class="ds-foreign-page">
+        <p class="ds-foreign-page__heading">Quarterly report</p>
+        <p class="ds-foreign-page__body">Revenue held steady across the period.</p>
+        <div class="ha-missing"><div class="ds-foreign-page__missing">Chart not loaded</div><div class="ds-foreign-page__missing">Logo not loaded</div></div>
+        <p class="ds-foreign-page__body">Two images and a script could not load.</p>
+      </div>
+  </div>
+  <figcaption><span class="ds-frame__step">04</span><strong>You choose one host</strong>
+    
+    <p>The other rows step aside, and the section reads “Approving”. One question, on the row you picked.</p>
+    <p><strong>This is the honest sentence.</strong> It is the same text that made the old pop-up three paragraphs tall – but read once, instead of four times over your file tree. Focus goes to the question itself, never to Confirm, so pressing <kbd>Enter</kbd> twice cannot grant anything.</p>
+    <p><strong>What ships falls short here.</strong> The question sits inside the list's <span data-claim="band-list-max-height" title="host-list clamp in PreviewChromeBand.css, px">240</span>px clamp, so in a narrow band Cancel and Confirm can be cut and must be scrolled to – recorded in the design system README's open defects (“Confirm inside the list clamp”).</p>
+  </figcaption>
+</figure>
+<figure class="ds-frame">
+  <div class="ha-panel" inert aria-hidden="true">
+    <div class="erf-band">
+      <div class="erf-band__announce">https://placehold.co is now allowed in this project. The preview is reloading.</div>
+      <div class="erf-band__bar" aria-label="Preview">
+        <button class="erf-band__tool" type="button" aria-label="Back" aria-disabled="true" aria-keyshortcuts="Meta+[" title="Back – no earlier page in this tab"><svg data-icon="arrow-left" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg></button>
+        <button class="erf-band__tool erf-band__tool--toggle" type="button" aria-label="Open links in this tab" aria-pressed="false" title="Open links in this tab – off: links open a new tab"><svg data-icon="mouse-pointer-click" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4.1 12 6"/><path d="m5.1 8-2.9-.8"/><path d="m6 12-1.9 2"/><path d="M7.2 2.2 8 5.1"/><path d="M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z"/></svg></button>
+        <button class="erf-band__tool" type="button" aria-label="Find" aria-keyshortcuts="Meta+F" title="Find"><svg data-icon="search" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg></button>
+        <span class="erf-band__spacer"></span>
+        <button class="erf-band__chip" type="button" aria-expanded="true" aria-label="3 blocked · 1 allowed. Remote hosts in this preview. Press Escape in the previewed page to return here.">
+          <span><span>3 blocked</span><span class="erf-band__chip-allowed"> · 1 allowed</span></span>
+          <span class="erf-band__chip-caret" aria-hidden="true">▾</span>
+        </button>
+        <span class="erf-band__separator" aria-hidden="true"></span>
+        <button class="erf-band__tool" type="button" aria-label="Open in default browser" title="Open in default browser"><svg data-icon="external-link" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></button>
+        <button class="erf-band__tool" type="button" aria-label="Export to PDF" aria-keyshortcuts="Meta+S" title="Export to PDF"><svg data-icon="file-down" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M12 18v-6"/><path d="m9 15 3 3 3-3"/></svg></button>
+      </div>
+      <div class="erf-band__list"><div class="erf-band__scroll"><div class="erf-band__section">Blocked on load</div><div class="erf-band__row"><span class="erf-host" dir="ltr" aria-label="https://fonts.googleapis.com">fonts.<wbr>googleapis.<wbr>com</span><span class="erf-band__kind"></span><button class="erf-band__allow" type="button" aria-label="Allow https://fonts.googleapis.com" aria-expanded="false">Allow</button></div><div class="erf-band__row"><span class="erf-host" dir="ltr" aria-label="https://cdn.jsdelivr.net">cdn.<wbr>jsdelivr.<wbr>net</span><span class="erf-band__kind"></span><button class="erf-band__allow" type="button" aria-label="Allow https://cdn.jsdelivr.net" aria-expanded="false">Allow</button></div><div class="erf-band__row"><span class="erf-host" dir="ltr" aria-label="https://cdnjs.cloudflare.com">cdnjs.<wbr>cloudflare.<wbr>com</span><span class="erf-band__kind"></span><button class="erf-band__allow" type="button" aria-label="Allow https://cdnjs.cloudflare.com" aria-expanded="false">Allow</button></div><div class="erf-band__section">Allowed in this project</div><div class="erf-band__row"><span class="erf-host" dir="ltr" aria-label="https://placehold.co">placehold.<wbr>co</span><span class="erf-band__kind"></span><span class="erf-band__state">Allowed ✓</span></div></div></div>
+    </div>
+    <div class="ds-foreign-page">
+        <p class="ds-foreign-page__heading">Quarterly report</p>
+        <p class="ds-foreign-page__body">Revenue held steady across the period. The chart now loads.</p>
+        <div class="ha-missing"><div class="ds-foreign-page__missing">Logo not loaded</div></div>
+        <p class="ds-foreign-page__body">One image and a script are still blocked.</p>
+      </div>
+  </div>
+  <figcaption><span class="ds-frame__step">05</span><strong>It worked</strong>
+    
+    <p>The preview reloads with the new permission, the row moves to “Allowed in this project”, and the other three stay listed. You are not returned to the start; focus goes to the chip.</p>
+    <p>The band's live region says “https://placehold.co is now allowed in this project. The preview is reloading.”, so the change is not only visible.</p>
+  </figcaption>
+</figure>
+<figure class="ds-frame">
+  <div class="ha-panel" inert aria-hidden="true">
+    <div class="erf-band">
+      <div class="erf-band__announce">Could not save https://placehold.co to this project. It is still blocked.</div>
+      <div class="erf-band__bar" aria-label="Preview">
+        <button class="erf-band__tool" type="button" aria-label="Back" aria-disabled="true" aria-keyshortcuts="Meta+[" title="Back – no earlier page in this tab"><svg data-icon="arrow-left" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg></button>
+        <button class="erf-band__tool erf-band__tool--toggle" type="button" aria-label="Open links in this tab" aria-pressed="false" title="Open links in this tab – off: links open a new tab"><svg data-icon="mouse-pointer-click" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4.1 12 6"/><path d="m5.1 8-2.9-.8"/><path d="m6 12-1.9 2"/><path d="M7.2 2.2 8 5.1"/><path d="M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z"/></svg></button>
+        <button class="erf-band__tool" type="button" aria-label="Find" aria-keyshortcuts="Meta+F" title="Find"><svg data-icon="search" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg></button>
+        <span class="erf-band__spacer"></span>
+        <button class="erf-band__chip erf-band__chip--failed" type="button" aria-expanded="true" aria-label="4 blocked · 0 allowed. Remote hosts in this preview. Press Escape in the previewed page to return here.">
+          <span><span>4 blocked</span><span class="erf-band__chip-allowed"> · 0 allowed</span></span>
+          <span class="erf-band__chip-caret" aria-hidden="true">▾</span>
+        </button>
+        <span class="erf-band__separator" aria-hidden="true"></span>
+        <button class="erf-band__tool" type="button" aria-label="Open in default browser" title="Open in default browser"><svg data-icon="external-link" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></button>
+        <button class="erf-band__tool" type="button" aria-label="Export to PDF" aria-keyshortcuts="Meta+S" title="Export to PDF"><svg data-icon="file-down" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M12 18v-6"/><path d="m9 15 3 3 3-3"/></svg></button>
+      </div>
+      <div class="erf-band__list"><div class="erf-band__scroll"><div class="erf-band__section">Blocked on load</div><div class="erf-band__row"><span class="erf-host" dir="ltr" aria-label="https://fonts.googleapis.com">fonts.<wbr>googleapis.<wbr>com</span><span class="erf-band__kind"></span><button class="erf-band__allow" type="button" aria-label="Allow https://fonts.googleapis.com" aria-expanded="false">Allow</button></div><div class="erf-band__row"><span class="erf-host" dir="ltr" aria-label="https://cdn.jsdelivr.net">cdn.<wbr>jsdelivr.<wbr>net</span><span class="erf-band__kind"></span><button class="erf-band__allow" type="button" aria-label="Allow https://cdn.jsdelivr.net" aria-expanded="false">Allow</button></div><div class="erf-band__row"><span class="erf-host" dir="ltr" aria-label="https://cdnjs.cloudflare.com">cdnjs.<wbr>cloudflare.<wbr>com</span><span class="erf-band__kind"></span><button class="erf-band__allow" type="button" aria-label="Allow https://cdnjs.cloudflare.com" aria-expanded="false">Allow</button></div><div class="erf-band__row"><span class="erf-host" dir="ltr" aria-label="https://placehold.co">placehold.<wbr>co</span><span class="erf-band__state erf-band__state--failed">Not saved – list full</span><button class="erf-band__allow" type="button" aria-label="Allow https://placehold.co" aria-expanded="false">Allow</button></div></div></div>
+    </div>
+    <div class="ds-foreign-page">
+        <p class="ds-foreign-page__heading">Quarterly report</p>
+        <p class="ds-foreign-page__body">Revenue held steady across the period.</p>
+        <div class="ha-missing"><div class="ds-foreign-page__missing">Chart not loaded</div><div class="ds-foreign-page__missing">Logo not loaded</div></div>
+        <p class="ds-foreign-page__body">Two images and a script could not load.</p>
+      </div>
+  </div>
+  <figcaption><span class="ds-frame__step">06</span><strong>It failed, and says why</strong>
+    
+    <p>Approving can fail. The row keeps its Allow and says why in a few words: <strong>“Not saved – list full”</strong> here, or “Not saved – check settings” when the project's settings file will not parse, “Not saved – not allowed”, or a bare “Not saved” (<code>approveFailureText</code> in <code>permissionBand.logic.ts</code>). A timeout is not a refusal: the grant is on disk, so the row says “Saved – reload to apply”.</p>
+    <p>The chip's caret turns red, so collapsing the list does not hide the failure, and the live region says “Could not save https://placehold.co to this project. It is still blocked.” Focus goes to the chip.</p>
+    <p><strong>The app ships an em dash</strong> in these reasons (“Not saved ⟨em dash⟩ list full”). This screen draws the en dash the <a href="../../design-system/system/foundations/writing.html#open-defects">Writing</a> card asks for; the em dash is listed there as an open defect. </p>
+    <p><strong>Drawn as it ships, and it collides.</strong> The reason does not wrap, and “Not saved – list full” is wider than the row's fixed middle track, so it runs under the Allow button. The track was sized for a bare “Not saved” (see the Permission band card's Exceptions). Read from the synced <code>band.css</code>, not checked in the running app; it needs an app follow-up – a wider track, or the reason on its own line.</p>
+  </figcaption>
+</figure>
+<figure class="ds-frame">
+  <div class="ha-panel" inert aria-hidden="true">
+    <div class="erf-band">
+      <div class="erf-band__announce"></div>
+      <div class="erf-band__bar" aria-label="Preview">
+        <button class="erf-band__tool" type="button" aria-label="Back" aria-disabled="true" aria-keyshortcuts="Meta+[" title="Back – no earlier page in this tab"><svg data-icon="arrow-left" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg></button>
+        <button class="erf-band__tool erf-band__tool--toggle" type="button" aria-label="Open links in this tab" aria-pressed="false" title="Open links in this tab – off: links open a new tab"><svg data-icon="mouse-pointer-click" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4.1 12 6"/><path d="m5.1 8-2.9-.8"/><path d="m6 12-1.9 2"/><path d="M7.2 2.2 8 5.1"/><path d="M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z"/></svg></button>
+        <button class="erf-band__tool" type="button" aria-label="Find" aria-keyshortcuts="Meta+F" title="Find"><svg data-icon="search" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg></button>
+        <span class="erf-band__spacer"></span>
+        <button class="erf-band__chip" type="button" aria-expanded="true" aria-label="0 blocked · 4 allowed. Remote hosts in this preview. Press Escape in the previewed page to return here.">
+          <span><span>0 blocked</span><span class="erf-band__chip-allowed"> · 4 allowed</span></span>
+          <span class="erf-band__chip-caret" aria-hidden="true">▾</span>
+        </button>
+        <span class="erf-band__separator" aria-hidden="true"></span>
+        <button class="erf-band__tool" type="button" aria-label="Open in default browser" title="Open in default browser"><svg data-icon="external-link" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></button>
+        <button class="erf-band__tool" type="button" aria-label="Export to PDF" aria-keyshortcuts="Meta+S" title="Export to PDF"><svg data-icon="file-down" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M12 18v-6"/><path d="m9 15 3 3 3-3"/></svg></button>
+      </div>
+      <div class="erf-band__list"><div class="erf-band__scroll"><div class="erf-band__section">Allowed in this project</div><div class="erf-band__row"><span class="erf-host" dir="ltr" aria-label="https://fonts.googleapis.com">fonts.<wbr>googleapis.<wbr>com</span><span class="erf-band__kind"></span><span class="erf-band__state">Allowed ✓</span></div><div class="erf-band__row"><span class="erf-host" dir="ltr" aria-label="https://cdn.jsdelivr.net">cdn.<wbr>jsdelivr.<wbr>net</span><span class="erf-band__kind"></span><span class="erf-band__state">Allowed ✓</span></div><div class="erf-band__row"><span class="erf-host" dir="ltr" aria-label="https://cdnjs.cloudflare.com">cdnjs.<wbr>cloudflare.<wbr>com</span><span class="erf-band__kind"></span><span class="erf-band__state">Allowed ✓</span></div><div class="erf-band__row"><span class="erf-host" dir="ltr" aria-label="https://placehold.co">placehold.<wbr>co</span><span class="erf-band__kind"></span><span class="erf-band__state">Allowed ✓</span></div></div></div>
+    </div>
+    <div class="ds-foreign-page">
+        <p class="ds-foreign-page__heading">Quarterly report</p>
+        <p class="ds-foreign-page__body">Revenue held steady across the period, with the strongest movement in the second half.</p>
+        <p class="ds-foreign-page__body">Costs tracked below forecast throughout.</p>
+      </div>
+  </div>
+  <figcaption><span class="ds-frame__step">07</span><strong>You open the project tomorrow</strong>
+    
+    <p>The hosts are already approved, so nothing is blocked and nothing asks. <strong>You can still see what was granted:</strong> the chip counts the allowed hosts, and the list shows them under “Allowed in this project”.</p>
+    <p>This matters most for a repository you cloned: it can arrive with hosts already approved by someone else, and this list is where you find out. The list is read-only – revoking is not built yet (<a href="https://github.com/qodeca/erfana/issues/86">#86</a>).</p>
+  </figcaption>
+</figure>
+<figure class="ds-frame">
+  <div class="ha-panel" inert aria-hidden="true">
+    <div class="erf-band">
+      <div class="erf-band__announce"></div>
+      <div class="erf-band__bar" aria-label="Preview">
+        <button class="erf-band__tool" type="button" aria-label="Back" aria-disabled="true" aria-keyshortcuts="Meta+[" title="Back – no earlier page in this tab"><svg data-icon="arrow-left" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg></button>
+        <button class="erf-band__tool erf-band__tool--toggle" type="button" aria-label="Open links in this tab" aria-pressed="false" title="Open links in this tab – off: links open a new tab"><svg data-icon="mouse-pointer-click" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4.1 12 6"/><path d="m5.1 8-2.9-.8"/><path d="m6 12-1.9 2"/><path d="M7.2 2.2 8 5.1"/><path d="M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z"/></svg></button>
+        <button class="erf-band__tool" type="button" aria-label="Find" aria-keyshortcuts="Meta+F" title="Find"><svg data-icon="search" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg></button>
+        <span class="erf-band__spacer"></span>
+        <button class="erf-band__chip" type="button" aria-expanded="true" aria-label="4 blocked · 0 allowed. Remote hosts in this preview. Press Escape in the previewed page to return here.">
+          <span><span>4 blocked</span><span class="erf-band__chip-allowed"> · 0 allowed</span></span>
+          <span class="erf-band__chip-caret" aria-hidden="true">▾</span>
+        </button>
+        <span class="erf-band__separator" aria-hidden="true"></span>
+        <button class="erf-band__tool" type="button" aria-label="Open in default browser" title="Open in default browser"><svg data-icon="external-link" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></button>
+        <button class="erf-band__tool" type="button" aria-label="Export to PDF" aria-keyshortcuts="Meta+S" title="Export to PDF"><svg data-icon="file-down" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M12 18v-6"/><path d="m9 15 3 3 3-3"/></svg></button>
+      </div>
+      <div class="erf-band__paused"><span aria-hidden="true">⚠</span>
+        <span>Paused the page so this list cannot be covered.</span></div>
+      <div class="erf-band__list"><div class="erf-band__scroll"><div class="erf-band__section">Blocked on load</div><div class="erf-band__row"><span class="erf-host" dir="ltr" aria-label="https://fonts.googleapis.com">fonts.<wbr>googleapis.<wbr>com</span><span class="erf-band__kind"></span><button class="erf-band__allow" type="button" aria-label="Allow https://fonts.googleapis.com" aria-expanded="false">Allow</button></div><div class="erf-band__row"><span class="erf-host" dir="ltr" aria-label="https://cdn.jsdelivr.net">cdn.<wbr>jsdelivr.<wbr>net</span><span class="erf-band__kind"></span><button class="erf-band__allow" type="button" aria-label="Allow https://cdn.jsdelivr.net" aria-expanded="false">Allow</button></div><div class="erf-band__row"><span class="erf-host" dir="ltr" aria-label="https://cdnjs.cloudflare.com">cdnjs.<wbr>cloudflare.<wbr>com</span><span class="erf-band__kind"></span><button class="erf-band__allow" type="button" aria-label="Allow https://cdnjs.cloudflare.com" aria-expanded="false">Allow</button></div><div class="erf-band__row"><span class="erf-host" dir="ltr" aria-label="https://placehold.co">placehold.<wbr>co</span><span class="erf-band__kind"></span><button class="erf-band__allow" type="button" aria-label="Allow https://placehold.co" aria-expanded="false">Allow</button></div></div></div>
+    </div>
+    <div class="ds-foreign-page ds-foreign-page--hidden">
+        <p class="ds-foreign-page__heading">Quarterly report</p>
+        <p class="ds-foreign-page__body">Revenue held steady across the period.</p>
+        <div class="ha-missing"><div class="ds-foreign-page__missing">Chart not loaded</div><div class="ds-foreign-page__missing">Logo not loaded</div></div>
+        <p class="ds-foreign-page__body">Two images and a script could not load.</p>
+      </div>
+  </div>
+  <figcaption><span class="ds-frame__step">08</span><strong>The page will not get out of the way</strong>
+    
+    <p>The page is asked to move and given <span data-claim="band-ack-timeout-ms" title="time the previewed page has to confirm it moved, ms (src/shared/constants.ts)">300</span> ms to confirm it did. A page stuck in a loop never answers – and silence has to mean <em>assume it is still covering you</em>.</p>
+    <p><strong>So the page is hidden rather than trusted</strong>, and the band says why in plain words. Anything else risks drawing an approval button on top of a page that could be imitating one.</p>
+  </figcaption>
+</figure>
+<figure class="ds-frame">
+  <div class="ha-panel ha-panel--short" inert aria-hidden="true">
+    <div class="erf-band">
+      <div class="erf-band__announce"></div>
+      <div class="erf-band__bar" aria-label="Preview">
+        <button class="erf-band__tool" type="button" aria-label="Back" aria-disabled="true" aria-keyshortcuts="Meta+[" title="Back – no earlier page in this tab"><svg data-icon="arrow-left" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg></button>
+        <button class="erf-band__tool erf-band__tool--toggle" type="button" aria-label="Open links in this tab" aria-pressed="false" title="Open links in this tab – off: links open a new tab"><svg data-icon="mouse-pointer-click" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4.1 12 6"/><path d="m5.1 8-2.9-.8"/><path d="m6 12-1.9 2"/><path d="M7.2 2.2 8 5.1"/><path d="M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z"/></svg></button>
+        <button class="erf-band__tool" type="button" aria-label="Find" aria-keyshortcuts="Meta+F" title="Find"><svg data-icon="search" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg></button>
+        <span class="erf-band__spacer"></span>
+        <button class="erf-band__chip" type="button" aria-expanded="true" aria-label="4 blocked · 0 allowed. Remote hosts in this preview. Press Escape in the previewed page to return here.">
+          <span><span>4 blocked</span><span class="erf-band__chip-allowed"> · 0 allowed</span></span>
+          <span class="erf-band__chip-caret" aria-hidden="true">▾</span>
+        </button>
+        <span class="erf-band__separator" aria-hidden="true"></span>
+        <button class="erf-band__tool" type="button" aria-label="Open in default browser" title="Open in default browser"><svg data-icon="external-link" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></button>
+        <button class="erf-band__tool" type="button" aria-label="Export to PDF" aria-keyshortcuts="Meta+S" title="Export to PDF"><svg data-icon="file-down" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M12 18v-6"/><path d="m9 15 3 3 3-3"/></svg></button>
+      </div>
+      <div class="erf-band__paused"><span aria-hidden="true">⚠</span>
+        <span>Paused the page so this list cannot be covered.</span></div>
+      <div class="erf-band__list"><div class="erf-band__scroll"><div class="erf-band__section">Blocked on load</div><div class="erf-band__row"><span class="erf-host" dir="ltr" aria-label="https://fonts.googleapis.com">fonts.<wbr>googleapis.<wbr>com</span><span class="erf-band__kind"></span><button class="erf-band__allow" type="button" aria-label="Allow https://fonts.googleapis.com" aria-expanded="false">Allow</button></div><div class="erf-band__row"><span class="erf-host" dir="ltr" aria-label="https://cdn.jsdelivr.net">cdn.<wbr>jsdelivr.<wbr>net</span><span class="erf-band__kind"></span><button class="erf-band__allow" type="button" aria-label="Allow https://cdn.jsdelivr.net" aria-expanded="false">Allow</button></div><div class="erf-band__row"><span class="erf-host" dir="ltr" aria-label="https://cdnjs.cloudflare.com">cdnjs.<wbr>cloudflare.<wbr>com</span><span class="erf-band__kind"></span><button class="erf-band__allow" type="button" aria-label="Allow https://cdnjs.cloudflare.com" aria-expanded="false">Allow</button></div><div class="erf-band__row"><span class="erf-host" dir="ltr" aria-label="https://placehold.co">placehold.<wbr>co</span><span class="erf-band__kind"></span><button class="erf-band__allow" type="button" aria-label="Allow https://placehold.co" aria-expanded="false">Allow</button></div></div></div>
+    </div>
+    <div class="ds-foreign-page ds-foreign-page--hidden">
+        <p class="ds-foreign-page__heading">Quarterly report</p>
+        <p class="ds-foreign-page__body">Revenue held steady across the period.</p>
+        <div class="ha-missing"><div class="ds-foreign-page__missing">Chart not loaded</div><div class="ds-foreign-page__missing">Logo not loaded</div></div>
+        <p class="ds-foreign-page__body">Two images and a script could not load.</p>
+      </div>
+  </div>
+  <figcaption><span class="ds-frame__step">09</span><strong>The panel is too short to share</strong>
+    
+    <p>Below <span data-claim="band-min-split-height" title="panel height below which the page and an open host list cannot share the space, px (htmlPreview.logic.ts)">320</span>px of panel height, splitting the space leaves a strip of page too thin to be a preview. The same fail-safe applies: hide the page, show the list.</p>
+    <p>One rule covering two situations, rather than a second special case to keep in sync.</p>
+  </figcaption>
+</figure>
+</div>
+
+<hr class="ha-rule">
+
+<h2 id="keyboard">The keyboard route</h2>
+<div class="ds-note">
+  A preview is a trap without this: focus goes into the page and there is no other documented way out.
+  <strong>Escape leaves the page.</strong> When the find bar is closed, an <kbd>Esc</kbd> pressed in the previewed page
+  returns focus to the band's chip. No new shortcut is invented, and the chip's accessible name says so out loud
+  (“… Press Escape in the previewed page to return here.”) – which is what WCAG 2.1.2 asks for: not just an exit,
+  but a stated one.
+</div>
+<p class="ds-muted">The contract, copied from the decided <a href="../../design-system/system/components/permission-band/index.html#keyboard">Permission band</a> card:</p>
+<table class="ds-keys">
+  <thead><tr><th>Key</th><th>Result</th><th>Focus ends on</th></tr></thead>
+  <tbody>
+    <tr><td><kbd>Enter</kbd> / <kbd>Space</kbd> on the chip</td><td>Opens or closes the list.</td><td>The chip.</td></tr>
+    <tr><td><kbd>Tab</kbd> in the open list</td><td>Walks the rows' Allow buttons in order.</td><td>The next Allow.</td></tr>
+    <tr><td><kbd>Enter</kbd> on Allow</td><td>Opens that row's confirm step.</td><td>Cancel, the first button of the step.</td></tr>
+    <tr><td><kbd>Tab</kbd> inside the confirm step</td><td>Stays inside it: Cancel, Confirm, Cancel.</td><td>The other button.</td></tr>
+    <tr><td><kbd>Esc</kbd> in the confirm step</td><td>Closes the step; nothing is granted.</td><td>The chip.</td></tr>
+    <tr><td><kbd>Enter</kbd> on Confirm</td><td>Saves the grant and reloads the preview, or reports Not saved.</td><td>The chip.</td></tr>
+    <tr><td><kbd>Esc</kbd> in the open list</td><td>Closes the list.</td><td>The chip.</td></tr>
+    <tr><td><kbd>⌘[</kbd> / <kbd>⌘]</kbd> (macOS), <kbd>Alt+←</kbd> / <kbd>Alt+→</kbd> (Windows, Linux), focus anywhere in the panel</td><td>Steps this tab back or forward; matched on the physical key.</td><td>Unchanged; with no earlier page, Back stays focused and <code>aria-disabled</code>.</td></tr>
+    <tr><td><kbd>⌘F</kbd> / <kbd>Ctrl+F</kbd>, <kbd>⌘S</kbd> / <kbd>Ctrl+S</kbd></td><td>Find in the page; export it to PDF. Both keep working at the minimal width, where their buttons leave the row.</td><td>The find field; unchanged for export.</td></tr>
+  </tbody>
+</table>
+<div class="ds-note">
+  <strong>What the app ships beyond the card – pending an owner decision, not rules.</strong> Two behaviours in
+  <code>PreviewChromeBand.tsx</code> and <code>PreviewBandConfirm.tsx</code> are not in the card's contract, and this
+  screen records them rather than deciding them:
+  <br><br>
+  <strong><kbd>↑</kbd> / <kbd>↓</kbd> in the open list</strong> move between the Allow buttons (rows themselves are not
+  focusable). The card names only <kbd>Tab</kbd>.
+  <br><br>
+  <strong><kbd>Enter</kbd> on Allow focuses the confirm box itself</strong>, not Cancel: the box is a
+  <code>role="alertdialog"</code> container, so a screen reader reads the whole question and its consequence on arrival,
+  and the first <kbd>Tab</kbd> lands on Cancel. The card's row says focus ends on Cancel.
+  <br><br>
+  Opening the list with the keyboard also moves focus to the first Allow; opening it with the mouse does not, because the
+  pointer already knows where it is. Which of these the card adopts, or the app drops, is the owner's call.
+</div>
+
+<h2>What it deliberately does not do</h2>
+<table>
+  <thead><tr><th>Not this</th><th>Why</th></tr></thead>
+  <tbody>
+    <tr><td>Approve everything at once</td><td>A single click granting four hosts is not a decision, it is a dismissal. The list stays a list.</td></tr>
+    <tr><td>Remember “always allow this host everywhere”</td><td>The grant is per project on purpose. A global allowlist would follow you into repositories you did not write.</td></tr>
+    <tr><td>Animate open</td><td>An eased height races the native page, which moves in one step, and exposes page pixels underneath the buttons mid-animation (<a href="../../design-system/system/foundations/motion.html">Motion</a>).</td></tr>
+    <tr><td>Revoke</td><td>Not built yet – <a href="https://github.com/qodeca/erfana/issues/86">issue #86</a>. This design delivers the <em>seeing</em> half, which is why the allowed list is read-only here.</td></tr>
+    <tr><td>Colour-code the risk</td><td>Every host in the blocked list carries the same risk once approved. Tinting some of them green would be a lie.</td></tr>
+  </tbody>
+</table>
+
+<h2 id="elsewhere">States drawn elsewhere</h2>
+<table>
+  <thead><tr><th>State</th><th>Where</th></tr></thead>
+  <tbody>
+    <tr><td>An IPv6 host, under “Cannot be allowed”</td><td><a href="../../design-system/system/components/permission-band/index.html#states">Permission band</a>, frame A</td></tr>
+    <tr><td>Confirm busy (“Saving…”), focused</td><td><a href="../../design-system/system/components/permission-band/index.html#confirm-ring">Permission band</a>, “The confirm step's focus ring goes outward”</td></tr>
+    <tr><td>The unencrypted-host warning in the confirm step</td><td>Not drawn; the reasoning is in <a href="../html-preview/108-http-and-ipv6-in-the-preview.md">108 – http and IPv6 in the preview</a></td></tr>
+    <tr><td>A truncated list (“Only the first hosts are listed …”)</td><td>Not drawn; its em dash is an open defect on the <a href="../../design-system/system/foundations/writing.html#open-defects">Writing</a> card</td></tr>
+  </tbody>
+</table>
+
+<section id="exceptions">
+<h2>Exceptions</h2>
+<p class="ds-muted">None. Every frame uses the Permission band card's markup and CSS unchanged. The one visible difference
+from what ships – the en dash in “Not saved – list full” – is the Writing card's open defect, not a deviation of this screen.</p>
+</section>
+
+</main>
+</body></html>

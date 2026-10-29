@@ -28,7 +28,7 @@
  * `vi.stubGlobal('window', …)` — that replaces the whole window object and
  * destroys React's DOM internals.
  *
- * @see docs/designs/design-issue-60.md §2.3, §2.7, §5
+ * @see docs/designs/large-projects/design-issue-60.md §2.3, §2.7, §5
  */
 
 import { act } from 'react'

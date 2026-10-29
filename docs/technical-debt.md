@@ -339,7 +339,7 @@ After the heartbeat hardening (Phase A4 resume-refresh, B1 symlink defense, D3 H
 
 **2026-08-24 update (#73) — the blocker is gone.** The recommended solution assumed the renderer had no multi-entry build, which was true: `electron.vite.config.ts` declared no `renderer.build.rollupOptions.input` at all. The image-export work needed a second renderer page for its rasterize harness and therefore introduced exactly that map, `{ index, imageExport }`, for the same reason stated here — a hash route on the app entry would evaluate the whole app module graph, `window.api` included, inside a window that must not have it. Giving the overlay its own `screenshotOverlay.html` is now adding a third key to an existing map plus one `loadFile` change, not a build-config redesign, and the four guards can then be retired. The preload side has been multi-entry since #164, so both halves of the split now have precedent.
 
-**Status**: Deferred — build-config housekeeping; also listed in [`docs/designs/design-issue-60.md`](./designs/design-issue-60.md) §8 with the allowlist as the interim control. **Promotion criterion now met**: the multi-entry renderer build exists, so the cost objection no longer holds.
+**Status**: Deferred — build-config housekeeping; also listed in [`docs/designs/large-projects/design-issue-60.md`](./designs/large-projects/design-issue-60.md) §8 with the allowlist as the interim control. **Promotion criterion now met**: the multi-entry renderer build exists, so the cost objection no longer holds.
 
 ---
 
@@ -739,7 +739,7 @@ One extra obstacle found since: `PreviewViewService.applyApprovedHosts` returns 
 | `src/preload/index.ts` | 1,179 | 1,190 |
 | `src/renderer/src/components/ProjectTree/context-menu/commands.test.tsx` | 845 | 879 |
 | `docs/design-system/system/components/permission-band/index.html` | 759 | 1,109 (a design card is one self-contained page; accepted) |
-| `docs/design-system/product/html-waiting/index.html` | 791 | 799 |
+| `docs/designs/html-waiting/index.html` | 791 | 799 |
 | `src/main/index.ts` | 670 | 677 |
 | `src/renderer/src/components/Panels/MarkdownEditorPanel.tsx` | 615 | 623 |
 | `src/renderer/src/hooks/useAutoSave.test.ts` | 524 | 539 |
@@ -873,7 +873,7 @@ One extra obstacle found since: `PreviewViewService.applyApprovedHosts` returns 
 
 **Impact**: The preview toolbar (`PreviewChromeBand.tsx`) puts its controls in a `role="toolbar"` with one tab stop each and no arrow-key navigation – as do `ActivityBar.tsx`, `MarkdownToolbar.tsx`, `MermaidToolbar.tsx`, `ImageViewerToolbar.tsx` and `ChatBubble.tsx`. The ARIA toolbar pattern expects one tab stop plus arrow keys.
 
-**Recommended Solution**: one shared roving-tabindex hook applied to all of them, or downgrade the role to `group` everywhere. Changing only the preview toolbar would make the app inconsistent.
+**Recommended Solution**: one shared roving-tabindex hook applied to all of them, or downgrade the role to `group` everywhere. Changing only the preview toolbar would make the app inconsistent. The target contract is drawn on the [Toolbar card](design-system/system/components/toolbar/index.html) (proposed), whose defects list names `MarkdownToolbar.tsx`, `MermaidToolbar.tsx` and `ImageViewerToolbar.tsx`.
 
 **Status**: Accepted at #124 QG-8 (U3) – a repo-wide task.
 
@@ -1032,7 +1032,7 @@ The `files.exclude` list, the project path filter and the Windows native directo
 - **L5 – a hostile pattern list can stay just under the match budget and never trip the tripwire.** The per-call budget (20,000 comparisons) and the 100-overrun tripwire bound the worst case, but a list tuned to finish just inside the budget costs about **150–230 µs per match call, measured** (QG-8 T1: a fresh matcher every 99 names across 10,000 hostile names, so the tripwire never fired). The walk makes one call per entry, so on a 222,000-entry project that is roughly 33–51 s of main-thread time for one tree read (arithmetic from the measured figure, not measured itself). Fix, if it matters: a cumulative per-walk budget as well as the per-call one. Where: `src/main/utils/excludeMatcher.ts` (`matchPatterns`).
 - **C-L3 – chokidar's `ignored` test costs more per path than it needs to.** `shouldDropAbs` goes through `toRootRelative`, which runs a lexical containment check, several `path.resolve` calls and a `path.relative` for every path chokidar meets: about 5.7 µs against 0.95 µs for a prefix slice, so roughly 1.5 s of extra main-thread time over a 300,000-entry macOS scan. Fix: resolve the root once per watch and slice when the path starts with `root + sep`. Where: `DirectoryWatcherCore.shouldDropAbs` (`watcher/DirectoryWatcherCore.ts`), `projectPathFilter.ts` (`toRootRelative`).
 - **R-L5 – (Windows) a folder created while the watcher holds its 512 handles gets no watch and no re-read.** `openChild` logs `Native watcher: handle cap reached, folder left unwatched` and still emits `addDir`, so the folder shows in the tree, but nothing requests a resync: changes inside it do not show live until the project is closed and opened again. Fix: a re-plan that frees a handle but never collapses a split parent folder holding excluded churn back into one recursive watch – that would bring back the #211 overflow re-reads. Where: `NativeRecursiveWatcher.ts` (`openChild`, the handle-cap branch).
-- **D1 – (Windows) a root whose real path cannot be resolved is watched as given.** `realpathSync.native` can fail on some RAM, network or virtual drives; for any code other than `ENOENT` (or `EPERM`, reported as `ENOENT`), `resolveRealRoot` logs `Native watcher: resolving the root failed, watching it as given` and every handle opens under the caller's spelling, which may be an 8.3 short name. Harmless on Electron 39's libuv 1.51.0, which does not abort on a short-name watch ([W0 spike](./spikes/211-windows-fs-watch.md)). **The re-check trigger has fired:** Electron 44.9.0, which v0.22.0 ships, bundles libuv 1.52.1 (read with `ELECTRON_RUN_AS_NODE=1 electron -p process.versions.uv` on 2026-10-25), the line this entry was waiting for; [File watching § Watch backends](./file-watching/README.md#watch-backends-211) now treats the `realpathSync.native` guard as load-bearing. Whether this fallback path aborts on such a drive has not been tested. Fix: re-check R13 (the short-name abort, [design](./designs/211-large-project-windows-watcher.md) §8) and the D15 self-event match on such a drive. Where: `NativeRecursiveWatcher.ts` (`resolveRealRoot`).
+- **D1 – (Windows) a root whose real path cannot be resolved is watched as given.** `realpathSync.native` can fail on some RAM, network or virtual drives; for any code other than `ENOENT` (or `EPERM`, reported as `ENOENT`), `resolveRealRoot` logs `Native watcher: resolving the root failed, watching it as given` and every handle opens under the caller's spelling, which may be an 8.3 short name. Harmless on Electron 39's libuv 1.51.0, which does not abort on a short-name watch ([W0 spike](./spikes/211-windows-fs-watch.md)). **The re-check trigger has fired:** Electron 44.9.0, which v0.22.0 ships, bundles libuv 1.52.1 (read with `ELECTRON_RUN_AS_NODE=1 electron -p process.versions.uv` on 2026-10-25), the line this entry was waiting for; [File watching § Watch backends](./file-watching/README.md#watch-backends-211) now treats the `realpathSync.native` guard as load-bearing. Whether this fallback path aborts on such a drive has not been tested. Fix: re-check R13 (the short-name abort, [design](./designs/large-projects/211-large-project-windows-watcher.md) §8) and the D15 self-event match on such a drive. Where: `NativeRecursiveWatcher.ts` (`resolveRealRoot`).
 
 **Status**: Accepted — recorded from the #211 QG-6, QG-7, QG-8 and QG-11a verdicts. User-visible limits of the same change are in [Known issues § Excluded folders](./known-issues.md#excluded-folders-filesexclude-known-limits).
 
@@ -1113,7 +1113,8 @@ Amendment discipline + promotion-rule conventions in [`windows/contributing.md`]
 - [Troubleshooting](./troubleshooting.md) - Common problems and fixes
 - [Architecture](./architecture.md) - System design and patterns
 - [Testing](./testing/README.md) - Test coverage and strategies
-- [ADRs](./adrs/README.md) - Architecture Decision Records (Phase 4: 0001 self-host whisper, 0002 minisign, 0003 dual-pubkey, 0004 TOCTOU close)
+- [ADRs](./adrs/README.md) - Architecture Decision Records (index in the README)
+- [Design system defects](./design-system/README.md#defects-the-cards-name) - App defects a design-system card names, kept with the cards
 
 ---
 

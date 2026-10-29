@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Element tokens of one document: captured and stripped at document start
- * (docs/designs/html-preview-comments.md §6, §9.1 S1, §19 R3-2; tests J-011,
+ * (docs/designs/comments/html-preview-comments.md §6, §9.1 S1, §19 R3-2; tests J-011,
  * SEC-04, SEC-26, SEC-30).
  *
  * The protocol handler serves a copy whose eligible start tags carry

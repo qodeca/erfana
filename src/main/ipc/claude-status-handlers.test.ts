@@ -10,7 +10,7 @@
  * minimally, mirroring `clipboard-handlers.test.ts` / `git-watcher-handlers.test.ts`.
  *
  * @see Issue #216 - Per-terminal Claude Code context status bar
- * @see docs/designs/216-claude-status-bar.md §8, §10
+ * @see docs/designs/context-meter/216-claude-status-bar.md §8, §10
  */
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import { join } from 'path'

@@ -5,7 +5,7 @@
      referenced elsewhere; do not bulk-rename without coordinating links. -->
 
 > **Version**: 3.0
-> **Last Updated**: August 2026
+> **Last Updated**: October 2026
 > **Design System**: the cards in [`docs/design-system/`](design-system/index.html); this file keeps only what they do not decide
 
 > **The visual decisions have moved to [`docs/design-system/`](design-system/index.html).**
@@ -20,9 +20,9 @@
 > which its own scale omitted. Two documents describing one system is how that
 > happens; the fix is one document, not a better second one.
 
-What is left here is the part `docs/design-system/` does not decide: the text selection
-policy (a dockview cascade fact with a test behind it), the dark-only stance, and
-the token discipline that `npm run lint:css` now enforces.
+What is left here is the part `docs/design-system/` does not decide: the `erf-` class namespace
+and the token discipline that `npm run lint:css` now enforces. The text selection policy and the
+dark-only stance moved to the [Theme card](design-system/system/foundations/theme.html).
 
 ---
 
@@ -51,15 +51,17 @@ the token discipline that `npm run lint:css` now enforces.
 
 ### Not Supported
 
-- **Light Mode** - Erfana is dark-mode only. Do not add `prefers-color-scheme` queries.
-
-> Everything else this list used to hold (corner radius, browser scrollbar support) is decided by the `docs/design-system/` cards above.
+> **Decided by the Theme card, [`docs/design-system/system/foundations/theme.html`](design-system/system/foundations/theme.html#dark-only)** (§ Dark only).
+> Erfana is dark-only: no `prefers-color-scheme` query, and `color-scheme: dark` set once on `:root`.
+>
+> This section is a stub. It keeps its heading so existing links still
+> resolve, and it holds no rule, so it cannot contradict the card.
 
 ---
 
 ## Color System
 
-> **Decided by [`docs/design-system/system/foundations/colors.html`](design-system/system/foundations/colors.html).** Every swatch is painted with the shipping token and every ratio is computed in the page, so a colour that fails is visibly red rather than described as safe.
+> **Decided by [`docs/design-system/system/foundations/colors.html`](design-system/system/foundations/colors.html).** Every swatch is painted with the shipping token and every value and ratio is baked into the card from the shipping token file, so a colour that fails says `fail` rather than being described as safe.
 >
 > This section is a stub. It keeps its heading so existing links still
 > resolve, and it holds no rule, so it cannot contradict the card.
@@ -94,38 +96,17 @@ the token discipline that `npm run lint:css` now enforces.
 
 ## Text selection policy
 
-`dockview-core` sets `user-select: none` on panel chrome, and that rule inherits into nested content – so without an explicit override, text inside panel content surfaces is silently non-selectable. This previously broke the markdown-preview prompt-template context menu (Explain / Modify / Ask / Visualize), which reads `window.getSelection().toString()` and silently does nothing when the result is empty. Treat selectability as a deliberate per-surface decision.
-
-| Policy | When to use | Example surfaces | CSS |
-|---|---|---|---|
-| Selectable | Data-bearing text users would want to copy – markdown body, dialog messages, toasts, settings descriptions, paths, filenames, status data, log lines | MarkdownPreview, Dialog body + title, Toast, Settings descriptions, FilePicker filename + path, status bar token counts, chat bubbles | `user-select: text;` |
-| Not selectable | Chrome where selection would interfere with click/drag affordances – tabs, tree nodes, toolbars, context menus, activity bar, drag handles, image-pan layers | EditorTab, ProjectTree node, Toolbar, ContextMenu, ActivityBar | `user-select: none;` (or rely on dockview's inherited `none`) |
-| Self-managed | Components that own their selection model via canvas or library internals | Monaco editor, xterm terminal canvas | Do not override; the component owns it |
-
-**Decision rule.** Would a user reasonably want to copy this text? If yes – add explicit selectable CSS. If it is a clickable or draggable label acting as chrome – leave `none`. If the component owns its own selection – do not interfere.
-
-**Scope rule.** Opt in at the data-text element, not at a click-target or drag-target ancestor. A row container with both `cursor: pointer` and `user-select: text` creates a gesture conflict (drag-to-select competes with click-to-pick). FilePicker is the worked example – the override lives on `.file-picker-filename` and `.file-picker-path` (data), not on `.file-picker-item` (the clickable row). Use container scope (`.dialog-body`, `.markdown-preview-content`) only when no descendant is interactive. When a container has both selectable content and chrome children (welcome panel's recent-project rows mix data text with action buttons), enumerate the data selectors explicitly – do not blanket the container.
-
-**Canonical override** lives in `src/renderer/src/styles/utilities.css`. To make a new surface selectable, add its selector to the grouped rule there (and add a row to `src/renderer/src/styles/userSelect.audit.test.ts`). Four CSS-module surfaces (`.metadataItem`, `.errorMessage`, `.statusSlot`, `.bannerMessage` in `ImageViewerPanel.module.css`) declare the rule in-place because the build-time class-name hashing prevents the central selector from matching them at runtime — for any other new surface, add it to `utilities.css`, not to the component file.
-
-```css
-/* src/renderer/src/styles/utilities.css */
-.markdown-preview-content,
-.dialog-body,
-/* ... */ {
-  user-select: text;
-}
-```
-
-The `-webkit-user-select` prefix is not needed; Erfana ships on Chromium 152 via Electron 44.x and unprefixed `user-select` has been honored in Chromium since v54.
-
-**Cascade assumption.** These overrides rely on app stylesheets loading after `dockview-core/dist/styles/dockview.css` in the Vite bundle. Don't change CSS import order without re-running `src/renderer/src/styles/userSelect.audit.test.ts`, which asserts every audited selector still declares `user-select: text` in its source file.
-
-See #211 (pre-migration issue number; it does not resolve in the current repository) for the original audit and per-component policy decisions.
+> **Decided by the Theme card, [`docs/design-system/system/foundations/theme.html`](design-system/system/foundations/theme.html#selection)** (§ Text selection).
+> The selectable / not selectable / self-managed table, the decision and scope rules, where the override lives
+> (`src/renderer/src/styles/utilities.css`, audited by `userSelect.audit.test.ts`) and the dockview cascade
+> assumption are all on the card.
+>
+> This section is a stub. It keeps its heading so existing links still
+> resolve, and it holds no rule, so it cannot contradict the card.
 
 ## CSS class namespacing (`erf-`)
 
-Component CSS that belongs to the design system is namespaced `erf-`, and `.stylelintrc.json` enforces it with `selector-class-pattern` – every class must match `^erf-[a-z0-9]+(-[a-z0-9]+)*(__[a-z0-9]+(-[a-z0-9]+)*)?(--[a-z0-9]+(-[a-z0-9]+)*)?$`, i.e. an `erf-` prefix, kebab-case words, an optional BEM `__element` and an optional `--modifier` (`erf-band`, `erf-band__row`, `erf-band--open`). The rule applies to `docs/design-system/system/components/**/*.css` and follows a file when it is adopted into `src/`: today that is `src/renderer/src/styles/hostName.css` and `src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewChromeBand.css`, listed by path in the config. When a design-system stylesheet moves into `src/`, add its new path to that override – scoping the rule to `docs/design-system/` alone would switch the guard off at the exact moment the CSS became shipping code.
+Component CSS that belongs to the design system is namespaced `erf-`, and `.stylelintrc.json` enforces it with `selector-class-pattern` – every class must match `^erf-[a-z0-9]+(-[a-z0-9]+)*(__[a-z0-9]+(-[a-z0-9]+)*)?(--[a-z0-9]+(-[a-z0-9]+)*)?$`, i.e. an `erf-` prefix, kebab-case words, an optional BEM `__element` and an optional `--modifier` (`erf-band`, `erf-band__row`, `erf-band--open`). The rule applies to `docs/design-system/system/components/**/*.css` and `docs/design-system/system/patterns/**/*.css`, and follows a file when it is adopted into `src/`: today that is `src/renderer/src/styles/hostName.css`, `src/renderer/src/components/Panels/HtmlPreviewPanel/components/PreviewChromeBand.css` and `PreviewNavControls.css` beside it, listed by path in the config (a guard in `npm run design -- --check` fails if an adopted path is missing). When a design-system stylesheet moves into `src/`, add its new path to that override – scoping the rule to `docs/design-system/` alone would switch the guard off at the exact moment the CSS became shipping code.
 
 The prefix is not cosmetic. Mermaid emits `class="row"` on gitGraph commit labels and on its generic label path, and the app injects that SVG with `innerHTML`, so a bare global `.row` reaches into diagram labels in the Markdown preview and in exported images. That collision was found by luck, not by review; the namespace makes it impossible. The cards' own documentation chrome under `docs/design-system/` (`.stage`, `.list-frame`, `.readout`) is not shipped UI and is exempt from the naming rule, though not from the token rules.
 
@@ -135,8 +116,8 @@ The prefix is not cosmetic. Mermaid emits `class="row"` on gitGraph commit label
 
 > **Colour, border-radius and z-index examples are gone from this list** because
 > `npm run lint:css` enforces them (see the checklist below). What is left is not
-> linted: `padding: 11px`, `font-size: 13px` and a hardcoded transition all pass,
-> so review for them by hand.
+> linted in `src/`: `padding: 11px`, `font-size: 13px` and a hardcoded transition all pass
+> there, so review for them by hand. In `docs/design-system/` and `docs/designs/` they fail lint.
 
 ### Spacing
 
@@ -187,7 +168,7 @@ which runs in the required `Lint` job:
 - Colours use tokens; no raw hex outside `design-tokens.css`
 - No bare `z-index`
 - No `border-radius` other than `0` or `var(--border-radius-circle)`
-- No retired token reaches `docs/design-system/`
+- No retired token reaches `docs/design-system/` or `docs/designs/`
 
 **Nobody checks these but you.** They are the ones that actually break for
 people, and none of them is expressible as a lint rule:
@@ -199,6 +180,7 @@ people, and none of them is expressible as a lint rule:
 - [ ] Any error is linked to its field with `aria-invalid` + `aria-describedby`
 - [ ] A role you declare is a promise: `role="tree"` means arrow keys work
 - [ ] It works keyboard-only, start to finish
+- [ ] Any departure from a card carries `/* deviates: docs/design-system/<card>.html – why */` at the site and a row in that card's Exceptions – nothing detects a departure that has no marker
 
 ---
 
@@ -208,5 +190,6 @@ people, and none of them is expressible as a lint rule:
 
 **The rules**: [`docs/design-system/index.html`](design-system/index.html) — open it in a browser.
 
-**Still here**: the [text selection policy](#text-selection-policy) and the
-[token gotchas](./ui-style-guide-reference.md#common-gotchas).
+**Still here**: the [`erf-` namespace](#css-class-namespacing-erf-) and the
+[token gotchas](./ui-style-guide-reference.md#common-gotchas). The text selection policy is on the
+[Theme card](design-system/system/foundations/theme.html#selection).

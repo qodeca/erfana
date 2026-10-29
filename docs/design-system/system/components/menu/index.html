@@ -1,129 +1,456 @@
-<!-- @card group="Components" name="Menu" subtitle="A role is a promise — arrows, typeahead, and the precedence rule for a disabled danger item" status="decided" reviewed="2026-08-31" -->
+<!-- @card group="Components" name="Menu" subtitle="A role is a promise – arrows, typeahead, and the precedence rule for a disabled danger item" status="decided" reviewed="2026-10-28" answers="Add a context menu" -->
 <!-- SPDX-License-Identifier: GPL-3.0-only -->
 <!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Erfana — menu</title>
+<title>Menu – Erfana design system</title>
 <link rel="stylesheet" href="../../../tokens.css">
 <link rel="stylesheet" href="../../../ds.css">
-<script src="../../../claims.js"></script>
+<link rel="stylesheet" href="../row/row.css">
 <link rel="stylesheet" href="./menu.css">
 <style>
-  .stage { display: flex; gap: var(--space-16); align-items: flex-start; flex-wrap: wrap; }
-  /* Tall enough for the whole menu. At 260px the last two items were clipped by
-     the surface — a demo that hides the state it is demonstrating. */
-  .surface { width: 420px; height: 380px; position: relative; overflow: hidden;
-             background: var(--color-bg-secondary);
-             border: var(--border-width) solid var(--color-border-default);
-             display: flex; align-items: center; justify-content: center; }
-  .surface p { max-width: 30ch; text-align: center; font-size: var(--text-sm);
-               color: var(--color-text-tertiary); }
-  .notes { max-width: 44ch; }
-  .live-menu { position: absolute; }
-  .readout { font-family: var(--font-mono); font-size: var(--text-sm);
-             color: var(--color-text-secondary); min-height: var(--space-14); }
-  .readout b { color: var(--color-brand-lime); font-weight: var(--font-normal); }
-  .gallery { display: flex; gap: var(--space-12); flex-wrap: wrap; align-items: flex-start; }
-  .gallery figure { margin: 0; }
-  .gallery figcaption { font-family: var(--font-mono); font-size: var(--text-xs);
-                        color: var(--color-text-tertiary); padding-bottom: var(--space-3); }
+  /* A frame's stand-in for the panel the menu opens over. */
+  .mn-frame-surface { position: relative; min-height: 420px; padding: var(--space-4) 0;
+                      background: var(--color-bg-secondary);
+                      border: var(--border-width) solid var(--color-border-default); }
+  .mn-frame-menu { min-width: 220px; }
+  /* The menu opens under the row it acts on: the frame draws it below the third
+     row (notes.md), over the rows that follow, as the app's menu floats. */
+  .mn-frame-surface > .mn-frame-menu { position: absolute; inset-block-start: calc(var(--space-4) + var(--space-14) * 3);
+                                       inset-inline-start: var(--space-20); }
+  .mn-popover-menu { min-width: 240px; margin: 0; inset: auto; position-area: bottom span-right; }
+  .mn-popover-menu::backdrop { background: transparent; }
+  .mn-trigger { height: var(--btn-height-md); padding: 0 var(--space-8); background: var(--color-btn-secondary-bg);
+                border: var(--border-width) solid var(--color-border-subtle); color: var(--color-text-primary);
+                font: inherit; cursor: pointer; anchor-name: --menu-trigger; }
+  .mn-popover-menu { position-anchor: --menu-trigger; }
+  .mn-trigger:hover { background: var(--color-btn-secondary-hover); }
+  .mn-trigger:focus-visible { outline: var(--border-width-thick) solid var(--color-border-focus); outline-offset: var(--space-1); }
+  /* A frame's stand-in for :focus-visible, mirroring menu.css – inset, because a
+     long menu scrolls and an outward ring on the first or last item is clipped. */
+  .erf-menu-item.is-focus { outline: var(--border-width-thick) solid var(--color-border-focus);
+                            outline-offset: calc(var(--space-1) * -1); }
 </style>
 </head>
 <body>
-
+<nav class="ds-crumbs" aria-label="Breadcrumb"><a href="../../../index.html">Erfana design system</a> <span aria-hidden="true">/</span> <a href="../../../index.html#components">Components</a> <span aria-hidden="true">/</span> <span aria-current="page">Menu</span></nav>
+<main>
 <h1>Menu</h1>
-<p class="ds-lede">
-  <strong>Right-click the panel below</strong> — then use only the keyboard. Arrows, Home, End, Enter,
-  Escape, and type a letter to jump.
+<p class="ds-meta"><span class="ds-status" data-status="decided">decided</span> reviewed 2026-10-28</p>
+<p class="ds-lede" id="decision">
+  A menu that declares <code>role="menu"</code> keeps the whole keyboard contract – arrows, Home, End,
+  Enter, Esc and a letter to jump – and a destructive item looks the same under the pointer and under the
+  keyboard. An item may carry a second <strong>reason line</strong> – mainly to say why a disabled item is
+  disabled – linked with <code>aria-describedby</code>, set at <code>--text-base</code> in
+  <code>--color-text-tertiary</code>, and part of the item: the arrows and typeahead never stop on it. Shown as a
+  table, a frame-by-frame pass, and every visual state.
 </p>
 
 <div class="ds-note">
-  <strong>The decision: a role is a promise.</strong> Erfana's context menu declares
-  <code>role="menu"</code> and <code>role="menuitem"</code> today and implements none of the keyboard
-  behaviour those roles commit to — no <code>tabIndex</code>, no arrow keys, no focus moved on open, no
-  focus returned on close. Only <kbd>Escape</kbd> is bound.
+  <strong>The decision: a role is a promise.</strong>
+  <strong>Before #90</strong>, Erfana's context menu declared <code>role="menu"</code> and
+  <code>role="menuitem"</code> and implemented none of the keyboard behaviour those roles commit to – no
+  <code>tabIndex</code>, no arrow keys, no focus moved on open, no focus returned on close. Only
+  <kbd>Esc</kbd> was bound.
   <br><br>
-  That is <strong>worse than declaring nothing</strong>. A screen reader switches to application mode on
-  a <code>menu</code> and hands the arrow keys straight to the widget, so the user loses their normal
-  browse-mode keys and gets nothing in exchange. The menu has
-  <strong><span data-claim="context-menu-dependants"></span></strong> dependants, so this is not a
-  corner of the app.
+  That was <strong>worse than declaring nothing</strong>. A screen reader switches to application mode on
+  a <code>menu</code> and hands the arrow keys straight to the widget, so the user lost their normal
+  browse-mode keys and got nothing in exchange – in a component with
+  <strong><span data-claim="context-menu-dependants" title="files that import a context menu component (a value import of ContextMenu, EditorContextMenu, TerminalContextMenu, PreviewContextMenu or TextareaContextMenu – not a type, helper or hook)">12</span></strong> dependants.
   <br><br>
-  <strong>Either implement the contract or drop the roles.</strong> Both are honest; only the current
-  state is not. This card implements it.
+  <strong>After #90</strong>, <code>ContextMenu.tsx</code> keeps the whole contract below: a roving
+  <code>tabindex</code>, arrows, <kbd>Home</kbd>, <kbd>End</kbd>, typeahead, focus moved in on open and handed
+  back on close. The rule stands for the next menu anyone builds: <strong>implement the contract or drop the
+  roles</strong>. Both are honest; a role with nothing behind it is not.
 </div>
 
-<h2>Live — keyboard only</h2>
+<h2 id="keyboard">The keyboard contract</h2>
+<p class="ds-muted">What each key does while the menu is open, and where focus ends. The app's own tests hold the
+shipping menu to this table: <code>ContextMenu.keyboard.test.tsx</code> and <code>ContextMenu.focus.test.tsx</code>.</p>
+<table class="ds-keys">
+  <thead><tr><th>Key</th><th>Result</th><th>Focus ends on</th></tr></thead>
+  <tbody>
+    <tr><td><kbd>Shift</kbd>+<kbd>F10</kbd>, <kbd>Menu</kbd>, right-click</td><td>Opens the menu at the trigger.</td><td>The first enabled item.</td></tr>
+    <tr><td><kbd>↑</kbd> <kbd>↓</kbd></td><td>Move between items, skipping separators. Wraps at both ends. A reason line is part of its item, never a stop of its own.</td><td>The previous or next item.</td></tr>
+    <tr><td><kbd>Home</kbd> <kbd>End</kbd></td><td>First and last item.</td><td>That item.</td></tr>
+    <tr><td><kbd>Enter</kbd> <kbd>Space</kbd></td><td>Activate. A disabled item does nothing and the menu stays open.</td><td>The trigger, or stays put on a disabled item.</td></tr>
+    <tr><td><kbd>Esc</kbd></td><td>Close.</td><td><strong>Whatever opened it.</strong></td></tr>
+    <tr><td><kbd>a</kbd>–<kbd>z</kbd></td><td>Jump to the next item whose <strong>label</strong> starts with that letter. A reason line is never matched.</td><td>That item.</td></tr>
+    <tr><td><kbd>Tab</kbd></td><td>Closes the menu. A menu is modal to the keyboard while open.</td><td>The trigger.</td></tr>
+  </tbody>
+</table>
 
-<div class="stage">
-  <div>
-    <div class="surface" id="surface" tabindex="0">
-      <p>Right-click here, or focus this panel and press <kbd>Shift</kbd>+<kbd>F10</kbd>.</p>
-    </div>
-    <div class="readout" id="readout">nothing chosen yet</div>
-  </div>
-  <div class="notes">
-    <h2 style="margin-top:0">The keyboard contract</h2>
-    <table>
-      <tbody>
-        <tr><td><code>↑ ↓</code></td><td>Move between items. Wraps at both ends.</td></tr>
-        <tr><td><code>Home End</code></td><td>First and last item.</td></tr>
-        <tr><td><code>Enter Space</code></td><td>Activate. A disabled item does nothing.</td></tr>
-        <tr><td><code>Escape</code></td><td>Close, and <strong>return focus to whatever opened it</strong>.</td></tr>
-        <tr><td><code>a–z</code></td><td>Jump to the next item starting with that letter.</td></tr>
-        <tr><td><code>Tab</code></td><td>Closes the menu. A menu is modal to the keyboard while open.</td></tr>
-      </tbody>
-    </table>
-
-    <div class="ds-note" style="margin-top: var(--space-8)">
-      <strong>Roving <code>tabindex</code>, not <code>aria-activedescendant</code>.</strong> Exactly one
-      item carries <code>tabindex="0"</code> and really holds focus; the rest are <code>-1</code>. Both
-      patterns are valid, and this one is chosen because real DOM focus is what makes
-      <code>:focus-visible</code>, scroll-into-view and the browser's own find behave normally. With
-      <code>aria-activedescendant</code> the focus ring is something you have to draw yourself, and a
-      design system that has just spent a card unifying focus rings should not immediately need a second
-      way to paint one.
-    </div>
-
-    <div class="ds-note">
-      <strong>Focus must come back.</strong> Closing a menu without restoring focus drops the user at
-      the top of the document — the same defect the Permission band card fixes on its Allow button. The
-      trigger is remembered when the menu opens, not looked up when it closes.
-    </div>
-
-    <div class="ds-note">
-      <strong>Typeahead is not a nicety.</strong> It is the only way a long menu is usable without
-      counting arrow presses, and it is what people expect from every native menu on every platform.
-    </div>
-  </div>
+<h3 id="sequence">One pass through it, frame by frame</h3>
+<div class="ds-frames">
+<figure class="ds-frame">
+<div class="mn-frame-surface" aria-hidden="true">
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">README.md</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"><svg data-icon="chevron-down" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="m6 9 6 6 6-6"/></svg></span><span class="erf-row__name">docs</span></div>
+  <div class="erf-row erf-row--selected erf-row--focus" style="padding-left: calc(var(--space-4) + 1 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">notes.md</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 1 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">plan.md</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">package.json</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">tsconfig.json</span></div>
+</div>
+<figcaption><span class="ds-frame__step">1</span><strong>Focus is on the trigger</strong> – The file row <code>notes.md</code> in the project tree holds focus, ring and all. Nothing is open.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div class="mn-frame-surface" aria-hidden="true">
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">README.md</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"><svg data-icon="chevron-down" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="m6 9 6 6 6-6"/></svg></span><span class="erf-row__name">docs</span></div>
+  <div class="erf-row erf-row--selected" style="padding-left: calc(var(--space-4) + 1 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">notes.md</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 1 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">plan.md</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">package.json</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">tsconfig.json</span></div>
+<div class="erf-menu mn-frame-menu">
+  <div class="erf-menu-item erf-menu-item--active"><span class="erf-menu-icon">↗</span><span class="erf-menu-label">Open</span><span class="erf-menu-shortcut">Enter</span></div>
+  <div class="erf-menu-item"><span class="erf-menu-icon">⇥</span><span class="erf-menu-label">Open to the side</span></div>
+  <div class="erf-menu-separator"></div>
+  <div class="erf-menu-item"><span class="erf-menu-icon">✂</span><span class="erf-menu-label">Cut</span><span class="erf-menu-shortcut">⌘X</span></div>
+  <div class="erf-menu-item"><span class="erf-menu-icon">⧉</span><span class="erf-menu-label">Copy</span><span class="erf-menu-shortcut">⌘C</span></div>
+  <div class="erf-menu-item" aria-disabled="true"><span class="erf-menu-icon">⎘</span><span class="erf-menu-label">Paste</span><span class="erf-menu-shortcut">⌘V</span></div>
+  <div class="erf-menu-separator"></div>
+  <div class="erf-menu-item"><span class="erf-menu-icon">✎</span><span class="erf-menu-label">Rename…</span><span class="erf-menu-shortcut">↩</span></div>
+  <div class="erf-menu-item erf-menu-item--danger"><span class="erf-menu-icon">⌫</span><span class="erf-menu-label">Delete</span><span class="erf-menu-shortcut">⌘⌫</span></div>
+  <div class="erf-menu-item erf-menu-item--danger" aria-disabled="true"><span class="erf-menu-icon">⌫</span><span class="erf-menu-label">Delete permanently</span></div>
+</div>
+</div>
+<figcaption><span class="ds-frame__step">2</span><strong><kbd>Shift</kbd>+<kbd>F10</kbd> or the <kbd>Menu</kbd> key</strong> – The menu opens under <code>notes.md</code>, which stays selected without a ring. Focus moves to the first item, <em>Open</em>, which takes <code>tabindex="0"</code>.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div class="mn-frame-surface" aria-hidden="true">
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">README.md</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"><svg data-icon="chevron-down" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="m6 9 6 6 6-6"/></svg></span><span class="erf-row__name">docs</span></div>
+  <div class="erf-row erf-row--selected" style="padding-left: calc(var(--space-4) + 1 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">notes.md</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 1 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">plan.md</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">package.json</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">tsconfig.json</span></div>
+<div class="erf-menu mn-frame-menu">
+  <div class="erf-menu-item"><span class="erf-menu-icon">↗</span><span class="erf-menu-label">Open</span><span class="erf-menu-shortcut">Enter</span></div>
+  <div class="erf-menu-item erf-menu-item--active"><span class="erf-menu-icon">⇥</span><span class="erf-menu-label">Open to the side</span></div>
+  <div class="erf-menu-separator"></div>
+  <div class="erf-menu-item"><span class="erf-menu-icon">✂</span><span class="erf-menu-label">Cut</span><span class="erf-menu-shortcut">⌘X</span></div>
+  <div class="erf-menu-item"><span class="erf-menu-icon">⧉</span><span class="erf-menu-label">Copy</span><span class="erf-menu-shortcut">⌘C</span></div>
+  <div class="erf-menu-item" aria-disabled="true"><span class="erf-menu-icon">⎘</span><span class="erf-menu-label">Paste</span><span class="erf-menu-shortcut">⌘V</span></div>
+  <div class="erf-menu-separator"></div>
+  <div class="erf-menu-item"><span class="erf-menu-icon">✎</span><span class="erf-menu-label">Rename…</span><span class="erf-menu-shortcut">↩</span></div>
+  <div class="erf-menu-item erf-menu-item--danger"><span class="erf-menu-icon">⌫</span><span class="erf-menu-label">Delete</span><span class="erf-menu-shortcut">⌘⌫</span></div>
+  <div class="erf-menu-item erf-menu-item--danger" aria-disabled="true"><span class="erf-menu-icon">⌫</span><span class="erf-menu-label">Delete permanently</span></div>
+</div>
+</div>
+<figcaption><span class="ds-frame__step">3</span><strong><kbd>↓</kbd></strong> – Focus moves to the next item. The separator is skipped.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div class="mn-frame-surface" aria-hidden="true">
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">README.md</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"><svg data-icon="chevron-down" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="m6 9 6 6 6-6"/></svg></span><span class="erf-row__name">docs</span></div>
+  <div class="erf-row erf-row--selected" style="padding-left: calc(var(--space-4) + 1 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">notes.md</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 1 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">plan.md</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">package.json</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">tsconfig.json</span></div>
+<div class="erf-menu mn-frame-menu">
+  <div class="erf-menu-item"><span class="erf-menu-icon">↗</span><span class="erf-menu-label">Open</span><span class="erf-menu-shortcut">Enter</span></div>
+  <div class="erf-menu-item"><span class="erf-menu-icon">⇥</span><span class="erf-menu-label">Open to the side</span></div>
+  <div class="erf-menu-separator"></div>
+  <div class="erf-menu-item"><span class="erf-menu-icon">✂</span><span class="erf-menu-label">Cut</span><span class="erf-menu-shortcut">⌘X</span></div>
+  <div class="erf-menu-item"><span class="erf-menu-icon">⧉</span><span class="erf-menu-label">Copy</span><span class="erf-menu-shortcut">⌘C</span></div>
+  <div class="erf-menu-item erf-menu-item--active" aria-disabled="true"><span class="erf-menu-icon">⎘</span><span class="erf-menu-label">Paste</span><span class="erf-menu-shortcut">⌘V</span></div>
+  <div class="erf-menu-separator"></div>
+  <div class="erf-menu-item"><span class="erf-menu-icon">✎</span><span class="erf-menu-label">Rename…</span><span class="erf-menu-shortcut">↩</span></div>
+  <div class="erf-menu-item erf-menu-item--danger"><span class="erf-menu-icon">⌫</span><span class="erf-menu-label">Delete</span><span class="erf-menu-shortcut">⌘⌫</span></div>
+  <div class="erf-menu-item erf-menu-item--danger" aria-disabled="true"><span class="erf-menu-icon">⌫</span><span class="erf-menu-label">Delete permanently</span></div>
+</div>
+</div>
+<figcaption><span class="ds-frame__step">4</span><strong><kbd>↓</kbd> <kbd>↓</kbd> <kbd>↓</kbd></strong> – A disabled item is still reached – <code>aria-disabled</code>, not <code>disabled</code> – so the capability stays discoverable.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div class="mn-frame-surface" aria-hidden="true">
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">README.md</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"><svg data-icon="chevron-down" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="m6 9 6 6 6-6"/></svg></span><span class="erf-row__name">docs</span></div>
+  <div class="erf-row erf-row--selected" style="padding-left: calc(var(--space-4) + 1 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">notes.md</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 1 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">plan.md</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">package.json</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">tsconfig.json</span></div>
+<div class="erf-menu mn-frame-menu">
+  <div class="erf-menu-item"><span class="erf-menu-icon">↗</span><span class="erf-menu-label">Open</span><span class="erf-menu-shortcut">Enter</span></div>
+  <div class="erf-menu-item"><span class="erf-menu-icon">⇥</span><span class="erf-menu-label">Open to the side</span></div>
+  <div class="erf-menu-separator"></div>
+  <div class="erf-menu-item"><span class="erf-menu-icon">✂</span><span class="erf-menu-label">Cut</span><span class="erf-menu-shortcut">⌘X</span></div>
+  <div class="erf-menu-item"><span class="erf-menu-icon">⧉</span><span class="erf-menu-label">Copy</span><span class="erf-menu-shortcut">⌘C</span></div>
+  <div class="erf-menu-item" aria-disabled="true"><span class="erf-menu-icon">⎘</span><span class="erf-menu-label">Paste</span><span class="erf-menu-shortcut">⌘V</span></div>
+  <div class="erf-menu-separator"></div>
+  <div class="erf-menu-item"><span class="erf-menu-icon">✎</span><span class="erf-menu-label">Rename…</span><span class="erf-menu-shortcut">↩</span></div>
+  <div class="erf-menu-item erf-menu-item--danger erf-menu-item--active"><span class="erf-menu-icon">⌫</span><span class="erf-menu-label">Delete</span><span class="erf-menu-shortcut">⌘⌫</span></div>
+  <div class="erf-menu-item erf-menu-item--danger" aria-disabled="true"><span class="erf-menu-icon">⌫</span><span class="erf-menu-label">Delete permanently</span></div>
+</div>
+</div>
+<figcaption><span class="ds-frame__step">5</span><strong>type <kbd>d</kbd></strong> – Typeahead jumps to the next item starting with “d”.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div class="mn-frame-surface" aria-hidden="true">
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">README.md</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"><svg data-icon="chevron-down" aria-hidden="true" stroke-linejoin="round" stroke-linecap="round" stroke-width="2" stroke="currentColor" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="m6 9 6 6 6-6"/></svg></span><span class="erf-row__name">docs</span></div>
+  <div class="erf-row erf-row--selected erf-row--focus" style="padding-left: calc(var(--space-4) + 1 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">notes.md</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 1 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">plan.md</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">package.json</span></div>
+  <div class="erf-row" style="padding-left: calc(var(--space-4) + 0 * var(--space-8))"><span class="erf-row__glyph"></span><span class="erf-row__name">tsconfig.json</span></div>
+</div>
+<figcaption><span class="ds-frame__step">6</span><strong><kbd>Esc</kbd></strong> – The menu closes and focus returns to <code>notes.md</code>, the row remembered when the menu opened.</figcaption>
+</figure>
 </div>
 
-<h2>Every state</h2>
+<h3 id="try-it">Open and close it for real</h3>
+<p class="ds-muted">This button opens the menu as a browser <code>popover</code>, with no script. <kbd>Esc</kbd> or a
+click outside closes it and the browser returns focus to the button – the open and close half of the contract.
+The arrow keys and typeahead are the app's code; the frames above show them. The demo practises what the card
+preaches: with no arrow keys behind it, it declares <strong>no</strong> <code>menu</code> role and no
+<code>aria-haspopup</code> – it is a labelled group of text.</p>
+<p><button class="mn-trigger" popovertarget="menu-popover">Open the file menu</button></p>
+<div popover id="menu-popover" class="erf-menu mn-popover-menu" role="group" aria-label="File actions (demo)">
+  <div class="erf-menu-item"><span class="erf-menu-icon" aria-hidden="true">↗</span><span class="erf-menu-label">Open</span><span class="erf-menu-shortcut" aria-hidden="true">Enter</span></div>
+  <div class="erf-menu-item"><span class="erf-menu-icon" aria-hidden="true">⇥</span><span class="erf-menu-label">Open to the side</span></div>
+  <div class="erf-menu-separator"></div>
+  <div class="erf-menu-item"><span class="erf-menu-icon" aria-hidden="true">✂</span><span class="erf-menu-label">Cut</span><span class="erf-menu-shortcut" aria-hidden="true">⌘X</span></div>
+  <div class="erf-menu-item"><span class="erf-menu-icon" aria-hidden="true">⧉</span><span class="erf-menu-label">Copy</span><span class="erf-menu-shortcut" aria-hidden="true">⌘C</span></div>
+  <div class="erf-menu-item" aria-disabled="true"><span class="erf-menu-icon" aria-hidden="true">⎘</span><span class="erf-menu-label">Paste</span><span class="erf-menu-shortcut" aria-hidden="true">⌘V</span></div>
+  <div class="erf-menu-separator"></div>
+  <div class="erf-menu-item"><span class="erf-menu-icon" aria-hidden="true">✎</span><span class="erf-menu-label">Rename…</span><span class="erf-menu-shortcut" aria-hidden="true">↩</span></div>
+  <div class="erf-menu-item erf-menu-item--danger"><span class="erf-menu-icon" aria-hidden="true">⌫</span><span class="erf-menu-label">Delete</span><span class="erf-menu-shortcut" aria-hidden="true">⌘⌫</span></div>
+  <div class="erf-menu-item erf-menu-item--danger" aria-disabled="true"><span class="erf-menu-icon" aria-hidden="true">⌫</span><span class="erf-menu-label">Delete permanently</span></div>
+</div>
 
-<div class="gallery" id="gallery"></div>
+<h3 id="markup">The markup</h3>
+<p class="ds-muted">Roving <code>tabindex</code>: exactly one item is <code>0</code>. The visible shortcut glyph and the
+icon are <code>aria-hidden</code>; the item names its keys with <code>aria-keyshortcuts</code>, written in the ARIA key
+syntax – DOM <code>KeyboardEvent.key</code> names joined with <code>+</code>, modifiers first – never as the glyph. The
+app converts one to the other in <code>ariaKeyShortcuts.ts</code>.</p>
+<table>
+  <thead><tr><th>Hint drawn</th><th><code>aria-keyshortcuts</code></th></tr></thead>
+  <tbody>
+    <tr><td><code>⌘X</code></td><td><code>Meta+X</code></td></tr>
+    <tr><td><code>⇧⌘F</code></td><td><code>Shift+Meta+F</code></td></tr>
+    <tr><td><code>⌘⌫</code></td><td><code>Meta+Backspace</code></td></tr>
+    <tr><td><code>↩</code></td><td><code>Enter</code></td></tr>
+    <tr><td><code>Ctrl+V</code></td><td><code>Control+V</code></td></tr>
+    <tr><td>right-click</td><td>left off – a value that is not a key is invalid, so no attribute beats a wrong one</td></tr>
+  </tbody>
+</table>
+<pre class="ds-code"><code>&lt;div role=&quot;menu&quot; aria-label=&quot;File actions&quot;&gt;
+  &lt;div role=&quot;menuitem&quot; tabindex=&quot;0&quot;&gt;Open&lt;/div&gt;
+  &lt;div role=&quot;menuitem&quot; tabindex=&quot;-1&quot;&gt;Open to the side&lt;/div&gt;
+  &lt;div role=&quot;separator&quot;&gt;&lt;/div&gt;
+  &lt;div role=&quot;menuitem&quot; tabindex=&quot;-1&quot; aria-keyshortcuts=&quot;Meta+X&quot;&gt;
+    &lt;span aria-hidden=&quot;true&quot;&gt;✂&lt;/span&gt;Cut&lt;span aria-hidden=&quot;true&quot;&gt;⌘X&lt;/span&gt;&lt;/div&gt;
+  &lt;div role=&quot;menuitem&quot; tabindex=&quot;-1&quot; aria-disabled=&quot;true&quot; aria-keyshortcuts=&quot;Meta+V&quot;&gt;
+    &lt;span aria-hidden=&quot;true&quot;&gt;⎘&lt;/span&gt;Paste&lt;span aria-hidden=&quot;true&quot;&gt;⌘V&lt;/span&gt;&lt;/div&gt;
+  &lt;div role=&quot;menuitem&quot; tabindex=&quot;-1&quot; aria-keyshortcuts=&quot;Meta+Backspace&quot;&gt;
+    &lt;span aria-hidden=&quot;true&quot;&gt;⌫&lt;/span&gt;Delete&lt;span aria-hidden=&quot;true&quot;&gt;⌘⌫&lt;/span&gt;&lt;/div&gt;
+  …
+&lt;/div&gt;</code></pre>
+
+<h3 id="reason">An item with a reason line</h3>
+<p class="ds-muted">The reason sits <strong>inside</strong> the menuitem, so it is part of the item: a click on it is a click
+on the item, and the arrows move past both lines together. Because it is inside, it would also join the item's name, so
+the item names itself from the label with <code>aria-labelledby</code> and points at the reason with
+<code>aria-describedby</code> – the reason is read once, as a description, after the name and the disabled state.
+Typeahead matches the label, never the reason. Both ids must be unique in the window.</p>
+<pre class="ds-code"><code>&lt;div role=&quot;menu&quot; aria-label=&quot;Element&quot;&gt;
+  &lt;div role=&quot;menuitem&quot; tabindex=&quot;0&quot; aria-disabled=&quot;true&quot;
+       class=&quot;erf-menu-item erf-menu-item--described&quot;
+       aria-labelledby=&quot;mi-comment-label&quot; aria-describedby=&quot;mi-comment-reason&quot;&gt;
+    &lt;span class=&quot;erf-menu-icon&quot; aria-hidden=&quot;true&quot;&gt;…&lt;/span&gt;
+    &lt;span class=&quot;erf-menu-label&quot; id=&quot;mi-comment-label&quot;&gt;Can't comment here&lt;/span&gt;
+    &lt;span class=&quot;erf-menu-desc&quot; id=&quot;mi-comment-reason&quot;&gt;Comments can't be added to the frontmatter.&lt;/span&gt;
+  &lt;/div&gt;
+&lt;/div&gt;</code></pre>
+<p class="ds-muted">A screen reader says roughly “Can't comment here, dimmed, menu item, Comments can't be added to the
+frontmatter.” The reason is a visible line, not a tooltip or a <code>title</code>: a keyboard or touch user never sees a
+tooltip that only hover opens, and a reason that has to be found is not a reason.</p>
+
+<div class="ds-note">
+  <strong>Roving <code>tabindex</code>, not <code>aria-activedescendant</code>.</strong> Exactly one
+  item carries <code>tabindex="0"</code> and really holds focus; the rest are <code>-1</code>. Both
+  patterns are valid, and this one is chosen because real DOM focus is what makes
+  <code>:focus-visible</code>, scroll-into-view and the browser's own find behave normally. With
+  <code>aria-activedescendant</code> the focus ring is something you have to draw yourself, and a
+  design system that has just spent a card unifying focus rings should not immediately need a second
+  way to paint one.
+</div>
+
+<div class="ds-note">
+  <strong>Focus must come back.</strong> Closing a menu without restoring focus drops the user at
+  the top of the document – the same rule the <a href="../permission-band/index.html#keyboard">Permission band</a>
+  card applies when its confirm step closes, returning focus to the chip. The trigger is remembered when the menu opens, not looked up when it closes.
+</div>
+
+<div class="ds-note">
+  <strong>Typeahead is not a nicety.</strong> It is the only way a long menu is usable without
+  counting arrow presses, and it is what people expect from every native menu on every platform.
+</div>
+
+<h2 id="states">Every state</h2>
+<p class="ds-muted">Each frame is one item in one state, under a neighbour at rest. <code>.is-focus</code> stands in for <code>:focus-visible</code>; the app never ships it.</p>
+
+<div class="ds-frames">
+<figure class="ds-frame">
+<div class="erf-menu" aria-hidden="true">
+  <div class="erf-menu-item"><span class="erf-menu-icon">✎</span><span class="erf-menu-label">Rename…</span><span class="erf-menu-shortcut">↩</span></div>
+  <div class="erf-menu-item"><span class="erf-menu-icon">⧉</span><span class="erf-menu-label">Copy</span><span class="erf-menu-shortcut">⌘C</span></div>
+</div>
+<figcaption><strong>Resting</strong> – Nothing under the pointer or the keyboard.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div class="erf-menu" aria-hidden="true">
+  <div class="erf-menu-item"><span class="erf-menu-icon">✎</span><span class="erf-menu-label">Rename…</span><span class="erf-menu-shortcut">↩</span></div>
+  <div class="erf-menu-item erf-menu-item--active"><span class="erf-menu-icon">⧉</span><span class="erf-menu-label">Copy</span><span class="erf-menu-shortcut">⌘C</span></div>
+</div>
+<figcaption><strong>Hover</strong> – The pointer is over the item. The pointer also moves the roving focus, so this is the active item – no ring, because the pointer put it there.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div class="erf-menu" aria-hidden="true">
+  <div class="erf-menu-item"><span class="erf-menu-icon">✎</span><span class="erf-menu-label">Rename…</span><span class="erf-menu-shortcut">↩</span></div>
+  <div class="erf-menu-item erf-menu-item--active is-focus"><span class="erf-menu-icon">⧉</span><span class="erf-menu-label">Copy</span><span class="erf-menu-shortcut">⌘C</span></div>
+</div>
+<figcaption><strong>Keyboard focus</strong> – Reached with an arrow key. The same fill as hover, plus the inset ring.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div class="erf-menu" aria-hidden="true">
+  <div class="erf-menu-item"><span class="erf-menu-icon">✎</span><span class="erf-menu-label">Rename…</span><span class="erf-menu-shortcut">↩</span></div>
+  <div class="erf-menu-item erf-menu-item--danger"><span class="erf-menu-icon">⌫</span><span class="erf-menu-label">Delete</span><span class="erf-menu-shortcut">⌘⌫</span></div>
+</div>
+<figcaption><strong>Danger</strong> – A destructive item at rest: the label and icon turn <code>--color-error</code>.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div class="erf-menu" aria-hidden="true">
+  <div class="erf-menu-item"><span class="erf-menu-icon">✎</span><span class="erf-menu-label">Rename…</span><span class="erf-menu-shortcut">↩</span></div>
+  <div class="erf-menu-item erf-menu-item--danger erf-menu-item--active"><span class="erf-menu-icon">⌫</span><span class="erf-menu-label">Delete</span><span class="erf-menu-shortcut">⌘⌫</span></div>
+</div>
+<figcaption><strong>Danger + hover</strong> – The danger fill, <code>--color-bg-danger-hover</code>.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div class="erf-menu" aria-hidden="true">
+  <div class="erf-menu-item"><span class="erf-menu-icon">✎</span><span class="erf-menu-label">Rename…</span><span class="erf-menu-shortcut">↩</span></div>
+  <div class="erf-menu-item erf-menu-item--danger erf-menu-item--active is-focus"><span class="erf-menu-icon">⌫</span><span class="erf-menu-label">Delete</span><span class="erf-menu-shortcut">⌘⌫</span></div>
+</div>
+<figcaption><strong>Danger + focus</strong> – The <strong>same</strong> danger fill as hover, plus the ring. Never the neutral grey.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div class="erf-menu" aria-hidden="true">
+  <div class="erf-menu-item"><span class="erf-menu-icon">✎</span><span class="erf-menu-label">Rename…</span><span class="erf-menu-shortcut">↩</span></div>
+  <div class="erf-menu-item" aria-disabled="true"><span class="erf-menu-icon">⎘</span><span class="erf-menu-label">Paste</span><span class="erf-menu-shortcut">⌘V</span></div>
+</div>
+<figcaption><strong>Disabled</strong> – Dim, and still reached by the arrows (<code>aria-disabled</code>).</figcaption>
+</figure>
+<figure class="ds-frame">
+<div class="erf-menu" aria-hidden="true">
+  <div class="erf-menu-item"><span class="erf-menu-icon">✎</span><span class="erf-menu-label">Rename…</span><span class="erf-menu-shortcut">↩</span></div>
+  <div class="erf-menu-item erf-menu-item--danger" aria-disabled="true"><span class="erf-menu-icon">⌫</span><span class="erf-menu-label">Delete permanently</span><span class="erf-menu-shortcut">⇧⌘⌫</span></div>
+</div>
+<figcaption><strong>Disabled + danger</strong> – Disabled wins: grey, not red.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div class="erf-menu" aria-hidden="true">
+  <div class="erf-menu-item"><span class="erf-menu-icon">✎</span><span class="erf-menu-label">Rename…</span><span class="erf-menu-shortcut">↩</span></div>
+  <div class="erf-menu-item erf-menu-item--danger is-focus" aria-disabled="true"><span class="erf-menu-icon">⌫</span><span class="erf-menu-label">Delete permanently</span><span class="erf-menu-shortcut">⇧⌘⌫</span></div>
+</div>
+<figcaption><strong>Disabled + danger + focus</strong> – The ring shows where focus is; no fill, because nothing will happen.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div class="erf-menu" aria-hidden="true">
+  <div class="erf-menu-item"><span class="erf-menu-icon">✎</span><span class="erf-menu-label">Rename…</span><span class="erf-menu-shortcut">↩</span></div>
+  <div class="erf-menu-item erf-menu-item--described erf-menu-item--active"><span class="erf-menu-icon">⇥</span><span class="erf-menu-label">Open to the side</span><span class="erf-menu-desc">Splits the editor and keeps this tab open.</span></div>
+</div>
+<figcaption><strong>Enabled with a reason</strong> – Active. The fill and any ring cover both lines: the reason is part of the item.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div class="erf-menu" aria-hidden="true">
+  <div class="erf-menu-item"><span class="erf-menu-icon">✎</span><span class="erf-menu-label">Rename…</span><span class="erf-menu-shortcut">↩</span></div>
+  <div class="erf-menu-item erf-menu-item--described" aria-disabled="true"><span class="erf-menu-icon">✚</span><span class="erf-menu-label">Can't comment here</span><span class="erf-menu-desc">Comments can't be added to the frontmatter.</span></div>
+</div>
+<figcaption><strong>Disabled with a reason</strong> – The label is dim; the reason stays <code>--color-text-tertiary</code>, because it is information, not the inactive control.</figcaption>
+</figure>
+<figure class="ds-frame">
+<div class="erf-menu" aria-hidden="true">
+  <div class="erf-menu-item"><span class="erf-menu-icon">✎</span><span class="erf-menu-label">Rename…</span><span class="erf-menu-shortcut">↩</span></div>
+  <div class="erf-menu-item erf-menu-item--described is-focus" aria-disabled="true"><span class="erf-menu-icon">✚</span><span class="erf-menu-label">Can't comment here</span><span class="erf-menu-desc">Comments can't be added to the frontmatter.</span></div>
+</div>
+<figcaption><strong>Disabled with a reason + focus</strong> – Reached by the arrows like any disabled item. One ring around both lines; no fill.</figcaption>
+</figure>
+</div>
+
+<div class="ds-note">
+  <strong>A reason line says why, where the user already is.</strong> A disabled item with no reason leaves the user
+  guessing; a tooltip only reaches the pointer. So the reason is a second visible line, <code>.erf-menu-desc</code> on an
+  item marked <code>.erf-menu-item--described</code>, at <code>--text-base</code> in <code>--color-text-tertiary</code>. It
+  is for a short sentence – one reason, not help text – and it is mainly for disabled items; an enabled item takes one only
+  when its label alone would mislead. It is not a stop: the arrows land on the item, typeahead reads the label.
+</div>
+
+<div class="ds-note">
+  <strong>Hover, keyboard focus and the active item look the same – for a destructive item too.</strong> A menu
+  has one active item whichever device you use. The danger fill used to sit on the hover rule alone, so the
+  keyboard landed on <em>Delete</em> with the neutral grey fill a pointer never showed. One fill per meaning, on
+  every route to it.
+</div>
 
 <div class="ds-note">
   <strong>Disabled beats danger.</strong> A greyed-out <em>Delete</em> must not still be red. The colour
-  is a promise about what activating the item will do, and a disabled item will not do anything — a red
+  is a promise about what activating the item will do, and a disabled item will not do anything – a red
   item you cannot click reads as an error, not as "not available right now". So the disabled rule wins
-  the cascade, and the demo above renders that case rather than describing it.
+  the cascade, and the frames above render that case rather than describing it.
   <br><br>
   Disabled text is deliberately dim: WCAG 1.4.3 exempts inactive controls. It is the one place on this
   card where low contrast is correct, which is worth saying out loud so nobody "fixes" it.
 </div>
 
+<h3 id="contrast">The shortcut hint, measured</h3>
+<p class="ds-muted">The hint is <code>aria-hidden</code> and repeated by <code>aria-keyshortcuts</code>, so assistive tech
+never depends on it – a sighted reader does, and reads it at <code>--text-sm</code>, so it needs 4.5:1 on every
+surface it sits on. <code>--color-text-secondary</code>, which <code>ContextMenu.css</code> still ships, does not; the card
+moves it to <code>--color-text-tertiary</code>.</p>
+<table>
+  <thead><tr><th>Surface</th><th><code>--color-text-tertiary</code> (decided)</th><th><code>--color-text-secondary</code> (ships today)</th></tr></thead>
+  <tbody>
+    <tr><td>The menu, <code>--color-bg-tertiary</code></td><td data-contrast="--color-text-tertiary on --color-bg-tertiary" data-min="4.5" data-result="pass">7.06:1 · pass</td><td class="ds-ratio"><span data-claim="menu-shortcut-on-tertiary" title="--color-text-secondary (the shortcut hint) on --color-bg-tertiary">4.15</span>:1</td></tr>
+    <tr><td>A highlighted item, <code>--color-bg-hover-solid</code></td><td data-contrast="--color-text-tertiary on --color-bg-hover-solid" data-min="4.5" data-result="pass">6.39:1 · pass</td><td class="ds-ratio"><span data-claim="menu-shortcut-on-hover-solid" title="--color-text-secondary (the shortcut hint) on --color-bg-hover-solid, a highlighted item">3.76</span>:1</td></tr>
+    <tr><td>A highlighted destructive item, <code>--color-bg-danger-hover</code></td><td data-contrast="--color-text-tertiary on --color-bg-danger-hover" data-min="4.5" data-result="pass">5.94:1 · pass</td><td class="ds-ratio"><span data-claim="menu-shortcut-on-danger-hover" title="--color-text-secondary (the shortcut hint) on --color-bg-danger-hover, a highlighted destructive item">3.49</span>:1</td></tr>
+  </tbody>
+</table>
+<p class="ds-muted">And the labels themselves: the danger label <code>--color-error</code> measures
+<span data-contrast="--color-error on --color-bg-tertiary" data-min="4.5" data-result="pass">6.23:1 · pass</span> at rest and
+<span data-contrast="--color-error on --color-bg-danger-hover" data-min="4.5" data-result="pass">5.25:1 · pass</span> on the danger fill; an ordinary
+label <code>--color-text-primary</code> measures <span data-contrast="--color-text-primary on --color-bg-hover-solid" data-min="4.5" data-result="pass">8.64:1 · pass</span>
+on the hover fill. A reason line, <code>--color-text-tertiary</code> at <code>--text-base</code>, measures
+<span data-contrast="--color-text-tertiary on --color-bg-tertiary" data-min="4.5" data-result="pass">7.06:1 · pass</span> on a
+resting or disabled item and
+<span data-contrast="--color-text-tertiary on --color-bg-hover-solid" data-min="4.5" data-result="pass">6.39:1 · pass</span>
+on an active one – the same pair as the shortcut hint, so a disabled item's reason is never exempt dim text.</p>
+
 <div class="ds-note">
   <strong>The trigger has to say something too.</strong> Whatever opens a menu carries
   <code>aria-haspopup="menu"</code> and <code>aria-expanded</code>. Without them a screen-reader user
-  has no way to know the control does anything before pressing it. Erfana's tree rows do not do this
-  today.
+  has no way to know the control does anything before pressing it. Where ARIA forbids one of the two – a tree
+  row, a text field, a widget a library owns – the opener is listed under Exceptions with the reason.
 </div>
 
+<section id="defects">
+<h2>Defects this card names</h2>
+<ul class="ds-muted">
+  <li><strong>No reason line in the app.</strong> <code>ContextMenuItem</code> has no field for one
+  (<code>ContextMenu/ContextMenu.tsx:26</code>), and the item renders only icon, label and shortcut. So the comment menu's
+  disabled “Can't comment here” ships with no reason at all (<code>Panels/HtmlPreviewPanel/comments/PreviewCommentsLayer.tsx:111</code>).
+  The fix the card implies: an optional <code>description</code> on the item, rendered as <code>.erf-menu-desc</code> with
+  <code>aria-labelledby</code> and <code>aria-describedby</code> as in <a href="#reason">the markup</a>. Typeahead already
+  matches <code>item.label</code> only, so it needs no change.</li>
+</ul>
+</section>
+
+<section id="exceptions">
 <h2>Exceptions</h2>
-<p style="max-width: 72ch; color: var(--color-text-tertiary)">
+<p class="ds-muted">
   Where the shipping openers depart from "the trigger carries <code>aria-haspopup="menu"</code> and
   <code>aria-expanded</code>", with the reason. Every opener here still opens its menu with
   <kbd>Shift</kbd>+<kbd>F10</kbd> and the <kbd>Menu</kbd> key, and the menu itself keeps the whole keyboard
@@ -155,14 +482,15 @@
     <tr>
       <td>Terminal</td>
       <td>The opener carries <code>aria-haspopup</code> and <code>aria-expanded</code>.</td>
-      <td>Neither. The focused element is xterm's helper textarea, whose ARIA xterm manages. See
-        <code>TerminalPanel.tsx</code>.</td>
+      <td>Neither. The focused element is xterm's helper textarea, whose ARIA xterm manages. The marker
+        sits where the terminal opens its menu, in <code>useXtermSession.ts</code>.</td>
     </tr>
     <tr>
       <td>Text fields (new file, rename, prompt, diagram chat)</td>
       <td>The opener carries <code>aria-haspopup</code> and <code>aria-expanded</code>.</td>
       <td><code>aria-haspopup="menu"</code> only. ARIA does not allow <code>aria-expanded</code> on a
-        <code>textbox</code>.</td>
+        <code>textbox</code>. See <code>PromptDialog.tsx</code>, <code>FileSystemDialog.tsx</code> and
+        <code>ChatBubble.tsx</code>.</td>
     </tr>
     <tr>
       <td>HTML-preview comment menu (“Add comment”)</td>
@@ -171,205 +499,31 @@
         the in-page picker announces the element instead. The menu itself keeps this card's whole contract, opens
         with <kbd>Shift</kbd>+<kbd>F10</kbd> and the <kbd>Menu</kbd> key, and on close returns focus natively to
         the page. Planned for P6; see the proposed
-        <a href="../../../product/html-comments/index.html">Commenting on a page</a> card.</td>
+        <a href="../../../../designs/comments/html-comments/index.html">Commenting on a page</a> card.</td>
+    </tr>
+      <tr>
+      <td>Menu minimum width (<code>menu.css</code>, and <code>ContextMenu.css</code>, which ships the same value)</td>
+      <td>Tokens only (<code>docs/design-system/README.md</code>).</td>
+      <td>A literal <code>min-width: <span data-claim="context-menu-min-width" title="min-width of .context-menu in ContextMenu.css, px">180</span>px</code>. No
+        width token exists for floating surfaces. Proposed: <code>--menu-min-width</code>, read by the context menu
+        and by any future dropdown, so two menus side by side cannot drift to two widths. The card file carries a
+        <code>deviates:</code> note until the token lands in <code>design-tokens.css</code>.</td>
     </tr>
   </tbody>
 </table>
+</section>
 
 <h2>What this card does not decide</h2>
 <table>
   <thead><tr><th>Question</th><th>Where it belongs</th></tr></thead>
   <tbody>
-    <tr><td>Submenus</td><td>Nothing in Erfana has one. Adding one adds <code>→</code> to open, <code>←</code> to close, and a hover delay — do not build it speculatively.</td></tr>
+    <tr><td>Submenus</td><td>Nothing in Erfana has one. Adding one adds <code>→</code> to open, <code>←</code> to close, and a hover delay – do not build it speculatively.</td></tr>
     <tr><td>Which items appear</td><td>The feature that owns the menu. This card decides how a menu behaves, not what is in it.</td></tr>
     <tr><td>Where the menu is positioned</td><td>Layering card for the stacking rung; flipping near a screen edge is component logic.</td></tr>
   </tbody>
 </table>
 
-<script>
-const ITEMS = [
-  { label: 'Open', icon: '↗', shortcut: 'Enter' },
-  { label: 'Open to the side', icon: '⇥' },
-  { separator: true },
-  { label: 'Cut', icon: '✂', shortcut: '⌘X' },
-  { label: 'Copy', icon: '⧉', shortcut: '⌘C' },
-  { label: 'Paste', icon: '⎘', shortcut: '⌘V', disabled: true },
-  { separator: true },
-  { label: 'Rename…', icon: '✎', shortcut: '↩' },
-  { label: 'Delete', icon: '⌫', shortcut: '⌘⌫', danger: true },
-  { label: 'Delete permanently', icon: '⌫', danger: true, disabled: true }
-];
 
-const surface = document.getElementById('surface');
-const readout = document.getElementById('readout');
-let menu = null;
-let trigger = null;      // remembered on OPEN, never looked up on close
-let typed = '';
-let typedAt = 0;
-
-function itemNodes() {
-  return menu ? [...menu.querySelectorAll('.erf-menu-item')] : [];
-}
-
-function focusItem(index) {
-  const nodes = itemNodes();
-  if (!nodes.length) return;
-  const wrapped = (index + nodes.length) % nodes.length;
-  for (const [i, node] of nodes.entries()) {
-    // Roving tabindex: exactly one item is reachable, and it is the one that has
-    // focus. Everything else is -1 so Tab cannot walk the list.
-    node.tabIndex = i === wrapped ? 0 : -1;
-    node.classList.toggle('erf-menu-item--active', i === wrapped);
-  }
-  nodes[wrapped].focus();
-}
-
-function activeIndex() {
-  return itemNodes().findIndex(n => n === document.activeElement);
-}
-
-function build(x, y) {
-  close();
-  menu = document.createElement('div');
-  menu.className = 'erf-menu live-menu';
-  menu.setAttribute('role', 'menu');
-  menu.setAttribute('aria-label', 'File actions');
-  menu.style.left = `${x}px`;
-  menu.style.top = `${y}px`;
-
-  for (const item of ITEMS) {
-    if (item.separator) {
-      const sep = document.createElement('div');
-      sep.className = 'erf-menu-separator';
-      sep.setAttribute('role', 'separator');
-      menu.appendChild(sep);
-      continue;
-    }
-    const node = document.createElement('div');
-    node.className = 'erf-menu-item'
-      + (item.danger ? ' erf-menu-item--danger' : '');
-    node.setAttribute('role', 'menuitem');
-    node.tabIndex = -1;
-    // aria-disabled, not the `disabled` attribute: a disabled menu item must
-    // stay REACHABLE by the arrow keys, or a keyboard user cannot discover that
-    // the capability exists at all. Removing it from the sequence hides
-    // information; greying it out conveys it.
-    if (item.disabled) node.setAttribute('aria-disabled', 'true');
-
-    node.innerHTML =
-      `<span class="erf-menu-icon" aria-hidden="true">${item.icon ?? ''}</span>` +
-      `<span class="erf-menu-label"></span>` +
-      (item.shortcut ? `<span class="erf-menu-shortcut" aria-hidden="true">${item.shortcut}</span>` : '');
-    node.querySelector('.erf-menu-label').textContent = item.label;
-    // The shortcut is decorative in the DOM, so the accessible name carries it.
-    if (item.shortcut) node.setAttribute('aria-keyshortcuts', item.shortcut);
-
-    node.addEventListener('click', () => choose(item, node));
-    menu.appendChild(node);
-  }
-
-  surface.appendChild(menu);
-  focusItem(0);
-}
-
-function choose(item, node) {
-  if (node.getAttribute('aria-disabled') === 'true') {
-    readout.innerHTML = `<b>${item.label}</b> is disabled — nothing happened, and focus stayed put.`;
-    return;
-  }
-  readout.innerHTML = `chose <b>${item.label}</b>`;
-  close();
-}
-
-function close() {
-  if (!menu) return;
-  menu.remove();
-  menu = null;
-  // Focus goes back to whatever opened this. Remembered on open — looking it up
-  // now would find the item that just disappeared.
-  if (trigger) trigger.focus();
-}
-
-surface.addEventListener('contextmenu', event => {
-  event.preventDefault();
-  trigger = surface;
-  const box = surface.getBoundingClientRect();
-  build(event.clientX - box.left, event.clientY - box.top);
-});
-
-surface.addEventListener('keydown', event => {
-  if (menu) return;
-  // Shift+F10 and the Menu key are the standard keyboard route to a context
-  // menu. Without them the menu is mouse-only however good its internals are.
-  if ((event.shiftKey && event.key === 'F10') || event.key === 'ContextMenu') {
-    event.preventDefault();
-    trigger = surface;
-    build(24, 24);
-  }
-});
-
-document.addEventListener('keydown', event => {
-  if (!menu) return;
-  const nodes = itemNodes();
-  const current = activeIndex();
-
-  switch (event.key) {
-    case 'ArrowDown': event.preventDefault(); focusItem(current + 1); return;
-    case 'ArrowUp': event.preventDefault(); focusItem(current - 1); return;
-    case 'Home': event.preventDefault(); focusItem(0); return;
-    case 'End': event.preventDefault(); focusItem(nodes.length - 1); return;
-    case 'Escape': event.preventDefault(); close(); return;
-    case 'Tab': event.preventDefault(); close(); return;
-    case 'Enter':
-    case ' ': {
-      event.preventDefault();
-      const node = nodes[current];
-      if (node) node.click();
-      return;
-    }
-    default: break;
-  }
-
-  // Typeahead. The buffer resets after a pause, so "de" finds Delete but a
-  // later "d" starts again rather than searching for "ded".
-  if (event.key.length === 1 && /\S/.test(event.key)) {
-    const now = Date.now();
-    typed = now - typedAt > 800 ? event.key : typed + event.key;
-    typedAt = now;
-    const from = typed.length === 1 ? current + 1 : current;
-    for (let i = 0; i < nodes.length; i += 1) {
-      const at = (from + i + nodes.length) % nodes.length;
-      const label = nodes[at].querySelector('.erf-menu-label').textContent.toLowerCase();
-      if (label.startsWith(typed.toLowerCase())) { focusItem(at); return; }
-    }
-  }
-});
-
-/* The state gallery: rendered from the same CSS the live menu uses, so a state
-   cannot look right here and wrong there. */
-const STATES = [
-  ['resting', ''],
-  ['active / hover', 'erf-menu-item--active'],
-  ['danger', 'erf-menu-item--danger'],
-  ['danger + active', 'erf-menu-item--danger erf-menu-item--active'],
-  ['disabled', ''],
-  ['disabled + danger — disabled wins', 'erf-menu-item--danger']
-];
-const gallery = document.getElementById('gallery');
-for (const [caption, cls] of STATES) {
-  const fig = document.createElement('figure');
-  const disabled = caption.startsWith('disabled');
-  fig.innerHTML = `<figcaption>${caption}</figcaption>
-    <div class="erf-menu" style="min-width:200px">
-      <div class="erf-menu-item ${cls}" role="menuitem"${disabled ? ' aria-disabled="true"' : ''}>
-        <span class="erf-menu-icon" aria-hidden="true">⌫</span>
-        <span class="erf-menu-label">Delete</span>
-        <span class="erf-menu-shortcut" aria-hidden="true">⌘⌫</span>
-      </div>
-    </div>`;
-  gallery.appendChild(fig);
-}
-</script>
-
+</main>
 </body>
 </html>

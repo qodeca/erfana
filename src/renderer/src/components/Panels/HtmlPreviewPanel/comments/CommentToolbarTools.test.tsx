@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * The three comment tools in the preview toolbar
- * (docs/designs/html-preview-comments.md §10.1, §10.10; R-010, R-021).
+ * (docs/designs/comments/html-preview-comments.md §10.1, §10.10; R-010, R-021).
  */
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'

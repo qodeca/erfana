@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * When the overlay redraws, and the page-wide side effects of comment mode
- * (docs/designs/html-preview-comments.md §6 status, §7.5 step 6, §10.1,
+ * (docs/designs/comments/html-preview-comments.md §6 status, §7.5 step 6, §10.1,
  * §10.2; tests J-006, J-016).
  *
  * - {@link RenderScheduler}: at most one render per animation frame, with a

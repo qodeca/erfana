@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Edge cases of quotes and snapshots (docs/designs/html-preview-comments.md
+ * Edge cases of quotes and snapshots (docs/designs/comments/html-preview-comments.md
  * §5.3, decision 34). The main cases live in `picks.test.ts`.
  */
 import { afterEach, describe, expect, it } from 'vitest'

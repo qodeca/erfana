@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * The comment parse worker shell and its message contract
- * (docs/designs/html-preview-comments.md §19 R3-12). The shell answers only
+ * (docs/designs/comments/html-preview-comments.md §19 R3-12). The shell answers only
  * well-formed requests – an instrument request or a comment file job – only
  * when started in its role, transfers the result's buffers, and answers a
  * throw with `error` and no text.

@@ -28,7 +28,7 @@
  * so a log line names a tab by `stablePathDigest(panelId)` (QG-7 S3).
  *
  * @module previewTabMove
- * @see docs/designs/design-issue-124-part3.md §3.6, §3.8
+ * @see docs/designs/html-preview/multi-page/design-issue-124-part3.md §3.6, §3.8
  */
 import type { DockviewApi, IDockviewPanel } from 'dockview'
 

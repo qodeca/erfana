@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Pages the HTML Preview comment e2e specs generate at test time and never
- * commit (docs/designs/html-preview-comments.md §12.3 "Generated at test time
+ * commit (docs/designs/comments/html-preview-comments.md §12.3 "Generated at test time
  * … never committed"): many comments on one page (E-013, F-003) and pages of a
  * given size for the instrumentation cost (F-002), and a full-width commented
  * element for the pin's edge clamp (E-029).

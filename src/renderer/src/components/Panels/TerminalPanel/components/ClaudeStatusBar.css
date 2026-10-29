@@ -9,7 +9,7 @@
  * from design §5 — the proposed `--terminal-ccbar-track-width` token is NOT yet
  * in design-tokens.css, so it is inlined here rather than inventing a token.
  *
- * @see docs/designs/216-claude-status-bar.md §5, §10
+ * @see docs/designs/context-meter/216-claude-status-bar.md §5, §10
  */
 
 .terminal-claude-statusbar {

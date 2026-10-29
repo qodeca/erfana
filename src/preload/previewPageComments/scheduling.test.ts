@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * When the overlay redraws, and the comment-mode cursor
- * (docs/designs/html-preview-comments.md §6 status, §10.1, §10.2).
+ * (docs/designs/comments/html-preview-comments.md §6 status, §10.1, §10.2).
  */
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { ANCHOR_CHECK_MIN_MS, RENDER_FALLBACK_MS } from './constants'

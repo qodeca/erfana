@@ -185,7 +185,7 @@ describe('checkDrift (--check)', () => {
   it('agrees when rows, files and the design match; pages not written yet are a note (part B state)', () => {
     const rows = validateManifest([still({ pages: ['docs/user-guide/how-to/open-a-project.md'] })])
     write('docs/user-guide/images/open-a-project/welcome.png')
-    write('docs/designs/138-user-guide/README.md', design(['open-a-project/welcome.png']))
+    write('docs/designs/user-guide/README.md', design(['open-a-project/welcome.png']))
     const r = checkDrift({ root, rows, listFiles: list })
     expect(r.drift).toEqual([])
     expect(r.notes.join()).toMatch(/not written yet/)
@@ -194,7 +194,7 @@ describe('checkDrift (--check)', () => {
   it('reports a row without a file, a file without a row and a design mismatch (break: any one check removed)', () => {
     const rows = validateManifest([still()])
     write('docs/user-guide/images/stray.png')
-    write('docs/designs/138-user-guide/README.md', design(['other.png']))
+    write('docs/designs/user-guide/README.md', design(['other.png']))
     const { drift } = checkDrift({ root, rows, listFiles: list })
     expect(drift).toContain('row without a file: open-a-project/welcome → docs/user-guide/images/open-a-project/welcome.png')
     expect(drift).toContain('file without a row: docs/user-guide/images/stray.png')
@@ -207,7 +207,7 @@ describe('checkDrift (--check)', () => {
       still({ pages: ['docs/user-guide/how-to/open-a-project.md', 'docs/user-guide/missing.md'] })
     ])
     write('docs/user-guide/images/open-a-project/welcome.png')
-    write('docs/designs/138-user-guide/README.md', design(['open-a-project/welcome.png']))
+    write('docs/designs/user-guide/README.md', design(['open-a-project/welcome.png']))
     write('docs/user-guide/how-to/open-a-project.md', '# Open\n\n![Screenshot](../images/nope.png)\n')
     const { drift } = checkDrift({ root, rows, listFiles: list })
     expect(drift.join('\n')).toMatch(/page does not exist: docs\/user-guide\/missing\.md/)
@@ -218,7 +218,7 @@ describe('checkDrift (--check)', () => {
   it('reports sizes for the budget', () => {
     const rows = validateManifest([still({ maxKB: 1 })])
     write('docs/user-guide/images/open-a-project/welcome.png', 'y'.repeat(2048))
-    write('docs/designs/138-user-guide/README.md', design(['open-a-project/welcome.png']))
+    write('docs/designs/user-guide/README.md', design(['open-a-project/welcome.png']))
     expect(checkDrift({ root, rows, listFiles: list }).budget.problems).toEqual(['open-a-project/welcome is 2 KB (limit 1 KB)'])
   })
 })

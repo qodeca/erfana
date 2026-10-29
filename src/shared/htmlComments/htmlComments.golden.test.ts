@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Golden tests: the v1 format as shipped (docs/designs/html-preview-comments.md
+ * Golden tests: the v1 format as shipped (docs/designs/comments/html-preview-comments.md
  * §12, decision 22; G-001–G-004). The format is a one-way door – every file
  * Erfana ever wrote must stay readable – so these fixtures are APPEND ONLY and
  * pinned by a SHA-256 manifest.

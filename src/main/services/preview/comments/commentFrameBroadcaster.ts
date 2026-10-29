@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * `preview-page:commentState` for every frame of a view
- * (docs/designs/html-preview-comments.md §7.1 step 2, §8, §19 R3-3, R3-4;
+ * (docs/designs/comments/html-preview-comments.md §7.1 step 2, §8, §19 R3-3, R3-4;
  * tests M-064, SEC-19).
  *
  * A frame with a commentable file and a bound load gets the full state: the

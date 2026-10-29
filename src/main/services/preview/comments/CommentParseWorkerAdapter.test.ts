@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * The comment parse worker client (docs/designs/html-preview-comments.md §19
+ * The comment parse worker client (docs/designs/comments/html-preview-comments.md §19
  * R3-12): one lazy persistent worker, a bounded serial queue, a per-request
  * timeout, and M-068 with security review S-M – the content a worker died on
  * is poisoned, a dead worker is replaced after a back-off, and too many deaths

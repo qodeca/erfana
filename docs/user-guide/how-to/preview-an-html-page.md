@@ -26,7 +26,7 @@ Open an HTML file to run its page in Erfana. Approve a remote host only when you
 
 ## Comment on an element
 
-1. Select **Comment mode** in the toolbar, or press <kbd>Cmd</kbd>+<kbd>Option</kbd>+<kbd>M</kbd> (Windows: <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>M</kbd>).
+1. Select **Comment mode** in the toolbar, or press <kbd>⌥⌘M</kbd> / <kbd>Ctrl+Alt+M</kbd>.
 2. Click an element, or right-click it and choose **Add comment**. The first time, enter your name.
 3. Type the comment and select **Save**. It is saved inside the `.html` file, and a pin marks the element.
 

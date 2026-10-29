@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * The strict, no-fallback atomic write for HTML Preview comments
- * (docs/designs/html-preview-comments.md §4.2 `atomicWrite.ts` row, §7.6
+ * (docs/designs/comments/html-preview-comments.md §4.2 `atomicWrite.ts` row, §7.6
  * step 9, threats S10 and S11).
  *
  * `atomicWriteText` keeps an editor save working wherever it can: through a

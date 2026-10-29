@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * HTML Preview comments – small parts the comment window, the identity step
- * and the drawer share (docs/design-system/product/html-comments/window.html).
+ * and the drawer share (docs/designs/comments/html-comments/window.html).
  *
  * SECURITY (threats S15, S18; SEC-19, SEC-25). Comment text, author names and
  * emails come from an HTML file anyone may have written. They are rendered as

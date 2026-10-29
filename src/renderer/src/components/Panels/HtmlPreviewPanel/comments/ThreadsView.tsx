@@ -2,8 +2,8 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * HTML Preview comments – the comment window's view of existing comments
- * (docs/designs/html-preview-comments.md §7.7, §10.4, decisions 8, 12, 30,
- * 31; R-004, R-005, R-006; docs/design-system/product/html-comments/window.html
+ * (docs/designs/comments/html-preview-comments.md §7.7, §10.4, decisions 8, 12, 30,
+ * 31; R-004, R-005, R-006; docs/designs/comments/html-comments/window.html
  * "A thread" and "When the comment cannot be used normally").
  *
  * Opened by a pin (any mode) or a drawer row. Main sent opaque keys only; the
@@ -88,7 +88,7 @@ export function selectThreads(
 /**
  * What a lost element said, struck through: shown under "Erfana can't find
  * this element any more" when the block stored a quote
- * (docs/designs/html-preview-comments.md §10.10 "It was attached to:").
+ * (docs/designs/comments/html-preview-comments.md §10.10 "It was attached to:").
  * Plain React text.
  *
  * @param props - The thread.

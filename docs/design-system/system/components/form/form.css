@@ -1,0 +1,278 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/**
+ * Form controls – the text field, the multi-line field, the select, the
+ * checkbox, and the hint, error and counter that sit under them.
+ *
+ * PROPOSED – not adopted. The closest thing that ships is the comment window's
+ * own copy (.erf-comment-field, .erf-comment-textarea, .erf-comment-input,
+ * .erf-comment-counter, .erf-comment-error in
+ * src/renderer/src/components/Panels/HtmlPreviewPanel/comments/CommentWindow.css),
+ * which this file follows value for value except where the Form controls card
+ * says otherwise. Adopting this is a MOVE, not a copy: the rules land in src/,
+ * and scripts/design-sync.mjs then syncs the file back here.
+ *
+ * What it changes against CommentWindow.css, each for a stated reason:
+ *   - hover BRIGHTENS the edge to --color-gray-500; the shipped step to
+ *     --color-border-subtle is darker than --color-border-input, so the edge
+ *     faded under the pointer;
+ *   - a read-only, disabled or invalid field does not react to hover at all.
+ *
+ * .is-hover and .is-focus are documentation-only hooks; they never ship in
+ * src/. Classes are prefixed erf-.
+ */
+
+/* ---------- the field: label, control, error, hint ---------- */
+
+/* Order inside a field, top to bottom: label, control, error, then the hint
+   (and the counter beside it). The control's aria-describedby lists the error
+   first, then the hint, then the counter. */
+.erf-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.erf-field__label {
+  font-size: var(--text-base);
+  color: var(--color-text-primary);
+}
+
+.erf-field__hint {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+  overflow-wrap: anywhere;
+}
+
+/* Icon + text under the field, linked by aria-describedby. Never a live
+   region: focus moves to the field on submit and the description is read. */
+.erf-field__error {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-error);
+}
+
+.erf-field__error svg {
+  flex: 0 0 auto;
+  inline-size: var(--icon-size-xs);
+  block-size: var(--icon-size-xs);
+  margin-block-start: var(--space-1);
+}
+
+/* ---------- the foot: hint and character counter on one line ---------- */
+
+.erf-field__foot {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-6);
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+}
+
+.erf-field__foot .erf-field__hint {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+}
+
+/* Always shown. From the warning line: a warning glyph AND colour. Past the
+   limit: an error glyph AND colour, plus the field error. Never colour alone. */
+.erf-field__counter {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.erf-field__counter svg {
+  flex: 0 0 auto;
+  inline-size: var(--icon-size-xs);
+  block-size: var(--icon-size-xs);
+}
+
+.erf-field__counter--near { color: var(--color-warning); }
+.erf-field__counter--over { color: var(--color-error); }
+
+/* ---------- text field, multi-line field, select ---------- */
+
+.erf-input,
+.erf-textarea,
+.erf-select {
+  box-sizing: border-box;
+  inline-size: 100%;
+  margin: 0;
+  background: var(--color-bg-input);
+  border: var(--border-width) solid var(--color-border-input);
+  border-radius: var(--border-radius);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+}
+
+.erf-input,
+.erf-select {
+  block-size: var(--input-height-md);
+  padding: 0 var(--space-6);
+}
+
+/* Four lines to start (rows="4" as well), grows by dragging, never sideways. */
+.erf-textarea {
+  display: block;
+  min-block-size: calc(var(--text-base) * var(--leading-normal) * 4 + var(--space-8));
+  padding: var(--space-4) var(--space-6);
+  line-height: var(--leading-normal);
+  resize: vertical;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* The compact reply: two lines to start (rows="2"), same rules otherwise. */
+.erf-textarea--reply {
+  min-block-size: calc(var(--text-base) * var(--leading-normal) * 2 + var(--space-8));
+}
+
+.erf-input::placeholder,
+.erf-textarea::placeholder { color: var(--color-text-placeholder); }
+
+/* Typed text is always selectable, read-only included, so it can be copied. */
+.erf-input,
+.erf-textarea { user-select: text; }
+
+/* Hover BRIGHTENS the boundary. --color-gray-500 stands in for the proposed
+   --color-border-input-hover until that token exists. A field that cannot be
+   changed – disabled or read-only – does not answer the pointer, and an
+   invalid field keeps its red edge. */
+.erf-input:is(:hover, [class~='is-hover']):not(:disabled, [readonly], [aria-invalid='true']),
+.erf-textarea:is(:hover, [class~='is-hover']):not(:disabled, [readonly], [aria-invalid='true']),
+.erf-select:is(:hover, [class~='is-hover']):not(:disabled, [aria-invalid='true']) {
+  border-color: var(--color-gray-500);
+}
+
+/* Outward, --space-1 off the edge: the one ring (Focus and keyboard card). */
+.erf-input:is(:focus-visible, [class~='is-focus']),
+.erf-textarea:is(:focus-visible, [class~='is-focus']),
+.erf-select:is(:focus-visible, [class~='is-focus']) {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
+}
+
+.erf-input[aria-invalid='true'],
+.erf-textarea[aria-invalid='true'],
+.erf-select[aria-invalid='true'] { border-color: var(--color-error); }
+
+/* Read-only: the resting edge, the resting text, a text cursor. It still takes
+   focus and its text still selects; the native readonly attribute is what a
+   screen reader announces, so no aria-readonly is added beside it. */
+.erf-input[readonly],
+.erf-textarea[readonly] { cursor: text; }
+
+.erf-input:disabled,
+.erf-textarea:disabled,
+.erf-select:disabled {
+  opacity: var(--opacity-disabled);
+  cursor: not-allowed;
+}
+
+/* The select's chevron is drawn with borders, so it follows the token and can
+   never go stale the way a colour baked into a data URI does. */
+.erf-select-wrap { position: relative; }
+
+.erf-select {
+  appearance: none;
+  padding-inline-end: var(--space-20);
+}
+
+.erf-select-wrap::after {
+  content: '';
+  position: absolute;
+  inset-inline-end: var(--space-8);
+  inset-block-start: 50%;
+  inline-size: var(--space-3);
+  block-size: var(--space-3);
+  border-right: var(--border-width-thick) solid var(--color-text-tertiary);
+  border-bottom: var(--border-width-thick) solid var(--color-text-tertiary);
+  transform: translateY(-70%) rotate(45deg);
+  pointer-events: none;
+}
+
+/* ---------- checkbox ---------- */
+
+/* Box, then a body holding the label (the NAME only) and the description,
+   which is its own element linked with aria-describedby. */
+.erf-check {
+  display: flex;
+  gap: var(--space-6);
+  align-items: flex-start;
+}
+
+/* A 24 x 24 target (WCAG 2.2 SC 2.5.8) around a 16px visible box: the outer
+   --space-2 is a transparent border that takes the pointer and paints nothing,
+   and the box's edge is an inset shadow inside it. */
+.erf-checkbox {
+  appearance: none;
+  flex: 0 0 auto;
+  display: grid;
+  place-content: center;
+  inline-size: var(--btn-height-sm);
+  block-size: var(--btn-height-sm);
+  margin: 0;
+  background: var(--color-bg-input);
+  background-clip: padding-box;
+  border: var(--space-2) solid transparent;
+  box-shadow: inset 0 0 0 var(--border-width) var(--color-border-input);
+  border-radius: var(--border-radius);
+  cursor: pointer;
+}
+
+.erf-checkbox:is(:hover, [class~='is-hover']):not(:disabled, :checked) {
+  box-shadow: inset 0 0 0 var(--border-width) var(--color-gray-500);
+}
+
+/* Checked is a fill AND a tick. */
+.erf-checkbox:checked {
+  background-color: var(--color-accent-primary);
+  box-shadow: inset 0 0 0 var(--border-width) var(--color-accent-primary);
+}
+
+.erf-checkbox:checked::after {
+  content: '';
+  inline-size: var(--space-3);
+  block-size: var(--space-5);
+  border-right: var(--border-width-thick) solid var(--color-brand-black);
+  border-bottom: var(--border-width-thick) solid var(--color-brand-black);
+  transform: translateY(calc(var(--border-width) * -1)) rotate(45deg);
+}
+
+/* Inward, into the transparent border, so the ring sits --space-1 off the
+   visible box and inside the 24 x 24 target. */
+.erf-checkbox:is(:focus-visible, [class~='is-focus']) {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: calc(var(--space-1) * -1);
+}
+
+.erf-checkbox:disabled {
+  opacity: var(--opacity-disabled);
+  cursor: not-allowed;
+}
+
+.erf-check__body {
+  min-inline-size: 0;
+  padding-block-start: var(--space-1);
+}
+
+.erf-check__label {
+  font-size: var(--text-base);
+  color: var(--color-text-primary);
+  cursor: pointer;
+}
+
+.erf-check__desc {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+}

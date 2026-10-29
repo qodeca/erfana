@@ -24,7 +24,7 @@
  * singleton surfaces (project path, global settings, sender predicate) plus an
  * injectable `graph` test seam.
  *
- * @see docs/designs/sd-074-html-preview.md §1.6, §4.4, §5
+ * @see docs/designs/html-preview/sd-074-html-preview.md §1.6, §4.4, §5
  * @see src/main/ipc/claude-status-handlers.ts (the disposable-bundle precedent)
  */
 import type { IpcMainEvent, IpcMainInvokeEvent } from 'electron'

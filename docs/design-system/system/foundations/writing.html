@@ -1,0 +1,290 @@
+<!-- @card group="Foundations" name="Writing" subtitle="Sentence case, en dashes, verbs on buttons, errors that say what to do – and no overclaiming AI" status="proposed" reviewed="never" answers="Word a button or a dialog; Write an error message; Write a keyboard shortcut; Describe what the agent does" -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Writing – Erfana design system</title>
+<link rel="stylesheet" href="../../tokens.css">
+<link rel="stylesheet" href="../../ds.css">
+<link rel="stylesheet" href="../components/badge/badge.css">
+<style>
+  /* Do / don't pairs. The verdict is a word first; the edge colour repeats it. */
+  .wr-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(calc(var(--space-24) * 6), 1fr));
+             gap: var(--space-8); margin: 0 0 var(--space-12); max-width: var(--ds-table-max); }
+  .wr-ex { margin: 0; padding: var(--space-6) var(--space-8); background: var(--color-bg-secondary);
+           border-left: var(--border-width-thick) solid var(--color-border-subtle); }
+  .wr-ex--do { border-left-color: var(--color-brand-lime); }
+  .wr-ex--dont { border-left-color: var(--color-error); }
+  .wr-ex > figcaption { margin-top: var(--space-4); font-size: var(--ds-text-small); color: var(--color-text-tertiary); }
+  /* Size and face from ds.css .ds-verdict; this adds the block and the caps. */
+  .wr-verdict { display: block; margin-bottom: var(--space-3);
+                text-transform: uppercase; letter-spacing: var(--ds-caps-tracking); }
+  .wr-ex--do .wr-verdict { color: var(--color-brand-lime); }
+  .wr-ex--dont .wr-verdict { color: var(--color-error); }
+
+  /* Miniature UI drawn inside an example. Pictures, not controls. */
+  .wr-dialog { padding: var(--space-6); background: var(--color-bg-primary);
+               border: var(--border-width) solid var(--color-border-subtle); }
+  .wr-dialog__title { margin: 0 0 var(--space-2); font-size: var(--text-md); font-weight: var(--font-semibold);
+                      color: var(--color-text-emphasis); }
+  .wr-dialog__body { margin: 0 0 var(--space-6); font-size: var(--text-base); color: var(--color-text-primary); }
+  .wr-actions { display: flex; justify-content: flex-end; gap: var(--space-4); }
+  .wr-btn { display: inline-block; padding: var(--space-2) var(--space-6); font-size: var(--text-base);
+            font-weight: var(--font-semibold); border: var(--border-width) solid var(--color-border-subtle);
+            color: var(--color-text-primary); }
+  .wr-btn--danger { background: var(--color-btn-danger-bg); border-color: var(--color-btn-danger-bg); color: var(--color-white); }
+  .wr-btn--primary { background: var(--color-btn-primary-bg); border-color: var(--color-btn-primary-bg); color: var(--color-btn-primary-text); }
+  .wr-toast { padding: var(--space-4) var(--space-6); background: var(--color-bg-tertiary);
+              border: var(--border-width) solid var(--color-border-subtle); border-left: var(--border-width-thick) solid var(--color-error);
+              font-size: var(--text-base); color: var(--color-text-primary); }
+  .wr-menu { padding: var(--space-2) 0; background: var(--color-bg-tertiary); border: var(--border-width) solid var(--color-border-subtle);
+             font-size: var(--text-base); color: var(--color-text-primary); }
+  .wr-menu__item { display: flex; justify-content: space-between; gap: var(--space-12); padding: var(--space-2) var(--space-6); }
+  .wr-menu__key { /* mockup: app scale – a menu shortcut */ color: var(--color-text-tertiary); font-family: var(--font-mono); font-size: var(--text-sm); }
+  .wr-hint { /* mockup: app scale – a dialog hint */ display: flex; flex-direction: column; gap: var(--space-3);
+             padding: var(--space-6); background: var(--color-bg-secondary); font-size: var(--text-sm); color: var(--color-text-tertiary); }
+  .wr-label { font-size: var(--text-base); color: var(--color-text-primary); }
+  /* Glossary tables: the word itself reads first. */
+  .wr-glossary td:first-child { white-space: nowrap; color: var(--color-text-bright); }
+  .wr-caps { /* mockup: app scale – a panel title */ font-size: var(--text-sm); font-weight: var(--font-semibold); text-transform: uppercase;
+             letter-spacing: var(--ds-caps-tracking); color: var(--color-text-primary); }
+</style>
+</head>
+<body>
+<nav class="ds-crumbs" aria-label="Breadcrumb"><a href="../../index.html">Erfana design system</a> <span aria-hidden="true">/</span> <a href="../../index.html#foundations">Foundations</a> <span aria-hidden="true">/</span> <span aria-current="page">Writing</span></nav>
+<main>
+<h1>Writing</h1>
+<p class="ds-meta"><span class="ds-status" data-status="proposed">proposed</span> not yet reviewed</p>
+<p class="ds-lede" id="decision">
+  Every string in Erfana is written in <strong>sentence case</strong>, uses an <strong>en dash</strong> where a dash is
+  needed, puts a <strong>verb</strong> on every button, says in an error <strong>what happened and what to do</strong>,
+  writes shortcuts the way the platform does, and never claims that Erfana itself is an AI.
+</p>
+
+<h2 id="case">Case</h2>
+<p class="ds-muted">Sentence case everywhere – titles, buttons, menu items, tabs, settings, tooltips, toasts. Capitalise
+the first word and proper nouns only: Erfana, Claude Code, Markdown, Mermaid, GitHub, macOS, Windows. Uppercase is a
+<em>style</em> two roles apply with CSS (panel titles and column headers – see Typography), never typed into the string,
+so a screen reader does not spell it out and a translation is not shouted.</p>
+<div class="wr-pair">
+  <figure class="wr-ex wr-ex--do"><span class="ds-verdict wr-verdict">Do</span><div aria-hidden="true"><span class="wr-label">Open recent project</span></div>
+    <figcaption>Sentence case. Reads as a phrase.</figcaption></figure>
+  <figure class="wr-ex wr-ex--dont"><span class="ds-verdict wr-verdict">Don't</span><div aria-hidden="true"><span class="wr-label">Open Recent Project</span></div>
+    <figcaption>Title case. Every word competes; proper nouns stop standing out.</figcaption></figure>
+  <figure class="wr-ex wr-ex--do"><span class="ds-verdict wr-verdict">Do</span><div aria-hidden="true"><span class="wr-caps">Project</span></div>
+    <figcaption>Typed "Project", uppercased by the panel-title style.</figcaption></figure>
+</div>
+
+<h2 id="punctuation">Dashes and punctuation</h2>
+<table class="ds-tokens">
+<thead><tr><th>Mark</th><th>Use</th><th>Example</th></tr></thead>
+<tbody>
+  <tr><td>En dash – with spaces</td><td>A break or an aside in a sentence, and in a card subtitle</td><td>Saved – 3 files changed</td></tr>
+  <tr><td>En dash, no spaces</td><td>A range</td><td>Lines 12–40, 10–11px</td></tr>
+  <tr><td>Em dash</td><td><strong>Never.</strong> The en dash covers both uses</td><td>–</td></tr>
+  <tr><td>Hyphen</td><td>Compound words and file names only</td><td>read-only, design-tokens.css</td></tr>
+  <tr><td>Ellipsis …</td><td>One character (…), not three dots. On a command that asks for more before it acts, and on a status that is still running</td><td>Rename…, Loading project…</td></tr>
+  <tr><td>Full stop</td><td>Ends a sentence in a body, a hint or a toast. Not on a title, a button, a menu item or a label</td><td>Applies to new terminals only.</td></tr>
+  <tr><td>Ampersand &amp;</td><td>Never in UI text, a title or a card name – write “and”</td><td>Rows and lists, Focus and keyboard</td></tr>
+  <tr><td>Quotes</td><td>Curly (“ ” ‘ ’) in UI text; straight only inside code</td><td>Delete “notes.md”?</td></tr>
+</tbody>
+</table>
+
+<h2 id="buttons">Buttons say what happens</h2>
+<p class="ds-muted">A button is a verb, or a verb and its object: the reader should know what will happen without
+reading the dialog. The confirming button repeats the title's verb. Cancel is always "Cancel". "OK", "Yes" and "No"
+are never a choice – they make the reader go back and re-read the question.</p>
+<div class="wr-pair">
+  <figure class="wr-ex wr-ex--do"><span class="ds-verdict wr-verdict">Do</span>
+    <div class="wr-dialog" aria-hidden="true"><p class="wr-dialog__title">Delete “notes.md”?</p><p class="wr-dialog__body">This removes the file from disk.</p>
+      <div class="wr-actions"><span class="wr-btn">Cancel</span><span class="wr-btn wr-btn--danger">Delete file</span></div></div>
+    <figcaption>The title asks, the body says the consequence, the button repeats the verb.</figcaption></figure>
+  <figure class="wr-ex wr-ex--dont"><span class="ds-verdict wr-verdict">Don't</span>
+    <div class="wr-dialog" aria-hidden="true"><p class="wr-dialog__title">Are you sure?</p><p class="wr-dialog__body">This action cannot be undone.</p>
+      <div class="wr-actions"><span class="wr-btn">No</span><span class="wr-btn wr-btn--danger">Yes</span></div></div>
+    <figcaption>Sure of what? Yes to what? The reader has to remember what they clicked.</figcaption></figure>
+</div>
+
+<h2 id="errors">Errors say what to do</h2>
+<p class="ds-muted">Three parts, in this order: <strong>what happened</strong> (in the reader's words, naming the thing),
+<strong>why</strong> if it is known, and <strong>what to do next</strong>. No blame ("you entered an invalid…"), no
+apology theatre ("Oops!"), no bare codes – a code goes after the sentence, for a bug report. The toast keeps the full
+file name; the log file gets it redacted (<code>redactUserInput</code>).</p>
+<div class="wr-pair">
+  <figure class="wr-ex wr-ex--do"><span class="ds-verdict wr-verdict">Do</span>
+    <div class="wr-toast" aria-hidden="true">Couldn't save “notes.md” – the disk is full. Free some space, then save again.</div>
+    <figcaption>What, why, what next. One sentence each, at most.</figcaption></figure>
+  <figure class="wr-ex wr-ex--dont"><span class="ds-verdict wr-verdict">Don't</span>
+    <div class="wr-toast" aria-hidden="true">Oops! Something went wrong (ENOSPC).</div>
+    <figcaption>Cheerful, vague, and only a code the reader cannot act on.</figcaption></figure>
+</div>
+<p class="ds-muted">A field error sits under its field, is linked with <code>aria-describedby</code> and
+<code>aria-invalid</code>, and says how to fix the value: "Enter a port between 1024 and 65535", not "Invalid input".
+See <a href="../components/form/index.html">Form controls</a>.</p>
+
+<h2 id="shortcuts">Keyboard shortcuts</h2>
+<p class="ds-muted">This card owns shortcut notation. Other cards draw shortcuts – the
+<a href="../components/badge/index.html#kbd">key style</a>, tooltips, menus – and link here instead of restating
+the rule.</p>
+<table class="ds-tokens">
+<thead><tr><th>Where</th><th>How it is written</th><th>Example</th></tr></thead>
+<tbody>
+  <tr><td>UI on macOS</td><td>Modifier glyphs in Apple's order ⌃ ⌥ ⇧ ⌘, then the key, no separators</td><td><kbd>⌘S</kbd>, <kbd>⌥⇧⌘F</kbd></td></tr>
+  <tr><td>UI on Windows and Linux</td><td>Ctrl, Alt, Shift spelled out in that order, then the key, joined with +</td><td><kbd>Ctrl+S</kbd>, <kbd>Ctrl+Alt+Shift+F</kbd></td></tr>
+  <tr><td>Key names</td><td>A named key is spelled out with a capital: Esc, Enter, Tab, Space, Backspace, Delete. Arrow keys are the glyphs ↑ ↓ ← →. A letter key is upper case. The same on every platform, alone or in a chord</td><td><kbd>Esc</kbd>, <kbd>⌘Enter</kbd>, <kbd>Ctrl+Enter</kbd>, <kbd>↑</kbd></td></tr>
+  <tr><td>Boxes</td><td>One <code>&lt;kbd&gt;</code> per chord, on both platforms: the box holds the whole label. Never one box per glyph or per word, and never a + between boxes – the app already renders <code>&lt;kbd&gt;{formatShortcut(…)}&lt;/kbd&gt;</code></td><td><kbd>⌘S</kbd> / <kbd>Ctrl+S</kbd></td></tr>
+  <tr><td>Code that renders a label</td><td>Always <code>formatShortcut(key, { mod, alt, shift })</code> from <code>utils/shortcutLabel.ts</code> – glyphs on macOS, Ctrl+ on Windows and Linux. Never a typed string</td><td><code>formatShortcut('B', { mod: true })</code></td></tr>
+  <tr><td><code>aria-keyshortcuts</code></td><td>The ARIA key names – Control, Alt, Shift, Meta, in that order, then the key – joined with +. <code>toAriaKeyShortcuts</code> in <code>ContextMenu/ariaKeyShortcuts.ts</code> derives it from the label</td><td><code>Meta+C</code>, <code>Alt+Meta+C</code>, <code>Control+V</code></td></tr>
+  <tr><td>Docs, cards and issues</td><td>Both platforms, macOS first, separated by a slash. A card that draws the app at one platform shows that platform's form</td><td><kbd>⌘B</kbd> / <kbd>Ctrl+B</kbd></td></tr>
+</tbody>
+</table>
+<div class="wr-pair">
+  <figure class="wr-ex wr-ex--do"><span class="ds-verdict wr-verdict">Do – one box per chord</span>
+    <div class="wr-hint" aria-hidden="true"><span><kbd class="erf-kbd">⌘Enter</kbd> to submit · <kbd class="erf-kbd">Esc</kbd> to cancel</span><span><kbd class="erf-kbd">Ctrl+Enter</kbd> to submit · <kbd class="erf-kbd">Esc</kbd> to cancel</span></div>
+    <figcaption>macOS, then Windows and Linux. Each box is exactly what <code>formatShortcut</code> returns.</figcaption></figure>
+  <figure class="wr-ex wr-ex--dont"><span class="ds-verdict wr-verdict">Don't – a box per key</span>
+    <div class="wr-hint" aria-hidden="true"><span><kbd class="erf-kbd">⌘</kbd><kbd class="erf-kbd">Enter</kbd> to submit · <kbd class="erf-kbd">Escape</kbd> to cancel</span><span><kbd class="erf-kbd">Ctrl</kbd>+<kbd class="erf-kbd">Enter</kbd> to submit · <kbd class="erf-kbd">esc</kbd> to cancel</span></div>
+    <figcaption>Split chords read as separate keys, and the key names drift from line to line.</figcaption></figure>
+</div>
+<div class="wr-pair">
+  <figure class="wr-ex wr-ex--do"><span class="ds-verdict wr-verdict">Do – macOS</span>
+    <div class="wr-menu" aria-hidden="true"><div class="wr-menu__item"><span>Copy</span><span class="wr-menu__key">⌘C</span></div><div class="wr-menu__item"><span>Add comment</span><span class="wr-menu__key">⌥⌘M</span></div></div>
+    <figcaption>What the platform's own menus show.</figcaption></figure>
+  <figure class="wr-ex wr-ex--dont"><span class="ds-verdict wr-verdict">Don't – macOS</span>
+    <div class="wr-menu" aria-hidden="true"><div class="wr-menu__item"><span>Copy</span><span class="wr-menu__key">⌘C</span></div><div class="wr-menu__item"><span>Add comment</span><span class="wr-menu__key">Cmd+Option+M</span></div></div>
+    <figcaption>Two notations in one menu. Spelling out Cmd is the Windows convention applied to a Mac.</figcaption></figure>
+</div>
+
+<h2 id="agent">Erfana hosts the agent – it is not one</h2>
+<p class="ds-muted">Erfana is a workspace with a terminal that runs a CLI coding agent of the user's choosing. The
+intelligence is the agent's. Copy that blurs this overclaims, and breaks the day the user runs a different agent.</p>
+<table class="ds-tokens">
+<thead><tr><th>Write</th><th>Not</th><th>Why</th></tr></thead>
+<tbody>
+  <tr><td>"the agent", "your coding agent"</td><td>"Erfana's AI", "the assistant"</td><td>Erfana has no model of its own</td></tr>
+  <tr><td>"Claude Code" – only where the feature really is Claude Code-specific (the context-window meter reads its transcripts)</td><td>"Claude" for anything the terminal does with any agent</td><td>Naming one vendor for a generic feature is false for every other agent</td></tr>
+  <tr><td>"Ask the agent to explain this"</td><td>"Erfana will explain this"</td><td>The action sends a prompt; the agent answers</td></tr>
+  <tr><td>"Agent-native Markdown workspace"</td><td>"AI-powered editor"</td><td>The product's own description, and the true one</td></tr>
+</tbody>
+</table>
+
+<h2 id="glossary">Product words</h2>
+<p class="ds-muted">Proposed. One word for each thing the reader handles, used the same way in every preview, menu,
+tooltip, announcement and error. The words below are the comment feature's, because that is where the vocabulary
+drifted first: the HTML preview shipped its own nouns, and the Markdown and selection comments inherited them. Decided
+for the comment feature by <a href="../../../designs/comments/comments-v2.md">Comments v2</a> (C-03 and the toolbar
+finding); this card makes them the app's words.</p>
+<table class="ds-tokens wr-glossary">
+<thead><tr><th>Word</th><th>Means</th><th>Write it like this</th></tr></thead>
+<tbody>
+  <tr><td>comment</td><td>One message the reader wrote, and the stored item in the file. Always "comment" – in both previews, in a delete and in an error</td><td>“Delete comment”, “Couldn't save the comment.”</td></tr>
+  <tr><td>thread</td><td>A first comment and its replies, about one target. Only where the difference from one comment matters – a delete, a count of conversations</td><td>“Delete thread”, “3 threads”</td></tr>
+  <tr><td>reply</td><td>A comment that answers a thread's first comment. The verb is the button</td><td>“Reply”, “2 replies”</td></tr>
+  <tr><td>icon</td><td>The small mark drawn on the preview beside a commented target. The reader's word for it, in every string</td><td>“Show comment icons and underlines”, “Its icon comes back when it does.”</td></tr>
+  <tr><td>underline</td><td>The mark under a commented phrase of text. Written “underline” in UI text; <em>mark</em> is the design and code name for the same thing and stays out of the UI</td><td>“Show comment icons and underlines”</td></tr>
+  <tr><td>selection</td><td>Text the reader selected to comment on. Not “highlight” – the app also highlights search results</td><td>“Comment on selection”</td></tr>
+  <tr><td>comment mode</td><td>The mode in which a click on the preview chooses a target instead of following a link. Lower case inside a sentence, capital at the start of a label</td><td>“Comment mode · List item, line 14 · Esc to leave”</td></tr>
+</tbody>
+</table>
+<p class="ds-muted">The limits a sentence may quote are read from the code, not typed:
+<code>COMMENT_MAX_CHARS = <span data-claim="comment-max-chars" title="COMMENT_MAX_CHARS in commentFormat.ts – characters one comment or reply may hold">4000</span></code> characters in one comment or reply, with the
+counter warning from <code>COMMENT_WARN_CHARS = <span data-claim="comment-warn-chars" title="COMMENT_WARN_CHARS in commentFormat.ts – where the character counter starts warning">3600</span></code>;
+<span data-claim="comment-max-replies" title="PREVIEW_LIMITS.COMMENT_MAX_REPLIES – replies one thread holds after its first comment">200</span> replies in a thread; <span data-claim="comment-max-threads-per-file" title="PREVIEW_LIMITS.COMMENT_MAX_BLOCKS_PER_FILE – threads (comment blocks) one file holds before its comments turn read-only">500</span>
+threads in one file before its comments turn read-only; files of up to <span data-claim="comment-file-max-mb" title="PREVIEW_LIMITS.COMMENT_FILE_MAX_BYTES in MB – the largest file Erfana adds comments to">25</span> MB.
+A string that states one of them builds it from the constant, as <code>FILE_LIMIT_TEXT</code> does
+(<code>commentCopy.ts:40</code>–<code>42</code>).</p>
+
+<h3 id="kind-nouns">What the reader commented on</h3>
+<p class="ds-muted">Each preview names a target by its kind, in words, never by a tag name (“Comment on p”). The HTML
+preview keeps the element's selector in a visible label, because an HTML author thinks in selectors; every other
+string uses these nouns.</p>
+<table class="ds-tokens wr-glossary">
+<thead><tr><th>Markdown target</th><th>Noun</th><th>Markdown target</th><th>Noun</th></tr></thead>
+<tbody>
+  <tr><td>Paragraph</td><td>paragraph</td><td>Quote</td><td>quote</td></tr>
+  <tr><td>Heading, levels 1–6</td><td>H1 heading … H6 heading</td><td>Table</td><td>table</td></tr>
+  <tr><td>List item</td><td>list item</td><td>Body row</td><td>row 2 (counted from 1)</td></tr>
+  <tr><td>List</td><td>list</td><td>Header row</td><td>header row</td></tr>
+  <tr><td>Code block</td><td>code block</td><td>Cell</td><td>row 2, column 3</td></tr>
+  <tr><td>Mermaid diagram</td><td>diagram</td><td>Divider</td><td>divider</td></tr>
+  <tr><td>Image</td><td>image</td><td>Raw HTML</td><td>HTML block</td></tr>
+</tbody>
+</table>
+<p class="ds-muted"><strong>Casing.</strong> A noun is capitalised at the start of a label, a title or a row and lower
+case inside a sentence: “List item · line 14” in the drawer, “Showing list item, line 14.” as an announcement,
+“Comments on H2 heading “Next steps”” as a window title. “H2” keeps its capital everywhere, because it is a name.
+“Code block” and “HTML block” are the only places the word <em>block</em> may appear – as part of a Markdown noun the
+reader already knows.</p>
+
+<h3 id="banned-words">Words the UI does not use</h3>
+<table class="ds-tokens wr-glossary">
+<thead><tr><th>Not in UI text</th><th>Write instead</th><th>Why</th></tr></thead>
+<tbody>
+  <tr><td>block</td><td>comment (the stored item); the kind noun (the target)</td><td>It meant both, so “Delete block…” read as “delete this paragraph”. It stays in <code>format-v1.md</code>, which is for tool authors</td></tr>
+  <tr><td>pin</td><td>icon</td><td>The design name for the mark on the preview. Fine in design notes and code; the reader never sees it</td></tr>
+  <tr><td>pick, as a noun</td><td>target, or the kind noun</td><td>“Your pick” is jargon. The verb is fine on a button: “Pick again”</td></tr>
+  <tr><td>element, in Markdown</td><td>the kind noun – paragraph, list item …</td><td>Markdown has no elements. Correct only in the HTML preview, where it is the reader's own word</td></tr>
+  <tr><td>page, in Markdown</td><td>preview, or file</td><td>A Markdown preview is a rendered file, not a page: “Show in preview”, not “Show on page”</td></tr>
+</tbody>
+</table>
+<p class="ds-muted"><strong>The HTML-only nouns, as they ship.</strong> These strings are right for the HTML preview and
+must not reach a Markdown or selection comment: “elements” in the file limit (<code>commentCopy.ts:42</code>), “page too
+large – it has too many elements” (<code>:71</code>), “Show on page” (<code>:234</code>) and “This element isn't on screen
+right now” (<code>:259</code>).</p>
+
+<h2 id="numbers">Numbers and names</h2>
+<ul class="ds-muted">
+  <li>Numerals for every count and size ("3 files", not "three files") – they scan faster in a dense UI.</li>
+  <li>Units with a space, except % and px: "2 KB", "1.5 s", "50%", "24px".</li>
+  <li>Paths, file names, hosts and commands go in the mono face and are never truncated in the middle of the part that identifies them – see <a href="../components/row/index.html">Rows and lists</a>.</li>
+  <li>Name a thing the same way everywhere: if the panel is "Project", the menu does not say "Explorer".</li>
+</ul>
+
+<section id="exceptions">
+<h2>Exceptions</h2>
+<p class="ds-muted">None recorded. A shipping string that departs from this card carries a <code>deviates:</code>
+marker at the site and gets a row here, naming the file.</p>
+<h3 id="open-defects">Open defects this card names</h3>
+<ul class="ds-muted">
+  <li><strong>Two macOS shortcut notations.</strong> <code>commentCopy.ts</code> types "Cmd+Option+M" and
+  "Cmd+Enter" for macOS, while <code>formatShortcut</code> renders the glyph form (⌥⌘M) everywhere else.</li>
+  <li><strong>Em dashes in the permission band.</strong> Shipped strings use an em dash where this card asks for an en
+  dash (shown here as ⟨em dash⟩, because no page in this folder may carry the character): the confirm sentence “but Erfana cannot limit it to that ⟨em dash⟩ the host will also be able to run code…”
+  (<code>PreviewBandConfirm.tsx:169</code>–<code>170</code>); the four approval failures “Not saved ⟨em dash⟩ list full”, “Not
+  saved ⟨em dash⟩ not allowed”, “Saved ⟨em dash⟩ reload to apply” and “Not saved ⟨em dash⟩ check settings”
+  (<code>permissionBand.logic.ts:354</code>–<code>372</code>); and “Only the first hosts are listed ⟨em dash⟩ this page asked for
+  more.” (<code>PreviewChromeBand.tsx:420</code>).</li>
+  <li><strong>Em dash in the clipboard toast.</strong> “Could not access the clipboard ⟨em dash⟩ another app may be using it.
+  Try again in a moment.” (<code>textClipboard.ts:44</code>–<code>46</code>). It also says “Could not” where the app's
+  other errors say “Couldn't”.</li>
+  <li><strong>“block” in shipped HTML comment strings.</strong> “Delete block”, “Delete block…” and “This block contains
+  git conflict markers” (<code>commentCopy.ts:251</code>, <code>:252</code>, <code>:257</code>) use the word this card
+  keeps out of the UI. The replacement wording is in <a href="#banned-words">Words the UI does not use</a>.</li>
+</ul>
+<h3 id="open-decisions">Decided – the user guide follows this card</h3>
+<ul class="ds-muted">
+  <li><strong>The user guide writes one box per chord.</strong> Owner decision, 2026-10-28: <code>docs/user-guide/</code>
+  follows the <a href="#shortcuts">Docs, cards and issues</a> row – glyphs, macOS first (<kbd>⌥⌘M</kbd> / <kbd>Ctrl+Alt+M</kbd>);
+  reference tables keep a macOS and a Windows column, each cell in that platform's form. <code>maintaining-this-guide.md</code>
+  points here.</li>
+</ul>
+</section>
+
+<section id="related">
+<h2>Related</h2>
+<ul class="ds-muted">
+  <li><a href="type.html">Typography</a> – the text styles a string is set in.</li>
+  <li><a href="brand.html">Brand</a> – how the name and the wordmark are written and drawn.</li>
+  <li><a href="../components/badge/index.html#kbd">Badges, chips and keys</a> – the key box a shortcut is drawn in.</li>
+  <li><a href="../patterns/states/index.html">Empty, loading and error states</a> – where an error sentence sits.</li>
+  <li><a href="../../../designs/comments/comments-v2.md">Comments v2</a> – the design the product words come from.</li>
+</ul>
+</section>
+
+</main>
+</body>
+</html>

@@ -1,0 +1,103 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/**
+ * The toolbar – a row of controls above a panel: groups, separators, a spacer,
+ * and an overflow button.
+ *
+ * PROPOSED – not adopted. The app ships several toolbars, each with its own
+ * layout rules:
+ *   src/renderer/src/components/Editor/MarkdownEditorPanel/components/MarkdownToolbar.css
+ *   src/renderer/src/components/Editor/MermaidToolbar/MermaidToolbar.css
+ *   src/renderer/src/components/Panels/TerminalPanel/components/TerminalToolbar.css
+ *   src/renderer/src/components/Panels/ImageViewerPanel/ImageViewerPanel.module.css
+ * This file owns the ROW only. The icon button and the toggle inside it are
+ * the Buttons card's button.css, and are never restyled here – except their
+ * HEIGHT, which is the row's to set so every tool lines up (Tool height).
+ *
+ * The overflow rule is drawn with a container query: a group marked
+ * collapsible leaves the row below a width, and the More button takes its
+ * place. Shipping code may measure instead; the rule it must keep is the same –
+ * no control is ever clipped while still reachable by keyboard (the image
+ * viewer's #73 failure, SC 2.4.11).
+ *
+ * Classes are prefixed erf-.
+ */
+
+.erf-toolbar {
+  /* PROPOSED TOKEN, NOT YET IN design-tokens.css: --toolbar-tool-height, the
+     one height for a toolbar tool and anything that lines up with one (a
+     count button, a floating action). Adding the token is an owner decision.
+     Until then this card-private fallback carries the proposed value, which is
+     --input-height-sm's, so a find field in the row shares the tools' line.
+     Delete this line when the token lands and read var(--toolbar-tool-height). */
+  --erf-toolbar-tool-height: var(--input-height-sm);
+
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: calc(var(--btn-height-md) + var(--space-3) * 2);
+  padding: var(--space-3) var(--space-6);
+  background-color: var(--color-bg-secondary);
+  border-bottom: var(--border-width) solid var(--color-border-default);
+  container-type: inline-size;
+  container-name: erf-toolbar;
+}
+
+/* A group: controls that belong together (bold, italic, strike). role="group"
+   with an aria-label when the group has a name a listener needs ("Layout
+   direction"); a plain wrapper otherwise. Inside a group controls touch –
+   the 2px gap is the whole separation. */
+.erf-toolbar__group {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+/* A separator between groups. role="separator" is optional – a group with a
+   name already tells a screen reader where the boundary is – and it is never
+   a tab stop. */
+.erf-toolbar__separator {
+  flex-shrink: 0;
+  width: var(--border-width);
+  height: var(--icon-size-lg);
+  margin: 0 var(--space-4);
+  background-color: var(--color-border-default);
+}
+
+/* Tool height: every button in the row – icon tools, toggles, view modes,
+   More and a menu button – takes the tool height, and an icon-only tool is a
+   square of it. Width beyond that is the button's own. */
+.erf-toolbar .erf-button { block-size: var(--erf-toolbar-tool-height); }
+.erf-toolbar .erf-button--icon { inline-size: var(--erf-toolbar-tool-height); }
+
+/* Pushes everything after it to the right edge. Not a control, not announced. */
+.erf-toolbar__spacer {
+  flex: 1 1 auto;
+  min-width: var(--space-6);
+}
+
+/* A status read-out inside the row ("Saved", "3 issues"). role="status" in
+   the markup; it shrinks and truncates before any control does. */
+.erf-toolbar__status {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text-tertiary);
+  font-size: var(--text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The More button: hidden while everything fits. */
+.erf-toolbar .erf-toolbar__more { display: none; }
+
+/* Below this width, collapsible groups (and the separator before each) leave
+   the row and the More button appears. The width is the row's own, not the
+   window's, because a toolbar lives in a panel. */
+@container erf-toolbar (max-width: 420px) {
+  .erf-toolbar__group--collapsible,
+  .erf-toolbar__separator--collapsible { display: none; }
+  .erf-toolbar .erf-toolbar__more { display: flex; }
+}

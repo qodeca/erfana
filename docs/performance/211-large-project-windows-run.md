@@ -5,9 +5,9 @@ SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 
 # Manual Windows run: the 222k-entry project on the native watcher (#211, W17)
 
-- **Issue:** [#211](https://github.com/qodeca/erfana/issues/211). **Design:** [W17 and AC8](../designs/211-large-project-windows-watcher.md#9-acceptance-criteria-traceability); spike: [W0](../spikes/211-windows-fs-watch.md).
+- **Issue:** [#211](https://github.com/qodeca/erfana/issues/211). **Design:** [W17 and AC8](../designs/large-projects/211-large-project-windows-watcher.md#9-acceptance-criteria-traceability); spike: [W0](../spikes/211-windows-fs-watch.md).
 - **Date:** 2026-09-29, times local. **Host:** Windows 11 Pro 10.0.26200, NTFS – the W0 host. **Build:** dev build of `fix/211-large-project-windows-stall`.
-- **Project:** `<project>`, the Xezar repository – the ~222k-entry project from the issue. Its test suite kept creating and deleting folders under `.local/test-tmp` for most of the run; that is the churn measured below.
+- **Project:** `<project>`, a large external repository – the ~222k-entry project from the issue. Its test suite kept creating and deleting folders under `.local/test-tmp` for most of the run; that is the churn measured below.
 - **Data:** the main-process log (`<home>/.erfana/logs/main.log`, plus `main.1.log` for the part before it rotated at 21:05), this dev instance's lines only, and the tester's run notes where marked. Two older Erfana builds were running on other projects (about 34k chokidar handles between them); their lines were ignored, but they shared the disk.
 - **Scope:** **no exclude list** – `excludePatternCount: 0` on every read. This run measures the root-cause fixes alone (the native watcher, and the watcher starting after the first read). The run with `.local/test-tmp` excluded is still to do – see "With the exclusion – pending".
 
@@ -50,7 +50,7 @@ SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 | `walkHints` | 64 | dropped (hidden or ignored) nested folders taken from the first read – exactly the cap |
 | `planCapped` | `true` | at least one plan cap was hit |
 
-`walkHintCount` was 64 on every read of the run, so the walk met more dropped nested folders than it may record. The log does not name the cap that tripped; with no exclude entries and 13 planned handles against a 512 cap, it is almost certainly the 64-hint cap (inferred). The cost: dropped folders past the cap stay inside a recursive watch. Their changes are still dropped one by one and never reach the tree, but a heavy burst inside one can overflow that watch's buffer and force a full re-read – [design deviation 1](../designs/211-large-project-windows-watcher.md#9-acceptance-criteria-traceability). It did not show here, because the churn was in a visible folder anyway.
+`walkHintCount` was 64 on every read of the run, so the walk met more dropped nested folders than it may record. The log does not name the cap that tripped; with no exclude entries and 13 planned handles against a 512 cap, it is almost certainly the 64-hint cap (inferred). The cost: dropped folders past the cap stay inside a recursive watch. Their changes are still dropped one by one and never reach the tree, but a heavy burst inside one can overflow that watch's buffer and force a full re-read – [design deviation 1](../designs/large-projects/211-large-project-windows-watcher.md#9-acceptance-criteria-traceability). It did not show here, because the churn was in a visible folder anyway.
 
 ## Under churn
 
@@ -107,7 +107,7 @@ Cause, inferred: disk and antivirus contention from the test suite creating and 
 | AC5 | reads and git status do not wait for the watcher | watcher started after read 1; git answered during it | met |
 | AC8 | documented manual run | this page | partial |
 
-**Is `.local/` gitignored in Xezar?** Yes – `<project>/.gitignore` has `/.local/`, so the D10 assumption behind AC2 holds for this exclusion. Git status listed 97–114 files throughout the run.
+**Is `.local/` gitignored in that project?** Yes – `<project>/.gitignore` has `/.local/`, so the D10 assumption behind AC2 holds for this exclusion. Git status listed 97–114 files throughout the run.
 
 ## With the exclusion – pending
 

@@ -72,7 +72,7 @@ Source paths are relative to `src/renderer/src/` (**R/**), `src/main/` (**M/**) 
 | TREE-11 | File right-click menu; HTML files add Open as source, Open in default browser | all | same | [reference/menus](./reference/menus.md#project-tree-context-menus) |
 | TREE-12 | Reveal in Finder / Reveal in Explorer | all (label per OS) | commands.tsx | [reference/project-tree](./reference/project-tree.md#file-actions) |
 | TREE-13 | Delete confirmation ("cannot be undone") | all | commands.tsx | [how-to/organise-project-files](./how-to/organise-project-files.md#manage-files) |
-| TREE-14 | Keyboard navigation: one Tab stop, arrows, Home/End, Enter, type-ahead, Shift+F10 (#88) | all | ProjectTree/treeKeyboard.ts | [reference/project-tree](./reference/project-tree.md#keyboard-navigation) |
+| TREE-14 | Keyboard navigation: one Tab stop, arrows, Home/End, Enter, type-ahead, <kbd>⇧F10</kbd> / <kbd>Shift+F10</kbd> (#88) | all | ProjectTree/treeKeyboard.ts | [reference/project-tree](./reference/project-tree.md#keyboard-navigation) |
 | TREE-15 | Hidden patterns and watcher ignore list (per-project settings) | all | S/ipc/project-settings-schema.ts | [reference/settings](./reference/settings.md#per-project-settings) |
 | TREE-16 | Excluded folders: `files.exclude` in the global and the project settings file (project adds to global); excluded paths are not shown, read or watched; `.erfana` is never excluded; git status unaffected | all | S/ipc/files-exclude-schema.ts, M/utils/excludeMatcher.ts | [reference/settings](./reference/settings.md#excluded-folders) |
 | TREE-17 | Large folders: only visible rows drawn; ignored build folders and folders past 50,000 entries read on expand; Loading… / Could not read this folder | all | ProjectTree/visibleRows.ts, TreePlaceholderRow.tsx, M/services/FileService.ts | [reference/project-tree](./reference/project-tree.md#large-projects) |
@@ -103,7 +103,7 @@ Source paths are relative to `src/renderer/src/` (**R/**), `src/main/` (**M/**) 
 | MM-01 | Mermaid diagrams with a toolbar: direction buttons, View fullscreen | all | MermaidToolbar.tsx | [how-to/work-with-mermaid-diagrams](./how-to/work-with-mermaid-diagrams.md#view-a-diagram) |
 | MM-02 | Mermaid error box with "Report this error to Claude Code" | all | MermaidDiagram.tsx | [how-to/work-with-mermaid-diagrams](./how-to/work-with-mermaid-diagrams.md#view-a-diagram) |
 | MM-03 | Full-screen diagram viewer: zoom, fit, reset, directions | all | Editor/DiagramViewer/DiagramViewer.tsx | [how-to/work-with-mermaid-diagrams](./how-to/work-with-mermaid-diagrams.md#view-a-diagram) |
-| MM-04 | Diagram chat ("Edit diagram"), send with Cmd/Ctrl+Enter | all | Editor/DiagramViewer/ChatBubble.tsx | [how-to/work-with-mermaid-diagrams](./how-to/work-with-mermaid-diagrams.md#view-a-diagram) |
+| MM-04 | Diagram chat ("Edit diagram"), send with <kbd>⌘Enter</kbd> / <kbd>Ctrl+Enter</kbd> | all | Editor/DiagramViewer/ChatBubble.tsx | [how-to/work-with-mermaid-diagrams](./how-to/work-with-mermaid-diagrams.md#view-a-diagram) |
 
 ## Image viewer
 
@@ -129,7 +129,7 @@ Source paths are relative to `src/renderer/src/` (**R/**), `src/main/` (**M/**) 
 | HP-06 | Links in place or new tab; 50-entry history; external links ask first | all | docs/html-preview/README.md | [how-to/preview-an-html-page](./how-to/preview-an-html-page.md#open-and-navigate-a-page) |
 | HP-07 | Frames from the same project, 3 levels, 50 per page | all | same | [reference/html-preview](./reference/html-preview.md#live-refresh-and-frames) |
 | HP-08 | Auto-refresh: CSS in place, HTML/JS reload; 16 watched files per preview | all | same | [reference/html-preview](./reference/html-preview.md#live-refresh-and-frames) |
-| HP-09 | Page zoom (View menu, Cmd/Ctrl + / - / 0) | all | M/menu.ts | [reference/html-preview](./reference/html-preview.md#zoom-and-pdf) |
+| HP-09 | Page zoom (View menu, <kbd>⌘+</kbd> <kbd>⌘-</kbd> <kbd>⌘0</kbd> / <kbd>Ctrl++</kbd> <kbd>Ctrl+-</kbd> <kbd>Ctrl+0</kbd>) | all | M/menu.ts | [reference/html-preview](./reference/html-preview.md#zoom-and-pdf) |
 | HP-10 | Stopped preview with Reload | all | PreviewFallback.tsx | [reference/troubleshooting](./reference/troubleshooting.md#html-preview-stopped-or-reports-issues) |
 | HP-11 | Keyboard into and out of the page (Enter/Space, Esc); Back/Forward keys | all (keys differ) | S/previewNavKeys.ts | [reference/keyboard-shortcuts](./reference/keyboard-shortcuts.md#html-preview) |
 | HP-12 | Off-switch: **Run HTML files** setting | all | Settings/sections/HtmlPreviewSection.tsx | [reference/settings](./reference/settings.md#html-preview) |
@@ -191,7 +191,7 @@ Source paths are relative to `src/renderer/src/` (**R/**), `src/main/` (**M/**) 
 | TR-03 | Backends: OpenAI API (audio leaves the machine) or local whisper.cpp (offline) | local: M, W x64 | Settings | [how-to/transcribe-audio-or-video](./how-to/transcribe-audio-or-video.md#transcribe-media) |
 | TR-04 | Long recordings are split into chunks | all | docs/features/README.md #13 | [reference/import-and-transcription](./reference/import-and-transcription.md#transcribe-audio-or-video) |
 | EX-01 | Markdown to PDF and Word; disabled in Editor Only | all | MarkdownToolbar.tsx, M/services/PdfService.ts | [how-to/export-to-pdf-or-word](./how-to/export-to-pdf-or-word.md#export-markdown) |
-| EX-02 | HTML page to PDF (toolbar or Cmd/Ctrl+S) | all | HtmlPreviewPanel | [how-to/export-to-pdf-or-word](./how-to/export-to-pdf-or-word.md#export-markdown) |
+| EX-02 | HTML page to PDF (toolbar or <kbd>⌘S</kbd> / <kbd>Ctrl+S</kbd>) | all | HtmlPreviewPanel | [how-to/export-to-pdf-or-word](./how-to/export-to-pdf-or-word.md#export-markdown) |
 | EX-03 | Image to PNG / PDF / clipboard | all | ImageViewerExportControls.tsx | [how-to/view-and-export-images](./how-to/view-and-export-images.md#view-and-export-an-image) |
 
 ## Settings
@@ -221,34 +221,34 @@ Every row goes into `reference/keyboard-shortcuts.md` with macOS and Windows col
 
 | ID | Keys (macOS / Windows) | Action | Scope | Guide section |
 |---|---|---|---|---|
-| KEY-01 | Cmd+B / Ctrl+B | Show or hide the Project sidebar (in the editor, Bold may win – to observe) | global | [Shortcuts](./reference/keyboard-shortcuts.md#app-and-windows) |
-| KEY-02 | Cmd+J / Ctrl+J | Show or hide the terminal | global | [Shortcuts](./reference/keyboard-shortcuts.md#app-and-windows) |
-| KEY-03 | Cmd+Shift+M / Ctrl+Shift+M | Maximize the terminal | global | [Shortcuts](./reference/keyboard-shortcuts.md#app-and-windows) |
-| KEY-04 | Cmd+Alt+R / Ctrl+Alt+R | Refresh the project tree | global | [Shortcuts](./reference/keyboard-shortcuts.md#app-and-windows) |
-| KEY-05 | Cmd+Shift+I / Ctrl+Shift+I | Import into the selected folder | tree | [Shortcuts](./reference/keyboard-shortcuts.md#project-tree) |
-| KEY-06 | Cmd+X/C/V / Ctrl+X/C/V | Cut, copy, paste files | tree | [Shortcuts](./reference/keyboard-shortcuts.md#project-tree) |
-| KEY-07 | Cmd+S / Ctrl+S | Save; in an HTML preview, export PDF | active tab | [Shortcuts](./reference/keyboard-shortcuts.md#editor-and-markdown-preview) |
-| KEY-08 | Cmd+W / Ctrl+W | Close tab | active tab | [Shortcuts](./reference/keyboard-shortcuts.md#editor-and-markdown-preview) |
-| KEY-09 | Cmd+F / Ctrl+F | Find | editor, preview, HTML page | [Shortcuts](./reference/keyboard-shortcuts.md#editor-and-markdown-preview) |
-| KEY-10 | Cmd+G, Shift+Cmd+G / Ctrl+G, Shift+Ctrl+G | Next, previous match | editor | [Shortcuts](./reference/keyboard-shortcuts.md#editor-and-markdown-preview) |
-| KEY-11 | Enter, Shift+Enter, Esc; Cmd+Option+C/W or Alt+C/W | Next, previous, close, case-sensitive and whole-word toggles in the find bar | find bar | [Shortcuts](./reference/keyboard-shortcuts.md#editor-and-markdown-preview) |
-| KEY-12 | Cmd+I, Cmd+K / Ctrl+I, Ctrl+K | Italic, insert link | editor | [Shortcuts](./reference/keyboard-shortcuts.md#editor-and-markdown-preview) |
-| KEY-13 | Cmd+C/X/V / Ctrl+C/X/V | Copy, cut, paste text | editor | [Shortcuts](./reference/keyboard-shortcuts.md#editor-and-markdown-preview) |
-| KEY-14 | F1, Cmd+/, Alt+↑/↓, Cmd+D, Alt+Click (also Windows) | Monaco commands | editor | [Shortcuts](./reference/keyboard-shortcuts.md#editor-and-markdown-preview) |
-| KEY-15 | Cmd+C; Ctrl+C with a selection / Ctrl+Shift+C, Ctrl+Shift+V | Terminal copy and paste (Ctrl+C without a selection interrupts) | terminal | [Shortcuts](./reference/keyboard-shortcuts.md#terminal) |
-| KEY-16 | Cmd+[ / Cmd+] (macOS); Alt+← / Alt+→ (Windows) | HTML preview Back / Forward | HTML preview | [Shortcuts](./reference/keyboard-shortcuts.md#html-preview) |
-| KEY-17 | Enter or Space, then Esc | Into the HTML page and back out | HTML preview | [Shortcuts](./reference/keyboard-shortcuts.md#html-preview) |
-| KEY-18 | + = - 0 F arrows Esc | Image zoom, reset, fit, pan, leave full screen | image viewer | [Shortcuts](./reference/keyboard-shortcuts.md#image-and-diagram-viewers) |
-| KEY-19 | + = - 0 F | Diagram zoom, reset, fit | diagram viewer | [Shortcuts](./reference/keyboard-shortcuts.md#image-and-diagram-viewers) |
-| KEY-20 | Cmd+Enter / Ctrl+Enter | Submit prompt dialog, send diagram chat | dialogs | [Shortcuts](./reference/keyboard-shortcuts.md#dialogs-and-file-picker) |
-| KEY-21 | ↑ ↓ Enter Esc | File picker | file picker | [Shortcuts](./reference/keyboard-shortcuts.md#dialogs-and-file-picker) |
-| KEY-22 | Esc | Close settings, dialogs, full screen | – | [Shortcuts](./reference/keyboard-shortcuts.md#dialogs-and-file-picker) |
-| KEY-23 | Cmd+Shift+N / Ctrl+Shift+N | New Window | menu | [Shortcuts](./reference/keyboard-shortcuts.md#app-and-windows) |
-| KEY-24 | Cmd+0, Cmd+Plus, Cmd+- / Ctrl+… | Actual size, zoom in, zoom out | menu | [Shortcuts](./reference/keyboard-shortcuts.md#app-and-windows) |
-| KEY-25 | Cmd+M, Cmd+H, Cmd+Q (macOS); Ctrl+M, Alt+F4, F11 (Windows) | Window management | OS | [Shortcuts](./reference/keyboard-shortcuts.md#app-and-windows) |
-| KEY-26 | Shift+F10 / Shift+F10 or Menu key; then arrows, Home/End, Enter/Space, type-ahead, Esc or Tab | Open and use any right-click menu | menus | [Shortcuts](./reference/keyboard-shortcuts.md#menus) |
-| KEY-27 | Esc on a focused toast | Close the message | toasts | [Shortcuts](./reference/keyboard-shortcuts.md#app-and-windows) |
-| KEY-28 | Cmd+Option+M / Ctrl+Alt+M; Esc | Turn HTML Preview comment mode on or off; leave it | HTML preview | [Shortcuts](./reference/keyboard-shortcuts.md#html-preview) |
+| KEY-01 | <kbd>⌘B</kbd> / <kbd>Ctrl+B</kbd> | Show or hide the Project sidebar (in the editor, Bold may win – to observe) | global | [Shortcuts](./reference/keyboard-shortcuts.md#app-and-windows) |
+| KEY-02 | <kbd>⌘J</kbd> / <kbd>Ctrl+J</kbd> | Show or hide the terminal | global | [Shortcuts](./reference/keyboard-shortcuts.md#app-and-windows) |
+| KEY-03 | <kbd>⇧⌘M</kbd> / <kbd>Ctrl+Shift+M</kbd> | Maximize the terminal | global | [Shortcuts](./reference/keyboard-shortcuts.md#app-and-windows) |
+| KEY-04 | <kbd>⌥⌘R</kbd> / <kbd>Ctrl+Alt+R</kbd> | Refresh the project tree | global | [Shortcuts](./reference/keyboard-shortcuts.md#app-and-windows) |
+| KEY-05 | <kbd>⇧⌘I</kbd> / <kbd>Ctrl+Shift+I</kbd> | Import into the selected folder | tree | [Shortcuts](./reference/keyboard-shortcuts.md#project-tree) |
+| KEY-06 | <kbd>⌘X</kbd> <kbd>⌘C</kbd> <kbd>⌘V</kbd> / <kbd>Ctrl+X</kbd> <kbd>Ctrl+C</kbd> <kbd>Ctrl+V</kbd> | Cut, copy, paste files | tree | [Shortcuts](./reference/keyboard-shortcuts.md#project-tree) |
+| KEY-07 | <kbd>⌘S</kbd> / <kbd>Ctrl+S</kbd> | Save; in an HTML preview, export PDF | active tab | [Shortcuts](./reference/keyboard-shortcuts.md#editor-and-markdown-preview) |
+| KEY-08 | <kbd>⌘W</kbd> / <kbd>Ctrl+W</kbd> | Close tab | active tab | [Shortcuts](./reference/keyboard-shortcuts.md#editor-and-markdown-preview) |
+| KEY-09 | <kbd>⌘F</kbd> / <kbd>Ctrl+F</kbd> | Find | editor, preview, HTML page | [Shortcuts](./reference/keyboard-shortcuts.md#editor-and-markdown-preview) |
+| KEY-10 | <kbd>⌘G</kbd> <kbd>⇧⌘G</kbd> / <kbd>Ctrl+G</kbd> <kbd>Ctrl+Shift+G</kbd> | Next, previous match | editor | [Shortcuts](./reference/keyboard-shortcuts.md#editor-and-markdown-preview) |
+| KEY-11 | <kbd>Enter</kbd>, <kbd>⇧Enter</kbd> / <kbd>Shift+Enter</kbd>, <kbd>Esc</kbd>; <kbd>⌥⌘C</kbd> <kbd>⌥⌘W</kbd> / <kbd>Alt+C</kbd> <kbd>Alt+W</kbd> | Next, previous, close, case-sensitive and whole-word toggles in the find bar | find bar | [Shortcuts](./reference/keyboard-shortcuts.md#editor-and-markdown-preview) |
+| KEY-12 | <kbd>⌘I</kbd> <kbd>⌘K</kbd> / <kbd>Ctrl+I</kbd> <kbd>Ctrl+K</kbd> | Italic, insert link | editor | [Shortcuts](./reference/keyboard-shortcuts.md#editor-and-markdown-preview) |
+| KEY-13 | <kbd>⌘C</kbd> <kbd>⌘X</kbd> <kbd>⌘V</kbd> / <kbd>Ctrl+C</kbd> <kbd>Ctrl+X</kbd> <kbd>Ctrl+V</kbd> | Copy, cut, paste text | editor | [Shortcuts](./reference/keyboard-shortcuts.md#editor-and-markdown-preview) |
+| KEY-14 | <kbd>F1</kbd>; <kbd>⌘/</kbd> / <kbd>Ctrl+/</kbd>; <kbd>⌥↑</kbd> <kbd>⌥↓</kbd> / <kbd>Alt+↑</kbd> <kbd>Alt+↓</kbd>; <kbd>⌘D</kbd> / <kbd>Ctrl+D</kbd>; hold <kbd>⌥</kbd> / <kbd>Alt</kbd> and click | Monaco commands | editor | [Shortcuts](./reference/keyboard-shortcuts.md#editor-and-markdown-preview) |
+| KEY-15 | <kbd>⌘C</kbd> / <kbd>Ctrl+C</kbd> with a selection; <kbd>⌃⇧C</kbd> <kbd>⌃⇧V</kbd> / <kbd>Ctrl+Shift+C</kbd> <kbd>Ctrl+Shift+V</kbd> | Terminal copy and paste (<kbd>⌃C</kbd> / <kbd>Ctrl+C</kbd> without a selection interrupts) | terminal | [Shortcuts](./reference/keyboard-shortcuts.md#terminal) |
+| KEY-16 | <kbd>⌘[</kbd> <kbd>⌘]</kbd> / <kbd>Alt+←</kbd> <kbd>Alt+→</kbd> | HTML preview Back / Forward | HTML preview | [Shortcuts](./reference/keyboard-shortcuts.md#html-preview) |
+| KEY-17 | <kbd>Enter</kbd> or <kbd>Space</kbd>, then <kbd>Esc</kbd> | Into the HTML page and back out | HTML preview | [Shortcuts](./reference/keyboard-shortcuts.md#html-preview) |
+| KEY-18 | <kbd>+</kbd> <kbd>=</kbd> <kbd>-</kbd> <kbd>0</kbd> <kbd>F</kbd>, arrows, <kbd>Esc</kbd> | Image zoom, reset, fit, pan, leave full screen | image viewer | [Shortcuts](./reference/keyboard-shortcuts.md#image-and-diagram-viewers) |
+| KEY-19 | <kbd>+</kbd> <kbd>=</kbd> <kbd>-</kbd> <kbd>0</kbd> <kbd>F</kbd> | Diagram zoom, reset, fit | diagram viewer | [Shortcuts](./reference/keyboard-shortcuts.md#image-and-diagram-viewers) |
+| KEY-20 | <kbd>⌘Enter</kbd> / <kbd>Ctrl+Enter</kbd> | Submit prompt dialog, send diagram chat | dialogs | [Shortcuts](./reference/keyboard-shortcuts.md#dialogs-and-file-picker) |
+| KEY-21 | <kbd>↑</kbd> <kbd>↓</kbd> <kbd>Enter</kbd> <kbd>Esc</kbd> | File picker | file picker | [Shortcuts](./reference/keyboard-shortcuts.md#dialogs-and-file-picker) |
+| KEY-22 | <kbd>Esc</kbd> | Close settings, dialogs, full screen | – | [Shortcuts](./reference/keyboard-shortcuts.md#dialogs-and-file-picker) |
+| KEY-23 | <kbd>⇧⌘N</kbd> / <kbd>Ctrl+Shift+N</kbd> | New Window | menu | [Shortcuts](./reference/keyboard-shortcuts.md#app-and-windows) |
+| KEY-24 | <kbd>⌘0</kbd> <kbd>⌘+</kbd> <kbd>⌘-</kbd> / <kbd>Ctrl+0</kbd> <kbd>Ctrl++</kbd> <kbd>Ctrl+-</kbd> | Actual size, zoom in, zoom out | menu | [Shortcuts](./reference/keyboard-shortcuts.md#app-and-windows) |
+| KEY-25 | <kbd>⌘M</kbd> <kbd>⌘H</kbd> <kbd>⌘Q</kbd> <kbd>⌃⌘F</kbd> / <kbd>Ctrl+M</kbd> <kbd>Alt+F4</kbd> <kbd>F11</kbd> | Window management | OS | [Shortcuts](./reference/keyboard-shortcuts.md#app-and-windows) |
+| KEY-26 | <kbd>⇧F10</kbd> / <kbd>Shift+F10</kbd> or <kbd>Menu</kbd>; then arrows, <kbd>Home</kbd> <kbd>End</kbd>, <kbd>Enter</kbd> or <kbd>Space</kbd>, type-ahead, <kbd>Esc</kbd> or <kbd>Tab</kbd> | Open and use any right-click menu | menus | [Shortcuts](./reference/keyboard-shortcuts.md#menus) |
+| KEY-27 | <kbd>Esc</kbd> on a focused toast | Close the message | toasts | [Shortcuts](./reference/keyboard-shortcuts.md#app-and-windows) |
+| KEY-28 | <kbd>⌥⌘M</kbd> / <kbd>Ctrl+Alt+M</kbd>; <kbd>Esc</kbd> | Turn HTML Preview comment mode on or off; leave it | HTML preview | [Shortcuts](./reference/keyboard-shortcuts.md#html-preview) |
 
 
 ## Menus and dialogs
@@ -293,5 +293,5 @@ current source behavior. Item 9 remains unverified.
 8. **Agent wording** (#144, resolved). `docs/features/README.md` items 1 and 4, `docs/prompts/README.md`
    and the other contributor pages now send prompt templates to the CLI agent in the terminal rather
    than claiming AI text operations. The guide attributes prompts to the CLI agent in the terminal.
-9. **Cmd+B in the editor.** Whether it makes text bold or toggles the sidebar is unverified. A
+9. **<kbd>⌘B</kbd> / <kbd>Ctrl+B</kbd> in the editor.** Whether it makes text bold or toggles the sidebar is unverified. A
    capture scene observes it, and the guide states what happens.

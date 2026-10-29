@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * HTML Preview comments – script-built pages and frames, through the real UI
- * (docs/designs/html-preview-comments.md §12.2 E-005, E-006, E-017, E-025;
+ * (docs/designs/comments/html-preview-comments.md §12.2 E-005, E-006, E-017, E-025;
  * §19 R3-3, R3-11; decisions 5, 15, 28, 30, 35).
  *
  * - **E-005** the JS slide deck (`comments/slide-deck/`): on slide 3, scrolled

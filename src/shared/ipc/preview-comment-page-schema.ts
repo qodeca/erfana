@@ -4,7 +4,7 @@
  * HTML Preview comments – the page's signals to main
  * (`preview-page:commentHello`, `…Pick`, `…Anchors`) and the bounded
  * primitives every comment payload is built from
- * (docs/designs/html-preview-comments.md §8, §9.1 S3, S7; tests I-001 –
+ * (docs/designs/comments/html-preview-comments.md §8, §9.1 S3, S7; tests I-001 –
  * I-005, SEC-05).
  *
  * These come from an untrusted page, through its preload. They carry enums, a

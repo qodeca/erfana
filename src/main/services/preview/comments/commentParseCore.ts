@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * The instrumentation pipeline the comment parse worker runs for one served
- * document (docs/designs/html-preview-comments.md §4.2 "PreviewProtocolHandler",
+ * document (docs/designs/comments/html-preview-comments.md §4.2 "PreviewProtocolHandler",
  * §6 "On every load", §19 R3-12, R3-13).
  *
  * Pure apart from its random source and a hash: no Electron, no file system,

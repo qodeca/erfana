@@ -1,6 +1,6 @@
 # Spikes – HTML Preview comments v1 (phase P0)
 
-> Date: 2026-10-25 · Branch: `feature/html-preview-comments` · Design: [docs/designs/html-preview-comments.md](../designs/html-preview-comments.md) (revision 3 folds these results in, see its §19).
+> Date: 2026-10-25 · Branch: `feature/html-preview-comments` · Design: [docs/designs/comments/html-preview-comments.md](../designs/comments/html-preview-comments.md) (revision 3 folds these results in, see its §19).
 > Machine: Windows 11 x64 under emulation on Apple Silicon (Parallels), one monitor at 125% scaling, Electron 44.9.3 (Chromium 152). Timings are upper bounds.
 > Probes were throwaway scripts in the session scratchpad and are not committed; the evidence excerpts below are copied from their logs.
 
@@ -391,7 +391,7 @@ Run any probe from the repo root: `npx electron "<this folder>/<spike>/main.cjs"
 
 ## P0 spikes S7 and S9 – results
 
-Date: 2026-10-25 · Branch: `feature/html-preview-comments` · Design: `docs/designs/html-preview-comments.md` (revision 2)
+Date: 2026-10-25 · Branch: `feature/html-preview-comments` · Design: `docs/designs/comments/html-preview-comments.md` (revision 2)
 
 **Machine (applies to every number below):** Windows 11 running in a Parallels VM on Apple Silicon. The OS reports x64, but the CPU is ARMv8 (`PROCESSOR_IDENTIFIER`: "ARMv8 (64-bit) Family 8"), so the x64 Node/Electron binaries run **under x64 emulation**. 10 vCPUs, 34 GB RAM. Expect native x64 or arm64 machines to be faster. Treat the timings as upper bounds.
 

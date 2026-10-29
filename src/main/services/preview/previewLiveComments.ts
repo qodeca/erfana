@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * HTML Preview comments for one live view, built from the view's parts
- * (docs/designs/html-preview-comments.md §4.2, §7.5).
+ * (docs/designs/comments/html-preview-comments.md §4.2, §7.5).
  *
  * Built last, once nothing in the view's wiring can throw, and only when both
  * halves exist: the session was built with comments on (its serving and the

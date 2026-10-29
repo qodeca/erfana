@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Bounds on one parse5 pass over a page (docs/designs/html-preview-comments.md
+ * Bounds on one parse5 pass over a page (docs/designs/comments/html-preview-comments.md
  * §19 Rev 4 "Element cap"; security review S-M).
  *
  * Counting start tags before the parse (`hasMoreStartTagsThan`) bounds what a

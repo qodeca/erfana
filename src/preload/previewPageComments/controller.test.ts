@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Pins, visibility reports, reveal and restore through the controller
- * (docs/designs/html-preview-comments.md §6 status, §7.5 step 6, §7.10,
+ * (docs/designs/comments/html-preview-comments.md §6 status, §7.5 step 6, §7.10,
  * §10.5, decisions 20 and 30, §19 R3-7; J-005, J-006, J-016).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'

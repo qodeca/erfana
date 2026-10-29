@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * The dirty-source guard behind the comment window's unsaved banner
- * (docs/designs/html-preview-comments.md §7.8, decision 13; R-007, R-024).
+ * (docs/designs/comments/html-preview-comments.md §7.8, decision 13; R-007, R-024).
  */
 import { act, renderHook } from '@testing-library/react'
 import type { DockviewApi } from 'dockview'

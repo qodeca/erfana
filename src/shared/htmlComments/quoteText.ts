@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * The text of a quote anchor (docs/designs/html-preview-comments.md §5.3,
+ * The text of a quote anchor (docs/designs/comments/html-preview-comments.md §5.3,
  * §5.9 step 4): an element's readable text, and the text on each side of it,
  * read from {@link HtmlIndex.visibleText} with whitespace runs collapsed to one
  * space, trimmed and NFC-normalised, so reformatting and NFD file names typed

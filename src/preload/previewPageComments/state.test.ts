@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * The `commentState` parser and the overlay's default theme
- * (docs/designs/html-preview-comments.md §8, §10.9; J-008 receive side).
+ * (docs/designs/comments/html-preview-comments.md §8, §10.9; J-008 receive side).
  */
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'

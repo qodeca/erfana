@@ -16,7 +16,7 @@
  *    while the bar is still green.
  *
  * @see Issue #216 - Per-terminal Claude Code context status bar
- * @see docs/designs/216-claude-status-bar.md §5 (UX), §10
+ * @see docs/designs/context-meter/216-claude-status-bar.md §5 (UX), §10
  */
 import { type ClaudeStatusLevel } from '../../../shared/ipc/claude-status-schema'
 

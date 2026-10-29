@@ -7,6 +7,8 @@ SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 
 These are Erfana's app and panel shortcuts. The active panel matters: an editor command acts on the foreground tab, and a terminal command acts in the terminal.
 
+Each box is one key combination, written the way the system shows it: on macOS with the symbols ⌃ Control, ⌥ Option, ⇧ Shift and ⌘ Command, on Windows spelled out with +. Outside the tables, macOS comes first: <kbd>⌘J</kbd> / <kbd>Ctrl+J</kbd>.
+
 **On this page**
 
 - [App and windows](#app-and-windows)
@@ -22,15 +24,14 @@ These are Erfana's app and panel shortcuts. The active panel matters: an editor 
 
 | Action | macOS | Windows |
 | --- | --- | --- |
-| Show or hide Project sidebar | <kbd>Cmd</kbd>+<kbd>B</kbd> | <kbd>Ctrl</kbd>+<kbd>B</kbd> |
-| Show or hide terminal | <kbd>Cmd</kbd>+<kbd>J</kbd> | <kbd>Ctrl</kbd>+<kbd>J</kbd> |
-| Maximize terminal | <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>M</kbd> | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>M</kbd> |
-| Refresh project tree | <kbd>Cmd</kbd>+<kbd>Alt</kbd>+<kbd>R</kbd> | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>R</kbd> |
-| New Window | <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>N</kbd> | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>N</kbd> |
-| Actual size; zoom in; zoom out | <kbd>Cmd</kbd>+<kbd>0</kbd>; <kbd>Cmd</kbd>+<kbd>+</kbd>; <kbd>Cmd</kbd>+<kbd>-</kbd> | <kbd>Ctrl</kbd>+<kbd>0</kbd>; <kbd>Ctrl</kbd>+<kbd>+</kbd>; <kbd>Ctrl</kbd>+<kbd>-</kbd> |
-| Minimize; hide; quit | <kbd>Cmd</kbd>+<kbd>M</kbd>; <kbd>Cmd</kbd>+<kbd>H</kbd>; <kbd>Cmd</kbd>+<kbd>Q</kbd> | <kbd>Ctrl</kbd>+<kbd>M</kbd>; none; **File > Exit** |
-| Close window; full screen | Use the window close control; **View > Toggle Full Screen** | <kbd>Alt</kbd>+<kbd>F4</kbd>; <kbd>F11</kbd> |
-
+| Show or hide Project sidebar | <kbd>⌘B</kbd> | <kbd>Ctrl+B</kbd> |
+| Show or hide terminal | <kbd>⌘J</kbd> | <kbd>Ctrl+J</kbd> |
+| Maximize terminal | <kbd>⇧⌘M</kbd> | <kbd>Ctrl+Shift+M</kbd> |
+| Refresh project tree | <kbd>⌥⌘R</kbd> | <kbd>Ctrl+Alt+R</kbd> |
+| New Window | <kbd>⇧⌘N</kbd> | <kbd>Ctrl+Shift+N</kbd> |
+| Actual size; zoom in; zoom out | <kbd>⌘0</kbd>; <kbd>⌘+</kbd>; <kbd>⌘-</kbd> | <kbd>Ctrl+0</kbd>; <kbd>Ctrl++</kbd>; <kbd>Ctrl+-</kbd> |
+| Minimize; hide; quit | <kbd>⌘M</kbd>; <kbd>⌘H</kbd>; <kbd>⌘Q</kbd> | <kbd>Ctrl+M</kbd>; none; **File > Exit** |
+| Close window; full screen | Use the window close control; <kbd>⌃⌘F</kbd> | <kbd>Alt+F4</kbd>; <kbd>F11</kbd> |
 | Move through recent projects on the Welcome tab; open one | <kbd>↑</kbd>; <kbd>↓</kbd>; <kbd>Home</kbd>; <kbd>End</kbd>; <kbd>Enter</kbd> or <kbd>Space</kbd> | Same |
 | Close a message (toast) that has focus | <kbd>Esc</kbd> | Same |
 
@@ -40,15 +41,15 @@ The View zoom commands zoom a focused HTML page first; otherwise they zoom the E
 
 | Action | macOS | Windows |
 | --- | --- | --- |
-| Import into selected folder | <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd> | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd> |
-| Cut; copy; paste selected files | <kbd>Cmd</kbd>+<kbd>X</kbd>; <kbd>Cmd</kbd>+<kbd>C</kbd>; <kbd>Cmd</kbd>+<kbd>V</kbd> | <kbd>Ctrl</kbd>+<kbd>X</kbd>; <kbd>Ctrl</kbd>+<kbd>C</kbd>; <kbd>Ctrl</kbd>+<kbd>V</kbd> |
+| Import into selected folder | <kbd>⇧⌘I</kbd> | <kbd>Ctrl+Shift+I</kbd> |
+| Cut; copy; paste selected files | <kbd>⌘X</kbd>; <kbd>⌘C</kbd>; <kbd>⌘V</kbd> | <kbd>Ctrl+X</kbd>; <kbd>Ctrl+C</kbd>; <kbd>Ctrl+V</kbd> |
 | Move to the previous or next row | <kbd>↑</kbd>; <kbd>↓</kbd> | Same |
 | Move to the first or last row | <kbd>Home</kbd>; <kbd>End</kbd> | Same |
 | Open a closed folder; on an open folder, move to its first item | <kbd>→</kbd> | Same |
 | Close an open folder; otherwise move to the parent folder | <kbd>←</kbd> | Same |
 | Open a file; open or close and select a folder | <kbd>Enter</kbd> | Same |
 | Jump to a row by name | Type its first letters | Same |
-| Open the row's menu | <kbd>Shift</kbd>+<kbd>F10</kbd> | <kbd>Shift</kbd>+<kbd>F10</kbd> or the <kbd>Menu</kbd> key |
+| Open the row's menu | <kbd>⇧F10</kbd> | <kbd>Shift+F10</kbd> or the <kbd>Menu</kbd> key |
 
 Cut, copy and paste act on the tree only while the tree has focus, so they never copy a folder you clicked earlier when you meant the text selected elsewhere. The whole tree is a single <kbd>Tab</kbd> stop: <kbd>Tab</kbd> enters it on the last row you used, and the next <kbd>Tab</kbd> leaves it. The arrow keys move focus without changing the selected folder; <kbd>Enter</kbd> or a click selects one. The row menu works like every other menu – see [Menus](#menus). Refresh and import are ignored while typing in a text field; import also needs a selected folder.
 
@@ -56,22 +57,22 @@ Cut, copy and paste act on the tree only while the tree has focus, so they never
 
 | Action | macOS | Windows |
 | --- | --- | --- |
-| Save active document; close active tab | <kbd>Cmd</kbd>+<kbd>S</kbd>; <kbd>Cmd</kbd>+<kbd>W</kbd> | <kbd>Ctrl</kbd>+<kbd>S</kbd>; <kbd>Ctrl</kbd>+<kbd>W</kbd> |
-| Find; next; previous | <kbd>Cmd</kbd>+<kbd>F</kbd>; <kbd>Cmd</kbd>+<kbd>G</kbd>; <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>G</kbd> | <kbd>Ctrl</kbd>+<kbd>F</kbd>; <kbd>Ctrl</kbd>+<kbd>G</kbd>; <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>G</kbd> |
-| Bold; italic; insert link | <kbd>Cmd</kbd>+<kbd>B</kbd>; <kbd>Cmd</kbd>+<kbd>I</kbd>; <kbd>Cmd</kbd>+<kbd>K</kbd> | <kbd>Ctrl</kbd>+<kbd>B</kbd>; <kbd>Ctrl</kbd>+<kbd>I</kbd>; <kbd>Ctrl</kbd>+<kbd>K</kbd> |
-| Copy; cut; paste text | <kbd>Cmd</kbd>+<kbd>C</kbd>; <kbd>Cmd</kbd>+<kbd>X</kbd>; <kbd>Cmd</kbd>+<kbd>V</kbd> | <kbd>Ctrl</kbd>+<kbd>C</kbd>; <kbd>Ctrl</kbd>+<kbd>X</kbd>; <kbd>Ctrl</kbd>+<kbd>V</kbd> |
-| Undo; redo; toggle comment | <kbd>Cmd</kbd>+<kbd>Z</kbd>; <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>; <kbd>Cmd</kbd>+<kbd>/</kbd> | <kbd>Ctrl</kbd>+<kbd>Z</kbd>; <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>; <kbd>Ctrl</kbd>+<kbd>/</kbd> |
-| Move line; select next match; add cursor | <kbd>Alt</kbd>+<kbd>↑/↓</kbd>; <kbd>Cmd</kbd>+<kbd>D</kbd>; <kbd>Alt</kbd>+select | <kbd>Alt</kbd>+<kbd>↑/↓</kbd>; <kbd>Ctrl</kbd>+<kbd>D</kbd>; <kbd>Alt</kbd>+select |
+| Save active document; close active tab | <kbd>⌘S</kbd>; <kbd>⌘W</kbd> | <kbd>Ctrl+S</kbd>; <kbd>Ctrl+W</kbd> |
+| Find; next; previous | <kbd>⌘F</kbd>; <kbd>⌘G</kbd>; <kbd>⇧⌘G</kbd> | <kbd>Ctrl+F</kbd>; <kbd>Ctrl+G</kbd>; <kbd>Ctrl+Shift+G</kbd> |
+| Bold; italic; insert link | <kbd>⌘B</kbd>; <kbd>⌘I</kbd>; <kbd>⌘K</kbd> | <kbd>Ctrl+B</kbd>; <kbd>Ctrl+I</kbd>; <kbd>Ctrl+K</kbd> |
+| Copy; cut; paste text | <kbd>⌘C</kbd>; <kbd>⌘X</kbd>; <kbd>⌘V</kbd> | <kbd>Ctrl+C</kbd>; <kbd>Ctrl+X</kbd>; <kbd>Ctrl+V</kbd> |
+| Undo; redo; toggle comment | <kbd>⌘Z</kbd>; <kbd>⇧⌘Z</kbd>; <kbd>⌘/</kbd> | <kbd>Ctrl+Z</kbd>; <kbd>Ctrl+Shift+Z</kbd>; <kbd>Ctrl+/</kbd> |
+| Move line; select next match; add cursor | <kbd>⌥↑</kbd> or <kbd>⌥↓</kbd>; <kbd>⌘D</kbd>; hold <kbd>⌥</kbd> and select | <kbd>Alt+↑</kbd> or <kbd>Alt+↓</kbd>; <kbd>Ctrl+D</kbd>; hold <kbd>Alt</kbd> and select |
 | Command palette | <kbd>F1</kbd> | <kbd>F1</kbd> |
 
-<kbd>Cmd</kbd>+<kbd>B</kbd> / <kbd>Ctrl</kbd>+<kbd>B</kbd> is also the global sidebar shortcut. Both handlers exist; which wins with the editor focused is unverified. Use the **Bold** toolbar button if needed.
+<kbd>⌘B</kbd> / <kbd>Ctrl+B</kbd> is also the global sidebar shortcut. Both handlers exist; which wins with the editor focused is unverified. Use the **Bold** toolbar button if needed.
 
-In the find bar, <kbd>Enter</kbd> moves to the next match, <kbd>Shift</kbd>+<kbd>Enter</kbd> to the previous match, and <kbd>Esc</kbd> closes it. These option keys work while the find bar has focus:
+In the find bar, <kbd>Enter</kbd> moves to the next match, <kbd>⇧Enter</kbd> / <kbd>Shift+Enter</kbd> to the previous match, and <kbd>Esc</kbd> closes it. These option keys work while the find bar has focus:
 
 | Option | macOS | Windows |
 | --- | --- | --- |
-| Toggle **Case sensitive** | <kbd>Cmd</kbd>+<kbd>Option</kbd>+<kbd>C</kbd> | <kbd>Alt</kbd>+<kbd>C</kbd> |
-| Toggle **Whole word** | <kbd>Cmd</kbd>+<kbd>Option</kbd>+<kbd>W</kbd> | <kbd>Alt</kbd>+<kbd>W</kbd> |
+| Toggle **Case sensitive** | <kbd>⌥⌘C</kbd> | <kbd>Alt+C</kbd> |
+| Toggle **Whole word** | <kbd>⌥⌘W</kbd> | <kbd>Alt+W</kbd> |
 
 **Whole word** does nothing in a view that does not support it.
 
@@ -79,20 +80,20 @@ In the find bar, <kbd>Enter</kbd> moves to the next match, <kbd>Shift</kbd>+<kbd
 
 | Action | macOS | Windows |
 | --- | --- | --- |
-| Copy selection; paste | <kbd>Cmd</kbd>+<kbd>C</kbd>; <kbd>Cmd</kbd>+<kbd>V</kbd> | <kbd>Ctrl</kbd>+<kbd>C</kbd>; <kbd>Ctrl</kbd>+<kbd>V</kbd> |
-| Explicit copy; paste | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd>; <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> | Same |
-| Interrupt without selected text | <kbd>Ctrl</kbd>+<kbd>C</kbd> | <kbd>Ctrl</kbd>+<kbd>C</kbd> |
+| Copy selection; paste | <kbd>⌘C</kbd>; <kbd>⌘V</kbd> | <kbd>Ctrl+C</kbd>; <kbd>Ctrl+V</kbd> |
+| Explicit copy; paste | <kbd>⌃⇧C</kbd>; <kbd>⌃⇧V</kbd> | <kbd>Ctrl+Shift+C</kbd>; <kbd>Ctrl+Shift+V</kbd> |
+| Interrupt without selected text | <kbd>⌃C</kbd> | <kbd>Ctrl+C</kbd> |
 
-Your shell also handles <kbd>Ctrl</kbd>+<kbd>D</kbd> (EOF), <kbd>Ctrl</kbd>+<kbd>L</kbd> (clear), <kbd>Ctrl</kbd>+<kbd>A/E</kbd> (line ends), <kbd>Ctrl</kbd>+<kbd>U/K</kbd> (delete to line ends), arrows (history), and <kbd>Tab</kbd> (completion); exact behaviour depends on the shell.
+On macOS the explicit copy and paste keys and the interrupt key use the Control key (⌃), not Command (⌘). Your shell also handles <kbd>⌃D</kbd> / <kbd>Ctrl+D</kbd> (EOF), <kbd>⌃L</kbd> / <kbd>Ctrl+L</kbd> (clear), <kbd>⌃A</kbd> and <kbd>⌃E</kbd> / <kbd>Ctrl+A</kbd> and <kbd>Ctrl+E</kbd> (line ends), <kbd>⌃U</kbd> and <kbd>⌃K</kbd> / <kbd>Ctrl+U</kbd> and <kbd>Ctrl+K</kbd> (delete to line ends), arrows (history), and <kbd>Tab</kbd> (completion); exact behaviour depends on the shell.
 
 ## HTML preview
 
 | Action | macOS | Windows |
 | --- | --- | --- |
-| Back; Forward | <kbd>Cmd</kbd>+<kbd>[</kbd>; <kbd>Cmd</kbd>+<kbd>]</kbd> | <kbd>Alt</kbd>+<kbd>←</kbd>; <kbd>Alt</kbd>+<kbd>→</kbd> |
-| Find; export PDF; close tab | <kbd>Cmd</kbd>+<kbd>F</kbd>; <kbd>Cmd</kbd>+<kbd>S</kbd>; <kbd>Cmd</kbd>+<kbd>W</kbd> | <kbd>Ctrl</kbd>+<kbd>F</kbd>; <kbd>Ctrl</kbd>+<kbd>S</kbd>; <kbd>Ctrl</kbd>+<kbd>W</kbd> |
+| Back; Forward | <kbd>⌘[</kbd>; <kbd>⌘]</kbd> | <kbd>Alt+←</kbd>; <kbd>Alt+→</kbd> |
+| Find; export PDF; close tab | <kbd>⌘F</kbd>; <kbd>⌘S</kbd>; <kbd>⌘W</kbd> | <kbd>Ctrl+F</kbd>; <kbd>Ctrl+S</kbd>; <kbd>Ctrl+W</kbd> |
 | Enter page; return to toolbar | <kbd>Enter</kbd> or <kbd>Space</kbd>; <kbd>Esc</kbd> | Same |
-| Turn comment mode on or off; leave it | <kbd>Cmd</kbd>+<kbd>Option</kbd>+<kbd>M</kbd>; <kbd>Esc</kbd> | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>M</kbd>; <kbd>Esc</kbd> |
+| Turn comment mode on or off; leave it | <kbd>⌥⌘M</kbd>; <kbd>Esc</kbd> | <kbd>Ctrl+Alt+M</kbd>; <kbd>Esc</kbd> |
 
 ## Image and diagram viewers
 
@@ -108,20 +109,20 @@ In the image viewer, the wheel zooms around the pointer, dragging pans, and doub
 
 | Action | macOS | Windows |
 | --- | --- | --- |
-| Submit prompt or send diagram chat | <kbd>Cmd</kbd>+<kbd>Enter</kbd> | <kbd>Ctrl</kbd>+<kbd>Enter</kbd> |
+| Submit prompt or send diagram chat | <kbd>⌘Enter</kbd> | <kbd>Ctrl+Enter</kbd> |
 | Close or cancel | <kbd>Esc</kbd> | <kbd>Esc</kbd> |
-| Move through file picker; choose file | <kbd>↑/↓</kbd>; <kbd>Enter</kbd> | Same |
+| Move through file picker; choose file | <kbd>↑</kbd> or <kbd>↓</kbd>; <kbd>Enter</kbd> | Same |
 
-In ordinary dialogs, <kbd>Enter</kbd> activates the focused button, even when it is **Cancel**. Prompts that delete, discard or quit open with focus on **Cancel**, so pressing <kbd>Enter</kbd> straight away keeps everything as it was; <kbd>Tab</kbd> moves focus and <kbd>Space</kbd> activates the focused control. The file picker also copies a selected path with <kbd>Cmd</kbd>+<kbd>C</kbd> (Windows: <kbd>Ctrl</kbd>+<kbd>C</kbd>).
+In ordinary dialogs, <kbd>Enter</kbd> activates the focused button, even when it is **Cancel**. Prompts that delete, discard or quit open with focus on **Cancel**, so pressing <kbd>Enter</kbd> straight away keeps everything as it was; <kbd>Tab</kbd> moves focus and <kbd>Space</kbd> activates the focused control. The file picker also copies a selected path with <kbd>⌘C</kbd> / <kbd>Ctrl+C</kbd>.
 
 ## Menus
 
 | Action | macOS | Windows |
 | --- | --- | --- |
-| Open the menu of the focused row, tab, editor, terminal or text field | <kbd>Shift</kbd>+<kbd>F10</kbd> | <kbd>Shift</kbd>+<kbd>F10</kbd> or the <kbd>Menu</kbd> key |
+| Open the menu of the focused row, tab, editor, terminal or text field | <kbd>⇧F10</kbd> | <kbd>Shift+F10</kbd> or the <kbd>Menu</kbd> key |
 | Move to the previous or next item; first or last item | <kbd>↑</kbd>; <kbd>↓</kbd>; <kbd>Home</kbd>; <kbd>End</kbd> | Same |
 | Choose the focused item | <kbd>Enter</kbd> or <kbd>Space</kbd> | Same |
 | Jump to an item by name | Type its first letters | Same |
 | Close the menu | <kbd>Esc</kbd> or <kbd>Tab</kbd> | Same |
 
-A menu opens with focus on its first item, and closing it puts focus back where it was. Greyed-out items can be reached but do nothing. In the editor the menu opens under the text cursor, in the terminal at the terminal cursor. While the terminal has focus, <kbd>Shift</kbd>+<kbd>F10</kbd> opens the menu and is not sent to the program running there.
+A menu opens with focus on its first item, and closing it puts focus back where it was. Greyed-out items can be reached but do nothing. In the editor the menu opens under the text cursor, in the terminal at the terminal cursor. While the terminal has focus, <kbd>⇧F10</kbd> / <kbd>Shift+F10</kbd> opens the menu and is not sent to the program running there.

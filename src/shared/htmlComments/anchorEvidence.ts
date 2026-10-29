@@ -3,7 +3,7 @@
 /**
  * What an element says about a block's stored anchor: whether a position
  * match is corroborated, and which elements a backup tier must not take
- * (docs/designs/html-preview-comments.md §5.9, §19 Rev 4 "position match must
+ * (docs/designs/comments/html-preview-comments.md §5.9, §19 Rev 4 "position match must
  * be corroborated", owner decision on the X-001 finding).
  *
  * Checking the tag alone handed an open comment to the NEXT element with that

@@ -15,7 +15,7 @@
  * page cannot smuggle bidi-override or zero-width characters through the
  * classifier. (`PreviewFailureLog.record` strips again — defence in depth.)
  *
- * @see docs/designs/sd-074-html-preview.md §0 (Console messages bound), §1.3
+ * @see docs/designs/html-preview/sd-074-html-preview.md §0 (Console messages bound), §1.3
  */
 import { ErrorCode } from '../../../shared/errors'
 import type { PreviewFailureInput } from '../../../shared/ipc/preview-types'

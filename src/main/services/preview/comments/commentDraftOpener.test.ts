@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Opening drafts and pins (docs/designs/html-preview-comments.md §7.3, §7.7;
+ * Opening drafts and pins (docs/designs/comments/html-preview-comments.md §7.3, §7.7;
  * M-033, M-056; review findings M1, M4, L3).
  */
 import { rm, writeFile } from 'node:fs/promises'

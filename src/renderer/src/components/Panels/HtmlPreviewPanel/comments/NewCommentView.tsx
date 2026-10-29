@@ -2,8 +2,8 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * HTML Preview comments – the "New comment" view of the comment window
- * (docs/designs/html-preview-comments.md §7.4, §7.8, §10.4; R-003, R-007,
- * R-022, R-024; docs/design-system/product/html-comments/window.html).
+ * (docs/designs/comments/html-preview-comments.md §7.4, §7.8, §10.4; R-003, R-007,
+ * R-022, R-024; docs/designs/comments/html-comments/window.html).
  *
  * - **Every error keeps the text.** A save is a re-read, a splice and a
  *   verified atomic write, so it can fail for reasons the reviewer did not

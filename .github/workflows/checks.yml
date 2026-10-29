@@ -63,8 +63,9 @@ jobs:
       - name: Lint CSS
         run: npm run lint:css
       # Everything under docs/design-system/ is committed, generated files included, so the
-      # folder renders on a fresh clone. This is what stops a stale token copy or
-      # a stale index being trusted by a reader.
+      # folder renders on a fresh clone. This is what stops a stale token copy, index or
+      # baked value being trusted by a reader, and it runs the design guards (static, links,
+      # deviations, token ownership, card anatomy).
       - name: Design system is in sync
         run: npm run design -- --check
 

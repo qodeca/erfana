@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * The parse half of a comment write: re-locate the target in the bytes just
- * read, plan ONE splice and verify it (docs/designs/html-preview-comments.md
+ * read, plan ONE splice and verify it (docs/designs/comments/html-preview-comments.md
  * §7.6 steps 4–8, §19 R3-12; threats S10, S13).
  *
  * Runs in the comment parse worker as the `write` job (`commentFileJobs.ts`),

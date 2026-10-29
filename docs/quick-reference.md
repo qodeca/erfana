@@ -19,9 +19,9 @@ npm run build:win        # Windows package (NSIS .exe; needs Developer Mode)
 # Quality
 npm run typecheck        # Type checking (node + web, and their tests + e2e)
 npm run lint             # eslint (JS/TS) + shebang check + 500-line file limit
-npm run lint:css         # stylelint: src/ CSS + the docs/design-system/ cards' inline styles
-npm run design           # Rebuild docs/design-system/ (index, token copy, claims)
-npm run design -- --check # Fail if a generated file under docs/design-system/ is stale
+npm run lint:css         # stylelint: src/ CSS + the docs/design-system/ cards and docs/designs/ screens
+npm run design           # Bake values into the cards and screens; regenerate the indexes, token copy and deviation register
+npm run design -- --check # Fail on stale baked values or a design guard (no JS, links, deviations, anatomy, 13px floor)
 npm run test             # All tests (vitest projects: main + main-perf + renderer + preload)
 npm run test:main        # vitest.main.config.ts config: src/main + src/shared + scripts (main-perf last)
 npm run test:renderer    # vitest.renderer.config.ts config: src/renderer/src only (jsdom)
@@ -52,7 +52,7 @@ See the complete [user shortcut reference](./user-guide/reference/keyboard-short
 --color-accent-primary     /* #A0A8FF (Qodeca Violet) */
 --color-accent-secondary   /* #E3E829 (Qodeca Lime) */
 
-/* Spacing (4px grid) */
+/* Spacing (2px grid – the number is a step, not pixels) */
 --space-4   /* 8px */
 --space-6   /* 12px */
 --space-8   /* 16px */
@@ -63,7 +63,7 @@ See the complete [user shortcut reference](./user-guide/reference/keyboard-short
 --text-sm   /* 11px */
 ```
 
-Full guide: the [design system](design-system/index.html) — open it in a browser. [UI Style Guide](./ui-style-guide.md) keeps the text-selection policy.
+Full guide: the [design system](design-system/index.html) — open it in a browser; how to use it is in [its README](design-system/README.md). The text-selection policy is on the [Theme card](design-system/system/foundations/theme.html#selection).
 
 ## Project Structure
 
@@ -117,6 +117,10 @@ Machine-enforced by `npm run lint:css` in the required `Lint` job:
 - Design tokens only — no raw hex outside `design-tokens.css`
 - `border-radius: 0` (or the circle token); nothing else
 - No bare `z-index` — use a rung from the scale
+- Design-system component CSS uses only `erf-` class names
+- No retired token (`--shadow-focus`, `--color-warning-bright` …) in `docs/design-system/` or `docs/designs/`
+
+A departure from a card needs `/* deviates: docs/design-system/<card>.html – why */` at the site and a row in the card's Exceptions; `npm run design -- --check` fails on a marker the card does not list.
 
 Nobody checks these but you:
 

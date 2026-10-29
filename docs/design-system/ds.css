@@ -2,9 +2,33 @@
 /* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
 @import url('./fonts.css');
 
-/* Page chrome for the Erfana design-system cards.
+/* Page chrome for the Erfana design-system cards and the feature screens.
    This file styles the DOCUMENTATION only. Component CSS lives beside each
-   component and is written against tokens.css so it can ship verbatim. */
+   component and is written against tokens.css so it can ship verbatim.
+
+   Static by rule: no page runs JavaScript. Interaction is CSS – :hover,
+   :focus-visible, :checked + <label>, <details>, :target, popover – or a
+   gallery of separate static frames, one per state.
+
+   Named chrome values. Documentation-only measurements live here as custom
+   properties with a ds- prefix, so no rule below carries a bare literal. */
+:root {
+  --ds-swatch-width: calc(var(--space-24) + var(--space-4)); /* 56px */
+  --ds-caps-tracking: 0.06em;
+  --ds-measure: 76ch;
+  --ds-measure-wide: 82ch;
+  --ds-table-max: 1100px;
+  /* Documentation text sizes. The app's chrome is small and dense (Typography
+     card), but these pages are read for minutes, so their own text never goes
+     below 13px and prose sits at 14px. A mockup that draws the app at real
+     scale keeps the app's sizes and says so with a mockup comment –
+     scripts/lib/design-static.mjs fails a 10px or 11px rule that does not. */
+  --ds-text-small: var(--text-base); /* 13px – the floor: labels, captions, code, meta */
+  --ds-text-body: var(--text-md);    /* 14px – prose: paragraphs, lists, notes, table cells */
+  /* The page title: one step above the scale's top (--text-2xl), so the steps
+     read h1 > h2 (--text-xl) > h3 (--text-lg) > lede (--text-prose) > body. */
+  --ds-text-title: calc(var(--text-2xl) * 1.2);
+}
 
 * { box-sizing: border-box; }
 
@@ -14,61 +38,81 @@ body {
   background: var(--color-bg-primary);
   color: var(--color-text-primary);
   font-family: var(--font-sans);
+  /* Stays at --text-base: a mockup that inherits its size from the page must
+     not grow. Prose takes --ds-text-body through the selectors below. */
   font-size: var(--text-base);
   line-height: var(--leading-normal);
 }
 
+/* Documentation prose. Excludes anything inside a drawing of the app – an erf-
+   component, a figure, or a frame marked inert or aria-hidden – so a picture
+   keeps the size it inherits. */
+main :where(p, li, dd):not(:where([class*='erf-'], [class*='erf-'] *, figure *, [inert] *, [aria-hidden='true'] *)) {
+  font-size: var(--ds-text-body);
+}
+
 h1 {
   margin: 0 0 var(--space-2);
-  font-size: var(--text-2xl);
+  font-size: var(--ds-text-title);
   font-weight: var(--font-semibold);
   color: var(--color-text-emphasis);
 }
 
 .ds-lede {
   margin: 0 0 var(--space-16);
-  max-width: 76ch;
+  max-width: var(--ds-measure);
   color: var(--color-text-secondary);
-  font-size: var(--text-md);
+  font-size: var(--text-prose);
 }
+/* A lede built from paragraphs keeps the lede size: the prose rule above
+   would otherwise pull each paragraph down to --ds-text-body. */
+.ds-lede :where(p, li) { font-size: inherit; }
 
-h2 {
+/* Documentation headings only: a component's own title (erf-dialog__title,
+   erf-comment-window__title …) is a picture of the app and must not inherit the
+   page rule underneath it. :where keeps the specificity of a bare h2. */
+h2:not(:where([class*='erf-'])) {
   margin: var(--space-20) 0 var(--space-8);
   padding-bottom: var(--space-4);
   border-bottom: var(--border-width) solid var(--color-border-default);
-  font-size: var(--text-lg);
+  font-size: var(--text-xl);
   font-weight: var(--font-semibold);
   color: var(--color-text-bright);
 }
 
-h2:first-of-type { margin-top: 0; }
+/* The first heading of a card's main content sits close to the lede above it.
+   (h2:first-of-type matched the first h2 of EVERY parent – a h2 inside a
+   figure or section lost its top margin too.) */
+main > h2:first-child,
+.ds-lede + h2 { margin-top: var(--space-16); }
 
 .ds-note {
   margin: 0 0 var(--space-8);
   padding: var(--space-6) var(--space-8);
   border-left: var(--border-width-thick) solid var(--color-accent-primary);
   background: var(--color-bg-secondary);
-  max-width: 82ch;
+  max-width: var(--ds-measure-wide);
   color: var(--color-text-tertiary);
+  font-size: var(--ds-text-body);
 }
 
 .ds-note strong { color: var(--color-text-emphasis); }
 
 code, .ds-mono {
   font-family: var(--font-mono);
-  font-size: var(--text-sm);
+  font-size: var(--ds-text-small);
 }
 
-table { border-collapse: collapse; width: 100%; max-width: 1100px; }
+table { border-collapse: collapse; width: 100%; max-width: var(--ds-table-max); }
 
 th {
   text-align: left;
   padding: var(--space-4) var(--space-8) var(--space-4) 0;
   border-bottom: var(--border-width) solid var(--color-border-subtle);
-  font-size: var(--text-sm);
+  font-size: var(--ds-text-small);
   font-weight: var(--font-medium);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: var(--ds-caps-tracking);
   color: var(--color-text-secondary);
 }
 
@@ -77,15 +121,304 @@ td {
   border-bottom: var(--border-width) solid var(--color-border-default);
   vertical-align: middle;
 }
+/* A documentation table cell reads as prose; a cell inside a drawing of the
+   app (a rendered Markdown table, an inert frame) keeps what it inherits. */
+td:not(:where([class*='erf-'] *, [inert] *, [aria-hidden='true'] *)) { font-size: var(--ds-text-body); }
+
+/* A header on a panel surface (a note, a frame) takes tertiary text:
+   secondary fails AA on --color-bg-secondary (the Colours card bakes the ratio). */
+:where(.ds-note, .ds-frame) th { color: var(--color-text-tertiary); }
+
+/* A token name in a table's first column stays on one line – a wrapped
+   "--color-text-" / "tertiary" reads as two tokens. */
+.ds-tokens td:first-child code,
+td:first-child > code:only-child { white-space: nowrap; }
+
+/* A browser may wrap inline code after any "-", and in the mono font a split
+   "design -" / "- --check" reads as an en dash. A short command or attribute
+   name in prose takes .ds-nowrap so it stays whole on one line. */
+.ds-nowrap { white-space: nowrap; }
+/* A lede quotes only short names (a file, a token, an attribute): keep each whole. */
+.ds-lede code { white-space: nowrap; }
 
 .ds-swatch {
-  width: 56px;
+  width: var(--ds-swatch-width);
   height: var(--btn-height-md);
   border: var(--border-width) solid var(--color-border-subtle);
 }
 
 .ds-pass { color: var(--color-brand-lime); }
 .ds-fail { color: var(--color-error); }
-.ds-na { color: var(--color-text-muted); }
+/* Tertiary, not muted: these are sentences a reader needs, and muted is
+   decoration and disabled only (Colours card). */
+.ds-na { color: var(--color-text-tertiary); }
 
-.ds-ratio { font-family: var(--font-mono); font-size: var(--text-sm); }
+.ds-ratio { font-family: var(--font-mono); font-size: var(--ds-text-small); }
+
+/* ---------- card chrome ---------- */
+
+/* Every card: <nav class="ds-crumbs"> first, then <main> holding the h1, the
+   .ds-status badge, #decision, the content and #exceptions. */
+main { display: block; max-width: calc(var(--ds-table-max) + var(--space-24)); }
+
+.ds-crumbs {
+  margin: 0 0 var(--space-8);
+  font-family: var(--font-mono);
+  font-size: var(--ds-text-small);
+  color: var(--color-text-tertiary);
+}
+.ds-crumbs [aria-current="page"] { color: var(--color-text-bright); }
+
+/* The status badge. Text first, colour second: the word is the information. */
+.ds-status {
+  display: inline-block;
+  padding: 0 var(--space-3);
+  border: var(--border-width) solid currentColor;
+  font-family: var(--font-mono);
+  font-size: var(--ds-text-small);
+  font-weight: var(--font-normal);
+  line-height: var(--leading-normal);
+  vertical-align: middle;
+  color: var(--color-text-tertiary);
+}
+.ds-status[data-status="decided"] { color: var(--color-brand-lime); }
+.ds-status[data-status="proposed"] { color: var(--color-brand-violet); }
+.ds-status[data-status="superseded"] { color: var(--color-text-tertiary); text-decoration: line-through; }
+
+.ds-muted { color: var(--color-text-tertiary); max-width: var(--ds-measure); }
+
+/* Links, from tokens. Visited keeps the link colour: these pages are a
+   reference read many times, and a purple "already seen" carries no meaning. */
+a { color: var(--color-link); text-underline-offset: var(--space-1); }
+a:visited { color: var(--color-link); }
+a:hover { color: var(--color-link-hover); }
+a:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
+  text-decoration: none;
+}
+
+kbd {
+  display: inline-block;
+  padding: 0 var(--space-2);
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-bottom-width: var(--border-width-thick);
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-bright);
+  font-family: var(--font-mono);
+  font-size: var(--ds-text-small);
+  line-height: var(--leading-normal);
+}
+
+/* A baked verdict: the text says pass or fail, the colour repeats it. */
+[data-result="pass"] { color: var(--color-brand-lime); }
+[data-result="fail"] { color: var(--color-error); }
+td[data-contrast], span[data-contrast] { font-family: var(--font-mono); font-size: var(--ds-text-small); white-space: nowrap; }
+
+.ds-num { font-family: var(--font-mono); font-size: var(--ds-text-small); text-align: right; }
+
+/* A token row's sample cell. */
+.ds-swatch--wide { width: calc(var(--ds-swatch-width) * 2); }
+
+/* ---------- static state frames ---------- */
+
+/* One state per frame: a figure holding the component as it looks in that
+   state, and a caption naming the state and how it is reached. Frames are
+   pictures – they hold no interactive roles, so a screen reader is not handed
+   thirty fake menus. */
+.ds-frames {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-8);
+  margin: 0 0 var(--space-16);
+}
+.ds-frame {
+  margin: 0;
+  padding: var(--space-8);
+  border: var(--border-width) solid var(--color-border-default);
+  background: var(--color-bg-tertiary);
+}
+.ds-frame > figcaption {
+  margin-top: var(--space-6);
+  font-size: var(--ds-text-small);
+  line-height: var(--leading-snug);
+  color: var(--color-text-tertiary);
+}
+.ds-frame > figcaption strong { color: var(--color-text-bright); font-weight: var(--font-medium); }
+.ds-frame__step {
+  display: inline-block;
+  min-width: var(--space-12);
+  margin-right: var(--space-2);
+  font-family: var(--font-mono);
+  color: var(--color-accent-primary);
+}
+
+/* A frame the reader can resize by its corner, instead of a range slider.
+   Container queries inside it respond as the real panel would. */
+.ds-resize {
+  resize: inline;
+  overflow: auto;
+  container-type: inline-size;
+  min-inline-size: calc(var(--space-24) * 4);
+  max-inline-size: 100%;
+}
+
+/* Forced states, for a frame that shows what :hover, :focus-visible or
+   :active looks like without the pointer. Component CSS that wants a frame to
+   show a state writes its rule for BOTH selectors, e.g.
+     .erf-x:hover, .erf-x.is-hover { ... }
+   .is-hover, .is-focus and .is-active are documentation-only hooks; they never
+   ship in src/. */
+.is-focus { outline: var(--border-width-thick) solid var(--color-border-focus); outline-offset: var(--space-1); }
+
+/* The key -> result -> focus table every interaction card carries. */
+.ds-keys td:first-child { white-space: nowrap; }
+
+/* Retired tokens: shown once, struck through, never as a swatch to copy. */
+.ds-retired {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4) var(--space-12);
+  margin: 0 0 var(--space-12);
+  padding: var(--space-6) var(--space-8);
+  border: var(--border-width) dashed var(--color-border-subtle);
+  font-family: var(--font-mono);
+  font-size: var(--ds-text-small);
+  color: var(--color-text-tertiary);
+}
+.ds-retired > strong { flex-basis: 100%; color: var(--color-text-bright); font-family: var(--font-sans); font-weight: var(--font-medium); }
+.ds-retired s { color: var(--color-text-tertiary); }
+
+/* Visually hidden, still read. Shipping code has its own copy; this one is
+   for the cards. */
+.erf-visually-hidden {
+  position: absolute;
+  width: var(--border-width);
+  height: var(--border-width);
+  margin: calc(var(--border-width) * -1);
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Under the h1: the status badge and the review date. */
+.ds-meta {
+  margin: 0 0 var(--space-12);
+  font-family: var(--font-mono);
+  font-size: var(--ds-text-small);
+  color: var(--color-text-tertiary);
+}
+
+/* Token tables. h3 groups a family inside a card. */
+h3:not(:where([class*='erf-'])) {
+  margin: var(--space-12) 0 var(--space-4);
+  font-size: var(--text-lg);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-bright);
+}
+.ds-tokens { margin-bottom: var(--space-8); }
+
+/* ---------- shared documentation labels ----------
+   One owner for the small documentation classes cards used to copy. All sit at
+   the floor, --ds-text-small. Card-private helpers use a card prefix (sf-,
+   mx-, dl- …); ds- is reserved for this file. */
+
+/* A code sample shown as text: markup a reader copies (<pre class="ds-code">). */
+.ds-code {
+  max-width: var(--ds-table-max);
+  padding: var(--space-8);
+  overflow-x: auto;
+  border: var(--border-width) solid var(--color-border-default);
+  background: var(--color-bg-tertiary);
+  font-family: var(--font-mono);
+  font-size: var(--ds-text-small);
+}
+
+/* A caption or note under a sample, a swatch or a figure. */
+.ds-caption {
+  font-size: var(--ds-text-small);
+  line-height: var(--leading-snug);
+  color: var(--color-text-tertiary);
+}
+
+/* A short name above or beside a sample: a token, a state, a surface. */
+.ds-label {
+  font-family: var(--font-mono);
+  font-size: var(--ds-text-small);
+  color: var(--color-text-tertiary);
+}
+
+/* A pass or fail verdict in words; pair it with .ds-pass or .ds-fail. */
+.ds-verdict {
+  font-family: var(--font-mono);
+  font-size: var(--ds-text-small);
+}
+
+/* ---------- a third-party previewed page ----------
+   The stand-in for someone else's HTML in the preview: the native view Erfana
+   does not style. One shared copy, so no card or screen re-declares its own
+   hex page. Markup:
+     <div class="ds-foreign-page">
+       <p class="ds-foreign-page__heading">Pricing</p>
+       <p class="ds-foreign-page__body">Text with a <span class="ds-foreign-page__link">link</span>.</p>
+       <div class="ds-foreign-page__missing">Image not loaded</div>
+     </div>
+   Add .ds-foreign-page--hidden for the fail-safe state, in which Erfana hides
+   the page rather than trust it (Permission band card). Sizes and spacing are
+   tokens and stay at 13px or more; only the paint and the face are the page's. */
+/* stylelint-disable color-no-hex, declaration-property-value-allowed-list --
+   This is NOT Erfana. It draws arbitrary third-party HTML on its own paper, in
+   its own face and colours; drawing it with Erfana's tokens would hide the one
+   boundary the frames that use it exist to show: where Erfana stops and
+   untrusted content begins. */
+.ds-foreign-page {
+  display: block;
+  overflow: hidden;
+  padding: var(--space-10);
+  background: #ffffff;
+  color: #3c3c3c;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: var(--text-md);
+  line-height: 1.6;
+}
+.ds-foreign-page__heading {
+  margin: 0 0 var(--space-6);
+  color: #1a1a1a;
+  font-size: var(--text-xl);
+  font-weight: 600;
+  line-height: 1.3;
+}
+.ds-foreign-page__body { margin: 0 0 var(--space-5); font-size: var(--text-md); }
+.ds-foreign-page__link,
+.ds-foreign-page__link:visited,
+.ds-foreign-page__link:hover { color: #1a0dab; text-decoration: underline; }
+/* A resource the page asked for and did not get – a blocked image or frame. */
+.ds-foreign-page__missing {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(var(--space-24) * 2);
+  padding: var(--space-4);
+  border: var(--border-width) dashed #8a8a8a;
+  background: #f4f4f4;
+  color: #595959;
+  font-size: var(--text-base);
+}
+/* stylelint-enable color-no-hex, declaration-property-value-allowed-list */
+/* The fail-safe: the page is hidden, its space kept, nothing of it drawn. */
+.ds-foreign-page--hidden { visibility: hidden; }
+
+/* mockup: app scale – code, a key or a table header inside a drawing of the
+   app keeps the app's 11px. Specificity (0,0,1) beats the documentation rules
+   above and loses to any component class rule. */
+:where([class*='erf-']) code,
+:where([class*='erf-']) kbd,
+:where([class*='erf-']) th { font-size: var(--text-sm); }
+
+/* mockup: app scale – a component set inline in documentation prose or a
+   table cell keeps the page's base size instead of inheriting the larger
+   prose size. Zero specificity, so the component's own rules still win. */
+:where(main p, main li, main dd, td):not(:where([class*='erf-'], [class*='erf-'] *, figure *, [inert] *, [aria-hidden='true'] *, [style]))
+  > :where([class*='erf-']) { font-size: var(--text-base); }

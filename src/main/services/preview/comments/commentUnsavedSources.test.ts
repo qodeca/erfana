@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * The windows' unsaved editor files (docs/designs/html-preview-comments.md
+ * The windows' unsaved editor files (docs/designs/comments/html-preview-comments.md
  * decision 13, §7.8; M-062).
  */
 import { mkdir, symlink } from 'node:fs/promises'

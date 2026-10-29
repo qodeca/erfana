@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Element tokens for the served copy (docs/designs/html-preview-comments.md
+ * Element tokens for the served copy (docs/designs/comments/html-preview-comments.md
  * §6, §19 R3-12, R3-13; U-090–U-093).
  */
 import { readFileSync } from 'node:fs'

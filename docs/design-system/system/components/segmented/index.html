@@ -1,0 +1,316 @@
+<!-- @card group="Components" name="Segmented control" subtitle="One of a few choices, all visible – a radio group drawn as equal cells, checked by a fill and a lime edge" status="proposed" reviewed="never" answers="Filter a list by state; Switch between a few views; Show one-of-many choices without a menu" -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Segmented control – Erfana design system</title>
+<link rel="stylesheet" href="../../../tokens.css">
+<link rel="stylesheet" href="../../../ds.css">
+<link rel="stylesheet" href="../badge/badge.css">
+<link rel="stylesheet" href="./segmented.css">
+<style>
+  /* The drawer's controls band, at the app's real scale: the panel surface and
+     the drawer's side padding. Documentation-only. */
+  .sg-stage { background: var(--color-bg-secondary); padding: var(--space-6) var(--space-8); }
+  /* The comment filters' own break: three cells as wide as "Needs attention 2". */
+  .sg-comment-filters { --erf-segmented-break: calc(var(--space-24) * 9); }
+  /* Widths the frames are drawn at. */
+  .sg-w-wide { inline-size: calc(var(--space-24) * 10); max-inline-size: 100%; }
+  .sg-w-drawer { inline-size: var(--comments-drawer-width); max-inline-size: 100%; }
+  .sg-w-min { inline-size: calc(var(--space-20) * 7); max-inline-size: 100%; }
+  .sg-fit { inline-size: fit-content; max-inline-size: 100%; }
+  .sg-frames-wide { grid-template-columns: repeat(auto-fill, minmax(min(520px, 100%), 1fr)); }
+  /* A sketch of a Windows contrast theme: system colours, no fills. */
+  .sg-fc { forced-color-adjust: none; background: Canvas; color: CanvasText; padding: var(--space-6) var(--space-8); }
+  .sg-fc .erf-segmented__label { color: CanvasText; }
+  .sg-fc .erf-segmented__cell { background: Canvas; color: CanvasText; border-color: CanvasText; }
+  .sg-fc .erf-segmented__cell[aria-checked='true'] { border-block-end-color: Highlight; }
+  .sg-fc .erf-counter { background: Canvas; color: CanvasText; border-color: CanvasText; }
+</style>
+</head>
+<body>
+<nav class="ds-crumbs" aria-label="Breadcrumb"><a href="../../../index.html">Erfana design system</a> <span aria-hidden="true">/</span> <a href="../../../index.html#components">Components</a> <span aria-hidden="true">/</span> <span aria-current="page">Segmented control</span></nav>
+<main>
+<h1>Segmented control</h1>
+<p class="ds-meta"><span class="ds-status" data-status="proposed">proposed</span> not yet reviewed</p>
+<p class="ds-lede" id="decision">
+  When the reader picks one of two to five choices and every choice should stay visible, use one
+  <code>.erf-segmented</code>: a <code>role="radiogroup"</code> of <code>role="radio"</code> cells with one tab stop.
+  The checked cell gets a fill <strong>and</strong> a <code data-token="--border-width-thick">2px</code> lime bottom edge –
+  the Rows and toggle signature, never colour alone. Cells are equal width; they share one row from
+  <code>--erf-segmented-break</code> (280px by default) and below it each cell takes a full row. The group has a name –
+  a visible label or <code>aria-label</code>.
+</p>
+
+<div class="ds-note">
+  <strong>What this card does not decide.</strong> Six or more choices, or choices that need a sentence each, are a
+  select or a menu (the <a href="../form/index.html">Form controls</a> and <a href="../menu/index.html">Menu</a> cards). An on/off
+  switch is a checkbox or a toggle button (<a href="../button/index.html">Buttons</a>). Radios <em>inside a toolbar</em> –
+  the Markdown view modes – stay under the <a href="../toolbar/index.html">Toolbar</a> card's one-tab-stop contract, drawn
+  with <code>.erf-button--toggle</code>; this card is for a group that stands on its own in a panel or a band.
+  The count is the <a href="../badge/index.html">Badge</a> card's <code>.erf-counter</code>.
+</div>
+
+<h2 id="states">Every state</h2>
+<p class="ds-muted">Drawn at the app's scale on the drawer's surface (<code>--color-bg-secondary</code>). The reference
+instance is the comment drawer's “Show” filter (<code>CommentDrawer.tsx</code>, the filter group; <code>CommentDrawer.css</code>, the
+<code>.erf-comment-filter</code> rules).</p>
+<div class="ds-frames sg-frames-wide">
+
+<figure class="ds-frame">
+<div aria-hidden="true" class="sg-stage sg-w-wide">
+  <div class="erf-segmented sg-comment-filters">
+    <span class="erf-segmented__label">Show</span>
+    <div class="erf-segmented__cells">
+      <span class="erf-segmented__cell" aria-checked="true">Open <span class="erf-counter">12</span></span>
+      <span class="erf-segmented__cell" aria-checked="false">Resolved <span class="erf-counter">4</span></span>
+      <span class="erf-segmented__cell" aria-checked="false">Needs attention <span class="erf-counter">2</span></span>
+    </div>
+  </div>
+</div>
+<figcaption><strong>Checked</strong> – Open is <code>aria-checked="true"</code>: <code>--color-bg-selected</code>, emphasis text and a lime
+bottom edge. The other cells keep a quiet edge of the same height, so checking a cell moves nothing.</figcaption>
+</figure>
+
+<figure class="ds-frame">
+<div aria-hidden="true" class="sg-stage sg-w-wide">
+  <div class="erf-segmented sg-comment-filters">
+    <span class="erf-segmented__label">Show</span>
+    <div class="erf-segmented__cells">
+      <span class="erf-segmented__cell" aria-checked="true">Open <span class="erf-counter">12</span></span>
+      <span class="erf-segmented__cell is-hover" aria-checked="false">Resolved <span class="erf-counter">4</span></span>
+      <span class="erf-segmented__cell" aria-checked="false">Needs attention <span class="erf-counter">2</span></span>
+    </div>
+  </div>
+</div>
+<figcaption><strong>Hover</strong> – the pointer is on Resolved: <code>--color-bg-hover-solid</code>. No lift, no edge change.</figcaption>
+</figure>
+
+<figure class="ds-frame">
+<div aria-hidden="true" class="sg-stage sg-w-wide">
+  <div class="erf-segmented sg-comment-filters">
+    <span class="erf-segmented__label">Show</span>
+    <div class="erf-segmented__cells">
+      <span class="erf-segmented__cell" aria-checked="false">Open <span class="erf-counter">12</span></span>
+      <span class="erf-segmented__cell is-focus" aria-checked="true">Resolved <span class="erf-counter">4</span></span>
+      <span class="erf-segmented__cell" aria-checked="false">Needs attention <span class="erf-counter">2</span></span>
+    </div>
+  </div>
+</div>
+<figcaption><strong>Focus-visible, after <kbd>→</kbd></strong> – the arrow moved focus <em>and</em> checked Resolved
+(automatic activation: a filter is cheap to apply). The one ring, outward; the cells sit <code data-token="--space-2">4px</code>
+apart so it never hides under a neighbour.</figcaption>
+</figure>
+
+<figure class="ds-frame">
+<div aria-hidden="true" class="sg-stage sg-w-wide">
+  <div class="erf-segmented sg-comment-filters">
+    <span class="erf-segmented__label">Show</span>
+    <div class="erf-segmented__cells">
+      <span class="erf-segmented__cell" aria-checked="true">Open <span class="erf-counter">12</span></span>
+      <span class="erf-segmented__cell" aria-checked="false">Resolved <span class="erf-counter">4</span></span>
+      <span class="erf-segmented__cell is-active" aria-checked="false">Needs attention <span class="erf-counter">2</span></span>
+    </div>
+  </div>
+</div>
+<figcaption><strong>Pressed</strong> – the pointer is down on Needs attention: <code>--color-bg-active</code>. It becomes checked on release.</figcaption>
+</figure>
+
+<figure class="ds-frame">
+<div aria-hidden="true" class="sg-stage sg-w-wide">
+  <div class="erf-segmented sg-comment-filters">
+    <span class="erf-segmented__label">Show</span>
+    <div class="erf-segmented__cells">
+      <span class="erf-segmented__cell" aria-checked="true">Open <span class="erf-counter">12</span></span>
+      <span class="erf-segmented__cell" aria-checked="false">Resolved <span class="erf-counter">4</span></span>
+      <span class="erf-segmented__cell" aria-checked="false" aria-disabled="true">Needs attention <span class="erf-counter">0</span></span>
+    </div>
+  </div>
+</div>
+<figcaption><strong>Disabled cell</strong> – <code>aria-disabled="true"</code>: <code>--color-text-disabled</code>, no hover, skipped by the
+arrows, still in the row and still named. Use it only when the choice exists but cannot apply now; a count of 0 alone
+is not a reason – an empty filter shows its empty state (the <a href="../../patterns/states/index.html">States</a> card).</figcaption>
+</figure>
+
+<figure class="ds-frame">
+<div aria-hidden="true" class="sg-stage sg-w-drawer">
+  <div class="erf-segmented sg-comment-filters">
+    <span class="erf-segmented__label">Show</span>
+    <div class="erf-segmented__cells">
+      <span class="erf-segmented__cell" aria-checked="true">Open <span class="erf-counter">12</span></span>
+      <span class="erf-segmented__cell" aria-checked="false">Resolved <span class="erf-counter">4</span></span>
+      <span class="erf-segmented__cell" aria-checked="false">Needs attention <span class="erf-counter">2</span></span>
+    </div>
+  </div>
+</div>
+<figcaption><strong>Below the break – the drawer at its default width</strong> (<code>--comments-drawer-width</code>,
+<code data-token="--comments-drawer-width">320px</code>). The three filters need about 400px to share a row equally, so in
+the drawer each takes a full row: still equal width, never a ragged two-and-one, never a clipped label.</figcaption>
+</figure>
+
+<figure class="ds-frame">
+<div aria-hidden="true" class="sg-stage sg-fit">
+  <div class="erf-segmented sg-w-min">
+    <div class="erf-segmented__cells">
+      <span class="erf-segmented__cell" aria-checked="false">Source</span>
+      <span class="erf-segmented__cell" aria-checked="true">Split</span>
+      <span class="erf-segmented__cell" aria-checked="false">Preview</span>
+    </div>
+  </div>
+</div>
+<figcaption><strong>No visible label, at 280px</strong> – a second candidate: the Markdown view mode, if it ever leaves
+the toolbar for a panel of its own. Short labels share one row from the default 280px break. With no visible label the
+group carries <code>aria-label="View mode"</code>.</figcaption>
+</figure>
+
+<figure class="ds-frame">
+<div aria-hidden="true" class="sg-fc sg-w-wide">
+  <div class="erf-segmented sg-comment-filters">
+    <span class="erf-segmented__label">Show</span>
+    <div class="erf-segmented__cells">
+      <span class="erf-segmented__cell" aria-checked="true">Open <span class="erf-counter">12</span></span>
+      <span class="erf-segmented__cell" aria-checked="false">Resolved <span class="erf-counter">4</span></span>
+      <span class="erf-segmented__cell" aria-checked="false">Needs attention <span class="erf-counter">2</span></span>
+    </div>
+  </div>
+</div>
+<figcaption><strong>Forced colours (a sketch)</strong> – a Windows contrast theme drops the fill. The checked cell keeps its
+thick bottom edge, in <code>Highlight</code> (the <a href="../../foundations/forced-colors.html">Forced colours</a> card's
+“Selected, checked, current” row). The shape still says which cell is checked.</figcaption>
+</figure>
+
+</div>
+
+<h3 id="resize">Drag the corner</h3>
+<p class="ds-muted">The comment filters in a frame you can resize by its bottom-right corner – one row while there is room
+for three equal cells, then a stack.</p>
+<div class="ds-frame ds-resize" aria-hidden="true">
+  <div class="sg-stage">
+    <div class="erf-segmented sg-comment-filters">
+      <span class="erf-segmented__label">Show</span>
+      <div class="erf-segmented__cells">
+        <span class="erf-segmented__cell" aria-checked="true">Open <span class="erf-counter">12</span></span>
+        <span class="erf-segmented__cell" aria-checked="false">Resolved <span class="erf-counter">4</span></span>
+        <span class="erf-segmented__cell" aria-checked="false">Needs attention <span class="erf-counter">2</span></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h2 id="width">Width: equal cells, one row or a stack</h2>
+<p class="ds-muted">Equal width says “these are peers”; a ragged row says one choice matters more. So a cell's basis is 0
+while the group is at least <code>--erf-segmented-break</code> wide – every cell takes an equal share of the row – and
+very large below it, so every cell wraps to its own full-width row. No media query, no script. The default break is
+280px (<code>calc(var(--space-20) * 7)</code>), which holds three cells of up to about eleven characters each. An
+instance with longer labels raises the break to three times its widest cell; the comment filters, with “Needs attention”
+and a count, set it to 432px (<code>calc(var(--space-24) * 9)</code>). A label never truncates – a truncated choice is a
+choice the reader cannot read.</p>
+
+<h2 id="contrast">Contrast</h2>
+<p class="ds-muted">Text needs 4.5:1; the lime edge and the ring are non-text and need 3:1. Disabled text is exempt and is
+measured only for the record.</p>
+<table>
+  <thead><tr><th>Part · state</th><th>Pair</th><th>Ratio</th></tr></thead>
+  <tbody>
+    <tr><td>Group label</td><td><code>--color-text-tertiary</code> on <code>--color-bg-secondary</code></td><td data-contrast="--color-text-tertiary on --color-bg-secondary" data-min="4.5" data-result="pass">6.33:1 · pass</td></tr>
+    <tr><td>Cell · resting</td><td><code>--color-text-primary</code> on <code>--color-bg-secondary</code></td><td data-contrast="--color-text-primary on --color-bg-secondary" data-min="4.5" data-result="pass">8.54:1 · pass</td></tr>
+    <tr><td>Cell · hover</td><td><code>--color-text-primary</code> on <code>--color-bg-hover-solid</code></td><td data-contrast="--color-text-primary on --color-bg-hover-solid" data-min="4.5" data-result="pass">8.64:1 · pass</td></tr>
+    <tr><td>Cell · pressed</td><td><code>--color-text-primary</code> on <code>--color-bg-active</code> over the panel</td><td data-contrast="--color-text-primary on --color-bg-active over --color-bg-secondary" data-min="4.5" data-result="pass">6.23:1 · pass</td></tr>
+    <tr><td>Cell · checked</td><td><code>--color-text-emphasis</code> on <code>--color-bg-selected</code> over the panel</td><td data-contrast="--color-text-emphasis on --color-bg-selected over --color-bg-secondary" data-min="4.5" data-result="pass">9.30:1 · pass</td></tr>
+    <tr><td>Count</td><td><code>--color-text-primary</code> on <code>--color-bg-tertiary</code></td><td data-contrast="--color-text-primary on --color-bg-tertiary" data-min="4.5" data-result="pass">9.53:1 · pass</td></tr>
+    <tr><td>Checked edge (3:1)</td><td><code>--color-brand-lime</code> on <code>--color-bg-selected</code> over the panel</td><td data-contrast="--color-brand-lime on --color-bg-selected over --color-bg-secondary" data-min="3" data-result="pass">7.01:1 · pass</td></tr>
+    <tr><td>Focus ring (3:1)</td><td><code>--color-border-focus</code> on <code>--color-bg-secondary</code></td><td data-contrast="--color-border-focus on --color-bg-secondary" data-min="3" data-result="pass">6.23:1 · pass</td></tr>
+    <tr><td>Disabled cell (exempt)</td><td><code>--color-text-disabled</code> on <code>--color-bg-secondary</code></td><td data-contrast="--color-text-disabled on --color-bg-secondary">2.69:1</td></tr>
+  </tbody>
+</table>
+
+<h2 id="keyboard">The keyboard contract</h2>
+<p class="ds-muted">One tab stop for the whole group (roving <code>tabindex</code>: the checked cell is <code>0</code>, the rest
+<code>-1</code>). Moving checks – the WAI-ARIA radio group pattern – because applying a filter or a view is cheap. When a
+choice is costly to apply, use a select with an explicit Apply instead.</p>
+<table class="ds-keys">
+  <thead><tr><th>Key</th><th>Result</th><th>Focus ends on</th><th>Held by</th></tr></thead>
+  <tbody>
+    <tr><td><kbd>Tab</kbd></td><td>Into the group, then out of it.</td><td>The checked cell, then the next control after the group.</td><td>No app test</td></tr>
+    <tr><td><kbd>→</kbd> <kbd>↓</kbd></td><td>Next cell, checked. Wraps from the last to the first. Skips a disabled cell.</td><td>That cell.</td><td><code>CommentDrawer.test.tsx</code> – switches filters with a click and with the arrow keys</td></tr>
+    <tr><td><kbd>←</kbd> <kbd>↑</kbd></td><td>Previous cell, checked. Wraps from the first to the last.</td><td>That cell.</td><td><code>CommentDrawer.test.tsx</code> – switches filters with a click and with the arrow keys</td></tr>
+    <tr><td><kbd>Home</kbd> <kbd>End</kbd></td><td>First and last enabled cell, checked.</td><td>That cell.</td><td>No app test – the shipping filter does not handle them</td></tr>
+    <tr><td><kbd>Space</kbd></td><td>Checks the focused cell (already checked after an arrow; needed after a click moved focus elsewhere).</td><td>Stays.</td><td>Native button activation</td></tr>
+    <tr><td>Screen reader</td><td>“Show, radio group. Open 12, radio button, checked, 1 of 3.” The count is part of the cell's name, so it is said with it; a changed count is not announced on its own.</td><td>–</td><td>No app test for the spoken form</td></tr>
+  </tbody>
+</table>
+
+<h2 id="markup">Markup</h2>
+<pre class="ds-code"><code>&lt;div class="erf-segmented" role="radiogroup" aria-labelledby="f-show"&gt;
+  &lt;span class="erf-segmented__label" id="f-show"&gt;Show&lt;/span&gt;
+  &lt;div class="erf-segmented__cells"&gt;
+    &lt;button type="button" class="erf-segmented__cell" role="radio" aria-checked="true"  tabindex="0"&gt;
+      Open &lt;span class="erf-counter"&gt;12&lt;/span&gt;&lt;/button&gt;
+    &lt;button type="button" class="erf-segmented__cell" role="radio" aria-checked="false" tabindex="-1"&gt;
+      Resolved &lt;span class="erf-counter"&gt;4&lt;/span&gt;&lt;/button&gt;
+    &lt;button type="button" class="erf-segmented__cell" role="radio" aria-checked="false" tabindex="-1"&gt;
+      Needs attention &lt;span class="erf-counter"&gt;2&lt;/span&gt;&lt;/button&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+&lt;!-- No visible label: drop the span and name the group.
+     &lt;div class="erf-segmented" role="radiogroup" aria-label="View mode"&gt;… --&gt;
+&lt;!-- Longer labels: raise the break on the instance.
+     .my-filters { --erf-segmented-break: calc(var(--space-24) * 9); } --&gt;</code></pre>
+
+<h2 id="tokens">Tokens</h2>
+<table class="ds-tokens">
+  <thead><tr><th>Part</th><th>Token</th></tr></thead>
+  <tbody>
+    <tr><td>Cell height</td><td><code>--btn-height-sm</code> (<code data-token="--btn-height-sm">24px</code>)</td></tr>
+    <tr><td>Cell padding · gap between cells</td><td><code>--space-4</code> · <code>--space-2</code></td></tr>
+    <tr><td>Edge · checked edge</td><td><code>--border-width</code> <code>--color-border-subtle</code> · <code>--border-width-thick</code> <code>--color-brand-lime</code></td></tr>
+    <tr><td>Fill · hover · pressed · checked</td><td>none · <code>--color-bg-hover-solid</code> · <code>--color-bg-active</code> · <code>--color-bg-selected</code></td></tr>
+    <tr><td>Text · checked · disabled · label</td><td><code>--color-text-primary</code> · <code>--color-text-emphasis</code> · <code>--color-text-disabled</code> · <code>--color-text-tertiary</code></td></tr>
+    <tr><td>Type</td><td><code>--font-sans</code>, <code>--text-sm</code> (<code data-token="--text-sm">11px</code>) at the app's scale – the shipping filter's size</td></tr>
+    <tr><td>Break</td><td><code>--erf-segmented-break</code>, a component property: <code>calc(var(--space-20) * 7)</code> by default</td></tr>
+  </tbody>
+</table>
+
+<h2 id="consolidation">What this replaces</h2>
+<table>
+  <thead><tr><th>Today</th><th>Becomes</th></tr></thead>
+  <tbody>
+    <tr><td><code>.erf-comment-filter</code> (<code>CommentDrawer.css</code>)</td><td><code>.erf-segmented</code>, with <code>.erf-segmented__cells</code> holding the cells</td></tr>
+    <tr><td><code>.erf-comment-filter__label</code></td><td><code>.erf-segmented__label</code>, on its own line above the cells</td></tr>
+    <tr><td><code>.erf-comment-filter__option</code></td><td><code>.erf-segmented__cell</code>, the same states and edge</td></tr>
+    <tr><td><code>.erf-comment-filter__count</code> (bare mono figure)</td><td><code>.erf-counter</code> (the Badge card)</td></tr>
+    <tr><td>The checked-edge rule in <code>CommentWindow.css</code>'s forced-colours block</td><td>The forced-colours block in <code>segmented.css</code></td></tr>
+  </tbody>
+</table>
+
+<section id="open-defects">
+<h2>Open defects this card names</h2>
+<ul class="ds-muted">
+  <li><strong>No <kbd>Home</kbd> or <kbd>End</kbd>.</strong> The shipping filter's key handler covers the four arrows only.</li>
+  <li><strong>A ragged wrap.</strong> The shipping options are content-sized and wrap one at a time, so in the 320px drawer
+  “Needs attention” drops to a second row on its own and the three look unequal.</li>
+  <li><strong>The count is a bare figure.</strong> <code>.erf-comment-filter__count</code> is a mono number with no
+  shape, where every other count in the app is an <code>.erf-counter</code>.</li>
+</ul>
+</section>
+
+<h2 id="related">Related</h2>
+<ul class="ds-muted">
+  <li><a href="../row/index.html">Rows and lists</a> and <a href="../button/index.html">Buttons</a>: the fill-plus-lime-edge selected signature this card reuses.</li>
+  <li><a href="../toolbar/index.html">Toolbar</a>: radios inside a toolbar, under its one-tab-stop contract.</li>
+  <li><a href="../../patterns/drawer/index.html">Drawer</a>: the controls band the comment filters sit in.</li>
+  <li><a href="../../foundations/focus.html">Focus</a> and <a href="../../foundations/forced-colors.html">Forced colours</a>.</li>
+</ul>
+
+<section id="exceptions">
+<h2>Exceptions</h2>
+<p class="ds-muted">None recorded. A shipping segmented control that departs from this card carries a
+<code>deviates:</code> marker at the site and gets a row here, naming the file.</p>
+</section>
+</main>
+</body>
+</html>

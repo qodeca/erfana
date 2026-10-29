@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Test ids of the HTML Preview comments UI (docs/designs/html-preview-comments.md
+ * Test ids of the HTML Preview comments UI (docs/designs/comments/html-preview-comments.md
  * §12.4), spread into `TEST_IDS` in `testids.ts` – import them from there.
  * They live in their own module because `testids.ts` is held to its size by
  * the max-lines ratchet. Every key starts with `COMMENT_`, which is what the
@@ -19,7 +19,7 @@ export const COMMENT_TEST_IDS = {
   // =========================================================================
   // HTML Preview Comments (76)
   // =========================================================================
-  // docs/designs/html-preview-comments.md §12.4. Every key starts with
+  // docs/designs/comments/html-preview-comments.md §12.4. Every key starts with
   // COMMENT_ so the section count test can find them.
 
   // Toolbar

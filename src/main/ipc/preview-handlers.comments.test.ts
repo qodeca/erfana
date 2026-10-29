@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * SEC-07 at the composition root (docs/designs/html-preview-comments.md §8,
+ * SEC-07 at the composition root (docs/designs/comments/html-preview-comments.md §8,
  * §12.3): the comment channels `registerPreviewHandlers` registers are gated
  * by the REAL preview sender predicate (`isTrustedPreviewSender`), not only by
  * the process-wide gate of `registry.ts`.

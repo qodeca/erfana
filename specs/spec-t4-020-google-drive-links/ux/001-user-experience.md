@@ -77,7 +77,7 @@ project-root/
 |---------|-------|-------|
 | Cloud icon color | `var(--color-brand-violet)` | #A0A8FF -- distinguishes from file/folder icons |
 | Display name | `var(--color-text-primary)` | #cccccc -- same as regular files |
-| Freshness text | `var(--color-text-secondary)` | #858585 -- muted, non-distracting |
+| Freshness text | `var(--color-text-tertiary)` | the lowest text colour that clears 4.5:1 on the tree ([Colours card](../../../docs/design-system/system/foundations/colors.html)) |
 | Freshness font | `var(--text-xs)` | 10px -- smaller than file name |
 | Node hover | `var(--color-bg-hover)` | rgba(255,255,255,0.05) -- standard tree hover |
 | Selected node | `var(--color-bg-selected)` | violet-muted -- same as current selection |
@@ -308,7 +308,7 @@ Not connected
                       [Sign in with Google]
 ```
 
-- "Not connected": `var(--color-text-muted)` (#6e6e6e)
+- "Not connected": `var(--color-text-tertiary)` – muted is decoration and disabled only ([Colours card](../../../docs/design-system/system/foundations/colors.html))
 - "Sign in with Google" button: `dialog-btn-primary` style (violet)
 - No linked files count shown when disconnected
 

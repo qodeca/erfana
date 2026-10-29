@@ -14,6 +14,8 @@ updates:
   - package-ecosystem: "npm"
     directory: "/"
     target-branch: "develop"
+    # Only the ecosystem label: without a list Dependabot also adds (and re-creates) `dependencies`.
+    labels: ["javascript"]
     schedule:
       interval: "weekly"
     # Two group PRs plus one PR per major; the default of 5 would let a
@@ -71,6 +73,8 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     target-branch: "develop"
+    # Only the ecosystem label: without a list Dependabot also adds (and re-creates) `dependencies`.
+    labels: ["github_actions"]
     schedule:
       interval: "weekly"
     # One grouped PR plus one per major: the default limit of 5 is enough.
@@ -87,5 +91,7 @@ updates:
   - package-ecosystem: "docker"
     directory: "/e2e/docker"
     target-branch: "develop"
+    # Only the ecosystem label: without a list Dependabot also adds (and re-creates) `dependencies`.
+    labels: ["docker"]
     schedule:
       interval: "weekly"

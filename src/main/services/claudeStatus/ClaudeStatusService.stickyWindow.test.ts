@@ -18,7 +18,7 @@
  *    an observation-corroborated one must.
  *
  * @see Issue #41 - Context meter reads the 200k window for Opus 5 sessions
- * @see docs/designs/41-model-capability-registry.md §5.3, §9.6, §13 (decision (b))
+ * @see docs/designs/context-meter/41-model-capability-registry.md §5.3, §9.6, §13 (decision (b))
  */
 import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
 import os from 'node:os'

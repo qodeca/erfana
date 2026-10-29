@@ -34,7 +34,7 @@
  * Robustness: this watcher NEVER throws outward — watch errors are swallowed
  * (logged) and watching continues; `closeAll` is safe to call repeatedly.
  *
- * @see docs/designs/216-claude-status-bar.md §3, §4, §7, §10
+ * @see docs/designs/context-meter/216-claude-status-bar.md §3, §4, §7, §10
  */
 import fs from 'node:fs'
 import path from 'node:path'

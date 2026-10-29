@@ -122,13 +122,18 @@ describe('design system authority', () => {
       expect(guide, `#${anchor} has no heading to land on`).toContain(`## ${heading}`)
     })
 
-    it('keeps the text selection policy as real content, not a stub', () => {
+    it('keeps the text selection policy on the Theme card, with the stub pointing at it', () => {
       const policy = ALL.find(s => s.heading.toLowerCase() === 'text selection policy')
       expect(policy, 'the text selection policy section is gone').toBeDefined()
-      // It is a dockview cascade fact with a test behind it, not a visual
-      // decision — so it is the one section that must NOT move to a card.
-      expect(policy.body).not.toContain('Decided by')
-      expect(policy.body.length).toBeGreaterThan(500)
+      // It used to be the one section kept as real content here, until the Theme
+      // card existed to hold it (the guide said so). Now the guide is a stub and
+      // the card carries the substance – checked here so the move cannot drop it.
+      expect(policy.body).toContain('docs/design-system/system/foundations/theme.html')
+      const card = readFileSync(path.join(ROOT, 'docs/design-system/system/foundations/theme.html'), 'utf8')
+      expect(card).toContain('id="selection"')
+      for (const fact of ['user-select: text', 'utilities.css', 'userSelect.audit.test.ts', 'dockview']) {
+        expect(card, `the Theme card no longer mentions ${fact}`).toContain(fact)
+      }
     })
   })
 })

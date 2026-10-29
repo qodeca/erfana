@@ -91,7 +91,7 @@ those lines with the package manifests:
 | Claim | Must equal |
 |---|---|
 | `CLAUDE.md` "Current version" banner | `package.json` `"version"` |
-| The Electron major in `CLAUDE.md`, `SDLC.md` (stack row), `CONTRIBUTING.md`, `docs/security.md`, `docs/ui-style-guide.md`, `docs/terminal/flickering-prevention.md` | the major of the `electron` range in `package.json` |
+| The Electron major in `CLAUDE.md`, `SDLC.md` (stack row), `CONTRIBUTING.md`, `docs/security.md`, `docs/terminal/flickering-prevention.md` | the major of the `electron` range in `package.json` |
 | The range quoted in `docs/security.md` | that range exactly as declared (`^44.9.0`), so a move to `~` or to an exact pin fails too |
 | The full Electron version in `docs/getting-started.md` and `docs/security.md` | the `electron` version resolved in `package-lock.json` |
 

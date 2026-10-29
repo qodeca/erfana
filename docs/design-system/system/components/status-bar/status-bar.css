@@ -1,0 +1,143 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/**
+ * The status bar – one display-only footer strip for a panel.
+ *
+ * PROPOSED – not adopted. A CONSOLIDATION: the app ships two footer strips
+ * that already agree on their height and disagree on everything else:
+ *   src/renderer/src/components/Panels/TerminalPanel/components/ClaudeStatusBar.css
+ *   (.terminal-claude-statusbar – bg-secondary, a 1px literal border, retired
+ *   colour tokens for its bands)
+ *   src/renderer/src/components/ProjectTree/ProjectTree.css
+ *   (.git-status-bar – text-secondary on bg-tertiary, under 4.5:1)
+ * Adopting is a MOVE: both become this file, and scripts/design-sync.mjs syncs
+ * it back here. Classes are prefixed erf-.
+ *
+ * Slots, start to end: leading identity (icon, name, badge), a spacer, the
+ * trailing values (meter, value, counts). Display-only: no tab stop.
+ */
+
+.erf-status-bar {
+  container: erf-status-bar / inline-size;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-4);
+  box-sizing: border-box;
+  block-size: var(--header-height);
+  padding-inline: var(--space-6);
+  background: var(--color-bg-tertiary);
+  border-block-start: var(--border-width) solid var(--color-border-default);
+  border-radius: var(--border-radius);
+  /* The Type card's status-line role: --text-sm, normal, snug, tertiary. */
+  color: var(--color-text-tertiary);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: var(--font-normal);
+  line-height: var(--leading-snug);
+  white-space: nowrap;
+  user-select: none;
+}
+
+/* Leading identity: what the bar is about. Shrinks before anything else
+   trailing does, by ellipsising the name. */
+.erf-status-bar__lead {
+  display: flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-inline-size: 0;
+}
+.erf-status-bar__icon {
+  flex: 0 0 auto;
+  inline-size: var(--icon-size-xs);
+  block-size: var(--icon-size-xs);
+}
+.erf-status-bar__name {
+  min-inline-size: 0;
+  overflow: hidden;
+  color: var(--color-text-primary);
+  font-weight: var(--font-medium);
+  text-overflow: ellipsis;
+}
+/* The badge slot holds an .erf-counter (Badge card), e.g. the window size. */
+.erf-status-bar__badge {
+  flex: 0 0 auto;
+  display: inline-flex;
+}
+
+.erf-status-bar__spacer {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+}
+
+/* Trailing values. The value itself never shrinks and is never dropped. */
+.erf-status-bar__values {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-4);
+}
+.erf-status-bar__value {
+  flex: 0 0 auto;
+  color: var(--color-text-primary);
+  font-weight: var(--font-semibold);
+  font-variant-numeric: tabular-nums;
+}
+.erf-status-bar__value[data-band='warning'] { color: var(--color-warning); }
+.erf-status-bar__value[data-band='danger'] { color: var(--color-error); }
+
+/* A quiet value: "Clean", a hint. Status-line colour, no italic. */
+.erf-status-bar__value--quiet {
+  color: var(--color-text-tertiary);
+  font-weight: var(--font-normal);
+}
+
+/* A count with a git letter, coloured as the tree colours it. The letter and
+   the number carry it; the colour repeats it. */
+.erf-status-bar__value[data-git='modified'] { color: var(--color-git-modified-light); }
+.erf-status-bar__value[data-git='untracked'] { color: var(--color-git-untracked-light); }
+.erf-status-bar__value[data-git='deleted'] { color: var(--color-git-deleted-light); }
+.erf-status-bar__value[data-git='staged'] { color: var(--color-git-staged-light); }
+.erf-status-bar__value[data-git='renamed'] { color: var(--color-git-renamed-light); }
+.erf-status-bar__value[data-git='conflicted'] { color: var(--color-git-conflicted-light); }
+
+/* The meter: a 4px bar on the panel surface, so the track reads against the
+   strip. The fill's band is the colour; the value beside it says the same. */
+.erf-status-bar__meter {
+  display: block;
+  flex: 0 1 calc(var(--space-16) * 2);
+  min-inline-size: var(--space-16);
+  block-size: var(--space-2);
+  overflow: hidden;
+  background: var(--color-bg-secondary);
+}
+.erf-status-bar__fill {
+  display: block;
+  block-size: 100%;
+  background: var(--color-context-safe);
+  transition: inline-size var(--transition-normal);
+}
+.erf-status-bar__fill[data-band='warning'] { background: var(--color-warning); }
+.erf-status-bar__fill[data-band='danger'] { background: var(--color-error); }
+
+@media (prefers-reduced-motion: reduce) {
+  .erf-status-bar__fill { transition: none; }
+}
+
+/* Collapse order as the panel narrows: the meter goes first, then the badge,
+   then the name ellipsises. The value stays. A container condition cannot
+   read a custom property, so the two widths are written here, once. */
+@container erf-status-bar (width < 240px) {
+  .erf-status-bar__meter { display: none; }
+}
+@container erf-status-bar (width < 180px) {
+  .erf-status-bar__badge { display: none; }
+}
+
+/* A contrast theme: the track and the fill keep an edge and a system colour. */
+@media (forced-colors: active) {
+  .erf-status-bar { border-block-start-color: CanvasText; }
+  .erf-status-bar__meter { border: var(--border-width) solid CanvasText; }
+  .erf-status-bar__fill { background: CanvasText; }
+}

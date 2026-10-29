@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * HTML Preview comments – the reviewer's journeys in e2e
- * (docs/designs/html-preview-comments.md §12.4, §13 P7).
+ * (docs/designs/comments/html-preview-comments.md §12.4, §13 P7).
  *
  * The P7 specs (`html-preview-comments{,.frames,.safety,.perf}.e2e.ts`) drive
  * the real UI the way a reviewer does. This module holds what they share, on

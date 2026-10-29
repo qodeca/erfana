@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Where the comment IPC handlers find a panel's service
- * (docs/designs/html-preview-comments.md §8; SEC-07): by panel and window
+ * (docs/designs/comments/html-preview-comments.md §8; SEC-07): by panel and window
  * together, so another window's request never reaches it.
  */
 import { describe, expect, it } from 'vitest'

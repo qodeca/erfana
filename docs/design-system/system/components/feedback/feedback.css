@@ -1,0 +1,336 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+
+/* ==========================================================================
+   Banners, bands, toasts, progress bars and meters – PROPOSED component CSS.
+
+   Authored here, no home in src/ yet. The Feedback card draws every state of
+   every class in this file. When adopted it is a CONSOLIDATION: the app ships
+   the banner under several class families (the card's "What ships today"
+   lists them), and adopting this file means deleting those copies.
+
+   Name boundary with the States pattern (states.css):
+   - .erf-progress      is the SPINNER – inline "still working", no amount.
+   - .erf-progress-bar  is the determinate (or indeterminate) BAR – this file.
+   - .erf-meter         is a LEVEL in a known range, not work moving to done.
+
+   Severity is never carried by colour alone: every banner, band and toast
+   title starts with a visually hidden word ("Warning: ", "Error: ",
+   "Note: ", "Done: "), and every severity has its own icon shape.
+   ========================================================================== */
+
+/* ---------- the banner (boxed form) ---------- */
+
+/* A boxed banner sits inside a dialog or a window, about the thing in it. */
+.erf-banner {
+  display: flex;
+  gap: var(--space-8);
+  flex-wrap: wrap;
+  align-items: flex-start;
+  padding: var(--space-6) var(--space-8);
+  border: var(--border-width) solid var(--color-border-default);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  color: var(--color-text-primary);
+}
+
+.erf-banner__icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  padding-top: var(--space-1);
+}
+.erf-banner__icon svg {
+  width: var(--icon-size-sm);
+  height: var(--icon-size-sm);
+}
+
+/* The body takes the row; below about 24 characters of room the actions
+   wrap under it rather than squeezing the sentence into a column. */
+.erf-banner__body {
+  flex: 1 1 24ch;
+  min-width: 0;
+}
+
+.erf-banner__title {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-emphasis);
+}
+
+/* Primary text in every tone – the comment window's banner already ships this. */
+.erf-banner__text {
+  margin: 0;
+  font-size: var(--text-base);
+  color: var(--color-text-primary);
+}
+
+/* A compact row of actions on the end edge. Its children are
+   erf-button erf-button--secondary erf-button--sm (button.css) – the banner
+   never invents its own button look. */
+.erf-banner__actions {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  align-self: center;
+  margin-inline-start: auto;
+}
+
+/* ---------- severities ---------- */
+
+.erf-banner--warning {
+  background: var(--color-warning-bg);
+  border-color: var(--color-warning-border);
+}
+.erf-banner--warning .erf-banner__icon { color: var(--color-warning); }
+
+.erf-banner--error {
+  background: var(--color-error-bg);
+  border-color: var(--color-error-border);
+}
+.erf-banner--error .erf-banner__icon { color: var(--color-error); }
+
+.erf-banner--success {
+  background: var(--color-success-bg);
+  border-color: var(--color-success-border);
+}
+.erf-banner--success .erf-banner__icon { color: var(--color-success); }
+
+/* Info: the proposed --color-info-bg and --color-info-border, in the same
+   10% fill / 30% edge alpha pattern the other three severities use. The
+   fallback draws them until the tokens exist in design-tokens.css; once they
+   do, the var() picks them up and the fallback is dead code to delete. */
+.erf-banner--info {
+  background: var(--color-info-bg, color-mix(in srgb, var(--color-info) 10%, transparent));
+  border-color: var(--color-info-border, color-mix(in srgb, var(--color-info) 30%, transparent));
+}
+.erf-banner--info .erf-banner__icon { color: var(--color-info); }
+
+/* ---------- the band form ---------- */
+
+/* A band is a state of the whole panel: full width, under the panel's
+   toolbar, a sibling of the Permission band. One row, bottom edge only, the
+   sentence at --text-base, actions on the end edge. The row keeps the height
+   of a row with actions even when it has none, so a band that gains or loses
+   its button does not move the content under it. */
+.erf-banner--band {
+  align-items: center;
+  gap: var(--space-4);
+  flex-wrap: nowrap;
+  min-block-size: calc(var(--btn-height-sm) + 2 * var(--space-2));
+  padding: var(--space-2) var(--space-6);
+  border-width: 0 0 var(--border-width);
+}
+.erf-banner--band .erf-banner__icon { padding-top: 0; }
+.erf-banner--band .erf-banner__body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: var(--space-4);
+}
+.erf-banner--band .erf-banner__title { margin: 0; }
+.erf-banner--band .erf-banner__actions { flex-wrap: nowrap; }
+
+/* ---------- the toast ---------- */
+
+/* 300–400px are the min and max widths Toast.css ships (the card bakes them
+   from the claims ledger). No token holds them yet. */
+.erf-toast {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-6);
+  min-width: 300px;
+  max-width: 400px;
+  padding: var(--space-6) var(--space-8);
+  background: var(--color-bg-tertiary);
+  border: var(--border-width) solid var(--color-border-default);
+  box-shadow: var(--shadow-md);
+  font-family: var(--font-sans);
+}
+.erf-toast__icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+}
+.erf-toast__icon svg {
+  width: var(--icon-size-md);
+  height: var(--icon-size-md);
+}
+.erf-toast--success .erf-toast__icon { color: var(--color-success); }
+.erf-toast--error .erf-toast__icon { color: var(--color-error); }
+.erf-toast--warning .erf-toast__icon { color: var(--color-warning); }
+.erf-toast--info .erf-toast__icon { color: var(--color-info); }
+.erf-toast__content {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.erf-toast__title {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-primary);
+}
+.erf-toast__count {
+  margin-inline-start: var(--space-2);
+  font-weight: var(--font-normal);
+  color: var(--color-text-tertiary);
+}
+/* --color-text-tertiary, not the --color-text-secondary Toast.css ships: the
+   message is --text-sm, and secondary fails 4.5:1 on the toast surface. */
+.erf-toast__message {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+  color: var(--color-text-tertiary);
+}
+.erf-toast__action {
+  display: inline-flex;
+  align-items: center;
+  margin-top: var(--space-4);
+  height: var(--btn-height-sm);
+  padding: 0 var(--space-6);
+  background: var(--color-btn-primary-bg);
+  color: var(--color-btn-primary-text);
+  border: none;
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  cursor: pointer;
+}
+.erf-toast__close {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--icon-size-lg);
+  height: var(--icon-size-lg);
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+}
+.erf-toast__close svg {
+  width: var(--icon-size-sm);
+  height: var(--icon-size-sm);
+}
+.erf-toast__close:is(:hover, [class~='is-hover']) {
+  background: var(--color-border-default);
+  color: var(--color-text-primary);
+}
+.erf-toast__close:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-border-focus);
+  outline-offset: var(--space-1);
+}
+/* Doc hook: the pointer is over the toast, so its countdown is paused. */
+.erf-toast[class~='is-paused'] { border-color: var(--color-border-subtle); }
+
+/* ---------- the progress bar ---------- */
+
+/* Determinate (or indeterminate) work inside a dialog or panel the reader is
+   watching. Not the spinner: that is .erf-progress in states.css. */
+.erf-progress-bar {
+  /* 1.5s is the sweep the document import ships; the proposed
+     --duration-progress (Motion card), named here until the token exists. */
+  --erf-progress-bar-sweep: 1.5s;
+
+  font-family: var(--font-sans);
+}
+.erf-progress-bar__label {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+}
+.erf-progress-bar__value {
+  color: var(--color-text-primary);
+  font-weight: var(--font-medium);
+  font-variant-numeric: tabular-nums;
+}
+.erf-progress-bar__track {
+  position: relative;
+  height: var(--space-4);
+  overflow: hidden;
+  background: var(--color-bg-tertiary);
+  border: var(--border-width) solid var(--color-border-subtle);
+}
+.erf-progress-bar__fill {
+  height: 100%;
+  background: var(--color-accent-primary);
+}
+.erf-progress-bar--indeterminate .erf-progress-bar__fill {
+  width: 40%;
+  animation: erf-progress-bar-sweep var(--erf-progress-bar-sweep) ease-in-out infinite;
+}
+@keyframes erf-progress-bar-sweep {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(250%); }
+}
+
+/* Reduced motion: no sweep, and no 40% segment parked at the start either –
+   that reads as "40% done". A full-width hatched fill says "busy, amount
+   unknown". --still is the doc hook that draws it regardless of the setting. */
+.erf-progress-bar--indeterminate.erf-progress-bar--still .erf-progress-bar__fill {
+  width: 100%;
+  animation: none;
+  background: repeating-linear-gradient(-45deg,
+    var(--color-accent-primary) 0 var(--space-2),
+    var(--color-bg-tertiary) var(--space-2) var(--space-4));
+}
+@media (prefers-reduced-motion: reduce) {
+  .erf-progress-bar--indeterminate .erf-progress-bar__fill {
+    width: 100%;
+    animation: none;
+    background: repeating-linear-gradient(-45deg,
+      var(--color-accent-primary) 0 var(--space-2),
+      var(--color-bg-tertiary) var(--space-2) var(--space-4));
+  }
+}
+
+/* ---------- the meter ---------- */
+
+/* A level inside a known range – role="meter", never "progressbar". The
+   reference is the terminal's context meter (ClaudeStatusBar.css). Band
+   colours are the ones the Colours card decides under #context-meter; the
+   visible value repeats the band so colour is never alone. */
+.erf-meter {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-width: 0;
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+}
+.erf-meter__label {
+  flex: 0 0 auto;
+  color: var(--color-text-tertiary);
+}
+.erf-meter__track {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: var(--space-2);
+  overflow: hidden;
+  background: var(--color-bg-tertiary);
+}
+.erf-meter__fill {
+  height: 100%;
+  background: var(--color-context-safe);
+  transition: width var(--transition-normal);
+}
+.erf-meter__value {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-primary);
+}
+.erf-meter--warning .erf-meter__fill { background: var(--color-warning); }
+.erf-meter--warning .erf-meter__value { color: var(--color-warning); }
+.erf-meter--critical .erf-meter__fill { background: var(--color-error); }
+.erf-meter--critical .erf-meter__value { color: var(--color-error); }
+
+@media (prefers-reduced-motion: reduce) {
+  .erf-meter__fill { transition: none; }
+}

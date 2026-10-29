@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Per-panel "this preview's own chrome covers its whole page area" flags
- * (HTML Preview comments, docs/designs/html-preview-comments.md §10.6).
+ * (HTML Preview comments, docs/designs/comments/html-preview-comments.md §10.6).
  *
  * WHY IT EXISTS. Under a 640 px panel the comments drawer takes the whole width
  * of the page area, so the page has nowhere to show – and a native view paints

@@ -23,7 +23,7 @@
  * first: the same sentence twice ("Showing overview.html.") is spoken twice.
  *
  * @module usePreviewMoveAnnouncer
- * @see docs/designs/design-issue-124-part3.md §3.8
+ * @see docs/designs/html-preview/multi-page/design-issue-124-part3.md §3.8
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'

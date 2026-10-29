@@ -1,6 +1,6 @@
 # Erfana HTML comments – format v1
 
-**Status: final for v1** (written with phase P1 of [HTML Preview comments](../designs/html-preview-comments.md), finalised in P8). The format is frozen: every file Erfana writes must stay readable by every later version, so v1 only ever gains optional fields. The serializer is `src/shared/htmlComments/format.ts`; its output is pinned by golden tests, and the examples below are parsed by them.
+**Status: final for v1** (written with phase P1 of [HTML Preview comments](../designs/comments/html-preview-comments.md), finalised in P8). The format is frozen: every file Erfana writes must stay readable by every later version, so v1 only ever gains optional fields. The serializer is `src/shared/htmlComments/format.ts`; its output is pinned by golden tests, and the examples below are parsed by them.
 
 Erfana's HTML Preview lets a reviewer click an element in a running page and leave a comment on it. The comment is stored **inside the `.html` file**, as an ordinary HTML comment placed right before the element. Browsers do not show it, it travels with the file through git, and a coding agent reading the file sees the request next to the markup it is about.
 

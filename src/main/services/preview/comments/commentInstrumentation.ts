@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Comment instrumentation for one preview view's protocol handler
- * (docs/designs/html-preview-comments.md §3 "Raw vs instrumented bytes",
+ * (docs/designs/comments/html-preview-comments.md §3 "Raw vs instrumented bytes",
  * §4.2 "PreviewProtocolHandler", §6, §19 R3-1, R3-12, R3-13; tests M-030,
  * M-031, M-060).
  *

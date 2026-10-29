@@ -68,12 +68,12 @@ Run the same checks CI runs before opening a PR:
 
 ```bash
 npm run lint            # eslint --fix, then the no-shebang check (lint:shebang) and the max-lines baseline check (lint:max-lines)
-npm run lint:css        # stylelint over src/ CSS and the docs/design-system/ cards
-npm run design -- --check   # fails if a generated file under docs/design-system/ is stale
+npm run lint:css        # stylelint over src/ CSS, the docs/design-system/ cards and the docs/designs/ screens
+npm run design -- --check   # stale generated files or baked values, plus the design guards (no JavaScript, links, deviation markers, card anatomy, 13px text floor)
 npm run typecheck       # tsc (node + web projects, their tests, and e2e)
 npm run test:cov        # every unit test once, plus the coverage floors (the Unit tests and Coverage jobs)
 npx electron-vite build # production build
-npm run check:headers   # every source file must carry the SPDX header (the MIT Xezar kit in .xezar/ is exempt)
+npm run check:headers   # every source file must carry the SPDX header
 npm run check:links     # relative links, anchors and user-guide wording (local gate only, not yet a CI step)
 npm audit signatures    # advisory in CI, but it catches a lockfile written by the wrong npm
 pipx run --spec "reuse[charset-normalizer]" reuse lint   # REUSE compliance
@@ -143,9 +143,9 @@ Never commit a real secret, even to history – rewrite it out and rotate the cr
 
 - TypeScript strict mode; React functional components with hooks; Zustand for state.
 - IPC pattern: `shared/ipc` schemas → `main/services` → `main/ipc` handlers → preload bridge → renderer.
-- UI: open the design system first – [`docs/design-system/index.html`](docs/design-system/index.html) – and use design tokens (`var(--color-*)`, `var(--space-*)`, `var(--text-*)`); `border-radius: 0` always. `npm run lint:css` enforces the token rules. (`docs/design-system/` is the design system; `docs/designs/` holds per-issue notes.)
+- UI: open the design system first – [`docs/design-system/index.html`](docs/design-system/index.html) – read the card for what you change, and use design tokens (`var(--color-*)`, `var(--space-*)`, `var(--text-*)`); `border-radius: 0` always. `npm run lint:css` enforces the token rules. A departure from a card needs `/* deviates: docs/design-system/<card>.html – why */` at the site and a row in that card's Exceptions; design pages are HTML, CSS and images only. Full contract: [`docs/design-system/README.md`](docs/design-system/README.md). (`docs/design-system/` is the design system; `docs/designs/<functionality>/` holds one feature's design.)
 - Prose: **sentence case**, en dashes (not em dashes).
-- New source files must carry the SPDX header (`npm run check:headers` enforces it; the Xezar kit under `.xezar/` is MIT and exempt, see `REUSE.toml`); new binary assets are covered by the `REUSE.toml` catch-all – add a `.license` sidecar only to *override* it (e.g. a third-party asset). `reuse lint` must pass.
+- New source files must carry the SPDX header (`npm run check:headers` enforces it); new binary assets are covered by the `REUSE.toml` catch-all – add a `.license` sidecar only to *override* it (e.g. a third-party asset). `reuse lint` must pass.
 
 ## Pull-request checklist
 
@@ -157,21 +157,16 @@ Never commit a real secret, even to history – rewrite it out and rotate the cr
 - [ ] Docs updated if behavior or project shape changed.
 - [ ] You agree to the project [CLA](CLA.md) (opening this PR records your agreement).
 
-## Automation in this repository
-
-This repository runs an agent pipeline (Xezar, `.xezar/`). **You start none of its workflows**: the
-project leader dispatches them. Nothing is broken when none of them runs on your pull request.
+## How a pull request moves
 
 - **What gates your pull request** is only the required GitHub checks: `Lint`, `Typecheck`,
   `Unit tests`, `Build`, `Coverage`, `License compliance` and `Secret scan`.
-- **Labels**: you may suggest a category (`bug`, `feature`, `refactor`, `security`, `dependencies`,
-  `documentation`) and a `priority-*`. Every other label is applied by the pipeline or a
-  maintainer - never apply those yourself.
+- **Labels**: a feature request carries `enhancement`; a bug report is marked by its `[Bug]: `
+  title prefix. A maintainer applies the rest.
 - **Documents** go under `docs/`, by subject; [docs/README.md](docs/README.md) lists the folders.
-- **Pull request titles** follow Conventional Commits: the pipeline squash-merges, so the title
-  becomes the commit on `develop`.
-- **How work moves**, stage by stage, is in [SDLC.md](SDLC.md). You do not need the pipeline to
-  contribute: branch from `develop`, open a pull request, and a maintainer takes it from there.
+- **Pull request titles** follow Conventional Commits, so the merge commit on `develop` reads well.
+- **How work moves**, stage by stage, is in [SDLC.md](SDLC.md). Branch from `develop`, open a pull
+  request, and a maintainer takes it from there.
 
 ## Reporting bugs and security issues
 

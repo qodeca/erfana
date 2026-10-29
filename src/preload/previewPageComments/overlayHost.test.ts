@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * The overlay host against a page that fights it
- * (docs/designs/html-preview-comments.md §9.1 S4, S25, §10.2, §19 R3-7;
+ * (docs/designs/comments/html-preview-comments.md §9.1 S4, S25, §10.2, §19 R3-7;
  * SEC-21, SEC-28, SEC-31).
  */
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'

@@ -1,0 +1,214 @@
+<!-- @card group="Foundations" name="Forced colours" subtitle="What survives a Windows contrast theme – every state keeps an edge, not just a fill" status="proposed" reviewed="never" answers="Make a state visible in a Windows contrast theme; Pick a system colour for focus, selection or disabled" -->
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Forced colours – Erfana design system</title>
+<link rel="stylesheet" href="../../tokens.css">
+<link rel="stylesheet" href="../../ds.css">
+<style>
+  .rules { max-width: var(--ds-measure-wide); margin: 0 0 var(--space-16); padding-left: var(--space-16);
+           color: var(--color-text-tertiary); }
+  .rules li { margin-bottom: var(--space-4); }
+  .rules strong { color: var(--color-text-bright); font-weight: var(--font-semibold); }
+  tbody th { text-align: left; font-weight: var(--font-normal); text-transform: none; letter-spacing: normal;
+             font-size: var(--text-base); color: var(--color-text-primary);
+             padding: var(--space-4) var(--space-8) var(--space-4) 0;
+             border-bottom: var(--border-width) solid var(--color-border-default); }
+  .sys { display: inline-block; width: var(--space-12); height: var(--space-12); vertical-align: middle;
+         margin-right: var(--space-4); border: var(--border-width) solid CanvasText; }
+
+  /* ---------- the simulation ----------
+     A frame painted with the browser's own system colours, in its dark scheme.
+     It is a simulation: a real Windows contrast theme picks its own values for
+     each keyword, and the browser also strips fills and shadows. The point is
+     which keyword each state uses, and that each state still has an edge. */
+  .fc { color-scheme: dark; forced-color-adjust: none; background: Canvas; color: CanvasText;
+        padding: var(--space-8); font-size: var(--text-base); }
+  .fc-row { display: flex; align-items: center; height: var(--btn-height-sm); padding: 0 var(--space-8);
+            border: var(--border-width) solid transparent; border-left-width: var(--border-width-thick); }
+  .fc-btn { display: inline-flex; align-items: center; height: var(--btn-height-md); padding: 0 var(--space-12);
+            background: ButtonFace; color: ButtonText; border: var(--border-width) solid ButtonBorder;
+            font-weight: var(--font-semibold); }
+  .fc-focus { outline: var(--border-width-thick) solid Highlight; outline-offset: var(--space-1); }
+  .fc-focus-in { outline: var(--border-width-thick) solid Highlight; outline-offset: calc(var(--space-1) * -1); }
+  .fc-selected { background: Highlight; color: HighlightText; border-left-color: HighlightText; }
+  .fc-selected-edge { border-left-color: CanvasText; }
+  .fc-disabled { color: GrayText; border-color: GrayText; }
+  .fc-pressed { border-color: Highlight; border-bottom-width: var(--border-width-thick); box-shadow: none; }
+  .fc-check { display: inline-block; width: var(--space-8); height: var(--space-8); margin-right: var(--space-4);
+              border: var(--border-width) solid CanvasText; background: Canvas; }
+  .fc-check--on { background: Highlight; border-color: Highlight; }
+  .fc-link { color: LinkText; text-decoration: underline; }
+  .fc-mark { background: Mark; color: MarkText; text-decoration: underline var(--border-width-thick) CanvasText;
+             text-decoration-skip-ink: none; text-underline-offset: var(--space-2); }
+  .fc-hit { background: Mark; color: MarkText; }
+  .fc-hit-current { background: MarkText; color: Mark; }
+  .fc-sel { background: Highlight; color: HighlightText; }
+  /* The same frames as the app would lose them: no fill, no shadow. */
+  .fc-lost-selected { border-left-color: transparent; }
+
+  /* The live rule. In a real forced-colours mode (Windows contrast theme, or
+     DevTools > Rendering > Emulate CSS media feature forced-colors) these
+     samples show what the browser does to them. */
+  .live { display: flex; flex-wrap: wrap; gap: var(--space-12); align-items: center;
+          padding: var(--space-12); background: var(--color-bg-secondary); }
+  .live-btn { height: var(--btn-height-md); padding: 0 var(--space-12); border: var(--border-width) solid transparent;
+              background: var(--color-btn-primary-bg); color: var(--color-text-on-accent);
+              font: var(--font-semibold) var(--text-md) var(--font-sans); cursor: pointer; }
+  .live-btn:focus-visible { outline: var(--border-width-thick) solid var(--color-border-focus); outline-offset: var(--space-1); }
+  .live-toggle { height: var(--btn-height-md); padding: 0 var(--space-12); cursor: pointer;
+                 border: var(--border-width) solid transparent; border-bottom: var(--border-width-thick) solid transparent;
+                 background: transparent; color: var(--color-text-primary); font: var(--text-md) var(--font-sans); }
+  .live-toggle[aria-pressed="true"] { background: var(--color-bg-selected); border-bottom-color: var(--color-brand-lime); }
+  .live-toggle:focus-visible { outline: var(--border-width-thick) solid var(--color-border-focus); outline-offset: var(--space-1); }
+  @media (forced-colors: active) {
+    .live-toggle[aria-pressed="true"] { border-bottom-color: Highlight; }
+    .live-btn:focus-visible, .live-toggle:focus-visible { outline-color: Highlight; }
+  }
+
+  pre { margin: 0 0 var(--space-12); padding: var(--space-8); background: var(--color-bg-secondary);
+        max-width: var(--ds-measure-wide); overflow-x: auto; color: var(--color-text-primary); }
+</style>
+</head>
+<body>
+<nav class="ds-crumbs" aria-label="Breadcrumb"><a href="../../index.html">Erfana design system</a> <span aria-hidden="true">/</span> <a href="../../index.html#foundations">Foundations</a> <span aria-hidden="true">/</span> <span aria-current="page">Forced colours</span></nav>
+<main>
+<h1>Forced colours</h1>
+<p class="ds-meta"><span class="ds-status" data-status="proposed">proposed</span> not yet reviewed</p>
+<p class="ds-lede" id="decision">
+  On Windows, a contrast theme replaces every colour Erfana chooses with a handful of system colours, removes
+  <code>box-shadow</code>, <code>text-shadow</code> and gradient backgrounds, and flattens fills. Images set with
+  <code>url()</code> survive. <strong>The rule: every state that carries information keeps a border, an outline or text
+  that survives that. This holds for focus, selected, pressed, checked, disabled and invalid. A state repainted for
+  forced colours uses the system colour named below for it.</strong> A state that is only a fill or a shadow vanishes.
+</p>
+
+<h2 id="rules">The rules</h2>
+<ol class="rules">
+  <li><strong>Every state keeps an edge.</strong> Selected has a border edge, pressed has a border edge, focus is an
+    <code>outline</code>. A fill alone is gone in a contrast theme; an edge is repainted in a system colour and stays.</li>
+  <li><strong>Focus is an outline, never a box-shadow.</strong> Forced colours remove <code>box-shadow</code>; the
+    <a href="focus.html">one ring</a> is an outline, so it survives with no extra rule. A transparent outline or border
+    is a legitimate placeholder: the browser paints it in a system colour.</li>
+  <li><strong>Use the system colour for the meaning,</strong> from the table below – not the one that happens to look
+    right in one theme.</li>
+  <li><strong><code>forced-color-adjust: none</code> is a last resort</strong>, for a control whose state is drawn only
+    by fill (a custom checkbox, a thumbnail picker), and it must then repaint every state with system colours itself.
+    Settings, the screen and window pickers and the screenshot overlay do exactly this.</li>
+  <li><strong>Icons are <code>currentColor</code></strong>, so they take the system text colour; an icon painted with a
+    token fill disappears or keeps a colour the user did not choose.</li>
+</ol>
+
+<h2 id="map">Which system colour for which state</h2>
+<table>
+<thead><tr><th scope="col">State</th><th scope="col">System colour</th><th scope="col">Pair it with</th><th scope="col">In Erfana today</th></tr></thead>
+<tbody>
+  <tr><th scope="row">Page, panel, field background</th><td><span class="sys" style="background: Canvas"></span><code>Canvas</code></td><td><code>CanvasText</code></td><td>The browser applies it; nothing to write.</td></tr>
+  <tr><th scope="row">Focus ring</th><td><span class="sys" style="background: Highlight"></span><code>Highlight</code></td><td>–</td><td>The outline survives as-is; the screenshot overlay switches its keyboard ring to <code>Highlight</code>.</td></tr>
+  <tr><th scope="row">Selected, checked, current</th><td><span class="sys" style="background: Highlight"></span><code>Highlight</code> fill or edge</td><td><code>HighlightText</code> on a <code>Highlight</code> fill</td><td>Settings checkboxes, screen and window pickers (fill); band toggles, comment filter and drawer row (edge).</td></tr>
+  <tr><th scope="row">Selected, but not focused</th><td><span class="sys" style="background: SelectedItem"></span><code>SelectedItem</code></td><td><code>SelectedItemText</code></td><td>Not used yet; the tree row keeps its edge instead (below).</td></tr>
+  <tr><th scope="row">Pressed toggle, open menu button</th><td><span class="sys" style="background: Highlight"></span><code>Highlight</code> edge</td><td>–</td><td><code>PreviewNavControls.css</code>, <code>CommentWindow.css</code>.</td></tr>
+  <tr><th scope="row">Disabled</th><td><span class="sys" style="background: GrayText"></span><code>GrayText</code></td><td>Its own border in <code>GrayText</code></td><td>The browser applies it to native disabled controls; a custom one sets it.</td></tr>
+  <tr><th scope="row">Button</th><td><span class="sys" style="background: ButtonFace"></span><code>ButtonFace</code></td><td><code>ButtonText</code>, <code>ButtonBorder</code></td><td>Native buttons get it for free.</td></tr>
+  <tr><th scope="row">Link</th><td><span class="sys" style="background: LinkText"></span><code>LinkText</code></td><td>An underline</td><td>Native links get it for free.</td></tr>
+  <tr><th scope="row">Search match, highlighted text</th><td><span class="sys" style="background: Mark"></span><code>Mark</code></td><td><code>MarkText</code></td><td>Proposed for Find hits and comment marks, with the current hit swapping the two and a mark keeping a <code>CanvasText</code> bar – <a href="highlights.html#forced">Text highlights</a>. Not shipped yet.</td></tr>
+</tbody>
+</table>
+<p class="ds-muted">The swatches are painted with the keywords themselves, so they show this browser's values in its
+dark scheme – a contrast theme supplies its own.</p>
+
+<h2 id="frames">Every state, simulated</h2>
+<p class="ds-muted">Static frames painted with system colours, as a contrast theme would paint them. Left of each pair:
+a state that keeps an edge and survives; right: the same state built from a fill or a shadow, as forced colours leave
+it.</p>
+<div class="ds-frames">
+  <figure class="ds-frame"><div class="fc" aria-hidden="true"><span class="fc-btn fc-focus">Save</span></div>
+    <figcaption><strong>Focus – survives.</strong> The outline is repainted in <code>Highlight</code>.</figcaption></figure>
+  <figure class="ds-frame"><div class="fc" aria-hidden="true"><span class="fc-btn">Save</span></div>
+    <figcaption><strong>Focus – lost.</strong> A box-shadow ring (the retired <code>--shadow-focus</code>) is removed;
+      nothing marks the focused button.</figcaption></figure>
+  <figure class="ds-frame"><div class="fc" aria-hidden="true"><div class="fc-row">README.md</div><div class="fc-row fc-selected-edge">notes.md</div><div class="fc-row">plan.md</div></div>
+    <figcaption><strong>Selected row – survives.</strong> The fill is gone, but the tree's left edge is a border and is
+      repainted in <code>CanvasText</code>.</figcaption></figure>
+  <figure class="ds-frame"><div class="fc" aria-hidden="true"><div class="fc-row">README.md</div><div class="fc-row fc-lost-selected">notes.md</div><div class="fc-row">plan.md</div></div>
+    <figcaption><strong>Selected row – lost.</strong> A row selected by <code>--color-bg-selected</code> alone: three
+      identical rows.</figcaption></figure>
+  <figure class="ds-frame"><div class="fc" aria-hidden="true"><div class="fc-row">README.md</div><div class="fc-row fc-selected">notes.md</div><div class="fc-row">plan.md</div></div>
+    <figcaption><strong>Selected row – repainted.</strong> With <code>forced-color-adjust: none</code>, a
+      <code>Highlight</code> fill and <code>HighlightText</code>: the picker dialogs' pattern.</figcaption></figure>
+  <figure class="ds-frame"><div class="fc" aria-hidden="true"><span class="fc-btn fc-pressed">Show comments</span> <span class="fc-btn">Same tab</span></div>
+    <figcaption><strong>Pressed toggle – survives.</strong> The lime bottom edge is repainted in <code>Highlight</code>
+      (<code>PreviewNavControls.css</code>). The unpressed toggle beside it keeps a plain button border and no
+      <code>Highlight</code> edge. This frame is drawn, not measured: how the shipping toggles look under a real
+      contrast theme is unverified. The proposed <code>button.css</code> gives every button a <code>ButtonText</code>
+      border in forced colours, so an unpressed toggle there is never edge-less.</figcaption></figure>
+  <figure class="ds-frame"><div class="fc" aria-hidden="true"><span class="fc-check fc-check--on"></span>Wrap long lines<br><span class="fc-check"></span>Show line numbers</div>
+    <figcaption><strong>Checkbox – repainted.</strong> On: a solid <code>Highlight</code> box. Off: a
+      <code>Canvas</code> box with a <code>CanvasText</code> edge (<code>SettingsOverlay.css</code>).</figcaption></figure>
+  <figure class="ds-frame"><div class="fc" aria-hidden="true"><span class="fc-btn fc-disabled">Export</span> <span class="fc-link">Open settings</span></div>
+    <figcaption><strong>Disabled and link.</strong> <code>GrayText</code> for the disabled button's text and edge;
+      <code>LinkText</code> with its underline for the link.</figcaption></figure>
+  <figure class="ds-frame"><div class="fc" aria-hidden="true">A <span class="fc-mark">commented phrase</span>, a <span class="fc-hit">hit</span>, the <span class="fc-hit-current">current hit</span> and <span class="fc-sel">a selection</span>.</div>
+    <figcaption><strong>Text highlights – proposed.</strong> Marks and hits take <code>Mark</code>; a comment mark
+      keeps a <code>CanvasText</code> bar, the current hit swaps <code>Mark</code> and <code>MarkText</code>, and
+      <code>Highlight</code> stays the selection's (<a href="highlights.html#forced">Text highlights</a>).</figcaption></figure>
+</div>
+
+<h2 id="code">The rule, in code</h2>
+<pre><code>/* A state drawn by fill needs an edge that forced colours keep. */
+.erf-toggle[aria-pressed="true"] {
+  background: var(--color-bg-selected);
+  border-bottom: var(--border-width-thick) solid var(--color-brand-lime);
+}
+@media (forced-colors: active) {
+  .erf-toggle[aria-pressed="true"] { border-bottom-color: Highlight; }
+}
+
+/* A control drawn only by fill opts out and repaints every state itself. */
+@media (forced-colors: active) {
+  .erf-check { forced-color-adjust: none; background: Canvas; border-color: CanvasText; }
+  .erf-check:checked { background: Highlight; border-color: Highlight; }
+  .erf-check:disabled { border-color: GrayText; }
+}</code></pre>
+
+<h3 id="live">Try it for real</h3>
+<p class="ds-muted">These controls carry the rule live. Turn on a Windows contrast theme, or in Chrome DevTools open
+Rendering and emulate <code>forced-colors: active</code>, then Tab to them: the pressed toggle keeps a
+<code>Highlight</code> edge and the ring turns <code>Highlight</code>.</p>
+<div class="live">
+  <button class="live-btn" type="button">Save</button>
+  <button class="live-toggle" type="button" aria-pressed="true">Show comments</button>
+  <button class="live-toggle" type="button" aria-pressed="false">Same tab</button>
+</div>
+
+<h2 id="gaps">Known gaps</h2>
+<ul class="ds-muted">
+  <li>The screen and window pickers draw their selected and focused ring as a <code>box-shadow</code>. Their
+    forced-colours block repaints the item with <code>Highlight</code>, so they survive there – but the default ring is
+    still a shadow, and a fourth ring idiom (<a href="focus.html">Focus card</a>).</li>
+  <li>Nothing checks this mechanically. For this card only the stylesheets that already carry a forced-colours block
+    were read; a state elsewhere drawn by fill alone has not been audited.</li>
+</ul>
+
+<h2 id="related">Related</h2>
+<ul class="ds-muted">
+  <li><a href="focus.html">Focus and keyboard</a> – the outline that survives without a rule.</li>
+  <li><a href="colors.html#states">Colours, interaction-state layers</a> – which states are fill-only by design.</li>
+  <li><a href="highlights.html">Text highlights</a> – Find, comment marks and the selection, and the system colour each takes.</li>
+  <li><a href="../components/form/index.html">Form controls</a> and <a href="../components/permission-band/index.html">Permission band</a> – components that ship a forced-colours block.</li>
+</ul>
+
+<section id="exceptions">
+<h2>Exceptions</h2>
+<p class="ds-muted">None recorded. A shipping component that departs from this card carries a
+<code>deviates:</code> marker at the site and gets a row here, naming the file.</p>
+</section>
+
+</main>
+</body>
+</html>

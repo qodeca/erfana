@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * The comments drawer (docs/designs/html-preview-comments.md §10.5; R-009,
+ * The comments drawer (docs/designs/comments/html-preview-comments.md §10.5; R-009,
  * R-020).
  */
 import { act, render, screen, waitFor, within } from '@testing-library/react'

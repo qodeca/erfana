@@ -1,155 +1,482 @@
-<!-- @card group="Components" name="Buttons" subtitle="Primary, secondary, danger — rules copied verbatim from Dialog.css" status="proposed" reviewed="2026-08-31" -->
+<!-- @card group="Components" name="Buttons" subtitle="One button in every variant, state and height – and the dialog buttons that ship today" status="proposed" reviewed="2026-08-31" answers="Add a button; Label a destructive action; Put a button beside a field" -->
 <!-- SPDX-License-Identifier: GPL-3.0-only -->
 <!-- SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. -->
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; child-src 'none'">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Erfana — buttons</title>
+<title>Buttons – Erfana design system</title>
 <link rel="stylesheet" href="../../../tokens.css">
 <link rel="stylesheet" href="../../../ds.css">
-<script src="../../../claims.js"></script>
+<link rel="stylesheet" href="button.css">
+<link rel="stylesheet" href="../row/row.css">
+<link rel="stylesheet" href="../menu/menu.css">
 <style>
 /* ==========================================================================
-   Mirrors src/renderer/src/components/Dialog/Dialog.css. The app owns it; this
-   card renders it.
-
-   This block used to be fenced with "do not improve it here", and the fence was
-   protecting a defect: the focus rule used bare :focus, a hardcoded 2px, and
-   --dialog-btn-primary-bg. The Focus card rules that one ring wins —
-   :focus-visible, --border-width-thick, --color-border-focus — so the two cards
-   gave opposite instructions and neither said which won. It LOOKED fine only
-   because both tokens happen to resolve to the same violet today.
-
-   Fixed in the app first, then here. A fence that stops a card being corrected
-   is how a design system canonises the drift it was built to kill.
+   ILLUSTRATION – mirrors the .dialog-btn rules in
+   src/renderer/src/components/Dialog/Dialog.css by hand. The app owns them; this
+   block shows what ships today. Nothing syncs it yet, so it can drift – the
+   Exceptions section records that, and the Defects section lists its departures. Do not copy from it: the rule of record is
+   button.css beside this card.
    ========================================================================== */
-:root {
+.bt-dialog-mirror {
   --dialog-border: var(--color-border-subtle);
   --dialog-text-secondary: var(--color-gray-200);
-  --dialog-btn-primary-bg: var(--color-btn-primary-bg);
-  --dialog-btn-primary-hover: var(--color-btn-primary-hover);
-  --dialog-btn-danger-bg: var(--color-btn-danger-bg);
-  --dialog-btn-danger-hover: var(--color-btn-danger-hover);
-  --dialog-btn-secondary-bg: var(--color-btn-secondary-bg);
 }
-
-.dialog-btn {
+.bt-dialog-mirror .dialog-btn {
   padding: var(--space-5) var(--space-12);
   border: none;
   border-radius: var(--border-radius);
   cursor: pointer;
+  font-family: var(--font-sans);
   font-size: var(--text-md);
   font-weight: var(--font-semibold);
   transition: all var(--transition-normal);
   letter-spacing: 0.2px;
 }
-.dialog-btn:focus-visible { outline: var(--border-width-thick) solid var(--color-border-focus); outline-offset: var(--space-1); }
+.bt-dialog-mirror .dialog-btn:focus-visible { outline: var(--border-width-thick) solid var(--color-border-focus); outline-offset: var(--space-1); }
+.bt-dialog-mirror .dialog-btn-primary { background-color: var(--color-btn-primary-bg); color: var(--color-btn-primary-text); box-shadow: var(--shadow-sm); }
+.bt-dialog-mirror .dialog-btn-primary:hover:not(:disabled) { background-color: var(--color-btn-primary-hover); box-shadow: var(--shadow-md); transform: translateY(calc(var(--border-width) * -1)); }
+.bt-dialog-mirror .dialog-btn-primary:active:not(:disabled) { transform: translateY(0); box-shadow: var(--shadow-xs); }
+.bt-dialog-mirror .dialog-btn-danger { background-color: var(--color-btn-danger-bg); color: var(--color-white); box-shadow: var(--shadow-sm); }
+.bt-dialog-mirror .dialog-btn-danger:hover:not(:disabled) { background-color: var(--color-btn-danger-hover); box-shadow: var(--shadow-md); transform: translateY(calc(var(--border-width) * -1)); }
+.bt-dialog-mirror .dialog-btn-danger:active:not(:disabled) { transform: translateY(0); box-shadow: var(--shadow-xs); }
+.bt-dialog-mirror .dialog-btn-secondary { background-color: transparent; color: var(--dialog-text-secondary); border: var(--border-width) solid var(--dialog-border); }
+.bt-dialog-mirror .dialog-btn-secondary:hover { background-color: var(--color-btn-secondary-bg); border-color: var(--color-gray-700); }
+.bt-dialog-mirror .dialog-btn:disabled { opacity: var(--opacity-disabled); cursor: not-allowed; box-shadow: none; }
+/* ===================== end illustration ===================== */
 
-.dialog-btn-primary {
-  background-color: var(--dialog-btn-primary-bg);
-  color: var(--color-btn-primary-text);
-  box-shadow: var(--shadow-sm);
-}
-.dialog-btn-primary:hover:not(:disabled) {
-  background-color: var(--dialog-btn-primary-hover);
-  box-shadow: var(--shadow-md);
-  transform: translateY(-1px);
-}
-.dialog-btn-primary:active:not(:disabled) { transform: translateY(0); box-shadow: var(--shadow-xs); }
+/* Documentation chrome. */
+.bt-bar { display: flex; gap: var(--space-8); align-items: center; flex-wrap: wrap;
+          padding: var(--space-12); background: var(--color-bg-secondary); margin-bottom: var(--space-12); }
+.bt-bar--primary { background: var(--color-bg-primary); border: var(--border-width) solid var(--color-border-default); }
+.bt-bar__label { inline-size: calc(var(--space-24) * 2.5); font-family: var(--font-mono); font-size: var(--ds-text-small);
+                 color: var(--color-text-tertiary); }
+.bt-size-box { inline-size: calc(var(--space-24) * 2.5); background: var(--color-brand-violet-muted);
+               border: var(--border-width) solid var(--color-accent-primary); }
 
-.dialog-btn-danger {
-  background-color: var(--dialog-btn-danger-bg);
-  color: var(--color-white);
-  box-shadow: var(--shadow-sm);
-}
-.dialog-btn-danger:hover:not(:disabled) {
-  background-color: var(--dialog-btn-danger-hover);
-  box-shadow: var(--shadow-md);
-  transform: translateY(-1px);
-}
-.dialog-btn-danger:active:not(:disabled) { transform: translateY(0); box-shadow: var(--shadow-xs); }
+/* The states matrix: each cell is a picture, so each cell is inert; the row headers stay readable. */
+.bt-matrix-wrap { overflow-x: auto; margin-bottom: var(--space-12); background: var(--color-bg-secondary);
+                  padding: var(--space-8); }
+.bt-matrix { width: auto; }
+/* Headers on the panel take tertiary text (secondary fails AA here – see the ratio baked in the table below). */
+.bt-matrix th { color: var(--color-text-tertiary); }
+.bt-matrix th, .bt-matrix td { padding: var(--space-6) var(--space-8) var(--space-6) 0; border-bottom-color: var(--color-border-default); }
+.bt-matrix th[scope="row"] { font-family: var(--font-mono); font-size: var(--ds-text-small); text-transform: none;
+                             letter-spacing: normal; color: var(--color-text-tertiary); white-space: nowrap; }
 
-.dialog-btn-secondary {
-  background-color: transparent;
-  color: var(--dialog-text-secondary);
-  border: var(--border-width) solid var(--dialog-border);
+/* The pairing row. */
+.bt-pair, .bt-pair__pic { display: flex; align-items: flex-start; gap: var(--space-4); }
+.bt-pair + .bt-pair { margin-top: var(--space-8); }
+.bt-field {
+  box-sizing: border-box;
+  inline-size: calc(var(--space-24) * 4);
+  padding: 0 var(--space-6);
+  display: flex; align-items: center;
+  background: var(--color-bg-input);
+  border: var(--border-width) solid var(--color-border-input);
+  color: var(--color-text-placeholder);
+  font-size: var(--text-base);
 }
-.dialog-btn-secondary:hover { background-color: var(--dialog-btn-secondary-bg); border-color: var(--color-gray-700); }
+.bt-field--sm { block-size: var(--input-height-sm); }
+.bt-field--md { block-size: var(--input-height-md); }
+.bt-pair__note { align-self: center; font-size: var(--ds-text-small); color: var(--color-text-tertiary); }
+.bt-pair--bad .erf-button { outline: var(--border-width) dashed var(--color-error); outline-offset: 0; }
 
-.dialog-btn:disabled { opacity: var(--opacity-disabled); cursor: not-allowed; box-shadow: none; }
-/* ===================== end verbatim ===================== */
+/* The blocked-primary frame: a field, its hint, and the dialog's buttons. */
+.bt-blocked { align-items: flex-end; justify-content: space-between; }
+.bt-blocked__field { display: flex; flex-direction: column; gap: var(--space-2); }
+.bt-blocked__label { font-size: var(--text-base); color: var(--color-text-primary); }
+.bt-blocked__hint { /* mockup: app scale */ font-size: var(--text-sm); color: var(--color-text-tertiary); }
+.bt-blocked__actions { display: flex; gap: var(--space-4); }
 
-.bar { display: flex; gap: var(--space-8); align-items: center; flex-wrap: wrap;
-       padding: var(--space-12); background: var(--color-bg-secondary); margin-bottom: var(--space-12); }
-.bar-label { width: 120px; font-family: var(--font-mono); font-size: var(--text-sm);
-             color: var(--color-text-tertiary); }
+/* The open menu-button frame: the menu hangs under its button. */
+.bt-menu-open { min-block-size: calc(var(--space-24) * 6); align-items: flex-start; }
+.bt-menu-anchor { position: relative; }
+.bt-menu { position: absolute; inset-block-start: calc(100% + var(--space-1)); inset-inline-start: 0; min-inline-size: max-content; }
 </style>
 </head>
 <body>
-
+<nav class="ds-crumbs" aria-label="Breadcrumb"><a href="../../../index.html">Erfana design system</a> <span aria-hidden="true">/</span> <a href="../../../index.html#components">Components</a> <span aria-hidden="true">/</span> <span aria-current="page">Buttons</span></nav>
+<main>
 <h1>Buttons</h1>
+<p class="ds-meta"><span class="ds-status" data-status="proposed">proposed</span> reviewed 2026-08-31</p>
+<p class="ds-lede" id="decision">
+  One button component, <code>.erf-button</code> in <a href="button.css">button.css</a>, in seven variants. Its
+  height is a <code>--btn-height-*</code> token, its focus is the one ring, a hover changes the fill and never moves
+  the button, and every state – disabled and busy included – reads without colour alone. The dialog buttons that
+  ship today are drawn further down as an illustration of what this replaces.
+</p>
 <p class="ds-lede">
-  Three variants. Hover and click them — the states are the real ones, not screenshots.
+  <strong>Disabled dims the content, never the button.</strong> The label and icon fade and the fill fades with
+  them, but the focus ring keeps full strength – the rule the Permission band and the comment window already ship.
+  A button that cannot run yet because a field is empty is <em>blocked</em>: the same disabled look on
+  <code>aria-disabled</code>, still in the tab order, never a third style.
 </p>
 
 <div class="ds-note">
   <strong>The primary button's label is near-black, not white.</strong> The brand violet is a light
-  tint, so white on it measures <span data-claim="contrast-primary-white"></span>:1 and fails WCAG
+  tint, so white on it measures <span data-claim="contrast-primary-white" title="--color-white on --color-btn-primary-bg, the historical label">2.20</span>:1 and fails WCAG
   1.4.3. <code>--color-btn-primary-text</code> (brand black) on the same violet measures
-  <span data-claim="contrast-primary-label"></span>:1, and
-  <span data-claim="contrast-primary-label-hover"></span>:1 on hover.
+  <span data-claim="contrast-primary-label" title="--color-btn-primary-text on --color-btn-primary-bg">8.39</span>:1, and
+  <span data-claim="contrast-primary-label-hover" title="--color-btn-primary-text on --color-btn-primary-hover">6.84</span>:1 on hover.
   <br><br>
   This holds for <em>every</em> violet fill, not only dialog buttons. The editor's Save button, the
   view-mode toggles, the welcome screen's action and the diagram chat buttons all shipped a white label
   until #231, because only <code>Dialog.css</code> was guarded. Now
-  <code>accentFill.contrast.test.ts</code> scans every renderer stylesheet — if you draw a violet
+  <code>accentFill.contrast.test.ts</code> scans every renderer stylesheet – if you draw a violet
   button with a white label in a design, the test will reject the implementation.
 </div>
 
-<h2>Variants</h2>
-
-<div class="bar">
-  <span class="bar-label">resting</span>
-  <button class="dialog-btn dialog-btn-primary">Confirm</button>
-  <button class="dialog-btn dialog-btn-secondary">Cancel</button>
-  <button class="dialog-btn dialog-btn-danger">Delete</button>
+<h2 id="variants">Live</h2>
+<p class="ds-muted">Real buttons with the proposed CSS. Hover, press and tab through them.</p>
+<div class="bt-bar">
+  <button type="button" class="erf-button erf-button--primary"><span>Save</span></button>
+  <button type="button" class="erf-button erf-button--secondary"><span>Cancel</span></button>
+  <button type="button" class="erf-button erf-button--danger"><span>Delete file</span></button>
+  <button type="button" class="erf-button erf-button--ghost"><span>Open folder</span></button>
+  <button type="button" class="erf-button erf-button--icon" aria-label="Close preview"><svg data-icon="x" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+  <button type="button" class="erf-button erf-button--toggle" aria-pressed="true"><span>Wrap</span></button>
+  <button type="button" class="erf-button erf-button--text"><span>Show more</span></button>
 </div>
 
-<div class="bar">
-  <span class="bar-label">disabled</span>
-  <button class="dialog-btn dialog-btn-primary" disabled>Confirm</button>
-  <button class="dialog-btn dialog-btn-secondary" disabled>Cancel</button>
-  <button class="dialog-btn dialog-btn-danger" disabled>Delete</button>
+<h2 id="states">Every state</h2>
+<p class="ds-muted">
+  Each cell is a static picture of one state, forced with a <code>.is-hover</code>, <code>.is-active</code> or
+  <code>.is-focus</code> hook that the CSS writes beside the real pseudo-class –
+  <code>:is(:hover, .is-hover)</code> – so the picture and the live button cannot disagree. Disabled uses the real
+  <code>disabled</code> attribute; busy uses <code>aria-busy="true"</code> with <code>aria-disabled="true"</code>. Every
+  label sits in its own <code>&lt;span&gt;</code>: the disabled rule dims child elements, and a bare text node is not one.
+</p>
+<div class="bt-matrix-wrap">
+<table class="bt-matrix">
+  <thead><tr><th>Variant</th><th>Resting</th><th>Hover</th><th>Active</th><th>Focus-visible</th><th>Disabled</th><th>Busy</th></tr></thead>
+  <tbody>
+    <tr><th scope="row">primary</th>
+      <td inert><button type="button" class="erf-button erf-button--primary"><span>Save</span></button></td>
+      <td inert><button type="button" class="erf-button erf-button--primary is-hover"><span>Save</span></button></td>
+      <td inert><button type="button" class="erf-button erf-button--primary is-active"><span>Save</span></button></td>
+      <td inert><button type="button" class="erf-button erf-button--primary is-focus"><span>Save</span></button></td>
+      <td inert><button type="button" class="erf-button erf-button--primary" disabled><span>Save</span></button></td>
+      <td inert><button type="button" class="erf-button erf-button--primary" aria-busy="true" aria-disabled="true"><span>Saving…</span></button></td></tr>
+    <tr><th scope="row">secondary</th>
+      <td inert><button type="button" class="erf-button erf-button--secondary"><span>Check</span></button></td>
+      <td inert><button type="button" class="erf-button erf-button--secondary is-hover"><span>Check</span></button></td>
+      <td inert><button type="button" class="erf-button erf-button--secondary is-active"><span>Check</span></button></td>
+      <td inert><button type="button" class="erf-button erf-button--secondary is-focus"><span>Check</span></button></td>
+      <td inert><button type="button" class="erf-button erf-button--secondary" disabled><span>Check</span></button></td>
+      <td inert><button type="button" class="erf-button erf-button--secondary" aria-busy="true" aria-disabled="true"><span>Checking…</span></button></td></tr>
+    <tr><th scope="row">danger</th>
+      <td inert><button type="button" class="erf-button erf-button--danger"><span>Delete</span></button></td>
+      <td inert><button type="button" class="erf-button erf-button--danger is-hover"><span>Delete</span></button></td>
+      <td inert><button type="button" class="erf-button erf-button--danger is-active"><span>Delete</span></button></td>
+      <td inert><button type="button" class="erf-button erf-button--danger is-focus"><span>Delete</span></button></td>
+      <td inert><button type="button" class="erf-button erf-button--danger" disabled><span>Delete</span></button></td>
+      <td inert><button type="button" class="erf-button erf-button--danger" aria-busy="true" aria-disabled="true"><span>Deleting…</span></button></td></tr>
+    <tr><th scope="row">ghost</th>
+      <td inert><button type="button" class="erf-button erf-button--ghost"><span>Open</span></button></td>
+      <td inert><button type="button" class="erf-button erf-button--ghost is-hover"><span>Open</span></button></td>
+      <td inert><button type="button" class="erf-button erf-button--ghost is-active"><span>Open</span></button></td>
+      <td inert><button type="button" class="erf-button erf-button--ghost is-focus"><span>Open</span></button></td>
+      <td inert><button type="button" class="erf-button erf-button--ghost" disabled><span>Open</span></button></td>
+      <td inert><button type="button" class="erf-button erf-button--ghost" aria-busy="true" aria-disabled="true"><span>Opening…</span></button></td></tr>
+    <tr><th scope="row">icon-only 24 × 24</th>
+      <td inert><button type="button" class="erf-button erf-button--icon" aria-label="Close"><svg data-icon="x" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></td>
+      <td inert><button type="button" class="erf-button erf-button--icon is-hover" aria-label="Close"><svg data-icon="x" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></td>
+      <td inert><button type="button" class="erf-button erf-button--icon is-active" aria-label="Close"><svg data-icon="x" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></td>
+      <td inert><button type="button" class="erf-button erf-button--icon is-focus" aria-label="Close"><svg data-icon="x" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></td>
+      <td inert><button type="button" class="erf-button erf-button--icon" aria-label="Close" disabled><svg data-icon="x" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></td>
+      <td><span class="ds-na">– an icon-only button never goes busy; its surface shows progress</span></td></tr>
+    <tr><th scope="row">toggle, aria-pressed</th>
+      <td inert><button type="button" class="erf-button erf-button--toggle" aria-pressed="false"><span>Wrap</span></button> <button type="button" class="erf-button erf-button--toggle" aria-pressed="true"><span>Wrap</span></button></td>
+      <td inert><button type="button" class="erf-button erf-button--toggle is-hover" aria-pressed="false"><span>Wrap</span></button> <button type="button" class="erf-button erf-button--toggle is-hover" aria-pressed="true"><span>Wrap</span></button></td>
+      <td inert><button type="button" class="erf-button erf-button--toggle is-active" aria-pressed="true"><span>Wrap</span></button></td>
+      <td inert><button type="button" class="erf-button erf-button--toggle is-focus" aria-pressed="false"><span>Wrap</span></button> <button type="button" class="erf-button erf-button--toggle is-focus" aria-pressed="true"><span>Wrap</span></button></td>
+      <td inert><button type="button" class="erf-button erf-button--toggle" aria-pressed="true" disabled><span>Wrap</span></button></td>
+      <td><span class="ds-na">– a toggle flips at once</span></td></tr>
+    <tr><th scope="row">text</th>
+      <td inert><button type="button" class="erf-button erf-button--text"><span>Load more</span></button></td>
+      <td inert><button type="button" class="erf-button erf-button--text is-hover"><span>Load more</span></button></td>
+      <td inert><button type="button" class="erf-button erf-button--text is-active"><span>Load more</span></button></td>
+      <td inert><button type="button" class="erf-button erf-button--text is-focus"><span>Load more</span></button></td>
+      <td inert><button type="button" class="erf-button erf-button--text" disabled><span>Load more</span></button></td>
+      <td inert><button type="button" class="erf-button erf-button--text" aria-busy="true" aria-disabled="true"><span>Loading…</span></button></td></tr>
+  </tbody>
+</table>
 </div>
 
-<div class="bar">
-  <span class="bar-label">focus ring</span>
-  <button class="dialog-btn dialog-btn-primary" id="focusme">Tab to me</button>
-  <span style="font-size: var(--text-sm); color: var(--color-text-secondary)">
-    2px solid violet, offset 2px. Never remove it.
+<table>
+  <thead><tr><th>State</th><th>How it reads without colour</th></tr></thead>
+  <tbody>
+    <tr><td>Hover</td><td>A fill appears or steps; the button never moves, so the pointer target never shifts under the cursor.</td></tr>
+    <tr><td>Focus-visible</td><td>The one ring: <code>--border-width-thick</code> of <code>--color-border-focus</code>, offset <code>--space-1</code>. Keyboard only – never after a mouse click.</td></tr>
+    <tr><td>Toggle pressed (on)</td><td>A fill <em>and</em> a lime bottom edge, and <code>aria-pressed="true"</code> for assistive tech. The label never changes when it is pressed – the state is the attribute, not the words.</td></tr>
+    <tr><td>Radio checked (one of many)</td><td>A fill and a brighter glyph, with no lime foot, and <code>aria-checked="true"</code>. Exactly one in the group is ever checked, so the reader compares it with its neighbours; the missing foot keeps it from reading as “on” beside a real toggle (<a href="../toolbar/index.html#view-modes">Toolbar – View modes beside toggles</a>).</td></tr>
+    <tr><td>Disabled</td><td>The label and icon take <code>--opacity-disabled</code>, the fill and edge are mixed towards transparent by the same amount, the cursor is not-allowed, and hover does nothing. The button itself is never given <code>opacity</code>, so a focus ring on an <code>aria-disabled</code> button keeps full strength. WCAG 1.4.3 exempts the label from contrast; it is still drawn legibly. Prefer explaining why nearby over a silent disabled button.</td></tr>
+    <tr><td>Blocked</td><td>The disabled look on <code>aria-disabled="true"</code> – never <code>disabled</code>, never a third style – because a required field is empty. It stays in the tab order and names what is missing through <code>aria-describedby</code>. <kbd>Enter</kbd> and click do nothing.</td></tr>
+    <tr><td>Busy</td><td>A spinner plus the <em>-ing</em> form of the button's verb, with an ellipsis: Save becomes “Saving…”, Check becomes “Checking…”, Load more becomes “Loading…”. <code>aria-busy="true"</code> and <code>aria-disabled="true"</code>, not <code>disabled</code>, so focus stays on the button instead of falling to <code>&lt;body&gt;</code>. The result is announced by the surface's live region, not by the button. <strong>The <code>::before</code> ring is the only busy spinner</strong>: feature CSS never adds a second one – no icon, no pseudo-element, no <code>.erf-progress</code> inside the button.</td></tr>
+  </tbody>
+</table>
+
+<h3 id="blocked">Focus on a disabled and on a blocked button</h3>
+<p class="ds-muted">A native <code>disabled</code> button never holds focus, so these two are the cases that need the
+ring: <code>aria-disabled</code> buttons the keyboard can still reach. In both the content is dimmed and the ring is not.</p>
+<div class="ds-frames">
+  <figure class="ds-frame">
+    <div class="bt-bar" inert aria-hidden="true">
+      <button type="button" class="erf-button erf-button--icon is-focus" aria-disabled="true" aria-label="Back"><svg data-icon="arrow-left" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg></button>
+      <button type="button" class="erf-button erf-button--icon" aria-label="Forward"><svg data-icon="arrow-right" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></button>
+      <button type="button" class="erf-button erf-button--secondary is-focus" aria-disabled="true"><span>Open in source</span></button>
+    </div>
+    <figcaption><strong>Disabled, focused</strong> – Back with nowhere to go, parked on by the panel after a move (the Permission band's case), and a secondary button. The glyph and label are dim; the ring is the full one ring.</figcaption>
+  </figure>
+  <figure class="ds-frame">
+    <div class="bt-bar bt-blocked" inert aria-hidden="true">
+      <span class="bt-blocked__field"><span class="bt-blocked__label">Name</span><span class="bt-field bt-field--md"></span><span class="bt-blocked__hint">Enter a name to save.</span></span>
+      <span class="bt-blocked__actions">
+        <button type="button" class="erf-button erf-button--secondary"><span>Cancel</span></button>
+        <button type="button" class="erf-button erf-button--primary is-focus" aria-disabled="true"><span>Save</span></button>
+      </span>
+    </div>
+    <figcaption><strong>Blocked primary, focused (proposed)</strong> – Save waits for a name. It is the disabled look on <code>aria-disabled="true"</code>, with <code>aria-describedby</code> pointing at the hint, so a listener hears “Save, dimmed, Enter a name to save.” The ring is full strength on the dimmed fill.</figcaption>
+  </figure>
+</div>
+
+<h3 id="contrast">Contrast, per variant</h3>
+<table>
+  <thead><tr><th>Variant · state</th><th>Pair</th><th>Ratio (4.5:1 for the label)</th></tr></thead>
+  <tbody>
+    <tr><td>primary · resting</td><td><code>--color-btn-primary-text</code> on <code>--color-btn-primary-bg</code></td><td data-contrast="--color-btn-primary-text on --color-btn-primary-bg" data-min="4.5" data-result="pass">8.39:1 · pass</td></tr>
+    <tr><td>primary · active</td><td><code>--color-btn-primary-text</code> on <code>--color-btn-primary-active</code></td><td data-contrast="--color-btn-primary-text on --color-btn-primary-active" data-min="4.5" data-result="pass">5.54:1 · pass</td></tr>
+    <tr><td>danger · resting</td><td><code>--color-white</code> on <code>--color-btn-danger-bg</code></td><td data-contrast="--color-white on --color-btn-danger-bg" data-min="4.5" data-result="pass">5.48:1 · pass</td></tr>
+    <tr><td>danger · hover, active</td><td><code>--color-white</code> on <code>--color-btn-danger-hover</code></td><td data-contrast="--color-white on --color-btn-danger-hover" data-min="4.5" data-result="pass">6.80:1 · pass</td></tr>
+    <tr><td>secondary · resting</td><td><code>--color-text-primary</code> on <code>--color-bg-secondary</code></td><td data-contrast="--color-text-primary on --color-bg-secondary" data-min="4.5" data-result="pass">8.54:1 · pass</td></tr>
+    <tr><td>secondary · hover</td><td><code>--color-text-bright</code> on <code>--color-btn-secondary-bg</code></td><td data-contrast="--color-text-bright on --color-btn-secondary-bg" data-min="4.5" data-result="pass">8.35:1 · pass</td></tr>
+    <tr><td>secondary · active</td><td><code>--color-text-bright</code> on <code>--color-btn-secondary-hover</code></td><td data-contrast="--color-text-bright on --color-btn-secondary-hover" data-min="4.5" data-result="pass">6.10:1 · pass</td></tr>
+    <tr><td>ghost · hover</td><td><code>--color-text-bright</code> on <code>--color-bg-hover</code> over a panel</td><td data-contrast="--color-text-bright on --color-bg-hover over --color-bg-secondary" data-min="4.5" data-result="pass">8.92:1 · pass</td></tr>
+    <tr><td>icon-only · resting (a glyph, 3:1)</td><td><code>--color-text-secondary</code> on <code>--color-bg-secondary</code></td><td data-contrast="--color-text-secondary on --color-bg-secondary" data-min="3" data-result="pass">3.72:1 · pass</td></tr>
+    <tr><td>toggle · resting, on a panel</td><td><code>--color-text-tertiary</code> on <code>--color-bg-secondary</code></td><td data-contrast="--color-text-tertiary on --color-bg-secondary" data-min="4.5" data-result="pass">6.33:1 · pass</td></tr>
+    <tr><td>toggle · resting, on a sidebar or strip</td><td><code>--color-text-tertiary</code> on <code>--color-bg-tertiary</code></td><td data-contrast="--color-text-tertiary on --color-bg-tertiary" data-min="4.5" data-result="pass">7.06:1 · pass</td></tr>
+    <tr><td>toggle · pressed</td><td><code>--color-text-bright</code> on <code>--color-bg-selected</code> over a panel</td><td data-contrast="--color-text-bright on --color-bg-selected over --color-bg-secondary" data-min="4.5" data-result="pass">7.04:1 · pass</td></tr>
+    <tr><td>toggle · pressed edge (3:1)</td><td><code>--color-brand-lime</code> on <code>--color-bg-secondary</code></td><td data-contrast="--color-brand-lime on --color-bg-secondary" data-min="3" data-result="pass">10.35:1 · pass</td></tr>
+    <tr><td>text</td><td><code>--color-link</code> on <code>--color-bg-secondary</code></td><td data-contrast="--color-link on --color-bg-secondary" data-min="4.5" data-result="pass">6.23:1 · pass</td></tr>
+    <tr><td>toggle · radio checked, glyph (3:1)</td><td><code>--color-text-bright</code> on <code>--color-bg-selected</code> over a panel</td><td data-contrast="--color-text-bright on --color-bg-selected over --color-bg-secondary" data-min="3" data-result="pass">7.04:1 · pass</td></tr>
+    <tr><td>menu button · open</td><td><code>--color-text-bright</code> on <code>--color-bg-hover-solid</code></td><td data-contrast="--color-text-bright on --color-bg-hover-solid" data-min="4.5" data-result="pass">10.51:1 · pass</td></tr>
+    <tr><td>menu button · caret, resting (3:1)</td><td><code>--color-text-tertiary</code> on <code>--color-bg-secondary</code></td><td data-contrast="--color-text-tertiary on --color-bg-secondary" data-min="3" data-result="pass">6.33:1 · pass</td></tr>
+    <tr><td>focus ring on a disabled or blocked button (3:1) – undimmed, so the same as any ring</td><td><code>--color-border-focus</code> on <code>--color-bg-secondary</code></td><td data-contrast="--color-border-focus on --color-bg-secondary" data-min="3" data-result="pass">6.23:1 · pass</td></tr>
+    <tr><td>focus ring (3:1)</td><td><code>--color-border-focus</code> on <code>--color-bg-secondary</code></td><td data-contrast="--color-border-focus on --color-bg-secondary" data-min="3" data-result="pass">6.23:1 · pass</td></tr>
+  </tbody>
+</table>
+
+<h2 id="menu-button">Menu button</h2>
+<p class="ds-muted">
+  A button that opens a <a href="../menu/index.html">Menu</a>: <code>.erf-button--menu</code> on top of a variant, a
+  label, then a <code>chevron-down</code> caret (<code>.erf-button__caret</code>). It carries
+  <code>aria-haspopup="menu"</code> and <code>aria-expanded</code>; while the menu is open the button keeps the hover
+  fill and the caret turns over. Both only repeat <code>aria-expanded</code>. The More button in a toolbar is the
+  icon-only form: no caret, an <code>aria-label</code>.
+</p>
+<div class="ds-frames">
+  <figure class="ds-frame">
+    <div class="bt-bar" inert aria-hidden="true">
+      <button type="button" class="erf-button erf-button--secondary erf-button--menu" aria-haspopup="menu" aria-expanded="false"><span>Export</span><svg class="erf-button__caret" data-icon="chevron-down" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
+      <button type="button" class="erf-button erf-button--ghost erf-button--menu" aria-haspopup="menu" aria-expanded="false"><span>Sort by name</span><svg class="erf-button__caret" data-icon="chevron-down" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
+    </div>
+    <figcaption><strong>Closed</strong> – secondary and ghost. <code>aria-expanded="false"</code>.</figcaption>
+  </figure>
+  <figure class="ds-frame">
+    <div class="bt-bar bt-menu-open" inert aria-hidden="true">
+      <span class="bt-menu-anchor">
+        <button type="button" class="erf-button erf-button--secondary erf-button--menu" aria-haspopup="menu" aria-expanded="true"><span>Export</span><svg class="erf-button__caret" data-icon="chevron-down" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
+        <span class="erf-menu bt-menu">
+          <span class="erf-menu-item erf-menu-item--active"><span class="erf-menu-label">PDF</span></span>
+          <span class="erf-menu-item"><span class="erf-menu-label">Word document</span></span>
+          <span class="erf-menu-item"><span class="erf-menu-label">Image</span></span>
+        </span>
+      </span>
+    </div>
+    <figcaption><strong>Open</strong> – the fill stays and the caret turns over; focus is in the menu, on its first item. <kbd>Esc</kbd> closes it and returns focus to the button.</figcaption>
+  </figure>
+  <figure class="ds-frame">
+    <div class="bt-bar" inert aria-hidden="true">
+      <button type="button" class="erf-button erf-button--secondary erf-button--menu is-focus" aria-haspopup="menu" aria-expanded="false"><span>Export</span><svg class="erf-button__caret" data-icon="chevron-down" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
+    </div>
+    <figcaption><strong>Focused</strong> – the one ring. <kbd>Enter</kbd>, <kbd>Space</kbd> or <kbd>↓</kbd> opens the menu on its first item; <kbd>↑</kbd> opens it on its last.</figcaption>
+  </figure>
+</div>
+
+<h2 id="heights">Heights</h2>
+<p class="ds-muted">The button scale. <code>--btn-height-sm</code> sits exactly on the 24 × 24 target floor
+(WCAG 2.2 SC 2.5.8), so nothing clickable is smaller. Pick a height by where the button sits, never by how
+important it is – importance is the variant. A tool in a toolbar takes the toolbar's proposed tool height instead
+(<a href="../toolbar/index.html#tool-height">Toolbar – Tool height</a>).</p>
+<table class="ds-tokens">
+<thead><tr><th>Token</th><th>Value</th><th>Sample</th><th>Use</th></tr></thead>
+<tbody>
+  <tr><td><code>--btn-height-sm</code></td><td><code data-token="--btn-height-sm">24px</code></td><td><div class="bt-size-box" style="block-size: var(--btn-height-sm)"></div></td><td>Toolbars, tree rows, icon-only – exactly the 24px WCAG target minimum</td></tr>
+  <tr><td><code>--btn-height-md</code></td><td><code data-token="--btn-height-md">32px</code></td><td><div class="bt-size-box" style="block-size: var(--btn-height-md)"></div></td><td>Default – dialogs, panels, settings</td></tr>
+  <tr><td><code>--btn-height-lg</code></td><td><code data-token="--btn-height-lg">40px</code></td><td><div class="bt-size-box" style="block-size: var(--btn-height-lg)"></div></td><td>A lone call to action – the welcome screen</td></tr>
+</tbody>
+</table>
+
+<div class="bt-bar">
+  <span class="bt-bar__label">sizes</span>
+  <span inert class="bt-bar" style="padding: 0; margin: 0; background: transparent">
+    <button type="button" class="erf-button erf-button--primary erf-button--sm"><span>Small</span></button>
+    <button type="button" class="erf-button erf-button--primary"><span>Medium</span></button>
+    <button type="button" class="erf-button erf-button--primary erf-button--lg"><span>Large</span></button>
+    <button type="button" class="erf-button erf-button--secondary erf-button--sm"><span>Small</span></button>
+    <button type="button" class="erf-button erf-button--secondary"><span>Medium</span></button>
+    <button type="button" class="erf-button erf-button--secondary erf-button--lg"><span>Large</span></button>
   </span>
 </div>
 
-<h2>Order and wording</h2>
+<h2 id="pairing">Beside a field</h2>
+<p class="ds-muted">
+  The button scale (24/32/40) and the field scale (28/36/44) do not pair, so a button beside a field never lines
+  up – the README lists it as a defect. Until the two scales are reconciled, a button that sits on the same row as
+  a field takes the <strong>field's</strong> height with <code>.erf-button--field-sm|md|lg</code>.
+</p>
+<div class="bt-bar" style="display: block">
+  <div class="bt-pair bt-pair--bad">
+    <span class="bt-pair__pic" inert><span class="bt-field bt-field--md">my-notes</span>
+    <button type="button" class="erf-button erf-button--secondary"><span>Browse</span></button></span>
+    <span class="bt-pair__note">Wrong: <code>--input-height-md</code> beside <code>--btn-height-md</code> – the bottom edges miss by a <code>--space-2</code>.</span>
+  </div>
+  <div class="bt-pair">
+    <span class="bt-pair__pic" inert><span class="bt-field bt-field--md">my-notes</span>
+    <button type="button" class="erf-button erf-button--secondary erf-button--field-md"><span>Browse</span></button></span>
+    <span class="bt-pair__note">Right: <code>.erf-button--field-md</code> – one height, both edges on one line.</span>
+  </div>
+  <div class="bt-pair">
+    <span class="bt-pair__pic" inert><span class="bt-field bt-field--sm">Find</span>
+    <button type="button" class="erf-button erf-button--icon erf-button--field-sm" style="inline-size: var(--input-height-sm)" aria-label="Next match"><svg data-icon="arrow-down" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></button></span>
+    <span class="bt-pair__note">Dense chrome: an icon button beside a find field goes square at <code>--input-height-sm</code>.</span>
+  </div>
+</div>
+
+<h2 id="order">Order and wording</h2>
 <div class="ds-note">
   <strong>Destructive action on the right, cancel on its left.</strong> The label says what will
-  happen — "Delete file", not "OK". A button that cannot be undone never gets keyboard focus by
+  happen – “Delete file”, not “OK”. A button that cannot be undone never gets keyboard focus by
   default, so pressing Return twice cannot trigger it.
 </div>
 
-<div class="bar" style="justify-content: flex-end">
-  <button class="dialog-btn dialog-btn-secondary">Cancel</button>
-  <button class="dialog-btn dialog-btn-danger">Delete file</button>
+<div class="bt-bar" style="justify-content: flex-end">
+  <button type="button" class="erf-button erf-button--secondary"><span>Cancel</span></button>
+  <button type="button" class="erf-button erf-button--danger"><span>Delete file</span></button>
 </div>
 
 <div class="ds-note">
   <strong>Proposed: the same rule, inline.</strong> The comment window confirms a delete in place, inside the
   message, rather than in a second dialog – Cancel first and focused, the destructive button on the right, a label
   that says what goes (“Delete comment”, “Delete thread”, “Delete block”). See the proposed
-  <a href="../../../product/html-comments/window.html">Comment window</a> card.
+  <a href="../../../../designs/comments/html-comments/window.html">Comment window</a> screen.
 </div>
 
+<h2 id="keyboard">The keyboard contract</h2>
+<table class="ds-keys">
+  <thead><tr><th>Key</th><th>Result</th><th>Focus ends on</th></tr></thead>
+  <tbody>
+    <tr><td><kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd></td><td>Moves to the next or previous button. A <code>disabled</code> button is skipped; a busy, blocked or <code>aria-disabled</code> one is not.</td><td>That button, with the ring</td></tr>
+    <tr><td><kbd>Enter</kbd> or <kbd>Space</kbd></td><td>Activates it. On a toggle, flips <code>aria-pressed</code>.</td><td>The same button – unless the action closes its surface, then the control that opened it</td></tr>
+    <tr><td><kbd>Enter</kbd> in a dialog field</td><td>Activates the primary button, never the danger one – and nothing while the primary is blocked</td><td>Wherever the action sends it; on a blocked primary, the field</td></tr>
+    <tr><td><kbd>Enter</kbd>, <kbd>Space</kbd> or <kbd>↓</kbd> on a menu button</td><td>Opens the menu; <code>aria-expanded</code> becomes true. <kbd>↑</kbd> opens it too.</td><td>The menu's first item (its last, after <kbd>↑</kbd>)</td></tr>
+    <tr><td><kbd>Esc</kbd> in a menu a button opened</td><td>Closes it; <code>aria-expanded</code> becomes false</td><td>The menu button</td></tr>
+    <tr><td><kbd>Tab</kbd> onto an <code>aria-disabled</code> or blocked button</td><td>Reached, not skipped. <kbd>Enter</kbd> and <kbd>Space</kbd> do nothing.</td><td>That button, with the full ring</td></tr>
+  </tbody>
+</table>
+<p class="ds-muted">These are native <code>&lt;button&gt;</code> behaviours: use the element and the contract comes free. A
+<code>&lt;div role="button"&gt;</code> has to re-implement every row.</p>
+
+<h2 id="shipping">What ships today: the dialog buttons</h2>
+<p class="ds-muted">
+  An illustration, mirroring the <code>.dialog-btn</code> rules in <code>Dialog.css</code> by hand so the card can
+  show what <code>.erf-button</code> replaces. Hover the primary one: it lifts by a pixel and grows a shadow. Hover
+  Cancel: its border changes to the colour it already has.
+</p>
+<div class="bt-bar bt-bar--primary bt-dialog-mirror">
+  <span class="bt-bar__label">resting</span>
+  <button type="button" class="dialog-btn dialog-btn-primary">Confirm</button>
+  <button type="button" class="dialog-btn dialog-btn-secondary">Cancel</button>
+  <button type="button" class="dialog-btn dialog-btn-danger">Delete</button>
+</div>
+<div class="bt-bar bt-bar--primary bt-dialog-mirror">
+  <span class="bt-bar__label">disabled</span>
+  <button type="button" class="dialog-btn dialog-btn-primary" disabled>Confirm</button>
+  <button type="button" class="dialog-btn dialog-btn-secondary" disabled>Cancel</button>
+  <button type="button" class="dialog-btn dialog-btn-danger" disabled>Delete</button>
+</div>
+
+<section id="open-defects">
+<h2>Open defects this card names</h2>
+<p class="ds-muted">Departures in the shipping dialog buttons (<code>src/renderer/src/components/Dialog/Dialog.css</code>). None is
+marked at the site, so none is an exception; each stays here until <code>.erf-button</code> is adopted (the adoption is
+deferred).</p>
+<ul class="ds-muted">
+  <li><strong>A height from padding.</strong> The button is about 37px tall: <code>--space-5</code> padding around a
+  <code>--text-md</code> line, not a <code>--btn-height-*</code> token. It matches neither the button scale nor the field scale.</li>
+  <li><strong>Hover moves the button.</strong> Primary and danger hover lift by <code>translateY(-1px)</code> and change the
+  shadow, with no reduced-motion guard.</li>
+  <li><strong>A tracking literal.</strong> <code>letter-spacing: 0.2px</code> – the only tracking literal on a control.</li>
+  <li><strong>A hover that changes nothing.</strong> Secondary hover sets <code>border-color: var(--color-gray-700)</code>, the
+  value <code>--color-border-subtle</code> already resolves to. <code>--dialog-btn-secondary-hover</code> is declared and never read.</li>
+  <li><strong><code>transition: all</code></strong> – animates every property, including ones that should snap.</li>
+  <li><strong>Disabled dims the whole button.</strong> <code>.dialog-btn:disabled</code> and the Markdown toolbar's
+  <code>.toolbar-btn:disabled</code> set <code>opacity</code> on the button. Harmless while they use native <code>disabled</code>
+  (it cannot hold focus); a defect the moment either moves to <code>aria-disabled</code>. The comment window already
+  overrides it for its own buttons (<code>CommentWindow.css</code>).</li>
+</ul>
+<p class="ds-muted">Tooltip-related – a name or a description that lives only in <code>title</code>, which is not shown on
+keyboard focus and is not reliably read (the <a href="../tooltip/index.html">Tooltip</a> card's rule):</p>
+<ul class="ds-muted">
+  <li><strong>The comment tools describe themselves in <code>title</code></strong> –
+  <code>HtmlPreviewPanel/comments/CommentToolbarTools.tsx</code>: the mode button, the list button (including the reason
+  it is unavailable) and the pins toggle.</li>
+  <li><strong>The context meter's detail is a <code>title</code></strong> – <code>TerminalPanel/components/ClaudeStatusBar.tsx:118</code>
+  puts the whole tooltip on the status bar's container.</li>
+</ul>
+</section>
+
+<h2 id="tokens">Tokens</h2>
+<table class="ds-tokens">
+  <thead><tr><th>Token</th><th>Value</th><th>Used for</th></tr></thead>
+  <tbody>
+    <tr><td><code>--opacity-disabled</code></td><td><code data-token="--opacity-disabled">0.4</code></td><td>The dim on a disabled button's content, and the mix on its fill</td></tr>
+    <tr><td><code>--btn-height-sm</code></td><td><code data-token="--btn-height-sm">24px</code></td><td>Small and icon-only buttons</td></tr>
+    <tr><td><code>--btn-height-md</code></td><td><code data-token="--btn-height-md">32px</code></td><td>The default height</td></tr>
+    <tr><td><code>--btn-height-lg</code></td><td><code data-token="--btn-height-lg">40px</code></td><td>A lone call to action</td></tr>
+    <tr><td><code>--icon-size-xs</code></td><td><code data-token="--icon-size-xs">12px</code></td><td>The busy spinner and the menu caret</td></tr>
+    <tr><td><code>--color-btn-primary-bg</code></td><td><code data-token="--color-btn-primary-bg">#A0A8FF</code></td><td>Primary fill</td></tr>
+    <tr><td><code>--color-btn-danger-bg</code></td><td><code data-token="--color-btn-danger-bg">#c72e0f</code></td><td>Danger fill</td></tr>
+  </tbody>
+</table>
+
+<h2 id="related">Related</h2>
+<ul class="ds-muted">
+  <li><a href="../../foundations/focus.html">Focus</a> (decided) – the one ring every button wears.</li>
+  <li><a href="../menu/index.html">Menu</a> (decided) – what a menu button opens, and its keyboard.</li>
+  <li><a href="../toolbar/index.html">Toolbar</a> – the row icon buttons and toggles sit in, and the proposed tool height.</li>
+  <li><a href="../permission-band/index.html">Permission band</a> (decided) – the shipped source of the “dim the content” rule.</li>
+  <li><a href="../../patterns/dialog/index.html">Dialog</a> – where primary, secondary and danger buttons sit.</li>
+  <li><a href="../../foundations/writing.html">Writing</a> – a verb on every button.</li>
+</ul>
+
+<section id="exceptions">
+<h2>Exceptions</h2>
+<p class="ds-muted">A shipping button that departs from this card carries a <code>deviates:</code> marker at the
+site and gets a row here, naming the file.</p>
+<table>
+  <thead><tr><th>File</th><th>Departure</th><th>Why it is still there</th></tr></thead>
+  <tbody>
+    <tr><td><code>Editor/MarkdownEditorPanel/components/MarkdownToolbar.css</code> (lines 72 and 102)</td><td>The formatting tools (<code>.toolbar-btn</code>) and the view-mode buttons (<code>.view-mode-btn</code>) are 32 × 28: the width is <code>--btn-height-md</code>, the height a <code>28px</code> literal – off the button scale.</td><td>It is the height the Toolbar card proposes for every tool (<a href="../toolbar/index.html#tool-height"><code>--toolbar-tool-height</code></a>). Not yet marked at the site: the marker, or the token, lands with the next change to that file.</td></tr>
+    <tr><td>This card</td><td>The “What ships today” block is mirrored by hand; no drift check holds it to <code>Dialog.css</code>. It is pending with the adoption.</td><td>Drift check pending</td></tr>
+  </tbody>
+</table>
+</section>
+
+</main>
 </body>
 </html>

@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * The listeners one view's comments put on its `webContents`
- * (docs/designs/html-preview-comments.md §4.2, §6 "Frames", §8; M-050): the
+ * (docs/designs/comments/html-preview-comments.md §4.2, §6 "Frames", §8; M-050): the
  * page's signals on the view's own `webContents.ipc`, and the frame a
  * navigation names resolved from its ids – never from the page.
  */

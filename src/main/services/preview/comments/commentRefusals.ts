@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * Why a comment read or write was refused, and the `ErrorCode` each reason
- * reaches the renderer as (docs/designs/html-preview-comments.md §8).
+ * reaches the renderer as (docs/designs/comments/html-preview-comments.md §8).
  *
  * The reason is finer than the code: it goes to the log (with a path digest,
  * never a path, a name or any comment text – §7.6 step 10) and lets a caller

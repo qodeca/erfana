@@ -55,7 +55,7 @@ export type ConfineVerdict =
  * Result of resolving an `erfana-preview://` request to a served body (§2.4).
  * `realPath` is the confined, fully resolved path the body was read from (the
  * step 8h `realpath`) – the key HTML Preview comments use for the file
- * (docs/designs/html-preview-comments.md §4.2).
+ * (docs/designs/comments/html-preview-comments.md §4.2).
  */
 export type PreviewResolveResult =
   | { ok: true; body: Buffer; ext: string; realPath: string }

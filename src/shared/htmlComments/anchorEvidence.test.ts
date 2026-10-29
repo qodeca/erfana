@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * A position match must be corroborated (docs/designs/html-preview-comments.md
+ * A position match must be corroborated (docs/designs/comments/html-preview-comments.md
  * §5.9 step 1, §19 Rev 4; U-089). The X-001 confirmation found that removing a
  * commented element handed its open comment to the next element with the same
  * tag. Every row of the decision table in `anchorEvidence.ts` is pinned here,

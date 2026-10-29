@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * What a pick says (docs/designs/html-preview-comments.md §5.3, §6, §8,
+ * What a pick says (docs/designs/comments/html-preview-comments.md §5.3, §6, §8,
  * decisions 16–17 and 34, §19 R3-5, R3-8; J-007, J-008, SEC-05, SEC-06).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'

@@ -22,7 +22,7 @@
  *
  * Nothing here sleeps; the waits are Playwright polls on a condition.
  *
- * @see docs/designs/design-issue-124-part3.md
+ * @see docs/designs/html-preview/multi-page/design-issue-124-part3.md
  */
 
 import { expect } from '@playwright/test'

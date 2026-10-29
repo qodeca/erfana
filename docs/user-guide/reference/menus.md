@@ -5,7 +5,7 @@ SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 
 # Use menus
 
-The app menu provides window, editing and view commands. Right-click menus act on the tab, tree item or selected text beneath the pointer; unavailable actions are disabled. Every right-click menu also opens from the keyboard: press <kbd>Shift</kbd>+<kbd>F10</kbd> (Windows: also the <kbd>Menu</kbd> key) on the focused tab, tree row, editor, terminal or text field, then use the arrow keys and <kbd>Enter</kbd> – see [keyboard shortcuts](keyboard-shortcuts.md#menus).
+The app menu provides window, editing and view commands. Right-click menus act on the tab, tree item or selected text beneath the pointer; unavailable actions are disabled. Every right-click menu also opens from the keyboard: press <kbd>⇧F10</kbd> / <kbd>Shift+F10</kbd> (Windows: also the <kbd>Menu</kbd> key) on the focused tab, tree row, editor, terminal or text field, then use the arrow keys and <kbd>Enter</kbd> – see [keyboard shortcuts](keyboard-shortcuts.md#menus).
 
 **On this page**
 
@@ -25,7 +25,7 @@ The app menu provides window, editing and view commands. Right-click menus act o
 
 ## File menu
 
-**What it does:** **New Window** opens another Erfana window; on Windows, **Exit** quits the app. **How to reach it:** **File > New Window**, <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>N</kbd> (Windows: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>N</kbd>). A project already open in another window focuses that window.
+**What it does:** **New Window** opens another Erfana window; on Windows, **Exit** quits the app. **How to reach it:** **File > New Window**, <kbd>⇧⌘N</kbd> / <kbd>Ctrl+Shift+N</kbd>. A project already open in another window focuses that window.
 
 ## Edit menu
 
@@ -33,7 +33,7 @@ The app menu provides window, editing and view commands. Right-click menus act o
 
 ## View menu
 
-**What it does:** **Reload** and **Force Reload** redraw the app; **Toggle Developer Tools** opens or closes developer tools; **Actual Size**, **Zoom In**, **Zoom Out** change zoom; **Toggle Full Screen** changes the window display. **How to reach it:** **View**. Zoom keys are <kbd>Cmd</kbd>+<kbd>0</kbd>, <kbd>Cmd</kbd>+<kbd>+</kbd>, <kbd>Cmd</kbd>+<kbd>-</kbd> (Windows: <kbd>Ctrl</kbd> in place of <kbd>Cmd</kbd>). When an HTML page has focus, zoom applies to that page first. Reloading can discard unsaved in-memory edits.
+**What it does:** **Reload** and **Force Reload** redraw the app; **Toggle Developer Tools** opens or closes developer tools; **Actual Size**, **Zoom In**, **Zoom Out** change zoom; **Toggle Full Screen** changes the window display. **How to reach it:** **View**. Zoom keys are <kbd>⌘0</kbd>, <kbd>⌘+</kbd>, <kbd>⌘-</kbd> / <kbd>Ctrl+0</kbd>, <kbd>Ctrl++</kbd>, <kbd>Ctrl+-</kbd>. When an HTML page has focus, zoom applies to that page first. Reloading can discard unsaved in-memory edits.
 
 ## Window menu
 

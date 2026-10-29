@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * HTML Preview comments – what the panel says when a write that was answered
- * "still saving" settles (docs/designs/html-preview-comments.md §8 Rev 3
+ * "still saving" settles (docs/designs/comments/html-preview-comments.md §8 Rev 3
  * note, §19 "Save pending settles").
  *
  * - **Landed**: the announcement a write answered in time gets ("Comment saved

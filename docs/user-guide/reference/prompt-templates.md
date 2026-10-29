@@ -34,7 +34,7 @@ A prompt template formats selected text or a dialog instruction and sends it to 
 
 ## Modify
 
-**What it does:** Opens an instruction dialog and asks the agent to rewrite the selected passage. It can change the file. **How to reach it:** selection context menu > **Modify**; describe the change and submit with <kbd>Cmd</kbd>+<kbd>Enter</kbd> (Windows: <kbd>Ctrl</kbd>+<kbd>Enter</kbd>).
+**What it does:** Opens an instruction dialog and asks the agent to rewrite the selected passage. It can change the file. **How to reach it:** selection context menu > **Modify**; describe the change and submit with <kbd>⌘Enter</kbd> / <kbd>Ctrl+Enter</kbd>.
 
 ## Ask
 
@@ -58,7 +58,7 @@ A prompt template formats selected text or a dialog instruction and sends it to 
 
 ## Diagram chat
 
-**What it does:** Sends an instruction to edit the open diagram's source. **How to reach it:** **Edit diagram** in the full-screen viewer; submit with <kbd>Cmd</kbd>+<kbd>Enter</kbd> (Windows: <kbd>Ctrl</kbd>+<kbd>Enter</kbd>).
+**What it does:** Sends an instruction to edit the open diagram's source. **How to reach it:** **Edit diagram** in the full-screen viewer; submit with <kbd>⌘Enter</kbd> / <kbd>Ctrl+Enter</kbd>.
 
 ## Organize import
 

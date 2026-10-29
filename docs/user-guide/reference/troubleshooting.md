@@ -40,7 +40,7 @@ Erfana shows a recovery screen or a local panel message when a part of the inter
 
 ## Terminal not available
 
-**What it does:** The terminal status panel reports that the terminal backend is unavailable. **How to reach it:** Open Terminal with the right activity bar or <kbd>Cmd</kbd>+<kbd>J</kbd> (Windows: <kbd>Ctrl</kbd>+<kbd>J</kbd>). Select **Recheck** after addressing the displayed cause; **Copy fix command** copies the suggested command for an installed development build. If the terminal still cannot start, include its message and log in a report. A **Terminal error** panel shows why the shell could not start in this project, for example a path Windows cannot start a shell in; open another project and the terminal starts again there.
+**What it does:** The terminal status panel reports that the terminal backend is unavailable. **How to reach it:** Open Terminal with the right activity bar or <kbd>⌘J</kbd> / <kbd>Ctrl+J</kbd>. Select **Recheck** after addressing the displayed cause; **Copy fix command** copies the suggested command for an installed development build. If the terminal still cannot start, include its message and log in a report. A **Terminal error** panel shows why the shell could not start in this project, for example a path Windows cannot start a shell in; open another project and the terminal starts again there.
 
 ## HTML preview stopped or reports issues
 

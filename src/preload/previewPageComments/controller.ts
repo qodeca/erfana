@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * One frame's comment overlay (docs/designs/html-preview-comments.md §6,
+ * One frame's comment overlay (docs/designs/comments/html-preview-comments.md §6,
  * §7.1–§7.3, §7.5 step 6–7, §7.10, §10; folded sections: §19 Rev 4).
  *
  * It holds the state main last sent, the document's tokens, the hover and

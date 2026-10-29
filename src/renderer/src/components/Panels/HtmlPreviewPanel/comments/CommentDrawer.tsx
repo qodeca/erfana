@@ -2,8 +2,8 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
  * HTML Preview comments – the comments drawer
- * (docs/designs/html-preview-comments.md decision 8, §10.6, §10.8; R-009,
- * R-020; docs/design-system/product/html-comments/drawer.html, proposed).
+ * (docs/designs/comments/html-preview-comments.md decision 8, §10.6, §10.8; R-009,
+ * R-020; docs/designs/comments/html-comments/drawer.html, proposed).
  *
  * The list of every comment on the page, and the GUARANTEED KEYBOARD ROUTE to
  * every thread: pins are not in the Tab order, and a hidden, resolved or lost

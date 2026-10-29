@@ -3,7 +3,7 @@
 /**
  * Shared set-up for the main-thread cost suites of the comment parse worker
  * (F-002 `commentParse.perf.test.ts`, `commentFileJobs.perf.test.ts`;
- * docs/designs/html-preview-comments.md §5.8, §12.2, §19 R3-12).
+ * docs/designs/comments/html-preview-comments.md §5.8, §12.2, §19 R3-12).
  *
  * The real worker entry (`commentParseWorker.ts`) is bundled with esbuild –
  * the bundler Vite itself runs on – into a temporary folder and started as a

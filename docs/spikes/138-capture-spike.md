@@ -7,7 +7,7 @@ SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 
 - **Issue:** [#138](https://github.com/qodeca/erfana/issues/138), plan step 1 of
   [`docs/features/138-user-guide.md`](../features/138-user-guide.md#step-1--spike-confirm-what-the-design-assumes-no-committed-code).
-- **Design:** [docs/designs/138-user-guide/](../designs/138-user-guide/README.md).
+- **Design:** [docs/designs/user-guide/](../designs/user-guide/README.md).
 - **Date:** 2026-09-25. **Time box:** about 3 hours; used about 1.5, plus a second run the same day
   once the owner had made the subscription token (Q4 real token, Q5, Q7).
 
@@ -231,7 +231,7 @@ subscription token – including whether it shows the account email or organisat
 Neither `/status` nor any login type other than "token variable present" was observed.
 
 **Found by accident: the sandbox must not sit inside a repository.** With the sandbox under
-`.local/xezar/scratch/` in the Erfana checkout, the trust screen said "This folder pre-approves 22
+a `.local/` scratch folder in the Erfana checkout, the trust screen said "This folder pre-approves 22
 tool permissions in .claude/settings.local.json" and listed the repository's own `mcp__…`
 permissions. Claude Code walks up from the working folder and loaded the checkout's
 `.claude/settings.local.json`. From `/tmp` and `/Users/Shared` the warning did not appear.

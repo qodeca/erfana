@@ -37,7 +37,7 @@
  *
  * @see Issue #216 - Per-terminal Claude Code context status bar
  * @see Issue #217 - Windows support for the Claude Code status bar
- * @see docs/designs/216-claude-status-bar.md §2, §10
+ * @see docs/designs/context-meter/216-claude-status-bar.md §2, §10
  */
 export function encodeProjectDir(cwd: string, platform: NodeJS.Platform = process.platform): string {
   if (platform === 'win32') return cwd.replace(/[/\\:.]/g, '-')
