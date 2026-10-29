@@ -2,9 +2,9 @@
   "spec_id": 23,
   "slug": "readme-video",
   "tier": "T3",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "created": "2026-10-29T11:20:00.000Z",
-  "updated": "2026-10-29T12:00:00.000Z",
+  "updated": "2026-10-29T15:30:00.000Z",
   "application": {
     "name": "README showcase video",
     "domain": null,
@@ -432,6 +432,12 @@
       "date": "2026-10-29T12:00:00.000Z",
       "author": "Claude Code (erfana:spec)",
       "changes": "Applied the 8 second-review findings (owner-approved): 2 s measured from the logged file write in real time, 1 s fade, app text judged at full size (owner decision), draft folder named, screenshot size in pixels, tab switch before step 8, non-macOS exit condition."
+    },
+    {
+      "version": "0.4.0",
+      "date": "2026-10-29T15:30:00.000Z",
+      "author": "Claude Code (owner decision)",
+      "changes": "FR-002 and AC-002: narrower project tree for more document room (owner decision 2026-10-29): tree about 15 %, preview about 52 %, terminal unchanged at about 33 % (its 80-column minimum leaves no room to shrink it)."
     }
   ]
 }

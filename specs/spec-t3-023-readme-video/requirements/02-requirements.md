@@ -45,7 +45,7 @@ Cuts are allowed only where a wait is sped up (023-FR-008); no step is shown fro
 
 ### 023-FR-002: Layout
 
-**Description:** Throughout steps 2–9 the window shall show the project tree, the document preview and the terminal side by side, with no editor pane. The tree takes about 20 % of the window width, the preview about 45 % and the terminal about 33 % (±5 percentage points each). The terminal shall show at least 80 columns. In step 8 the same three-panel layout holds: step 8 starts by switching back to the Markdown tab, which is in **Preview Only** mode (the tab's own view mode, not a change of window layout).
+**Description:** Throughout steps 2–9 the window shall show the project tree, the document preview and the terminal side by side, with no editor pane. The tree takes about 15 % of the window width, the preview about 52 % and the terminal about 33 % (±5 percentage points each), so the documents get the most room. The terminal shall show at least 80 columns. In step 8 the same three-panel layout holds: step 8 starts by switching back to the Markdown tab, which is in **Preview Only** mode (the tab's own view mode, not a change of window layout).
 
 **Priority:** Must
 

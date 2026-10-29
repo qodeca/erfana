@@ -348,7 +348,7 @@
       "description": "1920x1080 showcase video for the GitHub README: nine features in one real, continuous run (tree, preview, terminal; real Claude Code and OS dialogs), recorded on macOS, sped-up parts marked, WebP plus still PNG under 30 MB, gated by automatic checks and owner approval. Replaces the #139 demo loop.",
       "created": "2026-10-29T11:20:00.000Z",
       "path": "spec-t3-023-readme-video",
-      "last_modified": "2026-10-29T12:00:00.000Z",
+      "last_modified": "2026-10-29T15:30:00.000Z",
       "sections_count": 3,
       "requirements_count": 24,
       "documents": {

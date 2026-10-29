@@ -41,7 +41,7 @@
 
 **Tests:** 023-FR-002
 
-**Given** frames sampled from steps 2–9, **when** the panel widths are measured, **then** the tree is 15–25 %, the preview 40–50 % and the terminal 28–38 % of the window width, no editor pane is visible, and the terminal reports at least 80 columns.
+**Given** frames sampled from steps 2–9, **when** the panel widths are measured, **then** the tree is 10–20 %, the preview 47–57 % and the terminal 28–38 % of the window width, no editor pane is visible, and the terminal reports at least 80 columns.
 
 ### 023-AC-003: Agent start
 
