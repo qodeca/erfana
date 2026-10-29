@@ -55,3 +55,9 @@ src/shared/htmlComments/__fixtures__/** -text
 # folder, keep their bytes exactly (SHA-256 locks).
 src/shared/comments/__fixtures__/** -text
 e2e/fixtures/html-preview-corpus/comments/** -text
+
+# Spec 024 pin snapshots stay LF on every checkout, like the preload surface
+# snapshot above, so a Windows checkout compares the same bytes.
+src/preload/__snapshots__/previewPage.surface.pin.test.ts.snap text eol=lf
+src/shared/ipc/__snapshots__/preview-comment-schema.pin.test.ts.snap text eol=lf
+src/renderer/src/components/Panels/HtmlPreviewPanel/comments/__snapshots__/commentCopy.pin.test.ts.snap text eol=lf

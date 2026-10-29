@@ -129,6 +129,8 @@ export default defineConfig({
         '**/__test__/**',
         '**/__test-helpers__/**',
         '**/__fixtures__/**',
+        // Spec 024 shared test suites and test-only file kinds (overlay.suite.ts, the .txt preview).
+        '**/__conformance__/**',
         '**/__test-utils__/**',
         '**/test-utils/**',
         'src/renderer/src/utils/testHelpers.ts',

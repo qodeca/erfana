@@ -83,6 +83,8 @@ export default defineConfig({
         '**/__test__/**',
         '**/__test-helpers__/**',
         '**/__fixtures__/**',
+        // Spec 024 shared test suites and test-only file kinds (overlay.suite.ts, the .txt preview).
+        '**/__conformance__/**',
         'vitest.*.ts',
         'electron.vite.config.ts',
         // Type-only: declarations and the compile-time contract proofs.
