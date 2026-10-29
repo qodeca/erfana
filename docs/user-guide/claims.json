@@ -9703,7 +9703,7 @@
       "status": "fixed",
       "evidence": "source",
       "source": "specs/registry.json:4",
-      "match": "\"next\": 23",
+      "match": "\"next\": ",
       "note": "Said current max is 021; registry sequence.current is 22, so the stale number was dropped"
     },
     {
