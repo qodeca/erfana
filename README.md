@@ -18,9 +18,9 @@ Editor, live preview, project tree and a terminal running Claude Code – or any
 <p align="center">
   <picture>
     <source media="(prefers-reduced-motion: reduce)" srcset="docs/assets/readme/demo-still.png">
-    <img alt="Screenshot of the Visualize prompt: a Markdown list goes to Claude Code in the terminal and comes back as a flowchart in the live preview." src="docs/assets/readme/demo.webp" width="800">
+    <img alt="Animation of Erfana: open project, start Claude Code, import PDF, live agent edit, transcribe memo, preview HTML, comment, export PDF, capture window" src="docs/assets/readme/demo.webp" width="880">
   </picture><br>
-  <sub>A real Claude Code session in Erfana. The agent's working time is sped up.</sub>
+  <sub>One real, uncut session in Erfana with Claude Code. A sped-up wait shows its speed as ×N.</sub>
 </p>
 
 <p align="center">
