@@ -32,6 +32,18 @@ export const STORY = [
  */
 export const LABEL_UI_NAMES = ['Import a file', 'Comment mode', 'Export to PDF', 'Capture window']
 
+/** The demo project's input files the story uses (023-AC-011). */
+export const STORY_INPUTS = ['inbox/seed-order.pdf', 'recordings/committee-voice-note.m4a', 'site/index.html']
+
+/**
+ * The speech-model prerequisite (023-FR-018): the app's model list after the
+ * scene asked for the local "tiny" model. Null when it is there, otherwise
+ * the message that stops the run before anything is recorded.
+ */
+export function speechModelProblem(listing) {
+  return /tiny/.test(String(listing)) ? null : `the speech model is not downloaded (${String(listing).slice(0, 200)}); nothing was recorded`
+}
+
 /** Video geometry and limits (023-NFR-001…004). */
 export const VIDEO = {
   /** The window's outer size: content plus the 32 px title bar. */

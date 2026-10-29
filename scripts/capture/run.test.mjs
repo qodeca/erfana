@@ -13,7 +13,7 @@ import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { CaptureError } from './manifest.mjs'
-import { approveReadmeVideo, EXIT, parseArgs, readLogin, reportLines, runCheck, safeTarget, storyReportLines } from './run.mjs'
+import { approveReadmeVideo, EXIT, parseArgs, platformProblem, readLogin, reportLines, runCheck, safeTarget, stepResultProblem, storyReportLines } from './run.mjs'
 import { MARKER, VOLUME_ROOT, attachedImages, claudeJson, findClaude, layout, projectClaudeSettings, sandboxProblem, shellQuote, userClaudeSettings, volumeProblem } from './sandbox.mjs'
 import { capitalHeight, judgeFrame, normalise } from './legibility.mjs'
 
@@ -158,7 +158,9 @@ const STORY_DEMO = {
   layout: [{ step: 'edit', window: 1920, tree: 288, preview: 998, terminal: 634, editorVisible: false }],
   editLatencyMs: 640,
   screenshot: { width: 1920, height: 1080, expected: { width: 1920, height: 1080 } },
-  legibility: [{ what: 'label "Open a project" at 880 px', capPx: 7.6, samples: 2, readBack: true }]
+  legibility: [{ what: 'label "Open a project" at 880 px', capPx: 7.6, samples: 2, readBack: true }],
+  zoom: 1,
+  app: '0.23.1'
 }
 
 describe('reportLines', () => {
@@ -184,6 +186,38 @@ describe('storyReportLines (spec 023)', () => {
     expect(t).toMatch(/window screenshot: 1920×1080 \(window 1920×1080\)/)
     expect(t).toMatch(/capital height 7\.6 px/)
     expect(t).toMatch(/privacy: 412 pages read, 0 hits/)
+  })
+
+  it('names the recording method, the confirmed prerequisites, the app build, zoom and inputs (023-AC-011, 023-AC-012, 023-AC-019)', () => {
+    const t = storyReportLines(STORY_DEMO).join('\n')
+    expect(t).toMatch(/recording: macOS screen recording of the window area .*confirmed before recording: Screen Recording, Accessibility, Do Not Disturb/)
+    expect(t).toMatch(/app: Erfana 0\.23\.1, built from this checkout, zoom 1\.0; inputs: inbox\/seed-order\.pdf, recordings\/committee-voice-note\.m4a, site\/index\.html/)
+    expect(t).toMatch(/no frame retouched/)
+  })
+})
+
+describe('all or nothing (023-AC-013)', () => {
+  const all = Object.fromEntries(['open', 'agent', 'import', 'edit', 'transcribe', 'html', 'comment', 'export', 'screenshot'].map((id) => [id, 'ok']))
+  it('passes a log with every step result', () => {
+    expect(stepResultProblem({ results: all })).toBeNull()
+  })
+  it('discards the whole run when a step has no result, naming it (break: a draft without the agent edit)', () => {
+    const err = stepResultProblem({ results: { ...all, edit: '' } })
+    expect(err).toBeInstanceOf(CaptureError)
+    expect(err.exitCode).toBe(EXIT.SCENE)
+    expect(err.message).toMatch(/without a result: edit; the whole run is discarded/)
+    expect(stepResultProblem(null).message).toMatch(/open, agent/)
+  })
+})
+
+describe('platform (023-AC-024)', () => {
+  it('runs on macOS only, and says so on Linux and Windows (break: a recorder started elsewhere)', () => {
+    expect(platformProblem('darwin')).toBeNull()
+    for (const p of ['linux', 'win32']) {
+      const err = platformProblem(p)
+      expect(err.exitCode).toBe(EXIT.NOT_MACOS)
+      expect(err.message).toMatch(/macOS only.*No app or recorder was started/)
+    }
   })
 })
 

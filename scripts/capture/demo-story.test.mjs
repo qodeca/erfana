@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { describe, expect, it } from 'vitest'
-import { caption, LABEL_UI_NAMES, layoutProblems, lengthProblem, planStory, STORY, VIDEO, wordCount } from './demo-story.mjs'
+import { caption, LABEL_UI_NAMES, layoutProblems, lengthProblem, planStory, speechModelProblem, STORY, VIDEO, wordCount } from './demo-story.mjs'
 
 /** Nine back-to-back steps of `each` seconds from t = 10. */
 const steps = (each = 4) => STORY.map((s, i) => ({ id: s.id, start: 10 + i * each, end: 10 + (i + 1) * each }))
@@ -86,5 +86,12 @@ describe('layoutProblems (023-FR-002)', () => {
     expect(p.join('\n')).toMatch(/tree is 36\.5 %/)
     expect(p.join('\n')).toMatch(/editor pane is visible/)
     expect(p.join('\n')).toMatch(/60 columns, under 80/)
+  })
+})
+
+describe('speechModelProblem (023-AC-018)', () => {
+  it('passes when the tiny model is listed, and names the missing model otherwise', () => {
+    expect(speechModelProblem('[{"name":"tiny","downloaded":true}]')).toBeNull()
+    expect(speechModelProblem('error: offline')).toMatch(/speech model is not downloaded \(error: offline\); nothing was recorded/)
   })
 })

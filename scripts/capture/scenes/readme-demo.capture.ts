@@ -39,6 +39,7 @@ import { HtmlPreviewPage } from '../../../e2e/pages/html-preview.page'
 import { CommentChrome, clickElement, expectPin } from '../../../e2e/pages/html-preview.comments-ui'
 import { commentPanels } from '../../../e2e/pages/html-preview.comments'
 import { ProjectTreePage } from '../../../e2e/pages/project-tree.page'
+import { speechModelProblem } from '../demo-story.mjs'
 import { blurAll, launch, openProject, visible } from '../lib/app'
 import { anySelected, clearToasts } from '../lib/shots'
 import { ensureTerminalOpen, focusTerminal, installPtyRecorder, ptyLength, readPty, stopHookCount, waitForPty, waitForShellPrompt } from '../lib/terminal'
@@ -84,6 +85,7 @@ interface DemoLog {
   editLatencyMs: number | null
   screenshot: { width: number; height: number; expected: { width: number; height: number } } | null
   terminalRect: { x: number; y: number; width: number; height: number }
+  zoom: number
 }
 
 /** Wall-clock time once the current frame has been painted (two animation frames). */
@@ -134,7 +136,8 @@ async function prepareSpeech(page: Page, userData: string): Promise<void> {
       return `error: ${(e as Error).message}`
     }
   })
-  if (!/tiny/.test(ok)) throw new Error(`the speech model is not downloaded (${ok.slice(0, 200)}); nothing was recorded`)
+  const speech = speechModelProblem(ok)
+  if (speech) throw new Error(speech)
   if (!fs.existsSync(WHISPER_CACHE)) {
     fs.mkdirSync(path.dirname(WHISPER_CACHE), { recursive: true })
     fs.cpSync(target, WHISPER_CACHE, { recursive: true })
@@ -242,6 +245,7 @@ test('readme-demo', async () => {
     results: {},
     layout: [],
     columns: 0,
+    zoom: 0,
     editLatencyMs: null,
     screenshot: null,
     terminalRect: { x: 0, y: 0, width: 0, height: 0 }
@@ -330,6 +334,7 @@ test('readme-demo', async () => {
       height: Math.round(bounds.height * k)
     }
     log.window = { width: rect.width, height: rect.height }
+    log.zoom = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.getZoomFactor())
     // The pointer waits below the window, in the screen's corner, until the window picker needs it.
     const parkPointer = (): void => movePointer(place.bounds.x + 8, place.bounds.y + place.bounds.height - 8)
     parkPointer()

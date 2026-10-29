@@ -33913,8 +33913,8 @@
       "quote": "on macOS with a real Claude Code login",
       "status": "verified",
       "evidence": "source",
-      "source": "scripts/capture/run.mjs:224",
-      "match": "docs:screenshots runs on macOS only."
+      "source": "scripts/capture/run.mjs:377",
+      "match": "docs:screenshots runs on macOS only;"
     },
     {
       "id": "user-guide-maintaining-this-guide/04",
@@ -33975,7 +33975,7 @@
       "quote": "Inspect every image and the capture report before committing.",
       "status": "fixed",
       "evidence": "source",
-      "source": "scripts/capture/run.mjs:520",
+      "source": "scripts/capture/run.mjs:538",
       "match": "const out = [`capture report${partial ? ' (partial run)' : ''}`]",
       "note": "Said 'privacy report'; the run writes one capture report (report.txt); privacy hits stop the run rather than producing a separate report."
     },

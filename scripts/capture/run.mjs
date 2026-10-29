@@ -31,7 +31,7 @@ import { buildDenyList, createOcr, resolveTesseract, scanText, stripAnsi } from 
 import { contactSheetArgs, findSyncTime, frameAtArgs, runFfmpeg, stillArgs, storyArgs, storyWebpArgs, syncScanArgs, WEBP_QUALITIES, webpPageAt } from './encode.mjs'
 import { darkSpan, firstLetterHeight, judgeFrame, MIN_CAP_PX, regionCrop, resolveSharp } from './legibility.mjs'
 import { findClaude, prepareSandbox, removeSandbox, SANDBOX_ROOT, sandboxProblem } from './sandbox.mjs'
-import { layoutProblems, lengthProblem, planStory, STORY, VIDEO } from './demo-story.mjs'
+import { layoutProblems, lengthProblem, planStory, STORY, STORY_INPUTS, VIDEO } from './demo-story.mjs'
 import { videoPrerequisiteProblems } from './macos.mjs'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
@@ -221,7 +221,8 @@ async function main(argv) {
   if (opts.approve) return approveReadmeVideo({ rows })
 
   // 1. Preflight
-  if (process.platform !== 'darwin') throw new CaptureError('docs:screenshots runs on macOS only.', EXIT.NOT_MACOS)
+  const platform = platformProblem(process.platform)
+  if (platform) throw platform
   const { rows: selected, partial } = resolveOnly(rows, opts.only)
   const needsAgent = selected.some((r) => r.agent)
   const secrets = readLogin(process.env, fs, { required: needsAgent })
@@ -369,6 +370,23 @@ function checkTexts(id, sb, denyList, privacy, stem = stemOf(id)) {
 }
 
 /**
+ * Before anything else: the capture, and with it the README video, runs on
+ * macOS only (023-NFR-006). Returns the error to throw, or null.
+ */
+export function platformProblem(platform) {
+  return platform === 'darwin' ? null : new CaptureError('docs:screenshots runs on macOS only; the README video is recorded on macOS only. No app or recorder was started.', EXIT.NOT_MACOS)
+}
+
+/**
+ * All or nothing (023-FR-013): a step without a logged result discards the
+ * whole run. Returns the error to throw, or null.
+ */
+export function stepResultProblem(log) {
+  const missing = STORY.filter((s) => !log?.results?.[s.id])
+  return missing.length ? new CaptureError(`readme-demo: step(s) without a result: ${missing.map((s) => s.id).join(', ')}; the whole run is discarded`, EXIT.SCENE) : null
+}
+
+/**
  * The README video (spec 023): plan the edit from the scene's log, check the
  * story, encode the WebP at the best quality under the size limit, take the
  * still, then check legibility and privacy on the output. Any failed check
@@ -379,8 +397,8 @@ async function processStory(rows, sb, encodedDir, ocr, denyList, privacy, out) {
   const log = JSON.parse(readText(path.join(sb.raw, 'readme-demo.json')) ?? 'null')
   if (!log || !fs.existsSync(log.recording ?? '')) throw new CaptureError('readme-demo: the scene wrote no recording', EXIT.SCENE)
   const problems = []
-  const missing = STORY.filter((s) => !log.results?.[s.id])
-  if (missing.length) throw new CaptureError(`readme-demo: step(s) without a result: ${missing.map((s) => s.id).join(', ')}; the whole run is discarded`, EXIT.SCENE)
+  const unfinished = stepResultProblem(log)
+  if (unfinished) throw unfinished
 
   const syncVideo = findSyncTime(await runFfmpeg(syncScanArgs(log.recording), { stdout: true }))
   if (syncVideo === null) throw new CaptureError('readme-demo: the sync flash was not found in the recording', EXIT.SCENE)
@@ -495,7 +513,7 @@ async function processStory(rows, sb, encodedDir, ocr, denyList, privacy, out) {
   }
   out.set(webpRow.id, webp)
   out.set(stillRow.id, still)
-  return { duration, pages, quality, legibility, results: log.results, segments: plan.segments, steps: plan.steps, editLatencyMs: log.editLatencyMs, screenshot: shot, layout: log.layout, columns: log.columns, window: log.window }
+  return { duration, pages, quality, legibility, results: log.results, segments: plan.segments, steps: plan.steps, editLatencyMs: log.editLatencyMs, screenshot: shot, layout: log.layout, columns: log.columns, window: log.window, zoom: log.zoom, app: JSON.parse(readText(path.join(REPO_ROOT, 'package.json'))).version }
 }
 
 /**
@@ -540,6 +558,9 @@ export function reportLines({ rows, sizes, partial, version, demo, guideTotal, m
 export function storyReportLines(demo) {
   const out = ['README video: every check passed']
   out.push(`  length: ${demo.duration.toFixed(1)} s (${VIDEO.minSeconds}–${VIDEO.maxSeconds} s), ${demo.pages} WebP pages, quality ${demo.quality}, loop 0 (endless)`)
+  out.push(`  recording: macOS screen recording of the window area (AVFoundation, lossless, one take); confirmed before recording: Screen Recording, Accessibility, Do Not Disturb`)
+  out.push(`  app: Erfana ${demo.app}, built from this checkout, zoom ${Number(demo.zoom).toFixed(1)}; inputs: ${STORY_INPUTS.join(', ')}`)
+  out.push(`  edits: speed-ups, step labels, ×N marks, the hold and the fade only; no frame retouched`)
   out.push(`  window: ${demo.window.width}×${demo.window.height}; terminal ${demo.columns} columns`)
   for (const [i, s] of demo.steps.entries()) out.push(`  step ${i + 1} ${s.id} at ${s.from.toFixed(1)}–${s.to.toFixed(1)} s: ${demo.results[s.id]}`)
   for (const s of demo.segments.filter((x) => x.speed > 1)) out.push(`  sped up ×${s.speed}: ${(s.to - s.from).toFixed(1)} s of recording`)
@@ -549,7 +570,7 @@ export function storyReportLines(demo) {
   }
   out.push(`  edit to preview: ${demo.editLatencyMs} ms after the write`)
   out.push(`  window screenshot: ${demo.screenshot.width}×${demo.screenshot.height} (window ${demo.screenshot.expected.width}×${demo.screenshot.expected.height})`)
-  for (const l of demo.legibility) out.push(`  legibility ${l.what}: capital height ${l.capPx} px (${l.samples} words)${l.readBack === null ? '' : `, read back: ${l.readBack}`}`)
+  for (const l of demo.legibility) out.push(`  legibility ${l.what}: capital height ${l.capPx} px (${l.samples} sample${l.samples === 1 ? '' : 's'})${l.readBack === null ? '' : `, read back: ${l.readBack}`}`)
   out.push(`  privacy: ${demo.pages} pages read, 0 hits`)
   return out
 }
