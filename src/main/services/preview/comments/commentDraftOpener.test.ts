@@ -14,9 +14,9 @@ import { makeProject, type TempProject } from './__test-helpers__/commentWriterH
 import { FakeFrame, frameFile, serveLoad, stubFrameFiles, tokenOfTag } from './__test-helpers__/commentServiceHarness'
 import { createCommentDraftOpener, pinPickOf, placeOf, type DraftOpenerDeps } from './commentDraftOpener'
 import type { CommentDraft } from './commentDraftBuilder'
-import { createInProcessCommentFileJobs } from './commentFileJobs'
+import { createInProcessCommentFileJobs } from '../../comments/commentFileJobs'
 import { CommentFrames } from './commentFrames'
-import { CommentKeyStore } from './commentKeyStore'
+import { CommentKeyStore } from '../../comments/commentKeyStore'
 import type { PinGroup } from './commentPins'
 import { ElementTokenTable } from './ElementTokenTable'
 

@@ -9,11 +9,11 @@
  */
 import { vi, type Mock } from 'vitest'
 import { PreviewCommentPageChannels } from '../../../../../shared/ipc/preview-comment-channels'
-import { createInProcessCommentFileJobs } from '../commentFileJobs'
+import { createInProcessCommentFileJobs } from '../../../comments/commentFileJobs'
 import type { PreviewCommentServing } from '../commentInstrumentation'
 import { READ_SCROLL_SCRIPT } from '../commentScripts'
 import { createPreviewCommentRegistry, type PreviewCommentEmitters } from '../commentServiceTypes'
-import { createCommentUnsavedSources } from '../commentUnsavedSources'
+import { createCommentUnsavedSources } from '../../../comments/commentUnsavedSources'
 import { ElementTokenTable } from '../ElementTokenTable'
 import { PreviewCommentService, type PreviewCommentServiceDeps } from '../PreviewCommentService'
 import { makeProject, type TempProject } from './commentWriterHarness'

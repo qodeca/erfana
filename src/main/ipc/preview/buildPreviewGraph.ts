@@ -58,8 +58,8 @@ import {
   createPreviewCommentRegistry,
   type PreviewCommentShared
 } from '../../services/preview/comments/commentServiceTypes'
-import type { CommentIdentity } from '../../services/preview/comments/CommentWriter'
-import { createCommentUnsavedSources } from '../../services/preview/comments/commentUnsavedSources'
+import type { CommentIdentity } from '../../services/comments/CommentWriter'
+import { createCommentUnsavedSources } from '../../services/comments/commentUnsavedSources'
 import { focusHostWhileKey } from '../../services/preview/previewHostFocus'
 import { createPreviewEmitters, type PreviewEmitTarget } from './emit'
 import { createPreviewCommentEmitters } from './commentEmit'

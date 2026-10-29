@@ -13,9 +13,9 @@ import { logger } from '../../LoggingService'
 import { BASE_PAGE, commentedPage } from './__test-helpers__/commentedPages'
 import { commentServiceFixture, SCROLL, type CommentServiceFixture } from './__test-helpers__/commentServiceFixture'
 import { FakeFrame, flush, serveLoad, tokenOfTag } from './__test-helpers__/commentServiceHarness'
-import type { CommentWriteResult } from './CommentWriter'
-import * as listBuilder from './commentListBuilder'
-import { SAVE_TIMEOUT_MS } from './commentSaveFlow'
+import type { CommentWriteResult } from '../../comments/CommentWriter'
+import * as listBuilder from '../../comments/commentListBuilder'
+import { SAVE_TIMEOUT_MS } from '../../comments/commentSaveFlow'
 import { READ_SCROLL_SCRIPT } from './commentScripts'
 
 vi.mock('../../LoggingService', () => ({

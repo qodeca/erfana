@@ -44,7 +44,7 @@ import {
   restoreScrollScript,
   type TopScroll
 } from './commentScripts'
-import { samePathKey } from './commentUnsavedSources'
+import { samePathKey } from '../../comments/commentUnsavedSources'
 import type { PaintContents } from './commentStillCapture'
 
 /** How long a write waits for the watcher's reload before reloading itself (S2: never needed). */

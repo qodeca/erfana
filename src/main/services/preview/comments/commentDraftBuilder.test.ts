@@ -16,7 +16,7 @@ import { makeProject, PAGE, type TempProject } from './__test-helpers__/commentW
 import { damagedBlock, insertBefore } from './__test-helpers__/commentedPages'
 import { frameFile, serveLoad, tokenOfTag } from './__test-helpers__/commentServiceHarness'
 import { buildDraft, buildPin, cutText, EXCERPT_MAX_CHARS, lineAt } from './commentDraftBuilder'
-import { createInProcessCommentFileJobs, type CommentFileJobRunner } from './commentFileJobs'
+import { createInProcessCommentFileJobs, type CommentFileJobRunner } from '../../comments/commentFileJobs'
 import { ElementTokenTable } from './ElementTokenTable'
 
 vi.mock('../../LoggingService', () => ({

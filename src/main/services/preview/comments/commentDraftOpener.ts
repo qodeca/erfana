@@ -28,15 +28,15 @@
  */
 import { CommentPickRuntimeSchema, type CommentDraftOpened, type CommentPick } from '../../../../shared/ipc/preview-comment-schema'
 import type { PreviewBounds } from '../../../../shared/ipc/preview-types'
-import type { CommentFileJobRunner } from './commentFileJobs'
-import type { CommentBinding, CommentKeyStore } from './commentKeyStore'
+import type { CommentFileJobRunner } from '../../comments/commentFileJobs'
+import type { CommentBinding, CommentKeyStore } from '../../comments/commentKeyStore'
 import type { CommentFrameLike, FrameRecord } from './commentFrames'
 import { buildDraft, buildPin, draftKeyOf, type BuiltDraft, type BuiltPin, type CommentDraft } from './commentDraftBuilder'
 import { menuPoint } from './commentMenuPoint'
 import type { PinGroup } from './commentPins'
 import { captureFreshStill, waitForPaint, type FreshStillDeps, type PickFramePlace } from './commentStillCapture'
 import type { FrameOffset } from './commentScripts'
-import { samePathKey } from './commentUnsavedSources'
+import { samePathKey } from '../../comments/commentUnsavedSources'
 import type { ElementTokenEntry, ElementTokenTable } from './ElementTokenTable'
 import type { FrameFile } from './frameFileMap'
 

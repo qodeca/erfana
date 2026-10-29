@@ -27,14 +27,14 @@ import {
   seededRandom
 } from '../../../../../shared/comments/__fixtures__/commentTestData'
 import { sha256Hex } from '../../../../utils/atomicWriteBytesStrict'
-import { createInProcessCommentFileJobs } from '../commentFileJobs'
+import { createInProcessCommentFileJobs } from '../../../comments/commentFileJobs'
 import {
   CommentWriter,
   type CommentDraftTarget,
   type CommentFileTarget,
   type CommentIdentity,
   type CommentWriterDeps
-} from '../CommentWriter'
+} from '../../../comments/CommentWriter'
 
 export { FIXED_NOW, VIEW }
 

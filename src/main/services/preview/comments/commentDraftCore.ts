@@ -38,9 +38,9 @@ import {
   type RuntimeAnchor
 } from '../../../../shared/htmlComments'
 import type { CommentPick } from '../../../../shared/ipc/preview-comment-schema'
-import { writableRefusal, type JobDocument } from './commentJobDocs'
+import { writableRefusal, type JobDocument } from '../../comments/commentJobDocs'
 import { positionTarget } from './commentParseCore'
-import type { CommentRefusal } from './commentRefusals'
+import type { CommentRefusal } from '../../comments/commentRefusals'
 
 /** Characters of the start-tag excerpt the menu shows (§10.4). */
 export const EXCERPT_MAX_CHARS = 200

@@ -40,7 +40,7 @@ import {
   type CommentPick
 } from '../../../../shared/ipc/preview-comment-schema'
 import { logger } from '../../LoggingService'
-import { samePathKey } from './commentUnsavedSources'
+import { samePathKey } from '../../comments/commentUnsavedSources'
 import type { CommentFrameLike, CommentFrames, FrameRecord } from './commentFrames'
 import type { PickerStepInput } from './commentPickerStep'
 import type { ElementTokenEntry, ElementTokenTable } from './ElementTokenTable'

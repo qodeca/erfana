@@ -18,8 +18,8 @@ import { performance } from 'node:perf_hooks'
 import { Worker } from 'node:worker_threads'
 import { encodeText, serializeBlock, type CommentAnchor } from '../../../../../shared/htmlComments'
 import { BUTTON_ANCHOR, fixedId, makeComment } from '../../../../../shared/comments/__fixtures__/commentTestData'
-import { CommentParseClient, WORKER_HEAP_MB } from '../CommentParseWorkerAdapter'
-import { COMMENT_PARSE_WORKER_ROLE } from '../commentParseProtocol'
+import { CommentParseClient, WORKER_HEAP_MB } from '../../../comments/CommentParseWorkerAdapter'
+import { COMMENT_PARSE_WORKER_ROLE } from '../../../comments/commentParseProtocol'
 
 export const MB = 1024 * 1024
 
@@ -65,7 +65,7 @@ export async function startBenchWorker(prefix: string): Promise<BenchWorker> {
   const workerFile = join(outDir, 'comment-parse.worker.cjs')
   const { build } = await import('esbuild')
   await build({
-    entryPoints: [join(__dirname, '..', 'commentParseWorker.ts')],
+    entryPoints: [join(__dirname, '..', '..', '..', 'comments', 'commentParseWorker.ts')],
     bundle: true,
     platform: 'node',
     format: 'cjs',

@@ -47,7 +47,7 @@ import {
   sharedCommentParseClient,
   type CommentParseClient,
   type CommentParseFailure
-} from './CommentParseWorkerAdapter'
+} from '../../comments/CommentParseWorkerAdapter'
 import { registerCommentE2eSource, type CommentE2eSource } from './commentE2eHook'
 import { ElementTokenTable, type CommentLoadScope } from './ElementTokenTable'
 

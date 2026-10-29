@@ -33,7 +33,7 @@ import {
   CommentUnsavedSourcesRequestSchema
 } from '../../../shared/ipc/preview-comment-schema'
 import type { PreviewCommentRegistry } from '../../services/preview/comments/commentServiceTypes'
-import type { CommentUnsavedSources } from '../../services/preview/comments/commentUnsavedSources'
+import type { CommentUnsavedSources } from '../../services/comments/commentUnsavedSources'
 import { logger } from '../../services/LoggingService'
 import { redactedLogError } from '../../utils/redactUserInput'
 import { registerHandle, unregisterHandle } from '../registry'

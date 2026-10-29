@@ -20,9 +20,9 @@ import type {
   CommentSetModeResult,
   CommentsChanged
 } from '../../../../shared/ipc/preview-comment-schema'
-import type { CommentFileJobRunner } from './commentFileJobs'
-import type { CommentIdentity } from './CommentWriter'
-import type { CommentUnsavedSources } from './commentUnsavedSources'
+import type { CommentFileJobRunner } from '../../comments/commentFileJobs'
+import type { CommentIdentity } from '../../comments/CommentWriter'
+import type { CommentUnsavedSources } from '../../comments/commentUnsavedSources'
 
 /** Main → renderer comment events, each to the window that owns the view only. */
 export interface PreviewCommentEmitters {

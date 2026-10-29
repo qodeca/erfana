@@ -18,10 +18,10 @@
 import type { CommentUnavailableReason, CommentsChanged } from '../../../../shared/ipc/preview-comment-schema'
 import type { PreviewCommentServing } from './commentInstrumentation'
 import type { CommentFrameLike, CommentFrames, FrameRecord } from './commentFrames'
-import type { CommentBinding, CommentKeyStore } from './commentKeyStore'
-import type { ListedFile } from './commentListBuilder'
+import type { CommentBinding, CommentKeyStore } from '../../comments/commentKeyStore'
+import type { ListedFile } from '../../comments/commentListBuilder'
 import { addCounts, countsOf, type CommentCounts } from './commentPins'
-import { samePathKey } from './commentUnsavedSources'
+import { samePathKey } from '../../comments/commentUnsavedSources'
 
 /** Instrumentation's reasons as the renderer names them (§10.10 "Unavailable"). */
 const UNAVAILABLE: Readonly<Record<string, CommentUnavailableReason>> = {
