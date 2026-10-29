@@ -28,13 +28,36 @@ const appVersion: string = JSON.parse(
  * of values the second entry needs, or import it with `import type`, which is
  * erased and cannot create a chunk. See `src/preload/imageExport.ts`. Relaxing
  * this check is not a fix.
+ *
+ * It also keeps the shared overlay core (`src/shared/comments/overlayCore/`,
+ * spec 024, docs/adrs/0006-overlay-core-in-the-sealed-preload.md) in the
+ * sealed preview-page entry alone. The shared-chunk check above catches a
+ * second entry importing a core module the preview page imports too, but not
+ * one it imports alone (today `gesture.ts`), which Rollup inlines silently.
+ * The security control is the preload contract scan; this keeps the bundle
+ * honest about it.
  */
+const OVERLAY_CORE_DIR = '/src/shared/comments/overlayCore/'
+const OVERLAY_CORE_ENTRY = 'previewPage'
+
 function assertSelfContainedPreloads(): Plugin {
   return {
     name: 'erfana:preload-self-contained',
     apply: 'build',
     writeBundle(_options, bundle): void {
       const outputs = Object.values(bundle)
+
+      const overlayCoreOutsideItsEntry = outputs
+        .filter((output): output is Rollup.OutputChunk => output.type === 'chunk')
+        .filter((chunk) => !(chunk.isEntry && chunk.name === OVERLAY_CORE_ENTRY))
+        .filter((chunk) => chunk.moduleIds.some((id) => id.replace(/\\/g, '/').includes(OVERLAY_CORE_DIR)))
+        .map((chunk) => chunk.fileName)
+      if (overlayCoreOutsideItsEntry.length > 0) {
+        throw new Error(
+          `Preload output ${overlayCoreOutsideItsEntry.join(', ')} bundles the shared overlay core, which only the ` +
+            `${OVERLAY_CORE_ENTRY} entry may import (ADR 0006). Relaxing this check is not a fix.`
+        )
+      }
 
       const sharedChunks = outputs
         .filter((output): output is Rollup.OutputChunk => output.type === 'chunk')

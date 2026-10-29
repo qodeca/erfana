@@ -9,6 +9,7 @@
  * animation frame. The input side (`input.ts`) calls in with trusted events
  * only; everything that leaves for main goes through `send`.
  */
+import { reduceCommentMode, type CommentModeStep } from '../../shared/comments/overlayCore/modeState'
 import { AnchorReporter } from './anchors'
 import {
   COMMENT_HELLO_CHANNEL,
@@ -165,7 +166,7 @@ export class CommentController {
     if (this.view !== null && (JSON.stringify(next.theme) !== JSON.stringify(previous.theme) || next.hidden !== previous.hidden)) {
       this.host.setCss(overlayCss(next.theme, next.hidden))
     }
-    if (next.mode !== previous.mode) this.modeChanged(next.mode)
+    this.followMode(reduceCommentMode({ on: previous.mode }, { type: 'set', on: next.mode }))
     this.watch.set(next.mode || next.icons.length > 0)
     if (next.openSections !== undefined) this.sections.start(next.openSections)
     if (next.restore !== undefined) this.restorer.start(next.restore)
@@ -254,7 +255,8 @@ export class CommentController {
   /** A keyboard picker action, in comment mode. */
   pickerAction(action: PickerAction): void {
     if (action === 'exit') {
-      this.exit()
+      this.followMode(reduceCommentMode({ on: this.state.mode }, { type: 'escape' }))
+      this.render()
       return
     }
     const current = this.ensureCurrent()
@@ -358,13 +360,6 @@ export class CommentController {
     else this.moveTo(child)
   }
 
-  private exit(): void {
-    this.sendPick({ kind: 'exit', via: 'keyboard', view: viewOf(this.deps.win) })
-    this.state = { ...this.state, mode: false }
-    this.modeChanged(false)
-    this.render()
-  }
-
   private pickElement(kind: Extract<PickKind, 'menu' | 'open'>, element: Element, event?: MouseEvent): void {
     if (!this.state.commentable) return
     const where = event === undefined ? { point: elementPoint(element) } : { screen: screenOf(event) }
@@ -395,10 +390,14 @@ export class CommentController {
     if (limiter === this.limiters.pick && this.state.mode) this.pickHold.picked()
   }
 
-  private modeChanged(on: boolean): void {
-    this.cursor.set(on)
+  /** One comment-mode step (overlayCore `modeState.ts`); `state.mode` already holds a `set`. */
+  private followMode(step: CommentModeStep): void {
+    if (step.requestExit) this.sendPick({ kind: 'exit', via: 'keyboard', view: viewOf(this.deps.win) })
+    if (!step.changed) return
+    this.state = { ...this.state, mode: step.on }
+    this.cursor.set(step.on)
     // The window says the mode change (`commentModeChanged`); the page says nothing.
-    if (!on) {
+    if (!step.on) {
       this.select(null, false)
       this.pointer = null
     }

@@ -7,7 +7,7 @@
  * One pin per element, its tail tip on the element's top-right corner, 4 px
  * outward, clamped to the visible part of the element and to the viewport –
  * the frame's visible viewport, scrollbars excluded (`viewportOf`), with the
- * pin's box kept {@link PIN_EDGE_INSET_PX} inside each edge, so a full-width
+ * pin's box kept `PIN_EDGE_INSET_PX` inside each edge, so a full-width
  * element's pin is never drawn under the page's scrollbar (§19 Rev 4 "pins at
  * the right edge"). Vertically that is the design's clamp as before: an
  * element scrolled partly off keeps its pin at the viewport edge, one fully
@@ -18,23 +18,19 @@
  * document order, so an ancestor keeps the corner and its descendant moves.
  * The search is bounded: a pin is
  * compared with the pins of its own row only, and takes at most
- * {@link PIN_MAX_STEPS} steps – past that it stays put, overlapping – so a
+ * `PIN_MAX_STEPS` steps – past that it stays put, overlapping – so a
  * page with hundreds of pins in one row costs little per render. Only
  * elements that are rendered and on screen get a pin (the caller filters);
  * resolved threads never reach here – main counts open threads only, so a
  * count of 0 draws nothing.
+ *
+ * The placement rule itself is the shared overlay core's `placePin` (spec
+ * 024), so every preview's pins land alike; this module orders the elements
+ * and draws the pins.
  */
-import {
-  PIN_BODY,
-  PIN_BOX_PX,
-  PIN_EDGE_INSET_PX,
-  PIN_MAX_STEPS,
-  PIN_PATH,
-  PIN_STEP_PX,
-  PIN_TIP,
-  PIN_TIP_OFFSET_PX
-} from './constants'
-import { clipToViewport, overlaps, type Box, type Viewport } from './geometry'
+import { placePin } from '../../shared/comments/overlayCore/pinLayout'
+import { PIN_BODY, PIN_BOX_PX, PIN_PATH } from './constants'
+import type { Box, Viewport } from './geometry'
 
 const SVG_NS = 'http://www.w3.org/2000/svg'
 const HTML_NS = 'http://www.w3.org/1999/xhtml'
@@ -90,16 +86,6 @@ function documentOrder(a: PinInput, b: PinInput): number {
   return (a.element.compareDocumentPosition(b.element) & 4) !== 0 ? -1 : 1
 }
 
-/** The drawn bubble inside a pin's hit box: the view box's 2–22 units. */
-function bodyOf(box: Box, scale: number): Box {
-  const inset = PIN_TIP.x * scale
-  return { left: box.left + inset, top: box.top + inset, width: box.width - 2 * inset, height: box.height - 2 * inset }
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(Math.max(value, min), Math.max(min, max))
-}
-
 /**
  * Place the pins of `inputs` in `viewport` (the frame's visible viewport,
  * `viewportOf`); a pin's box is `size` CSS pixels square.
@@ -109,30 +95,16 @@ export function placePins(
   viewport: Viewport,
   size: number = PIN_BOX_PX
 ): PinPlacement[] {
-  const scale = size / PIN_BOX_PX
-  const inset = PIN_EDGE_INSET_PX
   const placed: PinPlacement[] = []
+  /** The boxes of `placed`, in the same order: what a later pin steps away from. */
+  const boxes: Box[] = []
   for (const input of [...inputs].sort(documentOrder)) {
     const content = pinContent(input.count, input.status)
-    const visible = clipToViewport(input.box, viewport)
-    if (content === null || visible === null) continue
-    const tipX = visible.left + visible.width + PIN_TIP_OFFSET_PX
-    const tipY = visible.top - PIN_TIP_OFFSET_PX
-    let left = clamp(tipX - PIN_TIP.x * scale, inset, viewport.width - size - inset)
-    const top = clamp(tipY - PIN_TIP.y * scale, inset, viewport.height - size - inset)
-    const at = (x: number): Box => ({ left: x, top, width: size, height: size })
-    // Collisions are judged on the drawn bubble (20 px inside the 24 px hit
-    // box), so pins 22 px apart sit side by side with a 2 px gap. They run
-    // after the clamp: every full-width element's pin lands on the same
-    // clamped spot, so one in the same row steps left like any other.
-    const row = placed.filter(pin => Math.abs(pin.box.top - top) < size).map(pin => bodyOf(pin.box, scale))
-    const step = PIN_STEP_PX * scale
-    for (let moves = 0; moves < PIN_MAX_STEPS && left - step >= inset; moves += 1) {
-      const body = bodyOf(at(left), scale)
-      if (!row.some(other => overlaps(other, body))) break
-      left -= step
-    }
-    placed.push({ ...input, content, box: at(left) })
+    if (content === null) continue
+    const box = placePin(input.box, boxes, viewport, size)
+    if (box === null) continue
+    boxes.push(box)
+    placed.push({ ...input, content, box })
   }
   return placed
 }
