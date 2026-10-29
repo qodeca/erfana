@@ -32,11 +32,11 @@
  * @module HtmlPreviewPanel/comments/NewCommentView
  */
 import { useEffect, useRef, useState } from 'react'
-import type { CommentSaveResult } from '../../../../../../shared/ipc/preview-comment-schema'
-import { ErrorCode } from '../../../../../../shared/errors'
-import { commentDrafts } from '../../../../stores/usePreviewCommentStore'
-import { useLatestRef } from '../../../../hooks/useLatestRef'
-import { useCommentDirtyGuard } from '../../../../hooks/useCommentDirtyGuard'
+import type { CommentSaveResult } from '../../../../shared/ipc/preview-comment-schema'
+import { ErrorCode } from '../../../../shared/errors'
+import { commentDrafts } from '../../stores/usePreviewCommentStore'
+import { useLatestRef } from '../../hooks/useLatestRef'
+import { useCommentDirtyGuard } from '../../hooks/useCommentDirtyGuard'
 import {
   COPY,
   IDENTITY_COPY,
@@ -58,10 +58,10 @@ import {
   VisibleText
 } from './CommentParts'
 import { IdentityEditor } from './IdentityStep'
-import { useCommentAlert, useInnerStep } from './commentLive'
+import { useCommentAlert, useInnerStep } from '../Panels/HtmlPreviewPanel/comments/commentLive'
 import { onCommentWriteSettled, trackCommentWrite, useCommentWritePending } from './commentPendingWrites'
 import { draftKeyOf, type CommentWindowRequest } from './commentWindowTypes'
-import { TEST_IDS } from '../../../../constants/testids'
+import { TEST_IDS } from '../../constants/testids'
 
 /** Props for {@link NewCommentView}. */
 export interface NewCommentViewProps {

@@ -36,15 +36,15 @@
  */
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { defaultRangeExtractor, useVirtualizer, type Range } from '@tanstack/react-virtual'
-import { renderIcon } from '../../../../utils/iconRegistry'
-import type { CommentListState } from '../../../../stores/usePreviewCommentStore'
+import { renderIcon } from '../../utils/iconRegistry'
+import type { CommentListState } from '../../stores/usePreviewCommentStore'
 import { COPY, DRAWER_COPY, readErrorText, unreadFilesText } from './commentCopy'
 import { formatCommentTime, plural, visibleString } from './commentFormat'
 import { drawerRows, type DrawerFilter, type DrawerRow } from './commentRows'
 import { ActionButton, CommentBanner, VisibleText } from './CommentParts'
 import './CommentWindow.css'
 import './CommentDrawer.css'
-import { TEST_IDS } from '../../../../constants/testids'
+import { TEST_IDS } from '../../constants/testids'
 
 /** A list longer than this is windowed (§10.6 "Rows virtualised above ~200 items"). */
 export const VIRTUALISE_ABOVE = 200

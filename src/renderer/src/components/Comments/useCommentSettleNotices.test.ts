@@ -7,15 +7,15 @@
  */
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ErrorCode } from '../../../../../../shared/errors'
-import type { CommentSaveRequest } from '../../../../../../shared/ipc/preview-comment-schema'
+import { ErrorCode } from '../../../../shared/errors'
+import type { CommentSaveRequest } from '../../../../shared/ipc/preview-comment-schema'
 import {
   DRAFT_TOKEN,
   installCommentsBridge,
   newRequest,
   threadsRequest,
   type FakeCommentsBridge
-} from './__test-helpers__/commentTestKit'
+} from '../Panels/HtmlPreviewPanel/comments/__test-helpers__/commentTestKit'
 import { resetCommentPendingWrites, trackCommentWrite } from './commentPendingWrites'
 import { draftKeyOf, type CommentWindowRequest } from './commentWindowTypes'
 import { useCommentSettleNotices } from './useCommentSettleNotices'

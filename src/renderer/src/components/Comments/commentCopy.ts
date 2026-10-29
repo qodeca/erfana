@@ -17,14 +17,14 @@
  *
  * @module HtmlPreviewPanel/comments/commentCopy
  */
-import { ERROR_MESSAGES, ErrorCode } from '../../../../../../shared/errors'
+import { ERROR_MESSAGES, ErrorCode } from '../../../../shared/errors'
 import type {
   CommentPickerElement,
   CommentSaveRequest,
   CommentUnavailableReason
-} from '../../../../../../shared/ipc/preview-comment-schema'
-import { PREVIEW_LIMITS } from '../../../../../../shared/preview-limits'
-import { isMacOS } from '../../../../utils/platform'
+} from '../../../../shared/ipc/preview-comment-schema'
+import { PREVIEW_LIMITS } from '../../../../shared/preview-limits'
+import { isMacOS } from '../../utils/platform'
 import { plural } from './commentFormat'
 
 /** A byte limit as the reader reads it: `25 MB`. */

@@ -8,7 +8,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GlobalSettings } from '../../../../../shared/ipc/global-settings-schema'
 import { useGlobalSettingsStore } from '../../../stores/useGlobalSettingsStore'
-import { IDENTITY_COPY, SETTINGS_COPY } from '../../Panels/HtmlPreviewPanel/comments/commentCopy'
+import { IDENTITY_COPY, SETTINGS_COPY } from '../../Comments/commentCopy'
 import { CommentsSection } from './CommentsSection'
 
 const settingsWith = (comments: object, enabled = true): GlobalSettings =>

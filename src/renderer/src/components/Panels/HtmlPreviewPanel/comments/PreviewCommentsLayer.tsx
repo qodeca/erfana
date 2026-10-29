@@ -27,11 +27,11 @@ import type {
 import type { CommentIdentitySettings } from '../../../../../../shared/ipc/global-settings-schema'
 import type { CommentListState } from '../../../../stores/usePreviewCommentStore'
 import { ContextMenu } from '../../../ContextMenu/ContextMenu'
-import { COPY } from './commentCopy'
-import type { Box } from './commentPlacement'
-import type { IdentityFormData } from './commentSchemas'
-import { CommentWindow } from './CommentWindow'
-import type { CommentWindowRequest, ElementDraft } from './commentWindowTypes'
+import { COPY } from '../../../Comments/commentCopy'
+import type { Box } from '../../../Comments/commentPlacement'
+import type { IdentityFormData } from '../../../Comments/commentSchemas'
+import { CommentWindow } from '../../../Comments/CommentWindow'
+import type { CommentWindowRequest, ElementDraft } from '../../../Comments/commentWindowTypes'
 
 /** Props for {@link PreviewCommentsLayer}. */
 export interface PreviewCommentsLayerProps {

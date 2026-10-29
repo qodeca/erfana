@@ -29,14 +29,14 @@
  * @module HtmlPreviewPanel/comments/commentPendingWrites
  */
 import { useSyncExternalStore } from 'react'
-import { ErrorCode } from '../../../../../../shared/errors'
+import { ErrorCode } from '../../../../shared/errors'
 import type {
   CommentSaveRequest,
   CommentSaveResult,
   CommentSaveSettled
-} from '../../../../../../shared/ipc/preview-comment-schema'
-import { commentGateway } from '../../../../services/preview/commentGateway'
-import { commentDrafts } from '../../../../stores/usePreviewCommentStore'
+} from '../../../../shared/ipc/preview-comment-schema'
+import { commentGateway } from '../../services/preview/commentGateway'
+import { commentDrafts } from '../../stores/usePreviewCommentStore'
 
 /**
  * How long a write answered "pending" is waited for. Main's own limits are far

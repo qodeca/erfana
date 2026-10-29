@@ -34,10 +34,10 @@ import {
   thread,
   type FakeCommentsBridge
 } from './__test-helpers__/commentTestKit'
-import { ANNOUNCE, COPY, DRAWER_COPY } from './commentCopy'
-import { drawerRows } from './commentRows'
+import { ANNOUNCE, COPY, DRAWER_COPY } from '../../../Comments/commentCopy'
+import { drawerRows } from '../../../Comments/commentRows'
 import { usePreviewComments, type PreviewComments } from './usePreviewComments'
-import { resetCommentPendingWrites } from './commentPendingWrites'
+import { resetCommentPendingWrites } from '../../../Comments/commentPendingWrites'
 
 const PANEL = 'preview-index'
 

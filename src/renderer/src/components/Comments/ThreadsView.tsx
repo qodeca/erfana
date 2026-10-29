@@ -26,7 +26,7 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import type {
   CommentFileView,
   CommentThreadView
-} from '../../../../../../shared/ipc/preview-comment-schema'
+} from '../../../../shared/ipc/preview-comment-schema'
 import {
   COPY,
   deleteBlockText,
@@ -43,8 +43,8 @@ import {
   type RunCommentOp,
   type ThreadContext
 } from './CommentThread'
-import { useInnerStep } from './commentLive'
-import { TEST_IDS } from '../../../../constants/testids'
+import { useInnerStep } from '../Panels/HtmlPreviewPanel/comments/commentLive'
+import { TEST_IDS } from '../../constants/testids'
 
 type DamagedBlock = CommentFileView['damaged'][number]
 type NewerBlock = CommentFileView['newer'][number]

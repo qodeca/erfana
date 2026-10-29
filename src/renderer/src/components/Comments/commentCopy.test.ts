@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ERROR_MESSAGES, ErrorCode } from '../../../../../../shared/errors'
-import { CommentUnavailableReasonSchema } from '../../../../../../shared/ipc/preview-comment-schema'
+import { ERROR_MESSAGES, ErrorCode } from '../../../../shared/errors'
+import { CommentUnavailableReasonSchema } from '../../../../shared/ipc/preview-comment-schema'
 
 const platform = vi.hoisted(() => ({ mac: false }))
-vi.mock('../../../../utils/platform', () => ({
+vi.mock('../../utils/platform', () => ({
   isMacOS: () => platform.mac,
   isWindows: () => !platform.mac
 }))

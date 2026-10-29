@@ -23,7 +23,7 @@ import { useEffect, useRef, useState } from 'react'
 import { IDENTITY_COPY, COPY } from './commentCopy'
 import { validateIdentity, type IdentityFormData, type IdentityFormErrors } from './commentSchemas'
 import { CommentInput, DialogButton } from './CommentParts'
-import { TEST_IDS } from '../../../../constants/testids'
+import { TEST_IDS } from '../../constants/testids'
 
 /** Props shared by both identity forms. */
 interface IdentityFormProps {

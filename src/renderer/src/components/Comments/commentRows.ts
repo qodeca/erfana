@@ -20,7 +20,7 @@
  *
  * @module HtmlPreviewPanel/comments/commentRows
  */
-import type { CommentFileView } from '../../../../../../shared/ipc/preview-comment-schema'
+import type { CommentFileView } from '../../../../shared/ipc/preview-comment-schema'
 import { COPY, DRAWER_COPY, inFrameTag } from './commentCopy'
 import { elementLabel } from './commentFormat'
 

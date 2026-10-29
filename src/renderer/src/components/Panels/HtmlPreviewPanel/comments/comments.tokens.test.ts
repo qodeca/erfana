@@ -23,7 +23,7 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { EDGE_PX, WINDOW_MAX_HEIGHT_PX, WINDOW_MAX_WIDTH_PX } from './commentPlacement'
+import { EDGE_PX, WINDOW_MAX_HEIGHT_PX, WINDOW_MAX_WIDTH_PX } from '../../../Comments/commentPlacement'
 
 const REPO = resolve(__dirname, '../../../../../../..')
 const read = (path: string): string => readFileSync(resolve(REPO, path), 'utf8')
@@ -31,10 +31,10 @@ const read = (path: string): string => readFileSync(resolve(REPO, path), 'utf8')
 const TOKENS_CSS = read('src/renderer/src/styles/design-tokens.css')
 const CHROME_CSS: Record<string, string> = {
   'CommentWindow.css': read(
-    'src/renderer/src/components/Panels/HtmlPreviewPanel/comments/CommentWindow.css'
+    'src/renderer/src/components/Comments/CommentWindow.css'
   ),
   'CommentDrawer.css': read(
-    'src/renderer/src/components/Panels/HtmlPreviewPanel/comments/CommentDrawer.css'
+    'src/renderer/src/components/Comments/CommentDrawer.css'
   ),
   'CommentsSection.css': read('src/renderer/src/components/Settings/sections/CommentsSection.css'),
   'PreviewNavControls.css': read(

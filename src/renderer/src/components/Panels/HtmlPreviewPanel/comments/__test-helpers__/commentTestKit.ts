@@ -20,7 +20,7 @@ import type {
   CommentThreadView,
   PreviewCommentsBridge
 } from '../../../../../../../shared/ipc/preview-comment-schema'
-import type { CommentWindowRequest } from '../commentWindowTypes'
+import type { CommentWindowRequest } from '../../../../Comments/commentWindowTypes'
 
 type Message = CommentThreadView['messages'][number]
 

@@ -8,15 +8,15 @@
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ErrorCode } from '../../../../../../shared/errors'
-import type { CommentSaveResult } from '../../../../../../shared/ipc/preview-comment-schema'
-import type { CommentIdentitySettings } from '../../../../../../shared/ipc/global-settings-schema'
+import { ErrorCode } from '../../../../shared/errors'
+import type { CommentSaveResult } from '../../../../shared/ipc/preview-comment-schema'
+import type { CommentIdentitySettings } from '../../../../shared/ipc/global-settings-schema'
 import {
   commentDrafts,
   INITIAL_PANEL_COMMENT_STATE
-} from '../../../../stores/usePreviewCommentStore'
-import { useOverlayOccluderStore } from '../../../../stores/useOverlayOccluderStore'
-import type { CommentDirtyGuard } from '../../../../hooks/useCommentDirtyGuard'
+} from '../../stores/usePreviewCommentStore'
+import { useOverlayOccluderStore } from '../../stores/useOverlayOccluderStore'
+import type { CommentDirtyGuard } from '../../hooks/useCommentDirtyGuard'
 
 const guard = vi.hoisted(() => ({
   current: {
@@ -28,7 +28,7 @@ const guard = vi.hoisted(() => ({
     holdForWrite: () => () => {}
   } as CommentDirtyGuard
 }))
-vi.mock('../../../../hooks/useCommentDirtyGuard', () => ({
+vi.mock('../../hooks/useCommentDirtyGuard', () => ({
   useCommentDirtyGuard: () => guard.current
 }))
 
@@ -37,7 +37,7 @@ import {
   installCommentsBridge,
   newRequest,
   type FakeCommentsBridge
-} from './__test-helpers__/commentTestKit'
+} from '../Panels/HtmlPreviewPanel/comments/__test-helpers__/commentTestKit'
 import { COPY, IDENTITY_COPY, unsavedConflictText } from './commentCopy'
 import { CommentWindow, type CommentWindowProps } from './CommentWindow'
 import { draftKeyOf } from './commentWindowTypes'

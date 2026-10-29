@@ -64,8 +64,8 @@ import { previewPlaceholderLabel, selectFallback, selectPanelView } from './html
 import './HtmlPreviewPanel.css'
 import { previewGateway } from '../../../services/previewGateway'
 import { usePreviewComments } from './comments/usePreviewComments'
-import { CommentToolbarTools } from './comments/CommentToolbarTools'
-import { CommentDrawer } from './comments/CommentDrawer'
+import { CommentToolbarTools } from '../../Comments/CommentToolbarTools'
+import { CommentDrawer } from '../../Comments/CommentDrawer'
 import { PreviewCommentsLayer } from './comments/PreviewCommentsLayer'
 
 /** Parameters passed to {@link HtmlPreviewPanel} via dockview. */

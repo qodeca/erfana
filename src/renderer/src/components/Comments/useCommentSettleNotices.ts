@@ -17,8 +17,8 @@
  * @module HtmlPreviewPanel/comments/useCommentSettleNotices
  */
 import { useEffect } from 'react'
-import { ErrorCode } from '../../../../../../shared/errors'
-import { useLatestRef } from '../../../../hooks/useLatestRef'
+import { ErrorCode } from '../../../../shared/errors'
+import { useLatestRef } from '../../hooks/useLatestRef'
 import { saveFailureCopy, writtenAnnouncement } from './commentCopy'
 import { onCommentWriteSettled, writeKeyOf, type SettledCommentWrite } from './commentPendingWrites'
 import { draftKeyOf, type CommentWindowRequest } from './commentWindowTypes'

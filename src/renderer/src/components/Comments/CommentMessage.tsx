@@ -23,17 +23,17 @@
  * @module HtmlPreviewPanel/comments/CommentMessage
  */
 import { useEffect, useId, useRef, useState } from 'react'
-import { renderIcon } from '../../../../utils/iconRegistry'
-import type { CommentThreadView } from '../../../../../../shared/ipc/preview-comment-schema'
-import { ContextMenu } from '../../../ContextMenu/ContextMenu'
-import { commentDrafts } from '../../../../stores/usePreviewCommentStore'
+import { renderIcon } from '../../utils/iconRegistry'
+import type { CommentThreadView } from '../../../../shared/ipc/preview-comment-schema'
+import { ContextMenu } from '../ContextMenu/ContextMenu'
+import { commentDrafts } from '../../stores/usePreviewCommentStore'
 import { COPY, deleteCommentText, deleteThreadText, fieldHint } from './commentCopy'
 import { formatCommentTime, visibleString } from './commentFormat'
-import { editDraftKey, useInnerStep } from './commentLive'
+import { editDraftKey, useInnerStep } from '../Panels/HtmlPreviewPanel/comments/commentLive'
 import { validateCommentText } from './commentSchemas'
 import { CommentField, DialogButton, VisibleText } from './CommentParts'
 import type { ThreadContext } from './CommentThread'
-import { TEST_IDS } from '../../../../constants/testids'
+import { TEST_IDS } from '../../constants/testids'
 
 type Message = CommentThreadView['messages'][number]
 

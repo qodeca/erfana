@@ -19,7 +19,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import type { CommentModeChanged } from '../../../../../../shared/ipc/preview-comment-schema'
 import { useLatestRef } from '../../../../hooks/useLatestRef'
-import { ANNOUNCE } from './commentCopy'
+import { ANNOUNCE } from '../../../Comments/commentCopy'
 
 /**
  * §10.10 "Announce" – where the page's keyboard picker moved (§10.8, E-022).

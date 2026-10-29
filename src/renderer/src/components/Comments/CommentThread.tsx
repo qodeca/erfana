@@ -30,20 +30,20 @@
  * @module HtmlPreviewPanel/comments/CommentThread
  */
 import { useEffect, useId, useRef, useState } from 'react'
-import { renderIcon } from '../../../../utils/iconRegistry'
+import { renderIcon } from '../../utils/iconRegistry'
 import type {
   CommentSaveRequest,
   CommentThreadView
-} from '../../../../../../shared/ipc/preview-comment-schema'
-import { commentDrafts } from '../../../../stores/usePreviewCommentStore'
+} from '../../../../shared/ipc/preview-comment-schema'
+import { commentDrafts } from '../../stores/usePreviewCommentStore'
 import { COPY, fieldHint, saveShortcutAria, saveShortcutLabel } from './commentCopy'
 import { formatCommentTime, visibleString } from './commentFormat'
-import { replyDraftKey } from './commentLive'
+import { replyDraftKey } from '../Panels/HtmlPreviewPanel/comments/commentLive'
 import { onCommentWriteSettled, useCommentWritePending } from './commentPendingWrites'
 import { CommentMessageView } from './CommentMessage'
 import { validateCommentText } from './commentSchemas'
 import { CommentField, DialogButton, VisibleText } from './CommentParts'
-import { TEST_IDS } from '../../../../constants/testids'
+import { TEST_IDS } from '../../constants/testids'
 
 /** A write the thread asks the window to make; resolves whether it was saved. */
 export type RunCommentOp = (request: CommentSaveRequest) => Promise<boolean>

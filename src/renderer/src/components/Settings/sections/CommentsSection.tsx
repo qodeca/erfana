@@ -35,14 +35,14 @@
  */
 import { useId, useState } from 'react'
 import { useGlobalSettingsStore } from '../../../stores/useGlobalSettingsStore'
-import { SETTINGS_COPY } from '../../Panels/HtmlPreviewPanel/comments/commentCopy'
+import { SETTINGS_COPY } from '../../Comments/commentCopy'
 import {
   AuthorEmailSchema,
   AuthorNameSchema
-} from '../../Panels/HtmlPreviewPanel/comments/commentSchemas'
-import { CommentBanner, CommentInput } from '../../Panels/HtmlPreviewPanel/comments/CommentParts'
+} from '../../Comments/commentSchemas'
+import { CommentBanner, CommentInput } from '../../Comments/CommentParts'
 import { useLiveText } from '../../Panels/HtmlPreviewPanel/comments/commentLive'
-import '../../Panels/HtmlPreviewPanel/comments/CommentWindow.css'
+import '../../Comments/CommentWindow.css'
 import './CommentsSection.css'
 import { TEST_IDS } from '../../../constants/testids'
 

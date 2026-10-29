@@ -8,15 +8,15 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ErrorCode } from '../../../../../../shared/errors'
+import { ErrorCode } from '../../../../shared/errors'
 import {
   CommentAnchorStatusSchema,
   CommentDraftOpenedSchema,
   CommentsChangedSchema,
   type CommentFileView,
   type CommentSaveResult
-} from '../../../../../../shared/ipc/preview-comment-schema'
-import { commentDrafts, type CommentListState } from '../../../../stores/usePreviewCommentStore'
+} from '../../../../shared/ipc/preview-comment-schema'
+import { commentDrafts, type CommentListState } from '../../stores/usePreviewCommentStore'
 import {
   damaged,
   fileView,
@@ -25,7 +25,7 @@ import {
   thread,
   threadsRequest,
   type FakeCommentsBridge
-} from './__test-helpers__/commentTestKit'
+} from '../Panels/HtmlPreviewPanel/comments/__test-helpers__/commentTestKit'
 import { COPY } from './commentCopy'
 import { CommentWindow, type CommentWindowProps } from './CommentWindow'
 import { newCommentFrom } from './commentWindowHeading'

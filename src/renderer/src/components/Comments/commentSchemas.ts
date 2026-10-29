@@ -19,7 +19,7 @@
  * @module HtmlPreviewPanel/comments/commentSchemas
  */
 import { z } from 'zod'
-import { PREVIEW_LIMITS } from '../../../../../../shared/preview-limits'
+import { PREVIEW_LIMITS } from '../../../../shared/preview-limits'
 import { IDENTITY_COPY, COPY, tooLongText } from './commentCopy'
 import { countCharacters, hasForbiddenIdentityCharacter, sanitizeMessage } from './commentFormat'
 

@@ -22,9 +22,9 @@
  *
  * @module HtmlPreviewPanel/comments/CommentToolbarTools
  */
-import { renderIcon } from '../../../../utils/iconRegistry'
-import type { CommentUnavailableReason } from '../../../../../../shared/ipc/preview-comment-schema'
-import type { CommentCounts } from '../../../../stores/usePreviewCommentStore'
+import { renderIcon } from '../../utils/iconRegistry'
+import type { CommentUnavailableReason } from '../../../../shared/ipc/preview-comment-schema'
+import type { CommentCounts } from '../../stores/usePreviewCommentStore'
 import {
   TOOL_COPY,
   commentModeAriaShortcut,
@@ -32,7 +32,7 @@ import {
   modeTooltip,
   unavailableTooltip
 } from './commentCopy'
-import { TEST_IDS } from '../../../../constants/testids'
+import { TEST_IDS } from '../../constants/testids'
 
 /** Reasons that leave nothing readable: list and pins go `aria-disabled` too. */
 const UNREADABLE: ReadonlySet<CommentUnavailableReason> = new Set([

@@ -5223,7 +5223,7 @@
       "quote": "(`CommentWindow.css:441`, a recorded exception)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/CommentWindow.css:441",
+      "source": "src/renderer/src/components/Comments/CommentWindow.css:441",
       "match": ".erf-comment-banner--info {"
     },
     {
@@ -5264,7 +5264,7 @@
       "quote": "reacts on read-only fields (`CommentWindow.css:300`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/CommentWindow.css:300",
+      "source": "src/renderer/src/components/Comments/CommentWindow.css:300",
       "match": ".erf-comment-textarea:hover,"
     },
     {
@@ -5274,7 +5274,7 @@
       "quote": "instead of reading `COMMENT_MAX_CHARS` (`commentCopy.ts:279`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentCopy.ts:279",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:279",
       "match": "return `Comments can be up to 4,000 characters."
     },
     {
@@ -5477,7 +5477,7 @@
       "quote": "`commentCopy.ts:46` types \"Cmd+Option+M\" for macOS",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentCopy.ts:46",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:46",
       "match": "return isMacOS() ? 'Cmd+Option+M' : 'Ctrl+Alt+M'"
     },
     {
@@ -5557,7 +5557,7 @@
       "quote": "(`commentCopy.ts:251`, `:252`, `:257`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentCopy.ts:251",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:251",
       "match": "deleteBlock: 'Delete block',"
     },
     {
@@ -7265,7 +7265,7 @@
       "quote": "Banners inside the window (`.erf-banner`) with the spoken severity word – which the shipped `CommentBanner` still lacks",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/CommentParts.tsx:77",
+      "source": "src/renderer/src/components/Comments/CommentParts.tsx:77",
       "match": "renderIcon('alert-triangle', { size: 16, 'aria-hidden': true })",
       "note": "The banner renders only its icon, hidden from assistive tech, before the text – no spoken severity word."
     },
@@ -7539,7 +7539,7 @@
       "quote": "the three toolbar toggles are one `CommentToolbarTools.tsx`",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/CommentToolbarTools.tsx:76",
+      "source": "src/renderer/src/components/Comments/CommentToolbarTools.tsx:76",
       "match": "export function CommentToolbarTools({",
       "note": "CommentModeToggle/CommentListToggle/ShowPinsToggle .tsx do not exist; the tools ship as one CommentToolbarTools component."
     },
@@ -17991,7 +17991,7 @@
       "quote": "filtered by **Open**, **Resolved** and **Needs attention**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/CommentDrawer.tsx:71",
+      "source": "src/renderer/src/components/Comments/CommentDrawer.tsx:71",
       "match": "{ key: 'attention', label: 'Needs attention', empty: DRAWER_COPY.emptyAttention }"
     },
     {
@@ -18001,7 +18001,7 @@
       "quote": "A comment whose element is hidden right now is tagged **Not visible now**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentCopy.ts:383",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:383",
       "match": "notVisible: 'Not visible now',"
     },
     {
@@ -18011,7 +18011,7 @@
       "quote": "one whose element is gone is tagged **Element not found**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentCopy.ts:384",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:384",
       "match": "notFound: 'Element not found',"
     },
     {
@@ -18021,7 +18021,7 @@
       "quote": "Erfana asks you to save those first (\"Save your edits first\")",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentCopy.ts:240",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:240",
       "match": "unsavedTitle: 'Save your edits first',"
     },
     {
@@ -18061,7 +18061,7 @@
       "quote": "**Right-click** opens a small menu with **Add comment**.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentCopy.ts:246",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:246",
       "match": "addComment: 'Add comment',"
     },
     {
@@ -18071,7 +18071,7 @@
       "quote": "The **Show comment icons** button hides or shows the pins for this tab only",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentCopy.ts:418",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:418",
       "match": "pins: 'Show comment icons',"
     },
     {
@@ -29059,7 +29059,7 @@
       "quote": "comment mode, pins, the Comments drawer, threads |",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentCopy.ts:372",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:372",
       "match": "/** §10.10 \"Drawer\" strings. */",
       "test": "e2e/html-preview-comments.e2e.ts",
       "note": "Removed the (v0.23.0) version tag: no code line proves the release it shipped in. Checker also removed docs/html-preview/README.md from the Source column: a Markdown doc is not a code source."
@@ -29733,7 +29733,7 @@
       "quote": "Comments > Comments in HTML preview, Your name, Your email (optional)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentCopy.ts:363",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:363",
       "match": "emailLabel: 'Your email (optional)',"
     },
     {
@@ -30437,7 +30437,7 @@
       "quote": "Turn HTML Preview comment mode on or off; leave it",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentCopy.ts:452",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:452",
       "match": "Esc to leave."
     },
     {
@@ -32248,7 +32248,7 @@
       "quote": "Select **Comment mode** in the toolbar",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentCopy.ts:416",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:416",
       "match": "mode: 'Comment mode'"
     },
     {
@@ -32268,7 +32268,7 @@
       "quote": "right-click it and choose **Add comment**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentCopy.ts:246",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:246",
       "match": "addComment: 'Add comment'"
     },
     {
@@ -32278,7 +32278,7 @@
       "quote": "enter your name in **Before your first comment**",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentCopy.ts:331",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:331",
       "match": "title: 'Before your first comment'",
       "note": "Named the first-use dialog."
     },
@@ -32289,7 +32289,7 @@
       "quote": "and select **Continue**.",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentCopy.ts:341",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:341",
       "match": "continue: 'Continue'",
       "note": "Added the dialog's confirm button."
     },
@@ -32300,7 +32300,7 @@
       "quote": "Type the comment and select **Save**.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentCopy.ts:224",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:224",
       "match": "save: 'Save'"
     },
     {
@@ -32375,7 +32375,7 @@
       "quote": "Select **Comment mode** in the toolbar, or press",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/CommentToolbarTools.tsx:108",
+      "source": "src/renderer/src/components/Comments/CommentToolbarTools.tsx:108",
       "match": "aria-label={TOOL_COPY.mode}",
       "note": "Checker: the Comment mode button is rendered by the toolbar tools component."
     },
@@ -35591,7 +35591,7 @@
       "quote": "lists every comment as Open, Resolved or Needs attention",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/CommentDrawer.tsx:71",
+      "source": "src/renderer/src/components/Comments/CommentDrawer.tsx:71",
       "match": "label: 'Needs attention'"
     },
     {
@@ -35601,7 +35601,7 @@
       "quote": "select **Comment mode** in the toolbar",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentCopy.ts:416",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:416",
       "match": "mode: 'Comment mode',"
     },
     {
@@ -35611,7 +35611,7 @@
       "quote": "press <kbd>⌥⌘M</kbd> / <kbd>Ctrl+Alt+M</kbd>",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentCopy.ts:46",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:46",
       "match": "isMacOS() ? 'Cmd+Option+M' : 'Ctrl+Alt+M'"
     },
     {
@@ -35621,7 +35621,7 @@
       "quote": "right-click it and choose **Add comment**",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentCopy.ts:246",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:246",
       "match": "addComment: 'Add comment',"
     },
     {
@@ -35631,7 +35631,7 @@
       "quote": "<kbd>Esc</kbd> leaves comment mode.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentCopy.ts:427",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:427",
       "match": "click an element to comment, Esc to leave"
     },
     {
@@ -35641,7 +35641,7 @@
       "quote": "The first comment asks for your name",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/IdentityStep.tsx:10",
+      "source": "src/renderer/src/components/Comments/IdentityStep.tsx:10",
       "match": "step 1 INSIDE the comment window on the first"
     },
     {
@@ -35651,7 +35651,7 @@
       "quote": "in [Settings > Comments](settings.md#comments)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentCopy.ts:357",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:357",
       "match": "title: 'Comments',"
     },
     {
@@ -35711,7 +35711,7 @@
       "quote": "the **Comments** drawer lists every comment",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentCopy.ts:374",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:374",
       "match": "title: 'Comments',"
     },
     {
@@ -35721,7 +35721,7 @@
       "quote": "change it, or turn comments off, in [Settings > Comments]",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentCopy.ts:358",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:358",
       "match": "flagLabel: 'Comments in HTML preview'"
     },
     {
@@ -39579,7 +39579,7 @@
       "quote": "Lets you add comments to elements of a previewed page.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentCopy.ts:359",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:359",
       "match": "flagHint: 'Lets you add comments to elements of a previewed page.',"
     },
     {
@@ -39599,7 +39599,7 @@
       "quote": "| **Your name** | Empty |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentCopy.ts:360",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:360",
       "match": "nameLabel: 'Your name',"
     },
     {
@@ -39609,7 +39609,7 @@
       "quote": "changing it affects new comments only",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentCopy.ts:362",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:362",
       "match": "Changing it affects new comments only."
     },
     {
@@ -39619,7 +39619,7 @@
       "quote": "Leave it empty and Erfana asks for a name the next time you comment.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/CommentWindow.tsx:152",
+      "source": "src/renderer/src/components/Comments/CommentWindow.tsx:152",
       "match": "!identity.authorName)",
       "note": "Repointed evidence to the comment window, which shows the identity step when no name is saved."
     },
@@ -39630,7 +39630,7 @@
       "quote": "| **Your email (optional)** | Empty | Also saved into the file. Leave it empty to keep it out. |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentCopy.ts:364",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:364",
       "match": "emailHint: 'Also saved into the file. Leave empty to keep it out.',"
     },
     {
@@ -39660,7 +39660,7 @@
       "quote": "in the page source and in git history once pushed",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentCopy.ts:366",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:366",
       "match": "in the page source and in git history once pushed."
     },
     {
@@ -43415,7 +43415,7 @@
       "quote": "Turns [comments in HTML preview](html-preview.md#comments) on or off",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentCopy.ts:358",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:358",
       "match": "flagLabel: 'Comments in HTML preview',",
       "note": "Link text said 'HTML Preview comments' (title case); now follows the in-app label in sentence case."
     },
@@ -47710,7 +47710,7 @@
       "quote": "a drawer listing every comment (Open, Resolved, Needs attention)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/CommentDrawer.tsx:71",
+      "source": "src/renderer/src/components/Comments/CommentDrawer.tsx:71",
       "match": "label: 'Needs attention'"
     },
     {
@@ -47840,7 +47840,7 @@
       "quote": "threads with reply, edit, resolve and delete",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentCopy.ts:227",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:227",
       "match": "resolve: 'Resolve',"
     },
     {
@@ -48428,7 +48428,7 @@
       "quote": "| Comment mode | Toggle, `aria-pressed`, `erf-band__tool--toggle` | `message-square-plus`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/CommentToolbarTools.tsx:120",
+      "source": "src/renderer/src/components/Comments/CommentToolbarTools.tsx:120",
       "match": "renderIcon('message-square-plus'"
     },
     {
@@ -48438,7 +48438,7 @@
       "quote": "| Comments list | Disclosure, `aria-expanded` + `aria-controls` | `messages-square` + count",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/CommentToolbarTools.tsx:137",
+      "source": "src/renderer/src/components/Comments/CommentToolbarTools.tsx:137",
       "match": "renderIcon('messages-square'"
     },
     {
@@ -48448,7 +48448,7 @@
       "quote": "`message-square` / `message-square-off`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/CommentToolbarTools.tsx:155",
+      "source": "src/renderer/src/components/Comments/CommentToolbarTools.tsx:155",
       "match": "renderIcon('message-square-off'"
     },
     {
@@ -48520,7 +48520,7 @@
       "quote": "One item \"Add comment\" (`message-square-plus`), menu label \"Element\"",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentCopy.ts:248",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:248",
       "match": "menuLabel: 'Element'"
     },
     {
@@ -48540,7 +48540,7 @@
       "quote": "block size ≤ `min(560px, page area − 16px)`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/CommentWindow.css:66",
+      "source": "src/renderer/src/components/Comments/CommentWindow.css:66",
       "match": "max-block-size: min(560px, 100vh - var(--space-8))"
     },
     {
@@ -48550,7 +48550,7 @@
       "quote": "4,000 characters, counter from 3,600",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentFormat.ts:22",
+      "source": "src/renderer/src/components/Comments/commentFormat.ts:22",
       "match": "COMMENT_WARN_CHARS = 3_600"
     },
     {
@@ -48611,7 +48611,7 @@
       "quote": "Flow sibling at the inline end of `.html-preview-page-area` (never absolute), 320 px (min 280)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/CommentDrawer.css:19",
+      "source": "src/renderer/src/components/Comments/CommentDrawer.css:19",
       "match": "min-inline-size: 280px"
     },
     {
@@ -48631,7 +48631,7 @@
       "quote": "Rows virtualised above ~200 items.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/CommentDrawer.tsx:50",
+      "source": "src/renderer/src/components/Comments/CommentDrawer.tsx:50",
       "match": "VIRTUALISE_ABOVE = 200"
     },
     {
@@ -48671,7 +48671,7 @@
       "quote": "not ready: \"Comment mode – available once the page has loaded\"",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentCopy.ts:417",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:417",
       "match": "Comment mode – available once the page has loaded"
     },
     {
@@ -48681,7 +48681,7 @@
       "quote": "\"Show comment icons – off: icons hidden on this page\"",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentCopy.ts:420",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:420",
       "match": "Show comment icons – off: icons hidden on this page"
     },
     {
@@ -48691,7 +48691,7 @@
       "quote": "\"page too large – it has too many elements\"",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentCopy.ts:71",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:71",
       "match": "'page too large – it has too many elements'",
       "note": "Listed reasons (file is a link, inline frame, unresolved git conflict) the unavailable-reason enum does not have, and missed page-too-large, document-replaced and disabled."
     },
@@ -48763,7 +48763,7 @@
       "quote": "A settle that never comes ends the wait after 2 minutes (`PENDING_WRITE_MAX_MS`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentPendingWrites.ts:47",
+      "source": "src/renderer/src/components/Comments/commentPendingWrites.ts:47",
       "match": "PENDING_WRITE_MAX_MS = 120_000"
     },
     {
@@ -48843,7 +48843,7 @@
       "quote": "New comment and Close are one group (`.erf-comment-window__foot-end`)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/ThreadsView.tsx:382",
+      "source": "src/renderer/src/components/Comments/ThreadsView.tsx:382",
       "match": "erf-comment-window__foot-end"
     },
     {
@@ -48893,7 +48893,7 @@
       "quote": "'Show on page', '640,000 elements'",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentCopy.ts:234",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:234",
       "match": "showOnPage: 'Show on page'"
     },
     {
@@ -48913,7 +48913,7 @@
       "quote": "The one-time notice is HTML-specific (commentCopy.ts:333-336)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentCopy.ts:333",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:333",
       "match": "into the HTML file next to each comment"
     },
     {
@@ -48933,7 +48933,7 @@
       "quote": "Settings says 'Saved into HTML files…'",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentCopy.ts:362",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:362",
       "match": "'Saved into HTML files next to each comment you write."
     },
     {
@@ -48953,7 +48953,7 @@
       "quote": "already lets an orphaned thread be replied to and resolved (ThreadsView.tsx:327-339, verified)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/ThreadsView.tsx:338",
+      "source": "src/renderer/src/components/Comments/ThreadsView.tsx:338",
       "match": "<CommentThread ctx={ctx} thread={thread} />"
     },
     {
@@ -48973,7 +48973,7 @@
       "quote": "but shown only when unattached (ThreadsView.tsx:329-333)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/ThreadsView.tsx:332",
+      "source": "src/renderer/src/components/Comments/ThreadsView.tsx:332",
       "match": "<QuoteOf thread={thread} />"
     },
     {
@@ -49033,7 +49033,7 @@
       "quote": "The picker says only 'Showing p, line 42.' (commentCopy.ts:463-466)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentCopy.ts:466",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:466",
       "match": "`Showing ${tag ?? 'an element'}, line ${line}.`"
     },
     {
@@ -49053,7 +49053,7 @@
       "quote": "ariaDescribedBy is set only for identity (CommentWindow.tsx:299)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/CommentWindow.tsx:299",
+      "source": "src/renderer/src/components/Comments/CommentWindow.tsx:299",
       "match": "ariaDescribedBy={view === 'identity' ? noticeId : undefined}"
     },
     {
@@ -49063,7 +49063,7 @@
       "quote": "Drawer rows are named by the selector ('button dot c t a')",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentRows.ts:96",
+      "source": "src/renderer/src/components/Comments/commentRows.ts:96",
       "match": "elementLabel(thread)"
     },
     {
@@ -49103,7 +49103,7 @@
       "quote": "ThreadsView footer has only Open in source, New comment and Close (ThreadsView.tsx:371-392)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/ThreadsView.tsx:371",
+      "source": "src/renderer/src/components/Comments/ThreadsView.tsx:371",
       "match": "erf-comment-window__foot"
     },
     {
@@ -49113,7 +49113,7 @@
       "quote": "Resolve leaves a window showing just 'Resolved by…' (CommentThread.tsx:141-146)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/CommentThread.tsx:248",
+      "source": "src/renderer/src/components/Comments/CommentThread.tsx:248",
       "match": "{'Resolved by '}"
     },
     {
@@ -49123,7 +49123,7 @@
       "quote": "TARGET_MOVED maps to 'close' (commentCopy.ts:150)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentCopy.ts:150",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:150",
       "match": "[ErrorCode.COMMENT_TARGET_MOVED]: 'close'"
     },
     {
@@ -49173,7 +49173,7 @@
       "quote": "a removed thread closes its window silently (CommentWindow.tsx:178-181)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/CommentWindow.tsx:180",
+      "source": "src/renderer/src/components/Comments/CommentWindow.tsx:180",
       "match": "if (selection === null || selectionEmpty) onClose()"
     },
     {
@@ -49183,7 +49183,7 @@
       "quote": "still say only 'click an element' (commentCopy.ts:379,427,452)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentCopy.ts:379",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:379",
       "match": "Turn on comment mode and click an element."
     },
     {
@@ -49213,7 +49213,7 @@
       "quote": "(CommentWindow.css:30-36 catcher)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/CommentWindow.css:30",
+      "source": "src/renderer/src/components/Comments/CommentWindow.css:30",
       "match": ".dialog-overlay.erf-comment-layer"
     },
     {
@@ -49263,7 +49263,7 @@
       "quote": "'Re-open' and 'Reopen it' mean different things (commentCopy.ts:228; errors.ts:602,606)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentCopy.ts:228",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:228",
       "match": "reopen: 'Re-open'"
     },
     {
@@ -49273,7 +49273,7 @@
       "quote": "Local validation errors and counter thresholds are not announced (NewCommentView.tsx:191-196)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/CommentParts.tsx:193",
+      "source": "src/renderer/src/components/Comments/CommentParts.tsx:193",
       "match": "<p className=\"erf-comment-error\" id="
     },
     {
@@ -49283,7 +49283,7 @@
       "quote": "4,000 is `COMMENT_MAX_CHARS`",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentFormat.ts:20",
+      "source": "src/renderer/src/components/Comments/commentFormat.ts:20",
       "match": "export const COMMENT_MAX_CHARS = 4_000"
     },
     {
@@ -49293,7 +49293,7 @@
       "quote": "Three near-identical bubble glyphs sit side by side (CommentToolbarTools.tsx:104-156)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/CommentToolbarTools.tsx:137",
+      "source": "src/renderer/src/components/Comments/CommentToolbarTools.tsx:137",
       "match": "renderIcon('messages-square'"
     },
     {
@@ -49313,7 +49313,7 @@
       "quote": "only the label dims (CommentWindow.css:166-172 in the shipped window, verified)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/CommentWindow.css:170",
+      "source": "src/renderer/src/components/Comments/CommentWindow.css:170",
       "match": "dialog-btn[aria-disabled='true'] > span",
       "note": "Cited the design card comments.css:182-183, which has drifted; the shipped behaviour is in the app CommentWindow.css."
     },
@@ -49366,7 +49366,7 @@
       "quote": "Row author and time come from the first message (commentRows.ts:109-112)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentRows.ts:111",
+      "source": "src/renderer/src/components/Comments/commentRows.ts:111",
       "match": "author: first?.by.name"
     },
     {
@@ -49376,7 +49376,7 @@
       "quote": "The drawer draws one heading from the first row (CommentDrawer.tsx:367-370)",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/CommentDrawer.tsx:369",
+      "source": "src/renderer/src/components/Comments/CommentDrawer.tsx:369",
       "match": "rows[filter][0].displayPath"
     },
     {
@@ -49386,7 +49386,7 @@
       "quote": "stack unevenly (CommentWindow.css:413-418)",
       "status": "fixed",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/CommentWindow.css:415",
+      "source": "src/renderer/src/components/Comments/CommentWindow.css:415",
       "match": "flex-wrap: wrap;",
       "note": "Cited the design card comments.css:316, which has drifted; the shipped banner actions wrap in the app CommentWindow.css."
     },
@@ -49960,7 +49960,7 @@
       "quote": "(its name says how many are open, for example \"Comments, 3 open, 1 needs attention\")",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentCopy.ts:447",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:447",
       "match": "return `Comments, ${open} open, ${attention} ${attention === 1 ? 'needs' : 'need'} attention`"
     },
     {
@@ -49970,7 +49970,7 @@
       "quote": "A very long list shows only the rows near the screen.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/CommentDrawer.tsx:18",
+      "source": "src/renderer/src/components/Comments/CommentDrawer.tsx:18",
       "match": "Above {@link VIRTUALISE_ABOVE} rows the list is windowed"
     },
     {
@@ -49990,7 +49990,7 @@
       "quote": "A script in a page you preview can read them too.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentCopy.ts:335",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:335",
       "match": "'committed and pushed. Scripts in pages previewed in this project can read them too."
     },
     {
@@ -50010,7 +50010,7 @@
       "quote": "Changing your name affects new comments only.",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentCopy.ts:362",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:362",
       "match": "'Saved into HTML files next to each comment you write. Changing it affects new comments only.',"
     },
     {
@@ -50050,7 +50050,7 @@
       "quote": "| The page keeps removing Erfana's overlay | Comments are unavailable for that page |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentCopy.ts:69",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:69",
       "match": "'overlay-removed': \"the page keeps removing Erfana's overlay\","
     },
     {
@@ -54687,7 +54687,7 @@
       "quote": "| comment | Comment mode: pin a note |",
       "status": "verified",
       "evidence": "source",
-      "source": "src/renderer/src/components/Panels/HtmlPreviewPanel/comments/commentCopy.ts:416",
+      "source": "src/renderer/src/components/Comments/commentCopy.ts:416",
       "match": "mode: 'Comment mode',"
     },
     {

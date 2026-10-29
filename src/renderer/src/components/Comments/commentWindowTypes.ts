@@ -10,7 +10,7 @@ import {
   COMMENT_DRAFT_KEY_PATTERN,
   COMMENT_DRAFT_TOKEN_PATTERN,
   type CommentDraftOpened
-} from '../../../../../../shared/ipc/preview-comment-schema'
+} from '../../../../shared/ipc/preview-comment-schema'
 
 /** A draft event of kind `menu` or `open`. */
 export type ElementDraft = Extract<CommentDraftOpened, { kind: 'menu' | 'open' }>

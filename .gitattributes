@@ -60,4 +60,4 @@ e2e/fixtures/html-preview-corpus/comments/** -text
 # snapshot above, so a Windows checkout compares the same bytes.
 src/preload/__snapshots__/previewPage.surface.pin.test.ts.snap text eol=lf
 src/shared/ipc/__snapshots__/preview-comment-schema.pin.test.ts.snap text eol=lf
-src/renderer/src/components/Panels/HtmlPreviewPanel/comments/__snapshots__/commentCopy.pin.test.ts.snap text eol=lf
+src/renderer/src/components/Comments/__snapshots__/commentCopy.pin.test.ts.snap text eol=lf

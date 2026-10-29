@@ -46,19 +46,19 @@
  * @module HtmlPreviewPanel/comments/CommentWindow
  */
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { renderIcon } from '../../../../utils/iconRegistry'
+import { renderIcon } from '../../utils/iconRegistry'
 import type {
   CommentSaveRequest,
   CommentSaveResult
-} from '../../../../../../shared/ipc/preview-comment-schema'
-import type { CommentIdentitySettings } from '../../../../../../shared/ipc/global-settings-schema'
-import { ErrorCode } from '../../../../../../shared/errors'
-import { BaseDialog } from '../../../Dialog/BaseDialog'
-import { readZIndexToken } from '../../../../utils/overlayStack'
-import type { CommentListState } from '../../../../stores/usePreviewCommentStore'
+} from '../../../../shared/ipc/preview-comment-schema'
+import type { CommentIdentitySettings } from '../../../../shared/ipc/global-settings-schema'
+import { ErrorCode } from '../../../../shared/errors'
+import { BaseDialog } from '../Dialog/BaseDialog'
+import { readZIndexToken } from '../../utils/overlayStack'
+import type { CommentListState } from '../../stores/usePreviewCommentStore'
 import { COPY, IDENTITY_COPY, readErrorText, saveFailureCopy, type SaveFailureCopy } from './commentCopy'
 import { visibleString } from './commentFormat'
-import { CommentStepsContext, replyDraftKey, useLiveText, type CommentSteps } from './commentLive'
+import { CommentStepsContext, replyDraftKey, useLiveText, type CommentSteps } from '../Panels/HtmlPreviewPanel/comments/commentLive'
 import {
   isCommentWritePending,
   onCommentWriteSettled,
@@ -74,7 +74,7 @@ import { IdentityStep } from './IdentityStep'
 import { NewCommentView } from './NewCommentView'
 import { ThreadsView, selectThreads } from './ThreadsView'
 import './CommentWindow.css'
-import { TEST_IDS } from '../../../../constants/testids'
+import { TEST_IDS } from '../../constants/testids'
 
 /** Props for {@link CommentWindow}. */
 export interface CommentWindowProps {

@@ -17,20 +17,20 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { CommentFileView, CommentSaveResult } from '../../../../../../shared/ipc/preview-comment-schema'
-import { commentDrafts, INITIAL_PANEL_COMMENT_STATE } from '../../../../stores/usePreviewCommentStore'
-import { useOverlayOccluderStore } from '../../../../stores/useOverlayOccluderStore'
-import type { CommentDirtyGuard } from '../../../../hooks/useCommentDirtyGuard'
+import type { CommentFileView, CommentSaveResult } from '../../../../shared/ipc/preview-comment-schema'
+import { commentDrafts, INITIAL_PANEL_COMMENT_STATE } from '../../stores/usePreviewCommentStore'
+import { useOverlayOccluderStore } from '../../stores/useOverlayOccluderStore'
+import type { CommentDirtyGuard } from '../../hooks/useCommentDirtyGuard'
 
 const mocks = vi.hoisted(() => ({ mac: false }))
-vi.mock('../../../../utils/platform', () => ({ isMacOS: () => mocks.mac, isWindows: () => !mocks.mac }))
+vi.mock('../../utils/platform', () => ({ isMacOS: () => mocks.mac, isWindows: () => !mocks.mac }))
 
 const guard = vi.hoisted(() => ({ current: null as unknown as CommentDirtyGuard }))
-vi.mock('../../../../hooks/useCommentDirtyGuard', () => ({
+vi.mock('../../hooks/useCommentDirtyGuard', () => ({
   useCommentDirtyGuard: () => guard.current
 }))
 
-import { fileView, newRequest, thread, threadsRequest } from './__test-helpers__/commentTestKit'
+import { fileView, newRequest, thread, threadsRequest } from '../Panels/HtmlPreviewPanel/comments/__test-helpers__/commentTestKit'
 import { COPY, IDENTITY_COPY } from './commentCopy'
 import { CommentWindow, type CommentWindowProps } from './CommentWindow'
 import { resetCommentPendingWrites } from './commentPendingWrites'

@@ -16,16 +16,16 @@
  * string escapes the pin.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ErrorCode } from '../../../../../../shared/errors'
+import { ErrorCode } from '../../../../shared/errors'
 import {
   CommentSaveOpSchema,
   CommentUnavailableReasonSchema,
   type CommentSaveRequest,
   type CommentUnavailableReason
-} from '../../../../../../shared/ipc/preview-comment-schema'
+} from '../../../../shared/ipc/preview-comment-schema'
 
 const platform = vi.hoisted(() => ({ mac: false }))
-vi.mock('../../../../utils/platform', () => ({
+vi.mock('../../utils/platform', () => ({
   isMacOS: () => platform.mac,
   isWindows: () => !platform.mac
 }))

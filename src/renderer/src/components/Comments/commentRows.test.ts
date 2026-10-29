@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { describe, expect, it } from 'vitest'
-import { damaged, fileView, message, thread } from './__test-helpers__/commentTestKit'
+import { damaged, fileView, message, thread } from '../Panels/HtmlPreviewPanel/comments/__test-helpers__/commentTestKit'
 import { COPY, DRAWER_COPY } from './commentCopy'
 import { drawerRows } from './commentRows'
 

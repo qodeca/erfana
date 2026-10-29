@@ -7,11 +7,11 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ErrorCode } from '../../../../../../shared/errors'
-import type { CommentFileView } from '../../../../../../shared/ipc/preview-comment-schema'
-import type { CommentListState } from '../../../../stores/usePreviewCommentStore'
-import { damaged, fileView, message, thread } from './__test-helpers__/commentTestKit'
-import { resolveFocusReturnTarget } from '../../../Dialog/BaseDialog'
+import { ErrorCode } from '../../../../shared/errors'
+import type { CommentFileView } from '../../../../shared/ipc/preview-comment-schema'
+import type { CommentListState } from '../../stores/usePreviewCommentStore'
+import { damaged, fileView, message, thread } from '../Panels/HtmlPreviewPanel/comments/__test-helpers__/commentTestKit'
+import { resolveFocusReturnTarget } from '../Dialog/BaseDialog'
 import { COPY, DRAWER_COPY, unreadFilesText } from './commentCopy'
 import {
   CommentDrawer,

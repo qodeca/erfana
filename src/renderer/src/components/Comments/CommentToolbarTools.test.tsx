@@ -9,7 +9,7 @@ import { resolve } from 'node:path'
 import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import { CommentUnavailableReasonSchema } from '../../../../../../shared/ipc/preview-comment-schema'
+import { CommentUnavailableReasonSchema } from '../../../../shared/ipc/preview-comment-schema'
 import { TOOL_COPY, unavailableTooltip } from './commentCopy'
 import { CommentToolbarTools, type CommentToolbarToolsProps } from './CommentToolbarTools'
 
@@ -151,7 +151,7 @@ describe('CommentToolbarTools', () => {
   })
 
   describe('narrow toolbar tiers (PreviewNavControls.css)', () => {
-    const css = readFileSync(resolve(__dirname, '../components/PreviewNavControls.css'), 'utf8')
+    const css = readFileSync(resolve(__dirname, '../Panels/HtmlPreviewPanel/components/PreviewNavControls.css'), 'utf8')
     const blocks = [...css.matchAll(/@container \(width < (\d+)px\) \{([\s\S]*?)\n\}/g)].map(m => ({
       width: Number(m[1]),
       body: m[2]

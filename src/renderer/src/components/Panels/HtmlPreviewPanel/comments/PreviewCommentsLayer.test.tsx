@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { INITIAL_PANEL_COMMENT_STATE } from '../../../../stores/usePreviewCommentStore'
 import { useOverlayOccluderStore } from '../../../../stores/useOverlayOccluderStore'
 import { menuDraft, newRequest, threadsRequest } from './__test-helpers__/commentTestKit'
-import { COPY } from './commentCopy'
+import { COPY } from '../../../Comments/commentCopy'
 import { PreviewCommentsLayer, type PreviewCommentsLayerProps } from './PreviewCommentsLayer'
 
 function setup(patch: Partial<PreviewCommentsLayerProps> = {}) {

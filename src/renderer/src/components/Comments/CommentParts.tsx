@@ -14,9 +14,9 @@
  * @module HtmlPreviewPanel/comments/CommentParts
  */
 import { useId, type ReactNode } from 'react'
-import { renderIcon } from '../../../../utils/iconRegistry'
+import { renderIcon } from '../../utils/iconRegistry'
 import { splitVisibleControls, counterState, COMMENT_MAX_CHARS } from './commentFormat'
-import { TEST_IDS } from '../../../../constants/testids'
+import { TEST_IDS } from '../../constants/testids'
 
 /** Props for {@link VisibleText}. */
 export interface VisibleTextProps {
