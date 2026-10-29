@@ -171,6 +171,8 @@ describe('serializer properties', () => {
     return makeComment({ msgs })
   }
 
+  const NEAR_CAP_MAX_CHARS = 600_000
+
   /** Comments near the 2 MB cap: many long messages of one character that escapes to several bytes. */
   const nearCapArb = fc
     .record({
@@ -178,7 +180,12 @@ describe('serializer properties', () => {
       length: fc.integer({ min: 2_000, max: PREVIEW_LIMITS.COMMENT_MESSAGE_MAX_CHARS }),
       fill: fc.constantFrom('a', '-', '<', '"', ch(0x1f600), LINE_SEP, ch(0xe9))
     })
-    .map(({ count, length, fill }) => nearCap(count, length, fill))
+    // #429: keep generated blocks near the cap (at most 600,000 message characters, up to
+    // about 3.6 MB once escaped), so a run stays cheap under coverage. The explicit examples
+    // below still hold the 6 MB refused case.
+    .map(({ count, length, fill }) =>
+      nearCap(Math.min(count, Math.ceil(NEAR_CAP_MAX_CHARS / length)), length, fill)
+    )
 
   it(
     'P-007 every block the serializer accepts is within 2 MB and reads back ok; the rest are refused as limit',
@@ -221,7 +228,8 @@ describe('serializer properties', () => {
       expect(accepted).toBeGreaterThan(0)
       expect(refused).toBeGreaterThan(0)
     },
-    PROPERTY_TIMEOUT_MS
+    // #429: this property serializes blocks of several MB, so it gets three times the budget.
+    3 * PROPERTY_TIMEOUT_MS
   )
 })
 
